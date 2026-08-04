@@ -1,13 +1,13 @@
-/* The studio's own markup.
+/* A markup do próprio estúdio.
 
-   The engine builds and owns this DOM (see core/dom.ts); React only hosts the
-   container. Keeping the ids/classes stable is what lets every engine module
-   (scene/models/livery/ui) bind by id without knowing where the node lives.
+   O engine constrói e é dono deste DOM (ver core/dom.ts); o React só hospeda o
+   container. Manter os ids/classes estáveis é o que permite a cada módulo do
+   engine (scene/models/livery/ui) ligar por id sem saber onde o nó mora.
 
-   The selector overlay (#ts-selector) and the viewport badges (#ts-badge,
-   #ts-mapbadge, #ts-colorbadge) are deliberately NOT here: ui/selector.ts builds
-   and injects them itself, because their markup is data-driven (one card per
-   manifest entry).
+   O overlay do seletor (#ts-selector) e os badges do render (#ts-badge,
+   #ts-mapbadge, #ts-colorbadge) NÃO estão aqui de propósito: ui/selector.ts os
+   constrói e injeta sozinho, porque a markup deles é orientada a dados (um card
+   por entrada do manifesto).
 
    NÃO EXISTE MAIS SIDEBAR. A coluna da direita carregava duas coisas, e as duas
    mudaram de lugar:
@@ -22,7 +22,7 @@
    Com isso o render ocupa a largura inteira, que é o assunto da tela. */
 export const STUDIO_HTML = /* html */ `
   <div id="app">
-    <!-- 3D VIEWPORT -->
+    <!-- O RENDER 3D -->
     <section id="viewport">
       <!-- NÃO EXISTE MAIS TOPBAR. Ela carregava a marca, a linha de estado e os
            dois checkboxes de visibilidade, e tomava ~56 px da altura do render
@@ -38,7 +38,7 @@ export const STUDIO_HTML = /* html */ `
              topbar: são ações sobre a CENA, e o lugar onde o olho já está é o
              render, não a barra. O canto esquerdo é do HUD de iluminação e dos
              badges do seletor.
-             Os ids são os mesmos de quando isto morava na topbar — ui/sidebar.ts
+             Os ids são os mesmos de quando isto morava na topbar — ui/chrome.ts
              liga por id e não precisou mudar.
              Ícones: SVG inline, 24x24, traço em currentColor, mesma convenção
              de ui/hud.ts (nunca emoji: a plataforma escolheria a fonte e o
@@ -97,49 +97,7 @@ export const STUDIO_HTML = /* html */ `
               <circle cx="12" cy="13.4" r="3.1"/>
             </svg>
           </button>
-          <!-- AJUSTE DA TINTA. Abre o painel que dirige vehicle/paint.ts ao vivo
-               e grava o resultado NA COR (previewConfig.truckStudio do Paint).
-               Fica aqui, e não num passo do seletor, porque é a única superfície
-               do estúdio que se usa OLHANDO o veículo: mexer no verniz sem ver a
-               lataria reagir é mexer no escuro. O passo de cor escolhe QUAL cor;
-               isto afina COMO ela é renderizada. -->
-          <button id="btn-paint" class="ts-vbtn" type="button" title="Ajustar a tinta"
-                  aria-label="Ajustar a tinta" aria-pressed="false">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-                 focusable="false" aria-hidden="true">
-              <path d="M5.2 10.6 12.6 3.2a2 2 0 0 1 2.8 0l2.6 2.6a2 2 0 0 1 0 2.8l-7.4 7.4
-                       a2 2 0 0 1-2.8 0l-2.6-2.6a2 2 0 0 1 0-2.8Z"/>
-              <path d="M8.4 7.4 14 13"/>
-              <path d="M19 15.4c1 1.4 1.6 2.5 1.6 3.3a1.6 1.6 0 0 1-3.2 0c0-.8.6-1.9 1.6-3.3Z"/>
-            </svg>
-          </button>
         </div>
-
-        <!-- PAINEL DE AJUSTE DA TINTA. Vidro sobre o render, do mesmo material
-             do HUD de luz e ancorado do mesmo lado do botão que o abre. Os
-             controles são montados por ui/paint-panel.ts a partir de uma tabela
-             de campos — escrever trinta <input> à mão aqui seria trinta lugares
-             para o nome de um parâmetro divergir de PaintParams. -->
-        <section id="paint-panel" class="ts-paint hidden" aria-label="Ajuste da tinta" hidden>
-          <header class="ts-paint__head">
-            <div class="ts-paint__title">
-              <i id="paint-chip" class="ts-paint__chip" aria-hidden="true"></i>
-              <div>
-                <strong id="paint-name">—</strong>
-                <span id="paint-sub">—</span>
-              </div>
-            </div>
-            <button id="paint-close" class="ts-paint__x" type="button" title="Fechar (Esc)"
-                    aria-label="Fechar o ajuste da tinta">✕</button>
-          </header>
-          <div id="paint-body" class="ts-paint__body"></div>
-          <footer class="ts-paint__foot">
-            <span id="paint-msg" class="ts-paint__msg" role="status" aria-live="polite"></span>
-            <button id="paint-revert" class="ts-paint__btn" type="button">Descartar</button>
-            <button id="paint-apply" class="ts-paint__btn ts-paint__btn--go" type="button">Aplicar</button>
-          </footer>
-        </section>
 
         <!-- DESIGN DO IMPLEMENTO — os três painéis pintáveis, um card cada.
              Mesmo material dos badges do seletor (vidro sobre o render), do lado
@@ -181,10 +139,20 @@ export const STUDIO_HTML = /* html */ `
           </button>
         </div>
 
+        <!-- O indicador de BOOTSTRAP: o que se vê entre a página abrir e o
+             catálogo responder, antes de existir seletor, cortina ou 3D.
+             Spinner + linha de texto, e nada mais. Havia aqui uma barra de
+             progresso (.load-bar / #load-fill) que ninguém escrevia: este painel
+             ganha a classe .hide assim que o catálogo termina, então qualquer
+             escrita posterior caía num elemento invisível. O que ela mostrava, na
+             prática, era um trilho de 220px parado em zero embaixo de
+             "CARREGANDO CATÁLOGO…" — pior do que não ter barra nenhuma, porque
+             uma barra parada lê como travado e um spinner lê como trabalhando.
+             O progresso de verdade tem dois donos, os dois com barra própria: a
+             cortina (ui/loader.ts) e a pílula de troca de veículo. -->
         <div id="loading">
           <div class="spinner"></div>
           <div class="load-text" id="load-text">Carregando modelos…</div>
-          <div class="load-bar"><i id="load-fill"></i></div>
         </div>
         <div id="cab-switching" class="hidden">
           <div class="spinner small"></div><span id="cab-switching-text">Trocando veículo…</span>
@@ -201,14 +169,16 @@ export const STUDIO_HTML = /* html */ `
              emocional da escolha do caminhão e dura segundos; isto dura menos
              de um. role=status + aria-live para quem não vê o spinner. -->
         <div id="ts-shot" class="hidden" role="status" aria-live="polite">
-          <div class="spinner small"></div><span id="ts-shot-text">Gerando imagem…</span>
+          <!-- Sem id: o rótulo é fixo, ninguém o reescreve, e um id que só
+               existe na markup é um contrato que o tsc não confere. -->
+          <div class="spinner small"></div><span>Gerando imagem…</span>
         </div>
         <div id="view-hint">Arraste para girar · scroll para zoom · botão direito para mover</div>
       </div>
     </section>
   </div>
 
-  <!-- LARGE LIVERY EDITOR MODAL -->
+  <!-- O EDITOR GRANDE DE PLOTAGEM, EM MODAL -->
   <div id="editor-modal" class="hidden">
     <div class="modal-card">
       <header class="modal-head">

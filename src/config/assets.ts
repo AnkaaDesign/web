@@ -1,5 +1,6 @@
 /**
- * Fonte única de verdade para os caminhos de `public/`.
+ * Fonte única de verdade para os caminhos de assets servidos — os de `public/`
+ * e a árvore do Truck Studio, que hoje mora na API.
  *
  * Tudo que mora em `public/` é servido cru na raiz do site (`/`), então o
  * caminho é uma URL pública — não um import resolvido pelo bundler. Isso quer
@@ -7,6 +8,11 @@
  * proteção contra 404 silencioso é todo mundo apontar para as constantes daqui.
  *
  * **Ao mover algo dentro de `public/`, edite SÓ este arquivo.**
+ *
+ * O mesmo raciocínio vale — e vale MAIS FORTE — para a árvore do Truck Studio:
+ * ela deixou de ser servida pelo web e passou a ser servida pela API sob
+ * `STUDIO_ASSETS_BASE`. Um caminho errado ali não é só um 404 silencioso: é um
+ * 404 contra a ORIGEM ERRADA, que em produção nem sequer tem os arquivos.
  *
  * Layout de `public/` (ver `public/README.md` para a convenção completa):
  *
@@ -19,10 +25,15 @@
  *                   (espelha `assets/messages/` do Flutter — mesmos nomes de arquivo)
  * - `ghs/`        → pictogramas de perigo GHS usados pela FISPQ
  * - `vendor/`     → assets de runtime de terceiros (worker do pdf.js, decoder Draco)
- * - `models/`     → geometria 3D (`vehicles/`, `props/`)
- * - `textures/`   → mapas de material (chão PBR + normal maps de tinta), plano
- * - `environments/` → cenários do Truck Studio (HDRI + céu + thumb)
- * - `brands/trucks/` → logos e fotos das montadoras (`TruckManufacturer`)
+ * - `textures/`   → **só** os dois normal maps de tinta (`PAINT_TEXTURE_ASSETS`);
+ *                   o resto do diretório mudou para a API junto com o studio
+ *
+ * Fora de `public/`, servido pela API sob `STUDIO_ASSETS_BASE`:
+ *
+ * - `models/vehicles/` → geometria 3D das cabines
+ * - `textures/`        → conjuntos PBR de chão + `macro_noise.webp`
+ * - `environments/`    → cenários do Truck Studio (HDRI + céu + thumb)
+ * - `brands/trucks/`   → logos e fotos das montadoras (`TruckManufacturer`)
  */
 
 /* ------------------------------------------------------------------ *
@@ -136,6 +147,13 @@ export const VENDOR_ASSETS = {
    * `setDecoderPath()`. É um DIRETÓRIO, não um arquivo: o loader escolhe entre
    * `draco_decoder.js` e `draco_decoder.wasm` em runtime conforme o navegador,
    * então a barra final é obrigatória.
+   *
+   * **NÃO foi junto para a API** quando a árvore do studio mudou. É dependência
+   * de BUILD vendorizada — irmã do worker do pdf.js logo acima, não arte de
+   * cena. São ~200 kB versionados, e o `.wasm` é código executado no contexto
+   * da página: mantê-lo na mesma origem evita a discussão de CSP/CORS que
+   * carregar WebAssembly de outro host abriria. Continua absoluto de raiz de
+   * site (`/vendor/…`) de propósito — não passa por `assetUrl()`.
    */
   dracoDecoderDir: "/vendor/draco/",
 } as const;
@@ -153,10 +171,19 @@ export const VENDOR_ASSETS = {
  * pickers pelo catálogo real de tintas, os mesmos arquivos vão alimentar os
  * DOIS renderizadores.
  *
- * Convivem no mesmo `textures/`, plano, que os conjuntos PBR do chão: o nome do
- * arquivo já diz de que família é (`asphalt_nor` vs `metallic_nor`), e separar
- * por consumidor seria agrupar por feature — o oposto do resto de `public/`.
- * A nomenclatura `<material>_<mapa>` é a mesma dos vizinhos.
+ * Conviviam no mesmo `textures/`, plano, que os conjuntos PBR do chão: o nome
+ * do arquivo já diz de que família é (`asphalt_nor` vs `metallic_nor`), e
+ * separar por consumidor seria agrupar por feature — o oposto do resto de
+ * `public/`. A nomenclatura `<material>_<mapa>` é a mesma dos vizinhos.
+ *
+ * ⚠️ **Estes DOIS arquivos continuam em `web/public/textures/`** mesmo depois de
+ * o resto de `textures/` ter migrado para a API (ver `STUDIO_ASSETS_BASE`
+ * abaixo). O consumidor aqui é o preview de acabamento do cadastro de Tinta —
+ * uma tela EM PRODUÇÃO que não tem nada a ver com o Truck Studio e não pode
+ * passar a depender de a API estar servindo a árvore do estúdio. São 2 arquivos
+ * pequenos; o motivo de a árvore do studio ter saído (300 MB) não se aplica.
+ * A duplicação de nome de diretório é intencional e o `_nor` no fim do nome é o
+ * que continua dizendo a qual família cada arquivo pertence.
  *
  * ⚠️ O Flutter ainda usa os nomes antigos em `mobile-flutter/assets/paint/`
  * (`metallic-normal-map.jpg`, `pearl-normal-map.jpg`). Os dois lados
@@ -179,14 +206,63 @@ export const PAINT_TEXTURE_ASSETS = {
  * ------------------------------------------------------------------ */
 
 /**
- * Diretórios que o engine do Truck Studio consome.
+ * Onde a árvore de assets do Truck Studio está HOSPEDADA.
+ *
+ * Ela não mora mais em `web/public/`. São ~300 MB de geometria, HDRI e mapas
+ * PBR — acima do limite de 100 MB por arquivo do GitHub e, somados aos 446 MB
+ * que `public/` chegou a ter, um clone que ninguém quer. Quem serve isso agora
+ * é a API, sob este prefixo.
+ *
+ * **A VERSÃO ESTÁ NA BASE, NÃO NO NOME DOS ARQUIVOS** (`/studio-assets/v1/…`).
+ * Content-hash em 400+ arquivos obrigaria a reescrever todos os manifestos a
+ * cada bake. Com um diretório de versão:
+ *
+ * - `Cache-Control: immutable` fica seguro (a URL nunca muda de conteúdo);
+ * - a virada é atômica (`v1` inteiro → `v2` inteiro, sem estado misto);
+ * - o rollback é trocar UMA variável de ambiente.
+ *
+ * Modos (ver `.env.example`):
+ *
+ * - `/studio-assets/v1` (padrão) → mesma origem da página. Em dev, o proxy do
+ *   `vite.config.ts` encaminha para a API; em produção, o nginx faz o mesmo.
+ *   Mesma origem = sem CORS, sem preflight, sem canvas contaminado.
+ * - `https://api.exemplo.com.br/studio-assets/v1` → origem absoluta da API.
+ *   Exige CORS na API (o three.js pede `crossOrigin=anonymous` por padrão).
+ * - `http://localhost:8080` → servidor estático qualquer, para trabalhar offline.
+ *
+ * Sem barra no fim: `STUDIO_ASSETS` já traz o separador em cada diretório.
+ */
+export const STUDIO_ASSETS_BASE: string = (() => {
+  const raw: unknown =
+    typeof import.meta !== "undefined" ? import.meta.env?.VITE_STUDIO_ASSETS_BASE : undefined;
+  const v = (typeof raw === "string" ? raw : "").trim().replace(/\/+$/, "");
+  /* Um valor que sobra VAZIO — variável em branco, ou literalmente "/" — não é
+     "mesma origem, raiz do site": é a base sumindo, e todo assetUrl() passaria
+     a devolver `/models/…` contra a origem do web, que não tem os arquivos.
+     Cai no padrão, que é o caminho que o proxy do vite e o nginx conhecem. */
+  return v || "/studio-assets/v1";
+})();
+
+/**
+ * Diretórios que o engine do Truck Studio consome, **relativos a
+ * `STUDIO_ASSETS_BASE`**.
  *
  * São DIRETÓRIOS (barra final) e não arquivos: o conteúdo é escolhido em
  * runtime pelos manifestos servidos (`environments.json`, `brands.json`,
- * `props.json`, `cabs.json`), que guardam caminhos **absolutos** a partir da
- * raiz do site. `assetUrl()` (engine/catalog/catalog.ts) deixa passar qualquer
- * caminho que já comece com `/`, então manifesto e código apontam para o mesmo
- * lugar sem prefixo intermediário.
+ * `cabs.json`), que guardam caminhos **relativos** — `models/vehicles/x.glb`,
+ * nunca `/models/vehicles/x.glb`.
+ *
+ * Por que relativos, e por que isso é o ponto do desenho todo: enquanto os
+ * manifestos guardavam caminho absoluto de raiz de site, cada um deles era uma
+ * segunda declaração de ONDE a árvore está hospedada — dado que o tsc não lê e
+ * que só falha em runtime. Agora existe UM lugar que sabe disso (`assetUrl()`,
+ * em `engine/catalog/catalog.ts`, que prefixa a base), e mover a árvore inteira
+ * é editar `VITE_STUDIO_ASSETS_BASE`.
+ *
+ * Consequência que vale repetir: **caminho relativo aqui NÃO é caminho de raiz
+ * de site.** Concatenar um destes diretórios e entregar o resultado direto a um
+ * `fetch`/`new Image()`/loader do three.js resolve contra a origem do WEB, que
+ * não tem mais os arquivos. Tudo tem de passar por `assetUrl()`.
  *
  * O engine importa isto via `engine/core/paths.ts` — o único ponto em que ele
  * toca no código do app. Ao mover qualquer um destes diretórios, ajuste aqui E
@@ -194,19 +270,18 @@ export const PAINT_TEXTURE_ASSETS = {
  */
 export const STUDIO_ASSETS = {
   /** Cabines, carretas e o baú refrigerado, mais os `*_meta.json` e `cabs.json`. */
-  vehiclesDir: "/models/vehicles/",
-  /** Objetos de cenário espalhados pela cena (`props.json` + um `.glb` por id). */
-  propsDir: "/models/props/",
-  /** Todas as texturas de material: conjuntos PBR do chão, macro_noise e os normal maps de tinta. */
-  texturesDir: "/textures/",
+  vehiclesDir: "models/vehicles/",
+  /** Conjuntos PBR do chão + `macro_noise.webp`. (Os normal maps de tinta NÃO estão aqui — ver `PAINT_TEXTURE_ASSETS`.) */
+  texturesDir: "textures/",
   /** Um subdiretório por cenário (`sky.hdr`, `sky.jpg`, `thumb.webp`) + `environments.json`. */
-  environmentsDir: "/environments/",
+  environmentsDir: "environments/",
   /** Um subdiretório por montadora (`logo.webp`, `logo-light.webp`, `models/*.webp`) + `brands.json`. */
-  truckBrandsDir: "/brands/trucks/",
+  truckBrandsDir: "brands/trucks/",
 } as const;
 
 /**
  * ⚠️ `models/vehicles/scania.fbx` tem 44 MB e **é baixado em runtime** — é a
  * cabine `scania` E a `daf` (`cabs.json`, `format: "fbx-scania"`). Não é arte
- * de origem esquecida no deploy; apagar quebra duas das seis montadoras.
+ * de origem esquecida no deploy; apagar quebra duas das seis montadoras. Ele é
+ * sozinho o maior motivo de a árvore ter saído do git.
  */

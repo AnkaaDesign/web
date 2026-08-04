@@ -99,6 +99,35 @@ let stage: Stage | null = null;
 /** true depois de uma falha de contexto: não tenta de novo a cada card. */
 let stageDead = false;
 
+/* SOLTO PARA VALER — e por que isto NÃO é o `stageDead` acima.
+   ---------------------------------------------------------------------------
+   `stageDead` significa "este navegador não consegue construir um contexto";
+   é decidido uma vez, em buildStage(), e nunca volta atrás. Esta flag significa
+   outra coisa: "o estúdio saiu da rota, pare de desenhar". São estados
+   independentes e juntá-los apagaria a diferença entre um erro permanente e um
+   desmonte normal.
+
+   A corrida que ela fecha: unmountStudio() chama disposePreviews(), que descarta
+   a geometria em cache e faz forceContextLoss() no renderizador — mas um
+   prewarmCabPreviews() em voo é uma FILA de doze `.then` encadeados, e os que
+   ainda não rodaram vão rodar assim mesmo. O primeiro deles chama getStage(),
+   que via `if (!stage) stage = buildStage()` alegremente abriria um contexto
+   WebGL offscreen NOVO numa página que o usuário já deixou, para renderizar
+   entradas cuja geometria acabou de ser liberada. Um contexto vivo e órfão ao
+   lado do estúdio é justamente o que releaseStage() existe para não deixar
+   acontecer.
+
+   O IDLE NÃO ENTRA AQUI. releaseStage() também é chamado pelo timer de
+   ociosidade, com a página montada e o seletor ainda podendo pedir miniatura —
+   ali reconstruir o palco é o comportamento certo. Por isso a flag é levantada
+   em disposePreviews(), não em releaseStage(). */
+let released = false;
+
+/* Um pedido de miniatura só chega pela UI montada (cabPreview, warmCabPreview,
+   prewarmCabPreviews). Chegou um: a página está de pé de novo, e o palco pode
+   voltar a ser construído sob demanda. */
+function reacquire() { released = false; }
+
 const cabs = new Map<string, CabEntry>();
 const loadingCabs = new Map<string, Promise<CabEntry | null>>();
 
@@ -257,6 +286,9 @@ function buildStage(): Stage | null {
 }
 
 function getStage(): Stage | null {
+  /* Antes do `if (!stage)`: é exatamente a construção sob demanda que não pode
+     acontecer depois do desmonte. */
+  if (released) return null;
   if (!stage) stage = buildStage();
   return stage;
 }
@@ -556,6 +588,7 @@ function drawShot(entry: CabEntry, hex: string, finish: PaintFinish): string | n
  * @returns {Promise<string|null>}
  */
 export function cabPreview(cabId: string, hex: string, finish: PaintFinish): Promise<string | null> {
+  reacquire();
   const key = cabId + '|' + hex + '|' + finish;
   const done = shots.get(key);
   if (done) return Promise.resolve(done);
@@ -564,9 +597,20 @@ export function cabPreview(cabId: string, hex: string, finish: PaintFinish): Pro
   if (!hasCabPreview(cabId)) return Promise.resolve(null);
 
   const job = chain
-    .then(() => loadCabForPreview(cabId))
+    /* Primeira checagem: os doze `.then` desta fila são encadeados de uma vez, e
+       os que ainda não rodaram vão rodar depois do desmonte. Sem isto cada um
+       deles ainda dispararia o download da geometria da cabine e deixaria a
+       entrada em `cabs` — geometria nova, adquirida DEPOIS de releaseStage(), que
+       ninguém mais vai liberar. */
+    .then(() => (released ? null : loadCabForPreview(cabId)))
     .then((entry) => {
-      if (!entry) return null;
+      /* Segunda checagem, e a que fecha a janela estreita: `entry` pode ter sido
+         resolvida ANTES do desmonte e chegar aqui DEPOIS dele, apontando para
+         geometria que releaseStage() já descartou. getStage() dentro de
+         drawShot() devolveria null e o card cairia na foto de qualquer jeito;
+         sair aqui evita percorrer a cena com malhas mortas para chegar à mesma
+         resposta. */
+      if (released || !entry) return null;
       const url = drawShot(entry, hex, finish);
       if (url) shots.set(key, url);
       touchIdle();
@@ -596,8 +640,9 @@ export function peekCabPreview(cabId: string, hex: string, finish: PaintFinish):
 
 /** Baixa a geometria da cabine antes de alguém pedir a primeira miniatura. */
 export function warmCabPreview(cabId: string | null | undefined) {
+  reacquire();
   if (!cabId || !hasCabPreview(cabId)) return;
-  chain = chain.then(() => loadCabForPreview(cabId)).catch(() => null);
+  chain = chain.then(() => (released ? null : loadCabForPreview(cabId))).catch(() => null);
 }
 
 /**
@@ -619,11 +664,25 @@ export function warmCabPreview(cabId: string | null | undefined) {
 export function prewarmCabPreviews(
   cabId: string | null | undefined,
   palette: { hex: string; finish: PaintFinish }[],
+  onProgress?: (f: number) => void,
 ): Promise<void> {
-  if (!cabId || !hasCabPreview(cabId) || !palette.length) return Promise.resolve();
+  reacquire();
+  if (!cabId || !hasCabPreview(cabId) || !palette.length) {
+    if (onProgress) onProgress(1);
+    return Promise.resolve();
+  }
   /* Serializado pela própria `chain` de cabPreview() — um canvas só, dois
-     renders concorrentes leriam o buffer um do outro. */
-  return Promise.all(palette.map((c) => cabPreview(cabId, c.hex, c.finish)))
+     renders concorrentes leriam o buffer um do outro. Como é serial, contar
+     quantos terminaram É a fração: doze renders + doze toDataURL() a 960x600
+     levam de meio a dois segundos, e sem este relato eles são parte do trecho
+     em que a barra não se mexia. */
+  let done = 0;
+  const tick = () => {
+    done++;
+    if (onProgress) onProgress(done / palette.length);
+  };
+  return Promise.all(palette.map((c) =>
+    cabPreview(cabId, c.hex, c.finish).then(tick, tick)))
     .then(() => undefined)
     .catch(() => undefined);
 }
@@ -649,6 +708,9 @@ function releaseStage() {
 
 /** Libera o contexto agora (o estúdio saiu da rota). Idempotente. */
 export function disposePreviews() {
+  /* Antes de releaseStage(), para que nada que rode dentro dele — ou logo depois
+     dele, num `.then` já agendado — consiga reabrir um contexto. Ver `released`. */
+  released = true;
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   releaseStage();
 }

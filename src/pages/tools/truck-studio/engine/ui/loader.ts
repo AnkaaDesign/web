@@ -18,7 +18,7 @@
    header of studio.ts). Every rAF, timer and listener started here is therefore
    torn down the moment the curtain hides — a leaked loop would keep running for
    the entire browser session, long after the route is gone. */
-import { root, $opt } from '../core/dom';
+import { root, $opt, el as make, initials, clamp01 } from '../core/dom';
 
 /** What the curtain shows while it is up. Every field may be null/''. */
 export interface LoaderInfo {
@@ -45,7 +45,7 @@ export interface LoaderInfo {
 const T = {
   curtainIn: 240,   // #ts-loader opacity 0 -> 1
   snap: 120,        // progress fill easing to 100% at the start of the outro
-  chromeOut: 180,   // type + logo + lane dashes + meter fading out together
+  chromeOut: 180,   // type + logo + meter fading out together
   scrimOut: 300,    // backdrop + vignette dissolving to reveal the 3D scene
   flight: 460,      // the FLIP of the truck photo into the badge
   handoff: 60,      // overlap: how long after the chrome starts fading we launch
@@ -112,8 +112,6 @@ let lastLabel = '';
 
 const now = () =>
   (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-
-const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /* Read the media query fresh on every call rather than keeping a
    MediaQueryList listener around: the curtain is up for seconds at a time, a
@@ -186,23 +184,12 @@ function cancelPending() {
   pending.clear();
 }
 
-/* ---------------- DOM ---------------- */
-function make<K extends keyof HTMLElementTagNameMap>(
-  tag: K, cls?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  return node;
-}
-
-/* "Volvo FH16 750" → "VF". Same rule ui/selector.ts uses for .ts-badge__fallback,
-   so the placeholder the curtain shows and the one the badge shows are the same
-   two letters — the FLIP then reads as one object moving, not as a swap. */
-function initials(name: string | null | undefined) {
-  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return '🚛';
-  return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
-}
+/* ---------------- DOM ----------------
+   `make` is core/dom.ts's `el`, imported under this file's own name because the
+   module-level `el` below is the #ts-loader node. `initials` comes from there
+   too, and that one is load-bearing: ui/selector.ts's badge has to spell the
+   same vehicle with the same two letters, or the outro's FLIP reads as a swap
+   between two objects rather than as one object moving. */
 
 /** Build the curtain DOM into the studio root. Idempotent. */
 export function initLoader() {
@@ -505,11 +492,6 @@ export function setLoaderProgress(p: number, label?: string) {
   if (next > targetP) targetP = next;
 }
 
-/** @returns {boolean} */
-export function isLoaderVisible(): boolean {
-  return built && visible;
-}
-
 /**
  * Tear the curtain down instantly, no animation (error paths, route unmount).
  * Safe to call at any time, including from inside an outro.
@@ -623,7 +605,7 @@ async function playOutro(wantFly: boolean) {
     trackEl.setAttribute('aria-valuenow', '100');
   }
 
-  /* 2. Type, logo, lane dashes and meter fade out together (180 ms). The
+  /* 2. Type, logo and meter fade out together (180 ms). The
      backdrop and vignette start dissolving 220 ms later so they finish at the
      same instant the hero lands on the badge — see the note on T. */
   el.classList.add('is-out');

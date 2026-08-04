@@ -1,14 +1,20 @@
 /* Catálogo do configurador: cenários (mapas) + fabricantes/modelos.
    ---------------------------------------------------------------------------
-   Fonte única de verdade para os dois manifestos servidos:
-     /environments/environments.json → cenários (HDRI, chão, preset de luz)
-     /brands/trucks/brands.json      → fabricantes e seus modelos de caminhão
+   Fonte única de verdade para os dois manifestos servidos, ambos RELATIVOS a
+   `STUDIO_BASE` (a árvore é servida pela API — ver core/paths.ts):
+     environments/environments.json → cenários (HDRI, chão, preset de luz)
+     brands/trucks/brands.json      → fabricantes e seus modelos de caminhão
+
+   Este módulo também hospeda `assetUrl()`, o único ponto do engine que sabe
+   ONDE a árvore está hospedada. Mora aqui, e não em core/paths.ts, porque
+   `exists()` e `fetchJSON()` — as duas primeiras coisas do boot a tocar a rede
+   — precisam dele, e porque paths.ts é de propósito só declaração.
 
    Segue o mesmo padrão de vehicle/models.ts/loadManifests(): busca com fallback embutido
    e sonda de disponibilidade por HEAD. A diferença é que aqui NADA pode lançar:
    o seletor abre antes do 3D existir, então uma falha de rede tem de degradar
    para um catálogo mínimo — mas ainda utilizável — em vez de travar o boot. */
-import { ENVIRONMENTS_DIR, TRUCK_BRANDS_DIR } from '../core/paths';
+import { ENVIRONMENTS_DIR, TRUCK_BRANDS_DIR, STUDIO_BASE } from '../core/paths';
 import { getColor, defaultColorId } from './colors';
 
 /* ---------------- tipos ----------------
@@ -18,7 +24,7 @@ import { getColor, defaultColorId } from './colors';
 
 export interface GroundDef {
   type: string;
-  /** albedo sRGB, tileável; caminho absoluto */
+  /** albedo sRGB, tileável; caminho relativo à base — resolver com assetUrl() */
   diffuse: string | null;
   /** mapa linear de rugosidade */
   rough: string | null;
@@ -46,7 +52,7 @@ export interface EnvironmentDef {
   /** título pt-BR do card */
   name: string;
   subtitle: string;
-  /** imagem do card; caminho absoluto */
+  /** imagem do card; caminho relativo à base — resolver com assetUrl() */
   thumb: string | null;
   /** equirect .hdr; null → céu procedural */
   hdri: string | null;
@@ -90,7 +96,7 @@ export interface ModelDef {
   name: string;
   /** ex.: 'Highline · 6x4' */
   subtitle: string;
-  /** foto do card; caminho absoluto */
+  /** foto do card; caminho relativo à base — resolver com assetUrl() */
   image: string | null;
   /** id em models/cabs.json → geometria 3D carregada */
   cab: string;
@@ -111,7 +117,7 @@ export interface ModelDef {
 export interface ManufacturerDef {
   id: string;
   name: string;
-  /** logo do card; caminho absoluto */
+  /** logo do card; caminho relativo à base — resolver com assetUrl() */
   logo: string | null;
   /** cor da marca (anel de hover do card) */
   accent: string;
@@ -214,18 +220,48 @@ const FALLBACK_MANUFACTURERS: Raw[] = [
 const errText = (e: unknown): string =>
   (e instanceof Error ? e.message : String(e));
 
-/* Já é uma URL final? Então devolver intocado — os manifestos guardam
-   caminhos absolutos ('/models/props/stone_01.glb'), e prefixar viraria lixo. */
-const ABSOLUTE_RE = /^(?:https?:\/\/|data:|blob:|\/\/|\/)/i;
+/* Já é uma URL final, de origem própria? Então devolver intocado.
+   ---------------------------------------------------------------------------
+   `/` NÃO ESTÁ MAIS NESTA LISTA, e essa é a mudança inteira. Enquanto a árvore
+   do studio era servida por `web/public/`, um caminho de raiz de site já era a
+   URL certa e passava direto. Com a árvore na API, um `/models/vehicles/x.glb`
+   resolve contra a origem do WEB — que não tem mais os arquivos — e o resultado
+   é um 404 mudo, porque quase todo carregador do engine degrada em silêncio.
+   Deixar só os esquemas que são MESMO absolutos (`https?://`, `data:`, `blob:`
+   e o protocol-relative `//`) faz todo o resto cair no prefixo. */
+const ABSOLUTE_RE = /^(?:https?:\/\/|data:|blob:|\/\/)/i;
+
+/* A base sem a barra inicial — usada só para detectar um caminho que JÁ a traz.
+   Declarada antes de assetUrl() de propósito: o valor tem de estar pronto na
+   primeira chamada, e um `const` depois da função ficaria na zona morta se
+   alguém a chamasse durante a avaliação de módulo. */
+const BASE_REL = STUDIO_BASE.replace(/^\/+/, '');
 
 /**
- * Normaliza um caminho vindo de manifesto para URL servível.
- * Os manifestos são absolutos, então na prática isto é pass-through:
- * assetUrl('/environments/urbano/thumb.webp') → '/environments/urbano/thumb.webp'
- * Um caminho relativo remanescente é resolvido contra a raiz do site — vira um
- * 404 visível em vez de silenciosamente virar outra coisa.
- * Devolve '' para null/undefined — <img src=""> não carrega nada, enquanto
+ * Normaliza um caminho de manifesto (ou de `core/paths.ts`) para URL servível,
+ * prefixando `STUDIO_BASE`.
+ *
+ * ESTE É O ÚNICO LUGAR DO CÓDIGO QUE SABE ONDE A ÁRVORE ESTÁ HOSPEDADA. Por
+ * isso os manifestos guardam caminho RELATIVO: cada caminho absoluto que
+ * existisse lá seria uma segunda declaração da hospedagem, num arquivo que o
+ * tsc não lê e que só falha em produção.
+ *
+ *   assetUrl('environments/urbano/thumb.webp')
+ *     → '/studio-assets/v1/environments/urbano/thumb.webp'
+ *   assetUrl('https://cdn.exemplo/x.hdr')  → intocado
+ *   assetUrl('data:image/png;base64,…')    → intocado
+ *
+ * A barra inicial é TOLERADA (e removida) de propósito: é rede de segurança de
+ * migração. Um manifesto antigo, um `*_meta.json` que ninguém reescreveu ou uma
+ * string esquecida em algum canto ainda resolve para o lugar certo em vez de
+ * virar `//studio-assets/v1//x` (barra dupla, que alguns servidores tratam como
+ * outro caminho) ou de apontar para a origem errada em silêncio.
+ *
+ * Devolve '' para null/undefined — `<img src="">` não carrega nada, enquanto
  * String(null) viraria a URL literal "null" e sujaria o console com um 404.
+ *
+ * **É IDEMPOTENTE**, e isso é contrato, não coincidência — ver a nota logo
+ * abaixo da função.
  * @param {string|null|undefined} path
  * @returns {string}
  */
@@ -234,16 +270,51 @@ export function assetUrl(path: string | null | undefined): string {
   const p = String(path).trim();
   if (!p) return '';
   if (ABSOLUTE_RE.test(p)) return p;
-  return '/' + p.replace(/^\.\//, '');
+  /* `./x` e `/x` chegam ao mesmo lugar que `x`: a base é a raiz da árvore, não
+     um diretório relativo ao documento — não existe "subir um nível" aqui. */
+  let rel = p.replace(/^\.\//, '').replace(/^\/+/, '');
+  /* Já traz a base? Então tirar, para recolocar exatamente uma vez. */
+  if (BASE_REL && (rel === BASE_REL || rel.startsWith(BASE_REL + '/'))) {
+    rel = rel.slice(BASE_REL.length).replace(/^\/+/, '');
+  }
+  return STUDIO_BASE + '/' + rel;
 }
 
-async function fetchJSON(url: string): Promise<Raw> {
+/* POR QUE A IDEMPOTÊNCIA É CONTRATO.
+   ---------------------------------------------------------------------------
+   `assetUrl(assetUrl(x)) === assetUrl(x)` tem de valer porque meia dúzia de
+   módulos resolve a URL no CHAMADOR e entrega o resultado a um carregador que
+   resolve de novo por dentro: `loadGLB()` (vehicle/models.ts) chama assetUrl no
+   corpo, e scene/set.ts, scene/environment.ts e ui/preview.ts o chamam com URLs
+   que já passaram por aqui. Sem idempotência, cada um desses caminhos vira
+   `/studio-assets/v1/studio-assets/v1/…` — um 404, e mudo, porque esses
+   carregadores degradam em silêncio por desenho.
+
+   Antes, a propriedade saía de graça: `/` estava em ABSOLUTE_RE, e a saída
+   começava com `/`. Tirar `/` de lá (que é o ponto desta mudança) MATOU essa
+   garantia justamente no modo padrão, o same-origin — a saída
+   `/studio-assets/v1/x` deixou de ser reconhecida como "já resolvida". Daí o
+   teste explícito de BASE_REL acima: é ele que reconstrói a propriedade.
+
+   Com base absoluta (`http://api…/studio-assets/v1`) a saída começa com
+   `http://` e o ABSOLUTE_RE lá em cima já resolve o caso — mas depender só
+   disso deixaria a idempotência valendo num modo e não no outro, que é a pior
+   forma possível de um invariante existir. */
+
+/* Os manifestos vivem DENTRO da árvore, então a URL deles se monta do mesmo
+   jeito que a de qualquer asset: passar por assetUrl() é o que faz o próprio
+   fetch do manifesto seguir a base. Sem isto, `environments.json` continuaria
+   sendo buscado na origem do web enquanto tudo que ele aponta vem da API. */
+async function fetchJSON(path: string): Promise<Raw> {
+  const url = assetUrl(path);
   const r = await fetch(url, { cache: 'no-cache' });
   if (!r.ok) throw new Error(url + ' → ' + r.status);
   return r.json();
 }
 
-/* HEAD na URL final. Qualquer erro (rede, CORS, offline) conta como ausente. */
+/* HEAD na URL final. Qualquer erro (rede, CORS, offline) conta como ausente.
+   Recebe caminho de manifesto, não URL: assetUrl() é chamado AQUI e uma única
+   vez — prefixar antes de chamar produziria dupla base. */
 async function exists(path: string | null): Promise<boolean> {
   const url = assetUrl(path);
   if (!url) return false;

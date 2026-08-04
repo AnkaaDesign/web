@@ -1,36 +1,63 @@
-/* Caminhos públicos do studio — a ÚNICA porta entre o engine e o app.
+/* Caminhos dos assets do studio — a ÚNICA porta entre o engine e o app.
    ---------------------------------------------------------------------------
    O resto do engine é um port autocontido: não importa nada de `@/`. Este
    módulo é a exceção deliberada, e existe para que os diretórios servidos
    tenham UMA definição em todo o repositório — `src/config/assets.ts` — em vez
    de uma cópia aqui e outra em cada manifesto.
 
-   Por que não um `ASSET_BASE` único, como era quando tudo vivia em
-   `/truck-studio/`: os assets deixaram de morar sob um prefixo comum. Cabines
-   são geometria (`/models/vehicles/`), o chão é textura (`/textures/`)
-   e o decoder Draco é dependência de terceiros (`/vendor/draco/`, ao lado do
-   worker do pdf.js). Um prefixo só não descreve mais nada de útil — cada
-   família tem o seu, e os manifestos servidos guardam caminhos absolutos.
+   ATENÇÃO — MUDOU: os diretórios abaixo são RELATIVOS, não absolutos de raiz
+   de site. A árvore de assets do studio (~300 MB) saiu de `web/public/` e é
+   servida pela API sob `STUDIO_BASE` (`/studio-assets/v1` por padrão). Um
+   `VEHICLES_DIR + 'x.glb'` entregue direto a um `fetch`, a um `new Image()` ou
+   a um loader do three.js resolve contra a origem do WEB, que não tem mais os
+   arquivos — e o sintoma é um 404 mudo, porque quase todo carregador daqui
+   degrada em silêncio por desenho.
 
-   Consequência prática: `assetUrl()` (../catalog/catalog.ts) devolve qualquer
-   caminho iniciado por `/` intocado, então manifesto e código convergem para a
-   mesma URL sem ninguém prefixar nada. */
-import { STUDIO_ASSETS, VENDOR_ASSETS } from '@/config/assets';
+   Regra: TUDO que sai daqui passa por `assetUrl()` (../catalog/catalog.ts)
+   antes de virar requisição. É `assetUrl()` que prefixa `STUDIO_BASE`, e é o
+   único lugar do código que sabe onde a árvore está hospedada. Os manifestos
+   servidos guardam caminhos relativos pelo mesmo motivo — assim manifesto e
+   código convergem para a mesma URL sem ninguém repetir a base.
 
-/** `/models/vehicles/` — cabines, carreta, baú, `cabs.json`, `*_meta.json`. */
+   Por que não um `ASSET_BASE` de feature, como era quando tudo vivia em
+   `/truck-studio/`: aquele prefixo agrupava por FEATURE o que o resto de
+   `public/` agrupa por TIPO, e a estrutura por tipo sobreviveu à mudança — ela
+   é a que está espelhada dentro de `STUDIO_BASE`. O que `STUDIO_BASE` é, e
+   `ASSET_BASE` não era, é uma declaração de HOSPEDAGEM: responde "em que
+   servidor", não "de que feature". Por isso ele pode ter uma versão dentro
+   (`/v1`) e ser trocado por variável de ambiente.
+
+   A única exceção é `DRACO_DECODER_DIR`: continua absoluto e continua no web —
+   é dependência de build vendorizada, não asset de cena. Ver `VENDOR_ASSETS`. */
+import { STUDIO_ASSETS, STUDIO_ASSETS_BASE, VENDOR_ASSETS } from '@/config/assets';
+
+/**
+ * Raiz de onde a árvore do studio é servida — sem barra no fim
+ * (`/studio-assets/v1`, ou uma origem absoluta da API).
+ *
+ * Exportado para quem precisa da base NUA: uma sonda de saúde, uma mensagem de
+ * erro que diga contra qual host o download falhou, ou um `<link rel=preconnect>`
+ * montado em runtime. Para montar URL de asset, use `assetUrl()` — não
+ * concatene isto à mão, ou a normalização de barras vira sua responsabilidade.
+ */
+export const STUDIO_BASE = STUDIO_ASSETS_BASE;
+
+/** `models/vehicles/` — cabines, carreta, baú, `cabs.json`, `*_meta.json`. Relativo a `STUDIO_BASE`. */
 export const VEHICLES_DIR = STUDIO_ASSETS.vehiclesDir;
 
-/** `/models/props/` — `props.json` e um `.glb` por prop espalhado na cena. */
-export const PROPS_DIR = STUDIO_ASSETS.propsDir;
-
-/** `/textures/` — conjuntos PBR do chão, `macro_noise.webp` e os normal maps de tinta. */
+/** `textures/` — conjuntos PBR do chão e `macro_noise.webp`. Relativo a `STUDIO_BASE`. */
 export const TEXTURES_DIR = STUDIO_ASSETS.texturesDir;
 
-/** `/environments/` — um diretório por cenário + `environments.json`. */
+/** `environments/` — um diretório por cenário + `environments.json`. Relativo a `STUDIO_BASE`. */
 export const ENVIRONMENTS_DIR = STUDIO_ASSETS.environmentsDir;
 
-/** `/brands/trucks/` — um diretório por montadora + `brands.json`. */
+/** `brands/trucks/` — um diretório por montadora + `brands.json`. Relativo a `STUDIO_BASE`. */
 export const TRUCK_BRANDS_DIR = STUDIO_ASSETS.truckBrandsDir;
 
-/** `/vendor/draco/` — diretório (não arquivo) exigido por `DRACOLoader.setDecoderPath`. */
+/**
+ * `/vendor/draco/` — diretório (não arquivo) exigido por `DRACOLoader.setDecoderPath`.
+ *
+ * ABSOLUTO e servido pelo WEB, ao contrário de todos os outros daqui: NÃO passe
+ * por `assetUrl()`. Ver a nota em `VENDOR_ASSETS.dracoDecoderDir`.
+ */
 export const DRACO_DECODER_DIR = VENDOR_ASSETS.dracoDecoderDir;

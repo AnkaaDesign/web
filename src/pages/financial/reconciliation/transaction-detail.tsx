@@ -17,6 +17,7 @@ import {
   useBankTransaction,
   useChangeCategory,
   useMatchCandidates,
+  useMatchTransaction,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
 import { useReceivableCandidates } from "@/hooks/financial/use-receivable";
@@ -40,6 +41,7 @@ import {
 import { ReceivableMatchSection } from "@/components/financial/reconciliation/receivable-match-section";
 import { TaskMatchSection } from "@/components/financial/reconciliation/task-match-section";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
+import { SettlementCard } from "@/components/financial/reconciliation/settlement-card";
 
 // Module-scoped so it isn't redefined on every render (which would remount the
 // whole subtree — including the stateful match section — and drop input focus).
@@ -69,6 +71,10 @@ export function ReconciliationTransactionDetailPage() {
     liveCandidatePool && liveCandidatePool.length > 0 ? liveCandidatePool[0].confidence : null;
   const unmatchMut = useUnmatchTransaction();
   const changeCategoryMut = useChangeCategory();
+  // "Vincular nota" on the Conciliação card — links the note the matched pedido
+  // already points at, closing the 3-way (extrato ↔ pedido ↔ nota) by hand
+  // rather than automatically, so the operator sees the CNPJ/valor first.
+  const matchMut = useMatchTransaction();
   const [unmatchOpen, setUnmatchOpen] = useState(false);
   // Inline category selection (no-NF case). Seeded from the transaction's tags
   // and resynced whenever it refetches.
@@ -152,6 +158,12 @@ export function ReconciliationTransactionDetailPage() {
   const isCredit = tx.type === "CREDIT";
   const activeMatches = (tx.matches ?? []).filter(m => !m.reversedAt);
   const hasNf = activeMatches.length > 0;
+  // "Desvincular" has exactly one home per page: "Notas vinculadas" when a real
+  // note/boleto is linked, "Recebimento conciliado" for credits, and otherwise
+  // the Conciliação card — which for a pedido/conta recorrente/aerografia is the
+  // only card that names what would be undone.
+  const hasDocumentMatch = activeMatches.some(m => m.fiscalDocument || m.bankSlip);
+  const unmatchFromSettlement = !isCredit && activeMatches.length > 0 && !hasDocumentMatch;
   const title = `Transação ${formatDate(tx.postedAt)}`;
 
   // No-NF: picking categories saves immediately (no modal, no value split). The
@@ -224,9 +236,13 @@ export function ReconciliationTransactionDetailPage() {
                       <IconArrowsExchange2 className="h-5 w-5 text-muted-foreground" />
                       Resumo da transação
                     </CardTitle>
+                    {/* Same `settlement` the Extrato row reads, so the badge
+                        here can no longer say "Resolvido" while the table says
+                        "Liquidado" about the very same transaction. */}
                     <MatchStatusBadge
                       status={tx.reconciliationStatus}
                       topMatchScore={liveTopScore}
+                      settlement={tx.settlement}
                     />
                   </div>
                 </CardHeader>
@@ -366,6 +382,26 @@ export function ReconciliationTransactionDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* O que sustenta a conciliação — extrato ↔ obrigação ↔ nota. Vale
+              para qualquer âncora (nota, boleto, parcela, pedido, conta
+              recorrente, aerografia, folha), que é justamente o que faltava:
+              o badge dizia "resolvido" e nenhuma seção dizia contra o quê. */}
+          {tx.settlement && tx.settlement.anchor !== "NONE" && (
+            <SettlementCard
+              transaction={tx}
+              linking={matchMut.isPending}
+              onRequestUnmatch={
+                unmatchFromSettlement ? () => setUnmatchOpen(true) : undefined
+              }
+              onLinkNf={(nf) =>
+                matchMut.mutate({
+                  transactionId: tx.id,
+                  payload: { fiscalDocumentIds: [nf.id] },
+                })
+              }
+            />
+          )}
 
           {/* CREDIT → conciliar contra parcelas a receber (entrada), e — para
               tarefas cujo orçamento se perdeu na migração — contra a própria

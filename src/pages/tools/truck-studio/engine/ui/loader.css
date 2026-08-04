@@ -138,10 +138,22 @@
   object-fit: contain;
   object-position: center bottom;
 }
-/* Rhymes with .ts-badge__fallback in selector.css — same hatch, same gradient,
-   same initials — so a missing photo flies into a matching tile instead of
-   morphing into a different-looking object. */
+/* The lettered placeholder plate — the fourth of four. The other three live in
+   selector.css, where they share one rule; this one keeps its own copy on
+   purpose, because a rule spanning two stylesheets would make index.tsx's import
+   order load-bearing and today it is not. What IS shared is the material: the
+   weave colour and the panel gradient come from studio.css's --ts-plate-*
+   tokens, so a retune reaches all four.
+   Rhyming with .ts-badge__fallback matters more here than anywhere else — same
+   hatch, same gradient, same two initials — because the outro FLIES this element
+   into that one, and a missing photo has to land as the same object rather than
+   morph into a different-looking tile. What differs is scale: this box is the
+   hero, so the type is 54px and the weave steps out to 12px to match.
+   The border and radius are this one's alone: the badge plate is clipped by its
+   card's own rounded corners, and the hero has nothing around it. */
 .truck-studio-root .ts-load-fallback {
+  --ts-plate-pitch: 12px;
+
   position: absolute;
   inset: 0;
   display: flex;
@@ -150,8 +162,12 @@
   border: 1px solid var(--stroke);
   border-radius: 16px;
   background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.028) 0 12px, transparent 12px 24px),
-    linear-gradient(160deg, var(--panel-2), var(--panel));
+    repeating-linear-gradient(
+      135deg,
+      var(--ts-plate-weave) 0 var(--ts-plate-pitch),
+      transparent var(--ts-plate-pitch) calc(var(--ts-plate-pitch) * 2)
+    ),
+    var(--ts-plate-panel);
   color: var(--muted);
   font-family: inherit;
   font-size: 54px;
@@ -162,14 +178,7 @@
 }
 
 /* ============================================================
-   4. Lane dashes — the only moving decoration
-   Very low contrast by design: this must be felt, not looked at. Its real job is
-   to keep the curtain alive during the FBX parse, when the progress bar has
-   nothing honest to say.
-   ============================================================ */
-
-/* ============================================================
-   5. Brand + type
+   4. Brand + type
    ============================================================ */
 
 .truck-studio-root .ts-load-info {
@@ -216,7 +225,7 @@
 }
 
 /* ============================================================
-   6. Progress
+   5. Progress
    ============================================================ */
 
 .truck-studio-root .ts-load-meter {
@@ -296,7 +305,7 @@
 }
 
 /* ============================================================
-   7. Intro cascade
+   6. Intro cascade
    Gated on .is-in so removing the class and re-adding it replays the whole
    sequence on a second showLoader().
    The keyframes animate the individual `translate` / `scale` properties instead
@@ -326,8 +335,8 @@
 }
 
 /* ============================================================
-   8. Outro
-   These rules MUST stay after section 7: they have identical specificity to the
+   7. Outro
+   These rules MUST stay after section 6: they have identical specificity to the
    .is-in cascade, so they win on source order alone.
    ============================================================ */
 
@@ -363,7 +372,7 @@
 }
 
 /* ============================================================
-   9. Keyframes — all namespaced ts-load-*
+   8. Keyframes — all namespaced ts-load-*
    None of them needs continuous time to land in a sane state: the finite ones
    fill `both` and the two loops look identical at every phase, so the multi-
    second main-thread stall during the FBX parse cannot leave anything stuck.
@@ -391,7 +400,7 @@
 }
 
 /* ============================================================
-   10. Reduced motion
+   9. Reduced motion
    Everything decorative goes; the progress fill stays, because its position is
    information rather than decoration. loader.ts branches the FLIP separately via
    matchMedia — a transform driven from JS is invisible to a CSS override.
@@ -418,7 +427,7 @@
 }
 
 /* ============================================================
-   11. Narrow viewports
+   10. Narrow viewports
    ============================================================ */
 
 @media (max-width: 720px) {

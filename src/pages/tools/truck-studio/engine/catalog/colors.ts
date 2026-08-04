@@ -6,38 +6,21 @@
 
    Sobre a base de dados: as cores de verdade são a tabela `Paint` da API
    (id, name, hex, finish, code, paintBrand, colorOrder — ver
-   prisma/schema.prisma), e é para lá que isto vai apontar. Hoje o estúdio NÃO
-   está conectado, então a lista embutida abaixo é o que aparece — e ela foi
-   escrita com os MESMOS campos do banco, para a ligação depois ser um mapper de
-   dez linhas e não uma refatoração.
+   prisma/schema.prisma), e o estúdio ESTÁ ligado nela. Quem faz a ligação é a
+   página React (../../index.tsx), que chama setColorProvider() na avaliação do
+   módulo — antes de mountStudio() — com uma consulta getPaints() de verdade.
 
-   Como ligar quando a API entrar (sem quebrar a regra do engine de não importar
-   `@/`): a página React chama setColorProvider() antes de mountStudio() —
+   Ela mora LÁ, e não aqui, porque o engine não importa `@/`: ele conhece só o
+   contrato `ColorProvider` (uma função que devolve uma promessa de qualquer
+   coisa), e este módulo valida o que chegar. A lista embutida abaixo continua
+   existindo e continua sendo servida quando o provedor falha, devolve vazio ou
+   não foi ligado — o que também é o caso de qualquer uso do engine fora desta
+   página. Ela foi escrita com os MESMOS campos do banco, que é o que tornou a
+   ligação um mapper de dez linhas em vez de uma refatoração.
 
-     import { setColorProvider } from './engine/catalog/colors';
-     setColorProvider(async () => (await getPaints({ orderBy: { colorOrder: 'asc' } }))
-       .data.map(p => ({ id: p.id, name: p.name, hex: p.hex,
-                         finish: FINISH_FROM_API[p.finish], code: p.code ?? null,
-                         brand: p.paintBrand?.name ?? null })));
-
-   — e loadColors() passa a servir o banco, caindo na lista embutida se a
-   chamada falhar. Mesmo contrato de catalog.ts: NADA aqui pode lançar, porque o
-   seletor abre antes de qualquer 3D existir. */
-import type { PaintFinish, PaintParams } from '../vehicle/paint';
-
-/**
- * Ajuste de renderização gravado para ESTA cor.
- *
- * É `previewConfig.truckStudio` do `Paint` (ver previewConfigSchema em
- * web/src/schemas/paint.ts, que é quem valida). Parcial de propósito: o painel
- * grava só o que foi mexido, e o que faltar cai no default do acabamento.
- *
- * Declarado aqui, e não importado de `@/schemas/paint`, porque o motor não
- * importa `@/` — é o que o mantém montável fora do app (harness.html) e o que
- * impede o estúdio de arrastar o barrel de schemas do Ankaa para dentro do
- * bundle da página.
- */
-export type PaintStudioConfig = Partial<PaintParams>;
+   Mesmo contrato de catalog.ts: NADA aqui pode lançar, porque o seletor abre
+   antes de qualquer 3D existir. */
+import type { PaintFinish } from '../vehicle/paint';
 
 /** Uma cor do catálogo — espelho do `Paint` da API, só com o que a UI usa. */
 export interface PaintColorDef {
@@ -58,10 +41,76 @@ export interface PaintColorDef {
   /** marca da tinta (PaintBrand.name) */
   brand: string | null;
   /**
-   * Ajuste de renderização gravado para esta cor, ou null quando ninguém
-   * ajustou ainda (e aí valem os defaults do acabamento em vehicle/paint.ts).
+   * MONTADORA do caminhão a que esta tinta pertence, no id do catálogo
+   * (`scania`, `volvo`, `daf`, `iveco`, `mb`, `vw`) — o mesmo id de
+   * `brands.json`, NÃO o enum do banco.
+   *
+   * A tradução do enum (`MERCEDES_BENZ` → `mb`, `VOLKSWAGEN` → `vw`) acontece
+   * do lado do provedor, em ../../index.tsx, porque é lá que se pode importar
+   * `@/constants`. O engine só vê o id do catálogo e nunca precisa conhecer o
+   * banco — é a mesma fronteira que mantém este módulo sem `@/`.
+   *
+   * `null` = tinta do catálogo geral, não amarrada a uma montadora.
    */
-  studio: PaintStudioConfig | null;
+  manufacturer: string | null;
+  /**
+   * AJUSTE CURADO desta tinta, quando o setor de pintura fez um.
+   *
+   * A tabela `Paint` tem uma coluna `previewConfig` que o gerador de amostra 2D
+   * usa para desenhar a pastilha de cor: luzes coloridas, cor de flip e cor de
+   * cintilância. Hoje 107 das 522 tintas têm uma. O estúdio 3D IGNORAVA isso e
+   * derivava o flop do próprio hex por fórmula (ver vehicle/paint.ts), o que dá
+   * um resultado plausível para uma tinta qualquer e ERRADO para uma tinta
+   * medida: o `Verde Saiph` da Mercedes vira amarelo no ângulo por causa de uma
+   * luz `#c7e52e` no ajuste dela, e nenhuma fórmula sobre `#70b725` chega lá.
+   *
+   * `null` = sem ajuste; a derivação por fórmula continua valendo, que é o
+   * comportamento certo para as 415 tintas sem curadoria.
+   */
+  effect: PaintEffect | null;
+}
+
+/**
+ * A parte do `previewConfig` do banco que o shader 3D sabe usar.
+ *
+ * Deliberadamente MENOR que o JSON do banco: aquele descreve um desenho 2D
+ * (posição e espalhamento de cada luz num plano), e nada disso tem tradução num
+ * material PBR sobre geometria. O que sobrevive à travessia é a INTENÇÃO
+ * CROMÁTICA — para que cor a tinta vira no ângulo, de que cor é o cintilo, e
+ * quão forte é o efeito.
+ */
+export interface PaintEffect {
+  /** cor do flop/interferência no ângulo rasante (o "amarelo" do Saiph) */
+  flip: string | null;
+  /** cor do floco metálico/mica */
+  flake: string | null;
+  /** 0..1 — quanto do efeito entra (o `effectIntensity` do banco, normalizado) */
+  intensity: number;
+  /** face medida no laboratório; sobrepõe `hex` NA RENDERIZAÇÃO, nunca no card */
+  color?: string | null;
+  /** acabamento medido; sobrepõe `finish` quando a receita discorda do catálogo */
+  recipeFinish?: string | null;
+  /* ---- campos da RECEITA DO paint-lab, quando o ajuste veio de lá ----
+     O laboratório (`paint-lab.html`) salva o conjunto PBR inteiro. Estes campos
+     são opcionais porque a outra fonte — o `previewConfig` do gerador 2D — não
+     tem como preenchê-los: ela descreve luzes num plano, não um material.
+     Ausente ⇒ o padrão do acabamento decide, como sempre decidiu. */
+  metalness?: number;
+  roughness?: number;
+  /** 0..1; o estúdio converte para clearcoatRoughness */
+  gloss?: number;
+  pearlAmount?: number;
+  /** quão rápido o flop viaja com o ângulo */
+  pearlTravel?: number;
+  flakeAmount?: number;
+  /** células por metro do ruído de floco */
+  flakeDensity?: number;
+  peel?: number;
+  peelScale?: number;
+  peelDetail?: number;
+  pearlMid?: string | null;
+  flakeTilt?: number;
+  flakeGloss?: number;
 }
 
 /** Como a API nomeia os acabamentos → como paint.ts os chama. */
@@ -78,32 +127,29 @@ export const FINISH_LABEL: Record<PaintFinish, string> = {
 };
 
 /* ---------------- lista embutida ----------------
-   Enquanto a API não entra. Ordem = `colorOrder`: neutros primeiro (é o que
-   mais sai), depois as cores de marca. */
-/* `studio` entra como null em todas: ajuste de renderização é dado do banco, e
-   uma paleta de emergência (API fora, provedor não ligado) não é lugar para
-   números afinados à mão — sem ajuste gravado o motor usa os defaults do
-   acabamento, que é exatamente o comportamento que se quer no fallback. */
-const BUILTIN: PaintColorDef[] = ([
-  { id: 'branco-geada', name: 'Branco Geada', hex: '#eef1f5', finish: 'solid', code: 'BR-100', brand: null },
-  { id: 'branco-perola', name: 'Branco Pérola', hex: '#e6e4dd', finish: 'pearl', code: 'BR-220', brand: null },
-  { id: 'prata-polar', name: 'Prata Polar', hex: '#b9bec6', finish: 'metallic', code: 'PR-410', brand: null },
-  { id: 'grafite', name: 'Grafite', hex: '#4b5058', finish: 'metallic', code: 'GF-520', brand: null },
-  { id: 'preto-onix', name: 'Preto Ônix', hex: '#15171c', finish: 'solid', code: 'PT-010', brand: null },
-  { id: 'vermelho-ankaa', name: 'Vermelho Ankaa', hex: '#c8102e', finish: 'solid', code: 'VM-300', brand: null },
-  { id: 'vermelho-rubi', name: 'Vermelho Rubi', hex: '#8d1524', finish: 'pearl', code: 'VM-360', brand: null },
-  { id: 'azul-ankaa', name: 'Azul Ankaa', hex: '#1b365d', finish: 'metallic', code: 'AZ-600', brand: null },
-  { id: 'azul-oceano', name: 'Azul Oceano', hex: '#2f77bd', finish: 'metallic', code: 'AZ-640', brand: null },
-  { id: 'verde-mata', name: 'Verde Mata', hex: '#1f5d3a', finish: 'metallic', code: 'VD-700', brand: null },
-  { id: 'amarelo-ambar', name: 'Amarelo Âmbar', hex: '#f0b31c', finish: 'solid', code: 'AM-800', brand: null },
-  { id: 'laranja-solar', name: 'Laranja Solar', hex: '#e2621b', finish: 'solid', code: 'LR-820', brand: null },
-] as Omit<PaintColorDef, 'studio'>[]).map((c) => ({ ...c, studio: null }));
+   A rede de segurança, não o caminho normal: é o que aparece quando a API não
+   responde, devolve vazio ou não há provedor ligado. Ordem = `colorOrder`:
+   neutros primeiro (é o que mais sai), depois as cores de marca. */
+const BUILTIN: PaintColorDef[] = [
+  { id: 'branco-geada', name: 'Branco Geada', hex: '#eef1f5', finish: 'solid', code: 'BR-100', brand: null, manufacturer: null, effect: null },
+  { id: 'branco-perola', name: 'Branco Pérola', hex: '#e6e4dd', finish: 'pearl', code: 'BR-220', brand: null, manufacturer: null, effect: null },
+  { id: 'prata-polar', name: 'Prata Polar', hex: '#b9bec6', finish: 'metallic', code: 'PR-410', brand: null, manufacturer: null, effect: null },
+  { id: 'grafite', name: 'Grafite', hex: '#4b5058', finish: 'metallic', code: 'GF-520', brand: null, manufacturer: null, effect: null },
+  { id: 'preto-onix', name: 'Preto Ônix', hex: '#15171c', finish: 'solid', code: 'PT-010', brand: null, manufacturer: null, effect: null },
+  { id: 'vermelho-ankaa', name: 'Vermelho Ankaa', hex: '#c8102e', finish: 'solid', code: 'VM-300', brand: null, manufacturer: null, effect: null },
+  { id: 'vermelho-rubi', name: 'Vermelho Rubi', hex: '#8d1524', finish: 'pearl', code: 'VM-360', brand: null, manufacturer: null, effect: null },
+  { id: 'azul-ankaa', name: 'Azul Ankaa', hex: '#1b365d', finish: 'metallic', code: 'AZ-600', brand: null, manufacturer: null, effect: null },
+  { id: 'azul-oceano', name: 'Azul Oceano', hex: '#2f77bd', finish: 'metallic', code: 'AZ-640', brand: null, manufacturer: null, effect: null },
+  { id: 'verde-mata', name: 'Verde Mata', hex: '#1f5d3a', finish: 'metallic', code: 'VD-700', brand: null, manufacturer: null, effect: null },
+  { id: 'amarelo-ambar', name: 'Amarelo Âmbar', hex: '#f0b31c', finish: 'solid', code: 'AM-800', brand: null, manufacturer: null, effect: null },
+  { id: 'laranja-solar', name: 'Laranja Solar', hex: '#e2621b', finish: 'solid', code: 'LR-820', brand: null, manufacturer: null, effect: null },
+];
 
 /* ---------------- estado ---------------- */
 
 /** A lista viva. Preenchida por loadColors(); nunca vazia depois do boot. */
 export const colors: PaintColorDef[] = [];
-/** true quando a lista veio do embutido (API ausente ou provedor não ligado). */
+/** true quando a lista veio do embutido (API fora do ar ou provedor não ligado). */
 export let colorsAreFallback = true;
 
 /** Provedor injetado pela aplicação; ver o cabeçalho. */
@@ -116,54 +162,41 @@ export function setColorProvider(fn: ColorProvider | null) {
   loading = null;                       // uma troca de fonte invalida o memo
 }
 
-/* ---------------- gravação do ajuste ----------------
-   O painel de tinta grava o ajuste NA COR, e a cor é uma linha de `Paint` — que
-   já carrega `manufacturer`, então uma linha já É "aquela cor daquela
-   montadora" e não faz falta chave nenhuma dentro do JSON.
-
-   Mesma inversão do provedor, e pelo mesmo motivo: quem sabe falar com a API é
-   a página React (que pode importar `@/api-client`), não o motor. O motor só
-   declara o buraco. Sem persistidor ligado o painel continua funcionando ao
-   vivo — só não tem onde salvar, e diz isso. */
-export type ColorPersister = (colorId: string, studio: PaintStudioConfig) => Promise<void>;
-let persister: ColorPersister | null = null;
-
-/** Liga o botão "Aplicar" do painel de tinta a um destino. */
-export function setColorPersister(fn: ColorPersister | null) {
-  persister = typeof fn === 'function' ? fn : null;
-}
-
-/** @returns {boolean} true quando há onde gravar — o painel usa para habilitar "Aplicar". */
-export const canPersistColors = () => persister !== null;
-
-/**
- * Grava o ajuste de renderização desta cor e atualiza a lista viva.
- *
- * A lista é atualizada ANTES do await de propósito: o painel já está mostrando
- * o resultado ao vivo, e deixar `colors` discordando do que está na tela até a
- * rede responder é o que faria reabrir o seletor "desfazer" o ajuste. Se a
- * gravação falhar o valor anterior volta, e o erro sobe para quem chamou
- * mostrar — engolir aqui daria um "Aplicado" para algo que não foi.
- *
- * @throws se não houver persistidor ligado, ou se a API recusar.
- */
-export async function saveColorStudio(colorId: string, studio: PaintStudioConfig): Promise<void> {
-  const entry = colors.find((c) => c.id === colorId);
-  if (!entry) throw new Error('Cor não está na paleta carregada.');
-  if (!persister) throw new Error('Sem destino para gravar: o estúdio não está ligado na API.');
-  const previous = entry.studio;
-  entry.studio = studio;
-  try {
-    await persister(colorId, studio);
-  } catch (e: unknown) {
-    entry.studio = previous;
-    throw e;
-  }
-}
-
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const str = (v: unknown): string | null =>
   (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/* O ajuste curado, validado com o mesmo rigor do resto: uma cor inválida vira
+   `null` e cai na derivação por fórmula, nunca numa cor inventada. */
+function normalizeEffect(input: unknown): PaintEffect | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const hex = (v: unknown): string | null => {
+    const h = str(v);
+    return h && HEX_RE.test(h) ? h : null;
+  };
+  const flip = hex(raw.flip);
+  const flake = hex(raw.flake);
+  if (!flip && !flake) return null;          // nada aproveitável
+  const n = Number(raw.intensity);
+  const num = (v: unknown): number | undefined => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : undefined;
+  };
+  return {
+    flip, flake,
+    color: hex(raw.color),
+    recipeFinish: str(raw.recipeFinish),
+    intensity: Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.6,
+    metalness: num(raw.metalness), roughness: num(raw.roughness),
+    gloss: num(raw.gloss),
+    pearlAmount: num(raw.pearlAmount), pearlTravel: num(raw.pearlTravel),
+    flakeAmount: num(raw.flakeAmount), flakeDensity: num(raw.flakeDensity),
+    peel: num(raw.peel), peelScale: num(raw.peelScale),
+    peelDetail: num(raw.peelDetail), pearlMid: hex(raw.pearlMid),
+    flakeTilt: num(raw.flakeTilt), flakeGloss: num(raw.flakeGloss),
+  };
+}
 
 /* Dado externo: valide, não confie. Uma entrada sem id/nome/hex válido é
    descartada em vez de virar um card que pinta o caminhão de preto. */
@@ -180,15 +213,16 @@ function normalize(input: unknown): PaintColorDef | null {
     || (rawFinish === 'metallic' || rawFinish === 'pearl' || rawFinish === 'solid'
       ? rawFinish as PaintFinish
       : 'solid');
-  /* O ajuste não invalida a cor: um `truckStudio` corrompido (editado à mão no
-     banco, gravado por uma versão anterior do painel) tem de degradar para "sem
-     ajuste" e deixar o card na paleta, não sumir com a cor da tela. Quem
-     valida de verdade é o zod no PUT — aqui só se checa que é objeto. */
-  const rawStudio = raw.studio;
-  const studio = rawStudio && typeof rawStudio === 'object' && !Array.isArray(rawStudio)
-    ? rawStudio as PaintStudioConfig
-    : null;
-  return { id, name, hex, finish, code: str(raw.code), brand: str(raw.brand), studio };
+  /* Minúsculo por contrato: o provedor manda o id do catálogo, mas um `SCANIA`
+     vindo de qualquer outra fonte não pode virar uma montadora desconhecida e
+     esvaziar a paleta em silêncio. */
+  const man = str(raw.manufacturer);
+  return {
+    id, name, hex, finish,
+    code: str(raw.code), brand: str(raw.brand),
+    manufacturer: man ? man.toLowerCase() : null,
+    effect: normalizeEffect(raw.effect),
+  };
 }
 
 let loading: Promise<PaintColorDef[]> | null = null;
@@ -225,6 +259,33 @@ export function loadColors(): Promise<PaintColorDef[]> {
 }
 
 /* ---------------- consultas ---------------- */
+
+/**
+ * A paleta de UMA montadora.
+ *
+ * POR QUE FILTRAR NO CLIENTE em vez de consultar por montadora: a tabela `Paint`
+ * tem 522 linhas, das quais só 77 estão amarradas a uma montadora (Volvo 26,
+ * Scania 23, Mercedes 11, VW 9, DAF 7, Iveco 1). Setenta e sete linhas cabem numa
+ * consulta só, no boot, junto do catálogo — e a partir daí trocar de montadora no
+ * seletor é síncrono. Uma consulta por montadora colocaria uma ida à rede no meio
+ * da navegação do seletor, que é exatamente onde ela mais aparece.
+ *
+ * Sem correspondência ⇒ devolve a paleta inteira em vez de uma lista vazia. Um
+ * passo de cor vazio não tem leitura possível: o usuário não sabe se a montadora
+ * não tem tinta cadastrada ou se algo quebrou.
+ */
+export function colorsFor(manufacturerId: string | null | undefined): PaintColorDef[] {
+  if (!manufacturerId) return colors;
+  const id = String(manufacturerId).toLowerCase();
+  const mine = colors.filter((c) => c.manufacturer === id);
+  return mine.length ? mine : colors;
+}
+
+/** A cor padrão DENTRO da paleta de uma montadora — a primeira, por `colorOrder`. */
+export function defaultColorFor(manufacturerId: string | null | undefined): PaintColorDef {
+  const list = colorsFor(manufacturerId);
+  return list[0] || defaultColor();
+}
 
 /** @returns {PaintColorDef|undefined} */
 export function getColor(id: string | null | undefined): PaintColorDef | undefined {

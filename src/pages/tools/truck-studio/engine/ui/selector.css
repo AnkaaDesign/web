@@ -1,9 +1,20 @@
-/* Truck Studio — 3-step card selector (Cenário → Fabricante → Modelo) and the
-   bottom-left model badge.
+/* Truck Studio — the 4-step card selector (Cenário → Fabricante → Modelo → Cor) and the
+   three badges that stay on the render afterwards: the scene card top-left, the colour
+   and truck cards bottom-left.
 
    Extends the design language of studio.css; it does NOT redefine it. Every custom
-   property used here (--panel, --panel-2, --stroke, --stroke-2, --text, --muted,
-   --accent) comes from the .truck-studio-root block in studio.css.
+   property used here comes from the .truck-studio-root block in studio.css — the palette
+   (--panel, --panel-2, --stroke, --stroke-2, --text, --muted, --accent) and the three
+   material sets the studio shares across stylesheets: --ts-glass-* (the smoked sheet the
+   badges and the carousel arrows are made of), --ts-pill-* (the "Trocar" affordance) and
+   --ts-plate-* (the lettered placeholder).
+
+   Those are TOKENS rather than shared rules on purpose. index.tsx imports four
+   stylesheets, and no selector is declared in two of them at the same specificity, which
+   is what makes the import order not load-bearing. A base rule in studio.css plus an
+   override here would create exactly that dependency — with no error anywhere if someone
+   reordered them. A custom property resolves at the point of use, against the element,
+   so it never enters a cross-file cascade at all.
 
    Two rules inherited from that file that shape everything below:
    - `.truck-studio-root * { box-sizing:border-box; margin:0; padding:0 }` — the studio
@@ -14,17 +25,19 @@
    Like studio.css, EVERY selector is scoped to .truck-studio-root: Ankaa's Tailwind must
    not leak in, and these very generic class names must not leak out.
 
-   Brand accent: Agent 4 sets `--ts-accent` inline on each `.ts-card`, so hover/selected
-   rings can be brand-coloured via `var(--ts-accent, var(--accent))`. */
+   Brand accent: selector.ts sets `--ts-accent` inline on each `.ts-card`, so hover/selected
+   rings can be brand-coloured via `var(--ts-accent, var(--accent))`. On the colour step
+   that accent is the paint itself rather than the marque — there, the card's brand IS
+   its colour. */
 
 /* ============================================================
    1. Overlay shell
    ============================================================ */
 
-/* z-index 500 is deliberate: it must sit above every piece of studio chrome that
-   paints inside the root (#loading is 10, #cab-switching is 9, the sidebar and topbar
-   are static), but stay well BELOW #editor-modal (9999) so the livery editor can still
-   open on top of anything. */
+/* z-index 500 is deliberate: it must sit above every piece of studio chrome that paints
+   inside the root (the badges and #ts-hud are 8, #cab-switching is 9, #loading is 10 and
+   the loading curtain is 400), but stay well BELOW #editor-modal (9999) so the livery
+   editor can still open on top of anything. */
 .truck-studio-root .ts-selector {
   position: absolute;
   inset: 0;
@@ -251,10 +264,30 @@
      conteúdo (a trilha tem doze cards) e estourar o overlay. */
   flex: 1 1 auto;
   min-width: 0;
-  /* Recorte da janela. O padding vertical é para a sombra/anel de seleção do
-     card não sair cortado no topo e na base — `overflow:hidden` corta tudo,
-     inclusive o outline, que fica FORA da caixa de borda. */
-  padding: 6px 0;
+  /* Recorte da janela. O padding existe para o anel de seleção do card não sair
+     cortado — `overflow:hidden` recorta na CAIXA DE PADDING, e o anel
+     (`outline: 2px` + `outline-offset: 2px` em .ts-card.is-selected) fica 4px
+     FORA da caixa de borda do card.
+
+     O PADDING É NOS QUATRO LADOS, e até 2026-08-03 era só vertical (`6px 0`).
+     A consequência era visível e só no PRIMEIRO card: com padding horizontal
+     zero, a caixa de padding coincide com o início da trilha, então os 4px de
+     anel do card selecionado ficavam à esquerda do recorte e sumiam. Topo, base
+     e direita apareciam; a borda esquerda saía cortada.
+
+     Por que não dá para compensar com margem negativa como no eixo vertical: a
+     janela é `flex: 1 1 auto` entre as duas setas, com `gap: 14px` no pai.
+     Margem negativa aqui empurraria a janela 6px para dentro de cada vão e
+     encostaria os cards nas setas. Sem a margem, a caixa de BORDA não muda (o
+     flex é quem a dimensiona) e só a caixa de conteúdo encolhe 12px — os cards
+     perdem ~4px de largura cada e nada mais se move.
+
+     E não vaza card vizinho pela sobra: a trilha anda de um passo inteiro
+     (card + vão), então a borda direita do card anterior para em `-{--ts-gap}`
+     do conteúdo. O menor `--ts-gap` do arquivo é 10px (ver os breakpoints no
+     fim), maior que estes 6px, então ele continua fora da caixa de padding em
+     qualquer largura. Ao mexer em `--ts-gap`, mantenha-o > 6px. */
+  padding: 6px;
   margin: -6px 0;
   overflow: hidden;
 }
@@ -285,9 +318,13 @@
   transition: opacity 380ms ease;
 }
 
-/* As setas usam o mesmo vidro dos view controls e do HUD: são controles
+/* As setas usam o mesmo vidro dos view controls e do HUD — e agora literalmente
+   o mesmo, pelos tokens --ts-glass-* de core/studio.css: são controles
    flutuando sobre a mesma superfície escura do overlay, e um botão sólido aqui
-   leria como um terceiro material. */
+   leria como um terceiro material. Duas coisas vieram junto com os tokens e não
+   estavam aqui: o passo de blur no hover (que é a metade "aumenta o efeito" do
+   material, e faltava só nestes botões) e o ramo sem backdrop-filter, que estes
+   eram os únicos cinco a não ter. */
 .truck-studio-root .ts-carousel__nav {
   flex: none;
   width: 40px;
@@ -299,14 +336,16 @@
   border-radius: 50%;
   color: var(--text);
   cursor: pointer;
-  background-color: rgba(8, 10, 14, 0.42);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
-  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease, opacity 0.18s ease;
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
+  box-shadow: var(--ts-glass-shadow-ctl);
+  transition: var(--ts-glass-transition), border-color 0.22s ease, color 0.22s ease, opacity 0.18s ease;
 }
 .truck-studio-root .ts-carousel__nav:hover {
-  background-color: rgba(8, 10, 14, 0.66);
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
   border-color: var(--accent);
   color: #ffffff;
 }
@@ -334,11 +373,12 @@
    ============================================================ */
 
 .truck-studio-root .ts-card {
-  /* Ring/glow colours. Declared as fallbacks first; the @supports block below swaps in a
+  /* Ring colour. Declared as a fallback first; the @supports block below swaps in a
      color-mix version so a very dark brand accent (Scania's #041E42, for instance) still
-     reads against the --panel surface instead of vanishing into it. */
+     reads against the --panel surface instead of vanishing into it.
+     There was a --ts-glow beside it, declared in both branches and read by nothing: the
+     glow it was mixed for was dropped when hover became border + surface only. */
   --ts-ring: var(--ts-accent, var(--accent));
-  --ts-glow: rgba(77, 163, 255, 0.35);
 
   display: flex;
   flex-direction: column;
@@ -364,7 +404,6 @@
   .truck-studio-root .ts-card {
     --ts-ring: color-mix(in oklab, var(--ts-accent, var(--accent)) 76%, #eaf2ff);
     --ts-ring-hi: color-mix(in oklab, var(--ts-accent, var(--accent)) 34%, #ffffff);
-    --ts-glow: color-mix(in srgb, var(--ts-accent, var(--accent)) 42%, transparent);
   }
 }
 
@@ -417,9 +456,12 @@
    chegando — e a cor é metade do que há para ver nele. Quem carrega o recado de
    indisponível é a tag "Em breve" mais o fato de o card não responder ao ponteiro;
    nenhum dos dois custa a imagem. A opacidade cai só o suficiente para o card
-   recuar ao lado de um vizinho clicável. */
-.truck-studio-root .ts-card.is-disabled,
-.truck-studio-root .ts-card[disabled] {
+   recuar ao lado de um vizinho clicável.
+   Só `.is-disabled`: o atributo `disabled` NUNCA é posto nestes cards, e é
+   deliberado — selector.ts usa aria-disabled + tabindex="-1" justamente para o
+   UA não pintar o cinza dele por cima do que este arquivo desenha. Um
+   `.ts-card[disabled]` aqui seria a regra e o motivo se contradizendo. */
+.truck-studio-root .ts-card.is-disabled {
   opacity: 0.9;
   pointer-events: none;
   cursor: default;
@@ -542,37 +584,64 @@
   object-position: center;
 }
 
-/* Placeholder tile — shown instead of <img> when the manifest has `image: null`/
-   `logo: null` or the asset 404s. It fills the same slot as .ts-card__img so the card
-   keeps its exact geometry, and it is styled as a deliberate plate (diagonal weave over
-   a panel gradient) rather than left as bare text, which is what an unstyled fallback
-   would look like: an error. This path is the DEFAULT until the real art lands. */
-.truck-studio-root .ts-card__fallback {
+/* ---------- THE LETTERED PLACEHOLDER PLATE ----------
+   Shown instead of <img> when the manifest has `image: null`/`logo: null` or the asset
+   404s. It fills the same slot as the image so the card keeps its exact geometry, and it
+   is styled as a deliberate plate (diagonal weave over a gradient) rather than left as
+   bare text, which is what an unstyled fallback looks like: an error. This path is the
+   DEFAULT until the real art lands.
+
+   THREE of them live in this file — card, truck badge, scene badge — and they used to be
+   three near-identical 25-line rules. They are one rule now, parameterised by the only
+   two things that actually differ: the WEAVE PITCH (it tracks the box — at the card's
+   10px the weave lands as three fat stripes across a 198px thumbnail) and the BASE
+   (opaque on the selector's own solid surface, translucent on a glass badge, where an
+   opaque plate would leave a card whose top half is solid and whose bottom half is not).
+   Type size follows in the per-element rules below.
+
+   loader.css's .ts-load-fallback is the fourth and keeps its own copy, deliberately: a
+   rule shared across two stylesheets would make index.tsx's import order load-bearing.
+   The pieces that CAN be shared without that cost — the weave colour, the two base
+   gradients — are the --ts-plate-* tokens in studio.css, and it reads them too.
+
+   `filter: saturate(.55)` is for the 🚛 emoji fallback, which arrives in full colour and
+   would jump out of the muted palette. Greyscale text is unaffected. */
+.truck-studio-root .ts-card__fallback,
+.truck-studio-root .ts-badge__fallback,
+.truck-studio-root .ts-mapbadge__fallback {
+  --ts-plate-pitch: 10px;
+  --ts-plate-base: var(--ts-plate-panel);
+
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px;
   background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.028) 0 10px, transparent 10px 20px),
-    linear-gradient(160deg, var(--panel-2), var(--panel));
+    repeating-linear-gradient(
+      135deg,
+      var(--ts-plate-weave) 0 var(--ts-plate-pitch),
+      transparent var(--ts-plate-pitch) calc(var(--ts-plate-pitch) * 2)
+    ),
+    var(--ts-plate-base);
   color: var(--muted);
   font-family: inherit;
   font-weight: 700;
-  font-size: 26px;
   line-height: 1;
-  letter-spacing: 0.14em;
-  /* letter-spacing also pads the LAST glyph, which pushes the string visually left;
-     the matching indent puts it back on the optical centre. */
-  text-indent: 0.14em;
   text-align: center;
   text-transform: uppercase;
   white-space: nowrap;
   user-select: none;
-  /* Tones down the colour emoji variant so it sits in the muted palette. Greyscale text
-     is unaffected by this. */
   filter: saturate(0.55);
+}
+/* letter-spacing also pads the LAST glyph, which pushes the string visually left; the
+   matching text-indent puts it back on the optical centre. The two always move together,
+   which is why every rule below declares the pair. */
+.truck-studio-root .ts-card__fallback {
+  padding: 10px;
+  font-size: 26px;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
 }
 /* Per-step sizing: the maps media is ~360px wide, the model/brand media ~280px, and the
    badge media only 220px, so one font-size cannot serve all three. */
@@ -655,20 +724,14 @@
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
 }
-.truck-studio-root .ts-btn--primary {
-  background: var(--accent);
-  border-color: transparent;
-  color: #08101f;
-}
-.truck-studio-root .ts-btn--primary:hover { background: var(--accent); filter: brightness(1.1); }
 .truck-studio-root .ts-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.truck-studio-root .ts-btn:disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
+/* No `--primary` variant and no `:disabled` state: this footer only ever holds "Voltar"
+   and "Cancelar", selector.ts builds both as `ts-btn ts-btn--ghost`, and neither is ever
+   disabled — the row is HIDDEN when there is nothing to go back to or cancel. The
+   carousel arrows are the buttons that do get disabled, and they carry their own rule. */
 
 /* ============================================================
    7. Viewport badges — truck (bottom-left) + scene (top-left)
@@ -718,38 +781,26 @@
   overflow: hidden;
   cursor: pointer;
 
-  /* THE surface — the same smoked glass as #ts-hud (ui/hud.css section 1) and the view
-     controls (studio.css), not the solid --panel this pair used to carry. Everything
-     that floats over the render is now one material: the scene behind it is the
-     subject, and a neutral smoked sheet reads as glass over the render instead of as
-     another opaque card sitting on it. saturate() above 1 puts a little of the scene's
-     colour back after the blur has washed it out.
-
-     The four numbers — 0.42/14px at rest, 0.66/20px hovered — are the panel's, on
-     purpose. Retune them here and they have to be retuned there too.
+  /* THE surface — the same smoked glass as #ts-hud (ui/hud.css) and the view controls
+     (studio.css), not the solid --panel this pair used to carry. Everything that floats
+     over the render is one material, and it is now one DECLARATION of that material:
+     the --ts-glass-* tokens in studio.css. This block used to carry its own copy of the
+     four numbers plus a note saying they had to be retuned in three other files by hand.
 
      NOTE for the internals below: `overflow:hidden` means every child paints over this
      glass, so __media and __fallback had to give up their opaque --panel-2 plates or
      they would punch a solid hole through the top of the card. */
-  background-color: rgba(8, 10, 14, 0.42);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
 
   /* A real drop shadow — the cards have to read as floating over the 3D render, not as
      part of it. */
-  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--ts-glass-shadow);
 
   /* Explicit property list, never `all`: `all` would also animate the entry keyframes
-     and the focus outline. Both filter lists name the same functions in the same order,
-     which is what makes backdrop-filter interpolable — swap blur/saturate around
-     between the two states and it snaps instead of animating. The -webkit- longhand is
-     transitioned separately because in an engine that only understands the prefixed
-     property the unprefixed name is not a known animatable property at all. */
-  transition:
-    border-color 0.18s ease,
-    background-color 0.22s ease,
-    backdrop-filter 0.22s ease,
-    -webkit-backdrop-filter 0.22s ease;
+     and the focus outline. */
+  transition: var(--ts-glass-transition), border-color 0.18s ease;
 }
 
 /* Hover is a BORDER + SURFACE CHANGE ONLY — no lift, no scale, exactly like .ts-card.
@@ -762,31 +813,15 @@
 .truck-studio-root .ts-mapbadge:hover,
 .truck-studio-root .ts-colorbadge:hover {
   border-color: var(--accent);
-  background-color: rgba(8, 10, 14, 0.66);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
 }
 
-/* Without this the cards are a 42%-opaque black film over a bright daylit render —
-   legible only because of the blur. Take the blur away and the name and subtitle sit
-   unreadable on the sky. So the unsupported branch trades the translucency away and goes
-   almost solid, exactly as #ts-hud does.
-
-   Written as `not ((unprefixed) or (-webkit-))` rather than the single unprefixed test:
-   Safari shipped -webkit-backdrop-filter for years without the unprefixed name, and the
-   plain test would have wrongly demoted a browser that blurs perfectly well. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .truck-studio-root .ts-badge,
-  .truck-studio-root .ts-mapbadge,
-  .truck-studio-root .ts-colorbadge {
-    background-color: rgba(10, 13, 19, 0.92);
-  }
-  .truck-studio-root .ts-badge:hover,
-  .truck-studio-root .ts-mapbadge:hover,
-  .truck-studio-root .ts-colorbadge:hover {
-    background-color: rgba(10, 13, 19, 0.97);
-  }
-}
+/* No @supports branch here any more: without a blur these cards would be a 42%-opaque
+   black film over a bright daylit render, with the name and subtitle unreadable on the
+   sky — and the fix for that now lives once, in studio.css, where the fallback swaps the
+   --ts-glass-* values themselves. Everything reading those tokens gets it. */
 
 /* ONE ring, never two. The border is pinned back to --stroke-2 so the accent outline is
    not shadowed by a second concentric accent line 2px inside it — the same standing
@@ -894,35 +929,9 @@
      card em duas linhas e empurrar a pilha por cima do render. */
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Mesma pílula "Trocar" dos outros dois, no lugar que sobra num card deitado.
-   ::after e não um nó: nada aqui é clicável por conta própria — o card é o
-   botão. */
-.truck-studio-root .ts-colorbadge::after {
-  content: "Trocar";
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  z-index: 2;
-  padding: 4px 9px;
-  border: 1px solid var(--stroke-2);
-  border-radius: 7px;
-  background: rgba(13, 16, 23, 0.78);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: var(--text);
-  font-size: 10.5px; font-weight: 600; line-height: 1;
-  white-space: nowrap;
-  translate: 0 -50%;
-  pointer-events: none;
-  opacity: 0.55;
-  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
-}
-.truck-studio-root .ts-colorbadge:hover::after,
-.truck-studio-root .ts-colorbadge:focus-visible::after {
-  opacity: 1;
-  background: rgba(13, 16, 23, 0.92);
-  border-color: var(--accent);
-}
+/* A pílula "Trocar" deste card é a mesma dos outros dois — ver a regra
+   compartilhada no fim da seção. A âncora é o que muda: num card DEITADO ela vai
+   ao meio da altura, e não ao topo. */
 
 /* ---------- truck badge internals ---------- */
 
@@ -947,33 +956,25 @@
   height: 100%;
   object-fit: cover;
 }
-/* Same placeholder plate as the cards, sized for the 220px badge — but with the base
-   gradient held TRANSLUCENT. .ts-card sits on the selector's own solid surface and can
-   afford --panel-2 → --panel; this one sits on glass, and an opaque plate would leave a
-   card whose top half is solid and whose bottom half is not. The weave and the muted
-   uppercase text are what say "no image", and both survive the change. */
+/* A miniatura 3D no crachá — mesma regra do card, e pelo mesmo motivo.
+   `cover` é o certo para a FOTO do manifesto (ela tem fundo e enche a moldura),
+   e é o errado para o RENDER: ele vem com fundo transparente, então `cover`
+   corta o caminhão nas rodas para preencher os 16:9. `contain` mostra o veículo
+   inteiro, e a sombra segue o alfa da imagem em vez da caixa. */
+.truck-studio-root .ts-badge__img--render {
+  padding: 3px 5px;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.45));
+}
+/* The plate above, sized for the 200px badge and held TRANSLUCENT — see that rule. */
 .truck-studio-root .ts-badge__fallback {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  --ts-plate-pitch: 8px;
+  --ts-plate-base: var(--ts-plate-glass);
   padding: 6px;
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.028) 0 8px, transparent 8px 16px),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  color: var(--muted);
-  font-family: inherit;
-  font-weight: 700;
   font-size: 18px;
-  line-height: 1;
   letter-spacing: 0.12em;
   text-indent: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
-  white-space: nowrap;
-  user-select: none;
-  filter: saturate(0.55);
 }
 .truck-studio-root .ts-badge__body {
   display: flex;
@@ -1032,35 +1033,15 @@
   height: 100%;
   object-fit: cover;
 }
-/* Same placeholder plate as .ts-card__fallback / .ts-badge__fallback — diagonal weave,
-   muted uppercase text — but sized for a ~198x111 thumbnail. The weave pitch shrinks
-   along with the box: at the card's 10px/20px it would land as three fat stripes across
-   a box this small. The base gradient is translucent for the same reason as
-   .ts-badge__fallback: this card is glass now, and an opaque plate would split it. */
+/* The plate above, sized for a ~198x111 thumbnail — the smallest of the three, hence the
+   tightest weave pitch. Translucent for the same reason as .ts-badge__fallback. */
 .truck-studio-root .ts-mapbadge__fallback {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  --ts-plate-pitch: 7px;
+  --ts-plate-base: var(--ts-plate-glass);
   padding: 6px;
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.028) 0 7px, transparent 7px 14px),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  color: var(--muted);
-  font-family: inherit;
-  font-weight: 700;
   font-size: 16px;
-  line-height: 1;
   letter-spacing: 0.12em;
-  /* letter-spacing also pads the LAST glyph; the matching indent puts the string back
-     on the optical centre. */
   text-indent: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
-  white-space: nowrap;
-  user-select: none;
-  filter: saturate(0.55);
 }
 .truck-studio-root .ts-mapbadge__body {
   display: flex;
@@ -1097,82 +1078,73 @@
   white-space: nowrap;
 }
 
-/* ---------- "Trocar" affordance, shared by both badges ----------
-   The card itself is the button now, so each badge still needs something that SAYS so;
-   a bare photo with `cursor:pointer` is not an affordance.
+/* ---------- "Trocar" affordance, shared by all three badges ----------
+   The card itself is the button, so each badge still needs something that SAYS so; a
+   bare photo with `cursor:pointer` is not an affordance.
 
-   The truck badge has a real .ts-badge__change node for this. The scene badge's DOM has
-   no equivalent, so its hint is a ::after on the card — same pill, same corner, so the
-   two read as one pattern rather than two ideas.
+   The truck badge has a real .ts-badge__change <span> for this. The other two have no
+   equivalent node, so their hint is a ::after on the card — same pill, same treatment, so
+   the three read as one pattern rather than three ideas. This used to be two rules plus a
+   third one 40 lines up for the colour badge; the only thing that ever differed between
+   them is the ANCHOR, which is the block after this one.
 
-   .ts-badge__change is styled to be correct whether U1 kept it as a <button> or demoted
-   it to a <span> inside the card button: everything visual lives here, and the two
-   button-only bits (:focus-visible ring below, and the fact that it is its own click
-   target) simply never engage on a span. Likewise, if a .ts-mapbadge__change element
-   ever does appear, the :has() rule stands the pseudo down instead of drawing two
-   pills. */
+   `pointer-events: none` on all three: none of them is a click target of its own, and a
+   pill that ate the press would be a target inside a target. The two pseudos could not
+   receive events anyway, and .ts-badge__change is an aria-hidden <span> — the leftovers
+   of the <button> it used to be (appearance, font-family, cursor) went with the same
+   pass: `cursor` inherits from the card, and `appearance` on a span never did anything.
+   Its :focus-visible rule went too — a span with no tabindex cannot ever match it.
+
+   The VALUES are studio.css's --ts-pill-* tokens, which .ts-panel__edit reads as well.
+   The box is written out in both files on purpose: one rule shared across two
+   stylesheets would make index.tsx's import order load-bearing, and it is not today. */
 .truck-studio-root .ts-badge__change,
-.truck-studio-root .ts-mapbadge__change,
-.truck-studio-root .ts-mapbadge::after {
+.truck-studio-root .ts-mapbadge::after,
+.truck-studio-root .ts-colorbadge::after {
   position: absolute;
-  top: 8px;
-  right: 8px;
   z-index: 2;
-  padding: 4px 9px;
+  padding: var(--ts-pill-pad);
   border: 1px solid var(--stroke-2);
   border-radius: 7px;
-  background: rgba(13, 16, 23, 0.78);
+  background: var(--ts-pill-bg);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   color: var(--text);
-  font-family: inherit;
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: pointer;
+  pointer-events: none;
   /* Visible enough to be discoverable, emphasised on hover so it does not compete with
      the photo the rest of the time. */
-  opacity: 0.55;
+  opacity: var(--ts-pill-opacity);
   transition: opacity 0.15s, background 0.15s, border-color 0.15s;
 }
-/* `content` is deliberately NOT in the block above: on a real element (not a pseudo)
-   `content` REPLACES the element's children, which would quietly blank out whatever
-   markup U1 puts inside .ts-badge__change. */
-.truck-studio-root .ts-mapbadge::after {
+/* `content` belongs to the pseudos only: on a real element it REPLACES the children,
+   which would blank out the "Trocar" text .ts-badge__change already carries. */
+.truck-studio-root .ts-badge__change,
+.truck-studio-root .ts-mapbadge::after { top: 8px; right: 8px; }
+.truck-studio-root .ts-mapbadge::after { content: "Trocar"; }
+/* Deitado: a pílula vai ao meio da altura, no espaço que sobra à direita. */
+.truck-studio-root .ts-colorbadge::after {
   content: "Trocar";
-  /* Purely decorative: the whole card is the click target, so the pill must never eat
-     the press nor offer a text caret. */
-  pointer-events: none;
+  top: 50%;
+  right: 8px;
+  translate: 0 -50%;
 }
-.truck-studio-root .ts-mapbadge:has(.ts-mapbadge__change)::after { content: none; }
 
-/* Revealed by hovering or focusing the CARD, because the card is the button. The
-   element's own :hover/:focus-visible is kept too, for the case where .ts-badge__change
-   survived as a separate <button> that can be tabbed to on its own. */
+/* Revealed by hovering or focusing the CARD, because the card is the button. There is no
+   companion rule on the pill's own :hover any more: the span is a child of the card, so
+   hovering it always hovers the card too — the second selector could never match alone. */
 .truck-studio-root .ts-badge:hover .ts-badge__change,
 .truck-studio-root .ts-badge:focus-visible .ts-badge__change,
-.truck-studio-root .ts-badge__change:hover,
-.truck-studio-root .ts-badge__change:focus-visible,
-.truck-studio-root .ts-mapbadge:hover .ts-mapbadge__change,
-.truck-studio-root .ts-mapbadge:focus-visible .ts-mapbadge__change,
-.truck-studio-root .ts-mapbadge__change:hover,
-.truck-studio-root .ts-mapbadge__change:focus-visible,
 .truck-studio-root .ts-mapbadge:hover::after,
-.truck-studio-root .ts-mapbadge:focus-visible::after {
+.truck-studio-root .ts-mapbadge:focus-visible::after,
+.truck-studio-root .ts-colorbadge:hover::after,
+.truck-studio-root .ts-colorbadge:focus-visible::after {
   opacity: 1;
-  background: rgba(13, 16, 23, 0.92);
+  background: var(--ts-pill-bg-hover);
   border-color: var(--accent);
-}
-/* Border held neutral so the outline is the only ring — same one-ring rule as .ts-card.
-   Inert when these are spans: :focus-visible cannot match a non-focusable element. */
-.truck-studio-root .ts-badge__change:focus-visible,
-.truck-studio-root .ts-mapbadge__change:focus-visible {
-  border-color: var(--stroke-2);
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 /* ============================================================
@@ -1294,7 +1266,6 @@
   .truck-studio-root .ts-colorbadge__swatch { width: 36px; }
   .truck-studio-root .ts-colorbadge__body { padding: 7px 52px 8px 9px; }
   .truck-studio-root .ts-colorbadge__name { font-size: 11.5px; }
-  .truck-studio-root .ts-colorbadge::after { opacity: 1; }
   .truck-studio-root .ts-badge,
   .truck-studio-root .ts-mapbadge {
     left: 10px;
@@ -1310,10 +1281,11 @@
   .truck-studio-root .ts-mapbadge__name { font-size: 11.5px; }
   .truck-studio-root .ts-mapbadge__fallback { font-size: 13px; }
   /* "Trocar" must stay visible at every width — on touch there is no hover to reveal it
-     with, and it is the signpost back to the selector. */
+     with, and it is the signpost back to the selector. The colour badge's pill was
+     getting the same treatment from a rule of its own, twenty lines up. */
   .truck-studio-root .ts-badge__change,
-  .truck-studio-root .ts-mapbadge__change,
-  .truck-studio-root .ts-mapbadge::after { opacity: 1; padding: 5px 9px; }
+  .truck-studio-root .ts-mapbadge::after,
+  .truck-studio-root .ts-colorbadge::after { opacity: 1; padding: 5px 9px; }
 }
 
 /* ---------- short viewports ----------
@@ -1361,7 +1333,6 @@
   .truck-studio-root .ts-mapbadge__fallback { font-size: 11px; letter-spacing: 0.06em; text-indent: 0.06em; }
   /* No thumbnail left to park the pill over, so it moves to the right edge and centres
      on the row; the body's right padding above is what reserves its column. */
-  .truck-studio-root .ts-mapbadge__change,
   .truck-studio-root .ts-mapbadge::after {
     top: 50%;
     right: 7px;
@@ -1394,16 +1365,13 @@
     animation: none;
   }
   .truck-studio-root .ts-selector__inner { translate: none; }
-  .truck-studio-root .ts-card,
-  .truck-studio-root .ts-card:hover,
-  .truck-studio-root .ts-card:active,
+  /* Only the breadcrumb step is left here. The card, its hover/active states and
+     .ts-card__img used to be cancelled too, from a time when hovering a card lifted it
+     and zoomed the photo; neither does any of that now — hover is border + surface only,
+     stated as a rule at the top of section 5 — so those overrides were cancelling
+     transforms and transitions that no base rule declares. */
   .truck-studio-root .ts-step.is-clickable:hover {
     transform: none;
-  }
-  .truck-studio-root .ts-card__img,
-  .truck-studio-root .ts-card:hover .ts-card__img {
-    transform: none;
-    transition: none;
   }
   .truck-studio-root .ts-selector,
   .truck-studio-root .ts-selector__inner,
@@ -1415,7 +1383,6 @@
   .truck-studio-root .ts-mapbadge,
   .truck-studio-root .ts-colorbadge,
   .truck-studio-root .ts-badge__change,
-  .truck-studio-root .ts-mapbadge__change,
   .truck-studio-root .ts-mapbadge::after,
   .truck-studio-root .ts-colorbadge::after {
     transition-duration: 0.01ms;

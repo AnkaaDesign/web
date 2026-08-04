@@ -28,14 +28,14 @@
 
    All styling lives in selector.css. The only inline styles we ever write are
    the per-brand `--ts-accent` custom property and image `src`. */
-import { root, $opt, isMounted } from '../core/dom';
+import { root, $opt, isMounted, el, initials } from '../core/dom';
 import {
   catalog, getEnvironment, getManufacturer, getModel, defaultChoice, assetUrl,
   saveChoice, loadChoice,
 } from '../catalog/catalog';
 import type { Choice, ResolvedChoice } from '../catalog/catalog';
 import {
-  colors, getColor, defaultColor, defaultColorId, FINISH_LABEL,
+  colorsFor, getColor, defaultColor, defaultColorId, FINISH_LABEL,
 } from '../catalog/colors';
 import type { PaintColorDef } from '../catalog/colors';
 import { cabPreview, peekCabPreview, hasCabPreview, warmCabPreview } from './preview';
@@ -43,8 +43,9 @@ import type { PaintFinish } from '../vehicle/paint';
 
 /** Which steps a flow walks; see FLOWS. */
 export type FlowId = 'full' | 'map' | 'truck' | 'color';
-/** The four steps, by the id STEPS uses. */
-export type StepId = 'map' | 'manufacturer' | 'model' | 'color';
+/** The four steps, by the id STEPS uses. Module-private: a caller names a FLOW,
+    never a step — see openSelector. */
+type StepId = 'map' | 'manufacturer' | 'model' | 'color';
 
 /** One step's static description — everything but the cards it renders. */
 interface StepDef {
@@ -104,6 +105,12 @@ export interface BadgeInfo {
   modelName?: string | null;
   modelSubtitle?: string | null;
   modelImage?: string | null;
+  /**
+   * A MESMA miniatura 3D dos cards do seletor: o cavalo escolhido renderizado na
+   * cor escolhida. `modelImage` (a foto do manifesto) vira o fallback de quem
+   * não tem geometria leve — ver setBadge().
+   */
+  preview?: CardPreview | null;
   manufacturerName?: string | null;
   logo?: string | null;
 }
@@ -163,8 +170,6 @@ const STEPS: StepDef[] = [
     aria: 'Cores disponíveis',
   },
 ];
-
-const STEP_INDEX: Record<StepId, number> = { map: 0, manufacturer: 1, model: 2, color: 3 };
 
 /* Tag de canto de tudo que ainda não tem geometria 3D. Uma constante porque o
    card do fabricante e o do modelo têm de dizer exatamente a mesma coisa. */
@@ -241,24 +246,11 @@ let lastChoice: ResolvedChoice | null = null;
 
 const listeners: ((choice: ResolvedChoice) => void)[] = [];
 
-/* ---------------- tiny DOM helpers (house style: build it in JS) ---------------- */
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K, cls?: string, text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-/* Initials are the graceful degradation for a missing photo: "Volvo FH16" → "VF".
-   Better than a broken-image icon, and it still identifies the card. */
-function initials(name: string | null | undefined) {
-  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return '🚛';
-  return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
-}
+/* ---------------- tiny DOM helpers (house style: build it in JS) ----------------
+   `el` and `initials` live in core/dom.ts: ui/hud.ts and ui/loader.ts build
+   their DOM the same way, and loader.ts's placeholder tile has to spell the
+   truck with exactly the same two letters this file's badge does, or the
+   outro's FLIP reads as a swap between two objects instead of one moving. */
 
 /**
  * Append an <img> to `box`, swapping in a text placeholder if the path is null
@@ -561,7 +553,12 @@ function backfill(choice: Choice): ResolvedChoice {
 
 /* Never open on a step whose prerequisite is missing — the model step with no
    manufacturer picked would render an empty grid with no way forward — and
-   never on a step outside the flow the caller asked for. */
+   never on a step outside the flow the caller asked for.
+
+   Today it is only ever asked for `seq[0]`, so with the backfill above it is an
+   identity: kept because it is what makes the OPENING step depend on the choice
+   rather than on the flow table, which is the invariant a fifth flow (or a
+   stale saved choice that outlives a manifest edit) would otherwise break. */
 function clampStep(requested: number, choice: Choice, seq: number[]) {
   let i = requested;
   /* O passo da cor renderiza o MODELO escolhido em cada card; sem modelo não há
@@ -641,7 +638,13 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
   const picked = getModel(choice.modelId);
   const cabId = picked?.model.cab || null;
   const renderable = !!cabId && hasCabPreview(cabId);
-  return colors.map((c) => ({
+  /* AS TINTAS DA MONTADORA ESCOLHIDA, não o catálogo inteiro. A tabela `Paint`
+     amarra cada cor a uma montadora, e é essa a pergunta deste passo: de que cor
+     ESTE caminhão. Mostrar as 522 do catálogo geral seria mostrar tinta de
+     concorrente — e, pior, colocar as linhas de teste na frente, porque quase
+     todas têm `colorOrder` 0. Montadora sem tinta cadastrada cai na paleta
+     inteira; ver colorsFor(). */
+  return colorsFor(choice.manufacturerId).map((c) => ({
     id: c.id,
     name: c.name,
     sub: FINISH_LABEL[c.finish] + (c.code ? ' · ' + c.code : ''),
@@ -669,12 +672,22 @@ function colorOf(choice: Choice): PaintColorDef {
    manifesto ou a placa de iniciais) SAI: são a mesma informação dita pior, e
    empilhá-las deixaria a foto aparecendo por baixo do fundo transparente do
    render. */
-function setRender(media: HTMLElement, url: string, alt: string) {
-  const img = el('img', 'ts-card__img ts-card__img--render');
+/**
+ * Troca o conteúdo de uma moldura pela miniatura 3D.
+ *
+ * `ns` é o PREFIXO das classes ('ts-card' ou 'ts-badge') e existe porque as duas
+ * molduras são estilizadas por regras diferentes: `.ts-card__img` é
+ * `object-fit: contain` numa caixa 16:10, `.ts-badge__img` é `cover` numa 16:9.
+ * Emitir a classe do card dentro do crachá deixaria o render sem estilo E não
+ * removeria a foto que já está lá — as duas ficariam empilhadas.
+ */
+function setRender(media: HTMLElement, url: string, alt: string, ns = 'ts-card') {
+  const img = el('img', ns + '__img ' + ns + '__img--render');
   img.decoding = 'async';
   img.alt = alt || '';
   img.src = url;
-  for (const old of media.querySelectorAll('.ts-card__img, .ts-card__fallback, .ts-card__logo')) {
+  for (const old of media.querySelectorAll(
+    '.' + ns + '__img, .' + ns + '__fallback, .' + ns + '__logo')) {
     old.remove();
   }
   media.insertBefore(img, media.firstChild);
@@ -1113,15 +1126,18 @@ function finish() {
  * choice) and true for the partial flows (the user already has a working
  * configuration on screen, so backing out has a sane meaning).
  *
+ * There is no "start on step N" option: a flow always opens on its own first
+ * step. The badges are what made one unnecessary — each of them opens the flow
+ * that IS the part of the wizard it stands for, which is the same request said
+ * in terms callers already have to know about.
+ *
  * @param {{ flow?: 'full'|'map'|'truck'|'color',
- *           step?: 'map'|'manufacturer'|'model'|'color',
  *           choice?: { envId, manufacturerId, modelId, colorId },
  *           cancellable?: boolean }} [opts]
  * @returns {Promise<{ envId, manufacturerId, modelId, colorId }|null>}
  */
 export function openSelector(opts: {
   flow?: FlowId;
-  step?: StepId;
   choice?: Choice | null;
   cancellable?: boolean;
 } = {}): Promise<ResolvedChoice | null> {
@@ -1152,16 +1168,13 @@ export function openSelector(opts: {
      up front — then every step it DOES show renders with a real selection. */
   if (flow !== 'full') backfill(choice);
 
-  const asked = opts.step ? STEP_INDEX[opts.step] : undefined;
-  const requested = asked != null ? asked : seq[0];
-
   return new Promise<ResolvedChoice | null>((resolve) => {
     session = {
       resolve,
       flow,
       seq,
       cancellable: opts.cancellable == null ? flow !== 'full' : !!opts.cancellable,
-      step: clampStep(requested, choice, seq),
+      step: clampStep(seq[0], choice, seq),
       choice,
       prevFocus,
     };
@@ -1175,16 +1188,6 @@ export function openSelector(opts: {
     overlay.classList.add('is-open');
     renderStep(true);
   });
-}
-
-/** @returns {boolean} */
-export function isSelectorOpen(): boolean {
-  return !!session;
-}
-
-/** Force-close; resolves the pending promise with null. */
-export function closeSelector() {
-  settle(null);
 }
 
 /* ---------------- keyboard: focus trap + Esc ---------------- */
@@ -1267,6 +1270,9 @@ function detachGlobalListeners() {
 
 /* ---------------- badges ---------------- */
 
+/* Geração do render do crachá do caminhão. Ver setBadge(). */
+let badgeRenderToken = 0;
+
 /**
  * Fill the bottom-left truck card. Pass null to hide it.
  * @param {{ modelName?: string, modelSubtitle?: string, modelImage?: string,
@@ -1280,10 +1286,31 @@ export function setBadge(info: BadgeInfo | null) {
   }
 
   badgeMedia.textContent = '';
+  /* A FOTO PRIMEIRO, sempre — e o render por cima quando ele existir.
+     O crachá é desenhado no meio de applyChoice(), antes de a cortina subir, e
+     nesse instante a miniatura desta cor pode ainda não ter sido renderizada.
+     Pintar a foto agora e trocar depois dá ao crachá o mesmo comportamento dos
+     cards (conteúdo imediato, render quando chega) em vez de um buraco. */
   appendImage(
     badgeMedia, info.modelImage, info.modelName || '',
     'ts-badge__img', 'ts-badge__fallback', initials(info.modelName),
   );
+  if (info.preview) {
+    const p = info.preview;
+    const ready = peekCabPreview(p.cabId, p.hex, p.finish);
+    if (ready) {
+      setRender(badgeMedia, ready, info.modelName || '', 'ts-badge');
+    } else {
+      /* O token fecha a corrida: trocar de caminhão ou de cor enquanto este
+         render está em voo tem de descartar o que chegar tarde, senão o crachá
+         mostra a cor anterior por cima da atual. */
+      const mine = ++badgeRenderToken;
+      void cabPreview(p.cabId, p.hex, p.finish).then((url) => {
+        if (!url || mine !== badgeRenderToken) return;
+        setRender(badgeMedia, url, info.modelName || '', 'ts-badge');
+      });
+    }
+  }
 
   badgeName.textContent = info.modelName || '';
   badgeSub.textContent = info.modelSubtitle || '';

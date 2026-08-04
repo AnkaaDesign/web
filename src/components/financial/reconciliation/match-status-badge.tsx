@@ -12,6 +12,8 @@ import type {
   BankTransactionCategoryTag,
   ReconciliationSource,
   ReconciliationStatus,
+  SettlementState,
+  TransactionSettlement,
 } from "@/types/reconciliation";
 
 /**
@@ -287,11 +289,101 @@ function CategoryChipsRow({
   );
 }
 
+/**
+ * Legacy three-way split of what backs a resolved transaction. Superseded by
+ * the API-derived `settlement` (see `TransactionSettlement`), which knows all
+ * seven anchors instead of collapsing four of them into "SETTLEMENT_ANCHOR".
+ * Kept as the fallback path for callers that have no settlement yet.
+ */
+export type ReconciliationLinkage =
+  | "FISCAL_DOCUMENT"
+  | "SETTLEMENT_ANCHOR"
+  | "NONE";
+
+/**
+ * The colour contract, and the only question it answers: **do I still have to
+ * touch this row?**
+ *
+ *   verde    — fechado, nada a fazer
+ *   amarelo  — falta trabalho (conciliar, ou buscar a nota)
+ *   vermelho — conciliado mas os valores discordam
+ *   cinza    — ignorado de propósito
+ *
+ * This is why a category-resolved line (Tarifa Bancária, Folha, Tributo) is
+ * GREEN and not grey: it is genuinely finished, and grey read as unfinished. It
+ * is also why a supplier payment cleared against a pedido with no nota is
+ * YELLOW even though the row is RECONCILED in the database — the money is
+ * proven, the fiscal leg is not.
+ */
+const SETTLEMENT_PRESENTATION: Record<
+  SettlementState,
+  { label: string; variant: BadgeProps["variant"]; title: string }
+> = {
+  SETTLED: {
+    label: "Conciliado",
+    variant: "completed",
+    title: "Conciliado e fechado — nada pendente nesta linha",
+  },
+  AWAITING_NF: {
+    label: "Aguardando nota",
+    variant: "amber",
+    title:
+      "O pagamento está provado pelo extrato e pela obrigação (pedido/conta), mas a nota fiscal ainda não foi vinculada",
+  },
+  UNTIED: {
+    label: "Sem vínculo",
+    variant: "amber",
+    title:
+      "Fechada apenas pela categoria, mas essa categoria tem contas recorrentes ativas — a obrigação existe e este pagamento não foi amarrado a nenhuma delas",
+  },
+  UNBACKED: {
+    label: "Sem lastro",
+    variant: "orange",
+    title:
+      "Marcada como resolvida sem nenhum documento nem categoria que a justifique — precisa de revisão",
+  },
+  OPEN: { label: "Pendente", variant: "pending", title: "Ainda não conciliada" },
+  DISPUTED: {
+    label: "Em disputa",
+    variant: "cancelled",
+    title: "Conciliada, mas os valores não fecham",
+  },
+  IGNORED: { label: "Ignorado", variant: "muted", title: "Fora do escopo da conciliação" },
+};
+
+/**
+ * The badge's text as a plain string — for the table's sort key, the toolbar
+ * search and the XLSX/PDF export, which must not keep saying "Resolvido" about
+ * a row the badge now calls "Aguardando nota".
+ */
+export function settlementStatusText(
+  status: ReconciliationStatus,
+  settlement?: TransactionSettlement | null,
+): string {
+  if (!settlement) return STATUS_LABEL[status] ?? status;
+  if (settlement.threeWay?.flag === "MISMATCH" || settlement.overAllocated) {
+    return "Divergência";
+  }
+  // Category-resolved rows say "Resolvido" and nothing else — the category name
+  // already has its own column, and repeating it in the status chip ("Resolvido
+  // · Pensão", "Resolvido · Folha de Pagamento") only made the column noisy.
+  if (settlement.state === "SETTLED" && settlement.anchor === "CATEGORY") return "Resolvido";
+  if (settlement.state === "OPEN" && status === "PARTIAL") return "Parcial";
+  return SETTLEMENT_PRESENTATION[settlement.state].label;
+}
+
 interface Props {
   status: ReconciliationStatus;
   /** Best candidate confidence (0-100). When provided on a PENDING/PARTIAL row,
    *  a colored "40%" chip is shown next to the status for quick triage. */
   topMatchScore?: number | null;
+  /** API-derived settlement view. When present it drives the whole badge — this
+   *  is what keeps the Extrato and the detail page saying the same thing. */
+  settlement?: TransactionSettlement | null;
+  /** Legacy fallback, used only when `settlement` is absent. */
+  linkage?: ReconciliationLinkage | null;
+  /** Resolving category name ("Tarifa Bancária"), shown on category-resolved rows. */
+  resolvedByLabel?: string | null;
   className?: string;
 }
 
@@ -300,19 +392,81 @@ interface Props {
  * their own dedicated column (see CategoryChips) — this badge is status-only.
  * For unresolved rows it can also surface the best candidate's confidence.
  */
-export function MatchStatusBadge({ status, topMatchScore, className }: Props) {
-  const cfg = STATUS_VARIANT[status];
+export function MatchStatusBadge({
+  status,
+  topMatchScore,
+  settlement,
+  linkage,
+  resolvedByLabel,
+  className,
+}: Props) {
   const showScore =
     (status === "PENDING" || status === "PARTIAL") &&
     typeof topMatchScore === "number" &&
     topMatchScore > 0;
+
+  if (settlement) {
+    const p = SETTLEMENT_PRESENTATION[settlement.state];
+    // A mismatch between the three legs — or matches claiming more money than
+    // the transaction moved — outranks the state's own colour: the row IS
+    // matched, but the figures disagree and a human has to look.
+    const mismatch =
+      settlement.threeWay?.flag === "MISMATCH" || settlement.overAllocated;
+    let label = p.label;
+    if (settlement.state === "SETTLED" && settlement.anchor === "CATEGORY") {
+      // Just "Resolvido" — the category has its own column; naming it again here
+      // ("Resolvido · Pensão") duplicated it without adding anything.
+      label = "Resolvido";
+    } else if (settlement.state === "OPEN" && status === "PARTIAL") {
+      label = "Parcial";
+    }
+    return (
+      <Badge
+        variant={mismatch ? "cancelled" : p.variant}
+        className={`whitespace-nowrap ${className ?? ""}`}
+        title={
+          settlement.overAllocated
+            ? "Os vínculos somam mais do que o valor da transação — o pagamento está lançado em duplicidade"
+            : mismatch
+              ? "Os valores de extrato, obrigação e nota não fecham"
+              : p.title
+        }
+      >
+        {label}
+        {mismatch && <span className="ml-1 opacity-80">· divergência</span>}
+        {showScore && !mismatch && (
+          <span className="ml-1 opacity-80">· {Math.round(topMatchScore!)}%</span>
+        )}
+      </Badge>
+    );
+  }
+
+  // ---- Fallback: no settlement on the payload (older cached responses). ----
+  const resolved = status === "RECONCILED" || status === "PARTIAL";
+  let label: string = STATUS_LABEL[status];
+  let variant = STATUS_VARIANT[status];
+  let title: string | undefined = showScore
+    ? "Confiança da melhor nota candidata"
+    : undefined;
+
+  if (resolved && linkage === "SETTLEMENT_ANCHOR") {
+    label = status === "PARTIAL" ? "Parcial · liquidado" : "Liquidado";
+    variant = "inProgress";
+    title = "Conciliado contra boleto, parcela ou pagamento recorrente — sem nota fiscal vinculada";
+  } else if (resolved && linkage === "NONE") {
+    label = resolvedByLabel ? `Resolvido · ${resolvedByLabel}` : "Resolvido sem documento";
+    variant = "muted";
+    title =
+      "Resolvido por categoria, sem documento vinculado. Não há nota fiscal associada a esta transação.";
+  }
+
   return (
     <Badge
-      variant={cfg}
+      variant={variant}
       className={`whitespace-nowrap ${className ?? ""}`}
-      title={showScore ? "Confiança da melhor nota candidata" : undefined}
+      title={title}
     >
-      {STATUS_LABEL[status]}
+      {label}
       {showScore && (
         <span className="ml-1 opacity-80">· {Math.round(topMatchScore!)}%</span>
       )}

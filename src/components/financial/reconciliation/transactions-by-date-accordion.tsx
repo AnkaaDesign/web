@@ -717,7 +717,13 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       );
     }
     case "reconciliationStatus": {
-      return <MatchStatusBadge status={t.reconciliationStatus} topMatchScore={t.topMatchScore} />;
+      return (
+        <MatchStatusBadge
+          status={t.reconciliationStatus}
+          topMatchScore={t.topMatchScore}
+          settlement={t.settlement}
+        />
+      );
     }
     default:
       return null;

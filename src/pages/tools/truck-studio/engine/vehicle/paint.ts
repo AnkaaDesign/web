@@ -52,95 +52,137 @@
                                           keeps it from reading as sandpaper)
 */
 import * as THREE from 'three';
+import { clamp01 } from '../core/dom';
 
 /* ---------------- parameter space ----------------
    Everything the UI can touch, normalised 0..1 (or a hex colour). This object
    is the single source of truth, is what localStorage/share links would carry,
    and is applied to every paint material by applyToMaterials(). */
-export const PAINT_FINISHES = ['solid', 'metallic', 'pearl'] as const;
+const PAINT_FINISHES = ['solid', 'metallic', 'pearl'] as const;
 
 /** The three finish families; see the module header for what each one models. */
 export type PaintFinish = (typeof PAINT_FINISHES)[number];
 
-/** Everything the UI can touch. Normalised 0..1, except the hex colours. */
+/**
+ * UMA RECEITA DE TINTA — o mesmo conjunto de campos que `paint-lab.html` salva.
+ *
+ * Este tipo deixou de ser "o que a UI pode mexer" e passou a ser O CONTRATO COM
+ * O LABORATÓRIO. O laboratório é onde a tinta é ajustada no olho, contra
+ * geometria e luz de verdade; se ele produz um campo que este material não sabe
+ * ler, a tinta aprovada lá não é a tinta que sai aqui — e foi exatamente o que
+ * acontecia com `pearlMid` e `peelDetail`.
+ *
+ * Todos os nomes são os DO LABORATÓRIO, deliberadamente. Já houve uma tradução
+ * no meio (`flop`, `flakeSize`, `flakeGlint`, `pearlSharp`, `ccGloss`) e ela era
+ * uma fonte silenciosa de divergência: cada renomeio é uma chance de o mapa
+ * ficar defasado do shader. Uma receita colada do laboratório agora entra em
+ * setPaint() sem passar por lugar nenhum que precise ser mantido em dia.
+ */
 export interface PaintParams {
   finish: PaintFinish;
   color: string;
-  /** clearcoat gloss → clearcoatRoughness */
-  ccGloss: number;
-  /** orange peel → coat micro-normal */
-  peel: number;
-  baseRough: number;
-  metallic: number;
-  flop: number;
-  flakeSize: number;
+  metalness: number;
+  roughness: number;
+  /** 0..1 — brilho do verniz; vira clearcoatRoughness */
+  gloss: number;
+
+  /* ---- perolizado: a cor VIAJA com o ângulo, face → meio → virada ---- */
+  pearlAmount: number;
+  /** o tom do MEIO do percurso — o que faltava, e o que separa um perolizado
+      de dois tons de um de três */
+  pearlMid: string;
+  /** a cor no ângulo rasante (o amarelo do Saiph, o rosa do Ruby) */
+  pearlFlip: string;
+  /** expoente do percurso: alto = a virada só aparece bem de raspão */
+  pearlTravel: number;
+
+  /* ---- floco metálico / mica ---- */
+  flakeAmount: number;
   flakeColor: string;
-  flakeGlint: number;
-  pearl: number;
-  pearlColor: string;
-  pearlSharp: number;
-  /**
-   * Quanto do ambiente a tinta devolve — `material.envMapIntensity`.
-   *
-   * É o parâmetro que mais mexe em QUANTO PIGMENTO SOBRA na tela, e por isso
-   * está aqui em vez de ser uma constante: com clearcoat 1.0 o verniz integra o
-   * hemisfério inteiro, e cada ponto de ambiente é uma folha a mais de reflexo
-   * por cima da cor. Medido no rubi #8d1524 (origem h 353° s 74%): a lataria
-   * chega à tela em h 7° s 52%, e tirar o verniz devolve h 359° s 64% — ou
-   * seja, o reflexo do verniz sozinho responde por ~8° de desvio de matiz e
-   * metade da saturação perdida.
-   *
-   * O default segue 1.3, que é o que o estúdio sempre usou.
-   */
-  envMapIntensity: number;
+  /** células por metro do Voronoi — densidade real, não um 0..1 */
+  flakeDensity: number;
+  /** quanto cada floco inclina a normal */
+  flakeTilt: number;
+  /** rugosidade DO floco (baixa = espelhinho) */
+  flakeGloss: number;
+
+  /* ---- casca de laranja, no verniz ---- */
+  peel: number;
+  peelScale: number;
+  /** segunda oitava do ruído: pele mais fina sobre a ondulação grande */
+  peelDetail: number;
+
+  /* ---- profundidade do verniz e tamanho do floco na tela ---- */
+  /** espessura ótica do verniz: desloca os flocos lateralmente com o ângulo,
+      que é o que os faz parecer SUSPENSOS sob um filme e não impressos */
+  coatThickness: number;
+  /** alvo, em pixels, da célula de floco — governa o antialiasing */
+  flakePx: number;
 }
 
-/** The finish-specific half of PaintParams — what switching finish resets. */
-export type PaintFinishDefaults =
-  Omit<PaintParams, 'finish' | 'color' | 'ccGloss' | 'peel' | 'envMapIntensity'>;
+/** A metade específica do acabamento — o que trocar de acabamento reseta. */
+type PaintFinishDefaults = Omit<PaintParams, 'finish' | 'color'>;
 
-/* Per-finish starting points. Switching finish resets the finish-specific
-   params to these (the shared ones — colour, coat gloss, peel — are kept). */
-export const PAINT_DEFAULTS_BY_FINISH: Record<PaintFinish, PaintFinishDefaults> = {
+/* Pontos de partida por acabamento. São os MESMOS números do `FINISHES` do
+   laboratório, expandidos com os campos que lá vêm do preset carregado. Uma
+   tinta com receita sobrepõe tudo isto; estes valores são o que uma tinta sem
+   curadoria recebe. */
+const PAINT_DEFAULTS_BY_FINISH: Record<PaintFinish, PaintFinishDefaults> = {
   solid: {
-    baseRough: 0.42,
-    metallic: 0, flop: 0,
-    flakeSize: 0.35, flakeColor: '#ffffff', flakeGlint: 0.5,
-    pearl: 0, pearlColor: '#ffffff', pearlSharp: 0.45,
+    metalness: 0.03, roughness: 0.26, gloss: 1.00,
+    pearlAmount: 0.00, pearlMid: '#ffffff', pearlFlip: '#ffffff', pearlTravel: 2.10,
+    flakeAmount: 0.00, flakeColor: '#ffffff', flakeDensity: 300,
+    flakeTilt: 0.38, flakeGloss: 0.07,
+    peel: 0.08, peelScale: 46, peelDetail: 0.5,
+    coatThickness: 0.012, flakePx: 2.4,
   },
   metallic: {
-    baseRough: 0.34,
-    metallic: 0.72, flop: 0.65,
-    flakeSize: 0.38, flakeColor: '#ffffff', flakeGlint: 0.55,
-    pearl: 0, pearlColor: '#ffffff', pearlSharp: 0.45,
+    metalness: 0.88, roughness: 0.34, gloss: 0.97,
+    pearlAmount: 0.12, pearlMid: '#ffffff', pearlFlip: '#ffffff', pearlTravel: 2.60,
+    flakeAmount: 0.55, flakeColor: '#ffffff', flakeDensity: 320,
+    flakeTilt: 0.40, flakeGloss: 0.06,
+    peel: 0.09, peelScale: 46, peelDetail: 0.5,
+    coatThickness: 0.013, flakePx: 2.4,
   },
   pearl: {
-    baseRough: 0.38,
-    metallic: 0, flop: 0.35,
-    flakeSize: 0.24, flakeColor: '#fff6e0', flakeGlint: 0.38,
-    pearl: 0.62, pearlColor: '#d8c7a8', pearlSharp: 0.45,
+    metalness: 0.82, roughness: 0.30, gloss: 1.00,
+    pearlAmount: 0.85, pearlMid: '#ffffff', pearlFlip: '#ffffff', pearlTravel: 2.10,
+    flakeAmount: 0.38, flakeColor: '#fff6e0', flakeDensity: 300,
+    flakeTilt: 0.36, flakeGloss: 0.07,
+    peel: 0.08, peelScale: 46, peelDetail: 0.5,
+    coatThickness: 0.015, flakePx: 2.4,
   },
 };
 
 const PAINT_BASE: PaintParams = {
   finish: 'metallic',
   color: '#b9bec6',
-  ccGloss: 0.90,        // clearcoat gloss  → clearcoatRoughness
-  peel: 0.12,           // orange peel      → coat micro-normal
-  envMapIntensity: 1.3, // quanto do ambiente o verniz devolve
   ...PAINT_DEFAULTS_BY_FINISH.metallic,
 };
 
-/* ---------------- colours derived from the base colour ----------------
-   Aluminium flakes physically take on some of the pigment they are suspended
-   in, and mica flop colours are relatives of the face colour — a flake or flop
-   colour picked independently of the base reads as glitter dust or as two
-   unrelated paints. So both follow the base colour automatically, and stop
-   doing so only once the user picks one deliberately (which then holds until
-   the next base-colour change). */
+/* ---------------- cores derivadas da cor base ----------------
+   O floco de alumínio absorve parte do pigmento em que está suspenso, e a cor de
+   virada da mica é parente da cor de face — um floco ou uma virada escolhidos
+   independentemente da base leem como purpurina ou como duas tintas diferentes.
+   Por isso as duas SEGUEM a cor base.
+
+   MAS A DERIVAÇÃO É O PADRÃO, NÃO A LEI. Ela existe para a tinta que ninguém
+   mediu: dá um resultado plausível a partir de um hex e nada mais. Uma tinta
+   MEDIDA sobrepõe.
+
+   Esta distinção já foi apagada uma vez, em 2026-08-03, e vale registrar por
+   quê: os dois sinalizadores de override foram removidos como inalcançáveis,
+   com o argumento — correto naquele instante — de que o catálogo de cores só
+   nomeava hex e acabamento, então ninguém nunca passava `flakeColor` nem
+   `pearlColor`. O que mudou foi o DADO, não o código: a tabela `Paint` tem
+   receita por tinta (`previewConfig`), e o `Vermelho Ruby` da Scania pede
+   `pearlFlip: #ae0034` sobre uma face `#c01c28`. Nenhuma rotação de matiz sobre
+   o hex chega lá — é uma medição, não uma fórmula.
+
+   Os sinalizadores voltaram por isso. Sem eles, `syncDerivedColors()` roda a
+   cada troca de cor e apaga a receita logo depois de ela ser aplicada. */
 const _tmpA = new THREE.Color(), _tmpB = new THREE.Color();
 const WHITE_C = new THREE.Color(0xffffff);
-let userFlakeColor = false, userPearlColor = false;
 
 function derivedFlakeColor(hex: string) {
   _tmpA.set(hex).lerp(WHITE_C, 0.62);
@@ -173,397 +215,346 @@ function derivedPearlColor(hex: string) {
   return '#' + _tmpB.getHexString(THREE.SRGBColorSpace);
 }
 
+/* Levantados quando uma RECEITA nomeia a cor; a partir daí a derivação não
+   toca mais naquele campo. Voltam a zero quando a receita sai (uma tinta sem
+   curadoria depois de uma com curadoria). */
+let userFlakeColor = false;
+let userPearlColor = false;
+
 function syncDerivedColors() {
   if (!userFlakeColor) params.flakeColor = derivedFlakeColor(params.color);
-  if (!userPearlColor) params.pearlColor = derivedPearlColor(params.color);
+  if (!userPearlColor) {
+    /* A virada derivada, e o MEIO do percurso junto. O laboratório autora os
+       dois; derivando, o meio fica na metade do caminho entre face e virada —
+       que é o que um perolizado de dois tons era antes deste port. */
+    const flip = derivedPearlColor(params.color);
+    params.pearlFlip = flip;
+    params.pearlMid = '#' + _tmpA.set(params.color)
+      .lerp(_tmpB.set(flip), 0.5).getHexString(THREE.SRGBColorSpace);
+  }
 }
 
 /* live parameters */
 const params: PaintParams = { ...PAINT_BASE };
-export const getPaintParams = (): PaintParams => ({ ...params });
-export const getFinish = () => params.finish;
+const getPaintParams = (): PaintParams => ({ ...params });
 syncDerivedColors();               // seed flake/flop tints from the base colour
 
-/* ---------------- shared uniforms ----------------
-   Every paint material (cab + trailer body + trailer front wall) references
-   the SAME uniform objects, so one write live-updates all of them. */
-const U = {
-  uFlakeScale: { value: 400 },
-  uFlakeStrength: { value: 0 },
-  uFlakeTint: { value: new THREE.Color(0xffffff) },
-  uGlintPower: { value: 600 },
-  uGlintJitter: { value: 0.26 },
-  /* fraction of cells that are actually a flake. This must stay SPARSE: at 0.7
-     the env-lit term stops being sparkle and becomes a uniform bright wash that
-     both flattens the paint and aliases into speckle at distance (measured:
-     +11 luminance, −11 stddev over the flank — brighter AND flatter, the exact
-     opposite of what flakes should do). */
-  uFlakeCoverage: { value: 0.22 },
-  uGlintGain: { value: 1.5 },
-  uFlakeEnvGain: { value: 0.32 },
-  uFlakeEnvRough: { value: 0.12 },
-  uFlopStrength: { value: 0 },
-  uPearlColor: { value: new THREE.Color(0xffffff) },
-  uPearlStrength: { value: 0 },
-  uPearlPower: { value: 1.8 },
-  uOrangePeel: { value: 0 },
-  uOrangePeelScale: { value: 140 },
-  /* key light, published by the scene rig every frame: direction is VIEW
-     space and points toward the light; colour is linear × intensity. We do not
-     read directionalLights[0] any more — three sorts shadow-casting lights
-     first, so that index is not a stable contract, and a preset that dims the
-     sun to zero would silently kill every glint. */
-  uKeyLightDir: { value: new THREE.Vector3(0, 0, 1) },
-  uKeyLightColor: { value: new THREE.Color(0xffffff) },
-  uGlintBoost: { value: 1 },     // night presets need brighter glints to read
-};
-export const _sharedPaint = U;   // tuning handle (window.__studio)
-
-/* Called by the scene rig once per frame. */
-export function setKeyLight(dirView: THREE.Vector3, colorLinear: THREE.Color, boost?: number) {
-  U.uKeyLightDir.value.copy(dirView);
-  U.uKeyLightColor.value.copy(colorLinear);
-  if (typeof boost === 'number') U.uGlintBoost.value = boost;
-}
-
-/* ---------------- parameter → material/uniform mapping ---------------- */
-const clamp01 = (v: number) => Math.min(1, Math.max(0, +v || 0));
-
-/* Metalness is the danger dial. Real metallic paint keeps a pigmented
-   dielectric basecoat; practitioners put the metal in a masked flake layer and
-   leave the body at 0 (or 0.05–0.25 when there is no flake lobe). We keep a
-   little so the flop and the F0 tint have something to bite on, and cap it far
-   below anything that would read as aluminium. */
-const METAL_CAP: Record<PaintFinish, number> = { solid: 0, metallic: 0.28, pearl: 0.22 };
-
-function metalnessFor(p: PaintParams) {
-  if (p.finish === 'metallic') return 0.04 + 0.24 * clamp01(p.metallic);
-  if (p.finish === 'pearl') return 0.08 + 0.14 * clamp01(p.pearl);
-  return 0;
-}
-
-const FLAKE_FREQ_FINE = 650, FLAKE_FREQ_COARSE = 125;
-
+/* Todo material de tinta vivo. Pertencimento ao CONJUNTO, não casamento de
+   nome: os nomes de origem variam ("carpaint", "CarPaint_01", …) e um teste por
+   substring seria frágil. */
 const materials = new Set<THREE.MeshPhysicalMaterial>();
 
-/* Recompute every uniform + material property from `params`. */
+/**
+ * Um ajuste de tinta: a receita inteira, toda opcional.
+ *
+ * `flakeColor` e `pearlFlip` aceitam `null`, e `null` significa "VOLTE A DERIVAR
+ * do hex" — não "pinte de nada". É como uma tinta sem receita desfaz o override
+ * deixado por uma tinta com receita; sem esse valor a virada medida da anterior
+ * grudaria na próxima.
+ */
+export type PaintPatch =
+  Omit<Partial<PaintParams>, 'flakeColor' | 'pearlFlip'> & {
+    flakeColor?: string | null;
+    pearlFlip?: string | null;
+  };
+
+/* ---------------- uniformes compartilhados ----------------
+   Todo material de tinta (cabine + baú + parede dianteira) referencia os MESMOS
+   objetos de uniform, então uma escrita atualiza todos ao vivo.
+
+   Estes são, um a um, os uniformes de `paint-lab.html`. Não é coincidência: o
+   shader abaixo É o do laboratório. Ver o cabeçalho de installPaintShader(). */
+const U = {
+  uFlakeAmount: { value: 0 },
+  uFlakeScale: { value: 300 },
+  uFlakeTilt: { value: 0.38 },
+  uFlakeGloss: { value: 0.07 },
+  uFlakeColor: { value: new THREE.Color(0xffffff) },
+  uFlakePx: { value: 2.4 },
+  uCoatThickness: { value: 0.013 },
+  uPearlAmount: { value: 0 },
+  uPearlTravel: { value: 2.1 },
+  uPearlMid: { value: new THREE.Color(0xffffff) },
+  uPearlFlip: { value: new THREE.Color(0xffffff) },
+  uPeel: { value: 0.09 },
+  uPeelScale: { value: 46 },
+  uPeelDetail: { value: 0.5 },
+};
+export const _sharedPaint = U;   // alça de ajuste (window.__studio)
+
+/**
+ * Chamado pelo rig da cena a cada quadro. HOJE NÃO FAZ NADA, e isso é
+ * intencional — a assinatura fica porque `scene/scene.ts` a importa, e essa
+ * importação é o que mantém este módulo sendo um SUMIDOURO de dependências (ver
+ * o cabeçalho de scene.ts: a luz é injetada aqui, este arquivo nunca importa a
+ * cena; inverter essa aresta fecha um ciclo em cima de um módulo que constrói
+ * um WebGLRenderer no tempo de import).
+ *
+ * Por que deixou de fazer algo: a versão anterior deste shader adicionava o
+ * brilho do floco À MÃO, a partir da direção da luz-chave publicada aqui, num
+ * termo somado depois de <lights_fragment_end>. O modelo do laboratório não
+ * precisa disso — ele perturba a NORMAL, a rugosidade e a metalicidade ANTES da
+ * iluminação, então o floco cintila sob qualquer luz que a cena tenha, do sol
+ * de meio-dia ao poste de sódio, sem ninguém dizer onde a luz está. É menos
+ * código e é mais correto.
+ */
+export function setKeyLight(_dirView: THREE.Vector3, _colorLinear: THREE.Color,
+  _boost?: number) { /* ver acima */ }
+
+/* ---------------- parâmetros → material/uniformes ----------------
+   UM PARA UM com a receita. Não há mais nenhuma conversão de escala aqui além
+   de `gloss → clearcoatRoughness`, que é a mesma fórmula do laboratório
+   (glossToCoat). Toda tradução que existia antes — `flakeSize` virando
+   frequência, `flakeGlint` virando ganho, `pearlSharp` virando expoente — era
+   um lugar a mais para o estúdio divergir do laboratório em silêncio. */
 function applyToMaterials() {
   const p = params;
-  const solid = p.finish === 'solid';
-  const pearlOn = p.finish === 'pearl';
 
-  const metal = Math.min(METAL_CAP[p.finish], metalnessFor(p));
-  /* Basecoat roughness. An automotive basecoat sits UNDER a clearcoat, so it is
-     far smoother than a bare painted surface — the old 0.10..0.55 range left
-     even the "glossy" solid finish at ~0.29, which scatters the highlight into
-     a dull sheen instead of a reflection. 0.05..0.29 reads as real paint. */
-  const rough = 0.05 + 0.24 * clamp01(p.baseRough);
-  /* clearcoat gloss → roughness. three floors clearcoatRoughness at ~0.0525
-     internally, so 0.90 gloss is already "OEM show finish". */
-  const ccRough = 0.22 - 0.19 * clamp01(p.ccGloss);
+  /* Mesma curva do laboratório: gloss 1 → verniz de vitrine, gloss 0 → acetinado.
+     O three trava clearcoatRoughness perto de 0.0525 internamente, então o topo
+     da faixa já é o mais liso que a engine desenha. */
+  const ccRough = 0.02 + 0.42 * (1 - clamp01(p.gloss));
 
   const col = new THREE.Color(p.color);
-  /* 0..4: acima disso o verniz estoura e não sobra pigmento nenhum; abaixo de 0
-     não existe. O clamp é aqui e não no painel porque setPaint() também é
-     dirigido pelo ajuste gravado no banco, que pode ter vindo de qualquer
-     lugar. */
-  const env = Math.min(4, Math.max(0, +p.envMapIntensity || 0));
   for (const m of materials) {
     m.color.copy(col);
-    m.metalness = metal;
-    m.roughness = rough;
+    m.metalness = clamp01(p.metalness);
+    m.roughness = clamp01(p.roughness);
     m.clearcoat = 1.0;
     m.clearcoatRoughness = ccRough;
-    m.envMapIntensity = env;
   }
 
-  /* flakes: metallic drives them directly; pearl sparkles at ~1/3 density;
-     solid has none. */
-  let flake = 0;
-  if (p.finish === 'metallic') flake = 0.22 + 0.78 * clamp01(p.metallic);
-  else if (pearlOn) flake = 0.34 * clamp01(p.pearl);
-  U.uFlakeStrength.value = flake;
-  U.uFlakeScale.value = FLAKE_FREQ_FINE - clamp01(p.flakeSize) * (FLAKE_FREQ_FINE - FLAKE_FREQ_COARSE);
-  U.uFlakeTint.value.set(p.flakeColor || '#ffffff');
-  U.uGlintGain.value = 0.25 + 3.25 * clamp01(p.flakeGlint);
-  /* coarser flakes are individually bigger, so their lobe is wider */
-  U.uGlintPower.value = 900 - 650 * clamp01(p.flakeSize);
-  /* pearl mica is sparser than aluminium flake; solid has no flakes at all */
-  U.uFlakeCoverage.value = solid ? 0 : (pearlOn ? 0.12 : 0.22);
+  U.uPearlAmount.value = clamp01(p.pearlAmount);
+  U.uPearlMid.value.set(p.pearlMid || '#ffffff');
+  U.uPearlFlip.value.set(p.pearlFlip || '#ffffff');
+  /* Piso 0.2: o expoente vai para o denominador do percurso e um valor perto de
+     zero faz a virada cobrir a peça inteira de uma vez. */
+  U.uPearlTravel.value = Math.max(0.2, p.pearlTravel);
 
-  U.uFlopStrength.value = solid ? 0 : clamp01(p.flop);
-  U.uPearlStrength.value = pearlOn ? clamp01(p.pearl) : 0;
-  U.uPearlColor.value.set(p.pearlColor || '#ffffff');
-  U.uPearlPower.value = 1.2 + 2.0 * clamp01(p.pearlSharp);
-  U.uOrangePeel.value = 0.035 * clamp01(p.peel);
+  U.uFlakeAmount.value = clamp01(p.flakeAmount);
+  U.uFlakeColor.value.set(p.flakeColor || '#ffffff');
+  U.uFlakeScale.value = Math.max(1, p.flakeDensity);
+  U.uFlakeTilt.value = Math.max(0, p.flakeTilt);
+  U.uFlakeGloss.value = clamp01(p.flakeGloss);
+  U.uFlakePx.value = Math.max(0.5, p.flakePx);
+  U.uCoatThickness.value = Math.max(0, p.coatThickness);
+
+  U.uPeel.value = Math.max(0, p.peel);
+  U.uPeelScale.value = Math.max(1, p.peelScale);
+  U.uPeelDetail.value = Math.max(0, p.peelDetail);
 }
 
-/* THE public setter. One funnel, because the mappings are coupled: a single
-   slider can write three uniforms, switching finish rewrites five params, and
-   setting the base colour re-derives two more. Per-control setters would have
-   to duplicate all of that in ui/sidebar.ts. */
-export function setPaint(partial?: Partial<PaintParams>): PaintParams {
-  const p: Partial<PaintParams> = partial || {};
+/**
+ * O ÚNICO ajustador. Um funil, porque as conversões são acopladas.
+ *
+ * Aceita uma receita do laboratório inteira. Campos ausentes ficam como estão;
+ * `null` em `flakeColor`/`pearlFlip` significa VOLTE A DERIVAR do hex.
+ */
+export function setPaint(partial?: PaintPatch): PaintParams {
+  const p: PaintPatch = partial || {};
   if (p.finish && p.finish !== params.finish) {
     const f: PaintFinish = PAINT_FINISHES.includes(p.finish) ? p.finish : 'metallic';
     Object.assign(params, PAINT_DEFAULTS_BY_FINISH[f], { finish: f });
-    /* the finish defaults carry placeholder flake/flop colours; re-derive them
-       from the colour actually on the vehicle */
     syncDerivedColors();
   }
-  /* An explicit pick wins — until the base colour moves again, at which point
-     following the new colour is far less surprising than keeping a tint chosen
-     for the previous one. */
-  if (p.color !== undefined) { userFlakeColor = false; userPearlColor = false; }
-  if (p.flakeColor !== undefined) userFlakeColor = true;
-  if (p.pearlColor !== undefined) userPearlColor = true;
+
+  /* ANTES do laço: syncDerivedColors() lá embaixo só respeita o que já foi
+     declarado explícito, e uma receita que chega junto com a cor tem de ganhar
+     dela. */
+  if (p.flakeColor !== undefined) userFlakeColor = p.flakeColor !== null;
+  if (p.pearlFlip !== undefined) userPearlColor = p.pearlFlip !== null;
 
   for (const [k, v] of Object.entries(p) as [keyof PaintParams, never][]) {
     if (k === 'finish') continue;
+    if (v === null || v === undefined) continue;   // "derive", não "pinte de null"
     if (k in params) params[k] = v;
   }
   if (p.color !== undefined) syncDerivedColors();
+  if (p.flakeColor === null || p.pearlFlip === null) syncDerivedColors();
 
   applyToMaterials();
   return getPaintParams();
 }
 
-/* Reset to the shipped default paint (metallic silver). */
-export function resetPaint(): PaintParams {
-  Object.assign(params, PAINT_BASE);
-  userFlakeColor = false;
-  userPearlColor = false;
-  syncDerivedColors();
-  applyToMaterials();
-  return getPaintParams();
+/* ---------------- GLSL ----------------
+   ESTE SHADER É O DE `paint-lab.html`, PORTADO SEM ALTERAÇÃO DE MODELO.
+   ---------------------------------------------------------------------------
+   POR QUE PORTAR EM VEZ DE MAPEAR. O estúdio tinha um shader de tinta próprio, e
+   ele era bom — mas era OUTRO. O laboratório é onde a tinta é aprovada, no olho,
+   contra geometria e luz; se o estúdio interpreta a mesma receita com outro
+   modelo, o que foi aprovado não é o que sai. Os dois divergiam em coisas que
+   nenhum ajuste de parâmetro reconcilia: o perolizado de lá tem TRÊS tons
+   (face → meio → virada) e o daqui tinha dois, então `pearlMid` não tinha onde
+   entrar; o floco de lá é um Voronoi 3D com refração no verniz e antialiasing
+   por oitavas, o daqui era ruído com um termo de brilho somado à mão.
+
+   O que o port TROUXE, além da paridade:
+   - `uPearlMid` — o tom do meio do percurso;
+   - refração na entrada do verniz (`uCoatThickness`): os flocos deslizam sob o
+     filme quando a câmera anda, em vez de parecerem impressos na chapa;
+   - antialiasing de floco por oitava (`uFlakePx`): aproximar SUBDIVIDE a célula
+     em vez de ampliá-la, e longe converge para a média estatística (que é
+     rugosidade) em vez de aliasar em cintilância grossa;
+   - `uPeelDetail` — segunda oitava da casca de laranja.
+
+   O que o port LEVOU: o termo de brilho pela luz-chave. Ver setKeyLight().
+
+   PONTOS DE INJEÇÃO. `PAINT_SURFACE` entra depois de <normal_fragment_maps>
+   porque é ali que `normal`, `roughnessFactor` e `metalnessFactor` já existem e
+   a iluminação ainda não rodou — perturbar os três ali é o que faz o floco
+   responder a QUALQUER luz da cena. `PAINT_ORANGEPEEL` entra depois de
+   <clearcoat_normal_fragment_maps> pelo mesmo motivo, uma camada acima. */
+const PAINT_COMMON = /* glsl */`
+varying vec3 vPaintWPos;
+uniform float uFlakeAmount; uniform float uFlakeScale; uniform float uFlakeTilt;
+uniform float uFlakeGloss;  uniform vec3  uFlakeColor;
+uniform float uFlakePx;     uniform float uCoatThickness;
+uniform float uPearlAmount; uniform float uPearlTravel;
+uniform vec3  uPearlMid;    uniform vec3  uPearlFlip;
+uniform float uPeel;        uniform float uPeelScale;  uniform float uPeelDetail;
+
+// Hashes do Dave Hoskins: sem sin(), estáveis entre drivers, e baratos o
+// bastante para oito chamadas por pixel na busca do Voronoi.
+float pHash13(vec3 q){
+  q = fract(q * 0.1031);
+  q += dot(q, q.zyx + 31.32);
+  return fract((q.x + q.y) * q.z);
 }
-
-/* ---------------- GLSL ---------------- */
-const PAINT_PARS = /* glsl */`
-varying vec3 vPaintWorldPos;
-varying vec3 vPaintWorldNormal;
-uniform float uFlakeScale;
-uniform float uFlakeStrength;
-uniform vec3  uFlakeTint;
-uniform float uGlintPower;
-uniform float uGlintJitter;
-uniform float uFlakeCoverage;
-uniform float uGlintGain;
-uniform float uFlakeEnvGain;
-uniform float uFlakeEnvRough;
-uniform float uFlopStrength;
-uniform vec3  uPearlColor;
-uniform float uPearlStrength;
-uniform float uPearlPower;
-uniform float uOrangePeel;
-uniform float uOrangePeelScale;
-uniform vec3  uKeyLightDir;
-uniform vec3  uKeyLightColor;
-uniform float uGlintBoost;
-
-/* flake state, handed from the lights_physical hook to the env hook */
-vec3  gFlakeNormalV = vec3( 0.0, 0.0, 1.0 );
-float gFlakeEnergy  = 0.0;
-float gPeelMag      = 0.0;
-
-/* INTEGER hash, not the usual fract(sin(dot(...))).
-   The sin trick collapses at large arguments: the flake field is world position
-   × up to 650, so a panel 8 m from the origin reaches cell indices in the
-   thousands and the sine argument approaches a million — far beyond float32's
-   ~7 significant digits. The fractional part then quantises and the "random"
-   field degenerates into a regular lattice. That was visible as a diagonal
-   cross-hatch moiré on the trailer flanks (the largest flat panel, furthest
-   from the origin) while the compact cab still looked fine.
-   PCG3D is exact at any magnitude because it only ever does integer work. */
-uvec3 tsPcg3d( uvec3 v ) {
-  v = v * 1664525u + 1013904223u;
-  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-  v ^= v >> 16u;
-  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-  return v;
+vec3 pHash33(vec3 q){
+  q = fract(q * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yxz + 33.33);
+  return fract((q.xxy + q.yxx) * q.zyx);
 }
-const float TS_INV = 1.0 / 1048575.0;
-uvec3 tsCellKey( vec3 cell ) {
-  // bias keeps the int→uint reinterpretation of negative coords well-defined
-  return uvec3( ivec3( floor( cell ) ) + 262144 );
+float pNoise(vec3 x){
+  vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);
+  float n000=pHash13(i);                     float n100=pHash13(i+vec3(1.0,0.0,0.0));
+  float n010=pHash13(i+vec3(0.0,1.0,0.0));   float n110=pHash13(i+vec3(1.0,1.0,0.0));
+  float n001=pHash13(i+vec3(0.0,0.0,1.0));   float n101=pHash13(i+vec3(1.0,0.0,1.0));
+  float n011=pHash13(i+vec3(0.0,1.0,1.0));   float n111=pHash13(i+vec3(1.0,1.0,1.0));
+  float nx00=mix(n000,n100,f.x); float nx10=mix(n010,n110,f.x);
+  float nx01=mix(n001,n101,f.x); float nx11=mix(n011,n111,f.x);
+  return mix( mix(nx00,nx10,f.y), mix(nx01,nx11,f.y), f.z );
 }
-float tsHash1( vec3 cell ) {
-  return float( tsPcg3d( tsCellKey( cell ) ).x & 1048575u ) * TS_INV;
-}
-vec3 tsHash3( vec3 cell ) {
-  uvec3 h = tsPcg3d( tsCellKey( cell ) ) & uvec3( 1048575u );
-  return -1.0 + 2.0 * ( vec3( h ) * TS_INV );
-}
-/* Nearest Voronoi feature cell, returned as INTEGER cell coordinates so every
-   downstream hash stays exact. No texture is involved, so there is no mipmap
-   averaging and no UV dependence: every painted mesh sparkles identically
-   regardless of how its UVs are laid out. */
-vec3 tsVoronoiCell( vec3 p ) {
-  vec3 ip = floor( p ); vec3 fp = fract( p );
-  float md = 999.0; vec3 id = ip;
-  for ( int z = -1; z <= 1; ++z )
-  for ( int y = -1; y <= 1; ++y )
-  for ( int x = -1; x <= 1; ++x ) {
-    vec3 o = vec3( float( x ), float( y ), float( z ) );
-    vec3 pt = 0.5 + 0.5 * tsHash3( ip + o );      // feature point inside the cell
-    float d = length( o + pt - fp );
-    if ( d < md ) { md = d; id = ip + o; }
-  }
-  return id;
-}
-float tsValueNoise( vec3 p ) {
-  vec3 i = floor( p ), f = fract( p );
-  f = f * f * ( 3.0 - 2.0 * f );
-  float n000 = tsHash1( i ), n100 = tsHash1( i + vec3( 1.0, 0.0, 0.0 ) );
-  float n010 = tsHash1( i + vec3( 0.0, 1.0, 0.0 ) ), n110 = tsHash1( i + vec3( 1.0, 1.0, 0.0 ) );
-  float n001 = tsHash1( i + vec3( 0.0, 0.0, 1.0 ) ), n101 = tsHash1( i + vec3( 1.0, 0.0, 1.0 ) );
-  float n011 = tsHash1( i + vec3( 0.0, 1.0, 1.0 ) ), n111 = tsHash1( i + vec3( 1.0 ) );
-  return mix( mix( mix( n000, n100, f.x ), mix( n010, n110, f.x ), f.y ),
-              mix( mix( n001, n101, f.x ), mix( n011, n111, f.x ), f.y ), f.z );
-}
-/* Hue travel must NOT be a linear-RGB lerp: a linear mix between, say, green
-   and magenta passes through a muddy dark midpoint. Blending in a roughly
-   perceptual (gamma) space keeps the transition chromatic all the way. */
-vec3 tsMixPerceptual( vec3 a, vec3 b, float t ) {
-  vec3 ga = pow( max( a, 0.0 ), vec3( 1.0 / 2.2 ) );
-  vec3 gb = pow( max( b, 0.0 ), vec3( 1.0 / 2.2 ) );
-  return pow( mix( ga, gb, t ), vec3( 2.2 ) );
-}
-`;
+float pPeelHeight(vec3 p){ return pNoise(p) + uPeelDetail*0.45*pNoise(p*3.17 + 21.7); }
 
-/* Orange peel — real clearcoat is never a perfect mirror; 4–12 mm ripples are
-   the single highest realism-per-line win because a flawless reflection is the
-   loudest CG tell. Applied to the COAT normal only: the basecoat underneath
-   stays smooth, which is physically what happens. */
-const PAINT_PEEL = /* glsl */`
-#ifdef USE_CLEARCOAT
-if ( uOrangePeel > 0.0001 ) {
-  vec3 pw = vPaintWorldPos * uOrangePeelScale;
-  float e = 0.35;
-  float h0 = tsValueNoise( pw );
-  vec3 grad = vec3(
-    tsValueNoise( pw + vec3( e, 0.0, 0.0 ) ) - h0,
-    tsValueNoise( pw + vec3( 0.0, e, 0.0 ) ) - h0,
-    tsValueNoise( pw + vec3( 0.0, 0.0, e ) ) - h0
-  ) / e;
-  vec3 nW = normalize( vPaintWorldNormal );
-  grad -= nW * dot( grad, nW );                       // tangential only
-  gPeelMag = length( grad ) * uOrangePeel;
-  vec3 bumpW = normalize( nW + grad * uOrangePeel );
-  vec3 bumpV = normalize( ( viewMatrix * vec4( bumpW, 0.0 ) ).xyz );
-  // fade the perturbation as the ripple period shrinks below a pixel,
-  // otherwise it aliases into shimmer at distance
-  float fwp = length( fwidth( pw ) );
-  clearcoatNormal = normalize( mix( clearcoatNormal, bumpV, 1.0 / ( 1.0 + fwp * fwp ) ) );
-}
-#endif
-`;
-
-/* Pearl travel + metallic flop + direct-light flake glint.
-   Runs BEFORE <lights_physical_fragment> so diffuseColor is still writable —
-   material.diffuseColor and material.specularColor are both derived from it. */
-const PAINT_BODY = /* glsl */`
-{
-  vec3 viewV = normalize( vViewPosition );
-  float facing = 1.0 - clamp( dot( normal, viewV ), 0.0, 1.0 );   // 0 face … 1 grazing
-
-  /* PEARL. Curve calibrated so the travel band sits around 45°–75°, which is
-     where real flop is measured (15°/45°/110° aspecular). A Schlick-style
-     pow(facing, 5) would cram it into the last 15° and read as a rim light. */
-  if ( uPearlStrength > 0.001 ) {
-    float w = smoothstep( 0.10, 0.55, pow( facing, uPearlPower ) );
-    diffuseColor.rgb = tsMixPerceptual( diffuseColor.rgb, uPearlColor, w * uPearlStrength );
-  }
-
-  /* FLOP. Metallic paint is bright face-on and darker at grazing angles — the
-     opposite of a solid colour, and the main cue that flakes are present. */
-  if ( uFlopStrength > 0.001 ) {
-    float w = smoothstep( 0.05, 0.60, pow( facing, 1.8 ) );
-    diffuseColor.rgb *= mix( 1.0 + 0.12 * uFlopStrength, 1.0 - 0.55 * uFlopStrength, w );
-  }
-
-  /* FLAKES */
-  if ( uFlakeStrength > 0.001 && uFlakeCoverage > 0.001 ) {
-    vec3 fp = vPaintWorldPos * uFlakeScale;
-    vec3 fcell = tsVoronoiCell( fp );
-    float fnoise = tsHash1( fcell );
-    // sparse subset: only the top uFlakeCoverage fraction of cells is a flake
-    float cov = step( 1.0 - uFlakeCoverage, fnoise );
-    // and most of those are dim — a uniform brightness makes it read as glitter.
-    // Offsets must be INTEGER: the cell key floors its input, so a fractional
-    // offset would land back on the same cell and correlate perfectly.
-    float fbright = pow( tsHash1( fcell + vec3( 17.0, 3.0, 11.0 ) ), 2.5 );
-
-    /* Anti-aliasing: once a pixel's world footprint covers more than one flake
-       cell, the sparkle can no longer be resolved and any remaining energy is
-       pure aliasing. Fading it out with the footprint is what stops a truck
-       seen from 20 m reading as sandpaper. The factor is folded into the shared
-       energy so BOTH the direct glint and the environment-lit term fade
-       together — gating only one of them was what produced the speckle. */
-    float fw = length( fwidth( fp ) );
-    float sharp = 1.0 / ( 1.0 + fw * fw * 4.0 );
-    float dist = length( vPaintWorldPos - cameraPosition );
-    float distFade = 1.0 - smoothstep( 8.0, 26.0, dist );
-
-    gFlakeEnergy = uFlakeStrength * cov * fbright * distFade * sharp;
-
-    vec3 nrmW = vPaintWorldNormal;
-    float nlen = length( nrmW );
-    if ( nlen > 1e-5 ) {
-      // per-flake mirror normal: a small random tilt around the surface normal
-      vec3 jw = normalize( nrmW / nlen
-        + tsHash3( fcell + vec3( 5.0, 29.0, 7.0 ) ) * uGlintJitter );
-      gFlakeNormalV = normalize( ( viewMatrix * vec4( jw, 0.0 ) ).xyz );
-
-      /* Direct glint from the key light. Every normalize() input is
-         length-guarded: L+V collapses to zero when the view opposes the light
-         and normalize(0) → NaN → black pixels. */
-      vec3 HvRaw = uKeyLightDir + viewV;
-      float hlen = length( HvRaw );
-      if ( hlen > 1e-3 ) {
-        float nh = clamp( dot( gFlakeNormalV, HvRaw / hlen ), 0.0, 1.0 );
-        float glint = pow( max( nh, 1e-4 ), uGlintPower );
-        float ndl = clamp( dot( normal, uKeyLightDir ), 0.0, 1.0 );
-        // flakes take on some of the pigment they sit in, never pure white
-        vec3 ftint = uFlakeTint * mix( diffuseColor.rgb, vec3( 1.0 ), 0.70 );
-        vec3 fadd = ftint * uKeyLightColor *
-          ( glint * ndl * gFlakeEnergy * uGlintGain * uGlintBoost );
-        fadd = min( fadd, vec3( 6.0 ) );
-        if ( all( greaterThanEqual( fadd, vec3( 0.0 ) ) ) ) {
-          // totalEmissiveRadiance is folded into outgoingLight BEFORE the
-          // clearcoat term in opaque_fragment, so these sit under the coat
-          totalEmissiveRadiance += fadd;
-        }
+// Voronoi 3D que preenche o espaço. Todo ponto da superfície cai em exatamente
+// uma célula, então os flocos ladrilham a tinta com fronteiras duras e
+// irregulares como as de verdade. As sementes só são jitteradas dentro de
+// +/-0.36 do centro da célula, o que torna a busca de oito células EXATA: a de
+// 27 também estaria certa e custaria o triplo de hash em células que nunca ganham.
+// Devolve xyz = o eixo aleatório da célula, w = o sorteio 0..1 dela.
+vec4 pFlakeCell(vec3 x, float scale){
+  vec3 p   = x*scale;
+  vec3 ip  = floor(p);
+  vec3 fp  = p - ip;
+  vec3 dir = step(vec3(0.5), fp)*2.0 - 1.0;
+  float md = 1e9;
+  vec3  mc = ip;
+  for(int a=0;a<2;a++){
+    for(int b=0;b<2;b++){
+      for(int c=0;c<2;c++){
+        vec3 o    = vec3(float(a),float(b),float(c)) * dir;
+        vec3 cid  = ip + o;
+        vec3 seed = o + 0.5 + ( pHash33(cid) - 0.5 )*0.72;
+        vec3 dl   = seed - fp;
+        float d   = dot(dl,dl);
+        if(d < md){ md = d; mc = cid; }
       }
     }
   }
+  vec3 axis = normalize( pHash33(mc + 17.13)*2.0 - 1.0 + vec3(1e-4,2e-4,3e-4) );
+  return vec4(axis, pHash13(mc + 41.7));
 }
 `;
 
-/* Orange peel also roughens the coat slightly — a rippled surface scatters a
-   little more. Runs AFTER lights_physical_fragment, where `material` exists. */
-const PAINT_POST = /* glsl */`
-#ifdef USE_CLEARCOAT
-// material.clearcoatRoughness only EXISTS on the PhysicalMaterial struct when
-// USE_CLEARCOAT is defined (three sets that from clearcoat > 0). Today the
-// paint always runs clearcoat 1.0, but an unguarded write here would turn any
-// future "sem verniz" option into a shader compile failure.
-if ( gPeelMag > 0.0 ) {
-  material.clearcoatRoughness = clamp( material.clearcoatRoughness + gPeelMag * 0.02, 0.0, 1.0 );
+const PAINT_SURFACE = /* glsl */`
+vec3  pV       = normalize( vViewPosition );
+vec3  pSmoothN = normal;
+
+// ---------------- perolizado: face -> meio -> virada ----------------
+float pNdV = clamp( dot( pSmoothN, pV ), 0.0, 1.0 );
+float pT   = pow( 1.0 - pNdV, max( uPearlTravel, 0.2 ) );
+vec3  pPC  = ( pT < 0.5 ) ? mix( diffuseColor.rgb, uPearlMid, pT*2.0 )
+                          : mix( uPearlMid, uPearlFlip, (pT-0.5)*2.0 );
+diffuseColor.rgb = mix( diffuseColor.rgb, pPC, uPearlAmount );
+
+// ---------------- floco metálico / mica ----------------
+if( uFlakeAmount > 0.001 ){
+  // A camada de floco fica SOB o verniz, então o raio de visão refrata na
+  // entrada e cai num ponto deslocado lateralmente. Amostrar nesse deslocamento
+  // é o que faz o floco parecer suspenso sob um filme transparente em vez de
+  // impresso na superfície: ele desliza quando a câmera anda.
+  vec3  Vw  = normalize( cameraPosition - vPaintWPos );
+  float vn  = max( dot( pSmoothN, Vw ), 0.12 );
+  vec3  fPos = vPaintWPos - ( Vw - pSmoothN*dot(Vw,pSmoothN) ) * ( uCoatThickness / vn );
+
+  // Limita a pegada do floco NA TELA. Um mapa de floco mipmapado ganha isso de
+  // graça; proceduralmente escolhemos a oitava cujas células caem perto de
+  // uFlakePx pixels e cruzamos para a próxima, então aproximar SUBDIVIDE em vez
+  // de ampliar uma célula até virar mancha.
+  float wpx   = max( length( fwidth( fPos ) ), 1e-6 );
+  float ideal = 1.0 / ( wpx * uFlakePx );
+  float lod   = clamp( log2( max( ideal/uFlakeScale, 1e-4 ) ), 0.0, 6.0 );
+  float l0    = floor( lod );
+  float fr    = lod - l0;
+  float sA    = uFlakeScale * exp2( l0 );
+  float sB    = sA * 2.0;
+
+  float px = wpx * sA;
+  float aa = 1.0 / ( 1.0 + px*px*1.2 );
+
+  vec4  cA = pFlakeCell( fPos, sA );
+  vec4  cB = pFlakeCell( fPos, sB );
+  float thr = uFlakeAmount * 0.85;
+  float mA = step( cA.w, thr ) * aa * (1.0 - fr);
+  float mB = step( cB.w, thr ) * aa * fr;
+
+  float jA = 0.45 + 1.1*pHash13( cA.xyz*7.3 + 5.1 );
+  float jB = 0.45 + 1.1*pHash13( cB.xyz*7.3 + 5.1 );
+  vec3  nA = normalize( pSmoothN + cA.xyz * uFlakeTilt * jA );
+  vec3  nB = normalize( pSmoothN + cB.xyz * uFlakeTilt * jB );
+
+  normal = normalize( mix( normal, nA, mA ) );
+  normal = normalize( mix( normal, nB, mB ) );
+
+  float m   = mA + mB;
+  float cov = uFlakeAmount * 0.85;
+
+  // resolvido: as células são grandes o bastante para amostrar uma por vez
+  roughnessFactor  = mix( roughnessFactor, uFlakeGloss, m );
+  metalnessFactor  = mix( metalnessFactor, 1.0, m );
+  // Varia a força do tom por floco. Sem isso, flocos vizinhos de cor idêntica
+  // fundem num borrão só em vez de lerem como grão.
+  float tint = mA*(0.40 + 0.60*pHash13( cA.xyz*3.1 + 91.7 ))
+             + mB*(0.40 + 0.60*pHash13( cB.xyz*3.1 + 91.7 ));
+  diffuseColor.rgb = mix( diffuseColor.rgb, uFlakeColor, tint*0.85 );
+
+  // Não resolvido: quando a célula fica abaixo de um pixel, uma amostra por
+  // pixel de um step binário alias em grumos grossos que parecem flocos
+  // gigantes. Baixar o peso só reduz o contraste deles. Convergimos para a
+  // média estatística — variância de normal sub-pixel É rugosidade, que é no
+  // que um mapa mipmapado se resolve sozinho.
+  float sub = 1.0 - aa;
+  roughnessFactor  = mix( roughnessFactor, mix(roughnessFactor,uFlakeGloss,cov) + 0.20*cov, sub );
+  metalnessFactor  = mix( metalnessFactor, mix(metalnessFactor,1.0,cov), sub );
+  diffuseColor.rgb = mix( diffuseColor.rgb, mix(diffuseColor.rgb,uFlakeColor,cov*0.70), sub );
+  roughnessFactor  = clamp( roughnessFactor, 0.02, 1.0 );
 }
-#endif
 `;
 
-/* Environment-lit flakes. THE trick that makes flakes twinkle when you orbit
-   without moving the sun: sample the env map through each flake's own jittered
-   normal, so neighbouring flakes fetch different directions. Added to
-   directSpecular so the clearcoat combine attenuates it. */
-const PAINT_ENV = /* glsl */`
-#ifdef USE_ENVMAP
-if ( gFlakeEnergy > 0.001 ) {
-  vec3 fenv = getIBLRadiance( geometryViewDir, gFlakeNormalV, uFlakeEnvRough );
-  reflectedLight.directSpecular +=
-    uFlakeTint * fenv * ( gFlakeEnergy * uFlakeEnvGain );
+const PAINT_ORANGEPEEL = /* glsl */`
+#ifdef CLEARCOAT
+if( uPeel > 0.001 ){
+  float opPx = length( fwidth( vPaintWPos ) ) * uPeelScale;
+  float opAA = 1.0 / (1.0 + opPx*opPx*2.0);
+  vec3  Pp   = vPaintWPos * uPeelScale;
+  float e    = 0.30;
+  float h0   = pPeelHeight(Pp);
+  vec3  g    = vec3( pPeelHeight(Pp+vec3(e,0.0,0.0)) - h0,
+                     pPeelHeight(Pp+vec3(0.0,e,0.0)) - h0,
+                     pPeelHeight(Pp+vec3(0.0,0.0,e)) - h0 ) / e;
+  g = g - clearcoatNormal * dot( g, clearcoatNormal );
+  clearcoatNormal = normalize( clearcoatNormal - g * uPeel * opAA );
 }
 #endif
 `;
@@ -572,24 +563,19 @@ function installPaintShader(m: THREE.MeshPhysicalMaterial) {
   m.onBeforeCompile = (shader: THREE.WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>',
-        '#include <common>\nvarying vec3 vPaintWorldPos;\nvarying vec3 vPaintWorldNormal;')
-      .replace('#include <fog_vertex>',
-        '#include <fog_vertex>\n'
-        + 'vPaintWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n'
-        + 'vPaintWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPaintWPos;')
+      .replace('#include <begin_vertex>',
+        '#include <begin_vertex>\n  vPaintWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + PAINT_PARS)
-      .replace('#include <clearcoat_normal_fragment_begin>',
-        '#include <clearcoat_normal_fragment_begin>\n' + PAINT_PEEL)
-      .replace('#include <lights_physical_fragment>',
-        PAINT_BODY + '\n#include <lights_physical_fragment>\n' + PAINT_POST)
-      .replace('#include <lights_fragment_end>',
-        '#include <lights_fragment_end>\n' + PAINT_ENV);
+      .replace('#include <common>', '#include <common>\n' + PAINT_COMMON)
+      .replace('#include <normal_fragment_maps>',
+        '#include <normal_fragment_maps>\n' + PAINT_SURFACE)
+      .replace('#include <clearcoat_normal_fragment_maps>',
+        '#include <clearcoat_normal_fragment_maps>\n' + PAINT_ORANGEPEEL);
   };
-  /* bumped whenever the injected GLSL changes — stale cached programs would
-     otherwise keep running the previous version */
-  m.customProgramCacheKey = () => 'truckstudio-paint-v4';
+  /* Sobe a cada mudança no GLSL injetado: um programa em cache com a versão
+     anterior continuaria rodando. v5 = o port do laboratório. */
+  m.customProgramCacheKey = () => 'truckstudio-paint-v5';
 }
 
 /* `_srcColor` is accepted and deliberately ignored: newly created paint
@@ -609,9 +595,7 @@ export function makePaintMaterial(_srcColor?: THREE.Color, srcMap?: THREE.Textur
        inward-wound faces and reads as see-through (verified root cause) */
     side: THREE.DoubleSide,
   });
-  /* Só a semente: o applyToMaterials() logo abaixo reescreve isto a partir de
-     `params`, que é quem manda desde que envMapIntensity virou parâmetro. */
-  m.envMapIntensity = params.envMapIntensity;
+  m.envMapIntensity = 1.3;
   if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
   installPaintShader(m);
   materials.add(m);
@@ -623,7 +607,6 @@ export function makePaintMaterial(_srcColor?: THREE.Color, srcMap?: THREE.Textur
 export function forgetPaintMaterial(m: THREE.Material) {
   materials.delete(m as THREE.MeshPhysicalMaterial);
 }
-export function paintMaterialCount() { return materials.size; }
 /* Registry membership, not a name match — source material names vary
    ("carpaint", "CarPaint_01", …) and a substring test would be fragile. */
 export function isPaintMaterial(m: THREE.Material) {

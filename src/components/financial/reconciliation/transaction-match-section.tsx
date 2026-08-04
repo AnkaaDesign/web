@@ -216,6 +216,21 @@ export function TransactionMatchSection({
     [transaction],
   );
   const hasExistingMatch = existingMatches.length > 0;
+  /**
+   * Only the matches this card can actually SHOW — a note or a boleto.
+   *
+   * A debit settled against a conta recorrente / pedido / aerografia / folha has
+   * live matches with neither, and the row renderer below resolves every field
+   * off `m.fiscalDocument` / `m.bankSlip`. Gating the card on `hasExistingMatch`
+   * therefore drew a "Notas vinculadas · Conciliação completa" panel whose rows
+   * were literally "—", one per anchor match. Those anchors belong to the
+   * Conciliação card, which names them properly.
+   */
+  const documentMatches = useMemo(
+    () => existingMatches.filter((m) => m.fiscalDocument || m.bankSlip),
+    [existingMatches],
+  );
+  const hasDocumentMatch = documentMatches.length > 0;
   // When this one payment settles several NFs of a single purchase order, the
   // matched NFs share a "#Ped:" order code. Surface that as a header so the
   // linked notes read as "one order, one payment" rather than loose NFs.
@@ -233,11 +248,17 @@ export function TransactionMatchSection({
       .map(([code, docs]) => ({ code, count: docs.size }));
   }, [existingMatches]);
   const existingAllocated = useMemo(
+    // Only NOTE matches count toward "how much of this payment is already
+    // covered by notes". An orderInstallment / recorrente anchor on the same
+    // transaction describes the SAME money from the obligation side, so adding
+    // it here made an anchored payment look fully spent and blocked linking the
+    // note it is still waiting for ("Excede", Salvar disabled).
+    //
     // `allocatedAmount` is a Prisma Decimal that serializes to a STRING over JSON,
     // so `sum + "65.80"` would string-concatenate (two linked NFs → "065.8074.70"
     // → NaN). Coerce every term to a real number before summing.
-    () => existingMatches.reduce((sum, m) => sum + (Number(m.allocatedAmount) || 0), 0),
-    [existingMatches],
+    () => documentMatches.reduce((sum, m) => sum + (Number(m.allocatedAmount) || 0), 0),
+    [documentMatches],
   );
 
   // Each selected note defaults its allocation (in `toggleSelect`) to what the
@@ -318,9 +339,12 @@ export function TransactionMatchSection({
   const allocationTolerance = hasOrderGroupSelected ? 2.0 : 0.05;
   const isValidAllocation = Math.abs(diff) <= allocationTolerance;
 
+  // "Conciliação completa" is a claim about the NOTES covering the payment, so
+  // it reads off the note matches only — an anchored-but-noteless payment is
+  // precisely the case that is NOT complete.
   const isFullyReconciled =
     transaction.reconciliationStatus === "RECONCILED" &&
-    hasExistingMatch &&
+    hasDocumentMatch &&
     existingAllocated + 0.05 >= txAmount;
   // Show candidates whenever the transaction still needs work:
   //  - PENDING: nothing linked yet.
@@ -335,9 +359,15 @@ export function TransactionMatchSection({
   //    status to RECONCILED, and we still want the match section visible.
   // A fully RECONCILED tx (covered by NFs, or remainder resolved by a reason) is
   // done — the panel stays hidden there.
+  //  - AWAITING_NF: the payment is already anchored to a pedido / conta
+  //    recorrente (so status is RECONCILED and a match exists — both old gates
+  //    fail) but the nota is still owed. The Conciliação card literally tells
+  //    the operator to "vincular a nota manualmente abaixo", and without this
+  //    clause there was nothing below to do it with.
   const showCandidates =
     transaction.reconciliationStatus === "PENDING" ||
     transaction.reconciliationStatus === "PARTIAL" ||
+    transaction.settlement?.state === "AWAITING_NF" ||
     (!hasExistingMatch && transaction.expectsFiscalDocument === true);
 
   const hasMatchChanges = selectedIds.length > 0;
@@ -516,8 +546,8 @@ export function TransactionMatchSection({
         </div>
       )}
 
-      {/* Notas vinculadas */}
-      {hasExistingMatch && (
+      {/* Notas vinculadas — só quando existe nota/boleto de verdade. */}
+      {hasDocumentMatch && (
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-3">
@@ -562,7 +592,7 @@ export function TransactionMatchSection({
                 </span>
               </div>
             )}
-            {existingMatches.map((m) => {
+            {documentMatches.map((m) => {
               const doc = m.fiscalDocument;
               const slip = m.bankSlip;
               const nfHref = doc?.id

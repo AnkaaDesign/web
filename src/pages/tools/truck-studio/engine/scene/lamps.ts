@@ -388,9 +388,17 @@ function updateLampFixtures() {
     u.lens.scale.set(geo.lensR * s, 0.22 * s, geo.lensR * LAMP_LENS_ASPECT * s);
     /* The spot originates AT THE LENS — 6 cm below it, so the housing is never
        between the source and the ground — and aims at a point on y = 0 pushed
-       LAMP_AIM_OFFSET further over the carriageway. */
+       LAMP_AIM_OFFSET further over the carriageway.
+       ONLY IF THERE IS A BRACKET, though. The offset is the stand-in for a
+       cutoff optic's asymmetric throw down the road, and a lamp with no
+       outreach is not that lamp: prepareLampModel() reports `outreach: 0` for a
+       post-top lantern, which is axially symmetric and lights the ground
+       AROUND ITSELF. Tilting it 10° there would slide the pool off the pole and
+       leave the base of the fixture in a shadow it is standing in the middle
+       of. The primitives always have an arm, so this reads true for them. */
+    const aim = geo.outreach > 0.01 ? LAMP_AIM_OFFSET : 0;
     u.spot.position.set(-geo.outreach * s, (geo.lensY - 0.06) * s, 0);
-    u.spot.target.position.set((-geo.outreach - LAMP_AIM_OFFSET) * s, 0, 0);
+    u.spot.target.position.set((-geo.outreach - aim) * s, 0, 0);
   }
 }
 

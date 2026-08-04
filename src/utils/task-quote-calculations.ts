@@ -2,6 +2,33 @@
  * Task Quote calculation utilities for global customer discount.
  */
 
+/** The discount terms of a billing config — the part that belongs to the DEAL and
+ *  must survive a change of billing customer. */
+export interface ConfigDiscountTerms {
+  discountType: string;
+  discountValue: number | null;
+  discountReference: string | null;
+}
+
+/** True when a config carries no effective discount: absent, NONE, or zero-valued. */
+export function hasNoEffectiveDiscount(config?: {
+  discountType?: string | null;
+  discountValue?: number | null;
+}): boolean {
+  if (!config) return true;
+  const t = config.discountType;
+  if (!t || t === 'NONE') return true;
+  return Number(config.discountValue ?? 0) === 0;
+}
+
+export function pickDiscountTerms(config: any): ConfigDiscountTerms {
+  return {
+    discountType: config?.discountType ?? 'NONE',
+    discountValue: config?.discountValue ?? null,
+    discountReference: config?.discountReference ?? null,
+  };
+}
+
 export function computeConfigDiscount(
   subtotal: number,
   discountType?: string,

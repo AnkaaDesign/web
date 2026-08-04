@@ -14,9 +14,10 @@
    - Class prefix `ts-hud`, single id `ts-hud`, keyframes namespaced `ts-hud-`. Tailwind
      defines global keyframes and the LAST definition of a name wins — that is why studio.css
      already had to rename `spin`.
-   - `.hidden { display:none !important }` comes from studio.css. showHud() uses it on the
-     panel and applyCollapsed() uses it on the body; nothing here invents a second hiding
-     mechanism, it only adds the chrome that goes with the collapsed state.
+   - `.hidden { display:none !important }` comes from studio.css. applyCollapsed() uses it on
+     the body; nothing here invents a second hiding mechanism, it only adds the chrome that
+     goes with the collapsed state. (The panel itself is never `.hidden`: hiding the whole
+     HUD is the clean mode's job, and that fades and slides it — see studio.css's .ts-bare.)
    - `.truck-studio-root * { box-sizing:border-box; margin:0; padding:0 }` — the studio ships
      its own reset, so nothing below re-zeroes margins.
    - Never `transition: all`. Every transition names its properties.
@@ -34,9 +35,11 @@
    language, and it must disappear under the selector overlay and the loading curtain exactly
    as they do.
 
-   Every design token used here (--panel, --stroke, --stroke-2, --text, --muted, --accent)
-   comes from the .truck-studio-root block in studio.css. This file defines nothing but the
-   four --ts-hud-* layout knobs in section 1.
+   Every design token used here (--stroke, --stroke-2, --text, --muted, --accent, and the
+   --ts-glass-* set that IS this panel's surface) comes from the .truck-studio-root block in
+   studio.css. This file declares only the four --ts-hud-* layout knobs and the day/night
+   rail in section 1 — plus one deliberate re-declaration: the night state overrides
+   --ts-glass-bg on #ts-hud itself, which is how a custom property is meant to be varied.
 
    ONE VALUE CROSSES THE FILE BOUNDARY: hud.ts publishes `--ts-hud-fill` (a percentage string)
    inline on every range input, because CSS cannot read an input's value. Section 4 drops it
@@ -114,35 +117,31 @@
   color: var(--text);
   font-family: inherit;
 
-  /* THE look. Near-black rather than a tinted --panel: the scene behind it is the subject,
-     and a neutral smoked sheet reads as glass over the render instead of as another opaque
-     card sitting on it. saturate() above 1 puts a little of the scene's colour back after
-     the blur has washed it out. */
-  background-color: rgba(8, 10, 14, 0.42);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  /* THE look — studio.css's --ts-glass-* tokens, the same ones the view controls, the
+     design cards, the three badges and the carousel arrows read. Near-black rather than a
+     tinted --panel: the scene behind it is the subject, and a neutral smoked sheet reads as
+     glass over the render instead of as another opaque card sitting on it. Each of those
+     five surfaces used to carry its own copy of these four numbers plus a note saying the
+     other four had to be retuned by hand to match. */
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
 
   /* A real drop shadow — the panel has to read as floating over the 3D render, not as part
-     of it. Matched to the badges' shadow so the column reads as one material. */
-  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+     of it. The `-ctl` variant is the taller one the view controls and the carousel arrows
+     also use; the design cards and badges sit lower, on --ts-glass-shadow. */
+  box-shadow: var(--ts-glass-shadow-ctl);
 
-  /* Both filter lists name the same functions in the same order, which is what makes
-     backdrop-filter interpolable — swap blur/saturate around between the two states and it
-     snaps instead of animating. The -webkit- longhand is transitioned separately because in
-     an engine that only understands the prefixed property the unprefixed name is not a known
-     animatable property at all. Never `all`. */
   /* As três últimas são do MODO LIMPO (#btn-chrome, core/studio.css): o painel
      sai deslizando para a esquerda em vez de sumir num quadro. Moram aqui, e não
      junto do resto do modo limpo, porque `transition` é uma propriedade só —
      studio.css é carregado ANTES deste arquivo e com a mesma especificidade, então
      uma segunda declaração lá seria descartada, e uma que vencesse levaria junto
-     as quatro linhas do vidro acima. Uma declaração, um dono.
+     as linhas do vidro acima. Uma declaração, um dono.
      A visibilidade tem duração zero e ganha o atraso no estado escondido: é ela
      que tira o painel do foco e do ponteiro, e só depois do fade. */
   transition:
-    background-color 220ms ease,
-    backdrop-filter 220ms ease,
-    -webkit-backdrop-filter 220ms ease,
+    var(--ts-glass-transition),
     border-color 220ms ease,
     box-shadow 220ms ease,
     opacity 240ms ease,
@@ -173,11 +172,14 @@
    near-black — and the same 42% film only flattens the panel into the scene until its edge
    disappears. So night trades opacity away and spends it on the border instead.
 
-   Source order here is load-bearing. This rule and the :hover rule below both score (1,1,0),
-   so the ONLY reason hover still wins over the night surface is that it comes second; the
-   night hover rule after it scores (1,2,0) and wins on specificity from anywhere. */
+   It redefines the TOKENS rather than the background: the panel reads
+   `var(--ts-glass-bg)` once, and the value it finds is whichever this element resolves —
+   which kills a source-order dependency that used to be documented right here. (The
+   border-color one survives: hover still beats the night border only because it comes
+   second at the same (1,1,0), and the night hover rule below outranks both at (1,2,0).) */
 .truck-studio-root #ts-hud[data-tod="noite"] {
-  background-color: rgba(10, 13, 20, 0.34);
+  --ts-glass-bg: rgba(10, 13, 20, 0.34);
+  --ts-glass-bg-hover: rgba(10, 13, 20, 0.6);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
@@ -188,46 +190,29 @@
    mid-gesture (the dial takes pointer capture, so :hover is genuinely lost there). */
 .truck-studio-root #ts-hud:hover,
 .truck-studio-root #ts-hud:focus-within {
-  background-color: rgba(8, 10, 14, 0.66);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
   border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 18px 46px -12px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--ts-glass-shadow-ctl-hover);
 }
 .truck-studio-root #ts-hud[data-tod="noite"]:hover,
 .truck-studio-root #ts-hud[data-tod="noite"]:focus-within {
-  background-color: rgba(10, 13, 20, 0.6);
   border-color: rgba(255, 255, 255, 0.26);
 }
 
-/* Without this the panel is a 42%-opaque black film over a bright daylit render — legible
-   only because of the blur. Take the blur away and the whole thing is very nearly invisible
-   and the labels sit unreadable on top of the sky. So the unsupported branch trades the
-   translucency away and goes almost solid.
-
-   Written as `not ((unprefixed) or (-webkit-))` rather than the single unprefixed test:
-   Safari shipped -webkit-backdrop-filter for years without the unprefixed name, and the
-   plain test would have wrongly demoted a browser that blurs perfectly well. */
+/* The DAY surfaces' no-blur fallback lives in studio.css, where swapping the --ts-glass-*
+   values covers this panel and the four other glass surfaces at once. Night still needs a
+   line here, and for the reason that block documents: @supports adds no specificity, so
+   the (1,1,0) `#ts-hud[data-tod="noite"]` rule above would out-rank a (0,1,0) token swap
+   on .truck-studio-root and hand an engine with no blur at all the most transparent
+   surface in the file — the exact failure the fallback exists to prevent. Night keeps a
+   touch less opacity than day; without a blur it is the border, not the fill, that holds
+   the edge. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .truck-studio-root #ts-hud {
-    background-color: rgba(10, 13, 19, 0.9);
-  }
-  .truck-studio-root #ts-hud:hover,
-  .truck-studio-root #ts-hud:focus-within {
-    background-color: rgba(10, 13, 19, 0.97);
-  }
-  /* The night surfaces have to be restated INSIDE this block, not merely overridden by it.
-     @supports adds no specificity, so the (1,1,0) `#ts-hud[data-tod="noite"]` rules above
-     would otherwise out-rank this (1,0,0) fallback and hand an engine with no blur at all
-     the most transparent surface in the file — the exact failure this branch exists to
-     prevent. Night keeps a touch less opacity than day; without a blur it is the border, not
-     the fill, that has to hold the edge. */
   .truck-studio-root #ts-hud[data-tod="noite"] {
-    background-color: rgba(10, 13, 19, 0.88);
-  }
-  .truck-studio-root #ts-hud[data-tod="noite"]:hover,
-  .truck-studio-root #ts-hud[data-tod="noite"]:focus-within {
-    background-color: rgba(10, 13, 19, 0.97);
+    --ts-glass-bg: rgba(10, 13, 19, 0.88);
+    --ts-glass-bg-hover: rgba(10, 13, 19, 0.97);
   }
 }
 
@@ -257,6 +242,12 @@
   text-align: left;
   cursor: pointer;
 }
+/* Nothing in hud.ts disables a control today, and this is kept anyway — unlike the
+   speculative selectors that came out of this file's neighbours in the same pass. The
+   difference is that this is a STATE of an element that exists, not a rule waiting on an
+   element that does not: `disabled` is one line of JS away (a preset row with no
+   environment loaded is the obvious future caller), the UA paints its own grey the moment
+   it appears, and there is no markup contract here to drift out of sync with. */
 .truck-studio-root #ts-hud button:disabled {
   opacity: 0.42;
   cursor: default;
@@ -272,9 +263,10 @@
    ============================================================ */
 
 /* The whole header IS the collapse button. The eyebrow treatment — 10.5px, 700, uppercase,
-   wide tracking — is the one .panel-title uses in studio.css and .ts-mapbadge__label uses in
-   selector.css, which is what ties this panel to the family rather than to a generic
-   floating widget.
+   wide tracking — is the one .ts-mapbadge__label and .ts-colorbadge__label use in
+   selector.css and .ts-panel__label uses in studio.css, which is what ties this panel to the
+   family rather than to a generic floating widget. (It used to cite studio.css's
+   .panel-title; that class went with the sidebar.)
 
    flex-wrap exists for one reason: .ts-hud__hint drops onto a second line when the panel is
    collapsed. `order` is what keeps the chevron OUT of that wrap — see both rules below. */
@@ -314,9 +306,9 @@
 }
 .truck-studio-root .ts-hud__head:focus:not(:focus-visible) { outline: none; }
 
-/* The bulb. The panel's one piece of colour when nothing is selected — the same job
-   studio.css's .logo-dot does for the topbar, and the thing that says "lighting" at a glance
-   on a collapsed panel. */
+/* The bulb. The panel's one piece of colour when nothing is selected, and the thing that
+   says "lighting" at a glance on a collapsed panel. (It used to be described as doing the
+   topbar's .logo-dot's job; both the topbar and that class are gone.) */
 .truck-studio-root .ts-hud__head-ico {
   flex: none;
   display: inline-flex;
@@ -545,6 +537,9 @@
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
+/* Kept for the same reason as `#ts-hud button:disabled` — a state of a real element, not a
+   rule waiting on markup that does not exist. Without it a disabled slider would keep the
+   full-contrast custom track and thumb below and look perfectly usable. */
 .truck-studio-root .ts-hud-range:disabled {
   opacity: 0.4;
   cursor: default;
@@ -728,12 +723,15 @@
    6. Clima — the weather tile picker
    ============================================================ */
 
-/* Six presets (ensolarado, nublado, chuvoso, dourado, neblina, estúdio) on a 3 x 2 grid.
-   Three columns is what the 200px panel affords — 176px of content less two 5px gaps is
-   ~55px a tile, enough for an 18px glyph over "Ensolarado" at 8.5px — and it is also what
-   the panel can afford VERTICALLY: two columns would be three rows and ~50px taller, on a
-   panel that already has to fit between two badges. Section 8 retunes the columns and the
-   label size wherever that arithmetic stops working.
+/* FOUR presets — ensolarado, nublado, chuvoso, neblina — on a 2 x 2 grid. hud.ts's
+   HUD_PRESETS is deliberately a subset of the scene's PRESET_ORDER: `dourado` is a time of
+   day, which the hour slider owns, and `estudio` belongs to the assetless fallback cenário.
+   Two columns is what the 200px panel affords once "Ensolarado" has to fit at 8.5px, and
+   two rows is what it can afford vertically between the scene badge above and the corner
+   stack below.
+   ONE declaration, at every width: this rule used to be repeated verbatim in all three
+   responsive blocks in section 8, which read as three deliberate retunes and were three
+   copies of the same two columns.
    minmax(0, 1fr) rather than 1fr: a grid track's default min-width is auto, and one long
    preset name would otherwise widen its column and push the row off the panel. */
 .truck-studio-root .ts-hud-tiles {
@@ -870,7 +868,7 @@
 /* .ts-mapbadge → 152px at top:10px, ~128px tall, bottom edge ~138px.
    .ts-corner   → 168px de largura, ~142px do caminhão + 8px de vão + ~40px do
                   card da cor, chegando a ~200px acima do rodapé de 10px.
-   Three tile columns cannot hold "Ensolarado" at this width, so the grid drops to two. */
+   The tile grid is untouched: two columns already, at every width. */
 @media (max-width: 680px) {
   .truck-studio-root #ts-hud {
     --ts-hud-w: 152px;
@@ -883,7 +881,6 @@
   .truck-studio-root .ts-hud__hint { padding-left: 23px; }
   .truck-studio-root .ts-hud__body { gap: 9px; padding: 9px; }
   .truck-studio-root .ts-hud-dial { width: 70px; height: 70px; }
-  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Short viewports. Height is what runs out first: the two badges and this panel share one
@@ -892,8 +889,8 @@
    .ts-badge reaches ~166px up. The panel keeps all five rows and simply scrolls — which is
    precisely what the max-height in section 1 and the body's own overflow are there for, and
    why the collapse toggle is worth having.
-   The tile grid stays at three columns (two would be TALLER, which is the wrong trade here);
-   the label shrinks instead, since ~47px of tile cannot hold "Ensolarado" at 8.5px. */
+   The tile grid keeps its two columns; what shrinks is the label, since ~76px of tile cannot
+   hold "Ensolarado" at 8.5px once the panel is down to 172px. */
 @media (max-height: 620px) {
   .truck-studio-root #ts-hud {
     --ts-hud-w: 172px;
@@ -907,7 +904,6 @@
   .truck-studio-root .ts-hud__body { gap: 8px; padding: 9px; }
   .truck-studio-root .ts-hud-row { gap: 4px; }
   .truck-studio-root .ts-hud-dial { width: 66px; height: 66px; }
-  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .truck-studio-root .ts-hud-tile { padding: 6px 2px 5px; font-size: 7.5px; }
   .truck-studio-root .ts-hud-tile__ico { width: 16px; height: 16px; }
 }
@@ -927,7 +923,6 @@
   }
   .truck-studio-root .ts-hud__head { padding: 7px 9px; }
   .truck-studio-root .ts-hud-dial { width: 62px; height: 62px; }
-  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .truck-studio-root .ts-hud-tile { font-size: 8px; }
 }
 

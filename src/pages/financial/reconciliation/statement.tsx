@@ -37,8 +37,8 @@ import { CategoryPickerDialog } from "@/components/financial/reconciliation/cate
 import {
   ALL_BUCKETS,
   BUCKET_META,
-  BUCKET_STATUSES,
   bucketOf,
+  migrateBuckets,
   parseBuckets,
   type BucketKey,
 } from "@/components/financial/reconciliation/transaction-buckets";
@@ -66,10 +66,13 @@ const DAY_GROUP_OPTS = {
   getDate: (t: BankTransaction) => t.postedAt,
   getGreen: (t: BankTransaction) => (t.type === "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
   getRed: (t: BankTransaction) => (t.type !== "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
-  getResolved: (t: BankTransaction) =>
-    t.reconciliationStatus === "RECONCILED" ||
-    t.reconciliationStatus === "PARTIAL" ||
-    t.reconciliationStatus === "IGNORED",
+  // The day progress bar answers "is this day done?", so a row still owing a
+  // nota must NOT count as resolved — it did, which is how a day could show
+  // 100% while carrying unfinished work.
+  getResolved: (t: BankTransaction) => {
+    const b = bucketOf(t);
+    return b === "RECONCILED" || b === "IGNORED";
+  },
   direction: "desc" as const,
 };
 
@@ -213,7 +216,10 @@ export const ReconciliationStatementPage = () => {
   const [buckets, setBuckets] = useState<BucketKey[]>(() => {
     const raw = searchParams.get("status");
     if (raw !== null) return parseBuckets(raw, ALL_BUCKETS);
-    return readStoredSelection(BUCKETS_STORAGE_KEY, ALL_BUCKETS) ?? ALL_BUCKETS;
+    // migrateBuckets: a view stored before the "Aguardando nota" split must not
+    // lose those rows — they used to be counted inside "Conciliadas".
+    const stored = readStoredSelection(BUCKETS_STORAGE_KEY, ALL_BUCKETS);
+    return stored ? migrateBuckets(stored) : ALL_BUCKETS;
   });
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
@@ -319,8 +325,8 @@ export const ReconciliationStatementPage = () => {
     });
   }, [typedRows, amountMin, amountMax]);
   const visibleRows = useMemo(() => {
-    const allowed = new Set(buckets.flatMap(b => BUCKET_STATUSES[b]));
-    return rangeRows.filter(t => allowed.has(t.reconciliationStatus));
+    const allowed = new Set(buckets);
+    return rangeRows.filter(t => allowed.has(bucketOf(t)));
   }, [rangeRows, buckets]);
 
   const totals = useMemo(() => {
@@ -340,11 +346,12 @@ export const ReconciliationStatementPage = () => {
     const out: Record<BucketKey, { count: number; total: number }> = {
       PENDING: { count: 0, total: 0 },
       PARTIAL: { count: 0, total: 0 },
+      AWAITING_NF: { count: 0, total: 0 },
       RECONCILED: { count: 0, total: 0 },
       IGNORED: { count: 0, total: 0 },
     };
     for (const t of rangeRows) {
-      const b = bucketOf(t.reconciliationStatus);
+      const b = bucketOf(t);
       out[b].count += 1;
       out[b].total += Math.abs(Number(t.amount) || 0);
     }
@@ -437,10 +444,24 @@ export const ReconciliationStatementPage = () => {
                   {
                     onSuccess: r => {
                       const classified = r.classified?.processed ?? 0;
+                      // Transactions the classifier closed on a resolving
+                      // category alone — no document attached, and none ever
+                      // expected. classifyBatch has always returned this count;
+                      // it was simply never read, which is how 369 rows became
+                      // "Resolvido" with nothing behind them and no one saw it.
+                      const resolvedByCategory = r.classified?.reconciled ?? 0;
+                      const parts = [
+                        `${classified} classificadas`,
+                        `${r.matched} conciliadas`,
+                        `${r.categorized} categorizadas`,
+                      ];
+                      if (resolvedByCategory > 0) {
+                        parts.push(`${resolvedByCategory} resolvidas sem documento`);
+                      }
                       toast({
                         title: "Verificação concluída",
-                        description: `${classified} classificadas · ${r.matched} conciliadas · ${r.categorized} categorizadas`,
-                        variant: "success",
+                        description: parts.join(" · "),
+                        variant: resolvedByCategory > 0 ? "warning" : "success",
                       });
                       refetch();
                     },
@@ -468,9 +489,13 @@ export const ReconciliationStatementPage = () => {
           className="flex-shrink-0"
         />
 
-        {/* Filters in one row — Entradas/Saídas (CREDIT/DEBIT type) + the 4
-            status buckets. Every card is a toggle; click again to clear. */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 flex-shrink-0">
+        {/* Filters in one row — Entradas/Saídas (CREDIT/DEBIT type) + the 5
+            status buckets. Every card is a toggle; click again to clear.
+            Seven columns from xl: the "Aguardando nota" bucket made it 7 cards,
+            which wrapped to a second row under the old 6-column cap. Below xl
+            the row is intentionally allowed to wrap rather than squeezing seven
+            currency values into slots too narrow to read them. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7 flex-shrink-0">
           <FinancialKpiCard
             label="Entradas"
             value={isLoading ? null : `+${formatCurrency(totals.credits)}`}

@@ -944,7 +944,33 @@ function TaskDetailContent() {
                           onCommit: async (v, t) => {
                             const quoteId = t.quote?.id;
                             if (!quoteId || !v) return;
-                            await taskQuoteService.update(quoteId, { customerConfigs: [{ customerId: v as string }] });
+                            // Carry the existing config's terms across the swap. Sending
+                            // only `customerId` made the server create the new config from
+                            // column defaults (discountType 'NONE'), silently dropping an
+                            // agreed discount and raising the invoiced total — and resetting
+                            // generateInvoice/generateBankSlip back to true. The API now also
+                            // inherits on a 1:1 replacement, but sending the terms explicitly
+                            // keeps this path correct on its own.
+                            const prev = t.quote?.customerConfigs?.[0];
+                            await taskQuoteService.update(quoteId, {
+                              customerConfigs: [
+                                {
+                                  customerId: v as string,
+                                  ...(prev
+                                    ? {
+                                        discountType: prev.discountType ?? "NONE",
+                                        discountValue: prev.discountValue ?? null,
+                                        discountReference: prev.discountReference ?? null,
+                                        paymentCondition: prev.paymentCondition ?? null,
+                                        paymentConfig: prev.paymentConfig ?? null,
+                                        customPaymentText: prev.customPaymentText ?? null,
+                                        generateInvoice: prev.generateInvoice ?? true,
+                                        generateBankSlip: prev.generateBankSlip ?? true,
+                                      }
+                                    : {}),
+                                },
+                              ],
+                            });
                             await Promise.all([
                               queryClient.invalidateQueries({ queryKey: ["tasks"] }),
                               queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),

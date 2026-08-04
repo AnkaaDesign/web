@@ -297,21 +297,25 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     delete data.colorPreview;
 
     // Include previewConfig from the generator settings (exclude baseColor and finish)
-    /* `previewConfig` é COMPARTILHADO com o Truck Studio, que grava os ajustes
-       de renderização 3D da cor sob a chave `truckStudio` (ver
-       previewConfigSchema em schemas/paint.ts). O gerador da miniatura não
-       conhece essa chave, então remontar o objeto só com os campos dele apagava
-       o ajuste do estúdio a cada save deste formulário. Carrega-se o que já
-       está gravado. */
-    const keptTruckStudio = (defaultValues?.previewConfig as any)?.truckStudio;
+    /* `previewConfig` tem DOIS autores: os quatro campos abaixo são do gerador
+       da amostra 2D, e o `paint-lab.html` grava no MESMO objeto a receita PBR
+       que o Truck Studio lê para pintar o caminhão em 3D (`pearlFlip`,
+       `pearlMid`, `flakeDensity`, `peelScale`, …).
+
+       Por isso o que já está gravado entra POR BAIXO em vez de o objeto ser
+       remontado do zero: remontar só com os campos do gerador apagava a receita
+       inteira a cada save deste formulário, e a cor voltava a ser um hex chapado
+       no estúdio sem nada na tela dizendo por quê. Espalhar tudo e sobrescrever
+       só os quatro campos preserva qualquer chave futura pelo mesmo caminho. */
+    const keptPreviewConfig = (defaultValues?.previewConfig as Record<string, unknown>) ?? {};
     if (previewGeneratorRef.current) {
       const generatorSettings = previewGeneratorRef.current.getSettings();
       (data as any).previewConfig = {
+        ...keptPreviewConfig,
         lights: generatorSettings.lights,
         effectIntensity: generatorSettings.effectIntensity,
         flakeColor: generatorSettings.flakeColor,
         flipColor: generatorSettings.flipColor,
-        ...(keptTruckStudio ? { truckStudio: keptTruckStudio } : {}),
       };
     } else if (previewSettings) {
       // Fallback to stored settings if generator is not mounted

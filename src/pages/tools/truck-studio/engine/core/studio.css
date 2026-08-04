@@ -1,13 +1,30 @@
-/* Truck Studio styles — a port of truck-studio/webapp/css/style.css, with every
-   selector scoped to .truck-studio-root so the studio's dark chrome and its
-   generic class names (.panel, .tool, .chip, .tab, .hidden…) cannot leak into
-   Ankaa, and Ankaa's Tailwind cannot restyle the studio.
+/* Estilos do Truck Studio — porte de truck-studio/webapp/css/style.css, com
+   TODO seletor escopado em .truck-studio-root, para que o tema escuro do
+   estúdio e seus nomes de classe genéricos (.tool, .tab, .hidden…) não vazem
+   para o Ankaa, e para que o Tailwind do Ankaa não reestilize o estúdio.
 
-   Changes vs upstream:
-   - :root / html / body rules folded into .truck-studio-root
-   - #app height 100vh -> 100% (the studio fills the page area, not the screen)
-   - @keyframes spin renamed (Tailwind owns the global "spin" keyframes)
-   - the editor modal's z-index raised above Ankaa's chrome */
+   Diferenças em relação ao original:
+   - regras de :root / html / body dobradas dentro de .truck-studio-root
+   - #app height 100vh -> 100% (o estúdio ocupa a área da página, não a tela)
+   - @keyframes spin renomeado (o "spin" global é do Tailwind)
+   - z-index do modal do editor acima da chrome do Ankaa
+
+   ESTE ARQUIVO É A BASE, e é por isso que os TOKENS COMPARTILHADOS moram aqui:
+   o vidro fumê, a pílula "Trocar"/"Editar" e a placa de iniciais aparecem
+   também em ui/selector.css, ui/hud.css e ui/loader.css, e cada um deles trazia
+   a sua própria cópia dos números com um comentário dizendo "se retocar aqui,
+   retoque lá" — que é a definição de duplicação.
+
+   POR QUE SÃO TOKENS E NÃO REGRAS COMPARTILHADAS. Seria mais curto declarar
+   aqui um `.ts-badge__change, .ts-panel__edit, … { … }` e deixar cada arquivo
+   só com o que o distingue. Não dá: os quatro CSS são importados por
+   index.tsx, e nenhum seletor é hoje declarado em DOIS deles com a mesma
+   especificidade — é isso, e só isso, que faz a ordem dos imports não ser
+   carregante. Uma regra-base aqui e um override lá criaria essa dependência,
+   sem erro em lugar nenhum se alguém trocasse a ordem: a UI voltaria calada a
+   uma aparência de duas versões atrás.
+   Uma custom property não tem esse problema — ela resolve no PONTO DE USO,
+   contra o elemento, e não participa de disputa entre arquivos. */
 
 .truck-studio-root {
   --bg: #0d1017;
@@ -19,6 +36,60 @@
   --muted: #8b93a7;
   --accent: #4da3ff;
   --accent-2: #c8102e;
+
+  /* ---------- VIDRO FUMÊ ----------
+     O material de tudo que flutua sobre o render: os view controls (.ts-vbtn),
+     os cards de design (.ts-panel), os três badges e as setas do carrossel
+     (ui/selector.css) e o HUD de iluminação (ui/hud.css). Um preto quase neutro
+     em vez de um --panel tingido: a cena atrás é o assunto, e uma lâmina fumê lê
+     como vidro sobre o render em vez de mais um card opaco em cima dele. O
+     saturate() acima de 1 devolve um pouco da cor que o blur lavou.
+
+     "No hover aumenta o efeito": mais opacidade E mais blur. Os quatro números
+     eram copiados em cinco lugares, cada um com o aviso de que retocar um
+     obrigava a retocar os outros quatro. Agora são estes.
+
+     As duas listas de filtro nomeiam as mesmas funções na mesma ordem: é isso
+     que torna o backdrop-filter interpolável (trocar blur/saturate de lugar
+     entre os estados faz ele saltar em vez de animar). */
+  --ts-glass-bg: rgba(8, 10, 14, 0.42);
+  --ts-glass-bg-hover: rgba(8, 10, 14, 0.66);
+  --ts-glass-filter: blur(14px) saturate(1.1);
+  --ts-glass-filter-hover: blur(20px) saturate(1.25);
+  /* Cards (painéis de design, badges): pousados, sombra curta. */
+  --ts-glass-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.45);
+  /* Controles (view controls, setas, HUD): flutuam mais alto. */
+  --ts-glass-shadow-ctl: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --ts-glass-shadow-ctl-hover: 0 18px 46px -12px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.55);
+  /* A longhand -webkit- entra na transição em separado porque num motor que só
+     entende a versão prefixada o nome sem prefixo não é sequer uma propriedade
+     animável. Nunca `all`. Quem usa isto acrescenta as suas próprias
+     propriedades depois da vírgula. */
+  --ts-glass-transition:
+    background-color 220ms ease,
+    backdrop-filter 220ms ease,
+    -webkit-backdrop-filter 220ms ease;
+
+  /* ---------- PÍLULA "Trocar" / "Editar" ----------
+     Quatro delas: o card de design (.ts-panel__edit, aqui) e os três badges
+     (ui/selector.css). O card inteiro é o alvo do clique nos quatro casos, e a
+     pílula é o que diz que ele é clicável — discreta em repouso, acesa no
+     hover/foco do card, para não competir com a foto o resto do tempo. */
+  --ts-pill-bg: rgba(13, 16, 23, 0.78);
+  --ts-pill-bg-hover: rgba(13, 16, 23, 0.92);
+  --ts-pill-pad: 4px 9px;
+  --ts-pill-opacity: 0.55;
+
+  /* ---------- PLACA DE INICIAIS ----------
+     O tramado diagonal que aparece no lugar da foto que falta. O PASSO é o que
+     muda entre as quatro (ele acompanha o tamanho da caixa: a 10px numa
+     miniatura de 198px o tramado vira três listras gordas), então ele é
+     declarado por consumidor; a cor do fio e o fundo são compartilhados.
+     `--ts-plate-glass` é o fundo das placas que ficam DENTRO de um card de
+     vidro — uma chapa opaca ali abriria um buraco sólido no topo do vidro. */
+  --ts-plate-weave: rgba(255, 255, 255, 0.028);
+  --ts-plate-panel: linear-gradient(160deg, var(--panel-2), var(--panel));
+  --ts-plate-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
 
   position: relative;
   height: 100%;
@@ -52,16 +123,16 @@
   white-space: nowrap;
 }
 .truck-studio-root button { font-family: inherit; cursor: pointer; }
-.truck-studio-root .ghost,
-.truck-studio-root .primary {
+/* Dois botões usam isto, os dois na barra do editor: "✕ Fechar" e o "×" do
+   fundo. Havia aqui um par `.primary` (variante em accent) e um `.ghost.on`
+   (estado ligado) — nenhum dos dois é escrito por ninguém: `.on` só é ligado em
+   .ts-vbtn e em .tool, e nada nunca recebeu a classe `primary`. */
+.truck-studio-root .ghost {
   padding: 7px 13px; border-radius: 9px; font-size: 12px; font-weight: 600;
   border: 1px solid var(--stroke-2); background: rgba(255, 255, 255, 0.05); color: var(--text);
   transition: background 0.15s;
 }
 .truck-studio-root .ghost:hover { background: rgba(255, 255, 255, 0.1); }
-.truck-studio-root .ghost.on { background: var(--accent); border-color: transparent; color: #08101f; }
-.truck-studio-root .primary { background: var(--accent); border-color: transparent; color: #08101f; }
-.truck-studio-root .primary:hover { filter: brightness(1.1); }
 
 .truck-studio-root #canvas-holder { flex: 1; position: relative; min-height: 0; }
 .truck-studio-root #canvas-holder canvas { display: block; outline: none; }
@@ -72,24 +143,9 @@
    MESMO VIDRO DO HUD DE ILUMINAÇÃO (ui/hud.css seção 1), e não por gosto: estes
    botões flutuam SOBRE um render vivo, do outro lado do mesmo canvas, e são o
    par simétrico do #ts-hud no canto oposto. Se os dois cantos usam materiais
-   diferentes o olho lê duas UIs empilhadas na cena em vez de uma. Um preto quase
-   neutro em vez de um --panel tingido: a cena atrás é o assunto, e uma lâmina
-   fumê lê como vidro sobre o render em vez de mais um card opaco em cima dele. O
-   saturate() acima de 1 devolve um pouco da cor da cena que o blur lavou.
-
-   Os quatro números — 0.42/14px em repouso, 0.66/20px no hover — são os MESMOS
-   do painel, incluindo a duração de 220ms. Qualquer ajuste aqui tem de ser feito
-   lá também, ou os dois cantos saem de sincronia.
-
-   As duas listas de filtro nomeiam as mesmas funções na mesma ordem: é isso que
-   torna o backdrop-filter interpolável (trocar blur/saturate de lugar entre os
-   estados faz ele saltar em vez de animar). A longhand -webkit- entra na
-   transição em separado porque num motor que só entende a versão prefixada o
-   nome sem prefixo não é sequer uma propriedade animável. Nunca `all`.
-
-   A sombra externa é o que separa o cluster do render atrás dele — casada com a
-   do painel e a dos badges, para que tudo que flutua sobre a cena seja um só
-   material.
+   diferentes o olho lê duas UIs empilhadas na cena em vez de uma. É por isso que
+   o material vem dos tokens --ts-glass-* lá em cima, e não de números escritos
+   aqui: os dois cantos não têm como sair de sincronia se lêem o mesmo valor.
 
    Hover/active mexem só em SUPERFÍCIE e BORDA. Nada de translate ou scale: são
    controles sobre uma imagem em movimento, e um botão que pula 1px lê como
@@ -115,32 +171,28 @@
   color: var(--text);
   cursor: pointer;
 
-  /* THE look — idêntico a #ts-hud em repouso. */
-  background-color: rgba(8, 10, 14, 0.42);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
+  box-shadow: var(--ts-glass-shadow-ctl);
 
   transition:
-    background-color 220ms ease,
-    backdrop-filter 220ms ease,
-    -webkit-backdrop-filter 220ms ease,
+    var(--ts-glass-transition),
     border-color 220ms ease,
     box-shadow 220ms ease,
     color 220ms ease;
 }
 .truck-studio-root .ts-vbtn svg { display: block; }
 
-/* "No hover aumenta o efeito": mais opacidade E mais blur, exatamente como o
-   painel. O ícone sobe para branco puro porque aqui ele é o único conteúdo — não
-   há rótulo para carregar o estado. */
+/* O ícone sobe para branco puro porque aqui ele é o único conteúdo — não há
+   rótulo para carregar o estado. */
 .truck-studio-root .ts-vbtn:hover {
-  background-color: rgba(8, 10, 14, 0.66);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
   border-color: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  box-shadow: 0 18px 46px -12px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--ts-glass-shadow-ctl-hover);
 }
 
 /* Pressionado: o vidro fecha — mais denso que o hover, com a sombra externa
@@ -160,7 +212,7 @@
   outline-offset: 2px;
 }
 
-/* Auto-rotate ligado. `.on` é escrito por ui/sidebar.ts. Continua sendo vidro —
+/* Auto-rotate ligado. `.on` é escrito por ui/chrome.ts. Continua sendo vidro —
    só o TINGIMENTO muda, herdando o backdrop-filter da regra base — mas com um
    accent forte o bastante para ser lido de relance sobre céu claro ou asfalto,
    apoiado pelo halo accent na sombra. É a linguagem que .ts-hud-tile.is-on usa
@@ -189,7 +241,7 @@
     0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-/* ui/sidebar.ts desabilita "Baixar imagem" enquanto a captura em alta resolução
+/* ui/chrome.ts desabilita "Baixar imagem" enquanto a captura em alta resolução
    roda — ela para o loop de render e segura a thread principal, e um segundo
    clique no meio disso pegaria o renderer já redimensionado.
    DEPOIS de `.on` de propósito: com a mesma especificidade (0,3,0) a ordem é o
@@ -202,17 +254,32 @@
   pointer-events: none;
 }
 
-/* Sem blur o botão é só um filme preto a 42% sobre um render claro — legível
-   apenas por causa do blur. Tire o blur e ele quase some e o ícone fica solto no
-   céu. Então o ramo sem suporte troca a translucidez por uma superfície quase
-   sólida, exatamente como #ts-hud faz.
+/* ---------- vidro fumê sem blur: o ramo de fallback, UM para os cinco ----------
+   Sem blur, cada uma dessas superfícies é só um filme preto a 42% sobre um
+   render claro — legível apenas por causa do blur. Tire o blur e o botão quase
+   some, e o ícone (ou o nome do caminhão, ou o rótulo do HUD) fica solto no céu.
+   Então o ramo sem suporte troca a translucidez por uma superfície quase sólida.
 
    Escrito como `not ((sem prefixo) or (-webkit-))` e não só o teste sem prefixo:
    o Safari embarcou -webkit-backdrop-filter por anos sem o nome sem prefixo, e o
-   teste simples rebaixaria um motor que borra perfeitamente bem. */
+   teste simples rebaixaria um motor que borra perfeitamente bem.
+
+   ANTES eram CINCO destes blocos, um por consumidor, em três arquivos — e cada
+   um trazia a mesma nota sobre @supports não somar especificidade, porque cada
+   um tinha de repetir a superfície com a especificidade do seu consumidor.
+   Redefinir a VARIÁVEL apaga o problema inteiro: quem lê `var(--ts-glass-bg)`
+   pega o valor novo seja qual for a especificidade da sua própria regra. Os
+   únicos que continuam precisando de linha própria são os que NÃO leem o token
+   — a variante em accent do botão de girar, e a superfície de noite do HUD
+   (ui/hud.css), que redefine o token num seletor mais específico.
+
+   A opacidade dos cinco divergiu ao longo das cópias (0,90 em dois arquivos,
+   0,92 em outros dois); aqui vira um número só. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .truck-studio-root .ts-vbtn { background-color: rgba(10, 13, 19, 0.9); }
-  .truck-studio-root .ts-vbtn:hover { background-color: rgba(10, 13, 19, 0.97); }
+  .truck-studio-root {
+    --ts-glass-bg: rgba(10, 13, 19, 0.92);
+    --ts-glass-bg-hover: rgba(10, 13, 19, 0.97);
+  }
   .truck-studio-root .ts-vbtn:active { background-color: rgba(6, 8, 13, 0.98); }
   /* O accent tem de ser restabelecido DENTRO do bloco: @supports não soma
      especificidade, então o `.ts-vbtn.on` (0,2,0) acima venceria este (0,1,0) e
@@ -334,10 +401,8 @@
 .truck-studio-root .spinner.small { width: 18px; height: 18px; border-width: 2px; }
 @keyframes truck-studio-spin { to { transform: rotate(360deg); } }
 .truck-studio-root .load-text { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
-.truck-studio-root .load-bar { width: 220px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.truck-studio-root .load-bar i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
 /* Duas pílulas, um desenho: a troca de veículo (studio.ts) e a captura em alta
-   resolução (ui/sidebar.ts + scene/capture.ts). Nós separados, dono separado,
+   resolução (ui/chrome.ts + scene/capture.ts). Nós separados, dono separado,
    mesma aparência — nunca estão no ar ao mesmo tempo, e se um dia estiverem,
    ficarão empilhadas em vez de brigar pelo mesmo elemento. */
 .truck-studio-root #cab-switching,
@@ -352,7 +417,6 @@
 /* Botão pequeno da barra do editor (o "×" que devolve o fundo ao alumínio).
    Sobreviveu à sidebar porque quem o usa é o modal, não ela. */
 .truck-studio-root .mini { padding: 3px 8px; border-radius: 6px; font-size: 11px; border: 1px solid var(--stroke-2); background: rgba(255, 255, 255, 0.05); color: var(--muted); }
-.truck-studio-root .mini.primary { background: var(--accent); border-color: transparent; color: #08101f; font-weight: 700; }
 
 /* ============================================================
    DESIGN DO IMPLEMENTO — os três cards sobre o render (#ts-panels)
@@ -422,26 +486,22 @@
   overflow: hidden;
   cursor: pointer;
 
-  /* O MESMO vidro dos badges: 0.42/14px em repouso, 0.66/20px no hover. Retocar
-     aqui obriga a retocar lá (e no HUD, e nos view controls). */
-  background-color: rgba(8, 10, 14, 0.42);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.45);
+  /* O MESMO vidro dos badges, do HUD e dos view controls — literalmente: os
+     quatro leem os tokens --ts-glass-* declarados no topo deste arquivo. */
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
+  box-shadow: var(--ts-glass-shadow);
 
-  transition:
-    border-color 0.18s ease,
-    background-color 0.22s ease,
-    backdrop-filter 0.22s ease,
-    -webkit-backdrop-filter 0.22s ease;
+  transition: var(--ts-glass-transition), border-color 0.18s ease;
 }
 /* Sem lift e sem scale, como os badges: são cards sobre uma imagem em
    movimento, e 2px de salto leem como falha de render, não como resposta. */
 .truck-studio-root .ts-panel:hover {
   border-color: var(--accent);
-  background-color: rgba(8, 10, 14, 0.66);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
 }
 /* Um anel só: a borda volta ao neutro para o outline não ganhar um segundo
    contorno concêntrico. Mesma regra dos cards e dos badges. */
@@ -451,11 +511,6 @@
   outline-offset: 2px;
 }
 .truck-studio-root .ts-panel:focus:not(:focus-visible) { outline: none; }
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .truck-studio-root .ts-panel { background-color: rgba(10, 13, 19, 0.92); }
-  .truck-studio-root .ts-panel:hover { background-color: rgba(10, 13, 19, 0.97); }
-}
 
 /* ---------- o painel de verdade, atrás da tela ----------
    O xadrez saiu. No lugar dele entra a FOTO do painel — a lateral completa e as
@@ -536,31 +591,36 @@
   font-size: 12.5px; font-weight: 700; line-height: 1.25;
   letter-spacing: 0.01em; color: var(--text);
 }
-/* Mesma pílula do "Trocar" dos badges — o card inteiro é o alvo do clique, e
-   isto é o que diz que ele é clicável. Decorativa: não come o clique nem
-   oferece cursor de texto. */
+/* Mesma pílula do "Trocar" dos badges (ui/selector.css) — o card inteiro é o
+   alvo do clique, e isto é o que diz que ele é clicável. Decorativa: não come o
+   clique nem oferece cursor de texto.
+   Os VALORES vêm dos tokens --ts-pill-* declarados no topo, que é onde a versão
+   dos badges também os lê; a caixa continua escrita nos dois arquivos porque um
+   seletor declarado em dois deles com a mesma especificidade tornaria a ORDEM
+   dos imports de index.tsx carregante, e ela hoje não é. Ver a nota nos
+   tokens. */
 .truck-studio-root .ts-panel__edit {
   position: absolute;
   right: 8px;
   bottom: 8px;
   z-index: 2;
-  padding: 4px 9px;
+  padding: var(--ts-pill-pad);
   border: 1px solid var(--stroke-2);
   border-radius: 7px;
-  background: rgba(13, 16, 23, 0.78);
+  background: var(--ts-pill-bg);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   color: var(--text);
   font-size: 10.5px; font-weight: 600; line-height: 1;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0.55;
+  opacity: var(--ts-pill-opacity);
   transition: opacity 0.15s, background 0.15s, border-color 0.15s;
 }
 .truck-studio-root .ts-panel:hover .ts-panel__edit,
 .truck-studio-root .ts-panel:focus-visible .ts-panel__edit {
   opacity: 1;
-  background: rgba(13, 16, 23, 0.92);
+  background: var(--ts-pill-bg-hover);
   border-color: var(--accent);
 }
 

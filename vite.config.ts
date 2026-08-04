@@ -122,6 +122,25 @@ export default defineConfig(({ mode }) => {
       fs: {
         strict: false,
       },
+      // A árvore de assets do Truck Studio (~300 MB de geometria, HDRI e mapas
+      // PBR) saiu de `public/` e é servida pela API sob `/studio-assets/`.
+      // Este proxy existe para que o loop local continue SAME-ORIGIN, que é o
+      // padrão de `VITE_STUDIO_ASSETS_BASE` (`/studio-assets/v1`):
+      //   - sem preflight de CORS em cada .glb/.hdr/.webp;
+      //   - o three.js pede `crossOrigin="anonymous"` por padrão, e livery.ts
+      //     ainda lê os PNGs de painel com `getImageData()` — de outra origem
+      //     sem cabeçalho de CORS o canvas fica CONTAMINADO e a medição da
+      //     janela vazada falha em silêncio;
+      //   - o dev reproduz o que o nginx faz em produção (mesmo prefixo,
+      //     mesma origem), em vez de um caminho feliz que só existe local.
+      // Apontar `VITE_STUDIO_ASSETS_BASE` para uma origem absoluta continua
+      // funcionando e simplesmente não passa por aqui.
+      proxy: {
+        "/studio-assets": {
+          target: apiUrl,
+          changeOrigin: true,
+        },
+      },
     },
     // Vitest. Without this block Vitest falls back to `environment: "node"` and never loads
     // `src/test/setup.ts` — which is written for a browser (it mocks matchMedia,
