@@ -86,6 +86,32 @@ const FINISH = {
   r_glass: { name: 'redglass', met: 0.00, rough: 0.10, two: true, alpha: 0.72, emissive: 0 },
 };
 
+/* O LETREIRO DA GRADE NÃO PODE SER UM ESPELHO.
+   ---------------------------------------------------------------------------
+   As letras IVECO da grade saíam VERDE-OLIVA no cenário do distrito industrial.
+   Não é cor errada: elas usam o mesmo `chrome` do resto (metalness 1, roughness
+   0,055), e um espelho perfeito virado para a frente devolve o que está à frente
+   — que ali é uma linha de árvores. É o outro lado do erro que o Scania
+   documenta: lá o cromado era escuro demais e o letreiro saía preto; aqui ele é
+   liso demais e o letreiro pega a paisagem.
+
+   ASPEREZA SOZINHA NÃO RESOLVE, e testar no estúdio foi o que mostrou isso: em
+   metalness 1 o three zera o difuso, então a cor da peça É o reflexo e roughness
+   só o embaça — um verde borrado continua verde. O que devolve as letras à cor
+   delas é BAIXAR O METALNESS, exatamente a receita que applyTrailerFinish() usa
+   nas lentes das lanternas. Em 0,30/0,34 elas leem prata claro em qualquer
+   cenário, com brilho de emblema e sem virar espelho.
+
+   A peça é achada pela MEDIDA, não pelo nome, e o bake exige encontrar
+   exatamente uma. */
+const BADGE = { met: 0.30, rough: 0.34, color: [0.80, 0.80, 0.82], name: 'chromebadge' };
+const isBadge = (box, zmaxAll) => (
+  box.max[2] > zmaxAll - 100 &&                    // a até 100 mm da face dianteira
+  box.max[0] - box.min[0] > 500 && box.max[0] - box.min[0] < 900 &&
+  box.max[1] - box.min[1] < 250 &&
+  box.max[2] - box.min[2] < 50
+);
+
 /* Por que emissive vai a ZERO nas lanternas e no farol
    ---------------------------------------------------------------------------
    A rip acende os faróis o tempo todo (emissive 0,85) e as lentes em 0,5. O
@@ -112,8 +138,21 @@ say(`origem (mm): x [${xmin.toFixed(1)}, ${xmax.toFixed(1)}]  y [${ymin.toFixed(
 const S = 0.001;                      // mm → m
 const xc = (xmin + xmax) / 2;         // centraliza a bitola em x=0
 
+/* caixa em mundo por malha, para as regras que dependem de MEDIDA */
+const meshBox = new Map();
+for (const p of parts) {
+  const mi = g.nodes[p.node].mesh;
+  let b = meshBox.get(mi);
+  if (!b) { b = { min: [1e30, 1e30, 1e30], max: [-1e30, -1e30, -1e30] }; meshBox.set(mi, b); }
+  for (let k = 0; k < 3; k++) {
+    b.min[k] = Math.min(b.min[k], p.box.min[k]);
+    b.max[k] = Math.max(b.max[k], p.box.max[k]);
+  }
+}
+
 /* ---------------- 2. malhas ---------------- */
-let flipped = 0, degen = 0, trisOut = 0, vertsOut = 0;
+let flipped = 0, degen = 0, trisOut = 0, vertsOut = 0, badges = 0;
+const badgeMatIdx = g.materials.length;      // material extra, anexado no fim
 const newMeshes = [];
 const meshMap = new Map();            // índice antigo → novo
 const bin = [];                       // chunks binários, na ordem dos bufferViews
@@ -229,13 +268,24 @@ for (const [mi, me] of g.meshes.entries()) {
   if (T.length) attributes.TEXCOORD_0 = pushAccessor(new Float32Array(T), 'VEC2', 5126, { target: 34962 });
   const indices = pushAccessor(new Uint32Array(I), 'SCALAR', 5125, { target: 34963 });
 
+  /* o letreiro da grade sai do `chrome` comum — ver BADGE */
+  let matOut = matIdx;
+  const box = meshBox.get(mi);
+  if (matIdx != null && g.materials[matIdx].name === 'chrome' && box && isBadge(box, zmax)) {
+    matOut = badgeMatIdx;
+    badges++;
+    say(`  letreiro da grade: ${me.name} — ${((box.max[0] - box.min[0]) / 10).toFixed(1)} × ` +
+      `${((box.max[1] - box.min[1]) / 10).toFixed(1)} cm em z ${(box.max[2] / 1000).toFixed(3)} m → cromado acetinado`);
+  }
+
   meshMap.set(mi, newMeshes.length);
-  newMeshes.push({ name: me.name, primitives: [{ attributes, indices, material: matIdx, mode: 4 }] });
+  newMeshes.push({ name: me.name, primitives: [{ attributes, indices, material: matOut, mode: 4 }] });
   trisOut += I.length / 3;
   vertsOut += P.length / 3;
 }
 
 say(`triângulos: ${trisOut.toLocaleString('pt-BR')}   vértices: ${vertsOut.toLocaleString('pt-BR')}`);
+if (badges !== 1) say(`!! o seletor do letreiro casou ${badges} peças (esperado 1) — confira BADGE/isBadge`);
 say(`degenerados descartados: ${degen.toLocaleString('pt-BR')}   primitivas invertidas pela conferência de normal: ${flipped}`);
 
 /* ---------------- 3. materiais ---------------- */
@@ -266,12 +316,31 @@ const materials = g.materials.map((m) => {
   }
   return out;
 });
+materials.push({
+  name: BADGE.name,
+  pbrMetallicRoughness: {
+    baseColorFactor: [...BADGE.color, 1],
+    metallicFactor: BADGE.met, roughnessFactor: BADGE.rough,
+  },
+  doubleSided: false,
+});
 
-/* ---------------- 4. texturas ---------------- */
+/* ---------------- 4. texturas ----------------
+   A PLACA DA RIP É A MARCA D'ÁGUA DO FORNECEDOR: 832×181 px escrito "SQUIR",
+   com o site e o crédito em letra miúda embaixo. Ela aparece na dianteira E na
+   traseira, e as duas malhas usam a textura INTEIRA (u e v de 0 a 1, medido),
+   então a substituição só precisa manter a proporção. `plate.png`, ao lado
+   deste script, é uma placa Mercosul limpa no mesmo 832×181. */
+const PLATE_PNG = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), 'plate.png');
 const images = (g.images || []).map((im) => {
   const uri = im.uri || '';
-  const mime = uri.slice(5, uri.indexOf(';'));
-  const data = Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64');
+  let mime = uri.slice(5, uri.indexOf(';'));
+  let data = Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64');
+  if (/plate/i.test(im.name || '') && fs.existsSync(PLATE_PNG)) {
+    data = fs.readFileSync(PLATE_PNG);
+    mime = 'image/png';
+    say(`placa substituída pela limpa (${(data.length / 1024).toFixed(0)} KB) — a da rip dizia SQUIR`);
+  }
   const byteOffset = bin.reduce((s, c) => s + c.byteLength + ((4 - (c.byteLength % 4)) % 4), 0);
   bin.push(data);
   bufferViews.push({ buffer: 0, byteOffset, byteLength: data.byteLength });
