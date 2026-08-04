@@ -407,4 +407,6 @@ let rearBody = 1e30;
 for (const p of parts) if (p.box.max[1] - ymin > 1500 && p.mat === 'body') rearBody = Math.min(rearBody, p.box.min[2]);
 say(`  rearBodyZ = ${mm(rearBody - zmin).toFixed(3)}`);
 
-fs.writeFileSync(path.join(path.dirname(OUT), 'iveco-bake.log.txt'), log.join('\n'), 'utf8');
+/* O log fica JUNTO DA FERRAMENTA, não junto do .glb: public/ é servido, e um
+   .txt de build ali vira asset público. */
+fs.writeFileSync(path.join(path.dirname(PLATE_PNG), 'ultimo-bake.log.txt'), log.join('\n'), 'utf8');

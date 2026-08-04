@@ -43,3 +43,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# log do bake da cabine Iveco (tools/iveco-bake)
+tools/iveco-bake/ultimo-bake.log.txt
