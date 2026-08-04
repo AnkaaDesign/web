@@ -46,3 +46,16 @@ coverage/
 
 # log do bake da cabine Iveco (tools/iveco-bake)
 tools/iveco-bake/ultimo-bake.log.txt
+
+# O IMPLEMENTO FICA FORA DO VERSIONAMENTO.
+# public/models/vehicles/trailer.glb é o bake NÃO ACHATADO do semirreboque
+# (5852 nós, 2151 malhas) e passa de 280 MB — o GitHub recusa qualquer arquivo
+# acima de 100 MB, então o push inteiro falharia por causa dele. O arquivo
+# continua no disco e é gerado por window.__exportTrailer() no viewer; a cópia
+# de distribuição é o .zip em Downloads.
+public/models/vehicles/trailer.glb
+# e os bakes anteriores, que são backup e não fonte
+public/models/vehicles/*.glb.bak
+public/models/vehicles/*.glb.prev-*
+public/models/vehicles/*.glb.bake*
+public/models/vehicles/trailer_old_probe.glb
