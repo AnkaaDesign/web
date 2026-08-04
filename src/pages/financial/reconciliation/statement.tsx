@@ -437,10 +437,24 @@ export const ReconciliationStatementPage = () => {
                   {
                     onSuccess: r => {
                       const classified = r.classified?.processed ?? 0;
+                      // Transactions the classifier closed on a resolving
+                      // category alone — no document attached, and none ever
+                      // expected. classifyBatch has always returned this count;
+                      // it was simply never read, which is how 369 rows became
+                      // "Resolvido" with nothing behind them and no one saw it.
+                      const resolvedByCategory = r.classified?.reconciled ?? 0;
+                      const parts = [
+                        `${classified} classificadas`,
+                        `${r.matched} conciliadas`,
+                        `${r.categorized} categorizadas`,
+                      ];
+                      if (resolvedByCategory > 0) {
+                        parts.push(`${resolvedByCategory} resolvidas sem documento`);
+                      }
                       toast({
                         title: "Verificação concluída",
-                        description: `${classified} classificadas · ${r.matched} conciliadas · ${r.categorized} categorizadas`,
-                        variant: "success",
+                        description: parts.join(" · "),
+                        variant: resolvedByCategory > 0 ? "warning" : "success",
                       });
                       refetch();
                     },

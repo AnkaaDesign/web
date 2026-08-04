@@ -287,11 +287,27 @@ function CategoryChipsRow({
   );
 }
 
+/**
+ * What actually backs a resolved transaction. `RECONCILED` alone conflates
+ * "linked to a fiscal document", "linked to a boleto/parcela" and "explained by
+ * a resolving category with nothing attached" — three very different facts that
+ * rendered as the same green chip, which is why hundreds of category-resolved
+ * rows accumulated unnoticed.
+ */
+export type ReconciliationLinkage =
+  | "FISCAL_DOCUMENT"
+  | "SETTLEMENT_ANCHOR"
+  | "NONE";
+
 interface Props {
   status: ReconciliationStatus;
   /** Best candidate confidence (0-100). When provided on a PENDING/PARTIAL row,
    *  a colored "40%" chip is shown next to the status for quick triage. */
   topMatchScore?: number | null;
+  /** What backs the resolution. Only meaningful for RECONCILED/PARTIAL rows. */
+  linkage?: ReconciliationLinkage | null;
+  /** Resolving category name ("Tarifa Bancária"), shown on category-resolved rows. */
+  resolvedByLabel?: string | null;
   className?: string;
 }
 
@@ -300,19 +316,49 @@ interface Props {
  * their own dedicated column (see CategoryChips) — this badge is status-only.
  * For unresolved rows it can also surface the best candidate's confidence.
  */
-export function MatchStatusBadge({ status, topMatchScore, className }: Props) {
-  const cfg = STATUS_VARIANT[status];
+export function MatchStatusBadge({
+  status,
+  topMatchScore,
+  linkage,
+  resolvedByLabel,
+  className,
+}: Props) {
   const showScore =
     (status === "PENDING" || status === "PARTIAL") &&
     typeof topMatchScore === "number" &&
     topMatchScore > 0;
+
+  // Split the terminal state by what backs it. No data migration needed — the
+  // distinction is derived from whether live matches exist and what they point
+  // at. A row resolved by a category is never shown as a plain green
+  // "Resolvido": it says so, and names the reason.
+  const resolved = status === "RECONCILED" || status === "PARTIAL";
+  let label: string = STATUS_LABEL[status];
+  let variant = STATUS_VARIANT[status];
+  let title: string | undefined = showScore
+    ? "Confiança da melhor nota candidata"
+    : undefined;
+
+  if (resolved && linkage === "SETTLEMENT_ANCHOR") {
+    label = status === "PARTIAL" ? "Parcial · liquidado" : "Liquidado";
+    variant = "inProgress";
+    title = "Conciliado contra boleto, parcela ou pagamento recorrente — sem nota fiscal vinculada";
+  } else if (resolved && linkage === "NONE") {
+    label = resolvedByLabel
+      ? `Resolvido · ${resolvedByLabel}`
+      : "Resolvido sem documento";
+    variant = "muted";
+    title =
+      "Resolvido por categoria, sem documento vinculado. Não há nota fiscal associada a esta transação.";
+  }
+
   return (
     <Badge
-      variant={cfg}
+      variant={variant}
       className={`whitespace-nowrap ${className ?? ""}`}
-      title={showScore ? "Confiança da melhor nota candidata" : undefined}
+      title={title}
     >
-      {STATUS_LABEL[status]}
+      {label}
       {showScore && (
         <span className="ml-1 opacity-80">· {Math.round(topMatchScore!)}%</span>
       )}

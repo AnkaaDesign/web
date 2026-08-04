@@ -5,7 +5,13 @@
  * manageable columns. Day grouping is provided by the DataTable's group rows.
  */
 import type { DataTableColumnDef } from "@/components/ui/datatable";
-import { CategoryChips, MatchStatusBadge, getAccountingTypeLabel, STATUS_LABEL } from "./match-status-badge";
+import {
+  CategoryChips,
+  MatchStatusBadge,
+  getAccountingTypeLabel,
+  STATUS_LABEL,
+  type ReconciliationLinkage,
+} from "./match-status-badge";
 import { LinkedDocCell } from "./transaction-buckets";
 import { formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import type { BankTransaction } from "@/types/reconciliation";
@@ -31,6 +37,27 @@ const linkedText = (t: BankTransaction): string => {
   }
   return "";
 };
+
+/**
+ * What backs a resolved transaction, derived from its live matches.
+ *
+ * Purely presentational — no new field is stored. RECONCILED is legitimately
+ * reached two different ways (a linked document, or a resolving category such
+ * as Tarifa Bancária that will never have a document), and rendering both as
+ * the same green "Resolvido" chip is what allowed hundreds of unbacked rows to
+ * accumulate without anyone noticing.
+ */
+const linkageOf = (t: BankTransaction): ReconciliationLinkage => {
+  const matches = (t.matches ?? []).filter((m) => !m.reversedAt);
+  if (matches.length === 0) return "NONE";
+  return matches.some((m) => m.fiscalDocument || m.fiscalDocumentId)
+    ? "FISCAL_DOCUMENT"
+    : "SETTLEMENT_ANCHOR";
+};
+
+/** Name of the resolving category holding an unbacked row up, if any. */
+const resolvedByLabelOf = (t: BankTransaction): string | null =>
+  (t.categories ?? []).find((c) => c.category?.isResolving)?.category?.name ?? null;
 
 export const STATEMENT_COLUMNS: DataTableColumnDef<BankTransaction>[] = [
   {
@@ -164,7 +191,12 @@ export const STATEMENT_COLUMNS: DataTableColumnDef<BankTransaction>[] = [
       exportValue: (t) => STATUS_LABEL[t.reconciliationStatus] ?? t.reconciliationStatus,
     },
     cell: ({ row }) => (
-      <MatchStatusBadge status={row.original.reconciliationStatus} topMatchScore={row.original.topMatchScore} />
+      <MatchStatusBadge
+        status={row.original.reconciliationStatus}
+        topMatchScore={row.original.topMatchScore}
+        linkage={linkageOf(row.original)}
+        resolvedByLabel={resolvedByLabelOf(row.original)}
+      />
     ),
   },
 ];
