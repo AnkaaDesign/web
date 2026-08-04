@@ -9,7 +9,7 @@ import {
   CategoryChips,
   MatchStatusBadge,
   getAccountingTypeLabel,
-  STATUS_LABEL,
+  settlementStatusText,
   type ReconciliationLinkage,
 } from "./match-status-badge";
 import { LinkedDocCell } from "./transaction-buckets";
@@ -19,8 +19,17 @@ import type { BankTransaction } from "@/types/reconciliation";
 const counterpartyText = (t: BankTransaction): string =>
   t.counterpartyName || (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : t.memo || "");
 
-/** What a reconciled transaction is linked TO — NF, boleto, parcela or tarefa. */
+/**
+ * What a reconciled transaction is linked TO — NF, boleto, parcela, pedido,
+ * conta recorrente, aerografia or folha.
+ *
+ * The API-derived `settlement.label` covers all seven anchors and is preferred;
+ * the hand-rolled walk below only ran for three of them, which is why an
+ * order-cleared supplier payment showed a green chip beside an EMPTY cell. It
+ * stays as the fallback for payloads without a settlement.
+ */
 const linkedText = (t: BankTransaction): string => {
+  if (t.settlement?.label) return t.settlement.label;
   const matches = (t.matches ?? []).filter((m) => !m.reversedAt);
   const doc = matches.find((m) => m.fiscalDocument)?.fiscalDocument;
   if (doc) return doc.emitName || (doc.emitCnpj ? formatCnpjCpf(doc.emitCnpj) : "NF");
@@ -183,17 +192,21 @@ export const STATEMENT_COLUMNS: DataTableColumnDef<BankTransaction>[] = [
     id: "reconciliationStatus",
     header: "Situação",
     size: 160,
-    accessorFn: (t) => STATUS_LABEL[t.reconciliationStatus] ?? t.reconciliationStatus,
+    // Sort/search/export read the SAME text the badge renders — otherwise an
+    // exported statement would still call an "Aguardando nota" row "Resolvido".
+    accessorFn: (t) => settlementStatusText(t.reconciliationStatus, t.settlement),
     meta: {
       // Right-aligned to match the saved layout — the Situação badge hugs the right edge.
       align: "right",
       headerLabel: "Situação",
-      exportValue: (t) => STATUS_LABEL[t.reconciliationStatus] ?? t.reconciliationStatus,
+      exportValue: (t) => settlementStatusText(t.reconciliationStatus, t.settlement),
     },
     cell: ({ row }) => (
       <MatchStatusBadge
         status={row.original.reconciliationStatus}
         topMatchScore={row.original.topMatchScore}
+        settlement={row.original.settlement}
+        // Fallback path only — `settlement` wins when present.
         linkage={linkageOf(row.original)}
         resolvedByLabel={resolvedByLabelOf(row.original)}
       />

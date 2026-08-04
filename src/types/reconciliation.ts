@@ -176,6 +176,8 @@ export interface BankTransaction {
   createdAt: string;
   updatedAt: string;
   matches?: ReconciliationMatch[];
+  /** Derived on the API — what backs this row and whether it still needs work. */
+  settlement?: TransactionSettlement | null;
 }
 
 export interface ReconciliationMatch {
@@ -207,6 +209,122 @@ export interface ReconciliationMatch {
   } | null;
   /** Receivable installment linked to this match (entrada conciliation). */
   installment?: ReconciliationMatchInstallment | null;
+  /** Purchase-order parcela settled by this debit (saída sem NF vinculada). */
+  orderInstallment?: {
+    id: string;
+    number: number;
+    amount: number;
+    dueDate: string | null;
+    status: string;
+    order?: {
+      id: string;
+      description: string | null;
+      supplier?: { id: string; fantasyName: string; cnpj: string | null } | null;
+      installments?: { id: string; amount: number }[];
+    } | null;
+  } | null;
+  /** Recurring bill occurrence (aluguel, energia, internet…) settled by this debit. */
+  recurrentOccurrence?: {
+    id: string;
+    competence: string;
+    dueDate: string | null;
+    expectsNf: boolean;
+    fiscalDocumentId: string | null;
+    recurrentPayable?: {
+      id: string;
+      name: string;
+      payeeName: string | null;
+      expectsNf: boolean;
+    } | null;
+  } | null;
+  /** Painter (aerografia) payment settled by this debit. */
+  airbrushing?: {
+    id: string;
+    price: number | null;
+    task?: { id: string; name: string | null; serialNumber: string | null } | null;
+  } | null;
+  /** Payroll month settled by this debit. */
+  payrollMonthSettlement?: {
+    id: string;
+    year: number;
+    month: number;
+    amount: number | null;
+  } | null;
+}
+
+/**
+ * What backs a transaction and whether anything is still owed — derived on the
+ * API (`settlement-summary.ts`) and returned on every list row AND on the detail
+ * fetch, so the Extrato badge and the detail badge read from one source instead
+ * of each recomputing their own (which is how the same row came to say
+ * "Liquidado" in the table and "Resolvido" on its own page).
+ */
+export type SettlementState =
+  | "SETTLED"
+  | "AWAITING_NF"
+  /** Fechada por uma categoria que tem contas recorrentes ativas, sem nenhuma
+   *  amarrada — a obrigação existe e este pagamento não foi ligado a ela. */
+  | "UNTIED"
+  | "UNBACKED"
+  | "OPEN"
+  | "IGNORED"
+  | "DISPUTED";
+
+export type SettlementAnchorKind =
+  | "FISCAL_DOCUMENT"
+  | "BANK_SLIP"
+  | "RECEIVABLE_INSTALLMENT"
+  | "ORDER_INSTALLMENT"
+  | "RECURRENT_OCCURRENCE"
+  | "AIRBRUSHING"
+  | "PAYROLL"
+  | "CATEGORY"
+  | "NONE";
+
+export interface SettlementNf {
+  id: string;
+  nfNumber: string | null;
+  accessKey: string | null;
+  issueDate: string | null;
+  totalValue: number | null;
+  emitName: string | null;
+  emitCnpj: string | null;
+  status: string | null;
+  /** The note already carries a live bank match (of its own). */
+  bankMatched: boolean;
+  /** "#Ped:" code that ties the note to the payment, when reached that way. */
+  viaOrderCode: string | null;
+}
+
+export interface ThreeWayView {
+  bank: number;
+  anchor: number | null;
+  nf: number | null;
+  flag: "OK" | "MISMATCH" | null;
+}
+
+export interface TransactionSettlement {
+  state: SettlementState;
+  anchor: SettlementAnchorKind;
+  label: string | null;
+  link: {
+    kind: "fiscalDocument" | "order" | "task" | "receivable" | "recurrent" | "payroll";
+    id: string | null;
+  } | null;
+  expectsNf: boolean;
+  /** First linked note (see `nfs` for all of them). */
+  nf: SettlementNf | null;
+  /** Every note linked to this transaction — one payment often settles an NF-e
+   *  plus an NFS-e, or one installment of a larger note. */
+  nfs: SettlementNf[];
+  /** Note reachable through the matched order but not yet linked here. */
+  suggestedNf: SettlementNf | null;
+  threeWay: ThreeWayView | null;
+  resolvedByCategory: string | null;
+  /** Σ allocatedAmount over the live matches. */
+  allocated: number;
+  /** The matches claim more money than the transaction moved (double booking). */
+  overAllocated: boolean;
 }
 
 /** Installment relation nested on a receivable (entrada) match, with just

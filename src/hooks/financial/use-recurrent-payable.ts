@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { recurrentPayableService } from "@/api-client/recurrent-payable";
-import { orderKeys, recurrentPayableKeys } from "@/hooks/common/query-keys";
+import { orderKeys, recurrentPayableKeys, reconciliationKeys } from "@/hooks/common/query-keys";
 import type {
   CreateRecurrentPayablePayload,
   PayRecurrentOccurrencePayload,
@@ -67,6 +67,13 @@ export function useRecurrentPayableMutations() {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: recurrentPayableKeys.all });
+    // Editing a recurring bill changes how its ALREADY-CONCILIATED bank
+    // transactions read: `expectsNf` is what decides between "Conciliado" and
+    // "Aguardando nota" on the Extrato and on the transaction detail page.
+    // Without this the API returns the new state immediately while the screen
+    // keeps serving the cached old one, so turning the flag off looked like it
+    // had done nothing.
+    qc.invalidateQueries({ queryKey: reconciliationKeys.all });
   };
 
   const createMutation = useMutation({

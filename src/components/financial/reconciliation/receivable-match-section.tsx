@@ -244,8 +244,15 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
           {linkedInstallments.length === 0 ? (
+            // Not necessarily a parcela: a credit is just as often matched
+            // straight to the NFS-e we issued. Saying "parcelas" regardless left
+            // the operator with a Desvincular button and no idea what it would
+            // undo — name what actually backs it (the Conciliação card above
+            // carries the full detail).
             <p className="text-sm text-muted-foreground">
-              Este crédito já está conciliado com uma ou mais parcelas a receber.
+              {transaction.settlement?.label
+                ? `Este crédito está conciliado com ${transaction.settlement.label}.`
+                : "Este crédito já está conciliado, mas o vínculo não pôde ser identificado — verifique o cartão Conciliação acima."}
             </p>
           ) : (
             <>

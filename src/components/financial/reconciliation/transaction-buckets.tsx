@@ -5,11 +5,12 @@ import {
   IconCheck,
   IconClockHour4,
   IconEqual,
+  IconFileInvoice,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { routes } from "@/constants";
 import { formatCNPJ } from "@/utils";
-import type { BankTransaction, ReconciliationStatus } from "@/types/reconciliation";
+import type { BankTransaction } from "@/types/reconciliation";
 
 /**
  * Shared status-bucket model + linked-document cell for the Conciliação
@@ -17,14 +18,12 @@ import type { BankTransaction, ReconciliationStatus } from "@/types/reconciliati
  * transaction list). DISPUTED rides along with PENDING: both mean "ainda não
  * explicada".
  */
-export type BucketKey = "PENDING" | "PARTIAL" | "RECONCILED" | "IGNORED";
-
-export const BUCKET_STATUSES: Record<BucketKey, ReconciliationStatus[]> = {
-  PENDING: ["PENDING", "DISPUTED"],
-  PARTIAL: ["PARTIAL"],
-  RECONCILED: ["RECONCILED"],
-  IGNORED: ["IGNORED"],
-};
+export type BucketKey =
+  | "PENDING"
+  | "PARTIAL"
+  | "AWAITING_NF"
+  | "RECONCILED"
+  | "IGNORED";
 
 export const BUCKET_META: Record<
   BucketKey,
@@ -40,6 +39,17 @@ export const BUCKET_META: Record<
     Icon: IconEqual,
     tone: "text-blue-600 bg-blue-500/10",
   },
+  // Split out of "Conciliadas": the money is proven, the nota is not. These used
+  // to hide inside the green count, which is exactly why nobody noticed them.
+  AWAITING_NF: {
+    // Covers every "conciliada no papel, mas falta algo" state — aguardando
+    // nota, sem vínculo com a obrigação, sem lastro. Short on purpose: this
+    // label sits in a 7-across KPI row where a long string steals width from
+    // the currency value. The badge carries the precise wording per row.
+    label: "A revisar",
+    Icon: IconFileInvoice,
+    tone: "text-amber-600 bg-amber-500/10",
+  },
   RECONCILED: {
     label: "Conciliadas",
     Icon: IconCheck,
@@ -52,17 +62,48 @@ export const BUCKET_META: Record<
   },
 };
 
-export const ALL_BUCKETS: BucketKey[] = ["PENDING", "PARTIAL", "RECONCILED", "IGNORED"];
+export const ALL_BUCKETS: BucketKey[] = [
+  "PENDING",
+  "PARTIAL",
+  "AWAITING_NF",
+  "RECONCILED",
+  "IGNORED",
+];
 
-/** Map a transaction's reconciliation status onto its summary bucket. */
-export function bucketOf(status: ReconciliationStatus): BucketKey {
-  return status === "PARTIAL"
-    ? "PARTIAL"
-    : status === "RECONCILED"
-      ? "RECONCILED"
-      : status === "IGNORED"
-        ? "IGNORED"
-        : "PENDING";
+/**
+ * Map a transaction onto its summary bucket.
+ *
+ * Keyed on the derived `settlement` rather than `reconciliationStatus` alone,
+ * because the status column cannot express "reconciled but still owes a nota" —
+ * a payment cleared against a pedido is RECONCILED in the database and yet is
+ * unfinished work.
+ */
+export function bucketOf(tx: BankTransaction): BucketKey {
+  const status = tx.reconciliationStatus;
+  if (status === "IGNORED") return "IGNORED";
+  if (status === "PARTIAL") return "PARTIAL";
+  if (status === "RECONCILED") {
+    const state = tx.settlement?.state;
+    return state === "AWAITING_NF" || state === "UNTIED" || state === "UNBACKED"
+      ? "AWAITING_NF"
+      : "RECONCILED";
+  }
+  return "PENDING";
+}
+
+/**
+ * Carry a selection saved before "Aguardando nota" existed onto the new set.
+ *
+ * Those rows used to sit inside RECONCILED, so anyone who had RECONCILED
+ * selected was already seeing them and must keep seeing them — otherwise the
+ * split would silently HIDE exactly the rows it exists to surface, for every
+ * user with a stored view or a shared `?status=` link.
+ */
+export function migrateBuckets(keys: BucketKey[]): BucketKey[] {
+  if (keys.includes("RECONCILED") && !keys.includes("AWAITING_NF")) {
+    return [...keys, "AWAITING_NF"];
+  }
+  return keys;
 }
 
 /**
@@ -75,7 +116,7 @@ export function parseBuckets(raw: string | null, fallback: BucketKey[]): BucketK
   const parsed = raw
     .split(",")
     .filter((s): s is BucketKey => (ALL_BUCKETS as string[]).includes(s));
-  return parsed.length > 0 ? parsed : fallback;
+  return parsed.length > 0 ? migrateBuckets(parsed) : fallback;
 }
 
 /** Renders the fiscal document / bank slip linked to a transaction (or —). */
@@ -140,6 +181,40 @@ export function LinkedDocCell({ tx }: { tx: BankTransaction }) {
         )}
         <IconArrowUpRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
       </Link>
+    );
+  }
+  // Pedido de compra, conta recorrente, aerografia e folha — as quatro âncoras
+  // que o walk acima nunca soube renderizar, e que por isso apareciam como "—"
+  // ao lado de um selo verde. O rótulo vem pronto da API (settlement.label).
+  const s = tx.settlement;
+  if (s?.label && s.anchor !== "NONE" && s.anchor !== "CATEGORY") {
+    const to =
+      s.link?.kind === "order" && s.link.id
+        ? routes.inventory.orders.details(s.link.id)
+        : s.link?.kind === "task" && s.link.id
+          ? routes.production.schedule.details(s.link.id)
+          : s.link?.kind === "recurrent" && s.link.id
+            ? routes.financial.recurrentPayables.edit(s.link.id)
+            : null;
+    const body = (
+      <>
+        <span className="truncate">{s.label}</span>
+        {to && <IconArrowUpRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />}
+      </>
+    );
+    return to ? (
+      <Link
+        to={to}
+        onClick={(e) => e.stopPropagation()}
+        className="inline-flex items-center gap-1 text-xs hover:underline max-w-[13rem]"
+        title={s.label}
+      >
+        {body}
+      </Link>
+    ) : (
+      <span className="inline-flex items-center gap-1 text-xs max-w-[13rem]" title={s.label}>
+        {body}
+      </span>
     );
   }
   return <span className="text-muted-foreground text-xs">—</span>;
