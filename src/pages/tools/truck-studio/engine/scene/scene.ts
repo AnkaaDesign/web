@@ -2326,7 +2326,16 @@ export function setInteriorBounds(
      Never on Y — ejecting downwards would put the camera under the floor. */
 let vehicleFocus: { c: THREE.Vector3; box: THREE.Box3; r: number } | null = null;
 let vehicleFocusHooked = false;
-const FOCUS_MIN_F = 0.30;   // minDistance, as a fraction of the rig radius
+/* minDistance, as a fraction of the rig radius. Estava em 0.30, que num rig de
+   ~18 m deixava a câmera chegar a ~2.8 m do centro — perto o bastante para o
+   enquadramento virar um close de painel de porta, sem veículo reconhecível na
+   tela e com a distorção de perspectiva do FOV de 45° esticando a lataria. Em
+   0.40 o limite fica em ~3.7 m, que ainda encosta o suficiente para inspecionar
+   um detalhe da arte e ainda lê como caminhão.
+   Não é o único limitador: FOCUS_SKIN empurra a câmera para fora da carroceria
+   todo quadro, porque minDistance é uma ESFERA e não sabe dizer "fora de uma
+   caixa de 15 m" (ver o cabeçalho acima). */
+const FOCUS_MIN_F = 0.40;   // minDistance, as a fraction of the rig radius
 const FOCUS_MAX_F = 2.60;   // maxDistance, same
 const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
 const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork

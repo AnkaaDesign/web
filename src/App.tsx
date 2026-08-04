@@ -409,6 +409,10 @@ const PaintFormulaDetails = lazy(() => import("@/pages/painting/formulas/details
 const PaintCatalogFormulaDetails = lazy(() => import("@/pages/painting/catalog/details/[id]/formulas/details/[formulaId]").then((module) => ({ default: module.default })));
 const PaintProductionDetails = lazy(() => import("@/pages/painting/productions/details/[id]").then((module) => ({ default: module.default })));
 const PaintProductionAvailability = lazy(() => import("@/pages/painting/availability").then((module) => ({ default: module.default })));
+const PaintingBudgetList = lazy(() => import("@/pages/administration/painting-budget/list").then((module) => ({ default: module.PaintingBudgetListPage })));
+const PaintingBudgetCreate = lazy(() => import("@/pages/administration/painting-budget/create").then((module) => ({ default: module.PaintingBudgetCreatePage })));
+const PaintingBudgetDetails = lazy(() => import("@/pages/administration/painting-budget/details/[id]").then((module) => ({ default: module.PaintingBudgetDetailsPage })));
+const PaintingBudgetConfig = lazy(() => import("@/pages/administration/painting-budget/config").then((module) => ({ default: module.PaintingBudgetConfigPage })));
 const ColorPalettePage = lazy(() => import("@/pages/tools/color-palette"));
 
 // Production
@@ -2735,6 +2739,39 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PaintBrandsDetails />
+                    </Suspense>
+                  }
+                />
+
+                <Route
+                  path={routes.administration.paintingBudget.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintingBudgetList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.paintingBudget.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintingBudgetCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.paintingBudget.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintingBudgetDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.paintingBudget.config}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintingBudgetConfig />
                     </Suspense>
                   }
                 />

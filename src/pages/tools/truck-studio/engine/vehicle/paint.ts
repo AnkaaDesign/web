@@ -79,10 +79,25 @@ export interface PaintParams {
   pearl: number;
   pearlColor: string;
   pearlSharp: number;
+  /**
+   * Quanto do ambiente a tinta devolve — `material.envMapIntensity`.
+   *
+   * É o parâmetro que mais mexe em QUANTO PIGMENTO SOBRA na tela, e por isso
+   * está aqui em vez de ser uma constante: com clearcoat 1.0 o verniz integra o
+   * hemisfério inteiro, e cada ponto de ambiente é uma folha a mais de reflexo
+   * por cima da cor. Medido no rubi #8d1524 (origem h 353° s 74%): a lataria
+   * chega à tela em h 7° s 52%, e tirar o verniz devolve h 359° s 64% — ou
+   * seja, o reflexo do verniz sozinho responde por ~8° de desvio de matiz e
+   * metade da saturação perdida.
+   *
+   * O default segue 1.3, que é o que o estúdio sempre usou.
+   */
+  envMapIntensity: number;
 }
 
 /** The finish-specific half of PaintParams — what switching finish resets. */
-export type PaintFinishDefaults = Omit<PaintParams, 'finish' | 'color' | 'ccGloss' | 'peel'>;
+export type PaintFinishDefaults =
+  Omit<PaintParams, 'finish' | 'color' | 'ccGloss' | 'peel' | 'envMapIntensity'>;
 
 /* Per-finish starting points. Switching finish resets the finish-specific
    params to these (the shared ones — colour, coat gloss, peel — are kept). */
@@ -112,6 +127,7 @@ const PAINT_BASE: PaintParams = {
   color: '#b9bec6',
   ccGloss: 0.90,        // clearcoat gloss  → clearcoatRoughness
   peel: 0.12,           // orange peel      → coat micro-normal
+  envMapIntensity: 1.3, // quanto do ambiente o verniz devolve
   ...PAINT_DEFAULTS_BY_FINISH.metallic,
 };
 
@@ -247,12 +263,18 @@ function applyToMaterials() {
   const ccRough = 0.22 - 0.19 * clamp01(p.ccGloss);
 
   const col = new THREE.Color(p.color);
+  /* 0..4: acima disso o verniz estoura e não sobra pigmento nenhum; abaixo de 0
+     não existe. O clamp é aqui e não no painel porque setPaint() também é
+     dirigido pelo ajuste gravado no banco, que pode ter vindo de qualquer
+     lugar. */
+  const env = Math.min(4, Math.max(0, +p.envMapIntensity || 0));
   for (const m of materials) {
     m.color.copy(col);
     m.metalness = metal;
     m.roughness = rough;
     m.clearcoat = 1.0;
     m.clearcoatRoughness = ccRough;
+    m.envMapIntensity = env;
   }
 
   /* flakes: metallic drives them directly; pearl sparkles at ~1/3 density;
@@ -587,7 +609,9 @@ export function makePaintMaterial(_srcColor?: THREE.Color, srcMap?: THREE.Textur
        inward-wound faces and reads as see-through (verified root cause) */
     side: THREE.DoubleSide,
   });
-  m.envMapIntensity = 1.3;
+  /* Só a semente: o applyToMaterials() logo abaixo reescreve isto a partir de
+     `params`, que é quem manda desde que envMapIntensity virou parâmetro. */
+  m.envMapIntensity = params.envMapIntensity;
   if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
   installPaintShader(m);
   materials.add(m);

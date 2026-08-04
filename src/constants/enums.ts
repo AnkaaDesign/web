@@ -2496,6 +2496,8 @@ export enum FAVORITE_PAGES {
   PINTURA_MARCAS_TINTA_EDITAR = "/pintura/marcas-de-tinta/editar/:id",
 
   // Administration - List Pages
+  ADMINISTRACAO_ORCAMENTO_PINTURA_LISTAR = "/administracao/orcamento-de-pintura",
+  ADMINISTRACAO_ORCAMENTO_PINTURA_CADASTRAR = "/administracao/orcamento-de-pintura/cadastrar",
   ADMINISTRACAO_CLIENTES_LISTAR = "/financeiro/clientes",
   ADMINISTRACAO_RESPONSAVEIS_LISTAR = "/financeiro/clientes/responsaveis",
   ADMINISTRACAO_COLABORADORES_LISTAR = "/departamento-pessoal/colaboradores",

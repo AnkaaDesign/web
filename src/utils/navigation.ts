@@ -57,8 +57,19 @@ function sortMenuItemsAlphabetically(menuItems: MenuItem[]): MenuItem[] {
 /**
  * Get filtered menu for a specific user and platform
  */
+/**
+ * Remove os itens marcados como `hiddenInMenu` (e sua subárvore). A rota segue
+ * existindo em MENU_ITEMS — só o menu deixa de oferecê-la.
+ */
+function filterMenuByVisibility(menuItems: MenuItem[]): MenuItem[] {
+  return menuItems
+    .filter((item) => !item.hiddenInMenu)
+    .map((item) => (item.children ? { ...item, children: filterMenuByVisibility(item.children) } : item));
+}
+
 export function getFilteredMenuForUser(menuItems: MenuItem[], user: NavigationUser | undefined, platform: "web" | "mobile"): MenuItem[] {
-  let filteredMenu = filterMenuByPlatform(menuItems, platform);
+  let filteredMenu = filterMenuByVisibility(menuItems);
+  filteredMenu = filterMenuByPlatform(filteredMenu, platform);
 
   // Apply environment filtering (staging vs production)
   filteredMenu = filterMenuByEnvironment(filteredMenu);

@@ -494,9 +494,14 @@ export function SignatureEnvelopeCard({
                     {shownRoles.length > 0 && <span className="shrink-0">·</span>}
                     <span className="truncate">{s.emailMasked}</span>
                   </p>
+                  {/* Sem o IP. Ele é PROVA, não estado: vive na trilha de
+                      auditoria, no selo impresso no PDF e no dossiê — os
+                      lugares a que se recorre para demonstrar autoria. Aqui a
+                      pergunta é só "já assinou?", e o endereço empurrava a data
+                      para fora da linha. */}
                   <p className="text-xs text-muted-foreground">
                     {s.signedAt
-                      ? `Assinou em ${fmtDateTime(s.signedAt)}${s.ipAddress ? ` · IP ${s.ipAddress}` : ""}`
+                      ? `Assinou em ${fmtDateTime(s.signedAt)}`
                       : s.refusalReason
                         ? `Recusou: ${s.refusalReason}`
                         : s.timesViewed > 0

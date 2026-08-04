@@ -28,6 +28,7 @@ export * from "./observation";
 export * from "./order";
 export * from "./paint";
 export * from "./paint-brand";
+export * from "./paintingAnalysis";
 export * from "./position";
 export * from "./preferences";
 export * from "./statistics-preferences";

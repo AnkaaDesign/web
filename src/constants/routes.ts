@@ -23,6 +23,12 @@ export const routes = {
         test: (key: string) => `/administracao/notificacoes/configuracoes/testar/${key}`,
       },
     },
+    paintingBudget: {
+      config: "/administracao/orcamento-de-pintura/configuracoes",
+      create: "/administracao/orcamento-de-pintura/cadastrar",
+      details: (id: string) => `/administracao/orcamento-de-pintura/detalhes/${id}`,
+      root: "/administracao/orcamento-de-pintura",
+    },
     messages: {
       create: "/administracao/mensagens/criar",
       details: (id: string) => `/administracao/mensagens/${id}`,

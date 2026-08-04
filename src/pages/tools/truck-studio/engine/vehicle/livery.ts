@@ -1,12 +1,25 @@
-/* Livery editing: THREE independent fabric canvases (left side, right side,
-   rear) + CanvasTextures on the trailer's LiveryUV (TEXCOORD_1), large modal
-   editor, panel-outline guides, previews, drag&drop. */
+/* Livery editing, o núcleo: as TRÊS telas fabric independentes (lateral
+   esquerda, direita, traseira), as CanvasTextures que elas alimentam pela
+   LiveryUV (TEXCOORD_1) do baú, a foto do painel com a janela vazada, as guias
+   de silhueta, as prévias dos cards e a escala real em centímetros.
+
+   O que NÃO está aqui: o modelo de documento (fontes, desfazer, alinhamento,
+   espelhamento) mora em ./livery-doc.ts, e a interface do editor (barra,
+   inspetor, camadas, teclado, réguas) em ../ui/livery-editor.ts e
+   ../ui/livery-guides.ts. Este módulo é a folha que os outros importam, e é o
+   que impede que eles tenham de importar uns aos outros.
+   studio.ts continua falando só com este arquivo. */
 import * as THREE from 'three';
 import * as fabric from 'fabric';
-import { root, $, $$, isMounted, evTarget } from '../core/dom';
+import { root, $, isMounted, evTarget } from '../core/dom';
 import { VEHICLES_DIR } from '../core/paths';
 import { setPaintTarget } from './models';
 import { setStatus } from '../ui/chrome';
+import { initLiveryEditor } from '../ui/livery-editor';
+
+/* Reexportados para quem já falava com este módulo (studio.ts, o handle de
+   depuração) não ter de saber que o editor mudou de arquivo. */
+export { openEditor, closeEditor, showSurface } from '../ui/livery-editor';
 
 /** The three paintable trailer panels. Every per-surface map is keyed by this. */
 export type SurfaceKey = 'left' | 'right' | 'rear';
@@ -28,7 +41,7 @@ export interface OutlineMeta {
    mesmo. Era exatamente o que o branco produzia, só que agora sem uma camada de
    tinta branca por cima de tudo. O "Fundo" da barra continua podendo pintar a
    tela inteira de uma cor, e o "×" volta para cá. */
-const DEFAULT_BG = '';
+export const DEFAULT_BG = '';
 
 function makeFab(el: HTMLCanvasElement) {
   return new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
@@ -37,16 +50,59 @@ export const fabLeft = makeFab($<HTMLCanvasElement>('fabric-left'));
 export const fabRight = makeFab($<HTMLCanvasElement>('fabric-right'));
 export const fabRear = makeFab($<HTMLCanvasElement>('fabric-rear'));
 
-const surfaces: Record<SurfaceKey, fabric.Canvas> = { left: fabLeft, right: fabRight, rear: fabRear };
-const SURFACE_KEYS: SurfaceKey[] = ['left', 'right', 'rear'];
+export const surfaces: Record<SurfaceKey, fabric.Canvas> = { left: fabLeft, right: fabRight, rear: fabRear };
+export const SURFACE_KEYS: SurfaceKey[] = ['left', 'right', 'rear'];
 let activeSurface: SurfaceKey = 'left';
-const active = () => surfaces[activeSurface];
+export const active = () => surfaces[activeSurface];
+export const activeKey = () => activeSurface;
+export const setActiveKey = (k: SurfaceKey) => { activeSurface = k; };
 
-const CAPTIONS: Record<SurfaceKey, string> = {
+/** A outra lateral do baú — a traseira não tem par. */
+export const otherSide = (key: SurfaceKey): SurfaceKey | null =>
+  key === 'left' ? 'right' : key === 'right' ? 'left' : null;
+
+export const CAPTIONS: Record<SurfaceKey, string> = {
   left: 'Lateral esquerda · pintura fica dentro da silhueta tracejada',
   right: 'Lateral direita · pintura fica dentro da silhueta tracejada',
   rear: 'Portas traseiras · pintura fica dentro da silhueta tracejada',
 };
+
+/* ---------------- escala real ----------------
+   Semeada com uma medida plausível e SUBSTITUÍDA pela geometria de verdade em
+   attachOverlays(), para que um baú diferente se corrija sozinho em vez de
+   reportar centímetros errados calado.
+
+   As telas já nascem na proporção do painel (2048x344 nas laterais, ver
+   core/template.ts), então mm/px sai praticamente igual nos dois eixos; a
+   conversão é feita por eixo mesmo assim, porque a traseira não fecha exato. */
+const PANEL_MM: Record<SurfaceKey, { w: number; h: number }> = {
+  left: { w: 14580, h: 2449 },
+  right: { w: 14580, h: 2449 },
+  rear: { w: 2430, h: 2460 },
+};
+
+export const panelMM = (key: SurfaceKey) => PANEL_MM[key];
+
+export function mmPerPx(key: SurfaceKey) {
+  const c = surfaces[key], p = PANEL_MM[key];
+  return { x: p.w / c.getWidth(), y: p.h / c.getHeight() };
+}
+/** A altura de letra segue o eixo vertical — por isso 'y' é o padrão. */
+export const pxToCm = (px: number, key: SurfaceKey, axis: 'x' | 'y' = 'y') => px * mmPerPx(key)[axis] / 10;
+export const cmToPx = (cm: number, key: SurfaceKey, axis: 'x' | 'y' = 'y') => cm * 10 / mmPerPx(key)[axis];
+
+/* u corre no Z nas laterais e no X na traseira; v sempre no Y.
+   Espelha addLiveryUV() em ./models.ts — se aquilo mudar, isto muda junto. */
+function measurePanel(mesh: THREE.Mesh, key: SurfaceKey) {
+  const g = mesh.geometry;
+  if (!g.boundingBox) g.computeBoundingBox();
+  const size = (g.boundingBox as THREE.Box3).getSize(new THREE.Vector3());
+  mesh.updateWorldMatrix(true, false);
+  const s = mesh.getWorldScale(new THREE.Vector3());
+  const w = key === 'rear' ? size.x * s.x : size.z * s.z;
+  const h = size.y * s.y;
+  if (w > 0.05 && h > 0.05) PANEL_MM[key] = { w: Math.round(w * 1000), h: Math.round(h * 1000) };
+}
 
 /* ---------------- textures ---------------- */
 function makeTex(el: HTMLCanvasElement) {
@@ -101,14 +157,36 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
 }
 
 export function attachOverlays(trailerRoot: THREE.Object3D) {
+  const byName: Record<string, SurfaceKey> = { SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear' };
   trailerRoot.traverse(node => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
-    if (o.name === 'SIDE_L') liveryMeshes.left.push(makeLiveryOverlay(o, texLeft));
-    else if (o.name === 'SIDE_R') liveryMeshes.right.push(makeLiveryOverlay(o, texRight));
-    else if (o.name === 'REAR') liveryMeshes.rear.push(makeLiveryOverlay(o, texRear));
+    const key = byName[o.name];
+    if (!key) return;
+    liveryMeshes[key].push(makeLiveryOverlay(o, textures[key]));
+    measurePanel(o, key);          // a régua em cm sai daqui, não de um número escrito à mão
   });
 }
+
+/* ---------------- quando a textura precisa subir para a GPU ----------------
+   As alças de seleção e o laço de marquee são desenhados no upperCanvasEl, que
+   NÃO é a fonte da textura — então trocar a seleção não exige upload nenhum.
+   Condicionar needsUpdate a uma revisão de CONTEÚDO, em vez de a cada
+   after:render, é o que impede o watchdog de 4 s de reenviar ~11 MB de textura
+   para sempre com o estúdio parado. */
+const rev: Record<SurfaceKey, number> = { left: 0, right: 0, rear: 0 };
+const uploaded: Record<SurfaceKey, number> = { left: -1, right: -1, rear: -1 };
+
+export function markDirty(key: SurfaceKey) { rev[key]++; }
+export function markAllDirty() { for (const k of SURFACE_KEYS) rev[k]++; }
+
+/* Os eventos transitórios entram para o 3D acompanhar o arrasto ao vivo —
+   object:modified sozinho só dispara quando o gesto termina. */
+const DIRTY_EVENTS = [
+  'object:added', 'object:removed', 'object:modified',
+  'object:moving', 'object:scaling', 'object:rotating', 'object:skewing',
+  'text:changed', 'text:editing:exited',
+] as const;
 
 /* ---------------- panel outline guides ---------------- */
 const FALLBACK_OUTLINE = [[0.015, 0.015], [0.985, 0.015], [0.985, 0.985], [0.015, 0.985]];
@@ -140,6 +218,16 @@ function installGuide(key: SurfaceKey) {
   svg.innerHTML = guideMarkup(outlines[key], w, h);
 }
 
+/* A silhueta em pixels da tela. Alinhar "ao painel" e o encaixe das guias
+   querem a área pintável, não o retângulo cru da tela. */
+export function outlineFrame(key: SurfaceKey) {
+  const c = surfaces[key], w = c.getWidth(), h = c.getHeight();
+  const xs = outlines[key].map(([u]) => u * w);
+  const ys = outlines[key].map(([, v]) => (1 - v) * h);
+  const l = Math.min(...xs), t = Math.min(...ys);
+  return { left: l, top: t, width: Math.max(...xs) - l, height: Math.max(...ys) - t };
+}
+
 export function setOutlines(meta: OutlineMeta | null) {
   if (meta && Array.isArray(meta.outlineSide) && meta.outlineSide.length >= 3) {
     outlines.left = meta.outlineSide;
@@ -159,7 +247,7 @@ const prevEls: Record<SurfaceKey, HTMLCanvasElement> = {
 };
 const prevPending: Record<SurfaceKey, boolean> = { left: false, right: false, rear: false };
 
-function drawPreview(key: SurfaceKey) {
+export function drawPreview(key: SurfaceKey) {
   const pc = prevEls[key];
   const ctx = pc?.getContext('2d');
   if (!pc || !ctx) return;
@@ -188,7 +276,11 @@ function schedulePreview(key: SurfaceKey) {
 }
 
 for (const k of SURFACE_KEYS) {
-  surfaces[k].on('after:render', () => {
+  const c = surfaces[k];
+  for (const ev of DIRTY_EVENTS) c.on(ev, () => markDirty(k));
+  c.on('after:render', () => {
+    if (uploaded[k] === rev[k]) return;
+    uploaded[k] = rev[k];
     textures[k].needsUpdate = true;
     schedulePreview(k);
   });
@@ -383,24 +475,26 @@ export function setCabPaintColor(hex: string | null | undefined) {
   syncImplementColor();
 }
 
-/* ---------------- modal ---------------- */
-const modal = $('editor-modal');
-const stage = $('modal-stage');
-const stagePanels: Record<SurfaceKey, HTMLElement> =
+/* ---------------- palco ---------------- */
+export const stagePanels: Record<SurfaceKey, HTMLElement> =
   { left: $('stage-left'), right: $('stage-right'), rear: $('stage-rear') };
 
 /* Duas caixas, não uma: a FOTO é o que ocupa o palco, e a tela é a janela dentro
-   dela. Antes só existia a tela, e era ela que era enquadrada. */
-function sizeModalCanvas(key: SurfaceKey) {
+   dela. Antes só existia a tela, e era ela que era enquadrada.
+   `zoom` multiplica o enquadramento; o excedente vira rolagem em .stage-scroll,
+   porque com uma letra de 20 cm o usuário vai querer chegar perto dela. */
+export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
   const fab = surfaces[key];
   const win = windows[key];
   const panel = stagePanels[key];
-  const maxW = stage.clientWidth - 40, maxH = stage.clientHeight - 40;
+  const stage = $('modal-stage');
+  const maxW = stage.clientWidth - 40, maxH = stage.clientHeight - 52;
   if (maxW <= 0 || maxH <= 0) return;         // modal ainda sem layout
 
   const outerAr = win ? win.photoAr : fab.getWidth() / fab.getHeight();
   let w = maxW, h = w / outerAr;
   if (h > maxH) { h = maxH; w = h * outerAr; }
+  w *= zoom; h *= zoom;
 
   panel.style.width = w + 'px';
   panel.style.height = h + 'px';
@@ -409,159 +503,6 @@ function sizeModalCanvas(key: SurfaceKey) {
     { cssOnly: true },
   );
   fab.calcOffset();
-}
-
-function showSurface(key: SurfaceKey) {
-  activeSurface = key;
-  for (const c of Object.values(surfaces)) c.isDrawingMode = false;
-  $$('.tool').forEach(b => b.classList.remove('on'));
-  for (const k of SURFACE_KEYS) stagePanels[k].classList.toggle('hidden', k !== key);
-  $$('#surface-tabs .tab').forEach(b =>
-    b.classList.toggle('active', b.dataset.surface === key));
-  $('editor-caption').textContent = CAPTIONS[key];
-  sizeModalCanvas(key);
-}
-
-export function openEditor(key?: SurfaceKey) {
-  modal.classList.remove('hidden');
-  showSurface(key || activeSurface);
-}
-export function closeEditor() {
-  for (const c of Object.values(surfaces)) {
-    c.isDrawingMode = false;
-    c.discardActiveObject();
-    c.requestRenderAll();
-  }
-  $$('.tool').forEach(b => b.classList.remove('on'));
-  modal.classList.add('hidden');
-}
-
-/* ---------------- tools ---------------- */
-const colorInput = $<HTMLInputElement>('color');
-const currentColor = () => colorInput.value;
-
-function setDrawMode(btn: HTMLElement) {
-  $$('.tool').forEach(b => b.classList.remove('on'));
-  for (const c of Object.values(surfaces)) c.isDrawingMode = false;
-  btn.classList.add('on');
-  const c = active();
-  c.isDrawingMode = true;
-  c.freeDrawingBrush = new fabric.PencilBrush(c);
-  c.freeDrawingBrush.color = currentColor();
-  c.freeDrawingBrush.width = +$<HTMLInputElement>('brush').value;
-}
-function stopDrawMode() {
-  $$('.tool').forEach(b => b.classList.remove('on'));
-  for (const c of Object.values(surfaces)) c.isDrawingMode = false;
-}
-
-function addImageFile(file: File, x?: number | null, y?: number | null) {
-  const url = URL.createObjectURL(file);
-  fabric.FabricImage.fromURL(url).then(img => {
-    const c = active();
-    const s = Math.min(c.getWidth() / 3 / img.width, c.getHeight() / 1.6 / img.height);
-    img.set({
-      left: x ?? c.getWidth() / 2, top: y ?? c.getHeight() / 2,
-      originX: 'center', originY: 'center',
-      scaleX: s, scaleY: s,
-    });
-    c.add(img);
-    c.setActiveObject(img);
-    URL.revokeObjectURL(url);
-  }).catch(err => console.error('logo:', err));
-}
-
-function bindTools() {
-  $$('.modal-toolbar .tool').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const act = btn.dataset.act;
-      const c = active();
-      const mid = { left: c.getWidth() / 2, top: c.getHeight() / 2 };
-      if (act !== 'draw') stopDrawMode();
-      switch (act) {
-        case 'text': {
-          const t = new fabric.IText('Sua marca', {
-            ...mid, originX: 'center', originY: 'center',
-            fontFamily: 'Arial Black', fontSize: c.getHeight() / 4,
-            fill: currentColor(),
-          });
-          c.add(t); c.setActiveObject(t);
-          break;
-        }
-        case 'logo': $('logo-input').click(); break;
-        case 'draw': setDrawMode(btn); break;
-        case 'rect': {
-          const r = new fabric.Rect({
-            ...mid, originX: 'center', originY: 'center',
-            width: c.getWidth() / 4, height: c.getHeight() / 2.4,
-            fill: currentColor(),
-          });
-          c.add(r); c.setActiveObject(r);
-          break;
-        }
-        case 'circle': {
-          const ci = new fabric.Circle({
-            ...mid, originX: 'center', originY: 'center',
-            radius: c.getHeight() / 4, fill: currentColor(),
-          });
-          c.add(ci); c.setActiveObject(ci);
-          break;
-        }
-        case 'delete': {
-          c.getActiveObjects().forEach((o) => c.remove(o));
-          c.discardActiveObject(); c.requestRenderAll();
-          break;
-        }
-        case 'clear':
-          c.getObjects().slice().forEach((o) => c.remove(o));
-          c.backgroundColor = DEFAULT_BG;
-          c.requestRenderAll();
-          break;
-        case 'front': {
-          const o = c.getActiveObject();
-          if (o) { c.bringObjectToFront(o); c.requestRenderAll(); }
-          break;
-        }
-        case 'back': {
-          const o = c.getActiveObject();
-          if (o) { c.sendObjectToBack(o); c.requestRenderAll(); }
-          break;
-        }
-      }
-    });
-  });
-
-  $('logo-input').addEventListener('change', (e) => {
-    const input = evTarget<HTMLInputElement>(e);
-    const file = input.files?.[0];
-    if (file) addImageFile(file);
-    input.value = '';
-  });
-
-  colorInput.addEventListener('input', () => {
-    const c = active();
-    const o = c.getActiveObject();
-    if (o) { o.set('fill', currentColor()); c.requestRenderAll(); }
-    if (c.isDrawingMode && c.freeDrawingBrush) c.freeDrawingBrush.color = currentColor();
-  });
-
-  $('brush').addEventListener('input', (e) => {
-    const { value } = evTarget<HTMLInputElement>(e);
-    for (const c of Object.values(surfaces)) {
-      if (c.freeDrawingBrush) c.freeDrawingBrush.width = +value;
-    }
-  });
-
-  $('bgcolor').addEventListener('input', (e) => {
-    const c = active();
-    c.backgroundColor = evTarget<HTMLInputElement>(e).value;
-    c.requestRenderAll();
-  });
-  $('bg-clear').addEventListener('click', () => {
-    const c = active();
-    c.backgroundColor = '';
-    c.requestRenderAll();
-  });
 }
 
 /* When the trailer panels are painted with the cab color, the livery canvases'
@@ -614,71 +555,19 @@ function bindTrailerPaint() {
   });
 }
 
-/* ---------------- drag & drop images onto the modal canvas ---------------- */
-function bindDnD() {
-  let depth = 0;
-  stage.addEventListener('dragenter', e => {
-    e.preventDefault();
-    if (++depth > 0) stage.classList.add('dragging');
-  });
-  stage.addEventListener('dragleave', e => {
-    e.preventDefault();
-    if (--depth <= 0) { depth = 0; stage.classList.remove('dragging'); }
-  });
-  stage.addEventListener('dragover', e => e.preventDefault());
-  stage.addEventListener('drop', e => {
-    e.preventDefault();
-    depth = 0;
-    stage.classList.remove('dragging');
-    const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
-    if (!file) return;
-    const c = active();
-    const rect = c.upperCanvasEl.getBoundingClientRect();
-    let x = null, y = null;
-    if (rect.width && rect.height &&
-        e.clientX >= rect.left && e.clientX <= rect.right &&
-        e.clientY >= rect.top && e.clientY <= rect.bottom) {
-      x = (e.clientX - rect.left) / rect.width * c.getWidth();
-      y = (e.clientY - rect.top) / rect.height * c.getHeight();
-    }
-    addImageFile(file, x, y);
-  });
-}
-
-/* ---------------- init ---------------- */
+/* ---------------- init ----------------
+   A interface do editor vive em ../ui/livery-editor.ts. A importação daquele
+   módulo fecha um ciclo com este (ele precisa das telas daqui), e o ciclo é
+   seguro por uma razão concreta: nada lá toca um binding deste arquivo durante
+   a AVALIAÇÃO do módulo — só dentro de funções, todas chamadas a partir do
+   initLiveryEditor() abaixo. Manter essa propriedade é o que impede um
+   ReferenceError de zona morta temporal no boot. */
 export function initLivery() {
-  bindTools();
-  bindDnD();
   bindTrailerPaint();
   syncImplementColor();
   /* Fora do caminho crítico: são ~4,5 M de pixels varridos, e até a medida
      chegar os cards já estão desenhados com a foto atrás (o fallback). */
   void measurePanelWindows();
-
-  $$('#surface-tabs .tab').forEach((btn) =>
-    btn.addEventListener('click', () => showSurface(btn.dataset.surface as SurfaceKey)));
-
-  $$('.preview-card').forEach((card) =>
-    card.addEventListener('click', () => openEditor(card.dataset.surface as SurfaceKey)));
-
-  $('modal-close').addEventListener('click', closeEditor);
-  modal.addEventListener('pointerdown', e => { if (e.target === modal) closeEditor(); });
-
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (!isMounted() || modal.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { closeEditor(); return; }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      const c = active();
-      const o = c.getActiveObject();
-      if (o && (o as fabric.IText).isEditing) return;   // typing inside IText
-      c.getActiveObjects().forEach((obj) => c.remove(obj));
-      c.discardActiveObject(); c.requestRenderAll();
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    if (!modal.classList.contains('hidden')) sizeModalCanvas(activeSurface);
-  });
 
   for (const k of SURFACE_KEYS) {
     installGuide(k);
@@ -686,12 +575,17 @@ export function initLivery() {
     drawPreview(k);
   }
 
+  initLiveryEditor();
+
   /* Watchdog: 2D canvas buffers can be discarded under GPU memory pressure
      (big models) and requestRenderAll depends on rAF, which stalls when the
      page isn't compositing. A periodic SYNCHRONOUS renderAll repaints from
-     fabric's object model and re-fires after:render (texture + previews). */
+     fabric's object model.
+     O upload para a GPU continua preso à revisão de conteúdo (markDirty), então
+     um repintar que produziu os mesmos pixels não custa nada de textura: um
+     buffer descartado volta sem pagar um upload que a textura não precisa. */
   setInterval(() => {
-    if (!isMounted()) return;                     // route left the studio — nothing to repaint
+    if (!isMounted() || document.hidden) return;  // route left the studio — nothing to repaint
     try { for (const c of Object.values(surfaces)) c.renderAll(); } catch { /* ignore */ }
   }, 4000);
 }

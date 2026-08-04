@@ -5,4 +5,5 @@ export * from "./use-paint-formula";
 export * from "./use-paint-formula-component";
 export * from "./use-paint-production";
 export * from "./use-paint-type";
+export * from "./use-painting-analysis";
 export * from "./use-production-availability";

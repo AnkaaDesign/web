@@ -297,6 +297,13 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     delete data.colorPreview;
 
     // Include previewConfig from the generator settings (exclude baseColor and finish)
+    /* `previewConfig` é COMPARTILHADO com o Truck Studio, que grava os ajustes
+       de renderização 3D da cor sob a chave `truckStudio` (ver
+       previewConfigSchema em schemas/paint.ts). O gerador da miniatura não
+       conhece essa chave, então remontar o objeto só com os campos dele apagava
+       o ajuste do estúdio a cada save deste formulário. Carrega-se o que já
+       está gravado. */
+    const keptTruckStudio = (defaultValues?.previewConfig as any)?.truckStudio;
     if (previewGeneratorRef.current) {
       const generatorSettings = previewGeneratorRef.current.getSettings();
       (data as any).previewConfig = {
@@ -304,6 +311,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
         effectIntensity: generatorSettings.effectIntensity,
         flakeColor: generatorSettings.flakeColor,
         flipColor: generatorSettings.flipColor,
+        ...(keptTruckStudio ? { truckStudio: keptTruckStudio } : {}),
       };
     } else if (previewSettings) {
       // Fallback to stored settings if generator is not mounted

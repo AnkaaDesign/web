@@ -14,6 +14,12 @@ export interface MenuItem {
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
   onlyInStaging?: boolean; // Indicates if this menu item should only be shown in staging environment
+  /**
+   * Mantém a rota registrada (breadcrumb, validação de rota, favoritos) mas tira
+   * o item — e toda a sua subárvore — do menu de navegação. Serve para páginas
+   * que só devem ser alcançadas pela URL direta.
+   */
+  hiddenInMenu?: boolean;
 }
 
 // Comprehensive Tabler icon mapping for Brazilian manufacturing system
@@ -499,6 +505,20 @@ export const NAVIGATION_MENU: MenuItem[] = [
       // Colaboradores (employee directory) lives under the Departamento Pessoal
       // section now (dp-colaboradores) — removed from Administração to avoid the
       // duplicate entry. ADMIN/HR still reach it via Departamento Pessoal.
+      {
+        id: "orcamento-pintura",
+        title: "Orçamento de Pintura",
+        icon: "calculator",
+        path: "/administracao/orcamento-de-pintura",
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+        // Fora do menu por decisão do dono: acessa-se só pela URL direta.
+        hiddenInMenu: true,
+        children: [
+          { id: "orcamento-pintura-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/orcamento-de-pintura/cadastrar" },
+          { id: "orcamento-pintura-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/orcamento-de-pintura/detalhes/:id", isDynamic: true },
+          { id: "orcamento-pintura-configuracoes", title: "Configurações", icon: "cog", path: "/administracao/orcamento-de-pintura/configuracoes" },
+        ],
+      },
       {
         id: "mensagens-admin",
         title: "Mensagens",

@@ -820,7 +820,10 @@ function convertScaniaMaterials(root: THREE.Object3D) {
     if (name.includes('carpaint')) {
       out = makePaintMaterial(src.color, src.map);   // automotive flake paint
       out.name = src.name;
-      (out as THREE.MeshStandardMaterial).envMapIntensity = 1.3;
+      /* NÃO fixar envMapIntensity aqui: virou parâmetro de tinta
+         (PaintParams.envMapIntensity) e quem manda nele é applyToMaterials(),
+         que roda a cada setPaint(). O 1.3 que morava nesta linha reescrevia o
+         ajuste gravado da cor toda vez que uma cabine era convertida. */
       cache.set(src.uuid, out);
       return out;
     }

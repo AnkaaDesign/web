@@ -97,7 +97,49 @@ export const STUDIO_HTML = /* html */ `
               <circle cx="12" cy="13.4" r="3.1"/>
             </svg>
           </button>
+          <!-- AJUSTE DA TINTA. Abre o painel que dirige vehicle/paint.ts ao vivo
+               e grava o resultado NA COR (previewConfig.truckStudio do Paint).
+               Fica aqui, e não num passo do seletor, porque é a única superfície
+               do estúdio que se usa OLHANDO o veículo: mexer no verniz sem ver a
+               lataria reagir é mexer no escuro. O passo de cor escolhe QUAL cor;
+               isto afina COMO ela é renderizada. -->
+          <button id="btn-paint" class="ts-vbtn" type="button" title="Ajustar a tinta"
+                  aria-label="Ajustar a tinta" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <path d="M5.2 10.6 12.6 3.2a2 2 0 0 1 2.8 0l2.6 2.6a2 2 0 0 1 0 2.8l-7.4 7.4
+                       a2 2 0 0 1-2.8 0l-2.6-2.6a2 2 0 0 1 0-2.8Z"/>
+              <path d="M8.4 7.4 14 13"/>
+              <path d="M19 15.4c1 1.4 1.6 2.5 1.6 3.3a1.6 1.6 0 0 1-3.2 0c0-.8.6-1.9 1.6-3.3Z"/>
+            </svg>
+          </button>
         </div>
+
+        <!-- PAINEL DE AJUSTE DA TINTA. Vidro sobre o render, do mesmo material
+             do HUD de luz e ancorado do mesmo lado do botão que o abre. Os
+             controles são montados por ui/paint-panel.ts a partir de uma tabela
+             de campos — escrever trinta <input> à mão aqui seria trinta lugares
+             para o nome de um parâmetro divergir de PaintParams. -->
+        <section id="paint-panel" class="ts-paint hidden" aria-label="Ajuste da tinta" hidden>
+          <header class="ts-paint__head">
+            <div class="ts-paint__title">
+              <i id="paint-chip" class="ts-paint__chip" aria-hidden="true"></i>
+              <div>
+                <strong id="paint-name">—</strong>
+                <span id="paint-sub">—</span>
+              </div>
+            </div>
+            <button id="paint-close" class="ts-paint__x" type="button" title="Fechar (Esc)"
+                    aria-label="Fechar o ajuste da tinta">✕</button>
+          </header>
+          <div id="paint-body" class="ts-paint__body"></div>
+          <footer class="ts-paint__foot">
+            <span id="paint-msg" class="ts-paint__msg" role="status" aria-live="polite"></span>
+            <button id="paint-revert" class="ts-paint__btn" type="button">Descartar</button>
+            <button id="paint-apply" class="ts-paint__btn ts-paint__btn--go" type="button">Aplicar</button>
+          </footer>
+        </section>
 
         <!-- DESIGN DO IMPLEMENTO — os três painéis pintáveis, um card cada.
              Mesmo material dos badges do seletor (vidro sobre o render), do lado
@@ -170,30 +212,52 @@ export const STUDIO_HTML = /* html */ `
   <div id="editor-modal" class="hidden">
     <div class="modal-card">
       <header class="modal-head">
+        <!-- O ponto nas abas das laterais diz se as duas carregam a MESMA arte.
+             Cheio = iguais; vazado = diferentes, e "Espelhar" iguala. É a
+             alternativa barata a um vínculo ao vivo entre os lados, que
+             obrigaria a decidir quem ganha a cada edição — e as duas laterais
+             são legitimamente assimétricas (o Thermo King fica de um lado só, e
+             as fitas 3M não devem ser espelhadas: ver CONVENTIONS.md). -->
         <div class="tabs" id="surface-tabs">
-          <button class="tab active" data-surface="left">Lateral esquerda</button>
-          <button class="tab" data-surface="right">Lateral direita</button>
+          <button class="tab active" data-surface="left">Lateral esquerda<i class="sync-dot"></i></button>
+          <button class="tab" data-surface="right">Lateral direita<i class="sync-dot"></i></button>
           <button class="tab" data-surface="rear">Traseira</button>
         </div>
         <div class="editor-caption" id="editor-caption">Lateral esquerda</div>
+        <button id="btn-mirror" class="ghost" title="Copiar esta arte para a outra lateral">↔ Espelhar</button>
+        <button id="btn-help" class="ghost" title="Atalhos do teclado">?</button>
         <button id="modal-close" class="ghost" title="Fechar (Esc)">✕ Fechar</button>
       </header>
 
+      <!-- Sem formas básicas e sem desenho à mão livre: o que se faz aqui é
+           COMPOR — texto, logo e o alinhamento entre eles. Um retângulo e um
+           traço de lápis não são pintura de frota, e ocupavam a barra que agora
+           é do desfazer. Cor, camada e tudo que é propriedade DE UM OBJETO
+           mudou-se para o inspetor à direita, que sabe o que está selecionado. -->
       <div class="modal-toolbar">
         <button class="tool" data-act="text"><span>T</span>Texto</button>
         <button class="tool" data-act="logo"><span>▣</span>Logo</button>
-        <button class="tool" data-act="draw"><span>✎</span>Desenhar</button>
-        <button class="tool" data-act="rect"><span>▭</span>Retângulo</button>
-        <button class="tool" data-act="circle"><span>◯</span>Círculo</button>
+        <button class="tool" data-act="duplicate"><span>⧉</span>Duplicar</button>
         <button class="tool" data-act="delete"><span>🗑</span>Excluir</button>
-        <button class="tool" data-act="front"><span>⬆</span>Frente</button>
-        <button class="tool" data-act="back"><span>⬇</span>Trás</button>
+        <span class="tb-sep"></span>
+        <button class="tool" data-act="undo" title="Desfazer (Ctrl+Z)"><span>↶</span>Desfazer</button>
+        <button class="tool" data-act="redo" title="Refazer (Ctrl+Shift+Z)"><span>↷</span>Refazer</button>
+        <span class="tb-sep"></span>
         <button class="tool" data-act="clear"><span>⌫</span>Limpar</button>
         <span class="tb-sep"></span>
-        <label class="tb-ctl"><span>Cor</span><input type="color" id="color" value="#c8102e" /></label>
-        <label class="tb-ctl"><span>Traço</span><input type="range" id="brush" min="2" max="60" value="14" /></label>
         <label class="tb-ctl"><span>Fundo</span><input type="color" id="bgcolor" value="#ffffff" />
           <button class="mini ghost" id="bg-clear" title="Voltar ao alumínio original">×</button></label>
+        <span class="tb-sep"></span>
+        <label class="tb-ctl"><span>Zoom</span>
+          <select id="stage-zoom" class="select tb-select">
+            <option value="fit" selected>Ajustar</option>
+            <option value="1.5">150 %</option>
+            <option value="2">200 %</option>
+            <option value="3">300 %</option>
+            <option value="4">400 %</option>
+          </select></label>
+        <label class="tb-ctl tb-chk-inline" title="Encaixe em bordas, centros e outros objetos (segure Shift para suspender)">
+          <input type="checkbox" id="snap-toggle" checked /><span>Guias</span></label>
         <span class="tb-sep"></span>
         <!-- "Pintar o implemento" mora AQUI, e não junto da escolha de cor: a cor
              é do cavalo, e estendê-la ao baú é uma decisão sobre o IMPLEMENTO —
@@ -222,19 +286,180 @@ export const STUDIO_HTML = /* html */ `
            foto por vehicle/livery.ts). Com a antiga 4:1 a tela era esticada ao
            virar textura e um círculo desenhado aqui saía oval no caminhão. A
            traseira segue quadrada — a janela dela mede 0,99. -->
-      <div class="modal-stage" id="modal-stage">
-        <div class="stage-panel" id="stage-left">
-          <div class="panel-window"><canvas id="fabric-left" width="2048" height="344"></canvas></div>
+      <div class="modal-body">
+        <div class="stage-wrap">
+          <canvas class="ruler ruler-h" id="ruler-h"></canvas>
+          <canvas class="ruler ruler-v" id="ruler-v"></canvas>
+          <span class="ruler-corner">cm</span>
+          <div class="modal-stage" id="modal-stage">
+            <div class="stage-scroll" id="stage-scroll">
+              <!-- Qual ponta é a cabine. addLiveryUV() (vehicle/models.ts) gera
+                   u = (z-minZ)/span na SIDE_L e u = (maxZ-z)/span na SIDE_R, e a
+                   frente do baú é o +Z — então as DUAS telas correm no sentido
+                   contrário uma da outra. É o que faz o mesmo desenho sair
+                   legível dos dois lados, e é também por isso que copiar uma
+                   lateral na outra sem espelhar a POSIÇÃO joga o logo da cabine
+                   lá para as portas. Sem estes rótulos isso parece defeito. -->
+              <div class="stage-panel" id="stage-left">
+                <span class="edge-label edge-start">◄ TRASEIRA</span>
+                <span class="edge-label edge-end">FRENTE ►</span>
+                <div class="panel-window"><canvas id="fabric-left" width="2048" height="344"></canvas></div>
+              </div>
+              <div class="stage-panel hidden" id="stage-right">
+                <span class="edge-label edge-start">◄ FRENTE</span>
+                <span class="edge-label edge-end">TRASEIRA ►</span>
+                <div class="panel-window"><canvas id="fabric-right" width="2048" height="344"></canvas></div>
+              </div>
+              <div class="stage-panel hidden" id="stage-rear">
+                <div class="panel-window"><canvas id="fabric-rear" width="1024" height="1024"></canvas></div>
+              </div>
+            </div>
+            <div id="drop-hint">Solte a imagem para adicionar</div>
+          </div>
         </div>
-        <div class="stage-panel hidden" id="stage-right">
-          <div class="panel-window"><canvas id="fabric-right" width="2048" height="344"></canvas></div>
-        </div>
-        <div class="stage-panel hidden" id="stage-rear">
-          <div class="panel-window"><canvas id="fabric-rear" width="1024" height="1024"></canvas></div>
-        </div>
-        <div id="drop-hint">Solte a imagem para adicionar</div>
+
+        <!-- O inspetor fica SEMPRE montado e só troca quais seções aparecem:
+             aparecer/sumir mudaria a largura do palco a cada clique, forçando um
+             reenquadramento da tela e fazendo o desenho pular. -->
+        <aside id="inspector">
+          <section class="panel insp" data-for="none">
+            <h3 class="panel-title">Painel</h3>
+            <div class="ctl"><span>Tamanho real</span><b id="panel-dims">—</b></div>
+            <div class="ctl"><span>Resolução</span><b id="panel-scale">—</b></div>
+            <p class="insp-hint">Selecione um objeto no painel para editar suas propriedades.</p>
+          </section>
+
+          <section class="panel insp hidden" data-for="text">
+            <h3 class="panel-title"><span>Tipografia</span><b class="panel-hint" id="font-current"></b></h3>
+            <div class="font-picker">
+              <button class="font-trigger" id="font-trigger"><span id="font-trigger-label">Anton</span><i>▾</i></button>
+              <div class="font-menu hidden" id="font-menu"></div>
+            </div>
+            <label class="ctl"><span>Corpo</span>
+              <span class="num-unit"><input type="number" id="t-size" class="num" min="1" step="1" /><em>cm</em></span>
+            </label>
+            <div class="chip-row" id="t-size-presets"></div>
+            <div class="ctl"><span>Peso</span>
+              <div class="seg tight" id="t-weight">
+                <button class="seg-btn on" data-w="400">Regular</button>
+                <button class="seg-btn" data-w="700">Bold</button>
+              </div>
+            </div>
+            <div class="ctl"><span>Alinhar</span>
+              <div class="seg tight" id="t-align">
+                <button class="seg-btn on" data-a="left" title="Esquerda">⯇</button>
+                <button class="seg-btn" data-a="center" title="Centro">≡</button>
+                <button class="seg-btn" data-a="right" title="Direita">⯈</button>
+              </div>
+            </div>
+            <label class="ctl range"><span>Entre letras <b id="t-tracking-val"></b></span>
+              <input type="range" id="t-tracking" min="-100" max="600" value="0" /></label>
+            <label class="ctl range"><span>Entrelinha <b id="t-leading-val"></b></span>
+              <input type="range" id="t-leading" min="80" max="220" value="116" /></label>
+            <label class="ctl"><span>Cor</span><input type="color" id="t-fill" value="#c8102e" /></label>
+            <label class="ctl"><span>Contorno</span>
+              <span class="row-2"><input type="color" id="t-stroke" value="#ffffff" />
+                <span class="num-unit"><input type="number" id="t-stroke-w" class="num sm" min="0" step="0.5" value="0" /><em>cm</em></span>
+              </span>
+            </label>
+          </section>
+
+          <section class="panel insp hidden" data-for="image">
+            <h3 class="panel-title"><span>Imagem</span><b class="panel-hint" id="img-name"></b></h3>
+            <label class="ctl range"><span>Opacidade <b id="i-opacity-val"></b></span>
+              <input type="range" id="i-opacity" min="10" max="100" value="100" /></label>
+            <button class="mini ghost" id="i-reset-aspect">Restaurar proporção original</button>
+            <div class="dpi-note" id="img-dpi"></div>
+          </section>
+
+          <section class="panel insp hidden" data-for="text image multi">
+            <h3 class="panel-title">Transformar</h3>
+            <div class="grid-2">
+              <label class="ctl mini-ctl"><span>X</span><input type="number" id="tf-x" class="num" step="1" /></label>
+              <label class="ctl mini-ctl"><span>Y</span><input type="number" id="tf-y" class="num" step="1" /></label>
+              <label class="ctl mini-ctl"><span>Larg.</span><input type="number" id="tf-w" class="num" step="1" /></label>
+              <label class="ctl mini-ctl"><span>Alt.</span><input type="number" id="tf-h" class="num" step="1" /></label>
+            </div>
+            <label class="ctl range"><span>Rotação <b id="tf-rot-val"></b></span>
+              <input type="range" id="tf-rot" min="-180" max="180" value="0" /></label>
+            <div class="chip-row" id="tf-rot-presets">
+              <button class="chip" data-deg="0">0°</button>
+              <button class="chip" data-deg="90">90°</button>
+              <button class="chip" data-deg="180">180°</button>
+              <button class="chip" data-deg="270">270°</button>
+            </div>
+            <div class="btn-row">
+              <button class="mini ghost" id="flip-x" title="Espelha o objeto — textos ficam invertidos">⇋ Inverter H</button>
+              <button class="mini ghost" id="flip-y">⇅ Inverter V</button>
+            </div>
+          </section>
+
+          <section class="panel insp hidden" data-for="text image multi">
+            <h3 class="panel-title"><span>Alinhar</span><b class="panel-hint" id="align-hint"></b></h3>
+            <div class="seg tight hidden" id="align-frame">
+              <button class="seg-btn" data-frame="outline">Painel</button>
+              <button class="seg-btn on" data-frame="selection">Seleção</button>
+            </div>
+            <div class="icon-grid" id="align-grid">
+              <button class="icon-btn" data-align="left"    title="Alinhar à esquerda">⇤</button>
+              <button class="icon-btn" data-align="hcenter" title="Centralizar na horizontal">↔</button>
+              <button class="icon-btn" data-align="right"   title="Alinhar à direita">⇥</button>
+              <button class="icon-btn" data-align="top"     title="Alinhar ao topo">⇡</button>
+              <button class="icon-btn" data-align="vcenter" title="Centralizar na vertical">↕</button>
+              <button class="icon-btn" data-align="bottom"  title="Alinhar à base">⇣</button>
+            </div>
+            <h4 class="sub-title">Distribuir</h4>
+            <div class="btn-row">
+              <button class="mini ghost" data-dist="x" title="Espaços iguais na horizontal">↔ Horizontal</button>
+              <button class="mini ghost" data-dist="y" title="Espaços iguais na vertical">↕ Vertical</button>
+            </div>
+            <label class="ctl"><span>Espaçamento</span>
+              <span class="num-unit"><input type="number" id="gap-val" class="num" min="0" step="1" value="10" /><em>cm</em></span>
+            </label>
+            <div class="btn-row">
+              <button class="mini ghost" data-gap="x">↔ Aplicar</button>
+              <button class="mini ghost" data-gap="y">↕ Aplicar</button>
+            </div>
+          </section>
+
+          <section class="panel insp" data-for="always">
+            <h3 class="panel-title"><span>Camadas</span><b class="panel-hint" id="layer-count"></b></h3>
+            <div class="layer-list" id="layer-list"></div>
+          </section>
+        </aside>
       </div>
-      <div class="modal-foot">Dica: arraste e solte uma imagem em qualquer lugar do painel · a linha tracejada é a silhueta real do painel</div>
+
+      <div class="modal-foot" id="modal-foot">Dica: arraste e solte uma imagem em qualquer lugar do painel · a linha tracejada é a silhueta real do painel</div>
+    </div>
+
+    <div class="popover hidden" id="mirror-pop">
+      <h4 id="mirror-pop-title">Espelhar para a lateral direita</h4>
+      <label class="radio-row"><input type="radio" name="mirror-mode" value="keep" checked />
+        <span><b>Manter a leitura</b><em>Textos e logos ficam legíveis dos dois lados, no mesmo ponto do implemento.</em></span></label>
+      <label class="radio-row"><input type="radio" name="mirror-mode" value="reflect" />
+        <span><b>Reflexo exato</b><em>Como um espelho — textos ficam invertidos.</em></span></label>
+      <p class="warn" id="mirror-warn"></p>
+      <div class="btn-row end">
+        <button class="mini ghost" id="mirror-cancel">Cancelar</button>
+        <button class="mini primary" id="mirror-go">Espelhar</button>
+      </div>
+    </div>
+
+    <div class="popover hidden" id="help-pop">
+      <h4>Atalhos</h4>
+      <dl class="keys">
+        <dt>Ctrl/⌘ Z</dt><dd>Desfazer</dd>
+        <dt>Ctrl/⌘ ⇧ Z</dt><dd>Refazer</dd>
+        <dt>Ctrl/⌘ D</dt><dd>Duplicar</dd>
+        <dt>Ctrl/⌘ A</dt><dd>Selecionar tudo</dd>
+        <dt>Ctrl/⌘ C · V</dt><dd>Copiar · colar (entre painéis)</dd>
+        <dt>Ctrl/⌘ ] · [</dt><dd>Trazer à frente · enviar para trás</dd>
+        <dt>← ↑ → ↓</dt><dd>Mover 1 px · ⇧ move 10 px</dd>
+        <dt>Delete</dt><dd>Excluir</dd>
+        <dt>T</dt><dd>Novo texto</dd>
+        <dt>⇧ (segurar)</dt><dd>Suspende o encaixe nas guias</dd>
+        <dt>Esc</dt><dd>Desselecionar · fechar</dd>
+      </dl>
     </div>
   </div>
 

@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 
+import { getPaints, updatePaint } from "@/api-client/paint";
+
 import { mountStudio, unmountStudio } from "./engine";
+import { setColorProvider, setColorPersister, type PaintStudioConfig } from "./engine/catalog/colors";
 import "./engine/core/studio.css";
+import "./engine/ui/paint-panel.css";
 import "./engine/ui/selector.css";
 import "./engine/ui/loader.css";
 import "./engine/ui/hud.css";
@@ -29,14 +33,67 @@ import "./engine/ui/hud.css";
  * them, and the order is load-bearing: studio.css declares the custom
  * properties and the `.hidden` rule the other three build on.
  */
+/* `previewConfig` é COMPARTILHADO: a raiz dele é do gerador da miniatura 2D da
+   cor e o estúdio mora sob `truckStudio` (ver previewConfigSchema em
+   schemas/paint.ts). Um PUT que mandasse só `{ truckStudio }` apagaria as luzes
+   e o effectIntensity do gerador, então o que veio no GET é guardado aqui e
+   remontado no save. Chave = id do Paint. */
+const previewConfigById = new Map<string, Record<string, unknown>>();
+
 export const TruckStudioPage = () => {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+
+    /* Ligado ANTES de mountStudio(): loadColors() memoiza a primeira chamada, e
+       o seletor abre a tela de cor durante o boot. Registrar depois deixaria a
+       primeira visita na paleta embutida.
+       O contrato de colors.ts é que NADA aqui pode lançar — a lista embutida é
+       o fallback, e doLoad() já trata a rejeição. */
+    setColorProvider(async () => {
+      previewConfigById.clear();
+      const res = await getPaints({
+        orderBy: { colorOrder: "asc" },
+        include: { paintBrand: true },
+        limit: 200,
+      });
+      return (res.data ?? []).map((p) => {
+        const cfg = (p.previewConfig ?? null) as Record<string, unknown> | null;
+        if (cfg) previewConfigById.set(p.id, cfg);
+        return {
+          id: p.id,
+          name: p.name,
+          hex: p.hex,
+          /* O banco tem cinco acabamentos e o motor tem três; a conversão é de
+             colors.ts, que mapeia MATTE/SATIN para 'solid'. Mandar o valor cru
+             deixa a decisão num lugar só. */
+          finish: p.finish,
+          code: p.code ?? null,
+          brand: p.paintBrand?.name ?? null,
+          studio: cfg?.truckStudio ?? null,
+        };
+      });
+    });
+
+    /* O destino do "Aplicar" do painel de tinta. Uma linha de `Paint` já carrega
+       `manufacturer`, então gravar na linha JÁ é gravar "aquela cor daquela
+       montadora" — não faz falta chave de montadora dentro do JSON. */
+    setColorPersister(async (colorId: string, studio: PaintStudioConfig) => {
+      const kept = previewConfigById.get(colorId) ?? {};
+      const next = { ...kept, truckStudio: studio };
+      await updatePaint(colorId, { previewConfig: next } as never);
+      previewConfigById.set(colorId, next);
+    });
+
     void mountStudio(host);
-    return () => unmountStudio();
+    return () => {
+      unmountStudio();
+      setColorProvider(null);
+      setColorPersister(null);
+      previewConfigById.clear();
+    };
   }, []);
 
   useEffect(() => {

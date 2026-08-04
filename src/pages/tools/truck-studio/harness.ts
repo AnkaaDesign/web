@@ -3,6 +3,7 @@
 // service worker serves harness.html from cache, because the proxy module is
 // only registered when vite itself transforms the HTML in the same session.
 import './engine/core/studio.css'
+import './engine/ui/paint-panel.css'
 import './engine/ui/selector.css'
 import './engine/ui/loader.css'
 import './engine/ui/hud.css'

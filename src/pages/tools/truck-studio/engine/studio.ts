@@ -48,6 +48,11 @@ import { initHud, syncHud } from './ui/hud';
 import * as scatter from './scene/scatter';
 import { initWeather } from './scene/weather';
 import { initUI, setStatus } from './ui/chrome';
+/* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
+   ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
+   já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
+   e um é o suficiente. */
+import { initPaintPanel, setPaintPanelColor } from './ui/paint-panel';
 import { root, $ } from './core/dom';
 import type { Choice, EnvironmentDef, ManufacturerDef, ModelDef } from './catalog/catalog';
 import type { CabDef } from './vehicle/models';
@@ -177,7 +182,15 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
    Roda em toda aplicação, inclusive quando a cor não mudou: uma troca de cabine
    cria materiais NOVOS, e eles precisam ser dirigidos outra vez. */
 function applyColor(color: PaintColorDef) {
-  paint.setPaint({ finish: color.finish, color: color.hex });
+  /* `color.studio` é o ajuste gravado para esta cor (previewConfig.truckStudio
+     do Paint), e entra DEPOIS de acabamento e cor base na MESMA chamada: dentro
+     de setPaint() a troca de acabamento reescreve os parâmetros da família para
+     os defaults dela, então um ajuste aplicado antes seria apagado. Sem ajuste
+     gravado o objeto é vazio e nada muda — o comportamento de sempre. */
+  paint.setPaint({ finish: color.finish, color: color.hex, ...(color.studio || {}) });
+  /* O painel de ajuste segue a cor que está no veículo: aberto, ele se
+     reapresenta na cor nova em vez de continuar editando a anterior. */
+  setPaintPanelColor(color.id);
   /* O editor de arte mostra a chapa do painel ATRÁS do desenho, e ela é branca
      ou é esta tinta, conforme o "pintar o implemento". Quem sabe qual é a tinta
      é aqui; quem sabe se ela vale para o baú é o livery. */
@@ -483,6 +496,7 @@ async function boot() {
     livery.initLivery();
     initWeather();
     initUI();
+    initPaintPanel();
 
     $('load-text').textContent = 'Carregando catálogo…';
     /* Three independent listas: o catálogo diz o que o usuário PODE escolher,
