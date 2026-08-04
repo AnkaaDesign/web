@@ -47,7 +47,12 @@ export interface MatchSaveState {
   missing: number;
   valid: boolean;
   selectedCount: number;
-  save: () => void;
+  /**
+   * May be async: a CREDIT can carry selections in BOTH the parcela section and
+   * the tarefa section, and the page then chains their saves, so it has to be
+   * able to await one before starting the next.
+   */
+  save: () => void | Promise<void>;
   /** Header action label — defaults to "Salvar conciliação" when omitted. */
   label?: string;
 }

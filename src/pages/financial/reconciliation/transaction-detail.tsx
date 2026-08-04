@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertCircle,
@@ -38,6 +38,7 @@ import {
   type MatchSaveState,
 } from "@/components/financial/reconciliation/transaction-match-section";
 import { ReceivableMatchSection } from "@/components/financial/reconciliation/receivable-match-section";
+import { TaskMatchSection } from "@/components/financial/reconciliation/task-match-section";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 
 // Module-scoped so it isn't redefined on every render (which would remount the
@@ -78,6 +79,44 @@ export function ReconciliationTransactionDetailPage() {
   // The match section reports its save-ability + allocation totals up so the
   // Salvar button and running "Alocado / Faltam" summary live in the header.
   const [matchState, setMatchState] = useState<MatchSaveState | null>(null);
+  // A CREDIT has two possible targets — an existing parcela, or a tarefa whose
+  // orçamento has to be created first — so it has two sections but only one
+  // header slot.
+  const [taskMatchState, setTaskMatchState] = useState<MatchSaveState | null>(null);
+
+  // Merge them. With selections in both, one credit legitimately splits across
+  // an existing parcela AND a tarefa, so the button has to run both saves
+  // rather than silently dropping one of them. They run in sequence, parcela
+  // first: each is an independent allocation that the server re-validates
+  // against the credit's remaining balance under its advisory lock, so a
+  // failure on the second leaves the first applied and the credit PARTIAL —
+  // recoverable, and visibly so.
+  const activeMatchState = useMemo<MatchSaveState | null>(() => {
+    const both = [matchState, taskMatchState].filter(Boolean) as MatchSaveState[];
+    if (both.length === 0) return null;
+    const picked = both.filter((s) => s.selectedCount > 0);
+    if (picked.length === 0) return both[0];
+    if (picked.length === 1) return picked[0];
+
+    const target = picked[0].target;
+    const allocated = picked.reduce((sum, s) => sum + s.allocated, 0);
+    const missing = Math.abs(target - allocated);
+    return {
+      // Over-allocating across the two sections is caught here — neither
+      // section can see the other's amounts.
+      canSave: picked.every((s) => s.canSave) && allocated <= target + 0.01,
+      saving: picked.some((s) => s.saving),
+      allocated,
+      target,
+      missing,
+      valid: missing <= 0.01,
+      selectedCount: picked.reduce((sum, s) => sum + s.selectedCount, 0),
+      label: "Conciliar tudo",
+      save: async () => {
+        for (const s of picked) await s.save();
+      },
+    };
+  }, [matchState, taskMatchState]);
 
   if (!id) return <Navigate to={routes.financial.reconciliation.statement} replace />;
 
@@ -138,33 +177,33 @@ export function ReconciliationTransactionDetailPage() {
           { label: title },
         ]}
         headerExtra={
-          matchState ? (
+          activeMatchState ? (
             <span className="text-sm whitespace-nowrap mr-1">
               Alocado{" "}
-              <strong className={matchState.valid ? "text-emerald-600" : "text-amber-600"}>
-                {formatCurrency(matchState.allocated)}
+              <strong className={activeMatchState.valid ? "text-emerald-600" : "text-amber-600"}>
+                {formatCurrency(activeMatchState.allocated)}
               </strong>{" "}
-              / {formatCurrency(matchState.target)}
-              {matchState.selectedCount > 0 && !matchState.valid && (
+              / {formatCurrency(activeMatchState.target)}
+              {activeMatchState.selectedCount > 0 && !activeMatchState.valid && (
                 <span className="text-amber-600">
                   {" "}·{" "}
-                  {matchState.allocated > matchState.target ? "Excede" : "Faltam"}{" "}
-                  {formatCurrency(matchState.missing)}
+                  {activeMatchState.allocated > activeMatchState.target ? "Excede" : "Faltam"}{" "}
+                  {formatCurrency(activeMatchState.missing)}
                 </span>
               )}
             </span>
           ) : undefined
         }
         actions={
-          matchState
+          activeMatchState
             ? [
                 {
                   key: "save",
-                  label: matchState.label ?? "Salvar conciliação",
+                  label: activeMatchState.label ?? "Salvar conciliação",
                   icon: IconDeviceFloppy,
-                  onClick: () => matchState.save(),
-                  disabled: !matchState.canSave,
-                  loading: matchState.saving,
+                  onClick: () => activeMatchState.save(),
+                  disabled: !activeMatchState.canSave,
+                  loading: activeMatchState.saving,
                   variant: "default" as const,
                 },
               ]
@@ -328,10 +367,21 @@ export function ReconciliationTransactionDetailPage() {
             </Card>
           </div>
 
-          {/* CREDIT → conciliar contra parcelas a receber (entrada). DEBIT →
+          {/* CREDIT → conciliar contra parcelas a receber (entrada), e — para
+              tarefas cujo orçamento se perdeu na migração — contra a própria
+              tarefa, criando o orçamento/fatura/parcela que falta. DEBIT →
               fluxo de notas fiscais existente (saída). */}
           {isCredit ? (
-            <ReceivableMatchSection transaction={tx} onSaveStateChange={setMatchState} />
+            <>
+              <ReceivableMatchSection transaction={tx} onSaveStateChange={setMatchState} />
+              <TaskMatchSection
+                transaction={tx}
+                onSaveStateChange={setTaskMatchState}
+                // The parcela section's claim on this credit, so the task
+                // section never proposes money that is already spoken for.
+                allocatedElsewhere={matchState?.allocated ?? 0}
+              />
+            </>
           ) : (
             <TransactionMatchSection
               transaction={tx}

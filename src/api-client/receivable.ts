@@ -6,6 +6,9 @@ import type {
   ReceivableMatchResponse,
   ReceivablesResponse,
   ReceivableUnmatchPayload,
+  TaskCandidatesResponse,
+  TaskMatchPayload,
+  TaskMatchResponse,
 } from "@/types/receivable";
 
 const basePath = "/financial/receivables";
@@ -33,4 +36,19 @@ export const receivableService = {
   // Undo a previous credit↔installment conciliation.
   unmatchReceivable: (payload: ReceivableUnmatchPayload) =>
     apiClient.post<ReceivableMatchResponse>(`${basePath}/unmatch`, payload),
+
+  // Tarefas a credit can be conciliated against — including tasks with NO
+  // orçamento, which the installment candidate list structurally cannot see.
+  // Without `search` the server resolves identity from the credit (CNPJ/nome);
+  // with it, the operator looks the task up by nome/série/placa/chassi/cliente.
+  getTaskCandidates: (transactionId: string, search?: string) =>
+    apiClient.get<TaskCandidatesResponse>(
+      `${basePath}/task-candidates/${transactionId}`,
+      { params: search ? { search } : undefined },
+    ),
+
+  // Conciliate a credit against one or more tarefas, creating the missing
+  // orçamento / fatura / parcela chain for whichever ones need it.
+  matchTasks: (payload: TaskMatchPayload) =>
+    apiClient.post<TaskMatchResponse>(`${basePath}/match-task`, payload),
 };

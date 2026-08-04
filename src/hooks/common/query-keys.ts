@@ -990,6 +990,10 @@ export const receivableKeys = {
   list: () => ["receivable", "list"] as const,
   candidates: (transactionId: string) =>
     ["receivable", "candidates", transactionId] as const,
+  // Under the same "receivable" prefix on purpose: matching a task mints
+  // parcelas, so `receivableKeys.all` must invalidate the task candidates too.
+  taskCandidates: (transactionId: string, search?: string) =>
+    ["receivable", "task-candidates", transactionId, search ?? ""] as const,
 };
 
 // =====================================================

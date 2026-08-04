@@ -131,3 +131,104 @@ export interface ReceivableMatchResponse {
   success: boolean;
   message: string;
 }
+
+// =====================
+// Task-anchored conciliation (credit ↔ Tarefa, orçamento optional)
+// =====================
+
+/**
+ * Billing shape of a Task from the point of view of an incoming credit.
+ *
+ * `NO_QUOTE` is the whole reason this flow exists: the migration left many
+ * tasks with no orçamento, and with no orçamento there is no fatura and no
+ * parcela — so nothing the ordinary candidate list can anchor a match to.
+ */
+export type TaskBillingState =
+  | "NO_QUOTE"
+  | "QUOTE_UNBILLED"
+  | "QUOTE_OPEN"
+  | "QUOTE_SETTLED";
+
+/** An open parcela already billed on a candidate task. */
+export interface TaskCandidateInstallment {
+  installmentId: string;
+  number: number;
+  dueDate: string;
+  amount: number;
+  paidAmount: number;
+  remaining: number;
+  status: string;
+  hasBankSlip: boolean;
+}
+
+/** A Task offered as a conciliation target for a bank credit. */
+export interface TaskMatchCandidate {
+  taskId: string;
+  taskName: string | null;
+  taskSerialNumber: string | null;
+  taskStatus: string;
+  plate: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  customerCnpjCpf: string | null;
+  quoteId: string | null;
+  budgetNumber: number | null;
+  quoteStatus: string | null;
+  quoteTotal: number | null;
+  billingState: TaskBillingState;
+  /** Balance allocatable without creating new billing capacity. */
+  openCapacity: number;
+  openInstallments: TaskCandidateInstallment[];
+  /** Already conciliated against this task, from any credit. */
+  reconciledAmount: number;
+  /** Server's proposal for this task's share of the credit. */
+  suggestedAmount: number;
+  confidence: number;
+  reason: string;
+  referenceDate: string | null;
+}
+
+export interface TaskCandidatesResponse {
+  success: boolean;
+  message: string;
+  data: TaskMatchCandidate[];
+}
+
+/** One task's share of a credit. */
+export interface TaskMatchAllocation {
+  taskId: string;
+  amount: number;
+  /** Billing customer — required when the task has neither quote nor customer. */
+  customerId?: string;
+  dueDate?: string;
+  description?: string;
+}
+
+export interface TaskMatchPayload {
+  transactionId: string;
+  allocations: TaskMatchAllocation[];
+  notes?: string;
+}
+
+/** What the server did, per task. */
+export interface TaskMatchOutcome {
+  taskId: string;
+  quoteId: string;
+  budgetNumber: number;
+  quoteCreated: boolean;
+  quoteExtended: boolean;
+  invoiceCreated: boolean;
+  allocated: number;
+  installmentIds: string[];
+}
+
+export interface TaskMatchResponse {
+  success: boolean;
+  message: string;
+  data: {
+    transactionId: string;
+    totalAllocated: number;
+    reconciliationStatus: string;
+    outcomes: TaskMatchOutcome[];
+  };
+}

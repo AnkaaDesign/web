@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { receivableService } from "@/api-client/receivable";
-import { receivableKeys, reconciliationKeys } from "@/hooks/common/query-keys";
+import { receivableKeys, reconciliationKeys, taskKeys } from "@/hooks/common/query-keys";
+// taskQuoteKeys lives with its hooks, not in the shared factory file.
+import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import type {
   ReceivableAllocatePayload,
   ReceivableMatchPayload,
   ReceivableUnmatchPayload,
+  TaskMatchPayload,
 } from "@/types/receivable";
 
 /**
@@ -45,6 +48,35 @@ export function useReceivableCandidates(
 }
 
 /**
+ * Tarefas a bank CREDIT can be conciliated against, including tasks with no
+ * orçamento at all.
+ *
+ * `staleTime: 0` for the same reason the NF candidate list uses it — another
+ * transaction may have consumed a task's open parcela since this list was
+ * cached, and here the list also drives what gets CREATED, so a stale read
+ * would propose minting a quote that already exists.
+ */
+export function useTaskMatchCandidates(
+  transactionId: string | undefined,
+  search: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: transactionId
+      ? receivableKeys.taskCandidates(transactionId, search)
+      : receivableKeys.all,
+    queryFn: () =>
+      transactionId
+        ? receivableService
+            .getTaskCandidates(transactionId, search)
+            .then((r) => r.data.data)
+        : Promise.reject(),
+    enabled: !!transactionId && enabled,
+    staleTime: 0,
+  });
+}
+
+/**
  * Conciliate / unconciliate a bank credit against a single receivable
  * installment. Both invalidate the receivables list (a matched installment
  * flips to Recebido/Conciliado) and the reconciliation namespace (the bank
@@ -56,6 +88,10 @@ export function useReceivableMutations() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: receivableKeys.all });
     qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    // A task match can mint an orçamento and a fatura, so the task and
+    // task-quote namespaces are no longer accurate either.
+    qc.invalidateQueries({ queryKey: taskKeys.all });
+    qc.invalidateQueries({ queryKey: taskQuoteKeys.all });
   };
 
   const matchMutation = useMutation({
@@ -76,12 +112,21 @@ export function useReceivableMutations() {
     onSuccess: () => invalidate(),
   });
 
+  // Conciliate against tarefas, minting the missing orçamento/fatura/parcela.
+  const matchTasksMutation = useMutation({
+    mutationFn: (payload: TaskMatchPayload) =>
+      receivableService.matchTasks(payload).then((r) => r.data),
+    onSuccess: () => invalidate(),
+  });
+
   return {
     matchMutation,
     unmatchMutation,
     allocateMutation,
+    matchTasksMutation,
     matchAsync: matchMutation.mutateAsync,
     unmatchAsync: unmatchMutation.mutateAsync,
     allocateAsync: allocateMutation.mutateAsync,
+    matchTasksAsync: matchTasksMutation.mutateAsync,
   };
 }
