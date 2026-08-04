@@ -238,7 +238,10 @@ import {
   setExternalEnvironment, setExposureBase, setGroundMaps,
   setSkyDomeVisible, setRoadVisible, setShadowCatcher, setLamps,
   setNearGround, setMacroVariation, setLampModel, preparePlateMaterial,
+  setSetGround, setHorizonHaze, setHorizonTint, setInteriorBounds,
 } from './scene';
+import { applySet, disposeSet } from './set';
+import type { SetDef, SetMaterialDef } from './set';
 import {
   loadPropCatalog, getPropDef, preloadProps,
   applyScatter, clearScatter, disposeProps,
@@ -1438,6 +1441,14 @@ export function disposeEnvironments() {
   setExternalEnvironment(null);
   setGroundMaps(null);
   setNearGround(null);
+  /* Ordem: solta a declaração do chão ANTES de descartar a geometria, senão o
+     plano procedural fica escondido com o set já fora da cena — nada de chão. */
+  setSetGround(false);
+  setHorizonHaze(null);
+  /* The tint goes out with the haze it colours — leaving it on would tint the
+     next scene's fog with this plate's horizon. */
+  setHorizonTint(null);
+  disposeSet();
   setShadowCatcher(null);
   /* PROPS OUT OF THE SCENE BEFORE THEIR GEOMETRY IS FREED. scatter.js's
      InstancedMeshes are built from its cached prop geometry, and scene.js's
@@ -1574,13 +1585,105 @@ function nearGroundOpts(ng: NearGround | null, entry: CacheEntry): NearGroundOpt
  *   LRU — an id that was resident when the entry was built may not be now.
  * @returns {Promise|null}
  */
+/**
+ * Valida o bloco `set` do manifesto.
+ *
+ * Mesma disciplina dos outros blocos crus deste módulo: catalog.ts repassa o
+ * objeto sem olhar, e é AQUI que ele vira dado tipado. Um `set` sem `url` é
+ * tratado como ausente — degradar para o cenário fotográfico antigo é sempre
+ * melhor do que abortar a troca de ambiente.
+ *
+ * @returns {SetDef|null}
+ */
+function resolveSet(envDef: EnvironmentDef): SetDef | null {
+  const raw = envDef.set;
+  if (!raw || typeof raw !== 'object') return null;
+  const url = path((raw as RawBlock).url);
+  if (!url) return null;
+
+  const out: SetDef = { url };
+
+  const rot = (raw as RawBlock).rotationY;
+  if (typeof rot === 'number' && isFinite(rot)) out.rotationY = rot;
+  if ((raw as RawBlock).interior === true) out.interior = true;
+
+  const b = (raw as RawBlock).bounds;
+  if (b && typeof b === 'object') {
+    const bb = b as RawBlock;
+    const f = (k: string, d: number) => (Number.isFinite(+(bb[k] as number)) ? +(bb[k] as number) : d);
+    out.bounds = { halfX: f('halfX', 20), halfZ: f('halfZ', 20), minY: f('minY', 1), maxY: f('maxY', 10) };
+  }
+
+  const mats = (raw as RawBlock).materials;
+  if (mats && typeof mats === 'object') {
+    const bound: Record<string, SetMaterialDef> = {};
+    for (const [name, v] of Object.entries(mats as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object') continue;
+      const m = v as RawBlock;
+      const def: SetMaterialDef = {};
+      for (const k of ['diffuse', 'rough', 'normal', 'ao'] as const) {
+        const p = path(m[k]);
+        if (p) def[k] = p;
+      }
+      /* `repeat` é repetição UV final, não metros por tile: o build autora UV
+         em metros/`uv_scale`, então quem escolhe o tamanho do ladrilho é o
+         manifesto e a conta já vem feita. 0 ou negativo cairia num
+         RepeatWrapping degenerado, daí o piso. */
+      if (typeof m.repeat === 'number' && m.repeat > 0) def.repeat = m.repeat;
+      if (Array.isArray(m.tintRgb) && m.tintRgb.length === 3 &&
+        m.tintRgb.every((n) => typeof n === 'number' && isFinite(n))) {
+        def.tintRgb = m.tintRgb as [number, number, number];
+      }
+      if (typeof m.roughness === 'number') def.roughness = Math.min(1, Math.max(0, m.roughness));
+      if (typeof m.metalness === 'number') def.metalness = Math.min(1, Math.max(0, m.metalness));
+      /* ESTES TRÊS FALTAVAM, e o `envIntensity` faltava desde sempre.
+         Esta função é uma LISTA BRANCA: campo do manifesto que não é copiado
+         aqui não chega em set.ts e some sem erro nenhum. `envIntensity` foi
+         escrito no manifesto, comentado, medido e BAIXADO DUAS VEZES
+         perseguindo "o chão está muito reflexivo" — e nenhuma das duas vezes
+         chegou ao material, porque morria nesta linha que não existia. É o
+         mesmo modo de falha que catalog.ts documenta em warnDroppedKeys().
+         `normalScale` e `macro` entram junto porque são a outra metade da
+         mesma correção (relevo que quebra o especular, e variação macro que
+         quebra o ladrilho). */
+      if (typeof m.envIntensity === 'number' && m.envIntensity >= 0) {
+        def.envIntensity = m.envIntensity;
+      }
+      if (typeof m.normalScale === 'number' && isFinite(m.normalScale)) {
+        def.normalScale = m.normalScale;
+      }
+      const mac = m.macro as RawBlock | undefined;
+      if (mac && typeof mac === 'object'
+        && typeof mac.scale === 'number' && mac.scale > 0
+        && typeof mac.amount === 'number') {
+        def.macro = { scale: mac.scale, amount: Math.min(1, Math.max(0, mac.amount)) };
+      }
+      bound[name] = def;
+    }
+    if (Object.keys(bound).length) out.materials = bound;
+  }
+  return out;
+}
+
 function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
   props: { lampModel: string | null }) {
   const hasHdri = !!(entry && entry.rt);
+
+  /* A 3D SET REPLACES THE WHOLE NEAR FIELD, AND THAT IS THE POINT.
+     `set` (scene/set.ts) brings real modelled ground, kerbs, painted lines and
+     buildings. Every simulation of those has to come down or it renders THROUGH
+     the real thing: the grounded dome would project the photo's floor over the
+     modelled asphalt, the near band would lay a 32 m disc on top of it, the
+     procedural strip sits at y=-0.01 under everything, and the shadow catcher
+     would double the truck's shadow against the set's own ground. So a set
+     turns all four off — see the guards threaded through this function.
+     The HDRI stays: it is still the sky and, more importantly, still the IBL
+     the paint reflects. */
+  const setDef = resolveSet(envDef);
   /* A projected floor needs the HDRI's IBL to make any sense — a photographed
      ground lit by the procedural gradient sky looks worse than no photo at all —
      so a failed HDRI drops the whole grounded path, not just the lighting. */
-  const dome = hasHdri ? ensureDome(envDef, entry) : null;
+  const dome = (hasHdri && !setDef) ? ensureDome(envDef, entry) : null;
   const grounded = !!dome;
 
   /* THE CG NEAR FIELD. Only under a dome: with no photograph behind it there is
@@ -1598,7 +1701,10 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
      procedural strip underneath would show through the band's dissolve — so
      when the band is up, the strip is hidden and retexturing it would only pay
      for a program recompile per material per environment switch. */
-  const hasMaps = !near && !!(maps.diffuse || maps.rough || maps.normal);
+  /* `!setDef`: the set carries its own textured ground, so retexturing the
+     procedural plane underneath would only pay for a shader recompile on a
+     surface nobody can see. */
+  const hasMaps = !near && !setDef && !!(maps.diffuse || maps.rough || maps.normal);
 
   /* Ground first: setGroundMaps() re-baselines the dry albedo and replays the
      current wetness, so doing it before the preset change means the tween
@@ -1673,8 +1779,13 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
 
      Note the ROAD is not the LAMPS: setRoadVisible() stopped taking the poles
      with it last round, which is what let the yard keep its lighting. */
+  /* With a set: the CG dome stays down whenever there is an HDRI to draw (same
+     rule as always), and the procedural road ALWAYS goes — the set models its
+     own carriageway, complete with the lane markings the strip could never
+     carry. `showRoad` in the manifest stops applying, which is why the two set
+     scenarios do not bother authoring it. */
   setSkyDomeVisible(grounded ? false : (hasHdri ? envDef.showSkyDome === true : true));
-  setRoadVisible(near ? false : (hasHdri ? envDef.showRoad !== false : true));
+  setRoadVisible(setDef ? false : (near ? false : (hasHdri ? envDef.showRoad !== false : true)));
 
   /* The truck has to keep dropping a real shadow onto the photographed ground —
      it is the single strongest cue that the CG object is standing on the plate.
@@ -1723,6 +1834,39 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
      cache, warmed by preloadProps() during the load phase above, so every id
      here is a hit. Handing over the raw glTF scenes as well would make it
      re-prepare geometry it has already prepared. */
+  /* O SET, EM PARALELO COM O SCATTER. Os dois são independentes (com um set o
+     scatter recebe [] e só limpa a cena anterior), e ambos são aguardados lá em
+     applyEnvironment — que é o que mantém a promessa "quando eu resolvo, a cena
+     está pronta". Declarar o chão ANTES do await evita um quadro com o plano
+     procedural de 700 m ainda visível por baixo do pátio modelado.
+     Nunca rejeita: applySet() já engole a falha de rede e devolve false, e o
+     cenário degrada para HDRI + chão procedural em vez de abortar a troca. */
+  setSetGround(!!setDef);
+  /* Only for a set, and only over a photograph: with the procedural gradient
+     dome there is no seam to hide (the dome already ends in the fog colour),
+     and a grounded scene has no visible sky at the horizon at all. `interior`
+     opts out too — a warehouse has a roof, so hazing its horizon would put a
+     band of fog across the far wall. */
+  setHorizonHaze(setDef && hasHdri && !setDef.interior
+    ? { strength: num((envDef.set as RawBlock)?.haze, 1) }
+    : null);
+  /* And the COLOUR that haze is painted in. The preset's fogColor is authored
+     for the procedural sky and has no relationship to a given panorama's
+     horizon (see setHorizonTint), so a scene standing against a photograph may
+     name the tone its own plate actually has. Set together with the haze and
+     cleared together with it: a scene without a set has no seam to match, and
+     leaving the previous plate's tint on would tint the next one's fog.
+     Read off `set.horizonColor` — it belongs to the same block as `haze`,
+     which is the other half of the same knob. */
+  setHorizonTint(setDef && hasHdri && !setDef.interior
+    ? (((envDef.set as RawBlock)?.horizonColor as string | number) ?? null)
+    : null);
+  /* Confine the orbit for a closed set. Unconditional, including with null:
+     leaving the previous scene's box in place would trap the camera in a
+     34 x 62 m cage in the middle of a 1.2 km industrial estate. */
+  setInteriorBounds(setDef && setDef.bounds ? setDef.bounds : null);
+  const setP = setDef ? applySet(setDef) : Promise.resolve(disposeSet());
+
   const scatterP = driveScatter(near ? scatterSpecs(envDef) : [], {
     /* SEEDS THE PRNG. The same scene must lay out identically every time it is
        applied, or switching away and back rearranges the yard. */
@@ -1789,7 +1933,10 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
 
   current = envDef;
   hdriOn = hasHdri;
-  return scatterP;
+  /* Os dois trabalhos assíncronos da cena viram um só ponto de espera.
+     `all`, não `race`: applyEnvironment() só pode dizer "pronto" quando o set
+     E o scatter estiverem na cena. */
+  return Promise.all([scatterP, setP]).then(() => undefined);
 }
 
 /**

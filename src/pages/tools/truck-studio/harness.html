@@ -26,16 +26,33 @@
   </head>
   <body>
     <div id="host"></div>
-    <script type="module">
-      import './engine/core/studio.css';
-      import './engine/ui/selector.css';
-      import './engine/ui/loader.css';
-      import './engine/ui/hud.css';
-      import { mountStudio } from './engine/index.ts';
-      window.__harnessReady = false;
-      mountStudio(document.getElementById('host'))
-        .then(() => { window.__harnessReady = true; })
-        .catch(e => { window.__harnessError = String(e && e.message || e); console.error(e); });
+    <!-- ?pump=1 — drive the frame loop without a visible tab.
+         Chrome stops requestAnimationFrame entirely in a background tab and
+         throttles setTimeout to about one call a minute, so an automated
+         browser whose pane is hidden never gets past boot: mountStudio() waits
+         on a frame that will not come, and the loader sits on "Carregando
+         catálogo…" forever. That is not a studio bug and there is nothing to
+         fix in the engine — it is the page being invisible.
+         MessageChannel is the way out: its messages are tasks, not timers, so
+         they are not throttled with the tab in the background. Swapping rAF for
+         a channel round-trip gives the engine a real (if unpaced) frame loop.
+         OPT-IN, and only ever on this page: the studio itself must keep the
+         browser's rAF, which is what keeps it synced to the display and idle
+         when nobody is looking. -->
+    <script>
+      if (new URLSearchParams(location.search).has('pump')) {
+        window.requestAnimationFrame = function (cb) {
+          var ch = new MessageChannel();
+          ch.port1.onmessage = function () { cb(performance.now()); };
+          ch.port2.postMessage(0);
+          return 0;
+        };
+        window.cancelAnimationFrame = function () {};
+        console.log('[harness] rAF pumped via MessageChannel (?pump=1)');
+      }
     </script>
+    <!-- real file, not an inline script: vite's html-proxy for inline modules
+         breaks when the app's service worker serves this page from cache -->
+    <script type="module" src="./harness.ts"></script>
   </body>
 </html>

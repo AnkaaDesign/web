@@ -3,7 +3,10 @@
    editor, panel-outline guides, previews, drag&drop. */
 import * as THREE from 'three';
 import * as fabric from 'fabric';
-import { $, $$, isMounted, evTarget } from '../core/dom';
+import { root, $, $$, isMounted, evTarget } from '../core/dom';
+import { VEHICLES_DIR } from '../core/paths';
+import { setPaintTarget } from './models';
+import { setStatus } from '../ui/chrome';
 
 /** The three paintable trailer panels. Every per-surface map is keyed by this. */
 export type SurfaceKey = 'left' | 'right' | 'rear';
@@ -15,9 +18,17 @@ export interface OutlineMeta {
 }
 
 /* ---------------- fabric canvases (live in the modal, always exist) -------- */
-/* default WHITE like the trailer's white panels; "×" clears to transparent
-   (original aluminum) and only then the checkerboard shows through */
-const DEFAULT_BG = '#ffffff';
+/* TRANSPARENTE por padrão, e não mais branco.
+   O branco existia para imitar o painel do baú num retângulo vazio. Agora o
+   painel de verdade está ali atrás — a foto da lateral e a das portas, POR BAIXO
+   da tela, tanto no card quanto no editor (core/studio.css) — e um fundo branco
+   opaco pintado por cima simplesmente a escondia.
+   Consequência no 3D, que é a que importa: a tela vira textura do overlay
+   (attachOverlays), então transparente = o baú aparece com o material dele
+   mesmo. Era exatamente o que o branco produzia, só que agora sem uma camada de
+   tinta branca por cima de tudo. O "Fundo" da barra continua podendo pintar a
+   tela inteira de uma cor, e o "×" volta para cá. */
+const DEFAULT_BG = '';
 
 function makeFab(el: HTMLCanvasElement) {
   return new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
@@ -53,6 +64,26 @@ const textures: Record<SurfaceKey, THREE.CanvasTexture> = { left: texLeft, right
 /* ---------------- 3D overlays ---------------- */
 export const liveryMeshes: Record<SurfaceKey, THREE.Mesh[]> = { left: [], right: [], rear: [] };
 
+/* NO polygonOffset. It was here to win the depth test against the panel this
+   overlay sits on, and it is not needed for that: the overlay SHARES the panel's
+   geometry and is drawn later (renderOrder 2, and the transparent pass runs after
+   the opaque one), so at equal depth three's default LessEqualDepth already lets
+   it through.
+ *
+ * What the bias did instead was leak. `polygonOffsetFactor: -1` is SLOPE-SCALED:
+ * the steeper the surface runs away from the camera, the further forward the
+ * fragment is pushed. Sighting along the flank — which is the whole point of a
+ * 15 m trailer — that slope is enormous, and the overlay was being pulled far
+ * enough forward to pass the depth test IN FRONT OF THE PERIMETER RAIL that runs
+ * along its bottom edge. The rail then read as a wide band of body colour that
+ * snapped back to metal when the camera moved a few degrees.
+ *
+ * Kennedy's own observation is what identifies it, and it is decisive: the defect
+ * is there in WHITE and gone when the implement is PAINTED. Painting changes two
+ * things, and only one of them touches this overlay — `setBackgroundsForPaint()`
+ * clears the canvas background to transparent, so the overlay stops covering
+ * anything. The bias was still there; there was simply nothing left to draw with
+ * it. Everything else about the two states is identical. */
 function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
   texture.channel = 1;
   const mat = new THREE.MeshStandardMaterial({
@@ -60,9 +91,6 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
     transparent: true,
     metalness: 0.1,
     roughness: 0.55,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -2,
   });
   if (mat.map) mat.map.channel = 1;
   const overlay = new THREE.Mesh(mesh.geometry, mat);
@@ -166,18 +194,220 @@ for (const k of SURFACE_KEYS) {
   });
 }
 
+/* ---------------- a foto do painel, e a janela dentro dela ----------------
+   Cada superfície tem uma FOTO do painel real com o painel VAZADO: a lataria,
+   os frisos, as dobradiças e a borracha central das portas são opacos, e onde
+   entra tinta é transparente. A tela do fabric é montada exatamente sobre esse
+   vazio e por BAIXO da foto — é isso que faz um texto atravessado pela borracha
+   aparecer cortado no editor do mesmo jeito que vai sair no baú.
+
+   Onde fica o vazio é MEDIDO na própria imagem, não escrito à mão: as fotos são
+   reexportadas (as duas mudaram no meio desta sessão), e um retângulo fixo no
+   código estaria errado no dia seguinte sem avisar ninguém.
+
+   Como se mede, e por que não é só a caixa dos pixels transparentes: o fundo em
+   volta do caminhão também é transparente, e ele encosta na borda da imagem. O
+   que caracteriza a JANELA é ser transparente e estar CERCADA — então uma linha
+   só conta se o trecho vazio dela tiver pixel opaco dos dois lados, a mesma
+   regra vale por coluna, e a janela é a interseção das duas. O fundo cai fora
+   por tocar a borda; a folga entre as lanternas do teto cai fora por não ser
+   cercada na vertical. */
+interface PanelWindow {
+  /** proporção da FOTO inteira (largura/altura) */
+  photoAr: number;
+  /** posição e tamanho da janela, em fração da foto */
+  x: number; y: number; w: number; h: number;
+}
+
+const PANEL_IMAGE: Record<SurfaceKey, string> = {
+  left: VEHICLES_DIR + 'panels/lateral.png',
+  right: VEHICLES_DIR + 'panels/lateral.png',
+  rear: VEHICLES_DIR + 'panels/traseira.png',
+};
+
+/* Sem medida ainda (ou foto sem janela): a tela ocupa a caixa inteira e a foto
+   volta a ficar ATRÁS dela — ver .ts-pw-ready em core/studio.css. Um fallback
+   que deixasse a foto opaca por cima esconderia o desenho inteiro. */
+const windows: Partial<Record<SurfaceKey, PanelWindow>> = {};
+
+/** alpha até aqui conta como vazado — margem para o antialias da borda */
+const CLEAR_A = 8;
+
+function findWindow(img: HTMLImageElement): PanelWindow | null {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (!W || !H) return null;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0);
+  let data: Uint8ClampedArray;
+  try { data = ctx.getImageData(0, 0, W, H).data; }
+  catch { return null; }                       // canvas de outra origem
+
+  const clear = (px: number, py: number) => data[(py * W + px) * 4 + 3] <= CLEAR_A;
+  /* Trechos curtos são frestas entre ferragens, não painel. 2% de cada eixo. */
+  const minRunX = Math.max(4, Math.round(W * 0.02));
+  const minRunY = Math.max(4, Math.round(H * 0.02));
+  const hIn = new Uint8Array(W * H), vIn = new Uint8Array(W * H);
+
+  for (let y = 0; y < H; y++) {
+    let s = -1;
+    for (let px = 0; px <= W; px++) {
+      const isClear = px < W && clear(px, y);
+      if (isClear) { if (s < 0) s = px; continue; }
+      if (s < 0) continue;
+      const e = px - 1;
+      if (s > 0 && e < W - 1 && e - s + 1 >= minRunX) {
+        for (let i = s; i <= e; i++) hIn[y * W + i] = 1;
+      }
+      s = -1;
+    }
+  }
+  for (let px = 0; px < W; px++) {
+    let s = -1;
+    for (let y = 0; y <= H; y++) {
+      const isClear = y < H && clear(px, y);
+      if (isClear) { if (s < 0) s = y; continue; }
+      if (s < 0) continue;
+      const e = y - 1;
+      if (s > 0 && e < H - 1 && e - s + 1 >= minRunY) {
+        for (let i = s; i <= e; i++) vIn[i * W + px] = 1;
+      }
+      s = -1;
+    }
+  }
+
+  let minX = W, maxX = -1, minY = H, maxY = -1;
+  for (let y = 0; y < H; y++) {
+    for (let px = 0; px < W; px++) {
+      if (!hIn[y * W + px] || !vIn[y * W + px]) continue;
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return null;                   // foto sem janela: opaca
+  const w = (maxX - minX + 1) / W, h = (maxY - minY + 1) / H;
+  /* Uma janela minúscula é medida errada (uma sombra vazada, um recorte solto),
+     e aceitar isso encolheria a tela de desenho a um selo no meio da foto. */
+  if (w < 0.2 || h < 0.2) return null;
+  return { photoAr: W / H, x: minX / W, y: minY / H, w, h };
+}
+
+const pct = (v: number) => (v * 100).toFixed(3) + '%';
+
+/* Publica a janela nas duas superfícies que a mostram — o card sobre o render e
+   o palco do editor. Vai em variáveis CSS porque quem desenha isso é o CSS;
+   daqui sai só a medida. */
+function publishWindow(key: SurfaceKey, win: PanelWindow) {
+  windows[key] = win;
+  const targets = [
+    root.querySelector<HTMLElement>('.preview-card[data-surface="' + key + '"]'),
+    stagePanels[key],
+  ];
+  for (const el of targets) {
+    if (!el) continue;
+    el.style.setProperty('--ts-pw-img', 'url("' + PANEL_IMAGE[key] + '")');
+    el.style.setProperty('--ts-pw-ar', String(win.photoAr));
+    el.style.setProperty('--ts-pw-x', pct(win.x));
+    el.style.setProperty('--ts-pw-y', pct(win.y));
+    el.style.setProperty('--ts-pw-w', pct(win.w));
+    el.style.setProperty('--ts-pw-h', pct(win.h));
+    el.classList.add('ts-pw-ready');
+  }
+}
+
+function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.addEventListener('load', () => resolve(img), { once: true });
+    img.addEventListener('error', () => resolve(null), { once: true });
+    img.src = url;
+  });
+}
+
+/* Mede uma vez por ARQUIVO: as duas laterais usam a mesma foto, e varrer 1,7 M
+   de pixels duas vezes para chegar ao mesmo número é trabalho jogado fora. */
+async function measurePanelWindows() {
+  const byUrl = new Map<string, Promise<PanelWindow | null>>();
+  await Promise.all(SURFACE_KEYS.map(async (key) => {
+    const url = PANEL_IMAGE[key];
+    let job = byUrl.get(url);
+    if (!job) {
+      job = loadImage(url).then((img) => (img ? findWindow(img) : null));
+      byUrl.set(url, job);
+    }
+    const win = await job;
+    if (!win) {
+      console.warn('[truck-studio] a foto do painel "' + key + '" não tem janela vazada —'
+        + ' o desenho segue POR CIMA dela (comportamento antigo). Exporte o PNG com o'
+        + ' painel transparente para o desenho entrar por baixo da ferragem.');
+      return;
+    }
+    publishWindow(key, win);
+    sizePreviewCanvas(key);
+    drawPreview(key);
+  }));
+}
+
+/* A prévia do card é um canvas de tamanho fixo no template; se a janela medida
+   tiver outra proporção, o buffer é reajustado para o desenho não sair
+   espremido dentro dele. Só a ALTURA muda — a largura é a resolução escolhida. */
+function sizePreviewCanvas(key: SurfaceKey) {
+  const win = windows[key];
+  const pc = prevEls[key];
+  if (!win || !pc) return;
+  const fab = surfaces[key];
+  const h = Math.max(24, Math.round(pc.width * (fab.getHeight() / fab.getWidth())));
+  if (pc.height !== h) pc.height = h;
+}
+
+/* ---------------- cor do implemento ----------------
+   O que aparece ATRÁS da arte, pela janela: o baú branco de fábrica ou, quando
+   "pintar o implemento" está ligado, a mesma tinta do cavalo. Uma variável CSS
+   porque os dois lugares que a mostram (card e editor) são desenhados por CSS,
+   e porque assim não há um segundo estado a manter em sincronia. */
+const IMPLEMENT_WHITE = '#ffffff';
+let cabPaintHex = IMPLEMENT_WHITE;
+let paintedImplement = false;
+
+function syncImplementColor() {
+  root.style.setProperty('--ts-implement', paintedImplement ? cabPaintHex : IMPLEMENT_WHITE);
+}
+
+/** A tinta escolhida para o cavalo; studio.ts chama a cada aplicação de cor. */
+export function setCabPaintColor(hex: string | null | undefined) {
+  cabPaintHex = hex || IMPLEMENT_WHITE;
+  syncImplementColor();
+}
+
 /* ---------------- modal ---------------- */
 const modal = $('editor-modal');
 const stage = $('modal-stage');
 const stagePanels: Record<SurfaceKey, HTMLElement> =
   { left: $('stage-left'), right: $('stage-right'), rear: $('stage-rear') };
 
-function sizeModalCanvas(fab: fabric.Canvas) {
+/* Duas caixas, não uma: a FOTO é o que ocupa o palco, e a tela é a janela dentro
+   dela. Antes só existia a tela, e era ela que era enquadrada. */
+function sizeModalCanvas(key: SurfaceKey) {
+  const fab = surfaces[key];
+  const win = windows[key];
+  const panel = stagePanels[key];
   const maxW = stage.clientWidth - 40, maxH = stage.clientHeight - 40;
-  const ar = fab.getWidth() / fab.getHeight();
-  let w = maxW, h = w / ar;
-  if (h > maxH) { h = maxH; w = h * ar; }
-  fab.setDimensions({ width: w + 'px', height: h + 'px' }, { cssOnly: true });
+  if (maxW <= 0 || maxH <= 0) return;         // modal ainda sem layout
+
+  const outerAr = win ? win.photoAr : fab.getWidth() / fab.getHeight();
+  let w = maxW, h = w / outerAr;
+  if (h > maxH) { h = maxH; w = h * outerAr; }
+
+  panel.style.width = w + 'px';
+  panel.style.height = h + 'px';
+  fab.setDimensions(
+    { width: (win ? w * win.w : w) + 'px', height: (win ? h * win.h : h) + 'px' },
+    { cssOnly: true },
+  );
   fab.calcOffset();
 }
 
@@ -189,7 +419,7 @@ function showSurface(key: SurfaceKey) {
   $$('#surface-tabs .tab').forEach(b =>
     b.classList.toggle('active', b.dataset.surface === key));
   $('editor-caption').textContent = CAPTIONS[key];
-  sizeModalCanvas(surfaces[key]);
+  sizeModalCanvas(key);
 }
 
 export function openEditor(key?: SurfaceKey) {
@@ -356,6 +586,34 @@ export function setBackgroundsForPaint(painted: boolean) {
   }
 }
 
+/* ---------------- "pintar o implemento com a cor do cavalo" ----------------
+   O controle mora na barra do editor grande, e não junto da escolha de cor: a
+   cor é do CAVALO (passo do seletor), e estendê-la ao baú é uma decisão sobre o
+   IMPLEMENTO — tomada olhando para o painel que vai receber a tinta.
+
+   As duas metades têm de andar juntas, e é por isso que estão na mesma função:
+   models.setPaintTarget('both') troca o material dos painéis do baú pela tinta
+   do cavalo, e setBackgroundsForPaint(true) tira o fundo BRANCO das telas do
+   fabric — sem isso o branco continuaria desenhado POR CIMA da tinta e o
+   implemento seguiria branco na tela. Desligar restaura o branco de fábrica.
+   Ligar/desligar não mexe em nada que o usuário tenha desenhado: o que sai e
+   volta é só o fundo. */
+function bindTrailerPaint() {
+  $('paint-trailer').addEventListener('change', (e) => {
+    const { checked } = evTarget<HTMLInputElement>(e);
+    setPaintTarget(checked ? 'both' : 'cab');
+    setBackgroundsForPaint(checked);
+    /* A chapa que aparece pela janela do painel segue a mesma decisão: ligado,
+       o baú é da cor do cavalo, e o editor tem de mostrar a arte sobre ELA — um
+       desenho que sumia no branco pode gritar sobre o vermelho, e vice-versa. */
+    paintedImplement = checked;
+    syncImplementColor();
+    setStatus(checked
+      ? 'Pintura aplicada à cabine e ao implemento (incluindo a frente)'
+      : 'Pintura somente na cabine');
+  });
+}
+
 /* ---------------- drag & drop images onto the modal canvas ---------------- */
 function bindDnD() {
   let depth = 0;
@@ -391,6 +649,11 @@ function bindDnD() {
 export function initLivery() {
   bindTools();
   bindDnD();
+  bindTrailerPaint();
+  syncImplementColor();
+  /* Fora do caminho crítico: são ~4,5 M de pixels varridos, e até a medida
+     chegar os cards já estão desenhados com a foto atrás (o fallback). */
+  void measurePanelWindows();
 
   $$('#surface-tabs .tab').forEach((btn) =>
     btn.addEventListener('click', () => showSurface(btn.dataset.surface as SurfaceKey)));
@@ -414,7 +677,7 @@ export function initLivery() {
   });
 
   window.addEventListener('resize', () => {
-    if (!modal.classList.contains('hidden')) sizeModalCanvas(active());
+    if (!modal.classList.contains('hidden')) sizeModalCanvas(activeSurface);
   });
 
   for (const k of SURFACE_KEYS) {

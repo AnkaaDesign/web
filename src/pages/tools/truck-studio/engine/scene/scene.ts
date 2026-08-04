@@ -200,10 +200,59 @@ export { preparePlateMaterial } from './plate';
 
 export const holder = $('canvas-holder');
 
-export const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+/* DEPTH PRECISION — why this is NOT a logarithmic buffer.
+   ---------------------------------------------------------------------------
+   The implement is a rip whose surfaces are stacked in MILLIMETRES: the
+   conspicuity tape lies on the perimeter rail, the rail on the body skin, the
+   rear tape on the bumper. Its viewer separates every coincident pair it can
+   find (defight.js) by only ~1.5 mm, and validated that number with
+   `logarithmicDepthBuffer: true` — which is what all eight rip viewers use.
+
+   Turning it on here looks like the obvious fix and is a TRAP: a logarithmic
+   buffer makes the fragment shader write gl_FragDepth, and a shader-written
+   depth **silently disables the GPU's polygon offset**. This studio leans on
+   polygonOffset for every decal it owns — the livery overlay, the front-wall
+   paint overlay, the painted road markings — so the trade is: stop the model's
+   own 1.5 mm pairs from fighting, and start the app's own decals fighting
+   instead. Measured before reverting: log depth on, the flank overlay flickers.
+
+   The linear buffer is kept and the RANGE is what got fixed instead. 24-bit
+   depth resolves roughly z²·(far−near)/(near·far·2²⁴): at the old unbounded
+   orbit that is millimetres at 100 m, which is what made whole components wink
+   in and out. With setVehicleFocus() capping the orbit at ~25 m and `near` no
+   longer allowed under 0.08, the same expression gives well under 0.1 mm — an
+   order of magnitude finer than anything defight.js left coincident. */
+export const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  preserveDrawingBuffer: true,
+});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // shadow.radius only works with PCFSoft
+
+/* THE SHADOW MAP IS NOT REDRAWN EVERY FRAME.
+   ---------------------------------------------------------------------------
+   The key light is DIRECTIONAL and its shadow camera is a fixed ortho box about
+   the origin, so the depth map depends only on the light's angle and on the
+   geometry — NOT on where the viewer is. Left on autoUpdate, three re-rendered
+   every caster into a 3072² map on every single frame, which on this rig means
+   drawing the whole vehicle TWICE per frame: the corrected implement alone is
+   8.6 M triangles, so orbiting the camera — a thing that cannot change a single
+   shadow texel — was costing a second full geometry pass. That is what made the
+   scene feel like it "loads stuck and then works", and what made the time-of-day
+   slider freeze under the thumb.
+
+   The map is now marked dirty explicitly: applyRig() does it whenever the light
+   pose changes (which covers the clock, the presets and every tween frame), and
+   invalidateShadows() is for everything else that moves a caster — a model or
+   set finishing its load, the Cabine/Implemento toggles, the coupling moving.
+   Miss one and the symptom is a stale shadow, so the callers are deliberately
+   few and all of them are load/visibility edges. */
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
+
+/** Redraw the shadow map on the next frame. Call after moving/showing a caster. */
+export function invalidateShadows() { renderer.shadowMap.needsUpdate = true; }
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 holder.appendChild(renderer.domElement);
@@ -498,6 +547,7 @@ let nearGroup!: THREE.Group;
 let nearBaseMat!: THREE.MeshStandardMaterial, nearRoadMat!: THREE.MeshStandardMaterial;
 const nearMeshes: THREE.Mesh[] = [];  // every mesh currently in nearGroup
 let nearOn = false;                   // is the band on screen?
+let setGroundOn = false;              // is a 3D set supplying the floor? (setSetGround)
 let nearOpaqueR = 0;                  // metres of FULLY opaque CG ground
 let nearGeoKey = '';                  // rebuild guard
 let nearUndulation: { amplitude: number; scale: number } | null = null;            // { amplitude, scale } | null, for the debug handle
@@ -670,6 +720,15 @@ for (const m of GROUND_MATS) dryColors.set(m, m.color.clone());
 const dryRough = new Map<THREE.MeshStandardMaterial, number>();
 for (const m of GROUND_MATS) dryRough.set(m, 0.95);
 
+/* O reflexo de ambiente do material COM TEMPO SECO. Existe pelo mesmo motivo de
+   dryColors e dryRough: applyWetness() é chamada de novo a cada mudança de clima
+   e a cada troca de cenário, então ela tem de partir de um estado guardado em
+   vez de assumir um. Sem isto, o valor de fábrica (1) vencia o do manifesto do
+   cenário. Materiais que entram depois (o chão do set) são registrados em
+   resnapshotGround(), que roda DEPOIS de bindMaterials. */
+const dryEnv = new Map<THREE.MeshStandardMaterial, number>();
+for (const m of GROUND_MATS) dryEnv.set(m, m.envMapIntensity);
+
 /* Roughness map to fall back to when the road is DRY. null for the procedural
    asphalt (it has none); an environment's PBR roughness map otherwise. Without
    this the first dry preset after a wet one would throw the PBR map away —
@@ -743,7 +802,16 @@ function applyWetness(w: number) {
     if (prof.rough !== null && prof.rough !== undefined) {
       m.roughness = THREE.MathUtils.lerp(dryRough.get(m) ?? 0.95, prof.rough, w);
     }
-    m.envMapIntensity = 1 + w * 0.35;
+    /* RELATIVO ao valor seco do material, nunca absoluto.
+       `= 1 + w*0.35` era a linha, e com tempo seco (w = 0) ela escrevia
+       EXATAMENTE 1 em cima de qualquer coisa que o cenário tivesse pedido —
+       incluindo o `envIntensity` do chão do set (0.20 no concreto, 0.28 no
+       asfalto do Distrito Industrial). Era um segundo dono do mesmo slot, e é a
+       explicação de "o chão está muito reflexivo" ter sobrevivido a duas
+       reduções no manifesto: o manifesto aplicava, e a chuva — mesmo a zero —
+       apagava logo em seguida. A molhagem continua fazendo o que fazia (+35% no
+       encharcado); ela só não decide mais o valor seco. */
+    m.envMapIntensity = (dryEnv.get(m) ?? 1) * (1 + w * 0.35);
   }
 
   /* The puddle roughnessMap is attached only while wet. Adding/removing a map
@@ -778,7 +846,15 @@ function applyWetness(w: number) {
    currently-wet m.color would bake the wet multiplier into dryColors forever
    and every later wet preset would multiply against it again. */
 function resnapshotGround(mats: THREE.MeshStandardMaterial[]) {
-  for (const m of mats) dryColors.set(m, m.color.clone());
+  for (const m of mats) {
+    dryColors.set(m, m.color.clone());
+    /* O reflexo seco entra JUNTO com a cor seca. Um material que chega aqui
+       acabou de ser configurado pelo cenário (set.ts→bindMaterials), então o que
+       ele tem agora É o valor seco — e é o que a molhagem tem de modular em vez
+       de substituir. */
+    dryEnv.set(m, m.envMapIntensity);
+    dryRough.set(m, m.roughness);
+  }
   applyWetness(curWetness);
 }
 
@@ -1549,8 +1625,50 @@ function lerpRig(dst: Rig, a: Rig, b: Rig, t: number) {
 const _dirW = new THREE.Vector3();
 const _dirV = new THREE.Vector3();
 const _keyCol = new THREE.Color();
+const _tintGraded = new THREE.Color();
+
+/* DAY-FOR-NIGHT FOR A MEASURED PLATE COLOUR.
+   `set.horizonColor` is the HDRI's own horizon band, measured off the plate in
+   LINEAR LIGHT AT MIDDAY — see the horizonNote in environments.json, which
+   documents the measurement and is right about it. What it could not know is
+   that the value was then treated as a constant: setHorizonTint() pinned fog and
+   the haze shell to it at every hour, while the sky behind them was being folded
+   down by the backgroundIntensity guard below.
+
+   That is the whole "o HDR no modo escuro não está bom". At 21:00 over
+   `distrito-industrial` the plate renders at min(1, 0.35) * 0.06 ≈ 0.021 of its
+   daylight radiance and the haze went on painting linear 0.102/0.124/0.050 at
+   0.7 alpha — roughly FIVE TIMES brighter than the photograph it is supposed to
+   be dissolving into, in a midday olive. The night sky was not the HDRI at all;
+   it was the haze shell, and the fog was washing the far end of the set the same
+   colour.
+
+   So the tint gets the same grade as the plate, which is also exactly the grade
+   environment.ts applies to a projected dome — one formula, three consumers, and
+   they can no longer drift:
+     * min(1, envIntensity) — the environment sets the level and the preset only
+       MODULATES it; a bright preset must not over-drive a photograph.
+     * a 6 % floor at full night. Stylised, not physical (moonlit is ~1e-5 of
+       sunlit); it keeps the horizon legible as a silhouette instead of a hole.
+     * the Purkinje cooling, so a dimmed day plate reads as night rather than as
+       underexposed day.
+   At noon n = 0 and envIntensity = 1, so k = 1 and this is the identity — the
+   daylight look is untouched, by construction. */
+function gradePlateColor(out: THREE.Color, src: THREE.Color, rig: Rig) {
+  const n = THREE.MathUtils.clamp(rig.nightness, 0, 1);
+  const k = Math.min(1, Math.max(0, rig.envIntensity)) * (1 - 0.94 * n);
+  return out.setRGB(
+    src.r * k * (1 - 0.18 * n),
+    src.g * k * (1 - 0.10 * n),
+    src.b * k,
+  );
+}
 
 function applyRig(rig: Rig) {
+  /* The light is about to move, so the depth map is stale. This is the hot path
+     for it — every tween frame lands here — and marking it is one boolean; the
+     redraw itself only happens on frames where the pose actually changed. */
+  renderer.shadowMap.needsUpdate = true;
   const azr = rig.keyAz * Math.PI / 180;
   const elr = rig.keyEl * Math.PI / 180;
   const r = 26;
@@ -1584,8 +1702,19 @@ function applyRig(rig: Rig) {
   /* `scene.fog` is typed `Fog | FogExp2 | null`; it is assigned one FogExp2 at
      module load (see the note there) and never replaced. */
   const fog = scene.fog as THREE.FogExp2;
-  fog.color.copy(rig.fogColor);
+  /* The measured tint is a DAYLIGHT sample and has to be graded to the hour —
+     see gradePlateColor(). rig.fogColor needs no such treatment: it is preset
+     data with a `noite` face and the clock already crossfaded it. */
+  const tint = horizonTint ? gradePlateColor(_tintGraded, horizonTint, rig) : null;
+  fog.color.copy(tint || rig.fogColor);
   fog.density = Math.max(0, rig.fogDensity);
+
+  /* The haze IS the fog, continued into the sky — so it tracks the same tweened
+     colour, every frame, or the two would diverge mid-crossfade and put the
+     seam back exactly where it was removed. */
+  if (hazeMesh) {
+    (hazeMesh.material as THREE.MeshBasicMaterial).color.copy(tint || rig.fogColor);
+  }
 
   /* GUARD: the colour is kept current either way (so releasing the HDRI
      restores the right sky instantly), but while one is up we must not bind it
@@ -1600,8 +1729,32 @@ function applyRig(rig: Rig) {
      photograph the way it may over-drive a synthetic gradient. */
   if (externalEnv) {
     const k = Math.max(0, rig.envIntensity);
-    scene.environmentIntensity = extEnvIntensity * k;
-    scene.backgroundIntensity = extEnvIntensity * Math.min(1, k);
+    /* NIGHT OVER A DAYLIGHT PHOTOGRAPH.
+       Every HDRI in the acervo was shot in daylight, and the preset system has
+       no way to make a photograph set. Before this, midnight left
+       backgroundIntensity at the rig's 0.35 while exposure ROSE to 1.45 — net
+       ~0.53 against noon's ~1.10, i.e. the "night" sky was rendering at half
+       the brightness of noon, with lit cumulus in it. That is the "24:00 não
+       fica noite" bug: the lights went out, the sky did not.
+
+       So `nightness` (already tweened 0→1 by the clock, orthogonal to weather)
+       drives the photo down on its own axis. Two different floors because the
+       two do different jobs:
+
+       BG 0.06 — the visible sky. 0.35 * 0.06 * 1.52 exposure ≈ 0.03 scene-
+       referred, which ACES renders as a dark blue-grey that still holds the
+       cloud structure. Scaling is UNIFORM, so bright cumulus stay brighter than
+       the sky behind them and read as moonlit cloud rather than as a flat wash.
+       A real night sky is ~1e-4 of day; 0.03 is the film-convention version,
+       and going lower just makes an unreadable black hole.
+
+       ENV 0.40 — the reflections. Deliberately far milder: this term is also
+       doing half the LIGHTING of the truck, and taking it to the background's
+       floor leaves black paint with no form. 0.35 * 0.40 = 0.14 keeps a dim sky
+       in the clearcoat while the lamps (240-295 cd) take over as the key. */
+    const nf = THREE.MathUtils.clamp(rig.nightness, 0, 1);
+    scene.environmentIntensity = extEnvIntensity * k * THREE.MathUtils.lerp(1, 0.40, nf);
+    scene.backgroundIntensity = extEnvIntensity * Math.min(1, k) * THREE.MathUtils.lerp(1, 0.06, nf);
   } else {
     scene.environmentIntensity = Math.max(0, rig.envIntensity);
   }
@@ -1701,6 +1854,45 @@ function setLampsEnabled(on: boolean) {
   for (const u of lampUnits) {
     if (u.spot.visible !== on) u.spot.visible = on;
   }
+}
+
+/**
+ * Compile BOTH light configurations now, so the hour slider never has to.
+ *
+ * THE STALL ON THE TIME SLIDER IS A SHADER RECOMPILE, and this is where it comes
+ * from. setLampsEnabled() flips SpotLight.visible on the whole pole pool at the
+ * day↔night crossing; WebGLRenderer gathers lights with traverseVisible(), so
+ * that moves NUM_SPOT_LIGHTS 0↔8 — which is part of the program CACHE KEY of
+ * every material in the scene. Crossing dusk therefore recompiles the set (a
+ * 176k-triangle industrial estate), the implement's ~50 materials and the cab,
+ * synchronously, in the middle of a pointer drag. It is a once-per-session cost
+ * because three then caches the programs by that key: the second crossing is
+ * free. So the fix is not to make it cheaper, it is to pay for it where a wait
+ * is expected.
+ *
+ * Kennedy's call, and it is the right one for a configurator: "prefiro ter um
+ * pouco mais de tempo de carregamento no início do que ter esse travamento na
+ * mudança do slider."
+ *
+ * Must run with every material already in the scene — studio.ts calls it after
+ * the set, the cab, the implement and the paint are all mounted. Restoring the
+ * flag afterwards matters: this is a warm-up, not a state change, and
+ * setLampsEnabled() remains the single writer of SpotLight.visible.
+ */
+export function warmLightPrograms() {
+  const was = lampsOn;
+  try {
+    setLampsEnabled(!was);
+    renderer.compile(scene, camera);
+  } catch (err) {
+    console.warn('[truck-studio] pré-compilação da configuração de luz alternativa falhou'
+      + ' — a primeira passagem por 18:00 pode engasgar.', err);
+  } finally {
+    setLampsEnabled(was);
+  }
+  /* And the configuration we are actually about to render, so the first frame
+     after the loader is not a compile either. */
+  try { renderer.compile(scene, camera); } catch (_) { /* ignore */ }
 }
 
 function beginTween(animate: boolean) {
@@ -1917,6 +2109,264 @@ export function setSkyDomeVisible(v: boolean) {
  * warns if both end up on.
  * @param {boolean} v
  */
+/* ---------------- horizon haze ----------------
+   THE SEAM BETWEEN 3D AND PHOTOGRAPH, AND WHY FOG ALONE CANNOT CLOSE IT.
+
+   three.js does not fog `scene.background`. Geometry recedes into `fogColor`;
+   the HDRI behind it stays at full contrast whatever the fog is doing. So a 3D
+   set always ends in a visible line: fogged ground on one side, crisp
+   photograph on the other. Raising fogDensity does not help — it fogs the only
+   half that was already fogged.
+
+   This is the missing half: a shell that fogs the SKY. An inverted sphere just
+   inside the far plane, painted `fogColor`, opaque at the horizon and fading to
+   nothing by ~24° elevation. It is transparent, so it draws after the opaque
+   pass and over the background; it is at 570 m with depthWrite off, so every
+   piece of real geometry occludes it correctly.
+
+   The two halves then MEET at the same colour: ground fades to fogColor going
+   out, sky fades to fogColor coming down, and the horizon stops being an edge.
+
+   It pays for the night as well. `fogColor` at night is 0x141d2e, so the lower
+   sky darkens with the scene instead of staying a lit daytime photograph —
+   which is the other half of the "24:00 não fica noite" fix in applyRig(). */
+const HAZE_R = 570;                    // camera.far is 600 — must sit inside it
+let hazeMesh: THREE.Mesh | null = null;
+
+/* ---------------- horizon tint ----------------
+   WHERE THE HAZE COLOUR COMES FROM WHEN A PHOTOGRAPH IS THE SKY.
+
+   The haze above closes the seam by painting the lower sky in `fogColor`, so
+   that fogged ground and fogged sky meet at one colour. That argument is only
+   true if `fogColor` IS the colour the sky has at the horizon — and under an
+   HDRI it is not. `fogColor` is PRESET data, authored for the procedural dome:
+   `ensolarado` inherits RIG_BASE's 0xb8d8f5, a pale sky blue.
+
+   Measured against what it was actually being painted over — the horizon band
+   of `rodovia/sky.hdr`, the panorama `distrito-industrial` uses — the two are
+   not close:
+
+     preset fogColor 0xb8d8f5    linear 0.487 0.708 0.947   pale blue
+     HDRI horizon    0x5a633f    linear 0.102 0.124 0.050   olive green
+
+   Five times too bright and the opposite hue. At `haze: 0.8` that is a pale
+   ribbon laid across a green field: the "faixa cinza que não faz sentido". No
+   amount of retuning `strength`, `low` or `high` can fix a colour, and turning
+   the haze down only trades the ribbon back for the hard seam it exists to
+   remove.
+
+   So an environment may declare the tone its own horizon actually has, and it
+   overrides `fogColor` for the two surfaces that have to agree with the
+   photograph — `scene.fog` and the haze shell. Everything else the preset
+   drives is untouched: this is a match to a specific plate, not a lighting
+   change, and `bgColor` in particular must keep tracking the preset because it
+   is what shows when the HDRI is released.
+
+   It is authored rather than sampled at load. Sampling is what the rip viewer
+   does and it is the more self-maintaining answer, but `loadHdr()` hands the
+   DataTexture straight to PMREM and drops it, so reading it back means keeping
+   a 16 MB float buffer alive per environment for one colour. One measured hex
+   in the manifest, with the measurement written down beside it, buys the same
+   thing for nothing. */
+let horizonTint: THREE.Color | null = null;
+
+/**
+ * Pin fog and horizon haze to a measured colour, or `null` to hand both back to
+ * the preset. Takes effect on the next applyRig(), which is every frame of a
+ * tween and at least once per environment change.
+ * @param {number | string | null} c hex (0x5a633f) or css string, sRGB
+ */
+export function setHorizonTint(c: number | string | null) {
+  if (c === null || c === undefined || c === '') {
+    horizonTint = null;
+    return;
+  }
+  horizonTint = new THREE.Color(c as THREE.ColorRepresentation);
+}
+const hazeU = {
+  uLow: { value: -0.10 },              // sin(elev) at which haze is full
+  uHigh: { value: 0.40 },              // sin(elev) at which haze is gone (~24°)
+  uStrength: { value: 0 },             // 0 = off; set by setHorizonHaze()
+};
+
+function makeHaze(): THREE.Mesh {
+  /* MeshBasicMaterial + onBeforeCompile rather than a ShaderMaterial: this way
+     the haze keeps three's own tonemapping_fragment and colorspace_fragment, so
+     it is graded by ACES exactly like the fogged geometry it has to match. A
+     hand-written ShaderMaterial would have to reproduce both chunks and would
+     drift from them on the next three upgrade. */
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xb8d8f5, side: THREE.BackSide,
+    transparent: true, depthWrite: false, fog: false,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLow = hazeU.uLow;
+    shader.uniforms.uHigh = hazeU.uHigh;
+    shader.uniforms.uStrength = hazeU.uStrength;
+    shader.vertexShader = 'varying vec3 vHazeDir;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvHazeDir = position;');
+    /* Injected after <map_fragment> on purpose: that chunk exists in every
+       three version this project has seen, where the name of the final output
+       chunk (output_fragment → opaque_fragment) has changed twice. */
+    shader.fragmentShader =
+      'varying vec3 vHazeDir;\nuniform float uLow;\nuniform float uHigh;\nuniform float uStrength;\n'
+      + shader.fragmentShader.replace('#include <map_fragment>',
+        '#include <map_fragment>\n\tdiffuseColor.a *= (1.0 - smoothstep(uLow, uHigh, normalize(vHazeDir).y)) * uStrength;');
+  };
+  const m = new THREE.Mesh(new THREE.SphereGeometry(HAZE_R, 32, 20), mat);
+  m.name = 'ts-haze';
+  m.frustumCulled = false;             // it is always around the camera
+  m.renderOrder = 10;                  // after the set, before the HUD sprites
+  return m;
+}
+
+/**
+ * Turn the horizon haze on or off.
+ * @param {null | {strength?: number, low?: number, high?: number}} opts
+ *        `strength` 0..1 scales the whole effect (1 = fully opaque at the
+ *        horizon). null removes it.
+ */
+export function setHorizonHaze(opts: null | { strength?: number; low?: number; high?: number }) {
+  if (!opts) {
+    hazeU.uStrength.value = 0;
+    if (hazeMesh) hazeMesh.visible = false;
+    return;
+  }
+  if (!hazeMesh) {
+    hazeMesh = makeHaze();
+    scene.add(hazeMesh);
+    /* Keeps the shell centred on the camera so the horizon stays at the
+       horizon: at 570 m a 60 m dolly would otherwise tilt the fade by ~6°. */
+    frameHooks.push(() => {
+      if (hazeMesh) hazeMesh.position.set(camera.position.x, 0, camera.position.z);
+    });
+  }
+  hazeMesh.visible = true;
+  hazeU.uStrength.value = THREE.MathUtils.clamp(
+    Number.isFinite(+opts.strength!) ? +opts.strength! : 1, 0, 1);
+  if (Number.isFinite(+opts.low!)) hazeU.uLow.value = +opts.low!;
+  if (Number.isFinite(+opts.high!)) hazeU.uHigh.value = +opts.high!;
+  /* Same source of truth as applyRig(), which repaints this on the next frame
+     anyway — but a scenery change can mount the shell while the rig is idle, and
+     one frame of an ungraded midday olive over a night scene is exactly the
+     artefact gradePlateColor() exists to remove. */
+  if (rigCur) {
+    (hazeMesh.material as THREE.MeshBasicMaterial).color.copy(
+      horizonTint ? gradePlateColor(_tintGraded, horizonTint, rigCur) : rigCur.fogColor);
+  }
+}
+
+/* ---------------- interior confinement ----------------
+   Keep the camera inside a closed set.
+
+   The cutaway (single-sided inward shell) means a camera OUTSIDE the warehouse
+   sees straight in — useful, but it also means the orbit can drift out into a
+   240 m grey apron and look back at a building with no far wall, which reads as
+   broken. With the shed now 69 x 124 m there is no reason to ever leave: the
+   truck can be framed from anywhere inside.
+
+   Clamped in a frame hook rather than through OrbitControls' own limits because
+   `maxDistance` is a radius about the target and this is a BOX — a radius large
+   enough to see down the 124 m length would also let the camera through the
+   69 m wall. */
+let interiorBox: { hx: number; hz: number; minY: number; maxY: number } | null = null;
+let interiorHooked = false;
+
+/**
+ * Confine the camera (and its orbit target) to a box, in world metres.
+ * @param {null | {halfX:number, halfZ:number, minY:number, maxY:number}} b
+ */
+export function setInteriorBounds(
+  b: null | { halfX: number; halfZ: number; minY: number; maxY: number },
+) {
+  interiorBox = b ? {
+    hx: Math.max(1, b.halfX), hz: Math.max(1, b.halfZ),
+    minY: b.minY, maxY: Math.max(b.minY + 0.5, b.maxY),
+  } : null;
+  if (!interiorBox || interiorHooked) return;
+  interiorHooked = true;
+  frameHooks.push(() => {
+    const k = interiorBox;
+    if (!k) return;
+    const c = THREE.MathUtils.clamp;
+    camera.position.set(
+      c(camera.position.x, -k.hx, k.hx),
+      c(camera.position.y, k.minY, k.maxY),
+      c(camera.position.z, -k.hz, k.hz));
+    /* The target too, or a clamped camera orbiting a target outside the box
+       would swing along the wall instead of around the truck. */
+    controls.target.set(
+      c(controls.target.x, -k.hx, k.hx),
+      c(controls.target.y, k.minY, k.maxY),
+      c(controls.target.z, -k.hz, k.hz));
+  });
+}
+
+/* ---------------- vehicle focus ----------------
+   The subject of this studio is ONE object. Until now nothing said so: the
+   orbit had no distance limits at all, and the only thing bounding a pan was
+   the set's interior box — 60 x 58 m for the distrito — so the rig could be
+   pushed to a speck in the corner of a yard, which is not a view of a truck.
+
+   Three limits, all derived from the rig's own size so they follow a change of
+   implement:
+
+   * ORBIT RANGE. minDistance keeps the camera off the bodywork, maxDistance
+     keeps the rig filling the frame. At 45° vertical FOV a 18 m rig needs
+     ~12 m to fit its length, so 2.6 r (~25 m) is a wide establishing shot and
+     anything beyond it is just a smaller truck.
+   * TARGET LEASH. OrbitControls bounds the camera about the target but nothing
+     bounds the TARGET, and panning drags it freely — that is the actual
+     mechanism by which the truck leaves the frame. It is now tied to a sphere
+     around the rig centre: enough to recompose, never enough to lose it.
+   * BODY EJECTION. minDistance is a SPHERE about the target, which cannot
+     express "outside a 15 m long box": a radius small enough to let you near
+     the flank also lets you sit inside the van from the front. So the camera is
+     pushed back out of the bodywork every frame, on whichever of X/Z is nearer.
+     Never on Y — ejecting downwards would put the camera under the floor. */
+let vehicleFocus: { c: THREE.Vector3; box: THREE.Box3; r: number } | null = null;
+let vehicleFocusHooked = false;
+const FOCUS_MIN_F = 0.30;   // minDistance, as a fraction of the rig radius
+const FOCUS_MAX_F = 2.60;   // maxDistance, same
+const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
+const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork
+const _fv = new THREE.Vector3();
+
+/** Lock the orbit to a rig. Pass null to release it (no limits). */
+export function setVehicleFocus(box: THREE.Box3 | null) {
+  if (!box || box.isEmpty()) {
+    vehicleFocus = null;
+    controls.minDistance = 0;
+    controls.maxDistance = Infinity;
+    return;
+  }
+  const c = box.getCenter(new THREE.Vector3());
+  const r = Math.max(2, box.getSize(new THREE.Vector3()).length() / 2);
+  vehicleFocus = { c, box: box.clone().expandByScalar(FOCUS_SKIN), r };
+  controls.minDistance = r * FOCUS_MIN_F;
+  controls.maxDistance = r * FOCUS_MAX_F;
+  if (vehicleFocusHooked) return;
+  vehicleFocusHooked = true;
+  frameHooks.push(() => {
+    const f = vehicleFocus;
+    if (!f) return;
+    _fv.subVectors(controls.target, f.c);
+    const lim = f.r * FOCUS_PAN_F;
+    if (_fv.lengthSq() > lim * lim) {
+      _fv.setLength(lim);
+      controls.target.copy(f.c).add(_fv);
+    }
+    const p = camera.position, b = f.box;
+    if (p.x > b.min.x && p.x < b.max.x && p.y > b.min.y && p.y < b.max.y &&
+        p.z > b.min.z && p.z < b.max.z) {
+      const outX = Math.min(p.x - b.min.x, b.max.x - p.x);
+      const outZ = Math.min(p.z - b.min.z, b.max.z - p.z);
+      if (outX <= outZ) p.x = (p.x - b.min.x < b.max.x - p.x) ? b.min.x : b.max.x;
+      else p.z = (p.z - b.min.z < b.max.z - p.z) ? b.min.z : b.max.z;
+    }
+  });
+}
+
 export function setRoadVisible(v: boolean) {
   roadOn = !!v;
   if (roadStrip) roadStrip.visible = roadOn;
@@ -2086,7 +2536,30 @@ function syncGroundReceivers() {
     const s = nearOn ? SHADOW_HALF * 2 : catcherSize;
     shadowCatcher.scale.set(s, 1, s);
   }
-  if (groundPlane) groundPlane.visible = !nearOn && !catcherWanted;
+  if (groundPlane) groundPlane.visible = !nearOn && !catcherWanted && !setGroundOn;
+}
+
+/* A 3D SET BRINGS ITS OWN FLOOR — see scene/set.ts.
+   This flag exists because the line above is the SINGLE WRITER of
+   groundPlane.visible and must stay that way: a set that reached in and set
+   `.visible = false` itself would be silently undone by the next
+   setShadowCatcher() call, which runs on every environment swap. So the set
+   declares its floor here and the existing rule absorbs it.
+
+   Without this the 700 m procedural grass plane sits at y=0, coplanar with the
+   set's own yard, and the pair z-fight across the entire view.
+   (The `let` itself lives up with `nearOn` — declaring it here would leave
+   syncGroundReceivers() reading it from the temporal dead zone.) */
+
+/**
+ * Declare that a 3D set is supplying the ground plane.
+ * @param {boolean} v
+ */
+export function setSetGround(v: boolean) {
+  const next = !!v;
+  if (next === setGroundOn) return;
+  setGroundOn = next;
+  if (groundPlane) groundPlane.visible = !nearOn && !catcherWanted && !setGroundOn;
 }
 
 /** The ground materials, for anything that needs to read their state.
@@ -2931,7 +3404,13 @@ export function startLoop() {
     // dynamic near plane: close-ups must not slice geometry (near ~0.03 when
     // zoomed in), while far views keep depth precision (near grows with range)
     const dist = camera.position.distanceTo(controls.target);
-    const near = THREE.MathUtils.clamp(dist / 50, 0.03, 0.3);
+    /* `near` is the dominant term in depth resolution — halving it halves the
+       precision everywhere. The old floor of 0.03 was sized for a camera that
+       could be anywhere; setVehicleFocus() now keeps it at least ~2.9 m from
+       the rig centre, so nothing is ever within 0.08 m of the lens and the
+       floor can rise. That alone is a 2.7x gain on every millimetre-scale
+       clearance in the implement. */
+    const near = THREE.MathUtils.clamp(dist / 40, 0.08, 0.5);
     if (Math.abs(near - camera.near) > near * 0.15) {
       camera.near = near;
       camera.updateProjectionMatrix();

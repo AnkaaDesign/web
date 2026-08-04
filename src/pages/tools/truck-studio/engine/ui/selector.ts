@@ -1,6 +1,12 @@
-/* Card selector (cenário → fabricante → modelo) + the two badge cards that stay
-   on the viewport afterwards: the SCENE badge top-left and the TRUCK badge
-   bottom-left.
+/* Card selector (cenário → fabricante → modelo → COR) + the three badge cards
+   that stay on the viewport afterwards: the SCENE badge top-left, and the TRUCK
+   and COLOUR badges bottom-left.
+
+   O passo da cor entrou quando a sidebar de pintura saiu. Ele não é um seletor
+   de hex: cada card é o CAVALO ESCOLHIDO renderizado naquela cor (ui/preview.ts
+   desenha as miniaturas fora da tela), porque a mesma tinta fica diferente em
+   cada lataria e escolher cor em quadradinho é escolher no escuro. A paleta vem
+   de catalog/colors.ts — hoje embutida, amanhã a tabela `Paint` da API.
    ---------------------------------------------------------------------------
    Everything here is built imperatively into the studio's own DOM (core/dom.ts), for
    the same reason the rest of the engine is: this subtree OUTLIVES the React
@@ -24,15 +30,21 @@
    the per-brand `--ts-accent` custom property and image `src`. */
 import { root, $opt, isMounted } from '../core/dom';
 import {
-  catalog, getEnvironment, getManufacturer, defaultChoice, assetUrl,
+  catalog, getEnvironment, getManufacturer, getModel, defaultChoice, assetUrl,
   saveChoice, loadChoice,
 } from '../catalog/catalog';
 import type { Choice, ResolvedChoice } from '../catalog/catalog';
+import {
+  colors, getColor, defaultColor, defaultColorId, FINISH_LABEL,
+} from '../catalog/colors';
+import type { PaintColorDef } from '../catalog/colors';
+import { cabPreview, peekCabPreview, hasCabPreview, warmCabPreview } from './preview';
+import type { PaintFinish } from '../vehicle/paint';
 
 /** Which steps a flow walks; see FLOWS. */
-export type FlowId = 'full' | 'map' | 'truck';
-/** The three steps, by the id STEPS uses. */
-export type StepId = 'map' | 'manufacturer' | 'model';
+export type FlowId = 'full' | 'map' | 'truck' | 'color';
+/** The four steps, by the id STEPS uses. */
+export type StepId = 'map' | 'manufacturer' | 'model' | 'color';
 
 /** One step's static description — everything but the cards it renders. */
 interface StepDef {
@@ -43,6 +55,13 @@ interface StepDef {
   /** modifier class telling selector.css how big this step's cards are */
   grid: string;
   aria: string;
+}
+
+/** O que um card precisa para pedir a miniatura 3D dele a ui/preview.ts. */
+interface CardPreview {
+  cabId: string;
+  hex: string;
+  finish: PaintFinish;
 }
 
 /** One card, flattened out of whatever the step is listing. */
@@ -57,6 +76,15 @@ interface CardItem {
   selected: boolean;
   /** false → card visível, marcado "Em breve", e NÃO clicável. */
   available: boolean;
+  /**
+   * Render 3D desta cabine nesta cor, no lugar da foto do manifesto. É o que
+   * faz o passo da cor existir — não há doze fotos de estúdio para doze cores —
+   * e o que faz o card do MODELO já mostrar a cor escolhida. Chega assíncrono e
+   * substitui o que estiver no lugar; null = card com foto, como antes.
+   */
+  preview?: CardPreview | null;
+  /** hex da cor que este card representa; pinta a moldura antes de o render chegar */
+  swatch?: string | null;
 }
 
 /** The single in-flight open() call. */
@@ -85,6 +113,15 @@ export interface MapBadgeInfo {
   envName?: string | null;
   envSubtitle?: string | null;
   envThumb?: string | null;
+}
+
+/** What setColorBadge() paints onto the bottom-left colour card. */
+export interface ColorBadgeInfo {
+  colorName?: string | null;
+  /** hex sRGB da amostra */
+  hex?: string | null;
+  /** 'Metálica', 'Sólida'… — só o rótulo, o card não decide nada sobre tinta */
+  finishLabel?: string | null;
 }
 
 /* ---------------- step definitions ---------------- */
@@ -117,9 +154,17 @@ const STEPS: StepDef[] = [
     grid: 'ts-cards--models',
     aria: 'Modelos disponíveis',
   },
+  {
+    id: 'color',
+    label: 'Cor',
+    title: 'Escolha a cor',
+    sub: 'A pintura do cavalo mecânico — cada card é o modelo escolhido, renderizado naquela cor.',
+    grid: 'ts-cards--colors',
+    aria: 'Cores disponíveis',
+  },
 ];
 
-const STEP_INDEX: Record<StepId, number> = { map: 0, manufacturer: 1, model: 2 };
+const STEP_INDEX: Record<StepId, number> = { map: 0, manufacturer: 1, model: 2, color: 3 };
 
 /* Tag de canto de tudo que ainda não tem geometria 3D. Uma constante porque o
    card do fabricante e o do modelo têm de dizer exatamente a mesma coisa. */
@@ -132,9 +177,13 @@ const EM_BREVE = 'Em breve';
    rather than absolute step ids (a 'truck' flow shows "1 Fabricante /
    2 Modelo" — showing "2, 3" would be lying about a flow the user is not in). */
 const FLOWS: Record<FlowId, number[]> = {
-  full: [0, 1, 2],
+  full: [0, 1, 2, 3],
   map: [0],
-  truck: [1, 2],
+  /* Trocar de caminhão passa PELA cor de novo, e isso é de propósito: a mesma
+     cor em outra cabine é outra imagem, e o passo custa um clique. Quem quer só
+     a cor tem o fluxo 'color', que é o badge da cor. */
+  truck: [1, 2, 3],
+  color: [3],
 };
 
 /* Anything focusable we might put inside the overlay. Used by the focus trap. */
@@ -176,6 +225,12 @@ let mapBadge!: HTMLElement;
 let mapBadgeMedia!: HTMLElement;
 let mapBadgeName!: HTMLElement;
 let mapBadgeFilled = false;
+
+/* Colour badge nodes (bottom-left, right above the truck badge). */
+let colorBadge!: HTMLElement;
+let colorBadgeSwatch!: HTMLElement;
+let colorBadgeName!: HTMLElement;
+let colorBadgeFilled = false;
 
 /* The single in-flight open() call, or null when the selector is closed:
    { resolve, cancellable, flow, seq, step, choice, prevFocus }. */
@@ -399,6 +454,31 @@ function buildMapBadge() {
   bindBadgeTrigger(mapBadge, 'map', 'Trocar cenário');
 }
 
+/* Bottom-left, imediatamente acima do badge do caminhão: a cor que está no
+   cavalo. Clicar reabre SÓ o passo da cor.
+   Existe pelo mesmo motivo dos outros dois — cada badge é a porta de entrada da
+   PARTE do assistente que ele representa. Sem ele, trocar de cor custaria o
+   fluxo do caminhão inteiro (fabricante → modelo → cor), e a cor é justamente o
+   que se mexe mais vezes.
+   Não tem miniatura 3D: o card é pequeno, o caminhão colorido já está NA TELA
+   atrás dele, e a amostra chapada é o que se lê de relance. */
+function buildColorBadge() {
+  colorBadge = el('div', 'ts-colorbadge hidden');
+  colorBadge.id = 'ts-colorbadge';
+
+  colorBadgeSwatch = el('span', 'ts-colorbadge__swatch');
+  colorBadgeSwatch.setAttribute('aria-hidden', 'true');
+  colorBadge.appendChild(colorBadgeSwatch);
+
+  const body = el('div', 'ts-colorbadge__body');
+  body.appendChild(el('div', 'ts-colorbadge__label', 'Cor'));
+  colorBadgeName = el('div', 'ts-colorbadge__name');
+  body.appendChild(colorBadgeName);
+  colorBadge.appendChild(body);
+
+  bindBadgeTrigger(colorBadge, 'color', 'Trocar cor');
+}
+
 /**
  * Build the overlay + badge DOM into the studio root. Call once, after
  * loadCatalog(). Safe to call twice (no-op the second time).
@@ -409,12 +489,21 @@ export function initSelector() {
   buildOverlay();
   buildMapBadge();
   buildBadge();
+  buildColorBadge();
 
-  /* Both badges live inside #canvas-holder (position: relative) so they hug the
+  /* Every badge lives inside #canvas-holder (position: relative) so they hug the
      3D viewport's corners instead of the page's. */
   const host = $opt('canvas-holder') || root;   // template changed under us — degrade
   host.appendChild(mapBadge);
-  host.appendChild(badge);
+  /* Cor e caminhão dividem o canto inferior esquerdo, e por isso dividem um
+     ancoradouro: a pilha é posicionada uma vez e o flex resolve a altura. Com
+     dois `bottom:` independentes, a altura do card do caminhão viraria um
+     número mágico a recalcular em cada media query. Ordem no DOM = ordem na
+     tela: cor em cima, caminhão embaixo. */
+  const corner = el('div', 'ts-corner');
+  corner.appendChild(colorBadge);
+  corner.appendChild(badge);
+  host.appendChild(corner);
 }
 
 /* ---------------- choice helpers ---------------- */
@@ -423,8 +512,10 @@ export function initSelector() {
    edited, fallback catalog active). Drop whatever no longer resolves instead of
    rendering a step with a phantom selection. */
 function sanitize(choice: Choice | null | undefined): Choice {
-  const out: Choice = { envId: null, manufacturerId: null, modelId: null };
+  const out: Choice = { envId: null, manufacturerId: null, modelId: null, colorId: null };
   if (!choice || typeof choice !== 'object') return out;
+  const color = getColor(choice.colorId);
+  if (color) out.colorId = color.id;
   const env = getEnvironment(choice.envId);
   if (env) out.envId = env.id;
   const man = getManufacturer(choice.manufacturerId);
@@ -460,6 +551,11 @@ function backfill(choice: Choice): ResolvedChoice {
     const usable = man?.models.find((m) => m.available);
     choice.modelId = usable ? usable.id : def.modelId;
   }
+  /* A cor nunca sai daqui nula, mesmo num fluxo que não mostra o passo dela:
+     studio.ts recebe uma escolha COMPLETA seja qual for o fluxo, e é dela que
+     sai a tinta aplicada — sem isto, um fluxo 'map' devolveria o caminhão sem
+     dizer de que cor ele é. */
+  if (!getColor(choice.colorId)) choice.colorId = def.colorId || defaultColorId();
   return choice as ResolvedChoice;
 }
 
@@ -468,6 +564,10 @@ function backfill(choice: Choice): ResolvedChoice {
    never on a step outside the flow the caller asked for. */
 function clampStep(requested: number, choice: Choice, seq: number[]) {
   let i = requested;
+  /* O passo da cor renderiza o MODELO escolhido em cada card; sem modelo não há
+     o que renderizar. (No fluxo 'color' o backfill de openSelector já garantiu
+     um, então isto só morde num estado que não deveria existir.) */
+  if (i === 3 && !choice.modelId) i = 2;
   if (i === 2 && !choice.manufacturerId) i = 1;
   if (i === 1 && !choice.envId && seq.includes(0)) i = 0;
   return seq.includes(i) ? i : seq[0];
@@ -506,24 +606,98 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
       available: true,
     }));
   }
-  const man = getManufacturer(choice.manufacturerId);
-  if (!man) return [];
-  return man.models.map(m => ({
-    id: m.id,
-    name: m.name,
-    sub: m.subtitle,
-    image: m.image,
+  if (stepIndex === 2) {
+    const man = getManufacturer(choice.manufacturerId);
+    if (!man) return [];
+    const color = colorOf(choice);
+    return man.models.map(m => ({
+      id: m.id,
+      name: m.name,
+      sub: m.subtitle,
+      image: m.image,
+      logo: null,
+      accent: man.accent,
+      /* A tag do indisponível é do motor, não do manifesto: um `note` autoral não
+         pode divergir do que o card realmente faz. */
+      tag: m.available ? m.note : EM_BREVE,
+      selected: m.id === choice.modelId,
+      available: m.available,
+      /* O card mostra o modelo NA COR que está escolhida — é o mesmo render que
+         o passo seguinte usa, então trocar de modelo já mostra como a cor atual
+         fica nele. Só quem tem geometria: um "Em breve" não tem o que renderizar
+         e continua com a foto do manifesto. */
+      preview: m.available && hasCabPreview(m.cab)
+        ? { cabId: m.cab, hex: color.hex, finish: color.finish }
+        : null,
+    }));
+  }
+
+  /* Passo da cor. Um card por cor da paleta (catalog/colors.ts), cada um com o
+     cavalo JÁ ESCOLHIDO renderizado naquela cor — que é a única forma honesta de
+     escolher tinta: a mesma cor fica diferente em cada lataria.
+     Se a cabine não tem geometria leve para miniatura, os cards continuam
+     existindo com a amostra chapada: escolher a cor não pode depender de um
+     render. */
+  const picked = getModel(choice.modelId);
+  const cabId = picked?.model.cab || null;
+  const renderable = !!cabId && hasCabPreview(cabId);
+  return colors.map((c) => ({
+    id: c.id,
+    name: c.name,
+    sub: FINISH_LABEL[c.finish] + (c.code ? ' · ' + c.code : ''),
+    image: null,
     logo: null,
-    accent: man.accent,
-    /* A tag do indisponível é do motor, não do manifesto: um `note` autoral não
-       pode divergir do que o card realmente faz. */
-    tag: m.available ? m.note : EM_BREVE,
-    selected: m.id === choice.modelId,
-    available: m.available,
+    /* O anel de seleção sai NA PRÓPRIA COR. É o único passo em que o accent não
+       é da marca — aqui a marca do card é a cor. */
+    accent: c.hex,
+    tag: null,
+    selected: c.id === choice.colorId,
+    available: true,
+    preview: renderable ? { cabId: cabId as string, hex: c.hex, finish: c.finish } : null,
+    swatch: c.hex,
   }));
 }
 
+/** A cor da escolha, ou a padrão — nunca undefined, para o card sempre ter tinta. */
+function colorOf(choice: Choice): PaintColorDef {
+  return getColor(choice.colorId) || defaultColor();
+}
+
 /* ---------------- rendering ---------------- */
+
+/* Troca o conteúdo da moldura pela miniatura 3D. O que estava lá (foto do
+   manifesto ou a placa de iniciais) SAI: são a mesma informação dita pior, e
+   empilhá-las deixaria a foto aparecendo por baixo do fundo transparente do
+   render. */
+function setRender(media: HTMLElement, url: string, alt: string) {
+  const img = el('img', 'ts-card__img ts-card__img--render');
+  img.decoding = 'async';
+  img.alt = alt || '';
+  img.src = url;
+  for (const old of media.querySelectorAll('.ts-card__img, .ts-card__fallback, .ts-card__logo')) {
+    old.remove();
+  }
+  media.insertBefore(img, media.firstChild);
+}
+
+/* Pede a miniatura e a encaixa quando ela chegar. Nunca bloqueia a montagem do
+   card: o grid tem de aparecer inteiro na hora, e as imagens vão pingando. */
+function attachPreview(btn: HTMLElement, media: HTMLElement, item: CardItem) {
+  const p = item.preview as CardPreview;
+  /* Já renderizada numa passada anterior: entra sem piscar. Reabrir o seletor
+     tem de ser instantâneo. */
+  const ready = peekCabPreview(p.cabId, p.hex, p.finish);
+  if (ready) { setRender(media, ready, item.name); return; }
+
+  media.classList.add('is-rendering');
+  void cabPreview(p.cabId, p.hex, p.finish).then((url) => {
+    media.classList.remove('is-rendering');
+    /* O grid é REFEITO a cada mudança de passo, e uma cor pode levar alguns
+       quadros: quando o render chega, ESTE card pode já ter sido descartado. */
+    if (!url || !btn.isConnected) return;
+    setRender(media, url, item.name);
+  });
+}
 
 function buildCard(item: CardItem, stepIndex: number) {
   /* <button> so Enter/Space, focus rings and the tab order all come for free —
@@ -550,12 +724,31 @@ function buildCard(item: CardItem, stepIndex: number) {
   if (item.accent) btn.style.setProperty('--ts-accent', item.accent);
 
   const media = el('span', 'ts-card__media');
+  /* Card de cor. A moldura NÃO é pintada da cor: doze placas chapadas competindo
+     entre si é o que faz o grid parecer uma cartela de tinta, e a cor que
+     interessa é a que está no CAMINHÃO. O fundo é um estúdio neutro — o mesmo
+     para os doze — e a identificação fica na amostra do canto e no nome.
+     A variável ainda vai no elemento porque é dela que a amostra se pinta. */
+  if (item.swatch) {
+    media.classList.add('ts-card__media--color');
+    media.style.setProperty('--ts-swatch', item.swatch);
+  }
   if (item.logo) {
     /* Brand cards: the logo is centred in the media box and the name repeats it
        right below, so the image is decorative → empty alt. */
     appendImage(media, item.logo, '', 'ts-card__logo', 'ts-card__fallback', initials(item.name));
   } else {
     appendImage(media, item.image, item.name, 'ts-card__img', 'ts-card__fallback', initials(item.name));
+  }
+  if (item.preview) attachPreview(btn, media, item);
+  /* A amostra: um chip da cor pura no canto da moldura. É o que garante que a
+     cor está dita mesmo quando o render ainda não chegou — e o que diz a cor de
+     fábrica sem depender de como a luz do estúdio a devolveu no render. */
+  if (item.swatch) {
+    const chip = el('span', 'ts-card__swatch');
+    chip.style.setProperty('--ts-swatch', item.swatch);
+    chip.setAttribute('aria-hidden', 'true');
+    media.appendChild(chip);
   }
   if (item.tag) {
     const tag = el('span', 'ts-card__tag', item.tag);
@@ -628,13 +821,134 @@ function renderSteps() {
   });
 }
 
+/* ---------------- carrossel (fabricante e cor) ----------------
+   Doze cores — ou seis marcas — num grid viram uma parede: o olho não compara
+   doze coisas, compara duas ou três. Esses dois passos mostram TRÊS por vez e
+   andam de três em três; cenário e modelo continuam grid, porque têm poucos
+   cards e cabem inteiros.
+   Os cards ficam TODOS no DOM — a janela é só recorte e translate, que é o que
+   permite a troca deslizar em vez de piscar. O preço disso é que os cards fora
+   da janela continuam focáveis, e é por isso que setPage() mexe no tabIndex: um
+   Tab não pode levar o foco para um card que ninguém está vendo. */
+const PER_PAGE = 3;
+/** Passos que rolam em vez de empilhar. Cenário e modelo têm 3 cards e ficam grid. */
+const CAROUSEL_STEPS = new Set<StepId>(['manufacturer', 'color']);
+
+let track: HTMLElement | null = null;
+let navPrev: HTMLButtonElement | null = null;
+let navNext: HTMLButtonElement | null = null;
+let pageStart = 0;
+let pageTotal = 0;
+
+/* Seta em SVG, no traço de currentColor — mesma convenção dos view controls e do
+   HUD. Nunca "‹": a plataforma escolheria a fonte, e o glifo não acompanharia
+   nem a cor nem o peso do resto. */
+function navIcon(dir: -1 | 1) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.9');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', dir < 0 ? 'M14.5 5.5 8 12l6.5 6.5' : 'M9.5 5.5 16 12l-6.5 6.5');
+  svg.appendChild(path);
+  return svg;
+}
+
+function setPage(start: number, animate: boolean) {
+  if (!track) return;
+  const max = Math.max(0, pageTotal - PER_PAGE);
+  pageStart = Math.min(Math.max(0, start), max);
+
+  /* Sem animação na primeira pintura: o grid acabou de aparecer com a cortina do
+     overlay, e deslizá-lo de saída leria como se algo tivesse escorregado. */
+  track.classList.toggle('is-instant', !animate);
+  track.style.setProperty('--ts-page', String(pageStart));
+  if (!animate) {
+    /* Força o layout antes de devolver a transição, senão ela pega o valor novo
+       na mesma recalculação e anima assim mesmo. */
+    void track.offsetWidth;
+    track.classList.remove('is-instant');
+  }
+
+  const cards = Array.from(track.children) as HTMLElement[];
+  cards.forEach((card, i) => {
+    const visible = i >= pageStart && i < pageStart + PER_PAGE;
+    /* Já pode ser -1 por estar indisponível; nunca devolver o foco a um desses. */
+    const disabled = card.classList.contains('is-disabled');
+    card.tabIndex = visible && !disabled ? 0 : -1;
+    card.classList.toggle('is-offscreen', !visible);
+  });
+
+  if (navPrev) navPrev.disabled = pageStart <= 0;
+  if (navNext) navNext.disabled = pageStart >= max;
+}
+
+function buildCarousel(items: CardItem[], stepIndex: number) {
+  track = el('div', 'ts-carousel__track');
+  pageTotal = items.length;
+  for (const item of items) track.appendChild(buildCard(item, stepIndex));
+
+  /* O nome do passo entra no rótulo: "Anteriores" sozinho não diz anteriores do
+     quê para quem chega pelo leitor de tela. */
+  const what = STEPS[stepIndex].label.toLowerCase();
+  navPrev = el('button', 'ts-carousel__nav');
+  navPrev.type = 'button';
+  navPrev.setAttribute('aria-label', 'Ver ' + what + ' anteriores');
+  navPrev.title = 'Anteriores';
+  navPrev.appendChild(navIcon(-1));
+  navPrev.addEventListener('click', () => setPage(pageStart - PER_PAGE, true));
+
+  navNext = el('button', 'ts-carousel__nav');
+  navNext.type = 'button';
+  navNext.setAttribute('aria-label', 'Ver mais ' + what);
+  navNext.title = 'Próximos';
+  navNext.appendChild(navIcon(1));
+  navNext.addEventListener('click', () => setPage(pageStart + PER_PAGE, true));
+
+  const win = el('div', 'ts-carousel__win');
+  win.appendChild(track);
+
+  cardsEl.appendChild(navPrev);
+  cardsEl.appendChild(win);
+  cardsEl.appendChild(navNext);
+
+  /* Abre na página da cor que já está no caminhão: reabrir o passo e não ver a
+     seleção seria o mesmo que abrir na página errada. */
+  const sel = items.findIndex((i) => i.selected);
+  setPage(Math.floor(Math.max(0, sel) / PER_PAGE) * PER_PAGE, false);
+}
+
 function renderCards(stepIndex: number) {
   const step = STEPS[stepIndex];
   cardsEl.className = 'ts-cards ' + step.grid;
   cardsEl.setAttribute('aria-label', step.aria);
   cardsEl.textContent = '';
+  /* O carrossel anterior foi embora junto com o textContent; largar as
+     referências é o que impede setPage() de escrever num nó já descartado
+     (as setas do teclado continuam ligadas ao documento). */
+  track = null;
+  navPrev = null;
+  navNext = null;
+  pageStart = 0;
+  pageTotal = 0;
+
   const items = itemsFor(stepIndex, (session as Session).choice);
-  for (const item of items) cardsEl.appendChild(buildCard(item, stepIndex));
+  /* Carrossel só onde a lista é longa o bastante para virar parede — e só se ela
+     REALMENTE passou de uma página: três marcas num carrossel seriam três cards
+     com duas setas mortas do lado. */
+  if (CAROUSEL_STEPS.has(step.id) && items.length > PER_PAGE) {
+    cardsEl.classList.add('ts-cards--carousel');
+    buildCarousel(items, stepIndex);
+  } else {
+    for (const item of items) cardsEl.appendChild(buildCard(item, stepIndex));
+  }
   return items;
 }
 
@@ -723,8 +1037,14 @@ function choose(stepIndex: number, id: string) {
        whole point of the clickable breadcrumb. */
     if (choice.manufacturerId !== id) choice.modelId = null;
     choice.manufacturerId = id;
-  } else {
+  } else if (stepIndex === 2) {
     choice.modelId = id;
+    /* O próximo passo vai renderizar ESTA cabine doze vezes. Começar a baixar a
+       geometria agora sobrepõe o download ao clique que o usuário ainda vai
+       dar, em vez de deixá-lo esperando na frente de um grid vazio. */
+    warmCabPreview(getModel(id)?.model.cab);
+  } else {
+    choice.colorId = id;
   }
 
   advance();
@@ -763,6 +1083,7 @@ function finish() {
      the loading photo into it, and a hidden node has no box. Do not reorder. */
   syncMapBadgeFromChoice(choice);
   syncBadgeFromChoice(choice);
+  syncColorBadgeFromChoice(choice);
   settle(choice);
 
   /* Fire listeners on the NEXT frame, after the browser has painted the closed
@@ -781,21 +1102,22 @@ function finish() {
 /**
  * Open the selector.
  *
- * `flow` picks WHICH steps run. All three resolve the same complete shape, so
+ * `flow` picks WHICH steps run. All four resolve the same complete shape, so
  * callers never branch on it:
- *   'full'  (default) cenário → fabricante → modelo
- *   'map'   cenário only; the current truck is carried through unchanged
- *   'truck' fabricante → modelo; the current cenário is carried through
+ *   'full'  (default) cenário → fabricante → modelo → cor
+ *   'map'   cenário only; the current truck and colour are carried through
+ *   'truck' fabricante → modelo → cor; the current cenário is carried through
+ *   'color' cor only; everything else is carried through
  *
  * `cancellable` defaults to false for 'full' (the first boot must produce a
  * choice) and true for the partial flows (the user already has a working
  * configuration on screen, so backing out has a sane meaning).
  *
- * @param {{ flow?: 'full'|'map'|'truck',
- *           step?: 'map'|'manufacturer'|'model',
- *           choice?: { envId: string, manufacturerId: string, modelId: string },
+ * @param {{ flow?: 'full'|'map'|'truck'|'color',
+ *           step?: 'map'|'manufacturer'|'model'|'color',
+ *           choice?: { envId, manufacturerId, modelId, colorId },
  *           cancellable?: boolean }} [opts]
- * @returns {Promise<{ envId: string, manufacturerId: string, modelId: string }|null>}
+ * @returns {Promise<{ envId, manufacturerId, modelId, colorId }|null>}
  */
 export function openSelector(opts: {
   flow?: FlowId;
@@ -887,6 +1209,16 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (session.cancellable) settle(null);
+    return;
+  }
+
+  /* Setas paginam o carrossel de cores. Só quando ele existe, e só quando o foco
+     está DENTRO do overlay: um passo sem carrossel não pode engolir as setas de
+     quem está navegando a página por trás. */
+  if (track && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      && overlay.contains(document.activeElement)) {
+    e.preventDefault();
+    setPage(pageStart + (e.key === 'ArrowLeft' ? -PER_PAGE : PER_PAGE), true);
     return;
   }
 
@@ -1030,10 +1362,48 @@ export function showMapBadge(visible: boolean) {
   mapBadge.classList.toggle('hidden', !visible);
 }
 
+/**
+ * Fill the bottom-left colour card. Pass null to hide it.
+ * @param {{ colorName?: string, hex?: string, finishLabel?: string }|null} info
+ */
+export function setColorBadge(info: ColorBadgeInfo | null) {
+  initSelector();
+  if (!info) {
+    colorBadge.classList.add('hidden');
+    return;
+  }
+
+  const hex = info.hex || '#b9bec6';
+  colorBadgeSwatch.style.setProperty('--ts-swatch', hex);
+  colorBadgeName.textContent = info.colorName || '';
+
+  const desc = [info.colorName, info.finishLabel].filter(Boolean).join(' · ');
+  colorBadge.setAttribute(
+    'aria-label',
+    info.colorName ? 'Trocar cor (atual: ' + info.colorName + ')' : 'Trocar cor',
+  );
+  colorBadge.title = desc ? 'Trocar cor · ' + desc : 'Trocar cor';
+
+  colorBadgeFilled = true;
+  colorBadge.classList.remove('hidden');
+}
+
+/** @param {boolean} visible */
+export function showColorBadge(visible: boolean) {
+  initSelector();
+  /* Mesmo motivo de showMapBadge: um card que ninguém preencheu seria uma placa
+     vazia sobre a cena. O caminho do visitante que volta não passa pelo
+     seletor, então a paleta é quem responde. */
+  if (visible && !colorBadgeFilled) {
+    syncColorBadgeFromChoice(sanitize(lastChoice || loadChoice() || defaultChoice()));
+  }
+  colorBadge.classList.toggle('hidden', !visible);
+}
+
 /* Keep the badges honest even if studio.ts forgets to refresh them: each badge is
    the trigger for its own flow, so a stale one would re-open the selector
-   preselected with the wrong truck/scene. studio.ts may still call
-   setBadge()/setMapBadge() to override. */
+   preselected with the wrong truck/scene/colour. studio.ts may still call
+   setBadge()/setMapBadge()/setColorBadge() to override. */
 function syncBadgeFromChoice(choice: Choice) {
   const man = getManufacturer(choice.manufacturerId);
   const model = man ? man.models.find((m) => m.id === choice.modelId) : null;
@@ -1054,6 +1424,16 @@ function syncMapBadgeFromChoice(choice: Choice) {
     envName: env.name,
     envSubtitle: env.subtitle,
     envThumb: env.thumb,
+  });
+}
+
+function syncColorBadgeFromChoice(choice: Choice) {
+  const color = getColor(choice.colorId);
+  if (!color) return;
+  setColorBadge({
+    colorName: color.name,
+    hex: color.hex,
+    finishLabel: FINISH_LABEL[color.finish],
   });
 }
 

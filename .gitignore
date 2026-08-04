@@ -54,8 +54,18 @@ tools/iveco-bake/ultimo-bake.log.txt
 # continua no disco e é gerado por window.__exportTrailer() no viewer; a cópia
 # de distribuição é o .zip em Downloads.
 public/models/vehicles/trailer.glb
-# e os bakes anteriores, que são backup e não fonte
-public/models/vehicles/*.glb.bak
-public/models/vehicles/*.glb.prev-*
-public/models/vehicles/*.glb.bake*
+# Bakes anteriores, em qualquer pasta de asset: são backup, não fonte. Cada
+# rodada de bake deixa um .prev/.bak do tamanho do próprio modelo (o do
+# distrito-industrial tem 36 MB), e sem isto eles reaparecem como arquivo novo
+# a cada `git status`.
+*.glb.bak
+*.glb.prev*
+*.glb.pre-*
+*.glb.bake*
+*.glb.[0-9][0-9][0-9][0-9]-*
 public/models/vehicles/trailer_old_probe.glb
+
+# Fontes cruas dos cenários (OBJ da rip que o tools/env-build consome). São
+# ENTRADA de build, do mesmo tipo que os rips em Downloads/trucks: 80 MB e
+# 950 mil linhas de texto que o app nunca serve.
+tools/env-build/_src_*/

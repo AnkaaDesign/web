@@ -56,12 +56,18 @@
    badges' way, and they are the ONLY things the responsive blocks in section 8 retune:
 
      --ts-hud-top      the .ts-mapbadge bottom edge plus a ~10px gap.
-     --ts-hud-reserve  the vertical band kept clear at the bottom for .ts-badge.
+     --ts-hud-reserve  the vertical band kept clear at the bottom for .ts-corner.
 
    .ts-mapbadge is 200px wide at top:14px and 158.4px tall (a 16:9 thumb over a two-line body
-   with explicit line-heights), so it ends at ~172.4px — hence 184px here. .ts-badge is the
-   taller card and reaches ~188.8px up from the bottom, hence 202px of reserve. Both were
-   recomputed against every breakpoint selector.css defines; see section 8.
+   with explicit line-heights), so it ends at ~172.4px — hence 184px here.
+
+   O canto de baixo deixou de ser um card só: .ts-corner empilha o badge da COR
+   sobre o do caminhão (selector.css seção 7), e medido no estúdio a pilha tem
+   233px a partir de bottom:14px, ou seja o topo dela fica a 247px do rodapé.
+   Daí 258px de reserva — os 202px de antes cobriam só o caminhão, e o HUD
+   passava 35px por cima da cor. Se um quarto card entrar naquele canto, este
+   número sobe junto; é a única ligação entre os dois arquivos.
+   Ambos recalculados contra cada breakpoint que selector.css define; ver seção 8.
 
    The `max()` floor is a safety net, not a layout: if #canvas-holder is ever shorter than
    top + reserve the calc goes negative, max-height clamps to 0 and the panel VANISHES.
@@ -73,7 +79,7 @@
 .truck-studio-root #ts-hud {
   --ts-hud-w: 200px;
   --ts-hud-top: 184px;
-  --ts-hud-reserve: 202px;
+  --ts-hud-reserve: 258px;
   --ts-hud-gutter: 14px;
 
   /* The 06:00 → 24:00 rail, on the real hour scale: 6h=0%, 12h=33%, 18h=67%, 24h=100%.
@@ -125,12 +131,23 @@
      snaps instead of animating. The -webkit- longhand is transitioned separately because in
      an engine that only understands the prefixed property the unprefixed name is not a known
      animatable property at all. Never `all`. */
+  /* As três últimas são do MODO LIMPO (#btn-chrome, core/studio.css): o painel
+     sai deslizando para a esquerda em vez de sumir num quadro. Moram aqui, e não
+     junto do resto do modo limpo, porque `transition` é uma propriedade só —
+     studio.css é carregado ANTES deste arquivo e com a mesma especificidade, então
+     uma segunda declaração lá seria descartada, e uma que vencesse levaria junto
+     as quatro linhas do vidro acima. Uma declaração, um dono.
+     A visibilidade tem duração zero e ganha o atraso no estado escondido: é ela
+     que tira o painel do foco e do ponteiro, e só depois do fade. */
   transition:
     background-color 220ms ease,
     backdrop-filter 220ms ease,
     -webkit-backdrop-filter 220ms ease,
     border-color 220ms ease,
-    box-shadow 220ms ease;
+    box-shadow 220ms ease,
+    opacity 240ms ease,
+    translate 300ms cubic-bezier(0.22, 0.7, 0.3, 1),
+    visibility 0s;
 
   /* Corner clipping for the scrolling body. The rule below hands the scroll to .ts-hud__body
      when that node exists. */
@@ -830,7 +847,11 @@
 }
 
 .truck-studio-root #ts-hud {
-  animation: ts-hud-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  /* `backwards`, nunca `both`: um valor preenchido por animação vence o valor
+     declarado, e com `both` este painel simplesmente NÃO obedecia a opacidade do
+     modo limpo (core/studio.css) — ficava parado enquanto os outros cards saíam.
+     `backwards` segura só o estado anterior ao início e depois sai do caminho. */
+  animation: ts-hud-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
 }
 
 /* ============================================================
@@ -847,13 +868,14 @@
    ============================================================ */
 
 /* .ts-mapbadge → 152px at top:10px, ~128px tall, bottom edge ~138px.
-   .ts-badge    → 168px, ~142px tall, reaching ~152px up from the bottom.
+   .ts-corner   → 168px de largura, ~142px do caminhão + 8px de vão + ~40px do
+                  card da cor, chegando a ~200px acima do rodapé de 10px.
    Three tile columns cannot hold "Ensolarado" at this width, so the grid drops to two. */
 @media (max-width: 680px) {
   .truck-studio-root #ts-hud {
     --ts-hud-w: 152px;
     --ts-hud-top: 148px;
-    --ts-hud-reserve: 164px;
+    --ts-hud-reserve: 212px;
     --ts-hud-gutter: 10px;
     border-radius: 12px;
   }
@@ -876,7 +898,8 @@
   .truck-studio-root #ts-hud {
     --ts-hud-w: 172px;
     --ts-hud-top: 158px;
-    --ts-hud-reserve: 178px;
+    /* 178px cobriam só o caminhão; a pilha ganhou o card da cor (~39px + 8 de vão). */
+    --ts-hud-reserve: 225px;
     --ts-hud-gutter: 10px;
   }
   .truck-studio-root .ts-hud__head { padding: 8px 9px; }
@@ -898,7 +921,8 @@
   .truck-studio-root #ts-hud {
     --ts-hud-w: 186px;
     --ts-hud-top: 74px;
-    --ts-hud-reserve: 166px;
+    /* Aqui o card da cor mantém o tamanho base (~47px) e o vão de 10px. */
+    --ts-hud-reserve: 223px;
     --ts-hud-gutter: 10px;
   }
   .truck-studio-root .ts-hud__head { padding: 7px 9px; }

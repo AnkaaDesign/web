@@ -1,42 +1,54 @@
-/* The studio's own markup — a verbatim port of truck-studio/webapp/index.html's
-   <body>, minus the <script> tags (Vite owns module loading here).
+/* The studio's own markup.
 
    The engine builds and owns this DOM (see core/dom.ts); React only hosts the
-   container. Keeping the ids/classes identical to the standalone app means
-   every engine module (scene/models/livery/ui) works untouched, and upstream
-   changes to the standalone app still apply cleanly.
+   container. Keeping the ids/classes stable is what lets every engine module
+   (scene/models/livery/ui) bind by id without knowing where the node lives.
 
-   The 3-step selector overlay (#ts-selector) and the bottom-left badge
-   (#ts-badge) are deliberately NOT here: ui/selector.ts builds and injects them
-   itself, because their markup is data-driven (one card per manifest entry). */
+   The selector overlay (#ts-selector) and the viewport badges (#ts-badge,
+   #ts-mapbadge, #ts-colorbadge) are deliberately NOT here: ui/selector.ts builds
+   and injects them itself, because their markup is data-driven (one card per
+   manifest entry).
+
+   NÃO EXISTE MAIS SIDEBAR. A coluna da direita carregava duas coisas, e as duas
+   mudaram de lugar:
+   - PINTURA virou um passo do seletor (ui/selector.ts): cards com o cavalo
+     renderizado em 3D, um por cor da paleta (catalog/colors.ts). Uma cor é uma
+     coisa que se ESCOLHE olhando, não oito sliders;
+   - DESIGN DO IMPLEMENTO virou três cards flutuando sobre o render
+     (#ts-panels), com as mesmas prévias vivas de antes. Clicar abre o mesmo
+     editor grande, que agora é o único lugar onde o desenho das laterais e da
+     traseira se mexe — e é lá que mora o "pintar o implemento", porque é uma
+     decisão sobre o IMPLEMENTO e não sobre o cavalo.
+   Com isso o render ocupa a largura inteira, que é o assunto da tela. */
 export const STUDIO_HTML = /* html */ `
   <div id="app">
     <!-- 3D VIEWPORT -->
     <section id="viewport">
-      <header id="topbar">
-        <div class="brand">
-          <span class="logo-dot"></span>
-          <div>
-            <h1>Truck Studio</h1>
-            <p id="brand-sub">Cavalo mecânico · Frigorífico Paleteiro</p>
-          </div>
-        </div>
-        <div class="top-actions">
-          <label class="chk"><input type="checkbox" id="show-cab" checked /><span>Cabine</span></label>
-          <label class="chk"><input type="checkbox" id="show-trailer" checked /><span>Implemento</span></label>
-        </div>
-      </header>
+      <!-- NÃO EXISTE MAIS TOPBAR. Ela carregava a marca, a linha de estado e os
+           dois checkboxes de visibilidade, e tomava ~56 px da altura do render
+           em todas as telas. O render é o produto; uma barra de identidade em
+           cima dele é o app se apresentando para si mesmo.
+           Os checkboxes foram embora de vez: eram um atalho de depuração
+           ("some com a cabine"), não uma escolha de configuração, e escondiam
+           metade do veículo sem nada na tela dizendo por quê.
+           A linha de estado sobrevive INVISÍVEL logo abaixo — ver #status. -->
       <div id="canvas-holder">
         <!-- VIEW CONTROLS — enquadrar / girar / capturar.
              Ficam DENTRO de #canvas-holder, no canto superior direito, e não na
              topbar: são ações sobre a CENA, e o lugar onde o olho já está é o
              render, não a barra. O canto esquerdo é do HUD de iluminação e dos
-             dois badges do seletor, então a direita é a metade livre.
+             badges do seletor.
              Os ids são os mesmos de quando isto morava na topbar — ui/sidebar.ts
              liga por id e não precisou mudar.
              Ícones: SVG inline, 24x24, traço em currentColor, mesma convenção
              de ui/hud.ts (nunca emoji: a plataforma escolheria a fonte e o
              glifo não seguiria a cor nem combinaria com o resto). -->
+        <!-- A linha de estado, agora só para leitor de tela. Ela é escrita de
+             cinco lugares (carga, captura, erro, troca de cor, pintura do
+             implemento) e é a única confirmação textual de que algo terminou —
+             então some da tela, não do documento. role=status + aria-live
+             anunciam a mudança sem ocupar um pixel. -->
+        <span id="status" class="ts-sr" role="status" aria-live="polite">Carregando…</span>
         <div id="view-controls" role="group" aria-label="Controles de visualização">
           <button id="btn-reset" class="ts-vbtn" type="button" title="Enquadrar o veículo"
                   aria-label="Enquadrar o veículo">
@@ -57,6 +69,24 @@ export const STUDIO_HTML = /* html */ `
               <path d="M20.4 4.2v3.6h-3.6"/>
             </svg>
           </button>
+          <!-- Esconder a interface. Recolhe TUDO que flutua sobre o render —
+               badges de cenário, caminhão e cor, HUD de luz, cards de design e a
+               dica — e deixa só a cena. Existe porque esta tela é usada para
+               olhar o caminhão e para mostrá-lo a alguém, e nesses dois momentos
+               a interface é justamente o que sobra.
+               Os próprios view controls FICAM: um botão que se esconde junto não
+               teria como ser desfeito a não ser adivinhando onde clicar. (A
+               captura em alta resolução nunca teve esse problema — ela
+               re-renderiza a cena 3D, e nenhum overlay de DOM entra nela.) -->
+          <button id="btn-chrome" class="ts-vbtn" type="button" title="Esconder a interface"
+                  aria-label="Esconder a interface" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <path d="M2.6 12S6.4 5.6 12 5.6 21.4 12 21.4 12 17.6 18.4 12 18.4 2.6 12 2.6 12Z"/>
+              <circle cx="12" cy="12" r="2.9"/>
+            </svg>
+          </button>
           <button id="btn-shot" class="ts-vbtn" type="button" title="Baixar imagem"
                   aria-label="Baixar imagem da cena">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
@@ -68,6 +98,47 @@ export const STUDIO_HTML = /* html */ `
             </svg>
           </button>
         </div>
+
+        <!-- DESIGN DO IMPLEMENTO — os três painéis pintáveis, um card cada.
+             Mesmo material dos badges do seletor (vidro sobre o render), do lado
+             oposto da tela, porque são a mesma classe de objeto: um cartão que
+             MOSTRA o que está configurado e ABRE onde se muda aquilo.
+             Cada card é um <button> para ganhar Enter/Espaço, foco e ordem de
+             tabulação de graça — e mantém .preview-card + data-surface,
+             que é por onde vehicle/livery.ts liga o clique.
+             Os <canvas> continuam com as MESMAS ids e os mesmos tamanhos de
+             buffer: livery.ts os resolve na avaliação do módulo, então eles têm
+             de existir AQUI, e não serem criados por JS depois. -->
+        <div id="ts-panels" role="group" aria-label="Design do implemento">
+          <button type="button" class="ts-panel ts-panel--rear preview-card" data-surface="rear"
+                  title="Editar as portas traseiras">
+            <span class="ts-panel__media square"><canvas id="prev-rear" width="300" height="300"></canvas></span>
+            <span class="ts-panel__body">
+              <span class="ts-panel__label">Portas</span>
+              <span class="ts-panel__name">Traseira</span>
+            </span>
+            <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+          </button>
+          <button type="button" class="ts-panel preview-card" data-surface="left"
+                  title="Editar a lateral esquerda">
+            <span class="ts-panel__media"><canvas id="prev-left" width="600" height="101"></canvas></span>
+            <span class="ts-panel__body">
+              <span class="ts-panel__label">Lateral</span>
+              <span class="ts-panel__name">Esquerda</span>
+            </span>
+            <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+          </button>
+          <button type="button" class="ts-panel preview-card" data-surface="right"
+                  title="Editar a lateral direita">
+            <span class="ts-panel__media"><canvas id="prev-right" width="600" height="101"></canvas></span>
+            <span class="ts-panel__body">
+              <span class="ts-panel__label">Lateral</span>
+              <span class="ts-panel__name">Direita</span>
+            </span>
+            <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+          </button>
+        </div>
+
         <div id="loading">
           <div class="spinner"></div>
           <div class="load-text" id="load-text">Carregando modelos…</div>
@@ -93,125 +164,6 @@ export const STUDIO_HTML = /* html */ `
         <div id="view-hint">Arraste para girar · scroll para zoom · botão direito para mover</div>
       </div>
     </section>
-
-    <!-- SIDEBAR -->
-    <aside id="sidebar">
-
-
-      <!-- Pintura -->
-      <section class="panel">
-        <h3 class="panel-title">
-          <span>Pintura</span>
-          <b class="panel-hint" id="paint-finish-label"></b>
-        </h3>
-
-        <div class="seg" id="paint-finish" role="group" aria-label="Acabamento">
-          <button class="seg-btn" data-finish="solid" title="Cor lisa com verniz — sem flocos">Sólida</button>
-          <button class="seg-btn on" data-finish="metallic" title="Flocos de alumínio na tinta">Metálica</button>
-          <button class="seg-btn" data-finish="pearl" title="Mica: a cor muda com o ângulo">Perolizada</button>
-        </div>
-
-        <label class="ctl">
-          <span>Cor base</span>
-          <input type="color" id="paint-color" value="#b9bec6" />
-        </label>
-        <label class="ctl range">
-          <span>Brilho do verniz <b id="cc-gloss-val"></b></span>
-          <input type="range" id="paint-cc-gloss" min="0" max="100" value="90"
-                 title="Nitidez do reflexo do verniz (clearcoat)" />
-        </label>
-        <label class="ctl range">
-          <span>Casca de laranja <b id="peel-val"></b></span>
-          <input type="range" id="paint-peel" min="0" max="100" value="12"
-                 title="Ondulação microscópica real do verniz — 0 % é um espelho perfeito, irreal" />
-        </label>
-
-        <div class="paint-group" data-finish="metallic">
-          <label class="ctl range">
-            <span>Intensidade metálica <b id="metallic-val"></b></span>
-            <input type="range" id="paint-metallic" min="0" max="100" value="72" />
-          </label>
-          <label class="ctl range">
-            <span>Flop (claro/escuro) <b id="flop-val"></b></span>
-            <input type="range" id="paint-flop" min="0" max="100" value="65"
-                   title="Clareia de frente e escurece de lado — a assinatura da tinta metálica" />
-          </label>
-        </div>
-
-        <div class="paint-group" data-finish="pearl">
-          <label class="ctl">
-            <span>Cor do reflexo</span>
-            <input type="color" id="paint-pearl-color" value="#d8c7a8"
-                   title="Cor que aparece nos ângulos rasantes (flop)" />
-          </label>
-          <label class="ctl range">
-            <span>Intensidade do perolizado <b id="pearl-val"></b></span>
-            <input type="range" id="paint-pearl" min="0" max="100" value="62" />
-          </label>
-          <label class="ctl range">
-            <span>Nitidez da transição <b id="pearl-sharp-val"></b></span>
-            <input type="range" id="paint-pearl-sharp" min="0" max="100" value="45" />
-          </label>
-        </div>
-
-        <div class="paint-group" data-finish="metallic pearl">
-          <label class="ctl range">
-            <span>Tamanho dos flocos <b id="flake-size-val"></b></span>
-            <input type="range" id="paint-flake-size" min="0" max="100" value="38" />
-          </label>
-          <label class="ctl range">
-            <span>Brilho dos flocos <b id="flake-glint-val"></b></span>
-            <input type="range" id="paint-flake-glint" min="0" max="100" value="55" />
-          </label>
-          <label class="ctl">
-            <span>Cor dos flocos</span>
-            <input type="color" id="paint-flake-color" value="#ffffff"
-                   title="Tinge o brilho dos flocos (ex.: vermelho com flocos dourados)" />
-          </label>
-        </div>
-
-        <label class="chk wide-chk">
-          <input type="checkbox" id="paint-trailer" />
-          <span>Aplicar ao implemento</span>
-        </label>
-      </section>
-
-      <!-- Design do implemento -->
-      <section class="panel">
-        <h3 class="panel-title">Design do implemento</h3>
-        <div class="preview-card" data-surface="left" title="Clique para editar">
-          <div class="preview-frame">
-            <canvas id="prev-left" width="600" height="150"></canvas>
-          </div>
-          <div class="preview-foot">
-            <span>Lateral esquerda</span>
-            <button class="mini primary btn-edit" data-surface="left">Editar</button>
-          </div>
-        </div>
-        <div class="preview-card" data-surface="right" title="Clique para editar">
-          <div class="preview-frame">
-            <canvas id="prev-right" width="600" height="150"></canvas>
-          </div>
-          <div class="preview-foot">
-            <span>Lateral direita</span>
-            <button class="mini primary btn-edit" data-surface="right">Editar</button>
-          </div>
-        </div>
-        <div class="preview-card" data-surface="rear" title="Clique para editar">
-          <div class="preview-frame square">
-            <canvas id="prev-rear" width="300" height="300"></canvas>
-          </div>
-          <div class="preview-foot">
-            <span>Traseira <small>(portas)</small></span>
-            <button class="mini primary btn-edit" data-surface="rear">Editar</button>
-          </div>
-        </div>
-      </section>
-
-      <div class="side-foot">
-        <span id="status">Carregando…</span>
-      </div>
-    </aside>
   </div>
 
   <!-- LARGE LIVERY EDITOR MODAL -->
@@ -242,17 +194,43 @@ export const STUDIO_HTML = /* html */ `
         <label class="tb-ctl"><span>Traço</span><input type="range" id="brush" min="2" max="60" value="14" /></label>
         <label class="tb-ctl"><span>Fundo</span><input type="color" id="bgcolor" value="#ffffff" />
           <button class="mini ghost" id="bg-clear" title="Voltar ao alumínio original">×</button></label>
+        <span class="tb-sep"></span>
+        <!-- "Pintar o implemento" mora AQUI, e não junto da escolha de cor: a cor
+             é do cavalo, e estendê-la ao baú é uma decisão sobre o IMPLEMENTO —
+             tomada olhando para o painel que vai receber a tinta.
+             Ligado, o fundo BRANCO das telas sai (o branco é o baú, e ele
+             esconderia a tinta por cima): é assim que o branco passa a refletir
+             a cor escolhida para o cavalo. Ver livery.ts→setBackgroundsForPaint()
+             e models.ts→setPaintTarget(). -->
+        <label class="tb-ctl tb-chk" title="Estende a pintura do cavalo às laterais, à traseira e à frente do baú">
+          <input type="checkbox" id="paint-trailer" />
+          <span>Pintar o implemento com a cor do cavalo</span>
+        </label>
       </div>
 
+      <!-- A tela de desenho fica DENTRO da foto do painel de verdade, e por
+           BAIXO dela: as fotos (models/vehicles/panels/*.png) têm o painel
+           vazado, então o que se vê pela janela é a arte, e o que fica por cima
+           é a estrutura — frisos, dobradiças, a borracha central das portas. É
+           isso que faz um texto atravessado pela borracha aparecer cortado aqui
+           igual ao que vai acontecer no baú.
+           .panel-window existe porque o fabric EMBRULHA o canvas num
+           .canvas-container que ele mesmo posiciona: pôr a janela nesse nó
+           seria disputar o style dele a cada resize. O wrapper é nosso, ele
+           mora dentro.
+           2048x344: a janela da lateral tem razão ~5,95 (medida na própria
+           foto por vehicle/livery.ts). Com a antiga 4:1 a tela era esticada ao
+           virar textura e um círculo desenhado aqui saía oval no caminhão. A
+           traseira segue quadrada — a janela dela mede 0,99. -->
       <div class="modal-stage" id="modal-stage">
         <div class="stage-panel" id="stage-left">
-          <canvas id="fabric-left" width="2048" height="512"></canvas>
+          <div class="panel-window"><canvas id="fabric-left" width="2048" height="344"></canvas></div>
         </div>
         <div class="stage-panel hidden" id="stage-right">
-          <canvas id="fabric-right" width="2048" height="512"></canvas>
+          <div class="panel-window"><canvas id="fabric-right" width="2048" height="344"></canvas></div>
         </div>
         <div class="stage-panel hidden" id="stage-rear">
-          <canvas id="fabric-rear" width="1024" height="1024"></canvas>
+          <div class="panel-window"><canvas id="fabric-rear" width="1024" height="1024"></canvas></div>
         </div>
         <div id="drop-hint">Solte a imagem para adicionar</div>
       </div>

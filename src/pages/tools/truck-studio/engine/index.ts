@@ -14,8 +14,11 @@
      scene/      the world around it — renderer/rig/ground (scene), and the
                  pieces split out of it: textures, sky, lamps, presets, plate.
                  Plus environment (HDRI scenes), scatter and weather.
-     ui/         the DOM chrome: sidebar, the 3-step selector, the loading
-                 curtain and the lighting HUD. Each ships its own stylesheet.
+     ui/         the DOM chrome: the topbar/view controls (chrome), the card
+                 selector — cenário, fabricante, modelo e COR —, the offscreen
+                 renderer that draws the cabs onto those cards (preview), the
+                 loading curtain and the lighting HUD. Each ships its own
+                 stylesheet.
 
    This file replaces the hand-written engine/main.d.ts the port shipped: the
    engine is TypeScript now, so its types are derived, not restated. */

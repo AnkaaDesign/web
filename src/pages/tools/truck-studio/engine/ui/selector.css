@@ -225,6 +225,109 @@
   --ts-media-ratio: 3 / 2;
   max-width: 876px;
 }
+.truck-studio-root .ts-cards--colors {
+  --ts-media-ratio: 16 / 10;
+  max-width: 1040px;
+}
+
+/* ---------- CARROSSEL ----------
+   Ligado pelo JS (ui/selector.ts) nos passos cuja lista é longa: doze cores,
+   seis marcas. Doze — ou seis — cards de uma vez viram uma parede, e o olho
+   compara duas ou três coisas, não doze. Três por vez, grandes, e as setas
+   andam de três em três.
+   O layout é a régua: [seta] [janela] [seta]. Os cards moram numa trilha que
+   desliza dentro da janela, e é por isso que a troca ANIMA em vez de piscar —
+   um grid refeito a cada página não teria de onde animar.
+   Vem depois dos modificadores de grid de propósito: mesma especificidade
+   (0,2,0), então quem decide entre `grid` e `flex` é a ordem. */
+.truck-studio-root .ts-cards--carousel {
+  --ts-gap: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.truck-studio-root .ts-carousel__win {
+  /* min-width:0 é o que impede a janela de ser empurrada pela largura do próprio
+     conteúdo (a trilha tem doze cards) e estourar o overlay. */
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Recorte da janela. O padding vertical é para a sombra/anel de seleção do
+     card não sair cortado no topo e na base — `overflow:hidden` corta tudo,
+     inclusive o outline, que fica FORA da caixa de borda. */
+  padding: 6px 0;
+  margin: -6px 0;
+  overflow: hidden;
+}
+.truck-studio-root .ts-carousel__track {
+  display: flex;
+  gap: var(--ts-gap);
+  /* Um passo = um card + um vão. Em porcentagem da própria trilha, porque é ela
+     que tem a largura da janela: (100% − 2 vãos)/3 + 1 vão. --ts-page é escrito
+     pelo JS como um número puro. */
+  transform: translateX(calc(
+    var(--ts-page, 0) * -1 * ((100% - 2 * var(--ts-gap)) / 3 + var(--ts-gap))
+  ));
+  transition: transform 380ms cubic-bezier(0.22, 0.7, 0.3, 1);
+  will-change: transform;
+}
+/* Primeira pintura: posiciona sem deslizar (ver setPage). */
+.truck-studio-root .ts-carousel__track.is-instant { transition: none; }
+.truck-studio-root .ts-carousel__track > .ts-card {
+  flex: 0 0 calc((100% - 2 * var(--ts-gap)) / 3);
+}
+/* Fora da janela. Só opacidade — o card CONTINUA no fluxo, senão a trilha
+   encolhe e a conta do passo deixa de fechar. O ponteiro é desligado junto com
+   o tabIndex que o JS já zera: um clique na borda de um card meio cortado
+   escolheria uma cor que o usuário não está vendo. */
+.truck-studio-root .ts-carousel__track > .ts-card.is-offscreen {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 380ms ease;
+}
+
+/* As setas usam o mesmo vidro dos view controls e do HUD: são controles
+   flutuando sobre a mesma superfície escura do overlay, e um botão sólido aqui
+   leria como um terceiro material. */
+.truck-studio-root .ts-carousel__nav {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--stroke-2);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  background-color: rgba(8, 10, 14, 0.42);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease, opacity 0.18s ease;
+}
+.truck-studio-root .ts-carousel__nav:hover {
+  background-color: rgba(8, 10, 14, 0.66);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+.truck-studio-root .ts-carousel__nav:focus-visible {
+  border-color: var(--stroke-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Ponta da lista. Some da ordem de tabulação junto (o atributo `disabled` faz
+   isso sozinho) e para de responder ao ponteiro, para o hover não acender um
+   botão que não faz nada. */
+.truck-studio-root .ts-carousel__nav:disabled {
+  opacity: 0.28;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-carousel__track { transition: none; }
+  .truck-studio-root .ts-carousel__track > .ts-card.is-offscreen { transition: none; }
+}
 
 /* ============================================================
    5. Card
@@ -356,6 +459,74 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* ---------- miniatura 3D (ui/preview.ts) ----------
+   O render vem com FUNDO TRANSPARENTE, então é `contain` e nunca `cover`: um
+   caminhão cortado nas rodas para preencher a moldura é exatamente o que uma
+   foto de catálogo não pode fazer. O padding tira a sensação de aperto que
+   `contain` dá quando a silhueta encosta na borda. */
+.truck-studio-root .ts-card__img--render {
+  padding: 4px 6px;
+  object-fit: contain;
+  object-position: center;
+  /* Uma sombra macia debaixo do veículo: sem chão, o render flutuaria no card.
+     drop-shadow segue o ALFA da imagem, então acompanha a silhueta e não a
+     caixa. */
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+}
+
+/* Card de cor: um ESTÚDIO NEUTRO, igual para as doze cores.
+   Pintar a moldura da própria cor (a primeira versão fazia isso) transformava o
+   passo numa cartela de tinta: doze retângulos chapados brigando entre si, cada
+   um mudando a cor que o olho enxerga no vizinho. O assunto do card é o
+   caminhão pintado; o fundo é onde ele está de pé.
+   O halo claro no alto e a sombra elíptica embaixo são o que dão chão ao render
+   — ele vem com fundo transparente, e sem isso ficaria boiando. */
+.truck-studio-root .ts-card__media--color {
+  background:
+    radial-gradient(58% 16% at 50% 88%, rgba(0, 0, 0, 0.38), transparent 72%),
+    radial-gradient(120% 96% at 50% 6%, rgba(255, 255, 255, 0.13), transparent 68%),
+    linear-gradient(180deg, #2d323d, #1e222c 62%, #171a22);
+}
+/* A amostra da cor pura, no canto da moldura. Pequena de propósito: ela
+   IDENTIFICA (é a cor do catálogo, sem luz de estúdio por cima), não decora.
+   O anel branco e a sombra a separam tanto de um fundo claro quanto de um
+   escuro — um chip preto sobre estúdio escuro sumiria. */
+.truck-studio-root .ts-card__swatch {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(0, 0, 0, 0.16)),
+    var(--ts-swatch, var(--panel-2));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+/* Enquanto o render está na fila. Uma barra fina varrendo a borda de baixo, não
+   um spinner: o card JÁ mostra a cor certa, então isto é "está chegando mais",
+   não "está vazio". */
+.truck-studio-root .ts-card__media.is-rendering::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 38%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  animation: ts-render-sweep 1.1s ease-in-out infinite;
+}
+@keyframes ts-render-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-card__media.is-rendering::after { animation: none; opacity: 0.5; }
 }
 
 /* Logos are CONTAINED, never covered: a cropped or edge-bleeding manufacturer mark is
@@ -522,7 +693,8 @@
    grey bevel over --panel: appearance/font-family/color/text-align all have to be
    re-stated here. */
 .truck-studio-root .ts-badge,
-.truck-studio-root .ts-mapbadge {
+.truck-studio-root .ts-mapbadge,
+.truck-studio-root .ts-colorbadge {
   position: absolute;
   left: 14px;
   z-index: 8;
@@ -587,7 +759,8 @@
    than just getting darker. The accent border stays — unlike the HUD these cards are
    buttons, and the accent edge is what says so. */
 .truck-studio-root .ts-badge:hover,
-.truck-studio-root .ts-mapbadge:hover {
+.truck-studio-root .ts-mapbadge:hover,
+.truck-studio-root .ts-colorbadge:hover {
   border-color: var(--accent);
   background-color: rgba(8, 10, 14, 0.66);
   backdrop-filter: blur(20px) saturate(1.25);
@@ -604,11 +777,13 @@
    plain test would have wrongly demoted a browser that blurs perfectly well. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .truck-studio-root .ts-badge,
-  .truck-studio-root .ts-mapbadge {
+  .truck-studio-root .ts-mapbadge,
+  .truck-studio-root .ts-colorbadge {
     background-color: rgba(10, 13, 19, 0.92);
   }
   .truck-studio-root .ts-badge:hover,
-  .truck-studio-root .ts-mapbadge:hover {
+  .truck-studio-root .ts-mapbadge:hover,
+  .truck-studio-root .ts-colorbadge:hover {
     background-color: rgba(10, 13, 19, 0.97);
   }
 }
@@ -618,29 +793,135 @@
    rule .ts-card follows. `outline` is not clipped by the `overflow:hidden` above,
    because an element's own outline is painted outside its border box. */
 .truck-studio-root .ts-badge:focus-visible,
-.truck-studio-root .ts-mapbadge:focus-visible {
+.truck-studio-root .ts-mapbadge:focus-visible,
+.truck-studio-root .ts-colorbadge:focus-visible {
   border-color: var(--stroke-2);
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .truck-studio-root .ts-badge:focus:not(:focus-visible),
-.truck-studio-root .ts-mapbadge:focus:not(:focus-visible) { outline: none; }
+.truck-studio-root .ts-mapbadge:focus:not(:focus-visible),
+.truck-studio-root .ts-colorbadge:focus:not(:focus-visible) { outline: none; }
 
 /* ---------- per-badge anchor, size and entry ----------
    Source order matters here: these re-declare --ts-badge-* at the same (0,2,0)
    specificity as the shared rule above, so they must stay BELOW it. */
 
+/* 200px nos três cards da esquerda — e o HUD de iluminação tem os mesmos 200px
+   (ui/hud.css). Eles ficam empilhados na mesma coluna, um sob o outro: larguras
+   diferentes ali leem como desalinhamento, não como hierarquia.
+   `backwards` e não `both`: com `both` a animação de entrada CONTINUA valendo
+   depois de terminar, e um valor preenchido por animação vence o valor
+   declarado — era por isso que este card e o do cenário não desapareciam junto
+   com os outros no modo limpo (core/studio.css). Com `backwards` a animação só
+   segura o estado ANTES de começar, e depois some do caminho. */
 .truck-studio-root .ts-badge {
-  --ts-badge-w: 220px;
+  --ts-badge-w: 200px;
   --ts-badge-radius: 12px;
   bottom: 14px;
-  animation: ts-badge-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  animation: ts-badge-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
 }
 .truck-studio-root .ts-mapbadge {
   --ts-badge-w: 200px;
   --ts-badge-radius: 12px;
   top: 14px;
-  animation: ts-mapbadge-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  animation: ts-mapbadge-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
+}
+
+/* ---------- canto inferior esquerdo: cor EM CIMA do caminhão ----------
+   Os dois viram uma pilha, e a pilha é que é ancorada. Empilhar por número
+   (`bottom: 198px` na cor) exigiria recalcular a altura do card do caminhão em
+   cada media query — e errar por 4px em qualquer uma delas encosta um card no
+   outro. O flex resolve isso de graça e continua certo se o badge do caminhão
+   mudar de tamanho.
+   Consequência: dentro da pilha os dois cards deixam de se posicionar sozinhos,
+   e é isso que as duas regras abaixo dizem. Ficam DEPOIS das regras por badge de
+   propósito — mesma especificidade, a ordem é o desempate. */
+.truck-studio-root .ts-corner {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.truck-studio-root .ts-corner > .ts-badge,
+.truck-studio-root .ts-corner > .ts-colorbadge {
+  position: static;
+}
+
+.truck-studio-root .ts-colorbadge {
+  --ts-badge-w: 200px;
+  --ts-badge-radius: 12px;
+  /* Deitado, não em coluna: este card não tem miniatura para mostrar — a
+     amostra é um quadrado, e o caminhão colorido já está na tela atrás dele.
+     Empilhar amostra e texto daria a ele o peso visual do card do caminhão. */
+  flex-direction: row;
+  align-items: center;
+  animation: ts-badge-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
+}
+.truck-studio-root .ts-colorbadge__swatch {
+  flex: none;
+  width: 44px;
+  align-self: stretch;
+  border-right: 1px solid var(--stroke);
+  /* O mesmo verniz do card de cor, em miniatura: reflexo em cima, sombra
+     embaixo. Uma chapa lisa leria como um retângulo de UI, não como tinta. */
+  background:
+    radial-gradient(120% 90% at 50% 10%, rgba(255, 255, 255, 0.26), transparent 60%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.3)),
+    var(--ts-swatch, var(--panel-2));
+}
+.truck-studio-root .ts-colorbadge__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  /* A direita reserva a coluna da pílula "Trocar". */
+  padding: 8px 58px 9px 10px;
+}
+.truck-studio-root .ts-colorbadge__label {
+  font-size: 9.5px; font-weight: 700; line-height: 1.2;
+  letter-spacing: 0.11em; text-indent: 0.11em; text-transform: uppercase;
+  color: var(--muted);
+}
+.truck-studio-root .ts-colorbadge__name {
+  font-size: 12.5px; font-weight: 700; line-height: 1.25;
+  letter-spacing: 0.01em; color: var(--text);
+  /* Nome de tinta vem de catálogo que não é nosso: um longo não pode quebrar o
+     card em duas linhas e empurrar a pilha por cima do render. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Mesma pílula "Trocar" dos outros dois, no lugar que sobra num card deitado.
+   ::after e não um nó: nada aqui é clicável por conta própria — o card é o
+   botão. */
+.truck-studio-root .ts-colorbadge::after {
+  content: "Trocar";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  z-index: 2;
+  padding: 4px 9px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 7px;
+  background: rgba(13, 16, 23, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text);
+  font-size: 10.5px; font-weight: 600; line-height: 1;
+  white-space: nowrap;
+  translate: 0 -50%;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.truck-studio-root .ts-colorbadge:hover::after,
+.truck-studio-root .ts-colorbadge:focus-visible::after {
+  opacity: 1;
+  background: rgba(13, 16, 23, 0.92);
+  border-color: var(--accent);
 }
 
 /* ---------- truck badge internals ---------- */
@@ -950,6 +1231,10 @@
   .truck-studio-root .ts-cards--maps { max-width: 738px; }
   .truck-studio-root .ts-cards--brands,
   .truck-studio-root .ts-cards--models { max-width: 578px; }
+  /* O carrossel continua com TRÊS por página em toda largura — é a régua do
+     passo, não um efeito do espaço disponível. O que encolhe é o card. */
+  .truck-studio-root .ts-cards--colors { max-width: 720px; }
+  .truck-studio-root .ts-cards--carousel { --ts-gap: 14px; }
   .truck-studio-root .ts-sel-title { font-size: 20px; }
 }
 
@@ -965,6 +1250,15 @@
   .truck-studio-root .ts-cards--brands,
   .truck-studio-root .ts-cards--models { max-width: 420px; }
   .truck-studio-root .ts-cards--brands { --ts-media-ratio: 16 / 9; }
+  /* O carrossel sobrevive à tela estreita: três cards pequenos ainda comparam
+     melhor do que uma coluna de doze rolando. Só as setas e o vão encolhem.
+     A regra genérica acima (`grid-template-columns: 1fr` em .ts-cards) não o
+     atinge: este é um flex container, e a propriedade simplesmente não se
+     aplica. */
+  .truck-studio-root .ts-cards--colors { max-width: 460px; --ts-media-ratio: 4 / 3; }
+  .truck-studio-root .ts-cards--carousel { --ts-gap: 10px; gap: 8px; }
+  .truck-studio-root .ts-carousel__nav { width: 32px; height: 32px; }
+  .truck-studio-root .ts-card__swatch { width: 20px; height: 20px; left: 7px; bottom: 7px; }
   .truck-studio-root .ts-step__label { display: none; }
   .truck-studio-root .ts-step + .ts-step::before { width: 26px; }
   .truck-studio-root .ts-sel-title { font-size: 18px; }
@@ -979,6 +1273,9 @@
   .truck-studio-root .ts-cards--brands,
   .truck-studio-root .ts-cards--models { max-width: 420px; }
   .truck-studio-root .ts-cards--brands { --ts-media-ratio: 16 / 9; }
+  .truck-studio-root .ts-cards--colors { max-width: 460px; --ts-media-ratio: 4 / 3; }
+  .truck-studio-root .ts-cards--carousel { --ts-gap: 10px; gap: 8px; }
+  .truck-studio-root .ts-carousel__nav { width: 32px; height: 32px; }
 }
 
 /* Both badges live in #canvas-holder. We do not own studio.css and must not turn that
@@ -989,6 +1286,15 @@
    left-anchored, so the only casualty is how close the truck badge gets to the
    centre-anchored #view-hint strip; the widths below keep a gap at every real width. */
 @media (max-width: 680px) {
+  .truck-studio-root .ts-corner { left: 10px; bottom: 10px; gap: 8px; }
+  .truck-studio-root .ts-colorbadge {
+    --ts-badge-w: 168px;
+    --ts-badge-radius: 10px;
+  }
+  .truck-studio-root .ts-colorbadge__swatch { width: 36px; }
+  .truck-studio-root .ts-colorbadge__body { padding: 7px 52px 8px 9px; }
+  .truck-studio-root .ts-colorbadge__name { font-size: 11.5px; }
+  .truck-studio-root .ts-colorbadge::after { opacity: 1; }
   .truck-studio-root .ts-badge,
   .truck-studio-root .ts-mapbadge {
     left: 10px;
@@ -1018,6 +1324,10 @@
    Placed AFTER the width block on purpose — where both match, the height constraint is
    the one actually about to break the layout. */
 @media (max-height: 620px) {
+  .truck-studio-root .ts-corner { left: 10px; bottom: 10px; gap: 8px; }
+  .truck-studio-root .ts-colorbadge { --ts-badge-w: 190px; }
+  .truck-studio-root .ts-colorbadge__swatch { width: 38px; }
+  .truck-studio-root .ts-colorbadge__body { padding: 6px 54px 7px 9px; }
   .truck-studio-root .ts-badge,
   .truck-studio-root .ts-mapbadge { left: 10px; }
   .truck-studio-root .ts-badge { --ts-badge-w: 190px; bottom: 10px; }
@@ -1079,7 +1389,8 @@
 @media (prefers-reduced-motion: reduce) {
   .truck-studio-root .ts-selector.is-open .ts-cards > .ts-card,
   .truck-studio-root .ts-badge,
-  .truck-studio-root .ts-mapbadge {
+  .truck-studio-root .ts-mapbadge,
+  .truck-studio-root .ts-colorbadge {
     animation: none;
   }
   .truck-studio-root .ts-selector__inner { translate: none; }
@@ -1102,9 +1413,11 @@
   .truck-studio-root .ts-btn,
   .truck-studio-root .ts-badge,
   .truck-studio-root .ts-mapbadge,
+  .truck-studio-root .ts-colorbadge,
   .truck-studio-root .ts-badge__change,
   .truck-studio-root .ts-mapbadge__change,
-  .truck-studio-root .ts-mapbadge::after {
+  .truck-studio-root .ts-mapbadge::after,
+  .truck-studio-root .ts-colorbadge::after {
     transition-duration: 0.01ms;
   }
 }

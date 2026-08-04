@@ -9,6 +9,7 @@
    o seletor abre antes do 3D existir, então uma falha de rede tem de degradar
    para um catálogo mínimo — mas ainda utilizável — em vez de travar o boot. */
 import { ENVIRONMENTS_DIR, TRUCK_BRANDS_DIR } from '../core/paths';
+import { getColor, defaultColorId } from './colors';
 
 /* ---------------- tipos ----------------
    Eram @typedef JSDoc; agora são o contrato de verdade que o tsc verifica. Toda
@@ -69,6 +70,8 @@ export interface EnvironmentDef {
      limites — o que NÃO pode é este normalizador descartá-los em silêncio. */
   grounded: RawBlock | null;
   nearGround: RawBlock | null;
+  /** geometria 3D real do cenário; presente → nearGround/scatter/pista saem */
+  set: RawBlock | null;
   scatter: RawBlock[];
   roadside: RawBlock[];
   shadowCatcher: RawBlock | null;
@@ -128,6 +131,8 @@ export interface Choice {
   envId: string | null;
   manufacturerId: string | null;
   modelId: string | null;
+  /** id em catalog/colors.ts — a pintura do cavalo mecânico */
+  colorId: string | null;
 }
 
 /** Uma escolha já resolvida contra o catálogo — nenhum id é nulo. */
@@ -135,6 +140,7 @@ export interface ResolvedChoice {
   envId: string;
   manufacturerId: string;
   modelId: string;
+  colorId: string;
 }
 
 export interface Catalog {
@@ -314,6 +320,11 @@ function normalizeEnvironment(input: unknown): EnvironmentDef | null {
        é uma lista branca, então um campo que não esteja aqui simplesmente
        desaparece e o recurso morre sem erro nenhum. */
     grounded: obj(raw.grounded),
+    /* Set 3D. Quando presente, environment.ts desliga o disco procedural, o
+       scatter e a pista: os três existem para simular o que o set traz de
+       verdade, e mantê-los ligados sobrepõe um asfalto CG ao asfalto modelado.
+       Cru de propósito, como os outros blocos — scene/set.ts é quem valida. */
+    set: obj(raw.set),
     /* Disco de chão CG que cobre o campo próximo — é o que o usuário realmente
        olha, então perdê-lo aqui devolveria a foto esticada e borrada de perto.
        scene/environment.ts valida e limita cada número; aqui só não pode sumir. */
@@ -557,6 +568,7 @@ export function defaultChoice(): Choice {
     envId: env ? env.id : null,
     manufacturerId: manufacturer ? manufacturer.id : null,
     modelId: model ? model.id : null,
+    colorId: defaultColorId(),
   };
 }
 
@@ -575,7 +587,18 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
   if (!found.model.available) return null;
   const env = getEnvironment(nullableStr(c.envId));
   if (!env) return null;
-  return { envId: env.id, manufacturerId: found.manufacturer.id, modelId: found.model.id };
+  /* A cor NÃO invalida a escolha quando não resolve: uma escolha gravada antes
+     de o passo da cor existir (ou apontando para uma cor que saiu da paleta)
+     ainda diz qual caminhão e qual cenário mostrar, e reabrir o seletor inteiro
+     por causa disso seria trocar um dado ausente por um usuário irritado. Cai
+     na cor padrão, que é o mesmo que um visitante novo recebe. */
+  const color = getColor(nullableStr(c.colorId));
+  return {
+    envId: env.id,
+    manufacturerId: found.manufacturer.id,
+    modelId: found.model.id,
+    colorId: color ? color.id : defaultColorId(),
+  };
 }
 
 /**

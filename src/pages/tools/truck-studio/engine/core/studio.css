@@ -31,23 +31,26 @@
 .truck-studio-root #app { display: flex; height: 100%; }
 .truck-studio-root .hidden { display: none !important; }
 
-/* ---------- viewport ---------- */
+/* ---------- viewport ----------
+   Sem topbar: o render ocupa a altura inteira. #viewport continua sendo uma
+   coluna flex porque #canvas-holder é `flex:1` e é dele que o three tira o
+   tamanho do buffer — trocar por `display:block` daria altura 0 ao holder. */
 .truck-studio-root #viewport { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.truck-studio-root #topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; border-bottom: 1px solid var(--stroke);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+
+/* Visível só para leitor de tela. A técnica é a clássica (1px recortado), e não
+   `display:none` nem `visibility:hidden`: as duas tiram o nó da árvore de
+   acessibilidade, e um aria-live que ninguém anuncia não serve para nada. */
+.truck-studio-root .ts-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
-.truck-studio-root .brand { display: flex; align-items: center; gap: 10px; }
-.truck-studio-root .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-.truck-studio-root .brand h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
-.truck-studio-root .brand p { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
-.truck-studio-root .top-actions { display: flex; gap: 8px; align-items: center; }
-.truck-studio-root .chk {
-  display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted);
-  border: 1px solid var(--stroke-2); border-radius: 9px; padding: 6px 10px; cursor: pointer; user-select: none;
-}
-.truck-studio-root .chk input { accent-color: var(--accent); }
 .truck-studio-root button { font-family: inherit; cursor: pointer; }
 .truck-studio-root .ghost,
 .truck-studio-root .primary {
@@ -233,6 +236,85 @@
   .truck-studio-root .ts-vbtn { transition: none; }
 }
 
+/* ---------- modo limpo (#btn-chrome, ui/chrome.ts) ----------
+   Recolhe tudo que flutua sobre o render. UMA lista, num lugar só: quem
+   acrescentar um overlay novo acrescenta uma linha aqui, e o botão continua
+   dizendo a verdade sem ninguém tocar no JS.
+   Os view controls NÃO entram — são a saída deste modo. As pílulas de carga
+   (#cab-switching, #ts-shot) e a cortina também não: são estado do sistema, e
+   escondê-las deixaria o estúdio parecendo travado.
+
+   Sai DESLIZANDO, cada um para a borda de onde veio: a coluna esquerda para a
+   esquerda, os cards de design para a direita, a dica para baixo. `display:none`
+   fazia tudo evaporar no mesmo quadro — o que num render vivo lê como falha de
+   desenho, não como um comando. */
+/* #ts-hud está de fora desta lista de PROPÓSITO: ui/hud.css declara a transição
+   dele (a do vidro no hover), é carregado depois deste arquivo e tem a mesma
+   especificidade — então uma segunda declaração aqui não venceria, e se
+   vencesse levaria a transição do vidro junto. O fade do HUD mora lá, na lista
+   que já existe. Os quatro abaixo não têm outro dono. */
+.truck-studio-root #ts-panels,
+.truck-studio-root .ts-corner,
+.truck-studio-root #ts-mapbadge,
+.truck-studio-root #view-hint {
+  transition:
+    opacity 240ms ease,
+    translate 300ms cubic-bezier(0.22, 0.7, 0.3, 1),
+    visibility 0s;
+}
+
+.truck-studio-root.ts-bare #ts-hud,
+.truck-studio-root.ts-bare #ts-panels,
+.truck-studio-root.ts-bare .ts-corner,
+.truck-studio-root.ts-bare #ts-mapbadge,
+.truck-studio-root.ts-bare #view-hint {
+  opacity: 0;
+  /* `visibility` e não `display`: é a única das duas que transiciona, e o atraso
+     é o que a segura até o fade acabar. Sem ela o card continuaria clicável e
+     tabulável, invisível, sobre a cena. */
+  visibility: hidden;
+  pointer-events: none;
+  /* O atraso vai só na visibilidade — o último item da lista de transições dos
+     quatro elementos daqui. O HUD tem a lista dele em ui/hud.css, com oito
+     itens: por isso a regra abaixo repete o atraso na medida daquela lista. */
+  transition-delay: 0s, 0s, 240ms;
+}
+/* O HUD precisa da MESMA regra de atraso, mas a lista dele (ui/hud.css) tem as
+   quatro linhas do vidro na frente — e quantas exatamente é coisa que o motor
+   decide, porque ele funde ou descarta o `-webkit-backdrop-filter` conforme o
+   suporte. Contar posições numa lista de tamanho variável é errar em silêncio:
+   foi o que aconteceu na primeira tentativa, e o atraso caiu na propriedade
+   errada, deixando o painel sumir de um quadro para o outro sem fade.
+   Então, ao ESCONDER, a transição é redeclarada inteira: três propriedades,
+   três durações, três atrasos, nenhuma posição a adivinhar. O vidro não perde
+   nada — as linhas dele valem no estado visível, que é onde existe hover. */
+.truck-studio-root.ts-bare #ts-hud {
+  transition-property: opacity, translate, visibility;
+  transition-duration: 240ms, 300ms, 0s;
+  transition-delay: 0s, 0s, 240ms;
+}
+.truck-studio-root.ts-bare #ts-hud,
+.truck-studio-root.ts-bare .ts-corner,
+.truck-studio-root.ts-bare #ts-mapbadge { translate: -18px 0; }
+.truck-studio-root.ts-bare #ts-panels { translate: 18px 0; }
+/* A dica já usa `transform: translateX(-50%)` para se centralizar; `translate` é
+   uma propriedade separada e compõe com ele em vez de sobrescrevê-lo. */
+.truck-studio-root.ts-bare #view-hint { translate: 0 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root #ts-panels,
+  .truck-studio-root .ts-corner,
+  .truck-studio-root #ts-mapbadge,
+  .truck-studio-root #view-hint {
+    transition-duration: 0.01ms, 0.01ms, 0s;
+  }
+  .truck-studio-root.ts-bare #ts-hud,
+  .truck-studio-root.ts-bare #ts-panels,
+  .truck-studio-root.ts-bare .ts-corner,
+  .truck-studio-root.ts-bare #ts-mapbadge,
+  .truck-studio-root.ts-bare #view-hint { translate: none; transition-delay: 0s; }
+}
+
 .truck-studio-root #view-hint {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   font-size: 11px; color: var(--muted); letter-spacing: 0.04em; pointer-events: none;
@@ -267,102 +349,242 @@
   -webkit-backdrop-filter: blur(6px);
 }
 
-/* ---------- sidebar ---------- */
-.truck-studio-root #sidebar {
-  width: 340px; display: flex; flex-direction: column; gap: 12px;
-  border-left: 1px solid var(--stroke); background: var(--panel);
-  padding: 14px; overflow-y: auto;
-}
-.truck-studio-root .panel {
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--panel-2); border: 1px solid var(--stroke);
-  border-radius: 13px; padding: 12px;
-}
-.truck-studio-root .panel-title {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--muted); display: flex; align-items: center; justify-content: space-between;
-}
-.truck-studio-root .select {
-  flex: 1; max-width: 200px;
-  background: var(--panel); color: var(--text); border: 1px solid var(--stroke-2);
-  border-radius: 9px; padding: 7px 9px; font-size: 12.5px; font-family: inherit;
-}
-.truck-studio-root .select:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.truck-studio-root .ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
-.truck-studio-root .ctl input[type="color"] {
-  width: 34px; height: 26px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 6px;
-}
-.truck-studio-root .ctl.range { flex-direction: column; align-items: stretch; gap: 5px; }
-.truck-studio-root .ctl.range span { display: flex; justify-content: space-between; }
-.truck-studio-root .ctl.range b { color: var(--text); font-weight: 600; }
-.truck-studio-root .ctl.range input { accent-color: var(--accent); width: 100%; }
+/* Botão pequeno da barra do editor (o "×" que devolve o fundo ao alumínio).
+   Sobreviveu à sidebar porque quem o usa é o modal, não ela. */
 .truck-studio-root .mini { padding: 3px 8px; border-radius: 6px; font-size: 11px; border: 1px solid var(--stroke-2); background: rgba(255, 255, 255, 0.05); color: var(--muted); }
 .truck-studio-root .mini.primary { background: var(--accent); border-color: transparent; color: #08101f; font-weight: 700; }
 
-.truck-studio-root .ctl-off { opacity: 0.4; pointer-events: none; }
-.truck-studio-root .ctl.range i { font-style: normal; color: var(--muted); }
-.truck-studio-root .panel-hint { font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--accent); }
+/* ============================================================
+   DESIGN DO IMPLEMENTO — os três cards sobre o render (#ts-panels)
+   ============================================================
+   Herdeiros diretos das "preview cards" da sidebar: mesmas prévias vivas, mesmo
+   clique abrindo o mesmo editor. O que mudou é o LUGAR e, com ele, o material:
+   agora flutuam sobre o render, então usam o vidro dos badges do seletor
+   (ui/selector.css seção 7) e não mais uma placa opaca. Tudo que paira sobre a
+   cena é um só material — foi assim que o HUD, os view controls e os badges
+   foram resolvidos, e um quarto material aqui quebraria a leitura.
 
-/* segmented control — finish type, day/night */
-.truck-studio-root .seg {
-  display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--stroke);
-  border-radius: 10px; padding: 3px;
-}
-.truck-studio-root .seg-btn {
-  flex: 1; padding: 7px 6px; border: none; border-radius: 8px; background: transparent;
-  color: var(--muted); font-size: 11.5px; font-weight: 600; font-family: inherit;
-  white-space: nowrap; transition: background 0.15s, color 0.15s;
-}
-.truck-studio-root .seg-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
-.truck-studio-root .seg-btn.on { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+   Ficam à DIREITA, empilhados e ANCORADOS PELA BASE. A coluna esquerda inteira
+   já tem dono — badge do cenário no topo, HUD de luz no meio (ui/hud.css ancora
+   em top:184px), cor e caminhão embaixo — e o topo direito é dos view controls.
+   Sobra a direita, que é também o lado onde a sidebar estava: o olho procura o
+   design do baú do mesmo lado de antes.
 
-/* preset chip rows — paint swatches and weather presets */
-.truck-studio-root .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.truck-studio-root .chip {
-  border: 1px solid var(--stroke-2); border-radius: 10px; background: rgba(255, 255, 255, 0.04);
-  color: var(--muted); font-family: inherit; font-size: 11px; font-weight: 600;
-  padding: 6px 9px; transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-}
-.truck-studio-root .chip:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
-.truck-studio-root .chip.on {
-  color: var(--accent); background: rgba(77, 163, 255, 0.12); border-color: transparent;
-  box-shadow: 0 0 0 1.5px var(--accent);
-}
-/* finish-specific control groups: shown only for the active finish */
-.truck-studio-root .paint-group { display: none; flex-direction: column; gap: 10px; }
-.truck-studio-root .paint-group.on { display: flex; }
+   `bottom` e não `top`: a pilha cresce PARA CIMA a partir do rodapé, então as
+   duas laterais — que é onde a arte de verdade vai — ficam sempre à mão, no
+   mesmo lugar, e é a traseira que sobe. Ancorada pelo topo, acrescentar um
+   quarto painel um dia empurraria as laterais para baixo do render.
+   A ordem no DOM é a ordem na tela (template.ts): traseira, esquerda, direita.
 
-/* paint-to-trailer toggle */
-.truck-studio-root .wide-chk {
-  justify-content: flex-start; border: 1px dashed var(--stroke-2);
-  color: var(--text); font-size: 12.5px; padding: 8px 10px;
+   z-index 8: mesma camada dos badges, abaixo da pílula de troca (9), do
+   #loading (10) e da cortina (400). */
+.truck-studio-root #ts-panels {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  /* Cada card tem a largura da PRÓPRIA foto, não uma largura de coluna comum:
+     uma lateral é uma tira de 5,9:1 e a traseira é quase quadrada. Igualadas na
+     largura, ou a lateral ficava ilegível ou a traseira virava um bloco alto
+     ocupando meia tela. Encostados à direita, que é a borda que os ancora. */
+  align-items: flex-end;
+  gap: 10px;
+  /* Nunca sobe além do topo do render; o excedente rola DENTRO da pilha em vez
+     de vazar por cima dos view controls. */
+  max-height: calc(100% - 74px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
-.truck-studio-root .wide-chk:hover { background: rgba(255, 255, 255, 0.04); }
+.truck-studio-root #ts-panels::-webkit-scrollbar { width: 6px; }
+.truck-studio-root #ts-panels::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14); border-radius: 3px;
+}
 
-/* preview cards */
-.truck-studio-root .preview-card {
-  border: 1px solid var(--stroke-2); border-radius: 11px; overflow: hidden; cursor: pointer;
-  background: #20242f; transition: border-color 0.15s;
-}
-.truck-studio-root .preview-card:hover { border-color: var(--accent); }
-.truck-studio-root .preview-frame {
-  position: relative; width: 100%;
-  background:
-    linear-gradient(45deg, #262b38 25%, transparent 25%, transparent 75%, #262b38 75%),
-    linear-gradient(45deg, #262b38 25%, transparent 25%, transparent 75%, #262b38 75%);
-  background-size: 14px 14px;
-  background-position: 0 0, 7px 7px;
-}
-.truck-studio-root .preview-frame canvas { display: block; width: 100%; height: auto; }
-.truck-studio-root .preview-frame.square canvas { max-height: 180px; width: auto; margin: 0 auto; }
-.truck-studio-root .preview-foot {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 7px 10px; font-size: 11.5px; color: var(--text); border-top: 1px solid var(--stroke);
-}
-.truck-studio-root .preview-foot small { color: var(--muted); }
+.truck-studio-root .ts-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: none;
+  /* Lateral: larga, porque 5,9:1 num card estreito não mostra desenho nenhum. */
+  width: 300px;
+  padding: 0;
+  border: 1px solid var(--stroke-2);
+  border-radius: 12px;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: hidden;
+  cursor: pointer;
 
-.truck-studio-root .side-foot { margin-top: auto; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; padding: 4px 2px; }
+  /* O MESMO vidro dos badges: 0.42/14px em repouso, 0.66/20px no hover. Retocar
+     aqui obriga a retocar lá (e no HUD, e nos view controls). */
+  background-color: rgba(8, 10, 14, 0.42);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.45);
+
+  transition:
+    border-color 0.18s ease,
+    background-color 0.22s ease,
+    backdrop-filter 0.22s ease,
+    -webkit-backdrop-filter 0.22s ease;
+}
+/* Sem lift e sem scale, como os badges: são cards sobre uma imagem em
+   movimento, e 2px de salto leem como falha de render, não como resposta. */
+.truck-studio-root .ts-panel:hover {
+  border-color: var(--accent);
+  background-color: rgba(8, 10, 14, 0.66);
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+}
+/* Um anel só: a borda volta ao neutro para o outline não ganhar um segundo
+   contorno concêntrico. Mesma regra dos cards e dos badges. */
+.truck-studio-root .ts-panel:focus-visible {
+  border-color: var(--stroke-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-panel:focus:not(:focus-visible) { outline: none; }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .truck-studio-root .ts-panel { background-color: rgba(10, 13, 19, 0.92); }
+  .truck-studio-root .ts-panel:hover { background-color: rgba(10, 13, 19, 0.97); }
+}
+
+/* ---------- o painel de verdade, atrás da tela ----------
+   O xadrez saiu. No lugar dele entra a FOTO do painel — a lateral completa e as
+   portas traseiras, renderizadas do próprio implemento
+   (public/models/vehicles/panels/) — e a tela do fabric fica por cima, agora
+   transparente por padrão (vehicle/livery.ts). O card deixa de ser um retângulo
+   vazio e passa a ser o painel: dá para ver onde estão os frisos, as dobradiças
+   e o rodapé antes mesmo de abrir o editor.
+
+   A mesma imagem, o mesmo enquadramento e a mesma regra valem no editor grande
+   (.stage-panel, mais abaixo): o que se vê no card é o que se desenha em cima.
+
+   `100% 100%` e não `cover`: a moldura tem exatamente a proporção da tela, que
+   por sua vez tem a proporção do painel — esticar não distorce nada e garante
+   que a foto e a área desenhável coincidem pixel a pixel. Um `cover` cortaria a
+   ponta da lateral, que é justamente onde a arte costuma ir. */
+.truck-studio-root .ts-panel__media {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 100%;
+  border-bottom: 1px solid var(--stroke);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* A pilha, de baixo para cima: CHAPA (a cor do implemento) → ARTE (a tela) →
+   FOTO (a ferragem, por cima). A foto tem o painel vazado, então o que se vê
+   pela janela é a arte sobre a chapa, e a borracha central das portas passa por
+   CIMA do que estiver desenhado ali — que é o ponto.
+   Tudo depende da janela ter sido MEDIDA (vehicle/livery.ts marca .ts-pw-ready).
+   Sem medida não há foto nenhuma: pousá-la por cima às cegas esconderia o
+   desenho inteiro se a exportação tiver vindo opaca. O console avisa. */
+.truck-studio-root .ts-panel.ts-pw-ready .ts-panel__media {
+  aspect-ratio: var(--ts-pw-ar, 4);
+  background-color: transparent;
+}
+.truck-studio-root .ts-panel.ts-pw-ready .ts-panel__media canvas {
+  position: absolute;
+  left: var(--ts-pw-x, 0%);
+  top: var(--ts-pw-y, 0%);
+  width: var(--ts-pw-w, 100%);
+  height: var(--ts-pw-h, 100%);
+  /* A chapa mora no próprio canvas: a tela do fabric é transparente, então o
+     fundo CSS dela É o painel. Um nó a menos, e impossível sair de registro. */
+  background: var(--ts-implement, #ffffff);
+}
+.truck-studio-root .ts-panel.ts-pw-ready .ts-panel__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-image: var(--ts-pw-img);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.truck-studio-root .ts-panel__media canvas { display: block; width: 100%; height: auto; }
+/* A traseira é quase quadrada (0,81 de foto): com os 300px da lateral ela teria
+   370px de altura sozinha e empurraria as duas laterais para fora do render.
+   Estreita, ela fica com ~185px — a mesma ordem de grandeza dos outros dois
+   cards somados, que é o peso que ela deve ter. */
+.truck-studio-root .ts-panel--rear { width: 150px; }
+
+.truck-studio-root .ts-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  /* A direita fica reservada para a pílula "Editar". */
+  padding: 7px 56px 8px 10px;
+}
+.truck-studio-root .ts-panel__label {
+  font-size: 9.5px; font-weight: 700; line-height: 1.2;
+  letter-spacing: 0.11em; text-indent: 0.11em; text-transform: uppercase;
+  color: var(--muted);
+}
+.truck-studio-root .ts-panel__name {
+  font-size: 12.5px; font-weight: 700; line-height: 1.25;
+  letter-spacing: 0.01em; color: var(--text);
+}
+/* Mesma pílula do "Trocar" dos badges — o card inteiro é o alvo do clique, e
+   isto é o que diz que ele é clicável. Decorativa: não come o clique nem
+   oferece cursor de texto. */
+.truck-studio-root .ts-panel__edit {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 4px 9px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 7px;
+  background: rgba(13, 16, 23, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text);
+  font-size: 10.5px; font-weight: 600; line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.truck-studio-root .ts-panel:hover .ts-panel__edit,
+.truck-studio-root .ts-panel:focus-visible .ts-panel__edit {
+  opacity: 1;
+  background: rgba(13, 16, 23, 0.92);
+  border-color: var(--accent);
+}
+
+/* Telas estreitas/baixas: os três cards encolhem antes de encostar no HUD.
+   Abaixo de 680px a lateral perde a moldura e vira só o rótulo — três cards
+   ainda cabem, e o desenho continua a um toque. */
+@media (max-width: 680px) {
+  .truck-studio-root #ts-panels { right: 10px; bottom: 10px; gap: 8px; width: 154px; }
+  .truck-studio-root .ts-panel__body { padding: 6px 50px 7px 8px; }
+  .truck-studio-root .ts-panel__name { font-size: 11.5px; }
+  .truck-studio-root .ts-panel__edit { opacity: 1; }
+  .truck-studio-root .ts-panel__media.square canvas { height: 96px; }
+}
+/* Pouca altura: a pilha é o que estoura primeiro (três cards + a traseira alta).
+   A traseira encolhe antes das laterais — é a que menos recebe arte. */
+@media (max-height: 620px) {
+  .truck-studio-root #ts-panels { bottom: 10px; gap: 8px; width: 176px; }
+  .truck-studio-root .ts-panel__media.square canvas { height: 84px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-panel,
+  .truck-studio-root .ts-panel__edit { transition-duration: 0.01ms; }
+}
 
 /* ---------- editor modal ---------- */
 .truck-studio-root #editor-modal {
@@ -402,6 +624,20 @@
 .truck-studio-root .tb-ctl { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
 .truck-studio-root .tb-ctl input[type="color"] { width: 30px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
 .truck-studio-root .tb-ctl input[type="range"] { width: 90px; accent-color: var(--accent); }
+/* "Pintar o implemento com a cor do cavalo". É a única coisa NA BARRA que muda
+   o veículo e não o desenho, então ganha um contorno tracejado — a mesma
+   convenção que a sidebar usava para esse mesmo controle — e o texto em
+   --text, não --muted: é uma decisão, não um parâmetro de ferramenta. */
+.truck-studio-root .tb-ctl.tb-chk {
+  gap: 7px; padding: 6px 10px; border: 1px dashed var(--stroke-2);
+  border-radius: 9px; color: var(--text); cursor: pointer; user-select: none;
+}
+.truck-studio-root .tb-ctl.tb-chk:hover { background: rgba(255, 255, 255, 0.05); }
+.truck-studio-root .tb-ctl.tb-chk input { accent-color: var(--accent); }
+.truck-studio-root .tb-ctl.tb-chk:has(input:checked) {
+  border-style: solid; border-color: var(--accent); color: var(--accent);
+  background: rgba(77, 163, 255, 0.12);
+}
 
 .truck-studio-root .modal-stage {
   flex: 1; min-height: 0; position: relative;
@@ -413,8 +649,35 @@
   background-position: 0 0, 10px 10px;
   padding: 16px;
 }
-.truck-studio-root .stage-panel { position: relative; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45); }
-.truck-studio-root .stage-panel .canvas-container { background: #fff0; }
+/* O palco do editor é a MESMA pilha do card, em tamanho de trabalho: chapa →
+   arte → foto por cima. É desenhar sobre o painel de verdade, com a ferragem
+   cobrindo o que passa por baixo dela.
+   A foto vai no .stage-panel e a janela num wrapper NOSSO (.panel-window), nunca
+   no .canvas-container: aquele nó é do fabric, que reescreve o style dele a cada
+   resize — o que puséssemos lá sumiria na primeira mudança de tamanho. */
+.truck-studio-root .stage-panel {
+  position: relative;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+}
+.truck-studio-root .stage-panel.ts-pw-ready .panel-window {
+  position: absolute;
+  left: var(--ts-pw-x, 0%);
+  top: var(--ts-pw-y, 0%);
+}
+.truck-studio-root .stage-panel.ts-pw-ready::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Acima da guia tracejada (20) e abaixo do aviso de arrastar imagem (30). */
+  z-index: 25;
+  background-image: var(--ts-pw-img);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+/* A chapa do editor. Mesma variável do card, então os dois mostram a mesma cor
+   de baú sem ninguém sincronizar nada. */
+.truck-studio-root .stage-panel .canvas-container { background: var(--ts-implement, #ffffff); }
 .truck-studio-root .guide-svg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 20;

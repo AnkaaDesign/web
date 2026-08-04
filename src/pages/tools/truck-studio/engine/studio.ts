@@ -9,15 +9,19 @@
    boot() therefore runs at most once per page load.
 
    Since the "Configurador" feature the studio no longer opens straight into a
-   default truck: boot() loads the catalog, then a 3-step selector (cenário →
-   fabricante → modelo) decides what to build, and a loading curtain covers the
-   download before flying the chosen truck's photo into the bottom-left badge.
+   default truck: boot() loads the catalog, then a 4-step selector (cenário →
+   fabricante → modelo → cor) decides what to build, and a loading curtain covers
+   the download before flying the chosen truck's photo into the bottom-left badge.
    Everything downstream of that decision funnels through ONE function,
-   applyChoice(), so the selector, the badge's "Trocar" button and the sidebar
-   select cannot drift apart — and so a choice arriving twice loads once. */
+   applyChoice(), so the selector and the badges cannot drift apart — and so a
+   choice arriving twice loads once.
+
+   A COR é o único campo da escolha que não custa download, e applyChoice tem um
+   atalho para isso: trocar só a cor não remonta a cabine. */
 import * as THREE from 'three';
 import * as sceneMod from './scene/scene';
-import { scene, camera, controls, renderer, frameAll, startLoop, stopLoop, resize } from './scene/scene';
+import { scene, camera, controls, renderer, frameAll, startLoop, stopLoop, resize,
+         setVehicleFocus, invalidateShadows, warmLightPrograms } from './scene/scene';
 import * as models from './vehicle/models';
 import * as paint from './vehicle/paint';
 import * as livery from './vehicle/livery';
@@ -31,7 +35,11 @@ import {
 } from './catalog/catalog';
 import {
   initSelector, openSelector, setBadge, showBadge, setMapBadge, showMapBadge,
+  setColorBadge, showColorBadge,
 } from './ui/selector';
+import { disposePreviews, prewarmCabPreviews } from './ui/preview';
+import { loadColors, getColor, defaultColor, FINISH_LABEL, colors } from './catalog/colors';
+import type { PaintColorDef } from './catalog/colors';
 import { applyEnvironment, getCurrentEnvironment } from './scene/environment';
 import {
   initLoader, showLoader, setLoaderProgress, finishLoader, hideLoader,
@@ -39,9 +47,7 @@ import {
 import { initHud, syncHud } from './ui/hud';
 import * as scatter from './scene/scatter';
 import { initWeather } from './scene/weather';
-import {
-  initUI, afterManifests, afterLoad, setStatus, syncPaintUI, setChoiceApplier,
-} from './ui/sidebar';
+import { initUI, setStatus } from './ui/chrome';
 import { root, $ } from './core/dom';
 import type { Choice, EnvironmentDef, ManufacturerDef, ModelDef } from './catalog/catalog';
 import type { CabDef } from './vehicle/models';
@@ -52,6 +58,7 @@ interface ResolvedPick {
   env: EnvironmentDef;
   model: ModelDef;
   manufacturer: ManufacturerDef;
+  color: PaintColorDef;
 }
 
 /** Which downloads this apply will run, and their relative weights. */
@@ -83,8 +90,16 @@ let pendingChoice: Choice | null = null;
 /* Serialises applies. Never rejects — runApply() swallows its own errors. */
 let applyQueue: Promise<Choice | null> = Promise.resolve(null);
 
-const sameChoice = (a: Choice | null, b: Choice | null) =>
+/* "É o mesmo VEÍCULO na mesma cena?" — a pergunta que decide se algo precisa ser
+   BAIXADO. A cor de propósito não entra: ela não custa um byte de rede. */
+const sameRig = (a: Choice | null, b: Choice | null) =>
   !!a && !!b && a.envId === b.envId && a.modelId === b.modelId;
+
+/* "É a mesma escolha, ponto?" — a pergunta do dedupe. A cor ENTRA aqui: sem
+   ela, escolher outra cor para o mesmo caminhão seria descartado como repetido
+   e o clique não faria nada. */
+const sameChoice = (a: Choice | null, b: Choice | null) =>
+  sameRig(a, b) && a!.colorId === b!.colorId;
 
 /* pt-BR label for whichever download last reported, shown under the bar. */
 const TASK_LABELS: Record<string, string> = {
@@ -137,12 +152,42 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
     || getEnvironment(fallback.envId)
     || catalogMod.catalog.environments[0];
   if (!env) return null;
+  /* Mesma escada do cenário: o que veio, senão o que já está na tela, senão o
+     padrão da paleta. Uma cor que saiu do catálogo vira a padrão em vez de
+     virar um boot sem tinta. */
+  const color = getColor(choice?.colorId) || getColor(currentChoice?.colorId) || defaultColor();
   return {
-    choice: { envId: env.id, manufacturerId: found.manufacturer.id, modelId: found.model.id },
+    choice: {
+      envId: env.id,
+      manufacturerId: found.manufacturer.id,
+      modelId: found.model.id,
+      colorId: color.id,
+    },
     env,
     model: found.model,
     manufacturer: found.manufacturer,
+    color,
   };
+}
+
+/* A tinta do cavalo, a partir da cor escolhida. UMA chamada e não duas: dentro
+   de setPaint() a troca de acabamento reescreve os parâmetros específicos da
+   família (flocos, flop, mica) para os defaults dela, e a cor base tem de ser
+   aplicada DEPOIS disso, senão a segunda chamada apagaria a primeira.
+   Roda em toda aplicação, inclusive quando a cor não mudou: uma troca de cabine
+   cria materiais NOVOS, e eles precisam ser dirigidos outra vez. */
+function applyColor(color: PaintColorDef) {
+  paint.setPaint({ finish: color.finish, color: color.hex });
+  /* O editor de arte mostra a chapa do painel ATRÁS do desenho, e ela é branca
+     ou é esta tinta, conforme o "pintar o implemento". Quem sabe qual é a tinta
+     é aqui; quem sabe se ela vale para o baú é o livery. */
+  livery.setCabPaintColor(color.hex);
+  setColorBadge({
+    colorName: color.name,
+    hex: color.hex,
+    finishLabel: FINISH_LABEL[color.finish],
+  });
+  showColorBadge(true);
 }
 
 /* brands.json and cabs.json are separate manifests, so the catalog may offer a
@@ -156,8 +201,55 @@ function resolveCabId(model: ModelDef): { id: string; exact: boolean } {
   return alt ? { id: alt.id, exact: false } : { id: model.cab, exact: true };
 }
 
+/* Compile every program and upload every texture the scene will need, then let
+   two real frames go by, BEFORE anything claims to be loaded.
+   `compileAsync` uses KHR_parallel_shader_compile where the driver has it, so
+   this yields instead of blocking the main thread the way `compile()` does. */
+/* EVERY WAIT IN HERE IS BOUNDED.
+   A backgrounded tab does not fire requestAnimationFrame at all, and three's
+   parallel-shader-compile polling can stall with it — so a plain `await` on
+   either one hangs boot() forever if the user switches tab while the studio
+   loads, and the curtain never comes down. Warming up is an OPTIMISATION; it is
+   never allowed to be the reason the app fails to start. */
+function bounded<T>(p: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([p, new Promise<void>((res) => setTimeout(res, ms))]);
+}
+
+async function warmUp() {
+  scene.updateMatrixWorld(true);
+  try {
+    const r = renderer as THREE.WebGLRenderer & {
+      compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<unknown>;
+    };
+    if (typeof r.compileAsync === 'function') await bounded(r.compileAsync(scene, camera), 8000);
+    else renderer.compile(scene, camera);
+  } catch (e) {
+    console.warn('[truck-studio] warm-up de shaders falhou', e);
+  }
+  invalidateShadows();      // the first real shadow pass belongs in here too
+  /* Two presented frames if the tab is visible; a short timer if it is not.
+     setTimeout still fires when backgrounded, rAF does not. */
+  await bounded(
+    new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
+    500,
+  );
+}
+
+/* Hand the orbit its subject: the rig's own box, measured after the trailer has
+   been coupled so it is the real silhouette and not the two groups' load poses.
+   Also the moment every caster has finished moving, so it is where the shadow
+   map gets marked. */
+function focusOnRig() {
+  const box = new THREE.Box3();
+  for (const g of [models.state.cabGroup, models.state.trailerGroup]) {
+    if (g.visible) box.expandByObject(g);
+  }
+  setVehicleFocus(box.isEmpty() ? null : box);
+  invalidateShadows();
+}
+
 async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean) {
-  const { choice, env, model, manufacturer } = resolved;
+  const { choice, env, model, manufacturer, color } = resolved;
   const current = getCurrentEnvironment();
   /* Re-applying the SAME environment would download nothing but would still
      reset the light preset, time of day and exposure — throwing away whatever
@@ -223,9 +315,30 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     /* A cab swap moves the coupling point, so the trailer has to be re-placed
        and the camera re-framed on BOTH paths, not just the first one. */
     models.placeTrailer();
+    /* AFTER the implement is in its final pose and the scenario's set is up: the
+       probe captures the world from the middle of the rig, so both have to be
+       where they will stay. Once per choice, never per frame — see scene/probe.ts. */
+    models.refreshVehicleReflection();
     frameAll([models.state.cabGroup, models.state.trailerGroup]);
-    if (first) afterLoad();
-    else syncPaintUI();                    // new materials, same parameters
+    /* Re-derived on every path, not just the first: a cab swap changes the
+       rig's length, and the orbit limits are a function of it. */
+    focusOnRig();
+    /* A tinta vem da ESCOLHA agora, não de um reset para o prata de fábrica: a
+       cor é um passo do seletor, e chegar aqui com ela já decidida é o ponto.
+       Nos dois caminhos, porque uma troca de cabine traz materiais novos. */
+    applyColor(color);
+
+    /* LAST, because it compiles whatever is in the scene and everything above
+       adds to it — the set, the cab, the implement, and the paint materials
+       applyColor() has just swapped in. Still inside the loader, which is the
+       whole point: this is the day↔night shader recompile, moved off the time
+       slider and onto the progress bar. See warmLightPrograms(). */
+    warmLightPrograms();
+
+    /* E as miniaturas do passo de cor, pelo mesmo motivo e no mesmo lugar: elas
+       renderizavam ao abrir o seletor, que é onde o usuário NÃO está esperando.
+       Aguardado de propósito — o custo vai para a barra de progresso. */
+    await prewarmCabPreviews(cab.id, colors);
 
     /* ui/selector.ts already fills both badges from the catalog before firing its
        listeners, but two paths never go through the selector — the sidebar model
@@ -248,13 +361,15 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     });
     showMapBadge(true);
 
-    $('brand-sub').textContent = `${model.name} · Frigorífico Paleteiro`;
+    /* #brand-sub morreu com a topbar. O que ele dizia — qual caminhão, qual
+       implemento — está no badge do caminhão e na linha de estado, e nenhum dos
+       dois precisava de uma terceira cópia. */
     const stand = cab.exact ? '' : ' · geometria provisória';
     setStatus(first
-      ? `Pronto · ${env.name} · cabine ${fmt(models.state.cabBox)}`
+      ? `Pronto · ${env.name} · ${color.name} · cabine ${fmt(models.state.cabBox)}`
         + ` · implemento ${fmt(models.state.trailerBox ?? null)}`
         + (models.state.trailerMeta ? '' : ' · engate padrão') + stand
-      : `${manufacturer.name} ${model.name} · ${env.name}` + stand);
+      : `${manufacturer.name} ${model.name} · ${color.name} · ${env.name}` + stand);
 
     currentChoice = choice;
     /* Persist only what actually rendered: a choice that failed to load must not
@@ -265,6 +380,13 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        every control in the lighting HUD is stale the moment the scenery changes.
        syncHud() re-reads the scene rather than trusting its last written values. */
     if (needEnv) syncHud();
+    /* Downloaded and parsed is NOT ready to draw. The first frame after the
+       curtain lifts is where three compiles every program it has not seen and
+       uploads every texture, and on this scene that is hundreds of milliseconds
+       of a frozen picture — which is exactly the "carrega meio travado e depois
+       funciona" that gets reported as a loading bug. Do it while the curtain is
+       still up, where a pause is what the user is already being shown. */
+    await warmUp();
     /* The outro is cosmetic: a hiccup in the flip animation must not turn a
        perfectly loaded scene into an error, but the curtain has to come down. */
     if (curtain) {
@@ -327,7 +449,27 @@ function applyChoice(
      "Trocar" flow must not reload ~30 MB either. `pendingChoice` is assigned
      synchronously below, so a second caller in the same tick always sees it
      even though the first load has not finished. */
-  if (!first && sameChoice(resolved.choice, pendingChoice || currentChoice)) return applyQueue;
+  const reference = pendingChoice || currentChoice;
+  if (!first && sameChoice(resolved.choice, reference)) return applyQueue;
+
+  /* SÓ A COR MUDOU. Não há um único byte para baixar: a tinta é um parâmetro de
+     material, e o caminho normal daqui para baixo chamaria models.loadCab() —
+     ou seja, remontaria a cabine inteira para trocar um hex. Este é o atalho.
+     Ele ainda passa pela FILA em vez de rodar na hora: se houver um load em
+     voo, aquele load termina aplicando a cor que ELE resolveu, e uma cor
+     aplicada antes dele seria desfeita alguns segundos depois, sozinha. */
+  if (!first && sameRig(resolved.choice, reference)) {
+    const runColor = () => {
+      applyColor(resolved.color);
+      currentChoice = resolved.choice;
+      saveChoice(resolved.choice);
+      setStatus(`${resolved.manufacturer.name} ${resolved.model.name} · ${resolved.color.name}`);
+      return resolved.choice;
+    };
+    applyQueue = applyQueue.then(runColor, runColor);
+    return applyQueue;
+  }
+
   pendingChoice = resolved.choice;
   /* Same handler on both branches: a rejected queue must not poison every
      later apply (runApply itself never throws, but the queue is shared). */
@@ -341,13 +483,12 @@ async function boot() {
     livery.initLivery();
     initWeather();
     initUI();
-    setChoiceApplier(applyChoice);         // sidebar select routes through applyChoice
 
     $('load-text').textContent = 'Carregando catálogo…';
-    /* Two independent manifests: the catalog says what the user may pick,
-       cabs.json says what the 3D loader can build. Neither blocks the other. */
-    await Promise.all([loadCatalog(), models.loadManifests()]);
-    afterManifests();
+    /* Three independent listas: o catálogo diz o que o usuário PODE escolher,
+       cabs.json diz o que o carregador 3D consegue montar, e a paleta diz de
+       que cores. Nenhuma bloqueia a outra, e nenhuma delas lança. */
+    await Promise.all([loadCatalog(), models.loadManifests(), loadColors()]);
 
     initSelector();
     initLoader();
@@ -440,5 +581,10 @@ export function unmountStudio() {
   observer?.disconnect();
   observer = null;
   sceneMod.flushSave();
+  /* O contexto WebGL das miniaturas é a única coisa aqui que NÃO vale a pena
+     manter viva fora da rota: as imagens já geradas ficam em cache no módulo, e
+     é isso que faz o seletor reabrir instantâneo — o contexto em si se refaz em
+     um quadro. */
+  disposePreviews();
   root.remove();
 }

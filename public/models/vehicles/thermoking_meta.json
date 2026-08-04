@@ -4,6 +4,8 @@
   "h": 1.68,
   "d": 0.796
  },
- "mountFace": "back at y=0 (+Y)",
+ "widthFrac": 0.83,
+ "topGap": 0.23,
+ "fitNote": "widthFrac = largura da carcaca como fracao da largura do bau; topGap = metros entre a linha do teto e o topo da carcaca. Antes o app so encaixava o topo a 0,02 m do teto e usava a escala crua do rip, o que deixava a unidade pequena e alta demais no painel branco da dianteira. A escala e aplicada em X e Y JUNTOS (o produto e real, nao pode ser esticado); Z continua vindo de TK_DEPTH. Ajuste estes dois numeros para casar a base da carcaca com o fim do painel branco, onde comecam as cantoneiras.",
  "notes": "Thermo King SLXi-class unit from 3D Ripper OBJ rip. Front (grille face) faces -Y in Blender / +Z in app; back mounting face flush at y=0, X and height centred at origin. Scaled to real width 2.03 m (uniform; rip proportions give H/D as logged). No textures in rip; materials are classified PBR values. Housing paint material: tk-housing-white (include in trailer-paint target set). Floating display-sign props from the rip (towers/board/shelf) were removed; THERMO KING letters relocated onto the front face."
 }
