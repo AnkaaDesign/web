@@ -4,9 +4,12 @@
     "geometria 3D para o modelo: o card aparece marcado 'Em breve' e não é clicável.",
     "O FABRICANTE continua sempre clicável — quem diz 'em breve' é o caminhão, no",
     "passo 3; entrar numa marca que ainda não saiu não é um beco, o 'Voltar' segue lá.",
-    "Hoje só scania e volvo têm cabine própria (models/scania.glb via",
-    "/models/vehicles/scania.fbx, e models/volvo.glb). O modelo disponível de cada um",
-    "fica NO MEIO da lista, que é a posição de destaque do grid de 3 cards.",
+    "Hoje scania, volvo e iveco têm cabine própria (models/scania.glb via",
+    "/models/vehicles/scania.fbx, models/volvo.glb e models/iveco.glb). O modelo",
+    "disponível de cada um fica NO MEIO da lista, que é a posição de destaque do grid",
+    "de 3 cards — por isso o S-Way 440 trocou de lugar com o 540: a geometria do rip",
+    "é um 4x2 (eixo direcional em z 7,22 e um único eixo trativo em z 3,71), então o",
+    "card disponível é o que diz 4x2.",
     "`cab` omitido = usa o id do fabricante (catalog.ts), que para os indisponíveis",
     "de propósito não existe em models/cabs.json.",
     "As fotos vivem em brands/<marca>/models/*.webp, 900x600, todas no MESMO fundo",
@@ -120,16 +123,17 @@
           "available": false
         },
         {
+          "id": "iveco-s-way-440",
+          "name": "S-Way 440",
+          "subtitle": "AS Highway · 4x2",
+          "image": "/brands/trucks/iveco/models/s-way.webp",
+          "cab": "iveco",
+          "available": true
+        },
+        {
           "id": "iveco-s-way-540",
           "name": "S-Way 540",
           "subtitle": "Cavalo mecânico · 6x4",
-          "image": "/brands/trucks/iveco/models/s-way.webp",
-          "available": false
-        },
-        {
-          "id": "iveco-s-way-440",
-          "name": "S-Way 440",
-          "subtitle": "Cavalo mecânico · 4x2",
           "image": "/brands/trucks/iveco/models/s-way.webp",
           "available": false
         }
