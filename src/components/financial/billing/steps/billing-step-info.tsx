@@ -12,6 +12,7 @@ import { getCustomers } from "@/api-client/customer";
 import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useResponsibles } from "@/hooks/administration/use-responsible";
+import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/task-quote-calculations";
 
 interface BillingStepInfoProps {
   task?: any;
@@ -92,37 +93,41 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
       const selectedIds: string[] = Array.isArray(value) ? value : value ? [value] : [];
       const currentConfigs = getValues("customerConfigs") || [];
 
-      // Save the config before the last customer is removed so its discount can be
-      // restored when the user adds a new customer (remove-then-add flow).
-      if (currentConfigs.length === 1 && selectedIds.length === 0) {
-        lastRemovedSingleConfigRef.current = currentConfigs[0];
+      // Mirror the CURRENT single-customer discount on every change — not only on
+      // the 1→0 transition. "Faturar Para" is a multi-select, so every click is a
+      // toggle and an atomic 1→1 replacement is unreachable from this UI: the real
+      // gesture is tick-new-then-untick-old (1→2→1). The previous code nulled this
+      // ref the instant the selection reached two, so by the time it collapsed back
+      // to one the discount was already gone, and the 1→1 branch could never fire.
+      // Writing `null` when the single config has no discount is what makes a
+      // deliberate "Nenhum" stick instead of being resurrected on the next collapse.
+      if (currentConfigs.length === 1) {
+        lastRemovedSingleConfigRef.current = hasNoEffectiveDiscount(currentConfigs[0])
+          ? null
+          : pickDiscountTerms(currentConfigs[0]);
       }
-      // In multi-customer mode the discount is per-customer, so don't carry over.
-      if (selectedIds.length >= 2) {
-        lastRemovedSingleConfigRef.current = null;
-      }
-
-      // Source for discount carry-over:
-      // 1. Atomic 1→1 replacement: the config being replaced is the source.
-      // 2. Remove-then-add (0→1): the last removed single config is the source.
-      const discountSource =
-        (currentConfigs.length === 1 && selectedIds.length === 1 ? currentConfigs[0] : null) ??
-        (currentConfigs.length === 0 && selectedIds.length === 1
-          ? lastRemovedSingleConfigRef.current
-          : null);
+      const discountCarry = lastRemovedSingleConfigRef.current;
 
       const newConfigs = selectedIds.map((customerId) => {
         const existing = currentConfigs.find((c: any) => c.customerId === customerId);
-        if (existing) return existing;
+        // Re-apply the remembered terms only when collapsing to exactly ONE customer
+        // that has no discount of its own. Multi-customer billing keeps its
+        // per-customer discounts untouched.
+        if (existing) {
+          return selectedIds.length === 1 && discountCarry && hasNoEffectiveDiscount(existing)
+            ? { ...existing, ...discountCarry }
+            : existing;
+        }
 
         const cached = customersCache.current.get(customerId);
+        const inherit = selectedIds.length === 1 ? discountCarry : null;
         return {
           customerId,
           subtotal: 0,
           total: 0,
-          discountType: discountSource?.discountType ?? "NONE",
-          discountValue: discountSource?.discountValue ?? null,
-          discountReference: discountSource?.discountReference ?? null,
+          discountType: inherit?.discountType ?? "NONE",
+          discountValue: inherit?.discountValue ?? null,
+          discountReference: inherit?.discountReference ?? null,
           paymentCondition: null,
           customPaymentText: null,
           generateInvoice: true,
@@ -252,8 +257,15 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => {
-                          const updated = customerConfigs.filter((c: any) => c.customerId !== config.customerId);
-                          setValue("customerConfigs", updated, { shouldDirty: true });
+                          // Route through handleCustomerChange rather than mutating the
+                          // array directly: this button used to bypass the discount
+                          // carry-over entirely, so removing the old customer here and
+                          // then picking a new one silently dropped the agreed discount.
+                          handleCustomerChange(
+                            customerConfigs
+                              .filter((c: any) => c.customerId !== config.customerId)
+                              .map((c: any) => c.customerId),
+                          );
                         }}
                       >
                         <IconTrash className="h-4 w-4" />
