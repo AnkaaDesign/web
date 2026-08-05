@@ -972,8 +972,13 @@ function setHourInternal(h: number) {
    traz `preset: 'ensolarado'` e sobrescreveria o novo padrão em silêncio: quem
    já abriu o estúdio uma vez nunca veria a mudança. Aposentar a chave é o que
    faz o padrão novo valer para todo mundo, e é o mesmo movimento que v1→v2. */
-const SCENE_KEY = 'truckstudio.scene.v4';
-for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2', 'truckstudio.scene.v3']) {
+/* v5 porque a hora de abertura mudou de 12:00 para 17:45 (ver OPEN_HOUR): um
+   estado v4 gravado traz `hour: 12` e sobrescreveria o novo padrão em silêncio —
+   quem já abriu o estúdio uma vez nunca veria a luz nova. É o mesmo motivo que
+   aposentou v3 quando o preset de abertura virou `dourado`. */
+const SCENE_KEY = 'truckstudio.scene.v5';
+for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2', 'truckstudio.scene.v3',
+  'truckstudio.scene.v4']) {
   try { localStorage.removeItem(old); } catch (_) { /* ignore */ }
 }
 
@@ -982,15 +987,31 @@ for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2', 'truckstudio.
    luz RASANTE, e é ela que faz a lataria mostrar o que a tinta tem. Sol a pino
    bate quase perpendicular à chapa: a casca de laranja some, o floco não
    cintila e o flop do perolizado não tem raspagem para aparecer. O preset
-   continua trocável no HUD; o que muda aqui é só com o que a página ABRE.
-   `hour` fica no meio-dia de propósito — o relógio serve à mistura dia/noite, e
-   a cara dourada já vem da face `dia` do preset, não do horário. */
+   continua trocável no HUD; o que muda aqui é só com o que a página ABRE. */
+
+/* A HORA DE ABERTURA É 17:45, e não mais o meio-dia.
+   Antes o `dourado` sozinho dava a cara rasante enquanto o relógio ficava em
+   12:00 — o preset pintava a luz de dourada, mas a GEOMETRIA continuava de sol a
+   pino. Sombra curta debaixo do veículo, nada de rastro comprido no chão, e a
+   mistura dia/noite (nightnessAt) em zero: dourado no tom, meio-dia na forma.
+   Com o relógio em 17:45 as duas coisas passam a concordar. Nesta latitude
+   (SUNRISE_H 5.6 / SUNSET_H 18.4) a conta dá:
+       sunAltitude(17.75) ≈ 11.4°   → sol baixo, sombra longa e rasante
+       sunAngles(17.75).az ≈ 269.8° → oeste, contra os ~285° que o `dourado` já
+                                      trazia autorado, então o preset e o relógio
+                                      apontam para o mesmo lado
+       nightnessAt(17.75) ≈ 0.21    → um fio de anoitecer no céu, ainda dia
+       goldenAt(17.75)    ≈ 0.70    → avermelhamento de sol baixo quase cheio
+   `az`/`el` seguem DERIVADOS de `hour` (os flags manuais continuam falsos), e é
+   por isso que basta mudar a hora: sunAngles() reposiciona a chave sozinha. */
+export const OPEN_HOUR = 17.75;
+
 export const LIGHT_DEFAULTS = {
-  preset: 'dourado', timeOfDay: 'dia' as TimeOfDay, hour: TOD_HOUR.dia,
-  /* az/el are DERIVED from `hour`; these are just what the clock says at noon.
+  preset: 'dourado', timeOfDay: 'dia' as TimeOfDay, hour: OPEN_HOUR,
+  /* az/el are DERIVED from `hour`; these are just what the clock says at 17:45.
      They stop being derived the moment one of the flags below goes true — see
      syncSunToHour() for the full override policy. */
-  az: sunAngles(TOD_HOUR.dia).az, el: sunAngles(TOD_HOUR.dia).el, brightness: 1,
+  az: sunAngles(OPEN_HOUR).az, el: sunAngles(OPEN_HOUR).el, brightness: 1,
   azManual: false, elManual: false,
 };
 export const sceneState = { ...LIGHT_DEFAULTS };
@@ -2054,7 +2075,18 @@ let vehicleFocusHooked = false;
    todo quadro, porque minDistance é uma ESFERA e não sabe dizer "fora de uma
    caixa de 15 m" (ver o cabeçalho acima). */
 const FOCUS_MIN_F = 0.40;   // minDistance, as a fraction of the rig radius
-const FOCUS_MAX_F = 2.60;   // maxDistance, same
+/* maxDistance, idem — mas agora é um PISO, não a palavra final: ver o
+   Math.max() em setVehicleFocus(). O 2.60 foi calculado para uma lente de 45°
+   (é o que o cabeçalho acima ainda descreve); a câmera passou a abrir em
+   CARD_FOV = 30, e uma teleobjetiva precisa de MAIS distância para enquadrar o
+   mesmo conjunto. O resultado era frameAll() pousar a câmera em ~3.9 r e o
+   clamp do OrbitControls puxá-la de volta para 2.6 r no primeiro quadro: a cena
+   abria mais fechada do que a pose do card, e não havia como afastar. */
+const FOCUS_MAX_F = 2.60;
+/* Folga de afastamento ALÉM da pose de abertura. Sem ela o limite de órbita
+   coincidiria com a distância de abertura e a roda do mouse não teria para onde
+   ir no sentido de afastar. */
+const OPEN_ZOOM_OUT = 1.35;
 const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
 const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork
 const _fv = new THREE.Vector3();
@@ -2073,7 +2105,12 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
   const r = Math.max(2, box.getSize(new THREE.Vector3()).length() / 2);
   vehicleFocus = { c, box: box.clone().expandByScalar(FOCUS_SKIN), r };
   controls.minDistance = r * FOCUS_MIN_F;
-  controls.maxDistance = r * FOCUS_MAX_F;
+  /* O limite de afastamento nunca pode ficar aquém da própria pose de abertura,
+     senão o clamp do OrbitControls desfaz frameAll() no primeiro quadro. Num
+     viewport estreito o meio-ângulo apertado é o HORIZONTAL, e a distância de
+     abertura passa de 6 r — por isso o piso sai de openingDistance() (que lê o
+     aspecto corrente) e não de mais uma constante. */
+  controls.maxDistance = Math.max(r * FOCUS_MAX_F, openingDistance(r) * OPEN_ZOOM_OUT);
   if (vehicleFocusHooked) return;
   vehicleFocusHooked = true;
   frameHooks.push(() => {
@@ -2263,6 +2300,18 @@ export function getCameraPose() {
   };
 }
 
+/** Distância de abertura para uma esfera envolvente de raio `r`: `raio / sin` do
+ *  meio-ângulo APERTADO — vertical num viewport deitado, horizontal num
+ *  estreito. É a mesma conta de preview.ts, e existe como função porque dois
+ *  lugares dependem do MESMO número: frameAll(), que pousa a câmera nele, e
+ *  setVehicleFocus(), que precisa garantir que o limite de órbita comporta a
+ *  pose — do contrário um desfaz o outro no primeiro quadro. */
+function openingDistance(r: number) {
+  const vHalf = camera.fov * Math.PI / 360;
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  return r / Math.sin(Math.min(vHalf, hHalf));
+}
+
 /* A ABERTURA DO ESTÚDIO É A POSE DO CARD.
    VIEW_DIR, FOV e TARGET_H vêm de ui/preview.ts — o mesmo três-quartos pela
    frente, a mesma elevação de ~7° e a mesma mira a 48% da altura da caixa. O
@@ -2288,9 +2337,7 @@ export function frameAll(groups: THREE.Object3D[]) {
   target.y = box.min.y + (box.max.y - box.min.y) * CARD_TARGET_H;
   controls.target.copy(target);
 
-  const vHalf = camera.fov * Math.PI / 360;
-  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-  const dist = sphere.radius / Math.sin(Math.min(vHalf, hHalf));
+  const dist = openingDistance(sphere.radius);
 
   camera.position.copy(target).addScaledVector(CARD_VIEW_DIR, dist);
   if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;

@@ -75,7 +75,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import {
-  pmrem, applyPreset, setTimeOfDay,
+  pmrem, applyPreset, setTimeOfDay, setHourOfDay, OPEN_HOUR,
   setExternalEnvironment, setExposureBase,
   setSkyDomeVisible, setLamps, setLampModel,
   setHorizonHaze, setHorizonTint, setInteriorBounds,
@@ -480,6 +480,15 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
      It is also what drives the rig hook that colours the dome, so the dome
      picks up its envIntensity on this call, not a frame later. */
   setTimeOfDay(envDef.timeOfDay === 'noite' ? 'noite' : 'dia', { animate: false });
+  /* setTimeOfDay() estaciona o relógio na hora canônica da face — 12:00 para
+     `dia` — porque é o que reproduz os dois rigs legados exatamente. Para um
+     ambiente de DIA isso desfaria a hora de abertura a cada troca de ambiente: o
+     estúdio abriria às 17:45 e voltaria para o sol a pino no primeiro clique do
+     seletor, que é justamente a queixa que OPEN_HOUR existe para resolver.
+     Devolver a hora ANTES do applyPreset() e não depois: applyPreset() re-deriva
+     o sol da hora CORRENTE (ver o seu docstring), então nesta ordem o preset já
+     nasce com a geometria rasante em vez de ser corrigido um passo atrás. */
+  if (envDef.timeOfDay !== 'noite') setHourOfDay(OPEN_HOUR, { animate: false });
   applyPreset(envDef.preset, { animate: false });
 
   current = envDef;
