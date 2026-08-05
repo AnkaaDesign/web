@@ -33,9 +33,18 @@ interface NfseActionsProps {
   /** When false, all mutating actions (emit/cancel) are hidden — read-only
    *  viewers (e.g. ACCOUNTING on Faturamento). Defaults to true. */
   canManage?: boolean;
+  /** When false, only emit/reconcile are offered. Used where a TaskNfseHistoryCard sits
+   *  alongside and already exposes a per-note Cancelar (which also reaches orphan notes),
+   *  so the screen does not show two cancel buttons for the same note. Defaults to true. */
+  showCancel?: boolean;
 }
 
-export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: NfseActionsProps) {
+export function NfseActions({
+  invoiceId,
+  nfseDocuments,
+  canManage = true,
+  showCancel = true,
+}: NfseActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonCode, setCancelReasonCode] = useState('1');
@@ -62,7 +71,7 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
   // Can emit if: no NFSe documents yet, latest is in error/pending state, or all are cancelled
   const hasAnyNfse = (nfseDocuments?.length ?? 0) > 0;
   const canEmit = !hasAnyNfse || !!errorOrPendingNfse || allCancelled;
-  const canCancel = !!authorizedNfse;
+  const canCancel = !!authorizedNfse && showCancel;
 
   // A doc left in PROCESSING is the one state with no way out: emission is a
   // non-transactional POST, so a crash between the request and the response leaves the

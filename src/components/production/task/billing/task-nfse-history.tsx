@@ -54,7 +54,7 @@ export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-          NFS-e
+          Histórico de NFS-e
           {history && history.total > 0 && (
             <Badge variant="secondary" className="ml-1">{history.total}</Badge>
           )}

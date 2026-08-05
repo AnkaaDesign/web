@@ -27,6 +27,7 @@ import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-s
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
+import { TaskNfseHistoryCard } from "@/components/production/task/billing/task-nfse-history";
 import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { FileItem, useFileViewer } from "@/components/common/file";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
@@ -492,7 +493,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                                       </div>
                                       <div className="flex items-center gap-1">
                                         {activeNfse?.elotechNfseId && <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />}
-                                        <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                        <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} showCancel={false} />
                                       </div>
                                     </div>
                                     {activeNfse?.elotechNfseId && <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />}
@@ -696,7 +697,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                       </div>
                       <div className="flex items-center gap-1">
                         {activeNfse?.elotechNfseId && activeNfse.status === "AUTHORIZED" && <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />}
-                        <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                        <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} showCancel={false} />
                       </div>
                     </div>
                     {activeNfse?.elotechNfseId && <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />}
@@ -708,6 +709,12 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           </div>
         );
       })()}
+
+      {/* Histórico completo de NFS-e da tarefa — inclui notas órfãs, isto é, notas emitidas e
+          depois canceladas cujo faturamento foi revertido (invoiceId → null). Os blocos acima
+          leem apenas as notas da fatura viva, então sem isto uma nota que existiu de verdade
+          na prefeitura simplesmente sumia da tela. Escopo de tarefa, renderizado uma vez. */}
+      <TaskNfseHistoryCard taskId={task.id} />
 
       {/* Guarantee */}
       {(() => {
