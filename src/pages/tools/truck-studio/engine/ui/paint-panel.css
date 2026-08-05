@@ -1,0 +1,200 @@
+/* Painel de ajuste da tinta.
+   Mesma linguagem do HUD de luz (hud.css): painel escuro translúcido encostado
+   numa borda, tipografia pequena, controles de largura cheia. A diferença é o
+   lado — a luz mora à esquerda, a tinta à direita — para que abrir os dois não
+   seja uma escolha entre um e outro. */
+
+/* z-index 8 e não 6: 8 é A CAMADA DOS PAINÉIS FLUTUANTES — os crachás, o
+   #ts-hud da luz e os cards do implemento (#ts-panels) estão todos nela, e a
+   pilha inteira está documentada no cabeçalho de ui/hud.css. Em 6 este painel
+   passava POR BAIXO dos cards do baú, que moram no mesmo canto.
+   O empate com os cards é resolvido pela ordem no DOM (este é acrescentado por
+   último, então ganha), mas cobrir os cards continuaria sendo ruim — por isso o
+   painel também não desce até embaixo: `bottom: auto` + teto de altura deixam a
+   metade de baixo da coluna direita para eles. O corpo rola por dentro. */
+.ts-pp {
+  position: absolute;
+  top: 64px;
+  right: 12px;
+  bottom: auto;
+  z-index: 8;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: min(62vh, calc(100dvh - 96px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(16, 18, 22, 0.86);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  color: #e9edf3;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.ts-pp.hidden,
+.ts-pp .hidden {
+  display: none;
+}
+
+/* ---- cabeçalho ---- */
+.ts-pp-top {
+  position: relative;
+  padding: 12px 38px 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ts-pp-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ts-pp-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(233, 237, 243, 0.6);
+}
+
+.ts-pp-x {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ts-pp-x:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ---- corpo rolável ---- */
+.ts-pp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 14px 10px;
+  overscroll-behavior: contain;   /* a roda não vaza para o orbit da cena */
+}
+
+.ts-pp-group {
+  padding: 10px 0 2px;
+}
+
+.ts-pp-group + .ts-pp-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ts-pp-gtitle {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(233, 237, 243, 0.45);
+}
+
+/* ---- um campo ---- */
+.ts-pp-row {
+  margin-bottom: 11px;
+}
+
+.ts-pp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.ts-pp-label {
+  font-size: 11.5px;
+}
+
+.ts-pp-val {
+  font-variant-numeric: tabular-nums;   /* o número não dança durante o arrasto */
+  font-size: 11px;
+  color: rgba(233, 237, 243, 0.55);
+}
+
+.ts-pp-range {
+  width: 100%;
+  accent-color: #7db2ff;
+  cursor: pointer;
+}
+
+.ts-pp-color {
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Não há regra de dica aqui, e a ausência é a correção: a versão anterior abria
+   um parágrafo no hover da linha (max-height 0 → 84px). Cada passagem do mouse
+   crescia e encolhia a linha sob o cursor, e o painel inteiro pulsava enquanto
+   se atravessava a lista. Um controle que muda de tamanho quando o ponteiro o
+   alcança é um alvo que foge — e a explicação não valia isso. Ela mora agora
+   ao lado da declaração de cada campo, em paint-panel.ts. */
+
+/* ---- rodapé ---- */
+.ts-pp-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.ts-pp-btn {
+  flex: 1 1 auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ts-pp-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.ts-pp-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ts-pp-btn.primary {
+  flex-basis: 100%;
+  border-color: rgba(125, 178, 255, 0.5);
+  background: rgba(125, 178, 255, 0.18);
+  font-weight: 600;
+}
+
+.ts-pp-btn.primary:hover:not(:disabled) {
+  background: rgba(125, 178, 255, 0.28);
+}
+
+@media (max-width: 720px) {
+  .ts-pp {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 58vh;
+  }
+}

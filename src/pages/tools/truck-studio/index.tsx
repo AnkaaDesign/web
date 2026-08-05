@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 
 import { mountStudio, unmountStudio } from "./engine";
-import { setColorProvider, FINISH_FROM_API } from "./engine/catalog/colors";
-import { getPaints } from "@/api-client/paint";
+import { setColorProvider, setColorPersister, FINISH_FROM_API } from "./engine/catalog/colors";
+import { getPaints, updatePaint } from "@/api-client/paint";
 import "./engine/core/studio.css";
 import "./engine/ui/selector.css";
 import "./engine/ui/loader.css";
 import "./engine/ui/hud.css";
+import "./engine/ui/paint-panel.css";
 
 /**
  * Truck Studio — configurador 3D (visualizador three.js + editor de plotagem
@@ -210,6 +211,31 @@ setColorProvider(async () => {
     /* O ajuste curado, quando existe. 107 das 522 tintas têm um. */
     effect: paintEffectFrom(p.previewConfig),
   }));
+});
+
+/**
+ * O caminho de volta: a receita ajustada no estúdio vira o `previewConfig` da
+ * tinta.
+ *
+ * GRAVA O OBJETO INTEIRO, e não um merge com o que estava lá. A coluna tem DOIS
+ * autores — o gerador de amostra 2D (luzes, `flipColor`, `effectIntensity`) e a
+ * receita PBR — e eles descrevem a mesma tinta por caminhos que não se somam:
+ * meio de um e meio do outro não é uma tinta, é um híbrido que nenhum dos dois
+ * lados sabe ler. Quem grava por último manda, e `paintEffectFrom()` decide qual
+ * dos dois formatos chegou pelo marcador `pearlFlip`.
+ *
+ * O schema da API preserva chave não declarada (`.passthrough()`), então os
+ * campos da receita atravessam a validação intactos — foi para isso que ele
+ * virou passthrough.
+ */
+setColorPersister(async (colorId, recipe) => {
+  /* O molde: `previewConfigSchema` declara os campos do gerador 2D com
+     `.default()`, então no tipo de SAÍDA do zod eles são obrigatórios — `lights`,
+     `effectIntensity`, `flakeColor`, `flipColor` — e uma receita PBR, que não
+     tem nenhum deles, não satisfaz esse tipo. Na ENTRADA são todos opcionais, e
+     é a entrada que este payload é. O schema é `.passthrough()`, então os campos
+     da receita atravessam a validação intactos. */
+  await updatePaint(colorId, { previewConfig: recipe } as Parameters<typeof updatePaint>[1]);
 });
 
 export const TruckStudioPage = () => {

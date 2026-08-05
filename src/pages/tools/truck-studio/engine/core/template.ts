@@ -97,6 +97,21 @@ export const STUDIO_HTML = /* html */ `
               <circle cx="12" cy="13.4" r="3.1"/>
             </svg>
           </button>
+          <!-- Ajuste da tinta. Fica na MESMA régua dos outros controles de vista
+               porque é a mesma natureza de comando: não muda o que o caminhão é,
+               muda como ele é visto. Ícone de pincel para não competir com a
+               pastilha de cor do seletor, que é onde se ESCOLHE a tinta —
+               aqui ela se afina e se grava. -->
+          <button id="btn-paint" class="ts-vbtn" type="button" title="Ajustar a tinta"
+                  aria-label="Ajustar e gravar a receita desta tinta">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <path d="M4.6 14.4 14 5a2.3 2.3 0 0 1 3.3 0l1.7 1.7a2.3 2.3 0 0 1 0 3.3l-9.4 9.4"/>
+              <path d="M4.6 14.4 9.6 19.4"/>
+              <path d="M6.6 20.9c-1.5 1-3.9.6-4.4-1.1.9 0 1.5-.5 1.8-1.3.4-1.1 1.6-1.7 2.7-1.3 1.1.4 1.6 1.6 1.2 2.7-.2.5-.6.8-1.3 1Z"/>
+            </svg>
+          </button>
         </div>
 
         <!-- DESIGN DO IMPLEMENTO — os três painéis pintáveis, um card cada.

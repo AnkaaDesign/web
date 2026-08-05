@@ -127,7 +127,7 @@ type PaintFinishDefaults = Omit<PaintParams, 'finish' | 'color'>;
    laboratório, expandidos com os campos que lá vêm do preset carregado. Uma
    tinta com receita sobrepõe tudo isto; estes valores são o que uma tinta sem
    curadoria recebe. */
-const PAINT_DEFAULTS_BY_FINISH: Record<PaintFinish, PaintFinishDefaults> = {
+export const PAINT_DEFAULTS_BY_FINISH: Record<PaintFinish, PaintFinishDefaults> = {
   solid: {
     metalness: 0.03, roughness: 0.26, gloss: 1.00,
     pearlAmount: 0.00, pearlMid: '#ffffff', pearlFlip: '#ffffff', pearlTravel: 2.10,
@@ -236,7 +236,9 @@ function syncDerivedColors() {
 
 /* live parameters */
 const params: PaintParams = { ...PAINT_BASE };
-const getPaintParams = (): PaintParams => ({ ...params });
+/** A receita VIVA, copiada. É o que o painel de ajuste lê para se apresentar —
+ *  ele nunca guarda uma cópia própria, porque duas cópias divergem. */
+export const getPaintParams = (): PaintParams => ({ ...params });
 syncDerivedColors();               // seed flake/flop tints from the base colour
 
 /* Todo material de tinta vivo. Pertencimento ao CONJUNTO, não casamento de
@@ -485,7 +487,23 @@ if( uFlakeAmount > 0.001 ){
   // é o que faz o floco parecer suspenso sob um filme transparente em vez de
   // impresso na superfície: ele desliza quando a câmera anda.
   vec3  Vw  = normalize( cameraPosition - vPaintWPos );
-  float vn  = max( dot( pSmoothN, Vw ), 0.12 );
+  // Piso SUAVE no cosseno, e não "max( ndv, 0.12 )".
+  //
+  // O piso existe porque "uCoatThickness / ndv" explode quando a superfície
+  // corre para o horizonte. Mas um max() é uma dobra: de um lado da curva
+  // onde ndv vale 0.12 o deslocamento ainda cresce, do outro ele congela. O
+  // ponto amostrado do floco anda até ali e para — e como a curva ndv = 0.12 é
+  // uma linha contínua sobre a lataria, o padrão de floco muda de fase EM CIMA
+  // dela. Lê-se como um vinco, uma "divisão" marcada atravessando a peça, que
+  // desliza quando a câmera gira porque a curva é definida pelo ângulo de
+  // visão. Só aparece com floco, ou seja: só em metálica e perolizada.
+  //
+  // sqrt(ndv² + k²) tem o mesmo teto de segurança (nunca desce abaixo de k) e
+  // é suave em toda parte: nenhuma derivada salta, então não há linha. Longe do
+  // piso ele vale ndv a menos de 1 %, então o efeito de profundidade do verniz
+  // é o mesmo que era.
+  float ndv = dot( pSmoothN, Vw );
+  float vn  = sqrt( ndv*ndv + 0.0144 );          // 0.0144 = 0.12²
   vec3  fPos = vPaintWPos - ( Vw - pSmoothN*dot(Vw,pSmoothN) ) * ( uCoatThickness / vn );
 
   // Limita a pegada do floco NA TELA. Um mapa de floco mipmapado ganha isso de

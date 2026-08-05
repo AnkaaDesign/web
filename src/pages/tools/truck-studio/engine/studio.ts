@@ -50,6 +50,11 @@ import {
 import { initHud, syncHud } from './ui/hud';
 import { initWeather } from './scene/weather';
 import { initUI, setStatus } from './ui/chrome';
+/* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
+   ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
+   já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
+   e um é o suficiente. */
+import { initPaintPanel, setPaintPanelColor } from './ui/paint-panel';
 import { root, $ } from './core/dom';
 import type { Choice, EnvironmentDef, ManufacturerDef, ModelDef } from './catalog/catalog';
 import type { CabDef } from './vehicle/models';
@@ -297,6 +302,10 @@ function applyColor(color: PaintColorDef) {
     ...(has(fx?.peelScale) ? { peelScale: fx!.peelScale } : {}),
     ...(has(fx?.peelDetail) ? { peelDetail: fx!.peelDetail } : {}),
   });
+  /* O painel de ajuste segue a cor que está no veículo: aberto, ele se
+     reapresenta na cor nova em vez de continuar editando a anterior — e o
+     "Descartar" dele passa a apontar para a receita DESTA cor. */
+  setPaintPanelColor(color.id);
   /* O editor de arte mostra a chapa do painel ATRÁS do desenho, e ela é branca
      ou é esta tinta, conforme o "pintar o implemento". Quem sabe qual é a tinta
      é aqui; quem sabe se ela vale para o baú é o livery. */
@@ -770,6 +779,7 @@ async function boot() {
     livery.initLivery();
     initWeather();
     initUI();
+    initPaintPanel();
 
     $('load-text').textContent = 'Carregando catálogo…';
     /* Três listas independentes: o catálogo diz o que o usuário PODE escolher,

@@ -162,6 +162,52 @@ export function setColorProvider(fn: ColorProvider | null) {
   loading = null;                       // uma troca de fonte invalida o memo
 }
 
+/* ---------------- gravar a receita de volta na tinta ----------------
+   O caminho inverso do provedor, e pela mesma razão de ser: quem sabe falar com
+   a API é ../../index.tsx (é React e pode importar `@/`); o engine não pode, e é
+   isso que o mantém portátil. Aqui fica só o buraco onde a função entra.
+
+   O FORMATO É O DO LABORATÓRIO. A receita gravada é o objeto `PaintParams`
+   inteiro, com os nomes que `paint-lab.html` usa — que são os mesmos que
+   `paintEffectFrom()` (em index.tsx) lê de volta, reconhecendo a receita pelo
+   marcador `pearlFlip`. É o que fecha o ciclo: o que este painel salva é
+   exatamente o que o estúdio carrega na próxima vez, sem tradução no meio. */
+export type ColorPersister = (colorId: string, recipe: Record<string, unknown>) => Promise<void>;
+let persister: ColorPersister | null = null;
+
+export function setColorPersister(fn: ColorPersister | null) {
+  persister = typeof fn === 'function' ? fn : null;
+}
+
+/** Sem provedor não há linha de `Paint` para gravar — o painel esconde o
+ *  "Aplicar" em vez de oferecer um botão que não faz nada. */
+export const canPersistColors = () => persister !== null && !colorsAreFallback;
+
+/**
+ * Grava a receita como padrão desta cor.
+ *
+ * Atualiza a lista EM MEMÓRIA antes de devolver, e não só o banco: a mesma cor
+ * será reaplicada a cada troca de cabine (studio.ts, applyColor) a partir de
+ * `colors[]`. Sem isto o veículo voltaria ao ajuste velho no próximo clique e o
+ * usuário veria a gravação "não pegar" — com o banco já correto.
+ */
+export async function saveColorRecipe(colorId: string, recipe: Record<string, unknown>) {
+  if (!persister) throw new Error('Sem fonte de tintas: nada a gravar.');
+  await persister(colorId, recipe);
+  /* A mesma tradução que `paintEffectFrom()` faz ao ler do banco, porque é o
+     mesmo salto: a receita chama `pearlFlip`/`flakeColor`/`finish`, e o
+     PaintEffect chama `flip`/`flake`/`recipeFinish`. `intensity: 1` porque uma
+     receita já traz as amplitudes em cada campo — não há um ganho global. */
+  const c = colors.find(x => x.id === colorId);
+  if (c) c.effect = normalizeEffect({
+    ...recipe,
+    flip: recipe.pearlFlip ?? null,
+    flake: recipe.flakeColor ?? null,
+    recipeFinish: recipe.finish ?? null,
+    intensity: 1,
+  });
+}
+
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const str = (v: unknown): string | null =>
   (typeof v === 'string' && v.trim() ? v.trim() : null);
