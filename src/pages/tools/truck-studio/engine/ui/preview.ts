@@ -30,6 +30,9 @@ import * as THREE from 'three';
 import { loadGLB, state as vehicleState } from '../vehicle/models';
 import { assetUrl } from '../catalog/catalog';
 import type { PaintFinish } from '../vehicle/paint';
+/* A pose do card. Mora em scene/view.ts porque o ESTÚDIO abre na mesma
+   (scene/scene.ts, frameAll()) — o card é a promessa, a cena é a entrega. */
+import { VIEW_DIR, FOV, TARGET_H } from '../scene/view';
 
 /* Tamanho do buffer. Um card de cor tem ~290 px de largura, e numa tela 2x isso
    já são 580 px de verdade — a primeira versão renderizava a 460 e o resultado
@@ -40,17 +43,6 @@ import type { PaintFinish } from '../vehicle/paint';
    devolve faixa vazia dos dois lados, ou seja pixels gastos em nada. */
 const W = 960, H = 600;
 
-/* Direção da câmera em relação ao centro da cabine. Três quartos pela frente e
-   BAIXO: o olho tem de ficar perto da linha do para-brisa, não acima do teto.
-   O componente y é o único número delicado aqui — a 0.62 (a primeira tentativa)
-   a câmera terminava ~1 m acima do teto e o card virava uma vista de cima, que
-   é justamente o que não mostra a lataria. Em 0.30 a elevação fica em ~7°:
-   ainda dá para ver que o veículo tem volume, e a lateral — que é onde a tinta
-   aparece — ocupa o card.
-   O +Z é a frente (vehicle/models.ts assenta a cabine ocupando [0, comprimento]
-   com a dianteira no +Z). */
-const VIEW_DIR = new THREE.Vector3(1.55, 0.30, 1.95).normalize();
-const FOV = 30;
 
 /* Tinta da miniatura — uma APROXIMAÇÃO deliberada de vehicle/paint.ts.
    O material de verdade injeta GLSL para flocos, flop e casca de laranja; nada
@@ -429,7 +421,7 @@ function frame(cam: THREE.PerspectiveCamera, root: THREE.Object3D, fit = 1) {
   const target = box.getCenter(new THREE.Vector3());
   /* Meia altura, não acima dela: mirar acima do meio inclina a câmera para
      baixo e devolve por outro caminho a vista de cima que VIEW_DIR tirou. */
-  target.y = box.min.y + (box.max.y - box.min.y) * 0.48;
+  target.y = box.min.y + (box.max.y - box.min.y) * TARGET_H;
 
   let dist = sphere.radius / Math.sin((FOV * Math.PI) / 360);
 

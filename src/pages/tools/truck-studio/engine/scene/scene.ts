@@ -151,6 +151,9 @@ import {
   lampUnits, lampModelEmissive, makeLamps, applyLampLayout, setLampRigRefresh,
   getLampLensMat, getLampIntensityScale,
 } from './lamps';
+import {
+  VIEW_DIR as CARD_VIEW_DIR, FOV as CARD_FOV, TARGET_H as CARD_TARGET_H,
+} from './view';
 import { LIGHT_PRESETS, RIG_BASE, COLOR_FIELDS, NUM_FIELDS, makeRig } from './presets';
 import type { Rig } from './presets';
 
@@ -401,8 +404,13 @@ scene.background = bgColor;
    density ≈ 1.978 / visibility_metres (98 % opaque at that distance). */
 scene.fog = new THREE.FogExp2(0xb8d8f5, 0.0028);
 
-export const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 600);
-camera.position.set(14, 6, 18);
+/* A MESMA lente do card (30°, scene/view.ts) e não os 45° de antes: a distância
+   que frameAll() calcula sai do meio-ângulo, então trocar a lente sem trocar a
+   conta mudaria o enquadramento — as duas coisas andam juntas por construção.
+   Uma grande-angular de 45° também incha a cabine de perto, que é o contrário do
+   que uma foto de veículo faz. */
+export const camera = new THREE.PerspectiveCamera(CARD_FOV, 1, 0.1, 600);
+camera.position.set(14, 6, 18);   // semente; frameAll() reposiciona ao carregar
 
 export const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -960,13 +968,25 @@ function setHourInternal(h: number) {
    to a v4 would have thrown away everyone's saved preset and brightness to
    solve a problem the validating reader already solves. v1 and v2 predate that
    discipline and stay purged. */
-const SCENE_KEY = 'truckstudio.scene.v3';
-for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2']) {
+/* v4 porque o preset de abertura mudou para `dourado`: um estado v3 gravado
+   traz `preset: 'ensolarado'` e sobrescreveria o novo padrão em silêncio: quem
+   já abriu o estúdio uma vez nunca veria a mudança. Aposentar a chave é o que
+   faz o padrão novo valer para todo mundo, e é o mesmo movimento que v1→v2. */
+const SCENE_KEY = 'truckstudio.scene.v4';
+for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2', 'truckstudio.scene.v3']) {
   try { localStorage.removeItem(old); } catch (_) { /* ignore */ }
 }
 
+/* `dourado` e não `ensolarado` como padrão: sol a 8° de elevação, chave
+   0xffbb81 contra um recorte frio (rim 0x9fb7e8) e halo forte no horizonte — é
+   luz RASANTE, e é ela que faz a lataria mostrar o que a tinta tem. Sol a pino
+   bate quase perpendicular à chapa: a casca de laranja some, o floco não
+   cintila e o flop do perolizado não tem raspagem para aparecer. O preset
+   continua trocável no HUD; o que muda aqui é só com o que a página ABRE.
+   `hour` fica no meio-dia de propósito — o relógio serve à mistura dia/noite, e
+   a cara dourada já vem da face `dia` do preset, não do horário. */
 export const LIGHT_DEFAULTS = {
-  preset: 'ensolarado', timeOfDay: 'dia' as TimeOfDay, hour: TOD_HOUR.dia,
+  preset: 'dourado', timeOfDay: 'dia' as TimeOfDay, hour: TOD_HOUR.dia,
   /* az/el are DERIVED from `hour`; these are just what the clock says at noon.
      They stop being derived the moment one of the flags below goes true — see
      syncSunToHour() for the full override policy. */
@@ -985,7 +1005,7 @@ function save() {
 export function flushSave() {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = 0; }
   try {
-    localStorage.setItem(SCENE_KEY, JSON.stringify({ v: 3, ...sceneState }));
+    localStorage.setItem(SCENE_KEY, JSON.stringify({ v: 4, ...sceneState }));
   } catch (_) { /* ignore */ }
 }
 addEventListener('pagehide', flushSave);
@@ -2243,20 +2263,38 @@ export function getCameraPose() {
   };
 }
 
+/* A ABERTURA DO ESTÚDIO É A POSE DO CARD.
+   VIEW_DIR, FOV e TARGET_H vêm de ui/preview.ts — o mesmo três-quartos pela
+   frente, a mesma elevação de ~7° e a mesma mira a 48% da altura da caixa. O
+   card é o que o usuário clicou; abrir noutro ângulo faz parecer que veio parar
+   noutro veículo.
+   A distância sai da ESFERA que envolve a caixa, e não de multiplicadores sobre
+   a diagonal: é a mesma conta de preview.ts (`raio / sin(meio-fov)`), a única
+   que garante enquadrar o conjunto inteiro venha ele cavalo sozinho ou com
+   implemento. O que preview.ts tem a mais — calibrate(), que mede a silhueta em
+   pixels e reaproxima — fica de fora de propósito: aqui a moldura é o viewport
+   do usuário, que muda de forma, e uma folga em volta é o que deixa girar sem
+   raspar o veículo na borda no primeiro arrasto.
+   O AJUSTE PELO ASPECTO some junto com o `k` que existia aqui: a conta antiga
+   corrigia a distância por um palpite (1.35/aspect); esta pergunta qual dos dois
+   meios-ângulos — vertical ou horizontal — é o apertado, e usa ele. Num viewport
+   deitado quem limita é a altura; num estreito, a largura. */
 export function frameAll(groups: THREE.Object3D[]) {
   const box = new THREE.Box3();
   for (const g of groups) if (g.visible) box.expandByObject(g);
   if (box.isEmpty()) return;
-  const c = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3()).length();
-  const k = Math.max(1, 1.35 / camera.aspect);   // narrow viewports need more distance
-  controls.target.copy(c);
-  camera.position.set(
-    c.x + size * 0.55 * k,
-    Math.max(CAM_MIN_Y, c.y + size * 0.28 * k),
-    c.z + size * 0.62 * k
-  );
-  camera.far = Math.max(size * 10, 700);         // keep the sky dome inside the frustum
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const target = box.getCenter(new THREE.Vector3());
+  target.y = box.min.y + (box.max.y - box.min.y) * CARD_TARGET_H;
+  controls.target.copy(target);
+
+  const vHalf = camera.fov * Math.PI / 360;
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  const dist = sphere.radius / Math.sin(Math.min(vHalf, hHalf));
+
+  camera.position.copy(target).addScaledVector(CARD_VIEW_DIR, dist);
+  if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
+  camera.far = Math.max(dist + sphere.radius * 4, 700);   // sky dome inside the frustum
   camera.updateProjectionMatrix();               // near is managed per-frame in the loop
   /* frameAll() does NOT call controls.update(), and damping is on, so the camera
      coasts into the new pose over several frames. One dirty frame would land it
