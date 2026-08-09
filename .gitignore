@@ -10,6 +10,10 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Cópias do `dist` guardadas antes de um deploy arriscado (`dist.bak-presaturado`,
+# `dist.bak-prestudio-20260804`). São build, do mesmo tipo que o `dist` acima —
+# só que com nome que escapava do padrão, e juntas passam de 450 MB.
+dist.bak-*
 *.local
 
 # Editor directories and files
@@ -76,6 +80,11 @@ public/models/vehicles/iveco_sway_metallica.glb
 # Saída de diagnóstico do tools/env-build: screenshots de conferência de cena,
 # regeráveis a qualquer momento e sem valor em revisão de código.
 tools/env-build/_shots_*/
+
+# Mesma coisa para a bancada do implemento: `tools/trailer-bench/shots/` são as
+# conferências lado a lado de cada rodada de calibração (8,9 MB em PNG), e os
+# scripts que as produzem estão versionados logo ao lado.
+tools/trailer-bench/shots/
 
 # Bakes anteriores, em qualquer pasta de asset: são backup, não fonte. Cada
 # rodada de bake deixa um .prev/.bak do tamanho do próprio modelo (o do

@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Truck Studio — bancada de render</title>
+<!-- Página de MÁQUINA. Ninguém a abre no navegador para olhar: quem a carrega
+     é o Playwright em shoot.mjs, que espera `window.__rigReady` e daí em
+     diante fala só com `window.__rig`.
+
+     O fundo xadrez existe para o caso em que ALGUÉM a abre — sem ele, um card
+     transparente sobre uma página branca parece um card branco, e a primeira
+     pergunta de quem depurar seria a errada. Ele não entra em pixel nenhum: o
+     que é lido de volta é o canvas, não a página. -->
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: grid; place-items: center; background: #1c1c1c;
+    background-image:
+      linear-gradient(45deg, #262626 25%, transparent 25%, transparent 75%, #262626 75%),
+      linear-gradient(45deg, #262626 25%, transparent 25%, transparent 75%, #262626 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 12px 12px;
+  }
+  canvas { width: 960px; height: 600px; display: block; }
+</style>
+<script type="module" src="/rig.js"></script>

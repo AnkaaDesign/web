@@ -48,6 +48,12 @@
     "src/**/*.tsx",
     "src/**/*.d.ts",
     "src/types/**/*.d.ts",
-    "vite-env.d.ts"
+    "vite-env.d.ts",
+    /* `tools/studio-render/rig.ts` roda no NAVEGADOR, importa `three` e o
+       engine do Truck Studio pelo alias `@/`, e é empacotado por esbuild — que
+       não confere tipo nenhum. Sem esta linha ele seria o único TypeScript do
+       repositório que ninguém verifica, e o primeiro sintoma de uma assinatura
+       mudada no engine seria um render errado, não um erro de build. */
+    "tools/studio-render/rig.ts"
   ]
 }
