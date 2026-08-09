@@ -1255,6 +1255,7 @@ export enum TRUCK_MANUFACTURER {
   VOLVO = "VOLVO",
   DAF = "DAF",
   IVECO = "IVECO",
+  MAN = "MAN",
 }
 
 /**
