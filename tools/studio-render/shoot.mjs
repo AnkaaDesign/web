@@ -141,7 +141,9 @@ if (!jobs.length) {
   console.log('nada a fazer (use --force para refazer o que já existe)');
   process.exit(0);
 }
-console.log(`${jobs.length} card(s) neutro(s) a produzir`);
+console.log(`${jobs.length} card(s) a produzir`
+  + (cores ? ' (neutro + acabamento + cor)' : ' (só o neutro)')
+  + ` · saída: ${OUT_ROOT}`);
 
 const { chromium } = await import(WEB + '/../api/node_modules/playwright/index.mjs');
 const server = await startServer();
