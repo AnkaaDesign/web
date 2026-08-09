@@ -181,6 +181,25 @@ export interface ChassisDef {
   paintMaterials: string[] | null;
 }
 
+/**
+ * Um acabamento de fábrica — ver `ModelDef.finishes` para o porquê de existir.
+ *
+ * Deliberadamente MENOR que um `ChassisDef`: um acabamento não tem geometria
+ * própria (`file`), não tem eixos e não tem `available` — se o modelo carrega,
+ * o acabamento carrega, porque é o MESMO arquivo com os mapas de tinta
+ * mantidos.
+ */
+export interface FinishDef {
+  /** kebab-case, estável — vai para o `localStorage` junto com a escolha. */
+  id: string;
+  /** nome pt-BR do card, no lugar onde uma tinta poria o nome dela. */
+  name: string;
+  /** a linha de baixo do card: o que a tinta poria como acabamento e código. */
+  subtitle: string;
+  /** foto de catálogo, para o card enquanto não houver render da combinação. */
+  image: string | null;
+}
+
 export interface ModelDef {
   /** kebab-case, estável (vai para o localStorage) */
   id: string;
@@ -229,6 +248,37 @@ export interface ModelDef {
    * edição especial. Inferir juntaria um defeito com uma decisão comercial.
    */
   specialEdition: boolean;
+  /**
+   * ACABAMENTOS DE FÁBRICA — uma película que o bake carrega e que a tinta não
+   * sabe fazer. Cada um é UM CARD NO PASSO DA COR, ao lado das tintas.
+   *
+   * POR QUE NÃO É UM MODELO, e por que deixou de ser um.
+   * -------------------------------------------------------------------------
+   * O S-Way 480 Metallica era uma entrada de MODELO própria, ao lado do S-Way
+   * 480 — dois cards para o mesmo caminhão, e o dono do produto leu isso como
+   * o que é: "ele é um Iveco 480, deveria ser como se fosse uma cor".
+   *
+   * O que travava a correção era a crença de que os dois eram malhas
+   * incompatíveis. Medido: no `iveco_metallica_4x2.glb` a película está ASSADA
+   * no albedo da tinta — todo material `*_carpaint_color` traz um `map` chamado
+   * `*_carpaint_color_assada`, enquanto no rip de fábrica esse material vem sem
+   * textura. Derrubando SÓ esse mapa, o mesmo arquivo vira um S-Way liso e
+   * pintável (verificado por render em `tools/trailer-bench/ivecoprobe.ts`),
+   * e recolocando-o a película volta idêntica. Uma malha, dois produtos.
+   *
+   * Então um acabamento não troca de arquivo: ele diz "não pinte, deixe o bake
+   * como está". Quem executa é `loadCab(..., paintMaterials: [])`, o mesmo
+   * caminho que uma cabine sem material de tinta já usava — nada de novo no
+   * carregador.
+   *
+   * O MAPA ASSADO É RECONHECIDO PELO NOME DA TEXTURA (`_assada`), não por lista
+   * no manifesto: quem assou batizou, e um marcador que viaja dentro do asset
+   * não pode ficar dessincronizado de um JSON. Ver `BAKED_FINISH_RE` em
+   * vehicle/models.ts.
+   *
+   * Vazio = o modelo só tem tinta, que é o caso de todos os outros 20.
+   */
+  finishes: FinishDef[];
   /** Padrão de `ChassisDef.paintMaterials` para os chassis que não declaram o
    *  seu. `null` = ninguém declarou → vale a detecção por shader. */
   paintMaterials: string[] | null;
@@ -270,6 +320,17 @@ export interface Choice {
   chassisId: string | null;
   /** id em catalog/colors.ts — a pintura do cavalo mecânico */
   colorId: string | null;
+  /**
+   * id em `ModelDef.finishes` — a película de fábrica, quando o usuário escolhe
+   * uma em vez de uma tinta.
+   *
+   * MUTUAMENTE EXCLUSIVO COM `colorId` na INTENÇÃO, não no armazenamento: os
+   * dois convivem no objeto porque o `colorId` continua valendo para o
+   * IMPLEMENTO (o baú é pintável mesmo atrás de um cavalo com película) e
+   * porque voltar de um acabamento para uma cor não pode ter perdido qual cor
+   * era. Quem manda na cabine é este campo quando ele não é nulo.
+   */
+  finishId: string | null;
 }
 
 /** Uma escolha já resolvida contra o catálogo — nenhum id é nulo. */
@@ -279,6 +340,10 @@ export interface ResolvedChoice {
   modelId: string;
   chassisId: string;
   colorId: string;
+  /** O ÚNICO campo que continua podendo ser nulo depois de resolvido, e é a
+   *  diferença que ele carrega: "nenhum acabamento" é um estado válido — o
+   *  normal, aliás —, enquanto "nenhuma cor" não é. */
+  finishId: string | null;
 }
 
 export interface Catalog {
@@ -698,8 +763,27 @@ function normalizeModel(input: unknown): ModelDef | null {
       paintMaterials: strArr(raw.paintMaterials),
     });
   }
+  /* Um acabamento sem `id` ou sem `name` é ruído de manifesto e sai calado, do
+     mesmo jeito que um chassi malformado: o passo da cor tem de continuar
+     abrindo com as tintas. */
+  const finishes: FinishDef[] = (Array.isArray(raw.finishes) ? raw.finishes : [])
+    .map((f: unknown) => {
+      const r = (f ?? {}) as Record<string, unknown>;
+      const fid = str(r.id, '');
+      const fname = str(r.name, '');
+      if (!fid || !fname) return null;
+      return {
+        id: fid,
+        name: fname,
+        subtitle: str(r.subtitle, ''),
+        image: nullableStr(r.image),
+      };
+    })
+    .filter((f): f is FinishDef => f !== null);
+
   return {
     chassis,
+    finishes,
     id,
     name,
     subtitle: str(raw.subtitle, ''),
@@ -995,8 +1079,24 @@ export function fileOf(
  */
 export function paintMaterialsOf(
   model: ModelDef, chassis: ChassisDef | null | undefined,
+  finishId?: string | null,
 ): string[] | null {
+  /* ACABAMENTO ATIVO ⇒ NENHUM MATERIAL ACEITA TINTA, e é assim que ele é
+     implementado inteiro. `loadCab()` já sabe o que fazer com uma lista vazia
+     (não troca material nenhum, e diz no log), então uma película não precisa
+     de um caminho novo no carregador — precisa de uma resposta diferente para
+     a pergunta que ele já faz. Ver `ModelDef.finishes`. */
+  if (finishId && model.finishes.some((f) => f.id === finishId)) return [];
   return (chassis ? chassis.paintMaterials : null) ?? model.paintMaterials ?? null;
+}
+
+/** O acabamento pedido, se ele existir NESTE modelo. `null` para tudo o mais —
+ *  inclusive para um id que sobreviveu no localStorage a uma troca de modelo. */
+export function finishOf(
+  model: ModelDef | null | undefined, finishId: string | null | undefined,
+): FinishDef | null {
+  if (!model || !finishId) return null;
+  return model.finishes.find((f) => f.id === finishId) ?? null;
 }
 
 /**
@@ -1031,6 +1131,10 @@ export function defaultChoice(): Choice {
     modelId: model ? model.id : null,
     chassisId: chassis ? chassis.id : null,
     colorId: defaultColorId(),
+    /* Um visitante novo abre na TINTA, nunca num acabamento: a película é uma
+       escolha deliberada, e abrir nela mostraria um caminhão de edição limitada
+       como se fosse o padrão da linha. */
+    finishId: null,
   };
 }
 
@@ -1043,6 +1147,7 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
   const c = choice as Raw;
   let wantedModel = nullableStr(c.modelId);
   let wantedChassis = nullableStr(c.chassisId);
+  const wantedFinish = nullableStr(c.finishId);
   let found = getModel(wantedModel);
   if (!found) {
     /* MIGRAÇÃO. O id salvo pode ser um id COMERCIAL de antes de `modelId`
@@ -1092,6 +1197,12 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
     modelId: found.model.id,
     chassisId: chassis ? chassis.id : DEFAULT_CHASSIS_ID,
     colorId: color ? color.id : defaultColorId(),
+    /* RESOLVIDO CONTRA O MODELO, e é o que impede um acabamento de sobreviver a
+       uma troca de caminhão: o id fica no localStorage, e sem este filtro um
+       S-Way com película escolhida viraria "Scania com película metallica" —
+       um estado que `paintMaterialsOf()` leria como "não pinte" num caminhão
+       que não tem outra coisa a mostrar. */
+    finishId: finishOf(found.model, wantedFinish)?.id ?? null,
   };
 }
 

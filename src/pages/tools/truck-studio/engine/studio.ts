@@ -35,6 +35,7 @@ import * as loader from './ui/loader';
 import {
   loadCatalog, loadChoice, saveChoice, defaultChoice,
   getEnvironment, getModel, assetUrl, defaultChassis, fileOf, paintMaterialsOf,
+  finishOf,
 } from './catalog/catalog';
 import {
   initSelector, openSelector, setBadge, showBadge, setMapBadge, showMapBadge,
@@ -43,6 +44,7 @@ import {
 import { loadRenders, renderUrl } from './catalog/renders';
 import { loadColors, getColor, defaultColor, FINISH_LABEL } from './catalog/colors';
 import type { PaintColorDef } from './catalog/colors';
+import type { FinishDef } from './catalog/catalog';
 import { applyEnvironment, getCurrentEnvironment, disposeEnvironments } from './scene/environment';
 import { disposeReflectionProbe } from './scene/probe';
 import {
@@ -70,6 +72,8 @@ interface ResolvedPick {
   chassis: ChassisDef;
   manufacturer: ManufacturerDef;
   color: PaintColorDef;
+  /** O acabamento de fábrica escolhido, quando há um. `null` = tinta normal. */
+  finish: FinishDef | null;
 }
 
 /** Quais downloads esta aplicação vai rodar, e o peso relativo de cada um. */
@@ -226,6 +230,12 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
   const chassis = found.model.chassis.find((c) => c.id === choice?.chassisId)
     || defaultChassis(found.model);
   if (!chassis) return null;
+  /* O ACABAMENTO É RESOLVIDO DENTRO DO MODELO, pela mesma razão do chassi: o id
+     vive no localStorage e sobrevive a uma troca de caminhão. Sem este filtro,
+     um `finishId` herdado apagaria a tinta de um modelo que não tem película
+     nenhuma para pôr no lugar — `paintMaterialsOf()` leria "[]" e a cabine
+     ficaria na cor do rip, calada. */
+  const finish = finishOf(found.model, choice?.finishId);
   return {
     choice: {
       envId: env.id,
@@ -233,12 +243,14 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
       modelId: found.model.id,
       chassisId: chassis.id,
       colorId: color.id,
+      finishId: finish ? finish.id : null,
     },
     env,
     model: found.model,
     chassis,
     manufacturer: found.manufacturer,
     color,
+    finish,
   };
 }
 
@@ -252,10 +264,46 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
    escrito num lugar só (setSpecialEdition), porque applyColor() roda por vários
    caminhos e não pode reabrir o crachá de cor que este estado fechou. */
 let specialEdition = false;
+/* O nome da película em cena, para o crachá. Módulo-privado e escrito no mesmo
+   lugar que `specialEdition`, pela mesma razão dele: `applyColor()` roda por
+   vários caminhos e não pode adivinhar o que o seletor escolheu. */
+let currentFinishName: string | null = null;
+/* A última tinta aplicada. Existe porque o CRACHÁ depende de duas coisas que
+   chegam em ORDENS diferentes: `applyColor()` roda antes de `setSpecialEdition()`
+   no caminho de carga, então quem escrevesse o crachá dentro de applyColor()
+   leria o acabamento ANTERIOR — o Metallica entrava em cena e o crachá ainda
+   dizia a cor do caminhão de antes. Com as duas metades guardadas, cada uma
+   pede a repintura quando muda, e a ordem deixa de importar. */
+let lastColor: PaintColorDef | null = null;
+
+/**
+ * Repinta o rótulo de cor do crachá a partir do estado corrente.
+ *
+ * COM ACABAMENTO, O CRACHÁ NOMEIA A PELÍCULA. Antes ele ficava mudo, o que
+ * fazia sentido enquanto uma edição especial fosse um MODELO — o nome dele já
+ * dizia "Metallica". Agora que a película é uma escolha DENTRO do S-Way 480,
+ * calar o crachá esconde justamente o que o usuário acabou de escolher.
+ * A amostra continua fora: uma película não tem um hex, e `paintBadgeSwatch()`
+ * já a suprime por `badgeSpecial`.
+ */
+function syncBadgeColor() {
+  const c = lastColor;
+  if (!c) return;
+  setBadgeColor(
+    specialEdition ? currentFinishName : c.name,
+    specialEdition ? null : c.hex,
+    specialEdition
+      ? (currentFinishName ? 'Acabamento de fábrica' : null)
+      : FINISH_LABEL[c.finish],
+  );
+}
 
 /** Liga/desliga as afordâncias de tinta do cavalo. Idempotente. */
-function setSpecialEdition(on: boolean) {
+function setSpecialEdition(on: boolean, finishName?: string | null) {
   specialEdition = on;
+  currentFinishName = on ? (finishName ?? null) : null;
+  /* Ver `lastColor`: esta é a metade que costuma chegar por último. */
+  syncBadgeColor();
   /* O card do caminhão abre o fluxo do caminhão INTEIRO, película ou não — e o
      seletor tira o passo da cor da sequência sozinho quando o modelo é uma
      edição especial (`seqFor`), então não há promessa a quebrar. O que o crachá
@@ -267,6 +315,12 @@ function setSpecialEdition(on: boolean) {
   const btn = document.getElementById('btn-paint');
   if (btn) btn.classList.toggle('hidden', on);
   if (on) closePaintPanel();
+  /* E o editor grande também: "Pintar o implemento com a cor do cavalo" era a
+     última afordância de tinta que sobrevivia a uma edição especial, e ela
+     oferecia estender ao baú uma cor que este caminhão não tem. Ver
+     `livery.setSpecialEdition()` para o porquê de esconder em vez de
+     desabilitar, e para a desmarcação obrigatória. */
+  livery.setSpecialEdition(on);
 }
 
 function applyColor(color: PaintColorDef) {
@@ -318,11 +372,8 @@ function applyColor(color: PaintColorDef) {
   /* A amostra do canto do card do caminhão — o que sobrou do card de cor. Só a
      amostra e o rótulo: repintar o crachá inteiro descartaria a imagem já
      decodificada para pôr a mesma de volta, piscando a cada troca de cor. */
-  setBadgeColor(
-    specialEdition ? null : color.name,
-    specialEdition ? null : color.hex,
-    FINISH_LABEL[color.finish],
-  );
+  lastColor = color;
+  syncBadgeColor();
   /* O laço sujo (scene.ts) só desenha quando alguém diz que a imagem mudou, e
      esta é uma das três lacunas que a nota de ON_DEMAND_RENDERING lista por
      nome: o atalho de só-cor pula o pipeline de carregamento de propósito, e com
@@ -632,7 +683,7 @@ function applyTrailerDimsDebounced(
 liveryStructure.setDimsApplier((patch) => applyTrailerDimsDebounced(patch));
 
 async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean) {
-  const { choice, env, model, chassis, manufacturer, color } = resolved;
+  const { choice, env, model, chassis, manufacturer, color, finish } = resolved;
   /* 'Highline · 6x4' — o chassi é um passo do seletor agora, então tudo que
      nomeia o veículo (a cortina, o crachá, a linha de estado) tem de dizer qual
      configuração está na tela. */
@@ -714,7 +765,13 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
          dentro de um crachá que mostra um render seria a troca de duas
          imagens diferentes disfarçada de uma. Cai na foto quando o render
          daquela combinação ainda não existe. */
-      modelImage: renderUrl(manufacturer.id, model.id, chassis.id, color.id)
+      /* O ACABAMENTO MANDA NA IMAGEM. `color.id` é a tinta, e com uma película
+         escolhida a tinta não é o que está na tela — a cortina mostrava o S-Way
+         BRANCO enquanto o estúdio montava o Metallica. O `colorId` continua
+         guardado (é a cor do implemento), mas quem nomeia o card do cavalo aqui
+         é o acabamento. */
+      modelImage: renderUrl(manufacturer.id, model.id, chassis.id,
+        finish ? finish.id : color.id)
         || assetUrl(chassis.image || model.image),
       logo: assetUrl(manufacturer.logo),
       manufacturerName: manufacturer.name,
@@ -729,7 +786,7 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     const tasks: Promise<unknown>[] = [];
     if (needCab) {
       tasks.push(models.loadCab(cabFile, progress.track('cab'),
-        paintMaterialsOf(model, chassis)));
+        paintMaterialsOf(model, chassis, finish?.id ?? null)));
     }
     if (needEnv) tasks.push(applyEnvironment(env, progress.track('env')));
     if (first) tasks.push(models.loadTrailer(progress.track('trailer')));
@@ -842,7 +899,13 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
       /* A MESMA imagem dos cards e da cortina. Sem espera, sem token de corrida:
          `renderUrl()` responde do manifesto já carregado, e a cadeia de
          fallback (render → foto → silhueta) mora dentro de setBadge(). */
-      render: { url: renderUrl(manufacturer.id, model.id, chassis.id, color.id), chassisId: chassis.id },
+      /* Mesma regra da cortina: com película, é ela que o crachá do canto
+         mostra. Eram os dois lugares em que o caminhão branco aparecia no lugar
+         do Metallica. */
+      render: {
+        url: renderUrl(manufacturer.id, model.id, chassis.id, finish ? finish.id : color.id),
+        chassisId: chassis.id,
+      },
       colorName: color.name,
       colorHex: color.hex,
       finishLabel: FINISH_LABEL[color.finish],
@@ -856,7 +919,12 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        applyColor() acima roda de qualquer forma, e é de propósito: ele também
        alimenta o editor de arte e o crachá, e a cor carregada continua sendo a
        do implemento, que É pintável mesmo atrás de um cavalo de edição especial. */
-    setSpecialEdition(!!model.specialEdition);
+    /* `specialEdition` (o modelo INTEIRO é uma película) ou um ACABAMENTO
+       escolhido — os dois chegam aqui como a mesma coisa, porque para as
+       afordâncias de tinta eles são: não há cor de cavalo a oferecer. A
+       diferença mora um passo antes, no seletor: o modelo especial some com o
+       passo da cor, o acabamento É um card dentro dele. */
+    setSpecialEdition(!!model.specialEdition || !!finish, finish?.name ?? null);
     setMapBadge({
       envName: env.name,
       envSubtitle: env.subtitle,

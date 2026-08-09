@@ -984,6 +984,40 @@ export function setCabPaintColor(hex: string | null | undefined) {
   syncImplementColor();
 }
 
+/**
+ * "Pintar o implemento com a cor do cavalo" SOME numa edição especial.
+ *
+ * O controle promete estender ao baú a tinta do cavalo, e numa edição especial
+ * não existe tinta do cavalo para estender: a película É o produto. Medido no
+ * `iveco_metallica_4x2.glb`, o desenho está ASSADO dentro do albedo — todos os
+ * materiais de tinta chegam com um `map` chamado `*_carpaint_color_assada`,
+ * enquanto no rip de fábrica o `carpaint_color` vem sem textura nenhuma. Por
+ * isso o modelo declara `paintMaterials: []` e o seletor tira o passo da cor
+ * (`seqFor`): não há cor a escolher.
+ *
+ * O que sobrava era este checkbox, o único lugar do app que ainda oferecia a
+ * tinta de um caminhão que não tem tinta. Ligado, ele pintava o baú com
+ * `cabPaintHex`, que numa edição especial é a cor que sobrou da ÚLTIMA escolha
+ * — de outro caminhão. Esconder é a correção certa: desabilitar deixaria na
+ * tela uma pergunta cuja resposta não existe.
+ *
+ * Desligar é obrigatório junto com esconder. Quem vem de um caminhão pintável
+ * com a caixa marcada trocaria de modelo e ficaria com o baú tingido, sem
+ * controle visível para desfazer.
+ */
+export function setSpecialEdition(on: boolean) {
+  const box = $('paint-trailer') as HTMLInputElement;
+  const row = box.closest('label');
+  if (on && box.checked) {
+    box.checked = false;
+    /* Pelo mesmo caminho do clique — as duas metades andam juntas; ver
+       `bindTrailerPaint()`. Um `checked = false` sozinho deixaria o material do
+       baú pintado e o fundo branco das telas fora. */
+    box.dispatchEvent(new Event('change'));
+  }
+  if (row) row.classList.toggle('hidden', on);
+}
+
 /* ---------------- palco ---------------- */
 export const stagePanels: Record<SurfaceKey, HTMLElement> =
   { left: $('stage-left'), right: $('stage-right'), rear: $('stage-rear') };

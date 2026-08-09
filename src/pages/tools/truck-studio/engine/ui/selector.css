@@ -224,23 +224,46 @@
   width: 100%;
   margin: 0 auto;
 }
-/* Step 1 (maps) is the hero step: ~360px cards with a 16:9 photo. */
-.truck-studio-root .ts-cards--maps {
-  --ts-media-ratio: 16 / 9;
-  max-width: 1116px; /* 3 x 360 + 2 x 18 */
-}
-/* Steps 2 and 3 sit visibly smaller: ~280px cards. */
-.truck-studio-root .ts-cards--brands {
-  --ts-media-ratio: 4 / 3;
-  max-width: 876px; /* 3 x 280 + 2 x 18 */
-}
-.truck-studio-root .ts-cards--models {
-  --ts-media-ratio: 3 / 2;
-  max-width: 876px;
-}
+/* UMA GEOMETRIA PARA OS QUATRO PASSOS.
+   ---------------------------------------------------------------------------
+   Aqui havia quatro: 16/9 a 1116px no mapa, 4/3 a 876 nas marcas, 3/2 a 876 nos
+   modelos e 16/10 a 1040 nas cores — quatro larguras de card e quatro
+   proporções de foto no mesmo overlay. A intenção estava escrita ("step 1 is
+   the hero"), mas o que ela produz é um card que muda de tamanho a cada clique
+   no MESMO fluxo, e foi assim que o dono do produto leu: "tem alguns cards com
+   o tamanho diferente dos outros".
+
+   Um seletor é UMA lista percorrida quatro vezes, e a hierarquia dele já é
+   dita pela trilha de migalhas e pelo título do passo. Tamanho não precisa
+   repetir isso — só precisa não atrapalhar a comparação entre irmãos, que é a
+   única coisa que o usuário faz nesta tela.
+
+   16/10 é a proporção dos RENDERS (960x600), que são o conteúdo de três dos
+   quatro passos. A foto de cenário é 16/9 e o logo de marca não tem proporção
+   nenhuma: as duas entram por `object-fit` na mesma caixa, sem esticar. */
+.truck-studio-root .ts-cards--maps,
+.truck-studio-root .ts-cards--brands,
+.truck-studio-root .ts-cards--models,
 .truck-studio-root .ts-cards--colors {
   --ts-media-ratio: 16 / 10;
   max-width: 1040px;
+  /* A CALHA DAS SETAS É RESERVADA SEMPRE, e é isto que faltava para o card ter
+     UM tamanho.
+     O carrossel só liga acima de três itens (`items.length > PER_PAGE`), e
+     quando liga as duas setas mais os dois vãos comem 108 px da largura útil.
+     Resultado: marca (7 itens) e cor (26) davam cards de ~299 px enquanto mapa
+     e chassi (2 itens, sem carrossel) davam ~335 px — no mesmo overlay, a um
+     clique de distância. Unificar `max-width` não bastava porque a diferença
+     não estava no contêiner, estava em quem mais divide a linha com ele.
+     Reservando a calha nos passos SEM carrossel, os dois caminhos chegam à
+     mesma janela útil e à mesma conta de card. */
+  --ts-rail: 54px; /* 40 da seta + 14 do vão */
+  padding-inline: var(--ts-rail);
+}
+/* O carrossel já gasta a calha com as setas de verdade: reservá-la duas vezes
+   estreitaria justamente o passo que tem mais o que mostrar. */
+.truck-studio-root .ts-cards--carousel {
+  padding-inline: 0;
 }
 
 /* ---------- CARROSSEL ----------
@@ -774,7 +797,8 @@
   letter-spacing: 0.01em;
   color: var(--text);
 }
-.truck-studio-root .ts-cards--maps .ts-card__name { font-size: 15px; }
+/* Sem tamanho de fonte por passo: o nome do cenário não é mais importante que
+   o do modelo, e o card do mapa já não é maior que os outros. */
 .truck-studio-root .ts-card__sub {
   font-size: 11.5px;
   line-height: 1.35;
@@ -1277,6 +1301,12 @@
   .truck-studio-root .ts-cards--colors { max-width: 460px; --ts-media-ratio: 4 / 3; }
   .truck-studio-root .ts-cards--carousel { --ts-gap: 10px; gap: 8px; }
   .truck-studio-root .ts-carousel__nav { width: 32px; height: 32px; }
+  /* A calha acompanha a seta, senão o passo sem carrossel fica mais estreito
+     que o com — o defeito de origem, invertido. */
+  .truck-studio-root .ts-cards--maps,
+  .truck-studio-root .ts-cards--brands,
+  .truck-studio-root .ts-cards--models,
+  .truck-studio-root .ts-cards--colors { --ts-rail: 46px; }
   .truck-studio-root .ts-card__swatch { width: 20px; height: 20px; left: 7px; bottom: 7px; }
   .truck-studio-root .ts-step__label { display: none; }
   .truck-studio-root .ts-step + .ts-step::before { width: 26px; }
@@ -1295,6 +1325,12 @@
   .truck-studio-root .ts-cards--colors { max-width: 460px; --ts-media-ratio: 4 / 3; }
   .truck-studio-root .ts-cards--carousel { --ts-gap: 10px; gap: 8px; }
   .truck-studio-root .ts-carousel__nav { width: 32px; height: 32px; }
+  /* A calha acompanha a seta, senão o passo sem carrossel fica mais estreito
+     que o com — o defeito de origem, invertido. */
+  .truck-studio-root .ts-cards--maps,
+  .truck-studio-root .ts-cards--brands,
+  .truck-studio-root .ts-cards--models,
+  .truck-studio-root .ts-cards--colors { --ts-rail: 46px; }
 }
 
 /* Both badges live in #canvas-holder. We do not own studio.css and must not turn that

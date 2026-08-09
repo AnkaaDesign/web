@@ -595,6 +595,44 @@ export function initSelector() {
   host.appendChild(corner);
 }
 
+/* Prefixo do id de um ACABAMENTO no passo da cor. Ver `choose()`: um passo
+   lista duas famílias de card (películas de fábrica e tintas de catálogo) e os
+   ids delas vêm de manifestos diferentes, que não têm como se coordenar. */
+const FINISH_PREFIX = 'acabamento:';
+
+/* NOME DE CHASSI: `6x2 (eixo de apoio elevatorio)` é DUAS informações num campo
+   só, e o card tem dois campos. A configuração de eixos é o título — é por ela
+   que se escolhe — e o que estiver entre parênteses vira o qualificador.
+   Sem parênteses, não há qualificador: `4x2` não precisa de segunda linha. */
+const CHASSIS_QUALIFIER_RE = /^(.*?)\s*\(([^)]*)\)\s*$/;
+const chassisTitle = (name: string) => CHASSIS_QUALIFIER_RE.exec(name)?.[1]?.trim() || name;
+const chassisQualifier = (name: string) => CHASSIS_QUALIFIER_RE.exec(name)?.[2]?.trim() || '';
+
+/* A LISTA DE EIXOS NÃO É SUBTÍTULO DE MODELO. `4x2 · 6x2-tl · 6x4` é a
+   pergunta do passo seguinte; deixá-la no card do modelo é gastar a segunda
+   linha com o que o usuário ainda vai escolher. O teste é sobre a FORMA do
+   texto (só configurações de eixo separadas por ·), não uma lista de exceções:
+   assim um subtítulo de verdade — `AS Highway` — passa, e um manifesto novo que
+   repita o vício é filtrado sem ninguém precisar lembrar. */
+const AXLE_LIST_RE = /^\s*\d+x\d+[a-z-]*(\s*·\s*\d+x\d+[a-z-]*)*\s*$/i;
+/** O subtítulo de modelo com a lista de eixos filtrada. Exportado por dentro
+ *  para `chassisSubtitle()` usar a MESMA régua — a cortina de carregamento e a
+ *  linha de estado mostravam `4x2 · 6x2a-tl · 6x2 (eixo de apoio elevatorio)`,
+ *  a lista inteira mais o escolhido, que é o mesmo vício visto de outro lugar. */
+function cleanModelSubtitle(sub: string | null | undefined): string {
+  const t = (sub || '').trim();
+  return !t || AXLE_LIST_RE.test(t) ? '' : t;
+}
+
+function modelSubtitle(m: { subtitle: string; available: boolean }): string {
+  const sub = cleanModelSubtitle(m.subtitle);
+  if (!sub) return '';
+  /* "Em breve" já é a TAG do card (`available: false`), e repeti-la embaixo do
+     nome era a mesma frase duas vezes no mesmo card. */
+  if (!m.available && /^em breve$/i.test(sub)) return '';
+  return sub;
+}
+
 /* ---------------- choice helpers ---------------- */
 
 /* A saved/passed choice can reference ids the catalog no longer has (manifest
@@ -603,10 +641,14 @@ export function initSelector() {
 function sanitize(choice: Choice | null | undefined): Choice {
   const out: Choice = {
     envId: null, manufacturerId: null, modelId: null, chassisId: null, colorId: null,
+    finishId: null,
   };
   if (!choice || typeof choice !== 'object') return out;
   const color = getColor(choice.colorId);
   if (color) out.colorId = color.id;
+  /* O acabamento é resolvido depois do modelo, mais abaixo — aqui só se anota o
+     pedido. Um id órfão (modelo trocado desde a última sessão) morre lá. */
+  out.finishId = choice.finishId ?? null;
   const env = getEnvironment(choice.envId);
   if (env) out.envId = env.id;
   const man = getManufacturer(choice.manufacturerId);
@@ -621,8 +663,12 @@ function sanitize(choice: Choice | null | undefined): Choice {
          (ou que perdeu a geometria) não pode chegar ao passo como selecionado. */
       const hit = model.chassis.find((c) => c.id === choice!.chassisId && c.available);
       if (hit) out.chassisId = hit.id;
-    }
-  }
+      /* E AQUI o acabamento morre se não for deste modelo. Sem isto, trocar de
+         caminhão levaria junto uma película que o novo não tem, e o passo da
+         cor abriria com nenhum card marcado. */
+      if (!model.finishes.some((f) => f.id === out.finishId)) out.finishId = null;
+    } else out.finishId = null;
+  } else out.finishId = null;
   return out;
 }
 
@@ -728,7 +774,13 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
     return man.models.map(m => ({
       id: m.id,
       name: m.name,
-      sub: m.subtitle,
+      /* SÓ O NOME DO MODELO. O subtítulo autorado é, em 19 dos 21 modelos, a
+         LISTA DE CHASSIS (`4x2 · 6x2-tl · 6x4`) — ou seja, a pergunta do passo
+         SEGUINTE, adiantada e sem poder ser respondida aqui. O que sobra de
+         útil (`AS Highway`) é a versão de cabine, e ela pertence ao nome
+         comercial, não a uma segunda linha. Onde houver algo que não seja a
+         lista de eixos, ele continua aparecendo. */
+      sub: modelSubtitle(m),
       image: m.image,
       logo: null,
       accent: man.accent,
@@ -758,10 +810,19 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
     const { model, manufacturer } = found;
     return model.chassis.map((c) => ({
       id: c.id,
-      name: c.name,
-      /* O subtítulo do chassi, senão o do modelo: um `6x4` sem legenda própria
-         ainda tem de dizer alguma coisa abaixo do nome. */
-      sub: c.subtitle || model.subtitle,
+      /* NOME E QUALIFICADOR SEPARADOS. Os nomes autorados vêm na forma
+         `6x2 (eixo de apoio elevatorio)`, e o card tem exatamente dois campos
+         para isso — usar o primeiro inteiro deixava o título com nove palavras
+         e o segundo com a lista de chassis do MODELO. Ver `splitChassisName()`. */
+      name: chassisTitle(c.name),
+      /* O QUALIFICADOR DESTE CHASSI, e nada mais.
+         Era `c.subtitle || model.subtitle`, e como nenhum chassi do manifesto
+         declara `subtitle`, o fallback disparava SEMPRE: o card do 4x2 saía com
+         o subtexto `4x2 · 6x2a-tl`, que é a lista de irmãos dele. O passo já é
+         "escolha o chassi" e o card já se chama pelo nome do chassi — repetir a
+         lista aqui era dizer duas vezes o que o passo inteiro está perguntando.
+         Sem qualificador, o card fica só com o nome, que basta. */
+      sub: c.subtitle || chassisQualifier(c.name),
       image: c.image || model.image,
       logo: null,
       accent: manufacturer.accent,
@@ -790,7 +851,30 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
      concorrente — e, pior, colocar as linhas de teste na frente, porque quase
      todas têm `colorOrder` 0. Montadora sem tinta cadastrada cai na paleta
      inteira; ver colorsFor(). */
-  return colorsFor(choice.manufacturerId).map((c) => ({
+  /* OS ACABAMENTOS DE FÁBRICA VÊM PRIMEIRO. Uma película não é uma tinta que
+     alguém aplica — é como o caminhão sai da fábrica —, e ela responde a mesma
+     pergunta deste passo. Enfileirá-la aqui é o que tira o S-Way Metallica da
+     lista de MODELOS, onde ele aparecia como um segundo caminhão ao lado do
+     S-Way 480 sendo o mesmo. Ver `ModelDef.finishes`.
+     Antes das tintas porque são poucas e são o diferencial do modelo; depois
+     delas vêm as 26 cores da montadora, na ordem do catálogo de tinta. */
+  const finishCards = (picked?.model.finishes ?? []).map((f) => ({
+    id: FINISH_PREFIX + f.id,
+    name: f.name,
+    sub: f.subtitle,
+    image: f.image,
+    logo: null,
+    /* Sem amostra e com o anel na cor da marca: uma película não tem UM hex, e
+       inventar um (o amarelo do Metallica? o preto?) mentiria sobre o produto.
+       O card mostra a FOTO, que é a única descrição honesta dela. */
+    accent: picked?.manufacturer.accent ?? null,
+    tag: null,
+    selected: choice.finishId === f.id,
+    available: true,
+    render: renderFor(manId, modelId, choice.chassisId, f.id),
+  }));
+
+  return finishCards.concat(colorsFor(choice.manufacturerId).map((c) => ({
     id: c.id,
     name: c.name,
     sub: FINISH_LABEL[c.finish] + (c.code ? ' · ' + c.code : ''),
@@ -800,11 +884,15 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
        é da marca — aqui a marca do card é a cor. */
     accent: c.hex,
     tag: null,
-    selected: c.id === choice.colorId,
+    /* Com um acabamento escolhido, NENHUMA tinta fica marcada: o `colorId`
+       continua guardado (é a cor do implemento, e é para onde se volta ao sair
+       da película), mas marcá-lo aqui mostraria dois cards selecionados no
+       mesmo passo. */
+    selected: !choice.finishId && c.id === choice.colorId,
     available: true,
     render: renderFor(manId, modelId, choice.chassisId, c.id),
     swatch: c.hex,
-  }));
+  })));
 }
 
 /* O chassi de OUTRO modelo que mais se parece com o escolhido: o mesmo id se
@@ -1299,7 +1387,18 @@ function choose(stepIndex: number, id: string) {
     choice.chassisId = id;
     warmRenders(choice);
   } else {
-    choice.colorId = id;
+    /* UM PASSO, DOIS TIPOS DE CARD. O passo da cor lista os ACABAMENTOS de
+       fábrica antes das tintas (ver `itemsFor`), e o id deles chega prefixado
+       para os dois nunca colidirem: `metallica` é um acabamento do S-Way e
+       poderia, um dia, ser também o nome de uma tinta de catálogo.
+
+       Escolher tinta LIMPA o acabamento, e vice-versa — são a mesma pergunta
+       ("de que cor este caminhão"), respondida de duas formas. O `colorId`
+       sobrevive por baixo de um acabamento de propósito: ele continua sendo a
+       cor do IMPLEMENTO, e é o que faz voltar do Metallica para a paleta cair
+       na tinta que já estava escolhida em vez de num padrão. */
+    if (id.startsWith(FINISH_PREFIX)) choice.finishId = id.slice(FINISH_PREFIX.length);
+    else { choice.colorId = id; choice.finishId = null; }
   }
 
   advance();
@@ -1783,17 +1882,21 @@ function syncBadgeFromChoice(choice: Choice) {
 export function chassisSubtitle(
   modelSubtitle: string | null | undefined, chassis: ChassisDef | null | undefined,
 ): string {
-  let base = (modelSubtitle || '').trim();
-  const name = (chassis?.name || '').trim();
+  /* DUAS LIMPEZAS, e as duas pela mesma razão de sempre: o manifesto guarda a
+     LISTA de configurações no subtítulo do modelo, e o nome do chassi carrega
+     um qualificador entre parênteses. Sem filtrar, a cortina anunciava
+     `4x2 · 6x2a-tl · 6x2 (eixo de apoio elevatorio)` — a lista inteira, mais o
+     escolhido, mais a explicação dele. Aqui cabe uma linha: o que o modelo é
+     ("AS Highway", quando existe) e qual configuração está na tela ("6x2").
+     Toda a maquinaria de aparar sufixo repetido saiu junto: ela existia para
+     desfazer a duplicação que a lista causava, e sem a lista não há o que
+     desfazer. */
+  const base = cleanModelSubtitle(modelSubtitle);
+  const name = chassisTitle((chassis?.name || '').trim());
   /* 'Padrão' é o chassi SINTÉTICO de um modelo que não declara nenhum — ele não
      é uma configuração, é a ausência de uma, e anunciá-lo seria inventar uma
      escolha que o catálogo não oferece. */
   if (!name || name === 'Padrão' || base === name) return base;
-  if (base.endsWith('· ' + name)) return base;
-  const token = name.split(/\s+/)[0];
-  if (token && base.toLowerCase().endsWith('· ' + token.toLowerCase())) {
-    base = base.slice(0, base.length - token.length - 2).trim();
-  }
   return base ? base + ' · ' + name : name;
 }
 
