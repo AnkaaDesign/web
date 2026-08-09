@@ -89,6 +89,82 @@ export interface EnvironmentDef {
   available: boolean;
 }
 
+/**
+ * Uma CONFIGURAÇÃO DE CHASSI de um modelo — `6x2`, `6x4`, `4x2`, `8x4`.
+ *
+ * POR QUE É UM TIPO PRÓPRIO, e não mais um sufixo no `subtitle`. Até aqui o
+ * `brands.json` listava `scania-r500 "Highline · 6x2"`, `scania-s730
+ * "Highline · 6x4"` e `scania-r450 "Highline · 4x2"` como três MODELOS irmãos
+ * que apontavam para a mesma cabine e a mesma foto. Ou seja: a taxonomia
+ * `marca → modelo × chassi` já existia, achatada numa lista só — e o preço era
+ * três cards idênticos, dois deles `available:false`, e nenhum lugar onde
+ * dizer que a rodagem muda.
+ *
+ * O passo do seletor é DIRIGIDO POR DADO: qualquer taxonomia válida
+ * (`modelo` = nome comercial como S730, ou = geração como "Scania S 2016")
+ * popula a etapa sem uma linha de código nova. O que o motor garante é só o
+ * invariante: `ModelDef.chassis` NUNCA é vazio — ver `normalizeModel()`.
+ */
+export interface ChassisDef {
+  /** kebab-case, estável (vai para o localStorage e para o caminho do render) */
+  id: string;
+  /** ex.: '6x4' */
+  name: string;
+  /** ex.: 'Trator · 3 eixos' */
+  subtitle: string;
+  /** foto/render do card; caminho relativo à base — resolver com assetUrl() */
+  image: string | null;
+  /**
+   * **A GEOMETRIA DESTE CHASSI** — caminho do `.glb` relativo a `STUDIO_BASE`
+   * (ex.: `models/trucks/daf_xd_6x4t_sl.glb`). Resolver com `assetUrl()`.
+   *
+   * SUBSTITUIU O `cab` E O `cabs.json` INTEIRO, e o motivo é que aquela
+   * indireção guardava DADO DERIVADO. `cabs.json` era indexado por um id de
+   * cabine e os valores dele eram PÓS-NORMALIZAÇÃO: traziam assados por dentro
+   * o `CAB_FORWARD_GAP = 0.10` e a convenção "traseira da cabine em z=0". Isso
+   * os tornava inúteis para o desktop (que normaliza noutro ponto) e os
+   * invalidava silenciosamente a cada re-bake — sem erro nenhum, só um caminhão
+   * no lugar errado.
+   *
+   * A forma limpa, e a mesma nos dois apps: **`file` diz QUAL geometria,
+   * `hitch.json` diz ONDE ela vai** (`groundY`, `centerX`, `orientYaw` e o
+   * bloco da quinta roda, todos em ESPAÇO CRU DO GLB, com uma impressão digital
+   * sha256 por arquivo para que dado velho seja DETECTÁVEL em vez de
+   * silenciosamente errado).
+   *
+   * Um chassi sem `file` resolvível **falha alto** em vez de cair na malha de
+   * outra montadora: renderizar um Scania quando pediram um DAF é pior que um
+   * erro. Ver `resolveChassisFile()` em studio.ts.
+   *
+   * `null` só é legítimo num chassi `available: false` ("Em breve").
+   */
+  file: string | null;
+  /** tag de canto autoral, como em ModelDef.note */
+  note: string | null;
+  /** false → card visível, marcado "Em breve", e NÃO clicável */
+  available: boolean;
+  /**
+   * IDS ANTIGOS QUE ESTA CONFIGURAÇÃO ABSORVEU — a ponte de migração.
+   *
+   * `modelId` passou a nomear a GERAÇÃO (`scania-s-2016`) e não mais a potência
+   * comercial (`scania-s730`), porque potência não tem geometria: S730 e S650
+   * são a mesma malha. A potência desceu para o rótulo do CHASSI, que é onde
+   * ela de fato distingue um produto de outro.
+   *
+   * Consequência: todo `truckstudio.choice.v1` gravado antes disso guarda um
+   * `modelId` que hoje não resolve. Sem esta lista, cada um deles derrubaria a
+   * escolha inteira e mandaria o visitante de volta ao seletor completo.
+   * Com ela, `scania-s730` resolve para `{modelId:'scania-s-2016',
+   * chassisId:'6x4-s730'}` e a visita continua exatamente onde parou.
+   *
+   * Mora no MANIFESTO e não numa tabela no código pelo motivo de sempre: quem
+   * sabe qual id virou qual é quem gerou o catálogo. Uma tabela aqui seria uma
+   * segunda taxonomia, atualizada por outra pessoa, num arquivo que o gerador
+   * não lê.
+   */
+  aliases: string[];
+}
+
 export interface ModelDef {
   /** kebab-case, estável (vai para o localStorage) */
   id: string;
@@ -98,8 +174,16 @@ export interface ModelDef {
   subtitle: string;
   /** foto do card; caminho relativo à base — resolver com assetUrl() */
   image: string | null;
-  /** id em models/cabs.json → geometria 3D carregada */
-  cab: string;
+  /**
+   * Geometria PADRÃO do modelo — o `.glb` que um chassi herda quando não
+   * declara `file` próprio. Relativo a `STUDIO_BASE`; resolver com `assetUrl()`.
+   *
+   * Era `cab: string`, um id em `models/cabs.json`. Aquele arquivo foi
+   * APOSENTADO — ver a nota longa em `ChassisDef.file`. Na taxonomia nova a
+   * geometria é por CHASSI (um 4x2 não é um 6x4 com uma roda a menos), então
+   * este campo é só o padrão de quem não se diferencia.
+   */
+  file: string | null;
   /** tag de canto em pt-BR (ex.: 'Prévia') */
   note: string | null;
   /**
@@ -112,6 +196,32 @@ export interface ModelDef {
    * seletor mostra o card marcado "Em breve"), mas não é clicável.
    */
   available: boolean;
+  /**
+   * EDIÇÃO ESPECIAL: a pintura é parte do produto, não uma escolha.
+   *
+   * Um S-Way Metallica, um FH da Iron Mark, um Actros de aniversário — o que os
+   * define é justamente a película, e oferecer doze cores para ela seria
+   * oferecer doze caminhões que não existem. Quem marca isto some com o passo
+   * "Cor" do seletor, com o card de cor do canto e com o painel de tinta.
+   *
+   * É AUTORADO NO MANIFESTO, não inferido de `paintMaterials: []` no cabs.json.
+   * Os dois costumam andar juntos, mas dizem coisas diferentes: `paintMaterials`
+   * vazio é uma verdade sobre a GEOMETRIA ("nenhum material aceita tinta"), e
+   * isto é uma verdade sobre o PRODUTO ("esta pintura é a identidade dele").
+   * Uma cabine pode ter os dois estados separados — uma bake sem material de
+   * tinta mapeado ainda é um caminhão comum, à espera de conserto, e não uma
+   * edição especial. Inferir juntaria um defeito com uma decisão comercial.
+   */
+  specialEdition: boolean;
+  /**
+   * Configurações de chassi deste modelo. **SEMPRE não-vazio**, garantido pelo
+   * normalizador: um modelo que não declara `chassis` recebe um sintético
+   * `{ id: 'padrao' }`, para o passo do seletor nunca renderizar grade vazia.
+   *
+   * Um modelo com UM chassi só não custa um clique: o seletor tira o passo da
+   * sequência e escolhe sozinho — ver `STEP_INDEX`/`seqFor()` em ui/selector.ts.
+   */
+  chassis: ChassisDef[];
 }
 
 export interface ManufacturerDef {
@@ -137,6 +247,8 @@ export interface Choice {
   envId: string | null;
   manufacturerId: string | null;
   modelId: string | null;
+  /** id em ModelDef.chassis — a configuração de eixos do cavalo mecânico */
+  chassisId: string | null;
   /** id em catalog/colors.ts — a pintura do cavalo mecânico */
   colorId: string | null;
 }
@@ -146,6 +258,7 @@ export interface ResolvedChoice {
   envId: string;
   manufacturerId: string;
   modelId: string;
+  chassisId: string;
   colorId: string;
 }
 
@@ -171,43 +284,93 @@ const CHOICE_KEY = 'truckstudio.choice.v1';
 
 /* ---------------- fallbacks embutidos ---------------- */
 
-/* UM cenário: exatamente o ambiente procedural que scene/scene.ts já sabe montar
-   sozinho (sem HDRI, com céu e pista procedurais). Ou seja, o estúdio continua
-   funcionando com ZERO assets baixados. */
-const FALLBACK_ENVIRONMENTS: Raw[] = [{
+/* Miniatura do cenário Estúdio, desenhada e não baixada.
+   ---------------------------------------------------------------------------
+   Um SVG em `data:` é a única `thumb` honesta para um cenário que por definição
+   não tem asset nenhum: pedir um .webp ao servidor para ilustrar "sem
+   downloads" seria contradizer o próprio cartão, e `thumb: null` cairia na
+   placa de iniciais, que lê como asset faltando. `assetUrl()` deixa `data:`
+   passar intocado (ver ABSOLUTE_RE), então isto atravessa o pipeline normal.
+   O desenho é o que a cena é: ciclorama sem emenda, key à esquerda em 45°,
+   fill à direita, rim atrás, e a elipse de contato no chão. */
+const STUDIO_THUMB = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">'
+  + '<defs>'
+  + '<linearGradient id="c" x1="0" y1="0" x2="0" y2="1">'
+  + '<stop offset="0" stop-color="#3a3d42"/><stop offset="0.62" stop-color="#55595f"/>'
+  + '<stop offset="1" stop-color="#3d4045"/></linearGradient>'
+  + '<radialGradient id="k" cx="0.3" cy="0.28" r="0.72">'
+  + '<stop offset="0" stop-color="#ffffff" stop-opacity="0.30"/>'
+  + '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>'
+  + '</defs>'
+  + '<rect width="320" height="200" fill="url(#c)"/>'
+  + '<rect width="320" height="200" fill="url(#k)"/>'
+  + '<ellipse cx="160" cy="150" rx="86" ry="13" fill="#000" opacity="0.30"/>'
+  + '<path d="M96 150V96h58l20 26h30v28Z" fill="#22c55e" opacity="0.92"/>'
+  + '<circle cx="126" cy="150" r="11" fill="#15803d"/>'
+  + '<circle cx="188" cy="150" r="11" fill="#15803d"/>'
+  + '<path d="M44 44v112M276 44v112" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>'
+  + '</svg>');
+
+/* O cenário ESTÚDIO — e ele não é mais só o fallback.
+   ---------------------------------------------------------------------------
+   Ele nasceu aqui como rede de segurança ("se o manifesto cair, ainda dá para
+   abrir o estúdio"), e ficou invisível para o usuário: só aparecia quando a
+   rede quebrava. Mas ele é justamente o cenário certo para APRESENTAR TINTA —
+   sem prédio, sem céu, sem contaminação de cor —, e custa zero byte.
+   Por isso `ensureStudioEnvironment()` lá embaixo o ACRESCENTA à lista vinda
+   do manifesto quando ela não o traz: é o terceiro cenário do seletor, ao lado
+   de `distrito-industrial` e `armazem`, e não substitui nenhum dos dois.
+   `showRoad:false` porque um ciclorama não tem pista, e `preset:'ciclorama'`
+   porque o `estudio` já é do `armazem` — dois cenários com a mesma luz seriam
+   o mesmo cenário com dois nomes. */
+const STUDIO_ENVIRONMENT: Raw = {
   id: 'estudio',
   name: 'Estúdio',
-  subtitle: 'Cenário procedural, sem downloads',
-  thumb: null,
+  subtitle: 'Ciclorama neutro · luz controlada, sem downloads',
+  thumb: STUDIO_THUMB,
   hdri: null,
   ground: { type: 'asphalt', diffuse: null, rough: null, normal: null, repeat: [4, 60] },
   showSkyDome: true,
-  showRoad: true,
+  showRoad: false,
   envRotation: 0,
   backgroundBlur: 0,
-  preset: 'estudio',
+  preset: 'ciclorama',
   timeOfDay: 'dia',
   exposure: 1,
   envIntensity: 1,
   credit: null,
-}];
+};
 
-/* Duas marcas com um modelo cada, apontando para as cabines que vehicle/models.ts já
-   carrega. `image`/`logo` são null de propósito: o seletor TEM de tolerar
-   imagem nula (renderiza só o texto) — nunca assuma URL de imagem aqui. */
+/* UM cenário: exatamente o ambiente procedural que scene/scene.ts já sabe montar
+   sozinho (sem HDRI, com céu procedural). Ou seja, o estúdio continua
+   funcionando com ZERO assets baixados. */
+const FALLBACK_ENVIRONMENTS: Raw[] = [STUDIO_ENVIRONMENT];
+
+/* Duas marcas com um modelo cada, apontando DIRETO para os `.glb` de produção.
+   `image`/`logo` são null de propósito: o seletor TEM de tolerar imagem nula
+   (renderiza só o texto) — nunca assuma URL de imagem aqui.
+
+   NA MESMA FORMA DO MANIFESTO, e isso é o ponto: `file` com o caminho do
+   arquivo, exatamente como um `brands.json` de verdade escreveria. As quatro
+   geometrias de produção herdadas (`scania.glb`, `volvo.glb`, `iveco.glb`,
+   `iveco_sway_metallica.glb`) NÃO têm caminho especial em lugar nenhum do
+   código — elas são apenas `file`s como quaisquer outros. Um segundo caminho
+   para "os modelos antigos" seria a indireção do `cabs.json` voltando pela
+   porta dos fundos. */
 const FALLBACK_MANUFACTURERS: Raw[] = [
   {
     id: 'scania', name: 'Scania', logo: null, accent: '#041E42',
     models: [{
       id: 'scania-s730', name: 'S730 V8', subtitle: 'Highline · 6x4',
-      image: null, cab: 'scania', note: null,
+      image: null, file: 'models/vehicles/scania.glb', note: null,
     }],
   },
   {
     id: 'volvo', name: 'Volvo', logo: null, accent: '#1B365D',
     models: [{
       id: 'volvo-fh16-750', name: 'FH16 750', subtitle: 'Globetrotter XL · 6x4',
-      image: null, cab: 'volvo', note: null,
+      image: null, file: 'models/vehicles/volvo.glb', note: null,
     }],
   },
 ];
@@ -438,25 +601,90 @@ function warnDroppedKeys(raw: Raw, out: object, seen: Set<string>, label: string
 }
 const envDropWarned = new Set<string>();
 
+/* Id do chassi sintético de um modelo que não declara nenhum. Constante porque
+   ele vai para o localStorage e para o caminho do render — mudar a string
+   invalidaria escolhas salvas e renders já produzidos. */
+export const DEFAULT_CHASSIS_ID = 'padrao';
+
+/** @returns {ChassisDef|null} null → entrada inutilizável, descartar. */
+function normalizeChassis(input: unknown, model: Raw): ChassisDef | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Raw;
+  const id = nullableStr(raw.id);
+  if (!id) return null;
+  return {
+    id,
+    /* O id JÁ é legível ('6x4'), então ele é o nome padrão. Um `name` autoral
+       ('6x4 Tractor') continua ganhando. */
+    name: str(raw.name, id),
+    subtitle: str(raw.subtitle, ''),
+    image: nullableStr(raw.image),
+    /* null e não o file do modelo: quem herda é o CONSUMIDOR (`chassis.file ??
+       model.file`), e guardar a herança já resolvida aqui apagaria a diferença
+       entre "não declarou" e "declarou igual ao modelo". */
+    file: nullableStr(raw.file),
+    note: nullableStr(raw.note),
+    /* Herda a disponibilidade do MODELO por omissão: um modelo inteiro "Em
+       breve" não pode ter chassis clicáveis por dentro. */
+    available: bool(raw.available, bool(model.available, true)),
+    aliases: (Array.isArray(raw.aliases) ? raw.aliases : [])
+      .filter((a): a is string => typeof a === 'string' && !!a.trim())
+      .map((a) => a.trim()),
+  };
+}
+
 /** @returns {ModelDef|null} */
-function normalizeModel(input: unknown, manufacturerId: string): ModelDef | null {
+/* `manufacturerId` saiu da assinatura junto com o `cabs.json`: ele existia só
+   para o palpite `cab: raw.cab ?? manufacturerId`, que era justamente o que
+   fazia um modelo sem geometria resolver para a malha de outra montadora. */
+function normalizeModel(input: unknown): ModelDef | null {
   if (!input || typeof input !== 'object') return null;
   const raw = input as Raw;
   const id = nullableStr(raw.id);
   const name = nullableStr(raw.name);
   if (!id || !name) return null;
+  /* INVARIANTE: a lista nunca sai vazia. Um manifesto anterior ao passo do
+     chassi (ou um modelo que de fato só tem uma configuração) recebe o
+     sintético, e todo consumidor — seletor, studio.ts, renders.ts — pode
+     assumir `chassis[0]` sem checagem. O rótulo herda o subtítulo do modelo,
+     que é justamente onde a configuração se escondia até aqui ('Highline · 6x4'). */
+  const chassis = (Array.isArray(raw.chassis) ? raw.chassis : [])
+    .map((c: unknown) => normalizeChassis(c, raw))
+    .filter((c): c is ChassisDef => c !== null);
+  if (!chassis.length) {
+    chassis.push({
+      id: DEFAULT_CHASSIS_ID,
+      name: 'Padrão',
+      subtitle: str(raw.subtitle, ''),
+      image: nullableStr(raw.image),
+      /* Herda a geometria do modelo: um chassi sintético existe justamente
+         porque o manifesto não diferenciou nada, então ele É o modelo. */
+      file: nullableStr(raw.file),
+      note: null,
+      available: bool(raw.available, true),
+      aliases: [],
+    });
+  }
   return {
+    chassis,
     id,
     name,
     subtitle: str(raw.subtitle, ''),
     image: nullableStr(raw.image),
-    /* sem `cab` explícito, o id do fabricante é o palpite certo em cabs.json */
-    cab: str(raw.cab, manufacturerId),
+    /* Sem `file` explícito, NÃO se inventa um caminho. O palpite que existia
+       aqui (`cab: raw.cab ?? manufacturerId`) era o que fazia um DAF sem
+       geometria resolver para um id que não existe em lugar nenhum e cair, mais
+       adiante, na malha de outra montadora. Um `null` honesto faz o carregador
+       falhar alto — ver ChassisDef.file. */
+    file: nullableStr(raw.file),
     note: nullableStr(raw.note),
     /* Default TRUE: um manifesto antigo, sem o campo, continua com todos os
        modelos selecionáveis — exatamente o comportamento anterior. Só quem
        escreve `false` explicitamente vira "Em breve". */
     available: bool(raw.available, true),
+    /* Default FALSE pelo mesmo motivo: nenhum manifesto existente vira edição
+       especial por omissão. */
+    specialEdition: bool(raw.specialEdition, false),
   };
 }
 
@@ -468,7 +696,7 @@ function normalizeManufacturer(input: unknown): ManufacturerDef | null {
   const name = nullableStr(raw.name);
   if (!id || !name) return null;
   const models = (Array.isArray(raw.models) ? raw.models : [])
-    .map((m: unknown) => normalizeModel(m, id))
+    .map((m: unknown) => normalizeModel(m))
     .filter((m): m is ModelDef => m !== null);
   /* fabricante sem modelo não tem passo 3 — seria um beco sem saída no seletor */
   if (!models.length) return null;
@@ -476,7 +704,11 @@ function normalizeManufacturer(input: unknown): ManufacturerDef | null {
     id,
     name,
     logo: nullableStr(raw.logo),
-    accent: str(raw.accent, '#3b82f6'),
+    /* Verde do projeto (green-500), não o `blue-500` do tailwind que estava
+       aqui: este é o accent de quem NÃO declarou o próprio, então ele tem de
+       ser a cor da casa. As marcas que declaram (`#041E42` da Scania,
+       `#0072CE` da DAF) continuam intocadas — identidade de terceiros. */
+    accent: str(raw.accent, '#22c55e'),
     models,
     available: true,                 // definido de verdade pela sonda mais abaixo
   };
@@ -508,6 +740,26 @@ async function loadManufacturers() {
     const list = (Array.isArray(j?.manufacturers) ? j.manufacturers : [])
       .map(normalizeManufacturer).filter((m): m is ManufacturerDef => m !== null);
     if (!list.length) throw new Error('brands.json sem fabricantes válidos');
+    /* MANIFESTO ANTERIOR AO CONTRATO DE GEOMETRIA.
+       ---------------------------------------------------------------------
+       Um `brands.json` que não traz `file` em NENHUM chassi é de antes de a
+       geometria passar a ser apontada pelo catálogo (quando ela vinha do
+       `cabs.json`, hoje aposentado). Cada modelo dele resolveria para "sem
+       geometria" e o estúdio não abriria nada.
+       Isto é uma verdade sobre o MANIFESTO INTEIRO, não sobre um caminhão, e é
+       por isso que a degradação é do manifesto inteiro: cai no catálogo
+       embutido — que aponta para .glb de produção reais — em vez de adivinhar
+       um caminho por modelo, que é exatamente o palpite que esta mudança
+       removeu. Uma linha de aviso dizendo o que republicar, e o estúdio abre. */
+    const anyFile = list.some((m) => m.models.some((mo) =>
+      mo.file || mo.chassis.some((c) => c.file)));
+    if (!anyFile) {
+      console.warn('[manifest] brands.json não declara `chassis[].file` em nenhum modelo —'
+        + ' é anterior ao contrato de geometria (o `cabs.json` foi aposentado).'
+        + ' Usando o catálogo embutido. Republique a árvore de assets para'
+        + ' restaurar o catálogo completo.');
+      throw new Error('brands.json sem `file` — manifesto obsoleto');
+    }
     return { list, fallback: false };
   } catch (e: unknown) {
     console.warn('[manifest] brands.json indisponível — usando catálogo mínimo Scania/Volvo.',
@@ -534,11 +786,33 @@ async function probeAvailability(environments: EnvironmentDef[], manufacturers: 
   ]);
 }
 
+/* O ESTÚDIO SEMPRE EXISTE.
+   Se o manifesto já o declara (o caminho desejado, e o que o desktop também vai
+   ler), essa entrada ganha — ela pode trazer thumb de verdade, exposição
+   ajustada, o que for. Se não, o motor o acrescenta: é um cenário sem asset
+   nenhum, então oferecê-lo nunca pode falhar, e escondê-lo até o manifesto ser
+   republicado seria esconder o cenário certo para julgar uma cor. */
+function ensureStudioEnvironment(list: EnvironmentDef[]): EnvironmentDef[] {
+  const declared = list.find((e) => e.id === STUDIO_ENVIRONMENT.id);
+  if (declared) {
+    /* A MINIATURA DESENHADA É DO MOTOR, e o manifesto não precisa carregá-la.
+       Um data-uri de SVG dentro do JSON servido seria um kilobyte de markup
+       repetido em cada resposta, ilegível na revisão e duplicado no desktop.
+       Então o manifesto declara `thumb: null` e QUEM PREENCHE é aqui — e uma
+       `thumb` de verdade, no dia em que alguém fotografar o ciclorama, ganha
+       sem que nada disto mude. */
+    if (!declared.thumb) declared.thumb = STUDIO_THUMB;
+    return list;
+  }
+  const built = normalizeEnvironment(STUDIO_ENVIRONMENT);
+  return built ? [...list, built] : list;
+}
+
 async function doLoadCatalog() {
   /* em paralelo e independentes: brands.json quebrado não pode derrubar os cenários */
   const [envs, mans] = await Promise.all([loadEnvironments(), loadManufacturers()]);
 
-  catalog.environments = envs.list;
+  catalog.environments = ensureStudioEnvironment(envs.list);
   catalog.manufacturers = mans.list;
   catalog.fallback = envs.fallback || mans.fallback;
 
@@ -611,6 +885,68 @@ export function getModel(modelId: string | null | undefined): { model: ModelDef;
 }
 
 /**
+ * Um id de modelo ANTIGO → o par {modelId, chassisId} que o absorveu.
+ *
+ * A ponte de migração de `ChassisDef.aliases`. Um `scania-s730` gravado no
+ * localStorage antes de `modelId` passar a nomear a geração resolve aqui para
+ * `{scania-s-2016, 6x4-s730}` em vez de invalidar a escolha inteira.
+ *
+ * Varre o catálogo em vez de manter um índice: roda no máximo uma vez por boot
+ * (só quando `getModel()` já falhou) sobre ~20 modelos × ~3 chassis. Um índice
+ * seria uma segunda estrutura para manter em sincronia com a primeira.
+ */
+export function resolveAlias(oldId: string | null | undefined):
+{ modelId: string; chassisId: string } | null {
+  if (!oldId) return null;
+  for (const man of catalog.manufacturers) {
+    for (const model of man.models) {
+      for (const chassis of model.chassis) {
+        if (chassis.aliases.includes(oldId)) {
+          return { modelId: model.id, chassisId: chassis.id };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * O primeiro chassi DISPONÍVEL de um modelo (senão o primeiro da lista).
+ * `chassis` nunca é vazio, então isto nunca devolve undefined para um modelo
+ * que existe — ver o invariante em `normalizeModel()`.
+ */
+export function defaultChassis(model: ModelDef | null | undefined): ChassisDef | null {
+  if (!model) return null;
+  return model.chassis.find((c) => c.available) || model.chassis[0] || null;
+}
+
+/**
+ * Resolve `{modelId, chassisId}` contra o catálogo. Um `chassisId` que não
+ * existe MAIS (o manifesto mudou embaixo de uma escolha salva) cai no primeiro
+ * disponível em vez de devolver null — o mesmo tratamento que a cor recebe, e
+ * pelo mesmo motivo: um chassi ausente não invalida "qual caminhão mostrar".
+ * @returns {{ model, manufacturer, chassis }|null}
+ */
+export function getChassis(modelId: string | null | undefined, chassisId: string | null | undefined) {
+  const found = getModel(modelId);
+  if (!found) return null;
+  const chassis = found.model.chassis.find((c) => c.id === chassisId)
+    || defaultChassis(found.model);
+  return chassis ? { ...found, chassis } : null;
+}
+
+/**
+ * A GEOMETRIA EFETIVA de um par modelo+chassi: o `file` do chassi ganha do
+ * `file` do modelo. `null` quando nenhum dos dois declara nada — e nesse caso
+ * quem chama tem de FALHAR, nunca escolher outra malha.
+ */
+export function fileOf(
+  model: ModelDef, chassis: ChassisDef | null | undefined,
+): string | null {
+  return (chassis && chassis.file) || model.file || null;
+}
+
+/**
  * Primeiro cenário DISPONÍVEL (senão o primeiro da lista), e o primeiro modelo
  * COM GEOMETRIA (senão o primeiro da lista). Preferir o disponível dos dois
  * lados evita abrir o estúdio já degradado quando só o cenário 1 ainda não foi
@@ -635,10 +971,12 @@ export function defaultChoice(): Choice {
     manufacturer = catalog.manufacturers[0] || null;
     model = manufacturer ? manufacturer.models[0] : null;
   }
+  const chassis = defaultChassis(model);
   return {
     envId: env ? env.id : null,
     manufacturerId: manufacturer ? manufacturer.id : null,
     modelId: model ? model.id : null,
+    chassisId: chassis ? chassis.id : null,
     colorId: defaultColorId(),
   };
 }
@@ -650,7 +988,24 @@ export function defaultChoice(): Choice {
 function normalizeChoice(choice: unknown): ResolvedChoice | null {
   if (!choice || typeof choice !== 'object') return null;
   const c = choice as Raw;
-  const found = getModel(nullableStr(c.modelId));
+  let wantedModel = nullableStr(c.modelId);
+  let wantedChassis = nullableStr(c.chassisId);
+  let found = getModel(wantedModel);
+  if (!found) {
+    /* MIGRAÇÃO. O id salvo pode ser um id COMERCIAL de antes de `modelId`
+       passar a nomear a geração. Se algum chassi o reivindica, a escolha
+       sobrevive inteira — e é o `chassisId` do alias que ganha, porque é ele
+       que carrega a potência que o id antigo nomeava. */
+    const alias = resolveAlias(wantedModel);
+    if (alias) {
+      wantedModel = alias.modelId;
+      wantedChassis = alias.chassisId;
+      found = getModel(wantedModel);
+    }
+  }
+  /* Nada resolveu: devolver null é o que manda studio.ts REABRIR O SELETOR em
+     vez de bootar numa escolha inventada. Uma seleção velha nunca prende o
+     seletor — ela some, e o fluxo completo recomeça do primeiro passo. */
   if (!found) return null;
   /* Um modelo que PERDEU a geometria (o manifesto mudou embaixo de uma escolha
      já salva) é tão inválido quanto um id que sumiu: devolver null aqui é o que
@@ -664,10 +1019,25 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
      por causa disso seria trocar um dado ausente por um usuário irritado. Cai
      na cor padrão, que é o mesmo que um visitante novo recebe. */
   const color = getColor(nullableStr(c.colorId));
+  /* O CHASSI SEGUE A REGRA DA COR, NÃO A DO MODELO — de propósito, e é o que
+     permite manter a chave `truckstudio.choice.v1` sem migração destrutiva.
+     Uma escolha gravada ANTES de o passo do chassi existir não traz `chassisId`
+     nenhum; invalidá-la por isso jogaria todo visitante que volta de volta para
+     o seletor completo, para trocar um campo que ele nunca escolheu. Cai no
+     primeiro disponível, que é exatamente o que um visitante novo recebe.
+     Só bumpar para `.v2` se o número de eixos passar a mudar a GEOMETRIA
+     carregada (`ChassisDef.cab`) — aí uma v1 apontaria para um conjunto que
+     nunca existiu. */
+  /* Um chassi que ainda existe mas PERDEU a geometria não entra como escolhido:
+     o estúdio tentaria montar o que o catálogo diz que não há. Cai no primeiro
+     disponível, igual a um visitante novo. */
+  const exact = found.model.chassis.find((h) => h.id === wantedChassis);
+  const chassis = exact && exact.available ? exact : defaultChassis(found.model);
   return {
     envId: env.id,
     manufacturerId: found.manufacturer.id,
     modelId: found.model.id,
+    chassisId: chassis ? chassis.id : DEFAULT_CHASSIS_ID,
     colorId: color ? color.id : defaultColorId(),
   };
 }

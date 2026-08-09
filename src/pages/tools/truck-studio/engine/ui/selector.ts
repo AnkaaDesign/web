@@ -1,12 +1,39 @@
-/* Card selector (cenário → fabricante → modelo → COR) + the three badge cards
-   that stay on the viewport afterwards: the SCENE badge top-left, and the TRUCK
-   and COLOUR badges bottom-left.
+/* Card selector (cenário → fabricante → modelo → CHASSI → COR) + the two badge
+   cards that stay on the viewport afterwards: the SCENE badge top-left and the
+   TRUCK badge bottom-left.
 
    O passo da cor entrou quando a sidebar de pintura saiu. Ele não é um seletor
-   de hex: cada card é o CAVALO ESCOLHIDO renderizado naquela cor (ui/preview.ts
-   desenha as miniaturas fora da tela), porque a mesma tinta fica diferente em
-   cada lataria e escolher cor em quadradinho é escolher no escuro. A paleta vem
-   de catalog/colors.ts — hoje embutida, amanhã a tabela `Paint` da API.
+   de hex: cada card é o CAVALO ESCOLHIDO naquela cor, porque a mesma tinta fica
+   diferente em cada lataria e escolher cor em quadradinho é escolher no escuro.
+   A paleta vem de catalog/colors.ts — hoje embutida, amanhã a tabela `Paint` da
+   API. As imagens vêm de catalog/renders.ts: renders PRÉ-PRODUZIDOS, não mais
+   um segundo contexto WebGL renderizando 26 miniaturas dentro da cortina.
+
+   O PASSO DO CHASSI é o quarto, e é dirigido por dado: o motor não sabe quantos
+   `6x2`/`6x4`/`4x2` existem nem se "modelo" é um nome comercial (S730) ou uma
+   geração (Scania S 2016) — ele lê `ModelDef.chassis`, que o normalizador
+   garante não-vazio. Um modelo com UM chassi só não custa clique nenhum: o
+   passo sai da sequência e a escolha é feita sozinha (ver `seqFor`).
+
+   NÃO EXISTE MAIS CARD DE COR, E NÃO EXISTE MAIS NENHUM "TROCAR".
+   O card de cor era o terceiro crachá, empilhado sobre o do caminhão, e saiu.
+   Depois saíram também as três afordâncias de texto que sobraram — a pílula
+   "Trocar cor" sobre o card do caminhão, o botão "Trocar caminhão" abaixo dele e
+   a pílula "Trocar" sobre o card do cenário. Decisão do dono do produto, na
+   revisão de 2026-08-08: *"nao deve haver botao trocar caminhao, o card do
+   caminhao deve levar para o seletor completo de caminhao, desde marca ate a
+   cor"* e *"doesnt need the trocar buttons / text here"*.
+
+   O QUE ISSO DEIXA: **o card É o controle**. O card do caminhão abre o fluxo
+   'truck' COMPLETO (marca → modelo → chassi → cor) e o card do cenário abre o
+   passo do cenário. Nenhum rótulo faz esse trabalho; quem o faz é o material —
+   `cursor: pointer`, borda de acento no hover, anel de foco visível — e o
+   teclado, que continua vindo de `role="button"` + tabindex + Enter/Espaço em
+   `bindBadgeTrigger()`. Ver a seção 7 de selector.css.
+
+   Consequência de rota: o cenário NÃO ficou órfão com o sumiço do botão. Ele
+   nunca dependeu dele — o crachá do cenário sempre foi a entrada dele, e
+   continua sendo.
    ---------------------------------------------------------------------------
    Everything here is built imperatively into the studio's own DOM (core/dom.ts), for
    the same reason the rest of the engine is: this subtree OUTLIVES the React
@@ -31,21 +58,26 @@
 import { root, $opt, isMounted, el, initials } from '../core/dom';
 import {
   catalog, getEnvironment, getManufacturer, getModel, defaultChoice, assetUrl,
-  saveChoice, loadChoice,
+  saveChoice, loadChoice, defaultChassis,
 } from '../catalog/catalog';
-import type { Choice, ResolvedChoice } from '../catalog/catalog';
+import type { Choice, ResolvedChoice, ChassisDef } from '../catalog/catalog';
 import {
-  colorsFor, getColor, defaultColor, defaultColorId, FINISH_LABEL,
+  colorsFor, getColor, defaultColorId, FINISH_LABEL,
 } from '../catalog/colors';
-import type { PaintColorDef } from '../catalog/colors';
-import { cabPreview, peekCabPreview, hasCabPreview, warmCabPreview } from './preview';
-import type { PaintFinish } from '../vehicle/paint';
+import { renderUrl, renderPlaceholder, prefetchRenders } from '../catalog/renders';
+/* Só o helper de ceder-um-quadro. ui/loader.ts não importa este módulo (ele
+   alcança `#ts-badge` por id, de propósito — ver badgeMediaRect lá), então esta
+   seta não fecha ciclo nenhum. */
+import { paintFrame } from './loader';
 
-/** Which steps a flow walks; see FLOWS. */
-export type FlowId = 'full' | 'map' | 'truck' | 'color';
-/** The four steps, by the id STEPS uses. Module-private: a caller names a FLOW,
+/** Which steps a flow walks; see FLOWS.
+    O fluxo 'color' SAIU: ele existia para o card do caminhão abrir só o passo da
+    cor, e o card passou a abrir o fluxo do caminhão inteiro. Um FlowId que nada
+    pode pedir é um ramo morto em `seqFor`, `clampStep` e na trilha. */
+export type FlowId = 'full' | 'map' | 'truck';
+/** The five steps, by the id STEPS uses. Module-private: a caller names a FLOW,
     never a step — see openSelector. */
-type StepId = 'map' | 'manufacturer' | 'model' | 'color';
+type StepId = 'map' | 'manufacturer' | 'model' | 'chassis' | 'color';
 
 /** One step's static description — everything but the cards it renders. */
 interface StepDef {
@@ -58,11 +90,12 @@ interface StepDef {
   aria: string;
 }
 
-/** O que um card precisa para pedir a miniatura 3D dele a ui/preview.ts. */
-interface CardPreview {
-  cabId: string;
-  hex: string;
-  finish: PaintFinish;
+/** O que um card precisa para achar (ou desenhar) a imagem dele. */
+interface CardRender {
+  /** URL de um render pré-produzido, ou null → cai na foto/placeholder */
+  url: string | null;
+  /** id do chassi, só para a silhueta do placeholder ter o nº de eixos certo */
+  chassisId: string | null;
 }
 
 /** One card, flattened out of whatever the step is listing. */
@@ -78,13 +111,14 @@ interface CardItem {
   /** false → card visível, marcado "Em breve", e NÃO clicável. */
   available: boolean;
   /**
-   * Render 3D desta cabine nesta cor, no lugar da foto do manifesto. É o que
-   * faz o passo da cor existir — não há doze fotos de estúdio para doze cores —
-   * e o que faz o card do MODELO já mostrar a cor escolhida. Chega assíncrono e
-   * substitui o que estiver no lugar; null = card com foto, como antes.
+   * Render pré-produzido deste modelo+chassi nesta cor, no lugar da foto do
+   * manifesto. É o que faz o passo da cor existir — não há doze fotos de
+   * estúdio para doze cores — e o que faz o card do MODELO já mostrar a cor
+   * escolhida. `url: null` cai na foto do manifesto e, na falta dela, no
+   * placeholder de silhueta: NUNCA uma moldura vazia.
    */
-  preview?: CardPreview | null;
-  /** hex da cor que este card representa; pinta a moldura antes de o render chegar */
+  render?: CardRender | null;
+  /** hex da cor que este card representa; pinta a amostra do canto */
   swatch?: string | null;
 }
 
@@ -106,13 +140,22 @@ export interface BadgeInfo {
   modelSubtitle?: string | null;
   modelImage?: string | null;
   /**
-   * A MESMA miniatura 3D dos cards do seletor: o cavalo escolhido renderizado na
-   * cor escolhida. `modelImage` (a foto do manifesto) vira o fallback de quem
-   * não tem geometria leve — ver setBadge().
+   * O MESMO render pré-produzido dos cards do seletor: este modelo+chassi nesta
+   * cor. `modelImage` (a foto do manifesto) é o degrau seguinte, e o
+   * placeholder de silhueta é o último — ver setBadge().
    */
-  preview?: CardPreview | null;
+  render?: CardRender | null;
   manufacturerName?: string | null;
   logo?: string | null;
+  /**
+   * A cor que está no cavalo. O card do caminhão é o gatilho da COR agora, então
+   * ele tem de dizer qual é: a amostra vai num chip no canto da moldura e o
+   * nome entra no `aria-label`. Foi o que substituiu o card de cor.
+   */
+  colorName?: string | null;
+  colorHex?: string | null;
+  /** 'Metálica', 'Sólida'… — só o rótulo, o crachá não decide nada sobre tinta */
+  finishLabel?: string | null;
 }
 
 /** What setMapBadge() paints onto the top-left scene card. */
@@ -120,15 +163,6 @@ export interface MapBadgeInfo {
   envName?: string | null;
   envSubtitle?: string | null;
   envThumb?: string | null;
-}
-
-/** What setColorBadge() paints onto the bottom-left colour card. */
-export interface ColorBadgeInfo {
-  colorName?: string | null;
-  /** hex sRGB da amostra */
-  hex?: string | null;
-  /** 'Metálica', 'Sólida'… — só o rótulo, o card não decide nada sobre tinta */
-  finishLabel?: string | null;
 }
 
 /* ---------------- step definitions ---------------- */
@@ -162,18 +196,45 @@ const STEPS: StepDef[] = [
     aria: 'Modelos disponíveis',
   },
   {
+    id: 'chassis',
+    label: 'Chassi',
+    title: 'Escolha o chassi',
+    sub: 'A configuração de eixos do cavalo mecânico.',
+    grid: 'ts-cards--models',
+    aria: 'Chassis disponíveis',
+  },
+  {
     id: 'color',
     label: 'Cor',
     title: 'Escolha a cor',
-    sub: 'A pintura do cavalo mecânico — cada card é o modelo escolhido, renderizado naquela cor.',
+    sub: 'A pintura do cavalo mecânico — cada card é o modelo escolhido, naquela cor.',
     grid: 'ts-cards--colors',
     aria: 'Cores disponíveis',
   },
 ];
 
+/* NOME → POSIÇÃO. Esta constante é o que tira as bombas-relógio do arquivo.
+   ---------------------------------------------------------------------------
+   Até aqui `itemsFor`, `choose` e `clampStep` comparavam `stepIndex === 3`
+   enquanto `CAROUSEL_STEPS` comparava `step.id` — duas linguagens para a mesma
+   coisa, no mesmo arquivo. Inserir o passo do CHASSI entre `model` e `color`
+   deslocou todo índice literal em um, e cada um deles teria falhado em
+   silêncio: o ramo da cor passaria a listar chassis, o pré-requisito do
+   `clampStep` guardaria o passo errado, e a edição especial removeria o chassi
+   em vez da cor.
+   Derivado de STEPS, nunca escrito à mão — um mapa manual seria a MESMA lista
+   de índices literais, só que num lugar mais fácil de esquecer. */
+const STEP_INDEX = STEPS.reduce((acc, s, i) => {
+  acc[s.id] = i;
+  return acc;
+}, {} as Record<StepId, number>);
+
 /* Tag de canto de tudo que ainda não tem geometria 3D. Uma constante porque o
    card do fabricante e o do modelo têm de dizer exatamente a mesma coisa. */
 const EM_BREVE = 'Em breve';
+/* Tag de canto de quem vem com a pintura de fábrica. Mesma razão de ser uma
+   constante: é ela que explica, no card, por que o passo da Cor não aparece. */
+const EDICAO_ESPECIAL = 'Edição especial';
 
 /* A flow is just the SUBSEQUENCE of STEPS it walks, in order. Everything that
    used to hardcode "step 0/1/2" now asks the sequence instead, which is what
@@ -182,14 +243,44 @@ const EM_BREVE = 'Em breve';
    rather than absolute step ids (a 'truck' flow shows "1 Fabricante /
    2 Modelo" — showing "2, 3" would be lying about a flow the user is not in). */
 const FLOWS: Record<FlowId, number[]> = {
-  full: [0, 1, 2, 3],
-  map: [0],
-  /* Trocar de caminhão passa PELA cor de novo, e isso é de propósito: a mesma
-     cor em outra cabine é outra imagem, e o passo custa um clique. Quem quer só
-     a cor tem o fluxo 'color', que é o badge da cor. */
-  truck: [1, 2, 3],
-  color: [3],
+  full: [STEP_INDEX.map, STEP_INDEX.manufacturer, STEP_INDEX.model, STEP_INDEX.chassis, STEP_INDEX.color],
+  map: [STEP_INDEX.map],
+  /* O FLUXO DO CARD DO CAMINHÃO — "desde marca até a cor", nas palavras do dono
+     do produto. Ele passa PELO chassi e PELA cor de propósito: a mesma cor em
+     outra cabine é outra imagem, e cada passo custa um clique.
+     O cenário não entra: ele é escolhido pelo card dele, no canto de cima. */
+  truck: [STEP_INDEX.manufacturer, STEP_INDEX.model, STEP_INDEX.chassis, STEP_INDEX.color],
 };
+
+/**
+ * A sequência REAL de um fluxo, dada a escolha atual — a subsequência de FLOWS
+ * menos os passos que não têm decisão a tomar.
+ *
+ * Duas remoções, as duas dirigidas por dado e as duas reversíveis:
+ *
+ * - **CHASSI com uma configuração só.** Um grid de um card é um clique
+ *   obrigatório sem alternativa: a decisão já está tomada, e pedi-la mesmo
+ *   assim é atrito puro. O passo sai e `choose()` escreve o chassi sozinho.
+ *   Se a única configuração NÃO estiver disponível ("Em breve"), o passo FICA:
+ *   aí o card tem o que dizer, e auto-selecionar um chassi sem geometria
+ *   levaria o estúdio a carregar algo que o catálogo disse que não existe.
+ *
+ * - **COR de uma edição especial.** A película É o produto; ver ModelDef.
+ *
+ * Reconstruída a cada escolha a partir do FLUXO, nunca mutada no lugar: o
+ * seletor não fecha entre um clique e outro, e quem vier de um modelo de chassi
+ * único de volta para um de três precisa do passo de novo.
+ */
+function seqFor(flow: FlowId, choice: Choice): number[] {
+  const base = FLOWS[flow];
+  const found = getModel(choice.modelId);
+  const chassis = found ? found.model.chassis : [];
+  const skipChassis = chassis.length === 1 && chassis[0].available;
+  const skipColor = !!found?.model.specialEdition;
+  if (!skipChassis && !skipColor) return base.slice();
+  return base.filter((s) =>
+    !(skipChassis && s === STEP_INDEX.chassis) && !(skipColor && s === STEP_INDEX.color));
+}
 
 /* Anything focusable we might put inside the overlay. Used by the focus trap. */
 const FOCUS_SEL = [
@@ -224,18 +315,26 @@ let badgeMedia!: HTMLElement;
 let badgeName!: HTMLElement;
 let badgeSub!: HTMLElement;
 let badgeLogo!: HTMLImageElement;
+/* A amostra da cor atual, no canto da moldura — o que sobrou do card de cor. */
+let badgeSwatch!: HTMLElement;
+
+/* Verdadeiro enquanto o cavalo em cena for uma edição especial. Não muda mais o
+   FLUXO que o card abre (ele sempre abre o do caminhão inteiro, e `seqFor`
+   remove o passo da cor sozinho quando o modelo é película) — muda só o que o
+   card DIZ: sem amostra de tinta e sem cor no nome acessível, porque ali não há
+   tinta escolhível para anunciar. Escrito só por setBadgeSpecialEdition(). */
+let badgeSpecial = false;
+
+/* O último BadgeInfo pintado. setBadgeColor() precisa dele para trocar SÓ a
+   amostra sem apagar modelo, foto e logo — applyColor() roda por caminhos que
+   não sabem qual caminhão está na tela. */
+let lastBadgeInfo: BadgeInfo | null = null;
 
 /* Scene badge nodes (top-left). */
 let mapBadge!: HTMLElement;
 let mapBadgeMedia!: HTMLElement;
 let mapBadgeName!: HTMLElement;
 let mapBadgeFilled = false;
-
-/* Colour badge nodes (bottom-left, right above the truck badge). */
-let colorBadge!: HTMLElement;
-let colorBadgeSwatch!: HTMLElement;
-let colorBadgeName!: HTMLElement;
-let colorBadgeFilled = false;
 
 /* The single in-flight open() call, or null when the selector is closed:
    { resolve, cancellable, flow, seq, step, choice, prevFocus }. */
@@ -357,6 +456,9 @@ function bindBadgeTrigger(node: HTMLElement, flow: FlowId, label: string) {
   node.tabIndex = 0;
   node.setAttribute('aria-label', label);
   node.title = label;
+  /* O fluxo de cada crachá é FIXO desde que o card do caminhão passou a abrir o
+     fluxo inteiro: o `() => FlowId` que existia aqui era o que alternava entre
+     'color' e 'truck' na edição especial, e não há mais 'color'. */
 
   /* #canvas-holder holds the WebGL canvas and both badges as SIBLINGS, and
      scene/scene.ts binds OrbitControls to `renderer.domElement` — the canvas itself,
@@ -379,13 +481,43 @@ function bindBadgeTrigger(node: HTMLElement, flow: FlowId, label: string) {
 }
 
 /* Bottom-left: the chosen truck, with the manufacturer logo in its corner.
-   Clicking it re-opens fabricante → modelo. */
+   ---------------------------------------------------------------------------
+   CLICAR NELE ABRE O SELETOR DE CAMINHÃO INTEIRO — marca → modelo → chassi →
+   cor. Foi para cá que foi parar tanto o card de cor (que ficava empilhado logo
+   acima e saiu) quanto o botão "Trocar caminhão" (que era irmão logo abaixo e
+   também saiu): três controles para uma decisão viraram um card.
+
+   O CARD NÃO TEM MAIS NENHUM FILHO INTERATIVO NEM NENHUM RÓTULO DE AÇÃO. A
+   pílula "Trocar cor" que morava dentro dele foi embora com o resto; o que diz
+   que ele é clicável é o material (selector.css §7: cursor, borda de acento no
+   hover, anel de foco) e o nome acessível abaixo. Duas consequências que valem
+   ser ditas em voz alta, porque as duas já foram bug aqui:
+
+   1. A11Y: não há mais nenhum <button> dentro de um `role="button"` — o controle
+      aninhado que o botão irmão existia para evitar deixou de ser possível, e o
+      alvo de clique voltou a ser um só.
+   2. MEDIÇÃO: `ui/loader.ts:badgeMediaRect()` mede a caixa de layout de
+      `#ts-badge .ts-badge__media` para VOAR a foto da cortina até ela (o FLIP
+      de saída). Nada aqui mexe em __media: ela continua sendo o primeiro filho
+      em bloco do card, com `width:100%` + `aspect-ratio`, e a amostra de cor
+      continua posicionada em absoluto dentro dela (o que não altera a caixa de
+      layout). O que saiu eram IRMÃOS dela. */
 function buildBadge() {
   badge = el('div', 'ts-badge hidden');
   badge.id = 'ts-badge';
 
   badgeMedia = el('div', 'ts-badge__media');
   badge.appendChild(badgeMedia);
+
+  /* A amostra da cor, no canto da moldura — mesma marcação e mesma variável
+     (`--ts-swatch`) do chip dos cards de cor, para os dois lerem como a mesma
+     coisa. É ela que diz QUE cor o card está mostrando agora que não há mais um
+     card de cor para dizê-lo. Dentro de __media de propósito: o FLIP mede a
+     caixa de layout do elemento, e um filho posicionado absolutamente não a
+     altera. */
+  badgeSwatch = el('span', 'ts-badge__swatch hidden');
+  badgeSwatch.setAttribute('aria-hidden', 'true');
+  badgeMedia.appendChild(badgeSwatch);
 
   const body = el('div', 'ts-badge__body');
   badgeName = el('div', 'ts-badge__name');
@@ -394,20 +526,6 @@ function buildBadge() {
   body.appendChild(badgeSub);
   badge.appendChild(body);
 
-  /* Both of these are DIRECT children of .ts-badge, never of __media/__body:
-     selector.css positions them absolutely against the card itself (logo at the
-     bottom-right corner, "Trocar" in its own slot).
-
-     .ts-badge__change is now a <span>, not a <button>: the whole card is the
-     click target, so a nested control would be a second tab stop that does
-     exactly what its own container does — and nesting an interactive element
-     inside role="button" is an outright a11y bug. It stays as the visible
-     affordance hint that says "this card is clickable", hidden from the
-     accessibility tree because the card's aria-label already says it. */
-  const change = el('span', 'ts-badge__change', 'Trocar');
-  change.setAttribute('aria-hidden', 'true');
-  badge.appendChild(change);
-
   badgeLogo = el('img', 'ts-badge__logo hidden');
   badgeLogo.loading = 'lazy';
   badgeLogo.decoding = 'async';
@@ -415,6 +533,10 @@ function buildBadge() {
   badgeLogo.addEventListener('error', () => badgeLogo.classList.add('hidden'));
   badge.appendChild(badgeLogo);
 
+  /* Sem nó de rótulo. O `aria-label` que bindBadgeTrigger põe no card é o que
+     anuncia a ação, e paintBadgeLabels() o mantém dizendo qual caminhão e qual
+     tinta estão na tela — um texto visível repetindo isso seria a terceira cópia
+     da mesma frase no mesmo canto. */
   bindBadgeTrigger(badge, 'truck', 'Trocar caminhão');
 }
 
@@ -436,39 +558,14 @@ function buildMapBadge() {
      truck badge, turning the viewport into two competing cards. The environment
      subtitle goes into the tooltip instead of being dropped (see setMapBadge).
 
-     No __change node either: selector.css draws this card's "Trocar" pill as a
-     ::after on the card, which cannot be clicked, selected or tabbed to. */
+     Nenhum rótulo de ação: a pílula "Trocar" que selector.css desenhava como um
+     ::after neste card saiu junto com as duas do card do caminhão. */
   body.appendChild(el('div', 'ts-mapbadge__label', 'Cenário'));
   mapBadgeName = el('div', 'ts-mapbadge__name');
   body.appendChild(mapBadgeName);
   mapBadge.appendChild(body);
 
   bindBadgeTrigger(mapBadge, 'map', 'Trocar cenário');
-}
-
-/* Bottom-left, imediatamente acima do badge do caminhão: a cor que está no
-   cavalo. Clicar reabre SÓ o passo da cor.
-   Existe pelo mesmo motivo dos outros dois — cada badge é a porta de entrada da
-   PARTE do assistente que ele representa. Sem ele, trocar de cor custaria o
-   fluxo do caminhão inteiro (fabricante → modelo → cor), e a cor é justamente o
-   que se mexe mais vezes.
-   Não tem miniatura 3D: o card é pequeno, o caminhão colorido já está NA TELA
-   atrás dele, e a amostra chapada é o que se lê de relance. */
-function buildColorBadge() {
-  colorBadge = el('div', 'ts-colorbadge hidden');
-  colorBadge.id = 'ts-colorbadge';
-
-  colorBadgeSwatch = el('span', 'ts-colorbadge__swatch');
-  colorBadgeSwatch.setAttribute('aria-hidden', 'true');
-  colorBadge.appendChild(colorBadgeSwatch);
-
-  const body = el('div', 'ts-colorbadge__body');
-  body.appendChild(el('div', 'ts-colorbadge__label', 'Cor'));
-  colorBadgeName = el('div', 'ts-colorbadge__name');
-  body.appendChild(colorBadgeName);
-  colorBadge.appendChild(body);
-
-  bindBadgeTrigger(colorBadge, 'color', 'Trocar cor');
 }
 
 /**
@@ -481,19 +578,19 @@ export function initSelector() {
   buildOverlay();
   buildMapBadge();
   buildBadge();
-  buildColorBadge();
 
   /* Every badge lives inside #canvas-holder (position: relative) so they hug the
      3D viewport's corners instead of the page's. */
   const host = $opt('canvas-holder') || root;   // template changed under us — degrade
   host.appendChild(mapBadge);
-  /* Cor e caminhão dividem o canto inferior esquerdo, e por isso dividem um
-     ancoradouro: a pilha é posicionada uma vez e o flex resolve a altura. Com
-     dois `bottom:` independentes, a altura do card do caminhão viraria um
-     número mágico a recalcular em cada media query. Ordem no DOM = ordem na
-     tela: cor em cima, caminhão embaixo. */
+  /* A pilha do canto inferior esquerdo, hoje com UM inquilino só — o card. Ela
+     não foi removida junto com o botão que a justificava por dois motivos
+     concretos, nenhum estético: `core/studio.css` ancora `.ts-corner` (posição,
+     e a lista do modo limpo que a faz deslizar para fora) e `ui/hud.css` reserva
+     a faixa de baixo por ela. Trocar o ancoramento para `#ts-badge` moveria
+     essas três regras de arquivo por nada.
+     `position: static` no card vem de selector.css: quem posiciona é a pilha. */
   const corner = el('div', 'ts-corner');
-  corner.appendChild(colorBadge);
   corner.appendChild(badge);
   host.appendChild(corner);
 }
@@ -504,7 +601,9 @@ export function initSelector() {
    edited, fallback catalog active). Drop whatever no longer resolves instead of
    rendering a step with a phantom selection. */
 function sanitize(choice: Choice | null | undefined): Choice {
-  const out: Choice = { envId: null, manufacturerId: null, modelId: null, colorId: null };
+  const out: Choice = {
+    envId: null, manufacturerId: null, modelId: null, chassisId: null, colorId: null,
+  };
   if (!choice || typeof choice !== 'object') return out;
   const color = getColor(choice.colorId);
   if (color) out.colorId = color.id;
@@ -514,9 +613,14 @@ function sanitize(choice: Choice | null | undefined): Choice {
   if (man) {
     out.manufacturerId = man.id;
     /* Só um modelo COM geometria sobrevive: preselecionar um "Em breve" deixaria
-       o passo 3 abrir com um card destacado que não pode ser clicado. */
-    if (man.models.some((m) => m.id === choice!.modelId && m.available)) {
-      out.modelId = choice!.modelId;
+       o passo do modelo abrir com um card destacado que não pode ser clicado. */
+    const model = man.models.find((m) => m.id === choice!.modelId && m.available);
+    if (model) {
+      out.modelId = model.id;
+      /* Mesma regra um nível abaixo: um chassi que não pertence a ESTE modelo
+         (ou que perdeu a geometria) não pode chegar ao passo como selecionado. */
+      const hit = model.chassis.find((c) => c.id === choice!.chassisId && c.available);
+      if (hit) out.chassisId = hit.id;
     }
   }
   return out;
@@ -542,6 +646,16 @@ function backfill(choice: Choice): ResolvedChoice {
        "Em breve". */
     const usable = man?.models.find((m) => m.available);
     choice.modelId = usable ? usable.id : def.modelId;
+    /* O chassi PERTENCE ao modelo: trocar o modelo aqui obriga a reeleger o
+       chassi, senão a escolha sai com um par que nunca existiu. */
+    choice.chassisId = null;
+  }
+  /* O chassi nunca sai nulo, mesmo num fluxo que não mostra o passo dele — e
+     `chassis` é garantidamente não-vazio (ver ModelDef.chassis), então isto
+     sempre encontra alguém. */
+  const model = getModel(choice.modelId)?.model;
+  if (model && !model.chassis.some((c) => c.id === choice.chassisId)) {
+    choice.chassisId = defaultChassis(model)?.id ?? null;
   }
   /* A cor nunca sai daqui nula, mesmo num fluxo que não mostra o passo dela:
      studio.ts recebe uma escolha COMPLETA seja qual for o fluxo, e é dela que
@@ -561,17 +675,22 @@ function backfill(choice: Choice): ResolvedChoice {
    stale saved choice that outlives a manifest edit) would otherwise break. */
 function clampStep(requested: number, choice: Choice, seq: number[]) {
   let i = requested;
-  /* O passo da cor renderiza o MODELO escolhido em cada card; sem modelo não há
-     o que renderizar. (No fluxo 'color' o backfill de openSelector já garantiu
-     um, então isto só morde num estado que não deveria existir.) */
-  if (i === 3 && !choice.modelId) i = 2;
-  if (i === 2 && !choice.manufacturerId) i = 1;
-  if (i === 1 && !choice.envId && seq.includes(0)) i = 0;
+  /* Pré-requisitos POR NOME, nunca por índice absoluto — ver STEP_INDEX. Em
+     cascata e nesta ordem, para um estado que perdeu dois níveis cair os dois.
+     O passo da cor mostra o MODELO+CHASSI escolhido em cada card; sem eles não
+     há o que mostrar. (No fluxo 'color' o backfill de openSelector já garantiu
+     os dois, então isto só morde num estado que não deveria existir.) */
+  if (i === STEP_INDEX.color && !choice.chassisId) i = STEP_INDEX.chassis;
+  if (i === STEP_INDEX.chassis && !choice.modelId) i = STEP_INDEX.model;
+  if (i === STEP_INDEX.model && !choice.manufacturerId) i = STEP_INDEX.manufacturer;
+  if (i === STEP_INDEX.manufacturer && !choice.envId && seq.includes(STEP_INDEX.map)) {
+    i = STEP_INDEX.map;
+  }
   return seq.includes(i) ? i : seq[0];
 }
 
 function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
-  if (stepIndex === 0) {
+  if (stepIndex === STEP_INDEX.map) {
     return catalog.environments.map(env => ({
       id: env.id,
       name: env.name,
@@ -586,7 +705,7 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
       available: true,
     }));
   }
-  if (stepIndex === 1) {
+  if (stepIndex === STEP_INDEX.manufacturer) {
     return catalog.manufacturers.map(man => ({
       id: man.id,
       name: man.name,
@@ -603,10 +722,9 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
       available: true,
     }));
   }
-  if (stepIndex === 2) {
+  if (stepIndex === STEP_INDEX.model) {
     const man = getManufacturer(choice.manufacturerId);
     if (!man) return [];
-    const color = colorOf(choice);
     return man.models.map(m => ({
       id: m.id,
       name: m.name,
@@ -615,29 +733,57 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
       logo: null,
       accent: man.accent,
       /* A tag do indisponível é do motor, não do manifesto: um `note` autoral não
-         pode divergir do que o card realmente faz. */
-      tag: m.available ? m.note : EM_BREVE,
+         pode divergir do que o card realmente faz. Vale o mesmo para a edição
+         especial — quem decide o rótulo é quem decide o comportamento, e o
+         comportamento (pular a cor) sai de `specialEdition`, não do `note`. */
+      tag: !m.available ? EM_BREVE : (m.specialEdition ? EDICAO_ESPECIAL : m.note),
       selected: m.id === choice.modelId,
       available: m.available,
-      /* O card mostra o modelo NA COR que está escolhida — é o mesmo render que
-         o passo seguinte usa, então trocar de modelo já mostra como a cor atual
-         fica nele. Só quem tem geometria: um "Em breve" não tem o que renderizar
-         e continua com a foto do manifesto. */
-      preview: m.available && hasCabPreview(m.cab)
-        ? { cabId: m.cab, hex: color.hex, finish: color.finish }
-        : null,
+      /* O card mostra o modelo NA COR que está escolhida — é a mesma imagem que
+         o passo da cor usa, então trocar de modelo já mostra como a cor atual
+         fica nele. O chassi é o que ESTE modelo tem de mais parecido com o
+         escolhido: um modelo que não conhece o chassi atual cai no default
+         dele, e a cadeia de fallback de renderUrl() resolve o resto. */
+      render: renderFor(man.id, m.id, chassisIdWithin(m.id, choice.chassisId), choice.colorId),
+    }));
+  }
+
+  if (stepIndex === STEP_INDEX.chassis) {
+    /* O PASSO DIRIGIDO POR DADO. O motor não sabe quais configurações existem —
+       ele lê `ModelDef.chassis`, que o normalizador garante não-vazio. Qualquer
+       taxonomia válida (`6x2`/`6x4`/`4x2`, ou `padrao` sozinho) popula isto sem
+       uma linha de código nova. */
+    const found = getModel(choice.modelId);
+    if (!found) return [];
+    const { model, manufacturer } = found;
+    return model.chassis.map((c) => ({
+      id: c.id,
+      name: c.name,
+      /* O subtítulo do chassi, senão o do modelo: um `6x4` sem legenda própria
+         ainda tem de dizer alguma coisa abaixo do nome. */
+      sub: c.subtitle || model.subtitle,
+      image: c.image || model.image,
+      logo: null,
+      accent: manufacturer.accent,
+      tag: !c.available ? EM_BREVE : c.note,
+      selected: c.id === choice.chassisId,
+      /* Mesmo tratamento do modelo "Em breve": card visível, marcado, e NÃO
+         clicável. Uma configuração sem geometria não pode virar uma escolha que
+         o estúdio depois não consegue montar. */
+      available: c.available,
+      render: renderFor(manufacturer.id, model.id, c.id, choice.colorId),
     }));
   }
 
   /* Passo da cor. Um card por cor da paleta (catalog/colors.ts), cada um com o
-     cavalo JÁ ESCOLHIDO renderizado naquela cor — que é a única forma honesta de
-     escolher tinta: a mesma cor fica diferente em cada lataria.
-     Se a cabine não tem geometria leve para miniatura, os cards continuam
-     existindo com a amostra chapada: escolher a cor não pode depender de um
-     render. */
+     cavalo JÁ ESCOLHIDO naquela cor — que é a única forma honesta de escolher
+     tinta: a mesma cor fica diferente em cada lataria.
+     Enquanto o render daquela combinação não existe, o card continua existindo
+     com a silhueta e a amostra: escolher a cor não pode depender de uma imagem
+     que ainda não foi produzida. */
   const picked = getModel(choice.modelId);
-  const cabId = picked?.model.cab || null;
-  const renderable = !!cabId && hasCabPreview(cabId);
+  const manId = picked?.manufacturer.id || null;
+  const modelId = picked?.model.id || null;
   /* AS TINTAS DA MONTADORA ESCOLHIDA, não o catálogo inteiro. A tabela `Paint`
      amarra cada cor a uma montadora, e é essa a pergunta deste passo: de que cor
      ESTE caminhão. Mostrar as 522 do catálogo geral seria mostrar tinta de
@@ -656,14 +802,26 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
     tag: null,
     selected: c.id === choice.colorId,
     available: true,
-    preview: renderable ? { cabId: cabId as string, hex: c.hex, finish: c.finish } : null,
+    render: renderFor(manId, modelId, choice.chassisId, c.id),
     swatch: c.hex,
   }));
 }
 
-/** A cor da escolha, ou a padrão — nunca undefined, para o card sempre ter tinta. */
-function colorOf(choice: Choice): PaintColorDef {
-  return getColor(choice.colorId) || defaultColor();
+/* O chassi de OUTRO modelo que mais se parece com o escolhido: o mesmo id se
+   ele existir lá, senão o default daquele modelo. É o que faz o card do passo
+   MODELO mostrar uma imagem plausível antes de o chassi ser reescolhido. */
+function chassisIdWithin(modelId: string, wanted: string | null): string | null {
+  const model = getModel(modelId)?.model;
+  if (!model) return wanted;
+  if (model.chassis.some((c) => c.id === wanted)) return wanted;
+  return defaultChassis(model)?.id ?? null;
+}
+
+function renderFor(
+  manufacturerId: string | null, modelId: string | null,
+  chassisId: string | null, colorId: string | null,
+): CardRender {
+  return { url: renderUrl(manufacturerId, modelId, chassisId, colorId), chassisId };
 }
 
 /* ---------------- rendering ---------------- */
@@ -681,35 +839,78 @@ function colorOf(choice: Choice): PaintColorDef {
  * Emitir a classe do card dentro do crachá deixaria o render sem estilo E não
  * removeria a foto que já está lá — as duas ficariam empilhadas.
  */
-function setRender(media: HTMLElement, url: string, alt: string, ns = 'ts-card') {
+function setRender(
+  media: HTMLElement, url: string, alt: string, ns = 'ts-card', onFail?: () => void,
+) {
   const img = el('img', ns + '__img ' + ns + '__img--render');
   img.decoding = 'async';
   img.alt = alt || '';
+  clearMedia(media, ns);
+  /* O ESQUELETO ENQUANTO A IMAGEM NÃO DECODIFICA. `.is-rendering` (a varredura
+     de 2 px na base) não cobre este caso: ela nasceu quando o card já mostrava
+     a cor e só o render 3D faltava. Com uma imagem REMOTA a moldura fica vazia
+     até o `load`, e uma barrinha de 2 px sobre o vazio lê como card quebrado.
+     A classe sai no load E no error — um esqueleto que gira para sempre é o
+     mesmo defeito com outra animação. */
+  media.classList.add('is-skeleton');
+  const done = () => media.classList.remove('is-skeleton');
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', () => {
+    done();
+    /* O manifesto disse que existe e o servidor discordou. Não insistir: cair
+       direto no degrau seguinte é o que garante o "nunca uma moldura vazia". */
+    img.remove();
+    if (onFail) onFail();
+    else if (!media.querySelector('.ts-ph')) media.appendChild(renderPlaceholder(alt, null));
+  }, { once: true });
   img.src = url;
-  for (const old of media.querySelectorAll(
-    '.' + ns + '__img, .' + ns + '__fallback, .' + ns + '__logo')) {
-    old.remove();
-  }
   media.insertBefore(img, media.firstChild);
 }
 
-/* Pede a miniatura e a encaixa quando ela chegar. Nunca bloqueia a montagem do
-   card: o grid tem de aparecer inteiro na hora, e as imagens vão pingando. */
-function attachPreview(btn: HTMLElement, media: HTMLElement, item: CardItem) {
-  const p = item.preview as CardPreview;
-  /* Já renderizada numa passada anterior: entra sem piscar. Reabrir o seletor
-     tem de ser instantâneo. */
-  const ready = peekCabPreview(p.cabId, p.hex, p.finish);
-  if (ready) { setRender(media, ready, item.name); return; }
+/* Tira o que estiver na moldura ANTES de pôr a imagem nova. São a mesma
+   informação dita pior, e empilhá-las deixaria a foto aparecendo por baixo do
+   fundo transparente do render. A amostra do canto e a tag NÃO saem: elas não
+   são conteúdo da moldura, são anotações sobre ela. */
+function clearMedia(media: HTMLElement, ns: string) {
+  for (const old of media.querySelectorAll(
+    '.' + ns + '__img, .' + ns + '__fallback, .' + ns + '__logo, .ts-ph')) {
+    old.remove();
+  }
+}
 
-  media.classList.add('is-rendering');
-  void cabPreview(p.cabId, p.hex, p.finish).then((url) => {
-    media.classList.remove('is-rendering');
-    /* O grid é REFEITO a cada mudança de passo, e uma cor pode levar alguns
-       quadros: quando o render chega, ESTE card pode já ter sido descartado. */
-    if (!url || !btn.isConnected) return;
-    setRender(media, url, item.name);
-  });
+/**
+ * Põe a imagem do card na moldura, descendo a CADEIA DE FALLBACK até algo
+ * aparecer. A ordem é a de DECISIONS §4, e o último degrau nunca falha:
+ *
+ *   1. render pré-produzido `modelo/chassi/cor` (ou o vizinho que renderUrl()
+ *      escolheu — a cadeia interna dele já correu);
+ *   2. a foto do manifesto (`ModelDef.image` / `ChassisDef.image`);
+ *   3. **o placeholder de silhueta**, com o nome do modelo no verde do projeto.
+ *
+ * NUNCA uma moldura vazia, e nunca o glifo de imagem quebrada do navegador.
+ * Síncrono: `renderUrl()` responde do manifesto já carregado, então não há mais
+ * fila, token de corrida nem cache de data URL para administrar — isso tudo
+ * morreu junto com ui/preview.ts.
+ */
+function attachMedia(media: HTMLElement, item: CardItem) {
+  const chassisId = item.render?.chassisId ?? null;
+  const fallback = () => {
+    if (!media.querySelector('.ts-ph')) media.appendChild(renderPlaceholder(item.name, chassisId));
+  };
+  const url = item.render?.url || null;
+  if (url) { setRender(media, url, item.name, 'ts-card', fallback); return; }
+  if (!item.image) { fallback(); return; }
+  /* A foto do manifesto — degrau 2. Montada aqui e não por appendImage()
+     justamente por causa do erro: a placa de iniciais daquela função é o
+     fallback certo para um LOGO ou uma miniatura de cenário, e o errado para
+     um caminhão, que tem uma silhueta para mostrar. */
+  const img = el('img', 'ts-card__img');
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.alt = item.name || '';
+  img.addEventListener('error', () => { img.remove(); fallback(); }, { once: true });
+  img.src = assetUrl(item.image);
+  media.insertBefore(img, media.firstChild);
 }
 
 function buildCard(item: CardItem, stepIndex: number) {
@@ -750,10 +951,13 @@ function buildCard(item: CardItem, stepIndex: number) {
     /* Brand cards: the logo is centred in the media box and the name repeats it
        right below, so the image is decorative → empty alt. */
     appendImage(media, item.logo, '', 'ts-card__logo', 'ts-card__fallback', initials(item.name));
+  } else if (item.render) {
+    /* Modelo / chassi / cor: render pré-produzido → foto do manifesto →
+       silhueta. Ver attachMedia(). */
+    attachMedia(media, item);
   } else {
     appendImage(media, item.image, item.name, 'ts-card__img', 'ts-card__fallback', initials(item.name));
   }
-  if (item.preview) attachPreview(btn, media, item);
   /* A amostra: um chip da cor pura no canto da moldura. É o que garante que a
      cor está dita mesmo quando o render ainda não chegou — e o que diz a cor de
      fábrica sem depender de como a luz do estúdio a devolveu no render. */
@@ -844,8 +1048,14 @@ function renderSteps() {
    da janela continuam focáveis, e é por isso que setPage() mexe no tabIndex: um
    Tab não pode levar o foco para um card que ninguém está vendo. */
 const PER_PAGE = 3;
-/** Passos que rolam em vez de empilhar. Cenário e modelo têm 3 cards e ficam grid. */
-const CAROUSEL_STEPS = new Set<StepId>(['manufacturer', 'color']);
+/** Passos que rolam em vez de empilhar. Só o cenário fica grid: tem 3 cards fixos.
+    MODELO entrou aqui quando a IVECO passou a ter 4 S-Way (o 480, o 440, a edição
+    Metallica e o 540). O grid é `repeat(3, 1fr)`, então o quarto card caía sozinho
+    numa segunda linha — e a regra é `items.length > PER_PAGE`, logo uma marca com
+    3 modelos ou menos continua exatamente como era, em grid.
+    CHASSI entrou junto: três configurações é o caso comum, mas um 8x4 ou um
+    tanque-tanque leva o modelo a quatro ou cinco, e a regra acima já cobre. */
+const CAROUSEL_STEPS = new Set<StepId>(['manufacturer', 'model', 'chassis', 'color']);
 
 let track: HTMLElement | null = null;
 let navPrev: HTMLButtonElement | null = null;
@@ -1042,25 +1252,68 @@ function choose(stepIndex: number, id: string) {
   if (!session) return;
   const choice = session.choice;
 
-  if (stepIndex === 0) {
+  if (stepIndex === STEP_INDEX.map) {
     choice.envId = id;
-  } else if (stepIndex === 1) {
+  } else if (stepIndex === STEP_INDEX.manufacturer) {
     /* Switching brands invalidates the model: keeping "S730" highlighted under
        Volvo would be a lie. Re-picking the SAME brand keeps it, which is the
        whole point of the clickable breadcrumb. */
-    if (choice.manufacturerId !== id) choice.modelId = null;
+    if (choice.manufacturerId !== id) { choice.modelId = null; choice.chassisId = null; }
     choice.manufacturerId = id;
-  } else if (stepIndex === 2) {
+  } else if (stepIndex === STEP_INDEX.model) {
+    /* Mesma lógica um nível abaixo: um chassi pertence a UM modelo, e manter
+       "6x4" marcado ao trocar de modelo seria uma mentira do mesmo tipo. */
+    if (choice.modelId !== id) choice.chassisId = null;
     choice.modelId = id;
-    /* O próximo passo vai renderizar ESTA cabine doze vezes. Começar a baixar a
-       geometria agora sobrepõe o download ao clique que o usuário ainda vai
-       dar, em vez de deixá-lo esperando na frente de um grid vazio. */
-    warmCabPreview(getModel(id)?.model.cab);
+    /* A SEQUÊNCIA É RECALCULADA A CADA ESCOLHA DE MODELO.
+       ---------------------------------------------------------------------
+       `seq` é dado de SESSÃO, não constante — foi feita para ser a
+       subsequência que ESTE fluxo caminha —, então recalculá-la aqui é usar o
+       mecanismo como ele foi desenhado, e não um caso especial colado por
+       cima. Tudo que lê a posição (a trilha de migalhas, "Voltar", advance(),
+       clampStep) já pergunta à sequência, então nada mais precisa saber disto.
+
+       RECALCULAR É O PONTO, não "remover": o seletor não fecha entre um clique
+       e outro, e quem vier de um modelo de chassi único (ou de uma edição
+       especial) de volta para um modelo de três configurações precisa dos
+       passos de volta. Ver seqFor(). */
+    session.seq = seqFor(session.flow, choice);
+    /* Os passos que a sequência acabou de tirar não vão ser mostrados, então
+       ninguém vai escolhê-los — e a escolha resolvida tem de sair COMPLETA de
+       qualquer jeito: é ela que o estúdio aplica e que vai para o localStorage.
+       Numa edição especial a cor simplesmente não é do usuário (a película já é
+       a pintura); num modelo de chassi único, a configuração é a que existe. */
+    if (!session.seq.includes(STEP_INDEX.chassis)) {
+      choice.chassisId = defaultChassis(getModel(id)?.model)?.id ?? null;
+    }
+    if (!session.seq.includes(STEP_INDEX.color) && !choice.colorId) {
+      choice.colorId = defaultChoice().colorId;
+    }
+    /* O passo seguinte vai pedir uma imagem por card. Começar a baixar as deste
+       modelo agora sobrepõe a rede ao clique que o usuário ainda vai dar, em
+       vez de deixá-lo esperando na frente de esqueletos. É o que sobrou do
+       antigo warmCabPreview(), e custa 1/1000 do que ele custava — nenhuma
+       geometria, nenhum contexto WebGL, só o cache HTTP. */
+    warmRenders(choice);
+  } else if (stepIndex === STEP_INDEX.chassis) {
+    choice.chassisId = id;
+    warmRenders(choice);
   } else {
     choice.colorId = id;
   }
 
   advance();
+}
+
+/* Pré-carrega as imagens da PRIMEIRA página do passo de cor deste caminhão.
+   Só a primeira: o carrossel mostra três por vez, e baixar 26 renders para
+   mostrar 3 é trocar um problema de latência por um de banda. */
+function warmRenders(choice: Choice) {
+  const found = getModel(choice.modelId);
+  if (!found) return;
+  const urls = colorsFor(choice.manufacturerId).slice(0, PER_PAGE * 2).map((c) =>
+    renderUrl(found.manufacturer.id, found.model.id, choice.chassisId, c.id));
+  prefetchRenders(urls);
 }
 
 /* ---------------- open / close lifecycle ---------------- */
@@ -1096,12 +1349,16 @@ function finish() {
      the loading photo into it, and a hidden node has no box. Do not reorder. */
   syncMapBadgeFromChoice(choice);
   syncBadgeFromChoice(choice);
-  syncColorBadgeFromChoice(choice);
   settle(choice);
 
   /* Fire listeners on the NEXT frame, after the browser has painted the closed
      overlay: studio.ts reacts by loading a cab/HDRI, and the #loading spinner it
      shows must be visible, not hidden behind a still-painted selector.
+
+     `paintFrame()` e não `requestAnimationFrame` cru — MEDIDO: rAF não dispara
+     numa aba escondida, e um `emit()` pendurado nele significa que a escolha
+     concluída NUNCA chega ao studio.ts. O seletor fecha, o crachá já mostra a
+     cor nova, e o caminhão continua com a antiga. Ver a nota em ui/loader.ts.
 
      NOTE for studio.ts: listeners fire on EVERY completed selection, including the
      one whose promise openSelector() just resolved. Make the handler idempotent
@@ -1109,7 +1366,7 @@ function finish() {
      that anyway, so that re-confirming the same truck does not re-download it,
      and the 'map' flow in particular resolves a choice whose truck half is
      byte-for-byte what is already on screen. */
-  requestAnimationFrame(() => emit(choice));
+  void paintFrame().then(() => emit(choice));
 }
 
 /**
@@ -1161,12 +1418,14 @@ export function openSelector(opts: {
   }
 
   const flow: FlowId = opts.flow && FLOWS[opts.flow] ? opts.flow : 'full';
-  const seq = FLOWS[flow];
 
   const choice = sanitize(opts.choice || lastChoice || loadChoice() || defaultChoice());
   /* A partial flow can never repair a stale id it does not show, so repair it
      up front — then every step it DOES show renders with a real selection. */
   if (flow !== 'full') backfill(choice);
+  /* DEPOIS do backfill: seqFor() pergunta ao MODELO quantos chassis ele tem, e
+     num fluxo parcial o modelo só existe depois de o backfill o repor. */
+  const seq = seqFor(flow, choice);
 
   return new Promise<ResolvedChoice | null>((resolve) => {
     session = {
@@ -1270,13 +1529,56 @@ function detachGlobalListeners() {
 
 /* ---------------- badges ---------------- */
 
-/* Geração do render do crachá do caminhão. Ver setBadge(). */
-let badgeRenderToken = 0;
+/* O nome acessível do card do caminhão diz o que o clique FAZ e o que o card
+   MOSTRA. Ele é a ÚNICA coisa que diz a primeira metade agora que não há rótulo
+   visível nenhum no card — daí ele se montar em um lugar só, e daí carregar
+   também a cor: para um leitor de tela o card é o resumo do veículo em cena. */
+/**
+ * 'Scania S 2016' — a marca mais o modelo, SEM repetir a marca.
+ *
+ * Com a taxonomia nova o `modelId` nomeia a GERAÇÃO, e o nome dela costuma já
+ * trazer a montadora dentro ('Scania S 2016', 'Volvo FH 2020'), porque é assim
+ * que a indústria a chama. Concatenar às cegas dava "Scania Scania S 2016" no
+ * nome acessível do crachá e na linha de estado.
+ *
+ * Comparação por prefixo e sem diferenciar caixa: `'Mercedes-Benz Actros'` sob
+ * a marca `'Mercedes-Benz'` é o mesmo caso. Um modelo que só COMEÇA parecido
+ * ('Scania' vs 'Scanialight') é separado pelo teste de limite de palavra.
+ */
+export function truckLabel(
+  manufacturerName: string | null | undefined, modelName: string | null | undefined,
+): string {
+  const man = (manufacturerName || '').trim();
+  const model = (modelName || '').trim();
+  if (!man) return model;
+  if (!model) return man;
+  const lower = model.toLowerCase();
+  const manLower = man.toLowerCase();
+  if (lower === manLower) return model;
+  if (lower.startsWith(manLower) && /[\s-]/.test(model.charAt(man.length))) return model;
+  return man + ' ' + model;
+}
+
+function paintBadgeLabels(info: BadgeInfo) {
+  const truck = truckLabel(info.manufacturerName, info.modelName);
+  const verb = 'Trocar caminhão';
+  /* A cor entra no nome acessível SÓ quando ela é escolha do usuário. Numa
+     edição especial a película é o produto, e anunciar uma tinta ao lado dela
+     descreveria uma escolha que o seletor não vai oferecer. */
+  const what = badgeSpecial
+    ? truck
+    : [truck, info.colorName].filter(Boolean).join(' · ');
+  badge.setAttribute('aria-label', what ? verb + ' (atual: ' + what + ')' : verb);
+  badge.title = what ? verb + ' · ' + what : verb;
+}
 
 /**
  * Fill the bottom-left truck card. Pass null to hide it.
- * @param {{ modelName?: string, modelSubtitle?: string, modelImage?: string,
- *           manufacturerName?: string, logo?: string }|null} info
+ *
+ * Ele é o gatilho do seletor de caminhão INTEIRO agora (o card de cor e o botão
+ * "Trocar caminhão" saíram os dois), então além do caminhão ele carrega a
+ * amostra da tinta no canto da moldura — é a única coisa na tela que diz que
+ * cor está aplicada. Ver buildBadge().
  */
 export function setBadge(info: BadgeInfo | null) {
   initSelector();
@@ -1284,37 +1586,40 @@ export function setBadge(info: BadgeInfo | null) {
     badge.classList.add('hidden');
     return;
   }
+  lastBadgeInfo = { ...info };
 
-  badgeMedia.textContent = '';
-  /* A FOTO PRIMEIRO, sempre — e o render por cima quando ele existir.
-     O crachá é desenhado no meio de applyChoice(), antes de a cortina subir, e
-     nesse instante a miniatura desta cor pode ainda não ter sido renderizada.
-     Pintar a foto agora e trocar depois dá ao crachá o mesmo comportamento dos
-     cards (conteúdo imediato, render quando chega) em vez de um buraco. */
-  appendImage(
-    badgeMedia, info.modelImage, info.modelName || '',
-    'ts-badge__img', 'ts-badge__fallback', initials(info.modelName),
-  );
-  if (info.preview) {
-    const p = info.preview;
-    const ready = peekCabPreview(p.cabId, p.hex, p.finish);
-    if (ready) {
-      setRender(badgeMedia, ready, info.modelName || '', 'ts-badge');
-    } else {
-      /* O token fecha a corrida: trocar de caminhão ou de cor enquanto este
-         render está em voo tem de descartar o que chegar tarde, senão o crachá
-         mostra a cor anterior por cima da atual. */
-      const mine = ++badgeRenderToken;
-      void cabPreview(p.cabId, p.hex, p.finish).then((url) => {
-        if (!url || mine !== badgeRenderToken) return;
-        setRender(badgeMedia, url, info.modelName || '', 'ts-badge');
-      });
+  /* A amostra é preservada: ela é filha de __media e não é conteúdo dela.
+     `textContent = ''` levaria o chip junto e o crachá perderia a cor. */
+  clearMedia(badgeMedia, 'ts-badge');
+  /* CADEIA DE FALLBACK, a mesma dos cards: render → foto do manifesto →
+     silhueta. Nunca uma moldura vazia, nem por um quadro — o crachá é desenhado
+     no meio de applyChoice(), ANTES de a cortina subir, e é a caixa que
+     ui/loader.ts mede para voar a foto até aqui. */
+  const url = info.render?.url || null;
+  const fallbackToPh = () => {
+    if (!badgeMedia.querySelector('.ts-ph')) {
+      badgeMedia.appendChild(renderPlaceholder(info.modelName || '', info.render?.chassisId ?? null));
     }
+  };
+  if (url) {
+    setRender(badgeMedia, url, info.modelName || '', 'ts-badge', fallbackToPh);
+  } else if (info.modelImage) {
+    appendImage(
+      badgeMedia, info.modelImage, info.modelName || '',
+      'ts-badge__img', 'ts-badge__fallback', initials(info.modelName),
+    );
+  } else {
+    fallbackToPh();
   }
 
   badgeName.textContent = info.modelName || '';
   badgeSub.textContent = info.modelSubtitle || '';
   badgeSub.classList.toggle('hidden', !info.modelSubtitle);
+
+  /* `badgeSpecial` manda: setBadge() roda em toda aplicação e não sabe se o
+     cavalo é película, então pintar a amostra sem consultá-lo devolveria à tela
+     a cor que setBadgeSpecialEdition() acabou de tirar dela. */
+  paintBadgeSwatch(badgeSpecial ? null : info.colorHex);
 
   if (info.logo) {
     badgeLogo.alt = info.manufacturerName || '';
@@ -1327,13 +1632,57 @@ export function setBadge(info: BadgeInfo | null) {
     badgeLogo.classList.add('hidden');
   }
 
-  /* The card is a button now, so its accessible name has to say what pressing it
-     does AND what it currently shows — the photo alone announces neither. */
-  const what = [info.manufacturerName, info.modelName].filter(Boolean).join(' ');
-  badge.setAttribute('aria-label', what ? 'Trocar caminhão (atual: ' + what + ')' : 'Trocar caminhão');
-  badge.title = what ? 'Trocar caminhão · ' + what : 'Trocar caminhão';
-
+  paintBadgeLabels(info);
   badge.classList.remove('hidden');
+}
+
+function paintBadgeSwatch(hex: string | null | undefined) {
+  /* Escondido, não cinza: uma amostra "sem cor" seria uma cor a menos de
+     distância de ser lida como a tinta do caminhão. */
+  if (!hex) { badgeSwatch.classList.add('hidden'); return; }
+  badgeSwatch.style.setProperty('--ts-swatch', hex);
+  badgeSwatch.classList.remove('hidden');
+}
+
+/**
+ * Troca SÓ a cor mostrada no card do caminhão — a amostra do canto e o nome
+ * acessível — mantendo modelo, foto e logo.
+ *
+ * Existe porque `applyColor()` (studio.ts) roda por caminhos que não sabem qual
+ * caminhão está na tela: o atalho de "só a cor mudou" não passa por
+ * `resolveChoice`. Sem isto, cada troca de cor teria de repintar o crachá
+ * inteiro — e repintar a moldura descartaria a imagem já decodificada para pôr
+ * a mesma de volta, piscando.
+ */
+export function setBadgeColor(
+  colorName: string | null, hex: string | null, finishLabel?: string | null,
+) {
+  initSelector();
+  if (!lastBadgeInfo) return;
+  lastBadgeInfo.colorName = colorName;
+  lastBadgeInfo.colorHex = hex;
+  lastBadgeInfo.finishLabel = finishLabel ?? null;
+  paintBadgeSwatch(badgeSpecial ? null : hex);
+  paintBadgeLabels(lastBadgeInfo);
+}
+
+/**
+ * Liga/desliga o modo "edição especial" do card do caminhão.
+ *
+ * Substituiu `setBadgeFlow()`, que existia para trocar o fluxo do card entre
+ * `'color'` e `'truck'`. O card abre o fluxo do caminhão INTEIRO agora, sempre,
+ * e o passo da cor sai dele sozinho quando o modelo é película (`seqFor`) — não
+ * há mais fluxo a escolher, só aparência a ajustar.
+ *
+ * O que muda: a amostra de tinta some. A película É a pintura, e mostrar uma
+ * cor escolhível ao lado dela seria oferecer o que não existe.
+ */
+export function setBadgeSpecialEdition(on: boolean) {
+  initSelector();
+  badgeSpecial = on;
+  if (on) paintBadgeSwatch(null);
+  else if (lastBadgeInfo) paintBadgeSwatch(lastBadgeInfo.colorHex);
+  if (lastBadgeInfo) paintBadgeLabels(lastBadgeInfo);
 }
 
 /** @param {boolean} visible */
@@ -1389,59 +1738,63 @@ export function showMapBadge(visible: boolean) {
   mapBadge.classList.toggle('hidden', !visible);
 }
 
-/**
- * Fill the bottom-left colour card. Pass null to hide it.
- * @param {{ colorName?: string, hex?: string, finishLabel?: string }|null} info
- */
-export function setColorBadge(info: ColorBadgeInfo | null) {
-  initSelector();
-  if (!info) {
-    colorBadge.classList.add('hidden');
-    return;
-  }
-
-  const hex = info.hex || '#b9bec6';
-  colorBadgeSwatch.style.setProperty('--ts-swatch', hex);
-  colorBadgeName.textContent = info.colorName || '';
-
-  const desc = [info.colorName, info.finishLabel].filter(Boolean).join(' · ');
-  colorBadge.setAttribute(
-    'aria-label',
-    info.colorName ? 'Trocar cor (atual: ' + info.colorName + ')' : 'Trocar cor',
-  );
-  colorBadge.title = desc ? 'Trocar cor · ' + desc : 'Trocar cor';
-
-  colorBadgeFilled = true;
-  colorBadge.classList.remove('hidden');
-}
-
-/** @param {boolean} visible */
-export function showColorBadge(visible: boolean) {
-  initSelector();
-  /* Mesmo motivo de showMapBadge: um card que ninguém preencheu seria uma placa
-     vazia sobre a cena. O caminho do visitante que volta não passa pelo
-     seletor, então a paleta é quem responde. */
-  if (visible && !colorBadgeFilled) {
-    syncColorBadgeFromChoice(sanitize(lastChoice || loadChoice() || defaultChoice()));
-  }
-  colorBadge.classList.toggle('hidden', !visible);
-}
-
 /* Keep the badges honest even if studio.ts forgets to refresh them: each badge is
    the trigger for its own flow, so a stale one would re-open the selector
    preselected with the wrong truck/scene/colour. studio.ts may still call
-   setBadge()/setMapBadge()/setColorBadge() to override. */
+   setBadge()/setMapBadge() to override. */
 function syncBadgeFromChoice(choice: Choice) {
   const man = getManufacturer(choice.manufacturerId);
   const model = man ? man.models.find((m) => m.id === choice.modelId) : null;
   if (!man || !model) return;
+  const chassis: ChassisDef | null =
+    model.chassis.find((c) => c.id === choice.chassisId) || defaultChassis(model);
+  const color = getColor(choice.colorId);
   setBadge({
     modelName: model.name,
-    modelSubtitle: model.subtitle,
-    modelImage: model.image,
+    /* O CHASSI ENTRA NO SUBTÍTULO. Ele é um passo do seletor agora, então o
+       crachá tem de dizer qual configuração está na tela — senão a única
+       diferença visível entre um 6x4 e um 4x2 seria a contagem de rodas no
+       render, que nem sempre existe ainda. Só quando ele diz algo: um chassi
+       sintético ('Padrão') repetiria o subtítulo do modelo. */
+    modelSubtitle: chassisSubtitle(model.subtitle, chassis),
+    modelImage: chassis?.image || model.image,
     manufacturerName: man.name,
     logo: man.logo,
+    render: renderFor(man.id, model.id, chassis?.id ?? null, choice.colorId),
+    colorName: color?.name ?? null,
+    colorHex: color?.hex ?? null,
+    finishLabel: color ? FINISH_LABEL[color.finish] : null,
   });
+}
+
+/**
+ * 'Highline · 6x4 S730' — o subtítulo do modelo mais a configuração, SEM
+ * repetir a configuração.
+ *
+ * A deduplicação não é preciosismo: durante a migração de taxonomia os dois
+ * lados dizem a mesma coisa. O subtítulo antigo do modelo já terminava com a
+ * rodagem ('Highline · 6x4'), porque era ali que o chassi se escondia; o nome
+ * do chassi novo COMEÇA com ela ('6x4 S730'), porque agora é ali que ele mora.
+ * Concatenar às cegas daria 'Highline · 6x4 · 6x4 S730'.
+ * Então: se o subtítulo termina no primeiro TOKEN do nome do chassi, esse
+ * pedaço sai do subtítulo — o nome do chassi é a fonte mais nova e mais
+ * específica das duas, e é ele que fica inteiro.
+ */
+export function chassisSubtitle(
+  modelSubtitle: string | null | undefined, chassis: ChassisDef | null | undefined,
+): string {
+  let base = (modelSubtitle || '').trim();
+  const name = (chassis?.name || '').trim();
+  /* 'Padrão' é o chassi SINTÉTICO de um modelo que não declara nenhum — ele não
+     é uma configuração, é a ausência de uma, e anunciá-lo seria inventar uma
+     escolha que o catálogo não oferece. */
+  if (!name || name === 'Padrão' || base === name) return base;
+  if (base.endsWith('· ' + name)) return base;
+  const token = name.split(/\s+/)[0];
+  if (token && base.toLowerCase().endsWith('· ' + token.toLowerCase())) {
+    base = base.slice(0, base.length - token.length - 2).trim();
+  }
+  return base ? base + ' · ' + name : name;
 }
 
 function syncMapBadgeFromChoice(choice: Choice) {
@@ -1454,21 +1807,12 @@ function syncMapBadgeFromChoice(choice: Choice) {
   });
 }
 
-function syncColorBadgeFromChoice(choice: Choice) {
-  const color = getColor(choice.colorId);
-  if (!color) return;
-  setColorBadge({
-    colorName: color.name,
-    hex: color.hex,
-    finishLabel: FINISH_LABEL[color.finish],
-  });
-}
-
-/* A badge press opens ONLY the part of the wizard that badge stands for, with
-   the current choice preselected, and IS cancellable — the user already has a
-   truck on screen, so backing out has a sane meaning here (unlike the first
-   boot). The completed selection reaches studio.ts through the onChange
-   listeners, so there is nothing to await. */
+/* A badge press opens the part of the wizard that badge stands for — o card do
+   cenário abre o passo do cenário, o card do caminhão abre marca → modelo →
+   chassi → cor —, com a escolha atual preselecionada, e IS cancellable: o
+   usuário já tem um caminhão na tela, então desistir tem um significado são aqui
+   (ao contrário do primeiro boot). The completed selection reaches studio.ts
+   through the onChange listeners, so there is nothing to await. */
 function openFlow(flow: FlowId) {
   /* Never let a badge press steal an overlay that is already up: openSelector's
      stale-session rule would resolve the pending promise with null, and boot's

@@ -267,10 +267,17 @@ export const STUDIO_HTML = /* html */ `
            .canvas-container que ele mesmo posiciona: pôr a janela nesse nó
            seria disputar o style dele a cada resize. O wrapper é nosso, ele
            mora dentro.
-           2048x344: a janela da lateral tem razão ~5,95 (medida na própria
-           foto por vehicle/livery.ts). Com a antiga 4:1 a tela era esticada ao
-           virar textura e um círculo desenhado aqui saía oval no caminhão. A
-           traseira segue quadrada — a janela dela mede 0,99. -->
+           OS TAMANHOS ABAIXO SÃO SEMENTE, NÃO VERDADE. Quem manda no buffer é
+           syncSurfaceAspect() (vehicle/livery.ts), chamada a cada chapa nova:
+           ela dimensiona a tela pela GEOMETRIA MEDIDA do painel, com densidade
+           constante em px/mm. Estes números só existem para o primeiro quadro,
+           antes de haver chapa recortada para medir, e por isso já vêm na razão
+           da chapa de fábrica — 2048x389 na lateral (14 655 x 2 777 mm,
+           razão 5,2775) e 977x1024 na traseira (2 590 x 2 716 mm, razão 0,9536).
+           O par 2048x344 que estava aqui tinha vindo de medir a FOTO
+           panels/lateral.png (razão 5,9535), não a chapa, e fazia toda a arte
+           sair 12,8 % mais alta que larga no baú. Mexer nestes números sem
+           mexer na chapa não muda nada: a próxima medição os sobrescreve. -->
       <div class="modal-body">
         <div class="stage-wrap">
           <canvas class="ruler ruler-h" id="ruler-h"></canvas>
@@ -288,15 +295,15 @@ export const STUDIO_HTML = /* html */ `
               <div class="stage-panel" id="stage-left">
                 <span class="edge-label edge-start">◄ TRASEIRA</span>
                 <span class="edge-label edge-end">FRENTE ►</span>
-                <div class="panel-window"><canvas id="fabric-left" width="2048" height="344"></canvas></div>
+                <div class="panel-window"><canvas id="fabric-left" width="2048" height="389"></canvas></div>
               </div>
               <div class="stage-panel hidden" id="stage-right">
                 <span class="edge-label edge-start">◄ FRENTE</span>
                 <span class="edge-label edge-end">TRASEIRA ►</span>
-                <div class="panel-window"><canvas id="fabric-right" width="2048" height="344"></canvas></div>
+                <div class="panel-window"><canvas id="fabric-right" width="2048" height="389"></canvas></div>
               </div>
               <div class="stage-panel hidden" id="stage-rear">
-                <div class="panel-window"><canvas id="fabric-rear" width="1024" height="1024"></canvas></div>
+                <div class="panel-window"><canvas id="fabric-rear" width="977" height="1024"></canvas></div>
               </div>
             </div>
             <div id="drop-hint">Solte a imagem para adicionar</div>
@@ -405,6 +412,22 @@ export const STUDIO_HTML = /* html */ `
               <button class="mini ghost" data-gap="x">↔ Aplicar</button>
               <button class="mini ghost" data-gap="y">↕ Aplicar</button>
             </div>
+          </section>
+
+          <!-- AS MEDIDAS DO IMPLEMENTO, editadas AQUI DENTRO.
+               O pedido é literal: "a edição das medidas deve ser direto no
+               livery". Não é um segundo formulário ao lado — é a mesma tela em
+               que a arte é desenhada, porque medida e arte são a mesma decisão
+               vista de dois ângulos: subir a altura do baú move a faixa
+               refletiva e o vão da porta por baixo do que já está desenhado, e
+               quem desenha precisa ver isso acontecer.
+               data-for="always" porque medida não é propriedade de um objeto
+               selecionado: ela vale com ou sem seleção.
+               O conteúdo é montado por ui/livery-measures.ts — ele depende do
+               número de portas cadastradas, que muda em tempo de execução. -->
+          <section class="panel insp" data-for="always">
+            <h3 class="panel-title"><span>Medidas do implemento</span><b class="panel-hint" id="measures-face"></b></h3>
+            <div id="measures-body"></div>
           </section>
 
           <section class="panel insp" data-for="always">

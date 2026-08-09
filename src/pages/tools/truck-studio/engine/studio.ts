@@ -10,8 +10,8 @@
    boot() roda, portanto, no máximo UMA vez por carregamento de página.
 
    Desde o "Configurador" o estúdio não abre mais direto num caminhão padrão:
-   boot() carrega o catálogo, um seletor de QUATRO passos (cenário → fabricante →
-   modelo → cor) decide o que construir, e uma cortina de carregamento cobre o
+   boot() carrega o catálogo, um seletor de CINCO passos (cenário → fabricante →
+   modelo → chassi → cor) decide o que construir, e uma cortina de carregamento cobre o
    download antes de voar a foto do caminhão escolhido para o crachá do canto
    inferior esquerdo. Tudo a jusante dessa decisão passa por UMA função,
    applyChoice(), para que o seletor e os crachás não possam divergir — e para
@@ -27,43 +27,47 @@ import { scene, camera, controls, renderer, frameAll, startLoop, stopLoop, resiz
 import * as models from './vehicle/models';
 import * as paint from './vehicle/paint';
 import * as livery from './vehicle/livery';
+import * as liveryStructure from './vehicle/livery-structure';
 import * as catalogMod from './catalog/catalog';
 import * as selector from './ui/selector';
 import * as environment from './scene/environment';
 import * as loader from './ui/loader';
 import {
   loadCatalog, loadChoice, saveChoice, defaultChoice,
-  getEnvironment, getModel, assetUrl,
+  getEnvironment, getModel, assetUrl, defaultChassis, fileOf,
 } from './catalog/catalog';
 import {
   initSelector, openSelector, setBadge, showBadge, setMapBadge, showMapBadge,
-  setColorBadge, showColorBadge,
+  setBadgeColor, setBadgeSpecialEdition, chassisSubtitle, truckLabel,
 } from './ui/selector';
-import { disposePreviews, prewarmCabPreviews, hasCabPreview } from './ui/preview';
-import { loadColors, getColor, defaultColor, colorsFor, FINISH_LABEL } from './catalog/colors';
+import { loadRenders, renderUrl } from './catalog/renders';
+import { loadColors, getColor, defaultColor, FINISH_LABEL } from './catalog/colors';
 import type { PaintColorDef } from './catalog/colors';
 import { applyEnvironment, getCurrentEnvironment, disposeEnvironments } from './scene/environment';
 import { disposeReflectionProbe } from './scene/probe';
 import {
   initLoader, showLoader, setLoaderProgress, finishLoader, hideLoader,
+  claimPill, paintFrame, withPill,
 } from './ui/loader';
 import { initHud, syncHud } from './ui/hud';
 import { initWeather } from './scene/weather';
-import { initUI, setStatus } from './ui/chrome';
+import { initUI, setStatus, setCaptureSubject } from './ui/chrome';
 /* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
    ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
    já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
    e um é o suficiente. */
-import { initPaintPanel, setPaintPanelColor } from './ui/paint-panel';
+import { initPaintPanel, setPaintPanelColor, closePaintPanel } from './ui/paint-panel';
 import { root, $ } from './core/dom';
-import type { Choice, EnvironmentDef, ManufacturerDef, ModelDef } from './catalog/catalog';
-import type { CabDef } from './vehicle/models';
+import type {
+  Choice, ChassisDef, EnvironmentDef, ManufacturerDef, ModelDef,
+} from './catalog/catalog';
 
 /** Uma escolha resolvida contra o catálogo: as entradas concretas que ela nomeia. */
 interface ResolvedPick {
   choice: Choice;
   env: EnvironmentDef;
   model: ModelDef;
+  chassis: ChassisDef;
   manufacturer: ManufacturerDef;
   color: PaintColorDef;
 }
@@ -103,9 +107,13 @@ let applyQueue: Promise<Choice | null> = Promise.resolve(null);
 let queueDepth = 0;
 
 /* "É o mesmo VEÍCULO na mesma cena?" — a pergunta que decide se algo precisa ser
-   BAIXADO. A cor de propósito não entra: ela não custa um byte de rede. */
+   BAIXADO. A cor de propósito não entra: ela não custa um byte de rede.
+   O CHASSI ENTRA, e tem de entrar: `ChassisDef.cab` pode apontar para outra
+   geometria, e sem ele uma troca de chassi cairia no atalho de "só a cor mudou"
+   — o card acenderia e absolutamente nada carregaria. */
 const sameRig = (a: Choice | null, b: Choice | null) =>
-  !!a && !!b && a.envId === b.envId && a.modelId === b.modelId;
+  !!a && !!b && a.envId === b.envId && a.modelId === b.modelId
+  && a.chassisId === b.chassisId;
 
 /* "É a mesma escolha, ponto?" — a pergunta do dedupe. A cor ENTRA aqui: sem
    ela, escolher outra cor para o mesmo caminhão seria descartado como repetido
@@ -120,44 +128,11 @@ const TASK_LABELS: Record<string, string> = {
   trailer: 'Carregando implemento…',
 };
 
-/* ---------------- a pílula de estado (#cab-switching) ----------------
-   UM elemento, mais de um dono possível, e é por isso que ninguém escreve nele
-   direto. Dois trechos deste arquivo querem a pílula:
-
-     1. uma escolha que ENTROU NA FILA atrás de outra — trocar de cor durante um
-        carregamento é o caso comum, e sem aviso o card acende, o caminhão não
-        muda e a tinta só aparece alguns segundos depois, sozinha;
-     2. uma aplicação com `curtain: false`, que é o afordance de console
-        descrito em applyChoice().
-
-   As duas podem estar vivas ao mesmo tempo (uma cor enfileirada atrás de um
-   carregamento sem cortina), então as reivindicações formam uma PILHA e quem
-   aparece é a MAIS ANTIGA: a pílula descreve o que está acontecendo agora, não
-   o que está esperando a vez. */
-interface PillClaim { text: string }
-const pillClaims: PillClaim[] = [];
-
-function drawPill() {
-  const showing = pillClaims[0];
-  if (!showing) { $('cab-switching').classList.add('hidden'); return; }
-  $('cab-switching-text').textContent = showing.text;
-  $('cab-switching').classList.remove('hidden');
-}
-
-/** Reivindica a pílula. `release()` é idempotente — pode ser chamado duas vezes. */
-function claimPill(text: string) {
-  const claim: PillClaim = { text };
-  pillClaims.push(claim);
-  drawPill();
-  return {
-    set(next: string) { claim.text = next; drawPill(); },
-    release() {
-      const i = pillClaims.indexOf(claim);
-      if (i >= 0) pillClaims.splice(i, 1);
-      drawPill();
-    },
-  };
-}
+/* A PÍLULA DE ESTADO MUDOU DE CASA. Ela era privada deste arquivo e virou
+   `claimPill()` em ui/loader.ts, ao lado da cortina — os dois são o mesmo
+   vocabulário de "espere um pouco", e ui/hud.ts também precisa dela (um clique
+   de preset de clima trava 0,8 s). Ver o cabeçalho daquele bloco. Os dois donos
+   originais continuam aqui: a fila (enqueue) e o afordance de console. */
 
 /**
  * Põe um trabalho na fila de aplicações e devolve a fila.
@@ -244,15 +219,24 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
      padrão da paleta. Uma cor que saiu do catálogo vira a padrão em vez de
      virar um boot sem tinta. */
   const color = getColor(choice?.colorId) || getColor(currentChoice?.colorId) || defaultColor();
+  /* O chassi PERTENCE ao modelo, então ele é resolvido DENTRO dele — um
+     `chassisId` que veio de outro modelo (escolha velha, manifesto reescrito)
+     não pode atravessar. `chassis` é garantidamente não-vazio, então o default
+     sempre existe. */
+  const chassis = found.model.chassis.find((c) => c.id === choice?.chassisId)
+    || defaultChassis(found.model);
+  if (!chassis) return null;
   return {
     choice: {
       envId: env.id,
       manufacturerId: found.manufacturer.id,
       modelId: found.model.id,
+      chassisId: chassis.id,
       colorId: color.id,
     },
     env,
     model: found.model,
+    chassis,
     manufacturer: found.manufacturer,
     color,
   };
@@ -264,6 +248,27 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
    aplicada DEPOIS disso, senão a segunda chamada apagaria a primeira.
    Roda em toda aplicação, inclusive quando a cor não mudou: uma troca de cabine
    cria materiais NOVOS, e eles precisam ser dirigidos outra vez. */
+/* Verdadeiro enquanto o cavalo em cena for uma edição especial. Módulo-privado e
+   escrito num lugar só (setSpecialEdition), porque applyColor() roda por vários
+   caminhos e não pode reabrir o crachá de cor que este estado fechou. */
+let specialEdition = false;
+
+/** Liga/desliga as afordâncias de tinta do cavalo. Idempotente. */
+function setSpecialEdition(on: boolean) {
+  specialEdition = on;
+  /* O card do caminhão abre o fluxo do caminhão INTEIRO, película ou não — e o
+     seletor tira o passo da cor da sequência sozinho quando o modelo é uma
+     edição especial (`seqFor`), então não há promessa a quebrar. O que o crachá
+     precisa saber é só que não há tinta a anunciar: sem amostra, sem cor no nome
+     acessível. */
+  setBadgeSpecialEdition(on);
+  /* O botão do painel de tinta é do chrome, não deste módulo — por isso pelo id,
+     e por isso tolerante: um chrome sem o botão não pode derrubar a carga. */
+  const btn = document.getElementById('btn-paint');
+  if (btn) btn.classList.toggle('hidden', on);
+  if (on) closePaintPanel();
+}
+
 function applyColor(color: PaintColorDef) {
   /* A RECEITA DA TINTA GANHA DA DERIVAÇÃO.
      vehicle/paint.ts sabe inventar uma cor de flop e uma de floco a partir do
@@ -310,12 +315,14 @@ function applyColor(color: PaintColorDef) {
      ou é esta tinta, conforme o "pintar o implemento". Quem sabe qual é a tinta
      é aqui; quem sabe se ela vale para o baú é o livery. */
   livery.setCabPaintColor(color.hex);
-  setColorBadge({
-    colorName: color.name,
-    hex: color.hex,
-    finishLabel: FINISH_LABEL[color.finish],
-  });
-  showColorBadge(true);
+  /* A amostra do canto do card do caminhão — o que sobrou do card de cor. Só a
+     amostra e o rótulo: repintar o crachá inteiro descartaria a imagem já
+     decodificada para pôr a mesma de volta, piscando a cada troca de cor. */
+  setBadgeColor(
+    specialEdition ? null : color.name,
+    specialEdition ? null : color.hex,
+    FINISH_LABEL[color.finish],
+  );
   /* O laço sujo (scene.ts) só desenha quando alguém diz que a imagem mudou, e
      esta é uma das três lacunas que a nota de ON_DEMAND_RENDERING lista por
      nome: o atalho de só-cor pula o pipeline de carregamento de propósito, e com
@@ -325,15 +332,67 @@ function applyColor(color: PaintColorDef) {
   invalidate();
 }
 
+/* ---------------- "a cor não pegou" NÃO é um defeito da interface ----------
+   Alguns bakes chegaram sem material de tinta mapeado: nenhum material do .glb
+   se chama `carpaint` (o padrão de `DEFAULT_PAINT_MATERIALS`), então
+   `applyColor()` roda perfeitamente e a cabine não muda de cor. Do lado de cá
+   isso é indistinguível de um clique perdido — e é exatamente o que esta
+   função existe para separar. (Era `paintMaterials` por cabine no `cabs.json`;
+   com ele aposentado o padrão vale para todos, e um bake que use outro nome é
+   um defeito do bake — que é o que esta mensagem diz.)
+
+   Ela NÃO é uma correção do bake (isso é do pipeline de asset) e NÃO bloqueia
+   a escolha: a cor continua sendo aplicada, gravada e usada no implemento, que
+   É pintável. O que ela faz é DIZER, na linha de estado, por que o cavalo não
+   mudou — um usuário informado é um bug relatado, um usuário calado é um bug
+   perdido. */
+function cabPaintMaterialCount(): number {
+  const cab = models.state.cab as THREE.Object3D | null | undefined;
+  if (!cab) return 0;
+  const seen = new Set<THREE.Material>();
+  cab.traverse((o: THREE.Object3D) => {
+    const mesh = o as THREE.Mesh;
+    const mat = mesh.material;
+    if (!mat) return;
+    for (const m of (Array.isArray(mat) ? mat : [mat])) {
+      if (m && paint.isPaintMaterial(m)) seen.add(m);
+    }
+  });
+  return seen.size;
+}
+
+function warnIfUnpaintable(color: PaintColorDef) {
+  if (cabPaintMaterialCount() > 0) return;
+  console.warn('[truck-studio] a cabine em cena não tem material de tinta mapeado —'
+    + ' a cor "' + color.name + '" foi aplicada ao implemento, mas o cavalo não muda.'
+    + ' Confira `paintMaterials` desta cabine em models/vehicles/cabs.json contra os'
+    + ' nomes de material do .glb.');
+  setStatus($('status').textContent + ' · cavalo sem material de tinta neste bake');
+}
+
 /* brands.json e cabs.json são manifestos separados, então o catálogo pode
    oferecer um modelo cuja cabine 3D nunca foi exportada. Ficar de pé numa cabine
    disponível mantém o estúdio usável — um viewport morto no primeiro boot é bem
    pior do que uma geometria provisória, e a linha de estado diz que é isso. */
-function resolveCabId(model: ModelDef): { id: string; exact: boolean } {
-  const wanted = models.state.byId[model.cab];
-  if (wanted && wanted.available) return { id: wanted.id, exact: true };
-  const alt: CabDef | undefined = models.state.cabs.find((c) => c.available) || models.state.cabs[0];
-  return alt ? { id: alt.id, exact: false } : { id: model.cab, exact: true };
+function resolveChassisFile(model: ModelDef, chassis: ChassisDef): string {
+  /* A geometria EFETIVA: o `file` do CHASSI ganha do do modelo. É o gancho que
+     permite um 4x2 e um 6x4 apontarem para bakes diferentes sem que nada aqui
+     mude — e alguns pares SÃO a mesma malha de propósito (um "6x2 taglift" e um
+     "6x4" podem ser arquivos byte-idênticos, e as duas cartas continuam
+     existindo porque a distinção é comercial). */
+  const file = fileOf(model, chassis);
+  /* SEM SUBSTITUIÇÃO POR OUTRA MALHA. O caminho antigo caía na primeira cabine
+     disponível do `cabs.json` e seguia em frente com um " · geometria
+     provisória" na linha de estado — ou seja, mostrava um Scania quando o
+     usuário pediu um DAF, e a única pista era um sufixo que ninguém lê. Isso é
+     pior do que um erro: a arte é aprovada sobre a lataria da montadora errada.
+     Um chassi sem geometria já é marcado "Em breve" e não é clicável, então
+     chegar aqui sem `file` significa manifesto inconsistente. */
+  if (!file) {
+    throw new Error(`O chassi "${chassis.name}" de ${model.name} não declara geometria`
+      + ' (`file`) no catálogo. Confira `chassis[].file` em brands.json.');
+  }
+  return file;
 }
 
 /* Compila todo programa e sobe toda textura que a cena vai precisar, e então
@@ -383,21 +442,182 @@ function focusOnRig() {
   invalidateShadows();
 }
 
+/* ---------------- redimensionamento do baú ----------------
+   A interface disto NÃO mora aqui, e não deve: este é o engine. O que mora aqui
+   é a costura entre os três donos que um resize toca e que não se conhecem —
+   `models` (a geometria e o engate), `livery` (a arte) e `scene` (a câmera).
+
+   O RECORTE DAS CHAPAS É DESTRUTIVO, e é isso que obriga esta função a existir.
+   `models.setTrailerDims()` joga fora as malhas SIDE_L/SIDE_R/REAR e recorta
+   três novas do corpo redimensionado; as sobreposições de arte que
+   `livery.attachOverlays()` havia pendurado nelas foram junto. Reatar não é
+   opcional: sem isso o editor continua desenhando nas telas fabric e o baú
+   continua branco. Feito por inscrição em vez de chamada direta porque
+   vehicle/livery importa vehicle/models — a seta aponta para lá, e uma de volta
+   fecharia um ciclo. */
+models.onTrailerPanelsRebuilt((trailer) => {
+  livery.attachOverlays(trailer);
+  /* attachOverlays() remede o painel e reescreve a régua em centímetros, então
+     a escala real acompanha o baú novo de graça. O que ela NÃO faz é subir a
+     textura: as telas não mudaram, só o objeto que as amostra. */
+  livery.markAllDirty();
+});
+
+/**
+ * Redimensiona o baú e devolve as medidas EFETIVAS (a altura fecha um número
+ * inteiro de frisos, então ela é ajustada). `null` num bake que não redimensiona.
+ *
+ * @param opts.frame reenquadra a câmera. Desligado por padrão de propósito: um
+ *   formulário com controle deslizante chamaria isto a cada quadro, e voar a
+ *   câmera a cada milímetro é enjoo, não feedback. Os LIMITES do orbit são
+ *   rederivados sempre — eles são função da silhueta do conjunto, e deixá-los
+ *   velhos prende o zoom numa caixa que não existe mais.
+ */
+export function setTrailerDims(
+  patch: { height?: number; length?: number }, opts: { frame?: boolean } = {},
+) {
+  const dims = models.setTrailerDims(patch);
+  if (!dims) return null;
+  if (opts.frame) frameAll([models.state.cabGroup, models.state.trailerGroup]);
+  focusOnRig();
+  return dims;
+}
+
+/* ---------------- o baú redimensionando, COM estado de carregamento ----------
+   O recorte é destrutivo (ver a nota da função acima): entre o descarte das
+   chapas SIDE_L/SIDE_R/REAR e o `attachOverlays()` que repõe a arte existe uma
+   janela em que o baú está BRANCO com o desenho solto. Ela durava um punhado de
+   quadros e não tinha aviso nenhum — o pior dos dois mundos, porque um usuário
+   que vê a arte sumir não sabe se ela voltou por si ou se ele a perdeu.
+
+   A saída NÃO é a cortina inteira: o formulário de medidas tem de continuar
+   visível enquanto o valor é aplicado, senão o usuário perde o contexto do que
+   acabou de digitar. É um véu LOCAL sobre o viewport (`.is-rebuilding` em
+   #canvas-holder, desenhado em core/studio.css) mais a pílula, que é o mesmo
+   vocabulário de todo o resto.
+
+   A GEOMETRIA É COALESCIDA DE VERDADE, e é isso que separa esta versão da
+   anterior. Coalescer só o véu e a pílula deixando o recorte rodar a cada
+   `input` seria um estado de carregamento que MENTE: o indicador ficaria
+   parado e suave enquanto o engasgo que ele deveria estar cobrindo continuava
+   acontecendo trinta vezes por segundo. O aplicador agora pode devolver uma
+   promessa (ver `DimsApplier` em vehicle/livery-structure.ts), e é ela que
+   permite responder "aceitei, mas ainda não recortei".
+
+   DEBOUNCE PURO DE SAÍDA, sem `maxWait` — decisão, não omissão. Um `maxWait`
+   daria um recorte a cada ~700 ms durante o arrasto, ou seja devolveria o
+   engasgo periódico que este trabalho existe para eliminar; a preferência do
+   produto é explícita em não travar DURANTE o uso. Então: ZERO recortes
+   enquanto a medida se mexe, UM quando ela assenta.
+
+   O inspetor não fica morto nesse meio-tempo — `setImplementMeasures()` já
+   atualiza a pilha 2D de forma otimista e recompõe na hora, então os painéis
+   desenhados acompanham o número em tempo real. Quem espera é só a malha 3D, e
+   é exatamente sobre ela que o véu está. O indicador passa a descrever o que
+   está mesmo acontecendo: "o 3D ainda não é este número".
+
+   E NÃO HÁ FILA. Os patches se FUNDEM num só (`dimsPending`, último valor de
+   cada campo ganha) e existe UM temporizador. Arrastar por dez segundos deixa
+   exatamente um recorte pendente, nunca uma pilha deles. */
+const DIMS_QUIET_MS = 260;
+let dimsTimer: ReturnType<typeof setTimeout> | null = null;
+let dimsPending: { height?: number; length?: number } | null = null;
+let dimsPill: { release(): void } | null = null;
+/* Quem espera o recorte coalescido. Todos os chamadores da janela resolvem com
+   o MESMO resultado — é um recorte só, então é uma resposta só. */
+let dimsWaiters: ((dims: ReturnType<typeof models.setTrailerDims>) => void)[] = [];
+
+function setViewportBusy(on: boolean) {
+  const holder = document.getElementById('canvas-holder');
+  if (holder) holder.classList.toggle('is-rebuilding', on);
+}
+
+function endDimsBusy() {
+  setViewportBusy(false);
+  dimsPill?.release();
+  dimsPill = null;
+}
+
+/** O recorte de verdade, uma vez, quando a medida parou de se mexer. */
+function flushTrailerDims() {
+  dimsTimer = null;
+  const patch = dimsPending;
+  dimsPending = null;
+  const waiters = dimsWaiters;
+  dimsWaiters = [];
+  let dims: ReturnType<typeof models.setTrailerDims> = null;
+  try {
+    if (patch) dims = setTrailerDims(patch);
+  } catch (e) {
+    /* Um recorte que lança não pode deixar o véu preso sobre o viewport para
+       sempre — o usuário ficaria com a cena embaçada e sem caminho de volta —
+       nem pendurar quem aguardou a promessa. */
+    console.error('[truck-studio] falha ao redimensionar o baú', e);
+  } finally {
+    endDimsBusy();
+    for (const w of waiters) w(dims);
+  }
+}
+
+/**
+ * A porta do FORMULÁRIO. Agenda o recorte e devolve uma PROMESSA — o contrato
+ * novo do `DimsApplier`, que é o que autoriza a coalescência.
+ *
+ * `setTrailerDims()` continua exportada e IMEDIATA para o console e para o
+ * "resetar", onde não há arrasto e esperar 260 ms não compraria nada.
+ */
+function applyTrailerDimsDebounced(
+  patch: { height?: number; length?: number },
+): Promise<ReturnType<typeof models.setTrailerDims>> {
+  /* Fusão, não fila: um arrasto que mexe só na altura não pode perder o
+     comprimento que veio antes dele. */
+  dimsPending = { ...dimsPending, ...patch };
+  if (!dimsPill) {
+    dimsPill = claimPill('Ajustando o baú…');
+    setViewportBusy(true);
+  }
+  if (dimsTimer) clearTimeout(dimsTimer);
+  dimsTimer = setTimeout(flushTrailerDims, DIMS_QUIET_MS);
+  return new Promise((resolve) => { dimsWaiters.push(resolve); });
+}
+
+/* O EDITOR DE MEDIDAS TEM DE PASSAR POR ESTA PORTA, e não pela crua.
+   ---------------------------------------------------------------------------
+   `vehicle/livery-structure.ts` é quem recebe a edição de medida vinda do
+   inspetor do editor de plotagem, e o padrão dele para redimensionar é
+   `models.setTrailerDims` — a porta crua, que regenera a geometria mas não
+   reata a arte nem rederiva os limites da órbita. A porta boa é a função logo
+   acima, e ela mora aqui porque é aqui que os três donos de um resize se
+   encontram.
+   Injetado em vez de importado pelo mesmo motivo do gancho
+   onTrailerPanelsRebuilt() logo acima: vehicle/* não importa studio.ts, e
+   inverter essa seta fecharia um ciclo. Feito na avaliação do módulo, portanto
+   antes de qualquer boot — não existe janela em que uma medida seja aplicada
+   pela porta crua. */
+liveryStructure.setDimsApplier((patch) => applyTrailerDimsDebounced(patch));
+
 async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean) {
-  const { choice, env, model, manufacturer, color } = resolved;
+  const { choice, env, model, chassis, manufacturer, color } = resolved;
+  /* 'Highline · 6x4' — o chassi é um passo do seletor agora, então tudo que
+     nomeia o veículo (a cortina, o crachá, a linha de estado) tem de dizer qual
+     configuração está na tela. */
+  const subtitle = chassisSubtitle(model.subtitle, chassis);
   const current = getCurrentEnvironment();
   /* Reaplicar o MESMO cenário não baixaria nada, mas ainda assim zeraria o
      preset de luz, a hora do dia e a exposição — jogando fora o que o usuário
      ajustou na sidebar só porque trocou de cabine. */
   const needEnv = first || !current || current.id !== env.id;
-  const cab = resolveCabId(model);
+  const cabFile = resolveChassisFile(model, chassis);
   /* A cabine que já está montada NÃO é remontada. Vale para duas rotas reais:
      a troca só de CENÁRIO (o fluxo parcial do card do topo, em que o modelo não
      muda) e a reconstrução depois da liberação diferida lá embaixo — as duas
      baixavam e reparseavam megabytes de cabine para pôr no lugar exatamente a
      mesma geometria. `state.cabId` é escrito por loadCab() e é null antes do
      primeiro, então o boot sempre carrega. */
-  const needCab = first || models.state.cabId !== cab.id;
+  /* `state.cabId` é o CAMINHO do arquivo em cena agora, não um id de cabine —
+     mesma comparação, chave melhor: dois chassis que apontam para o mesmo .glb
+     (os pares byte-idênticos) não pagam um download por troca de carta. */
+  const needCab = first || models.state.cabId !== cabFile;
 
   /* PESOS EM MEGABYTES, não em contagem de tarefas.
      ---------------------------------------------------------------------------
@@ -448,12 +668,19 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        caminhão encolhendo para dentro do crachá do caminhão animaria algo que
        não aconteceu. Troca de modelo — e o primeiro boot, em que o caminhão é a
        recompensa — ficam no caminhão. */
-    const modelChanged = !currentChoice || currentChoice.modelId !== choice.modelId;
+    const modelChanged = !currentChoice || currentChoice.modelId !== choice.modelId
+      || currentChoice.chassisId !== choice.chassisId;
     showLoader({
       subject: modelChanged ? 'truck' : 'map',
       modelName: model.name,
-      modelSubtitle: model.subtitle,
-      modelImage: assetUrl(model.image),
+      modelSubtitle: subtitle,
+      /* O render pré-produzido é a imagem certa da cortina: ela é a MESMA que
+         vai voar para o crachá no fim, e uma foto de manifesto voando para
+         dentro de um crachá que mostra um render seria a troca de duas
+         imagens diferentes disfarçada de uma. Cai na foto quando o render
+         daquela combinação ainda não existe. */
+      modelImage: renderUrl(manufacturer.id, model.id, chassis.id, color.id)
+        || assetUrl(chassis.image || model.image),
       logo: assetUrl(manufacturer.logo),
       manufacturerName: manufacturer.name,
       envName: env.name,
@@ -465,7 +692,7 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
   try {
     /* Cenário e geometria são downloads independentes — rodam juntos. */
     const tasks: Promise<unknown>[] = [];
-    if (needCab) tasks.push(models.loadCab(cab.id, progress.track('cab')));
+    if (needCab) tasks.push(models.loadCab(cabFile, progress.track('cab')));
     if (needEnv) tasks.push(applyEnvironment(env, progress.track('env')));
     if (first) tasks.push(models.loadTrailer(progress.track('trailer')));
 
@@ -501,7 +728,10 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     const phase = curtain
       ? (f: number, label: string) => setLoaderProgress(0.70 + 0.30 * f, label)
       : () => { /* a pílula não tem barra própria */ };
-    const paint = () => new Promise<void>(r => requestAnimationFrame(() => r()));
+    /* `paint` era um `const` local daqui; virou `paintFrame()` em ui/loader.ts
+       quando os outros quatro pontos de travamento (cor, baú, preset de luz,
+       captura) passaram a precisar exatamente do mesmo quadro cedido. */
+    const paint = paintFrame;
 
     if (first) {
       livery.attachOverlays(models.state.trailer as THREE.Object3D);
@@ -530,7 +760,7 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        Nos dois caminhos, porque uma troca de cabine traz materiais novos. */
     applyColor(color);
 
-    phase(0.4, 'Compilando materiais…');
+    phase(0.35, 'Compilando materiais…');
     await paint();
     /* POR ÚLTIMO, porque compila o que estiver na cena e tudo acima acrescenta a
        ela — o set, a cabine, o implemento e os materiais de tinta que
@@ -544,17 +774,15 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        exatamente o travamento que este bloco existe para pagar adiantado. */
     await warmLightPrograms();
 
-    /* E as miniaturas do passo de cor, pelo mesmo motivo e no mesmo lugar: elas
-       renderizavam ao abrir o seletor, que é onde o usuário NÃO está esperando.
-       Aguardado de propósito — o custo vai para a barra de progresso. */
-    phase(0.6, 'Gerando miniaturas de cor…');
-    await paint();
-    /* Só as tintas DESTA montadora. Cada cor custa um render offscreen aqui
-       dentro da cortina, e o catálogo tem 522 linhas: aquecer todas seriam
-       minutos de espera para mostrar tinta que este caminhão nunca vai receber.
-       A maior paleta de montadora hoje tem 26 cores. */
-    await prewarmCabPreviews(cab.id, colorsFor(choice.manufacturerId),
-      f => phase(0.6 + 0.3 * f, 'Gerando miniaturas de cor…'));
+    /* A FASE "Gerando miniaturas de cor…" SUMIU DAQUI, e essa é a maior
+       economia desta mudança. Ela renderizava a paleta inteira da montadora —
+       até 26 cores — num segundo contexto WebGL, dentro da cortina, a cada
+       troca de caminhão: de meio a quatro segundos de main thread congelada.
+       As imagens agora são pré-produzidas (catalog/renders.ts) e o cache é o do
+       navegador. As frações desta fase foram REBALANCEADAS: `warmLightPrograms`
+       ficava em 0,4–0,6 e agora ocupa 0,35–0,85, e o primeiro quadro entra em
+       0,85 em vez de 0,9 — o tempo real que a fase de miniaturas ocupava foi
+       redistribuído em vez de deixar a barra saltar 30 pontos de uma vez. */
 
     /* ui/selector.ts já preenche os dois crachás a partir do catálogo antes de
        disparar os listeners, mas dois caminhos nunca passam pelo seletor — o
@@ -564,20 +792,28 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        precisa estar visível. */
     setBadge({
       modelName: model.name,
-      modelSubtitle: model.subtitle,
-      modelImage: assetUrl(model.image),
+      modelSubtitle: subtitle,
+      modelImage: assetUrl(chassis.image || model.image),
       manufacturerName: manufacturer.name,
       logo: assetUrl(manufacturer.logo),
-      /* A MESMA miniatura 3D dos cards, e por isso de graça: prewarmCabPreviews()
-         logo acima já renderizou esta cabine nesta cor, então peekCabPreview()
-         acerta o cache e o crachá pinta o render sem esperar nada.
-         A foto do manifesto continua indo junto como fallback — uma cabine sem
-         geometria leve (`preview` ausente no cabs.json) não tem o que renderizar. */
-      preview: hasCabPreview(cab.id)
-        ? { cabId: cab.id, hex: color.hex, finish: color.finish }
-        : null,
+      /* A MESMA imagem dos cards e da cortina. Sem espera, sem token de corrida:
+         `renderUrl()` responde do manifesto já carregado, e a cadeia de
+         fallback (render → foto → silhueta) mora dentro de setBadge(). */
+      render: { url: renderUrl(manufacturer.id, model.id, chassis.id, color.id), chassisId: chassis.id },
+      colorName: color.name,
+      colorHex: color.hex,
+      finishLabel: FINISH_LABEL[color.finish],
     });
     showBadge(true);
+    /* EDIÇÃO ESPECIAL: some com as duas afordâncias de tinta.
+       O seletor já tira o passo "Cor" da sequência, mas o card de cor do canto e
+       o botão do painel de tinta vivem FORA dele e continuariam abrindo um fluxo
+       que não muda nada — a cabine não tem material de tinta registrado, então
+       cada clique seria uma promessa que a cena não cumpre.
+       applyColor() acima roda de qualquer forma, e é de propósito: ele também
+       alimenta o editor de arte e o crachá, e a cor carregada continua sendo a
+       do implemento, que É pintável mesmo atrás de um cavalo de edição especial. */
+    setSpecialEdition(!!model.specialEdition);
     setMapBadge({
       envName: env.name,
       envSubtitle: env.subtitle,
@@ -588,12 +824,21 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     /* #brand-sub morreu com a topbar. O que ele dizia — qual caminhão, qual
        implemento — está no badge do caminhão e na linha de estado, e nenhum dos
        dois precisava de uma terceira cópia. */
-    const stand = cab.exact ? '' : ' · geometria provisória';
+    /* O sufixo " · geometria provisória" SUMIU junto com a substituição de
+       malha que ele descrevia: não existe mais um caminho em que o estúdio
+       mostre a cabine de outra montadora. Ou a geometria pedida carrega, ou
+       resolveChassisFile()/loadCab() lançam e o catch abaixo mantém a cena
+       anterior de pé com a mensagem. O que sobrou de "degradado" é o
+       posicionamento sem `hitch.json`, e isso a linha diz por si. */
+    const stand = models.state.hitch ? '' : ' · engate medido em cena';
     setStatus(first
       ? `Pronto · ${env.name} · ${color.name} · cabine ${fmt(models.state.cabBox)}`
         + ` · implemento ${fmt(models.state.trailerBox ?? null)}`
         + (models.state.trailerMeta ? '' : ' · engate padrão') + stand
-      : `${manufacturer.name} ${model.name} · ${color.name} · ${env.name}` + stand);
+      : `${truckLabel(manufacturer.name, model.name)} · ${chassis.name} · ${color.name} · ${env.name}` + stand);
+    /* O nome do arquivo da captura carrega o veículo inteiro — quem baixa cinco
+       variações não pode acabar com `truck-studio (4).png`. */
+    setCaptureSubject([truckLabel(manufacturer.name, model.name), chassis.name, color.name]);
 
     currentChoice = choice;
     /* Persiste só o que de fato renderizou: uma escolha que falhou ao carregar
@@ -611,7 +856,7 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        imagem congelada — que é exatamente o "carrega meio travado e depois
        funciona" que chega como bug de carregamento. Faça isso com a cortina
        ainda de pé, onde a pausa é o que o usuário já está vendo. */
-    phase(0.9, 'Renderizando o primeiro quadro…');
+    phase(0.85, 'Renderizando o primeiro quadro…');
     await paint();
     await warmUp();
     /* A saída é cosmética: um soluço na animação de flip não pode transformar
@@ -689,18 +934,28 @@ function applyChoice(
      voo, aquele load termina aplicando a cor que ELE resolveu, e uma cor
      aplicada antes dele seria desfeita alguns segundos depois, sozinha. */
   if (!first && sameRig(resolved.choice, reference)) {
-    const runColor = () => {
+    /* SEMPRE COM PÍLULA, e não só quando a fila estiver ocupada.
+       ---------------------------------------------------------------------
+       Este era o furo: `enqueue()` só mostra o aviso se JÁ houver um load em
+       voo, e no caso comum — nenhum download pendente — `runColor` rodava
+       síncrono e sem feedback nenhum. Só que ele não é barato: applyColor()
+       troca o MeshPhysicalMaterial da cabine inteira, reescreve a chapa do
+       editor de arte e invalida a cena. Numa cabine grande isso é um engasgo
+       visível, e um engasgo sem aviso é indistinguível de um clique perdido.
+       `withPill` anuncia, deixa o navegador PINTAR o anúncio (um rAF) e só
+       então aplica — custa ~16 ms e elimina o "clique que não fez nada". */
+    const runColor = () => withPill(`Aplicando ${resolved.color.name}…`, () => {
       applyColor(resolved.color);
       currentChoice = resolved.choice;
       saveChoice(resolved.choice);
-      setStatus(`${resolved.manufacturer.name} ${resolved.model.name} · ${resolved.color.name}`);
+      setStatus(`${truckLabel(resolved.manufacturer.name, resolved.model.name)} · ${resolved.color.name}`);
+      warnIfUnpaintable(resolved.color);
       return resolved.choice;
-    };
-    /* O rótulo que enqueue() mostra SE esta cor tiver de esperar. Era o buraco
-       de UX do atalho: o card acendia, o caminhão não mudava e não havia
-       spinner nenhum — parecia que o clique tinha se perdido, quando na verdade
-       a tinta estava correta e presa atrás de um download. */
-    return enqueue(`Aplicando ${resolved.color.name}…`, runColor);
+    });
+    /* O rótulo que enqueue() mostra SE esta cor tiver de esperar ATRÁS de
+       outra coisa — a espera na fila e a aplicação em si são estados
+       diferentes e dizem frases diferentes. */
+    return enqueue(`${resolved.color.name} · aguardando o carregamento atual…`, runColor);
   }
 
   pendingChoice = resolved.choice;
@@ -785,7 +1040,11 @@ async function boot() {
     /* Três listas independentes: o catálogo diz o que o usuário PODE escolher,
        cabs.json diz o que o carregador 3D consegue montar, e a paleta diz de
        que cores. Nenhuma bloqueia a outra, e nenhuma delas lança. */
-    await Promise.all([loadCatalog(), models.loadManifests(), loadColors()]);
+    /* `loadRenders()` entra aqui e não mais tarde: os cards do seletor pedem a
+       URL do render de forma SÍNCRONA, então o manifesto tem de estar em
+       memória antes de o primeiro grid ser montado. Ele nunca lança e nunca
+       bloqueia nada — ausente = todo card cai no placeholder de silhueta. */
+    await Promise.all([loadCatalog(), models.loadManifests(), loadColors(), loadRenders()]);
 
     initSelector();
     initLoader();
@@ -824,6 +1083,23 @@ async function boot() {
       loader,
       applyChoice,
       uniforms: paint._sharedPaint,
+      /* O redimensionamento do baú, pela porta que costura livery e câmera —
+         `models.setTrailerDims` cru deixaria a arte solta. O formulário vive
+         fora do engine; isto é o que ele (e o console) chamam. */
+      setTrailerDims,
+      resetTrailerDims: () => setTrailerDims({
+        height: models.state.trailerRig?.base.height ?? 0,
+        length: models.state.trailerRig?.base.length ?? 0,
+      }, { frame: true }),
+      get trailerDims() { return models.getTrailerDims(); },
+      get trailerRig() { return models.state.trailerRig; },
+      /* As medidas e a representação 2D do painel. `describeStructure('left')`
+         diz, camada por camada, o que está desenhado, em que caixa, e se a
+         fonte é arte real ou placeholder; `registerLiveryArt('stripe',
+         {kind:'svg', markup})` é o ponto de entrada dos SVGs que o cliente vai
+         mandar — dá para provar o encaixe pelo console antes de existir
+         qualquer interface para isso. Nada disto toca a textura do baú. */
+      measures: liveryStructure,
       cabGroup: models.state.cabGroup,
       trailerGroup: models.state.trailerGroup,
       get cab() { return models.state.cab; },
@@ -852,10 +1128,45 @@ async function boot() {
  * Prende o estúdio a `host` e começa a renderizar. Seguro chamar de novo depois
  * de unmountStudio() — a essa altura os modelos já estão em memória.
  */
+/* ---------------- o modo claro/escuro do host ----------------
+   As telas de CARGA e de ERRO seguem o tema do app em volta; o resto da chrome
+   (vidro sobre o render) não. Ver o bloco `--ts-screen-*` em core/studio.css,
+   que explica por que o escopo é esse.
+
+   O SINAL, em ordem: a classe `.dark` que o Ankaa põe na <html> (Tailwind
+   `darkMode: ["class"]`) manda; sem ela, `prefers-color-scheme`. Escrito como um
+   teste POSITIVO de claro porque o desktop não tem classe nenhuma e não pode
+   cair em claro por omissão — lá quem decide é o sistema operacional. */
+const lightQuery = typeof matchMedia === 'function'
+  ? matchMedia('(prefers-color-scheme: light)') : null;
+let themeObserver: MutationObserver | null = null;
+
+function applyHostTheme() {
+  const html = document.documentElement;
+  const light = html.classList.contains('light')
+    || (!html.classList.contains('dark') && !!lightQuery?.matches);
+  root.classList.toggle('ts-light', light);
+}
+
+/** Liga a observação do tema. Idempotente — mountStudio() pode rodar de novo. */
+function watchHostTheme() {
+  applyHostTheme();
+  if (themeObserver) return;
+  /* A classe da <html> muda sem evento nenhum quando o usuário aperta o toggle
+     do Ankaa, e o estúdio pode estar montado nesse instante. `attributeFilter`
+     mantém isto num único atributo de um único nó. */
+  themeObserver = new MutationObserver(applyHostTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true, attributeFilter: ['class'],
+  });
+  lightQuery?.addEventListener('change', applyHostTheme);
+}
+
 export function mountStudio(host: HTMLElement): Promise<void> {
   /* PRIMEIRA COISA: uma volta cancela a liberação diferida. Trocar de aba e
      voltar em dez segundos não pode custar nada. */
   cancelRelease();
+  watchHostTheme();
   /* Contraparte de teardownLivery(): reinstala os listeners globais da plotagem
      (keydown no `document`, resize na `window`). Idempotente, e seguro aqui —
      antes de initLivery(), porque o boot ainda pode não ter rodado. */
@@ -892,12 +1203,16 @@ export function unmountStudio() {
   stopLoop();
   observer?.disconnect();
   observer = null;
+  /* Os dois observadores de tema saem junto com o resto: uma ferramenta que saiu
+     da rota não tem por que continuar ouvindo a <html> do app inteiro. */
+  themeObserver?.disconnect();
+  themeObserver = null;
+  lightQuery?.removeEventListener('change', applyHostTheme);
   sceneMod.flushSave();
-  /* O contexto WebGL das miniaturas é a única coisa aqui que NÃO vale a pena
-     manter viva fora da rota: as imagens já geradas ficam em cache no módulo, e
-     é isso que faz o seletor reabrir instantâneo — o contexto em si se refaz em
-     um quadro. */
-  disposePreviews();
+  /* `disposePreviews()` sumiu daqui junto com ui/preview.ts: não existe mais um
+     segundo contexto WebGL para descartar na saída da rota, e o cache das
+     imagens dos cards passou a ser o cache HTTP do navegador — que não precisa
+     de ninguém para administrá-lo. */
   /* Os dois listeners globais da plotagem saem junto. Eram guardados por
      isMounted() e portanto inofensivos, mas uma ferramenta 3D não tem por que
      manter captura no `document` do app inteiro depois de sair da rota. */

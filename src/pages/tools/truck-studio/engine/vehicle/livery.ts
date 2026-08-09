@@ -18,6 +18,16 @@ import { invalidate } from '../scene/scene';
 import { setPaintTarget } from './models';
 import { setStatus } from '../ui/chrome';
 import { initLiveryEditor } from '../ui/livery-editor';
+/* A REPRESENTAÇÃO do painel — faixa refletiva, cantoneira e vãos de porta
+   derivados das MEDIDAS do implemento. Ela é de ./livery-structure e desenha
+   nos dois lugares em que o painel aparece DESENHADO: o palco do editor e a
+   miniatura do card. Ela NÃO vira textura: essas peças já existem em geometria
+   no baú (ver o cabeçalho daquele arquivo). Quem alimenta o 3D continua sendo
+   exclusivamente a arte das telas fabric deste módulo — nada abaixo desta linha
+   mudou de dono. */
+import {
+  refreshFromTrailer, mountStructureCanvas, drawStructureInto, onStructureRedrawn,
+} from './livery-structure';
 
 /* Reexportados para quem já falava com este módulo (studio.ts, o handle de
    depuração) não ter de saber que o editor mudou de arquivo. */
@@ -45,8 +55,29 @@ export interface OutlineMeta {
    tela inteira de uma cor, e o "×" volta para cá. */
 export const DEFAULT_BG = '';
 
+/* ---------------- a tela de baixo é ARTE PURA ----------------
+   `skipControlsDrawing` não é preferência de estilo: é a fronteira entre o
+   EDITOR e a TEXTURA.
+
+   O que acontecia sem ele: `StaticCanvas.renderCanvas()` (fabric 6.5.1) termina
+   com `if (this.controlsAboveOverlay && !this.skipControlsDrawing)
+   this.drawControls(ctx)` — e o `ctx` dessa chamada é o `contextContainer`, ou
+   seja o **lowerCanvasEl**, que é exatamente o elemento de onde a
+   `CanvasTexture` do baú lê. Resultado: a moldura de seleção e as oito alças de
+   transformação do objeto ativo eram ASSADAS na textura e apareciam no
+   implemento em 3D. Medido: com um retângulo selecionado, os pixels do
+   lowerCanvasEl nos cantos da caixa vinham `(177,203,255,128)` — azul-claro
+   translúcido do controle — em vez da arte.
+
+   O upperCanvasEl existe justamente para isso e estava VAZIO. Então as alças
+   passam a ser desenhadas lá (ver o laço de `after:render` mais abaixo), o
+   editor continua idêntico aos olhos do usuário, e a textura vê só arte.
+   `contextTopDirty` é o que faz o próprio fabric limpar a camada de cima no
+   render seguinte — sem marcar, a alça velha ficaria como rastro. */
 function makeFab(el: HTMLCanvasElement) {
-  return new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
+  const c = new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
+  (c as unknown as { skipControlsDrawing: boolean }).skipControlsDrawing = true;
+  return c;
 }
 export const fabLeft = makeFab($<HTMLCanvasElement>('fabric-left'));
 export const fabRight = makeFab($<HTMLCanvasElement>('fabric-right'));
@@ -74,13 +105,12 @@ export const CAPTIONS: Record<SurfaceKey, string> = {
    attachOverlays(), para que um baú diferente se corrija sozinho em vez de
    reportar centímetros errados calado.
 
-   As telas já nascem na proporção do painel (2048x344 nas laterais, ver
-   core/template.ts), então mm/px sai praticamente igual nos dois eixos; a
-   conversão é feita por eixo mesmo assim, porque a traseira não fecha exato. */
+   Os valores abaixo são SÓ a semente do primeiro quadro, antes de existir
+   chapa recortada para medir. `measurePanel()` os reescreve com a chapa real. */
 const PANEL_MM: Record<SurfaceKey, { w: number; h: number }> = {
-  left: { w: 14580, h: 2449 },
-  right: { w: 14580, h: 2449 },
-  rear: { w: 2430, h: 2460 },
+  left: { w: 14655, h: 2777 },
+  right: { w: 14655, h: 2777 },
+  rear: { w: 2590, h: 2716 },
 };
 
 export const panelMM = (key: SurfaceKey) => PANEL_MM[key];
@@ -93,8 +123,246 @@ export function mmPerPx(key: SurfaceKey) {
 export const pxToCm = (px: number, key: SurfaceKey, axis: 'x' | 'y' = 'y') => px * mmPerPx(key)[axis] / 10;
 export const cmToPx = (cm: number, key: SurfaceKey, axis: 'x' | 'y' = 'y') => cm * 10 / mmPerPx(key)[axis];
 
+/* ---------------- a tela SEGUE a chapa ----------------
+   O buffer da tela do fabric é dimensionado a partir da GEOMETRIA MEDIDA, com
+   densidade constante em pixels por milímetro. Não é detalhe de performance: é
+   a única coisa que mantém a arte em sincronia com o corpo branco.
+
+   O QUE ESTAVA ERRADO. As telas nasciam com tamanho literal em
+   core/template.ts (2048x344 nas laterais, 1024x1024 na traseira) e NADA
+   redimensionava o buffer — a única chamada a `setDimensions()` usa
+   `{ cssOnly: true }`, que muda a caixa na tela e não o backing store. Os
+   2048x344 saíram de medir a FOTO `panels/lateral.png` (razão 5,9535), não a
+   chapa: a chapa mede 14 655 x 2 777 mm, razão 5,2775. Como a arte é mapeada
+   por `uv1` normalizada de 0 a 1, a diferença vira ANISOTROPIA — tudo que se
+   desenhasse na lateral saía 12,8 % mais alto que largo no baú (4,9 % na
+   traseira). Círculo virava elipse. E, como a chapa muda de razão a cada
+   redimensionamento e a tela não mudava, a distorção ANDAVA com a medida: caía
+   para ~7,9 % num baú de 20,58 m. A arte "desamassava" sozinha ao alongar.
+
+   O QUE PASSA A VALER. `mm/px` é uma CONSTANTE do projeto, igual nos dois
+   eixos e igual em qualquer medida. A tela é a chapa vezes a densidade, e só
+   isso. Três consequências, todas desejadas:
+
+   · a razão da tela bate com a razão da chapa em ~20 ppm (o resíduo é o
+     arredondamento para pixel inteiro, e ele é atacado derivando a LARGURA da
+     altura já arredondada — o erro relativo fica 0,5 / largura);
+   · um logotipo de 400 mm continua com 400 mm depois de qualquer resize, sem
+     reamostrar nada: mudar de medida só acrescenta ou tira pixels na borda, e
+     as coordenadas de cada objeto do fabric continuam valendo;
+   · `pxToCm` passa a dar o mesmo em 'x' e em 'y' — a régua em centímetros
+     deixa de mentir 11,4 % na largura das letras.
+
+   A densidade é o que a lateral de fábrica já usava (2048 px / 14 655 mm), para
+   não degradar a resolução de quem já desenhou. O teto de 4096 px protege o
+   limite de textura da GPU; se ele morder (baú acima de ~29 m, fora da faixa
+   editável), a densidade cai e AÍ sim a arte é reescalada — uniformemente, por
+   `rescaleObjects()`, que é uma reamostragem correta e não um `putImageData`
+   de tamanhos diferentes. */
+
+/** Pixels por MILÍMETRO de chapa, por face. Os dois valores são a densidade que
+ *  cada tela já tinha na medida de fábrica — 2048 px na lateral de 14 655 mm e
+ *  1024 px na traseira de 2 716 mm —, de modo que ninguém perca resolução na
+ *  troca. Cada face tem a sua porque a traseira é 5x menor que a lateral: uma
+ *  densidade só deixaria a traseira com 362 px de largura. */
+const PX_PER_MM: Record<SurfaceKey, number> = {
+  left: 2048 / 14655,
+  right: 2048 / 14655,
+  rear: 1024 / 2716,
+};
+/** Teto por eixo, para não estourar o limite de textura da GPU. */
+const MAX_TEX_PX = 4096;
+/** Piso, para a tela nunca ficar degenerada durante o boot. */
+const MIN_TEX_PX = 64;
+
+/**
+ * O tamanho de buffer que uma chapa pede.
+ *
+ * Duas coisas acontecem aqui, e as duas importam:
+ *
+ * 1. A ARESTA CURTA sai da densidade; a LONGA sai da razão da chapa. Derivar a
+ *    longa da razão, em vez de arredondar as duas independentemente, prende a
+ *    razão da tela à razão da chapa dentro de meio pixel da aresta longa.
+ * 2. Ainda assim meio pixel é ~200 ppm, então a aresta curta é PROCURADA numa
+ *    janela de ±3 px: entre sete candidatos, o melhor costuma errar uma ordem
+ *    de grandeza menos. A busca é determinística e o custo é sete divisões.
+ */
+function canvasFor(key: SurfaceKey, p: { w: number; h: number }) {
+  const ar = p.w / Math.max(1e-6, p.h);
+  /* Densidade nominal, rebaixada só se o teto de textura morder. */
+  const d = Math.min(
+    PX_PER_MM[key],
+    MAX_TEX_PX / Math.max(1, p.w),
+    MAX_TEX_PX / Math.max(1, p.h),
+  );
+  const wide = ar >= 1;
+  const short0 = Math.round((wide ? p.h : p.w) * d);
+
+  let best = { width: MIN_TEX_PX, height: MIN_TEX_PX }, bestErr = Infinity;
+  for (let k = -3; k <= 3; k++) {
+    const s = short0 + k;
+    if (s < MIN_TEX_PX) continue;
+    const long = Math.round(wide ? s * ar : s / ar);
+    if (long < MIN_TEX_PX || long > MAX_TEX_PX) continue;
+    const cand = wide ? { width: long, height: s } : { width: s, height: long };
+    const err = Math.abs(cand.width / cand.height - ar) / ar;
+    if (err < bestErr) { bestErr = err; best = cand; }
+  }
+  return best;
+}
+
+/** A chapa para a qual a tela CORRENTE foi dimensionada — as DUAS medidas.
+ *  `measurePanel()` já reescreveu `PANEL_MM` quando `syncSurfaceAspect()` roda,
+ *  e sem o par anterior não dá para converter a arte de pixel para milímetro.
+ *  Guardar só a largura (como antes) cegava justamente o eixo que muda quando o
+ *  usuário mexe na ALTURA — que é o caso relatado. */
+const prevPanel: Record<SurfaceKey, { w: number; h: number }> = {
+  left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right }, rear: { ...PANEL_MM.rear },
+};
+
+/**
+ * Leva a arte para a tela NOVA preservando MILÍMETRO e ÂNCORA REAIS.
+ *
+ * A arte do fabric é guardada em pixels de tela, e a tela muda de tamanho a
+ * cada medida do baú. Duas coisas precisam sobreviver a essa troca, e nenhuma
+ * das duas sobrevive sozinha:
+ *
+ * 1. O TAMANHO FÍSICO. Um logotipo de 400 mm continua com 400 mm. Como
+ *    `canvasFor()` procura a aresta curta numa janela de ±3 px para casar a
+ *    razão, a densidade oscila alguns décimos de por mil entre uma medida e
+ *    outra; converter para milímetro e voltar absorve essa oscilação em vez de
+ *    deixá-la virar um escalonamento cego (a versão anterior derivava o fator
+ *    só da LARGURA e, numa mudança de altura pura, aplicava +0,59 % de escala
+ *    do nada).
+ *
+ * 2. A ÂNCORA. O piso do baú é o datum físico: o teto sobe, o piso não sai do
+ *    lugar (ver `mapZ`/`stretchY` em trailer-geometry.ts). Um adesivo colado a
+ *    1 m do piso continua a 1 m do piso quando o baú fica mais alto. Mas
+ *    `addLiveryUV()` faz `v = (max.y − y)/spanY`, ou seja **v = 0 é o TETO** —
+ *    então a coordenada `top` do fabric é distância até o TETO, e mantê-la
+ *    fazia a arte inteira SUBIR junto com o teto. Por isso o que se preserva
+ *    aqui é a distância até a BORDA DE BAIXO da tela.
+ */
+interface Frame {
+  /** tamanho do buffer da tela, em pixels */
+  px: { w: number; h: number };
+  /** chapa que essa tela representa, em milímetros */
+  mm: { w: number; h: number };
+}
+
+function remapObjects(fab: fabric.Canvas, from: Frame, to: Frame) {
+  const h1 = to.px.h;
+  const ok = [from.px.w, from.px.h, from.mm.w, from.mm.h, to.px.w, to.px.h, to.mm.w, to.mm.h];
+  if (ok.some((v) => !(v > 0))) return;
+  /* px por mm, por eixo, antes e depois. A razão entre elas é TUDO o que a
+     arte precisa saber sobre a troca de tela. */
+  const sx = (to.px.w / to.mm.w) / (from.px.w / from.mm.w);
+  const sy = (to.px.h / to.mm.h) / (from.px.h / from.mm.h);
+  /* A escala do OBJETO é uniforme por decreto: `canvasFor()` mantém os dois
+     eixos isotrópicos a partes por milhão, e usar dois fatores diferentes
+     transformaria círculo em elipse ao primeiro resíduo de arredondamento. */
+  const s = (sx + sy) / 2;
+  const uniform = Math.abs(s - 1) > 1e-9;
+  for (const o of fab.getObjects()) {
+    const left = (o.left ?? 0) * sx;
+    /* distância até o pé da tela, preservada */
+    const fromBottom = from.px.h - (o.top ?? 0);
+    const top = h1 - fromBottom * sy;
+    o.set({ left, top });
+    if (uniform) {
+      o.set({ scaleX: (o.scaleX ?? 1) * s, scaleY: (o.scaleY ?? 1) * s });
+      if (typeof o.strokeWidth === 'number') o.set({ strokeWidth: o.strokeWidth * s });
+    }
+    o.setCoords();
+  }
+}
+
+/**
+ * Põe o buffer da tela na proporção da chapa MEDIDA. Devolve `true` se mexeu.
+ *
+ * Chamada por `attachOverlays()`, que é o único portão por onde chapa nova
+ * chega — no boot e a cada recorte de `models.setTrailerDims()`.
+ */
+export function syncSurfaceAspect(key: SurfaceKey): boolean {
+  const fab = surfaces[key];
+  const want = canvasFor(key, PANEL_MM[key]);
+  const w0 = fab.getWidth(), h0 = fab.getHeight();
+  if (w0 === want.width && h0 === want.height) return false;
+
+  const before: Frame = { px: { w: w0, h: h0 }, mm: { ...prevPanel[key] } };
+  const after: Frame = { px: { w: want.width, h: want.height }, mm: { ...PANEL_MM[key] } };
+  prevPanel[key] = { ...PANEL_MM[key] };
+
+  fab.setDimensions({ width: want.width, height: want.height });
+  remapObjects(fab, before, after);
+
+  /* ---- E A CAIXA NA TELA TEM DE SER REPOSTA ----
+     `setDimensions()` sem `{ cssOnly: true }` escreve o tamanho do BUFFER
+     também no `style` dos dois canvas — é o que o fabric faz, por contrato. O
+     enquadramento que `sizeModalCanvas()` tinha calculado some junto, e o palco
+     passa a mostrar a tela em PIXELS DE BUFFER.
+
+     Medido no app, com o editor aberto, subindo de 2,78 m para 2,88 m: a tela
+     ia de `1093 x 207,117 px` (o enquadramento certo) para `2064 x 406 px` — o
+     tamanho cru do buffer. 1,89x mais larga e 1,96x mais alta que a janela do
+     painel: a arte aparecia gigante e o pé dela caía muito abaixo da chapa. É
+     exatamente o relato de "Sua marca fora e abaixo do painel, enorme" depois
+     de mexer na altura. E não voltava sozinho: `sizeModalCanvas()` só roda ao
+     abrir o editor, ao redimensionar a janela e ao mudar o zoom — nenhum desses
+     acontece ao digitar uma medida.
+
+     Então o enquadramento é REFEITO aqui, com o mesmo zoom que estava valendo.
+     `sizeModalCanvas()` sai sozinha quando o modal ainda não tem layout, o que
+     cobre o boot e o caso do editor fechado. */
+  sizeModalCanvas(key, zoomOf(key));
+
+  /* ---- E A TEXTURA TEM DE SER REALOCADA, NÃO SÓ REENVIADA ----
+     Este é o defeito que fazia a arte simplesmente NÃO CHEGAR ao baú depois de
+     qualquer mudança de medida, e ele é invisível em qualquer leitura de
+     código JavaScript porque acontece dentro do WebGL.
+
+     O three.js aloca a textura com `texStorage2D`, que é armazenamento
+     IMUTÁVEL: o tamanho é fixado na PRIMEIRA subida e todas as seguintes são
+     `texSubImage2D` dentro daquele retângulo. Trocar o buffer da tela (que é o
+     que a linha acima faz, porque a chapa mudou de proporção) deixa a fonte
+     maior que o destino, e o driver recusa a cópia. Medido no Chrome, ao subir
+     o baú de 2,777 m para 3,519 m — a tela vai de 2037x386 para 2049x492:
+
+         GL_INVALID_VALUE: glCopySubTextureCHROMIUM:
+                           Offset overflows texture dimensions.        (x3)
+
+     Três erros, um por face. O three não consulta `getError()`, então nada
+     estoura: `needsUpdate` continua sendo aceito, `texture.version` continua
+     subindo, e a GPU continua exibindo para sempre o ÚLTIMO conteúdo que coube
+     — no caso, a tela em branco de antes de o usuário desenhar. Daí o sintoma
+     relatado: "o livery não está sendo aplicado no modelo 3D".
+
+     `dispose()` derruba o objeto de GPU (o three ouve o evento e apaga o
+     `__version` da textura), então a subida seguinte volta a passar pelo
+     caminho de ALOCAÇÃO e refaz o `texStorage2D` no tamanho novo. É a única
+     operação que reabre esse caminho; nem `needsUpdate`, nem
+     `source.needsUpdate`, nem trocar `image` fazem isso. */
+  textures[key].dispose();
+
+  fab.requestRenderAll();
+  markDirty(key);
+  return true;
+}
+
+/** Quanto a razão da tela se afasta da razão da chapa. Só arredondamento de
+ *  pixel deve aparecer aqui — é o número que a verificação numérica lê. */
+export function aspectError(key: SurfaceKey): number {
+  const p = PANEL_MM[key], c = surfaces[key];
+  const panel = p.w / p.h, canvas = c.getWidth() / c.getHeight();
+  return Math.abs(canvas - panel) / panel;
+}
+
 /* u corre no Z nas laterais e no X na traseira; v sempre no Y.
-   Espelha addLiveryUV() em ./models.ts — se aquilo mudar, isto muda junto. */
+   Espelha addLiveryUV() em ./models.ts — se aquilo mudar, isto muda junto.
+
+   Mede a chapa INTEIRA, que é o que `addLiveryUV` normaliza: `uv1` vai de 0 a 1
+   sobre os limites da própria chapa, saia e arremate de topo inclusos. Medir só
+   a área frisada faria a régua bater e a arte sair deslocada. */
 function measurePanel(mesh: THREE.Mesh, key: SurfaceKey) {
   const g = mesh.geometry;
   if (!g.boundingBox) g.computeBoundingBox();
@@ -170,7 +438,33 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
     if (!key) return;
     makeLiveryOverlay(o, textures[key]);
     measurePanel(o, key);          // a régua em cm sai daqui, não de um número escrito à mão
+    /* E a TELA segue a chapa que acabou de ser medida. Sem esta linha o buffer
+       ficaria no tamanho literal de core/template.ts e a arte sairia esticada
+       na razão entre as duas proporções — ver a nota em `canvasFor()`. */
+    syncSurfaceAspect(key);
+    /* E a silhueta segue o METAL que corre por cima da chapa, remedido agora:
+       a cantoneira acompanha o teto e o friso fica no piso, então a faixa
+       pintável muda de fração a cada altura. Ver `measurePaintable()`. */
+    measurePaintable(trailerRoot, o, key);
   });
+  /* As duas superfícies que mostram a janela do painel dependem da faixa
+     medida (é ela que diz onde a tela se encaixa na foto), então a publicação
+     é refeita aqui — no boot a foto ainda pode não ter chegado, e aí
+     `measurePanelWindows()` publica quando chegar. */
+  for (const k of SURFACE_KEYS) {
+    const win = windows[k];
+    if (win) publishWindow(k, win);
+    installGuide(k);
+    drawPreview(k);
+  }
+  /* AS MEDIDAS REANCORAM PELO MESMO PORTÃO, e isso é deliberado:
+     attachOverlays() é chamada nos DOIS momentos em que existem chapas novas —
+     no boot e a cada recorte de `models.setTrailerDims()` (ver o gancho
+     onTrailerPanelsRebuilt em studio.ts). É por aqui que a altura ajustada ao
+     número inteiro de frisos volta para os campos do editor e a representação
+     do painel é recomposta. Nenhuma malha nova é criada: a representação é 2D,
+     e o 3D continua recebendo só a arte, pelas sobreposições acima. */
+  refreshFromTrailer();
 }
 
 /* ---------------- quando a textura precisa subir para a GPU ----------------
@@ -198,6 +492,118 @@ const FALLBACK_OUTLINE = [[0.015, 0.015], [0.985, 0.015], [0.985, 0.985], [0.015
 const outlines: Record<SurfaceKey, number[][]> =
   { left: FALLBACK_OUTLINE, right: FALLBACK_OUTLINE, rear: FALLBACK_OUTLINE };
 
+/* ---------------- ONDE A CHAPA BRANCA REALMENTE APARECE ----------------
+   A silhueta tracejada é a promessa que o editor faz ao cliente: "pinte aqui e
+   sai assim no baú". Ela vinha de `trailer_meta.json`, e lá `outlineSide` é o
+   QUADRADO UNITÁRIO — ou seja, a promessa era "o painel inteiro", quando o
+   painel inteiro não é pintável.
+
+   O que o recorte de `buildLiveryPanels()` entrega vai do PISO ao TETO, saia e
+   arremate inclusos, porque é a chapa inteira que a `LiveryUV` normaliza. Mas
+   sobre essa chapa correm perfis que NÃO são chapa: o friso de proteção
+   lateral em baixo e a cantoneira galvanizada em cima. Arte colocada ali fica
+   escondida atrás de metal — que é exatamente o relato: no editor o texto
+   encosta na estrutura com folga, no implemento ele sai CORTADO.
+
+   Então isto é MEDIDO no próprio implemento, a cada recorte, em vez de escrito
+   à mão: números fixos valeriam para um `trailer.glb` só, e há mais de um bake
+   em circulação (o do desktop tem 37 primitivas, o do web 2157). O critério é
+   geométrico e não depende de nome de nó nem de material:
+
+     · a peça tem de estar SOBRE a pele — atravessar o plano da chapa dentro de
+       `SKIN_REACH`, que é o que separa um perfil aparafusado por fora de
+       qualquer coisa que passe pelo interior do baú;
+     · e tem de ser CORRIDA — cobrir pelo menos `RAIL_SPAN` do comprimento do
+       painel, que é o que descarta lanterna, dobradiça, rebite e trava, peças
+       que ocupam um ponto e não uma faixa.
+
+   O que sobra são as faixas em Y ocupadas por perfil. A área pintável é o
+   MAIOR VÃO LIVRE entre elas — não "o painel menos uma margem fixa", porque a
+   margem não é fixa: ela muda com a altura pedida (a cantoneira acompanha o
+   teto, o friso fica no piso), e é justamente por isso que o defeito só
+   apareceu depois de o usuário mexer na altura. */
+
+/** Folga em torno do plano da pele para uma peça contar como "por cima dela". */
+const SKIN_REACH = 0.06;
+/** Fração do comprimento do painel que uma peça tem de cobrir para ser perfil. */
+const RAIL_SPAN = 0.5;
+/** Um vão menor que isto não é área de arte; é fresta entre ferragens. */
+const MIN_BAND = 0.15;
+
+/** Faixa pintável medida, em fração do painel a partir do PÉ. `null` = não deu
+ *  para medir e vale o que veio do manifesto. */
+const measured: Partial<Record<SurfaceKey, [number, number]>> = {};
+
+function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: SurfaceKey) {
+  const g = panel.geometry;
+  if (!g.boundingBox) g.computeBoundingBox();
+  const pb = g.boundingBox as THREE.Box3;
+  const spanY = pb.max.y - pb.min.y;
+  if (!(spanY > 0.2)) return;
+
+  const rear = key === 'rear';
+  /* Eixo NORMAL à chapa e eixo em que ela CORRE. */
+  const n: 'x' | 'z' = rear ? 'z' : 'x';
+  const r: 'x' | 'z' = rear ? 'x' : 'z';
+  const plane = (pb.min[n] + pb.max[n]) / 2;
+  const lo = pb.min[r], hi = pb.max[r];
+  const runLen = hi - lo;
+  if (!(runLen > 0.5)) return;
+
+  /* Caixa de cada candidato no espaço do IMPLEMENTO, que é onde as chapas
+     recortadas vivem. `applyMatrix4` sobre a caixa local é exato enquanto os
+     nós não giram (é o caso deste bake: só escala e translação), e errar para
+     mais aqui só encolheria a área pintável — por isso a peça ainda precisa
+     passar nos dois testes acima para contar. */
+  trailerRoot.updateWorldMatrix(true, true);
+  const toLocal = trailerRoot.matrixWorld.clone().invert();
+  const box = new THREE.Box3();
+  const m = new THREE.Matrix4();
+  const bands: [number, number][] = [];
+
+  trailerRoot.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.visible || !o.geometry) return;
+    if (o === panel || /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) return;
+    /* E as SOBREPOSIÇÕES DE ARTE, que são filhas das chapas e compartilham a
+       geometria delas. Sem esta linha a primeira candidata é a própria arte —
+       caixa idêntica à do painel, cobertura 100 % — e a medição conclui que
+       não existe faixa livre nenhuma. Foi o que aconteceu na primeira
+       execução: `outlineFrame` voltou o painel inteiro, que é justamente a
+       promessa errada que esta função existe para desfazer. */
+    if (o.parent && /^(SIDE_L|SIDE_R|REAR)$/.test(o.parent.name)) return;
+    /* O branco é a própria chapa (e o corpo paramétrico atrás dela): não é
+       obstáculo, é o que se está pintando. */
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.some((mm) => !!mm && /cor_padrao_branco|metalbranco/i.test(mm.name || ''))) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const gb = o.geometry.boundingBox;
+    if (!gb) return;
+    box.copy(gb).applyMatrix4(m.multiplyMatrices(toLocal, o.matrixWorld));
+    if (box.isEmpty()) return;
+    if (box.min[n] > plane + SKIN_REACH || box.max[n] < plane - SKIN_REACH) return;
+    const cover = Math.min(box.max[r], hi) - Math.max(box.min[r], lo);
+    if (cover < runLen * RAIL_SPAN) return;
+    const y0 = Math.max(box.min.y, pb.min.y), y1 = Math.min(box.max.y, pb.max.y);
+    if (y1 > y0) bands.push([y0, y1]);
+  });
+
+  /* O maior vão LIVRE entre as faixas ocupadas. */
+  bands.sort((a, b) => a[0] - b[0]);
+  let cursor = pb.min.y, bestLo = pb.min.y, bestHi = pb.max.y, best = -1;
+  const consider = (a: number, b: number) => { if (b - a > best) { best = b - a; bestLo = a; bestHi = b; } };
+  for (const [a, b] of bands) {
+    if (a > cursor) consider(cursor, a);
+    if (b > cursor) cursor = b;
+  }
+  consider(cursor, pb.max.y);
+  if (best < MIN_BAND) return;                     // medida implausível: não mente
+
+  const v0 = (bestLo - pb.min.y) / spanY, v1 = (bestHi - pb.min.y) / spanY;
+  measured[key] = [v0, v1];
+  outlines[key] = [[0, v0], [1, v0], [1, v1], [0, v1]];
+}
+
 function guideMarkup(poly: number[][], w: number, h: number) {
   const pts = poly.map(([u, v]) => [u * w, (1 - v) * h]);
   const path = 'M ' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') + ' Z';
@@ -212,6 +618,10 @@ function installGuide(key: SurfaceKey) {
   const fab = surfaces[key];
   const w = fab.getWidth(), h = fab.getHeight();
   const wrap = fab.wrapperEl;
+  /* A estrutura entra como PRIMEIRO filho do wrapper e a guia como ÚLTIMO: o
+     fabric não usa z-index nos dois canvas dele, então a ordem de documento é a
+     ordem de empilhamento. Chapa estrutural → arte do fabric → silhueta. */
+  mountStructureCanvas(key, wrap);
   let svg = wrap.querySelector('.guide-svg');
   if (!svg) {
     svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -233,12 +643,17 @@ export function outlineFrame(key: SurfaceKey) {
   return { left: l, top: t, width: Math.max(...xs) - l, height: Math.max(...ys) - t };
 }
 
+/* A MEDIDA GANHA DO MANIFESTO, e isto é regra e não preferência: o
+   `trailer_meta.json` traz o quadrado unitário nas duas faces, que é a única
+   silhueta garantidamente errada — ela promete o painel inteiro. Enquanto
+   `measurePaintable()` tiver um número para a face, o manifesto só serve de
+   degradação para quando não houver chapa recortada para medir. */
 export function setOutlines(meta: OutlineMeta | null) {
-  if (meta && Array.isArray(meta.outlineSide) && meta.outlineSide.length >= 3) {
+  if (!measured.left && meta && Array.isArray(meta.outlineSide) && meta.outlineSide.length >= 3) {
     outlines.left = meta.outlineSide;
     outlines.right = meta.outlineSide;
   }
-  if (meta && Array.isArray(meta.outlineRear) && meta.outlineRear.length >= 3) {
+  if (!measured.rear && meta && Array.isArray(meta.outlineRear) && meta.outlineRear.length >= 3) {
     outlines.rear = meta.outlineRear;
   }
   for (const k of SURFACE_KEYS) { installGuide(k); drawPreview(k); }
@@ -258,6 +673,10 @@ export function drawPreview(key: SurfaceKey) {
   if (!pc || !ctx) return;
   const src = surfaces[key].lowerCanvasEl;
   ctx.clearRect(0, 0, pc.width, pc.height);
+  /* Representação primeiro, arte por cima — a mesma ordem de documento do
+     palco. O card e o editor mostram a mesma pilha, e é essa igualdade que faz
+     a miniatura ser uma promessa honesta do que o editor abre. */
+  drawStructureInto(ctx, key, pc.width, pc.height);
   ctx.drawImage(src, 0, 0, pc.width, pc.height);
   const poly = outlines[key];
   ctx.save();
@@ -280,10 +699,26 @@ function schedulePreview(key: SurfaceKey) {
   requestAnimationFrame(() => { prevPending[key] = false; drawPreview(key); });
 }
 
+/* As alças que `skipControlsDrawing` tirou da tela de baixo entram aqui, na de
+   CIMA — que é a camada de interação do fabric e não alimenta textura nenhuma.
+   O usuário continua vendo moldura e alças exatamente como antes; o baú deixa
+   de vê-las. `contextTopDirty` é o sinal que faz o próprio `renderAll()` limpar
+   essa camada no quadro seguinte, senão a alça anterior fica como rastro. */
+function paintControlsOnTop(c: fabric.Canvas) {
+  const top = c.contextTop;
+  if (!top) return;
+  const dirty = c as unknown as { contextTopDirty: boolean };
+  c.clearContext(top);
+  if (!c.getActiveObject()) { dirty.contextTopDirty = false; return; }
+  c.drawControls(top);
+  dirty.contextTopDirty = true;
+}
+
 for (const k of SURFACE_KEYS) {
   const c = surfaces[k];
   for (const ev of DIRTY_EVENTS) c.on(ev, () => markDirty(k));
   c.on('after:render', () => {
+    paintControlsOnTop(c);
     if (uploaded[k] === rev[k]) return;
     uploaded[k] = rev[k];
     textures[k].needsUpdate = true;
@@ -411,8 +846,39 @@ const pct = (v: number) => (v * 100).toFixed(3) + '%';
 /* Publica a janela nas duas superfícies que a mostram — o card sobre o render e
    o palco do editor. Vai em variáveis CSS porque quem desenha isso é o CSS;
    daqui sai só a medida. */
+/**
+ * Onde a TELA fica dentro da foto — e por que não é a janela vazada.
+ *
+ * A tela do fabric cobre a chapa INTEIRA: `addLiveryUV()` normaliza `uv1` de 0
+ * a 1 sobre os limites do recorte, piso a teto. A janela vazada da foto, por
+ * sua vez, é só a parte PINTÁVEL — o que sobra entre o friso de proteção e a
+ * cantoneira. Encaixar a tela dentro da janela, como se fazia, iguala duas
+ * coisas diferentes: o pé da tela passa a valer o pé da janela, e toda a arte
+ * desce em bloco. É essa a diferença que o usuário viu — o texto com folga
+ * sobre a estrutura no editor e cortado por ela no implemento.
+ *
+ * Aqui a conta é a inversa e é exata: a tela é esticada para que a FAIXA
+ * PINTÁVEL DELA (medida no 3D por `measurePaintable()`) caia exatamente sobre a
+ * janela da foto. O excedente — saia e arremate — fica atrás da foto, que
+ * continua desenhada por cima (`.stage-panel::after` em core/studio.css). O
+ * resultado é o comportamento honesto: arte posta fora da faixa desaparece sob
+ * a ferragem no editor exatamente como desaparece no baú.
+ */
+function canvasRect(key: SurfaceKey, win: PanelWindow) {
+  const band = measured[key];
+  if (!band) return { x: win.x, y: win.y, w: win.w, h: win.h };
+  const [v0, v1] = band;
+  const span = v1 - v0;
+  if (!(span > 0.05)) return { x: win.x, y: win.y, w: win.w, h: win.h };
+  const h = win.h / span;
+  /* `v` corre de baixo para cima; a tela cresce para baixo. O topo da faixa
+     (v1) fica a `1 − v1` da borda de cima da tela. */
+  return { x: win.x, y: win.y - (1 - v1) * h, w: win.w, h };
+}
+
 function publishWindow(key: SurfaceKey, win: PanelWindow) {
   windows[key] = win;
+  const r = canvasRect(key, win);
   const targets = [
     root.querySelector<HTMLElement>('.preview-card[data-surface="' + key + '"]'),
     stagePanels[key],
@@ -421,12 +887,26 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
     if (!el) continue;
     el.style.setProperty('--ts-pw-img', 'url("' + PANEL_IMAGE[key] + '")');
     el.style.setProperty('--ts-pw-ar', String(win.photoAr));
-    el.style.setProperty('--ts-pw-x', pct(win.x));
-    el.style.setProperty('--ts-pw-y', pct(win.y));
-    el.style.setProperty('--ts-pw-w', pct(win.w));
-    el.style.setProperty('--ts-pw-h', pct(win.h));
+    el.style.setProperty('--ts-pw-x', pct(r.x));
+    el.style.setProperty('--ts-pw-y', pct(r.y));
+    el.style.setProperty('--ts-pw-w', pct(r.w));
+    el.style.setProperty('--ts-pw-h', pct(r.h));
     el.classList.add('ts-pw-ready');
   }
+  /* A MINIATURA TEM DE RECORTAR, e é consequência direta da conta acima.
+     `canvasRect()` devolve de propósito uma tela MAIOR que a janela — ela cobre
+     a chapa inteira e só a faixa pintável dela cai sobre o vazado da foto. No
+     card, essa tela é um `position: absolute` dentro de `.ts-panel__media`, que
+     não tem recorte nenhum (`overflow: visible`, medido): a saia e o arremate
+     de topo, que ficam fora da janela, são desenhados PARA FORA da moldura do
+     cartão. É a arte "vazando por baixo da miniatura".
+     A foto por cima é `inset: 0`, ou seja cobre só a moldura — não esconde o
+     que passa dela. O recorte vai no estilo em linha porque `core/studio.css`
+     tem outro dono; a regra é de quem calcula a caixa, e é aqui. */
+  const media = root.querySelector<HTMLElement>(
+    '.preview-card[data-surface="' + key + '"] .ts-panel__media',
+  );
+  if (media) media.style.overflow = 'hidden';
 }
 
 function loadImage(url: string): Promise<HTMLImageElement | null> {
@@ -512,6 +992,11 @@ export const stagePanels: Record<SurfaceKey, HTMLElement> =
    dela. Antes só existia a tela, e era ela que era enquadrada.
    `zoom` multiplica o enquadramento; o excedente vira rolagem em .stage-scroll,
    porque com uma letra de 20 cm o usuário vai querer chegar perto dela. */
+/** O zoom com que cada palco foi enquadrado pela última vez. `syncSurfaceAspect()`
+ *  precisa dele para refazer o enquadramento sem que o editor tenha de avisar. */
+const lastZoom: Record<SurfaceKey, number> = { left: 1, right: 1, rear: 1 };
+const zoomOf = (key: SurfaceKey) => lastZoom[key];
+
 export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
   const fab = surfaces[key];
   const win = windows[key];
@@ -519,6 +1004,7 @@ export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
   const stage = $('modal-stage');
   const maxW = stage.clientWidth - 40, maxH = stage.clientHeight - 52;
   if (maxW <= 0 || maxH <= 0) return;         // modal ainda sem layout
+  lastZoom[key] = zoom;
 
   const outerAr = win ? win.photoAr : fab.getWidth() / fab.getHeight();
   let w = maxW, h = w / outerAr;
@@ -527,8 +1013,24 @@ export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
 
   panel.style.width = w + 'px';
   panel.style.height = h + 'px';
+  /* A CAIXA DA TELA É `canvasRect()`, E NÃO A JANELA VAZADA.
+     As duas superfícies em que o painel aparece têm de usar a MESMA conta, e
+     até aqui não usavam: o card é posicionado por `--ts-pw-*`, que
+     `publishWindow()` publica a partir de `canvasRect()` — a tela ESTICADA, de
+     modo que a faixa pintável dela caia sobre a janela da foto —, enquanto o
+     palco do editor era dimensionado pela janela CRUA. O `.panel-window` já
+     ficava na origem de `canvasRect()` (é `--ts-pw-x/y` no CSS), então origem e
+     tamanho vinham de contas diferentes.
+
+     O efeito é o defeito relatado: a chapa INTEIRA (piso a teto, que é o que a
+     `uv1` normaliza) era espremida dentro da faixa PINTÁVEL, que é ~80 % dela.
+     Com a faixa medida em 1,7266…3,9614 de um painel 1,3919…4,1688, a arte
+     subia 9,74 % da altura da janela — 218 mm de baú. O cliente punha o texto
+     com folga sobre o trilho no editor e o encontrava cortado por ele no 3D.
+     Agora as duas caixas saem da mesma função e o editor mostra a posição real. */
+  const r = win ? canvasRect(key, win) : null;
   fab.setDimensions(
-    { width: (win ? w * win.w : w) + 'px', height: (win ? h * win.h : h) + 'px' },
+    { width: (r ? w * r.w : w) + 'px', height: (r ? h * r.h : h) + 'px' },
     { cssOnly: true },
   );
   fab.calcOffset();
@@ -594,6 +1096,10 @@ function bindTrailerPaint() {
 export function initLivery() {
   bindTrailerPaint();
   syncImplementColor();
+  /* A miniatura do card não observa o canvas estrutural — ela é um `drawImage`
+     de uma vez só. Então quem recompõe avisa, e o card se redesenha. Sem isto,
+     mudar uma medida atualizaria o 3D e o palco e deixaria o card velho. */
+  onStructureRedrawn((k) => schedulePreview(k));
   /* Fora do caminho crítico: são ~4,5 M de pixels varridos, e até a medida
      chegar os cards já estão desenhados com a foto atrás (o fallback). */
   void measurePanelWindows();

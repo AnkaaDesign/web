@@ -35,7 +35,11 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background-color: var(--bg);
+  /* --ts-screen-bg e não --bg: a cortina é uma das duas telas que seguem o modo
+     claro/escuro do host (a outra é #loading). Ver o bloco --ts-screen-* em
+     core/studio.css. */
+  background-color: var(--ts-screen-bg);
+  color: var(--ts-screen-text);
   opacity: 0;
   /* The curtain owns the pointer while it is up: OrbitControls underneath must
      not react to a drag the user aimed at the loading screen. */
@@ -63,6 +67,12 @@
   transform: scale(1);
   transition: opacity 900ms ease-out;
 }
+/* No claro a foto tem de CLAREAR o fundo, não escurecê-lo: `brightness(0.34)`
+   sobre #f5f5f5 desenharia uma mancha escura no meio de uma tela branca, que é o
+   contrário do "felt rather than looked at" acima. */
+.truck-studio-root.ts-light .ts-load-bg {
+  filter: blur(26px) saturate(0.6) brightness(1.5);
+}
 .truck-studio-root .ts-load.is-in .ts-load-bg {
   opacity: 1;
   /* Only `transform` comes from the keyframe. Opacity stays on a transition on
@@ -78,11 +88,42 @@
   inset: 0;
   background: radial-gradient(
     120% 92% at 50% 42%,
-    rgba(13, 16, 23, 0.22) 0%,
-    rgba(13, 16, 23, 0.84) 62%,
-    rgba(8, 10, 15, 0.97) 100%
+    rgba(17, 17, 17,0.22) 0%,
+    rgba(17, 17, 17,0.84) 62%,
+    rgba(11, 11, 11, 0.97) 100%
   );
 }
+
+/* ---------- a cortina no MODO CLARO ----------
+   Um bloco, não trinta overrides: as regras abaixo já leem `--text`, `--muted`,
+   `--stroke`, `--stroke-2`, `--accent` e `--panel*`, e custom properties
+   HERDAM — então reapontá-las na raiz da cortina reveste tudo que está dentro
+   dela de uma vez, sem que nenhuma regra individual precise saber que existe um
+   modo claro. Fora da cortina os mesmos nomes continuam valendo os escuros, que
+   é o que mantém o vidro sobre o render intacto nos dois modos.
+   As três exceções são superfícies escritas em rgba branco/preto literal, que
+   nenhuma variável alcança. */
+.truck-studio-root.ts-light .ts-load {
+  --text: var(--ts-screen-text);
+  --muted: var(--ts-screen-muted);
+  --accent: var(--ts-screen-accent);
+  --stroke: rgba(0, 0, 0, 0.09);
+  --stroke-2: var(--ts-screen-stroke);
+  --panel: var(--ts-screen-panel);
+  --panel-2: #fafafa;
+}
+/* 1. A vinheta inverte: ela existe para FECHAR as bordas em direção ao fundo, e
+      o fundo agora é claro. */
+.truck-studio-root.ts-light .ts-load-scrim {
+  background: radial-gradient(
+    120% 92% at 50% 42%,
+    rgba(245, 245, 245, 0.28) 0%,
+    rgba(245, 245, 245, 0.86) 62%,
+    rgba(245, 245, 245, 0.97) 100%
+  );
+}
+/* 2. A pílula do nome do cenário: um branco a 3% sobre branco é nada. */
+.truck-studio-root.ts-light .ts-load-env { background: rgba(0, 0, 0, 0.04); }
 
 .truck-studio-root .ts-load-inner {
   position: relative;
@@ -361,7 +402,7 @@
    earlier would reveal the already-populated badge underneath and make the
    flight look pointless. */
 .truck-studio-root .ts-load.is-out {
-  background-color: rgba(13, 16, 23, 0);
+  background-color: rgba(17, 17, 17,0);
   transition: background-color 300ms ease 220ms;
 }
 .truck-studio-root .ts-load.is-out .ts-load-bg,

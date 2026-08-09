@@ -1,5 +1,6 @@
 {
   "removedNote": "2026-08-03 — OS TRES CENARIOS SO-HDRI FORAM REMOVIDOS: `rodovia`, `patio-logistico` e `urbano`. Eram uma foto equirect mais um chao procedural (disco de asfalto com fade, orla de grama, tufos espalhados, postes gerados em codigo), e o olho rejeita essa transicao por quatro motivos que nenhum ajuste de cor resolve — o disco e redondo, o chao e plano, os tufos nao tem arranjo, e NADA oclui o horizonte: o caminhao fica sobre um disco dentro de uma foto infinita. O acervo agora e so cenario com geometria de verdade (`set`). ATUALIZACAO 2026-08-03 (mesma data, mais tarde): a versao anterior desta nota mandava PRESERVAR /environments/patio-logistico/ porque `armazem` usaria o sky.hdr de la. ISSO ESTAVA ERRADO — `armazem` declara `hdri: null` e e iluminado pelas faixas Emissive da propria casca, como o setNote dele sempre disse. A pasta inteira foi apagada. O QUE CONTINUA VALENDO: /environments/rodovia/sky.hdr NAO pode ser apagado, porque `distrito-industrial` o usa como ceu e fonte de reflexo. O resto de rodovia/ (sky.jpg, thumb.webp) e /environments/urbano/ inteiro ja foram removidos. O maquinario que so estes tres cenarios usavam TAMBEM ja foi arrancado do engine: nearGround, scatter/roadside, shadowCatcher, o domo projetado (GroundedSkybox) e todo o carregador de conjuntos PBR de chão por manifesto sairam de scene.ts e environment.ts, junto com props/ e as texturas _4k/_disp/dirt_*/macro_noise. Nao ha mais caminho de foto-como-cenario: um cenario novo PRECISA trazer um bloco `set`.",
+  "studioNote": "2026-08-08 — O CENARIO `estudio` E O UNICO SEM BLOCO `set`, e isso e deliberado, nao uma pendencia. A regra do removedNote acima ('um cenario novo PRECISA trazer um bloco set') existe porque foto-equirect + chao procedural nao fecha a transicao foto/CG. Um CICLORAMA nao tem essa transicao para fechar: nao ha horizonte a ocluir, nao ha asfalto a casar, nao ha foto nenhuma. O fundo E o gradiente neutro do preset, que e exatamente o que um ciclorama de estudio e na vida real — papel sem emenda. Por isso `hdri: null`, `set` ausente e `showRoad: false`. Ele custa ZERO byte e e o cenario certo para julgar uma cor (sem predio, sem ceu, sem contaminacao cromatica). A `thumb` e um SVG data-uri desenhado em engine/catalog/catalog.ts (STUDIO_THUMB): pedir um .webp ao servidor para ilustrar 'sem downloads' seria contradizer o proprio cartao. ATENCAO: o engine GARANTE este cenario mesmo que o manifesto nao o traga — ver ensureStudioEnvironment() em catalog.ts. Ele esta declarado aqui para que a arvore servida pela API e o desktop leiam a MESMA lista; a entrada do manifesto ganha da embutida. CORRECAO 2026-08-08 — A PREMISSA ACIMA ('o fundo E o gradiente neutro do preset') ESTAVA ERRADA, e foi medida: a camera de uma foto de veiculo olha praticamente na horizontal, entao ela so enxerga a FAIXA DO HORIZONTE do domo procedural e as tres bandas de cor do ceu ficam fora do quadro. O fundo saia com luminancia 110,2 / 110,1 / 110,1 / 110,1 / 110,5 do topo a base — liso, sem gradiente nenhum. Um domo de ceu nao produz gradiente vertical num enquadramento horizontal, por construcao. E, sem bloco `set` e sem o maquinario de `shadowCatcher` (arrancado do engine em 2026-08-03), o cenario tambem nao tinha CHAO: o caminhao flutuava num vazio cinza, sem sombra de contato. As duas coisas agora vem de engine/scene/cyclorama.ts — uma sala de ciclorama revolvida (piso, concordancia, parede, teto), gerada em codigo, que PRESERVA a propriedade de ZERO byte de download que faz este cenario valer a pena. Por isso `showSkyDome` passou a false (a sala e fechada, o domo nao teria por onde aparecer) e `ground.type` passou a 'cyclorama'. A sala e ligada pelo PRESET (`ciclorama`), nao por um campo novo aqui, porque normalizeEnvironment() e uma lista branca e um campo desconhecido evapora em silencio.",
   "environments": [
     {
       "id": "distrito-industrial",
@@ -60,12 +61,13 @@
             "rough": "textures/concrete_rough.webp",
             "normal": "textures/concrete_nor.jpg",
             "ao": "textures/concrete_ao.webp",
-            "repeat": 2,
+            "repeat": 1,
             "tintRgb": [
               0.72,
               0.71,
               0.68
-            ]
+            ],
+            "aproNote": "2026-08-08 — ESTE MATERIAL MUDOU DE FUNCAO. Nao existem mais lajes de apron (foram removidas em 2026-08-03 porque cada uma se cercava de um degrau de 12 cm sem nada que o explicasse). Agora ele e a SARJETA: a faixa de concreto de 45 cm que corre rente ao asfalto dos dois lados de cada pista, entre a borda da pista e o meio-fio. As UV dela saem do build em x/2 e y/2, entao repeat 1 = ladrilho de 2 m — era repeat 2 sobre a mesma UV, ou seja 1 m, fino demais para uma peca de concreto moldada in loco."
           },
           "KERB_CONCRETE": {
             "diffuse": "textures/concrete_diff.webp",
@@ -102,7 +104,43 @@
             ],
             "roughness": 0.94,
             "envIntensity": 0.6,
-            "repeatNote": "ESTE usa UV_M_FAR 64, nao 8: o disco tem 2,4 km e com UV_M 8 as UV chegariam a +/-150, onde um varying mediump (o que uma GPU de celular da a uma UV interpolada) tem passo de ~12 cm e a grama quantiza visivelmente. 64 / 16 = ladrilho de 4 m. Era repeat 11 sobre UV 0..1, ou seja 218 m por ladrilho — um lencol verde chapado, que e metade do motivo de o campo distante nao ler como campo."
+            "repeatNote": "ESTE usa UV_M_FAR 64, nao 8: o terreno externo tem 1,18 km e com UV_M 8 as UV chegariam a +/-74 antes do repeat, onde um varying mediump (o que uma GPU de celular da a uma UV interpolada) tem passo de ~12 cm e a grama quantiza visivelmente. 64 / 16 = ladrilho de 4 m. ATENCAO 2026-08-08: este material passou a ser SO o campo distante (as faixas `out_*` fora da cerca). A grama de dentro da propriedade e do canteiro central agora e GRASS_NEAR, porque ela usa UV_M 8 e um mesmo material nao pode ter duas escalas de UV."
+          },
+          "GRASS_NEAR": {
+            "diffuse": "textures/grass_diff.webp",
+            "rough": "textures/grass_rough.webp",
+            "normal": "textures/grass_nor.jpg",
+            "ao": "textures/grass_ao.webp",
+            "repeat": 2,
+            "tintRgb": [
+              0.26,
+              0.36,
+              0.17
+            ],
+            "roughness": 0.93,
+            "envIntensity": 0.5,
+            "grassNote": "2026-08-08 — NOVO. A grama de DENTRO da cerca: o canteiro central entre as duas pistas, as faixas de terreno entre a laje e o alambrado, e as manchas de grama espalhadas nelas. Existe separado de GRASS_VERGE por um motivo puramente tecnico e nao estetico: as UV do chao sao metros/UV_M, o campo distante precisa de UV_M 64 por precisao de varying, e o terreno perto precisa de UV_M 8 para o ladrilho nao ficar gigante. Um material so nao pode ter as duas. UV_M 8 / repeat 2 = ladrilho de 4 m, o mesmo tamanho aparente do campo distante — que e o ponto: as duas gramas tem de casar na transicao da cerca. O tom e mais verde e menos seco que o do campo porque esta e grama cortada dentro da planta."
+          },
+          "TREE_BARK": {
+            "repeat": 1,
+            "tintRgb": [
+              0.2,
+              0.16,
+              0.13
+            ],
+            "roughness": 0.92,
+            "metalness": 0
+          },
+          "TREE_LEAF": {
+            "repeat": 1,
+            "tintRgb": [
+              0.19,
+              0.26,
+              0.11
+            ],
+            "roughness": 0.88,
+            "metalness": 0,
+            "treeNote": "2026-08-08 — SEM MAPA, de proposito, igual a LINE_PAINT. Nao ha textura de folha nem de casca em /textures e nao vale a pena baixar uma: as arvores sao geradas (tools/env-build/veg.py) e toda a variacao delas vem do COLOR_0, que e escrito vertice a vertice — mais escuro no interior da copa, mais quente nas pontas, com um deslocamento de matiz por arvore para que nenhuma leia como a mesma planta. Uma cor chapada aqui daria uma bola de bilhar verde; o COLOR_0 e o que faz a massa existir. ELES SAO DECLARADOS AQUI DE PROPOSITO mesmo sem mapa: set.ts collectSolids trata como CHAO toda malha cujos materiais estejam todos neste bloco, e arvore declarada = arvore que a camera atravessa em vez de desviar. Como toda arvore esta a 78 m ou mais da origem e a orbita maxima e ~31 m, atravessar nunca acontece — e desviar de uma arvore seria pior."
           },
           "GRAVEL_SHOULDER": {
             "diffuse": "textures/gravel_diff.webp",
@@ -116,20 +154,22 @@
               0.46
             ],
             "roughness": 0.93,
-            "repeatNote": "UV_M 8 / repeat 2.667 = ladrilho de 3 m. Era repeat 14 sobre UV 0..1 num acostamento de 1400 x 1,1 m: 100 m por 8 cm."
+            "repeatNote": "2026-08-08: passou de 2.667 para 8 junto com a UV do plano `outer`, que foi para UV_M_FAR 64 pelo mesmo motivo de precisao que GRASS_VERGE — o plano tem 1,18 km e em UV_M 8 as UV passavam de +/-74. 64 / 8 = ladrilho de 8 m. Manter 2.667 aqui depois da mudanca de UV daria um ladrilho de 24 m de brita, que e brita nenhuma."
           },
           "_DIRT_WORN_removido": "2026-08-03: o material DIRT_WORN foi retirado deste bloco JUNTO com os quatro arquivos /textures/dirt_* que ele nomeava. O unico consumidor era o talude de terra em r=240 m, removido antes — ver hazeNote —, e o material nao existe em nenhum dos dois set.glb, entao bindMaterials nunca chegava a buscar nada. Ficar declarado 'porque um proximo build pode precisar' deixou de ser gratis no momento em que as texturas sairam do disco: seria um 404 no dia em que um set exportasse esse nome. Para voltar a usar terra batida, restaure os quatro arquivos E este bloco na mesma mudanca."
         },
         "bounds": {
-          "halfX": 60,
-          "halfZ": 58,
-          "minY": 0.15,
+          "halfX": 110,
+          "halfZ": 130,
+          "minY": 0.35,
           "maxY": 32
         },
-        "boundsNote": "O patio agora TERMINA na cerca (antes o concreto seguia 10 m alem dela). Em coordenadas do set a laje vai de x -92,4..86,3 e z -63,4..100,6; a caixa e simetrica, entao halfZ caiu de 85 para 58 para a camera nao sair do concreto pelo lado sul. halfX 60 continua folgado contra os 86 m mais curtos em x.",
+        "pushbackRemovido": "2026-08-08 — O BLOCO `pushback` FOI REMOVIDO, e a nota dele sempre mandou remove-lo neste dia exato: 'QUANDO O set.glb FOR REEXPORTADO com as construcoes ja recuadas, ESTE BLOCO TEM DE SAIR — senao o recuo e aplicado duas vezes'. Foi reexportado. O recuo agora esta na geometria: build_industrial_park.py tem TALL_SETBACK = 60 m e a funcao audit_layout FALHA a build imprimindo SETBACK para qualquer peca com mais de 8 m de altura cuja caixa chegue a menos disso da rua A. Duas pecas foram efetivamente movidas por essa verificacao durante este rebuild (o bloco de processo, que estava a 58 m, e os escritorios da portaria, a 52 m) — que e exatamente o tipo de coisa que 'olhar um render' nao pega. set.ts applyPushback continua existindo e continua correto; simplesmente nao ha mais nada neste manifesto que o acione.",
+        "boundsNote": "2026-08-08 — REFEITO com a laje nova. A propriedade foi de 225 para 330 m de meia-largura (660 x 660 m, mais que o dobro da area cercada) mas a LAJE nao acompanhou: ela vai de x -206..182 e y -196..214 em coordenadas do build, e o resto da propriedade e grama com arvores. A caixa e simetrica e fica bem dentro da laje: halfX 110 e halfZ 130 contra os 182 e 196 mais curtos. Era 60 x 58 sobre uma laje de 92 x 63, ou seja a mesma folga proporcional. NENHUM DOS DOIS NUMEROS E ALCANCAVEL NA PRATICA — maxDistance da orbita fica em ~31 m — e e por isso que sao generosos em vez de justos: a caixa existe para impedir a camera de sair do chao, nao para enquadrar.\n\nminY SUBIU DE 0,15 PARA 0,35, E ISSO NAO E COSMETICO. O patio agora fica ACIMA da rua (+12 cm) em vez de abaixo (-14 cm), porque um meio-fio segura terreno mais alto — e com ondulacao de +/-6 cm o concreto chega a +18 cm. Uma camera limitada a 0,15 m atravessaria o proprio chao nos pontos altos.",
         "setNote": "Rebuild 2026-08-02 a partir do glTF rippado com atribuicao por mesh reconstruida (folhas de contato vs renders do autor — ver industrial-vol1-pipeline.md na pasta do rip). Vaga do caminhao na origem, rua ASPHALT_ROAD ao longo de Z com LINE_PAINT, patio GROUND_CONCRETE, entorno GRASS_VERGE, cerca Zabor_02 de topo dobrado com portoes na rua, tufos de grama instanciados (EXT_mesh_gpu_instancing) e predios com texturas embutidas (1024, Draco). Galpoes com portas viradas para a rua; construcoes altas recuadas para a orbita da camera ficar limpa. Nota do set anterior preservada no set.glb.bak.\n\nTerceira rodada (2026-08-02, tarde): (1) o PATIO TERMINA NA CERCA — antes a laje seguia 10 m alem dela e a grama, que e semeada do lado de fora, nascia no concreto; (2) a rua interna sai pelos DOIS portoes e morre numa via de passagem leste-oeste que corre 1,4 km para a bruma, com canteiro de 7 m entre cerca e acostamento — junção em T dos dois lados, e o berm de terra em 240 m ganhou vao onde a via cruza; (3) portoes Zabor_01 agora escalados pela PROPRIA altura (davam 2,87 m contra 3,4 m da cerca, porque herdavam a escala do painel Zabor_02) e as folhas passam 0,9 m alem da abertura; os trechos de cerca sao ladrilhados por SEGMENTO ate a borda do portao, em vez de terem paineis descartados do meio da fiada; (4) desgaste do patio (apron junto ao meio-fio, rastros de pneu saindo da rua, manchas de oleo, sujeira nas bordas) vai em COLOR_0 do plano de 1 m — aoMap so modula o ambiente e sumia no sol, e o engine religa GROUND_CONCRETE as texturas dele, entao vertex color e o unico canal que sobrevive ao port; (5) texturas dos kits de cerca reduzidas a 512 e todo o set convertido para WebP: 37,5 MB (acima do teto de 35) -> 5,3 MB.",
         "setNoteOld": "Distrito reconstruido do zero a partir do pacote OBJ da Industrial Buildings Collection Vol.1 (293k tris, contra 98k do glTF rippado). ATLAS POR MODELO: nem o OBJ nem o glTF sabem qual textura vai onde — o OBJ nao tem .mtl nem usemtl, e o glTF tem bindings mas colapsados (99,8% em Container, que e o atlas de ferrugem; era por isso que TUDO ficava de metal oxidado). O mapeamento foi levantado renderizando cada modelo contra os cinco atlas e comparando com o render do proprio autor: Walls = telha cinza com faixa escura (os galpoes), MetalTrim = acabamento claro com amarelo de seguranca exatamente em guarda-corpos/escadas/passarelas (tanques, vasos, unidades), ConcreteLeaks = aco cinza intemperizado (pipe racks, chamines), Container = ferrugem, correto so para o container de 20 pes. CHAO: sem remendos nem juntas geometricas — quads de aresta dura sobre plano liso lem como retangulo colado, nao como desgaste ('cheio de artefatos'); a variacao vem so de vertex color (continua por construcao) e do PBR ligado em runtime. HORIZONTE: a emenda CG/HDRI nao e suavizada, e ocluida — cerca de topo chanfrado a 235 m mais um talude de terra de 3 m atras dela.",
         "setNote2026-08-03": "Rebuild a partir do viewer do rip (viewer/src, __exportSet()), 5,3 -> 6,3 MB. Cinco correcoes, todas no relatorio do Kennedy: (1) OS GALPOES DE DOCA (1_11+2_12) eram um par de 4,1 m de altura a 26 m da rua do outro lado de um patio vazio — agora 1,6x (6,6 m no beiral, 51 m de testada) e a face de doca vem de x 32 para x 26 em coordenadas do app; o limite e a orbita do estudio, que com maxDistance 2,6r chega a ~25 m do caminhao, entao mais perto que isso e uma parede dentro da camera. (2) O PREDIO DAS CHAMINES (3002_10) estava de COSTAS: a fachada com as faixas de janela e as portas apontava para leste e a rua so via a parede cega com as venezianas — 180 graus em torno do centro da propria pegada, que mapeia a pegada nela mesma e nao cria sobreposicao nova. As duas em viewer/src/tweaks.js, aplicadas na cena VIVA antes de buildGround medir o sitio. (3) UV DO CHAO EM METROS — ver repeatNote. (4) TALUDE DE TERRA REMOVIDO — ver horizonNote/hazeNote. (5) Disco de grama de 56 para 96 segmentos: a 570 m a bruma so comeca a cobrir, e um poligono de 56 lados num raio de 1,2 km mostra a aresta.",
+        "setNote2026-08-08": "REBUILD GRANDE. tools/env-build/build_industrial_park.py + ibc1.py + dl_packs.py + props_ph.py + veg.py; conferido com shot_park.py, que liga as mesmas texturas de /textures neste bloco e enquadra com o VIEW_DIR do view.ts, para o preview nao poder discordar do app.\n\n1. A CERCA TINHA SUMIDO DO DISCO. FENCE_SRC apontava para 'Downloads\\3D Ripper Pro\\...', pasta que nao existe mais, e build_fence() apenas registra 'fence source missing' e RETORNA — nao levanta erro. Ou seja: rodar o script commitado hoje gerava um distrito SEM PERIMETRO NENHUM, e a emenda chao/HDRI que a cerca existe para tapar voltava inteira. O alambrado agora e gerado aqui a partir das texturas do kit CC0 modular_chainlink_fence (alpha de tela + difuso de mourao), o que tambem transforma a altura dele num numero no script em vez de numa propriedade do kit que estivesse na pasta.\n\n2. DUAS PISTAS COM CANTEIRO. O caminhao continua em x=0 — isso nao e negociavel, o app estaciona na origem em z=0 —, entao o par NAO e centrado nele: a rua A e a do caminhao e a rua B corre a oeste, atras de um canteiro de 10,5 m. Oeste porque o VIEW_DIR padrao poe a camera a leste-sudeste: o oeste e o que o enquadramento OLHA.\n\n3. A JUNCAO RUA/PATIO E O DETALHE. Antes era uma caixa de meio-fio e um patio 14 cm ABAIXO da rua, que e ao contrario — meio-fio segura terreno mais alto, nao cerca terreno afundado. A secao agora e sarjeta -> face do meio-fio -> patio, com o patio 12 cm ACIMA da pista e o meio-fio em pedras separadas de 1,10 m com junta de 1,5 cm. A junta e o detalhe: um prisma extrudado de 660 m le como fita de plastico a qualquer distancia.\n\n4. A TINTA E DESGASTADA, NAO PINTADA. Toda marcacao e subdividida ao longo do proprio comprimento e carrega desgaste em COLOR_0 de quatro fontes independentes — um campo fBm em coordenadas de MUNDO (para o desgaste atravessar a fronteira entre marcas em vez de parar nela), a trilha de roda, uma saude sorteada por marca, e as pontas. Vagas inteiras somem enquanto a vizinha continua nitida.\n\n5. UM BUG QUE SO A VISTA DE CIMA PEGOU: subir o patio para +12 cm inverteu uma premissa que todo o empilhamento de chao usava desde que foi escrito — a de que a rua e a superficie MAIS ALTA e por isso pode ser deitada por cima de tudo. Em +12 cm o patio virou uma tampa de concreto de 468 m sobre as duas pistas, as sarjetas, os meio-fios e todas as marcacoes. O render de topo mostrava uma planta com canteiro verde e nenhuma rua dos lados. Chao que atravessaria o corredor viario agora sai em duas lajes (add_slab); o que esta ABAIXO da rua (out_* a -28 cm, outer a -30 cm) continua inteiro, porque nunca disputou.\n\n6. MODELOS NOVOS: 7 predios do Industrial Buildings Pack (guarita com cancela, galpao de docas, armazens, escritorio de obra), ~15 predios do Mid-Century Industrial Buildings (o arquivo e UM OBJ com todos eles numa grade de vitrine — dl_packs.split_midcentury separa por componentes conexos e depois agrupa por proximidade em XY), o armario de comando do Industrial device e as cacambas do Trash Container 3. NENHUM DOS QUATRO TRAZ .mtl OU `usemtl`, igual ao IBC1: o pareamento foi RENDERIZADO (probe_dl.py) e conferido na geometria — caixilho cai em janela, nivelador de doca cai em vao de doca, ferrugem cai no modelo cujo atlas se chama oldWarehouse.\n\n7. AS ARVORES SAO GERADAS (veg.py), nao importadas. Nada no disco tem arvore, e o shrub CC0 mais proximo tem 156 012 faces para 40 cm de planta. A primeira versao das copas saiu como ORIGAMI — 4x7 segmentos, plana, com deslocamento de +/-37 % — e o close-up nao deixou duvida. Resolvido com mais resolucao, deslocamento menor e de frequencia mais alta, e use_smooth, que era o que faltava de verdade.\n\n8. NADA E PLANTADO A MENOS DE 78 m DA ORIGEM. Arbusto gerado e massa convincente a 60 m e caroco facetado a 10 m, e o canteiro perto do caminhao e a unica plantacao que a camera do estudio consegue chegar perto. Ali e grama cortada — que tambem e o que uma faixa de canteiro perto de cruzamento e na vida real, pela mesma razao de visibilidade.\n\n9. O POSTE DA POLY HAVEN SAIU. street_lamp_02 e uma luminaria ornamental de ferro fundido; na altura de via virava um lampiao vitoriano de 8 m ao lado de uma planta quimica, por 2 598 faces e tres texturas. A iluminacao viaria agora e um mastro galvanizado gerado (make_mast), 30 quads, que reaproveita o material do mourao da cerca e portanto nao acrescenta textura nenhuma.\n\n10. TAMANHO: a primeira exportacao completa deu 34,2 MB, com 31,5 MB SO de geometria contra 2,65 MB de todas as texturas somadas. Nao foi resolvido comprimindo textura: `yard` estava com 160 cortes (4,49 MB), os meio-fios corriam os 1 180 m inteiros da rua (4 276 pedras, 3,72 MB), e cada pista era um retangulo de 13 x 1 180 m cortado 130 x 130, ou seja amostrando o chao a cada 10 CENTIMETROS na largura e a cada 9 METROS no comprimento — a razao exatamente invertida. Com cortes proporcionais (cuts_y), meio-fio so dentro da propriedade e pedra separada so nos 130 m centrais, e decimacao das tres trelicas do IBC1 que sozinhas custavam 5,4 MB: 18,9 MB.",
         "haze": 0.7,
         "horizonColor": "#5a633f",
         "horizonNote": "MEDIDO, nao escolhido. A bruma de horizonte (scene.ts, makeHaze) era pintada com o fogColor do PRESET, e o preset `ensolarado` herda o 0xb8d8f5 do RIG_BASE — um azul de ceu procedural. Sobre este HDRI isso e simplesmente a cor errada: a faixa do horizonte do proprio rodovia/sky.hdr, integrada nas linhas 501..547 de 1024 (a banda que fica exatamente na emenda), da linear 0.102/0.124/0.050, que e #5a633f — verde oliva de campo. O preset estava cinco vezes claro demais e no matiz oposto, e a 0.8 de forca isso vira uma fita clara atravessada na foto: a 'faixa cinza que nao faz sentido'. Nao ha ajuste de `haze` que corrija uma COR — abaixar a forca so troca a fita de volta pela emenda dura. `set.horizonColor` prende a fog e a bruma neste tom (scene.ts, setHorizonTint); o bgColor continua seguindo o preset, porque e ele que aparece quando o HDRI e solto. Para remedir depois de trocar o HDRI: media da banda em torno de v=0.5 do equirect, em luz LINEAR, convertida para sRGB.",
@@ -159,8 +199,16 @@
         "source": "Nicholas3D",
         "asset": "Industrial Buildings Collection Vol.1",
         "author": "Nicholas3D",
-        "license": "VERIFICAR antes de publicar"
-      },
+        "license": "VERIFICAR antes de publicar",
+        "tambem": [
+          "Industrial Buildings Pack (7 predios: guarita, galpao de docas, armazens, escritorio de obra) — VERIFICAR licenca",
+          "Mid-Century Industrial Buildings (~15 predios) — VERIFICAR licenca",
+          "Industrial device (armario de comando) — VERIFICAR licenca",
+          "Trash Container 3 PBR (cacambas) — VERIFICAR licenca",
+          "Poly Haven CC0: modular_chainlink_fence (so as texturas — a geometria do alambrado e gerada), concrete_road_barrier, utility_box_01, wooden_crate_01, plastic_crate_02, industrial_pastic_container"
+        ],
+        "licencaNote": "2026-08-08 — OS QUATRO PACOTES NOVOS ENTRARAM COM A LICENCA POR VERIFICAR, igual ao IBC1, e isso e uma pendencia REAL e nao uma formalidade: eles vieram como .zip na pasta de Downloads, sem arquivo de licenca e sem pagina de origem junto. Os assets da Poly Haven sao CC0 e nao tem esse problema. Antes de publicar, confirmar os quatro — e note que as texturas deles estao EMBUTIDAS no set.glb, entao 'e so nao commitar o zip' nao resolve nada."
+        },
       "scatter": [],
       "roadside": []
     },
@@ -229,6 +277,28 @@
       },
       "scatter": [],
       "roadside": []
+    },
+    {
+      "id": "estudio",
+      "name": "Estúdio",
+      "subtitle": "Ciclorama neutro · luz controlada, sem downloads",
+      "thumb": null,
+      "hdri": null,
+      "backgroundImage": null,
+      "ground": { "type": "cyclorama", "diffuse": null, "rough": null, "normal": null, "repeat": [1, 1] },
+      "showSkyDome": false,
+      "showRoad": false,
+      "envRotation": 0,
+      "backgroundBlur": 0,
+      "preset": "ciclorama",
+      "timeOfDay": "dia",
+      "exposure": 1,
+      "envIntensity": 1,
+      "lamps": {
+        "enabled": false,
+        "lampsNote": "2026-08-08 — ESTA LINHA E UMA CORRECAO DE DEFEITO, nao uma preferencia. `lamps` AUSENTE nao significa 'nenhum poste': scene/environment.ts trata null como 'a fileira embutida', e por isso oito postes de iluminacao publica nasciam dentro do ciclorama — foi o 'nao deve ter esses postes de luz' do relatorio. Os outros dois cenarios sempre escreveram este bloco e por isso nunca mostraram o defeito. O engine tambem passou a forcar `enabled:false` para o preset `ciclorama`, de modo que o STUDIO_ENVIRONMENT embutido de catalog/catalog.ts (que nao passa por este arquivo) fique coberto pela mesma correcao."
+      },
+      "credit": null
     }
   ]
 }

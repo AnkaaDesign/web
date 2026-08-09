@@ -20,7 +20,15 @@ import type { Rig } from './presets';
 
 const RAIN_COUNT = 2600;                 // ≈0.21 drops/m³ in a 26 m box
 const RAIN_BOX = new THREE.Vector3(26, 26, 26);
-const RIPPLE_COUNT = 160;
+/* 160 bastavam para uma faixa de 12 x 40 m onde TODA instância estava sempre
+   viva. O campo agora é 44 x 44 m (4x a área) e cada instância só desenha
+   enquanto o aro dela existe — o resto do intervalo ela fica ociosa, que é o
+   ponto (ver `lifeT` no shader). Essa fração média é ~0,42, e a borda do
+   quadrado ainda está em fade, então o que decide o número é a densidade VISTA
+   perto da câmera: 1400 x 0,42 ≈ 590 aros no ar, ou ~0,3 por m² nos 31 x 31 m
+   centrais — a mesma densidade que os 160 antigos davam na faixa estreita.
+   Continua um único draw call de quads de dois triângulos. */
+const RIPPLE_COUNT = 1400;
 
 /* ---------------- shared quad ---------------- */
 type QuadAttr = [name: string, data: Float32Array, itemSize: number];
@@ -50,6 +58,7 @@ uniform float uWidth;
 uniform float uAmount;
 attribute vec3 aSeed;
 attribute float aRand;
+attribute vec3 aVar;
 varying vec2 vQuad;
 varying float vFade;
 
@@ -63,11 +72,38 @@ void main() {
     return;
   }
 
+  /* CALIBRE DA GOTA — em aVar.x, e NÃO mais em aRand.
+     aRand é o gate de densidade: derivar o tamanho dele amarrava as duas coisas
+     (uma chuva fraca só tinha as gotas de um extremo) e, pior, fazia toda gota
+     que existia num dado uAmount cair numa faixa estreita de velocidade — um
+     campo inteiro descendo em bloco, que é metade da leitura de "chuva de
+     protetor de tela". Com um segundo sorteio o calibre é independente de
+     quantas gotas estão no ar. */
+  float sz = aVar.x;
   // Gunn & Kinzer terminal velocities: 1 mm → 4.0 m/s, 2 mm → 6.5, 5 mm → 9.1
-  float speed = mix( 4.5, 9.0, aRand / max( uAmount, 1e-3 ) );
+  float speed = mix( 4.0, 9.2, sz );
+
+  /* RAJADA. O vento era uma constante, então o campo inteiro descia na mesma
+     inclinação para sempre — nenhuma chuva real faz isso. Duas senóides de
+     períodos incomensuráveis (0,23 e 0,57 Hz) nunca repetem o mesmo par, e a
+     rajada é GLOBAL de propósito: é uma massa de ar que passa, então as gotas
+     têm de inclinar JUNTAS. O que é por gota é só um resto de turbulência,
+     defasado por aVar.y. */
+  float gust = 1.0 + 0.50 * sin( uTime * 0.9 ) + 0.22 * sin( uTime * 2.3 + 1.7 );
+  vec2 wind = uWind * gust;
+  float turb = 0.12 * sin( uTime * 2.1 + aVar.y * 31.4 );
 
   vec3 base = aSeed * uBox;
-  base.xz += uTime * uWind;
+  /* O DESLOCAMENTO É A INTEGRAL DA RAJADA, não uTime vezes wind. Multiplicar o
+     fator instantâneo pelo tempo faria a amplitude do balanço CRESCER com o
+     relógio — meio minuto de cena e o campo inteiro estaria varrendo dezenas de
+     metros para os lados a cada ciclo. Integrada, a rajada vale ±0,56 m de
+     balanço para sempre, e — o que importa de verdade — é a mesma história que
+     wind conta lá embaixo na inclinação do risco: os traços tombam no mesmo
+     instante em que as gotas andam de lado.
+     ∫0.50·sin(0.9t) = −0.556·cos(0.9t);  ∫0.22·sin(2.3t+1.7) = −0.096·cos(…) */
+  float drift = uTime - 0.556 * cos( uTime * 0.9 ) - 0.096 * cos( uTime * 2.3 + 1.7 );
+  base.xz += uWind * drift + turb;
   base.y -= uTime * speed;
 
   // fold XZ around the camera, Y against the box height (ground-anchored)
@@ -76,7 +112,7 @@ void main() {
   vec3 world = vec3( uCamPos.x + rel.x, wy, uCamPos.z + rel.y );
 
   vec3 posV = ( viewMatrix * vec4( world, 1.0 ) ).xyz;
-  vec3 velV = ( viewMatrix * vec4( vec3( uWind.x, -speed, uWind.y ), 0.0 ) ).xyz;
+  vec3 velV = ( viewMatrix * vec4( vec3( wind.x, -speed, wind.y ), 0.0 ) ).xyz;
 
   vec2 d = velV.xy;
   float lenXY = length( d );
@@ -85,14 +121,29 @@ void main() {
   // velocity, so its streak shrinks to a point
   float fore = lenXY / max( length( velV ), 1e-4 );
 
+  /* O RISCO É UM BORRÃO DE EXPOSIÇÃO, então ele acompanha a velocidade: uma
+     gota grande cai o dobro mais rápido e deixa o dobro de rastro no mesmo
+     obturador. Antes uLen/uWidth eram os mesmos para todas — 2600 traços
+     idênticos, que o olho lê como textura rolando e não como chuva. */
+  float len = uLen * ( 0.45 + 1.15 * sz );
+  float wid = uWidth * ( 0.72 + 0.56 * sz );
+
   vec2 perp = vec2( -dir.y, dir.x );
-  posV.xy += dir * ( position.y * uLen * fore ) + perp * ( position.x * uWidth );
+  posV.xy += dir * ( position.y * len * fore ) + perp * ( position.x * wid );
 
   vQuad = position.xy;
   // fade the nearest drops out: a streak a few centimetres from the lens is a
   // full-screen smear
   float dist = length( world - uCamPos );
   vFade = smoothstep( 0.6, 2.5, dist ) * ( 0.35 + 0.65 * fore );
+
+  /* CORTINAS. Chuva vem em levas: faixas mais e menos densas atravessando o
+     campo. É uma onda longa (~22 m de período) lida na posição de MUNDO da
+     gota, não no índice dela, senão a leva andaria grudada na câmera.
+     Aplicada na OPACIDADE e não no descarte: cortar a gota faria cada uma
+     piscar ao cruzar a borda da faixa — na opacidade ela entra e sai da leva. */
+  float curtain = 0.62 + 0.38 * sin( world.x * 0.29 + world.z * 0.21 - uTime * 0.9 );
+  vFade *= curtain * ( 0.72 + 0.56 * aVar.z );
 
   gl_Position = projectionMatrix * vec4( posV, 1.0 );
 }
@@ -127,6 +178,16 @@ const rainU = {
 };
 
 
+/* Os três sorteios INDEPENDENTES de aRand: calibre da gota (x), fase da
+   turbulência (y) e variação de opacidade (z). Estarem separados do gate de
+   densidade é o que impede "toda gota visível numa chuva fraca é do mesmo
+   tamanho" — ver o comentário no vertex shader. */
+function varSeeds(count: number) {
+  const v = new Float32Array(count * 3);
+  for (let i = 0; i < v.length; i++) v[i] = Math.random();
+  return v;
+}
+
 function makeRain() {
   const seeds = new Float32Array(RAIN_COUNT * 3);
   const rand = new Float32Array(RAIN_COUNT);
@@ -139,6 +200,7 @@ function makeRain() {
   const geo = instancedQuad(RAIN_COUNT, [
     ['aSeed', seeds, 3],
     ['aRand', rand, 1],
+    ['aVar', varSeeds(RAIN_COUNT), 3],
   ]);
   const mat = new THREE.ShaderMaterial({
     uniforms: rainU,
@@ -163,30 +225,90 @@ function makeRain() {
 
 /* ---------------- impact ripples ----------------
    Without these the wet road reads as "it rained an hour ago" — the drops
-   visibly never arrive. Confined to the asphalt strip (|x| < 6) and folded
-   along Z only, since ripples on grass would be nonsense. */
+   visibly never arrive.
+
+   O QUE HAVIA AQUI E POR QUE LIA COMO PADRÃO, e não como chuva. Três coisas,
+   todas de construção:
+
+   * UM RELÓGIO SÓ. `life = fract(uTime * 1.15 + aRand * 7.31)`: todo anel do
+     campo tinha O MESMO período de 0,87 s, defasado. Um campo inteiro pulsando
+     na mesma frequência é a definição de mecânico — o olho acha o compasso em
+     dois segundos. Agora o período é por instância (aVar.x).
+   * POSIÇÃO FIXA. A posição saía de `aSeed` e nunca mudava, então cada anel
+     renascia EXATAMENTE no mesmo ponto a cada ciclo: 160 pontos parados
+     piscando para sempre, que é o padrão que se enxerga. Agora a posição é
+     sorteada A CADA CICLO por um hash de (instância, número do ciclo) — a gota
+     seguinte cai noutro lugar, como uma gota faz.
+   * UM TAMANHO SÓ. `radius = 0.05 + life * 0.34` para todos. Agora o raio
+     máximo e a força também saem do hash do ciclo.
+
+   A FAIXA DE 12 m TAMBÉM SAIU. Ela vinha de quando o cenário era `rodovia` —
+   um disco de asfalto estreito, e o comentário original dizia "ondulação na
+   grama seria absurdo". Esse cenário foi removido em 2026-08-03; os dois que
+   restaram são um pátio de concreto de 178 m e um galpão. Prender os anéis a
+   |x| < 6 hoje só desenha uma esteira no meio do pátio, com o resto da laje
+   seca sob a mesma chuva. O campo agora é um quadrado dobrado em torno da
+   câmera, com as bordas em fade — quem cruza a borda da dobra cruza invisível,
+   que é o que impede o salto de posição de aparecer. */
 const RIPPLE_VERT = /* glsl */`
 uniform float uTime;
 uniform vec3 uCamPos;
-uniform float uSpanZ;
+uniform float uSpan;
 uniform float uAmount;
-attribute vec3 aSeed;
 attribute float aRand;
+attribute vec3 aVar;
 varying vec2 vQuad;
 varying float vLife;
+varying float vRing;
+varying float vFade;
+
+/* hash 2D → 2D (Dave Hoskins). Barato e sem textura: é o que permite sortear
+   uma posição NOVA a cada ciclo sem tocar em buffer nenhum. */
+vec2 hash22( vec2 p ) {
+  vec3 p3 = fract( vec3( p.xyx ) * vec3( 0.1031, 0.1030, 0.0973 ) );
+  p3 += dot( p3, p3.yzx + 33.33 );
+  return fract( ( p3.xx + p3.yz ) * p3.zy );
+}
 
 void main() {
   if ( aRand > uAmount ) {
     gl_Position = vec4( 2.0, 2.0, 2.0, 1.0 );
-    vQuad = vec2( 0.0 ); vLife = 0.0;
+    vQuad = vec2( 0.0 ); vLife = 0.0; vRing = 0.5; vFade = 0.0;
     return;
   }
-  float life = fract( uTime * 1.15 + aRand * 7.31 );
-  float radius = 0.05 + life * 0.34;
 
-  float z0 = aSeed.z * uSpanZ;
-  float relZ = mod( z0 - uCamPos.z + 0.5 * uSpanZ, uSpanZ ) - 0.5 * uSpanZ;
-  vec3 world = vec3( ( aSeed.x - 0.5 ) * 12.0, 0.008, uCamPos.z + relZ );
+  /* INTERVALO e DURAÇÃO SÃO COISAS DIFERENTES, e é aqui que a versão de cima
+     ainda errava: com life = fract(uTime / period) o anel durava o período
+     inteiro, então um ponto onde a gota cai a cada 1,9 s desenhava um aro se
+     abrindo em 1,9 s — câmera lenta. Uma ondulação de impacto real se abre e
+     morre em meio segundo, chova muito ou pouco; o que a intensidade muda é de
+     quanto em quanto tempo a PRÓXIMA cai ali.
+     Então period é só o intervalo, lifeT é a duração do aro, e entre uma
+     coisa e outra a instância simplesmente não desenha. O ciclo ocioso é o que
+     dá o espaçamento irregular que faz o campo parecer chuva e não pisca-pisca. */
+  float period = mix( 0.55, 1.9, aVar.x );
+  float t = uTime / period + aRand * 7.31;
+  float cycle = floor( t );
+
+  // sorteio novo a cada ciclo: onde cai, que tamanho tem, quanto dura, quanto marca
+  vec2 h = hash22( vec2( aRand * 137.0 + cycle, aVar.y * 91.0 - cycle * 1.7 ) );
+  vec2 g = hash22( vec2( cycle * 3.1 - aVar.z * 57.0, aRand * 11.0 + cycle ) );
+  vec2 k = hash22( vec2( aVar.x * 63.0 - cycle, cycle * 7.7 + aRand * 29.0 ) );
+
+  float lifeT = mix( 0.30, 0.62, g.y );      // duração do aro, em segundos
+  float phase = fract( t ) * period;         // segundos desde a batida
+  if ( phase > lifeT ) {                     // entre uma gota e a seguinte
+    gl_Position = vec4( 2.0, 2.0, 2.0, 1.0 );
+    vQuad = vec2( 0.0 ); vLife = 0.0; vRing = 0.5; vFade = 0.0;
+    return;
+  }
+  float life = phase / lifeT;
+
+  float radius = ( 0.04 + life * mix( 0.20, 0.46, g.x ) );
+
+  vec2 p0 = ( h - 0.5 ) * uSpan;
+  vec2 rel = mod( p0 - uCamPos.xz + 0.5 * uSpan, uSpan ) - 0.5 * uSpan;
+  vec3 world = vec3( uCamPos.x + rel.x, 0.008, uCamPos.z + rel.y );
 
   // ground-plane billboard: the quad lies flat in XZ
   world.x += position.x * radius * 2.0;
@@ -194,6 +316,15 @@ void main() {
 
   vQuad = position.xy;
   vLife = life;
+  /* Espessura do anel, por ciclo: um respingo miúdo faz um aro fino e nítido,
+     uma gota graúda faz uma marca larga e mole. Era uma constante no fragmento. */
+  vRing = mix( 0.16, 0.42, k.x );
+  /* FADE DE BORDA, e a força do respingo no mesmo varying.
+     A dobra é o que mantém o campo em volta da câmera, e o preço dela é um salto
+     de uSpan metros para quem cruza a borda no meio da vida. Apagando os
+     últimos 15% do quadrado, esse salto acontece com alpha zero. */
+  float edge = 1.0 - smoothstep( 0.35, 0.5, max( abs( rel.x ), abs( rel.y ) ) / uSpan );
+  vFade = edge * ( 0.45 + 0.85 * k.y );
   gl_Position = projectionMatrix * viewMatrix * vec4( world, 1.0 );
 }
 `;
@@ -203,10 +334,12 @@ uniform vec3 uTint;
 uniform float uOpacity;
 varying vec2 vQuad;
 varying float vLife;
+varying float vRing;
+varying float vFade;
 void main() {
   float d = abs( length( vQuad ) * 2.0 - 0.92 );
-  float a = 1.0 - smoothstep( 0.0, 0.30, d );       // forward edges, see above
-  a *= ( 1.0 - vLife ) * ( 1.0 - vLife ) * uOpacity;
+  float a = 1.0 - smoothstep( 0.0, vRing, d );      // forward edges, see above
+  a *= ( 1.0 - vLife ) * ( 1.0 - vLife ) * uOpacity * vFade;
   if ( a <= 0.002 ) discard;
   gl_FragColor = vec4( uTint, a );
 }
@@ -215,7 +348,11 @@ void main() {
 const rippleU = {
   uTime: { value: 0 },
   uCamPos: { value: new THREE.Vector3() },
-  uSpanZ: { value: 40 },
+  /* Lado do quadrado dobrado em volta da câmera. Era `uSpanZ: 40` sobre uma
+     faixa de 12 m em x; agora os dois eixos são o mesmo vão, e 44 m cobre a
+     órbita inteira do estúdio (maxDistance passa de 50 m, mas o chão visível
+     junto ao veículo é o que precisa de respingo). */
+  uSpan: { value: 44 },
   uAmount: { value: 0 },
   uTint: { value: new THREE.Color(0xdbe6f5) },
   uOpacity: { value: 0 },
@@ -223,17 +360,15 @@ const rippleU = {
 
 
 function makeRipples() {
-  const seeds = new Float32Array(RIPPLE_COUNT * 3);
+  /* SEM `aSeed` aqui, ao contrário da chuva: a posição do anel deixou de ser um
+     sorteio fixo por instância e passou a sair do hash do CICLO — era justamente
+     a posição congelada que desenhava o padrão. O que sobra por instância é o
+     gate de densidade e as três variações de aVar. */
   const rand = new Float32Array(RIPPLE_COUNT);
-  for (let i = 0; i < RIPPLE_COUNT; i++) {
-    seeds[i * 3] = Math.random();
-    seeds[i * 3 + 1] = Math.random();
-    seeds[i * 3 + 2] = Math.random();
-    rand[i] = Math.random();
-  }
+  for (let i = 0; i < RIPPLE_COUNT; i++) rand[i] = Math.random();
   const geo = instancedQuad(RIPPLE_COUNT, [
-    ['aSeed', seeds, 3],
     ['aRand', rand, 1],
+    ['aVar', varSeeds(RIPPLE_COUNT), 3],
   ]);
   const mat = new THREE.ShaderMaterial({
     uniforms: rippleU,
@@ -267,7 +402,13 @@ export function initWeather() {
   onRig((rig: Rig) => {
     amount = THREE.MathUtils.clamp(rig.rain, 0, 1);
     rainU.uAmount.value = amount;
-    rainU.uOpacity.value = 0.34 * Math.min(1, amount * 1.4);
+    /* 0.34 -> 0.46 PARA COMPENSAR AS CORTINAS, não para deixar a chuva mais
+       forte. O `curtain` do vertex shader multiplica a opacidade por algo entre
+       0,24 e 1,0 (média 0,62), então manter 0,34 aqui entregaria uma chuva ~40%
+       mais fraca do que a de antes só por causa da variação. Com 0,46 a faixa
+       DENSA da leva bate perto do que o preset já entregava e a faixa rala fica
+       de fato mais rala — que é o ponto. */
+    rainU.uOpacity.value = 0.46 * Math.min(1, amount * 1.4);
     rainU.uTint.value.copy(rig.rainColor);
     rainU.uWidth.value = 0.010 + 0.006 * amount;
 

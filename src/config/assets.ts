@@ -277,6 +277,18 @@ export const STUDIO_ASSETS = {
   environmentsDir: "environments/",
   /** Um subdiretório por montadora (`logo.webp`, `logo-light.webp`, `models/*.webp`) + `brands.json`. */
   truckBrandsDir: "brands/trucks/",
+  /**
+   * Renders pré-produzidos dos cards do seletor + `renders.json`.
+   *
+   * Convenção travada:
+   * `renders/trucks/<manufacturerId>/<modelId>/<chassisId>/<colorId>.webp`, 960×600.
+   *
+   * Substituiu o segundo contexto WebGL de `engine/ui/preview.ts`, que
+   * renderizava a paleta inteira da montadora dentro da cortina de
+   * carregamento. O manifesto `renders/renders.json` diz quais existem, para
+   * nenhum card virar um 404 — ver `engine/catalog/renders.ts`.
+   */
+  rendersDir: "renders/",
 } as const;
 
 /**

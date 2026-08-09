@@ -95,8 +95,14 @@ AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayNam
 interface AlertDialogActionProps extends React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> {
   children?: React.ReactNode;
   className?: string;
-  onClick?: () => void | Promise<void>;
   disabled?: boolean;
+  /* onClick NÃO é redeclarado de propósito. A herança já traz o
+     MouseEventHandler do Radix, com o evento; redeclarar como `() => void`
+     ESTREITAVA o tipo e apagava o parâmetro que o Radix realmente passa — e
+     quem precisa de `e.preventDefault()` para segurar o diálogo aberto
+     enquanto a requisição corre não conseguia tipar o handler. Um handler
+     `() => void` continua atribuível a MouseEventHandler, então nada que já
+     funcionava quebra. */
 }
 
 const AlertDialogAction = React.forwardRef<React.ElementRef<typeof AlertDialogPrimitive.Action>, AlertDialogActionProps>(({ className, children, ...props }, ref) => (
@@ -109,8 +115,8 @@ AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
 interface AlertDialogCancelProps extends React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel> {
   children?: React.ReactNode;
   className?: string;
-  onClick?: () => void | Promise<void>;
   disabled?: boolean;
+  /* Mesmo motivo do Action acima: não estreitar `onClick`. */
 }
 
 const AlertDialogCancel = React.forwardRef<React.ElementRef<typeof AlertDialogPrimitive.Cancel>, AlertDialogCancelProps>(({ className, children, ...props }, ref) => (

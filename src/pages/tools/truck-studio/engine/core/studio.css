@@ -27,15 +27,80 @@
    contra o elemento, e não participa de disputa entre arquivos. */
 
 .truck-studio-root {
-  --bg: #0d1017;
-  --panel: #131722;
-  --panel-2: #181d2b;
+  /* ---------- CINZAS NEUTROS, OS MESMOS DO SISTEMA ----------
+     Esta paleta era AZULADA: `--bg: #0d1017` é R13 G16 B23, e `--panel`,
+     `--panel-2`, `--text` e `--muted` seguiam o mesmo desvio. Sobre a tela de
+     carga — que é `background: var(--bg)` em cheio — isso lia como um azul
+     escuro, e o dono do produto pediu o contrário: *"essa tela nao deve ser
+     azulado, mas sim o mesmo cinza utilizado no sistema, e branco no light
+     mode."*
+
+     Os valores agora são NUMERICAMENTE os tokens do Ankaa (src/index.css), para
+     que não haja como divergirem por retoque:
+
+       --bg      = --background  0 0% 11%  = #1c1c1c
+       --panel   = --card        0 0% 15%  = #262626
+       --panel-2 = --card-nested 0 0% 18%  = #2e2e2e
+       --text    = --foreground  0 0% 85%  = #d9d9d9
+       --muted                   0 0% 64%  = #a3a3a3
+
+     Copiados como hex e não importados: o engine não importa nada de `@/` fora
+     de `core/paths.ts`, e ler `hsl(var(--background))` daqui amarraria o motor à
+     folha do Ankaa — que o desktop não carrega. O comentário é o contrato. */
+  --bg: #1c1c1c;
+  --panel: #262626;
+  --panel-2: #2e2e2e;
   --stroke: rgba(255, 255, 255, 0.07);
   --stroke-2: rgba(255, 255, 255, 0.13);
-  --text: #e8ebf3;
-  --muted: #8b93a7;
-  --accent: #4da3ff;
+  --text: #d9d9d9;
+  --muted: #a3a3a3;
+  /* O VERDE DO PROJETO, LEVADO PARA A SUPERFÍCIE ESCURA.
+     ---------------------------------------------------------------------
+     A marca é `--primary: 142 72% 29%` = green-700 `#15803d` (src/index.css,
+     comentado "matching logo"). Mas o estúdio é uma superfície escura, e
+     `#15803d` sobre `#262626` fica em ~2,7:1 — abaixo do mínimo para texto e
+     para ícone. Então o accent daqui é `#22c55e` (green-500), que é o mesmo
+     verde levado ao valor legível no escuro.
+     MEDIDO sobre os cinzas NOVOS: 7,48:1 sobre `--bg #1c1c1c`, 6,64:1 sobre
+     `--panel #262626` e 5,96:1 sobre `--panel-2 #2e2e2e` — AA em corpo nos três
+     e AAA em texto grande. (Sobre os azuis que saíram era 8,35:1 e 7,85:1: o
+     cinza do sistema é mais claro que o azul que ele substituiu, então a razão
+     cai um pouco e continua passando com folga.)
+     `--text #d9d9d9` sobre `--bg`: 12,07:1. `--muted #a3a3a3`: 6,76:1 sobre
+     `--bg` e 6,00:1 sobre `--panel`.
+     Onde o verde aparece como PREENCHIMENTO SÓLIDO atrás de texto claro, o
+     valor é `#16a34a` (green-600, marcado "Primary green" no tailwind.config).
+     Onde é fundo translúcido, `rgba(34, 197, 94, α)` com o mesmo α de antes. */
+  --accent: #22c55e;
   --accent-2: #c8102e;
+  /* O verde SÓLIDO, para preenchimento atrás de texto claro. */
+  --accent-solid: #16a34a;
+
+  /* ---------- AS TELAS DE CARGA E DE ERRO SEGUEM O MODO DO HOST ----------
+     `#loading` (a tela de boot, que é também onde "Erro ao carregar: …" aparece)
+     e `.ts-load` (a cortina) são as duas superfícies do estúdio que o usuário vê
+     ANTES de haver um render atrás delas — e são as únicas que fazem sentido
+     virar claras num Ankaa claro. O resto da chrome (o vidro fumê, o HUD, os
+     cards) flutua SOBRE um render 3D e continua escuro nos dois modos: um painel
+     branco sobre uma cena noturna não é consistência, é ofuscamento.
+
+     Por isso tokens próprios em vez de `var(--bg)` direto: o escopo do tema fica
+     declarado no nome, e ninguém precisa adivinhar quanto da UI vira clara.
+
+     O interruptor é `.ts-light` no root do estúdio, escrito por
+     `studio.ts:applyHostTheme()` — que lê a classe `.dark` do Ankaa (Tailwind
+     `darkMode: ["class"]`) e, na falta dela, `prefers-color-scheme`. Um seletor
+     de ancestral tipo `html:not(.dark) .truck-studio-root` não serviria: no
+     Electron não existe `.dark` em lugar nenhum, e o desktop cairia em claro
+     sempre. */
+  --ts-screen-bg: var(--bg);
+  --ts-screen-panel: var(--panel);
+  --ts-screen-text: var(--text);
+  --ts-screen-muted: var(--muted);
+  --ts-screen-accent: var(--accent);
+  /* A trilha do spinner e as bordas destas telas — claras sobre o escuro. */
+  --ts-screen-track: rgba(255, 255, 255, 0.12);
+  --ts-screen-stroke: rgba(255, 255, 255, 0.13);
 
   /* ---------- VIDRO FUMÊ ----------
      O material de tudo que flutua sobre o render: os view controls (.ts-vbtn),
@@ -52,8 +117,8 @@
      As duas listas de filtro nomeiam as mesmas funções na mesma ordem: é isso
      que torna o backdrop-filter interpolável (trocar blur/saturate de lugar
      entre os estados faz ele saltar em vez de animar). */
-  --ts-glass-bg: rgba(8, 10, 14, 0.42);
-  --ts-glass-bg-hover: rgba(8, 10, 14, 0.66);
+  --ts-glass-bg: rgba(11, 11, 11,0.42);
+  --ts-glass-bg-hover: rgba(11, 11, 11,0.66);
   --ts-glass-filter: blur(14px) saturate(1.1);
   --ts-glass-filter-hover: blur(20px) saturate(1.25);
   /* Cards (painéis de design, badges): pousados, sombra curta. */
@@ -75,8 +140,8 @@
      (ui/selector.css). O card inteiro é o alvo do clique nos quatro casos, e a
      pílula é o que diz que ele é clicável — discreta em repouso, acesa no
      hover/foco do card, para não competir com a foto o resto do tempo. */
-  --ts-pill-bg: rgba(13, 16, 23, 0.78);
-  --ts-pill-bg-hover: rgba(13, 16, 23, 0.92);
+  --ts-pill-bg: rgba(17, 17, 17,0.78);
+  --ts-pill-bg-hover: rgba(17, 17, 17,0.92);
   --ts-pill-pad: 4px 9px;
   --ts-pill-opacity: 0.55;
 
@@ -91,13 +156,68 @@
   --ts-plate-panel: linear-gradient(160deg, var(--panel-2), var(--panel));
   --ts-plate-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
 
+  /* ---------- A CAIXA DO ESTÚDIO ----------
+     `position: relative` é o que faz `inset: 0` de TODA camada de tela cheia do
+     estúdio — a cortina (#ts-loader, z 400), a tela de boot/erro (#loading, z
+     10) e o overlay do seletor (z 500) — resolver contra ESTE elemento. Perder
+     essa linha não dá erro: as camadas passam a se medir contra o primeiro
+     ancestral posicionado que houver, que é do host.
+
+     A ALTURA É O PONTO FRÁGIL, e já quebrou uma vez. `height: 100%` só resolve
+     se o PAI tiver altura definida; num host que dá altura por conteúdo (um
+     `<div>` solto, um flex item sem `min-height`), 100% de `auto` é `auto`, o
+     root encolhe até o conteúdo e a tela de carga vira uma faixa de ~150px no
+     topo com o canvas do three aparecendo embaixo dela. Foi exatamente esse o
+     sintoma relatado.
+     As três linhas abaixo cobrem os três jeitos de um host dar (ou não dar)
+     altura, na ordem em que se aplicam:
+       height: 100%      o caso normal — o host tem altura, nós a preenchemos;
+       flex: 1 / align   o host é um flex/grid container e nos estica;
+       min-height        a rede: um host SEM altura nenhuma ainda produz uma
+                         caixa utilizável em vez de uma faixa, e o defeito fica
+                         visível como "um pouco curto" em vez de silencioso.
+     `100cqh` não entra: #canvas-holder não pode virar container de consulta (o
+     three tira o tamanho do buffer dele) — ver ui/selector.css §9. */
   position: relative;
   height: 100%;
+  min-height: 420px;
+  /* Só valem quando o host é flex/grid; num bloco comum são inertes. */
+  flex: 1 1 auto;
+  align-self: stretch;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
 }
+
+/* MODO CLARO — os mesmos tokens do sistema, do outro lado:
+     --background 0 0% 96% = #f5f5f5 · --card 0 0% 100% = #ffffff
+     --foreground 0 0% 25% = #404040
+   O acento volta para o verde da MARCA (`--primary` green-700 `#15803d`).
+   MEDIDO sobre #f5f5f5: acento 4,60:1 e texto 9,51:1, os dois passando AA — e o
+   `#22c55e` do escuro mediria 1,91:1 ali, ilegível. É a mesma operação do bloco
+   acima, espelhada.
+
+   UM DESVIO DELIBERADO do sistema, e só um: `--muted-foreground` do Ankaa é
+   `0 0% 45%` = #737373, que sobre #f5f5f5 dá 4,35:1 — passa raspando por baixo
+   dos 4,5:1 de AA para corpo. Aqui ele veste o `.load-text` de 12px, que é a
+   ÚNICA frase numa tela inteira e a que a pessoa lê quando algo deu errado
+   ("Erro ao carregar: …"). Dois passos mais escuro, `0 0% 42%` = #6b6b6b,
+   fecha em 4,89:1. No escuro não há desvio: #a3a3a3 já mede 6,76:1.
+
+   SÓ OS TOKENS DE TELA. Este bloco não pode redeclarar `--bg`/`--panel`/`--text`:
+   eles vestem o vidro que flutua sobre o render, que continua escuro nos dois
+   modos. Ver o comentário de --ts-screen-* acima. */
+.truck-studio-root.ts-light {
+  --ts-screen-bg: #f5f5f5;
+  --ts-screen-panel: #ffffff;
+  --ts-screen-text: #404040;
+  --ts-screen-muted: #6b6b6b;
+  --ts-screen-accent: #15803d;
+  --ts-screen-track: rgba(0, 0, 0, 0.12);
+  --ts-screen-stroke: rgba(0, 0, 0, 0.14);
+}
+
 .truck-studio-root * { box-sizing: border-box; margin: 0; padding: 0; }
 .truck-studio-root #app { display: flex; height: 100%; }
 .truck-studio-root .hidden { display: none !important; }
@@ -136,6 +256,42 @@
 
 .truck-studio-root #canvas-holder { flex: 1; position: relative; min-height: 0; }
 .truck-studio-root #canvas-holder canvas { display: block; outline: none; }
+
+/* ---------- O VÉU DE RECONSTRUÇÃO ----------
+   Escrito por studio.ts enquanto o baú está sendo recortado. O recorte é
+   DESTRUTIVO: as chapas SIDE_L/SIDE_R/REAR são descartadas e três novas são
+   cortadas do corpo redimensionado, e entre uma coisa e outra o baú aparece
+   branco com a arte solta. Isso durava alguns quadros e não tinha aviso nenhum
+   — o pior dos dois mundos, porque quem vê a arte sumir não sabe se ela volta.
+
+   Um véu LOCAL, e não a cortina inteira: o formulário de medidas tem de
+   continuar visível enquanto o valor é aplicado, senão o usuário perde o
+   contexto do que acabou de digitar. É a mesma decisão que a pílula toma — o
+   que dura menos de um segundo não toma a tela.
+
+   `::after` sobre o holder, e não uma classe no canvas: o canvas é do three, e
+   um filtro nele custaria uma composição da cena inteira por quadro. O véu é
+   uma camada de DOM que não toca o render. `pointer-events` fica passando: o
+   orbit continua funcionando, porque a cena está apenas se ajustando, não
+   indisponível. */
+.truck-studio-root #canvas-holder.is-rebuilding::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 7;                       /* sob os badges (8) e sob a pílula (9) */
+  pointer-events: none;
+  background: rgba(17, 17, 17,0.28);
+  backdrop-filter: blur(2px) saturate(0.85);
+  -webkit-backdrop-filter: blur(2px) saturate(0.85);
+  animation: ts-veil-in 140ms ease-out backwards;
+}
+@keyframes ts-veil-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root #canvas-holder.is-rebuilding::after { animation: none; }
+}
 /* ============================================================
    VIEW CONTROLS — enquadrar / girar / capturar, no canto superior
    direito do render (a markup está em core/template.ts).
@@ -158,6 +314,165 @@
   z-index: 8;              /* mesma camada dos badges; abaixo do curtain (400) */
   display: flex;
   gap: 7px;
+}
+/* ENQUANTO O MENU DE CAPTURA ESTÁ ABERTO o cluster sobe uma camada. Medido: os
+   view controls e #ts-panels são os DOIS z-index 8, e os panels vêm depois na
+   markup — então eles pintavam por cima. O `z-index: 9` do próprio menu não
+   resolvia: ele vive DENTRO do contexto de empilhamento que `#view-controls`
+   cria, e um filho não escapa do contexto do pai por mais alto que suba.
+   Só enquanto aberto, e não de vez, porque fora disso os panels têm tanto
+   direito à sobreposição quanto os controles — quem chegou por último ganha, que
+   é o que a ordem da markup já diz. */
+.truck-studio-root #view-controls.has-shotmenu { z-index: 9; }
+
+/* ---------- captura: UM botão, que abre o menu ----------
+   A SETA AO LADO DA CÂMERA SAIU (`.ts-vbtn--caret`, 20px de largura), e com ela
+   o botão dividido: a câmera não captura mais direto. Clicar nela abre este
+   menu; clicar num item é que tira o render. Pedido do dono do produto — ver o
+   cabeçalho de ui/chrome.ts, que explica por que a qualidade deixou de ser um
+   modo invisível e virou parte da ação.
+
+   `.ts-shotgroup` fica: ele é quem ancora o menu (`position: relative`), e o
+   botão da câmera continua sendo um `.ts-vbtn` igual aos outros quatro — mesma
+   largura, mesma régua. Construído em ui/chrome.ts porque as linhas do menu
+   carregam a RESOLUÇÃO CALCULADA de cada preset, que só existe em runtime. */
+.truck-studio-root .ts-shotgroup {
+  position: relative;
+  display: flex;
+}
+/* Enquanto o menu está aberto o botão fica no estado "ligado" do resto da régua
+   (.ts-vbtn.on): é o que amarra o painel ao controle que o abriu. */
+.truck-studio-root .ts-shotgroup .ts-vbtn[aria-expanded="true"] {
+  border-color: var(--accent);
+  background-color: var(--accent-solid);
+  color: #eafff1;
+}
+
+.truck-studio-root .ts-shotmenu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 9;
+  min-width: 264px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 12px;
+  /* O MESMO vidro fumê de tudo que flutua sobre o render, mas com o fundo mais
+     fechado: um menu tem de ser legível por cima de céu claro, e um painel de
+     texto pede mais opacidade que um botão de ícone. */
+  background-color: rgba(13, 13, 13, 0.9);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
+  box-shadow: var(--ts-glass-shadow-ctl);
+  animation: ts-shotmenu-in 130ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
+}
+@keyframes ts-shotmenu-in {
+  from { opacity: 0; translate: 0 -6px; }
+  to   { opacity: 1; translate: none; }
+}
+/* O título. `aria-hidden` no DOM porque o menu já tem `aria-label` com o mesmo
+   texto — na tela ele existe para dizer o ASSUNTO das três linhas, senão
+   "Baixa / Média / Alta" sozinhas não dizem alta o quê. */
+.truck-studio-root .ts-shotmenu__head {
+  padding: 4px 9px 6px;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.truck-studio-root .ts-shotmenu__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.truck-studio-root .ts-shotmenu__item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--stroke-2);
+}
+/* MEMÓRIA, NÃO ESTADO LIGADO. Este é o preset da última captura, e o menu abre
+   com o foco nele. A marcação é deliberadamente mais leve que a de um item
+   selecionado — uma borda e um fundo de 10%, não o preenchimento sólido de
+   `.ts-vbtn.on` — porque nenhum destes três está "ativo": os três são ações. */
+.truck-studio-root .ts-shotmenu__item.is-on {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.42);
+}
+/* Hover e foco ganham do estado de memória: o item sob a mão é o que vai
+   acontecer se a mão fechar, e isso tem de vencer qualquer outra ênfase. */
+.truck-studio-root .ts-shotmenu__item:hover,
+.truck-studio-root .ts-shotmenu__item:focus-visible {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: var(--accent);
+}
+.truck-studio-root .ts-shotmenu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.truck-studio-root .ts-shotmenu__item:active {
+  background: rgba(34, 197, 94, 0.28);
+}
+/* Nome à esquerda, dimensões à direita, na mesma linha: as três resoluções
+   ficam alinhadas em coluna e dá para compará-las de relance. */
+.truck-studio-root .ts-shotmenu__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.truck-studio-root .ts-shotmenu__name {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+.truck-studio-root .ts-shotmenu__dim {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.truck-studio-root .ts-shotmenu__hint {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+/* A etiqueta de "último uso", canto superior direito do item. */
+.truck-studio-root .ts-shotmenu__last {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  display: none;                 /* só aparece quando não há dimensão ali */
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* A linha do nome já ocupa o canto superior direito com as dimensões, então a
+   etiqueta desce para o fim da legenda em vez de brigar por aquele espaço. */
+.truck-studio-root .ts-shotmenu__item.is-on .ts-shotmenu__last {
+  position: static;
+  display: block;
+  margin-top: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-shotmenu { animation: none; }
 }
 
 .truck-studio-root .ts-vbtn {
@@ -219,23 +534,27 @@
    no painel, com a alfa mais alta porque estes 34px estão sobre o render nu, sem
    uma lâmina de vidro por trás para escurecer o fundo primeiro. */
 .truck-studio-root .ts-vbtn.on {
-  background-color: rgba(77, 163, 255, 0.34);
-  border-color: rgba(140, 200, 255, 0.5);
-  color: #eaf4ff;
+  background-color: rgba(34, 197, 94, 0.34);
+  /* green-300 — a borda é um degrau mais clara que o preenchimento, como o azul
+     fazia, para o botão ter aresta sobre céu claro. */
+  border-color: rgba(134, 239, 172, 0.5);
+  color: #eafff1;
   box-shadow:
     0 16px 40px -12px rgba(0, 0, 0, 0.85),
-    0 2px 12px rgba(77, 163, 255, 0.35);
+    0 2px 12px rgba(34, 197, 94, 0.35);
 }
 .truck-studio-root .ts-vbtn.on:hover {
-  background-color: rgba(77, 163, 255, 0.46);
-  border-color: rgba(170, 215, 255, 0.62);
+  background-color: rgba(34, 197, 94, 0.46);
+  /* green-200 */
+  border-color: rgba(187, 247, 208, 0.62);
   color: #ffffff;
   box-shadow:
     0 18px 46px -12px rgba(0, 0, 0, 0.9),
-    0 2px 14px rgba(77, 163, 255, 0.45);
+    0 2px 14px rgba(34, 197, 94, 0.45);
 }
 .truck-studio-root .ts-vbtn.on:active {
-  background-color: rgba(58, 132, 214, 0.6);
+  /* green-600 — o pressionado escurece, como o azul escurecia. */
+  background-color: rgba(22, 163, 74, 0.6);
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.45),
     0 1px 3px rgba(0, 0, 0, 0.4);
@@ -277,10 +596,10 @@
    0,92 em outros dois); aqui vira um número só. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .truck-studio-root {
-    --ts-glass-bg: rgba(10, 13, 19, 0.92);
-    --ts-glass-bg-hover: rgba(10, 13, 19, 0.97);
+    --ts-glass-bg: rgba(14, 14, 14,0.92);
+    --ts-glass-bg-hover: rgba(14, 14, 14,0.97);
   }
-  .truck-studio-root .ts-vbtn:active { background-color: rgba(6, 8, 13, 0.98); }
+  .truck-studio-root .ts-vbtn:active { background-color: rgba(9, 9, 9,0.98); }
   /* O accent tem de ser restabelecido DENTRO do bloco: @supports não soma
      especificidade, então o `.ts-vbtn.on` (0,2,0) acima venceria este (0,1,0) e
      entregaria a um motor sem blur nenhum justamente a superfície mais
@@ -385,22 +704,34 @@
 .truck-studio-root #view-hint {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   font-size: 11px; color: var(--muted); letter-spacing: 0.04em; pointer-events: none;
-  background: rgba(13, 16, 23, 0.55); padding: 5px 12px; border-radius: 20px; backdrop-filter: blur(4px);
+  background: rgba(17, 17, 17,0.55); padding: 5px 12px; border-radius: 20px; backdrop-filter: blur(4px);
 }
+/* A TELA DE BOOT — e a de ERRO, que é esta mesma com outro texto ("Erro ao
+   carregar: …", escrito por studio.ts em #load-text). Ela cobre a área inteira e
+   é a primeira coisa que alguém vê, então é ela que tem de estar no cinza do
+   sistema — e branca no modo claro. Ver os tokens --ts-screen-* lá em cima. */
 .truck-studio-root #loading {
   position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
-  align-items: center; justify-content: center; background: var(--bg); z-index: 10;
+  align-items: center; justify-content: center;
+  background: var(--ts-screen-bg); color: var(--ts-screen-text); z-index: 10;
   transition: opacity 0.4s;
 }
 .truck-studio-root #loading.hide { opacity: 0; pointer-events: none; }
+/* O spinner grande é filho de #loading e segue o tema dele; o `.small` vive nas
+   pílulas sobre o render (que continuam escuras nos dois modos), então a trilha
+   dele é a clara fixa. */
 .truck-studio-root .spinner {
   width: 38px; height: 38px; border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.12); border-top-color: var(--accent);
+  border: 3px solid var(--ts-screen-track); border-top-color: var(--ts-screen-accent);
   animation: truck-studio-spin 1s linear infinite;
 }
-.truck-studio-root .spinner.small { width: 18px; height: 18px; border-width: 2px; }
+.truck-studio-root .spinner.small {
+  width: 18px; height: 18px; border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.12); border-top-color: var(--accent);
+}
 @keyframes truck-studio-spin { to { transform: rotate(360deg); } }
-.truck-studio-root .load-text { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+/* Só existe dentro de #loading (core/template.ts), então segue o tema da tela. */
+.truck-studio-root .load-text { font-size: 12px; color: var(--ts-screen-muted); letter-spacing: 0.08em; text-transform: uppercase; }
 /* Duas pílulas, um desenho: a troca de veículo (studio.ts) e a captura em alta
    resolução (ui/chrome.ts + scene/capture.ts). Nós separados, dono separado,
    mesma aparência — nunca estão no ar ao mesmo tempo, e se um dia estiverem,
@@ -409,9 +740,33 @@
 .truck-studio-root #ts-shot {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 9;
   display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--text);
-  background: rgba(13, 16, 23, 0.8); border: 1px solid var(--stroke-2);
+  background: rgba(17, 17, 17,0.8); border: 1px solid var(--stroke-2);
   padding: 8px 16px; border-radius: 22px; backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+}
+
+/* A BARRA DE PROGRESSO da captura (ui/chrome.ts a injeta na pílula #ts-shot).
+   Só aparece no preset alto, onde há 16 ladrilhos e vários segundos para
+   preencher; nos outros dois ela fica `hidden`, porque uma barra que vai de 0 a
+   100 num quadro só pisca. */
+.truck-studio-root .ts-shotbar {
+  width: 78px;
+  height: 4px;
+  flex: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.truck-studio-root .ts-shotbar__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-shotbar__fill { transition: none; }
 }
 
 /* Botão pequeno da barra do editor (o "×" que devolve o fundo ao alumínio).
@@ -666,7 +1021,7 @@
   padding: 8px 18px; border: none; border-radius: 8px; background: transparent;
   color: var(--muted); font-size: 12px; font-weight: 600;
 }
-.truck-studio-root .tab.active { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+.truck-studio-root .tab.active { background: rgba(34, 197, 94, 0.16); color: var(--accent); }
 .truck-studio-root .editor-caption { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; flex: 1; }
 .truck-studio-root .modal-toolbar {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -679,7 +1034,7 @@
 }
 .truck-studio-root .tool span { font-size: 13px; }
 .truck-studio-root .tool:hover { background: rgba(255, 255, 255, 0.09); }
-.truck-studio-root .tool.on { background: rgba(77, 163, 255, 0.18); border-color: var(--accent); color: var(--accent); }
+.truck-studio-root .tool.on { background: rgba(34, 197, 94, 0.18); border-color: var(--accent); color: var(--accent); }
 .truck-studio-root .tb-sep { width: 1px; height: 22px; background: var(--stroke-2); margin: 0 4px; }
 .truck-studio-root .tb-ctl { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
 .truck-studio-root .tb-ctl input[type="color"] { width: 30px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
@@ -696,15 +1051,15 @@
 .truck-studio-root .tb-ctl.tb-chk input { accent-color: var(--accent); }
 .truck-studio-root .tb-ctl.tb-chk:has(input:checked) {
   border-style: solid; border-color: var(--accent); color: var(--accent);
-  background: rgba(77, 163, 255, 0.12);
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .truck-studio-root .modal-stage {
   flex: 1; min-height: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
   background:
-    linear-gradient(45deg, #1a1e29 25%, transparent 25%, transparent 75%, #1a1e29 75%),
-    linear-gradient(45deg, #1a1e29 25%, transparent 25%, transparent 75%, #1a1e29 75%);
+    linear-gradient(45deg, #2a2a2a 25%, transparent 25%, transparent 75%, #2a2a2a 75%),
+    linear-gradient(45deg, #2a2a2a 25%, transparent 25%, transparent 75%, #2a2a2a 75%);
   background-size: 20px 20px;
   background-position: 0 0, 10px 10px;
   padding: 16px;
@@ -738,6 +1093,22 @@
 /* A chapa do editor. Mesma variável do card, então os dois mostram a mesma cor
    de baú sem ninguém sincronizar nada. */
 .truck-studio-root .stage-panel .canvas-container { background: var(--ts-implement, #ffffff); }
+/* A REPRESENTAÇÃO 2D do painel — faixa refletiva, cantoneira, vãos de porta,
+   tudo derivado das MEDIDAS (vehicle/livery-structure.ts). É o que substitui a
+   foto estática do painel no que ela não sabe fazer: redimensionar. Não tem
+   contraparte no 3D, de propósito — as peças já estão modeladas lá.
+   SEM z-index de propósito. Ela é inserida como PRIMEIRO filho do
+   .canvas-container, e os dois canvas do fabric não declaram z-index nenhum:
+   entre posicionados de `z-index: auto`, quem vem depois na árvore pinta por
+   cima. Declarar um número aqui só criaria um contexto de empilhamento novo
+   para reproduzir a ordem que a árvore já dá. A `.guide-svg` acima é o caso
+   oposto e por isso tem 20: ela precisa vencer QUALQUER coisa.
+   O canvas tem a resolução do painel em metros, não a da tela — o CSS o estica
+   para a janela, que é a mesma que a tela do fabric ocupa. */
+.truck-studio-root .ts-structure {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+}
 .truck-studio-root .guide-svg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 20;
@@ -746,7 +1117,7 @@
   position: absolute; inset: 14px; z-index: 30; pointer-events: none;
   display: none; align-items: center; justify-content: center;
   border: 2px dashed var(--accent); border-radius: 14px;
-  background: rgba(77, 163, 255, 0.12); color: var(--accent);
+  background: rgba(34, 197, 94, 0.12); color: var(--accent);
   font-size: 15px; font-weight: 700; letter-spacing: 0.03em;
 }
 .truck-studio-root .modal-stage.dragging #drop-hint { display: flex; }
@@ -877,7 +1248,7 @@
   white-space: nowrap; transition: background 0.15s, color 0.15s;
 }
 .truck-studio-root .seg-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
-.truck-studio-root .seg-btn.on { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+.truck-studio-root .seg-btn.on { background: rgba(34, 197, 94, 0.16); color: var(--accent); }
 
 .truck-studio-root .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .truck-studio-root .chip {
@@ -887,7 +1258,7 @@
 }
 .truck-studio-root .chip:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
 .truck-studio-root .chip.on {
-  color: var(--accent); background: rgba(77, 163, 255, 0.12); border-color: transparent;
+  color: var(--accent); background: rgba(34, 197, 94, 0.12); border-color: transparent;
   box-shadow: 0 0 0 1.5px var(--accent);
 }
 
@@ -929,6 +1300,32 @@
 .truck-studio-root .num-unit .num { padding-right: 24px; }
 .truck-studio-root .row-2 { display: flex; align-items: center; gap: 6px; }
 .truck-studio-root .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+/* ---------- medidas do implemento (ui/livery-measures.ts) ----------
+   Reaproveita `.ctl`, `.num-unit` e `.num` do inspetor de propósito: um campo
+   de medida não é um controle de outra espécie, e dar-lhe visual próprio faria
+   parecer que ele pertence a outro lugar — que é exatamente o contrário do
+   pedido de ter medida e livery na mesma tela.
+   O que muda é só a DENSIDADE: uma porta tem três medidas, e três `.ctl` de
+   largura cheia empurrariam a lista de camadas para fora da tela. */
+.truck-studio-root #measures-body { display: flex; flex-direction: column; gap: 9px; }
+.truck-studio-root .ms-door {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--stroke-2); border-radius: 9px; padding: 8px;
+}
+.truck-studio-root .ms-door-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.truck-studio-root .ms-door-del { padding: 2px 7px; line-height: 1; }
+.truck-studio-root .ms-door-grid { display: flex; flex-direction: column; gap: 5px; }
+.truck-studio-root .ms-door-grid .ctl { font-size: 11px; }
+.truck-studio-root .ms-door-grid .num-unit { width: 78px; }
+/* Um campo desabilitado aqui não está "quebrado": é uma medida que existe e não
+   se edita (a largura padrão de 2,60 m). Ele fica legível, só sem cursor. */
+.truck-studio-root .ms-num:disabled { opacity: 0.55; cursor: not-allowed; }
+.truck-studio-root .ms-note { opacity: 0.75; }
 .truck-studio-root .mini-ctl { flex-direction: column; align-items: stretch; gap: 3px; font-size: 10.5px; }
 .truck-studio-root .btn-row { display: flex; gap: 6px; }
 .truck-studio-root .btn-row.end { justify-content: flex-end; margin-top: 4px; }
@@ -941,7 +1338,7 @@
   background: rgba(255, 255, 255, 0.04); color: var(--text); font-size: 14px; font-family: inherit;
   transition: background 0.15s, color 0.15s;
 }
-.truck-studio-root .icon-btn:hover { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+.truck-studio-root .icon-btn:hover { background: rgba(34, 197, 94, 0.16); color: var(--accent); }
 
 /* Cada linha do seletor é escrita NA PRÓPRIA fonte: quem pinta caminhão escolhe
    letra pelo desenho dela, nunca pelo nome. */
@@ -965,7 +1362,7 @@
   transition: background 0.15s;
 }
 .truck-studio-root .font-opt:hover { background: rgba(255, 255, 255, 0.06); }
-.truck-studio-root .font-opt.on { background: rgba(77, 163, 255, 0.14); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.truck-studio-root .font-opt.on { background: rgba(34, 197, 94, 0.14); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .truck-studio-root .font-opt b { display: block; font-size: 20px; font-weight: 400; line-height: 1.25; }
 .truck-studio-root .font-opt em {
   display: block; font-style: normal; font-size: 10px; color: var(--muted);
@@ -983,7 +1380,7 @@
   font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.15s;
 }
 .truck-studio-root .layer-row:hover { background: rgba(255, 255, 255, 0.05); }
-.truck-studio-root .layer-row.on { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+.truck-studio-root .layer-row.on { background: rgba(34, 197, 94, 0.16); color: var(--accent); }
 .truck-studio-root .layer-row.dragover { box-shadow: inset 0 2px 0 var(--accent); }
 .truck-studio-root .layer-row.is-hidden .lyr-name { opacity: 0.4; }
 .truck-studio-root .lyr-grip { cursor: grab; color: var(--muted); font-size: 11px; flex: none; }

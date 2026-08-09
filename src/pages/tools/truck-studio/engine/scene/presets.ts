@@ -259,9 +259,120 @@ export const LIGHT_PRESETS: Record<string, LightPreset> = {
       lampIntensity: 140, lampEmissive: 2.2, lampColor: 0xcfd8e8,
     },
   },
+
+  /* CICLORAMA — a luz do cenário `estudio` do seletor.
+     ---------------------------------------------------------------------
+     Por que não reusar `estudio` acima: aquele preset já é o do cenário
+     `armazem`, e dois cenários com a mesma luz seriam o mesmo cenário com
+     dois nomes. Este é o outro extremo do mesmo material.
+
+     As três diferenças, e nenhuma é cosmética:
+     1. FUNDO SEM EMENDA. `fogDensity` cai a 0.0004 (o `estudio` usa 0.0012) e
+        as três bandas do céu ficam a um passo de distância umas das outras
+        (0x60646b → 0x6d7178). O gradiente quase-liso é o que lê como papel de
+        ciclorama; um degradê marcado leria como horizonte, que é exatamente o
+        que um estúdio não tem.
+     2. KEY/FILL/RIM SEPARADOS DE VERDADE. Key mais forte e mais alta (2.6 a
+        52°) com sombra MAIS DURA e mais escura (raio 3.4 contra 6.0): num
+        estúdio a softbox está perto, então o contato é definido. O hemi cai
+        para 0.30 e vira o FILL — a chapa branca do outro lado —, e o rim sobe
+        para 0.62 com uma luz fria, que é o contorno que separa a lataria do
+        fundo cinza. Com fill alto e rim baixo, cavalo escuro e ciclorama viram
+        a mesma mancha.
+     3. NENHUMA CONTAMINAÇÃO DE COR. `ambientColor` neutro puro (0x7a7e84,
+        R=G=B) e `keyColor` a 0xfffaf4 em vez do 0xfff6ed do showroom: esta é a
+        cena em que se JULGA uma tinta, e qualquer dominante aqui é uma
+        mentira sobre a cor que o cliente vai receber.
+
+     `env:'room'` e `solar:false` pelos mesmos motivos do `estudio`: os painéis
+     retangulares do RoomEnvironment dão à tinta o realce alongado de softbox
+     que um céu em gradiente não tem, e um estúdio não tem sol para orbitar. */
+  ciclorama: {
+    name: 'Ciclorama', env: 'room', solar: false,
+    dia: {
+      /* KEY NEUTRA POR DEFINIÇÃO. Esta é a cena em que se JULGA uma tinta, então
+         a luz principal não pode ter dominante nenhuma: R=G=B exato. A "leve
+         frieza" que uma foto de estúdio tem vem do rim lá embaixo, que é luz de
+         recorte e não luz de leitura. A versão anterior usava 0xfffaf4 — 11
+         níveis de amarelo — e isso desloca qualquer branco para creme. */
+      keyColor: 0xffffff, keyIntensity: 3.4, keyAz: 138, keyEl: 46,
+      /* Softbox grande e PERTO: sombra funda o bastante para dar peso e macia o
+         bastante para não virar recorte duro. É ela que apoia o pneu no chão —
+         antes não havia sombra nenhuma, porque não havia chão. */
+      shadowIntensity: 0.90, shadowRadius: 4.5,
+      /* O RECORTE. Subiu de 0.62 para 0.88 e é a peça que separa a lataria do
+         fundo agora que o fundo ficou escuro. Frio de propósito, e é a ÚNICA
+         dominante autorada nesta cena: contra uma key neutra ele lê como o
+         contorno de uma segunda fonte, que é o que um kicker é. */
+      rimColor: 0xccd9f2, rimIntensity: 0.88,
+      /* FILL, e estritamente neutro. O hemi é a chapa branca do outro lado. */
+      hemiSky: 0x9c9c9c, hemiGround: 0x3a3a3a, hemiIntensity: 0.32,
+      /* AMBIENTE BAIXO. Luz ambiente é justamente o termo que achata: ela chega
+         igual em toda face e come a diferença entre o lado da key e o lado do
+         fill. 0.14 -> 0.09 é metade da correção de "muito opaco". */
+      ambientColor: 0x7d7d7d, ambientIntensity: 0.09,
+      /* FUNDO NEUTRO E ESCURO, R=G=B exato.
+         Duas mudanças numa. (1) A COR: 0x60646b é 96/100/107 — azul, e era o que
+         deixava a tela do carregamento puxando para azul contra o cinza neutro
+         do restante da interface. (2) O VALOR: medido no app, o fundo antigo
+         renderizava em luminância 110 contra uma carreta branca em 141. Trinta e
+         um níveis de separação num quadro de 255 é o que o olho lê como "tudo
+         colado, tudo esbranquiçado". Um estúdio de verdade mantém o fundo BEM
+         abaixo do sujeito e devolve a separação pelo rim.
+         Isto é também a cor de limpeza do canvas antes de a sala existir, então
+         ela fica perto do #1c1c1c da interface de propósito — a transição do
+         carregamento para a cena deixa de ter emenda de cor. */
+      fogColor: 0x242424, fogDensity: 0.0004,
+      bgColor: 0x242424,
+      /* O domo fica DESLIGADO neste cenário (a sala é fechada, ver
+         scene/cyclorama.ts), mas as bandas continuam autoradas e neutras: elas
+         ainda alimentam o PMREM procedural se alguém abrir este preset num
+         cenário sem sala. */
+      skyTop: 0x242424, skyMid: 0x2a2a2a, skyHorizon: 0x303030,
+      skyMidPos: 0.5, skyBias: 1.0,
+      skyHaloColor: 0xffffff, skyHalo: 0.02, skyDisc: 0.0, cloudiness: 0,
+      /* 1.45 -> 0.85. O RoomEnvironment é uma caixa BRANCA, e a 1.45 ele
+         despejava luz quase omnidirecional no cavalo: forma nenhuma, tudo no
+         mesmo meio-tom. A modelagem passa a vir da key; o ambiente volta a ser o
+         que num estúdio ele é — o preenchimento das sombras e o realce alongado
+         de softbox no verniz. Este número também é o que mantém cavalo e
+         implemento juntos: ele escala o que o cavalo reflete, e a sala escura que
+         a sonda captura escala o que o implemento reflete, na mesma direção.
+         A exposição desce junto (1.06 -> 0.95) para tirar o branco do ombro da
+         ACES: medido, a 1.06 a lataria branca ficava presa em ~198 de luminância
+         mesmo variando a key em 3x — que é a definição de "estourado". */
+      envIntensity: 0.85, exposure: 0.95,
+    },
+    noite: {
+      /* A face noite de um ciclorama não é "de noite": é o mesmo estúdio com a
+         luz de sala apagada e só os painéis acesos. Fundo bem mais escuro,
+         key e rim intactos em COR (a tinta continua tendo de ser julgável) e
+         só um pouco menores em intensidade.
+         Todos os cinzas aqui também são R=G=B exato: o motivo de neutralidade da
+         face dia não muda quando a luz de sala apaga. */
+      keyColor: 0xffffff, keyIntensity: 3.0, keyAz: 138, keyEl: 46,
+      shadowIntensity: 0.94, shadowRadius: 4.0,
+      rimColor: 0xc4d3ef, rimIntensity: 0.95,
+      hemiSky: 0x353535, hemiGround: 0x181818, hemiIntensity: 0.22,
+      ambientColor: 0x2c2c2c, ambientIntensity: 0.07,
+      fogColor: 0x131313, fogDensity: 0.0004,
+      bgColor: 0x131313,
+      skyTop: 0x131313, skyMid: 0x161616, skyHorizon: 0x1a1a1a,
+      skyMidPos: 0.5, skyBias: 1.0,
+      skyHaloColor: 0xffffff, skyHalo: 0.02, skyDisc: 0.0, cloudiness: 0,
+      envIntensity: 0.70, exposure: 1.06,
+      nightness: 1, glintBoost: 1.3,
+      /* Sem poste: um ciclorama não tem luminária de rua, e acender uma aqui
+         jogaria uma dominante quente na única cena que existe para não ter
+         nenhuma. */
+      lampIntensity: 0, lampEmissive: 0,
+    },
+  },
 };
 
-export const PRESET_ORDER = ['ensolarado', 'nublado', 'chuvoso', 'dourado', 'neblina', 'estudio'];
+export const PRESET_ORDER = [
+  'ensolarado', 'nublado', 'chuvoso', 'dourado', 'neblina', 'estudio', 'ciclorama',
+];
 
 /* ---------------- types ----------------
    A preset FACE is authored as hex + numbers (RigSource); the rig the scene

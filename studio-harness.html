@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Truck Studio — harness</title>
+    <style>
+      /* Cinza neutro do sistema (--background 0 0% 11%), não o azulado que
+         estava aqui: o harness não pode reintroduzir o tom que o engine acabou
+         de tirar. */
+      html, body { height: 100%; margin: 0; background: #1c1c1c; }
+      #studio-host { position: fixed; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="studio-host"></div>
+    <script>
+      // --- instrumentação de upload de textura (só para diagnóstico) ---
+      window.GLLOG = [];
+      const P = WebGL2RenderingContext.prototype;
+      const _storage = P.texStorage2D, _sub = P.texSubImage2D, _img = P.texImage2D;
+      P.texStorage2D = function (t, l, f, w, h) {
+        window.GLLOG.push({ op: 'storage', w, h, err: 0 });
+        return _storage.apply(this, arguments);
+      };
+      P.texSubImage2D = function () {
+        const r = _sub.apply(this, arguments);
+        const e = this.getError();
+        const a = arguments;
+        if (e) window.GLLOG.push({ op: 'sub', w: a[4], h: a[5], src: a[6] && a[6].width ? a[6].width + 'x' + a[6].height : '', err: e });
+        return r;
+      };
+      P.texImage2D = function () {
+        const r = _img.apply(this, arguments);
+        const e = this.getError();
+        if (e) window.GLLOG.push({ op: 'img', err: e });
+        return r;
+      };
+    </script>
+    <script type="module">
+      import '/src/pages/tools/truck-studio/engine/core/studio.css';
+      import '/src/pages/tools/truck-studio/engine/ui/selector.css';
+      import '/src/pages/tools/truck-studio/engine/ui/loader.css';
+      import '/src/pages/tools/truck-studio/engine/ui/hud.css';
+      import '/src/pages/tools/truck-studio/engine/ui/paint-panel.css';
+      const eng = await import('/src/pages/tools/truck-studio/engine/index.ts');
+      const models = await import('/src/pages/tools/truck-studio/engine/vehicle/models.ts');
+      const livery = await import('/src/pages/tools/truck-studio/engine/vehicle/livery.ts');
+      const scene = await import('/src/pages/tools/truck-studio/engine/scene/scene.ts');
+      window.TS = { eng, models, livery, scene };
+      await eng.mountStudio(document.getElementById('studio-host'));
+      window.TS_READY = true;
+    </script>
+  </body>
+</html>

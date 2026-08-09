@@ -10,194 +10,655 @@
    holder's CSS size, and `setPixelRatio(min(devicePixelRatio, 2))`. So the
    exported file came out at *holder size x DPR, capped at 2x* — roughly
    1500x900 on a 1080p desktop monitor, and never more than 2x even on a 4K
-   panel. Same code, half the pixels depending on the display: which is why the
-   export could look acceptable on a laptop and mushy on a desktop.
+   panel. Same code, half the pixels depending on the display.
 
-   So the fix is to render ONE off-screen frame at a higher resolution, read
-   that back, and put everything exactly as it was. Nothing here changes the
-   studio's steady-state cost: every knob this file turns is restored in the
-   `finally`, and the oversized buffer is handed back to the driver the moment
-   `resize()` runs. The studio idles at exactly the weight it did before.
+   O QUE MUDOU DEPOIS DISSO, EM DUAS ETAPAS
+   ---------------------------------------------------------------------------
+   (1) TRÊS PRESETS, E A ARESTA LONGA É O ALVO. Antes existia um `scale` (3x o
+   viewport), que reproduzia a queixa original com outro nome: a MESMA escolha
+   dava arquivos diferentes em monitores diferentes. Agora o usuário escolhe uma
+   ARESTA LONGA — 1920, 3840 ou 7680 — e a proporção é a DO QUE ESTÁ NA TELA.
+   Dois monitores, a mesma escolha, o mesmo número de pixels.
 
-   THE FOUR THINGS THAT MAKE IT CORRECT, none of them optional:
+   (2) A CAPTURA SAIU DA TELA. Esta é a correção do defeito relatado pelo dono do
+   produto: *"quando vou tirar o render, a camera muda completamente de posicao
+   do que estava; depois que o render e baixado ela volta."* Ele estava certo, e
+   a causa eram DUAS coisas que a versão anterior fazia no objeto vivo:
 
-   1. `setSize(w, h, false)` — updateStyle FALSE. The canvas keeps its CSS size
-      and only the backing store grows, so the page does not reflow and the
-      viewport does not visibly resize under the user.
+     - `camera.setViewOffset(...)` era aplicado NA CÂMERA DO ESTÚDIO, uma vez por
+       ladrilho. Dezesseis sub-frustums em ~1,4 s, cada um desenhado no canvas
+       visível: o usuário via a vista saltar por dezesseis enquadramentos e
+       voltar.
+     - `renderer.setSize(tile, tile, false)` trocava o tamanho do BUFFER do canvas
+       visível mantendo o tamanho CSS, então cada ladrilho aparecia esticado
+       sobre a área inteira do render — o que amplificava o salto.
 
-   2. Both axes scale by the same factor, so the camera's aspect is unchanged
-      and the framing of the export is exactly the framing on screen. No camera
-      state is touched at all.
+   A regra agora é dura e vale para os três presets:
 
-   3. The render loop is STOPPED around the whole operation. The encode is
-      async, and a loop left running would re-render the scene at the capture
-      size for as long as the encode takes — burning a 12-megapixel frame every
-      16 ms — and would be racing the readback for the same buffer.
+     A CAPTURA NÃO TOCA NA CÂMERA VIVA E NÃO ESCREVE NO CANVAS VISÍVEL.
 
-   4. `toBlob`, never `toDataURL`. A 12 MP PNG as base64 is a string tens of
-      megabytes long, and browsers cap the size of a `data:` URL a download can
-      point at. An object URL has neither problem, and `toBlob` also lets the
-      engine encode off the main thread.
+   Duas peças a garantem, e nenhuma depende de restaurar nada:
 
-   THE SHADOW MAP is the one thing that does not scale by itself. It is a fixed
-   3072^2 depth target (SHADOW_MAP_SIZE in scene.ts), so at 3x the shadows would
-   stay exactly as coarse while the geometry around them got three times
-   sharper — the softness would read as a defect rather than as PCF. It is
-   therefore bumped for the capture frame and put back afterwards. This is the
-   expensive part of the operation (a 4096^2 depth target is ~67 MB, and the
-   restore pays for a second reallocation), which is why it is capped and why
-   the caller is expected to have an overlay up.
+     - UMA CÓPIA DA CÂMERA. `captureCamera()` devolve uma PerspectiveCamera nova
+       com a mesma pose, o mesmo frustum e a mesma matriz de mundo. Todo
+       `setViewOffset`/`aspect`/`updateProjectionMatrix` acontece nela. Não há o
+       que restaurar no `finally`, e — o que importa mais — uma exceção no meio
+       do mosaico não pode deixar a câmera do estúdio enquadrando 1/16 da cena,
+       que era o modo de falha mais assustador que este arquivo tinha.
+       Copiar é também o que torna o mosaico IMUNE a a câmera se mexer no meio:
+       os dezesseis ladrilhos saem do mesmo frustum, congelado no clique.
+     - UM WebGLRenderTarget. Cada passe renderiza para um alvo fora de tela e
+       volta por `readRenderTargetPixels`. O framebuffer padrão — o canvas que o
+       usuário está olhando — não é ligado, não é limpo e não é desenhado em
+       nenhum momento da captura. `renderer.setSize`/`setPixelRatio` saíram
+       daqui: um render target tem o próprio viewport, então o buffer do canvas
+       visível nem precisa mudar de tamanho.
 
-   WHAT IS DELIBERATELY NOT DONE: the environment map is left alone. The near
-   band picks its 4k/2k variant by distance (environment.ts), and asking for a
-   sharper one mid-capture means a network fetch and a PMREM re-bake — seconds
-   of wait and a lot of memory for something that is behind the truck and
-   already blurred by the tone mapping. */
-import { renderer, scene, camera, holder, resize, getKeyLight, startLoop, stopLoop } from './scene';
+   POR QUE `isXRRenderTarget = true` NO ALVO. Não é gambiarra decorativa; sem
+   isso a imagem sai com OUTRAS CORES. Em three r0.179 (WebGLPrograms.js:6946 e
+   :6979) o mapeamento de tons e a codificação de saída são desligados quando se
+   renderiza para um render target — a menos que ele seja o alvo do XR:
+
+       toneMapping    = (target === null || target.isXRRenderTarget) ? renderer.toneMapping : NoToneMapping
+       outputColorSpace = target === null ? renderer.outputColorSpace
+                        : (target.isXRRenderTarget ? target.texture.colorSpace : LinearSRGBColorSpace)
+
+   Sem a marca, a captura sairia SEM o ACESFilmic e SEM o encode sRGB — linear,
+   escura e dessaturada, nada parecida com a tela. Com ela mais
+   `texture.colorSpace = SRGBColorSpace` e `texture.internalFormat = 'RGBA8'`
+   (ver makeTarget: os três andam juntos, e sem o terceiro o resolve do MSAA
+   falha e a imagem sai preta), o alvo passa exatamente pelo mesmo caminho de
+   saída do canvas. É o mesmo contrato que o próprio three usa para o framebuffer
+   do WebXR. Se um dia three remover a marca (o TODO deles é a issue #23278), o
+   sintoma será cor errada na imagem salva, não uma exceção — daí este parágrafo.
+
+   | Preset | Aresta | ~16:9      | MP   | Passes | Formato      |
+   |--------|--------|------------|------|--------|--------------|
+   | baixa  | 1920   | 1920x1080  |  2,1 | 1      | WebP q 0.92  |
+   | média  | 3840   | 3840x2160  |  8,3 | 1      | PNG          |
+   | alta   | 7680   | 7680x4320  | 33,2 | 16     | PNG          |
+
+   POR QUE "ALTA" NÃO CABE NUM PASSE ÚNICO. Com 4 amostras o alvo custa ~40 bytes
+   por pixel (cor + profundidade, multiamostrados). 33 MP seriam ~1,3 GB — perda
+   de contexto garantida, o que derrubaria o estúdio inteiro em vez de apenas
+   falhar em salvar um arquivo. E supersampling (renderizar 2x e reduzir)
+   MULTIPLICA POR 4 exatamente o problema que precisa encolher.
+
+   A saída é RENDERIZAR EM LADRILHOS, que o three suporta nativamente via
+   `camera.setViewOffset(fullW, fullH, x, y, w, h)`: cada ladrilho é um render
+   normal de <= 1920^2, com MSAA de verdade, lido para um canvas 2D do tamanho
+   final. A memória de GPU fica CONSTANTE seja qual for a resolução pedida; o
+   custo passa a ser RAM de canvas (7680x4320x4 ~ 132 MB) e N renders sequenciais.
+
+   OS INVARIANTES, nenhum opcional:
+
+   1. NADA VIVO É MUTADO PARA DESENHAR. Câmera copiada, alvo próprio. O que ainda
+      é global — o mapa de sombra e o laço de render — está listado no item 4.
+
+   2. A PROPORÇÃO DA IMAGEM É A DA CÂMERA QUE ESTÁ NA TELA. `camera.aspect` é o
+      que decide o enquadramento do viewport, então é dele — e não do tamanho do
+      holder, que pode estar um quadro à frente do `resize()` — que a saída é
+      derivada. Detalhe que faz o ladrilho ser EXATO: `updateProjectionMatrix()`
+      deriva o frustum completo de `aspect` e o view offset recorta um
+      sub-retângulo NORMALIZADO dele (`offsetX / fullWidth`). Logo o mosaico só
+      fecha sem distorção se `fullW / fullH == aspect` — e como as dimensões são
+      ARREDONDADAS PARA MÚLTIPLOS da grade de ladrilhos, quem se ajusta é a
+      CÓPIA: `cam.aspect = fullW / fullH`. O desvio em relação à tela é < 0,05 %,
+      e o mosaico fica exato por construção em vez de por sorte.
+
+   3. `toBlob`, nunca `toDataURL`. Um PNG de 33 MP em base64 é uma string de
+      centenas de MB, e os navegadores limitam o tamanho de um `data:` que um
+      download pode apontar.
+
+   4. O laço de render fica PARADO em volta da operação inteira, e o MAPA DE
+      SOMBRA é aumentado UMA VEZ para os 16 ladrilhos. São as duas únicas coisas
+      globais que a captura ainda mexe, e as duas voltam no `finally`. O laço
+      parado não é performance: com ele vivo, `applyAvoidance()` continuaria
+      correndo a câmera do estúdio entre os ladrilhos — inofensivo para a imagem
+      (que sai da cópia), mas seria trabalho de GPU disputando com o mosaico.
+
+   POR QUE OS LADRILHOS NÃO COSTURAM. Tudo que roda por FRAGMENTO e depende só
+   da cor ou da profundidade é invariante à posição do ladrilho: o tone mapping
+   (ACESFilmic) é uma função da cor, e o fog é função da distância. Não existe
+   nenhum passe de tela cheia nesta cena — um bloom ou uma vinheta costurariam,
+   e é por isso que este comentário existe.
+
+   O MAPA DE SOMBRA é a única coisa que não escala sozinha. É um alvo de
+   profundidade 3072^2 fixo (SHADOW_MAP_SIZE em scene.ts), então numa imagem 4x
+   mais nítida a sombra ficaria exatamente igual de grossa e a suavidade leria
+   como defeito em vez de PCF. Ele é aumentado UMA VEZ para a sessão inteira de
+   ladrilhos — o que finalmente amortiza as duas realocações que ele custa — e
+   devolvido no `finally`.
+   ATENÇÃO ao par `dispose()` + `needsUpdate`: `scene.ts` roda com
+   `shadowMap.autoUpdate = false`, e o `WebGLShadowMap.render()` do three sai
+   logo na entrada quando `autoUpdate` e `needsUpdate` são os dois falsos. Soltar
+   o mapa sem marcar `needsUpdate` deixava `light.shadow.map` em null pelo resto
+   da captura — a imagem saía SEM A SOMBRA do key light, em silêncio. As duas
+   marcações abaixo são o conserto, e a do `finally` é o que devolve o mapa de
+   3072 ao viewport.
+
+   O QUE DELIBERADAMENTE NÃO É FEITO: o mapa de ambiente fica como está. */
+import * as THREE from 'three';
+import {
+  renderer, scene, camera, holder, getKeyLight, startLoop, stopLoop, invalidateShadows,
+} from './scene';
 import { root } from '../core/dom';
 
-/** How much sharper than the screen the export is, before the clamps below. */
-const DEFAULT_SCALE = 3;
+/** Os três presets, pelo id que a interface e o localStorage usam. */
+export type CaptureQuality = 'low' | 'medium' | 'high';
 
-/* Ceiling on the exported image, in pixels. 16 MP is ~5300x3000 — a generous
-   print size — and is the number that keeps this safe on the weak integrated
-   GPUs this studio also has to run on. The default framebuffer is multisampled
-   (`antialias: true`), so the driver allocates several bytes per pixel per
-   sample here; asking for a 3x buffer on a 2560-wide window with no ceiling is
-   how a capture turns into a lost WebGL context, which would take the whole
-   studio down rather than merely failing to save a file. */
-const MAX_PIXELS = 16e6;
+interface QualityPreset {
+  /** rótulo pt-BR do menu */
+  label: string;
+  /** o que ele é para, em cinco palavras */
+  hint: string;
+  /** ARESTA LONGA alvo, em pixels — o ÚNICO botão do preset */
+  edge: number;
+  mime: string;
+  ext: string;
+  /** só para WebP/JPEG; PNG ignora */
+  quality?: number;
+  /** ladrilhos por eixo. 1 = passe único */
+  tiles: number;
+  /** aumentar o mapa de sombra para acompanhar a resolução */
+  sharpenShadows: boolean;
+}
 
-/* Ceiling on the boosted shadow map. 4096^2 is one doubling of the steady-state
-   3072^2 and already ~67 MB of depth target; 8192^2 would be 268 MB for a
-   difference PCF blurs past anyway (see the SHADOW_MAP_SIZE note in scene.ts,
-   which made the same trade in the other direction). */
+/* UM PRESET É UMA RESOLUÇÃO, E SÓ.
+   O teto de ÁREA que morava aqui (`maxPixels`) saiu: ele fazia "Alta · 7680"
+   entregar 7303 px num viewport 4:3 — a mesma classe de surpresa que o `scale`
+   por viewport tinha, só que mais difícil de perceber, porque o menu continuava
+   dizendo 7680. A rede contra uma imagem grande demais não precisa ser um número
+   por preset: se o canvas de composição não alocar, a captura DEGRADA para Média
+   com mensagem (ver captureViewport), que é a resposta certa e já existia. */
+export const CAPTURE_PRESETS: Record<CaptureQuality, QualityPreset> = {
+  /* WebP com perdas a 0.92 é ~8x menor que o PNG equivalente e visualmente
+     indistinguível nesta escala — é o preset "mando por e-mail agora". */
+  low: {
+    label: 'Baixa', hint: 'Rápida, para e-mail',
+    edge: 1920,
+    mime: 'image/webp', ext: 'webp', quality: 0.92,
+    tiles: 1,
+    /* A sombra FICA em 3072^2: a 1920 de aresta longa ela já é mais fina que o
+       pixel da imagem, e as duas realocações que o aumento custa seriam pagas
+       por nada. */
+    sharpenShadows: false,
+  },
+  medium: {
+    label: 'Média', hint: 'Padrão',
+    edge: 3840,
+    mime: 'image/png', ext: 'png',
+    tiles: 1,
+    sharpenShadows: true,
+  },
+  high: {
+    label: 'Alta', hint: 'Impressão / zoom',
+    edge: 7680,
+    mime: 'image/png', ext: 'png',
+    /* 4 x 4. Com aresta longa 7680 cada ladrilho fica em 1920, que é o tamanho
+       em que um alvo multiamostrado ainda é barato (~150 MB a 4 amostras) em
+       placa integrada. */
+    tiles: 4,
+    sharpenShadows: true,
+  },
+};
+
+export const DEFAULT_QUALITY: CaptureQuality = 'medium';
+
+/** Aresta máxima de um ÚNICO ladrilho. Ver o preset `high`. */
+const MAX_TILE = 1920;
+
+/* Teto do mapa de sombra aumentado. 4096^2 é uma duplicação do 3072^2 de
+   regime e já são ~67 MB de alvo de profundidade; 8192^2 seriam 268 MB para uma
+   diferença que o PCF borra de qualquer jeito. */
 const MAX_SHADOW = 4096;
+
+/** Amostras de MSAA do alvo de captura — as mesmas que `antialias: true` pede. */
+const WANT_SAMPLES = 4;
 
 export interface CaptureResult {
   blob: Blob;
-  /** the exported image's real pixel dimensions, after every clamp */
+  /** as dimensões reais da imagem exportada, depois de todos os limites */
   width: number;
   height: number;
-  /** what the scale actually resolved to — may be below the one requested */
-  scale: number;
+  /** o preset que de fato rodou — pode ser MENOR que o pedido (ver `degraded`) */
+  quality: CaptureQuality;
+  /** quantos ladrilhos foram renderizados (1 = passe único) */
+  tiles: number;
+  /** não-nulo quando o preset pedido não coube nesta placa */
+  degraded: string | null;
 }
 
 export interface CaptureOptions {
-  /** upscale factor to aim for; clamped against the GPU and MAX_PIXELS */
-  scale?: number;
-  /** bump the shadow map to match the higher resolution. Default true. */
+  quality?: CaptureQuality;
+  /** desligar o aumento do mapa de sombra (afordance de console) */
   sharpenShadows?: boolean;
+  /** progresso do modo alta: `onTile(feitos, total)` */
+  onTile?: (done: number, total: number) => void;
 }
 
-/* Promisified toBlob. `toBlob` reports failure by handing back null rather than
-   by throwing, and the one thing that must not happen is a rejected promise
-   skipping the caller's restore path — so every failure mode arrives here as a
-   plain null and the caller decides. */
-function encodePng(canvas: HTMLCanvasElement): Promise<Blob | null> {
+/* Promisified toBlob. `toBlob` reporta falha devolvendo null em vez de lançar, e
+   a única coisa que não pode acontecer é uma promessa rejeitada pular o caminho
+   de restauração do chamador — então todo modo de falha chega aqui como um null
+   simples e quem chamou decide. */
+function encode(canvas: HTMLCanvasElement, mime: string, quality?: number): Promise<Blob | null> {
   return new Promise((resolve) => {
     try {
-      canvas.toBlob((blob) => resolve(blob), 'image/png');
+      canvas.toBlob((blob) => resolve(blob), mime, quality);
     } catch {
       resolve(null);
     }
   });
 }
 
-/**
- * What the requested scale survives as, once the GPU's limits and MAX_PIXELS
- * have had their say. Never returns less than 1: a capture must never come out
- * SMALLER than what is on screen, which is what a naive clamp would do on a
- * window already wider than the device's maximum renderbuffer.
- */
-function resolveScale(w: number, h: number, want: number): number {
+/** A maior aresta de buffer que este driver aceita. */
+function edgeLimit(): number {
   const caps = renderer.capabilities;
   const gl = renderer.getContext();
-  /* MAX_RENDERBUFFER_SIZE is the limit that actually applies to the drawing
-     buffer, and it is not always the same as MAX_TEXTURE_SIZE; take whichever
-     is smaller, and fall back to the texture limit if the query comes back
-     empty (some drivers report 0 for parameters they do not implement). */
+  /* MAX_RENDERBUFFER_SIZE é o limite que de fato se aplica a um alvo de render, e
+     nem sempre é igual a MAX_TEXTURE_SIZE; pegar o menor, e cair no limite de
+     textura se a consulta voltar vazia (alguns drivers reportam 0 para
+     parâmetros que não implementam). */
   const rbMax = Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) || caps.maxTextureSize;
-  const edgeMax = Math.max(1, Math.min(rbMax, caps.maxTextureSize));
-  const byEdge = Math.min(edgeMax / w, edgeMax / h);
-  const byArea = Math.sqrt(MAX_PIXELS / (w * h));
-  return Math.max(1, Math.min(want, byEdge, byArea));
+  return Math.max(1, Math.min(rbMax, caps.maxTextureSize));
 }
 
 /**
- * Render one frame at up to `scale`x the viewport and hand back a PNG blob.
+ * A proporção DO QUE ESTÁ NA TELA.
  *
- * BLOCKING: the oversized render happens synchronously on the main thread and
- * can take a few hundred milliseconds. Callers must put an overlay up and let
- * the browser PAINT it — two animation frames — before awaiting this, or the
- * indicator will not appear until the work it is announcing is already over.
+ * `camera.aspect` e não `holder.clientWidth / clientHeight`: é o aspect da
+ * câmera que decide o enquadramento do quadro que o usuário está vendo agora, e
+ * os dois podem divergir por um instante (o `resize()` de scene.ts roda num
+ * quadro, e a captura pode ser pedida antes dele). Capturar pelo holder nesse
+ * intervalo daria uma imagem enquadrada diferente da tela — que é exatamente a
+ * surpresa que este módulo tem de não produzir.
+ */
+function viewportAspect(): number {
+  const a = camera.aspect;
+  if (Number.isFinite(a) && a > 0) return a;
+  const w = holder.clientWidth || 16;
+  const h = holder.clientHeight || 9;
+  return w / h;
+}
+
+/**
+ * As dimensões de saída de um preset, dada a proporção do viewport.
  *
- * The scene is left exactly as it was found, including after a failure.
+ * A aresta LONGA recebe `preset.edge`, exatamente; a curta sai da proporção.
+ * Não há mais nenhum outro fator: o preset é uma resolução.
+ */
+function outputSize(aspect: number, preset: QualityPreset) {
+  const outW = aspect >= 1 ? preset.edge : Math.round(preset.edge * aspect);
+  const outH = aspect >= 1 ? Math.round(preset.edge / aspect) : preset.edge;
+  return { outW: Math.max(1, outW), outH: Math.max(1, outH) };
+}
+
+/**
+ * Quantos ladrilhos por eixo, e de que tamanho, para uma saída de outW x outH.
+ *
+ * TODO PRESET PASSA POR AQUI, inclusive os de "passe único" — que na prática são
+ * os que o grid devolve como 1x1. Não é uniformidade por gosto: o alvo de render
+ * é MULTIAMOSTRADO, e o que ele custa é `w * h * (cor + profundidade) *
+ * amostras` ≈ 32 bytes por pixel a 4 amostras. Um passe único de 3840x1678 são
+ * ~206 MB numa alocação só — e MEDIDO neste harness ele não volta: a captura
+ * fica pendurada ANTES do primeiro `render()`, sem erro, esperando o driver.
+ * Com o teto de `MAX_TILE` a mesma imagem sai em 2 ladrilhos de 1920x1678
+ * (~103 MB cada, um de cada vez) e a memória de GPU passa a ser CONSTANTE seja
+ * qual for o preset. `preset.tiles` deixou de ser "quantos ladrilhos" e virou o
+ * MÍNIMO por eixo; quem manda é o maior entre ele e o que o teto exige.
+ *
+ * As dimensões voltam ARREDONDADAS para múltiplos exatos da grade — ver o
+ * invariante 2 no cabeçalho: é isso que faz todo ladrilho ter o mesmo tamanho
+ * (uma alocação de alvo para os 16) e o mosaico fechar sem sobreposição nem
+ * folga. Quem se ajusta ao arredondamento é o `aspect` da CÓPIA da câmera.
+ *
+ * Conferido nos três presets, com o viewport 961x420 do harness:
+ *   Baixa 1920x839  → 1x1 = 1  · ladrilho 1920x839
+ *   Média 3840x1678 → 2x1 = 2  · ladrilho 1920x1678
+ *   Alta  7680x3356 → 4x4 = 16 · ladrilho 1920x839   (os 16 verificados, intactos)
+ */
+function tiling(outW: number, outH: number, want: number, edgeMax: number) {
+  const cap = Math.max(256, Math.min(MAX_TILE, edgeMax));
+  /* Nunca menos ladrilhos do que o driver exige: se a placa só aceita 2048 e a
+     imagem tem 7680, quatro por eixo é o MÍNIMO, não uma preferência. */
+  let nx = Math.max(want, Math.ceil(outW / cap));
+  let ny = Math.max(want, Math.ceil(outH / cap));
+  /* Uma imagem menor que a grade pedida não precisa dela. */
+  nx = Math.max(1, Math.min(nx, outW));
+  ny = Math.max(1, Math.min(ny, outH));
+  const tileW = Math.max(1, Math.round(outW / nx));
+  const tileH = Math.max(1, Math.round(outH / ny));
+  return { nx, ny, tileW, tileH, fullW: tileW * nx, fullH: tileH * ny };
+}
+
+/**
+ * A CÓPIA da câmera do estúdio — o coração da correção deste módulo.
+ *
+ * `copy()` do three já traz pose, matriz de mundo, a INVERSA dela, o frustum e
+ * as duas matrizes de projeção. As duas linhas que importam vêm depois:
+ * desligar as duas atualizações automáticas. Sem elas, `renderer.render()` veria
+ * uma câmera sem pai e recalcularia `matrixWorld` a partir de `matrix` — o que é
+ * a mesma coisa HOJE, e deixaria de ser no dia em que a câmera do estúdio ganhar
+ * um pai. Copiar a matriz de mundo e proibir o recálculo é correto nos dois
+ * casos.
+ *
+ * O `aspect` recebido é o do MOSAICO (fullW/fullH), não o da tela: ver o
+ * invariante 2.
+ */
+function captureCamera(aspect: number): THREE.PerspectiveCamera {
+  const cam = new THREE.PerspectiveCamera();
+  cam.copy(camera, false);
+  cam.matrixAutoUpdate = false;
+  cam.matrixWorldAutoUpdate = false;
+  /* Uma câmera de estúdio nunca deveria ter um view offset posto, mas `copy()`
+     traria um se tivesse — e ele se somaria ao recorte do ladrilho. */
+  cam.clearViewOffset();
+  cam.aspect = aspect;
+  cam.updateProjectionMatrix();
+  return cam;
+}
+
+/** O alvo fora de tela de um passe. Ver o cabeçalho para `isXRRenderTarget`. */
+function makeTarget(w: number, h: number): THREE.WebGLRenderTarget {
+  const gl = renderer.getContext() as WebGL2RenderingContext;
+  const maxSamples = Number(gl.getParameter(gl.MAX_SAMPLES)) || 0;
+  const rt = new THREE.WebGLRenderTarget(w, h, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    generateMipmaps: false,
+    depthBuffer: true,
+    /* Nada nesta cena usa stencil, e o buffer combinado custaria a mesma banda
+       de memória do de profundidade em cada resolve de ladrilho. */
+    stencilBuffer: false,
+    samples: Math.max(0, Math.min(WANT_SAMPLES, maxSamples)),
+  });
+  /* O TRIO que faz a imagem sair EXATAMENTE com as cores da tela. Os dois
+     primeiros estão explicados no cabeçalho; o terceiro é obrigatório e foi
+     descoberto medindo — sem ele a captura sai PRETA.
+
+     `isXRRenderTarget` chega a `getInternalFormat(..., forceLinearTransfer)`
+     (WebGLTextures.js:12088) e força o RENDERBUFFER MULTIAMOSTRADO a RGBA8,
+     enquanto a textura de resolve, derivada de `colorSpace = SRGB`, ficaria
+     SRGB8_ALPHA8. Os dois formatos entram no mesmo `blitFramebuffer` do resolve,
+     que exige formatos compatíveis: o driver devolve GL_INVALID_OPERATION
+     (1282), o resolve não acontece e `readRenderTargetPixels` lê um alvo nunca
+     escrito — zeros. Nomear o formato interno alinha os dois lados em RGBA8, e
+     como `outputColorSpace` continua vindo de `texture.colorSpace`, o shader
+     segue escrevendo os bytes já codificados em sRGB.
+
+     MEDIDO contra o canvas visível (mesmo tamanho, mesma câmera, ~45 000 canais
+     amostrados), as quatro combinações possíveis:
+
+       samples 4 + XR + RGBA8   erro médio 0,00 · máximo 0    ← esta
+       samples 4 + XR           GL 1282, imagem toda preta
+       samples 4 sem XR         erro médio 5,90 · máximo 55   (sem tone mapping)
+       samples 0 + XR           erro médio 66,42              (codifica duas vezes)
+
+     Ou seja: a imagem salva é o quadro da tela, byte a byte, só que maior. */
+  rt.texture.colorSpace = THREE.SRGBColorSpace;
+  rt.texture.internalFormat = 'RGBA8';
+  (rt as unknown as { isXRRenderTarget: boolean }).isXRRenderTarget = true;
+  return rt;
+}
+
+/**
+ * Uma linha de pixels do WebGL vem de baixo para cima; um ImageData vai de cima
+ * para baixo. A cópia é por LINHA (`set` de um subarray é memcpy), e o alfa é
+ * forçado a opaco depois.
+ *
+ * O alfa não é preciosismo: a cena é opaca (o fundo é céu ou cor de limpeza com
+ * alfa 1), mas um único pixel com alfa < 255 num PNG vira transparência de
+ * verdade no arquivo salvo, e o canvas 2D é `alpha: false` justamente para isso
+ * não existir. Escrito byte a byte, não por Uint32: um OR de máscara dependeria
+ * da ordem de bytes da máquina.
+ */
+function flipInto(src: Uint8Array, dst: Uint8ClampedArray, w: number, h: number) {
+  const row = w * 4;
+  for (let y = 0; y < h; y++) {
+    dst.set(src.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+  }
+  for (let i = 3; i < dst.length; i += 4) dst[i] = 255;
+}
+
+/* Um quadro cedido ENTRE ladrilhos, não dentro: mantém a aba responsiva e deixa
+   a pílula de progresso repintar "7/16" de verdade.
+
+   SÓ COM A ABA VISÍVEL, e isso foi medido: numa aba escondida não há pintura a
+   esperar, `requestAnimationFrame` nunca dispara e o `setTimeout` cai no
+   *intensive throttling* do Chrome (um disparo por minuto depois de 5 min
+   escondida). Uma captura de 16 ladrilhos passou de alguns segundos para 25 s
+   POR LADRILHO. Sem ninguém olhando, o certo é não ceder nada.
+   (Escrito aqui em vez de importado de ui/loader.ts: scene/ não importa ui/, e
+   essa seta é o que mantém o engine portável.) */
+function yieldFrame(): Promise<void> {
+  if (document.hidden) return Promise.resolve();
+  return new Promise<void>((r) => {
+    let settled = false;
+    const go = () => { if (!settled) { settled = true; r(); } };
+    requestAnimationFrame(go);
+    setTimeout(go, 250);
+  });
+}
+
+/**
+ * O mosaico — N x N renders FORA DA TELA compostos num canvas 2D. `nx * ny === 1`
+ * é o caso do passe único, e passa pelo mesmo caminho de propósito: um segundo
+ * caminho de render seria um segundo lugar de onde a câmera viva pode ser tocada.
+ *
+ * Devolve null quando o canvas de composição ou o alvo de render não puderam ser
+ * alocados — 33 MP de RGBA são ~132 MB, e um navegador que recusa isso tem de
+ * degradar para Média com uma mensagem, não travar.
+ */
+async function renderMosaic(
+  cam: THREE.PerspectiveCamera,
+  fullW: number, fullH: number, nx: number, ny: number, tileW: number, tileH: number,
+  onTile?: (done: number, total: number) => void,
+): Promise<HTMLCanvasElement | null> {
+  const out = document.createElement('canvas');
+  out.width = fullW;
+  out.height = fullH;
+  /* `alpha: false` e `willReadFrequently: false`: a composição é só escrita, e
+     um alvo opaco é metade da banda de memória de um com alfa. */
+  const ctx = out.getContext('2d', { alpha: false });
+  if (!ctx) return null;
+
+  const total = nx * ny;
+  /* O alvo anterior é quase sempre `null`, mas a sonda de reflexo (scene/probe.ts)
+     também usa alvos — restaurar o que estava é mais barato que assumir. */
+  const prevTarget = renderer.getRenderTarget();
+  let rt: THREE.WebGLRenderTarget | null = null;
+
+  try {
+    rt = makeTarget(tileW, tileH);
+    /* Dois buffers, REUSADOS pelos 16 ladrilhos: um do tamanho do ladrilho para
+       a leitura crua e um para o ImageData já virado. */
+    const src = new Uint8Array(tileW * tileH * 4);
+    const dst = new Uint8ClampedArray(tileW * tileH * 4);
+
+    let done = 0;
+    onTile?.(0, total);
+
+    for (let ty = 0; ty < ny; ty++) {
+      for (let tx = 0; tx < nx; tx++) {
+        if (total > 1) {
+          /* O recorte exato do frustum, NA CÓPIA. Os dois primeiros argumentos
+             são o tamanho da imagem COMPLETA — é a razão `offset / full` que o
+             three usa, então eles têm de descrever o mosaico inteiro, não o
+             ladrilho. */
+          cam.setViewOffset(fullW, fullH, tx * tileW, ty * tileH, tileW, tileH);
+          cam.updateProjectionMatrix();
+        }
+        renderer.setRenderTarget(rt);
+        renderer.render(scene, cam);
+        /* Desligar o alvo é o que RESOLVE o multiamostrado para a textura de uma
+           amostra que `readRenderTargetPixels` lê (WebGLRenderer.js:16528). Ler
+           com o alvo ainda ligado devolveria o buffer não resolvido. */
+        renderer.setRenderTarget(null);
+        renderer.readRenderTargetPixels(rt, 0, 0, tileW, tileH, src);
+        flipInto(src, dst, tileW, tileH);
+        ctx.putImageData(new ImageData(dst, tileW, tileH), tx * tileW, ty * tileH);
+        done++;
+        onTile?.(done, total);
+        if (done < total) await yieldFrame();
+      }
+    }
+    return out;
+  } catch (err: unknown) {
+    /* Alocação recusada, contexto perdido, driver reclamando do tamanho: tudo
+       chega aqui como "não deu", e quem chamou degrada. Uma exceção subindo
+       daqui pularia o `finally` de captureViewport() e é o que não pode
+       acontecer. */
+    console.warn('[truck-studio] o mosaico de captura falhou', err);
+    return null;
+  } finally {
+    renderer.setRenderTarget(prevTarget);
+    rt?.dispose();
+  }
+}
+
+/**
+ * Renderiza a cena no preset pedido e devolve a imagem.
+ *
+ * BLOQUEANTE: o render acontece na thread principal e pode levar segundos no
+ * preset alto. Quem chama tem de subir um indicador e deixar o navegador PINTÁ-LO
+ * — dois quadros — antes de aguardar isto, senão o aviso só aparece depois de o
+ * trabalho que ele anuncia ter acabado.
+ *
+ * O VIEWPORT NÃO SE MEXE. Nem durante, nem depois, nem depois de uma falha: a
+ * câmera do estúdio não é tocada e o canvas visível não é escrito. O que o
+ * usuário vê durante uma captura é a cena dele, parada, e o indicador de
+ * progresso.
  */
 export async function captureViewport(opts: CaptureOptions = {}): Promise<CaptureResult> {
-  const w = holder.clientWidth;
-  const h = holder.clientHeight;
-  /* A detached or collapsed holder is a normal state here (route change, Ankaa's
-     sidebar animating), and it is also the one case where the restore below
-     could not put the renderer back — resize() bails on a zero-sized holder. So
-     refuse the capture outright rather than half-perform it. */
-  if (!w || !h) throw new Error('O viewport está sem tamanho.');
+  const aspect = viewportAspect();
+  if (!Number.isFinite(aspect) || aspect <= 0) throw new Error('O viewport está sem tamanho.');
 
-  const scale = resolveScale(w, h, Math.max(1, opts.scale ?? DEFAULT_SCALE));
-  const outW = Math.max(1, Math.round(w * scale));
-  const outH = Math.max(1, Math.round(h * scale));
+  let quality: CaptureQuality = opts.quality && CAPTURE_PRESETS[opts.quality]
+    ? opts.quality : DEFAULT_QUALITY;
+  let preset = CAPTURE_PRESETS[quality];
+  let degraded: string | null = null;
 
+  const edgeMax = edgeLimit();
+  let { outW, outH } = outputSize(aspect, preset);
+
+  /* O LIMITE DO DRIVER NÃO ENCOLHE MAIS A IMAGEM. Ele entra em `tiling()` como
+     teto do LADRILHO, e uma placa mais fraca passa a pagar em número de
+     ladrilhos em vez de em resolução — que é exatamente o que o ladrilhamento
+     existe para permitir. Antes, um passe único acima do limite era reduzido e o
+     usuário recebia 4000 px onde o menu prometia 7680. */
   const key = getKeyLight();
-  const prevRatio = renderer.getPixelRatio();
-  /* .clone(), not a reference: mapSize is a live Vector2 that we are about to
-     mutate in place, so holding the object would "save" the new value. */
+  /* .clone(), não uma referência: mapSize é um Vector2 vivo que estamos prestes
+     a mutar no lugar, então guardar o objeto "salvaria" o valor novo. */
   const prevShadow = key.shadow.mapSize.clone();
   const wantShadow = Math.min(
     MAX_SHADOW,
     renderer.capabilities.maxTextureSize,
-    Math.round(prevShadow.x * scale),
+    /* Proporcional à nitidez ganha: quantas vezes a imagem é maior que a tela. */
+    Math.round(prevShadow.x * Math.max(1, Math.max(outW, outH)
+      / Math.max(1, Math.max(renderer.domElement.width, renderer.domElement.height)))),
   );
-  const bumpShadow = opts.sharpenShadows !== false && wantShadow > prevShadow.x;
+  const bumpShadow = (opts.sharpenShadows ?? preset.sharpenShadows) && wantShadow > prevShadow.x;
 
   stopLoop();
   try {
-    /* three sizes a shadow map once and caches the render target, so changing
-       mapSize alone does nothing. Disposing and nulling it is the documented way
-       to force the reallocation on the next render. */
+    /* o three dimensiona o mapa de sombra uma vez e guarda o alvo, então mudar
+       mapSize sozinho não faz nada. Descartar e anular é a forma documentada de
+       forçar a realocação no próximo render — e `needsUpdate` é o que autoriza
+       esse render a acontecer, porque scene.ts roda com `autoUpdate = false`
+       (ver o cabeçalho). UMA VEZ para os 16 ladrilhos: o three zera o
+       `needsUpdate` no primeiro render, e os outros quinze reusam o mapa. */
     if (bumpShadow) {
       key.shadow.mapSize.set(wantShadow, wantShadow);
       key.shadow.map?.dispose();
       key.shadow.map = null;
+      renderer.shadowMap.needsUpdate = true;
     }
 
-    /* Pixel ratio to 1 and the whole multiplier expressed in setSize: the two
-       compose, so leaving a DPR of 2 in place would silently double the request
-       again and blow past both clamps above. */
-    renderer.setPixelRatio(1);
-    renderer.setSize(outW, outH, false);
-    renderer.render(scene, camera);
+    /* UM CAMINHO SÓ para os três presets — ver `tiling()`. */
+    const mosaic = async (w: number, h: number, want: number) => {
+      const t = tiling(w, h, want, edgeMax);
+      outW = t.fullW;
+      outH = t.fullH;
+      return {
+        tiles: t.nx * t.ny,
+        canvas: await renderMosaic(
+          captureCamera(t.fullW / t.fullH),
+          t.fullW, t.fullH, t.nx, t.ny, t.tileW, t.tileH, opts.onTile,
+        ),
+      };
+    };
 
-    const blob = await encodePng(renderer.domElement);
+    let { canvas, tiles } = await mosaic(outW, outH, preset.tiles);
+    if (!canvas && quality !== 'medium') {
+      /* O mosaico não coube — o canvas 2D de composição é o que falha primeiro
+         (7680x4320 de RGBA são ~132 MB). Degradar para Média em vez de falhar: o
+         usuário pediu uma imagem, e uma imagem menor é uma resposta; um erro não
+         é. Só uma vez, e nunca de Média para Média. */
+      quality = 'medium';
+      preset = CAPTURE_PRESETS.medium;
+      const s = outputSize(aspect, preset);
+      degraded = 'A resolução alta não coube nesta placa; a imagem saiu em '
+        + s.outW + ' px.';
+      ({ canvas, tiles } = await mosaic(s.outW, s.outH, preset.tiles));
+    }
+    if (!canvas) throw new Error('O navegador não conseguiu alocar a imagem.');
+
+    let blob = await encode(canvas, preset.mime, preset.quality);
+    /* WebP não é universal (Safari antigo). Um `toBlob` que devolve null por
+       causa do MIME tem de virar PNG, não um erro — o usuário pediu a imagem
+       rápida, e o formato é um detalhe de entrega. */
+    if (!blob && preset.mime !== 'image/png') {
+      blob = await encode(canvas, 'image/png');
+      if (blob) degraded = (degraded ? degraded + ' ' : '') + 'WebP indisponível; saiu em PNG.';
+    }
     if (!blob) throw new Error('O navegador não conseguiu codificar a imagem.');
-    return { blob, width: outW, height: outH, scale };
+    return { blob, width: outW, height: outH, quality, tiles, degraded };
   } finally {
-    /* Order matters. The shadow map goes back FIRST so that the normal-size
-       render below is what pays for its reallocation — that hitch then happens
-       while the caller's overlay is still up, instead of as a dropped frame the
-       moment the scene comes back to life. */
+    /* NÃO HÁ CÂMERA A RESTAURAR — é o ponto do módulo. O que volta é só o que é
+       global: o mapa de sombra e o laço.
+       `invalidateShadows()` em vez de escrever `needsUpdate` na mão porque ele
+       também PEDE UM QUADRO: o laço de scene.ts é dirigido por sujeira, e sem o
+       pedido o mapa de 3072 só seria realocado no próximo movimento do usuário —
+       até lá a cena ficaria com a sombra da captura, que é mais fina mas custa
+       uma realocação parada na memória. */
     if (bumpShadow) {
       key.shadow.mapSize.copy(prevShadow);
       key.shadow.map?.dispose();
       key.shadow.map = null;
+      invalidateShadows();
     }
-    renderer.setPixelRatio(prevRatio);
-    resize();
-    renderer.render(scene, camera);
-    /* Only resume if the studio is still on the page. unmountStudio() stops the
-       loop and detaches `root`, and a capture in flight across that route change
-       would otherwise restart a loop nobody can see and nobody will ever stop —
-       it would render for the rest of the browser session. The next
-       mountStudio() calls startLoop() itself. */
+    /* Só retome se o estúdio ainda estiver na página. unmountStudio() para o
+       laço e solta o `root`, e uma captura em voo através dessa troca de rota
+       reiniciaria um laço que ninguém vê e ninguém vai parar. */
     if (root.isConnected) startLoop();
   }
+}
+
+/**
+ * As dimensões que um preset PRODUZIRIA agora, sem renderizar nada.
+ *
+ * É o que faz o menu de qualidade mostrar "Alta · 7680 × 4320" em vez de só
+ * "Alta": o número é o que torna a escolha informada. Mesma conta de
+ * captureViewport(), pela mesma proporção — se estes dois divergirem, o menu
+ * mente.
+ */
+export function previewSize(quality: CaptureQuality): { width: number; height: number } {
+  const preset = CAPTURE_PRESETS[quality] || CAPTURE_PRESETS[DEFAULT_QUALITY];
+  const { outW, outH } = outputSize(viewportAspect(), preset);
+  const t = tiling(outW, outH, preset.tiles, edgeLimit());
+  return { width: t.fullW, height: t.fullH };
+}
+
+/**
+ * Quantos ladrilhos um preset renderizaria agora. É o que o menu usa para dizer
+ * "16 ladrilhos" sem chutar — o número saía de `preset.tiles²`, que deixou de
+ * ser a verdade quando o teto de MAX_TILE passou a poder aumentar a grade.
+ */
+export function previewTiles(quality: CaptureQuality): number {
+  const preset = CAPTURE_PRESETS[quality] || CAPTURE_PRESETS[DEFAULT_QUALITY];
+  const { outW, outH } = outputSize(viewportAspect(), preset);
+  const t = tiling(outW, outH, preset.tiles, edgeLimit());
+  return t.nx * t.ny;
 }
