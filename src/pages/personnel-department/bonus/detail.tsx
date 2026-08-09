@@ -585,17 +585,17 @@ export default function BonusDetailPage() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-sm text-muted-foreground">Colaboradores</span>
-                  <span className="text-sm font-medium">{taskStats.totalCollaborators}</span>
+                  {/* Headcount MÉDIO do período, fracionário — é ele que divide
+                      as tarefas ponderadas. A contagem de linhas não fecha a
+                      conta quando alguém entra ou sai no meio do período. */}
+                  <span className="text-sm font-medium">
+                    {formatDecimal(taskStats.periodDivisor || taskStats.totalCollaborators)}
+                  </span>
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-sm text-muted-foreground">Média por Colaborador</span>
-                  {/* O divisor é fracionário desde a proporcionalidade — sem ele
-                      a média deixou de ser óbvia a partir do nº de colaboradores. */}
                   <span className="text-sm font-medium">
                     {formatDecimal(taskStats.averageTasksPerUser)}
-                    <span className="font-normal text-muted-foreground">
-                      {" "}(÷ {formatDecimal(taskStats.periodDivisor)})
-                    </span>
                   </span>
                 </div>
                 {eligibility.isPartial && (

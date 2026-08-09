@@ -17,6 +17,8 @@ const BONUS_COLUMNS: BonusColumn[] = [
   { key: "performanceLevel", header: "Desempenho", defaultVisible: true },
   { key: "tasksCompleted", header: "Tarefas", defaultVisible: false },
   { key: "totalWeightedTasks", header: "Tarefas Ponderadas", defaultVisible: true },
+  // Valor exibido é o headcount MÉDIO do período (Σ dos pesos), fracionário —
+  // é ele que divide as tarefas ponderadas.
   { key: "totalCollaborators", header: "Colaboradores", defaultVisible: true },
   { key: "averageTasks", header: "Média", defaultVisible: true },
   { key: "eligibilityWeight", header: "Proporção", defaultVisible: true },

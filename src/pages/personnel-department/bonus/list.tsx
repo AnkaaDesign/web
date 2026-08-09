@@ -232,6 +232,13 @@ const toNumber = (value: any, fallback = 0): number => {
 // Peso de elegibilidade [0,1] → "95%"
 const formatEligibilityWeight = (weight: number): string => `${Math.round(weight * 100)}%`;
 
+// Divisor do período → "15,14" / "18" (inteiro exato sai sem casas decimais,
+// para não sugerir precisão onde não houve movimentação no quadro).
+const formatDivisor = (value: number): string =>
+  Number.isInteger(value)
+    ? value.toLocaleString("pt-BR")
+    : value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 // Data ISO do desligamento → "DD/MM"
 const formatShortDate = (iso: string): string => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
@@ -372,7 +379,28 @@ function BonusTableComponent({
     {
       key: "totalCollaborators",
       header: "Colaboradores",
-      accessor: (row: BonusRow) => row.totalCollaborators || 0,
+      // Mostra o headcount MÉDIO do período — fracionário — porque é ele que
+      // divide as tarefas ponderadas. Exibir a contagem de linhas fazia a conta
+      // não fechar na tela: 16,5 ÷ 18 = 0,92, mas a média era 1,09, porque o
+      // divisor real era 15,14. Quem entrou ou saiu no meio conta a fração de
+      // dias úteis que trabalhou.
+      accessor: (row: BonusRow) => {
+        const headcount = row.totalCollaborators || 0;
+        const divisor = row.periodDivisor ?? headcount;
+        const isFractional = Math.abs(divisor - headcount) > 0.005;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="whitespace-nowrap">{formatDivisor(divisor)}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {isFractional
+                ? `${headcount} pessoas no período, mas quem entrou ou saiu no meio conta só a fração de dias úteis que trabalhou — a soma dos pesos dá ${formatDivisor(divisor)}, e é esse o número que divide as tarefas.`
+                : `${headcount} pessoas, todas o período inteiro.`}
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
       sortable: true,
       className: "text-sm w-28 font-medium truncate",
       align: "left" as const,
@@ -380,7 +408,24 @@ function BonusTableComponent({
     {
       key: "averageTasks",
       header: "Média",
-      accessor: (row: BonusRow) => row.averageTasks.toFixed(2),
+      // Duas casas é o que o cálculo usa de fato (a API arredonda B1 antes de
+      // alimentar o polinômio), mas a conta só fica legível ao lado do divisor
+      // fracionário — daí o tooltip com a divisão explícita.
+      accessor: (row: BonusRow) => {
+        const divisor = row.periodDivisor ?? row.totalCollaborators ?? 0;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="whitespace-nowrap">{row.averageTasks.toFixed(2)}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {divisor > 0
+                ? `${row.totalWeightedTasks.toFixed(1)} tarefas ponderadas ÷ ${formatDivisor(divisor)} = ${(row.totalWeightedTasks / divisor).toFixed(4)}, arredondado para ${row.averageTasks.toFixed(2)}`
+                : "Sem divisor no período."}
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
       align: "left" as const,

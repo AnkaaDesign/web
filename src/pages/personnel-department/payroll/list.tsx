@@ -694,12 +694,20 @@ export default function PayrollListPage() {
       let totalTasksForPeriod = 0;
       let eligibleUsersCount = 0;
       let hasValidBonusData = false;
+      // Divisor do período, como a API o calculou. Cada linha `Bonus` carrega o
+      // mesmo valor, então a primeira que aparecer basta.
+      let periodDivisorFromApi: number | null = null;
 
       // First pass: calculate totals for the period
       payrollsArray.forEach((payroll: any) => {
         if (!payroll?.user) return;
         const user = payroll.user;
         const bonus = payroll.bonus;
+
+        if (periodDivisorFromApi == null && bonus?.periodDivisor != null) {
+          const parsed = Number(bonus.periodDivisor);
+          if (Number.isFinite(parsed) && parsed > 0) periodDivisorFromApi = parsed;
+        }
 
         // Check if user is eligible for bonus
         const isEligible = isUserEligibleForBonus(user);
@@ -722,8 +730,19 @@ export default function PayrollListPage() {
         }
       });
 
-      // Calculate the average tasks per eligible user (same for all users in old implementation)
-      const averageTasksPerUser = eligibleUsersCount > 0 ? totalTasksForPeriod / eligibleUsersCount : 0;
+      // O divisor vem da API, não da contagem de linhas.
+      //
+      // Contar quem passa em `isUserEligibleForBonus` reimplementa em TypeScript
+      // a semântica antiga do `BONIFIABLE_USER_WHERE`: o filtro exige
+      // `currentContractStatus === ACTIVE`, então uma demissão apagava a pessoa
+      // do denominador RETROATIVAMENTE enquanto as tarefas dela seguiam no
+      // numerador. O divisor correto é o headcount MÉDIO do período — soma dos
+      // pesos de elegibilidade, fracionária —, e é isso que `periodDivisor` traz.
+      //
+      // A contagem continua servindo de fallback para linha antiga, gravada
+      // antes da proporcionalidade, que não tem o campo.
+      const divisorForAverage = periodDivisorFromApi ?? eligibleUsersCount;
+      const averageTasksPerUser = divisorForAverage > 0 ? totalTasksForPeriod / divisorForAverage : 0;
 
       // Second pass: create payroll rows with period-wide statistics
       payrollsArray.forEach((payroll: any) => {

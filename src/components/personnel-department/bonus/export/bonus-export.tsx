@@ -108,8 +108,16 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   },
   {
     id: "totalCollaborators",
+    // Headcount MÉDIO do período (Σ dos pesos) — o número que divide as tarefas
+    // ponderadas. Exportar a contagem de linhas fazia a conta não fechar na
+    // planilha: 16,5 ÷ 18 = 0,92 contra a média exportada de 1,09.
     label: "Colaboradores",
-    getValue: (row: BonusRow) => (row.totalCollaborators ?? 0).toString()
+    getValue: (row: BonusRow) => {
+      const divisor = row.periodDivisor ?? row.totalCollaborators ?? 0;
+      return Number.isInteger(divisor)
+        ? divisor.toString()
+        : divisor.toFixed(2).replace(".", ",");
+    }
   },
   {
     id: "averageTasks",
@@ -184,7 +192,7 @@ const COLUMN_WIDTH_WEIGHTS: Record<string, number> = {
   "performanceLevel": 7,
   "tasksCompleted": 7,
   "totalWeightedTasks": 8,
-  "totalCollaborators": 7,
+  "totalCollaborators": 13,
   "averageTasks": 7,
   "eligibilityWeight": 7,
   "terminatedAt": 8,
