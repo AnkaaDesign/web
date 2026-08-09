@@ -2085,8 +2085,13 @@ const FOCUS_MIN_F = 0.40;   // minDistance, as a fraction of the rig radius
 const FOCUS_MAX_F = 2.60;
 /* Folga de afastamento ALÉM da pose de abertura. Sem ela o limite de órbita
    coincidiria com a distância de abertura e a roda do mouse não teria para onde
-   ir no sentido de afastar. */
-const OPEN_ZOOM_OUT = 1.35;
+   ir no sentido de afastar.
+   1.35 -> 1.15: a 1,35 o afastamento máximo passava de 48 m num conjunto de
+   19 m, e lá o caminhão já era um detalhe no meio do pátio — o set foi autorado
+   para uma órbita bem mais curta (ver setNote em environments.json). 1.15 ainda
+   dá curso de roda para afastar além da abertura, que é a razão de este número
+   existir, sem deixar a órbita sair do pátio útil. */
+const OPEN_ZOOM_OUT = 1.15;
 const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
 const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork
 const _fv = new THREE.Vector3();
@@ -2127,14 +2132,377 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
         p.z > b.min.z && p.z < b.max.z) {
       const outX = Math.min(p.x - b.min.x, b.max.x - p.x);
       const outZ = Math.min(p.z - b.min.z, b.max.z - p.z);
+      /* IMEDIATA, e não amortecida. Uma versão desta função empurrava a câmera
+         uma fração do caminho por quadro, para a saída não ser um salto — e o
+         resultado foi a câmera ENTRAR no caminhão, que é a única coisa que esta
+         guarda existe para impedir. Duas razões, e as duas condenam qualquer
+         suavização aqui:
+
+         * ela é o ÚNICO obstáculo entre a órbita e o interior da carroceria.
+           `minDistance` é 0,40 r — uns 3,8 m — medidos a partir da MIRA, que
+           fica no meio de um conjunto de 19 m: dar zoom até o limite já põe o
+           olho dentro da cabine, e é esta expulsão que o tira de lá. Amortecida,
+           passam-se uns dez quadros lá dentro a cada vez;
+         * ela DISPUTA com o OrbitControls. Cada quadro ele recompõe a órbita a
+           partir da posição que encontrar, então um empurrão de 28% por quadro é
+           simplesmente refeito pelo arrasto do usuário no quadro seguinte —
+           arrastando contra a lataria dá para ficar dentro dela indefinidamente.
+
+         O desvio das construções (setCameraObstacles, abaixo) pode ser suave
+         porque é uma preferência de enquadramento; isto é uma parede. */
       if (outX <= outZ) p.x = (p.x - b.min.x < b.max.x - p.x) ? b.min.x : b.max.x;
       else p.z = (p.z - b.min.z < b.max.z - p.z) ? b.min.z : b.max.z;
     }
   });
 }
 
+/* ---------------- desvio das construções ----------------
+   O PROBLEMA. Acima há três limites: a caixa do interior (setInteriorBounds), a
+   coleira da mira e a expulsão da carroceria. NENHUM DELES SABE ONDE ESTÃO OS
+   PRÉDIOS — a caixa do interior é o PERÍMETRO do pátio, e dentro dele há
+   galpões, tanques e contêineres que a órbita atravessa como se fossem ar.
 
+   Isso não incomodava enquanto a órbita era curta. O set foi autorado contra
+   ela: "os galpões de doca vêm de x 32 para x 26 ... o limite é a órbita do
+   estúdio, que com maxDistance 2,6 r chega a ~25 m do caminhão, então mais perto
+   que isso é uma parede dentro da câmera" (environments.json, setNote). Com a
+   lente de 30° a pose de abertura pousa em ~3,9 r e maxDistance virou
+   openingDistance(r) * 1.35 — perto de 50 m num conjunto de 19 m. A órbita
+   alcança o que o set supôs inalcançável.
 
+   POR QUE O TESTE É DE TRIÂNGULO E NÃO DE CAIXA. Esta é a terceira versão, e as
+   duas anteriores morreram na mesma pedra: usavam a caixa envolvente de cada
+   malha. Neste set isso NÃO FUNCIONA, e a razão é a organização do .glb — as
+   malhas são agrupadas por ATLAS DE MATERIAL, não por prédio (ver setNoteOld em
+   environments.json: "Container = ferrugem", "MetalTrim = guarda-corpos,
+   escadas, passarelas de tanques e vasos"). Uma malha é o conjunto de TODAS as
+   peças daquele atlas espalhadas pelo pátio, e a caixa dela é o volume que as
+   envolve, quase todo ar. Medido sobre a geometria de verdade, com célula de
+   2 m:
+
+       malha `Container` em x[22,6..51,8] z[9,7..44,2], 24 m de altura,
+       a 22,6 m do caminhão — a caixa MAIS PRÓXIMA de todas —
+       tem 0,115 de ocupação real. 88,5% dela é pátio vazio.
+
+   O efeito na tela era exatamente a queixa: a câmera parada em pátio aberto,
+   com o prédio à VISTA e não na frente, e a correção disparando. Medido em 2000
+   direções: a caixa acusava obstrução em 38,8% delas, a geometria real em 14,0%
+   — 34,2% de FALSO POSITIVO, mais de uma direção em três.
+
+   Com raycast de triângulo o falso positivo deixa de existir por construção:
+   quem responde é a superfície do tanque, não o ar em volta dele. O custo
+   medido é 0,356 ms por raio contra os 201 mil triângulos do cenário inteiro,
+   uma vez por quadro e só quando a câmera se move — cabe folgado no orçamento
+   de um quadro.
+
+   E A CORREÇÃO NÃO É A POSIÇÃO VERDADEIRA DA CÂMERA. O OrbitControls é o dono
+   da órbita; escrever a posição corrigida de volta nele apagaria o afastamento
+   que o usuário pediu e — pior — faria o arrasto DISPUTAR com a correção, que
+   foi como a versão de expulsão travava a câmera. Então a posição verdadeira é
+   guardada, a corrigida é escrita só para desenhar, e no topo do quadro seguinte
+   a verdadeira volta ANTES de controls.update(), que assim nunca a vê.
+
+   ---- QUARTA VERSÃO: O GATILHO SEMPRE ESTEVE CERTO. A RESPOSTA É QUE NÃO ----
+
+   As três versões anteriores discutiram QUANDO desviar. Medido sobre o
+   distrito-industrial de verdade — os 201.202 triângulos sólidos que
+   collectSolids() entrega, 5.190 poses de órbita dentro da caixa do interior —
+   o gatilho não é o problema:
+
+     · a correção dispara em 7,7% da órbita alcançável;
+     · nessas poses o caminhão está 100% tapado em 370 de 401, medido lançando
+       60 raios da câmera para pontos espalhados na caixa do conjunto;
+     · falso positivo de verdade (menos de 25% do caminhão tapado): 1 em 401.
+
+   Ou seja: quando ela dispara, há mesmo um galpão na frente. O que estava errado
+   é O QUE ELA FAZIA. Encolher a distância tirava 9,1 m na mediana e até 22 m de
+   uma órbita de 36 a 49 m — quase metade do afastamento — e isso não é "desviar
+   de um prédio", é reenquadrar o caminhão inteiro sem ninguém ter pedido. Era
+   exatamente essa a queixa: "me dá um zoom in extremo".
+
+   E A APROXIMAÇÃO NUNCA FOI NECESSÁRIA. Nas mesmas poses em que a correção
+   dispara, SUBIR a câmera — mesmo azimute, MESMA DISTÂNCIA — limpa a linha de
+   visada em 266 de 266, com 10° de subida na mediana, 22° no p90 e 30° no pior
+   caso. Não existe uma só pose neste cenário em que encolher a órbita seja a
+   única saída. (Girar também resolveria, com 12° na mediana, mas o azimute é o
+   eixo que o usuário está arrastando: corrigir ali é disputar com a mão dele.
+   A altura é o eixo livre.)
+
+   Então a ordem inverteu. PRIMEIRO SOBE — ganha altura e olha por cima do
+   telhado, que é o que uma câmera de cinema faz e o que preserva o
+   enquadramento. Só se a subida bater no teto é que a distância encolhe, e agora
+   limitada a CUT_MAX_F da órbita, para nunca mais virar um salto. */
+const BLOCK_SKIN = 0.6;      // metros de folga entre a lente e a construção
+const BLOCK_MIN_D = 1.0;     // metros — piso absoluto quando não há rig em foco
+
+/* A SUBIDA, que agora é a resposta principal.
+   RISE_STEP é o passo do rastreio quadro a quadro. RISE_MAX 32° cobre com folga
+   o pior caso medido (30°); RISE_ELEV_MAX impede que a soma vire uma vista de
+   cima — o enquadramento que VIEW_DIR (scene/view.ts) existe para evitar, e que
+   não mostra a lataria. */
+const RISE_STEP = 2.5;
+const RISE_MAX = 32;
+const RISE_ELEV_MAX = 62;
+/* Quando a visada passa de livre para bloqueada, um passo por quadro levaria
+   ~13 quadros só para DECIDIR a altura — 0,2 s raspando a parede. A transição é
+   rara (só na quina do galpão), então ali vale pagar uma varredura grossa de uma
+   vez; no regime permanente volta a ser um passo por quadro. */
+const RISE_PROBE_STEPS = 6;
+/* Assimétrico, e pelo mesmo motivo do recuo: a quina de um galpão é uma
+   descontinuidade, então entrar tem de ser rápido; sair devagar, senão sair de
+   trás do prédio devolve a câmera num pulo. */
+const RISE_IN = 0.20;
+const RISE_OUT = 0.45;
+/* Ao APROXIMAR — que agora só acontece com a subida no teto. 0,12 s espalha a
+   correção por ~7 quadros. */
+const AVOID_IN = 0.12;
+/* Ao DEVOLVER a distância: lento de propósito, mesma razão. */
+const AVOID_OUT = 0.38;
+/* TETO DA APROXIMAÇÃO, como fração da órbita. É o número que impede o "zoom in
+   extremo" de voltar por qualquer caminho: acima de ~30% o usuário deixa de ler
+   como ajuste e passa a ler como zoom. */
+const CUT_MAX_F = 0.30;
+
+let obstacles: THREE.Object3D[] = [];
+const _rc = new THREE.Raycaster();
+
+/**
+ * Declara a geometria SÓLIDA do cenário — aquela que a câmera não pode
+ * atravessar. Chamado por scene/set.ts a cada troca de cenário; `null` libera.
+ *
+ * São as malhas em si, e não caixas: ver o cabeçalho acima para por que a caixa
+ * envolvente não serve neste set.
+ */
+export function setCameraObstacles(list: THREE.Object3D[] | null) {
+  obstacles = list && list.length ? list.slice() : [];
+  /* O recuo E a subida suavizados eram medidos contra o cenário que saiu. */
+  avoidCut = NaN; cutTarget = 0;
+  riseNow = NaN; riseTarget = 0; wasBlocked = false;
+  releaseAvoidance();
+  _rayFrom.set(NaN, NaN, NaN);
+  _rayTo.set(NaN, NaN, NaN);
+  invalidate();
+}
+
+/**
+ * Distância em que o raio SAI da caixa do veículo, partindo da mira (que está
+ * dentro dela). É o piso do recuo: abaixo disto a câmera está DENTRO da
+ * carroceria.
+ *
+ * O piso não pode ser `controls.minDistance`: minDistance é o raio de uma
+ * ESFERA em torno da mira — 0,40 r, uns 4 m num conjunto de 19 m — e a mira
+ * fica no MEIO do veículo, então 4 m ao longo do comprimento ainda é a cabine
+ * por dentro. Contra uma caixa a conta certa é a saída do raio.
+ */
+function bodyExitDistance(dx: number, dy: number, dz: number) {
+  const f = vehicleFocus;
+  if (!f) return 0;
+  const b = f.box, o = controls.target;
+  let t = Infinity;
+  if (dx > 1e-6) t = Math.min(t, (b.max.x - o.x) / dx);
+  else if (dx < -1e-6) t = Math.min(t, (b.min.x - o.x) / dx);
+  if (dy > 1e-6) t = Math.min(t, (b.max.y - o.y) / dy);
+  else if (dy < -1e-6) t = Math.min(t, (b.min.y - o.y) / dy);
+  if (dz > 1e-6) t = Math.min(t, (b.max.z - o.z) / dz);
+  else if (dz < -1e-6) t = Math.min(t, (b.min.z - o.z) / dz);
+  return Number.isFinite(t) && t > 0 ? t : 0;
+}
+
+let avoidApplied = false;
+let avoidCut = NaN;                           // recuo suavizado, em metros
+let cutTarget = 0;                            // recuo que o rastreio quer, em metros
+let riseNow = NaN;                            // subida suavizada, em graus
+let riseTarget = 0;                           // subida que o rastreio quer, em graus
+let wasBlocked = false;                       // para detectar a TRANSIÇÃO livre→tapado
+const _avoidTrue = new THREE.Vector3();       // onde o OrbitControls pôs a câmera
+const _avoidShown = new THREE.Vector3();      // o que foi escrito para desenhar
+const _avoidDir = new THREE.Vector3();
+const _riseDir = new THREE.Vector3();         // _avoidDir girada para cima
+const _riseAxis = new THREE.Vector3();
+const _UP = new THREE.Vector3(0, 1, 0);
+/* O raycast é a única parte cara disto, e uma cena parada (ou girando só a
+   chuva) não muda nem a mira nem a câmera. Guardar a POSE em vez do resultado de
+   um raio só é o que permite lançar vários (a busca da altura) sem pagar por
+   eles num quadro em que ninguém mexeu na câmera. */
+const _rayFrom = new THREE.Vector3(NaN, NaN, NaN);
+const _rayTo = new THREE.Vector3(NaN, NaN, NaN);
+
+/** Devolve a posição verdadeira, se a correção deste quadro ainda estiver de pé. */
+function releaseAvoidance() {
+  if (!avoidApplied) return;
+  avoidApplied = false;
+  /* SÓ desfaz se a câmera continuar exatamente onde applyAvoidance() a deixou.
+     No intervalo entre um quadro e outro qualquer um pode reposicioná-la —
+     frameAll() no botão "enquadrar", capture.ts, o console — e restaurar por
+     cima disso desfaria a pose de quem mandou, um quadro depois. */
+  if (camera.position.distanceToSquared(_avoidShown) < 1e-8) {
+    camera.position.copy(_avoidTrue);
+  }
+}
+
+/**
+ * `_avoidDir` girada `deg` para CIMA, em torno do eixo horizontal perpendicular
+ * a ela. Resultado em `_riseDir`.
+ *
+ * @returns false quando a direção já está vertical demais para ter esse eixo —
+ *   aí não existe "subir" e o chamador fica com a direção original.
+ */
+function raisedDir(deg: number) {
+  _riseDir.copy(_avoidDir);
+  if (deg <= 1e-4) return true;
+  /* cross(dir, up) e não cross(up, dir): com dir = +Z o primeiro dá -X, e girar
+     +Z em torno de -X por um ângulo positivo leva a direção para CIMA. Trocar a
+     ordem desce a câmera para dentro do chão, silenciosamente. */
+  _riseAxis.crossVectors(_avoidDir, _UP);
+  const l = _riseAxis.length();
+  if (l < 1e-4) return false;
+  _riseAxis.divideScalar(l);
+  _riseDir.applyAxisAngle(_riseAxis, deg * Math.PI / 180).normalize();
+  return true;
+}
+
+/** Primeira superfície sólida entre a mira e `dist` na direção `dir`, ou Infinity. */
+function hitAlong(dir: THREE.Vector3, dist: number) {
+  if (!obstacles.length) return Infinity;
+  _rc.set(controls.target, dir);
+  _rc.near = 0;
+  /* Além da câmera não interessa: encurtar o alcance descarta cedo toda malha
+     mais distante que ela, que é a maior economia disponível aqui. */
+  _rc.far = dist;
+  const hits = _rc.intersectObjects(obstacles, false);
+  return hits.length ? hits[0].distance : Infinity;
+}
+
+/**
+ * Decide QUANTO subir e, só no que sobrar, quanto aproximar. Escreve
+ * `riseTarget` / `cutTarget`; a suavização é de quem chama.
+ *
+ * Custo em raios: 2 no regime livre, ~3 no regime tapado, até 8 no quadro da
+ * transição. A 0,356 ms por raio isso é 0,7 ms num quadro comum — a mesma ordem
+ * do raio único da versão anterior, porque o caro aqui nunca foi a quantidade de
+ * raios e sim rodá-los num quadro em que nada mexeu (ver o cache da pose).
+ */
+function trackAvoidance(trueDist: number, floor: number) {
+  if (trueDist <= floor) { riseTarget = 0; cutTarget = 0; wasBlocked = false; return; }
+
+  const elev = Math.asin(THREE.MathUtils.clamp(_avoidDir.y, -1, 1)) * 180 / Math.PI;
+  /* TETO DA SUBIDA. Além de RISE_MAX e da vista-de-cima, a caixa do interior
+     também limita: subir levanta a câmera, e passar de `maxY` faria o gancho de
+     confinamento puxá-la de volta no quadro seguinte — a correção brigaria com o
+     clamp e a câmera tremeria na altura. Resolver aqui, no ângulo, é exato: o
+     raio horizontal só ENCOLHE ao subir, então x/z nunca podem ser violados. */
+  let elevCeil = RISE_ELEV_MAX;
+  if (interiorBox) {
+    const room = (interiorBox.maxY - controls.target.y) / trueDist;
+    elevCeil = Math.min(elevCeil,
+      Math.asin(THREE.MathUtils.clamp(room, -1, 1)) * 180 / Math.PI);
+  }
+  const ceiling = Math.max(0, Math.min(RISE_MAX, elevCeil - elev));
+
+  /** distância do primeiro sólido com a câmera subida `deg`; Infinity = livre */
+  const probe = (deg: number) => (raisedDir(deg) ? hitAlong(_riseDir, trueDist) : 0);
+
+  let want = Math.min(riseTarget, ceiling);
+  let hit = probe(want);
+
+  if (hit >= trueDist) {
+    /* Livre onde estamos. Tenta DEVOLVER um passo de altura — é o que faz a
+       câmera descer sozinha depois que o galpão sai da frente, em vez de ficar
+       presa lá em cima pelo resto da sessão. */
+    if (want > 0 && probe(Math.max(0, want - RISE_STEP)) >= trueDist) {
+      want = Math.max(0, want - RISE_STEP);
+    }
+    riseTarget = want;
+    cutTarget = 0;
+    wasBlocked = false;
+    return;
+  }
+
+  if (!wasBlocked) {
+    /* TRANSIÇÃO: varredura grossa, uma vez, para achar a altura de uma tacada. */
+    want = ceiling;
+    for (let i = 1; i <= RISE_PROBE_STEPS; i++) {
+      const deg = ceiling * i / RISE_PROBE_STEPS;
+      if (probe(deg) >= trueDist) { want = deg; break; }
+    }
+  } else {
+    want = Math.min(ceiling, want + RISE_STEP);
+  }
+  wasBlocked = true;
+  riseTarget = want;
+
+  /* O que a subida não resolveu — e só isso — vira aproximação, com teto. */
+  hit = probe(want);
+  if (hit >= trueDist) { cutTarget = 0; return; }
+  const allowed = Math.min(trueDist, Math.max(floor, hit - BLOCK_SKIN));
+  cutTarget = Math.min(trueDist - allowed, trueDist * CUT_MAX_F);
+}
+
+/**
+ * Encolhe a distância da câmera até caber antes da primeira construção.
+ * Roda DEPOIS dos frameHooks (que são os donos da posição verdadeira) e a
+ * correção FICA APLICADA até o topo do quadro seguinte — é isso que faz um
+ * `renderer.render()` de fora do laço, como o de capture.ts, sair igual ao que
+ * estava na tela.
+ */
+function applyAvoidance(dt: number) {
+  const trueDist = camera.position.distanceTo(controls.target);
+  if (trueDist < 1e-3) return;
+  _avoidDir.subVectors(camera.position, controls.target).divideScalar(trueDist);
+
+  /* O PISO DO RECUO: nenhuma construção justifica pôr a câmera dentro da
+     carroceria. Sai da saída do raio na caixa do veículo, com a mesma folga que
+     a expulsão usa; minDistance entra como piso esférico de reserva. */
+  const floor = Math.max(
+    bodyExitDistance(_avoidDir.x, _avoidDir.y, _avoidDir.z) + BLOCK_SKIN,
+    controls.minDistance, BLOCK_MIN_D);
+
+  /* Nada se moveu ⇒ os ALVOS são os mesmos e nenhum raio precisa ser lançado; a
+     suavização abaixo continua andando com o relógio. É o que torna o custo do
+     raycast proporcional ao MOVIMENTO e não ao tempo: uma cena parada com a
+     chuva ligada continua desenhando quadros e não paga nada por eles. */
+  if (!_rayFrom.equals(controls.target) || !_rayTo.equals(camera.position)) {
+    _rayFrom.copy(controls.target);
+    _rayTo.copy(camera.position);
+    trackAvoidance(trueDist, floor);
+  }
+
+  /* O QUE É SUAVIZADO SÃO AS CORREÇÕES, NÃO A POSE. Amortecer a distância em si
+     faz a câmera PERSEGUIR o próprio zoom: com a órbita livre a distância
+     desejada muda a cada volta da roda e a suavizada chega 0,38 s depois, então
+     afastar viraria um elástico mesmo sem construção nenhuma por perto.
+     Amortecendo o RECUO e a SUBIDA (ambos zero com o caminho livre) a órbita
+     livre passa exatamente como se isto não existisse. */
+  if (!Number.isFinite(riseNow)) riseNow = riseTarget;
+  else {
+    const tau = riseTarget > riseNow ? RISE_IN : RISE_OUT;
+    riseNow += (riseTarget - riseNow) * (1 - Math.exp(-Math.max(dt, 1e-4) / tau));
+  }
+  if (!Number.isFinite(avoidCut)) avoidCut = cutTarget;
+  else {
+    const tau = cutTarget > avoidCut ? AVOID_IN : AVOID_OUT;
+    avoidCut += (cutTarget - avoidCut) * (1 - Math.exp(-Math.max(dt, 1e-4) / tau));
+  }
+  if (avoidCut < 0) avoidCut = 0;
+  const maxCut = trueDist - floor;
+  if (avoidCut > maxCut) avoidCut = Math.max(0, maxCut);
+  if (riseNow < 0) riseNow = 0;
+
+  /* ANTES do retorno curto: enquanto a suavização não assentou há movimento na
+     tela que nenhuma outra condição de wantsFrame() enxerga — a órbita não
+     mudou, o rig não mudou. */
+  if (Math.abs(cutTarget - avoidCut) > 0.01 || Math.abs(riseTarget - riseNow) > 0.05) {
+    invalidate();
+  }
+
+  if (avoidCut < 0.01 && riseNow < 0.05) return;   // livre, ou a um triz disso
+  _avoidTrue.copy(camera.position);
+  raisedDir(riseNow);
+  camera.position.copy(controls.target).addScaledVector(_riseDir, trueDist - avoidCut);
+  if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
+  _avoidShown.copy(camera.position);
+  avoidApplied = true;
+}
 
 /**
  * Hand scene.background / scene.environment over to a photoreal HDRI (or take
@@ -2312,6 +2680,50 @@ function openingDistance(r: number) {
   return r / Math.sin(Math.min(vHalf, hHalf));
 }
 
+/* VIEW_DIR ESTÁ NO EIXO DO VEÍCULO, E A CENA GIRA O VEÍCULO.
+   ---------------------------------------------------------------------------
+   `VIEW_DIR` é escrito no referencial do MODELO — "+Z é a frente" (ver
+   view.ts), então o +X dele é o lado do MOTORISTA e o três-quartos que ele
+   descreve é dianteiro. O card (ui/preview.ts) renderiza o veículo na origem,
+   sem giro nenhum, e por isso o vê exatamente assim.
+
+   O estúdio não: `RIG_PLACEMENT` (vehicle/models.ts) põe o conjunto 22 m
+   adiante e VIRADO 180°, para ele apontar para a saída do pátio em vez do fundo
+   dele. Somar VIEW_DIR ao centro em MUNDO, como se fazia aqui, ignora esse
+   giro — e com yaw = π o mundo +X/+Z cai no -X/-Z do veículo, ou seja no lado
+   do PASSAGEIRO e por trás. A cena abria espelhada em relação ao card que o
+   usuário tinha acabado de clicar.
+
+   Então a direção é levada para o referencial do conjunto antes de ser usada.
+   Só o YAW: uma inclinação qualquer que o nó viesse a ter é da CARROCERIA, e
+   herdar isso rodaria o horizonte. Com o conjunto na origem (yaw 0) a conta é a
+   identidade, que é o comportamento antigo — nada muda no card nem em cena
+   sem cenário. */
+const _poseUp = new THREE.Vector3(0, 1, 0);
+const _poseQ = new THREE.Quaternion();
+const _poseE = new THREE.Euler();
+const _poseYaw = new THREE.Quaternion();
+const _poseP = new THREE.Vector3();
+const _poseS = new THREE.Vector3();
+const _poseDir = new THREE.Vector3();
+
+/** VIEW_DIR do card, girado para o referencial em que o conjunto está posto. */
+function openingDir(groups: THREE.Object3D[]) {
+  _poseYaw.identity();
+  for (const g of groups) {
+    if (!g.visible) continue;
+    /* frameAll() já chamou expandByObject() nestes nós, que atualiza a matriz de
+       mundo — mas openingDir() é chamada por quem quiser, e uma matriz velha aqui
+       devolveria o lado errado sem qualquer sintoma. */
+    g.updateWorldMatrix(true, false);
+    g.matrixWorld.decompose(_poseP, _poseQ, _poseS);
+    _poseE.setFromQuaternion(_poseQ, 'YXZ');
+    _poseYaw.setFromAxisAngle(_poseUp, _poseE.y);
+    break;
+  }
+  return _poseDir.copy(CARD_VIEW_DIR).applyQuaternion(_poseYaw);
+}
+
 /* A ABERTURA DO ESTÚDIO É A POSE DO CARD.
    VIEW_DIR, FOV e TARGET_H vêm de ui/preview.ts — o mesmo três-quartos pela
    frente, a mesma elevação de ~7° e a mesma mira a 48% da altura da caixa. O
@@ -2339,8 +2751,15 @@ export function frameAll(groups: THREE.Object3D[]) {
 
   const dist = openingDistance(sphere.radius);
 
-  camera.position.copy(target).addScaledVector(CARD_VIEW_DIR, dist);
+  camera.position.copy(target).addScaledVector(openingDir(groups), dist);
   if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
+  /* A correção suavizada é sobre a órbita ANTERIOR. Sem zerá-la, uma pose de
+     abertura ampla nasceria encolhida (e agora também LEVANTADA) e iria se
+     assentando ao longo do AVOID_OUT/RISE_OUT — que são lentos de propósito, e
+     aqui apareceriam como a cena "respirando" ao carregar ou a cada clique em
+     enquadrar. */
+  avoidCut = NaN; cutTarget = 0;
+  riseNow = NaN; riseTarget = 0; wasBlocked = false;
   camera.far = Math.max(dist + sphere.radius * 4, 700);   // sky dome inside the frustum
   camera.updateProjectionMatrix();               // near is managed per-frame in the loop
   /* frameAll() does NOT call controls.update(), and damping is on, so the camera
@@ -2509,6 +2928,13 @@ export function startLoop() {
     /* A backgrounded tab returns one huge dt, which would complete every tween
        in a single frame (a visible jump) and teleport the rain field. */
     const dt = Math.min(clock.getDelta(), 0.1);
+    /* ANTES de controls.update(): o desvio das construções deixa a câmera numa
+       posição ENCOLHIDA para desenhar, e o OrbitControls lê `camera.position`
+       para saber onde a órbita está. Sem desfazer a correção aqui ele a leria
+       como se fosse a que o usuário pediu e a incorporaria — a aproximação
+       forçada por um galpão viraria permanente, e o arrasto passaria a disputar
+       com ela (foi assim que a versão por expulsão travava a câmera). */
+    releaseAvoidance();
     /* Returns true while the camera is still being transformed — a drag, inertia
        from `enableDamping`, a zoom, autoRotate. This is the ONLY signal that
        says "damping has not settled yet", and it is why the dirty loop does not
@@ -2543,6 +2969,13 @@ export function startLoop() {
        body ejection, the haze shell following the camera) and a state they were
        not allowed to correct would be a state the NEXT drawn frame renders wrong.
        They are a few vector ops, not a draw call. */
+
+    /* DEPOIS dos hooks: eles são os donos da posição verdadeira (a caixa do
+       interior, a expulsão da carroceria), e corrigir antes deles seria corrigir
+       uma posição que ainda vai mudar. Roda também em quadro pulado — a
+       suavização anda com o RELÓGIO, e pular a atualização faria a correção
+       saltar de uma vez quando o desenho voltasse. */
+    applyAvoidance(dt);
 
     /* Checked AFTER the hooks and BEFORE the dirty counter is spent: a frame
        skipped because the scene graph is deliberately wrong must not consume the

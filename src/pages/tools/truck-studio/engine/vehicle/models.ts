@@ -37,6 +37,18 @@ export interface CabDef {
    */
   preview?: string;
   paintMaterials?: string[];
+  /**
+   * Direção da câmera da MINIATURA desta cabine (ui/preview.ts), no referencial
+   * do modelo — mesmo eixo do VIEW_DIR de scene/view.ts, +Z na dianteira.
+   * Ausente = usa o VIEW_DIR global, que é o caso normal.
+   *
+   * Existe porque o ângulo do card é um só para todas as cabines e a LEITURA
+   * dele não é: um S-Way, mais largo e de lateral reta, aparece mais de perfil
+   * que um FH no mesmo azimute. Isto NÃO afeta a abertura do estúdio, que segue
+   * o VIEW_DIR global — o card é a promessa e a cena é a entrega, e afastar os
+   * dois de propósito é uma decisão por veículo, não um acidente.
+   */
+  viewDir?: number[];
   wheelMeshRegex?: string;
   dims?: { height: number; length: number };
   /** kingpin plate: null → legacy trailer placement */

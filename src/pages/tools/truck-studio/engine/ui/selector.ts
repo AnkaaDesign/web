@@ -174,6 +174,9 @@ const STEPS: StepDef[] = [
 /* Tag de canto de tudo que ainda não tem geometria 3D. Uma constante porque o
    card do fabricante e o do modelo têm de dizer exatamente a mesma coisa. */
 const EM_BREVE = 'Em breve';
+/* Tag de canto de quem vem com a pintura de fábrica. Mesma razão de ser uma
+   constante: é ela que explica, no card, por que o passo da Cor não aparece. */
+const EDICAO_ESPECIAL = 'Edição especial';
 
 /* A flow is just the SUBSEQUENCE of STEPS it walks, in order. Everything that
    used to hardcode "step 0/1/2" now asks the sequence instead, which is what
@@ -615,14 +618,19 @@ function itemsFor(stepIndex: number, choice: Choice): CardItem[] {
       logo: null,
       accent: man.accent,
       /* A tag do indisponível é do motor, não do manifesto: um `note` autoral não
-         pode divergir do que o card realmente faz. */
-      tag: m.available ? m.note : EM_BREVE,
+         pode divergir do que o card realmente faz. Vale o mesmo para a edição
+         especial — quem decide o rótulo é quem decide o comportamento, e o
+         comportamento (pular a cor) sai de `specialEdition`, não do `note`. */
+      tag: !m.available ? EM_BREVE : (m.specialEdition ? EDICAO_ESPECIAL : m.note),
       selected: m.id === choice.modelId,
       available: m.available,
       /* O card mostra o modelo NA COR que está escolhida — é o mesmo render que
          o passo seguinte usa, então trocar de modelo já mostra como a cor atual
          fica nele. Só quem tem geometria: um "Em breve" não tem o que renderizar
-         e continua com a foto do manifesto. */
+         e continua com a foto do manifesto.
+         Numa edição especial a cor pedida é ignorada pelo render (a cabine não
+         tem material de tinta), então o card sai com a película — que é
+         exatamente o que ele precisa mostrar. */
       preview: m.available && hasCabPreview(m.cab)
         ? { cabId: m.cab, hex: color.hex, finish: color.finish }
         : null,
@@ -844,8 +852,12 @@ function renderSteps() {
    da janela continuam focáveis, e é por isso que setPage() mexe no tabIndex: um
    Tab não pode levar o foco para um card que ninguém está vendo. */
 const PER_PAGE = 3;
-/** Passos que rolam em vez de empilhar. Cenário e modelo têm 3 cards e ficam grid. */
-const CAROUSEL_STEPS = new Set<StepId>(['manufacturer', 'color']);
+/** Passos que rolam em vez de empilhar. Só o cenário fica grid: tem 3 cards fixos.
+    MODELO entrou aqui quando a IVECO passou a ter 4 S-Way (o 480, o 440, a edição
+    Metallica e o 540). O grid é `repeat(3, 1fr)`, então o quarto card caía sozinho
+    numa segunda linha — e a regra é `items.length > PER_PAGE`, logo uma marca com
+    3 modelos ou menos continua exatamente como era, em grid. */
+const CAROUSEL_STEPS = new Set<StepId>(['manufacturer', 'model', 'color']);
 
 let track: HTMLElement | null = null;
 let navPrev: HTMLButtonElement | null = null;
@@ -1052,9 +1064,31 @@ function choose(stepIndex: number, id: string) {
     choice.manufacturerId = id;
   } else if (stepIndex === 2) {
     choice.modelId = id;
+    /* EDIÇÃO ESPECIAL: o passo da cor SAI da sequência deste fluxo.
+       ---------------------------------------------------------------------
+       A sequência é dado de sessão, não constante — `seq` foi feita para ser a
+       subsequência que ESTE fluxo caminha —, então tirar e repor o passo 3 aqui
+       é usar o mecanismo como ele foi desenhado, e não um caso especial colado
+       por cima. Tudo que lê a posição (a trilha de migalhas, "Voltar", advance(),
+       clampStep) já pergunta à sequência, então nada mais precisa saber disto.
+
+       REPOR É TÃO IMPORTANTE QUANTO TIRAR: o seletor não fecha entre um clique e
+       outro, e quem vier de uma edição especial de volta para um modelo comum
+       precisa da cor de novo. Por isso o passo é reconstruído a partir do FLUXO
+       a cada escolha, em vez de ser removido para sempre. */
+    const special = !!getModel(id)?.model.specialEdition;
+    const base = FLOWS[session.flow];
+    session.seq = special ? base.filter((s) => s !== 3) : base.slice();
+    /* Uma cor tem de existir na escolha resolvida de qualquer jeito — ela é o
+       que o estúdio aplica e o que vai para o localStorage. Numa edição especial
+       ela simplesmente não é do usuário: a película já é a pintura, e o valor
+       carregado só evita um `null` em quem lê `colorId`. */
+    if (special && !choice.colorId) choice.colorId = defaultChoice().colorId;
     /* O próximo passo vai renderizar ESTA cabine doze vezes. Começar a baixar a
        geometria agora sobrepõe o download ao clique que o usuário ainda vai
-       dar, em vez de deixá-lo esperando na frente de um grid vazio. */
+       dar, em vez de deixá-lo esperando na frente de um grid vazio. Numa edição
+       especial não há passo seguinte de cor, mas a cabine é a mesma que o
+       estúdio vai carregar — o aquecimento continua valendo. */
     warmCabPreview(getModel(id)?.model.cab);
   } else {
     choice.colorId = id;

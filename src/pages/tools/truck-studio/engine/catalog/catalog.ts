@@ -112,6 +112,23 @@ export interface ModelDef {
    * seletor mostra o card marcado "Em breve"), mas não é clicável.
    */
   available: boolean;
+  /**
+   * EDIÇÃO ESPECIAL: a pintura é parte do produto, não uma escolha.
+   *
+   * Um S-Way Metallica, um FH da Iron Mark, um Actros de aniversário — o que os
+   * define é justamente a película, e oferecer doze cores para ela seria
+   * oferecer doze caminhões que não existem. Quem marca isto some com o passo
+   * "Cor" do seletor, com o card de cor do canto e com o painel de tinta.
+   *
+   * É AUTORADO NO MANIFESTO, não inferido de `paintMaterials: []` no cabs.json.
+   * Os dois costumam andar juntos, mas dizem coisas diferentes: `paintMaterials`
+   * vazio é uma verdade sobre a GEOMETRIA ("nenhum material aceita tinta"), e
+   * isto é uma verdade sobre o PRODUTO ("esta pintura é a identidade dele").
+   * Uma cabine pode ter os dois estados separados — uma bake sem material de
+   * tinta mapeado ainda é um caminhão comum, à espera de conserto, e não uma
+   * edição especial. Inferir juntaria um defeito com uma decisão comercial.
+   */
+  specialEdition: boolean;
 }
 
 export interface ManufacturerDef {
@@ -457,6 +474,9 @@ function normalizeModel(input: unknown, manufacturerId: string): ModelDef | null
        modelos selecionáveis — exatamente o comportamento anterior. Só quem
        escreve `false` explicitamente vira "Em breve". */
     available: bool(raw.available, true),
+    /* Default FALSE pelo mesmo motivo: nenhum manifesto existente vira edição
+       especial por omissão. */
+    specialEdition: bool(raw.specialEdition, false),
   };
 }
 

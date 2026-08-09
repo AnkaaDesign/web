@@ -32,7 +32,7 @@ import { assetUrl } from '../catalog/catalog';
 import type { PaintFinish } from '../vehicle/paint';
 /* A pose do card. Mora em scene/view.ts porque o ESTÚDIO abre na mesma
    (scene/scene.ts, frameAll()) — o card é a promessa, a cena é a entrega. */
-import { VIEW_DIR, FOV, TARGET_H } from '../scene/view';
+import { CARD_VIEW_DIR, FOV, TARGET_H } from '../scene/view';
 
 /* Tamanho do buffer. Um card de cor tem ~290 px de largura, e numa tela 2x isso
    já são 580 px de verdade — a primeira versão renderizava a 460 e o resultado
@@ -77,6 +77,20 @@ interface CabEntry {
   root: THREE.Object3D;
   /** os materiais de tinta desta cabine — recoloridos a cada render */
   paint: THREE.MeshPhysicalMaterial[];
+  /**
+   * Direção da câmera desta cabine: `viewDir` do cabs.json, senão o VIEW_DIR
+   * global. Resolvida na carga porque frame() é chamada também de dentro de
+   * calibrate(), que só tem o entry em mão.
+   *
+   * POR QUE UM OVERRIDE POR CABINE. O ângulo é o MESMO para todas — medido:
+   * as quatro cabines têm o eixo longo em Z e a dianteira em +Z, e frame() usa
+   * um VIEW_DIR só. O que muda é a CARROCERIA: o S-Way é o mais largo em
+   * relação ao comprimento (3,00 / 5,77 = 0,52 contra 0,46 do FH) e tem a
+   * lateral alta e reta, então no mesmo azimute ele LÊ mais de perfil que o
+   * Volvo e a Scania. Corrigir isso mexendo no VIEW_DIR global giraria os três
+   * juntos e não resolveria nada; o ajuste é por veículo.
+   */
+  dir: THREE.Vector3;
   /**
    * Correção de enquadramento medida NA IMAGEM, uma vez por cabine (< 1 = a
    * câmera chega mais perto). Ver calibrate(): a caixa projetada ainda sobra
@@ -377,10 +391,18 @@ function loadCabForPreview(cabId: string): Promise<CabEntry | null> {
   const def = vehicleState.byId[cabId];
   const subs = (def?.paintMaterials || ['carpaint']).map((s) => s.toLowerCase());
 
+  /* Três números, ou nada. Um `viewDir` pela metade no manifesto é erro de
+     digitação, e cair no padrão é melhor que enquadrar por um vetor truncado. */
+  const vd = Array.isArray(def?.viewDir) && def.viewDir.length === 3
+    && def.viewDir.every((n) => typeof n === 'number' && Number.isFinite(n))
+    ? new THREE.Vector3(def.viewDir[0], def.viewDir[1], def.viewDir[2])
+    : null;
+  const dir = vd && vd.lengthSq() > 1e-6 ? vd.normalize() : CARD_VIEW_DIR.clone();
+
   const job = loadGLB(assetUrl(src))
     .then((root) => {
       center(root);
-      const entry: CabEntry = { root, paint: installPaint(root, subs) };
+      const entry: CabEntry = { root, paint: installPaint(root, subs), dir };
       cabs.set(cabId, entry);
       return entry;
     })
@@ -414,7 +436,8 @@ const _corner = new THREE.Vector3();
    cantos da caixa e corrige-se a distância pela sobra medida. Duas voltas —
    a projeção não é linear na distância, mas converge rápido, e a segunda volta
    já entrega erro abaixo de 1%. */
-function frame(cam: THREE.PerspectiveCamera, root: THREE.Object3D, fit = 1) {
+function frame(cam: THREE.PerspectiveCamera, root: THREE.Object3D, fit = 1,
+               dir: THREE.Vector3 = CARD_VIEW_DIR) {
   const box = new THREE.Box3().setFromObject(root);
   if (box.isEmpty()) return;
   const sphere = box.getBoundingSphere(new THREE.Sphere());
@@ -426,7 +449,7 @@ function frame(cam: THREE.PerspectiveCamera, root: THREE.Object3D, fit = 1) {
   let dist = sphere.radius / Math.sin((FOV * Math.PI) / 360);
 
   const place = () => {
-    cam.position.copy(target).addScaledVector(VIEW_DIR, dist);
+    cam.position.copy(target).addScaledVector(dir, dist);
     /* near/far a cada volta: eles dependem da distância que acabou de mudar, e
        um near maior que a frente do caminhão o cortaria ao meio. */
     cam.near = Math.max(0.05, dist - sphere.radius * 2);
@@ -522,7 +545,7 @@ function calibrate(entry: CabEntry, st: Stage): number {
     /* Passo limitado: uma medida estranha (um mesh gigante invisível, um
        recorte) não pode enfiar a câmera dentro do caminhão nem jogá-la longe. */
     fit *= Math.min(1.35, Math.max(0.72, used / FIT_TARGET));
-    frame(st.camera, entry.root, fit);
+    frame(st.camera, entry.root, fit, entry.dir);
     st.renderer.render(st.scene, st.camera);
   }
   return fit;
@@ -553,7 +576,7 @@ function drawShot(entry: CabEntry, hex: string, finish: PaintFinish): string | n
 
   st.scene.add(entry.root);
   try {
-    frame(st.camera, entry.root, entry.fit ?? 1);
+    frame(st.camera, entry.root, entry.fit ?? 1, entry.dir);
     st.renderer.render(st.scene, st.camera);
     /* Primeira miniatura desta cabine: acerta o enquadramento olhando o
        resultado e guarda o fator. As outras onze cores já saem prontas. */

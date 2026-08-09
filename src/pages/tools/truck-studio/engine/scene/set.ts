@@ -29,7 +29,7 @@
    antigos. Sem isso, cada set carregaria a sua própria cópia do mesmo asfalto
    4k: o `distrito-industrial` fecha em 7,8 MB porque o chão dele pesa zero. */
 import * as THREE from 'three';
-import { scene, renderer, registerGroundMaterials } from './scene';
+import { scene, renderer, registerGroundMaterials, setCameraObstacles } from './scene';
 import type { GroundMatEntry, GroundSurface } from './scene';
 import { loadGLB } from '../vehicle/models';
 import { assetUrl } from '../catalog/catalog';
@@ -92,6 +92,8 @@ export interface SetDef {
   interior?: boolean;
   /** caixa que prende a câmera dentro do set, em metros de mundo */
   bounds?: { halfX: number; halfZ: number; minY: number; maxY: number };
+  /** afasta da rua, no carregamento, as malhas mais altas que `minHeight` */
+  pushback?: { minHeight: number; distance: number; from?: number };
 }
 
 const group = new THREE.Group();
@@ -468,6 +470,101 @@ function disposeTree(root: THREE.Object3D) {
   });
 }
 
+/* ---------------- geometria sólida e recuo das construções ----------------
+   Duas coisas que este módulo tem e scene.ts não: quais malhas são CHÃO e quais
+   são construção, e a chance de mexer nelas antes de qualquer medida.
+
+   O QUE É SÓLIDO. Não é uma heurística de tamanho — é o próprio manifesto.
+   `def.materials` existe para dizer quais nomes de material são superfície de
+   chão (é por eles que bindMaterials religa asfalto, concreto, meio-fio, faixa
+   e grama). Logo: malha cujos materiais são TODOS de chão é chão; o resto é
+   construção. Vale a pena ser exato aqui porque uma classificação errada vira
+   uma câmera que se aproxima sozinha em pátio aberto.
+
+   O ESPALHAMENTO FICA DE FORA. `EXT_mesh_gpu_instancing` neste set são os tufos
+   de grama e a fiada de cerca. Grama não é obstáculo, e quem impede a câmera de
+   sair do pátio é a caixa do interior, que é o perímetro dele. Um InstancedMesh
+   também é o pior caso possível para o raycast: uma malha só, com todas as
+   instâncias dentro. */
+function collectSolids(root: THREE.Object3D, def: SetDef) {
+  const ground = new Set(Object.keys(def.materials || {}));
+  const out: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if ((mesh as unknown as THREE.InstancedMesh).isInstancedMesh) return;
+    const mm = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    /* TODOS de chão para ser chão: uma malha que mistura parede e piso é
+       construção, e tratá-la como chão abriria um buraco numa parede. */
+    if (mm.length && mm.every((m) => m && ground.has((m as THREE.Material).name))) return;
+    out.push(mesh);
+  });
+  return out.length ? out : null;
+}
+
+/* ---------------- recuo das construções altas ----------------
+   Afasta da rua as construções mais altas. Pedido de olho — "as construções
+   altas ficam levemente mais para trás em relação à rua" — e com um efeito
+   colateral que interessa à câmera: quanto mais longe o prédio, menor o recuo
+   que o desvio precisa aplicar quando a órbita passa atrás dele.
+
+   É UM AJUSTE DE CARGA, não uma reexportação. O certo seria refazer o set.glb
+   (tools/env-build), e é lá que isto deve acabar se for para ficar; enquanto
+   for um número em ajuste, mexer no manifesto evita um ciclo de rebuild de
+   6 MB por metro experimentado. As duas coisas não podem coexistir: no dia em
+   que o .glb nascer com as construções já recuadas, este bloco tem de sair do
+   manifesto, senão o recuo é aplicado duas vezes.
+
+   O CRITÉRIO É A ALTURA porque é o que foi pedido, e ela separa bem: no
+   distrito as malhas de 8 m para cima são os galpões altos, os tanques e as
+   chaminés; abaixo ficam os galpões de doca (5 a 6,6 m) e os contêineres
+   (2,6 m), que já estão recuados e servem de escala perto do caminhão.
+
+   MEDIDO ANTES DE APLICAR, sobre o próprio .glb: com 8 m de recuo nenhuma
+   construção sai da laje de concreto (x -92,4..86,3) e nenhum par de caixas
+   passa a se sobrepor que já não se sobrepusesse — 13 pares antes, 13 depois,
+   todos entre peças do mesmo complexo. */
+function applyPushback(root: THREE.Object3D, def: SetDef) {
+  const cfg = def.pushback;
+  if (!cfg || !(cfg.distance > 0)) return 0;
+  const minH = cfg.minHeight > 0 ? cfg.minHeight : 8;
+  const from = Number.isFinite(cfg.from as number) ? (cfg.from as number) : 0;
+  const box = new THREE.Box3();
+  const world = new THREE.Vector3();
+  const origin = new THREE.Vector3();
+  const inv = new THREE.Matrix4();
+  const moved: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if ((mesh as unknown as THREE.InstancedMesh).isInstancedMesh) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const local = mesh.geometry.boundingBox;
+    if (!local || local.isEmpty()) return;
+    box.copy(local).applyMatrix4(mesh.matrixWorld);
+    if (box.max.y - box.min.y < minH) return;
+    moved.push(mesh);
+  });
+  for (const mesh of moved) {
+    box.copy(mesh.geometry.boundingBox!).applyMatrix4(mesh.matrixWorld);
+    const centre = (box.min.x + box.max.x) / 2;
+    world.set(centre >= from ? cfg.distance : -cfg.distance, 0, 0);
+    /* O deslocamento é de MUNDO e a posição do nó é do PAI. Converter um VETOR
+       pela inversa do pai não é aplicar a matriz nele — isso levaria a
+       translação junto —, é a diferença entre dois PONTOS convertidos. (E não
+       serve transformDirection(), que normaliza e jogaria fora o comprimento.) */
+    if (mesh.parent) {
+      inv.copy(mesh.parent.matrixWorld).invert();
+      origin.set(0, 0, 0).applyMatrix4(inv);
+      world.applyMatrix4(inv).sub(origin);
+    }
+    mesh.position.add(world);
+    mesh.updateMatrix();
+  }
+  if (moved.length) root.updateMatrixWorld(true);
+  return moved.length;
+}
+
 /** Remove o set atual da cena e libera geometria/materiais. */
 export function disposeSet() {
   for (const child of [...group.children]) {
@@ -475,6 +572,9 @@ export function disposeSet() {
     disposeTree(child);
   }
   currentUrl = null;
+  /* As caixas são de MUNDO e valiam para esta geometria: mantê-las depois de ela
+     sair prenderia a câmera contra prédios que não estão mais na cena. */
+  setCameraObstacles(null);
   stats = { meshes: 0, triangles: 0, materials: 0, bound: 0 };
 }
 
@@ -587,6 +687,12 @@ export async function applySet(def: SetDef | null | undefined,
 
   group.add(root);
   currentUrl = url;
+  /* DEPOIS do add(): as duas etapas medem em espaço de MUNDO, e enquanto o root
+     está solto a matriz dele não tem o pai. E o recuo vem ANTES da coleta, ou a
+     câmera desviaria das construções onde elas estavam. */
+  const pushed = applyPushback(root, def!);
+  if (pushed) console.info(`[set] recuo aplicado a ${pushed} malhas altas`);
+  setCameraObstacles(collectSolids(root, def!));
   stats = { meshes, triangles, materials: mats.size, bound };
   return true;
 }

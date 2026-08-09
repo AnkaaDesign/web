@@ -54,7 +54,7 @@ import { initUI, setStatus } from './ui/chrome';
    ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
    já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
    e um é o suficiente. */
-import { initPaintPanel, setPaintPanelColor } from './ui/paint-panel';
+import { initPaintPanel, setPaintPanelColor, closePaintPanel } from './ui/paint-panel';
 import { root, $ } from './core/dom';
 import type { Choice, EnvironmentDef, ManufacturerDef, ModelDef } from './catalog/catalog';
 import type { CabDef } from './vehicle/models';
@@ -264,6 +264,22 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
    aplicada DEPOIS disso, senão a segunda chamada apagaria a primeira.
    Roda em toda aplicação, inclusive quando a cor não mudou: uma troca de cabine
    cria materiais NOVOS, e eles precisam ser dirigidos outra vez. */
+/* Verdadeiro enquanto o cavalo em cena for uma edição especial. Módulo-privado e
+   escrito num lugar só (setSpecialEdition), porque applyColor() roda por vários
+   caminhos e não pode reabrir o crachá de cor que este estado fechou. */
+let specialEdition = false;
+
+/** Liga/desliga as afordâncias de tinta do cavalo. Idempotente. */
+function setSpecialEdition(on: boolean) {
+  specialEdition = on;
+  showColorBadge(!on);
+  /* O botão do painel de tinta é do chrome, não deste módulo — por isso pelo id,
+     e por isso tolerante: um chrome sem o botão não pode derrubar a carga. */
+  const btn = document.getElementById('btn-paint');
+  if (btn) btn.classList.toggle('hidden', on);
+  if (on) closePaintPanel();
+}
+
 function applyColor(color: PaintColorDef) {
   /* A RECEITA DA TINTA GANHA DA DERIVAÇÃO.
      vehicle/paint.ts sabe inventar uma cor de flop e uma de floco a partir do
@@ -315,7 +331,7 @@ function applyColor(color: PaintColorDef) {
     hex: color.hex,
     finishLabel: FINISH_LABEL[color.finish],
   });
-  showColorBadge(true);
+  showColorBadge(!specialEdition);
   /* O laço sujo (scene.ts) só desenha quando alguém diz que a imagem mudou, e
      esta é uma das três lacunas que a nota de ON_DEMAND_RENDERING lista por
      nome: o atalho de só-cor pula o pipeline de carregamento de propósito, e com
@@ -578,6 +594,15 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
         : null,
     });
     showBadge(true);
+    /* EDIÇÃO ESPECIAL: some com as duas afordâncias de tinta.
+       O seletor já tira o passo "Cor" da sequência, mas o card de cor do canto e
+       o botão do painel de tinta vivem FORA dele e continuariam abrindo um fluxo
+       que não muda nada — a cabine não tem material de tinta registrado, então
+       cada clique seria uma promessa que a cena não cumpre.
+       applyColor() acima roda de qualquer forma, e é de propósito: ele também
+       alimenta o editor de arte e o crachá, e a cor carregada continua sendo a
+       do implemento, que É pintável mesmo atrás de um cavalo de edição especial. */
+    setSpecialEdition(!!model.specialEdition);
     setMapBadge({
       envName: env.name,
       envSubtitle: env.subtitle,
