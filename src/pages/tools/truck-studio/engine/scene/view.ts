@@ -51,32 +51,48 @@ import * as THREE from 'three';
    PASSAGEIRO, de trás. Ver openingDir() em scene/scene.ts. */
 export const VIEW_DIR = new THREE.Vector3(2.20, 0.575, 1.17).normalize();
 
-/* A POSE DO CARD, QUE DE PROPOSITO NAO E MAIS A DO ESTUDIO.
+/* A POSE DO CARD, QUE DE PROPOSITO NAO E A DO ESTUDIO.
    ---------------------------------------------------------------------------
    O cabecalho deste arquivo diz que as duas tem de bater, e a razao continua
-   valendo: abrir a cena noutro angulo faz parecer que veio parar noutro
-   veiculo. O que mudou e que "o mesmo angulo" para de significar "a mesma
+   valendo: abrir a cena noutro angulo faz parecer que o veiculo virou outro no
+   caminho. O que mudou e que "o mesmo angulo" para de significar "a mesma
    leitura" quando as duas molduras sao diferentes.
 
    No estudio a camera pousa em openingDistance() e sobra folga em volta do
-   caminhao. No card, calibrate() mede a silhueta em pixels e APROXIMA ate ela
-   encher ~90% do eixo mais apertado. Com o quadro cheio, os mesmos 13 graus de
-   elevacao entregam muito mais telhado: a mesma pose, lida de duas distancias,
-   nao e a mesma imagem. Foi essa a queixa — o estudio ficou bom e o card ficou
-   "muito do topo".
+   caminhao. No card o quadro e CHEIO — a silhueta ocupa 88 % da altura. Com o
+   quadro cheio, os mesmos graus de elevacao entregam muito mais telhado: a
+   mesma pose, lida de duas distancias, nao e a mesma imagem.
 
-   Entao o card fica MAIS BAIXO e MAIS FRONTAL que a cena:
-     azimute   52 graus (contra 62 do estudio)
-     elevacao   8 graus (contra 13)
-   Perto o bastante para o card continuar sendo a promessa que a cena cumpre,
-   longe o bastante para os dois enquadramentos lerem igual.
+   Quem consome esta constante e so o pipeline offline
+   (`tools/studio-render/rig.ts`). `scene/scene.ts` importa o `VIEW_DIR` acima
+   com o APELIDO `CARD_VIEW_DIR`, que e outra coisa: a pose da cena.
 
-   O override por cabine (`viewDir` no cabs.json) SAIU junto com o cabs.json, e
-   com ele o consumidor desta constante no card: os cards mostram renders
-   PRE-PRODUZIDOS agora (catalog/renders.ts), nao um render ao vivo. Esta pose
-   continua sendo a de frameAll(), e e ELA que o pipeline offline de renders tem
-   de reproduzir para o card prometer o que a cena entrega. */
-export const CARD_VIEW_DIR = new THREE.Vector3(2.00, 0.360, 1.56).normalize();
+   MEDIDO NAS FOTOS DE CATÁLOGO, em 2026-08-09, e não escolhido no olho.
+   ---------------------------------------------------------------------------
+   As três fotos de fabricante que o projeto já tinha — `iveco/models/s-way`,
+   `volvo/models/fh16` e `scania/models/s730` — são exatamente o que um card de
+   caminhão tem de parecer, e as três concordam entre si: FRENTE quase inteira,
+   lateral encurtada, e do teto só uma fresta.
+
+   Como o azimute sai delas: a largura aparente da FRENTE é `W·cos(az)` e a do
+   FLANCO é `L·sin(az)`. Medindo os dois no S-Way (300 px de frente para 270 px
+   de flanco, sobre 2,5 m de largura e 2,3 m de cabine) sai `tan(az) ≈ 0,98`,
+   ou seja **az ≈ 42°**. A elevação sai das elipses das rodas, que nas três
+   fotos são quase círculos: **el ≈ 3,5°**. Comparando o primeiro render com a
+   foto lado a lado, 42° ainda mostrava mais flanco que a referência; o valor
+   fechado é **38°**, que é onde as duas larguras aparentes coincidem.
+
+     x = sin(38°)·cos(3,5°)   y = sin(3,5°)   z = cos(38°)·cos(3,5°)
+
+   ERA (2.00, 0.360, 1.56) — az 52°, el 8,1°. Dez graus mais de perfil e o
+   dobro de elevação, e a diferença NÃO é sutil no quadro: com o caminhão
+   ocupando 88 % da altura, o FOV de 30° põe a câmera a ~8,5 m; a 8° de
+   elevação ela pousa a 3,1 m do chão, ou seja ACIMA da metade de uma cabine de
+   4 m, olhando para o capô e para o teto. A 3,5° ela cai para ~2,4 m — altura
+   de janela de motorista, que é de onde as fotos de catálogo são tiradas.
+
+   */
+export const CARD_VIEW_DIR = new THREE.Vector3(0.6145, 0.0610, 0.7865).normalize();
 
 /** Teleobjetiva curta. É o que achata a perspectiva e afasta a câmera: uma
  *  cabine em 45° incha de perto e denuncia o CG. */
