@@ -9,11 +9,16 @@ import { scene, onRig, invalidate } from '../scene/scene';
 import {
   makePaintMaterial, forgetPaintMaterial, setPaint, isPaintMaterial,
 } from './paint';
+import {
+  setupCommon, setShadowCasters, isPaintableMaterial, materialNamesOf, maskOnly,
+  TEXTURE_ANISOTROPY,
+} from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
 import { TrailerRig, type TrailerDims } from './trailer-rig';
+import { swapTrailerWheels } from './wheels';
 import {
   solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
   type TractorHitch, type HitchManifest, type CouplingSolution,
@@ -551,234 +556,11 @@ export function cabDefFor(
   };
 }
 
-/* ---------------- material / mesh setup ---------------- */
-const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
-
-/* ---------------- QUEM ACEITA TINTA, e por que não é mais só o nome --------
-   `nome.includes('carpaint')` era uma verdade sobre TRÊS geometrias curadas —
-   as de `models/vehicles/`, cujo bake RENOMEIA o corpo para `carpaint` porque
-   ali o nome do material é FUNCIONAL (ver o cabeçalho de tools/iveco-bake).
-   As 49 cabines de `models/trucks/` nunca passaram por esse renomeio: são rips
-   SCS/ETS2 no padrão `<peça>_mat_<NNNN>_<textura-fonte>`, e a chapa pintável se
-   chama `plain_grey`, `color` ou `carpaint*` conforme o ano do modelo.
-
-   MEDIDO nos 49 arquivos: pelo nome, 26 deles não têm UM material de tinta —
-   escolher uma cor não muda absolutamente nada — e entre os 23 restantes o
-   casamento às vezes pega só a capa do retrovisor (DAF XF Euro6) ou só a saia
-   lateral (Iveco Hi-Way).
-
-   ENTÃO A PERGUNTA MUDA DE "COMO SE CHAMA" PARA "QUE SHADER É". Toda tinta de
-   caminhão da SCS sai do exportador com a mesma assinatura, e ela sobrevive ao
-   renomeio de qualquer pipeline: KHR_materials_clearcoat com fator 1, roughness
-   0,089 e metalness 0,15 ou 0,55. Conferido contra os 49 arquivos: acerta 100%
-   dos materiais que hoje casam por `carpaint` e encontra o equivalente exato
-   nos 26 que não casavam nada.
-
-   O nome CONTINUA valendo, em OU — este teste é um SUPERCONJUNTO do anterior,
-   de propósito. Nada que pinta hoje deixa de pintar; o que era invisível passa
-   a ser alcançado. Vidro fica de fora explicitamente: ele também pode sair com
-   clearcoat, e pintar a janela seria pior que não pintar a lataria. */
-const PAINT_ROUGHNESS = 0.089;
-const PAINT_METALNESS = [0.15, 0.55];
-const PAINT_TOL = 0.02;
-
-/** A assinatura do shader de tinta da SCS, independente de como o bake nomeou. */
-function looksLikeTruckPaint(m: THREE.Material): boolean {
-  const p = m as THREE.MeshPhysicalMaterial;
-  /* `clearcoat` só existe em MeshPhysicalMaterial — o GLTFLoader promove o
-     material a Physical justamente quando a extensão está presente, então esta
-     checagem é a leitura do KHR_materials_clearcoat depois do parse. */
-  if (typeof p.clearcoat !== 'number' || p.clearcoat < 0.9) return false;
-  if (Math.abs((p.roughness ?? 1) - PAINT_ROUGHNESS) > PAINT_TOL) return false;
-  return PAINT_METALNESS.some((v) => Math.abs((p.metalness ?? 0) - v) <= PAINT_TOL);
-}
-
-/**
- * Este material recebe a tinta do configurador?
- *
- * `authored` (de `paintMaterials`, no brands.json) é EXCLUSIVO quando existe:
- * uma lista escrita à mão é a medição daquele bake específico e não pode ser
- * sobreposta por convenção nenhuma. E `[]` é uma declaração legítima — "esta
- * geometria não tem lataria pintável" —, não um pedido de padrão; por isso o
- * teste é a presença da lista, não o seu tamanho.
- */
-export function isPaintableMaterial(
-  m: THREE.Material | null | undefined, authored?: string[] | null,
-): boolean {
-  if (!m) return false;
-  const name = (m.name || '').toLowerCase();
-  if (GLASS_RE.test(name)) return false;
-  if (authored) return authored.some((s) => name.includes(s.toLowerCase()));
-  if (name.includes('carpaint')) return true;
-  return looksLikeTruckPaint(m);
-}
-
-/** Todo nome de material sob uma raiz — o que um diagnóstico precisa para
- *  dizer, no console, como ESTE bake chama as coisas. */
-function materialNamesOf(root: THREE.Object3D): string[] {
-  const out = new Set<string>();
-  root.traverse((node) => {
-    const o = node as THREE.Mesh;
-    if (!o.isMesh || !o.material) return;
-    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
-      if (m) out.add(m.name || '(sem nome)');
-    }
-  });
-  return [...out].sort();
-}
-
-/* ANISOTROPY ON EVERY SLOT, not only on the albedo.
-   ---------------------------------------------------------------------------
-   The flanks of a tractor-trailer are what the camera spends its whole orbit
-   looking at edge-on, and a grazing angle is the one case where trilinear
-   filtering collapses: the mip level chosen for the axis that is compressed in
-   screen space blurs the axis that is not, along with it. `map` was already at
-   8, so the ALBEDO stayed sharp down the length of the truck — but normalMap,
-   roughnessMap and metalnessMap kept the default of 1, and those are the maps
-   that carry the micro-detail the specular lobe is built from. The panel grain,
-   the scuffing, the brushed direction on the rails: all of it smeared into a
-   flat wash a few metres out while the paint under it stayed crisp.
-
-   That is a LIGHTING difference, not a texture nicety, and it is a quality gain
-   rather than an optimisation — it costs sampler bandwidth and nothing else.
-   No `needsUpdate` is needed: this runs before the first render, so the textures
-   have not been uploaded yet and the value is read at upload time. three clamps
-   it to the device's own maximum there too, so 8 is a ceiling, never a demand. */
-const TEXTURE_ANISOTROPY = 8;
-
-/* SHADOW CASTERS ARE CHOSEN BY SIZE — and here is the arithmetic, so the number
-   below survives the next person who reads it.
-   ---------------------------------------------------------------------------
-   The key light is a 3072² shadow map over a ±24 m ortho frustum (scene/scene.ts
-   spells out why those two numbers are what they are): 3072 / 48 = 64 texels per
-   metre, i.e. 1.56 cm per texel. It renders through PCFSoftShadowMap with
-   `shadow.radius` running 2–12, so even at the TIGHTEST rig setting the filter
-   kernel spans roughly five texels — about 7.8 cm — and every sample it averages
-   is a sample of mostly-not-this-object.
-
-   An occluder whose world diameter is smaller than that kernel therefore cannot
-   put a visible shadow anywhere: whatever depth it writes is diluted below the
-   quantisation of the filtered result before it can reach a pixel. Drawing it
-   into the shadow map is pure cost with a provably empty output.
-
-   MEASURED on trailer.glb by walking its node hierarchy and applying each node's
-   world transform to its POSITION accessor bounds — 5852 nodes, 2151 of them
-   carrying a mesh, 2157 three.js Mesh objects once multi-primitive meshes are
-   split, 5.31 M triangles in total. At least 640 of those meshes come out under
-   5 cm across, carrying 788 k triangles — 29.7 % of the meshes and 14.8 % of the
-   triangles — and 483 of the 640 are literally named
-   `stitch_result_stitch_all_parafusos_*`. "At least", because that measurement
-   uses the diagonal of each primitive's local box as the sphere diameter, which
-   is an UPPER bound on the radius `computeBoundingSphere()` actually derives
-   from the vertices; the runtime figure can only be higher.
-
-   So this removes ~640+ draw calls and ~0.79 M triangles from every shadow pass.
-   "Every pass" is not "every frame" here: the renderer runs with
-   `shadowMap.autoUpdate = false`, so it means every load, every scenario change,
-   and every frame of a time-of-day drag — which is exactly where the frame time
-   is already worst.
-
-   5 cm sits below the 7.8 cm kernel with margin, so the cut is invisible by
-   construction and not merely by inspection. `receiveShadow` stays TRUE on
-   everything: a bolt is far too small to cast a shadow and exactly the right
-   size to be sitting in the truck's. */
-const SHADOW_CASTER_MIN_M = 0.05;
-
-const _casterSphere = new THREE.Sphere();
-
-/**
- * Decide quem projeta sombra, pelo tamanho em ESPAÇO DE MUNDO.
- *
- * A medida tem de ser em MUNDO, nunca na geometria local, e não é teoria: a
- * Scania chega do FBXLoader nas unidades da rip e é reescalada por ~1/100 na
- * raiz (ver loadScaniaOriginal), e o próprio implemento traz nós com escala de
- * maior eixo indo de 0,0012 a 1,0022 — três ordens de grandeza dentro do mesmo
- * arquivo. Um diâmetro local aqui não erraria por pouco: ele diria que um
- * parafuso tem metros.
- */
-function setShadowCasters(root: THREE.Object3D) {
-  /* setupCommon() roda ANTES de a raiz entrar no grupo dela, e os carregadores
-     deixam `matrixWorld` por escrever (o GLTFLoader compõe `matrix` e para por
-     aí). Sem esta linha toda esfera abaixo voltaria medida pela identidade.
-     Solta do grafo, "mundo" é o espaço da própria raiz — que é onde a escala da
-     raiz vive, e é essa a escala que importa. */
-  root.updateMatrixWorld(true);
-  /* O computeBoundingSphere() abaixo não é trabalho NOVO: o three já o faria,
-     preguiçosamente, na primeira vez que o frustum testasse cada malha — ou
-     seja, no primeiro quadro. Fazê-lo aqui só o move para dentro da cortina de
-     carregamento, onde ninguém está olhando o contador de quadros. E ele lê o
-     atributo de posição, não o índice, então continua correto depois de
-     buildLiveryPanels() reescrever índices (os vértices ficam onde estão). */
-  let cast = 0, skip = 0;
-  root.traverse((node) => {
-    const o = node as THREE.Mesh;
-    if (!o.isMesh) return;
-    o.receiveShadow = true;
-    const g = o.geometry;
-    if (!g) { o.castShadow = false; return; }
-    if (!g.boundingSphere) g.computeBoundingSphere();
-    const bs = g.boundingSphere;
-    /* Geometria degenerada ou com NaN: continua projetando. A falha barata é uma
-       chamada de desenho desperdiçada; a cara é uma sombra que sumiu. */
-    if (!bs || !Number.isFinite(bs.radius)) { o.castShadow = true; cast++; return; }
-    /* Sphere.applyMatrix4 escala o raio pelo maior fator de escala da matriz —
-       é a conversão para mundo que interessa aqui. */
-    const diameter = _casterSphere.copy(bs).applyMatrix4(o.matrixWorld).radius * 2;
-    o.castShadow = diameter >= SHADOW_CASTER_MIN_M;
-    if (o.castShadow) cast++; else skip++;
-  });
-  if (skip) {
-    console.info('[sombra] emissores:', cast, '· descartados', skip,
-      `(< ${SHADOW_CASTER_MIN_M * 100} cm — abaixo do filtro PCF de ~7,8 cm)`);
-  }
-}
-
-export function setupCommon(root: THREE.Object3D) {
-  setShadowCasters(root);
-  root.traverse((node) => {
-    const o = node as THREE.Mesh;
-    if (!o.isMesh) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    for (const raw of mats) {
-      if (!raw) continue;
-      /* The GLBs and the FBX rip both arrive as MeshStandard/MeshPhysical, so
-         the PBR slots below always exist; `Material` is just the widest type
-         `Mesh.material` can be declared as. */
-      const m = raw as THREE.MeshStandardMaterial;
-      m.envMapIntensity = 1.35;
-      for (const tex of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap]) {
-        if (tex) tex.anisotropy = TEXTURE_ANISOTROPY;
-      }
-      const isGlass = GLASS_RE.test(m.name || '');
-      if (isGlass) {
-        m.transparent = true;
-        m.depthWrite = false;
-        m.roughness = Math.min(m.roughness ?? 1, 0.12);
-        o.renderOrder = Math.max(o.renderOrder, 20);   // glass last, over the body
-      } else if (m.transparent) {
-        if ((m.opacity ?? 1) >= 0.99 && !m.alphaMap) {
-          // Body panels / decals wrongly flagged transparent: keep texture alpha
-          // (alphaTest) but WRITE depth — depthWrite=false here is what made the
-          // cab look foggy/blurred (interior blending through the shell).
-          m.depthWrite = true;
-          m.alphaTest = Math.max(m.alphaTest || 0, 0.02);
-        } else {
-          m.depthWrite = false;
-          /* A genuinely see-through surface that does NOT write depth has to be
-             drawn after everything it covers, and GLASS_RE alone does not find
-             them all: the trailer's rear lamp cover is `lente-sinaleita-traseira`
-             — no "glass"/"vidro" in the name — so it kept renderOrder 0 while the
-             marker-lamp cover beside it (`vidro-lanternas-pisca`) got 20. Two
-             covers on the same lamp cluster, sorted into different passes, is
-             what made the rear lamps flicker between angles. The rule that
-             matters is the one about DEPTH, not about the word in the name: no
-             depth write ⇒ draw last. */
-          o.renderOrder = Math.max(o.renderOrder, 20);
-        }
-      }
-    }
-  });
-}
+/* ---------------- material / mesh setup ----------------
+   MOVIDO para ./material-setup.ts em 2026-08-09 — ver o cabeçalho de lá.
+   Os nomes continuam saindo DESTE módulo (reexport abaixo), então nada que
+   importava `setupCommon`/`isPaintableMaterial` daqui precisou mudar. */
+export { setupCommon, isPaintableMaterial } from './material-setup';
 
 /* App-side transparency audit: ONLY real glass may be transparent. Anything
    else flagged transparent (rip artifacts, loader quirks) is forced opaque.
@@ -980,6 +762,59 @@ function runningTyres(root: THREE.Object3D): TyreMetrics | null {
     '· base', (floor * 1000).toFixed(1), 'mm · bogie z',
     out.zMin.toFixed(2), '…', out.zMax.toFixed(2));
   return out;
+}
+
+/**
+ * Caixa de `subject`, medida POR VÉRTICE, no referencial de `frame`.
+ *
+ * POR QUE ISTO EXISTE, e por que `bboxOfMatching()` não serve onde ela é usada.
+ * ---------------------------------------------------------------------------
+ * `bboxOfMatching()` soma `Box3.expandByObject()`, que é a caixa alinhada aos
+ * eixos de uma caixa alinhada aos eixos DO NÓ — estritamente maior que a real
+ * assim que o nó tem rotação. Este módulo repete o aviso em cinco lugares e
+ * mesmo assim `placeThermoKing()` caiu nele, porque o implemento ENGATADO tem
+ * rotação: `applyRootPose()` escreve `rotation.x = pitchX`, a inclinação que o
+ * solver de engate deriva da altura da quinta roda — ou seja, um número que
+ * MUDA COM O CHASSI DO CAVALO.
+ *
+ * Medido: com o baú de ~14,7 m inclinado pelo engate, a `max.y` da caixa das
+ * chapas laterais sobe cerca de (L/2)·sen θ — dezenas de milímetros — e some de
+ * novo quando a inclinação muda. Era o suficiente para a unidade descolar da
+ * travessa em uns chassis e encavalar em outros.
+ *
+ * Pior que o erro: as DUAS chamadas de `placeThermoKing()` viam poses
+ * diferentes. `attachThermoKing()` chama com o conjunto já engatado e
+ * INCLINADO; `setTrailerDims()` chama depois de zerar `t.rotation`, com o baú
+ * PLANO. A mesma função, dois referenciais, dois resultados.
+ *
+ * Medir por vértice no referencial do implemento apaga as duas coisas de uma
+ * vez: não há caixa de caixa, e a pose do conjunto — posição, giro de 180° e
+ * inclinação de engate — deixa de entrar na conta por construção. É a mesma
+ * doutrina de `TrailerRig.rigMatrixOf()` e de `measureFrontRailUnderside()`.
+ */
+function bboxInFrame(
+  frame: THREE.Object3D, subject: THREE.Object3D, matcher?: MeshMatcher,
+): THREE.Box3 {
+  frame.updateWorldMatrix(true, true);
+  subject.updateWorldMatrix(true, true);
+  const inv = frame.matrixWorld.clone().invert();
+  /* Mesma normalização de `bboxOfMatching()`: o filtro pode ser função ou
+     regex de nome, e quem chama não deveria ter de saber qual. */
+  const test = matcher === undefined
+    ? null
+    : (typeof matcher === 'function' ? matcher : (o: THREE.Mesh) => matcher.test(o.name));
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  const m = new THREE.Matrix4();
+  subject.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    if (test && !test(o)) return;
+    m.multiplyMatrices(inv, o.matrixWorld);
+    const pos = o.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m));
+  });
+  return box;
 }
 
 function bboxOfMatching(root: THREE.Object3D, matcher: MeshMatcher) {
@@ -1687,7 +1522,23 @@ export async function loadCab(
         if (isPaintableMaterial(m, authored)) {
           const cached = cache.get(m.uuid);
           if (cached) return cached;
-          const paint = makePaintMaterial(m.color, m.map);
+          /* O MAPA ASSADO NÃO ATRAVESSA A TINTA. `makePaintMaterial()` preserva
+             o `map` de origem de propósito — nas cabines normais ele carrega
+             vinco, junta e sujeira, e a tinta multiplica por cima. No bake do
+             S-Way Metallica ele carrega A PELÍCULA, e multiplicar tinta por
+             película devolvia a arte em tons da cor escolhida (foi o que
+             obrigou aquele modelo a declarar `paintMaterials: []`).
+             Sem o mapa, o mesmo arquivo pinta liso — e é isso que permite ao
+             Metallica ser um ACABAMENTO do S-Way 480 em vez de um modelo à
+             parte. Ver `ModelDef.finishes`. */
+          /* O mapa só atravessa quando a GEOMETRIA depende dele. `alphaTest`
+             marca exatamente esse caso — as tomadas de ar, cuja colmeia é o
+             alfa da textura —, e aí ele passa como MÁSCARA, sem o desenho.
+             Fora isso, tinta assada não atravessa tinta. */
+          const src = m.alphaTest > 0
+            ? (maskOnly(m.map) ?? m.map)
+            : (BAKED_FINISH_RE.test(m.map?.name || '') ? null : m.map);
+          const paint = makePaintMaterial(m.color, src);
           paint.name = m.name;
           cache.set(m.uuid, paint);
           painted.push(m.name || '(sem nome)');
@@ -1726,6 +1577,16 @@ export async function loadCab(
   setPaint({});
   reapplyVehicleWetness();     // a freshly loaded cab starts dry otherwise
   placeTrailer();
+  /* E A UNIDADE REASSENTA. Trocar de cavalo muda a altura da quinta roda, logo
+     a inclinação de engate que `applyRootPose()` escreve no implemento — era
+     por aí que o Thermo King saía do lugar "conforme o chassi". Desde que
+     `placeThermoKing()` resolve tudo no referencial do IMPLEMENTO (ver
+     `bboxInFrame`), o resultado não depende mais dessa pose e esta chamada é
+     redundante por construção. Ela fica assim mesmo: é idempotente, custa duas
+     varreduras de caixa numa troca de cabine que já refaz o engate inteiro, e é
+     o que torna "a unidade segue o implemento" uma garantia do CÓDIGO em vez de
+     uma propriedade que alguém precisa reprovar a cada mudança. */
+  placeThermoKing();
   syncTrailerPaintFromCab();   // keep painted trailer in step after a cab switch
   /* Pose final — daqui em diante a cabine é mobília. placeTrailer() acabou de
      repor a colocação do conjunto, então as matrizes de mundo estão certas no
@@ -1768,6 +1629,48 @@ const TRAILER_RUBBER_RE = /^borracha|aparabarro|^pneu/i;
 /* Large mill-finish members: rails, posts, frame, hardware. Every one is
    `metalness: 1`, so each is a mirror of the environment until told otherwise. */
 const TRAILER_STRUCT_METAL_RE = /galvanizado|estrutura-principal|^inox|metal-pouco-polido|metal-claro|^aro-rodas/i;
+/* A RODA DO FH16 NÃO É RIP DO IMPLEMENTO — e por isso nada aqui pode encostar
+   nela.
+   ---------------------------------------------------------------------------
+   Tudo neste bloco existe para consertar o que o rip do IMPLEMENTO mente sobre
+   os próprios materiais: uma lente de lanterna que se declara metal, uma
+   longarina que se declara espelho, uma borracha que espelha o céu. A roda
+   trazida por `vehicle/wheels.ts` vem do MESMO bake das cabines do catálogo,
+   já é dielétrica (`metalness 0`), já tem cor e normal próprios, e no cavalo é
+   renderizada exatamente como `setupCommon()` a deixa: `envMapIntensity` 1.35.
+
+   Passar o corte de borracha nela era o defeito relatado — "o pneu continua
+   muito preto, enquanto o do Volvo é levemente acinzentado". Os dois pneus são
+   O MESMO ASSET e a MESMA textura; o que mudava era o ambiente, 1.35 no cavalo
+   contra 0.3 no implemento. Num dielétrico que passa o dia na sombra do baú o
+   ambiente é quase toda a luz que ele recebe, então 4,5x menos ambiente é a
+   diferença entre borracha e silhueta preta.
+
+   A ironia é que o nome foi escolhido para casar: `pneu-fh16` casa `^pneu` em
+   TRAILER_RUBBER_RE, e o bake documentava isso como se fosse a intenção certa.
+   Era o contrário — a regra da borracha é um remendo para material errado, e
+   aplicá-la a material CERTO só estraga.
+
+   O sufixo `.001` entra porque o exportador do Blender desambigua nomes
+   repetidos: o disco e o cubo da roda avulsa saem como `roda-disco-fh16.001` e
+   `roda-cubo-fh16.001`. */
+const FH16_WHEEL_RE = /-fh16(\.\d+)?$/i;
+
+/* PELÍCULA ASSADA DENTRO DO ALBEDO DA TINTA — reconhecida pelo nome da TEXTURA.
+   ---------------------------------------------------------------------------
+   Quem preparou o `iveco_metallica_4x2.glb` assou a arte da edição limitada nos
+   próprios materiais de tinta e batizou cada imagem com o sufixo: os dezesseis
+   `*_carpaint_color` chegam com `map` = `*_carpaint_color_assada`, enquanto no
+   rip de fábrica (confira no Volvo) `carpaint_color` vem SEM textura nenhuma.
+
+   O marcador é o nome da textura, e não uma lista no manifesto, porque ele
+   viaja DENTRO do asset: uma lista em JSON pode dessincronizar de um re-bake
+   sem que nada reclame, e o sintoma seria a película voltando por baixo da
+   tinta — exatamente o defeito que isto existe para fechar.
+
+   As máscaras de grade (`*_colmeia`) NÃO casam, e não podem casar: elas são o
+   alfa que vaza a colmeia, e derrubá-las transformaria a grade numa chapa. */
+const BAKED_FINISH_RE = /_assada$/i;
 
 function applyTrailerFinish(root: THREE.Object3D) {
   const seen = new Set<string>();
@@ -1781,6 +1684,9 @@ function applyTrailerFinish(root: THREE.Object3D) {
       if (!m || seen.has(m.uuid)) continue;
       seen.add(m.uuid);
       const name = m.name || '';
+      /* Material autorado, não material do rip — ver `FH16_WHEEL_RE`. Sai com o
+         1.35 de `setupCommon()`, que é o que o cavalo mostra na roda idêntica. */
+      if (FH16_WHEEL_RE.test(name)) { log.push(`${name}: intocado (roda autorada)`); continue; }
       if (TRAILER_DECAL_RE.test(name)) {
         /* The geometry is right — the bake now quantises positions on one
            scene-wide grid, so a decal 0.2 mm proud stays proud. This is the belt
@@ -2565,6 +2471,7 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
     state.trailerTyreHalfSpan = (tyres.zMax - tyres.zMin) / 2;
   }
   placeTrailer();
+  await attachFh16Wheels(trailer);   // optional — a roda original fica se faltar
   await attachThermoKing();   // optional — skips gracefully if the GLB is absent
   reapplyVehicleWetness();
   /* DEPOIS do Thermo King: ele entra como filho do implemento, então congelar
@@ -2573,6 +2480,61 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
      que está congelado. */
   freezeMatrices(trailer);
   return trailer;
+}
+
+/* ---------------- rodagem do FH16 ----------------
+   O porquê da troca e toda a geometria estão em `vehicle/wheels.ts`; aqui fica
+   só o ciclo de carga, que é o mesmo do Thermo King: opcional, com guarda de
+   concorrência e degradação silenciosa para "fica como estava".
+
+   DUAS DIFERENÇAS em relação ao Thermo King, e as duas são deliberadas:
+
+   1. NÃO mexe em `setRigPlacement`. `swapTrailerWheels()` resolve a pose em
+      mundo e converte para o local do implemento no fim — o mesmo contrato de
+      `placeThermoKing()` —, então ele vale com o conjunto engatado, girado e
+      inclinado. É o que permite chamá-lo DEPOIS de `placeTrailer()` sem
+      devolver o rig para a origem, e portanto sem a janela em que um quadro
+      poderia mostrar o caminhão no meio do pátio.
+   2. O acabamento é aplicado ao ASSET, não ao implemento. `applyTrailerFinish()`
+      já rodou lá em cima, antes de esta roda existir; sem esta chamada o pneu
+      novo ficaria com o `envMapIntensity` 1.35 que `setupCommon()` põe em tudo,
+      espelhando o céu como plástico polido. O nome `pneu-fh16` foi escolhido no
+      bake justamente para casar `^pneu` em `TRAILER_RUBBER_RE`.
+
+   A raiz do asset NÃO é descartada no caminho feliz: `clone(true)` compartilha
+   geometria e material com ela, e um `disposeTree()` levaria junto os buffers
+   que as oito cópias estão usando. */
+/** `_v2` E NÃO `wheel_fh16.glb`, e o motivo é um erro que já custou uma rodada.
+ *
+ *  A primeira bake saiu com a roda montada ao contrário (o disco enterrado para
+ *  dentro do rodado) e ficou servida por uma hora antes de ser corrigida. A
+ *  correção foi publicada SOBRESCREVENDO o arquivo — e `/studio-assets/v1/` sai
+ *  da API com `Cache-Control: public, max-age=31536000, immutable`. Todo
+ *  navegador que abriu o estúdio naquela janela ficou com a roda torta presa
+ *  por um ano, sem cache-buster nenhum para puxar: o URL É a promessa de que os
+ *  bytes não mudam, e a promessa foi quebrada.
+ *
+ *  Por isso o nome novo. `wheel_fh16.glb` está QUEIMADO — não reaproveitar,
+ *  nem para uma bake correta: existem clientes com a versão errada colada
+ *  naquele URL. Toda bake seguinte ganha o próximo sufixo (ou uma árvore `vN`),
+ *  que é a regra escrita em `tools/wheel-bake/README.md` e no cabeçalho do
+ *  mount em `api/src/main.ts`. */
+const WHEEL_ASSET = 'wheel_fh16_v2.glb';
+
+async function attachFh16Wheels(trailer: THREE.Object3D) {
+  const mine = trailerGen;
+  let asset: THREE.Group;
+  try {
+    asset = await loadGLB(VEHICLES_DIR + WHEEL_ASSET);
+  } catch (e: unknown) {
+    console.warn('[rodas]', WHEEL_ASSET, 'indisponível — a rodagem original fica.',
+      errText(e));
+    return;
+  }
+  if (mine !== trailerGen) { disposeTree(asset); return; }
+  setupCommon(asset);
+  applyTrailerFinish(asset);
+  if (!swapTrailerWheels(trailer, asset)) disposeTree(asset);
 }
 
 /* ---------------- Thermo King refrigeration unit ----------------
@@ -2671,7 +2633,8 @@ const FRONT_RAIL_MAT_RE = /ferragem|estrutura/i;
 const FRONT_RAIL_BAND = 0.15;
 
 /**
- * A face de BAIXO da travessa que fecha o topo da testeira, em espaço de mundo.
+ * A face de BAIXO da travessa que fecha o topo da testeira, NO REFERENCIAL DO
+ * IMPLEMENTO.
  *
  * `null` quando não há peça que sirva — e aí `placeThermoKing()` volta para o
  * recuo do teto em vez de inventar uma altura.
@@ -2693,10 +2656,13 @@ function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
      Traz-se o vértice para lá, que é o mesmo contrato de `TrailerRig`. */
   const inv = trailer.matrixWorld.clone().invert();
   const zMin = rig.profile.z1 - FRONT_RAIL_BAND;
-  /* O FILTRO é local (é lá que `z1` significa alguma coisa); a ALTURA que sai
-     daqui é de MUNDO, porque é em mundo que `placeThermoKing()` resolve a pose
-     e o implemento pode estar engatado, girado e inclinado. Por isso os dois
-     vetores: um vértice, dois referenciais, nenhuma conversão no fim. */
+  /* FILTRO E ALTURA, os dois LOCAIS. A altura saía em MUNDO porque era em mundo
+     que `placeThermoKing()` resolvia a pose — e era justamente aí que a
+     inclinação de engate entrava na conta: a mesma travessa dava um Y de mundo
+     diferente para cada altura de quinta roda, ou seja, para cada chassi de
+     cavalo. Agora as duas pontas falam o referencial do implemento e a pose do
+     conjunto não tem por onde vazar. Os dois vetores continuam porque o vértice
+     ainda precisa passar pelo mundo para chegar ao local. */
   const loc = new THREE.Vector3();
   const wld = new THREE.Vector3();
   let bestTop = -Infinity, bestUnder: number | null = null;
@@ -2713,7 +2679,7 @@ function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
       loc.copy(wld).applyMatrix4(inv);
       if (loc.z < zMin) continue;
       n++;
-      if (wld.y < wLo) wLo = wld.y; if (wld.y > wHi) wHi = wld.y;
+      if (loc.y < wLo) wLo = loc.y; if (loc.y > wHi) wHi = loc.y;
       if (loc.x < xLo) xLo = loc.x; if (loc.x > xHi) xHi = loc.x;
     }
     if (!n || xLo > -0.5 || xHi < 0.5) return;        // tem de atravessar o centro
@@ -2741,11 +2707,19 @@ function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
 export function placeThermoKing() {
   const tk = state.tk, trailer = state.trailer;
   if (!tk || !trailer || !state.tkSize) return;
-  const sideBox = bboxOfMatching(trailer, bodyPanelPred(trailer));
+  /* AS DUAS CAIXAS NO REFERENCIAL DO IMPLEMENTO — ver `bboxInFrame()` para o
+     que a versão em mundo estava somando junto. Em resumo: o implemento
+     engatado carrega a inclinação que o solver deriva da altura da quinta roda,
+     ou seja um giro que MUDA COM O CHASSI DO CAVALO, e caixa-de-caixa-girada
+     transformava esse giro em dezenas de milímetros de deslocamento da
+     unidade. Medido no referencial do baú, nada disso existe: a pose do
+     conjunto some da conta e a unidade acompanha o implemento por construção,
+     que é o que se pede dela. */
+  const sideBox = bboxInFrame(trailer, trailer, bodyPanelPred(trailer));
   if (sideBox.isEmpty()) return;
-  /* Caixa da unidade na pose ATUAL: o rip não tem a origem no centro, então é
-     ela que diz onde as faces estão em relação à origem do nó. */
-  const b = new THREE.Box3().setFromObject(tk);
+  /* Caixa da unidade no MESMO referencial: o rip não tem a origem no centro,
+     então é ela que diz onde as faces estão em relação à origem do nó. */
+  const b = bboxInFrame(trailer, tk);
   if (b.isEmpty()) return;
   /* ALTURA — ENCOSTADA NA TRAVESSA, e a travessa é MEDIDA.
      -----------------------------------------------------------------------
@@ -2772,20 +2746,18 @@ export function placeThermoKing() {
      o que cede é a altura de encosto, não o tamanho: a base encosta no piso e
      a unidade sobe o quanto faltar. */
   const top = Math.max(wantTop, sideBox.min.y + (b.max.y - b.min.y));
-  /* Deslocamento pedido, em MUNDO. */
+  /* Deslocamento pedido, JÁ no referencial do implemento — e é aí que a
+     conversão de mundo para local deixa de existir. `tk` é filho do implemento,
+     então `tk.position` mora exatamente neste referencial: somar é a operação
+     inteira. A versão anterior resolvia em mundo e convertia pela parte linear
+     da matriz do pai; a conversão estava correta, o referencial da MEDIDA é que
+     não estava. */
   const move = new THREE.Vector3(
     (sideBox.min.x + sideBox.max.x) / 2 - (b.min.x + b.max.x) / 2,   // centrada em X
-    top - b.max.y,                                                   // topo sob o teto
+    top - b.max.y,                                                   // topo sob a travessa
     sideBox.max.z - b.min.z,                                         // costas rentes à parede
   );
-  /* Mundo → local pela parte LINEAR da matriz do implemento (a diferença entre
-     dois pontos elimina a translação), porque `position` mora no pai. Sem
-     isso, um implemento engatado — girado 180° e inclinado — receberia o
-     deslocamento no referencial errado. */
-  trailer.updateWorldMatrix(true, false);
-  const o0 = trailer.worldToLocal(new THREE.Vector3());
-  const o1 = trailer.worldToLocal(move.clone());
-  tk.position.add(o1.sub(o0));
+  tk.position.add(move);
   tk.updateMatrix();
   tk.updateMatrixWorld(true);
 }

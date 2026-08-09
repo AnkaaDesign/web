@@ -1272,6 +1272,38 @@ export class TrailerAssembly {
    *
    * Recebe uma lista de cascas, não uma só, porque a unidade que se repete
    * pode ter mais de uma peça — o par de rebites do teto é o caso.
+   *
+   * A UV VIAJA JUNTO, e o motivo é o defeito que ela consertou.
+   * ---------------------------------------------------------------------------
+   * Este molde carregava só POSIÇÃO e NORMAL. Para um rebite de `inox-ferragem`
+   * — cor chapada, sem mapa nenhum — isso basta e foi por isso que passou. Mas
+   * o mesmo molde serve a `Faixa-3M`, e esse material é textura PURA: o fator
+   * de cor-base dele é [1,1,1,1] e TODO o desenho refletivo mora no
+   * `baseColorTexture` (1024², mais um `normalMap` de 1024²). Uma geometria sem
+   * `uv` não deixa de amostrar a textura — ela amostra o mesmo texel (0,0) em
+   * cada vértice. O resultado é a fita inteira pintada de uma cor só, fosca e
+   * sem relevo: exatamente "as faixas ficam acinzentadas, opacas".
+   *
+   * E o defeito só aparecia AO MEXER NA MEDIDA porque o `InstancedMesh` nasce
+   * com `instanceMatrix` zerada (todas as instâncias degeneradas, invisíveis) e
+   * `TrailerAssembly` não roda `set()` no construtor: até o primeiro resize
+   * quem estava na tela era a casca ORIGINAL, com a UV dela. O primeiro `set()`
+   * colapsa as originais e entrega a cena às instâncias — e é aí que a fita
+   * troca de aparência.
+   *
+   * Pelo bake atual isto vale para 76 primitivas de `Faixa-3M` e mais
+   * `lanterna-pisca-quadrado(LEDs)`, `metal-galvanizado-mantido`, `borracha` e
+   * `borracha-preta` — todo material instanciado que tenha mapa.
+   *
+   * `uv1` entra pelo mesmo motivo: é a TEXCOORD_1 que `livery.ts` usa nos
+   * painéis recortados. Nenhuma das duas precisa de transformação — coordenada
+   * de textura não é posição.
+   *
+   * A TANGENTE NÃO viaja, e é decisão. Ela é vec4 com handedness no `w`, e num
+   * nó espelhado (7 deles aqui) o `w` teria de ser negado junto com a troca de
+   * enrolamento abaixo. Sem o atributo, três monta o frame por derivada de tela,
+   * que é o caminho padrão de qualquer malha sem TANGENT — e não há vizinho com
+   * quem destoar, porque a casca original é colapsada.
    */
   private templateOf(piece: Piece, parts: Part[], center: THREE.Vector3): THREE.BufferGeometry | null {
     const geo = piece.mesh.geometry as THREE.BufferGeometry;
@@ -1279,13 +1311,18 @@ export class TrailerAssembly {
     const nrmAttr = geo.getAttribute('normal') as THREE.BufferAttribute | undefined;
     if (!index) return null;
 
+    /* Lidas pela API do atributo, nunca por `.array`: os atributos deste GLB são
+       INTERLEAVED — a mesma armadilha anotada no construtor. */
+    const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute | undefined;
+    const uv1Attr = geo.getAttribute('uv1') as THREE.BufferAttribute | undefined;
+
     const want = new Set<number>();
     for (const part of parts) for (const i of part.idx) want.add(i);
 
     const m4 = piece.mesh.matrixWorld;
     const m3 = new THREE.Matrix3().getNormalMatrix(m4);
     const v = new THREE.Vector3();
-    const pos: number[] = [], nrm: number[] = [];
+    const pos: number[] = [], nrm: number[] = [], uv: number[] = [], uv1: number[] = [];
 
     /* NÓ ESPELHADO: 7 nós do modelo têm `scale.x` negativa (as lanternas
        traseiras 002, o painel de LED do triângulo, a lanterna lateral 002 e a
@@ -1310,6 +1347,8 @@ export class TrailerAssembly {
           v.set(nrmAttr.getX(k), nrmAttr.getY(k), nrmAttr.getZ(k)).applyMatrix3(m3).normalize();
           nrm.push(v.x, v.y, v.z);
         } else nrm.push(0, 1, 0);
+        if (uvAttr) uv.push(uvAttr.getX(k), uvAttr.getY(k));
+        if (uv1Attr) uv1.push(uv1Attr.getX(k), uv1Attr.getY(k));
       }
     }
     if (!pos.length) return null;
@@ -1317,6 +1356,8 @@ export class TrailerAssembly {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    if (uv.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    if (uv1.length) g.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2));
     return g;
   }
 
