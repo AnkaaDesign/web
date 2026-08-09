@@ -40,20 +40,31 @@ import {
 import { getColor, saveColorRecipe, canPersistColors, FINISH_LABEL } from '../catalog/colors';
 import { setStatus } from './chrome';
 
-/* Os parâmetros que o painel expõe. É `PaintParams` MENOS `color`: a cor base é
-   escolhida no passo de cor do seletor e é a identidade da linha de `Paint` —
-   deixar o painel reescrever o hex faria "Vermelho Rubi" virar azul no catálogo
-   inteiro, inclusive nos cards e no crachá.
-   `flakePx` também fica de fora: é alvo de ANTIALIASING em pixels de tela, não
-   uma propriedade da tinta, e não há o que decidir nele olhando o caminhão. */
-type Key = Exclude<keyof PaintParams, 'color' | 'flakePx'>;
+/* Os parâmetros que o painel expõe. É `PaintParams` menos `flakePx`, que é alvo
+   de ANTIALIASING em pixels de tela e não uma propriedade da tinta — não há o
+   que decidir nele olhando o caminhão.
+
+   `color` ENTROU, e o motivo de ele estar fora não valia. O receio era que o
+   painel reescrevesse o hex e fizesse "Vermelho Rubi" virar azul no catálogo
+   inteiro. Mas quem grava é `saveColorRecipe()` → `previewConfig`, e NUNCA a
+   coluna `hex`: o card, a amostra e o crachá continuam lendo a cor de catálogo.
+   O que a receita carrega é a face MEDIDA da tinta, que sobrepõe o catálogo só
+   na renderização 3D — é exatamente por isso que o `Vermelho Ruby` está gravado
+   como `#750406` e a receita pede `#c01c28`.
+
+   Pior: `recipeNow()` já gravava `color` (ele serializa o `PaintParams`
+   inteiro). O painel PERSISTIA um campo que não deixava ninguém editar. E num
+   acabamento LISO isso deixava o editor sem nenhum controle de cor, porque os
+   três campos de cor que existiam (floco, meio, virada) são todos de efeito e
+   só aparecem em metálico e perolizado. */
+type Key = Exclude<keyof PaintParams, 'flakePx'>;
 
 /* Sem texto de ajuda na interface. O que cada campo faz está anotado ao lado da
    declaração dele, abaixo: é onde a informação vale (para quem mexe nos limites)
    e não onde ela atrapalha (quinze parágrafos num painel de 300 px). */
 interface RangeField {
   kind: 'range';
-  key: Exclude<Key, 'finish' | 'flakeColor' | 'pearlMid' | 'pearlFlip'>;
+  key: Exclude<Key, 'finish' | 'color' | 'flakeColor' | 'pearlMid' | 'pearlFlip'>;
   label: string;
   min: number;
   max: number;
@@ -63,7 +74,7 @@ interface RangeField {
 }
 interface ColorField {
   kind: 'color';
-  key: 'flakeColor' | 'pearlMid' | 'pearlFlip';
+  key: 'color' | 'flakeColor' | 'pearlMid' | 'pearlFlip';
   label: string;
   only?: PaintFinish[];
 }
@@ -76,6 +87,14 @@ const GROUPS: Group[] = [
   {
     title: 'Base',
     fields: [
+      /* SEM `only`: toda tinta tem cor de base, e num acabamento liso ela é a
+         única que existe — era o caso em que o painel abria sem nenhum controle
+         de cor. Grava em `previewConfig.color` (a face medida), não no `hex` do
+         catálogo; ver a nota de `Key` acima. "Padrão do acabamento" não a
+         devolve ao original de propósito: `PAINT_DEFAULTS_BY_FINISH` é
+         `Omit<PaintParams,'finish'|'color'>`, porque a cor é a identidade da
+         tinta e não um valor de fábrica do acabamento. */
+      { kind: 'color', key: 'color', label: 'Cor da base' },
       /* Um basecoat vive SOB o verniz, então é bem mais liso que uma superfície
          pintada nua — daí o teto baixo não ser 1 por acidente. */
       { kind: 'range', key: 'roughness', label: 'Rugosidade da base', min: 0, max: 1, step: 0.01 },
@@ -170,6 +189,11 @@ let colorId: string | null = null;
 let baseline: PaintParams | null = null;
 const inputs = new Map<Key, HTMLInputElement>();
 const rows = new Map<Key, HTMLElement>();
+/* A SEÇÃO, para poder sumir inteira. Esconder as linhas uma a uma deixava o
+   título órfão: num acabamento liso, "Floco" e "Viagem de cor" viravam dois
+   cabeçalhos sem nada embaixo — o mesmo ruído que a regra de esconder campo
+   existe para evitar, só que com outra cara. */
+const groupEls = new Map<string, HTMLElement>();
 
 const isOpen = () => !!panel && !panel.classList.contains('hidden');
 
@@ -235,6 +259,7 @@ function build() {
     const sec = el('section', 'ts-pp-group');
     sec.appendChild(el('h3', 'ts-pp-gtitle', g.title));
     for (const f of g.fields) sec.appendChild(buildRow(f));
+    groupEls.set(g.title, sec);
     body.appendChild(sec);
   }
   panel.appendChild(body);
@@ -283,6 +308,7 @@ function build() {
 function sync() {
   const p = getPaintParams();
   for (const g of GROUPS) {
+    let anyVisible = false;
     for (const f of g.fields) {
       const input = inputs.get(f.key);
       const row = rows.get(f.key);
@@ -294,6 +320,7 @@ function sync() {
       const applies = !f.only || f.only.includes(p.finish);
       row.classList.toggle('hidden', !applies);
       if (!applies) continue;
+      anyVisible = true;
 
       const v = p[f.key];
       if (isColorKey(f)) {
@@ -304,6 +331,8 @@ function sync() {
         if (val) val.textContent = fmt(Number(v), f);
       }
     }
+    /* Nenhum campo deste grupo pertence ao acabamento: o título vai junto. */
+    groupEls.get(g.title)?.classList.toggle('hidden', !anyVisible);
   }
 
   const c = colorId ? getColor(colorId) : undefined;
