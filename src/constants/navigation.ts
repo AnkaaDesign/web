@@ -2211,6 +2211,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {
+        // Estúdio 3D. O gate real está em route-privileges (`/ferramentas/estudio-3D`);
+        // este aqui só decide quem VÊ o item no menu. Manter os dois em sincronia.
+        id: "ferramentas-estudio-3d",
+        title: "Estúdio 3D",
+        icon: "truck",
+        path: "/ferramentas/estudio-3D",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
         // Calendário. PRODUCTION_MANAGER gets it via its own Ferramentas group above.
         id: "ferramentas-calendario",
         title: "Calendário",

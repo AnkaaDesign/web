@@ -151,6 +151,8 @@ export function BonusValueDayModal({
     weightedTasks: number;
     rawTaskCount: number;
     performanceLevel: number;
+    /** Divisor B1 do período (fracionário) — repetido em cada linha pela API. */
+    periodDivisor?: number;
     tasks?: Array<{ sectorId?: string | null }>;
   }> = Array.isArray(payroll?.bonuses) ? payroll.bonuses : [];
 
@@ -176,7 +178,12 @@ export function BonusValueDayModal({
     ? Math.min(1, dayBonusValue / forecastedFinalBonusValue)
     : 0;
 
-  const eligibleCount = filteredUsers.filter(u => (u.performanceLevel ?? 0) > 0).length;
+  // Divisor B1 do período — vem pronto da API e é FRACIONÁRIO (soma dos pesos de
+  // elegibilidade). Contar elegíveis aqui devolvia um inteiro que ignora quem
+  // entrou ou saiu no meio do período. `totalEligibleUsersForAverage` é o campo
+  // do endpoint live; `periodDivisor` vem repetido em cada linha de bônus.
+  const periodDivisor =
+    Number(payroll?.totalEligibleUsersForAverage ?? payrollUsers[0]?.periodDivisor) || 0;
   const liveBonusTotal = filteredUsers.reduce((s, u) => s + (u.baseBonus ?? 0), 0);
   // The /bonus/live endpoint computes each user's bonus from the CURRENT B1,
   // while the chart's projected final uses an end-of-period extrapolated B1 —
@@ -211,7 +218,7 @@ export function BonusValueDayModal({
   // for B1 so it reflects reality, not the projection. Forecast days use the
   // projected end-of-period weighted task count (the same projection the chart uses).
   const b1WeightedTasks = dayIsForecast ? forecastedFinalWeightedTaskCount : dayWeightedTaskCount;
-  const b1 = eligibleCount > 0 ? b1WeightedTasks / eligibleCount : 0;
+  const b1 = periodDivisor > 0 ? b1WeightedTasks / periodDivisor : 0;
 
   const tasksLoading = tasksQuery.isLoading;
   const tasksError = tasksQuery.isError;
@@ -244,8 +251,7 @@ export function BonusValueDayModal({
               <>
                 <span className="text-foreground/80">·</span>
                 <span>
-                  <strong className="text-foreground">{eligibleCount}</strong>{' '}
-                  elegível{eligibleCount !== 1 ? 'eis' : ''}
+                  divisor <strong className="text-foreground">{periodDivisor.toFixed(2)}</strong>
                 </span>
               </>
             )}
@@ -439,6 +445,11 @@ export function BonusValueDayModal({
                 </div>
                 <div className="text-right font-medium text-foreground">
                   {b1WeightedTasks.toFixed(2)}
+                </div>
+
+                <div className="text-muted-foreground">Divisor do período (soma das proporções)</div>
+                <div className="text-right font-medium text-foreground">
+                  {periodDivisor.toFixed(2)}
                 </div>
 
                 <div className="text-muted-foreground">B1 (média/colaborador elegível)</div>

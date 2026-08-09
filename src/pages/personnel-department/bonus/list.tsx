@@ -6,11 +6,14 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   IconFilter,
   IconRefresh,
   IconCalculator,
   IconAlertCircle,
+  IconAlertTriangle,
   IconUsers,
   IconAdjustments,
   IconInfoCircle,
@@ -39,7 +42,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { useApplyPeriodAdjustment, usePeriodAdjustment } from "@/hooks/personnel-department/use-bonus";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, EMPLOYEE_TYPE, CONTRACT_STATUS } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, EMPLOYEE_TYPE } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { BonusFilters } from "@/components/personnel-department/bonus/list/bonus-filters";
@@ -187,6 +190,15 @@ interface BonusRow {
   // Period statistics (same for all rows in the period)
   totalCollaborators?: number;
 
+  // Proporcionalidade no período (26→25)
+  eligibilityWeight: number;        // [0,1] — 1 = período inteiro
+  eligibleDays?: number | null;     // dias úteis elegíveis
+  periodBusinessDays?: number | null; // dias úteis do período
+  periodDivisor?: number | null;    // divisor B1 do período (fracionário)
+  terminatedAt?: string | null;     // desligamento DENTRO do período
+  currentlyEmployed: boolean;       // false = desligada hoje
+  hasSecullumId: boolean;           // false = sem apuração de ponto
+
   // Discount data
   totalDiscounts: number;
   netBonus: number;
@@ -206,6 +218,28 @@ interface BonusRow {
 const formatCurrency = (n: number | null | undefined): string => {
   if (n == null) return "—";
   return _formatCurrency(n);
+};
+
+// Decimais do Prisma chegam como number, string ou { toNumber() } — mesmo
+// destrinchar que as outras colunas fazem inline.
+const toNumber = (value: any, fallback = 0): number => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && typeof value.toNumber === 'function') return value.toNumber();
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+// Peso de elegibilidade [0,1] → "95%"
+const formatEligibilityWeight = (weight: number): string => `${Math.round(weight * 100)}%`;
+
+// Data ISO do desligamento → "DD/MM"
+const formatShortDate = (iso: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return `${m[3]}/${m[2]}`;
+  const parsed = new Date(iso);
+  return isNaN(parsed.getTime())
+    ? "-"
+    : parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 };
 
 // BonusTableComponent - Simple table for displaying bonus data
@@ -255,9 +289,36 @@ function BonusTableComponent({
     {
       key: "user.name",
       header: "Colaborador",
-      accessor: (row: BonusRow) => row.userName,
+      accessor: (row: BonusRow) => (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate">{row.userName}</span>
+          {/* Desligamento DENTRO do período → data; desligamento posterior →
+              badge discreto, porque o bônus do período continua válido. */}
+          {row.terminatedAt ? (
+            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+              Desligado em {formatShortDate(row.terminatedAt)}
+            </Badge>
+          ) : !row.currentlyEmployed ? (
+            <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] font-normal text-muted-foreground">
+              Desligado
+            </Badge>
+          ) : null}
+          {!row.hasSecullumId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="shrink-0 text-amber-600">
+                  <IconAlertTriangle className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                Sem ponto eletrônico — bônus sem desconto de falta nem assiduidade
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      ),
       sortable: true,
-      className: "font-medium text-sm w-40 truncate",
+      className: "font-medium text-sm w-56",
       align: "left" as const,
     },
     {
@@ -322,6 +383,42 @@ function BonusTableComponent({
       accessor: (row: BonusRow) => row.averageTasks.toFixed(2),
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
+      align: "left" as const,
+    },
+    {
+      key: "eligibilityWeight",
+      header: "Proporção",
+      accessor: (row: BonusRow) => {
+        // Período inteiro é o caso normal — não vira ruído na tabela.
+        if (row.eligibilityWeight >= 1) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+        const daysLabel =
+          row.eligibleDays != null && row.periodBusinessDays != null
+            ? `${row.eligibleDays} de ${row.periodBusinessDays} dias úteis`
+            : "Proporção de dias úteis elegíveis no período";
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="whitespace-nowrap text-amber-600">
+                {formatEligibilityWeight(row.eligibilityWeight)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{daysLabel}</TooltipContent>
+          </Tooltip>
+        );
+      },
+      sortable: true,
+      className: "text-sm w-24 font-medium truncate",
+      align: "left" as const,
+    },
+    {
+      key: "terminatedAt",
+      header: "Desligado em",
+      accessor: (row: BonusRow) =>
+        row.terminatedAt ? formatShortDate(row.terminatedAt) : "—",
+      sortable: true,
+      className: "text-sm w-28 truncate",
       align: "left" as const,
     },
     {
@@ -448,11 +545,15 @@ export default function BonusListPage() {
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      currentContractStatus: CONTRACT_STATUS.ACTIVE,
+      // Sem filtro de currentContractStatus: precisa resolver o nome de quem foi
+      // desligado no período, senão o badge do filtro fica com o UUID cru.
       currentEmployeeType: EMPLOYEE_TYPE.CLT, // Bonus is folha-only → CLT (exclude terceirizado/PJ/autônomo)
       payrollNumber: { not: null },
-      secullumEmployeeId: { not: null },
+      // Sem filtro de secullumEmployeeId — o desligamento desvincula do Secullum
+      // e o badge do desligado ficaria com o UUID cru.
     },
+    // 100 é o TETO do userGetManySchema da API (`limit: max(100)`) — qualquer
+    // valor acima é REJEITADO com 400 e o badge não resolve nome nenhum.
     limit: 100,
   });
 
@@ -517,6 +618,7 @@ export default function BonusListPage() {
       'totalWeightedTasks',
       'totalCollaborators',
       'averageTasks',
+      'eligibilityWeight',
       'bonus',
       'totalDiscounts',
       'netBonus',
@@ -649,6 +751,16 @@ export default function BonusListPage() {
       // bonus.users contains all eligible users for bonus calculation
       const totalCollaborators = bonus.users?.length || 0;
 
+      // Proporcionalidade temporal — vem pronta da API. Linhas antigas (antes da
+      // proporcionalidade) não trazem os campos: assumem período inteiro.
+      const eligibilityWeight = toNumber(bonus.eligibilityWeight, 1);
+      const periodDivisor = bonus.periodDivisor != null ? toNumber(bonus.periodDivisor) : null;
+      const terminatedAt = bonus.terminatedAt
+        ? (typeof bonus.terminatedAt === 'string'
+          ? bonus.terminatedAt
+          : new Date(bonus.terminatedAt).toISOString())
+        : null;
+
       // Get average tasks per user directly from API (pre-calculated correctly)
       // This is: totalWeightedTasks / totalEligibleUsers
       const averageTasks = bonus.averageTaskPerUser
@@ -687,6 +799,14 @@ export default function BonusListPage() {
         totalWeightedTasks: totalWeightedTasks,   // Total weighted tasks for the period
 
         totalCollaborators: totalCollaborators,   // Total bonifiable users
+
+        eligibilityWeight,
+        eligibleDays: bonus.eligibleDays ?? null,
+        periodBusinessDays: bonus.periodBusinessDays ?? null,
+        periodDivisor,
+        terminatedAt,
+        currentlyEmployed: bonus.currentlyEmployed ?? true,
+        hasSecullumId: bonus.hasSecullumId ?? true,
 
         totalDiscounts: totalDiscounts,
         netBonus: netBonusAmount,

@@ -20,6 +20,120 @@
    the entire browser session, long after the route is gone. */
 import { root, $opt, el as make, initials, clamp01 } from '../core/dom';
 
+/* ---------------- a pílula de estado (#cab-switching) ----------------
+   O IRMÃO DISCRETO DA CORTINA, e ele mora aqui pelo mesmo motivo que a cortina:
+   os dois são o vocabulário de "espere um pouco" do estúdio, e ter dois donos
+   para isso é como uma interface acaba discordando de si mesma.
+
+   Ela vivia dentro de studio.ts, privada. Mas a preferência do produto é
+   EXPLÍCITA — "sempre mostrar loading em vez de renderizar incompleto ou travar
+   durante o uso" — e quem trava não é só o studio.ts: um clique de preset de
+   clima (ui/hud.ts) abre um tween de 0,8 s em que cada quadro redesenha o mapa
+   de sombra inteiro. O hud não pode importar studio.ts (studio importa hud), e a
+   saída certa não é um segundo indicador: é este, promovido a um módulo que os
+   dois já importam.
+
+   UM elemento, mais de um dono possível, então ninguém escreve nele direto. As
+   reivindicações formam uma PILHA e quem aparece é a MAIS ANTIGA: a pílula
+   descreve o que está acontecendo agora, não o que está esperando a vez. */
+
+interface PillClaim { text: string }
+const pillClaims: PillClaim[] = [];
+
+/** O identificador do que a reivindicação devolve. `release()` é idempotente. */
+export interface PillHandle {
+  set(next: string): void;
+  release(): void;
+}
+
+function drawPill() {
+  /* $opt e não $: a pílula é do template, e um template que mudou embaixo de nós
+     não pode derrubar o carregamento que ela apenas ANUNCIA. */
+  const box = $opt('cab-switching');
+  const text = $opt('cab-switching-text');
+  if (!box) return;
+  const showing = pillClaims[0];
+  if (!showing) { box.classList.add('hidden'); return; }
+  if (text) text.textContent = showing.text;
+  box.classList.remove('hidden');
+}
+
+/** Reivindica a pílula de estado. Sempre solte no `finally`. */
+export function claimPill(text: string): PillHandle {
+  const claim: PillClaim = { text };
+  pillClaims.push(claim);
+  drawPill();
+  return {
+    set(next: string) { claim.text = next; drawPill(); },
+    release() {
+      const i = pillClaims.indexOf(claim);
+      if (i >= 0) pillClaims.splice(i, 1);
+      drawPill();
+    },
+  };
+}
+
+/**
+ * Cede um quadro ao navegador.
+ *
+ * OBRIGATÓRIO antes de todo bloco síncrono e pesado que acabou de anunciar a si
+ * mesmo: sem isto o rótulo novo só apareceria DEPOIS do trabalho que ele
+ * anuncia, que é o mesmo que não anunciar nada. Era um `const` local de
+ * `runApply()` em studio.ts; virou módulo quando os quatro outros pontos de
+ * travamento (cor, redimensionamento do baú, preset de luz, captura) passaram a
+ * precisar dele.
+ *
+ * ⚠️ LIMITADO NO TEMPO, e isto NÃO é zelo excessivo — é um travamento medido.
+ * `requestAnimationFrame` NÃO DISPARA numa aba em segundo plano (nem numa que o
+ * navegador parou de compor). Um `await` cru nele pendura para sempre quem
+ * esperar: a cortina de carregamento congela no rótulo da fase, a fila de
+ * aplicações para de andar, e o usuário volta para a aba e encontra
+ * "Posicionando o veículo… 0%" para o resto da sessão. Foi exatamente o que
+ * aconteceu ao verificar isto com a aba sem compor.
+ *
+ * A saída tem dois degraus, e o primeiro é o que importa:
+ *
+ * 1. ABA ESCONDIDA → resolve NA HORA. Não há quadro para ceder: nada vai ser
+ *    pintado, então esperar por uma pintura é esperar por nada. Isto não é só
+ *    mais rápido, é a diferença entre um carregamento que termina em segundo
+ *    plano e um que rasteja — o Chrome aplica *intensive throttling* a
+ *    `setTimeout` numa aba escondida há mais de 5 min (um disparo por MINUTO), e
+ *    uma sequência de esperas presa nisso leva minutos para atravessar quatro
+ *    fases.
+ * 2. ABA VISÍVEL → `requestAnimationFrame`, com `setTimeout` de 250 ms como
+ *    rede de segurança para a janela em que a aba fica escondida ENTRE o teste
+ *    acima e o callback.
+ *
+ * Ceder o quadro é uma OTIMIZAÇÃO DE APRESENTAÇÃO; nunca pode ser o motivo de
+ * um carregamento não terminar.
+ */
+export function paintFrame(): Promise<void> {
+  if (typeof document !== 'undefined' && document.hidden) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    requestAnimationFrame(done);
+    setTimeout(done, 250);
+  });
+}
+
+/**
+ * Envolve um trabalho síncrono e pesado na pílula: anuncia, deixa o navegador
+ * PINTAR o anúncio, roda, e solta — inclusive se o trabalho lançar.
+ *
+ * Este é o helper que fecha os "cliques perdidos": um clique que muda a cena mas
+ * não mostra nada por 300 ms é indistinguível de um clique que se perdeu.
+ */
+export async function withPill<T>(text: string, job: () => T | Promise<T>): Promise<T> {
+  const pill = claimPill(text);
+  try {
+    await paintFrame();
+    return await job();
+  } finally {
+    pill.release();
+  }
+}
+
 /** What the curtain shows while it is up. Every field may be null/''. */
 export interface LoaderInfo {
   /** which card this load is about — decides the hero AND the flight target */

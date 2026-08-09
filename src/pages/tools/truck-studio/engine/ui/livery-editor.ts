@@ -24,6 +24,10 @@ import {
   copySurface, sidesMatch, restorePersisted, bindPersistFlush,
 } from '../vehicle/livery-doc';
 import { initSnapping, setSnapEnabled, drawRulers, resizeSnapLayers } from './livery-guides';
+/* O painel de medidas do implemento, no inspetor. Ele NÃO importa
+   ../vehicle/livery (o ciclo desta dupla já é um a mais do que se quer), então é
+   este arquivo que lhe diz qual face está ativa. */
+import { initLiveryMeasures, syncMeasures } from './livery-measures';
 
 type AnyObj = fabric.FabricObject & {
   id?: string | null; name?: string; locked?: boolean; assetId?: string; renamed?: boolean;
@@ -642,6 +646,10 @@ export function showSurface(key: SurfaceKey) {
   $('editor-caption').textContent = CAPTIONS[key];
   resize();
   syncInspector();
+  /* As portas são POR FACE, então o painel de medidas troca de conteúdo junto
+     com a aba. A altura e o comprimento não trocam — são do baú inteiro —, e é
+     por isso que a seção não é escondida nem remontada do zero aqui. */
+  syncMeasures(key);
 }
 
 export function openEditor(key?: SurfaceKey) {
@@ -798,6 +806,10 @@ export function initLiveryEditor() {
   bindMirror();
   bindDnD();
   bindKeys();
+  /* Depois dos binds e antes dos ouvintes do fabric: ele monta DOM dentro do
+     inspetor e se inscreve nas mudanças de medida, e nada aqui em baixo depende
+     disso ter acontecido. */
+  initLiveryMeasures();
 
   for (const btn of $$('#surface-tabs .tab')) {
     btn.addEventListener('click', () => showSurface(btn.dataset.surface as SurfaceKey));

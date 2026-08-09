@@ -71,8 +71,11 @@ export const VIEW_DIR = new THREE.Vector3(2.20, 0.575, 1.17).normalize();
    Perto o bastante para o card continuar sendo a promessa que a cena cumpre,
    longe o bastante para os dois enquadramentos lerem igual.
 
-   Uma cabine pode sobrescrever isto com `viewDir` no cabs.json (as duas IVECO
-   usam, porque o S-Way le mais de perfil que o FH no mesmo azimute). */
+   O override por cabine (`viewDir` no cabs.json) SAIU junto com o cabs.json, e
+   com ele o consumidor desta constante no card: os cards mostram renders
+   PRE-PRODUZIDOS agora (catalog/renders.ts), nao um render ao vivo. Esta pose
+   continua sendo a de frameAll(), e e ELA que o pipeline offline de renders tem
+   de reproduzir para o card prometer o que a cena entrega. */
 export const CARD_VIEW_DIR = new THREE.Vector3(2.00, 0.360, 1.56).normalize();
 
 /** Teleobjetiva curta. É o que achata a perspectiva e afasta a câmera: uma

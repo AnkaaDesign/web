@@ -13,19 +13,63 @@ import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
+import { TrailerRig, type TrailerDims } from './trailer-rig';
+import {
+  solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
+  type TractorHitch, type HitchManifest, type CouplingSolution,
+  type CouplingDefaults, type Profile,
+} from './coupling';
 
 export { makePaintMaterial };
+export type { TrailerDims };
+export type { CouplingSolution };
 
 /* Mensagem legível de um valor lançado — `catch (e)` é `unknown` sob strict. */
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /* ---------------- types ---------------- */
 
-/** One entry of models/cabs.json. */
+/* ---------------- POR QUE `cabs.json` FOI APOSENTADO ----------------
+   Ele indexava a geometria por um id de CABINE (`scania`, `volvo`, `daf`) e o
+   catálogo apontava para esse id. Duas coisas erradas, e a segunda é grave:
+
+   1. UMA INDIREÇÃO QUE NÃO PAGAVA POR SI. O manifesto de marcas já sabia qual
+      arquivo queria; passar por um segundo manifesto para descobrir o mesmo
+      caminho só criava um lugar a mais para os dois discordarem — e eles
+      discordaram: `chassis[].file` do brands.json v2 não tinha nenhum `cab`
+      correspondente, então a geometria simplesmente não ligava.
+
+   2. GUARDAVA DADO DERIVADO. Os valores de `cabs.json` eram
+      PÓS-NORMALIZAÇÃO: traziam assados por dentro o `CAB_FORWARD_GAP = 0.10` e
+      a convenção "traseira da cabine em z=0". Isso os tornava inúteis para o
+      desktop, que normaliza noutro ponto, e os invalidava a cada re-bake — sem
+      erro nenhum, só um caminhão alguns centímetros fora do lugar.
+
+   O QUE ENTROU NO LUGAR, e é a mesma forma nos dois apps:
+     `chassis[].file`  → QUAL geometria (catalog/catalog.ts)
+     `hitch.json`      → ONDE ela vai, em ESPAÇO CRU DO GLB
+
+   `hitch.json` traz por tratora `orientYaw`, `groundY`, `centerX`, o bloco
+   completo da quinta roda, `rearBody`, `axles`, `wheelMeshRegex` e `bbox` —
+   mais uma impressão digital `sha256` do arquivo de origem, que é o que torna
+   dado velho DETECTÁVEL em vez de silenciosamente errado.
+
+   A junção entre os dois é o CAMINHO DO ARQUIVO (`tractors[*].sourceFile`), não
+   um id: um id seria uma terceira coisa a manter em sincronia, e o caminho já é
+   único por construção. */
+
+/* O LADO CAVALO do contrato já é lido por `vehicle/coupling.ts`
+   (`HitchManifest`, `findTractor()`, `defaultsOf()`), carregado em
+   `state.hitch` mais abaixo. NÃO existe um segundo leitor de `hitch.json` neste
+   arquivo: `findTractor(state.hitch, { file })` casa pelo `sourceFile`
+   normalizado, que é exatamente a junção que o catálogo precisa. */
+
+/** O que o carregador precisa saber para montar UMA geometria de cavalo. */
 export interface CabDef {
+  /** o próprio caminho do arquivo — a chave de identidade agora */
   id: string;
   name: string;
-  /** absolute path under /models/vehicles/ */
+  /** caminho relativo a STUDIO_BASE; resolver com assetUrl() */
   file: string;
   /** 'fbx-scania' routes through FBXLoader + convertScaniaMaterials() */
   format?: string;
@@ -68,17 +112,19 @@ export interface TrailerMeta {
 
 /** Everything loaded into the scene about the vehicle itself. */
 export interface VehicleState {
-  cabs: CabDef[];
-  byId: Record<string, CabDef>;
-  manifestFallback: boolean;
   trailerMeta: TrailerMeta | null;
   cabGroup: THREE.Group;
   trailerGroup: THREE.Group;
   cab: THREE.Object3D | null;
+  /** O CAMINHO do .glb em cena — a identidade da geometria carregada agora.
+   *  Era o id de `cabs.json`; virou o arquivo, que é o que o catálogo aponta. */
   cabId: string | null;
   cabDef: CabDef | null;
   cabBox: THREE.Box3 | null;
   trailer: THREE.Object3D | null;
+  /** O baú paramétrico. `null` num bake sem o material branco de fábrica — o
+   *  implemento continua carregando, só não redimensiona (ver buildTrailerRig). */
+  trailerRig: TrailerRig | null;
   /** captured after grounding, so placeTrailer() can re-derive from a fixed pose */
   trailerBase: { pos: THREE.Vector3; frontZ: number } | null;
   trailerBox?: THREE.Box3;
@@ -91,9 +137,26 @@ export interface VehicleState {
   /** Thermo King unit (protrudes toward the cab) */
   tk: THREE.Object3D | null;
   tkDepth: number;
+  /** Tamanho REAL da carcaça, medido depois da escala uniforme. Guardado porque
+   *  `placeThermoKing()` rederiva a pose a cada medida e não pode remedir o
+   *  produto — ele não muda de tamanho quando o baú muda. */
+  tkSize?: THREE.Vector3;
+  /** `topGap` do manifesto: metros entre a linha do teto e o topo da carcaça. */
+  tkTopGap?: number;
   paintMats: THREE.Material[];
   /** 'both' paints the trailer panels too */
   paintTarget: 'cab' | 'both';
+  /** `models/vehicles/hitch.json` — o lado CAVALO do contrato de engate. */
+  hitch: HitchManifest | null;
+  /** os `defaults` do manifesto, já com degradação campo a campo */
+  hitchDefaults: CouplingDefaults;
+  /**
+   * A entrada da cabine corrente, com `rearProfile` MEDIDO do modelo carregado.
+   * `null` numa cabine fora do manifesto → `placeTrailer()` cai no legado.
+   */
+  cabHitch: TractorHitch | null;
+  /** A última solução de engate — a HUD e a sonda leem daqui. */
+  coupled: CouplingSolution | null;
   trailerPaintMat: THREE.MeshPhysicalMaterial | null;
   /** front-wall paint overlays; `undefined` = not built yet, `[]` = none found */
   frontWalls?: THREE.Mesh[];
@@ -113,25 +176,24 @@ const STEER_TIRE_OD = 1.015;   // m — real steer-tire outer diameter anchors t
 
 /* Legacy values used when manifests are not (yet) available. */
 const LEGACY_TRAILER_FRONT_Z = 2.65;
-const DEFAULT_CABS: { cabs: CabDef[] } = {
-  cabs: [{
-    id: 'scania', name: 'Scania S730', file: VEHICLES_DIR + 'scania.glb',
-    paintMaterials: ['carpaint'],
-    wheelMeshRegex: 'tire|rim|pneu',
-    dims: { height: 3.85, length: 5.7 },
-    fifthwheel: null,                    // null → legacy trailer placement
-  }],
-};
+
+/* Materiais de tinta padrão. Era `paintMaterials` por cabine no `cabs.json`;
+   com ele aposentado, o padrão vale para todo mundo e um bake que use outro
+   nome é um defeito do bake, não uma configuração — `warnIfUnpaintable()` em
+   studio.ts é quem passou a dizer isso em voz alta. */
+const DEFAULT_PAINT_MATERIALS = ['carpaint'];
+const DEFAULT_WHEEL_RE = 'tire|rim|pneu';
 
 try { localStorage.removeItem('truckstudio.coupling.v1'); } catch { /* legacy key */ }
 
 export const state: VehicleState = {
-  cabs: [], byId: {}, manifestFallback: false,
   trailerMeta: null,
   cabGroup: new THREE.Group(),
   trailerGroup: new THREE.Group(),
   cab: null, cabId: null, cabDef: null, cabBox: null,
-  trailer: null, trailerBase: null,     // { pos, frontZ } captured after grounding
+  trailer: null, trailerRig: null,
+  hitch: null, hitchDefaults: FALLBACK_DEFAULTS, cabHitch: null, coupled: null,
+  trailerBase: null,                    // { pos, frontZ } captured after grounding
   tk: null, tkDepth: 0,                 // Thermo King unit (protrudes toward the cab)
   paintMats: [],
   paintTarget: 'cab',                   // 'cab' | 'both' (trailer panels painted too)
@@ -410,55 +472,71 @@ export async function loadManifests() {
      the console (and a hard error under some CSP/report setups), and the whole
      point of this block is that a missing manifest is a normal, survivable
      state. The fallbacks below are exactly the ones the serial version had. */
-  const cabsReq: Promise<CabDef[] | null> = fetchJSON(VEHICLES_DIR + 'cabs.json')
-    .then((j) => {
-      if (!Array.isArray(j.cabs) || !j.cabs.length) throw new Error('cabs.json vazio');
-      return j.cabs as CabDef[];
-    })
-    .catch((e: unknown) => {
-      console.warn('[manifest] cabs.json indisponível — usando padrão Scania.', errText(e));
-      return null;
-    });
   const metaReq: Promise<TrailerMeta | null> = fetchJSON(VEHICLES_DIR + 'trailer_meta.json')
     .catch((e: unknown) => {
       console.warn('[manifest] trailer_meta.json indisponível — engate legado + painéis retangulares.', errText(e));
       return null;
     });
 
-  const cabs = await cabsReq;
-  if (cabs) {
-    state.cabs = cabs;
-  } else {
-    state.cabs = DEFAULT_CABS.cabs;
-    state.manifestFallback = true;
-  }
-  /* The FBX pipeline is now MANIFEST-DRIVEN: any cab may declare
-     `format: "fbx-scania"` and get FBXLoader + convertScaniaMaterials() + the
-     steer-tire scale anchor. That is how `daf` reuses the very same source mesh
-     as `scania` without a second special case in here.
-     Two guards remain:
-     - a `scania` entry that declares NO format at all (an old cabs.json, or the
-       built-in DEFAULT_CABS fallback) is still forced onto the FBX, so a stale
-       manifest can never regress the cab back to the rejected GLB;
-     - a cab that asks for 'fbx-scania' but points at something that is not an
-       .fbx is a manifest typo — fall back to the default FBX rather than hand a
-       GLB to FBXLoader. */
-  for (const c of state.cabs) {
-    if (!c.format && c.id === 'scania') c.format = 'fbx-scania';
-    if (c.format === 'fbx-scania' && !/\.fbx(\?|$)/i.test(c.file || '')) c.file = SCANIA_FBX;
-  }
-  // availability probe (a listed model may not be exported yet). Cabs sharing a
-  // file (scania + daf) simply probe the same URL twice — harmless, and it keeps
-  // `available` a plain per-cab flag.
-  await Promise.all(state.cabs.map(async c => {
-    try { c.available = (await fetch(assetUrl(c.file), { method: 'HEAD' })).ok; }
-    catch { c.available = false; }
-  }));
-  state.byId = Object.fromEntries(state.cabs.map(c => [c.id, c]));
-
   /* Já em voo desde o topo da função — este await normalmente não espera nada. */
   state.trailerMeta = await metaReq;
+
+  /* O CONTRATO DE ENGATE. Um arquivo, um caminho relativo, os dois apps:
+     `models/vehicles/hitch.json`, resolvido por `assetUrl()` como todo o resto.
+     Ausência não é erro fatal — cai no engate legado e diz por quê. */
+  try {
+    state.hitch = await fetchJSON(VEHICLES_DIR + 'hitch.json') as HitchManifest;
+    state.hitchDefaults = defaultsOf(state.hitch);
+    const n = Object.keys(state.hitch?.tractors ?? {}).length;
+    console.info('[engate] hitch.json —', n, 'cavalos ·',
+      'folga', state.hitchDefaults.cabTrailerClearance, 'm ·',
+      'inclinação máx', (state.hitchDefaults.maxCouplingPitchRad * 180 / Math.PI).toFixed(1) + '°');
+    /* `implements` VAZIO é decisão, não pendência: o baú é paramétrico e um
+       número congelado aqui estaria errado no primeiro resize. O lado do
+       implemento sai de `TrailerRig.hitch`. Ver o cabeçalho de coupling.ts. */
+  } catch (e: unknown) {
+    console.warn('[engate] hitch.json indisponível —', errText(e),
+      '· o engate cai no caminho legado (assentamento medido em cena).');
+    state.hitch = null;
+    state.hitchDefaults = FALLBACK_DEFAULTS;
+  }
   return state;
+}
+
+/**
+ * Monta o descritor de carga de uma geometria de cavalo a partir do CAMINHO
+ * dela, casando com `hitch.json` quando existir medição.
+ *
+ * O roteamento de FORMATO continua dirigido por dado, não por id: um `.fbx`
+ * entra pelo FBXLoader + convertScaniaMaterials() + a âncora de escala pelo
+ * pneu direcional. Era `format: 'fbx-scania'` declarado no `cabs.json`; agora sai
+ * da EXTENSÃO do arquivo, que é a mesma informação sem um manifesto para
+ * mantê-la. As quatro geometrias de produção herdadas não têm caminho especial:
+ * `scania.fbx` entra pelo FBX porque termina em `.fbx`, e `volvo.glb` pelo GLB
+ * porque termina em `.glb`.
+ */
+export function cabDefFor(file: string, name?: string): CabDef {
+  /* UM leitor de `hitch.json` no engine, e ele é o de coupling.ts. `findTractor`
+     casa pelo `sourceFile` NORMALIZADO (barras e `./` iniciais), que é a junção
+     certa: o catálogo aponta para o arquivo, não para a chave legível
+     (`daf-xd-4x2-sl`) do manifesto. */
+  const hit = findTractor(state.hitch, { file });
+  return {
+    id: file,
+    name: name || file.split('/').pop() || file,
+    file,
+    format: /\.fbx(\?|$)/i.test(file) ? 'fbx-scania' : undefined,
+    paintMaterials: DEFAULT_PAINT_MATERIALS,
+    wheelMeshRegex: DEFAULT_WHEEL_RE,
+    /* A quinta roda MEDIDA ganha do assentamento por caixa. `plateTopY` e `z`
+       são exatamente os dois números que o engate precisa, e vêm em espaço cru
+       do arquivo — que é a diferença toda em relação ao `cabs.json`, cujos
+       valores já vinham normalizados e portanto não sobreviviam a um re-bake. */
+    fifthwheel: hit
+      ? { z: hit.fifthWheel.z, topY: hit.fifthWheel.plateTopY }
+      : null,
+    available: true,
+  };
 }
 
 /* ---------------- material / mesh setup ---------------- */
@@ -710,8 +788,18 @@ function bodyPanelPred(_root: THREE.Object3D): MeshMatcher {
      buildLiveryPanels() started creating the same three names at runtime: the
      Thermo King dropped 21 cm on its own.
      Both bakes agree on the material — in the merged one the panels carry it too,
-     so this predicate covers the skin AND the rest either way. */
+     so this predicate covers the skin AND the rest either way.
+
+     E O INVISÍVEL NÃO CONTA. Desde que `TrailerBody` entrou, o branco de fábrica
+     existe DUAS vezes na cena: as malhas originais, que ele apaga com
+     `visible = false`, e a malha paramétrica que as substitui. As originais
+     continuam com o material branco e continuam sendo varridas por
+     `Box3.expandByObject()`, que não olha `visible` — então, sem este filtro, a
+     caixa do baú voltaria sempre nas medidas DE FÁBRICA por mais que o usuário
+     redimensionasse, e `trailerBase.frontZ` (o engate) e a montagem do Thermo
+     King viriam junto. Um corpo escondido não é carroceria. */
   return (o: THREE.Mesh) => {
+    if (!o.visible) return false;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     return mats.some((m) => !!m && WHITE_BODY_RE.test(m.name || ''));
   };
@@ -869,7 +957,12 @@ function disposeTree(root: THREE.Object3D) {
 /* The car-paint material itself lives in vehicle/paint.ts (three finish families,
    flakes, pearl colour travel, orange peel). This module only decides WHICH
    meshes get it. */
-const CAB_FORWARD_GAP = 0.10;   // user request: cabs slightly forward of ideal kingpin
+/* `CAB_FORWARD_GAP = 0.10` FOI APAGADO. Era um desengate deliberado de 100 mm
+   aplicado a toda cabine — "cabs slightly forward of ideal kingpin" — e todo
+   `fifthwheel.z` de `cabs.json` o carrega embutido, que é parte de por que
+   aquele arquivo não podia ser lido por dois normalizadores diferentes. Se a
+   cabine deve ficar adiantada na CENA, isso é `RIG_PLACEMENT`; dentro do engate
+   é uma mentira sobre onde o pino trava. Ver o bloco em placeTrailer(). */
 
 /* ---------------- wet vehicle ----------------
    In the rain the bodywork gets glossier, but its albedo must NOT be darkened:
@@ -1010,6 +1103,10 @@ function buildFrontWallOverlay() {
   state.trailer.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh || /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) return;
+    /* Mesmo motivo de buildLiveryPanels(): as chapas brancas originais seguem
+       na cena, só escondidas por `TrailerBody`. Extrair a parede dianteira de
+       uma delas desenharia a tinta na altura de fábrica. */
+    if (!o.visible) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     if (mats.some(isWhiteBodyMat)) sources.push(o);
   });
@@ -1409,9 +1506,24 @@ async function loadScaniaOriginal(def: CabDef, onProgress?: (t: number) => void)
 let cabGen = 0;
 let trailerGen = 0;
 
+/**
+ * Carrega a geometria de um cavalo A PARTIR DO CAMINHO DO ARQUIVO.
+ *
+ * `id` é o caminho (`models/trucks/daf_xd_6x4t_sl.glb`), não mais um id de
+ * `cabs.json` — ver a nota de aposentadoria no topo do arquivo.
+ *
+ * FALHA ALTO quando não há arquivo. O caminho antigo caía na primeira cabine
+ * disponível do manifesto, o que significava desenhar um Scania quando o
+ * usuário pediu um DAF e escrever "geometria provisória" numa linha de estado
+ * que ninguém lê. Um caminhão errado apresentado como certo é pior do que um
+ * erro: o cliente aprova a arte sobre a lataria de outra montadora.
+ */
 export async function loadCab(id: string, onProgress?: (t: number) => void) {
-  const def = state.byId[id];
-  if (!def) throw new Error('Cabine desconhecida: ' + id);
+  if (!id) {
+    throw new Error('Este chassi não declara geometria (`file`) no catálogo —'
+      + ' nada a carregar. Confira `chassis[].file` em brands.json.');
+  }
+  const def = cabDefFor(id);
   const mine = ++cabGen;
   const cab = def.format === 'fbx-scania'
     ? await loadScaniaOriginal(def, onProgress)
@@ -1429,18 +1541,50 @@ export async function loadCab(id: string, onProgress?: (t: number) => void) {
   setupCommon(cab);
   auditTransparency(cab, def.id);            // only glass may be transparent
   state.cabGroup.add(cab);
-  const wheelRe = new RegExp(def.wheelMeshRegex || 'tire|rim|pneu', 'i');
-  // FBX mesh names may not carry wheel words — match material names too
-  const wheelPred = (o: THREE.Mesh) => wheelRe.test(o.name) || wheelRe.test(firstMatName(o));
-  const box = groundAndCenter(cab, /./, wheelPred);
-  cab.position.z -= box.min.z;               // cab rear at z=0 → occupies [0, length]
-  cab.position.z += CAB_FORWARD_GAP;         // slightly forward: more cab↔trailer gap
-  cab.updateWorldMatrix(true, true);
+  /* NORMALIZAÇÃO A PARTIR DE DADO, quando existe entrada no manifesto.
+     ------------------------------------------------------------------------
+     `orientYaw` / `groundY` / `centerX` saem de `hitch.json`, medidos uma vez
+     por vértice e carimbados com o `sha256` dos bytes. Não há caixa envolvente
+     no caminho — é ela que fazia cada rip pairar de 0 a 230 mm conforme a
+     rotação dos nós de roda, e é ela que a antiga heurística de orientação por
+     centroide também consultava.
+
+     A POSE não é escrita aqui: quem a escreve é `placeTrailer()`, porque a
+     âncora do conjunto é a garganta do acoplador e a cabine é que anda até ela.
+     Aqui só se mede o que depende da malha — o perfil da traseira. */
+  const hitchEntry = findTractor(state.hitch, { id: def.id, file: def.file });
+  if (hitchEntry) {
+    /* Medido com a raiz na IDENTIDADE: aí o mundo é o espaço CRU do GLB, que é
+       o referencial em que o manifesto fala, e `N()` faz a rotação e as duas
+       translações de uma vez. Medir com a raiz já girada obrigaria a desfazer
+       `centerX` no sinal certo — uma chance a mais de errar por nada. */
+    cab.rotation.set(0, 0, 0);
+    cab.position.set(0, 0, 0);
+    cab.updateWorldMatrix(true, true);
+    hitchEntry.rearProfile = measureCabRearProfile(cab, hitchEntry);
+    state.cabHitch = hitchEntry;
+    const fw = hitchEntry.fifthWheel;
+    console.info('[engate] cavalo', hitchEntry.id, '· quinta roda z', fw.z.toFixed(4),
+      'prato', fw.plateTopY.toFixed(4), `(${((fw.plateTopY - hitchEntry.groundY) * 1000).toFixed(0)} mm do solo)`,
+      '·', fw.method ?? '?', fw.confidence ?? '?',
+      fw.needsManualReview ? `· ⚠ ±${((fw.uncertaintyM ?? 0) * 1000).toFixed(0)} mm` : '');
+  } else {
+    state.cabHitch = null;
+    const wheelRe = new RegExp(def.wheelMeshRegex || 'tire|rim|pneu', 'i');
+    // FBX mesh names may not carry wheel words — match material names too
+    const wheelPred = (o: THREE.Mesh) => wheelRe.test(o.name) || wheelRe.test(firstMatName(o));
+    const box = groundAndCenter(cab, /./, wheelPred);
+    cab.position.z -= box.min.z;             // legado: traseira em z=0 → ocupa [0, length]
+    cab.updateWorldMatrix(true, true);
+  }
 
   state.cab = cab;
   state.cabId = id;
   state.cabDef = def;
   state.cabBox = bboxOfMatching(cab, /./);
+  /* A cabine mudou de tamanho e de ponto de engate: o conjunto se refaz agora,
+     e não na próxima coisa que por acaso chamar `placeTrailer()`. */
+  placeTrailer();
 
   const subs = (def.paintMaterials || ['carpaint']).map((s) => s.toLowerCase());
   // GLB cabs (volvo): upgrade the paint materials to automotive flake paint
@@ -1640,45 +1784,75 @@ function applyTrailerFinish(root: THREE.Object3D) {
   console.info('[implemento] acabamento restaurado —', log.length ? log.join(' · ') : 'nada casou (VERIFICAR: os nomes de material mudaram?)');
 }
 
-/* ---------------- local reflection ----------------
-   Binds the probe's cubemap as `envMap` on the implement's materials, so what the
-   metal mirrors is the scene it is standing in and not the scenario's HDRI. An
-   explicit `envMap` takes precedence over `scene.environment` in three, so this is
-   a per-material override and everything else in the scene is untouched.
+/* ---------------- reflexo local ----------------
+   Prende o cubemap da sonda como `envMap` nos materiais do VEÍCULO INTEIRO —
+   cavalo e implemento —, para que o que o metal espelha seja a cena em que ele
+   está e não o HDRI do cenário. Em three, um `envMap` explícito tem precedência
+   sobre `scene.environment`, então isto é um override por material e o resto da
+   cena continua intocado.
 
-   Applied to the WHOLE implement rather than only the obvious metals: a dielectric
-   barely changes (its environment term is a weak Fresnel rim), and picking a
-   subset would leave two neighbouring parts reflecting two different worlds, which
-   is a worse artefact than the one being fixed.
+   Aplicado ao veículo TODO e não só aos metais óbvios: um dielétrico quase não
+   muda (seu termo de ambiente é uma borda de Fresnel fraca), e escolher um
+   subconjunto deixaria duas peças vizinhas espelhando dois mundos diferentes,
+   que é um artefato pior do que o que se está consertando.
 
-   The intensities that applyTrailerFinish() sets are deliberately NOT changed
-   here. They were chosen to stop the HDRI's horizon drawing a line on the flank;
-   a local capture has no such horizon, so if the metals now read too dark that is
-   a tuning question to settle against a render, not something to guess at.
+   As intensidades que applyTrailerFinish() e setupCommon() escrevem NÃO são
+   alteradas aqui. Elas foram escolhidas para impedir o horizonte do HDRI de
+   desenhar uma linha no flanco; uma captura local não tem esse horizonte.
 
    ------------------------------------------------------------------------
-   THE PROBE DOES NOT SEE THE CLOCK, AND THAT IS WHY THE IMPLEMENT GLOWED AT
-   NIGHT. Two compounding faults, both consequences of the sentence three lines
-   above this one — "an explicit envMap takes precedence over scene.environment":
+   POR QUE O CAVALO ENTROU AQUI (2026-08-08). Até esta data a sonda valia só
+   para `state.trailer`, e essa era a assimetria que o dono do produto relatou
+   como "está alterando mais o cavalo do que o implemento". Medido na cena viva:
+   48/48 materiais do implemento carregavam `envMap` explícito e 0/95 do cavalo
+   carregavam — as duas metades amostravam AMBIENTES DIFERENTES por construção,
+   e nenhum ajuste de luz fecha isso, porque a diferença não está na luz.
 
-     1. It takes precedence over `scene.environmentIntensity` too. That uniform
-        is the ONLY thing carrying the day-for-night grade to reflections
-        (applyRig() drives it to lerp(1, 0.40, nightness) under an HDRI), and a
-        material with its own envMap is not multiplied by it — only by its own
-        envMapIntensity, which applyTrailerFinish() authored as a constant 1.0
-        to 1.35. So every surface on the implement kept full daylight
-        reflectivity at midnight.
-     2. It ran once per choice and never again, so the CONTENT was a capture of
-        the scenario at whatever hour the model happened to load at — a lit
-        warehouse and a bright sky, mirrored by a truck parked in the dark.
+   A correção NÃO foi tirar o `envMap` do implemento, e isso foi decidido por
+   medida, não por gosto. Quem depende da sonda é o cenário de FORA: as barras
+   estruturais (`inox-ferragem`, `metal-*`, 1156 malhas) são `metalness: 1` com
+   `envMapIntensity` 1.0, ou seja, tudo o que elas mostram é o ambiente. Esse
+   1.0 só existe PORQUE a captura local não tem horizonte — antes da sonda o
+   valor era 0.18/0.28, cortado justamente para esconder a linha do horizonte do
+   HDRI correndo pelo estrado de 15 m (ver o bloco TRAILER_STRUCT_METAL_RE).
+   Devolver essas barras para `scene.environment` mantendo 1.0 traria a linha de
+   volta em intensidade cheia — regressão dupla no `distrito-industrial`, que
+   está fora de escopo para mudança de aparência.
 
-     And it applies to `state.trailer` only, which is why this reads as the
-     implement being lit differently from the cab rather than as the whole rig
-     being bright: the cab has no explicit envMap and has been following the
-     clock correctly the whole time. That asymmetry is exactly what Kennedy saw.
+   Então a sonda é a fonte melhor, e o que faltava era ela cobrir as duas
+   metades. Isto não inventa desenho novo: `scene/probe.ts` sempre disse "ligado
+   como `envMap` nos materiais DO VEÍCULO", a função sempre se chamou
+   `refreshVehicleReflection`, o ponto de captura sempre foi o centro do
+   conjunto (cavalo + implemento) e a captura sempre escondeu OS DOIS grupos —
+   ou seja, o cubemap já era válido para o cavalo. Só a aplicação parou no meio.
 
-   Both are fixed by ONE continuous scalar — see applyProbeEnvGain() below for
-   why it is a ratio of `scene.environmentIntensity` and not a re-capture. */
+   ------------------------------------------------------------------------
+   A SONDA NÃO VÊ O RELÓGIO, E ERA POR ISSO QUE O IMPLEMENTO BRILHAVA À NOITE.
+   Duas faltas que se somavam, ambas consequência da frase lá em cima — "um
+   `envMap` explícito tem precedência sobre `scene.environment`":
+
+     1. Tem precedência sobre `scene.environmentIntensity` também. Esse uniform
+        é a ÚNICA coisa que leva a gradação dia-para-noite aos reflexos
+        (applyRig() o leva a lerp(1, 0.40, nightness) sob um HDRI), e um
+        material com `envMap` próprio não é multiplicado por ele — só pelo seu
+        `envMapIntensity`. Assim toda superfície do implemento mantinha
+        refletividade de meio-dia à meia-noite.
+     2. Rodava uma vez por escolha e nunca mais, então o CONTEÚDO era uma
+        captura do cenário na hora em que o modelo tivesse carregado.
+
+   As duas se resolvem por UM escalar contínuo — ver applyProbeEnvGain() abaixo
+   para por que ele é uma RAZÃO de `scene.environmentIntensity` e não uma nova
+   captura. Com o cavalo dentro do mesmo mapa, esse escalar passa a reger as
+   duas metades pela mesma lei, que é o ponto todo desta mudança.
+
+   SOBRE O NÍVEL, e é uma diferença real: um material sem `envMap` recebia
+   `envMapIntensity × scene.environmentIntensity`; com a sonda ele recebe só
+   `envMapIntensity × f`. Isso NÃO é uma intensidade perdida. `environmentIntensity`
+   existe para AJUSTAR um HDRI arbitrário — que está em unidades da foto — ao rig
+   da cena. A sonda não precisa desse ajuste: ela é um render da cena já
+   iluminada, nas unidades do próprio framebuffer. Multiplicar de novo seria
+   contar o encaixe duas vezes. Por isso a base registrada é o `envMapIntensity`
+   autorado, cru, para as duas metades. */
 /** Authored envMapIntensity per implement material — the value the tracking gain
  *  multiplies. Read back through the map so a re-capture never compounds. */
 let probeBase = new Map<THREE.MeshStandardMaterial, number>();
@@ -1723,7 +1897,9 @@ onRig(applyProbeEnvGain);
 
 export function refreshVehicleReflection() {
   const trailer = state.trailer;
-  if (!trailer) return;
+  /* Basta UMA das metades: o cavalo também amostra a sonda agora, então uma
+     cena só com cabine ainda tem o que corrigir. */
+  if (!trailer && !state.cab) return;
   const rig = new THREE.Box3();
   rig.expandByObject(state.trailerGroup);
   if (state.cab) rig.expandByObject(state.cabGroup);
@@ -1738,34 +1914,45 @@ export function refreshVehicleReflection() {
   });
   if (!tex) return;
 
-  let n = 0;
   const seen = new Set<string>();
-  /* Rebuilt rather than mutated: a cab or implement swap disposes materials, and
-     a Map keyed on them would hold every generation alive. Bases are carried
-     over from the outgoing map when the material survives — reading
-     envMapIntensity off the material here would read the PREVIOUS night gain and
-     bake it in, compounding a little more with every re-capture. */
+  /* Reconstruído em vez de mutado: uma troca de cabine ou de implemento descarta
+     materiais, e um Map com chave neles seguraria viva toda geração. As bases
+     são trazidas do mapa que sai quando o material sobrevive — ler
+     envMapIntensity do material aqui leria o ganho de noite ANTERIOR e o
+     assaria dentro, compondo um pouco mais a cada nova captura. */
   const next = new Map<THREE.MeshStandardMaterial, number>();
-  trailer.traverse((node) => {
-    const o = node as THREE.Mesh;
-    if (!o.isMesh) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    for (const raw of mats) {
-      const m = raw as THREE.MeshStandardMaterial;
-      if (!m || seen.has(m.uuid)) continue;
-      seen.add(m.uuid);
-      m.envMap = tex;
-      m.needsUpdate = true;
-      next.set(m, probeBase.get(m) ?? m.envMapIntensity);
-      n++;
-    }
-  });
+  const bind = (root: THREE.Object3D | null) => {
+    let n = 0;
+    if (!root) return n;
+    root.traverse((node) => {
+      const o = node as THREE.Mesh;
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const raw of mats) {
+        const m = raw as THREE.MeshStandardMaterial;
+        if (!m || seen.has(m.uuid)) continue;
+        seen.add(m.uuid);
+        m.envMap = tex;
+        m.needsUpdate = true;
+        next.set(m, probeBase.get(m) ?? m.envMapIntensity);
+        n++;
+      }
+    });
+    return n;
+  };
+  /* AS DUAS METADES. O `seen` é compartilhado de propósito: cavalo e implemento
+     podem compartilhar material (o mesmo material de tinta, por exemplo), e
+     contá-lo duas vezes só inflaria o número do log. */
+  const nCab = bind(state.cab);
+  const nTrailer = bind(trailer);
+  const n = nCab + nTrailer;
   probeBase = next;
-  /* The capture happened under the CURRENT rig, so its radiance already carries
-     the environment level for this hour: the gain is 1 until the clock moves. */
+  /* A captura aconteceu sob o rig ATUAL, então a radiância dela já carrega o
+     nível de ambiente desta hora: o ganho é 1 até o relógio andar. */
   probeEnvIntensity = scene.environmentIntensity || 1;
   applyProbeEnvGain();
-  console.info('[probe] reflexo local aplicado a', n, 'materiais do implemento · captura em',
+  console.info('[probe] reflexo local aplicado a', n, 'materiais do veículo —',
+    nCab, 'do cavalo +', nTrailer, 'do implemento · captura em',
     at.toArray().map((v) => +v.toFixed(2)).join(', '),
     '· envIntensity', probeEnvIntensity.toFixed(3));
 }
@@ -1837,6 +2024,13 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
   trailer.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    /* `visible` FILTRA, e é o que faz o recorte sair do corpo PARAMÉTRICO.
+       `TrailerBody` não apaga as malhas brancas originais — ele as esconde. Se
+       elas entrassem aqui, o passo 1 mediria a caixa do baú de fábrica (é ela
+       que fica mais larga em Z quando o baú encurta, e mais baixa quando ele
+       sobe), os limiares de 40 mm cairiam no lugar errado e os painéis sairiam
+       recortados de uma geometria que ninguém vê. */
+    if (!o.visible) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     if (mats.some((m) => !!m && WHITE_BODY_RE.test(m.name || ''))) sources.push(o);
   });
@@ -1980,6 +2174,253 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     `· ${strippedTris} triângulos removidos de ${strippedMeshes} malhas de origem`);
 }
 
+/* ---------------- baú paramétrico ----------------
+   O núcleo mora em ./trailer-geometry.ts (o BRANCO) e ./trailer-assembly.ts (o
+   resto do baú), costurados por ./trailer-rig.ts. Aqui fica só o que é do ciclo
+   de vida do implemento: quando construir, e o que precisa ser REFEITO depois de
+   cada mudança de medida.
+
+   O QUE UM RESIZE INVALIDA, e por quê:
+
+   1. AS TRÊS CHAPAS DE LIVERY. buildLiveryPanels() não é um filtro sobre a
+      geometria viva: ele COPIA triângulos para malhas novas e os REMOVE das de
+      origem. Essas cópias guardam posições de vértice, então no instante em que
+      o corpo muda de altura ou de comprimento elas viram um fantasma do baú
+      antigo — e a LiveryUV delas foi normalizada pelos limites antigos, então a
+      arte também sairia fora de escala. Não há como corrigi-las no lugar; a
+      única resposta honesta é jogá-las fora e recortar de novo.
+
+   2. O ÍNDICE DA MALHA BRANCA. A remoção do item 1 é feita reescrevendo o índice
+      da geometria de origem. `TrailerBody.rebuild()` troca os ATRIBUTOS e não
+      mexe no índice — então um índice sobrevivente apontaria para ordinais de
+      uma malha que não existe mais (contagem de vértices diferente a cada
+      número de frisos). Por isso ele é zerado ANTES do rebuild, e não depois.
+
+   3. A PAREDE DIANTEIRA PINTADA. buildFrontWallOverlay() extrai a pele da
+      parede e desenha uma cópia coincidente por cima. Coincidente com a parede
+      ANTIGA, quando a altura muda.
+
+   4. A CAIXA DO BAÚ — `trailerBox` e `trailerBase.frontZ`. placeTrailer() põe o
+      pino-rei sobre a quinta roda medindo a partir da parede dianteira. O
+      comprimento cresce PARA TRÁS de propósito (ver `mapZ` em
+      trailer-geometry.ts), mas a testeira ainda avança alguns milímetros com o
+      esticamento em Z das peças que atravessam o vão, e o engate tem de saber.
+
+   O que NÃO é refeito, e é decisão: `trailerPivotFromFront` não é remedido a
+   partir dos pneus. A rodagem não se mexe — só a parede de referência anda — e
+   um novo `runningTyres()` custaria uma varredura de todos os vértices dos doze
+   pneus para chegar ao mesmo número que a subtração dá de graça. */
+
+/** Ouvintes do "os painéis foram recortados de novo". Existe porque
+ *  vehicle/livery.ts importa ESTE módulo: a dependência inversa fecharia um
+ *  ciclo, então quem quiser reagir se inscreve. studio.ts é o único assinante,
+ *  e reata as sobreposições de arte nas chapas novas. */
+type PanelListener = (trailer: THREE.Object3D) => void;
+const panelListeners: PanelListener[] = [];
+export function onTrailerPanelsRebuilt(cb: PanelListener) {
+  panelListeners.push(cb);
+  return () => { const i = panelListeners.indexOf(cb); if (i >= 0) panelListeners.splice(i, 1); };
+}
+
+/** Materiais que pertencem à CENA e não a uma chapa: sobrevivem ao descarte. */
+const isSharedMat = (m: THREE.Material | null | undefined) =>
+  !!m && (m === (state.trailerPaintMat as THREE.Material | null)
+    || m === (state.frontWallMat as THREE.Material | null));
+
+/**
+ * Devolve à GPU as três chapas recortadas — e as sobreposições de arte que
+ * `livery.attachOverlays()` pendurou nelas.
+ *
+ * A sobreposição COMPARTILHA a geometria da chapa (é o mesmo painel, com outro
+ * material e outra ordem de render), então a geometria é liberada UMA vez, aqui
+ * no dono. O material da sobreposição, esse sim, é dela: um por painel, criado
+ * a cada `attachOverlays()`. Sem liberá-lo, cada resize deixaria três programas
+ * de shader e três `MeshStandardMaterial` vivos para sempre — o vazamento que
+ * um redimensionamento contínuo transforma em minutos de sessão.
+ *
+ * A CanvasTexture NÃO é liberada: ela é das telas do editor, vive fora daqui, e
+ * `Material.dispose()` não a leva junto — que é exatamente o comportamento que
+ * torna isto seguro.
+ */
+function disposeLiveryPanels(trailer: THREE.Object3D) {
+  const doomed: THREE.Mesh[] = [];
+  trailer.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) doomed.push(o);
+  });
+  for (const panel of doomed) {
+    panel.traverse((node) => {
+      const o = node as THREE.Mesh;
+      if (o === panel || !o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+      for (const m of mats) if (!isSharedMat(m)) { forgetPaintMaterial(m); m.dispose(); }
+    });
+    panel.clear();                       // solta as sobreposições antes do resto
+    panel.geometry.dispose();
+    /* Com "pintar implemento" ligado, `material` é o material de tinta
+       COMPARTILHADO e o clone branco da chapa está guardado em `origMat`.
+       Liberar o compartilhado apagaria a tinta da cabine junto. */
+    const own = [panel.material, panel.userData.origMat as THREE.Material | undefined];
+    for (const m of own) {
+      const list = Array.isArray(m) ? m : (m ? [m] : []);
+      for (const one of list) if (!isSharedMat(one)) { forgetPaintMaterial(one); one.dispose(); }
+    }
+    panel.removeFromParent();
+  }
+}
+
+/** Idem para a parede dianteira. `frontWallMat` é compartilhado e fica. */
+function disposeFrontWallOverlays() {
+  for (const w of state.frontWalls || []) {
+    w.geometry.dispose();
+    w.removeFromParent();
+  }
+  state.frontWalls = undefined;          // `undefined` = "reconstruir", ver a guarda
+}
+
+/**
+ * Constrói o baú paramétrico sobre o implemento recém-assentado.
+ *
+ * Roda ANTES de applyTrailerFinish() de propósito: `TrailerBody` CLONA o
+ * material branco de fábrica, e um clone tirado depois do acabamento não teria
+ * recebido nenhuma das correções que aquela função aplica por nome. Construído
+ * antes, o clone já está pendurado no `root` quando a varredura passa e recebe o
+ * mesmo tratamento que o original teria recebido.
+ *
+ * E antes de buildLiveryPanels(), pelo motivo que dá nome a tudo isto: as
+ * chapas de livery têm de ser recortadas do corpo PARAMÉTRICO. Recortadas do
+ * original, elas seriam a única parte do baú que não redimensiona.
+ *
+ * Falhar aqui não é fatal. Um bake sem o material branco de fábrica continua
+ * carregando, pintando e exportando imagem — só não redimensiona.
+ */
+function buildTrailerRig(trailer: THREE.Object3D) {
+  try {
+    const rig = new TrailerRig(trailer);
+    state.trailerRig = rig;
+    const p = rig.profile;
+    console.info('[baú] paramétrico —', p.shells, 'cascas ·', p.ribbedShells, 'frisada(s) ·',
+      p.ribCount, 'frisos a', (p.pitch * 1000).toFixed(1), 'mm · base',
+      `${p.base.length.toFixed(3)} × ${p.base.height.toFixed(3)} × ${p.base.width.toFixed(3)} m`,
+      '· conjunto', rig.assembly.stats.parts, 'peças de', rig.assembly.stats.meshes, 'malhas');
+  } catch (e: unknown) {
+    state.trailerRig = null;
+    console.warn('[baú] geometria paramétrica indisponível —', errText(e),
+      '· o implemento carrega, mas não redimensiona.');
+  }
+}
+
+/** As medidas correntes do baú, ou `null` se este bake não redimensiona. */
+export function getTrailerDims(): TrailerDims | null {
+  return state.trailerRig ? state.trailerRig.current : null;
+}
+
+/**
+ * A ÚNICA porta de entrada do redimensionamento. Devolve as medidas EFETIVAS —
+ * a altura é ajustada para fechar um número inteiro de frisos, então o que sai
+ * raramente é idêntico ao que entrou.
+ *
+ * A sequência abaixo não é arbitrária; cada passo depende do anterior.
+ */
+export function setTrailerDims(patch: { height?: number; length?: number }): TrailerDims | null {
+  const rig = state.trailerRig;
+  const t = state.trailer;
+  const base = state.trailerBase;
+  if (!rig || !t || !base) return null;
+
+  /* 1. DE VOLTA À POSE DE CARGA, e o `rigGroup` à identidade.
+     `TrailerAssembly.set()` decide em ESPAÇO DE MUNDO ("esta peça encosta no
+     teto?", "está sob o piso?") contra números medidos no construtor, que rodou
+     com o implemento assentado na origem. Chamá-lo com o conjunto engatado, 12 m
+     adiante e girado 180°, compararia coordenadas de dois referenciais
+     diferentes — e a inclinação do engate ainda somaria uma rotação em X que
+     nenhuma dessas regras prevê. placeTrailer(), no fim, devolve tudo. */
+  setRigPlacement(false);
+  t.rotation.set(0, 0, 0);               // yaw também: `placeTrailer()` escreve os três
+  t.position.copy(base.pos);
+  t.updateMatrix();                      // nó congelado; ver freezeMatrices()
+  t.updateWorldMatrix(true, true);
+  /* É NESTA POSE que `TrailerRig.set()` vai remedir as âncoras de engate (pino,
+     chapa e manchas de contato do bogie). Se a linha acima não voltasse o
+     implemento à pose de carga, o acessor mediria uma geometria inclinada e
+     deslocada 12 m — e o engate seguinte fecharia sobre números de outro
+     referencial, sem erro nenhum para denunciar. */
+
+  /* 2. O ÍNDICE VELHO MORRE ANTES DO REBUILD. Ele é o resíduo do recorte
+        anterior e aponta para uma contagem de vértices que está prestes a
+        mudar. Depois do rebuild já seria tarde: a malha passaria um quadro
+        indexando lixo. */
+  const bodyGeo = rig.body.mesh.geometry as THREE.BufferGeometry;
+  bodyGeo.setIndex(null);
+  bodyGeo.clearGroups();
+
+  const dims = rig.set(patch);
+
+  /* 3. As chapas antigas saem, as novas são recortadas do corpo novo. A ordem
+        importa duas vezes: buildLiveryPanels() desiste se já achar uma malha
+        SIDE_L/SIDE_R/REAR, e as chapas antigas carregam o mesmo material branco
+        das de origem — deixadas na cena, entrariam como fonte do próprio
+        recorte. */
+  disposeLiveryPanels(t);
+  disposeFrontWallOverlays();
+  buildLiveryPanels(t);
+
+  /* 4. O Thermo King pendura na parede dianteira a uma folga fixa abaixo do
+        teto, e a parede acabou de mudar de altura. Ele não faz parte do
+        `TrailerAssembly` (entrou na cena depois dele), então é aqui que
+        acompanha — e acompanha REMEDINDO a parede, não somando um delta.
+
+        O que havia aqui era `tk.position.y += rig.roofDelta() − roofBefore`, e
+        ele tinha três problemas de uma vez: só corrigia Y (a testeira também
+        avança alguns milímetros com o esticamento em Z, e a unidade ficava
+        descolada dela), acumulava o resíduo de cada resize sem nunca
+        reancorar, e dependia de `roofDelta()` prever exatamente onde a chapa
+        foi parar em vez de perguntar. `placeThermoKing()` resolve as três
+        coordenadas contra a caixa recém-medida do corpo, então é idempotente e
+        a unidade fica rente à parede em qualquer medida. O TAMANHO dela não
+        entra na conta: é produto físico e não cresce com a caixa. */
+  placeThermoKing();
+
+  /* 5. A caixa do baú, rederivada da geometria nova — é o que o engate lê. */
+  const box = bboxOfMatching(t, bodyPanelPred(t));
+  if (state.trailerPivotFromFront !== undefined) {
+    /* A rodagem não andou; só a parede de referência. O braço do engate é a
+       distância entre as duas, então a correção é a diferença, exata. */
+    state.trailerPivotFromFront += box.max.z - base.frontZ;
+  }
+  state.trailerBox = box;
+  state.trailerBase = { pos: base.pos.clone(), frontZ: box.max.z };
+
+  /* 6. As chapas novas nasceram com `matrixAutoUpdate` ligado; o resto do
+        implemento está congelado desde o fim de loadTrailer(). Recongelar iguala
+        as duas metades — e tem de vir antes de placeTrailer(), que é quem
+        recompõe a pose sob essa regra. */
+  freezeMatrices(t);
+  placeTrailer();
+
+  /* 7. Tinta e molhagem por último, porque valem sobre MALHAS: as três chapas
+        que acabaram de nascer não estão em registro nenhum. Reafirmar o alvo
+        corrente repinta as novas e reconstrói a parede dianteira que o passo 3
+        descartou. */
+  setPaintTarget(state.paintTarget);
+  reapplyVehicleWetness();
+
+  /* 8. E a arte volta para cima delas — ver onTrailerPanelsRebuilt(). */
+  for (const cb of panelListeners) cb(t);
+
+  invalidate();
+  console.info('[baú] redimensionado —',
+    `${dims.length.toFixed(3)} × ${dims.height.toFixed(3)} m ·`,
+    rig.ribs.count, 'frisos · testeira z', box.max.z.toFixed(3));
+  return dims;
+}
+
+/** Volta o baú às medidas de fábrica. */
+export function resetTrailerDims(): TrailerDims | null {
+  const rig = state.trailerRig;
+  return rig ? setTrailerDims({ height: rig.base.height, length: rig.base.length }) : null;
+}
+
 /* ---------------- trailer ---------------- */
 export async function loadTrailer(onProgress?: (t: number) => void) {
   const mine = ++trailerGen;
@@ -1999,12 +2440,24 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
   const box = groundAndCenter(trailer, bodyPanelPred(trailer),
     (o: THREE.Mesh) => tyreSet.has(o), tyres ? tyres.minY : undefined);
   auditTransparency(trailer, 'trailer');     // glass blends, decals alphaTest
+  /* O BAÚ PARAMÉTRICO ENTRA AQUI — depois do assentamento (as duas metades
+     medem em espaço de mundo e esta é a pose de referência de toda medida
+     posterior), antes do acabamento e do recorte das chapas. Ver
+     buildTrailerRig() para o porquê de cada uma dessas duas fronteiras. */
+  buildTrailerRig(trailer);
   applyTrailerFinish(trailer);               // AFTER setupCommon: it overrides env 1.35
   /* After grounding, before studio.ts calls livery.attachOverlays(). */
   buildLiveryPanels(trailer);
   state.trailer = trailer;
-  state.trailerBase = { pos: trailer.position.clone(), frontZ: box.max.z };
-  state.trailerBox = box;
+  /* Remedida DEPOIS do baú paramétrico: `box` veio de groundAndCenter(), que
+     rodou sobre as chapas originais — as mesmas que `TrailerBody` acabou de
+     esconder. Nas medidas de fábrica as duas caixas coincidem, e é justamente
+     por isso que trocar agora é barato: o engate passa a ler a geometria que
+     ele vai continuar lendo depois do primeiro resize, em vez de uma que só
+     valia até ele. */
+  const bodyBox = state.trailerRig ? bboxOfMatching(trailer, bodyPanelPred(trailer)) : box;
+  state.trailerBase = { pos: trailer.position.clone(), frontZ: bodyBox.max.z };
+  state.trailerBox = bodyBox;
   /* Where the tyres meet the ground, measured back from the front wall. The
      coupling pitch (see placeTrailer) turns about this, so it has to be taken
      from the base pose — before any placement moves the trailer along Z.
@@ -2046,90 +2499,341 @@ export async function attachThermoKing() {
   setRigPlacement(false);       // idem: medidas de mundo daqui para baixo
   setupCommon(tk);
   auditTransparency(tk, 'thermoking');       // only glass may be transparent
-  // Real SLXi housings are slimmer than the rip: squash the depth (local Z,
-  // the mount axis) to 0.53 m. The back mounting plane is local z=0, so the
-  // scale is anchored there and the flush fit is preserved.
-  const TK_DEPTH = 0.53;
-  {
-    const raw = new THREE.Box3().setFromObject(tk);
-    const rawDepth = raw.max.z - raw.min.z;
-    if (rawDepth > 1e-6) tk.scale.z *= TK_DEPTH / rawDepth;
-    tk.updateWorldMatrix(true, true);
-  }
-  /* Measured BEFORE the unit joins the trailer — `state.tk` is set below, and
-     once it is a child, a whole-object fallback would include the unit in its
-     own mount plane. bodyPanelPred() removes that fallback, but the ordering is
-     still the honest one. */
-  const trailerRoot = state.trailer as THREE.Object3D;
-  const sideBox = bboxOfMatching(trailerRoot, bodyPanelPred(trailerRoot));
-  const wallZ = sideBox.max.z;
-  const roofY = sideBox.max.y;
-  const cx = (sideBox.min.x + sideBox.max.x) / 2;
 
-  /* SIZE AND DROP, both from thermoking_meta.json so they can be trimmed
-     without a code change.
-       widthFrac — the housing's width as a fraction of the body width. The unit
-         is meant to fill the white front panel out to where the corner rails
-         start; the rip's own scale left it floating in the middle of it.
-       topGap   — metres between the roof line and the top of the housing. It
-         used to be a flat 0.02, which pinned the unit under the roof cap; the
-         real thing sits lower, with its base on the front panel's bottom edge.
-     Scaled in X and Y together — this is a photograph of a real product, so it
-     may not be stretched — and Z is left alone because TK_DEPTH above already
-     set the mount depth. */
+  /* ---- TAMANHO: o do PRODUTO, e ESCALA ÚNICA ----
+     `thermoking_meta.json` traz `dims` — 2,03 x 1,68 x 0,796 m, a carcaça
+     SLXi real, e o próprio manifesto diz que o rip já sai nessa proporção
+     ("Scaled to real width 2.03 m (uniform; rip proportions give H/D as
+     logged)"). O código anterior LIA `dims` e não a usava para nada além do
+     log: ele espremia a profundidade para 0,53 m fixos e depois esticava X e Y
+     juntos até a largura virar `widthFrac` da largura do BAÚ. Resultado
+     medido no app, com este mesmo GLB:
+
+         bbox aplicada  2,16 x 1,79 x 0,53      dims do manifesto  2,03 x 1,68 x 0,796
+
+     ou seja 6,4 % maior nos dois eixos da frente e 33 % mais rasa — e, pior,
+     a razão entre os eixos mudou, o que é justamente o que não se pode fazer
+     com a fotografia de um produto real. Ela também deixava de ser uma medida
+     absoluta: `widthFrac` amarra a unidade à largura do baú, então a carcaça
+     PASSARIA A CRESCER se a caixa crescesse. A classificação de nós é
+     explícita quanto a isso — a unidade de refrigeração mantém o tamanho real
+     e apenas TRANSLADA.
+
+     Então: um fator UNIFORME, tirado da largura declarada. Os outros dois
+     eixos saem da proporção do rip, e o log confere os três contra `dims`
+     para que uma divergência apareça em vez de passar calada.
+     `widthFrac` fica só como degradação para um manifesto sem `dims`. */
   const readNum = (v: unknown, d: number, lo: number, hi: number) =>
     Number.isFinite(+(v as number)) ? Math.min(hi, Math.max(lo, +(v as number))) : d;
-  const widthFrac = readNum(meta?.widthFrac, 0.86, 0.4, 1);
-  const topGap = readNum(meta?.topGap, 0.1, 0, 1);
+  const dims = (meta?.dims && typeof meta.dims === 'object' ? meta.dims : null) as
+    { w?: number; h?: number; d?: number } | null;
+
+  const trailerRoot = state.trailer as THREE.Object3D;
+  const bodyW = (() => {
+    const bb = bboxOfMatching(trailerRoot, bodyPanelPred(trailerRoot));
+    return bb.max.x - bb.min.x;
+  })();
   {
-    const cur = new THREE.Box3().setFromObject(tk);
-    const curW = cur.max.x - cur.min.x;
-    const wantW = (sideBox.max.x - sideBox.min.x) * widthFrac;
-    if (curW > 1e-6) {
-      const s = wantW / curW;
-      tk.scale.x *= s;
-      tk.scale.y *= s;
+    const raw = new THREE.Box3().setFromObject(tk);
+    const rawW = raw.max.x - raw.min.x;
+    const wantW = dims && Number.isFinite(+(dims.w as number)) && +(dims.w as number) > 0
+      ? +(dims.w as number)
+      : bodyW * readNum(meta?.widthFrac, 0.83, 0.4, 1);
+    if (rawW > 1e-6) {
+      const s = wantW / rawW;
+      tk.scale.multiplyScalar(s);           // UNIFORME: o produto não se deforma
       tk.updateWorldMatrix(true, true);
     }
   }
 
-  /* Refeito AGORA porque setupCommon() mediu esta unidade antes dos dois blocos
-     de escala acima, e o corte de emissores de sombra é uma medida absoluta em
+  /* Refeito AGORA porque setupCommon() mediu esta unidade antes do bloco de
+     escala acima, e o corte de emissores de sombra é uma medida absoluta em
      metros: um alvo de 5 cm num modelo que ainda vai encolher (ou crescer) é uma
      pergunta respondida cedo demais. Idempotente — só reescreve as flags. */
   setShadowCasters(tk);
 
   const b = new THREE.Box3().setFromObject(tk);      // measured, not assumed
-  const target = new THREE.Vector3(
-    cx - (b.min.x + b.max.x) / 2,                    // centered on the wall
-    (roofY - topGap) - b.max.y,                      // top sits topGap below the roof line
-    wallZ - b.min.z                                  // back face flush on the wall plane
-  );
-  const trailer = state.trailer as THREE.Object3D;
-  trailer.updateWorldMatrix(true, false);
-  tk.position.copy(trailer.worldToLocal(target.clone()));
-  trailer.add(tk);
+  state.tkSize = b.getSize(new THREE.Vector3());
+  state.tkTopGap = readNum(meta?.topGap, 0.23, 0, 1);
+  state.tkDepth = state.tkSize.z;                    // extends cab-clearance clamp
+  trailerRoot.add(tk);
   state.tk = tk;
-  state.tkDepth = b.max.z - b.min.z;                 // extends cab-clearance clamp
-  const dims = meta?.dims || null;
-  console.info('[tk] attached — depth', state.tkDepth.toFixed(3),
-    'bbox', b.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)),
-    dims ? 'meta ' + JSON.stringify(dims) : '(sem meta)');
+  placeThermoKing();
+  const got = state.tkSize;
+  console.info('[tk] attached — bbox',
+    [got.x, got.y, got.z].map((v) => +v.toFixed(3)).join(' x '),
+    dims ? '· meta ' + [dims.w, dims.h, dims.d].join(' x ') : '· (sem meta: escala por widthFrac)',
+    '· topGap', state.tkTopGap.toFixed(3));
   placeTrailer();                                    // re-clamp with tk depth
 }
 
-/* Coupling per CONVENTIONS.md: kingpin over the fifth wheel. */
-const CAB_TRAILER_CLEARANCE = 0.15;   // min gap (m) between cab rear bodywork and trailer front wall
+/** Ferragem estrutural da testeira — o critério é o MATERIAL, não o nome do nó. */
+const FRONT_RAIL_MAT_RE = /ferragem|estrutura/i;
+/** Profundidade da faixa, medida da testeira para trás, onde a travessa cabe. */
+const FRONT_RAIL_BAND = 0.15;
 
+/**
+ * A face de BAIXO da travessa que fecha o topo da testeira, em espaço de mundo.
+ *
+ * `null` quando não há peça que sirva — e aí `placeThermoKing()` volta para o
+ * recuo do teto em vez de inventar uma altura.
+ *
+ * O que qualifica: ferragem, na faixa da testeira, ATRAVESSANDO A LINHA DE
+ * CENTRO. O último teste é o que separa a travessa dos montantes de canto e das
+ * lanternas — todos eles são ferragem na mesma faixa, e todos vivem nas bordas.
+ * Entre as candidatas ganha a de topo mais alto, que é a do teto.
+ *
+ * Por vértice, e não por `Box3.setFromObject`: a caixa de um nó girado é a
+ * caixa de uma caixa girada, e aqui o erro entraria direto na altura da
+ * unidade. É a mesma regra do resto deste módulo.
+ */
+function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
+  const rig = state.trailerRig;
+  if (!rig) return null;
+  trailer.updateWorldMatrix(true, true);
+  /* Os limiares (`z1`) vivem no referencial do implemento; os vértices, não.
+     Traz-se o vértice para lá, que é o mesmo contrato de `TrailerRig`. */
+  const inv = trailer.matrixWorld.clone().invert();
+  const zMin = rig.profile.z1 - FRONT_RAIL_BAND;
+  /* O FILTRO é local (é lá que `z1` significa alguma coisa); a ALTURA que sai
+     daqui é de MUNDO, porque é em mundo que `placeThermoKing()` resolve a pose
+     e o implemento pode estar engatado, girado e inclinado. Por isso os dois
+     vetores: um vértice, dois referenciais, nenhuma conversão no fim. */
+  const loc = new THREE.Vector3();
+  const wld = new THREE.Vector3();
+  let bestTop = -Infinity, bestUnder: number | null = null;
+  trailer.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.visible || !o.geometry?.attributes?.position) return;
+    if (state.tk && (o === state.tk || !!state.tk.getObjectById(o.id))) return;   // a unidade não se mede
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (!mats.some((m) => !!m && FRONT_RAIL_MAT_RE.test(m.name || ''))) return;
+    const pos = o.geometry.attributes.position;
+    let n = 0, wLo = Infinity, wHi = -Infinity, xLo = Infinity, xHi = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      wld.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      loc.copy(wld).applyMatrix4(inv);
+      if (loc.z < zMin) continue;
+      n++;
+      if (wld.y < wLo) wLo = wld.y; if (wld.y > wHi) wHi = wld.y;
+      if (loc.x < xLo) xLo = loc.x; if (loc.x > xHi) xHi = loc.x;
+    }
+    if (!n || xLo > -0.5 || xHi < 0.5) return;        // tem de atravessar o centro
+    if (wHi > bestTop) { bestTop = wHi; bestUnder = wLo; }
+  });
+  return bestUnder;
+}
+
+/**
+ * Assenta a unidade na parede dianteira, na medida CORRENTE do baú.
+ *
+ * REDERIVADA, nunca acumulada. O caminho anterior somava `position.y += dRoof`
+ * a cada resize e não tocava em X nem em Z: a unidade seguia a linha do teto
+ * por um delta calculado, e qualquer resíduo — o do próprio `roofDelta()`, o
+ * avanço de alguns milímetros que a testeira ganha com o esticamento em Z —
+ * ficava somado para sempre, resize após resize. Medir a parede e resolver as
+ * três coordenadas de uma vez custa uma caixa e elimina a deriva por
+ * construção: a unidade fica encostada, centrada e na altura certa em qualquer
+ * medida, e chamar isto duas vezes seguidas dá o mesmo resultado.
+ *
+ * A unidade é filha do implemento e o implemento pode estar engatado (girado
+ * 180° e inclinado), então a pose é resolvida em MUNDO e convertida para local
+ * no fim — que é o mesmo contrato de `attachThermoKing()`.
+ */
+export function placeThermoKing() {
+  const tk = state.tk, trailer = state.trailer;
+  if (!tk || !trailer || !state.tkSize) return;
+  const sideBox = bboxOfMatching(trailer, bodyPanelPred(trailer));
+  if (sideBox.isEmpty()) return;
+  /* Caixa da unidade na pose ATUAL: o rip não tem a origem no centro, então é
+     ela que diz onde as faces estão em relação à origem do nó. */
+  const b = new THREE.Box3().setFromObject(tk);
+  if (b.isEmpty()) return;
+  /* ALTURA — ENCOSTADA NA TRAVESSA, e a travessa é MEDIDA.
+     -----------------------------------------------------------------------
+     Era `sideBox.max.y − topGap`, um recuo fixo de 230 mm da linha do teto, e
+     ele deixava a unidade 155 mm abaixo da travessa metálica que fecha o topo
+     da testeira — em TODA altura de baú (medido no app em 2,19 / 2,51 / 2,78 /
+     3,10 / 3,41 / 4,00 m: −154,8 a −155,7 mm). É esse vão que se vê de cima.
+
+     A travessa não é um número: é a peça de ferragem da testeira que atravessa
+     a linha de centro, e ela ACOMPANHA a altura — a face de baixo dela ficou
+     em `roofY − 94,9 mm` nas seis medidas, com 0,8 mm de variação em 1,8 m de
+     curso. Então medi-la a cada reconstrução é o que faz o alinhamento seguir
+     o baú, em vez de um segundo `topGap` fixo que só estaria certo na medida
+     de fábrica.
+
+     NÃO existe recorte na parede para encaixar a unidade — o relevo da
+     testeira é de milímetros, não de centímetros. Encostar na travessa é o que
+     a geometria oferece, e é a metade acionável do pedido. */
+  const rail = measureFrontRailUnderside(trailer);
+  const wantTop = rail ?? (sideBox.max.y - (state.tkTopGap ?? 0.23));
+  /* A carcaça tem 1,68 m e não encolhe, então num baú baixo a regra acima
+     sozinha empurraria a base ABAIXO do piso (medido: −34 mm num baú de
+     1,876 m, ou seja a unidade entrando no estrado). Como o produto é físico,
+     o que cede é a altura de encosto, não o tamanho: a base encosta no piso e
+     a unidade sobe o quanto faltar. */
+  const top = Math.max(wantTop, sideBox.min.y + (b.max.y - b.min.y));
+  /* Deslocamento pedido, em MUNDO. */
+  const move = new THREE.Vector3(
+    (sideBox.min.x + sideBox.max.x) / 2 - (b.min.x + b.max.x) / 2,   // centrada em X
+    top - b.max.y,                                                   // topo sob o teto
+    sideBox.max.z - b.min.z,                                         // costas rentes à parede
+  );
+  /* Mundo → local pela parte LINEAR da matriz do implemento (a diferença entre
+     dois pontos elimina a translação), porque `position` mora no pai. Sem
+     isso, um implemento engatado — girado 180° e inclinado — receberia o
+     deslocamento no referencial errado. */
+  trailer.updateWorldMatrix(true, false);
+  const o0 = trailer.worldToLocal(new THREE.Vector3());
+  const o1 = trailer.worldToLocal(move.clone());
+  tk.position.add(o1.sub(o0));
+  tk.updateMatrix();
+  tk.updateMatrixWorld(true);
+}
+
+/* ===========================================================================
+   O ENGATE.
+   ---------------------------------------------------------------------------
+   O QUE FOI APAGADO AQUI, e por quê — para ninguém trazer de volta.
+
+   1. `fifthwheelTopY = 1.151` fixo para todos os modelos (era do desktop, em
+      `src/main.ts` e `src/studio/loader.ts`). Dava `lift = 1,151 − 1,2418 =
+      −0,0908` em TODO caminhão.
+   2. `Math.max(0, lift)`. Descartava o caso negativo — os mesmos 91 mm — antes
+      de usá-lo, e o resultado era uma lâmina de luz do dia entre a chapa e o
+      acoplador que nenhum valor de manifesto conseguia fechar.
+   3. `frontZ = Math.min(frontZ, rearBodyZ − 0,15)`. Escorregava o implemento
+      para trás em SILÊNCIO quando a folga não fechava — desengatava o pino sem
+      dizer nada. Agora a folga é medida por PERFIL e a falha é RELATADA.
+   4. `Box3.setFromObject` no caminho de posicionamento (`groundModel()` do
+      desktop, `groundAndCenter()` daqui). A caixa de um nó girado é a caixa de
+      uma caixa girada: o implemento pairava ~230 mm por causa disso.
+   5. `LEGACY_TRAILER_FRONT_Z` e `CAB_FORWARD_GAP = 0,10` no caminho principal.
+      O segundo era um desengate deliberado de 100 mm aplicado a toda cabine, e
+      todo `z` de `cabs.json` o carrega embutido. Se a cabine deve ficar
+      adiantada no cenário, isso é `RIG_PLACEMENT`, não uma mentira dentro do
+      engate.
+
+   O que entra no lugar: `vehicle/coupling.ts` — um solver PURO, sem `three` e
+   sem `@/`, exercitado pela sonda headless sobre os 53 cavalos. Ele devolve
+   pose para as DUAS metades, e esta função é a única que as escreve.
+   =========================================================================== */
+
+/**
+ * Perfil da traseira do CAVALO, medido no modelo carregado, no referencial
+ * NORMALIZADO (contato em y = 0, linha de centro em x = 0, frente em +Z).
+ *
+ * Por que não sai de `hitch.json`: o `rearBody.z` de lá é `bbox.max.z`, a ponta
+ * do CHASSI — 1,6 m ATRÁS da quinta roda. Usá-lo como datum de folga empurraria
+ * o implemento 2,4 m para trás em todo modelo. E `rearBody.profile` é `null` em
+ * todas as 53 entradas. O manifesto tem os números que não mudam; este aqui muda
+ * com a malha carregada, então é medido.
+ *
+ * Bandas de 100 mm, e cada uma guarda o z MÍNIMO (o mais traseiro) daquela
+ * altura. É o perfil que um escalar não expressa: longarina, parede do leito e
+ * defletor de teto ficam em z diferentes em alturas diferentes.
+ */
+const REAR_PROFILE_BAND = 0.10;
+
+function measureCabRearProfile(cab: THREE.Object3D, h: TractorHitch): Profile {
+  cab.updateWorldMatrix(true, true);
+  const cos = Math.cos(h.orientYaw), sin = Math.sin(h.orientYaw);
+  const v = new THREE.Vector3();
+  const bands = new Map<number, number>();
+  cab.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.visible) return;
+    const pos = o.geometry?.attributes?.position;
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      /* N(p, h) — a mesma normalização do solver, aplicada vértice a vértice.
+         Nenhuma caixa envolvente entra aqui. */
+      const dx = v.x - h.centerX;
+      const ny = v.y - h.groundY;
+      const nz = -dx * sin + v.z * cos;
+      const b = Math.floor(ny / REAR_PROFILE_BAND);
+      const cur = bands.get(b);
+      if (cur === undefined || nz < cur) bands.set(b, nz);
+    }
+  });
+  return [...bands.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([b, z]) => ({ y: (b + 0.5) * REAR_PROFILE_BAND, z }));
+}
+
+/** Escreve a pose normalizada de uma raiz. Congelada: `updateMatrix()` é lei. */
+function applyRootPose(
+  root: THREE.Object3D, p: { yaw: number; x: number; y: number; z: number; pitchX?: number },
+) {
+  root.rotation.set(p.pitchX ?? 0, p.yaw, 0);
+  root.position.set(p.x, p.y, p.z);
+  root.updateMatrix();
+  root.updateWorldMatrix(true, true);
+}
+
+/**
+ * Resolve e aplica o engate. Fim de TODO caminho que mexe no conjunto — carga
+ * de cabine, de implemento, do Thermo King e resize —, e por isso é aqui que o
+ * lugar do conjunto no cenário volta a valer (ver `rigGroup`), inclusive nas
+ * saídas antecipadas: sair daqui com o conjunto na origem deixaria o caminhão
+ * no lugar errado até a próxima carga.
+ *
+ * O nome ficou `placeTrailer` porque é o que os chamadores conhecem, mas ela
+ * posiciona AS DUAS metades: a âncora do conjunto é a garganta do acoplador, e
+ * quem a leva até a origem é o cavalo.
+ */
 export function placeTrailer() {
   const t = state.trailer;
-  /* Esta função é o fim de TODO caminho que mexe no conjunto — carga de cabine,
-     de implemento, do Thermo King e os controles de engate — e por isso é aqui
-     que o lugar dele no cenário volta a valer (ver rigGroup). Inclusive na saída
-     antecipada: sair daqui com o conjunto na origem deixaria o caminhão no lugar
-     errado até a próxima carga. Ela mesma só usa coordenadas locais, então roda
-     igual com o pai deslocado ou não. */
+  const cab = state.cab;
+  const ht = state.cabHitch;
+  const hi = state.trailerRig ? state.trailerRig.hitch : null;
+
+  if (ht && hi && cab && t) {
+    const sol = solveCoupling(ht, hi, state.hitchDefaults, {
+      tkDepth: state.tkDepth || 0,
+      /* Reporta e MANTÉM O ENGATE. Recuar o implemento por causa de folga é
+         desengatar o pino — o defeito que este módulo existe para apagar. */
+      onClearanceFail: 'report',
+    });
+    state.coupled = sol;
+
+    applyRootPose(cab, sol.tractor);
+    /* Os controles manuais de engate estão zerados e continuam existindo como
+       ajuste EXPLÍCITO do usuário; entram por fora da solução, nunca dentro. */
+    applyRootPose(t, {
+      ...sol.implement,
+      y: sol.implement.y + state.coupling.y,
+      z: sol.implement.z + state.coupling.z,
+    });
+
+    for (const r of sol.reports) {
+      const say = r.kind === 'low-confidence' ? console.info : console.warn;
+      say('[engate]', r.message);
+    }
+    setRigPlacement(true);
+    return;
+  }
+
+  /* DEGRADAÇÃO — só para cabine sem entrada em `hitch.json` (as quatro do
+     `cabs.json` antigo). Não é o caminho principal e diz que não é: acopla pelo
+     par `cabs.json` + `trailer_meta.json`, que vivem no referencial pós-
+     `groundAndCenter` e só valem para aquelas quatro. */
+  /* A SOLUÇÃO ANTERIOR MORRE AQUI. Ela é de OUTRO caminhão: sair daqui com ela
+     de pé faz a HUD, a sonda e qualquer verificação lerem o engate do modelo
+     passado como se fosse o deste. Foi assim que uma varredura no app mostrou
+     seis chassis "resolvidos" que nunca tinham passado pelo solver. */
+  state.coupled = null;
   if (!t || !state.trailerBase) { setRigPlacement(true); return; }
+  /* Uma vez POR CABINE, não uma vez por página: com um único `legacyWarned`
+     global a segunda cabine sem manifesto caía no legado em silêncio. */
+  if (legacyWarnedFor !== state.cabId) {
+    legacyWarnedFor = state.cabId;
+    console.warn('[engate] sem entrada em hitch.json para', state.cabId,
+      '— engate LEGADO (cabs.json + trailer_meta.json). Sem teste de perfil,',
+      'sem teste de varredura, e a inclinação usa o bogie medido por malha.');
+  }
   const kp = state.trailerMeta?.kingpin;
   const fw = state.cabDef?.fifthwheel;
   let frontZ = LEGACY_TRAILER_FRONT_Z, lift = 0;
@@ -2139,68 +2843,35 @@ export function placeTrailer() {
       lift = fw.topY - kp.plateBottomY;
     }
   }
-  // No-overlap guard: cab occupies z∈[0,length], trailer extends toward -Z from
-  // its front wall at frontZ. Keep that wall — plus the Thermo King unit that
-  // protrudes tkDepth toward the cab — behind the cab's rear bodywork.
-  const rb = state.cabDef?.rearBodyZ;
-  if (typeof rb === 'number') {
-    frontZ = Math.min(frontZ, rb - CAB_TRAILER_CLEARANCE - (state.tkDepth || 0));
-  }
-  t.rotation.x = 0;                       // re-derived below; never accumulate
+  t.rotation.x = 0;                       // re-derivado abaixo; nunca acumula
   t.position.copy(state.trailerBase.pos);
   t.position.z += (frontZ + state.coupling.z) - state.trailerBase.frontZ;
-  // Grounding wins: never sink the trailer through the floor. The base pose has
-  // tire min-y = 0, so the total vertical offset IS the tire clearance. Only
-  // lift for the kingpin match (nose-high is fine, sunk wheels are not), and
-  // clamp the Engate height slider so tires stay above -0.01 m.
-  let dy = Math.max(0, lift) + state.coupling.y;
-  if (dy < -0.01) dy = -0.01;
-  t.position.y += dy;
+  /* Sem `Math.max(0, …)`: o caso negativo vira INCLINAÇÃO logo abaixo, e é
+     exatamente ele que produzia os 91 mm de vão. */
+  t.position.y += (lift >= 0 ? lift : 0) + state.coupling.y;
 
-  /* A NEGATIVE lift is a PITCH, not a drop.
-     -----------------------------------------------------------------------
-     `Math.max(0, lift)` above throws away the case where the trailer's kingpin
-     plate sits ABOVE this cab's fifth wheel — on the corrected implement that is
-     91 mm — and the result is a visible slab of daylight between the plate and
-     the coupler that no value in trailer_meta.json can close, because the clamp
-     discards it before it is used.
-
-     Dropping the trailer bodily would bury its tyres, which is what the clamp
-     exists to prevent. But that is not what a real rig does: the trailer is held
-     at the kingpin and rests on its own tyres, so if the plate is high the
-     trailer simply sits NOSE-DOWN, pivoting on the tyre contact patch. Over a
-     ~10 m kingpin-to-axle arm, 91 mm is about half a degree — invisible as an
-     attitude, and it puts the plate exactly on the coupler.
-
-     The pivot point stays fixed by construction: rotate about it, then translate
-     by however far it moved. */
   const halfSpan = state.trailerTyreHalfSpan ?? 0;
   const arm = (state.trailerPivotFromFront ?? 0) - (kp?.zFromFront ?? 0);
-  /* Solved so BOTH ends land: the pitch is taken about the bogie CENTRE, which
-     tips the downhill axle `halfSpan·sinθ` under the floor, so the trailer is
-     raised by exactly that much afterwards. The raise also lifts the plate, so
-     the angle has to account for it — the net drop at the plate is
-     (arm − halfSpan)·sinθ. Solving that for the required drop gives the one
-     angle where the plate sits on the coupler AND the lowest tyre sits on the
-     ground, with no iteration. */
   const armEff = arm - halfSpan;
-  if (lift < -0.001 && armEff > 0.5) {
-    const theta = Math.asin(THREE.MathUtils.clamp(-lift / armEff, 0, 0.25));
+  if (lift < -0.001 && armEff > state.hitchDefaults.minPitchArm) {
+    const theta = Math.asin(THREE.MathUtils.clamp(
+      -lift / armEff, 0, Math.sin(state.hitchDefaults.maxCouplingPitchRad)));
     const pivotZ = (frontZ + state.coupling.z) - (state.trailerPivotFromFront as number);
     const p0 = t.position.clone();
-    const pivot = new THREE.Vector3(p0.x, 0, pivotZ);      // y = 0: the contact patch
+    const pivot = new THREE.Vector3(p0.x, 0, pivotZ);      // y = 0: a mancha de contato
     const local = pivot.clone().sub(p0);
     t.rotation.x = theta;
     const moved = local.applyMatrix4(new THREE.Matrix4().makeRotationX(theta)).add(p0);
     t.position.add(pivot.sub(moved));
-    t.position.y += halfSpan * Math.sin(theta);            // put the bogie back on the ground
+    t.position.y += halfSpan * Math.sin(theta);            // bogie de volta ao chão
+  } else if (lift < -0.001) {
+    t.position.y += lift;
+    console.warn('[engate] braço curto no caminho legado: o casamento do pino virou queda de',
+      (lift * 1000).toFixed(0), 'mm.');
   }
-  /* O implemento está congelado desde o fim de loadTrailer(), e esta função é o
-     único lugar que volta a escrever a pose dele. Sem este updateMatrix() a
-     matriz local ficaria na pose da carga e o engate simplesmente não se moveria
-     (ver freezeMatrices). */
   t.updateMatrix();
   t.updateWorldMatrix(true, true);
-  /* Engate resolvido: o conjunto volta para o lugar dele no cenário. */
   setRigPlacement(true);
 }
+
+let legacyWarnedFor: string | null = null;

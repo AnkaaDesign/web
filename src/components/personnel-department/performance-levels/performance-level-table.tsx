@@ -144,6 +144,10 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   // This uses GET /bonus/period-stats/:year/:month which is accessible to HR users
   // (unlike GET /tasks which doesn't include HUMAN_RESOURCES in @Roles)
   const [taskQuantityFromApi, setTaskQuantityFromApi] = useState<number>(0);
+  // Divisor B1 do período, vindo da API (`periodDivisor`, com `eligibleUsers`
+  // como nome legado do mesmo campo). É FRACIONÁRIO: quem entrou ou saiu no meio
+  // do período conta a fração de dias úteis, não 1 e nem 0.
+  const [periodDivisorFromApi, setPeriodDivisorFromApi] = useState<number>(0);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
   useEffect(() => {
@@ -156,9 +160,11 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
           ? data.totalWeightedTasks
           : Number(data.totalWeightedTasks) || 0;
         setTaskQuantityFromApi(weightedTasks);
+        setPeriodDivisorFromApi(Number(data.periodDivisor ?? data.eligibleUsers) || 0);
       } catch (err) {
         console.error('[PerformanceLevelTable] Failed to fetch period task stats:', err);
         setTaskQuantityFromApi(0);
+        setPeriodDivisorFromApi(0);
       } finally {
         setIsLoadingTasks(false);
       }
@@ -180,17 +186,12 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
   // Calculate average tasks per user
   const averageTasksPerUser = useMemo(() => {
-    // Count eligible users (bonifiable positions with performance level > 0)
-    const eligibleUsers = users.filter(user =>
-      user.position?.bonifiable === true &&
-      (userPerformanceLevels.get(user.id) || user.performanceLevel || 0) > 0
-    );
+    // O divisor vem da API — recontar elegíveis no cliente devolvia um inteiro
+    // que ignora a proporcionalidade e não bate com o B1 usado no bônus real.
+    if (periodDivisorFromApi <= 0) return 0;
 
-    const eligibleCount = eligibleUsers.length;
-    if (eligibleCount === 0) return 0;
-
-    return taskQuantity / eligibleCount;
-  }, [users, taskQuantity, userPerformanceLevels]);
+    return taskQuantity / periodDivisorFromApi;
+  }, [taskQuantity, periodDivisorFromApi]);
 
   // Bonus values come from the API's /bonus/simulate endpoint — the web
   // frontend never recomputes the formula locally.
@@ -689,6 +690,9 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                 </span>
                 <span className="font-semibold text-foreground">
                   {averageTasksPerUser.toFixed(2)} tarefas
+                  <span className="font-normal text-muted-foreground">
+                    {" "}(÷ {periodDivisorFromApi.toFixed(2)})
+                  </span>
                 </span>
               </div>
             )}

@@ -35,7 +35,56 @@ import { root, $opt, el, num } from '../core/dom';
 import {
   sceneState, LIGHT_PRESETS, applyPreset, setLightParams,
   setHourOfDay, getHourOfDay, HOUR_MIN, HOUR_MAX, beginLightScrub,
+  warmLightPrograms,
 } from '../scene/scene';
+import { claimPill, paintFrame } from './loader';
+
+/* ---------------- trocar de preset SEM engasgo ----------------
+   Um clique de preset abre um tween de 0,8 s ≈ 48 quadros, e CADA UM redesenha
+   o mapa de sombra inteiro. Pior: o primeiro quadro do preset novo é onde o
+   three compila todo programa que ele ainda não viu, e essa compilação é
+   síncrona — o tween começa travando exatamente onde ele deveria ser mais
+   suave.
+
+   A correção não é esconder o travamento: é PAGÁ-LO ANTES, anunciado.
+   `warmLightPrograms()` já existe e já é aguardado dentro da cortina de
+   carregamento (studio.ts) justamente para isto; aqui ele ganha o mesmo uso com
+   a pílula no lugar da cortina, porque isto dura menos de um segundo e tomar a
+   tela inteira por isso seria trocar um engasgo por um susto.
+
+   Ordem: pílula → um quadro cedido (senão a pílula só apareceria DEPOIS do
+   trabalho que ela anuncia) → compilar → só então o tween. O travamento vira
+   uma espera anunciada de duração conhecida. */
+let presetBusy = false;
+
+async function applyPresetWithFeedback(id: string, name: string) {
+  /* Um de cada vez: dois tweens sobrepostos disputariam o mesmo rig, e o
+     segundo clique já não teria como saber de onde a luz está saindo. */
+  if (presetBusy) return;
+  presetBusy = true;
+  const pill = claimPill(`Ajustando a luz · ${name}…`);
+  try {
+    await paintFrame();
+    /* Aguardado: sem isto a compilação aconteceria no primeiro quadro do tween,
+       que é o quadro que o usuário está olhando. */
+    await warmLightPrograms();
+    beginLightScrub();
+    applyPreset(id);
+    syncHud();                              // applyPreset resets az/el/brightness
+    /* A pílula fica de pé enquanto o tween corre. Ela descreve o que está
+       acontecendo, e o que está acontecendo dura 0,8 s. */
+    await new Promise<void>((r) => setTimeout(r, PRESET_TWEEN_MS));
+  } finally {
+    pill.release();
+    presetBusy = false;
+  }
+}
+
+/* O tween de applyPreset() em scene/scene.ts. Duplicado como número aqui de
+   propósito: ele não é exportado, e importar a constante obrigaria a mexer num
+   módulo de cena para um detalhe de UI. Errar para MAIS seria uma pílula
+   pendurada depois de a luz assentar; este valor é o do tween. */
+const PRESET_TWEEN_MS = 800;
 
 /* Same ranges the sidebar shipped, so nothing about the light's reachable set
    changes with the move: elevation 2..85°, brightness 15..250 % of the preset's
@@ -333,13 +382,7 @@ function buildWeatherRow() {
     tile.appendChild(el('span', 'ts-hud-tile__name', preset.name));
     /* Discrete switch, so this one DOES animate — the crossfade between two
        preset faces is the whole point of the control. */
-    tile.addEventListener('click', () => {
-      /* Um clique de preset abre um tween de 0,8 s ≈ 48 quadros, cada um
-         redesenhando o mapa de sombra inteiro. */
-      beginLightScrub();
-      applyPreset(id);
-      syncHud();                            // applyPreset resets az/el/brightness
-    });
+    tile.addEventListener('click', () => { void applyPresetWithFeedback(id, preset.name); });
     tilesEl.appendChild(tile);
   }
   row.appendChild(tilesEl);

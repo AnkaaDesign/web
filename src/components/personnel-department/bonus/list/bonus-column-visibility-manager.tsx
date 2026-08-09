@@ -19,6 +19,8 @@ const BONUS_COLUMNS: BonusColumn[] = [
   { key: "totalWeightedTasks", header: "Tarefas Ponderadas", defaultVisible: true },
   { key: "totalCollaborators", header: "Colaboradores", defaultVisible: true },
   { key: "averageTasks", header: "Média", defaultVisible: true },
+  { key: "eligibilityWeight", header: "Proporção", defaultVisible: true },
+  { key: "terminatedAt", header: "Desligado em", defaultVisible: false },
   { key: "bonus", header: "Bônus Bruto", defaultVisible: true },
   { key: "totalDiscounts", header: "Ajustes", defaultVisible: true },
   { key: "netBonus", header: "Bônus Líquido", defaultVisible: true },

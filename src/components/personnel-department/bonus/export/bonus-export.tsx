@@ -24,6 +24,13 @@ interface BonusRow {
   averageTasks: number;
   totalWeightedTasks: number;
   totalCollaborators?: number;
+  eligibilityWeight: number;
+  eligibleDays?: number | null;
+  periodBusinessDays?: number | null;
+  periodDivisor?: number | null;
+  terminatedAt?: string | null;
+  currentlyEmployed: boolean;
+  hasSecullumId: boolean;
   bonusStatus: 'live' | 'saved';
   totalDiscounts: number;
   netBonus: number;
@@ -108,15 +115,26 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
     id: "averageTasks",
     label: "Média",
     getValue: (row: BonusRow) => {
-      const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
+      // O desligado entra no relatório: o bônus proporcional dele é devido.
+      const isEligible = row.performanceLevel > 0;
       return isEligible ? row.averageTasks.toFixed(2) : "-";
     }
+  },
+  {
+    id: "eligibilityWeight",
+    label: "Proporção",
+    getValue: (row: BonusRow) => `${Math.round((row.eligibilityWeight ?? 1) * 100)}%`
+  },
+  {
+    id: "terminatedAt",
+    label: "Desligado em",
+    getValue: (row: BonusRow) => (row.terminatedAt ? formatDate(new Date(row.terminatedAt)) : "-")
   },
   {
     id: "bonus",
     label: "Bônus Bruto",
     getValue: (row: BonusRow) => {
-      const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
+      const isEligible = row.performanceLevel > 0;
       return isEligible ? formatCurrency(row.baseBonus ?? row.bonusAmount) : "Não elegível";
     }
   },
@@ -144,6 +162,7 @@ const DEFAULT_VISIBLE_COLUMNS = new Set([
   "totalWeightedTasks",
   "totalCollaborators",
   "averageTasks",
+  "eligibilityWeight",
   "bonus",
   "totalDiscounts",
   "netBonus",
@@ -167,6 +186,8 @@ const COLUMN_WIDTH_WEIGHTS: Record<string, number> = {
   "totalWeightedTasks": 8,
   "totalCollaborators": 7,
   "averageTasks": 7,
+  "eligibilityWeight": 7,
+  "terminatedAt": 8,
   "bonus": 11,
   "totalDiscounts": 11,
   "netBonus": 12,
@@ -195,11 +216,15 @@ export function BonusExport({
     const totalBaseBonus = data.reduce((sum, row) => sum + (row.baseBonus ?? row.bonusAmount ?? 0), 0);
     const totalNet = data.reduce((sum, row) => sum + (row.netBonus || 0), 0);
     const totalDiscounts = data.reduce((sum, row) => sum + (row.totalDiscounts || 0), 0);
-    const eligibleUsers = data.filter(row => row.position?.bonifiable && row.performanceLevel > 0);
+    // Desligados fazem parte do relatório — o bônus proporcional deles é devido
+    // e precisa somar nos totais. Só o nível de desempenho 0 fica de fora.
+    const eligibleUsers = data.filter(row => row.performanceLevel > 0);
 
     // Get weighted tasks from first eligible user (they share the same pool)
     const totalWeightedTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.totalWeightedTasks || 0 : 0;
     const avgTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.averageTasks || 0 : 0;
+    // Divisor B1 do período — fracionário e igual para todas as linhas.
+    const periodDivisor = eligibleUsers.length > 0 ? eligibleUsers[0]?.periodDivisor ?? 0 : 0;
 
     return {
       totalBaseBonus,
@@ -207,6 +232,7 @@ export function BonusExport({
       totalDiscounts,
       totalWeightedTasks,
       avgTasks,
+      periodDivisor,
       eligibleCount: eligibleUsers.length,
       totalCount: data.length
     };
@@ -512,6 +538,7 @@ export function BonusExport({
               <p><strong>Período:</strong> ${periodLabel}</p>
               <p><strong>Tarefas Ponderadas:</strong> ${totals.totalWeightedTasks.toFixed(1)}</p>
               <p><strong>Total de colaboradores:</strong> ${totals.totalCount}</p>
+              <p><strong>Divisor do período:</strong> ${totals.periodDivisor.toFixed(2)}</p>
               <p><strong>Média por colaborador:</strong> ${totals.avgTasks.toFixed(2)}</p>
             </div>
           </div>

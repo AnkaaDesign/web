@@ -81,6 +81,7 @@ import {
   setHorizonHaze, setHorizonTint, setInteriorBounds,
 } from './scene';
 import { applySet, disposeSet, disposeSetTextures } from './set';
+import { setCyclorama } from './cyclorama';
 import type { SetDef, SetMaterialDef } from './set';
 import { loadGLB } from '../vehicle/models';
 import { assetUrl } from '../catalog/catalog';
@@ -400,11 +401,34 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
      the paint reflects. */
   const setDef = resolveSet(envDef);
 
+  /* O CENÁRIO DE ESTÚDIO, e por que ele é reconhecido pelo PRESET.
+     ---------------------------------------------------------------------
+     `ciclorama` é o único preset com sala própria (scene/cyclorama.ts), e é o
+     preset que só o cenário `estudio` usa — `armazem` usa `estudio`, que é
+     outro. Testar o preset em vez de acrescentar um campo ao manifesto mantém a
+     correção inteira dentro de scene/**: `normalizeEnvironment()` é uma lista
+     branca, então um campo novo teria de ser aberto em catalog/catalog.ts para
+     não evaporar no meio do caminho.
+     E, principalmente, isto vale para as DUAS fontes do cenário: a entrada do
+     manifesto e o `STUDIO_ENVIRONMENT` embutido que `ensureStudioEnvironment()`
+     acrescenta quando o manifesto não o traz. Corrigir só o JSON deixaria o
+     caminho de fallback com poste de rua dentro do estúdio. */
+  const isStudio = envDef.preset === 'ciclorama';
+
+  /* A SALA DE CICLORAMA. Ela É o chão e É o fundo deste cenário — o `estudio`
+     não tem bloco `set` e o maquinário de `shadowCatcher` saiu do engine em
+     2026-08-03, então sem isto o caminhão flutua num vazio cinza sem sombra de
+     contato. Ver o cabeçalho de scene/cyclorama.ts. */
+  setCyclorama(isStudio);
+
   /* O CÉU PROCEDURAL só aparece quando não há HDRI para desenhar. `armazem` é
      exatamente esse caso (`hdri: null`): a casca fechada esconde o domo, mas ele
      continua sendo o fundo de qualquer fresta. Com HDRI, quem manda é o
-     manifesto — e os dois cenários atuais trazem `showSkyDome: false`. */
-  setSkyDomeVisible(hasHdri ? envDef.showSkyDome === true : true);
+     manifesto — e os dois cenários atuais trazem `showSkyDome: false`.
+     O estúdio é a terceira situação: a sala de ciclorama é fechada, então o domo
+     não teria por onde aparecer, e mantê-lo ligado só paga um PMREM de céu que
+     nada amostra. */
+  setSkyDomeVisible(isStudio ? false : (hasHdri ? envDef.showSkyDome === true : true));
 
   /* ---- GEOMETRIA REAL: o modelo do poste, depois o set ----
      ANTES de setLamps(), que distribui o pool: lamps.ts escala e orienta a
@@ -416,8 +440,15 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
   /* Todo cenário ganha postes, inclusive o pátio: `null` é "a fileira embutida",
      não "nenhum", e quem não quer nenhum escreve `"lamps": { "enabled": false }`.
      Os SPOTLIGHTS são um pool fixo de 8 que setLampsEnabled() liga por
-     dia/noite — isto aqui só move geometria, então é barato chamar por troca. */
-  setLamps(envDef.lamps ? { ...envDef.lamps } : null);
+     dia/noite — isto aqui só move geometria, então é barato chamar por troca.
+
+     O ESTÚDIO NUNCA TEM POSTE, e o default acima é justamente por que ele tinha:
+     a entrada `estudio` do manifesto (e o `STUDIO_ENVIRONMENT` embutido) não
+     declara `lamps`, o que aqui significa "a fileira embutida" e não "nenhum" —
+     então oito postes de iluminação pública nasciam dentro do ciclorama. Era o
+     "não deve ter esses postes de luz" do relatório. Os outros dois cenários já
+     escrevem `{ enabled: false }` e por isso nunca mostraram o defeito. */
+  setLamps(isStudio ? { enabled: false } : (envDef.lamps ? { ...envDef.lamps } : null));
 
   /* O SET É O CHÃO — não há mais plano procedural para arbitrar contra ele, que
      é por que `setSetGround()` deixou de existir. Nunca rejeita: applySet()
@@ -444,8 +475,13 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
     : null);
   /* Confine the orbit for a closed set. Unconditional, including with null:
      leaving the previous scene's box in place would trap the camera in a
-     34 x 62 m cage in the middle of a 1.2 km industrial estate. */
-  setInteriorBounds(setDef && setDef.bounds ? setDef.bounds : null);
+     34 x 62 m cage in the middle of a 1.2 km industrial estate.
+     O ESTÚDIO É A EXCEÇÃO, e é uma exceção de ORDEM, não de gosto: a sala do
+     ciclorama é gerada em código e centrada NO RIG (que não fica na origem), e
+     por isso é ela quem chama `setInteriorBounds()`, com um centro. Chamar aqui
+     também sobrescreveria aquela caixa por uma centrada na origem — e a última
+     chamada da troca é esta, então o estúdio perderia a caixa certa em silêncio. */
+  if (!isStudio) setInteriorBounds(setDef && setDef.bounds ? setDef.bounds : null);
   const setP = setDef ? applySet(setDef, onSetProgress)
     : Promise.resolve(disposeSet()).then(() => { if (onSetProgress) onSetProgress(1); return false; });
 

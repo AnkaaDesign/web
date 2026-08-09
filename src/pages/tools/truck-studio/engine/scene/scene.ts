@@ -2005,7 +2005,7 @@ export function setHorizonHaze(opts: null | { strength?: number; low?: number; h
    `maxDistance` is a radius about the target and this is a BOX — a radius large
    enough to see down the 124 m length would also let the camera through the
    69 m wall. */
-let interiorBox: { hx: number; hz: number; minY: number; maxY: number } | null = null;
+let interiorBox: { hx: number; hz: number; cx: number; cz: number; minY: number; maxY: number } | null = null;
 let interiorHooked = false;
 
 /**
@@ -2013,10 +2013,23 @@ let interiorHooked = false;
  * @param {null | {halfX:number, halfZ:number, minY:number, maxY:number}} b
  */
 export function setInteriorBounds(
-  b: null | { halfX: number; halfZ: number; minY: number; maxY: number },
+  b: null | {
+    halfX: number; halfZ: number; minY: number; maxY: number;
+    /* CENTRO DA CAIXA, opcional, padrão a origem do mundo.
+       Existe porque o RIG não fica na origem: ele está em (0, 0, 22) e o
+       conjunto ocupa z de 17,9 a 35,7. Para os dois cenários com `set` isso
+       nunca importou — as caixas deles são grandes e folgadas o bastante
+       (armazém: halfZ 62) para conter o rig deslocado —, mas uma sala gerada em
+       código e centrada NO VEÍCULO (scene/cyclorama.ts) precisa de uma caixa
+       centrada no mesmo lugar, senão a câmera é proibida de passar por trás do
+       implemento. Omitir os dois campos reproduz exatamente o comportamento
+       anterior, que é o que os cenários existentes fazem. */
+    centerX?: number; centerZ?: number;
+  },
 ) {
   interiorBox = b ? {
     hx: Math.max(1, b.halfX), hz: Math.max(1, b.halfZ),
+    cx: b.centerX ?? 0, cz: b.centerZ ?? 0,
     minY: b.minY, maxY: Math.max(b.minY + 0.5, b.maxY),
   } : null;
   /* The clamp runs in a frame hook, so a new box only bites on the next drawn
@@ -2029,15 +2042,15 @@ export function setInteriorBounds(
     if (!k) return;
     const c = THREE.MathUtils.clamp;
     camera.position.set(
-      c(camera.position.x, -k.hx, k.hx),
+      c(camera.position.x, k.cx - k.hx, k.cx + k.hx),
       c(camera.position.y, k.minY, k.maxY),
-      c(camera.position.z, -k.hz, k.hz));
+      c(camera.position.z, k.cz - k.hz, k.cz + k.hz));
     /* The target too, or a clamped camera orbiting a target outside the box
        would swing along the wall instead of around the truck. */
     controls.target.set(
-      c(controls.target.x, -k.hx, k.hx),
+      c(controls.target.x, k.cx - k.hx, k.cx + k.hx),
       c(controls.target.y, k.minY, k.maxY),
-      c(controls.target.z, -k.hz, k.hz));
+      c(controls.target.z, k.cz - k.hz, k.cz + k.hz));
   });
 }
 

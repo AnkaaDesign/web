@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { mountStudio, unmountStudio } from "./engine";
 import { setColorProvider, setColorPersister, FINISH_FROM_API } from "./engine/catalog/colors";
-import { getPaints, updatePaint } from "@/api-client/paint";
+import { updatePaint } from "@/api-client/paint";
 import "./engine/core/studio.css";
 import "./engine/ui/selector.css";
 import "./engine/ui/loader.css";
@@ -14,11 +14,15 @@ import "./engine/ui/paint-panel.css";
  * fabric.js) de um semirreboque Frigorífico Paleteiro atrás de um cavalo
  * selecionável.
  *
- * Não listado de propósito: alcançável só em /ferramentas/teste enquanto a
- * funcionalidade está sendo construída. Não está no menu nem no hub Ferramentas.
+ * Publicado em /ferramentas/estudio-3D, no menu de navegação e no hub de
+ * Ferramentas (grupo "Cores"). O acesso continua restrito a ADMIN pelo gate em
+ * utils/route-privileges.ts — mudar o público é editar aquela linha, não o menu.
  *
- * Fluxo: o estúdio abre num seletor de cards de QUATRO passos — cenário →
- * fabricante → modelo → cor — e então uma cortina animada cobre o download e
+ * A geometria não é servida por esta origem: vem da API sob STUDIO_ASSETS_BASE
+ * (runbook em api/docs/DEPLOYMENT-studio-assets.md).
+ *
+ * Fluxo: o estúdio abre num seletor de cards de CINCO passos — cenário →
+ * fabricante → modelo → chassi → cor — e então uma cortina animada cobre o download e
  * voa a foto do caminhão escolhido para um crachá no canto inferior esquerdo,
  * que é também por onde o seletor é reaberto. A escolha é lembrada, então uma
  * visita de volta cai direto na vista 3D. Tudo isso vive no engine
@@ -77,14 +81,33 @@ import "./engine/ui/paint-panel.css";
  * embutida tanto num erro quanto numa lista vazia. Uma API fora do ar custa as
  * cores do banco, nunca o seletor.
  */
-const PAINT_MANUFACTURER_TO_BRAND: Record<string, string> = {
-  SCANIA: "scania",
-  VOLVO: "volvo",
-  DAF: "daf",
-  IVECO: "iveco",
-  MERCEDES_BENZ: "mb",
-  VOLKSWAGEN: "vw",
-};
+/**
+ * O endpoint PÚBLICO de cores do estúdio.
+ *
+ * `GET /studio/colors` — sem autenticação, sem paginação, ordenado por
+ * `colorOrder ASC, name ASC`, com `Cache-Control: public, max-age=86400`. Ele
+ * devolve só o que o estúdio usa (`id, name, hex, finish, code, colorOrder,
+ * brand, manufacturer, previewConfig`) e nunca fórmula, componente ou custo.
+ *
+ * POR QUE PRODUÇÃO, E NÃO A ORIGEM DA PÁGINA. O estúdio precisa de cor mesmo
+ * sem uma API local rodando — é a mesma decisão que já vale para a árvore de
+ * assets. `VITE_STUDIO_COLORS_URL` existe para apontar a um servidor local
+ * quando se está justamente mexendo neste endpoint.
+ *
+ * ⚠️ NÃO É `getPaints()`. Aquele é o api-client autenticado e pagina em 20; e o
+ * enum→id de catálogo (`MERCEDES_BENZ` → `mb`) que este arquivo fazia à mão
+ * SAIU: o servidor já devolve o id do catálogo. Duas cópias da mesma tradução
+ * são uma divergência esperando a próxima montadora.
+ */
+const STUDIO_COLORS_URL: string =
+  (import.meta.env?.VITE_STUDIO_COLORS_URL as string | undefined)?.trim()
+  || "https://api.ankaadesign.com.br/studio/colors";
+
+/* Teto de espera. Sem ele, uma API que aceita a conexão e nunca responde
+   deixaria loadColors() pendurado — e loadColors() é aguardado no boot, ao lado
+   do catálogo, então o estúdio nunca abriria. Um provedor lento tem de custar a
+   paleta do banco, jamais a página. */
+const COLORS_TIMEOUT_MS = 8000;
 
 /**
  * `previewConfig` do banco → a intenção cromática que o shader 3D sabe usar.
@@ -177,37 +200,63 @@ function paintEffectFrom(cfg: unknown) {
   };
 }
 
+/** Uma linha de `GET /studio/colors`, ainda sem validar (o engine valida). */
+interface StudioColorRow {
+  id?: unknown;
+  name?: unknown;
+  hex?: unknown;
+  finish?: unknown;
+  code?: unknown;
+  brand?: unknown;
+  manufacturer?: unknown;
+  previewConfig?: unknown;
+}
+
 setColorProvider(async () => {
-  const res = await getPaints({
-    /* SÓ as tintas amarradas a uma montadora. São 77 de 522 — o resto do
-       catálogo é tinta geral (e algumas linhas de teste), e o passo de cor do
-       estúdio pergunta "de que cor este caminhão?", não "que tintas existem".
-       Puxar as 522 traria nomes como `teste`/`dsfds` para a frente da paleta,
-       porque `colorOrder` é 0 na maioria delas. */
-    where: { manufacturer: { not: null } },
-    /* `colorOrder` é a ordem curada pelo setor; o nome só desempata os zeros. */
-    orderBy: [{ colorOrder: "asc" }, { name: "asc" }],
-    include: { paintBrand: true },
-    /* Teto folgado sobre as 77 de hoje: um lote novo de tintas entra sem
-       precisar mexer aqui, e ainda assim existe um limite — sem ele o padrão do
-       servidor decide, e ele pagina em 20. */
-    limit: 200,
+  /* AbortSignal.timeout tem suporte universal nos alvos deste app; o `?.` é
+     para o jsdom do Vitest, onde o polyfill pode não estar. Sem sinal, a
+     requisição simplesmente não tem teto — inconveniente, nunca fatal. */
+  const signal = AbortSignal.timeout?.(COLORS_TIMEOUT_MS);
+  const res = await fetch(STUDIO_COLORS_URL, {
+    signal,
+    /* Rota pública: nenhum cabeçalho de autenticação, e `omit` para o navegador
+       não anexar cookie de sessão numa requisição cross-origin que não precisa
+       dele (seria preflight de graça, e um 401 onde deveria haver 200). */
+    credentials: "omit",
+    headers: { Accept: "application/json" },
   });
-  return (res?.data ?? []).map((p) => ({
+  if (!res.ok) {
+    /* UMA mensagem clara, e ela vai para o `console.warn` de
+       engine/catalog/colors.ts junto com "usando a paleta embutida". O 404 é o
+       caminho ESPERADO enquanto o endpoint não é implantado — ver o README de
+       implantação —, então a mensagem tem de dizer isso em vez de parecer um
+       bug do estúdio. */
+    throw new Error(
+      `GET ${STUDIO_COLORS_URL} → ${res.status}`
+      + (res.status === 404
+        ? " (endpoint público de cores ainda não implantado na API)"
+        : ""),
+    );
+  }
+  const body = (await res.json()) as { data?: unknown };
+  const rows: StudioColorRow[] = Array.isArray(body?.data) ? body.data as StudioColorRow[] : [];
+  return rows.map((p) => ({
     id: p.id,
     name: p.name,
     hex: p.hex,
-    /* O banco tem cinco acabamentos e o motor de tinta tem três; o mapa mora no
-       engine porque a conversão é dele, não da API. */
-    finish: FINISH_FROM_API[p.finish],
+    /* O banco tem cinco acabamentos (SOLID/METALLIC/PEARL/MATTE/SATIN) e o
+       motor de tinta tem três; o mapa mora no ENGINE porque a conversão é dele.
+       O servidor manda o valor cru de propósito — inventar um acabamento do
+       lado de lá tiraria do estúdio a única decisão que é mesmo dele. */
+    finish: typeof p.finish === "string" ? FINISH_FROM_API[p.finish] : undefined,
     code: p.code ?? null,
-    brand: p.paintBrand?.name ?? null,
-    /* Enum do banco → id do catálogo (brands.json). A tradução é AQUI porque
-       este arquivo é React e pode importar `@/`; o engine não pode, e é o que
-       o mantém portátil. */
-    manufacturer: p.manufacturer
-      ? PAINT_MANUFACTURER_TO_BRAND[p.manufacturer] ?? null
-      : null,
+    /* Já achatado pelo servidor (`paintBrand.name`). */
+    brand: p.brand ?? null,
+    /* JÁ É O ID DO CATÁLOGO (`scania`, `mb`, `vw`…), traduzido no servidor.
+       A tabela enum→id que ficava aqui foi apagada: com o servidor traduzindo,
+       ela era uma segunda definição da mesma coisa, e a próxima montadora
+       entraria num lado e não no outro. */
+    manufacturer: p.manufacturer ?? null,
     /* O ajuste curado, quando existe. 107 das 522 tintas têm um. */
     effect: paintEffectFrom(p.previewConfig),
   }));

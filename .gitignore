@@ -54,6 +54,29 @@ tools/iveco-bake/ultimo-bake.log.txt
 # continua no disco e é gerado por window.__exportTrailer() no viewer; a cópia
 # de distribuição é o .zip em Downloads.
 public/models/vehicles/trailer.glb
+
+# AS CABINES TAMBÉM FICAM FORA, pelo mesmo motivo e pela mesma rota de entrega.
+# `public/models/trucks/` são as 49 cabines do catálogo novo (320 MB, a maior
+# com 22 MB) e `iveco_sway_metallica.glb` tem 22 MB. Nenhum arquivo isolado
+# estoura o limite de 100 MB do GitHub, mas versioná-los cravaria ~340 MB no
+# histórico PARA SEMPRE — e histórico não se apaga sem reescrever a árvore
+# inteira.
+#
+# Não são fonte: são saída do bake (ETS2/tools/asset-pipeline), e a entrega
+# para produção é o rsync descrito em I4-DEPLOY.md, não o git. Mesma decisão já
+# tomada para o implemento acima; aqui só se aplica a mesma regra ao resto da
+# frota.
+#
+# O que CONTINUA versionado é tudo que descreve a frota e cabe no repo: os
+# manifestos (`brands.json`, `hitch.json`, `renders.json`), as fotos de card e
+# os renders — sem eles o catálogo não abre.
+public/models/trucks/
+public/models/vehicles/iveco_sway_metallica.glb
+
+# Saída de diagnóstico do tools/env-build: screenshots de conferência de cena,
+# regeráveis a qualquer momento e sem valor em revisão de código.
+tools/env-build/_shots_*/
+
 # Bakes anteriores, em qualquer pasta de asset: são backup, não fonte. Cada
 # rodada de bake deixa um .prev/.bak do tamanho do próprio modelo (o do
 # distrito-industrial tem 36 MB), e sem isto eles reaparecem como arquivo novo

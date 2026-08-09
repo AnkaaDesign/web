@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { formatCurrency } from "../../../../utils";
-import { IconUsers, IconTrendingUp, IconCheckbox, IconAward, IconChevronUp } from "@tabler/icons-react";
+import { IconUsers, IconTrendingUp, IconCheckbox, IconAward, IconChevronUp, IconDivide } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 // Generic bonus item interface that works with both Bonus and BonusRow types
@@ -24,6 +24,9 @@ interface BonusItem {
   weightedTasks?: number | { toNumber: () => number };
   // Average tasks per user (same for all users in a period)
   averageTasks?: number;
+  // Divisor B1 do período (soma dos pesos de elegibilidade) — igual para todos
+  // os usuários do período e FRACIONÁRIO por construção.
+  periodDivisor?: number | { toNumber: () => number } | null;
   // Period info
   year: number;
   month: number;
@@ -68,15 +71,17 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     // Each period contributes the SAME totalWeightedTasks regardless of how many
     // user rows exist, so we de-dup by month key and read the period total
     // straight from the bonus row.
-    const perMonth = new Map<string, { weightedTasks: number; average: number }>();
+    const perMonth = new Map<string, { weightedTasks: number; average: number; divisor: number }>();
 
     bonuses.forEach(bonus => {
       const id = bonus.userId || bonus.oderId || '';
       uniqueUserIds.add(id);
 
-      const isBonifiable = bonus.position?.bonifiable ?? bonus.user?.position?.bonifiable;
+      // Só o nível de desempenho 0 tira alguém dos KPIs. O DESLIGADO continua
+      // dentro: ele tem bônus proporcional legítimo no período e, se ficasse de
+      // fora, o total exibido não bateria com a soma das linhas da tabela.
       const performanceLevel = bonus.performanceLevel ?? 1;
-      const isEligible = isBonifiable !== false && performanceLevel > 0;
+      const isEligible = performanceLevel > 0;
 
       if (isEligible) {
         bonifiableUserIds.add(id);
@@ -95,7 +100,8 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
             ? toNumber(bonus.totalWeightedTasks)
             : toNumber(bonus.weightedTasks);
           const average = bonus.averageTasks ?? 0;
-          perMonth.set(monthKey, { weightedTasks, average });
+          const divisor = toNumber(bonus.periodDivisor ?? undefined);
+          perMonth.set(monthKey, { weightedTasks, average, divisor });
         }
       }
     });
@@ -107,21 +113,21 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     // Multi-month: sum the per-period totals.
     let totalTasksCompleted = 0;
     let averageSum = 0;
+    let divisorSum = 0;
     for (const m of perMonth.values()) {
       totalTasksCompleted += m.weightedTasks;
       averageSum += m.average;
+      divisorSum += m.divisor;
     }
     const averageTasksPerUser = perMonth.size > 0 ? averageSum / perMonth.size : 0;
+    // Multi-mês: cada período tem o seu divisor, então exibimos a média deles.
+    const periodDivisor = perMonth.size > 0 ? divisorSum / perMonth.size : 0;
 
     // Calculate averages
     // For multi-month: divide by total bonus entries for eligible users
     // For single-month: divide by number of eligible users
     const bonusEntriesCount = isMultiMonth
-      ? bonuses.filter(b => {
-          const isBonifiable = b.position?.bonifiable ?? b.user?.position?.bonifiable;
-          const performanceLevel = b.performanceLevel ?? 1;
-          return isBonifiable !== false && performanceLevel > 0;
-        }).length
+      ? bonuses.filter(b => (b.performanceLevel ?? 1) > 0).length
       : bonifiableUsersCount;
 
     const averageBonusPerUser = bonusEntriesCount > 0
@@ -152,6 +158,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
       totalTasksCompleted,
       averageBonusPerUser,
       averageTasksPerUser,
+      periodDivisor,
       bonifiableUsersCount,
       uniqueUsersCount,
       isMultiMonth,
@@ -164,6 +171,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     totalTasksCompleted,
     averageBonusPerUser,
     averageTasksPerUser,
+    periodDivisor,
     bonifiableUsersCount,
     uniqueUsersCount,
     isMultiMonth,
@@ -184,8 +192,8 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
           <div className="h-4 w-32 bg-muted animate-pulse rounded" />
         </div>
         <div className="py-3 pt-1 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-            {[1, 2, 3, 4, 5].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
                 <div className="h-4 w-24 bg-muted animate-pulse rounded mb-2" />
                 <div className="h-6 w-16 bg-muted animate-pulse rounded mb-1" />
@@ -226,7 +234,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
         )}
       >
         <div className="py-3 pt-1 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
             {/* Total Bonus Amount */}
             <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
@@ -303,6 +311,22 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
                 <p className="text-xl font-bold text-purple-600">{averageTasksPerUser.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground mt-1 min-h-[1rem]">
                   Tarefas por funcionário
+                </p>
+              </div>
+            </div>
+
+            {/* Period Divisor — soma dos pesos de elegibilidade (fracionário) */}
+            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
+              <div className="flex items-center gap-2 mb-1">
+                <IconDivide className="h-4 w-4 text-cyan-600 flex-shrink-0" />
+                <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
+                  {isMultiMonth ? 'Divisor Médio do Período' : 'Divisor do Período'}
+                </p>
+              </div>
+              <div className="flex-grow flex flex-col justify-between">
+                <p className="text-xl font-bold text-cyan-600">{periodDivisor.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1 min-h-[1rem]">
+                  Soma das proporções
                 </p>
               </div>
             </div>

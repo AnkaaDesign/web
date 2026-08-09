@@ -42,7 +42,9 @@ import { STUDIO_ASSETS, STUDIO_ASSETS_BASE, VENDOR_ASSETS } from '@/config/asset
  */
 export const STUDIO_BASE = STUDIO_ASSETS_BASE;
 
-/** `models/vehicles/` — cabines, carreta, baú, `cabs.json`, `*_meta.json`. Relativo a `STUDIO_BASE`. */
+/** `models/vehicles/` — cavalos, carreta, baú, `hitch.json`, `*_meta.json`.
+ *  Relativo a `STUDIO_BASE`. (`cabs.json` foi aposentado — a geometria vem de
+ *  `chassis[].file` no brands.json e o posicionamento de `hitch.json`.) */
 export const VEHICLES_DIR = STUDIO_ASSETS.vehiclesDir;
 
 /** `textures/` — conjuntos PBR do chão e `macro_noise.webp`. Relativo a `STUDIO_BASE`. */
@@ -53,6 +55,15 @@ export const ENVIRONMENTS_DIR = STUDIO_ASSETS.environmentsDir;
 
 /** `brands/trucks/` — um diretório por montadora + `brands.json`. Relativo a `STUDIO_BASE`. */
 export const TRUCK_BRANDS_DIR = STUDIO_ASSETS.truckBrandsDir;
+
+/**
+ * `renders/` — renders pré-produzidos dos cards + `renders.json`.
+ * Relativo a `STUDIO_BASE`.
+ *
+ * Layout: `renders/trucks/<manufacturerId>/<modelId>/<chassisId>/<colorId>.webp`.
+ * Quem monta essas URLs é `catalog/renders.ts`, sempre por `assetUrl()`.
+ */
+export const RENDERS_DIR = STUDIO_ASSETS.rendersDir;
 
 /**
  * `/vendor/draco/` — diretório (não arquivo) exigido por `DRACOLoader.setDecoderPath`.

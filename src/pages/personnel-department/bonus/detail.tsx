@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { formatCurrency } from "../../../utils";
+import { formatCurrency, formatDate } from "../../../utils";
 import { cn } from "@/lib/utils";
 import { BonusTasksList } from "@/components/personnel-department/bonus/detail";
 import { BonusRulesModal } from "@/components/personnel-department/bonus/bonus-rules-modal";
@@ -39,6 +39,15 @@ function getMonthName(month?: number): string {
   const monthIndex = month - 1;
   return MONTH_NAMES[monthIndex] || "";
 }
+
+// Helper to coerce a Decimal/string/number into a plain number
+const toNum = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parseFloat(value) || 0;
+  if (value?.toNumber) return value.toNumber();
+  return 0;
+};
 
 // Helper to format decimal values
 const formatDecimal = (value: any): string => {
@@ -264,8 +273,6 @@ export default function BonusDetailPage() {
   // final round, drifting from the saved value.
   const calculateFinalAmount = useMemo(() => {
     if (!bonus) return 0;
-    const toNum = (v: any): number =>
-      typeof v === 'number' ? v : v?.toNumber?.() ?? Number(v) ?? 0;
     const netBonus = (bonus as any).netBonus;
     if (netBonus !== null && netBonus !== undefined) {
       return toNum(netBonus);
@@ -297,15 +304,21 @@ export default function BonusDetailPage() {
     // Saved bonus.users may include stale entries (users connected before the
     // perf>0 filter was added to the save path). The list endpoint already
     // returns a fresh eligible-only list, but getById returns the raw relation.
-    // Filter to perf>0 here so detail count matches both the list table and
-    // the divisor that was actually used for averageTaskPerUser.
+    // Filter to perf>0 here so detail count matches the list table.
     const eligibleUsersFromBonus = users.filter(
       (u: any) => (u?.performanceLevel ?? 0) > 0,
     ).length;
-    const totalCollaboratorsFromBonus = eligibleUsersFromBonus || users.length || 1;
     const totalCollaborators = bonus
-      ? totalCollaboratorsFromBonus
-      : (periodStats?.eligibleUsers ?? periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
+      ? (eligibleUsersFromBonus || users.length)
+      : (periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
+
+    // O que essa contagem NÃO é mais: o divisor. B1 usa `periodDivisor` — a soma
+    // dos pesos de elegibilidade, FRACIONÁRIA — e vem pronto da API. Contar
+    // usuários devolvia um inteiro que não bate com averageTaskPerUser, porque
+    // quem entrou ou saiu no meio do período conta fração de dia útil.
+    const periodDivisor = bonus
+      ? toNum(bonus?.periodDivisor)
+      : toNum(periodStats?.periodDivisor ?? periodStats?.eligibleUsers);
 
     const averageTasksPerUserFromBonus = bonus?.averageTaskPerUser
       ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
@@ -320,10 +333,26 @@ export default function BonusDetailPage() {
       totalRawTasks,
       totalPonderedTasks,
       totalCollaborators,
+      periodDivisor,
       averageTasksPerUser,
       tasks,
     };
   }, [bonus, periodStats]);
+
+  // Proporcionalidade da PESSOA no período — 1 = período inteiro. Linhas antigas
+  // (anteriores à proporcionalidade) não trazem o campo e valem 1.
+  const eligibility = useMemo(() => {
+    const weight = activeBonus?.eligibilityWeight != null ? toNum(activeBonus.eligibilityWeight) : 1;
+    return {
+      weight,
+      isPartial: weight < 1,
+      eligibleDays: activeBonus?.eligibleDays ?? null,
+      periodBusinessDays: activeBonus?.periodBusinessDays ?? null,
+      terminatedAt: activeBonus?.terminatedAt ?? null,
+      currentlyEmployed: activeBonus?.currentlyEmployed ?? true,
+      hasSecullumId: activeBonus?.hasSecullumId ?? true,
+    };
+  }, [activeBonus]);
 
   // Validation — hard error out only when we truly have no id.
   if (!id) {
@@ -560,8 +589,43 @@ export default function BonusDetailPage() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-sm text-muted-foreground">Média por Colaborador</span>
-                  <span className="text-sm font-medium">{formatDecimal(taskStats.averageTasksPerUser)}</span>
+                  {/* O divisor é fracionário desde a proporcionalidade — sem ele
+                      a média deixou de ser óbvia a partir do nº de colaboradores. */}
+                  <span className="text-sm font-medium">
+                    {formatDecimal(taskStats.averageTasksPerUser)}
+                    <span className="font-normal text-muted-foreground">
+                      {" "}(÷ {formatDecimal(taskStats.periodDivisor)})
+                    </span>
+                  </span>
                 </div>
+                {eligibility.isPartial && (
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Proporção no período</span>
+                    <span className="text-sm font-medium text-amber-600">
+                      {Math.round(eligibility.weight * 100)}%
+                      {eligibility.eligibleDays != null && eligibility.periodBusinessDays != null && (
+                        <span className="font-normal text-muted-foreground">
+                          {" "}({eligibility.eligibleDays} de {eligibility.periodBusinessDays} dias úteis)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {(eligibility.terminatedAt || !eligibility.currentlyEmployed) && (
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Desligamento</span>
+                    <span className="text-sm font-medium">
+                      {eligibility.terminatedAt
+                        ? formatDate(new Date(eligibility.terminatedAt))
+                        : "Desligado"}
+                    </span>
+                  </div>
+                )}
+                {!eligibility.hasSecullumId && (
+                  <p className="text-xs text-amber-600">
+                    Sem ponto eletrônico — bônus sem desconto de falta nem assiduidade.
+                  </p>
+                )}
                 <Separator className="my-2" />
                 {bonus ? (
                   <>

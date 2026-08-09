@@ -827,10 +827,12 @@ export const routes = {
     notes: {
       root: "/ferramentas/notas",
     },
-    // Truck Studio — 3D configurator under construction. Deliberately NOT in
-    // the navigation menu nor on the Ferramentas hub: reachable by URL only.
+    // Estúdio 3D — configurador 3D de caminhão. Saiu da rota oculta
+    // `/ferramentas/teste` em 2026-08-09 e passou a constar na navegação e no
+    // hub de Ferramentas. A geometria NÃO vem daqui: é servida pela API sob
+    // STUDIO_ASSETS_BASE (ver api/docs/DEPLOYMENT-studio-assets.md).
     truckStudio: {
-      root: "/ferramentas/teste",
+      root: "/ferramentas/estudio-3D",
     },
   },
 

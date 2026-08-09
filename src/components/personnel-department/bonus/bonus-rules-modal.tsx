@@ -12,6 +12,7 @@ import {
   IconTrendingUp,
   IconTrendingDown,
   IconCalendarOff,
+  IconCalendarStats,
   IconHeartbeat,
   IconCheckbox,
   IconBan,
@@ -32,6 +33,8 @@ function detectSection(ref?: string): string | null {
   if (lower.includes("falta")) return "faltas";
   if (lower.includes("assiduidade")) return "assiduidade";
   if (lower.includes("suspensa") || lower.includes("suspens")) return "suspensas";
+  if (lower.includes("proporc") || lower.includes("desligad") || lower.includes("efetiva"))
+    return "proporcionalidade";
   return null;
 }
 
@@ -114,6 +117,36 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
         </DialogHeader>
 
         <div className="space-y-4">
+
+          {/* Proporcionalidade no período */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-3">
+              <IconCalendarStats className="h-3.5 w-3.5 text-primary" />
+              Período
+            </p>
+            <Section
+              icon={IconCalendarStats}
+              title="Proporcionalidade no período"
+              badge="Proporção do bônus"
+              badgeClassName="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+              highlighted={highlighted === "proporcionalidade"}
+            >
+              <p>
+                Quem trabalha o <strong className="text-foreground">período inteiro</strong> (do dia 26 ao dia 25) conta como <strong className="text-foreground">1 colaborador</strong> no cálculo e recebe <strong className="text-foreground">100% do bônus</strong>.
+              </p>
+              <p>
+                Quem é <strong className="text-foreground">desligado</strong> ou <strong className="text-foreground">efetivado no meio do período</strong> conta apenas a <strong className="text-foreground">fração de dias úteis trabalhados</strong> e recebe <strong className="text-foreground">essa mesma fração</strong> do bônus. Exemplo: quem esteve na empresa em 19 dos 20 dias úteis do período conta 0,95 e recebe 95%.
+              </p>
+              <p>
+                A <strong className="text-foreground">média por colaborador</strong> usa a <strong className="text-foreground">soma dessas frações</strong> — por isso ela costuma ser um número quebrado, e não a contagem de pessoas.
+              </p>
+              <p className="text-xs italic">
+                O desligamento não apaga o bônus: quem saiu no meio do período continua com o valor proporcional aos dias em que trabalhou.
+              </p>
+            </Section>
+          </div>
+
+          <Separator />
 
           {/* Assiduidade */}
           <div>
