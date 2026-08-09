@@ -223,6 +223,19 @@ setColorProvider(async () => {
        não anexar cookie de sessão numa requisição cross-origin que não precisa
        dele (seria preflight de graça, e um 401 onde deveria haver 200). */
     credentials: "omit",
+    /* REVALIDA SEMPRE. Esta lista é EDITADA NO LUGAR: o Ajuste da Tinta grava
+       `previewConfig` na mesma tabela, e quem grava é justamente quem precisa
+       ver o resultado ao recarregar. Sem esta flag o navegador servia a paleta
+       do próprio cache — a rota mandava `max-age=86400` — e a receita recém
+       salva sumia por até 24 horas, apesar de estar no banco.
+
+       A flag fica aqui MESMO com o cabeçalho da rota já corrigido, e não é
+       redundância: todo navegador que carregou o estúdio antes da correção tem
+       uma cópia válida por um dia, e `no-cache` no pedido é o que a força a
+       perguntar de novo em vez de esperar o prazo vencer. É a mesma flag que
+       catalog.ts, renders.ts e vehicle/models.ts usam nos manifestos, e pelo
+       mesmo motivo. */
+    cache: "no-cache",
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
