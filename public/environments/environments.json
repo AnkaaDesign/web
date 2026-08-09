@@ -121,27 +121,7 @@
             "envIntensity": 0.5,
             "grassNote": "2026-08-08 — NOVO. A grama de DENTRO da cerca: o canteiro central entre as duas pistas, as faixas de terreno entre a laje e o alambrado, e as manchas de grama espalhadas nelas. Existe separado de GRASS_VERGE por um motivo puramente tecnico e nao estetico: as UV do chao sao metros/UV_M, o campo distante precisa de UV_M 64 por precisao de varying, e o terreno perto precisa de UV_M 8 para o ladrilho nao ficar gigante. Um material so nao pode ter as duas. UV_M 8 / repeat 2 = ladrilho de 4 m, o mesmo tamanho aparente do campo distante — que e o ponto: as duas gramas tem de casar na transicao da cerca. O tom e mais verde e menos seco que o do campo porque esta e grama cortada dentro da planta."
           },
-          "TREE_BARK": {
-            "repeat": 1,
-            "tintRgb": [
-              0.2,
-              0.16,
-              0.13
-            ],
-            "roughness": 0.92,
-            "metalness": 0
-          },
-          "TREE_LEAF": {
-            "repeat": 1,
-            "tintRgb": [
-              0.19,
-              0.26,
-              0.11
-            ],
-            "roughness": 0.88,
-            "metalness": 0,
-            "treeNote": "2026-08-08 — SEM MAPA, de proposito, igual a LINE_PAINT. Nao ha textura de folha nem de casca em /textures e nao vale a pena baixar uma: as arvores sao geradas (tools/env-build/veg.py) e toda a variacao delas vem do COLOR_0, que e escrito vertice a vertice — mais escuro no interior da copa, mais quente nas pontas, com um deslocamento de matiz por arvore para que nenhuma leia como a mesma planta. Uma cor chapada aqui daria uma bola de bilhar verde; o COLOR_0 e o que faz a massa existir. ELES SAO DECLARADOS AQUI DE PROPOSITO mesmo sem mapa: set.ts collectSolids trata como CHAO toda malha cujos materiais estejam todos neste bloco, e arvore declarada = arvore que a camera atravessa em vez de desviar. Como toda arvore esta a 78 m ou mais da origem e a orbita maxima e ~31 m, atravessar nunca acontece — e desviar de uma arvore seria pior."
-          },
+          "_TREE_BARK_TREE_LEAF_removidos": "2026-08-09 — AS DUAS SAIRAM porque a vegetacao gerada saiu junto. Elas eram slots sem mapa cuja variacao vinha toda do COLOR_0, o que era o melhor possivel enquanto o projeto nao tinha nenhuma textura de folha com alfa. Agora tem: tools/env-build/bake_impostors.py renderiza os modelos CC0 da Poly Haven (jacaranda_tree, island_tree_02, searsia_lucida) ortograficamente sobre filme transparente, e a planta e desenhada em cartoes cruzados com esse PNG RGBA. POR QUE NAO OS MODELOS DIRETO, que era o pedido: medido, jacaranda_tree tem 3.863.832 faces e island_tree_02 tem 1.072.212 — para UMA arvore de 3,4 m. O cinturao tem ~450. Sao assets de render offline, e decimar nao salva: nao ha atlas de folha a preservar, as folhas sao geometria modelada (o glTF declara alphaMode BLEND sobre um JPG sem canal alfa, o que prova), entao um decimador de colapso vira as folhas em pasta. O impostor mantem a aparencia REAL da arvore por 6 triangulos. Os materiais dos cartoes (PLANT_*) carregam a textura embutida e por isso NAO sao declarados aqui — declarar faria set.ts collectSolids trata-los como chao. Eles tambem saem instanciados via EXT_mesh_gpu_instancing, e collectSolids ja ignora InstancedMesh, entao a camera nao desvia de arvore de qualquer jeito.",
           "GRAVEL_SHOULDER": {
             "diffuse": "textures/gravel_diff.webp",
             "rough": "textures/gravel_rough.webp",
