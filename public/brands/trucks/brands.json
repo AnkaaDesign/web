@@ -499,6 +499,7 @@
      "subtitle": "4x2",
      "image": "brands/trucks/iveco/models/s-way.webp",
      "available": true,
+     "specialEdition": true,
      "chassis": [
       {
        "id": "4x2",
@@ -514,6 +515,7 @@
      "subtitle": "Edicao especial · 4x2",
      "image": "brands/trucks/iveco/models/s-way.webp",
      "available": true,
+     "specialEdition": true,
      "legacy": true,
      "compressed": false,
      "chassis": [
