@@ -214,8 +214,11 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // shadow.radius only works 
 /* THE SHADOW MAP IS NOT REDRAWN EVERY FRAME.
    ---------------------------------------------------------------------------
    The key light is DIRECTIONAL and its shadow camera is a fixed ortho box about
-   the origin, so the depth map depends only on the light's angle and on the
-   geometry — NOT on where the viewer is. Left on autoUpdate, three re-rendered
+   the RIG (see placeKeyLight — it used to be about the origin, which is what cut
+   the implement out of the map), so the depth map depends only on the light's
+   angle, on the geometry and on where the rig sits — NOT on where the viewer is.
+   Moving the box is itself an invalidation, and setVehicleFocus() pays it.
+   Left on autoUpdate, three re-rendered
    every caster into a 3072² map on every single frame, which on this rig means
    drawing the whole vehicle TWICE per frame: the corrected implement alone is
    8.6 M triangles, so orbiting the camera — a thing that cannot change a single
@@ -481,6 +484,56 @@ key.shadow.bias = -0.0004;
 key.shadow.normalBias = 0.02;
 key.shadow.radius = 2;
 scene.add(key, key.target);
+
+/* ---- ONDE A CAIXA DE SOMBRA FICA CENTRADA, e por que ela não podia ficar na
+   ORIGEM.
+   ---------------------------------------------------------------------------
+   O bloco acima raciocina inteiro em "distância da origem" — "a frustum that
+   stops 14 m from the origin", "±24 holds the whole rig". Isso pressupõe que o
+   conjunto MORA na origem, e ele não mora: `vehicle/models.ts` declara
+   `RIG_PLACEMENT = { z: 22, yaw: π }` e `setRigPlacement(true)` põe o `rigGroup`
+   a 22 m em Z, girado 180° (12 m da primeira posição + 10 de recuo). O solver de
+   engate entrega a garganta da quinta roda na origem do rig, e com o giro o
+   caminhão aponta para −Z: o cavalo ocupa mais ou menos z 16…22 e o implemento
+   cresce de 22 para trás, até z ≈ 36 num baú de 14,7 m.
+
+   Com a caixa de ±24 m centrada na origem, o corte cai em z = 24 — ou seja,
+   dentro dos dois primeiros metros do baú. O cavalo está inteiro dentro do
+   frustum e projeta; o implemento fica quase todo FORA e não projeta nada. É o
+   relato, literal: "somente o cavalo faz sombra, o trailer não". E não é um
+   defeito de `castShadow`, de material nem de receptor — nada disso é
+   consultado para geometria que a câmera de sombra não enxerga.
+
+   A correção é mover a caixa para o conjunto, não alargá-la: dobrar
+   `SHADOW_HALF` para cobrir a origem E o rig custaria 4× a área do mapa (de
+   64 para 32 texels/m no mesmo 3072², que é a densidade que o bloco acima
+   comprou de volta de propósito) para iluminar 22 m de pátio vazio.
+
+   Como uma luz DIRECIONAL só lê `position − target` para sombrear, transladar
+   os dois juntos não muda um pixel de iluminação — muda apenas de onde a
+   câmera ortográfica olha. Quem informa o centro é `setVehicleFocus()`, que já
+   recebe a caixa do conjunto medida DEPOIS do engate (`focusOnRig()` em
+   studio.ts) e já é seguida de `invalidateShadows()`. */
+const KEY_ORBIT_R = 26;
+/** Direção UNITÁRIA do alvo para a luz. É ela que sombreia, não `key.position`
+ *  — que a partir daqui carrega o deslocamento do conjunto somado. */
+const _keyDir = new THREE.Vector3(0, 1, 0);
+/** Centro da caixa de sombra, em mundo. Origem enquanto não há conjunto. */
+const _shadowFocus = new THREE.Vector3();
+
+/** Repõe luz e alvo em torno de `_shadowFocus`, preservando `_keyDir`. */
+function placeKeyLight() {
+  key.position.copy(_keyDir).multiplyScalar(KEY_ORBIT_R).add(_shadowFocus);
+  key.target.position.copy(_shadowFocus);
+  /* A câmera de sombra lê `light.matrixWorld` e `light.target.matrixWorld`, não
+     `position`. Os dois nós ficaram FORA do congelamento de `models.ts` e
+     recompõem sozinhos no `updateMatrixWorld()` da cena — mas essa passagem só
+     acontece no `render()`, e quem chama isto de fora do laço (setVehicleFocus)
+     marca o mapa como sujo no mesmo instante. Escrever aqui é o que garante que
+     o passe de sombra desse quadro já use a pose nova. */
+  key.updateMatrixWorld(true);
+  key.target.updateMatrixWorld(true);
+}
 
 /* cool counter-light from behind: separates the bodywork from the sky and
    gives the metallic flanks something to catch */
@@ -1393,12 +1446,16 @@ function applyRig(rig: Rig) {
   }
   const azr = rig.keyAz * Math.PI / 180;
   const elr = rig.keyEl * Math.PI / 180;
-  const r = 26;
-  key.position.set(
+  const r = KEY_ORBIT_R;
+  /* O piso de 1,0 m em Y é o mesmo de sempre — ele impede o sol rasante de
+     entrar por baixo do chão —, só que agora aplicado à direção antes de ela ser
+     escalada e deslocada. Em r = 26 os dois são o mesmo número. */
+  _keyDir.set(
     r * Math.cos(elr) * Math.sin(azr),
     Math.max(1.0, r * Math.sin(elr)),
     r * Math.cos(elr) * Math.cos(azr)
-  );
+  ).normalize();
+  placeKeyLight();
   key.color.copy(rig.keyColor);
   key.intensity = Math.max(0, rig.keyIntensity);
   key.shadow.intensity = THREE.MathUtils.clamp(rig.shadowIntensity, 0, 1);
@@ -1495,7 +1552,11 @@ function applyRig(rig: Rig) {
   skyU.uHalo.value = Math.max(0, rig.skyHalo);
   skyU.uDisc.value = Math.max(0, rig.skyDisc);
   skyU.uCloud.value = THREE.MathUtils.clamp(rig.cloudiness, 0, 1);
-  _dirW.copy(key.position).normalize();
+  /* `_keyDir`, não `key.position.normalize()`: desde que a caixa de sombra
+     acompanha o conjunto, a POSIÇÃO da luz carrega o deslocamento do rig e
+     normalizá-la daria uma direção de sol errada (e dependente de onde o
+     caminhão está). Ver placeKeyLight(). */
+  _dirW.copy(_keyDir);
   skyU.uKeyDir.value.copy(_dirW);
 
   if (starsMesh) {
@@ -1716,7 +1777,7 @@ export function updateLighting(dt: number) {
   } else if (rigCur) {
     /* the paint uniforms are VIEW space, so they must refresh as the camera
        orbits even when the rig itself is static */
-    _dirW.copy(key.position).normalize();
+    _dirW.copy(_keyDir);          // ver a nota em applyRig(): NÃO é key.position
     _dirV.copy(_dirW).transformDirection(camera.matrixWorldInverse);
     _keyCol.copy(key.color).multiplyScalar(key.intensity);
     setKeyLight(_dirV, _keyCol, rigCur.glintBoost);
@@ -2109,7 +2170,15 @@ const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
 const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork
 const _fv = new THREE.Vector3();
 
-/** Lock the orbit to a rig. Pass null to release it (no limits). */
+/**
+ * Lock the orbit to a rig. Pass null to release it (no limits).
+ *
+ * É TAMBÉM O DONO DO CENTRO DA CAIXA DE SOMBRA, e não por conveniência: esta é
+ * a única função do engine que recebe a caixa do conjunto INTEIRO já engatado e
+ * já colocado no cenário (`focusOnRig()` em studio.ts a chama depois do engate,
+ * e emenda `invalidateShadows()` logo em seguida). Ver o bloco de
+ * `placeKeyLight()` para o que a caixa centrada na origem estava cortando fora.
+ */
 export function setVehicleFocus(box: THREE.Box3 | null) {
   /* Same reason as setInteriorBounds(): the ejection runs in a frame hook. */
   invalidate();
@@ -2117,9 +2186,20 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
     vehicleFocus = null;
     controls.minDistance = 0;
     controls.maxDistance = Infinity;
+    /* Sem conjunto, a caixa volta para a origem — é onde o cenário está. */
+    _shadowFocus.set(0, 0, 0);
+    placeKeyLight();
+    renderer.shadowMap.needsUpdate = true;
     return;
   }
   const c = box.getCenter(new THREE.Vector3());
+  /* Só X e Z. A altura fica no CHÃO de propósito: o alcance vertical do
+     `near/far` foi dimensionado para uma luz a 26 m de um alvo no nível do
+     solo, e subir o alvo para o meio da carroceria (~2 m) empurraria o plano
+     próximo para dentro do próprio caminhão sob sol alto. */
+  _shadowFocus.set(c.x, 0, c.z);
+  placeKeyLight();
+  renderer.shadowMap.needsUpdate = true;
   const r = Math.max(2, box.getSize(new THREE.Vector3()).length() / 2);
   vehicleFocus = { c, box: box.clone().expandByScalar(FOCUS_SKIN), r };
   controls.minDistance = r * FOCUS_MIN_F;
