@@ -5,7 +5,7 @@ import { IconFilter, IconBuilding, IconBriefcase, IconUserCheck } from "@tabler/
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../../constants";
+import { EMPLOYEE_TYPE } from "../../../../constants";
 
 // Extended filters with UI-only fields for bonus
 interface BonusFiltersData extends Partial<UserGetManyFormData> {
@@ -32,12 +32,18 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      currentContractStatus: CONTRACT_STATUS.ACTIVE, // Only active users for bonus (not terminated)
+      // NÃO filtrar por currentContractStatus: quem foi desligado no meio do
+      // período tem bônus proporcional legítimo e precisa aparecer no filtro.
       currentEmployeeType: EMPLOYEE_TYPE.CLT, // Bonus is folha-only → CLT (exclude terceirizado/PJ/autônomo)
       payrollNumber: { not: null }, // Only users with payroll numbers
-      secullumEmployeeId: { not: null } // Only users registered in Secullum
+      // NÃO filtrar por secullumEmployeeId: o desligamento desvincula a pessoa
+      // do Secullum, então exigi-lo aqui esconderia justamente os desligados
+      // que agora têm bônus proporcional. Sem ponto eletrônico o bônus sai sem
+      // desconto de falta e sem assiduidade — sinalizado por `hasSecullumId`.
     },
-    limit: 100, // Max 100 due to API limit
+    // 100 é o TETO do userGetManySchema da API (`limit: max(100)`) — qualquer
+    // valor acima é REJEITADO com 400 e o combobox fica vazio.
+    limit: 100,
   });
 
   const { data: sectorsData } = useSectors({

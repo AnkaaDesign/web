@@ -44,6 +44,25 @@ export interface Bonus extends BaseEntity {
     };
   } | null;
 
+  // ---- Proporcionalidade temporal (período 26→25) ----
+  // Quem trabalha o período inteiro tem peso 1; quem é desligado ou efetivado no
+  // meio conta a fração de dias úteis trabalhados. O peso multiplica o bônus
+  // individual E é a parcela da pessoa no divisor B1 do período.
+  /** [0,1]. 1 = período inteiro. 0,95 = elegível em 95% dos dias úteis. */
+  eligibilityWeight?: DecimalValue | number;
+  /** Dias úteis em que esteve elegível dentro do período. */
+  eligibleDays?: number | null;
+  /** Dias úteis do período (seg–sex menos feriados nacionais). */
+  periodBusinessDays?: number | null;
+  /** Divisor B1 do período (soma dos pesos). FRACIONÁRIO — ex.: 17.3000. */
+  periodDivisor?: DecimalValue | number | null;
+  /** ISO date — preenchido quando o desligamento ocorreu DENTRO do período. */
+  terminatedAt?: string | null;
+  /** false = desligada hoje (saiu em período posterior ao exibido). */
+  currentlyEmployed?: boolean;
+  /** false = sem apuração de ponto ⇒ sem desconto de falta nem extra de assiduidade. */
+  hasSecullumId?: boolean;
+
   // Note: Bonus status is NOT a Prisma column. Status was previously tracked
   // here but the database has no such field. Use derived state from
   // payrollId presence (saved/draft) instead.
@@ -254,6 +273,21 @@ export interface LiveBonus {
   lastCalculatedAt?: string;
   /** True when the live response was served from the stale SWR tier (age > 30 min). */
   isStale?: boolean;
+  // ---- Proporcionalidade temporal (mesmos campos do Bonus salvo) ----
+  /** [0,1]. 1 = período inteiro. 0,95 = elegível em 95% dos dias úteis. */
+  eligibilityWeight?: number;
+  /** Dias úteis em que esteve elegível dentro do período. */
+  eligibleDays?: number | null;
+  /** Dias úteis do período (seg–sex menos feriados nacionais). */
+  periodBusinessDays?: number | null;
+  /** Divisor B1 do período (soma dos pesos). FRACIONÁRIO — ex.: 17.3000. */
+  periodDivisor?: number | null;
+  /** ISO date — preenchido quando o desligamento ocorreu DENTRO do período. */
+  terminatedAt?: string | null;
+  /** false = desligada hoje (saiu em período posterior ao exibido). */
+  currentlyEmployed?: boolean;
+  /** false = sem apuração de ponto ⇒ sem desconto de falta nem extra de assiduidade. */
+  hasSecullumId?: boolean;
   tasks?: Task[];
   users?: User[];
   bonusDiscounts?: BonusDiscount[];
