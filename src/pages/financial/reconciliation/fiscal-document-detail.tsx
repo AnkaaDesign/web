@@ -278,9 +278,19 @@ export function ReconciliationFiscalDocumentDetailPage() {
   // never match a bank line, so it's "resolved" without any transaction.
   const isOffBankResolved =
     !!doc.offBankResolvedAt && activeNfMatches.length === 0;
+  // SAIDA: an emitted note never earns a bank match, so "vinculada" means the
+  // NfseDocument carries a faturamento/tarefa. Trust the server's `linked`, but
+  // fall back to the same rule locally — an older API that omits the field must
+  // not make a fully-billed note read "Pendente".
+  const isSaidaLinked =
+    doc.linked ??
+    (!!doc.nfseDocument?.invoiceId ||
+      !!doc.nfseDocument?.taskId ||
+      activeNfMatches.length > 0 ||
+      !!doc.offBankResolvedAt);
   const nfStatus: ReconciliationStatus =
     doc.operationType === "SAIDA"
-      ? doc.linked
+      ? isSaidaLinked
         ? "RECONCILED"
         : "PENDING"
       : isOffBankResolved
