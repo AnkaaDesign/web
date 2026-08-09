@@ -11,6 +11,7 @@ import {
   IconRecycle,
   IconNote,
   IconLayoutGrid,
+  IconTruck,
 } from "@tabler/icons-react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 
@@ -69,6 +70,13 @@ const toolGroups: ToolGroup[] = [
         description: "Sistema true-color para explorar paletas e combinações",
         route: routes.tools.colorPalette.root,
         icon: IconPalette,
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
+        label: "Estúdio 3D",
+        description: "Visualize a pintura no caminhão em 3D, com cabine, implemento e cenário",
+        route: routes.tools.truckStudio.root,
+        icon: IconTruck,
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
     ],

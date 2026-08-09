@@ -14,8 +14,12 @@ import "./engine/ui/paint-panel.css";
  * fabric.js) de um semirreboque Frigorífico Paleteiro atrás de um cavalo
  * selecionável.
  *
- * Não listado de propósito: alcançável só em /ferramentas/teste enquanto a
- * funcionalidade está sendo construída. Não está no menu nem no hub Ferramentas.
+ * Publicado em /ferramentas/estudio-3D, no menu de navegação e no hub de
+ * Ferramentas (grupo "Cores"). O acesso continua restrito a ADMIN pelo gate em
+ * utils/route-privileges.ts — mudar o público é editar aquela linha, não o menu.
+ *
+ * A geometria não é servida por esta origem: vem da API sob STUDIO_ASSETS_BASE
+ * (runbook em api/docs/DEPLOYMENT-studio-assets.md).
  *
  * Fluxo: o estúdio abre num seletor de cards de CINCO passos — cenário →
  * fabricante → modelo → chassi → cor — e então uma cortina animada cobre o download e

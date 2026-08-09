@@ -3711,7 +3711,7 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Truck Studio — unlisted URL, ADMIN only (see route-privileges) */}
+                {/* Estúdio 3D — ADMIN only (o gate está em route-privileges) */}
                 <Route
                   path={routes.tools.truckStudio.root}
                   element={

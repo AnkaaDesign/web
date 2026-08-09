@@ -335,8 +335,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/ferramentas/paleta": ["ADMIN"],
   // Certificado de Resíduos — ADMIN + ACCOUNTING
   "/ferramentas/certificado-residuos": ["ADMIN", "ACCOUNTING"],
-  // Truck Studio (unlisted, under construction) — ADMIN only
-  "/ferramentas/teste": ["ADMIN"],
+  // Estúdio 3D — ADMIN only. Já aparece na navegação e no hub, mas o gate
+  // continua fechado enquanto o QA ponta a ponta não fecha; abrir para
+  // COMMERCIAL/DESIGNER é trocar esta linha, não mexer no menu.
+  "/ferramentas/estudio-3D": ["ADMIN"],
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",
