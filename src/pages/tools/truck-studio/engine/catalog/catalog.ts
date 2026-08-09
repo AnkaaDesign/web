@@ -163,6 +163,22 @@ export interface ChassisDef {
    * não lê.
    */
   aliases: string[];
+  /**
+   * OVERRIDE dos materiais que aceitam tinta neste `.glb` — substrings de nome,
+   * case-insensitive. `null` = não declarado → herda do modelo e, se ele também
+   * não declarar, vale a DETECÇÃO de `isPaintableMaterial()` (vehicle/models.ts),
+   * que pergunta pela assinatura do shader em vez do nome.
+   *
+   * Mora no CHASSI porque a geometria é do chassi (`file`): quem sabe como o
+   * bake nomeou a lataria é o ARQUIVO, e dois chassis do mesmo modelo podem ter
+   * vindo de bakes diferentes — o Iveco Stralis e o Scania Streamline mudam o
+   * nome do material de corpo entre o 4x2 e o 6x2.
+   *
+   * A herança é resolvida por `paintMaterialsOf()`, pelo mesmo motivo que
+   * `fileOf()` existe: guardá-la já resolvida aqui apagaria a diferença entre
+   * "não declarou" e "declarou igual ao modelo".
+   */
+  paintMaterials: string[] | null;
 }
 
 export interface ModelDef {
@@ -213,6 +229,9 @@ export interface ModelDef {
    * edição especial. Inferir juntaria um defeito com uma decisão comercial.
    */
   specialEdition: boolean;
+  /** Padrão de `ChassisDef.paintMaterials` para os chassis que não declaram o
+   *  seu. `null` = ninguém declarou → vale a detecção por shader. */
+  paintMaterials: string[] | null;
   /**
    * Configurações de chassi deste modelo. **SEMPRE não-vazio**, garantido pelo
    * normalizador: um modelo que não declara `chassis` recebe um sintético
@@ -497,6 +516,15 @@ const obj = (v: unknown): RawBlock | null =>
    para o consumidor poder iterar sem checar. */
 const arr = (v: unknown): RawBlock[] =>
   (Array.isArray(v) ? v.filter((e): e is RawBlock => !!e && typeof e === 'object') : []);
+/* Lista de strings do manifesto (`paintMaterials`). Devolve `null` — e NÃO `[]` —
+   quando a chave não existe, porque os dois estados dizem coisas diferentes:
+   ausente = "herde / detecte"; `[]` = "esta geometria não tem lataria pintável",
+   que é uma declaração legítima e não um bake por consertar. Colapsar os dois
+   apagaria justamente a distinção que torna o campo útil. */
+const strArr = (v: unknown): string[] | null =>
+  (Array.isArray(v)
+    ? v.filter((s): s is string => typeof s === 'string' && !!s.trim()).map((s) => s.trim())
+    : null);
 
 /* ---------------- validação / normalização ----------------
    Manifesto é dado externo: valide, não confie. Toda entrada volta com TODOS os
@@ -630,6 +658,9 @@ function normalizeChassis(input: unknown, model: Raw): ChassisDef | null {
     aliases: (Array.isArray(raw.aliases) ? raw.aliases : [])
       .filter((a): a is string => typeof a === 'string' && !!a.trim())
       .map((a) => a.trim()),
+    /* `null` e não o do modelo: a herança é do CONSUMIDOR
+       (`paintMaterialsOf()`), exatamente como o `file` logo acima. */
+    paintMaterials: strArr(raw.paintMaterials),
   };
 }
 
@@ -663,6 +694,8 @@ function normalizeModel(input: unknown): ModelDef | null {
       note: null,
       available: bool(raw.available, true),
       aliases: [],
+      /* O sintético É o modelo — herda a declaração dele, como herda o `file`. */
+      paintMaterials: strArr(raw.paintMaterials),
     });
   }
   return {
@@ -685,6 +718,9 @@ function normalizeModel(input: unknown): ModelDef | null {
     /* Default FALSE pelo mesmo motivo: nenhum manifesto existente vira edição
        especial por omissão. */
     specialEdition: bool(raw.specialEdition, false),
+    /* `null` = não declarado. O PADRÃO não mora aqui: catalog.ts diz o que o
+       manifesto declarou, não o que o bake assume. */
+    paintMaterials: strArr(raw.paintMaterials),
   };
 }
 
@@ -944,6 +980,23 @@ export function fileOf(
   model: ModelDef, chassis: ChassisDef | null | undefined,
 ): string | null {
   return (chassis && chassis.file) || model.file || null;
+}
+
+/**
+ * OS MATERIAIS PINTÁVEIS AUTORADOS de um par modelo+chassi — mesma cascata de
+ * `fileOf()`, e de propósito: quem manda é o nível que declara a GEOMETRIA.
+ *
+ * `null` = ninguém declarou → quem carrega usa a detecção por shader
+ * (`isPaintableMaterial()`, em vehicle/models.ts).
+ *
+ * `??` e NÃO `||`: um `[]` declarado é a verdade "nenhum material aceita tinta",
+ * e `||` a transformaria de volta em "detecte" sem dizer nada — que é a classe
+ * de bug que este campo existe para tornar declarável.
+ */
+export function paintMaterialsOf(
+  model: ModelDef, chassis: ChassisDef | null | undefined,
+): string[] | null {
+  return (chassis ? chassis.paintMaterials : null) ?? model.paintMaterials ?? null;
 }
 
 /**

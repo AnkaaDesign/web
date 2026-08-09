@@ -80,7 +80,10 @@ export interface CabDef {
    * cabine que já é .glb: ali `file` serve para as duas coisas.
    */
   preview?: string;
-  paintMaterials?: string[];
+  /** Override AUTORADO dos materiais que aceitam tinta neste bake, vindo do
+   *  `brands.json`. `null` = não declarado → vale a detecção de
+   *  `isPaintableMaterial()`. `[]` = "nenhum material aceita tinta". */
+  paintMaterials?: string[] | null;
   /**
    * Direção da câmera da MINIATURA desta cabine (ui/preview.ts), no referencial
    * do modelo — mesmo eixo do VIEW_DIR de scene/view.ts, +Z na dianteira.
@@ -177,11 +180,12 @@ const STEER_TIRE_OD = 1.015;   // m — real steer-tire outer diameter anchors t
 /* Legacy values used when manifests are not (yet) available. */
 const LEGACY_TRAILER_FRONT_Z = 2.65;
 
-/* Materiais de tinta padrão. Era `paintMaterials` por cabine no `cabs.json`;
-   com ele aposentado, o padrão vale para todo mundo e um bake que use outro
-   nome é um defeito do bake, não uma configuração — `warnIfUnpaintable()` em
-   studio.ts é quem passou a dizer isso em voz alta. */
-const DEFAULT_PAINT_MATERIALS = ['carpaint'];
+/* NÃO existe mais uma lista de nomes padrão. Ela era `['carpaint']`, herdada do
+   `cabs.json` aposentado, e a premissa embutida — "todo bake chama a lataria de
+   carpaint" — só valia para as três geometrias curadas de `models/vehicles/`.
+   Quem decide agora é `isPaintableMaterial()`, que pergunta pelo SHADER e não
+   pelo nome; o nome continua valendo em OU, e a lista autorada por bake voltou
+   a ser possível via `chassis[].paintMaterials` no brands.json. */
 const DEFAULT_WHEEL_RE = 'tire|rim|pneu';
 
 try { localStorage.removeItem('truckstudio.coupling.v1'); } catch { /* legacy key */ }
@@ -515,7 +519,9 @@ export async function loadManifests() {
  * `scania.fbx` entra pelo FBX porque termina em `.fbx`, e `volvo.glb` pelo GLB
  * porque termina em `.glb`.
  */
-export function cabDefFor(file: string, name?: string): CabDef {
+export function cabDefFor(
+  file: string, name?: string, paintMaterials?: string[] | null,
+): CabDef {
   /* UM leitor de `hitch.json` no engine, e ele é o de coupling.ts. `findTractor`
      casa pelo `sourceFile` NORMALIZADO (barras e `./` iniciais), que é a junção
      certa: o catálogo aponta para o arquivo, não para a chave legível
@@ -526,7 +532,13 @@ export function cabDefFor(file: string, name?: string): CabDef {
     name: name || file.split('/').pop() || file,
     file,
     format: /\.fbx(\?|$)/i.test(file) ? 'fbx-scania' : undefined,
-    paintMaterials: DEFAULT_PAINT_MATERIALS,
+    /* VEM DE FORA, e `null` = "use a convenção". Era `DEFAULT_PAINT_MATERIALS`
+       cravado aqui — e como esta é a ÚNICA fábrica de CabDef, isso tornava o
+       campo INALCANÇÁVEL por dado: declarar `paintMaterials` no brands.json não
+       tinha efeito nenhum, sem erro e sem aviso. O override por bake volta a
+       existir, que é o que permite consertar por manifesto os poucos arquivos
+       em que a assinatura do shader não basta. */
+    paintMaterials: paintMaterials ?? null,
     wheelMeshRegex: DEFAULT_WHEEL_RE,
     /* A quinta roda MEDIDA ganha do assentamento por caixa. `plateTopY` e `z`
        são exatamente os dois números que o engate precisa, e vêm em espaço cru
@@ -541,6 +553,79 @@ export function cabDefFor(file: string, name?: string): CabDef {
 
 /* ---------------- material / mesh setup ---------------- */
 const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
+
+/* ---------------- QUEM ACEITA TINTA, e por que não é mais só o nome --------
+   `nome.includes('carpaint')` era uma verdade sobre TRÊS geometrias curadas —
+   as de `models/vehicles/`, cujo bake RENOMEIA o corpo para `carpaint` porque
+   ali o nome do material é FUNCIONAL (ver o cabeçalho de tools/iveco-bake).
+   As 49 cabines de `models/trucks/` nunca passaram por esse renomeio: são rips
+   SCS/ETS2 no padrão `<peça>_mat_<NNNN>_<textura-fonte>`, e a chapa pintável se
+   chama `plain_grey`, `color` ou `carpaint*` conforme o ano do modelo.
+
+   MEDIDO nos 49 arquivos: pelo nome, 26 deles não têm UM material de tinta —
+   escolher uma cor não muda absolutamente nada — e entre os 23 restantes o
+   casamento às vezes pega só a capa do retrovisor (DAF XF Euro6) ou só a saia
+   lateral (Iveco Hi-Way).
+
+   ENTÃO A PERGUNTA MUDA DE "COMO SE CHAMA" PARA "QUE SHADER É". Toda tinta de
+   caminhão da SCS sai do exportador com a mesma assinatura, e ela sobrevive ao
+   renomeio de qualquer pipeline: KHR_materials_clearcoat com fator 1, roughness
+   0,089 e metalness 0,15 ou 0,55. Conferido contra os 49 arquivos: acerta 100%
+   dos materiais que hoje casam por `carpaint` e encontra o equivalente exato
+   nos 26 que não casavam nada.
+
+   O nome CONTINUA valendo, em OU — este teste é um SUPERCONJUNTO do anterior,
+   de propósito. Nada que pinta hoje deixa de pintar; o que era invisível passa
+   a ser alcançado. Vidro fica de fora explicitamente: ele também pode sair com
+   clearcoat, e pintar a janela seria pior que não pintar a lataria. */
+const PAINT_ROUGHNESS = 0.089;
+const PAINT_METALNESS = [0.15, 0.55];
+const PAINT_TOL = 0.02;
+
+/** A assinatura do shader de tinta da SCS, independente de como o bake nomeou. */
+function looksLikeTruckPaint(m: THREE.Material): boolean {
+  const p = m as THREE.MeshPhysicalMaterial;
+  /* `clearcoat` só existe em MeshPhysicalMaterial — o GLTFLoader promove o
+     material a Physical justamente quando a extensão está presente, então esta
+     checagem é a leitura do KHR_materials_clearcoat depois do parse. */
+  if (typeof p.clearcoat !== 'number' || p.clearcoat < 0.9) return false;
+  if (Math.abs((p.roughness ?? 1) - PAINT_ROUGHNESS) > PAINT_TOL) return false;
+  return PAINT_METALNESS.some((v) => Math.abs((p.metalness ?? 0) - v) <= PAINT_TOL);
+}
+
+/**
+ * Este material recebe a tinta do configurador?
+ *
+ * `authored` (de `paintMaterials`, no brands.json) é EXCLUSIVO quando existe:
+ * uma lista escrita à mão é a medição daquele bake específico e não pode ser
+ * sobreposta por convenção nenhuma. E `[]` é uma declaração legítima — "esta
+ * geometria não tem lataria pintável" —, não um pedido de padrão; por isso o
+ * teste é a presença da lista, não o seu tamanho.
+ */
+export function isPaintableMaterial(
+  m: THREE.Material | null | undefined, authored?: string[] | null,
+): boolean {
+  if (!m) return false;
+  const name = (m.name || '').toLowerCase();
+  if (GLASS_RE.test(name)) return false;
+  if (authored) return authored.some((s) => name.includes(s.toLowerCase()));
+  if (name.includes('carpaint')) return true;
+  return looksLikeTruckPaint(m);
+}
+
+/** Todo nome de material sob uma raiz — o que um diagnóstico precisa para
+ *  dizer, no console, como ESTE bake chama as coisas. */
+function materialNamesOf(root: THREE.Object3D): string[] {
+  const out = new Set<string>();
+  root.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.material) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (m) out.add(m.name || '(sem nome)');
+    }
+  });
+  return [...out].sort();
+}
 
 /* ANISOTROPY ON EVERY SLOT, not only on the albedo.
    ---------------------------------------------------------------------------
@@ -1518,12 +1603,14 @@ let trailerGen = 0;
  * que ninguém lê. Um caminhão errado apresentado como certo é pior do que um
  * erro: o cliente aprova a arte sobre a lataria de outra montadora.
  */
-export async function loadCab(id: string, onProgress?: (t: number) => void) {
+export async function loadCab(
+  id: string, onProgress?: (t: number) => void, paintMaterials?: string[] | null,
+) {
   if (!id) {
     throw new Error('Este chassi não declara geometria (`file`) no catálogo —'
       + ' nada a carregar. Confira `chassis[].file` em brands.json.');
   }
-  const def = cabDefFor(id);
+  const def = cabDefFor(id, undefined, paintMaterials);
   const mine = ++cabGen;
   const cab = def.format === 'fbx-scania'
     ? await loadScaniaOriginal(def, onProgress)
@@ -1586,7 +1673,8 @@ export async function loadCab(id: string, onProgress?: (t: number) => void) {
      e não na próxima coisa que por acaso chamar `placeTrailer()`. */
   placeTrailer();
 
-  const subs = (def.paintMaterials || ['carpaint']).map((s) => s.toLowerCase());
+  const authored = def.paintMaterials ?? null;
+  const painted: string[] = [];
   // GLB cabs (volvo): upgrade the paint materials to automotive flake paint
   if (def.format !== 'fbx-scania') {
     const cache = new Map<string, THREE.Material>();
@@ -1596,12 +1684,13 @@ export async function loadCab(id: string, onProgress?: (t: number) => void) {
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const rep = mats.map((raw) => {
         const m = raw as THREE.MeshStandardMaterial;
-        if (m && subs.some((sub) => (m.name || '').toLowerCase().includes(sub))) {
+        if (isPaintableMaterial(m, authored)) {
           const cached = cache.get(m.uuid);
           if (cached) return cached;
           const paint = makePaintMaterial(m.color, m.map);
           paint.name = m.name;
           cache.set(m.uuid, paint);
+          painted.push(m.name || '(sem nome)');
           return paint;
         }
         return m;
@@ -1609,19 +1698,28 @@ export async function loadCab(id: string, onProgress?: (t: number) => void) {
       o.material = Array.isArray(o.material) ? rep : rep[0];
     });
   }
+  /* `state.paintMats` era preenchido por uma SEGUNDA varredura e nunca lido por
+     ninguém — o registro vivo de tinta é o Set de vehicle/paint.ts, alimentado
+     por makePaintMaterial(). Passa a guardar os nomes que ACABARAM de ser
+     trocados, que é o que um diagnóstico precisa, e a varredura extra sai. */
   state.paintMats = [];
-  const seen = new Set<THREE.Material>();
-  cab.traverse((node) => {
-    const o = node as THREE.Mesh;
-    if (!o.isMesh) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    for (const m of mats) {
-      if (m && !seen.has(m) && subs.some((sub) => (m.name || '').toLowerCase().includes(sub))) {
-        seen.add(m);
-        state.paintMats.push(m);
-      }
+
+  /* DIZER EM VOZ ALTA, no CARREGAMENTO. Um bake sem lataria pintável é, do lado
+     do usuário, indistinguível de um clique perdido — e era exatamente esse o
+     buraco: o único aviso vivia no atalho de troca-de-cor, então escolher
+     caminhão e cor de uma vez (o fluxo normal do seletor) falhava calado. O log
+     lista os nomes do arquivo justamente para não ser preciso abrir o .glb. */
+  if (def.format !== 'fbx-scania') {
+    if (painted.length) {
+      console.info(`[tinta] ${def.file} · ${painted.length} material(is):`,
+        painted.join(', '), authored ? '(lista autorada)' : '(por detecção)');
+    } else {
+      console.warn(`[tinta] NENHUM material de tinta em ${def.file}`
+        + ' — a cabine NÃO vai mudar de cor.'
+        + (authored ? ' A lista autorada em `chassis[].paintMaterials` não casou nada.' : '')
+        + ' Materiais que este arquivo declara:', materialNamesOf(cab).join(', '));
     }
-  });
+  }
   /* Newly created paint materials register themselves with vehicle/paint.ts, so a
      re-apply pushes the CURRENT parameters onto them — the imported colour is
      never used, and a cab swap keeps whatever the user had configured. */

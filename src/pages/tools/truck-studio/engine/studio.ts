@@ -34,7 +34,7 @@ import * as environment from './scene/environment';
 import * as loader from './ui/loader';
 import {
   loadCatalog, loadChoice, saveChoice, defaultChoice,
-  getEnvironment, getModel, assetUrl, defaultChassis, fileOf,
+  getEnvironment, getModel, assetUrl, defaultChassis, fileOf, paintMaterialsOf,
 } from './catalog/catalog';
 import {
   initSelector, openSelector, setBadge, showBadge, setMapBadge, showMapBadge,
@@ -333,41 +333,76 @@ function applyColor(color: PaintColorDef) {
 }
 
 /* ---------------- "a cor não pegou" NÃO é um defeito da interface ----------
-   Alguns bakes chegaram sem material de tinta mapeado: nenhum material do .glb
-   se chama `carpaint` (o padrão de `DEFAULT_PAINT_MATERIALS`), então
-   `applyColor()` roda perfeitamente e a cabine não muda de cor. Do lado de cá
-   isso é indistinguível de um clique perdido — e é exatamente o que esta
-   função existe para separar. (Era `paintMaterials` por cabine no `cabs.json`;
-   com ele aposentado o padrão vale para todos, e um bake que use outro nome é
-   um defeito do bake — que é o que esta mensagem diz.)
+   Um bake sem lataria pintável roda `applyColor()` perfeitamente e não muda de
+   cor. Do lado de cá isso é indistinguível de um clique perdido — e é o que
+   esta função existe para separar.
 
-   Ela NÃO é uma correção do bake (isso é do pipeline de asset) e NÃO bloqueia
-   a escolha: a cor continua sendo aplicada, gravada e usada no implemento, que
-   É pintável. O que ela faz é DIZER, na linha de estado, por que o cavalo não
-   mudou — um usuário informado é um bug relatado, um usuário calado é um bug
-   perdido. */
-function cabPaintMaterialCount(): number {
+   ELA MEDIA A COISA ERRADA. O teste era `contagem > 0`, ou seja PRESENÇA, e o
+   caso que aparece de verdade não é o zero: é o bake em que a tinta alcança uma
+   PEÇA e não o veículo — um retrovisor, uma saia lateral, um emblema. Contagem
+   1, aviso calado, e o usuário vendo uma peça trocar de cor enquanto o caminhão
+   fica igual. Agora o teste é de COBERTURA: a diagonal da caixa das malhas
+   pintadas sobre a diagonal da caixa da cabine. Diagonal e não área porque a
+   pergunta é de EXTENSÃO ("a tinta alcança o veículo?"), não de metros
+   quadrados, e são duas caixas em vez de uma varredura de triângulos.
+
+   A pergunta é feita ao REGISTRO de tinta (`isPaintMaterial`), não ao nome: o
+   nome é o que ESCOLHE o material lá atrás, e um teste que repetisse o mesmo
+   critério só confirmaria a si mesmo.
+
+   Ela NÃO conserta o bake (isso é do pipeline de asset) e NÃO bloqueia a
+   escolha: a cor continua aplicada, gravada e usada no implemento, que É
+   pintável. O que ela faz é DIZER por que o cavalo não mudou — um usuário
+   informado é um bug relatado, um usuário calado é um bug perdido. */
+const PAINT_COVERAGE_MIN = 0.25;
+
+function cabPaintCoverage(): { mats: number; coverage: number; names: string[] } {
   const cab = models.state.cab as THREE.Object3D | null | undefined;
-  if (!cab) return 0;
+  if (!cab) return { mats: 0, coverage: 0, names: [] };
   const seen = new Set<THREE.Material>();
+  const names = new Set<string>();
+  const box = new THREE.Box3();
+  cab.updateWorldMatrix(true, true);
   cab.traverse((o: THREE.Object3D) => {
     const mesh = o as THREE.Mesh;
     const mat = mesh.material;
-    if (!mat) return;
+    if (!mesh.isMesh || !mat) return;
+    let hit = false;
     for (const m of (Array.isArray(mat) ? mat : [mat])) {
-      if (m && paint.isPaintMaterial(m)) seen.add(m);
+      if (m && paint.isPaintMaterial(m)) {
+        seen.add(m); names.add(m.name || '(sem nome)'); hit = true;
+      }
     }
+    if (hit) box.expandByObject(mesh);
   });
-  return seen.size;
+  const cabBox = new THREE.Box3().setFromObject(cab);
+  const span = box.isEmpty() ? 0 : box.getSize(new THREE.Vector3()).length();
+  const cabSpan = cabBox.isEmpty() ? 0 : cabBox.getSize(new THREE.Vector3()).length();
+  return {
+    mats: seen.size,
+    coverage: cabSpan > 1e-6 ? Math.min(1, span / cabSpan) : 0,
+    names: [...names].sort(),
+  };
 }
 
 function warnIfUnpaintable(color: PaintColorDef) {
-  if (cabPaintMaterialCount() > 0) return;
-  console.warn('[truck-studio] a cabine em cena não tem material de tinta mapeado —'
-    + ' a cor "' + color.name + '" foi aplicada ao implemento, mas o cavalo não muda.'
-    + ' Confira `paintMaterials` desta cabine em models/vehicles/cabs.json contra os'
-    + ' nomes de material do .glb.');
-  setStatus($('status').textContent + ' · cavalo sem material de tinta neste bake');
+  const c = cabPaintCoverage();
+  if (c.mats > 0 && c.coverage >= PAINT_COVERAGE_MIN) return;
+  const pct = Math.round(c.coverage * 100);
+  /* A mensagem NÃO manda mais conferir `cabs.json`: aquele manifesto foi
+     aposentado e `paintMaterials` era uma constante cravada em toda cabine.
+     Mandar alguém abrir um arquivo que não existe é pior que não dizer nada. */
+  console.warn('[truck-studio] a cor "' + color.name + '" foi aplicada, mas '
+    + (c.mats === 0
+      ? 'a cabine em cena não tem NENHUM material de tinta.'
+      : `só ${c.mats} material(is) cobre(m) ~${pct}% da silhueta da cabine `
+        + `(${c.names.join(', ')}).`)
+    + ' O implemento continua pintável; o cavalo não. Veja o censo `[tinta]` no'
+    + ' console: ele lista como este bake nomeia os materiais dele. O conserto é'
+    + ' declarar `chassis[].paintMaterials` no brands.json ou corrigir o bake.');
+  setStatus($('status').textContent + (c.mats === 0
+    ? ' · cavalo sem material de tinta neste bake'
+    : ` · só ~${pct}% do cavalo é pintável neste bake`));
 }
 
 /* brands.json e cabs.json são manifestos separados, então o catálogo pode
@@ -692,7 +727,10 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
   try {
     /* Cenário e geometria são downloads independentes — rodam juntos. */
     const tasks: Promise<unknown>[] = [];
-    if (needCab) tasks.push(models.loadCab(cabFile, progress.track('cab')));
+    if (needCab) {
+      tasks.push(models.loadCab(cabFile, progress.track('cab'),
+        paintMaterialsOf(model, chassis)));
+    }
     if (needEnv) tasks.push(applyEnvironment(env, progress.track('env')));
     if (first) tasks.push(models.loadTrailer(progress.track('trailer')));
 
@@ -759,6 +797,11 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        cor é um passo do seletor, e chegar aqui com ela já decidida é o ponto.
        Nos dois caminhos, porque uma troca de cabine traz materiais novos. */
     applyColor(color);
+    /* O MESMO aviso do atalho de só-cor, e é aqui que ele faltava: uma cabine
+       impintável entrava pelo boot e pelo "Trocar" em silêncio absoluto, e o
+       usuário só descobria ao trocar de cor DEPOIS — que é o único caminho que
+       já avisava. */
+    warnIfUnpaintable(color);
 
     phase(0.35, 'Compilando materiais…');
     await paint();
