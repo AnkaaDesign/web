@@ -77,7 +77,7 @@ const toolGroups: ToolGroup[] = [
         description: "Visualize a pintura no caminhão em 3D, com cabine, implemento e cenário",
         route: routes.tools.truckStudio.root,
         icon: IconTruck,
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
       },
     ],
   },

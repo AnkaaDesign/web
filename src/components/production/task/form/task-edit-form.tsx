@@ -1924,7 +1924,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             .map(row => ({
               name: row.name.trim(),
               phone: row.phone.trim(),
-              email: (row.email ?? '').trim().toLowerCase(),
+              email: (row.email ?? '').trim().toLowerCase() || undefined,
               cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
               roles: row.roles,
               isActive: row.isActive !== undefined ? row.isActive : true,
@@ -2245,7 +2245,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             .map(row => ({
               name: row.name.trim(),
               phone: row.phone.trim(),
-              email: (row.email ?? '').trim().toLowerCase(),
+              email: (row.email ?? '').trim().toLowerCase() || undefined,
               cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
               roles: row.roles,
               isActive: row.isActive,

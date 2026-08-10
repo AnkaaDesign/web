@@ -11,9 +11,9 @@ interface DismissalDateInputProps {
 /**
  * Termination date of the current vínculo (EmploymentContract.terminationDate).
  *
- * Only rendered for an already-TERMINATED vínculo — this corrects a wrong date,
- * it does not dismiss anyone (that is the desligamento flow, which also sets the
- * termination type/reason).
+ * Rendered whenever the situação do vínculo is (or is being set to) TERMINATED —
+ * both to register a desligamento and to correct the date of an old one. The
+ * legal nature of the rescisão is the sibling <TerminationTypeSelector />.
  *
  * The clear button is hidden because a TERMINATED contract with no termination
  * date is an inconsistent state — but that is presentation only: the segmented
@@ -46,7 +46,7 @@ export function DismissalDateInput({ disabled }: DismissalDateInputProps) {
           }
           context="general"
           disabled={disabled}
-          required={false}
+          required
           mode="date"
           showClearButton={false}
           constraints={{ minDate: (admissionDate as Date | null) || undefined }}

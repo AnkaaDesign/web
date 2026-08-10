@@ -61,13 +61,15 @@ const EditCollaboratorPage = () => {
 
     try {
       // If data is FormData, send it as-is (for file uploads)
-      // Otherwise, remove currentContractType before sending to API (it's only used for validation)
+      // Otherwise, drop the validation-only snapshots before sending to the API
+      // (currentContractType / currentContractStatus exist purely to let the
+      // client-side refines reason about the persisted vínculo).
       const dataToSend = data instanceof FormData
         ? data
         : (() => {
-            const { currentContractType, ...rest } = data as UserUpdateFormData;
+            const { currentContractType, currentContractStatus, ...rest } = data as UserUpdateFormData;
             return rest;
-          })() as Omit<UserUpdateFormData, 'currentContractType'>;
+          })() as Omit<UserUpdateFormData, 'currentContractType' | 'currentContractStatus'>;
 
       const response = (await update({ id, data: dataToSend as any })) as UserUpdateResponse;
 
@@ -152,6 +154,11 @@ const EditCollaboratorPage = () => {
       employeeType: user.currentEmployeeType ?? undefined,
       contractStatus: user.currentContractStatus ?? undefined,
       currentContractType: user.currentContractType ?? undefined, // for transition validation
+      // Snapshot of the persisted situation. Lets the form tell "registrando o
+      // desligamento agora" (requires a tipo de demissão, and the status picker
+      // stays editable) from "corrigindo um vínculo já desligado" (terminal —
+      // the picker locks, only date/type remain editable).
+      currentContractStatus: user.currentContractStatus ?? undefined,
       providerName: user.currentContract?.providerName ?? undefined,
       providerCnpj: user.currentContract?.providerCnpj ?? undefined,
       verified: user.verified,
@@ -186,6 +193,7 @@ const EditCollaboratorPage = () => {
       exp2StartAt: parseLocalDate(user.currentContract?.exp2StartAt),
       exp2EndAt: parseLocalDate(user.currentContract?.exp2EndAt),
       terminationDate: parseLocalDate(user.currentContract?.terminationDate),
+      terminationType: user.currentContract?.terminationType ?? null,
 
       // PPE Sizes (CRITICAL - this was missing before!)
       ppeSize: user.ppeSize ? {

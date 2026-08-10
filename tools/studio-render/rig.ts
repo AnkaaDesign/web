@@ -242,7 +242,8 @@ scene.add(softTop, softSide, softKick);
 
    `fromScene` com blur 0.02 (e não 0.04): menos borrão preserva a borda dos
    painéis, e é a BORDA do reflexo que lê como brilho especular. */
-function makeStudioEnvironment(roomGlow: number, panelPower: number): THREE.Scene {
+function makeStudioEnvironment(roomGlow: number, panelPower: number,
+  floorLevel: number, wallF: number): THREE.Scene {
   const s = new THREE.Scene();
 
   /* A SALA É UM GRADIENTE, e não uma caixa de cor chapada.
@@ -271,12 +272,58 @@ function makeStudioEnvironment(roomGlow: number, panelPower: number): THREE.Scen
   g.height = 256;
   const gc = g.getContext('2d')!;
   const grad = gc.createLinearGradient(0, 0, 0, 256);
-  const lo = Math.round(6 * roomGlow), hi = Math.round(150 * roomGlow);
-  const mid = Math.round(74 * roomGlow);
+  const hi = Math.round(150 * roomGlow);
+  /* A PAREDE VIROU BOTÃO SEPARADO DO TETO na leva 6, e o motivo é a medida que
+     reordenou o rig inteiro: apagando uma fonte de cada vez, o veículo cai de
+     p50 56 para 3 quando o AMBIENTE some, e fica em 50 quando só ele sobra.
+     Só a softbox de topo, ou só o painel lateral, entregam um caminhão PRETO.
+     Ou seja, desde a leva 4 — quando a sala deixou de ser uma caixa quase
+     preta — as sete fontes diretas somam ~10 % da imagem e o gradiente desta
+     sala É a iluminação.
+     Logo, "a parte escura está escura demais" não se resolve em luz de
+     preenchimento (medido: `side` a 6x move um nível): resolve-se
+     COMPRIMINDO a sala, que é o que a lataria de fato vê. `wallF` levanta a
+     parede sem levantar o teto, e é a parede que dá lugar ao chão subir sem
+     passar por cima dela. */
+  const mid = Math.round(74 * roomGlow * wallF);
+  /* O CHÃO DEIXOU DE SER PRETO PURO.
+     ------------------------------------------------------------------------
+     A base era fixa em 6, o que a `room: 1,5` põe o chão em rgb(9) — preto na
+     prática. E o chão é METADE do que uma lataria vertical reflete: tudo
+     abaixo da linha de horizonte (a metade de baixo da porta, o tanque, o
+     para-choque, a saia) mostra ELE. Com 9 ali, essas superfícies não têm o
+     que refletir e caem para o preto qualquer que seja a tinta — foi a queixa
+     de que "as partes escuras estão escuras demais".
+
+     `floorLevel` é essa base, e continua passando por `roomGlow` para que o
+     brilho da sala siga sendo um botão só.
+
+     O DEGRAU DO HORIZONTE É UMA FRAÇÃO, E NÃO UMA DISTÂNCIA FIXA — e esta é a
+     parte que a medida NÃO pega. A faixa logo abaixo da linha era `mid × 0,35`,
+     um valor absoluto; somar o piso a ela funciona enquanto o piso é baixo e
+     INVERTE a sala quando ele sobe. Medido: com `floor: 90` a faixa sai em 165
+     contra 111 da parede, ou seja o chão fica mais claro que a parede e o
+     caminhão passa a ser iluminado por baixo. A varredura aprovava essa
+     receita — ela mede o histograma do VEÍCULO, e o veículo de fato clareia —,
+     e o defeito só apareceria na imagem.
+
+     Como fração do vão parede→chão, o degrau acompanha o piso. 0,30 é o que
+     reproduz a receita original: com piso 9 e parede 111 dá 40, contra os 39
+     de `mid × 0,35`.
+
+     E A TRAVA. A fração só ordena teto > parede > faixa > chão enquanto o chão
+     estiver ABAIXO da parede; passando dela a sala vira um estúdio iluminado
+     pelo piso, com o vinco lendo ao contrário. `floor: 90` fazia isso (chão
+     135 contra parede 111) e a varredura APROVAVA, porque ela mede o
+     histograma do veículo e o veículo de fato clareia. O teto do 0,72 deixa
+     sempre um degrau de horizonte de pelo menos 28 % da parede — abaixo disso
+     a linha some, e a linha é o que separa "chapa polida" de "plástico". */
+  const piso = Math.min(Math.round(floorLevel * roomGlow), Math.round(mid * 0.72));
+  const sub = Math.round(piso + (mid - piso) * 0.30);
   grad.addColorStop(0.00, `rgb(${hi},${hi},${Math.min(255, hi + 8)})`);   // teto
   grad.addColorStop(0.48, `rgb(${mid},${mid},${mid + 4})`);               // parede
-  grad.addColorStop(0.52, `rgb(${Math.round(mid * 0.35)},${Math.round(mid * 0.35)},${Math.round(mid * 0.37)})`);
-  grad.addColorStop(1.00, `rgb(${lo},${lo},${lo})`);                      // chão
+  grad.addColorStop(0.52, `rgb(${sub},${sub},${sub + 2})`);               // sob o horizonte
+  grad.addColorStop(1.00, `rgb(${piso},${piso},${piso + 1})`);            // chão
   gc.fillStyle = grad;
   gc.fillRect(0, 0, 4, 256);
   const tex = new THREE.CanvasTexture(g);
@@ -317,10 +364,13 @@ function makeStudioEnvironment(roomGlow: number, panelPower: number): THREE.Scen
  *  calibração varre dezenas de combinações por segundo nas outras dimensões. */
 let roomBrightness = -1;
 let panelPower = -1;
+let floorBase = -1;
+let wallLift = -1;
 
-function rebuildEnvironment(roomGlow: number, power: number) {
+function rebuildEnvironment(roomGlow: number, power: number, floorLevel: number,
+  wallF: number) {
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = makeStudioEnvironment(roomGlow, power);
+  const envScene = makeStudioEnvironment(roomGlow, power, floorLevel, wallF);
   scene.environment?.dispose();
   scene.environment = pmrem.fromScene(envScene, 0.02).texture;
   pmrem.dispose();
@@ -330,6 +380,8 @@ function rebuildEnvironment(roomGlow: number, power: number) {
   });
   roomBrightness = roomGlow;
   panelPower = power;
+  floorBase = floorLevel;
+  wallLift = wallF;
 }
 
 /* ---------------- NÃO existe chão nesta cena ----------------
@@ -793,6 +845,25 @@ export interface Mix {
   /** brilho das paredes do estúdio refletido */
   room: number;
   /**
+   * O CINZA DO CHÃO do estúdio refletido, antes de `room` — ver
+   * `makeStudioEnvironment()`. 6 é o valor histórico, que com `room: 1,5` dá
+   * rgb(9): preto puro na prática, e é ele que enterrava tudo o que fica
+   * abaixo da linha de horizonte (tanque, saia, para-choque, a metade de baixo
+   * da porta). Botão SEPARADO de `room` porque levantar a sala inteira para
+   * levantar o chão estouraria o teto, que já chega a rgb(225).
+   */
+  floor: number;
+  /**
+   * MULTIPLICADOR DA PAREDE da sala refletida, separado do teto (`room`).
+   *
+   * Existe porque o chão só pode subir até onde a parede permite — passando
+   * dela, a sala fica iluminada por baixo e o horizonte, que é a leitura de
+   * chapa polida, some. Levantar a parede junto é o que COMPRIME a sala em vez
+   * de só clarear tudo, e comprimir a sala é a única coisa que alcança o lado
+   * escuro, porque a sala é ~90 % da luz que chega ao veículo.
+   */
+  wall: number;
+  /**
    * AZIMUTE E ELEVAÇÃO DA KEY, em graus, no referencial do veículo (0° = +Z =
    * a frente). São parâmetro, e não o `keyAz`/`keyEl` do preset, porque a
    * direção é o que de fato abre o histograma — ver o cabeçalho de `MIX`.
@@ -825,8 +896,9 @@ function setMix(m: Mix) {
   softSide.intensity = SOFT_SIDE * m.side * g;
   softKick.intensity = SOFT_KICK * m.kick * g;
   scene.environmentIntensity = ENV_BASE * m.env * g;
-  if (m.room !== roomBrightness || m.panel !== panelPower) {
-    rebuildEnvironment(m.room, m.panel);
+  if (m.room !== roomBrightness || m.panel !== panelPower || m.floor !== floorBase
+    || m.wall !== wallLift) {
+    rebuildEnvironment(m.room, m.panel, m.floor, m.wall);
   }
   lightAim = m;
   if (current) placeLights(currentBox.getCenter(new THREE.Vector3()),
@@ -932,7 +1004,13 @@ const MIX: Mix = {
                ambiente REFLETIDO. Na cena do aplicativo isso já funcionava
                porque lá há céu, chão e pátio; aqui havia preto.
                NÃO se mexeu em `vehicle/paint.ts`: o comportamento de tinta do
-               app está aprovado, e o defeito era do ambiente deste rig. */
+               app está aprovado, e o defeito era do ambiente deste rig.
+       leva 5  o CHÃO da sala refletida, que continuava em rgb(9), virou um
+               cinza escuro (`floor`), e o ambiente refletido subiu um passo
+               (`env` 1,35 -> 1,60). Ficou de fora o que a varredura provou ser
+               inerte: `ambF`/`hemiF` são 2 % da cena e `env` acima de 1,8
+               chapa o ombro. O ganho NÃO se mexeu — o nível já estava
+               aprovado, e o defeito era só do lado escuro. */
   gain: 0.42,
   /* A KEY VEM PARA A FRENTE. 138° é do preset `ciclorama`, autorado para a
      CENA, onde a câmera orbita; no card ela é fixa em az 38°, e a 138° a key
@@ -953,15 +1031,57 @@ const MIX: Mix = {
      longe demais: a sombra do lado do fill virou massa sem desenho e o veículo
      inteiro caiu para p50 87. Hemi e ambiente SÃO a chapa branca do outro lado
      de um estúdio; sem eles não existe estúdio, existe holofote. */
-  hemiF: 1.50,
-  ambF: 1.30,
-  env: 1.35,
+  /* DOBRADOS NA LEVA 5, e é honesto dizer que eles quase não aparecem: o
+     preset traz `ambientIntensity` 0,09 e `hemiIntensity` 0,32 contra key 3,4
+     e softbox de topo 4,2. Medido, multiplicá-los por OITO move a mediana do
+     preto de 22 para 23 e piora o `spread` da metálica — é um botão de ~2 % da
+     cena. Quem faz o papel de "luz ambiente de estúdio" aqui é o ambiente
+     REFLETIDO (`env` + `floor`), não estes dois. */
+  hemiF: 3.00,
+  ambF: 2.60,
+  /* 1,60 -> 1,10 na leva 6, e isto é DESCER de propósito. A sala comprimida
+     (`wall`/`floor` abaixo) levanta a imagem inteira junto com o lado escuro;
+     `env` é onde esse excesso de nível é devolvido, para que a mudança seja de
+     FORMA e não de exposição. Medido: com a sala comprimida e `env` em 1,10, a
+     lataria branca fica em p50 187 (era 182 na leva 5) e o p90 dela CAI de 230
+     para 222 — ou seja, o lado escuro subiu e o ombro não. */
+  env: 1.10,
   /* A SALA DEIXOU DE SER PRETO ABSOLUTO. Com o gradiente novo, 1,5 põe o teto
-     em ~rgb(225), a parede em ~rgb(111) e o chão em ~rgb(9): um cinza escuro de
-     estúdio, não uma caixa preta. É o que dá à tinta METÁLICA alguma coisa para
-     refletir — medido no `Silver Grey`, o veículo sai de p50 50 para 69 e a
-     branca de 157 para 170, sem estouro. */
+     em ~rgb(225) e tirou a sala do preto absoluto — é o que deu à tinta
+     METÁLICA alguma coisa para refletir (no `Silver Grey`, p50 50 -> 69).
+     Continua sendo o botão do TETO; a parede e o chão saíram daqui na leva 6
+     e viraram `wall` e `floor`, abaixo. */
   room: 1.50,
+  /* ---------------- A SALA, QUE É A LUZ ----------------
+     A leva 6 mediu o rig apagando uma fonte de cada vez, e o resultado
+     reordena as levas anteriores:
+
+         tudo                      p50 56
+         só o ambiente refletido   p50 50
+         SEM o ambiente refletido  p50  3
+         só a softbox de topo      p50  0   (caminhão preto)
+         só o painel lateral       p50  0   (caminhão preto)
+
+     Desde a leva 4, quando a sala virou um gradiente claro, as sete fontes
+     diretas somam ~10 % da imagem. É por isso que as varreduras de `key`,
+     `top` e `side` davam sempre na mesma — `side` a SEIS VEZES move um nível.
+     Não havia o que mover: quem ilumina o veículo é esta sala.
+
+     Logo "a parte escura está muito escura" é, literalmente, a metade de baixo
+     dela. `wall` e `floor` a COMPRIMEM (chão e parede sobem, o teto fica onde
+     está, que é quem dá o realce), e `env` acima devolve o nível.
+
+     Medido no preto: `escuro%` de 35,9 para 13,5 e p25 de 9 para 24, com a
+     lataria branca parada em p50 187 e clip 0,00. E o `spread` da metálica —
+     a distância entre o ombro que estoura e o flanco que some — cai de 127
+     para 102, que era a outra queixa.
+
+     O `floor` efetivo é travado em `wall × 0,72` (ver
+     `makeStudioEnvironment()`): 130 pede rgb(195) e recebe 160, contra uma
+     parede em 222. É a trava que impede a sala de virar um estúdio iluminado
+     pelo chão. */
+  floor: 130,
+  wall: 2.00,
   panel: 1.00,
 };
 setMix(MIX);

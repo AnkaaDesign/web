@@ -18,7 +18,7 @@ import { SectorSelector } from "./sector-selector";
 import { SectorLeaderSwitch } from "./sector-leader-switch";
 import { SecullumSyncSwitch } from "./secullum-sync-switch";
 import { HorarioSelector } from "./horario-selector";
-import { EmployeeTypeSelector, ContractTypeSelector, ContractStatusDisplay, ProviderFields } from "./status-selector";
+import { EmployeeTypeSelector, ContractTypeSelector, ContractStatusField, TerminationTypeSelector, ProviderFields } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
 import { StatusDatesSection } from "./status-dates-section";
 import { DismissalDateInput } from "./dismissal-date-input";
@@ -208,8 +208,45 @@ export function UserForm(props: UserFormProps) {
   // Access formState properties during render for proper subscription
   const { isValid, isDirty, errors } = form.formState;
 
-  // Dismissal is no longer set inline — the contract STATUS (ACTIVE/DISMISSED)
-  // is driven by the termination flow and shown read-only. No sync effect needed.
+  // Keep the termination fields consistent with the vínculo situation the
+  // operator just picked. Both directions matter:
+  //
+  //  ACTIVE → TERMINATED  prefill the dismissal date with today, so the required
+  //                       field is never silently empty. 13:00 local, NOT
+  //                       midnight: that is the anchor `DateTimeInput` stamps on
+  //                       every mode="date" field (calendar and typed alike), and
+  //                       a calendar date living in a timestamp column has to sit
+  //                       far from the UTC boundary — both readers slice the UTC
+  //                       day (`split('T')[0]` here, `toISOString().slice(0,10)`
+  //                       in the Secullum bridge). Prefilling midnight would make
+  //                       an untouched date the one value in the form that does
+  //                       not match what the picker writes.
+  //  TERMINATED → ACTIVE  wipe date + type. Leaving them behind trips the
+  //                       userUpdateSchema refine "quando a data de demissão é
+  //                       fornecida, a situação do contrato deve ser TERMINATED"
+  //                       and the operator gets an error on a field they can no
+  //                       longer see.
+  //
+  // Only fires on a real change: the first observed value is the one `reset()`
+  // just loaded, and acting on it would mark a freshly-opened form dirty.
+  const prevContractStatusRef = useRef<CONTRACT_STATUS | undefined>(undefined);
+  useEffect(() => {
+    if (mode !== "update" || contractStatus === undefined) return;
+    const prev = prevContractStatusRef.current;
+    prevContractStatusRef.current = contractStatus;
+    if (prev === undefined || prev === contractStatus) return;
+
+    if (contractStatus === CONTRACT_STATUS.TERMINATED) {
+      if (!form.getValues("terminationDate" as any)) {
+        const today = new Date();
+        today.setHours(13, 0, 0, 0);
+        form.setValue("terminationDate" as any, today, { shouldDirty: true, shouldValidate: true });
+      }
+    } else {
+      form.setValue("terminationDate" as any, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue("terminationType" as any, null, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [contractStatus, form, mode]);
 
   // Debug validation errors in development - only log on user interaction
   useEffect(() => {
@@ -491,14 +528,17 @@ export function UserForm(props: UserFormProps) {
               {/* Prestador (terceirizado/PJ) */}
               {isProvider && <ProviderFields disabled={isSubmitting} namePath="providerName" cnpjPath="providerCnpj" />}
 
-              {/* Situação do vínculo (somente leitura — definida pelo desligamento) */}
-              {mode === "update" && <ContractStatusDisplay />}
+              {/* Situação do vínculo — Ativo → Desligado é editável aqui; um
+                  vínculo já desligado é terminal e renderiza somente leitura. */}
+              {mode === "update" && <ContractStatusField disabled={isSubmitting} />}
 
-              {/* Data de demissão — editável apenas para corrigir um vínculo já
-                  desligado; o desligamento em si é feito pelo fluxo próprio. */}
+              {/* Dados da demissão — aparecem ao marcar "Desligado" e ao abrir um
+                  vínculo já desligado (para corrigir data/tipo). Ambos exigidos
+                  pelo userUpdateSchema quando a situação é TERMINATED. */}
               {mode === "update" && isTerminated && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <DismissalDateInput disabled={isSubmitting} />
+                  <TerminationTypeSelector disabled={isSubmitting} />
                 </div>
               )}
 

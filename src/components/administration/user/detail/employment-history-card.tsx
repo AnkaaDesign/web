@@ -7,7 +7,7 @@ import { IconBriefcase, IconAlertTriangle, IconCalendar } from "@tabler/icons-re
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatDate, formatRelativeTime } from "../../../../utils";
-import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS, STABILITY_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS, STABILITY_TYPE_LABELS, TERMINATION_TYPE_LABELS } from "../../../../constants";
 import { useEmploymentContracts } from "../../../../hooks/personnel-department/use-employment-contracts";
 import type { EmploymentContract, ContractPhaseHistory } from "../../../../types/employment-contract";
 
@@ -193,6 +193,11 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", 
                             Admissão: {admission ? formatDate(admission) : "-"}
                             {contract.effectedAt ? ` · Efetivado: ${formatDate(contract.effectedAt)}` : ""}
                             {isTerminated ? ` · Desligamento: ${contract.terminationDate ? formatDate(contract.terminationDate) : "-"}` : ""}
+                            {/* Older dismissals (registered by the "Demitir" shortcut, which never asked
+                                for one) legitimately carry no type — omit the segment instead of "-". */}
+                            {isTerminated && contract.terminationType
+                              ? ` · ${TERMINATION_TYPE_LABELS[contract.terminationType] || contract.terminationType}`
+                              : ""}
                           </div>
 
                           {hasStability && (

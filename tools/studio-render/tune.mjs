@@ -84,28 +84,93 @@ const ALVO = {
  *  do pneu acaba. */
 const MINLUM = 90;
 
-const GANHOS = [0.62, 0.52, 0.44];
+/* A LEVA 5 NÃO VARRE GANHO. O nível foi aprovado ("essa já está quase boa"),
+   e o defeito que sobrou está só no lado escuro. Varrer o ganho junto moveria
+   o histograma inteiro e desfaria justamente o que já está certo; 0,40 entra
+   só como rede, para o caso de o piso novo subir a massa. */
+const GANHOS = [0.42];
 
 const BASE = {
   key: 0.55, top: 1, side: 0.22, kick: 0.85, rimF: 1,
   hemiF: 0.3, ambF: 0.25, env: 0.85, room: 0.12,
-  keyAz: 25, keyEl: 52, sideAz: 90, panel: 1,
+  keyAz: 25, keyEl: 52, sideAz: 90, panel: 1, floor: 6,
 };
 
+/* A LEVA 4 — o que está no ar. É daqui que a leva 5 parte. */
+const LEVA4 = {
+  ...BASE, hemiF: 1.5, ambF: 1.3, env: 1.35, key: 0.38, top: 0.75, kick: 0.6,
+  room: 1.5, floor: 6,
+};
+
+/* ---------------- a varredura da leva 5 ----------------
+   O PEDIDO: "o fundo um cinza escuro em vez de preto puro, e um pouco mais de
+   luz ambiente". São duas causas diferentes para a mesma queixa, e por isso a
+   varredura as ISOLA antes de combiná-las:
+
+     `floor`  o chão do estúdio REFLETIDO. É o que a metade de baixo de
+              qualquer superfície vertical mostra — tanque, saia, para-choque,
+              a porta abaixo do horizonte. Estava em 6, ou rgb(9) depois de
+              `room`. Alcança sobretudo a METÁLICA, que quase não tem difusa.
+     `ambF`/  a luz que chega igual em toda face. É o que alcança a tinta
+     `hemiF`  SÓLIDA escura, que o ambiente refletido não levanta.
+
+   As duas linhas `só-` existem para não repetir o erro de método das levas
+   anteriores: sem elas, uma combinação boa não diz qual dos dois botões a
+   produziu, e o próximo ajuste vira chute.
+
+   O QUE A VARREDURA EXPLORATÓRIA MEDIU, e que decidiu esta rodada:
+
+     `ambF`/`hemiF` NÃO SÃO O BOTÃO. `ambientIntensity` do preset é 0,09 e
+       `hemiIntensity` 0,32, contra key 3,4 e softbox de topo 4,2 — mesmo
+       multiplicados por OITO o preto ficou em p50 23 (era 22) e o branco subiu
+       14 níveis, piorando o `spread` da metálica. É um botão de 2 % da cena.
+     `env` (o ambiente refletido inteiro) LEVANTA E ESTOURA JUNTO: dobrado,
+       levou a lataria branca de p90 225 para 240 e o `spread` da metálica de
+       125 para 137 — que é exatamente o defeito que a leva 4 tinha corrigido.
+     `floor` faz o que se pediu e só isso: o preto vai de p50 22 para 29 e o
+       `escuro%` dele de 42 para 23, com a lataria branca parada em p90 226 e
+       clip 0. Ele levanta a METADE DE BAIXO — que é onde a queixa está — sem
+       tocar no ombro.
+
+   Daí a rodada: varrer `floor` dentro da faixa em que a sala continua sendo
+   uma sala (piso < faixa < parede < teto), com o passo de ambiente junto,
+   pequeno, porque foi o que se pediu e porque mais que isso não é ambiente, é
+   estouro. */
+/* ---------------- a varredura da leva 6: a SALA, que é a luz ----------------
+   O RIG FOI MEDIDO FONTE A FONTE, apagando uma de cada vez, e o resultado
+   reordena tudo o que veio antes:
+
+       tudo                       p50 56
+       só o ambiente refletido    p50 50
+       SEM o ambiente refletido   p50  3
+       só a softbox de topo       p50  0   (caminhão preto)
+       só o painel lateral        p50  0   (caminhão preto)
+
+   Desde a leva 4 — quando a sala deixou de ser uma caixa quase preta — as sete
+   fontes diretas somam ~10 % da imagem. Foi por isso que TODA a varredura de
+   `side`, `top`, `key` da rodada anterior deu na mesma: `side` a 6x moveu um
+   nível. Não havia o que mover.
+
+   Então o que se varre aqui é a SALA. Ela tem três alturas — teto (`room`),
+   parede (`wall`) e chão (`floor`) — e a queixa "a parte escura está muito
+   escura" é, literalmente, a metade de baixo dela. Comprimir = subir chão e
+   parede mantendo o teto, que é quem dá o realce. */
+const LEVA5 = {
+  ...BASE, key: 0.38, top: 0.75, side: 0.22, kick: 0.60, rimF: 1.00,
+  hemiF: 3.00, ambF: 2.60, env: 1.60, room: 1.50, floor: 44, wall: 1.00,
+  panel: 1.00,
+};
 const RECEITAS = {
-  /* A que está no ar (leva 3). Linha de base da comparação. */
-  'leva3': { ...BASE, hemiF: 1.3, ambF: 1.1, env: 1.25, key: 0.38, top: 0.75, kick: 0.6 },
-  /* MAIS AMBIENTE, MENOS FOCAL. Cada linha aperta a razão key/fill um passo
-     mais: é ela que decide a distância entre o ombro iluminado e o flanco. */
-  'r1': { ...BASE, hemiF: 1.8, ambF: 1.6, env: 1.5, key: 0.28, top: 0.60, kick: 0.5 },
-  'r2': { ...BASE, hemiF: 2.4, ambF: 2.1, env: 1.7, key: 0.22, top: 0.50, kick: 0.45 },
-  'r3': { ...BASE, hemiF: 3.0, ambF: 2.6, env: 1.9, key: 0.16, top: 0.42, kick: 0.4 },
-  /* O painel LATERAL sobe junto: ele é quem ilumina o flanco de frente para a
-     câmera, ou seja exatamente a face que está caindo longe. */
-  'r2-lado': { ...BASE, hemiF: 2.4, ambF: 2.1, env: 1.7, key: 0.22, top: 0.50,
-    kick: 0.45, side: 0.55 },
-  'r3-lado': { ...BASE, hemiF: 3.0, ambF: 2.6, env: 1.9, key: 0.16, top: 0.42,
-    kick: 0.4, side: 0.7 },
+  'leva5': LEVA5,
+  'w13-p60': { ...LEVA5, wall: 1.3, floor: 60 },
+  'w13-p75': { ...LEVA5, wall: 1.3, floor: 75 },
+  'w16-p90': { ...LEVA5, wall: 1.6, floor: 90 },
+  'w16-p110': { ...LEVA5, wall: 1.6, floor: 110 },
+  'w20-p130': { ...LEVA5, wall: 2.0, floor: 130 },
+  /* A sala comprimida levanta TUDO, inclusive o ombro; estas duas devolvem o
+     nível pelo `env` para isolar o efeito de FORMA do efeito de nível. */
+  'w16-p110-e13': { ...LEVA5, wall: 1.6, floor: 110, env: 1.30 },
+  'w20-p130-e11': { ...LEVA5, wall: 2.0, floor: 130, env: 1.10 },
 };
 
 /* ---------------- plumbing ---------------- */
@@ -149,6 +214,14 @@ const branco = doAlvo.find((j) => /branco/i.test(j.label)) ?? doAlvo[1] ?? doAlv
    a face do fill, então é nela que o ombro estoura primeiro. */
 const metalica = doAlvo.find((j) => /prata artico|silver|prata/i.test(j.label))
   ?? doAlvo.find((j) => /cinza|gray|grey/i.test(j.label)) ?? doAlvo.at(-1);
+/* O PRETO VOLTOU, como TERCEIRO corpo de prova, e não no lugar da metálica.
+   A queixa da leva 4 é do lado escuro, e uma tinta sólida escura é o único
+   corpo em que ele é a imagem INTEIRA: no branco ele é a sombra, na metálica
+   é o flanco. Os dois botões desta rodada chegam nela por caminhos opostos —
+   o chão refletido quase não a toca (difusa, não espelho), o ambiente sim —,
+   então é ela que separa as duas hipóteses. */
+const escura = doAlvo.find((j) => /preto|black/i.test(j.label))
+  ?? doAlvo.find((j) => /grafite|chumbo|carv[aã]o/i.test(j.label)) ?? metalica;
 
 const server = await startServer();
 const browser = await chromium.launch({
@@ -168,17 +241,21 @@ console.log(`chassi: ${branco.key}`);
 console.log(`alvo: inteiro p50 ${ALVO.todoP50}  |  `
   + `lataria p50 ${ALVO.latariaP50} p90 ${ALVO.latariaP90}  |  `
   + `spread(metalica) ${ALVO.spread}\n`);
-console.log(`${R('ganho', 6)}  ${L('cor', 20)} ${R('p10', 4)} ${R('p50', 4)} `
-  + `${R('esc%', 6)}  |  ${R('p50', 4)} ${R('p90', 4)} ${R('clip%', 6)}  `
-  + `${R('spread', 6)}   erro`);
-console.log(`${' '.repeat(28)}-- veiculo inteiro --   -- lataria L>90 --`);
+/* O LADO ESCURO GANHOU COLUNA PRÓPRIA (`p25` da lataria L>60) porque a queixa
+   que sobrou é só dele, e nenhuma das colunas antigas o mostrava: `p25` do
+   veículo inteiro mistura pneu e grade (pretos por albedo) e o `spread` só diz
+   a DISTÂNCIA entre os dois extremos, sem dizer qual deles se moveu. */
+console.log(`${R('ganho', 6)}  ${L('cor', 20)} ${R('p25', 4)} ${R('p50', 4)} `
+  + `${R('esc%', 6)}  |  ${R('p25', 5)} ${R('p90', 5)} ${R('spread', 6)}  |  `
+  + `${R('p90', 4)} ${R('clip%', 6)}`);
+console.log(`${' '.repeat(28)}-- inteiro --   -- lataria L>60 --     L>90`);
 
 let melhor = null;
 for (const [nome, mixBase] of Object.entries(RECEITAS)) {
   for (const g of GANHOS) {
     await page.evaluate((m) => window.__rig.setMix(m), { ...mixBase, gain: g });
     const linhas = [];
-    for (const job of [branco, metalica]) {
+    for (const job of [branco, metalica, escura]) {
       await page.evaluate((r) => window.__rig.shoot(r), job.recipe);
       /* DUAS MEDIDAS por render, e é essa a correção de método: uma no veículo
          INTEIRO (que enxerga a sombra) e outra só na lataria clara (que enxerga
@@ -190,10 +267,10 @@ for (const [nome, mixBase] of Object.entries(RECEITAS)) {
          é justamente a parte que está caindo longe. Com 90 ele ficaria de fora
          e o spread mediria só a metade iluminada. */
       const corpo = await page.evaluate(() => window.__rig.measure(60));
-      linhas.push([job, todo, lat, corpo.p90 - corpo.p25]);
+      linhas.push([job, todo, lat, corpo]);
     }
     const [, tb, lb] = linhas[0];
-    const spreadMet = linhas[1][3];                    // o spread da METÁLICA
+    const spreadMet = linhas[1][3].p90 - linhas[1][3].p25;   // o spread da METÁLICA
     const erro = Math.abs(tb.p50 - ALVO.todoP50)
       + Math.abs(lb.p50 - ALVO.latariaP50) * 0.8
       + Math.abs(lb.p90 - ALVO.latariaP90) * 0.8
@@ -203,14 +280,14 @@ for (const [nome, mixBase] of Object.entries(RECEITAS)) {
     if (!melhor || erro < melhor.erro) {
       melhor = { nome, g, erro, todo: tb, lat: lb, mix: { ...mixBase, gain: g } };
     }
-    for (const [job, todo, lat, sp] of linhas) {
+    for (const [job, todo, lat, corpo] of linhas) {
       const cor = job.label.split('·').at(-1).trim().slice(0, 20);
       console.log(`${R(job === branco ? String(g) : '', 6)}  ${L(cor, 20)} `
-        + `${R(todo.p10.toFixed(0), 4)} ${R(todo.p50.toFixed(0), 4)} `
-        + `${R(todo.crush.toFixed(1), 6)}  |  ${R(lat.p50.toFixed(0), 4)} `
-        + `${R(lat.p90.toFixed(0), 4)} ${R(lat.clip.toFixed(2), 6)}  `
-        + `${R(sp.toFixed(0), 6)}`
-        + (job === branco ? `   ${erro.toFixed(0)}` : ''));
+        + `${R(todo.p25.toFixed(0), 4)} ${R(todo.p50.toFixed(0), 4)} `
+        + `${R(todo.crush.toFixed(1), 6)}  |  ${R(corpo.p25.toFixed(0), 5)} `
+        + `${R(corpo.p90.toFixed(0), 5)} `
+        + `${R((corpo.p90 - corpo.p25).toFixed(0), 6)}  |  `
+        + `${R(lat.p90.toFixed(0), 4)} ${R(lat.clip.toFixed(2), 6)}`);
     }
   }
   console.log(`   ^ receita: ${nome}\n`);

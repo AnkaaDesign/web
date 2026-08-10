@@ -64,14 +64,13 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const cpfInvalid = showCreateInputs && cpfDigits.length > 0 && !isValidCPF(cpfDigits);
     const cpfError = cpfInvalid && (touched.cpf || showErrors);
 
-    // O e-mail é OBRIGATÓRIO: é por ele que sai o convite e o código da
-    // assinatura eletrônica. Um contato cadastrado sem e-mail trava o envio do
-    // orçamento lá na frente, com o erro aparecendo longe daqui.
+    // O e-mail é OPCIONAL no cadastro: ele é o canal da assinatura eletrônica,
+    // mas a exigência pertence ao envio do envelope de assinatura — não à
+    // criação/edição do orçamento. Quando preenchido, o formato é validado.
     const emailValue = value.email?.trim() || '';
-    const emailEmpty = showCreateInputs && !emailValue;
     const emailInvalid =
       showCreateInputs && !!emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
-    const emailError = (emailEmpty || emailInvalid) && (touched.email || showErrors);
+    const emailError = emailInvalid && (touched.email || showErrors);
 
     // Async query function for the Combobox
     const queryFn = useCallback(async (searchTerm: string, page?: number) => {
@@ -313,12 +312,11 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 {cpfError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">CPF inválido</p>}
               </div>
 
-              {/* E-mail — obrigatório: é o canal da assinatura eletrônica.
-                  Já existia em `ResponsibleRowData` e já era enviado no
-                  payload, mas não tinha campo: era impossível preencher pela
-                  linha. */}
+              {/* E-mail — opcional: é o canal da assinatura eletrônica, mas a
+                  exigência fica no envio do envelope de assinatura, não no
+                  cadastro. Quando preenchido, o formato é validado. */}
               <div className="relative space-y-2">
-                {isFirstRow && <FormLabel>E-mail <span className="text-destructive">*</span></FormLabel>}
+                {isFirstRow && <FormLabel>E-mail</FormLabel>}
                 <Input
                   type="email"
                   value={value.email || ''}
@@ -335,7 +333,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 />
                 {emailError && (
                   <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">
-                    {emailEmpty ? 'E-mail é obrigatório' : 'E-mail inválido'}
+                    E-mail inválido
                   </p>
                 )}
               </div>

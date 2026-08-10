@@ -647,7 +647,9 @@ export const FinancialBudgetCreatePage = () => {
         .map(row => ({
           name: row.name.trim(),
           phone: row.phone.trim(),
-          email: (row.email ?? '').trim().toLowerCase(),
+          // E-mail é opcional no cadastro — vazio vira undefined para não
+          // enviar string vazia no payload.
+          email: (row.email ?? '').trim().toLowerCase() || undefined,
           cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
           roles: row.roles,
           isActive: row.isActive,

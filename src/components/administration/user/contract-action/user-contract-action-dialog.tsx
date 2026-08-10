@@ -119,7 +119,17 @@ function UserContractActionDialog({
   const confirm = useCallback(async () => {
     if (!users || users.length === 0) return;
     const items = users;
+    // 13:00 local, NOT `new Date()`. terminationDate is a calendar date stored in
+    // a timestamp column, and both readers slice the UTC day — the edit form
+    // (`split('T')[0]`) and the Secullum bridge (`toISOString().slice(0,10)`, the
+    // value written to `Demissao`). A raw stamp taken after 21:00 in São Paulo is
+    // already the next day in UTC and the dismissal shows up a day late in both.
+    // 13:00 is the same anchor `DateTimeInput` writes for every mode="date" field,
+    // so a dismissal registered by this shortcut and one registered by the edit
+    // form are byte-identical, and it keeps 8h of margin on either side of the
+    // boundary (midnight local would leave only 3h).
     const now = new Date();
+    now.setHours(13, 0, 0, 0);
     const payload = config.payload(now);
 
     setIsSubmitting(true);

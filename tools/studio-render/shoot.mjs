@@ -93,9 +93,16 @@ const fileOf = (model, chassis) => chassis.file || model.file || null;
 const jobs = [];
 for (const man of brands.manufacturers) {
   for (const model of man.models || []) {
-    if (model.available === false) continue;
     for (const chassis of model.chassis || []) {
-      if (chassis.available === false) continue;
+      /* "EM BREVE" GANHA O NEUTRO, e só ele. Este laço PULAVA o indisponível
+         inteiro, em desacordo com `matrix.mjs`, que diz no cabeçalho: "um card
+         indisponível continua LISTADO, marcado 'Em breve'. Ele merece o render
+         neutro (o usuário vê o caminhão que vem por aí) e nenhum de cor."
+         O seletor de fato lista esses cards (`ui/selector.ts`, tag EM_BREVE),
+         então descartá-los aqui derruba o card no placeholder de silhueta —
+         ou, quando existe irmão, num chassi que não é o do card. Foi assim que
+         a leva 6 saiu com dois chassis a menos que a árvore viva. */
+      const usable = chassis.available !== false && model.available !== false;
       const file = fileOf(model, chassis);
       if (!file) continue;
       const key = `${man.id}/${model.id}`;
@@ -118,7 +125,7 @@ for (const man of brands.manufacturers) {
       };
 
       enfileira(NEUTRAL, {});
-      if (!cores) continue;
+      if (!cores || !usable) continue;
 
       /* ACABAMENTO: `paintMaterials: []` é a mesma regra que
          `paintMaterialsOf()` aplica no catálogo quando há `finishId` — a
@@ -137,14 +144,21 @@ for (const man of brands.manufacturers) {
   }
 }
 
-if (!jobs.length) {
-  console.log('nada a fazer (use --force para refazer o que já existe)');
-  process.exit(0);
+/* SAIR AQUI DEIXAVA O MANIFESTO PARA TRÁS. O `process.exit(0)` que existia
+   neste ponto era anterior ao bloco que reescreve `renders.json`, então uma
+   árvore com todas as imagens no lugar e um manifesto ausente ou velho não
+   tinha como se consertar: rodar de novo caía justamente aqui. O manifesto é
+   derivado do DISCO e custa uma varredura de diretórios — vale sempre. */
+const nadaAProduzir = !jobs.length;
+if (nadaAProduzir) {
+  console.log('nada a renderizar (use --force para refazer o que já existe)'
+    + ' — reescrevendo só o manifesto');
 }
-console.log(`${jobs.length} card(s) a produzir`
+if (!nadaAProduzir) console.log(`${jobs.length} card(s) a produzir`
   + (cores ? ' (neutro + acabamento + cor)' : ' (só o neutro)')
   + ` · saída: ${OUT_ROOT}`);
 
+if (!nadaAProduzir) {
 const { chromium } = await import(WEB + '/../api/node_modules/playwright/index.mjs');
 const server = await startServer();
 const browser = await chromium.launch({
@@ -196,6 +210,7 @@ for (const j of jobs) {
 
 await browser.close();
 await server.close();
+}
 
 /* O MANIFESTO É REESCRITO A PARTIR DO DISCO, nunca somando ao que estava lá: a
    verdade é o diretório, e um `have` que só cresce nunca perde a linha de uma
@@ -219,8 +234,19 @@ for (const man of await readdir(root)) {
     }
   }
 }
+/* O MOLDE VEM DO MANIFESTO VIVO QUANDO A ÁRVORE É NOVA — e sem isto o
+   `--out DIR` produzia as 821 imagens e morria na última linha com ENOENT,
+   porque um diretório recém-criado não tem `renders.json` para reler. O molde
+   importa: `catalog/renders.ts` lê `format` e `have`, e um manifesto sem
+   `format` deixa TODO card cair no placeholder de silhueta, sem erro no
+   console — que foi exatamente como uma leva anterior ficou inerte. */
 const manifestPath = join(OUT_ROOT, 'renders.json');
-const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+const molde = await readFile(manifestPath, 'utf8')
+  .catch(() => readFile(join(V1, 'renders/renders.json'), 'utf8'))
+  .catch(() => null);
+const manifest = molde
+  ? JSON.parse(molde)
+  : { schema: 'truck-studio/renders@1', format: 'webp', size: [960, 600] };
 manifest.have = have;
 manifest.counts = {
   combinacoes: Object.keys(have).length,

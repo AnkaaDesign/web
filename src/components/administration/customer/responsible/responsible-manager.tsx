@@ -25,12 +25,13 @@ export function validateResponsibleRows(rows: ResponsibleRowData[]): boolean {
       // mod-11 e devolve uma mensagem genérica, então deixar passar aqui só
       // troca um erro de campo por um 400 sem contexto.
       //
-      // E-mail é obrigatório — é o canal da assinatura eletrônica (convite e
-      // código de uso único). Sem ele o contato não consegue assinar orçamento.
+      // E-mail é OPCIONAL no cadastro — a exigência pertence ao ato de enviar
+      // o envelope de assinatura eletrônica, não à criação/edição do orçamento.
+      // Quando preenchido, o formato continua validado.
       const cpfDigits = (row.cpf || '').replace(/\D/g, '');
       const cpfOk = cpfDigits.length === 0 || isValidCPF(cpfDigits);
       const email = row.email?.trim() || '';
-      const emailOk = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const emailOk = email.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       return (
         !!row.name?.trim() &&
         !!row.phone?.trim() &&

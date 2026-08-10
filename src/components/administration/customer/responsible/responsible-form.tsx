@@ -57,26 +57,13 @@ const responsibleSchema = z.object({
 /**
  * O schema depende do modo por causa do e-mail.
  *
- * Em CRIAÇÃO ele é obrigatório: a assinatura eletrônica de orçamento é enviada
- * por e-mail (convite e código de uso único), então um contato novo sem e-mail
- * nasce impedido de assinar. Barrar aqui evita criar a lacuna.
- *
- * Em EDIÇÃO segue opcional: muito cadastro antigo não tem e-mail, e exigi-lo
- * impediria de corrigir um telefone enquanto ninguém descobre o endereço. Quem
- * cobra de fato é a emissão do envelope, que recusa nominalmente quem está sem.
+ * O e-mail é opcional em criação e edição: muito cadastro não tem e-mail, e a
+ * exigência real pertence à emissão do envelope de assinatura, que recusa
+ * nominalmente quem está sem endereço na hora de enviar.
  */
-const buildResponsibleSchema = (mode: 'create' | 'edit') =>
+const buildResponsibleSchema = (_mode: 'create' | 'edit') =>
   responsibleSchema.superRefine((data, ctx) => {
     const email = (data.email || '').trim();
-
-    if (mode === 'create' && !email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['email'],
-        message: 'E-mail é obrigatório — é por ele que a assinatura eletrônica é enviada',
-      });
-      return;
-    }
 
     // O e-mail também é ELE o usuário do login — habilitar acesso sem e-mail
     // cria uma conta em que ninguém consegue entrar.
@@ -364,9 +351,7 @@ export function ResponsibleForm({
                   name="email"
                   render={({ field }) => (
                     <FormItem className="md:col-span-7">
-                      <FormLabel>
-                        E-mail{mode === 'create' && <span className="text-destructive"> *</span>}
-                      </FormLabel>
+                      <FormLabel>E-mail</FormLabel>
                       <FormControl>
                         <Input
                           {...field}

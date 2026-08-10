@@ -1317,6 +1317,11 @@ export const userUpdateSchema = z
     ppeSize: ppeSizeCreateNestedSchema.optional(),
     // Store the current contract type for transition validation (set by backend).
     currentContractType: z.nativeEnum(CONTRACT_TYPE).nullable().optional(),
+    // Same idea for the vínculo SITUATION: the persisted status, carried by the
+    // edit form so the refines below can tell "corrigindo um desligamento antigo"
+    // apart from "registrando o desligamento agora". Validation-only — the API's
+    // userUpdateSchema doesn't declare it, so zod strips it server-side.
+    currentContractStatus: z.nativeEnum(CONTRACT_STATUS).nullable().optional(),
     // Sector leader flag - when true, sets this user as manager of their sector
     // The backend will update Sector.leaderId accordingly
     isSectorLeader: z.boolean().optional(),
@@ -1350,6 +1355,38 @@ export const userUpdateSchema = z
     {
       message: "Um vínculo desligado precisa de uma data de demissão",
       path: ["terminationDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      // The dismissal date cannot predate the admission of the vínculo it ends.
+      // The picker already constrains this via minDate, but a value typed into
+      // the segmented input bypasses the calendar.
+      const admission = data.exp1StartAt ?? data.admissionDate;
+      if (!data.terminationDate || !admission) return true;
+      return data.terminationDate.getTime() >= admission.getTime();
+    },
+    {
+      message: "A data de demissão não pode ser anterior à data de admissão",
+      path: ["terminationDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Registering the desligamento HERE (the vínculo was active when the form
+      // loaded) must also record its legal nature — it is what drives the verbas
+      // da rescisão. Correcting an already-terminated vínculo stays lenient: the
+      // "Demitir" shortcut in the tables never asked for a type, so historical
+      // rows legitimately carry null and must remain saveable.
+      const isNewDismissal =
+        data.contractStatus === CONTRACT_STATUS.TERMINATED &&
+        data.currentContractStatus != null &&
+        data.currentContractStatus !== CONTRACT_STATUS.TERMINATED;
+      return !isNewDismissal || !!data.terminationType;
+    },
+    {
+      message: "Selecione o tipo de demissão",
+      path: ["terminationType"],
     }
   )
   .refine(

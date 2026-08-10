@@ -1241,6 +1241,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {
+    // Estúdio 3D para LOGISTIC como item flat — LOGISTIC não faz parte da
+    // audiência da seção Ferramentas hierárquica (mesmo motivo do Notas no Pessoal).
+    id: "estudio-3d-logistic",
+    title: "Estúdio 3D",
+    icon: "truck",
+    path: "/ferramentas/estudio-3D",
+    requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
+  },
+  {
     id: "historico-logistic",
     title: "Histórico",
     icon: "history",
@@ -1461,6 +1470,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
       { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
       { id: "ferramentas-calendario-pm", title: "Calendário", icon: "calendarStats", path: "/departamento-pessoal/calendario" },
+      { id: "ferramentas-estudio-3d-pm", title: "Estúdio 3D", icon: "truck", path: "/ferramentas/estudio-3D" },
       { id: "ferramentas-notas-pm", title: "Notas", icon: "note", path: "/ferramentas/notas" },
     ],
   },
@@ -2213,11 +2223,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
       {
         // Estúdio 3D. O gate real está em route-privileges (`/ferramentas/estudio-3D`);
         // este aqui só decide quem VÊ o item no menu. Manter os dois em sincronia.
+        // LOGISTIC e PRODUCTION_MANAGER não passam por esta seção — recebem o
+        // item via flat "estudio-3d-logistic" e via o grupo Ferramentas do PM.
         id: "ferramentas-estudio-3d",
         title: "Estúdio 3D",
         icon: "truck",
         path: "/ferramentas/estudio-3D",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
       },
       {
         // Calendário. PRODUCTION_MANAGER gets it via its own Ferramentas group above.

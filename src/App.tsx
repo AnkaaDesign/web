@@ -528,7 +528,7 @@ const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cos
 const NotesPage = lazy(() => import("@/pages/tools/notes"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
-// Truck Studio — unlisted, under construction (no menu entry, no hub card)
+// Truck Studio — ADMIN/COMMERCIAL/LOGISTIC/PRODUCTION_MANAGER (gate em route-privileges)
 const TruckStudioPage = lazy(() => import("@/pages/tools/truck-studio").then((module) => ({ default: module.TruckStudioPage })));
 
 function App() {
@@ -3711,7 +3711,7 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Estúdio 3D — ADMIN only (o gate está em route-privileges) */}
+                {/* Estúdio 3D — ADMIN/COMMERCIAL/LOGISTIC/PM (o gate está em route-privileges) */}
                 <Route
                   path={routes.tools.truckStudio.root}
                   element={
