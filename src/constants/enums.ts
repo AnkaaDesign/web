@@ -2983,6 +2983,22 @@ export enum QUESTIONNAIRE_ENTRY_STATUS {
   SUBMITTED = "SUBMITTED",
 }
 
+// How a question is answered: OPTIONS = escolha fechada entre as opções
+// cadastradas; TEXT = texto livre (sem opções e sem nota).
+export enum QUESTIONNAIRE_QUESTION_TYPE {
+  OPTIONS = "OPTIONS",
+  TEXT = "TEXT",
+}
+
+// Como o público-alvo de uma campanha é escolhido. Vira gente na ABERTURA, não
+// na criação — quem entra no setor/cargo antes de abrir também recebe a ficha.
+export enum QUESTIONNAIRE_AUDIENCE {
+  ALL_USERS = "ALL_USERS",
+  SECTORS = "SECTORS",
+  POSITIONS = "POSITIONS",
+  USERS = "USERS",
+}
+
 export const QUESTIONNAIRE_STATUS_LABELS: Record<QUESTIONNAIRE_STATUS, string> = {
   [QUESTIONNAIRE_STATUS.DRAFT]: "Rascunho",
   [QUESTIONNAIRE_STATUS.OPEN]: "Aberto",
@@ -2994,4 +3010,24 @@ export const QUESTIONNAIRE_ENTRY_STATUS_LABELS: Record<QUESTIONNAIRE_ENTRY_STATU
   [QUESTIONNAIRE_ENTRY_STATUS.PENDING]: "Pendente",
   [QUESTIONNAIRE_ENTRY_STATUS.IN_PROGRESS]: "Em andamento",
   [QUESTIONNAIRE_ENTRY_STATUS.SUBMITTED]: "Enviado",
+};
+
+export const QUESTIONNAIRE_QUESTION_TYPE_LABELS: Record<QUESTIONNAIRE_QUESTION_TYPE, string> = {
+  [QUESTIONNAIRE_QUESTION_TYPE.OPTIONS]: "Fechada",
+  [QUESTIONNAIRE_QUESTION_TYPE.TEXT]: "Texto livre",
+};
+
+export const QUESTIONNAIRE_AUDIENCE_LABELS: Record<QUESTIONNAIRE_AUDIENCE, string> = {
+  [QUESTIONNAIRE_AUDIENCE.ALL_USERS]: "Todos os colaboradores",
+  [QUESTIONNAIRE_AUDIENCE.SECTORS]: "Setores específicos",
+  [QUESTIONNAIRE_AUDIENCE.POSITIONS]: "Cargos específicos",
+  [QUESTIONNAIRE_AUDIENCE.USERS]: "Colaboradores específicos",
+};
+
+/** Rótulo curto para tabelas/badges (coluna PÚBLICO). */
+export const QUESTIONNAIRE_AUDIENCE_SHORT_LABELS: Record<QUESTIONNAIRE_AUDIENCE, string> = {
+  [QUESTIONNAIRE_AUDIENCE.ALL_USERS]: "Todos",
+  [QUESTIONNAIRE_AUDIENCE.SECTORS]: "Setores",
+  [QUESTIONNAIRE_AUDIENCE.POSITIONS]: "Cargos",
+  [QUESTIONNAIRE_AUDIENCE.USERS]: "Colaboradores",
 };

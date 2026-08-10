@@ -6,7 +6,12 @@ import { useCreateQuestionnaireQuestion } from "@/hooks/questionnaire/use-questi
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { PerguntaForm, type PerguntaFormValues } from "@/components/questionnaire/admin/pergunta-form";
+import {
+  PerguntaForm,
+  toApiOptions,
+  toApiQuestionType,
+  type PerguntaFormValues,
+} from "@/components/questionnaire/admin/pergunta-form";
 
 export const QuestionnairePerguntaCreatePage = () => {
   usePageTracker({ title: "Nova Pergunta", icon: "clipboard-list" });
@@ -14,15 +19,19 @@ export const QuestionnairePerguntaCreatePage = () => {
   const createMut = useCreateQuestionnaireQuestion();
 
   const onSubmit = async (values: PerguntaFormValues) => {
+    const options = toApiOptions(values);
     try {
       await createMut.mutateAsync({
         groupId: values.groupId,
-        order: values.order,
+        // `order` omitido de propósito: o serviço usa a última do tema + 1.
         title: values.title,
         description: values.description,
         helpText: values.helpText ?? null,
+        type: toApiQuestionType(values),
+        isRequired: values.isRequired,
         isActive: values.isActive,
-        options: values.options.map((o) => ({ order: o.order, value: o.value, label: o.label, description: o.description ?? null })),
+        // Texto livre não manda `options` — a API rejeita opções nesse tipo.
+        ...(options.length ? { options } : {}),
       });
       navigate(routes.administration.questionnaire.perguntas);
     } catch {
@@ -31,7 +40,7 @@ export const QuestionnairePerguntaCreatePage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-5xl flex-shrink-0">
           <PageHeader

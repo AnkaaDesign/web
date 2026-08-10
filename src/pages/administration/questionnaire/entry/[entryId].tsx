@@ -17,9 +17,15 @@ import {
   IconMessage2,
   IconNotes,
   IconRefresh,
+  IconWriting,
 } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, QUESTIONNAIRE_ENTRY_STATUS } from "@/constants";
+import {
+  routes,
+  SECTOR_PRIVILEGES,
+  QUESTIONNAIRE_ENTRY_STATUS,
+  QUESTIONNAIRE_QUESTION_TYPE,
+} from "@/constants";
 import {
   useQuestionnaireEntry,
   useReopenQuestionnaireEntry,
@@ -49,6 +55,12 @@ const noop = () => {};
 const asTopic = (q: any) =>
   q ? { ...q, skill: q.group ?? null, levels: (q.options ?? []).map((o: any) => ({ id: o.id, score: o.value, name: o.label, description: o.description ?? "" })) } : null;
 
+const isTextQuestion = (q: any) => q?.type === QUESTIONNAIRE_QUESTION_TYPE.TEXT;
+
+/** Respondida = tem nota (fechada) ou texto (livre). */
+const hasAnswer = (q: any, a: any) =>
+  isTextQuestion(q) ? !!a?.textValue?.trim() : a?.value != null;
+
 export const QuestionnaireEntryDetailsPage = () => {
   usePageTracker({ title: "Resposta do Questionário", icon: "clipboard-list" });
   const { id, entryId } = useParams<{ id: string; entryId: string }>();
@@ -60,7 +72,13 @@ export const QuestionnaireEntryDetailsPage = () => {
   const reopenMut = useReopenQuestionnaireEntry(entryId ?? "");
 
   const entry = data?.data as any;
-  const questions = useMemo(() => ((entry?.questions ?? []) as any[]).filter((q) => (q.options?.length ?? 0) > 0), [entry]);
+  const questions = useMemo(
+    () =>
+      ((entry?.questions ?? []) as any[]).filter(
+        (q) => isTextQuestion(q) || (q.options?.length ?? 0) > 0,
+      ),
+    [entry],
+  );
   const answersByQuestion = entry?.answersByQuestion ?? {};
 
   const total = questions.length;
@@ -69,7 +87,7 @@ export const QuestionnaireEntryDetailsPage = () => {
 
   const progressByQuestion = useMemo(() => {
     const map = new Map<string, { scored: number; total: number }>();
-    for (const q of questions) map.set(q.id, { scored: answersByQuestion[q.id]?.value != null ? 1 : 0, total: 1 });
+    for (const q of questions) map.set(q.id, { scored: hasAnswer(q, answersByQuestion[q.id]) ? 1 : 0, total: 1 });
     return map;
   }, [questions, answersByQuestion]);
 
@@ -84,7 +102,7 @@ export const QuestionnaireEntryDetailsPage = () => {
   const goToOffset = (offset: number) => { if (total) setActiveIndex((i) => (i + offset + total) % total); };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="flex flex-col gap-4 bg-background px-4 pt-4 pb-6">
         <PageHeader
           variant="detail"
@@ -112,6 +130,11 @@ export const QuestionnaireEntryDetailsPage = () => {
             <button type="button" onClick={() => setPickerOpen(true)} className="group flex min-w-0 flex-1 flex-col gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/40">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="truncate text-sm font-semibold leading-tight">{active?.title ?? "—"}</span>
+                {active?.isRequired === false && (
+                  <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Opcional
+                  </span>
+                )}
                 <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
                   Pergunta {total === 0 ? 0 : activeIndex + 1} de {total}
                   {active?.group?.name ? ` · ${active.group.name}` : ""}
@@ -121,7 +144,7 @@ export const QuestionnaireEntryDetailsPage = () => {
               <StepperProgressBar
                 total={total}
                 currentIndex={activeIndex}
-                isScored={(i) => answersByQuestion[questions[i]?.id]?.value != null}
+                isScored={(i) => hasAnswer(questions[i], answersByQuestion[questions[i]?.id])}
                 className="w-full"
               />
             </button>
@@ -165,14 +188,39 @@ export const QuestionnaireEntryDetailsPage = () => {
                 )}
               </div>
               <div className="flex flex-col">
-                <ScoreLevelPicker
-                  topic={asTopic(active) as any}
-                  currentScore={activeAnswer?.value ?? null}
-                  readOnly
-                  showHeader={false}
-                  onPickScore={noop}
-                  selectedAction={activeAnswer?.comment?.trim() ? <CommentButton value={activeAnswer.comment} /> : undefined}
-                />
+                {isTextQuestion(active) ? (
+                  <Card className="flex flex-1 flex-col">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <IconWriting className="h-4 w-4 text-muted-foreground" />
+                        Resposta
+                        {active.isRequired === false && (
+                          <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-1 flex-col">
+                      {activeAnswer?.textValue?.trim() ? (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                          {activeAnswer.textValue}
+                        </p>
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground">
+                          Sem resposta registrada.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <ScoreLevelPicker
+                    topic={asTopic(active) as any}
+                    currentScore={activeAnswer?.value ?? null}
+                    readOnly
+                    showHeader={false}
+                    onPickScore={noop}
+                    selectedAction={activeAnswer?.comment?.trim() ? <CommentButton value={activeAnswer.comment} /> : undefined}
+                  />
+                )}
               </div>
             </div>
           </>

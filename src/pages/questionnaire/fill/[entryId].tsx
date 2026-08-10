@@ -18,9 +18,10 @@ import {
   IconMessage2,
   IconNotes,
   IconSend,
+  IconWriting,
 } from "@tabler/icons-react";
 
-import { routes, QUESTIONNAIRE_ENTRY_STATUS } from "@/constants";
+import { routes, QUESTIONNAIRE_ENTRY_STATUS, QUESTIONNAIRE_QUESTION_TYPE } from "@/constants";
 import {
   useQuestionnaireEntry,
   useBatchUpsertQuestionnaireAnswers,
@@ -67,6 +68,12 @@ const asTopic = (q: any) =>
       }
     : null;
 
+const isTextQuestion = (q: any) => q?.type === QUESTIONNAIRE_QUESTION_TYPE.TEXT;
+
+/** Uma pergunta está respondida quando tem nota (fechada) ou texto (livre). */
+const isAnswered = (q: any, a?: { value: number | null; textValue: string }) =>
+  isTextQuestion(q) ? !!a?.textValue.trim() : a?.value != null;
+
 export const QuestionnaireFillPage = () => {
   const { entryId } = useParams<{ entryId: string }>();
   const navigate = useNavigate();
@@ -79,12 +86,19 @@ export const QuestionnaireFillPage = () => {
   const entry = data?.data as any; // service injects `questions` + `answersByQuestion`
   const isReadOnly = entry?.status === QUESTIONNAIRE_ENTRY_STATUS.SUBMITTED;
 
+  // Uma pergunta fechada sem opções está mal cadastrada e não tem como ser
+  // respondida; uma de texto livre nunca tem opções e PRECISA aparecer.
   const questions = useMemo(
-    () => ((entry?.questions ?? []) as any[]).filter((q) => (q.options?.length ?? 0) > 0),
+    () =>
+      ((entry?.questions ?? []) as any[]).filter(
+        (q) => isTextQuestion(q) || (q.options?.length ?? 0) > 0,
+      ),
     [entry],
   );
 
-  const [answers, setAnswers] = useState<Record<string, { value: number | null; comment: string }>>({});
+  const [answers, setAnswers] = useState<
+    Record<string, { value: number | null; textValue: string; comment: string }>
+  >({});
   const [activeIndex, setActiveIndex] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
@@ -97,28 +111,55 @@ export const QuestionnaireFillPage = () => {
     if (seedRef.current === sig) return;
     seedRef.current = sig;
     const byQ = entry.answersByQuestion ?? {};
-    const seed: Record<string, { value: number | null; comment: string }> = {};
-    for (const q of questions) seed[q.id] = { value: byQ[q.id]?.value ?? null, comment: byQ[q.id]?.comment ?? "" };
+    const seed: Record<string, { value: number | null; textValue: string; comment: string }> = {};
+    for (const q of questions) {
+      seed[q.id] = {
+        value: byQ[q.id]?.value ?? null,
+        textValue: byQ[q.id]?.textValue ?? "",
+        comment: byQ[q.id]?.comment ?? "",
+      };
+    }
     setAnswers(seed);
   }, [entry, questions]);
 
   const activeQuestion = questions[activeIndex] ?? null;
-  const activeAnswer = activeQuestion ? answers[activeQuestion.id] ?? { value: null, comment: "" } : null;
+  const activeAnswer = activeQuestion
+    ? answers[activeQuestion.id] ?? { value: null, textValue: "", comment: "" }
+    : null;
   const total = questions.length;
-  const answered = useMemo(() => Object.values(answers).filter((a) => a.value != null).length, [answers]);
+  const answered = useMemo(
+    () => questions.filter((q) => isAnswered(q, answers[q.id])).length,
+    [questions, answers],
+  );
+  // Só as obrigatórias travam o envio (o backend valida o mesmo).
+  const missingRequired = useMemo(
+    () => questions.filter((q) => q.isRequired !== false && !isAnswered(q, answers[q.id])).length,
+    [questions, answers],
+  );
 
-  // Debounced per-question save.
+  // Autosave com debounce. O que está pendente fica ACUMULADO por pergunta em
+  // vez de num único payload: com o auto-avanço de 450ms e o debounce de 600ms,
+  // responder duas perguntas seguidas rápido descartava o salvamento da
+  // primeira. Um valor nulo (ou texto vazio) é enviado de propósito — é assim
+  // que a API apaga a resposta de uma pergunta opcional.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaves = useRef<Map<string, any>>(new Map());
   const saveAnswer = useCallback(
-    (questionId: string, value: number | null, comment: string) => {
-      if (!entryId || isReadOnly || value == null) return;
+    (question: any, value: number | null, textValue: string, comment: string) => {
+      if (!entryId || isReadOnly) return;
+      pendingSaves.current.set(
+        question.id,
+        isTextQuestion(question)
+          ? { questionId: question.id, value: null, textValue: textValue.trim() || null }
+          : { questionId: question.id, value, comment: comment.trim() ? comment.trim() : null },
+      );
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
+        const batch = [...pendingSaves.current.values()];
+        pendingSaves.current.clear();
+        if (!batch.length) return;
         try {
-          await upsert.mutateAsync({
-            answers: [{ questionId, value, comment: comment.trim() ? comment.trim() : null }],
-            suppressToast: true,
-          });
+          await upsert.mutateAsync({ answers: batch, suppressToast: true });
         } catch {
           /* toast via interceptor */
         }
@@ -135,32 +176,67 @@ export const QuestionnaireFillPage = () => {
 
   const handlePick = (score: number) => {
     if (isReadOnly || !activeQuestion) return;
-    const next = { value: score, comment: answers[activeQuestion.id]?.comment ?? "" };
+    const cur = answers[activeQuestion.id] ?? { value: null, textValue: "", comment: "" };
+    const next = { ...cur, value: score };
     setAnswers((prev) => ({ ...prev, [activeQuestion.id]: next }));
-    saveAnswer(activeQuestion.id, score, next.comment);
+    saveAnswer(activeQuestion, score, next.textValue, next.comment);
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
     advanceTimer.current = setTimeout(() => goToOffset(1), AUTO_ADVANCE_MS);
   };
 
   const handleComment = (comment: string) => {
     if (isReadOnly || !activeQuestion) return;
-    const cur = answers[activeQuestion.id] ?? { value: null, comment: "" };
+    const cur = answers[activeQuestion.id] ?? { value: null, textValue: "", comment: "" };
     setAnswers((prev) => ({ ...prev, [activeQuestion.id]: { ...cur, comment } }));
     if (advanceTimer.current) clearTimeout(advanceTimer.current); // typing cancels auto-advance
-    saveAnswer(activeQuestion.id, cur.value, comment);
+    // Sem nota escolhida, `{value:null}` significa APAGAR para a API — o
+    // comentário seria jogado fora. Fica só no estado local até a nota existir
+    // (escolher a nota reenvia o comentário junto).
+    if (cur.value != null) saveAnswer(activeQuestion, cur.value, cur.textValue, comment);
+  };
+
+  const handleText = (textValue: string) => {
+    if (isReadOnly || !activeQuestion) return;
+    const cur = answers[activeQuestion.id] ?? { value: null, textValue: "", comment: "" };
+    setAnswers((prev) => ({ ...prev, [activeQuestion.id]: { ...cur, textValue } }));
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    saveAnswer(activeQuestion, cur.value, textValue, cur.comment);
   };
 
   const flushAll = useCallback(async () => {
     if (!entryId || isReadOnly) return;
-    const payload = Object.entries(answers)
-      .filter(([, a]) => a.value != null)
-      .map(([questionId, a]) => ({ questionId, value: a.value as number, comment: a.comment.trim() ? a.comment.trim() : null }));
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    // A fila pendente entra no payload em vez de ser descartada. Ela pode
+    // conter um APAGAR (opcional esvaziada) — e apagar não aparece na lista de
+    // respondidas abaixo, então limpar a fila ressuscitava o texto antigo numa
+    // ficha que está prestes a ser congelada.
+    const pendentes = [...pendingSaves.current.values()];
+    pendingSaves.current.clear();
+    const respondidas = questions
+      .filter((q) => isAnswered(q, answers[q.id]))
+      .map((q) => {
+        const a = answers[q.id];
+        return isTextQuestion(q)
+          ? { questionId: q.id, value: null, textValue: a.textValue.trim() }
+          : {
+              questionId: q.id,
+              value: a.value as number,
+              comment: a.comment.trim() ? a.comment.trim() : null,
+            };
+      });
+    // A fila vence: é o estado mais recente da tela.
+    const porPergunta = new Map<string, any>();
+    for (const a of respondidas) porPergunta.set(a.questionId, a);
+    for (const a of pendentes) porPergunta.set(a.questionId, a);
+    const payload = [...porPergunta.values()];
     if (payload.length) await upsert.mutateAsync({ answers: payload, suppressToast: true });
-  }, [entryId, isReadOnly, answers, upsert]);
+  }, [entryId, isReadOnly, questions, answers, upsert]);
 
   const handleSubmitClick = () => {
-    if (answered !== total) {
-      toast.warning(`Responda todas as perguntas antes de enviar (${answered}/${total}).`);
+    if (missingRequired > 0) {
+      toast.warning(
+        `Responda as ${missingRequired} pergunta(s) obrigatória(s) antes de enviar (${answered}/${total} respondidas).`,
+      );
       return;
     }
     setSubmitOpen(true);
@@ -180,7 +256,7 @@ export const QuestionnaireFillPage = () => {
 
   const progressByQuestion = useMemo(() => {
     const map = new Map<string, { scored: number; total: number }>();
-    for (const q of questions) map.set(q.id, { scored: answers[q.id]?.value != null ? 1 : 0, total: 1 });
+    for (const q of questions) map.set(q.id, { scored: isAnswered(q, answers[q.id]) ? 1 : 0, total: 1 });
     return map;
   }, [questions, answers]);
 
@@ -202,7 +278,7 @@ export const QuestionnaireFillPage = () => {
                 label: "Finalizar e enviar",
                 icon: IconSend,
                 onClick: handleSubmitClick,
-                disabled: answered !== total || submitMut.isPending,
+                disabled: missingRequired > 0 || submitMut.isPending,
                 loading: submitMut.isPending,
               }]
             : []),
@@ -233,6 +309,11 @@ export const QuestionnaireFillPage = () => {
               <button type="button" onClick={() => setPickerOpen(true)} className="group flex min-w-0 flex-1 flex-col gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/40">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="truncate text-sm font-semibold leading-tight">{activeQuestion?.title ?? "—"}</span>
+                  {activeQuestion?.isRequired === false && (
+                    <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Opcional
+                    </span>
+                  )}
                   <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
                     Pergunta {total === 0 ? 0 : activeIndex + 1} de {total}
                     {activeQuestion?.group?.name ? ` · ${activeQuestion.group.name}` : ""}
@@ -242,7 +323,7 @@ export const QuestionnaireFillPage = () => {
                 <StepperProgressBar
                   total={total}
                   currentIndex={activeIndex}
-                  isScored={(i) => answers[questions[i]?.id]?.value != null}
+                  isScored={(i) => isAnswered(questions[i], answers[questions[i]?.id])}
                   className="w-full"
                 />
               </button>
@@ -293,35 +374,63 @@ export const QuestionnaireFillPage = () => {
                   )}
                 </div>
                 <div className="flex flex-col">
-                  <ScoreLevelPicker
-                    topic={asTopic(activeQuestion) as any}
-                    currentScore={activeAnswer?.value ?? null}
-                    readOnly={isReadOnly}
-                    isSaving={upsert.isPending}
-                    showHeader={false}
-                    onPickScore={handlePick}
-                  />
+                  {isTextQuestion(activeQuestion) ? (
+                    <Card className="flex flex-1 flex-col">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <IconWriting className="h-4 w-4 text-muted-foreground" />
+                          Sua resposta
+                          {activeQuestion.isRequired === false && (
+                            <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 flex-col">
+                        <Textarea
+                          value={activeAnswer?.textValue ?? ""}
+                          onChange={(e) => handleText(e.target.value)}
+                          disabled={isReadOnly}
+                          rows={10}
+                          maxLength={5000}
+                          className="flex-1"
+                          placeholder={isReadOnly ? "Sem resposta." : "Escreva sua resposta…"}
+                        />
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <ScoreLevelPicker
+                      topic={asTopic(activeQuestion) as any}
+                      currentScore={activeAnswer?.value ?? null}
+                      readOnly={isReadOnly}
+                      isSaving={upsert.isPending}
+                      showHeader={false}
+                      onPickScore={handlePick}
+                    />
+                  )}
                 </div>
               </div>
 
-              {/* Comment. */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <IconMessage2 className="h-4 w-4 text-muted-foreground" />
-                    Comentário <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={activeAnswer?.comment ?? ""}
-                    onChange={(e) => handleComment(e.target.value)}
-                    disabled={isReadOnly}
-                    rows={3}
-                    placeholder={isReadOnly ? "Sem comentário." : "Adicione um comentário (opcional)…"}
-                  />
-                </CardContent>
-              </Card>
+              {/* Comment — só faz sentido em pergunta fechada: numa de texto
+                  livre a resposta JÁ é o texto. */}
+              {!isTextQuestion(activeQuestion) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <IconMessage2 className="h-4 w-4 text-muted-foreground" />
+                      Comentário <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={activeAnswer?.comment ?? ""}
+                      onChange={(e) => handleComment(e.target.value)}
+                      disabled={isReadOnly}
+                      rows={3}
+                      placeholder={isReadOnly ? "Sem comentário." : "Adicione um comentário (opcional)…"}
+                    />
+                  </CardContent>
+                </Card>
+              )}
             </>
           ) : null}
 
@@ -349,8 +458,9 @@ export const QuestionnaireFillPage = () => {
               Enviar questionário?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Você respondeu {answered} de {total} pergunta(s). Após o envio, as respostas não poderão
-              ser alteradas.
+              Você respondeu {answered} de {total} pergunta(s)
+              {answered < total ? " — as demais são opcionais e ficarão em branco" : ""}. Após o
+              envio, as respostas não poderão ser alteradas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

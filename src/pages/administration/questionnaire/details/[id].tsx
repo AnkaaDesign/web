@@ -23,6 +23,9 @@ import {
   routes,
   SECTOR_PRIVILEGES,
   QUESTIONNAIRE_STATUS,
+  QUESTIONNAIRE_QUESTION_TYPE,
+  QUESTIONNAIRE_AUDIENCE,
+  QUESTIONNAIRE_AUDIENCE_LABELS,
 } from "@/constants";
 import {
   useQuestionnaire,
@@ -71,6 +74,19 @@ const CELL_BASE = "px-3 py-3 align-middle !border-b !border-border/30";
 
 const fmt = (d: Date | string | null | undefined) =>
   d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+
+/** "Setores específicos (3)" — o modo mais quantos critérios ele carrega. */
+const audienceSummary = (q: any) => {
+  const audience = (q.audience ?? QUESTIONNAIRE_AUDIENCE.ALL_USERS) as QUESTIONNAIRE_AUDIENCE;
+  const label = QUESTIONNAIRE_AUDIENCE_LABELS[audience];
+  const count = {
+    [QUESTIONNAIRE_AUDIENCE.ALL_USERS]: null,
+    [QUESTIONNAIRE_AUDIENCE.SECTORS]: (q.targetSectorIds ?? []).length,
+    [QUESTIONNAIRE_AUDIENCE.POSITIONS]: (q.targetPositionIds ?? []).length,
+    [QUESTIONNAIRE_AUDIENCE.USERS]: q._count?.targetUsers ?? (q.targetUsers ?? []).length,
+  }[audience];
+  return count == null ? label : `${label} (${count})`;
+};
 
 export const QuestionnaireDetailsPage = () => {
   usePageTracker({ title: "Detalhe do Questionário", icon: "clipboard-list" });
@@ -242,7 +258,7 @@ export const QuestionnaireDetailsPage = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -282,14 +298,7 @@ export const QuestionnaireDetailsPage = () => {
                   <DetailRow label="Período" value={`${fmt(q.periodStart)} – ${fmt(q.periodEnd)}`} />
                   <DetailRow label="Perguntas" value={String(q._count?.questions ?? 0)} />
                   <DetailRow label="Fichas geradas" value={String(q._count?.entries ?? 0)} />
-                  <DetailRow
-                    label="Público-alvo"
-                    value={
-                      q.targetAllUsers
-                        ? "Todos os colaboradores"
-                        : `${q._count?.targetUsers ?? (q.targetUsers ?? []).length} colaborador(es)`
-                    }
-                  />
+                  <DetailRow label="Público-alvo" value={audienceSummary(q)} />
                   <DetailRow label="Criada por" value={q.createdBy?.name ?? "—"} />
                   {q.description && (
                     <>
@@ -324,7 +333,15 @@ export const QuestionnaireDetailsPage = () => {
                             <div className="flex flex-col gap-2">
                               {tema.items.map((question: any) => (
                                 <div key={question.id} className="rounded-md border border-border/40 bg-muted/30 px-3 py-2 text-sm">
-                                  <span className="font-medium leading-tight">{question.title}</span>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium leading-tight">{question.title}</span>
+                                    {question.type === QUESTIONNAIRE_QUESTION_TYPE.TEXT && (
+                                      <Badge variant="outline" className="text-[10px] font-normal">Texto livre</Badge>
+                                    )}
+                                    {question.isRequired === false && (
+                                      <Badge variant="gray" className="text-[10px] font-normal">Opcional</Badge>
+                                    )}
+                                  </div>
                                   {question.description && (
                                     <p className="mt-0.5 text-xs leading-snug text-muted-foreground/80">{question.description}</p>
                                   )}

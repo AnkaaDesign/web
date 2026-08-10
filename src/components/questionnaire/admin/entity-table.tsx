@@ -5,12 +5,15 @@
 // Card wrapping the search row, a flex-1 scrollable table, and the pagination at
 // the bottom — so the questionnaire admin matches the assessment admin layout.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { IconArrowsSort, IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export interface EntityColumn<T> {
@@ -19,6 +22,23 @@ export interface EntityColumn<T> {
   align?: "left" | "center" | "right";
   className?: string;
   cell: (row: T) => ReactNode;
+  /** Torna o cabeçalho clicável. A tradução `key` → `orderBy` fica na página. */
+  sortable?: boolean;
+}
+
+export type EntitySort = { key: string; direction: "asc" | "desc" } | null;
+
+/** One entry of the right-click menu built per row by `contextActions`. */
+export interface EntityRowAction {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  /** Renders in destructive red and behind a leading separator. */
+  destructive?: boolean;
+  /** Draws a separator above this entry. */
+  separatorBefore?: boolean;
 }
 
 interface EntityTableProps<T extends { id: string }> {
@@ -34,9 +54,21 @@ interface EntityTableProps<T extends { id: string }> {
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: number) => void;
   onRowClick?: (row: T) => void;
+  /** Right-click menu for a row. Return an empty array to suppress the menu. */
+  contextActions?: (row: T) => EntityRowAction[];
+  /** Coluna ordenada no momento; `null` = ordenação padrão da página. */
+  sort?: EntitySort;
+  onSortChange?: (sort: EntitySort) => void;
   emptyText?: string;
   className?: string;
 }
+
+/** asc → desc → padrão. */
+const nextSort = (current: EntitySort, key: string): EntitySort => {
+  if (current?.key !== key) return { key, direction: "asc" };
+  if (current.direction === "asc") return { key, direction: "desc" };
+  return null;
+};
 
 const alignClass = (a?: "left" | "center" | "right") =>
   a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
@@ -54,10 +86,24 @@ export function EntityTable<T extends { id: string }>({
   onPageChange,
   onPageSizeChange,
   onRowClick,
+  contextActions,
+  sort = null,
+  onSortChange,
   emptyText = "Nenhum resultado.",
   className,
 }: EntityTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const [menu, setMenu] = useState<{ x: number; y: number; actions: EntityRowAction[] } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, row: T) => {
+    if (!contextActions) return;
+    const actions = contextActions(row);
+    if (!actions.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ x: e.clientX, y: e.clientY, actions });
+  };
+
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
       <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden p-4">
@@ -70,14 +116,45 @@ export function EntityTable<T extends { id: string }>({
           <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow className="bg-muted hover:bg-muted">
-                {columns.map((c) => (
-                  <TableHead
-                    key={c.key}
-                    className={cn("whitespace-nowrap bg-muted text-xs font-bold uppercase text-foreground", alignClass(c.align), c.className)}
-                  >
-                    {c.header}
-                  </TableHead>
-                ))}
+                {columns.map((c) => {
+                  const isSortable = !!c.sortable && !!onSortChange;
+                  const active = sort?.key === c.key ? sort.direction : null;
+                  return (
+                    <TableHead
+                      key={c.key}
+                      aria-sort={active ? (active === "asc" ? "ascending" : "descending") : undefined}
+                      className={cn(
+                        "whitespace-nowrap bg-muted text-xs font-bold uppercase text-foreground",
+                        alignClass(c.align),
+                        c.className,
+                        isSortable && "p-0",
+                      )}
+                    >
+                      {isSortable ? (
+                        <button
+                          type="button"
+                          onClick={() => onSortChange!(nextSort(sort, c.key))}
+                          className={cn(
+                            "flex h-full w-full items-center gap-1.5 px-3 py-2 transition-colors hover:text-primary",
+                            c.align === "right" && "justify-end",
+                            c.align === "center" && "justify-center",
+                          )}
+                        >
+                          <span className="truncate">{c.header}</span>
+                          {active === "asc" ? (
+                            <IconSortAscending className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          ) : active === "desc" ? (
+                            <IconSortDescending className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          ) : (
+                            <IconArrowsSort className="h-3.5 w-3.5 shrink-0 opacity-40" />
+                          )}
+                        </button>
+                      ) : (
+                        c.header
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -100,6 +177,7 @@ export function EntityTable<T extends { id: string }>({
                   <TableRow
                     key={row.id}
                     onClick={() => onRowClick?.(row)}
+                    onContextMenu={(e) => handleContextMenu(e, row)}
                     className={cn(
                       idx % 2 === 1 ? "!bg-muted/15" : "!bg-transparent",
                       onRowClick && "cursor-pointer hover:!bg-muted/30",
@@ -130,6 +208,32 @@ export function EntityTable<T extends { id: string }>({
           showPageInfo
         />
       </CardContent>
+
+      <DropdownMenu open={!!menu} onOpenChange={(open) => !open && setMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={menu}
+          isOpen={!!menu}
+          className="w-56 ![position:fixed]"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {(menu?.actions ?? []).map((action) => (
+            <div key={action.key}>
+              {action.separatorBefore && <DropdownMenuSeparator />}
+              <DropdownMenuItem
+                disabled={action.disabled}
+                onClick={() => {
+                  setMenu(null);
+                  action.onClick();
+                }}
+                className={cn(action.destructive && "text-destructive")}
+              >
+                {action.icon}
+                {action.label}
+              </DropdownMenuItem>
+            </div>
+          ))}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
     </Card>
   );
 }

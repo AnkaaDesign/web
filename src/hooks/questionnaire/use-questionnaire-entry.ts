@@ -10,6 +10,7 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query";
+import { QUESTIONNAIRE_ENTRY_STATUS, QUESTIONNAIRE_STATUS } from "@/constants";
 import {
   getQuestionnaireEntries,
   getQuestionnaireEntryById,
@@ -28,7 +29,6 @@ import type {
   QuestionnaireEntryGetUniqueResponse,
   QuestionnaireEntryUpdateResponse,
 } from "../../types";
-import { QUESTIONNAIRE_ENTRY_STATUS } from "../../constants";
 import { questionnaireEntryKeys, questionnaireKeys } from "../common/query-keys";
 
 export function useQuestionnaireEntries(
@@ -72,13 +72,20 @@ export function useMyPendingQuestionnaireEntries(
   const params: QuestionnaireEntryGetManyFormData = {
     ...extraParams,
     respondentId: "me",
+    // O filtro precisa ir ao SERVIDOR. Sem ele a fila dependia de a ficha
+    // pendente cair na primeira página de 20 pela ordenação padrão — um
+    // acoplamento invisível a um default do serviço.
+    status: [QUESTIONNAIRE_ENTRY_STATUS.PENDING, QUESTIONNAIRE_ENTRY_STATUS.IN_PROGRESS],
+    // Campanha encerrada não aceita mais resposta: mantê-la na fila prendia o
+    // usuário num redirect para uma ficha que só devolve 400.
+    where: { ...(extraParams?.where ?? {}), questionnaire: { status: QUESTIONNAIRE_STATUS.OPEN } },
     include: extraParams?.include ?? {
       questionnaire: true,
       _count: { select: { answers: true } },
     },
   };
   return useQuery({
-    queryKey: questionnaireEntryKeys.mine(),
+    queryKey: [...questionnaireEntryKeys.mine(), extraParams ?? null],
     queryFn: () => getQuestionnaireEntries(params),
     staleTime: 1000 * 30,
     ...options,

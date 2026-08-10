@@ -8,10 +8,12 @@
 
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  IconAsterisk,
   IconCalendarPlus,
   IconCalendarTime,
   IconClipboardList,
   IconEdit,
+  IconForms,
   IconHash,
   IconHelpCircle,
   IconInfoCircle,
@@ -20,7 +22,12 @@ import {
   IconToggleRight,
 } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../../../constants";
+import {
+  routes,
+  SECTOR_PRIVILEGES,
+  QUESTIONNAIRE_QUESTION_TYPE,
+  QUESTIONNAIRE_QUESTION_TYPE_LABELS,
+} from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";
 import { useQuestionnaireQuestion } from "../../../../../hooks/questionnaire/use-questionnaire";
 
@@ -65,9 +72,11 @@ export const QuestionnairePerguntaDetailsPage = () => {
   const sortedOptions = [...(question.options ?? [])].sort(
     (a, b) => (a.order ?? 0) - (b.order ?? 0),
   );
+  const questionType = question.type ?? QUESTIONNAIRE_QUESTION_TYPE.OPTIONS;
+  const isFreeText = questionType === QUESTIONNAIRE_QUESTION_TYPE.TEXT;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -120,6 +129,26 @@ export const QuestionnairePerguntaDetailsPage = () => {
                     icon={IconHash}
                     label="Ordem"
                     value={<span className="font-mono">{question.order}</span>}
+                  />
+                  <DetailRow
+                    icon={IconForms}
+                    label="Tipo de resposta"
+                    value={
+                      <Badge variant="outline" className="font-normal">
+                        {QUESTIONNAIRE_QUESTION_TYPE_LABELS[questionType as QUESTIONNAIRE_QUESTION_TYPE]}
+                      </Badge>
+                    }
+                  />
+                  <DetailRow
+                    icon={IconAsterisk}
+                    label="Obrigatória"
+                    value={
+                      question.isRequired === false ? (
+                        <Badge variant="gray" className="font-normal">Opcional</Badge>
+                      ) : (
+                        <Badge variant="default" className="font-normal">Obrigatória</Badge>
+                      )
+                    }
                   />
                   <DetailRow
                     icon={IconToggleRight}
@@ -190,10 +219,17 @@ export const QuestionnairePerguntaDetailsPage = () => {
           {/* Opções de resposta */}
           <Card>
             <CardHeader>
-              <CardTitle>Opções de resposta ({sortedOptions.length})</CardTitle>
+              <CardTitle>
+                {isFreeText ? "Resposta" : `Opções de resposta (${sortedOptions.length})`}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {sortedOptions.length === 0 ? (
+              {isFreeText ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Pergunta de texto livre — o colaborador escreve a resposta com as próprias
+                  palavras. Não há opções nem nota.
+                </div>
+              ) : sortedOptions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   Nenhuma opção cadastrada. Edite a pergunta para definir as opções de resposta.
                 </div>

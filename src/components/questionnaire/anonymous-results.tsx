@@ -7,9 +7,10 @@
 // endpoint, which omits all identity information by contract.
 
 import { useMemo } from "react";
-import { IconChartBar, IconEyeOff, IconLoader2, IconMessage2 } from "@tabler/icons-react";
+import { IconChartBar, IconEyeOff, IconLoader2, IconMessage2, IconWriting } from "@tabler/icons-react";
 
 import { useQuestionnaireResults } from "@/hooks/questionnaire/use-questionnaire";
+import { QUESTIONNAIRE_QUESTION_TYPE } from "@/constants";
 import type { QuestionnaireResultsQuestion } from "@/types";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,50 +97,74 @@ export function AnonymousResults({ questionnaireId }: { questionnaireId: string 
 }
 
 function QuestionResult({ question }: { question: QuestionnaireResultsQuestion }) {
-  const { title, group, options, distribution, answeredCount, average, commentCount } = question;
+  const { title, group, type, isRequired, options, distribution, textAnswers, answeredCount, average, commentCount } =
+    question;
+  // Pergunta de texto livre não tem escala: nada de barras, média ou nota — só
+  // as respostas escritas, já sem qualquer vínculo com quem respondeu.
+  const isFreeText = type === QUESTIONNAIRE_QUESTION_TYPE.TEXT;
 
   return (
     <div className="rounded-lg border border-border/40 bg-muted/20 p-4 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 space-y-0.5">
           <span className="font-medium leading-tight">{title}</span>
-          {group?.name && (
-            <p className="text-xs text-muted-foreground">{group.name}</p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            {[group?.name, isFreeText ? "Texto livre" : null, isRequired === false ? "Opcional" : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {average != null && (
+          {!isFreeText && average != null && (
             <ScoreBadge score={Math.round(average)} label={average.toFixed(2)} size="md" />
           )}
         </div>
       </div>
 
-      <div className="space-y-2">
-        {options.map((opt) => {
-          const count = distribution[String(opt.value)] ?? 0;
-          const pct = answeredCount > 0 ? Math.round((count / answeredCount) * 100) : 0;
-          return (
-            <div key={opt.value} className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-foreground/90">{opt.label}</span>
-                <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
-                  {count} · {pct}%
-                </span>
+      {isFreeText ? (
+        <div className="space-y-2">
+          {textAnswers.length === 0 ? (
+            <p className="text-sm italic text-muted-foreground">Nenhuma resposta registrada.</p>
+          ) : (
+            textAnswers.map((text, i) => (
+              <div
+                key={i}
+                className="flex gap-2 rounded-md border border-border/40 bg-background/60 px-3 py-2"
+              >
+                <IconWriting className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{text}</p>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn("h-full rounded-full bg-primary transition-all")}
-                  style={{ width: `${pct}%` }}
-                />
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {options.map((opt) => {
+            const count = distribution[String(opt.value)] ?? 0;
+            const pct = answeredCount > 0 ? Math.round((count / answeredCount) * 100) : 0;
+            return (
+              <div key={opt.value} className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-foreground/90">{opt.label}</span>
+                  <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                    {count} · {pct}%
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn("h-full rounded-full bg-primary transition-all")}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span className="tabular-nums">{answeredCount} resposta(s)</span>
-        {commentCount > 0 && (
+        {!isFreeText && commentCount > 0 && (
           <span className="flex items-center gap-1 tabular-nums">
             <IconMessage2 className="h-3.5 w-3.5" />
             {commentCount} comentário(s)

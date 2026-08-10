@@ -21,11 +21,15 @@ import type {
   ORDER_BY_DIRECTION,
   QUESTIONNAIRE_STATUS,
   QUESTIONNAIRE_ENTRY_STATUS,
+  QUESTIONNAIRE_QUESTION_TYPE,
+  QUESTIONNAIRE_AUDIENCE,
 } from "../constants";
 import type { User, UserIncludes } from "./user";
 
 export type QuestionnaireStatus = QUESTIONNAIRE_STATUS;
 export type QuestionnaireEntryStatus = QUESTIONNAIRE_ENTRY_STATUS;
+export type QuestionnaireQuestionType = QUESTIONNAIRE_QUESTION_TYPE;
+export type QuestionnaireAudienceMode = QUESTIONNAIRE_AUDIENCE;
 
 // =====================
 // Entities
@@ -46,6 +50,10 @@ export interface QuestionnaireQuestion extends BaseEntity {
   title: string;
   description: string;
   helpText?: string | null;
+  /** OPTIONS = escolha entre `options`; TEXT = texto livre (sem options). */
+  type: QuestionnaireQuestionType;
+  /** Quando false, o respondente pode enviar a ficha deixando-a em branco. */
+  isRequired: boolean;
   isActive: boolean;
   deletedAt?: Date | null;
 
@@ -54,7 +62,7 @@ export interface QuestionnaireQuestion extends BaseEntity {
   links?: QuestionnaireQuestionLink[];
   answers?: QuestionnaireAnswer[];
 
-  _count?: { options?: number; answers?: number };
+  _count?: { options?: number; answers?: number; links?: number };
 }
 
 export interface QuestionnaireGroup extends BaseEntity {
@@ -86,7 +94,10 @@ export interface QuestionnaireQuestionLink {
 export interface QuestionnaireAnswer extends BaseEntity {
   entryId: string;
   questionId: string;
-  value: number;
+  /** Nota da opção escolhida — null em perguntas de texto livre. */
+  value?: number | null;
+  /** Texto livre — null em perguntas fechadas. */
+  textValue?: string | null;
   comment?: string | null;
 
   entry?: QuestionnaireEntry;
@@ -106,6 +117,10 @@ export interface QuestionnaireEntry extends BaseEntity {
   respondent?: User;
   answers?: QuestionnaireAnswer[];
 
+  /** Injetados por `serializeEntryDetail` no GET de uma ficha. */
+  questions?: QuestionnaireQuestion[];
+  answersByQuestion?: Record<string, QuestionnaireAnswer>;
+
   _count?: { answers?: number };
 }
 
@@ -116,7 +131,10 @@ export interface Questionnaire extends BaseEntity {
   periodEnd: Date;
   status: QuestionnaireStatus;
   createdById: string;
-  targetAllUsers: boolean;
+  /** Como o público foi escolhido — resolvido em pessoas na abertura. */
+  audience: QuestionnaireAudienceMode;
+  targetSectorIds: string[];
+  targetPositionIds: string[];
   isAnonymous: boolean;
   deletedAt?: Date | null;
 
@@ -141,7 +159,7 @@ export interface QuestionnaireQuestionIncludes {
   options?: boolean | { include?: QuestionnaireOptionIncludes };
   links?: boolean;
   answers?: boolean;
-  _count?: boolean | { select?: { options?: boolean; answers?: boolean } };
+  _count?: boolean | { select?: { options?: boolean; answers?: boolean; links?: boolean } };
 }
 
 export interface QuestionnaireGroupIncludes {
@@ -171,6 +189,7 @@ export interface QuestionnaireGroupOrderBy {
   id?: ORDER_BY_DIRECTION;
   name?: ORDER_BY_DIRECTION;
   order?: ORDER_BY_DIRECTION;
+  isActive?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 }
@@ -179,8 +198,13 @@ export interface QuestionnaireQuestionOrderBy {
   groupId?: ORDER_BY_DIRECTION;
   order?: ORDER_BY_DIRECTION;
   title?: ORDER_BY_DIRECTION;
+  type?: ORDER_BY_DIRECTION;
+  isRequired?: ORDER_BY_DIRECTION;
+  isActive?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
+  /** Ordena pelo tema — `groupId` é uuid e embaralharia os temas. */
+  group?: { name?: ORDER_BY_DIRECTION; order?: ORDER_BY_DIRECTION };
 }
 export interface QuestionnaireOrderBy {
   id?: ORDER_BY_DIRECTION;
@@ -237,10 +261,16 @@ export interface QuestionnaireResultsQuestion {
   description?: string | null;
   helpText?: string | null;
   order: number;
+  type: QuestionnaireQuestionType;
+  isRequired: boolean;
   group: { id: string; name: string } | null;
   options: { value: number; label: string }[];
   /** Map of option value (as string) -> count of answers with that value. */
   distribution: Record<string, number>;
+  /** Denominador das barras e da média — pode diferir de `answeredCount`. */
+  scoredCount: number;
+  /** Free-text answers (TEXT questions only) — never carries respondent identity. */
+  textAnswers: string[];
   answeredCount: number;
   average: number | null;
   commentCount: number;
@@ -283,10 +313,13 @@ export interface QuestionnaireOptionFormData {
 
 export interface QuestionnaireQuestionCreateFormData {
   groupId: string;
-  order: number;
+  /** Ausente = o serviço usa a última ordem do tema + 1. */
+  order?: number;
   title: string;
   description: string;
   helpText?: string | null;
+  type?: QuestionnaireQuestionType;
+  isRequired?: boolean;
   isActive?: boolean;
   options?: QuestionnaireOptionFormData[];
 }
@@ -296,6 +329,8 @@ export interface QuestionnaireQuestionUpdateFormData {
   title?: string;
   description?: string;
   helpText?: string | null;
+  type?: QuestionnaireQuestionType;
+  isRequired?: boolean;
   isActive?: boolean;
 }
 export interface QuestionnaireOptionsUpsertFormData {
@@ -307,9 +342,11 @@ export interface QuestionnaireCreateFormData {
   description?: string | null;
   periodStart: Date;
   periodEnd: Date;
-  targetAllUsers?: boolean;
+  audience?: QuestionnaireAudienceMode;
   isAnonymous?: boolean;
   userIds?: string[];
+  sectorIds?: string[];
+  positionIds?: string[];
   questionIds?: string[];
   groupIds?: string[];
 }
@@ -318,16 +355,21 @@ export interface QuestionnaireUpdateFormData {
   description?: string | null;
   periodStart?: Date;
   periodEnd?: Date;
-  targetAllUsers?: boolean;
+  audience?: QuestionnaireAudienceMode;
   isAnonymous?: boolean;
   userIds?: string[];
+  sectorIds?: string[];
+  positionIds?: string[];
   questionIds?: string[];
   groupIds?: string[];
 }
 
 export interface QuestionnaireAnswerFormData {
   questionId: string;
-  value: number;
+  /** Nota escolhida (pergunta fechada). Null junto com textValue = apagar. */
+  value?: number | null;
+  /** Texto livre (pergunta de texto). Vazio = apagar a resposta. */
+  textValue?: string | null;
   comment?: string | null;
 }
 export interface QuestionnaireEntryAnswersUpsertFormData {
@@ -364,6 +406,8 @@ export interface QuestionnaireQuestionGetManyFormData {
   groupId?: string;
   groupIds?: string[];
   isActive?: boolean;
+  isRequired?: boolean;
+  types?: QuestionnaireQuestionType[];
 }
 export interface QuestionnaireGetManyFormData {
   page?: number;
