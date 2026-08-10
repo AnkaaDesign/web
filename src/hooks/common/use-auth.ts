@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authService } from "../../api-client";
+import { safeLocalStorage } from "../../api-client/platform-utils";
 import type {
   SignInFormData,
   SignUpFormData,
@@ -98,9 +99,14 @@ export function useAuth(): AuthHookReturn {
   });
 
   const logout = useMutation({
-    // Wrap so the mutation stays void-variabled; authService.logout now takes an
-    // optional { refreshToken } body which this generic hook doesn't supply.
-    mutationFn: () => authService.logout(),
+    // The refresh token MUST travel with the logout. Omitting it does not mean
+    // "log out this tab" — the API falls back to revoking every refresh token
+    // the user owns, so a logout here would silently end their phone's session
+    // too. Send it and only this device's session is revoked.
+    mutationFn: () => {
+      const refreshToken = safeLocalStorage.getItem("ankaa_refresh_token");
+      return authService.logout(refreshToken ? { refreshToken } : undefined);
+    },
     onSuccess: () => {
       queryClient.clear(); // Clear all cached data on logout
     },
