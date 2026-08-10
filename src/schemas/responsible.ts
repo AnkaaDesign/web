@@ -21,25 +21,34 @@ const rolesSchema = z.preprocess(
 
 // Email validation.
 //
-// Opcional em todo lugar (criação, inline e atualização): o e-mail é o canal
-// da assinatura eletrônica de orçamento, mas a exigência pertence ao ato de
-// enviar o envelope de assinatura — não ao cadastro do contato. Quando
-// preenchido, o formato continua validado e o valor é normalizado
-// (trim + lowercase). Campo vazio ("") sai como null — a API rejeita "" no
-// .email() e a coluna Responsible.email tem @unique, então strings vazias
-// colidiriam entre si. `undefined` é preservado: em update, "campo ausente"
-// (sem mudança) e "limpar o e-mail" (null) precisam continuar distinguíveis.
-const emailSchema = z
-  .union([
-    z.literal(''),
-    z
-      .string()
-      .email('E-mail inválido')
-      .transform(value => value.trim().toLowerCase()),
-  ])
-  .optional()
-  .nullable()
-  .transform(value => (value === '' ? null : value));
+// OPCIONAL em todo lugar (criação, inline e atualização): nem todo contato tem
+// e-mail, e exigi-lo travava o cadastro inteiro. O e-mail continua sendo o
+// canal da assinatura eletrônica de orçamento (convite + código de uso único),
+// mas essa cobrança pertence ao ato de ENVIAR o envelope de assinatura — não ao
+// cadastro do contato. Quando preenchido, o formato é validado e normalizado.
+//
+// Campo vazio ("") sai como null: a API rejeita "" no .email() e a coluna
+// Responsible.email tem @unique, então strings vazias colidiriam entre si.
+// `undefined` é preservado: em update, "campo ausente" (sem mudança) e "limpar
+// o e-mail" (null) precisam continuar distinguíveis, senão todo PATCH parcial
+// apagaria o e-mail de quem já tinha.
+//
+// O `preprocess` (em vez de uma união com `z.literal('')`) faz duas coisas que
+// a união não fazia:
+//   1. normaliza ANTES de validar — senão " a@b.com ", colado ou vindo do
+//      autocomplete do teclado, era recusado por causa dos espaços;
+//   2. preserva a mensagem 'E-mail inválido' — na união, QUALQUER e-mail
+//      malformado caía em invalid_union e virava "Invalid input" em inglês,
+//      justamente no erro mais comum do campo.
+const emailSchema = z.preprocess(
+  value => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'string') return value.trim().toLowerCase() || null;
+    return value;
+  },
+  z.string().email('E-mail inválido').nullable().optional(),
+);
 
 // Password validation (min 6 chars when provided)
 const passwordSchema = z
