@@ -174,6 +174,9 @@ async function main() {
       z: [+b.min.z.toFixed(4), +b.max.z.toFixed(4)],
       y: [+b.min.y.toFixed(4), +b.max.y.toFixed(4)],
       profundidade_mm: +((skinR - b.min.x) * 1000).toFixed(1),
+      /* A FACE do marco, atrás da crista: 6,0 mm (`FRAME_FRONT`). Na crista
+         (0,0) ela engolia a borracha — "a borracha está muito fina". */
+      face_mm: +((skinR - b.max.x) * 1000).toFixed(1),
       material: (jamb.material as THREE.Material).name,
       /* Cor e metalness do marco: é por eles que ele lê como perfil escuro ou
          como espelho. Um `color` escuro num metal puro não escurece nada — a
@@ -367,8 +370,13 @@ async function main() {
          que reprova sempre é uma asserção que ninguém lê. */
       tris_esperados: 96,
       profundidade_esperada_mm: 71.1,
+      /* Fundo em 71,1 E face em 6,0: `profundidade_mm` mede da crista ao ponto
+         mais fundo (não muda com o recuo da face); `face_mm` é que prova o
+         recuo — na crista (0,0) o marco engolia a borracha. */
+      face_esperada_mm: 6.0,
       aprovado: jambBox.tris === 96
         && Math.abs(jambBox.profundidade_mm - 71.1) < 0.5
+        && Math.abs(jambBox.face_mm - 6.0) < 0.5
         && !/MeshStandardMaterial|^marco__/.test(jambBox.material),
     },
     apos_resize: {

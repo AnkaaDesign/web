@@ -59,10 +59,10 @@
 
 import * as THREE from 'three';
 import {
-  layoutDoor, holeOf, rejectReason, doorFrameGeometry, flatSegments, DOOR_PARTS, PART_TOL,
+  layoutDoor, holeOf, rejectReason, doorFrameGeometry, snapFlatSegments, DOOR_PARTS, PART_TOL,
   LEAF_INSET, DOOR_REVEAL, SILL_CLEARANCE, HEAD_DROP,
   type DoorRect, type DoorPart, type DoorPartSpec, type DoorPlacement,
-  type DoorPlane, type DoorSurface,
+  type DoorPlane, type DoorSurface, type RibGrid,
 } from './trailer-door';
 
 export type { DoorRect, DoorPlane };
@@ -165,6 +165,8 @@ interface Shell {
   unit: Tri[];
   cap: Tri[];
   ribs: number;
+  /** Altura do VALE dentro da unidade (o trecho plano do perfil, medido). */
+  valeH: number;
   /** Estica em Y em vez de transladar (chapa lisa grande). */
   stretchY: boolean;
 }
@@ -620,6 +622,10 @@ function measureSill(
  * `FrontSide` isso não escurece a peça: apaga. Por isso o índice é revertido
  * junto quando o determinante é negativo.
  */
+/** As famílias que existem em PAR ESPELHADO nas pontas da porta — o kit as
+ *  guarda na orientação da ponta de BAIXO e `layoutDoor()` espelha a de cima. */
+const END_FLIP = new Set<DoorPart>(['CABECOTE', 'MACHO', 'ENCAIXE', 'BORRACHA_H']);
+
 function extractDoorKit(
   root: THREE.Object3D, bodyWorld: THREE.Box3,
 ): Map<DoorPart, DoorKitEntry> {
@@ -819,6 +825,19 @@ function extractDoorKit(
       const geo = mesh.geometry.clone();
       geo.applyMatrix4(m4);
       orientGeometry(geo, perm, [s0, s1, s2]);
+      /* PEÇA DE PONTA VEM NORMALIZADA PARA A PONTA DE BAIXO. Cabeçote, macho,
+         encaixe e travessa de borracha existem em pares espelhados na vertical
+         (a unidade do topo é a imagem da de baixo), e este laço pega a PRIMEIRA
+         malha que casar — de qual ponta ela vem é sorte da travessia. Sem
+         normalizar, um kit extraído do topo saía de cabeça para baixo nas duas
+         pontas; normalizado, `layoutDoor()` marca `flipY` na instância do topo
+         e o came do macho aponta para a boca do encaixe em vez de para longe
+         dela. O espelho inverte o enrolamento, então ele é revertido junto. */
+      if (END_FLIP.has(sp.part)
+        && mid[perm[1]] > centre.getComponent(perm[1])) {
+        geo.scale(1, -1, 1);
+        reverseWinding(geo);
+      }
       anchorGeometry(geo, sp.anchor);
       const src = mats.find((m) => !!m && sp.material.test(m.name || '')) as THREE.Material;
       kit.set(sp.part, { geo, mat: src });
@@ -962,27 +981,35 @@ function makeJambMaterial(
     ?? new THREE.MeshStandardMaterial({ color: reserva, metalness: 0.6, roughness: 0.6 });
   m.name = `${(src as THREE.Material | null)?.name ?? rótulo}__porta`;
   m.side = THREE.DoubleSide;
-  /* A ÚNICA decisão de aparência que sobrou nesta feature, e ela está aqui em
-     vez de escondida numa medida.
+  /* O ACABAMENTO DE METAL ESTRUTURAL, aplicado AQUI e não pela varredura.
+     `applyTrailerFinish()` anda por MALHAS, e este clone nasce no construtor
+     do `TrailerBody`, quando ainda não existe porta nenhuma — sem malha, a
+     varredura nunca o vê. O original recebe rug ≥0,62 e env 1,0 (o bloco
+     `TRAILER_STRUCT_METAL_RE` de `models.ts`: galvanizado de usinagem é
+     ACETINADO, não espelho); o clone órfão ficava com os escalares crus do
+     rip — metalness 1, roughness baixa — e virava um espelho do HDRI: é o
+     "o inox da porta está refletindo o HDR". O mesmo piso, escrito aqui,
+     torna o resultado independente da ordem das varreduras. */
+  {
+    const s = m as THREE.MeshStandardMaterial;
+    if ('roughness' in s) {
+      if (!s.roughnessMap) s.roughness = Math.max(s.roughness ?? 0, 0.62);
+      s.envMapIntensity = 1.0;
+    }
+  }
+  /* A tinta é um MECANISMO DORMENTE: hoje nenhum chamador a passa.
    *
-   * No implemento da Ibiporã o marco é `metal-estrutura-principal-padrao` e
-   * renderiza ESCURO — marco e borracha formam juntos a faixa preta de ~130 mm
-   * que se vê na foto de catálogo, e é ela que faz a porta LER como porta. No
-   * nosso `trailer.glb` o material de mesmo nome sai claro, quase igual à
-   * parede: o contorno vira 59 mm de metal branco mais 48 mm de borracha, e a
-   * porta some na lateral.
+   * Ela existiu para escurecer o marco para 0x2b2e33, imitando a faixa preta
+   * da foto de catálogo da Ibiporã — e a decisão foi revertida (ver o call
+   * site no construtor): escurecido, o marco empatava com a borracha e o
+   * conjunto lia INVERTIDO. A referência de aparência é a porta traseira do
+   * NOSSO bake, onde o marco é claro e o contorno escuro é da borracha.
    *
-   * A versão anterior tentou consertar isso pela GEOMETRIA — estreitou
-   * `FRAME_WIDTH` de 78,7 para 40 mm "para a proporção do que se vê voltar ao
-   * que a foto mostra". Não voltava, e abria uma fresta de 19 mm para dentro do
-   * baú em toda a volta da porta, porque a borracha só alcança 35,25 mm.
-   * Escurecer o CLONE (que já é renomeado `__porta` e só veste o marco) resolve
-   * o que era o problema de verdade e não mexe em nenhuma cota.
-   *
-   * E o `metalness` desce junto, porque só a cor não escurece nada: num metal
-   * puro a cor tinge o REFLEXO, e o reflexo aqui é um ambiente de sala branca —
-   * o perfil continuava saindo prateado com a cor em 0x2b2e33. Baixando para
-   * 0,35 ele passa a ler como o perfil anodizado escuro que é. */
+   * O bloco fica porque ele ensina o que "escurecer um material" exige de
+   * verdade — cor sozinha não escurece nada: num metal puro a cor tinge o
+   * REFLEXO (daí o metalness descer), e `clearcoat`/`sheen` refletem o
+   * ambiente POR CIMA de qualquer cor de base (daí serem zerados). Se um
+   * acabamento escuro voltar a ser necessário, é por aqui. */
   if (tinta !== undefined && 'color' in m) {
     const s = m as THREE.MeshPhysicalMaterial;
     s.color.setHex(tinta);
@@ -1033,9 +1060,9 @@ function makeJambMaterial(
  * certo, e o cabeçalho dele diz "giro, não espelhamento" pelo mesmo motivo
  * técnico visto do outro lado.)
  */
-function mirrorAxis(src: THREE.BufferGeometry, axis: 'x' | 'z'): THREE.BufferGeometry {
+function mirrorAxis(src: THREE.BufferGeometry, axis: 'x' | 'y' | 'z'): THREE.BufferGeometry {
   const geo = src.clone();
-  const k = axis === 'x' ? 0 : 2;
+  const k = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
   const flip = (a: THREE.BufferAttribute) => {
     for (let i = 0; i < a.count; i++) {
       const c = [a.getX(i), a.getY(i), a.getZ(i)];
@@ -1088,6 +1115,9 @@ export class TrailerBody {
   private doors = new Map<Face, DoorSpec[]>();
   /** A CRISTA do friso de cada lateral — o plano em que a porta é montada. */
   private skinX: Record<'left' | 'right', number> = { left: 0, right: 0 };
+  /** A grade do friso de cada lateral, para ancorar as faixas lisas da folha
+   *  no VALE (`snapFlatSegments`). Medida na malha, como tudo aqui. */
+  private ribGrid: Partial<Record<'left' | 'right', RibGrid>> = {};
   /** As peças da porta, extraídas do próprio implemento no construtor. */
   private kit = new Map<DoorPart, DoorKitEntry>();
   /** As malhas instanciadas em cena, por `peça|lado`. */
@@ -1097,8 +1127,8 @@ export class TrailerBody {
   /** Marco e borracha de cada lateral: duas malhas por face, todas as portas
    *  juntas. Chave `face|frame` / `face|seal`. */
   private jambs = new Map<string, THREE.Mesh>();
-  /** Os dois materiais das peças de vão, tirados do próprio implemento. */
-  private jambMat: { frame: THREE.Material } | null = null;
+  /** Os materiais das peças de vão, tirados do próprio implemento. */
+  private jambMat: { frame: THREE.Material; trim: THREE.Material } | null = null;
   constructor(root: THREE.Object3D) {
     const { tris, meshes, material } = collect(root);
     if (!tris.length) throw new Error('TrailerBody: nenhuma malha branca encontrada');
@@ -1132,7 +1162,7 @@ export class TrailerBody {
       const sh: Shell = {
         tris: group, min: b.min, max: b.max,
         behaviour: 'local', rows: [], skirt: [], unit: [], cap: [], ribs: 0,
-        stretchY: false,
+        valeH: 0, stretchY: false,
       };
 
       const spanZ = b.max.z - b.min.z;
@@ -1155,6 +1185,10 @@ export class TrailerBody {
           pitch = median(gaps) || NOMINAL_PITCH;
           ribCount = sh.ribs; row0 = rows[0]; rowN = rows[rows.length - 1];
           this.sliceRibbed(sh, pitch);
+          if (sh.face && sh.valeH > 0) {
+            this.ribGrid[sh.face as 'left' | 'right'] =
+              { row0: rows[0], pitch, valeH: sh.valeH };
+          }
           this.shells.push(sh);
           continue;
         }
@@ -1224,8 +1258,22 @@ export class TrailerBody {
     /* O KIT vem do PRÓPRIO implemento, e é extraído aqui — antes do primeiro
        `rebuild()`, que já pode precisar dele. Ver `extractDoorKit()`. */
     this.kit = extractDoorKit(root, new THREE.Box3(body.min.clone(), body.max.clone()));
+    /* SEM tinta, e a remoção é decisão de produto (2026-08-10). O marco chegou a
+       ser escurecido para 0x2b2e33 imitando a foto de catálogo da Ibiporã — mas
+       borracha (#2b2b2d) e marco tingido (#2b2e33) são o MESMO tom, e os dois
+       fundiam num anel preto de ~130 mm. O perfil arredondado da borracha pega
+       brilho e lia como METAL encostado na folha; o marco chapado lia como
+       BORRACHA por fora — "está invertido", sendo que a geometria estava certa
+       (folha → borracha → marco, provado por raio na bancada). No NOSSO bake a
+       referência é a porta traseira: marco galvanizado CLARO com a borracha
+       preta destacada contra ele. Sem tinta, o contorno escuro volta a ser da
+       borracha, que é de quem ele é. */
     this.jambMat = {
-      frame: makeJambMaterial(root, DOOR_FRAME_MAT_RE, 'marco', 0x2b2e33, 0x2b2e33),
+      frame: makeJambMaterial(root, DOOR_FRAME_MAT_RE, 'marco', 0x2b2e33),
+      /* A moldura é GALVANIZADA — o material da saia e da cantoneira, não o
+         do marco e não inox: pedido de produto, e é o mesmo perfil que
+         `measureSill()` já localiza por este nome. */
+      trim: makeJambMaterial(root, FRAME_MAT_RE, 'moldura', 0x9aa0a3),
     };
 
     this.rebuild();
@@ -1249,6 +1297,21 @@ export class TrailerBody {
         for (let k = 0; k < 3; k++) p[k * 3 + 1] = (p[k * 3 + 1] - lo) * sy;
         sh.unit.push({ p, n: c.n });
       }
+    }
+
+    /* O VALE da unidade, medido nela: a fileira começa no vale (é onde
+       `findRows` marca), que é um trecho PLANO — nenhum vértice no meio. O
+       primeiro salto grande na lista de Ys é a altura dele. É esta medida que
+       ancora as bordas das faixas lisas da folha (`snapFlatSegments`): borda
+       de faixa no meio do ARCO deixa o perfil cortado a meia subida, o degrau
+       que lia como "a parte lisa está por cima do friso". */
+    const ys = new Set<number>();
+    for (const t of sh.unit) {
+      for (let k = 0; k < 3; k++) ys.add(Math.round(t.p[k * 3 + 1] * 1e4) / 1e4);
+    }
+    const sorted = [...ys].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i + 1] - sorted[i] > ROW_GAP) { sh.valeH = sorted[i + 1]; break; }
     }
   }
 
@@ -1352,10 +1415,14 @@ export class TrailerBody {
        atrás (`JAMB_DEPTH`), e é ele que fecha o vão — ver `jambGeometry()`. A
        folha é o pedaço da própria pele, então o friso dela continua alinhado
        com o da parede: é o mesmo friso, no mesmo passo e na mesma fase. */
-    const doorsOf = (face: Face | undefined): { leaf: DoorRect; hole: DoorRect }[] => {
+    type DoorCut = {
+      leaf: DoorRect; hole: DoorRect;
+      segs: { lo: number; hi: number; flat: boolean }[];
+    };
+    const doorsOf = (face: Face | undefined): DoorCut[] => {
       const list = face ? this.doors.get(face) : undefined;
       if (!list?.length || face === 'rear') return [];
-      const out: { leaf: DoorRect; hole: DoorRect }[] = [];
+      const out: DoorCut[] = [];
       for (const d of list) {
         /* CLAMP AQUI, e não só no editor. `livery-structure.ts` também limita —
            mas ele limita o que o formulário mostra, e as duas listas são
@@ -1394,14 +1461,20 @@ export class TrailerBody {
           console.warn('[porta] porta de', face, 'recusada —', why);
           continue;
         }
-        out.push({ leaf, hole: holeOf(leaf) });
+        /* As faixas lisas saem daqui, UMA vez por porta, já ancoradas no VALE
+           do friso da face — é a grade medida quem decide onde cada borda
+           para, e é o que faz as quatro faixas terminarem como a que "já
+           continua a descida do friso". */
+        const grid = face === 'left' || face === 'right'
+          ? this.ribGrid[face] : undefined;
+        out.push({ leaf, hole: holeOf(leaf), segs: snapFlatSegments(leaf, grid) });
       }
       return out;
     };
 
     /* Uma face por vez: `doorsOf()` roda uma vez por lateral, não uma vez por
        triângulo. São ~73 mil triângulos e a lista é relida em cada um. */
-    const doorsFor = new Map<Face, { leaf: DoorRect; hole: DoorRect }[]>();
+    const doorsFor = new Map<Face, DoorCut[]>();
     for (const face of ['left', 'right'] as const) doorsFor.set(face, doorsOf(face));
 
     const write = (t: Tri) => {
@@ -1446,49 +1519,31 @@ export class TrailerBody {
       const bucket = leafTris.find((l) => l.face === face);
       const sgn = face === 'right' ? -1 : 1;
       const dx = sgn * LEAF_INSET;
-      for (const { leaf } of doors) {
+      for (const { leaf, segs } of doors) {
         /* A FOLHA NÃO TEM O FRISO CORRIDO DA PAREDE. Ela sai recortada dela —
-           é o que mantém passo e FASE do friso —, e as quatro faixas lisas
-           medidas no nó 2354 são aplicadas aqui, achatando o relevo para o plano
-           do VALE. É a mesma superfície, sem o vinco, que é o que uma chapa lisa
-           é. Ver `LEAF_FLAT_BANDS`.
+           é o que mantém passo e FASE do friso — e SÓ os segmentos FRISADOS
+           passam por aqui. As faixas lisas NÃO são o friso achatado: cada uma
+           é UM QUAD, emitido uma vez por porta depois desta varredura (ver o
+           laço das faixas em `rebuild()`).
 
-           O triângulo é CORTADO na borda da faixa antes de ser achatado. Antes
-           o teste era por triângulo inteiro (`inFlatBand` nos três vértices) e a
-           fileira de friso que cruzasse a borda ficava toda em relevo — degrau
-           serrilhado, porque as bordas são fração da altura e o friso vem da
-           parede, então elas nunca caem numa aresta. */
-        const segs = flatSegments(leaf);
+           A versão que achatava a malha projetava TODOS os vértices do
+           segmento no plano do vale — pele externa, pele INTERNA (a face gêmea
+           0,8 mm atrás, ver o construtor) e paredes do vinco viravam
+           superfícies exatamente COPLANARES. Em branco `FrontSide` isso era
+           invisível: a pele interna é descartada pelo enrolamento e o que
+           sobrepõe sombreia igual. Com a tinta do cavalo — flake amostrado por
+           fragmento, camadas físicas — coplanaridade é ruído por pixel: o
+           "piscando, chuviscando" que só aparecia nas partes lisas e só com
+           essa tinta. Uma chapa lisa é UM plano; a geometria agora diz isso
+           literalmente, e de quebra o corte na borda da faixa continua exato
+           (`clipSlab` na fronteira do segmento). */
         for (const whole of intersectRect(t, leaf)) {
         for (const seg of segs) {
+        if (seg.flat) continue;
         for (const piece of clipSlab(whole, seg.lo, seg.hi)) {
           const q = new Float32Array(piece.p);
-          const flat = seg.flat;
-          for (let k = 0; k < 3; k++) {
-            /* `+ sgn`, e o sinal é o conserto. `sgn` é −1 na lateral DIREITA,
-               onde "fora" é +X; `xCrest − sgn·RIB_RELIEF` levava a faixa lisa
-               para 5,2 mm À FRENTE da crista, e o `dx` de recuo devolvia só
-               5,1 — a faixa ficava rasante com a crista enquanto o resto da
-               folha ficava 5,1 mm atrás dela. Ou seja: uma CHAPA POR CIMA DOS
-               FRISOS, que é exatamente o relato ("está sendo adicionada outra
-               placa acima dos frisos, em vez de apenas não desenhar os frisos
-               nessas áreas"). Com `+ sgn` a faixa cai no plano do VALE, 5,2 mm
-               atrás da crista da folha, que é o que uma chapa sem vinco é. */
-            if (flat) q[k * 3] = xCrest[face] + sgn * RIB_RELIEF;
-            q[k * 3] += dx;
-          }
-          if (flat) {
-            /* Achatado, o vinco some e a normal dele mente: ela ainda aponta
-               para a parede do friso que deixou de existir. A normal de uma
-               chapa lisa é a do painel. */
-            const n = new Float32Array(piece.n);
-            for (let k = 0; k < 3; k++) {
-              n[k * 3] = -sgn; n[k * 3 + 1] = 0; n[k * 3 + 2] = 0;
-            }
-            bucket?.tris.push({ p: q, n });
-          } else {
-            bucket?.tris.push({ p: q, n: piece.n });
-          }
+          for (let k = 0; k < 3; k++) q[k * 3] += dx;
+          bucket?.tris.push({ p: q, n: piece.n });
         }
         }
         }
@@ -1550,6 +1605,34 @@ export class TrailerBody {
       for (const t of sh.tris) push(t, dy, sh.behaviour, sh.face);
     }
 
+    /* AS FAIXAS LISAS DA FOLHA, um QUAD por faixa — a contraparte do `continue`
+       em `emit()`. Duas faces de triângulo no plano do VALE da folha
+       (crista − 5,2 − 5,1 mm), normal do painel, enrolamento para FORA (o
+       corpo é `FrontSide`: enrolamento errado não escurece, SOME). Nenhuma
+       estrutura interna: é isso que mata o chuvisco da tinta flake. */
+    for (const l of leafTris) {
+      const sgn = l.face === 'right' ? -1 : 1;
+      for (const { leaf, segs } of doorsFor.get(l.face) ?? []) {
+        const x = xCrest[l.face] + sgn * (RIB_RELIEF + LEAF_INSET);
+        for (const seg of segs) {
+          if (!seg.flat) continue;
+          const { z0, z1 } = leaf;
+          const quad: [number, number][] = sgn < 0
+            ? [[seg.lo, z0], [seg.hi, z1], [seg.lo, z1], [seg.lo, z0], [seg.hi, z0], [seg.hi, z1]]
+            : [[seg.lo, z0], [seg.lo, z1], [seg.hi, z1], [seg.lo, z0], [seg.hi, z1], [seg.hi, z0]];
+          for (let tI = 0; tI < 2; tI++) {
+            const p = new Float32Array(9), n = new Float32Array(9);
+            for (let k = 0; k < 3; k++) {
+              const [y, z] = quad[tI * 3 + k];
+              p[k * 3] = x; p[k * 3 + 1] = y; p[k * 3 + 2] = z;
+              n[k * 3] = -sgn; n[k * 3 + 1] = 0; n[k * 3 + 2] = 0;
+            }
+            l.tris.push({ p, n });
+          }
+        }
+      }
+    }
+
     /* A folha entra DEPOIS da chapa e no MESMO buffer: mesma malha, mesmo
        material, mesmo recorte de painel de livery. Numa malha própria ela
        ficaria de fora de `buildLiveryPanels()` e seria a única parte do baú sem
@@ -1597,22 +1680,22 @@ export class TrailerBody {
       const plane: DoorPlane = {
         xSkin: this.skinX[face], sign: face === 'right' ? 1 : -1,
       };
-      /* UMA superfície, o marco. A segunda era um anel de `borracha-preta`
-         desenhado à mão, e ele saiu: a vedação de verdade é peça EXTRAÍDA
-         (`BORRACHA_V`/`BORRACHA_H`), e as duas juntas davam duas borrachas
-         sobrepostas com seções diferentes. Ver `doorFrameGeometry()`. */
-      const acc: Record<'frame', DoorSurface> = {
+      /* DUAS superfícies: o marco e a MOLDURA galvanizada em volta do vão.
+         (Um anel de `borracha-preta` desenhado à mão já morou aqui e saiu: a
+         vedação de verdade é peça EXTRAÍDA — `BORRACHA_V`/`BORRACHA_H`.) */
+      const acc: Record<'frame' | 'trim', DoorSurface> = {
         frame: { position: [], normal: [] },
+        trim: { position: [], normal: [] },
       };
       for (const { leaf } of doors) {
         const q = doorFrameGeometry(leaf, plane);
-        for (const k of ['frame'] as const) {
+        for (const k of ['frame', 'trim'] as const) {
           acc[k].position.push(...q[k].position);
           acc[k].normal.push(...q[k].normal);
         }
       }
 
-      for (const k of ['frame'] as const) {
+      for (const k of ['frame', 'trim'] as const) {
         const s = acc[k];
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(s.position, 3));
@@ -1627,7 +1710,7 @@ export class TrailerBody {
         geo.computeBoundingSphere();
 
         const mesh = new THREE.Mesh(geo, this.jambMat[k]);
-        mesh.name = `PORTA_MARCO_${face === 'right' ? 'R' : 'L'}`;
+        mesh.name = `PORTA_${k === 'frame' ? 'MARCO' : 'MOLDURA'}_${face === 'right' ? 'R' : 'L'}`;
         mesh.castShadow = mesh.receiveShadow = true;
         this.group.add(mesh);
         this.jambs.set(`${face}|${k}`, mesh);
@@ -1656,7 +1739,11 @@ export class TrailerBody {
       };
       for (const { leaf } of doors) {
         for (const pl of layoutDoor(leaf, plane)) {
-          const key = `${pl.part}|${face}`;
+          /* A instância de TOPO de uma peça de ponta é ESPELHADA na vertical
+             (`flipY`), e espelho é geometria — não cabe na matriz de uma
+             InstancedMesh sem inverter o enrolamento da chamada inteira. Cada
+             orientação vira sua própria malha instanciada. */
+          const key = `${pl.part}|${face}|${pl.flipY ? 'v' : '-'}`;
           const list = wanted.get(key);
           if (list) list.push(pl); else wanted.set(key, [pl]);
         }
@@ -1674,7 +1761,7 @@ export class TrailerBody {
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
     for (const [key, list] of wanted) {
-      const [part, face] = key.split('|') as [DoorPart, 'left' | 'right'];
+      const [part, face, flip] = key.split('|') as [DoorPart, 'left' | 'right', 'v' | '-'];
       const entry = this.kit.get(part);
       if (!entry) continue;
 
@@ -1688,9 +1775,13 @@ export class TrailerBody {
            peças de uma porta e virava as da outra — a dobradiça ao contrário com
            o resto do kit certo. `x` continua aqui porque é do LADO do baú, não
            da peça. */
-        const geo = face === 'right' ? entry.geo.clone() : mirrorAxis(entry.geo, 'x');
+        let geo = face === 'right' ? entry.geo.clone() : mirrorAxis(entry.geo, 'x');
+        /* O espelho VERTICAL da instância de topo — composto com o de lado
+           quando os dois se aplicam; cada `mirrorAxis` reverte o enrolamento
+           do seu espelho, então a composição fecha sozinha. */
+        if (flip === 'v') geo = mirrorAxis(geo, 'y');
         mesh = new THREE.InstancedMesh(geo, this.partMaterial(entry.mat), list.length);
-        mesh.name = `PORTA_${part}_${face === 'right' ? 'R' : 'L'}`;
+        mesh.name = `PORTA_${part}_${face === 'right' ? 'R' : 'L'}${flip === 'v' ? '_TOPO' : ''}`;
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.frustumCulled = false;   // a caixa de uma InstancedMesh mal cobre o conjunto
         this.group.add(mesh);

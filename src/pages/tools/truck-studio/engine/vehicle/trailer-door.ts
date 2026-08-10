@@ -317,6 +317,23 @@ export const FRAME_FRONT = 0.0060;
 /** Profundidade do marco. Medido: 65,1 mm (−1,2935 a −1,2284). */
 export const FRAME_DEPTH = 0.0651;
 
+/* --------------------------------------------------------------- moldura
+   A TIRA GALVANIZADA em volta do vão — pedido de produto (2026-08-10): "uma
+   moldurinha bem sutil em volta do frame metálico, uma pequena tira de
+   elevação, galvanizada e não inox". É o arremate que um implemento montado
+   tem na boca do vão, e as três medidas abaixo são DECISÃO DE APARÊNCIA
+   (registradas aqui, não escondidas): estreita e quase rasante, para ler como
+   arremate e não como segundo marco. */
+/** Largura da tira, da borda do vão para FORA, sobre a parede. Esteve 22 mm e
+ *  leu como segundo marco — "muito grosso, precisa ser 1/3". */
+export const TRIM_WIDTH = 0.0073;
+/** Quanto ela fica À FRENTE da crista do friso — a "pequena elevação".
+ *  Dobrada de 2,5 para 5 mm no mesmo ajuste ("pode ser 2x a altura"). */
+export const TRIM_PROUD = 0.005;
+/** Até onde ela desce atrás da crista: 6,2 mm passa o vale do friso (5,2 mm)
+ *  e fecha contra a chapa em qualquer fase, sem fresta por trás. */
+export const TRIM_SINK = 0.0062;
+
 /* --------------------------------------------------------------- borracha
    A VEDAÇÃO, MEDIDA NO NOSSO BAKE (porta traseira direita) — e é aqui que a
    versão anterior errava por 38 mm.
@@ -461,11 +478,29 @@ const GUIA_FRAC = [0.3611, 0.6389];
 const GUIA_W = 0.0217, SUPORTE_GUIA_W = 0.0215;
 /** Rebites da guia: dois, a ±33 mm do eixo do varão, na altura dela · w −7,7. */
 const GUIA_REBITE_DD = 0.033, GUIA_REBITE_W = -0.0077;
-/** Anéis do varão: v 10 e 104 do pé, e os simétricos do topo · w 23. */
-const ANEL_V = [0.010, 0.104], ANEL_W = 0.0230;
+/**
+ * Anéis do varão: v 10 do pé e do topo · w 23. UM por ponta.
+ *
+ * O rip dizia quatro (10 · 104 · 2346 · 2440) e este arquivo os desenhava — mas
+ * o NOSSO bake tem só dois por varão (`kit.json`: v 10,1 e 2450,1, nada em
+ * 104). O par extra caía DENTRO do vão do cabeçote (que vai de −30 a +131 da
+ * ponta): é o anel flutuando sobre a trava superior do varão que a tela
+ * apontou como "parafusos no local errado".
+ */
+const ANEL_V = [0.010], ANEL_W = 0.0230;
 /** Macho de ponta: 87,9 mm da borda livre · v −32,8 (ABAIXO da folha) · w 23. */
 const MACHO_D = 0.0879, MACHO_OVER = 0.0328, MACHO_W = 0.0230;
-/** Rebites do cabeçote: ±31 mm do eixo do varão, v 41 e 121 do pé · w −6,2. */
+/**
+ * Rebites do cabeçote: ±31 mm do eixo do varão, DOIS pares por cabeçote, a
+ * v 41 e 121 da ponta · w −6,2 — como o rip sempre disse.
+ *
+ * A fileira de 41 chegou a ser REMOVIDA daqui com base numa varredura dos
+ * rebites da traseira que não a mostrava — mas a lista de Y daquele dump era
+ * TRUNCADA, e o render da nossa própria traseira desmente a conclusão: cada
+ * cabeçote mostra quatro parafusos, um par no topo e um no pé da chapa da
+ * flange. A remoção é o "os dois parafusos da primeira peça que segura o
+ * varão em cima estão sem". Uma lista cortada não é uma lista vazia.
+ */
 const CABECOTE_REBITE_DD = 0.031, CABECOTE_REBITE_V = [0.041, 0.121];
 const CABECOTE_REBITE_W = -0.0062;
 
@@ -480,8 +515,21 @@ const ENCAIXE_REBITE_D = 0.0900, ENCAIXE_REBITE_W = -0.0032;
 
 /* --- fecho: tudo a v ≈ 193 mm, altura de canela --- */
 const FECHO_V = 0.1932;
-/** Distância da borda LIVRE, medida no nosso bake. */
-const BATENTE_D = 0.3183, BATENTE_W = 0.0340;
+/**
+ * Batente do fecho: 384,8 mm da borda livre — e o número tem história.
+ *
+ * A porta traseira do nosso bake tem DOIS fechos completos (v 193 e v 373 mm,
+ * um varão cada) e por isso DOIS batentes: (D 380,6 · v 193) e (D 322,3 ·
+ * v 373), medidos em `kit.json`. Este arquivo já teve 376,5 (o número do rip,
+ * certo) e foi "corrigido" para 318,3 quando uma medição achou o batente DO
+ * OUTRO fecho e o pôs na altura deste — o resultado era a peça preta enfiada
+ * na ponta do manípulo (tala do manípulo até ~316 mm; batente em 298…339).
+ * Com 384,8 (o D 380,6 na convenção deste arquivo, que mede os três metais do
+ * fecho +4,2 mm — manípulo 192,9/188,7, contra-fecho 228,6/224,4, suporte
+ * 282,0/277,8) ele volta para onde o bake o mostra: 364…405 mm, livre da
+ * ponta do manípulo, como o rip sempre disse.
+ */
+const BATENTE_D = 0.3848, BATENTE_W = 0.0340;
 const SUPORTE_FECHO_D = 0.2820, SUPORTE_FECHO_W = 0.0239;
 const CONTRAFECHO_D = 0.2286, CONTRAFECHO_W = 0.0232;
 const MANIPULO_D = 0.1929, MANIPULO_W = 0.0220;
@@ -568,6 +616,66 @@ export function flatSegments(leaf: DoorRect): { lo: number; hi: number; flat: bo
   return out;
 }
 
+/**
+ * A grade do friso de uma lateral, em Y absoluto: os VALES ficam em
+ * `[row0 + k·pitch, row0 + k·pitch + valeH]` e o arco ocupa o resto do passo.
+ * Medida por `TrailerBody` na própria malha, nunca arbitrada.
+ */
+export interface RibGrid { row0: number; pitch: number; valeH: number }
+
+/**
+ * `flatSegments()` com as bordas internas ANCORADAS NO VALE do friso.
+ *
+ * As faixas do modelo real casam com o friso por construção — elas trocam
+ * segmentos INTEIROS de arco por chapa lisa, então toda borda de faixa cai
+ * onde a chapa já está no plano do vale. As nossas eram fração da altura da
+ * folha sobre um friso que vem recortado da parede: a fase é um acidente da
+ * posição da porta, e uma borda podia cair no MEIO do arco. A faixa (que está
+ * no plano do vale) encontrava o arco cortado a meia altura: um degrau aberto
+ * de até 5,2 mm que lia como "a parte lisa está construída em cima do friso".
+ * A segunda faixa de baixo saía perfeita por sorte — a borda dela caía no
+ * vale, "continuando a descida do friso" — e é esse o comportamento que aqui
+ * vira regra: borda de BAIXO desce até o fim do vale mais próximo, borda de
+ * CIMA sobe até o começo do vale seguinte. As faixas só CRESCEM, então as
+ * guias do varão (fração 0,3611/0,6389, com ≥68 mm de margem nominal para a
+ * borda) continuam dentro delas em qualquer altura de porta.
+ */
+export function snapFlatSegments(
+  leaf: DoorRect, grid?: RibGrid,
+): { lo: number; hi: number; flat: boolean }[] {
+  if (!grid || !(grid.pitch > 0) || !(grid.valeH > 0)) return flatSegments(leaf);
+  const { y0, y1 } = leaf;
+  const h = y1 - y0;
+  const fase = (y: number) => {
+    const p = (y - grid.row0) % grid.pitch;
+    return p < 0 ? p + grid.pitch : p;
+  };
+  const eps = 1e-6;
+  /* Borda inferior de faixa: se cair no arco, desce até o TETO do vale de
+     baixo — o friso termina a descida e a chapa lisa continua no mesmo plano. */
+  const paraBaixo = (y: number) => {
+    const p = fase(y);
+    return p <= grid.valeH + eps ? y : y - (p - grid.valeH);
+  };
+  /* Borda superior: sobe até o PISO do vale seguinte, onde o arco recomeça. */
+  const paraCima = (y: number) => {
+    const p = fase(y);
+    return p <= grid.valeH + eps ? y : y + (grid.pitch - p);
+  };
+  const out: { lo: number; hi: number; flat: boolean }[] = [];
+  let cursor = y0;
+  for (const [a, b] of LEAF_FLAT_BANDS) {
+    /* As pontas da folha (a === 0, b === 1) são borda de PORTA, não de faixa:
+       ficam onde estão. */
+    const lo = a <= 0 ? y0 : paraBaixo(y0 + a * h);
+    const hi = b >= 1 ? y1 : paraCima(y0 + b * h);
+    if (lo > cursor) out.push({ lo: cursor, hi: lo, flat: false });
+    if (hi > cursor) { out.push({ lo: Math.max(lo, cursor), hi, flat: true }); cursor = hi; }
+  }
+  if (cursor < y1) out.push({ lo: cursor, hi: y1, flat: false });
+  return out;
+}
+
 /* --------------------------------------------------------------- o recorte */
 
 /** O VÃO na chapa, a partir do retângulo da folha. */
@@ -631,6 +739,17 @@ export interface DoorPlacement {
    *  produto físico e não crescem com a porta. */
   sy?: number;
   sz?: number;
+  /**
+   * Instância do TOPO de uma peça de PONTA: espelhada verticalmente.
+   *
+   * O kit guarda UMA geometria por família, normalizada para a orientação da
+   * ponta de BAIXO (`extractDoorKit`). Cabeçote, macho, encaixe e travessa de
+   * borracha são assimétricos na vertical — no implemento a unidade do topo é
+   * a imagem espelhada da de baixo. Sem isto, a peça de baixo era desenhada nas
+   * DUAS pontas e o came do topo apontava para longe da boca do encaixe: "a
+   * parte de segurar o varão superior não está batendo com a parte soldada".
+   */
+  flipY?: boolean;
 }
 
 /**
@@ -665,7 +784,7 @@ export function layoutDoor(leaf: DoorRect, plane: DoorPlane): DoorPlacement[] {
   const h = y1 - y0;
   const p: DoorPlacement[] = [];
   const add = (part: DoorPart, w: number, y: number, z: number,
-    s?: { sy?: number; sz?: number }) =>
+    s?: { sy?: number; sz?: number; flipY?: boolean }) =>
     p.push({ part, x: out(w), y, z, ...s });
 
   /* ========================================================== BORRACHA
@@ -695,9 +814,11 @@ export function layoutDoor(leaf: DoorRect, plane: DoorPlane): DoorPlacement[] {
        pé do eixo Y) punha a peça inteira meio comprimento fora do lugar; era o
        que fazia a vedação horizontal nunca encostar no canto. */
     const hLen = (cz1 - cz0) + SEAL_SECTION;
-    for (const y of [cy0, cy1]) {
-      add('BORRACHA_H', SEAL_W, y, (cz0 + cz1) / 2, { sz: hLen / SEAL_H_LEN });
-    }
+    add('BORRACHA_H', SEAL_W, cy0, (cz0 + cz1) / 2, { sz: hLen / SEAL_H_LEN });
+    /* A travessa de CIMA é a de baixo espelhada — o perfil tem lábio, e o
+       lábio da travessa superior aponta para baixo. */
+    add('BORRACHA_H', SEAL_W, cy1, (cz0 + cz1) / 2,
+      { sz: hLen / SEAL_H_LEN, flipY: true });
   }
 
   /* ========================================================== DOBRADIÇA
@@ -738,7 +859,8 @@ export function layoutDoor(leaf: DoorRect, plane: DoorPlane): DoorPlacement[] {
      cada um (duas colunas a ±31 mm do eixo, duas linhas a 41 e 121 mm da
      ponta). Os rebites entram porque a peça é parafusada na folha e sem eles o
      cabeçote lê como colado. */
-  for (const y of [y0 + CABECOTE_V, y1 - CABECOTE_V]) add('CABECOTE', CABECOTE_W, y, varaoZ);
+  add('CABECOTE', CABECOTE_W, y0 + CABECOTE_V, varaoZ);
+  add('CABECOTE', CABECOTE_W, y1 - CABECOTE_V, varaoZ, { flipY: true });
   for (const dd of [-CABECOTE_REBITE_DD, CABECOTE_REBITE_DD]) {
     for (const dv of CABECOTE_REBITE_V) {
       add('REBITE', CABECOTE_REBITE_W, y0 + dv, varaoZ + dd);
@@ -767,20 +889,22 @@ export function layoutDoor(leaf: DoorRect, plane: DoorPlane): DoorPlacement[] {
     add('ANEL', ANEL_W, y1 - dv, varaoZ);
   }
 
-  /* Machos de ponta: passam da folha e entram no encaixe do marco. */
-  for (const y of [y0 - MACHO_OVER, y1 + MACHO_OVER]) {
-    add('MACHO', MACHO_W, y, z1 - MACHO_D);
-  }
+  /* Machos de ponta: passam da folha e entram no encaixe do marco. O de cima
+     é o de baixo ESPELHADO — o came aponta para a boca que o recebe. */
+  add('MACHO', MACHO_W, y0 - MACHO_OVER, z1 - MACHO_D);
+  add('MACHO', MACHO_W, y1 + MACHO_OVER, z1 - MACHO_D, { flipY: true });
 
   /* E os ENCAIXES que os recebem, soldados ao marco: 59,8 mm além de cada ponta
      da folha e no Z DO MACHO — não no do varão. Os dois ficam a 20 mm de
      distância um do outro, e é o macho que tem de entrar no encaixe; alinhá-lo
      pelo varão deixava a ponta batendo 20 mm ao lado da boca. Medido no nosso
      bake: encaixe em u 1109,6 contra macho em 1112,1 e varão em 1091,9. */
-  for (const y of [y0 - ENCAIXE_OVER, y1 + ENCAIXE_OVER]) {
-    add('ENCAIXE', ENCAIXE_W, y, z1 - ENCAIXE_D);
-    add('REBITE', ENCAIXE_REBITE_W, y, z1 - ENCAIXE_REBITE_D);
-  }
+  add('ENCAIXE', ENCAIXE_W, y0 - ENCAIXE_OVER, z1 - ENCAIXE_D);
+  add('REBITE', ENCAIXE_REBITE_W, y0 - ENCAIXE_OVER, z1 - ENCAIXE_REBITE_D);
+  /* O encaixe de cima espelhado, com a BOCA para baixo — é nela que o came
+     do macho superior entra. */
+  add('ENCAIXE', ENCAIXE_W, y1 + ENCAIXE_OVER, z1 - ENCAIXE_D, { flipY: true });
+  add('REBITE', ENCAIXE_REBITE_W, y1 + ENCAIXE_OVER, z1 - ENCAIXE_REBITE_D);
 
   /* ============================================================== FECHO
      Tudo a 193 mm do PÉ. É fecho de baú frigorífico: altura de canela, não de
@@ -865,30 +989,44 @@ const grow = (r: DoorRect, d: number): DoorRect =>
  *
  * A geometria é a medida, sem folga inventada:
  *
- *   perfil    do vão para dentro, `FRAME_WIDTH` (78,7 mm), da CRISTA da pele
- *             até `FRAME_FRONT + FRAME_DEPTH` (71,1 mm) de fundura
+ *   perfil    do vão para dentro, `FRAME_WIDTH` (78,7 mm), de `FRAME_FRONT`
+ *             (6,0 mm atrás da crista) até 71,1 mm de fundura
  *   retorno   os 12 mm mais fundos, seguindo até a borda da folha
  *
- * O perfil corre até a CRISTA (e não até `FRAME_FRONT`) para tapar a borda
- * cortada da chapa, que tem espessura zero. E a borracha, montada 19,55 mm
- * sobre ele, é o que fecha a junta sem deixar fresta em ângulo nenhum: não há
- * um plano de encontro para errar.
+ * O perfil nasce em `FRAME_FRONT` — a MEDIDA — e não na crista: 0,6 mm à
+ * frente da face da borracha, um marco na crista engolia a sobreposição de
+ * 19,55 mm e deixava a vedação com 15,7 mm visíveis ("a borracha está muito
+ * fina"). Recuado, a borracha monta sobre ele e é ela que fecha a junta sem
+ * deixar fresta em ângulo nenhum: não há um plano de encontro para errar.
  */
 export function doorFrameGeometry(
   leaf: DoorRect, plane: DoorPlane,
-): { frame: DoorSurface } {
+): { frame: DoorSurface; trim: DoorSurface } {
   const { xSkin, sign } = plane;
   const hole = holeOf(leaf);
   const frame: DoorSurface = { position: [], normal: [] };
+  const trim: DoorSurface = { position: [], normal: [] };
   /* `sign` decide para que lado é "dentro"; os pares são normalizados para
      x0 < x1 para que as normais de `box()` continuem valendo. */
   const span = (a: number, b: number): [number, number] =>
     (sign > 0 ? [xSkin - b, xSkin - a] : [xSkin + a, xSkin + b]);
 
-  /* O perfil visível: da CRISTA da pele até 71,1 mm de fundura, `FRAME_WIDTH`
-     da borda do vão para dentro. Correr até a crista é o que tapa a borda
-     cortada da chapa, que tem espessura zero. */
-  const [fx0, fx1] = span(0, FRAME_FRONT + FRAME_DEPTH);
+  /* O perfil visível: de `FRAME_FRONT` (6,0 mm atrás da crista — a MEDIDA) até
+     71,1 mm de fundura, `FRAME_WIDTH` da borda do vão para dentro.
+
+     Ele já correu até a crista, "para tapar a borda cortada da chapa". O preço
+     era inverter a pilha: a face da borracha fica 0,6 mm atrás da crista
+     (`SEAL_FRONT`), então um marco NA crista passava 0,6 mm à frente dela e
+     ENGOLIA os 19,55 mm de sobreposição — da borracha sobravam 15,7 mm
+     visíveis, e é o "a borracha está muito fina". Recuado à medida, a borracha
+     fica 5,4 mm à frente do marco e MONTA sobre ele, como o rip descreve ("a
+     borracha monta 20,9 mm no marco") e como a traseira do nosso bake mostra:
+     a faixa preta inteira de ~48 mm, com o metal claro por fora. O rebaixo de
+     6 mm na boca do vão é real — "marco, borracha e folha começam todos entre
+     4,5 e 6,0 mm atrás da crista" — e a borda cortada da chapa, de espessura
+     zero, não tem face para mostrar: o que se vê pelo degrau é a própria face
+     do marco, 6 mm atrás, que é o que o implemento mostra. */
+  const [fx0, fx1] = span(FRAME_FRONT, FRAME_FRONT + FRAME_DEPTH);
   ring(frame, fx0, fx1, hole, grow(hole, -FRAME_WIDTH));
 
   /* E o RETORNO DO FUNDO, no mesmo material e no mesmo anel: da borda interna
@@ -908,9 +1046,17 @@ export function doorFrameGeometry(
   const [bx0, bx1] = span(FRAME_FRONT + FRAME_DEPTH - 0.012, FRAME_FRONT + FRAME_DEPTH);
   ring(frame, bx0, bx1, grow(hole, -FRAME_WIDTH), leaf);
 
+  /* A MOLDURA: o anel galvanizado em volta do vão, POR FORA dele, sobre a
+     parede — `TRIM_WIDTH` de largura, da elevação de `TRIM_PROUD` à frente da
+     crista até `TRIM_SINK` atrás dela (passa o vale do friso, então fecha
+     contra a chapa em qualquer fase). Vai em superfície PRÓPRIA porque o
+     material é outro: galvanizado da saia, não o do marco. */
+  const [tx0, tx1] = span(-TRIM_PROUD, TRIM_SINK);
+  ring(trim, tx0, tx1, grow(hole, TRIM_WIDTH), hole);
+
   /* As peças SOLDADAS ao marco — macho da dobradiça e encaixe do varão — não
      são construídas aqui: elas existem no implemento e entram pelo mesmo
      caminho de todo o resto do kit. Ver `SUPORTE_TALA` e `ENCAIXE`. */
 
-  return { frame };
+  return { frame, trim };
 }

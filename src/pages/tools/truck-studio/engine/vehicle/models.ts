@@ -235,9 +235,9 @@ export const state: VehicleState = {
 export const rigGroup = new THREE.Group();
 rigGroup.name = 'RIG';
 /* z é medido no EIXO DA PISTA, não no sentido da cabine: com o giro de 180° o
-   caminhão aponta para o -Z, então recuar (dar ré) é aumentar z. 22 = os 12 da
-   primeira posição mais os 10 de recuo. */
-export const RIG_PLACEMENT = { z: 22, yaw: Math.PI };
+   caminhão aponta para o -Z, então recuar (dar ré) é aumentar z. 4 = os 12 da
+   primeira posição mais os 10 de recuo, menos 18 de avanço. */
+export const RIG_PLACEMENT = { z: 4, yaw: Math.PI };
 
 /** Liga (true) ou suspende (false) o lugar do conjunto no cenário. */
 function setRigPlacement(on: boolean) {
@@ -2444,7 +2444,18 @@ export function setTrailerDoors(face: Face, doors: DoorSpec[]): TrailerDims | nu
   const rig = state.trailerRig;
   if (!rig) return null;
   rig.stageDoors(face, doors);
-  return setTrailerDims({});
+  const dims = setTrailerDims({});
+  /* A SONDA DE REFLEXO É RELIGADA AQUI, e sem isto a porta espelhava outro
+     mundo. `refreshVehicleReflection()` prende o cubemap local como `envMap`
+     nos materiais que encontra NAS MALHAS do veículo — e as malhas da porta
+     (marco, moldura, ferragem `__porta`) só passam a existir neste momento.
+     Criadas depois da captura do load, ficavam sem `envMap` explícito e caíam
+     em `scene.environment`: o HDRI cru, com horizonte e sem o próprio caminhão
+     — "o inox da porta está refletindo o HDR em vez dos modelos 3D". Religar
+     também as inscreve em `probeBase`, então a gradação dia-noite passa a
+     valer para elas como para o resto do conjunto. */
+  refreshVehicleReflection();
+  return dims;
 }
 
 /** Volta o baú às medidas de fábrica. */

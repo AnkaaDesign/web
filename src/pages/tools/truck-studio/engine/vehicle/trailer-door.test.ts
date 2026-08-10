@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  layoutDoor, holeOf, doorFrameGeometry, rejectReason, flatSegments,
+  layoutDoor, holeOf, doorFrameGeometry, rejectReason, flatSegments, snapFlatSegments,
+  TRIM_WIDTH, TRIM_PROUD, TRIM_SINK,
   DOOR_REVEAL, LEAF_INSET, FRAME_WIDTH, FRAME_FRONT, FRAME_DEPTH, talaHeights,
   SEAL_SECTION, SEAL_OVERLAP, SEAL_FRONT, SEAL_DEPTH, SEAL_OUT, SEAL_W,
   DOOR_PARTS, LEAF_FLAT_BANDS,
@@ -79,7 +80,10 @@ describe('dobradiças: passo FIXO, contagem variável', () => {
     expect(p.filter((x) => x.part === 'CABECOTE').length).toBe(2);
     expect(p.filter((x) => x.part === 'GUIA').length).toBe(2);
     expect(p.filter((x) => x.part === 'SUPORTE_GUIA').length).toBe(2);
-    expect(p.filter((x) => x.part === 'ANEL').length).toBe(4);
+    /* DOIS, não quatro: o rip listava anéis em v 10 e 104, mas o nosso bake só
+       tem o de v 10 em cada ponta (`kit.json`) — o de 104 caía dentro do vão do
+       cabeçote, flutuando sobre a trava superior do varão. */
+    expect(p.filter((x) => x.part === 'ANEL').length).toBe(2);
     expect(p.filter((x) => x.part === 'MACHO').length).toBe(2);
     expect(p.filter((x) => x.part === 'ENCAIXE').length).toBe(2);
   });
@@ -89,6 +93,27 @@ describe('dobradiças: passo FIXO, contagem variável', () => {
     for (const part of ['BATENTE', 'SUPORTE_FECHO', 'CONTRAFECHO', 'MANIPULO',
       'ALAVANCA', 'TRINCO']) {
       expect(p.filter((x) => x.part === part).length).toBe(1);
+    }
+  });
+
+  it('peça de ponta: a instância de CIMA é espelhada, a de baixo não', () => {
+    /* Cabeçote, macho, encaixe e travessa de borracha existem em par espelhado
+       na vertical. O kit guarda a orientação da ponta de BAIXO; sem o `flipY`
+       na de cima, o came do macho superior apontava para longe da boca do
+       encaixe — "a parte de segurar o varão superior não está batendo com a
+       parte soldada". */
+    const leaf = leafOf(0.87, 2.46);
+    const p = layoutDoor(leaf, PLANE);
+    const meio = (leaf.y0 + leaf.y1) / 2;
+    for (const part of ['CABECOTE', 'MACHO', 'ENCAIXE', 'BORRACHA_H']) {
+      const xs2 = p.filter((x) => x.part === part);
+      expect(xs2.length).toBe(2);
+      for (const x of xs2) expect(!!x.flipY).toBe(x.y > meio);
+    }
+    /* E nada mais é espelhado: rebite, anel e fecho são simétricos ou de pé. */
+    for (const x of p) {
+      if (['CABECOTE', 'MACHO', 'ENCAIXE', 'BORRACHA_H'].includes(x.part)) continue;
+      expect(x.flipY).toBeUndefined();
     }
   });
 
@@ -145,9 +170,11 @@ describe('a mão da porta: charneira na TRASEIRA, varão na DIANTEIRA', () => {
 
   it('toda peça da folha cai DENTRO da largura dela', () => {
     /* O fecho inteiro mora entre o varão e o meio da folha; nada pode escapar
-       pela borda, que é onde a chapa acaba e o marco começa. O batente já esteve
-       a 376,5 mm da borda (número do rip) quando o nosso bake mede 318,3 — 58 mm
-       de erro numa peça de 41 mm, ou seja ela não encostava em mais nada. */
+       pela borda, que é onde a chapa acaba e o marco começa. O batente esteve a
+       318,3 mm por uma medição que achou o batente DO OUTRO FECHO (a traseira
+       tem dois, v 193 e v 373) e o pôs na altura deste, enfiado na ponta do
+       manípulo. O do fecho de v 193 está a 380,6 no bake (384,8 na convenção
+       deste arquivo) — que é o que o rip sempre disse (376,5). */
     for (const x of p) {
       if (x.part === 'PINO' || x.part === 'PORCA' || x.part === 'TRAVA_PINO'
         || x.part === 'SUPORTE_TALA' || x.part === 'BORRACHA_V'
@@ -253,9 +280,13 @@ describe('marco e vedação fecham o vão, com as medidas do bake', () => {
     expect(sobra).toBeGreaterThan(marcoAte);
   });
 
-  it('o marco vai da crista até 71,1 mm atrás dela', () => {
+  it('o marco vai de 6,0 mm (a face medida) até 71,1 mm atrás da crista', () => {
+    /* A face já esteve NA crista, "para tapar a borda cortada da chapa" — e aí
+       ela passava 0,6 mm à frente da borracha e engolia a sobreposição: da
+       vedação sobravam 15,7 mm visíveis ("a borracha está muito fina"). A face
+       medida é 6,0 mm atrás da crista, ATRÁS da borracha, que monta sobre ela. */
     const x = xs(frame);
-    expect(PLANE.xSkin - x.hi).toBeCloseTo(0, 9);
+    expect((PLANE.xSkin - x.hi) * 1000).toBeCloseTo(6.0, 1);
     expect((PLANE.xSkin - x.lo) * 1000).toBeCloseTo(71.1, 1);
   });
 
@@ -268,6 +299,24 @@ describe('marco e vedação fecham o vão, com as medidas do bake', () => {
     expect(f.lo).toBeCloseTo(hole.z0, 9);
     expect(f.hi).toBeCloseTo(leaf.z0, 9);
     expect(FRAME_WIDTH * 1000).toBeCloseTo(78.7, 1);
+  });
+
+  it('a moldura é uma tira galvanizada em volta do vão, quase rasante', () => {
+    /* Pedido de produto: "uma moldurinha bem sutil em volta do frame metálico,
+       uma pequena tira de elevação, galvanizada". Anel de 4 caixas POR FORA do
+       vão, de `TRIM_PROUD` à frente da crista até `TRIM_SINK` atrás (passa o
+       vale do friso e fecha contra a chapa em qualquer fase). */
+    const { trim } = doorFrameGeometry(leaf, PLANE);
+    expect(trim.position.length / 3).toBe(4 * 12 * 3);
+    const x = xs(trim);
+    expect((x.hi - PLANE.xSkin) * 1000).toBeCloseTo(TRIM_PROUD * 1000, 6);
+    expect((PLANE.xSkin - x.lo) * 1000).toBeCloseTo(TRIM_SINK * 1000, 6);
+    let zLo = Infinity, zHi = -Infinity;
+    for (let i = 2; i < trim.position.length; i += 3) {
+      zLo = Math.min(zLo, trim.position[i]); zHi = Math.max(zHi, trim.position[i]);
+    }
+    expect(zLo).toBeCloseTo(hole.z0 - TRIM_WIDTH, 9);
+    expect(zHi).toBeCloseTo(hole.z1 + TRIM_WIDTH, 9);
   });
 
   it('a porta é RASANTE: nada passa de 71,2 mm atrás da crista', () => {
@@ -295,6 +344,52 @@ describe('faixas lisas da folha', () => {
     const lisos = flatSegments(leaf).filter((s) => s.flat)
       .map((s) => [+((s.lo - leaf.y0) / h).toFixed(4), +((s.hi - leaf.y0) / h).toFixed(4)]);
     expect(lisos).toEqual(LEAF_FLAT_BANDS.map(([a, b]) => [+a.toFixed(4), +b.toFixed(4)]));
+  });
+
+  it('ancorada na grade, toda borda interna de faixa cai no VALE do friso', () => {
+    /* O defeito: as bordas são fração da altura da folha e o friso vem
+       recortado da parede — a fase é acidente, e uma borda no meio do ARCO
+       deixa o perfil cortado a meia subida, o degrau que lia como "a parte
+       lisa está construída em cima do friso" (só a 2ª de baixo escapava, por
+       sorte de fase). Ancorada, a borda de baixo termina a descida do friso e
+       a de cima para onde o arco seguinte começa — em QUALQUER altura. */
+    const grid = { row0: 1.5669, pitch: 0.0534, valeH: 0.0271 };
+    const fase = (y: number) => {
+      const p = (y - grid.row0) % grid.pitch;
+      return p < 0 ? p + grid.pitch : p;
+    };
+    for (const hh of [0.9, 1.6, 2.1, 2.35, 2.46, 3.0]) {
+      const leaf = leafOf(0.87, hh);
+      const segs = snapFlatSegments(leaf, grid);
+      /* cobertura contínua, como sempre */
+      expect(segs[0].lo).toBeCloseTo(leaf.y0, 9);
+      expect(segs[segs.length - 1].hi).toBeCloseTo(leaf.y1, 9);
+      for (let i = 1; i < segs.length; i++) {
+        expect(segs[i].lo).toBeCloseTo(segs[i - 1].hi, 9);
+      }
+      /* No vale = fase ∈ [0, valeH]. O 0 chega pelos DOIS lados: `paraCima`
+         ancora no início do vale e, em float, `fase()` pode devolver
+         `pitch − ε` em vez de 0 — o wrap é aceito como o zero que é. */
+      const noVale = (y: number) => {
+        const p = fase(y);
+        return p <= grid.valeH + 1e-6 || p >= grid.pitch - 1e-6;
+      };
+      for (const s of segs.filter((x) => x.flat)) {
+        if (Math.abs(s.lo - leaf.y0) > 1e-9) expect(noVale(s.lo)).toBe(true);
+        if (Math.abs(s.hi - leaf.y1) > 1e-9) expect(noVale(s.hi)).toBe(true);
+      }
+      /* e as faixas só CRESCEM: as guias (0,3611/0,6389) continuam dentro. */
+      const h = leaf.y1 - leaf.y0;
+      for (const f of [0.3611, 0.6389]) {
+        const y = leaf.y0 + f * h;
+        expect(segs.some((s) => s.flat && y >= s.lo && y <= s.hi)).toBe(true);
+      }
+    }
+  });
+
+  it('sem grade, a ancoragem degrada para as frações puras', () => {
+    const leaf = leafOf(0.87, 2.35);
+    expect(snapFlatSegments(leaf, undefined)).toEqual(flatSegments(leaf));
   });
 });
 
