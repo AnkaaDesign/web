@@ -510,9 +510,13 @@ const outlines: Record<SurfaceKey, number[][]> =
    em circulação (o do desktop tem 37 primitivas, o do web 2157). O critério é
    geométrico e não depende de nome de nó nem de material:
 
-     · a peça tem de estar SOBRE a pele — atravessar o plano da chapa dentro de
-       `SKIN_REACH`, que é o que separa um perfil aparafusado por fora de
-       qualquer coisa que passe pelo interior do baú;
+     · a peça tem de ALCANÇAR a face externa da chapa (`SKIN_REACH` de folga
+       para trás, `SKIN_OUT` para a frente), que é o que separa um perfil
+       aparafusado por fora de qualquer coisa que passe pelo interior do baú.
+       Este critério já esteve escrito como "atravessar o plano MÉDIO do painel
+       dentro de 60 mm", e não é a mesma coisa: o painel é uma casca de 11 mm,
+       então 60 mm em torno do meio dele varrem o interior do baú. Ver
+       `SKIN_REACH`;
      · e tem de ser CORRIDA — cobrir pelo menos `RAIL_SPAN` do comprimento do
        painel, que é o que descarta lanterna, dobradiça, rebite e trava, peças
        que ocupam um ponto e não uma faixa.
@@ -523,8 +527,32 @@ const outlines: Record<SurfaceKey, number[][]> =
    teto, o friso fica no piso), e é justamente por isso que o defeito só
    apareceu depois de o usuário mexer na altura. */
 
-/** Folga em torno do plano da pele para uma peça contar como "por cima dela". */
-const SKIN_REACH = 0.06;
+/**
+ * Quanto uma peça pode ficar ATRÁS da face externa da chapa e ainda contar como
+ * perfil por cima dela. **20 mm.**
+ *
+ * Era 0,06 m — mas medidos a partir do PLANO MÉDIO do painel, e o painel é uma
+ * casca de 11 mm (o relevo do friso). Ou seja: a janela de aceitação entrava
+ * 60 mm PARA DENTRO DO BAÚ, e lá dentro há estrutura corrida. Medido no
+ * `trailer.glb`, três peças eram lidas como perfil sem tocar a pele:
+ *
+ *   lateral-proteco-piso-02        x 1,135…1,240   64 mm atrás da crista
+ *   stitch…metal-galvanizado-polido_0_13   x 1,235…1,238   66 mm atrás
+ *   stitch…metal-galvanizado-polido_0_14   x 1,235…1,238   66 mm atrás
+ *
+ * As duas últimas ocupavam as faixas 295–445 mm e 1347–1497 mm do painel, e
+ * partiam a área livre em três pedaços: o maior sobrava com 38,6 % da altura.
+ * É o "adicionei uma porta e o painel ficou tomado pelo véu cinza" — e a porta
+ * não tinha nada a ver com isso, ela só foi o momento em que se olhou.
+ *
+ * O teste agora é contra a FACE EXTERNA da chapa e só admite peça que CHEGUE
+ * nela: um perfil aparafusado por fora passa, uma longarina interna não. Com a
+ * correção sobram as duas faixas legítimas — o friso da saia (0–127 mm) e a
+ * cantoneira (2569–2777 mm) — e 87,9 % de área pintável.
+ */
+const SKIN_REACH = 0.02;
+/** E quanto ela pode se afastar para FORA e ainda ser perfil do painel. */
+const SKIN_OUT = 0.20;
 /** Fração do comprimento do painel que uma peça tem de cobrir para ser perfil. */
 const RAIL_SPAN = 0.5;
 /** Um vão menor que isto não é área de arte; é fresta entre ferragens. */
@@ -545,7 +573,13 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   /* Eixo NORMAL à chapa e eixo em que ela CORRE. */
   const n: 'x' | 'z' = rear ? 'z' : 'x';
   const r: 'x' | 'z' = rear ? 'x' : 'z';
-  const plane = (pb.min[n] + pb.max[n]) / 2;
+  /* A FACE EXTERNA da chapa, e o sentido de "para fora".
+     Não é convenção nova: é a MESMA regra que recortou o painel em
+     `buildLiveryPanels()` — SIDE_R sai do maior x, SIDE_L do menor, REAR do
+     menor z. Usar o plano MÉDIO aqui, como esta função fazia, apagava a
+     distinção entre "perfil aparafusado na pele" e "estrutura por dentro". */
+  const dir = key === 'right' ? 1 : -1;
+  const face = dir > 0 ? pb.max[n] : pb.min[n];
   const lo = pb.min[r], hi = pb.max[r];
   const runLen = hi - lo;
   if (!(runLen > 0.5)) return;
@@ -560,6 +594,13 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   const box = new THREE.Box3();
   const m = new THREE.Matrix4();
   const bands: [number, number][] = [];
+  /* Quem produziu cada faixa. É diagnóstico e não enfeite: a área NÃO pintável
+     é desenhada como um véu escuro sobre o painel (ver `guideMarkup`), e quando
+     ele sai maior do que deveria — a queixa "o que é essa parte cinza" — não há
+     como saber por qual peça sem isto. Uma caixa é uma CAIXA: uma malha só que
+     agrupe peças espalhadas ocupa a faixa das duas, e é assim que um véu de
+     meio painel nasce de uma ferragem de 5 cm. */
+  const blame: string[] = [];
 
   trailerRoot.traverse((node) => {
     const o = node as THREE.Mesh;
@@ -581,11 +622,22 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
     if (!gb) return;
     box.copy(gb).applyMatrix4(m.multiplyMatrices(toLocal, o.matrixWorld));
     if (box.isEmpty()) return;
-    if (box.min[n] > plane + SKIN_REACH || box.max[n] < plane - SKIN_REACH) return;
+    /* Alcança a pele por fora? `reach` é o ponto mais externo da peça e `back`
+       o mais interno; a peça conta se o externo chega à face (com 20 mm de
+       folga para trás) e o interno não está a mais de 20 cm para fora dela. */
+    const reach = dir > 0 ? box.max[n] : box.min[n];
+    const back = dir > 0 ? box.min[n] : box.max[n];
+    if (dir * (reach - face) < -SKIN_REACH) return;
+    if (dir * (back - face) > SKIN_OUT) return;
     const cover = Math.min(box.max[r], hi) - Math.max(box.min[r], lo);
     if (cover < runLen * RAIL_SPAN) return;
     const y0 = Math.max(box.min.y, pb.min.y), y1 = Math.min(box.max.y, pb.max.y);
-    if (y1 > y0) bands.push([y0, y1]);
+    if (y1 > y0) {
+      bands.push([y0, y1]);
+      const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+      blame.push(`${o.name || '(sem nome)'} [${mat?.name || '?'}] `
+        + `${((y0 - pb.min.y) * 1000).toFixed(0)}–${((y1 - pb.min.y) * 1000).toFixed(0)} mm`);
+    }
   });
 
   /* O maior vão LIVRE entre as faixas ocupadas. */
@@ -602,6 +654,16 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   const v0 = (bestLo - pb.min.y) / spanY, v1 = (bestHi - pb.min.y) / spanY;
   measured[key] = [v0, v1];
   outlines[key] = [[0, v0], [1, v0], [1, v1], [0, v1]];
+
+  /* Só reclama quando o véu come mais de um terço do painel. As duas faixas
+     legítimas — o friso da saia e a cantoneira de topo — somam ~340 mm de
+     2,78 m, ou seja 12 %; acima de 33 % é quase certo que uma caixa de malha
+     agrupada está sendo lida como perfil corrido, e aí o número interessa. */
+  if (v1 - v0 < 0.67) {
+    console.warn(`[livery] painel ${key}: só ${((v1 - v0) * 100).toFixed(0)} %`
+      + ` é pintável (de ${(v0 * 100).toFixed(0)} % a ${(v1 * 100).toFixed(0)} %`
+      + ' da altura). Peças lidas como perfil corrido:', blame.join(' · '));
+  }
 }
 
 function guideMarkup(poly: number[][], w: number, h: number) {

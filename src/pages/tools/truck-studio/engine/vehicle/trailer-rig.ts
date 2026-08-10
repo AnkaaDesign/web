@@ -48,12 +48,13 @@
    vez, como REJEIÇÃO barata de malha longe da região de interesse, onde errar
    para mais só custa varrer vértice à toa. */
 import * as THREE from 'three';
-import { TrailerBody, type TrailerDims } from './trailer-geometry';
+import { TrailerBody, type TrailerDims, type DoorSpec, type Face } from './trailer-geometry';
 import { TrailerAssembly } from './trailer-assembly';
 import { deriveImplementHitch, type ImplementHitch, type ImplementMeasurements } from './coupling';
 
 export type { TrailerDims };
 export type { ImplementHitch };
+export type { DoorSpec, Face };
 
 /* Os pneus, pelo mesmo critério de `models.ts`: nome OU material. */
 const TYRE_RE = /pneu|tire/i;
@@ -196,6 +197,46 @@ export class TrailerRig {
   }
 
   reset() { return this.set({ height: this.base.height, length: this.base.length }); }
+
+  /* -------------------------------------------------------------- portas */
+
+  /**
+   * As portas laterais de uma face — o método que `livery-structure.ts` procura.
+   *
+   * Ele detecta a existência deste método antes de chamar (`typeof
+   * rig.setDoors === 'function'`), e enquanto ele não existia as portas
+   * cadastradas viravam só a camada 2D do editor. Agora elas viram vão recortado
+   * na chapa, folha frisada, moldura, borracha e ferragem — ver
+   * `trailer-door.ts`.
+   *
+   * Só o BRANCO tem porta. `TrailerAssembly` não é avisado de propósito: nada do
+   * que ele move (teto, cantoneira, frame traseiro, varões, lanternas) cruza o
+   * retângulo de uma porta lateral, e mandá-lo recortar seria dar a ele uma
+   * segunda verdade sobre onde a porta está.
+   *
+   * NÃO chama `measureAnchors()`. Uma porta não move pino-rei nem pneu, e a
+   * medição custa uma varredura de vértice inteira — que aqui aconteceria a cada
+   * tecla digitada no campo de largura da porta.
+   */
+  setDoors(face: Face, doors: DoorSpec[]): this {
+    this.body.setDoors(face, doors);
+    return this;
+  }
+
+  /**
+   * Idem, sem reconstruir — ver `TrailerBody.stageDoors()`.
+   *
+   * É por aqui que `models.setTrailerDoors()` entra: ele guarda as portas e
+   * deixa o rebuild para a sequência de `setTrailerDims()`, que é a única que
+   * também descarta e recorta de novo as chapas de livery. Reconstruir sem
+   * recortar duplica os painéis.
+   */
+  stageDoors(face: Face, doors: DoorSpec[]): this {
+    this.body.stageDoors(face, doors);
+    return this;
+  }
+
+  getDoors(face: Face): DoorSpec[] { return this.body.getDoors(face); }
 
   /* ------------------------------------------------------------- o engate */
 

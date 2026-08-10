@@ -58,12 +58,36 @@
    proporcional, preservando a forma. */
 
 import * as THREE from 'three';
+import {
+  layoutDoor, holeOf, rejectReason, doorFrameGeometry, flatSegments, DOOR_PARTS, PART_TOL,
+  LEAF_INSET, DOOR_REVEAL, SILL_CLEARANCE, HEAD_DROP,
+  type DoorRect, type DoorPart, type DoorPartSpec, type DoorPlacement,
+  type DoorPlane, type DoorSurface,
+} from './trailer-door';
+
+export type { DoorRect, DoorPlane };
 
 /** Material da parte branca, medido no arquivo. */
 export const WHITE_RE = /Cor_padrao_branco|metalBranco/i;
 
+/** Perfil galvanizado da saia lateral — é o topo dele que dá o batente. */
+const FRAME_MAT_RE = /metal-galvanizado-mantido/i;
+
+/** O MARCO da porta: o perfil escuro da estrutura. Medido no `.gltf` com
+ *  hierarquia — os nós `estrutura-principal-34…51` contornam o vão. */
+const DOOR_FRAME_MAT_RE = /metal-estrutura-principal-padrao/i;
+
+/* A BORRACHA já não tem material próprio aqui: ela deixou de ser desenhada e
+   virou peça EXTRAÍDA do implemento (`BORRACHA_V`/`BORRACHA_H` em
+   `trailer-door.ts`), que traz o material junto por construção. */
+
 /** Tolerância de solda de vértice, em metros. */
 const WELD = 1e-4;
+
+/** Relevo do friso: 5,20 mm entre o VALE e a CRISTA (cabeçalho, item 3). A
+ *  faixa lisa da folha fica no plano do VALE — é a chapa sem o vinco, e é por
+ *  isso que ela lê como rebaixo e não como relevo. */
+const RIB_RELIEF = 0.0052;
 
 /** Um vão em Y maior que isto separa duas fileiras de friso. */
 const ROW_GAP = 0.02;
@@ -88,11 +112,44 @@ export interface TrailerDims {
 
 type Behaviour = 'ribbed' | 'span' | 'rear' | 'front' | 'local';
 
-interface Tri {
+export interface Tri {
   /** 9 floats: 3 vértices × (x,y,z), em espaço de MUNDO. */
   p: Float32Array;
   /** 9 floats: normais correspondentes, em espaço de mundo. */
   n: Float32Array;
+}
+
+/**
+ * Face do baú, nos mesmos nomes que o formulário de medidas usa.
+ *
+ * O EIXO É O QUE O RESTO DO ENGINE JÁ DECIDIU, e não uma convenção nova daqui:
+ * `models.ts` recorta `SIDE_R` na face de MAIOR X (`>= box.max.x − skin`) e
+ * `livery.ts` mapeia `SIDE_R → 'right'`. Portanto **+X é `right`** neste
+ * projeto, e a dianteira é +Z (`trailer_meta.json`: `frontZ` é o maior z das
+ * chapas). Inverter isto aqui não trocaria só um rótulo — poria toda porta na
+ * lateral oposta à que o cliente desenhou no editor, calada.
+ */
+export type Face = 'left' | 'right' | 'rear';
+
+/**
+ * Uma porta, nas unidades e nomes do formulário: tudo em METROS.
+ *
+ * `position` é medido da DIANTEIRA do baú para trás. É de propósito: o baú
+ * cresce para trás (`mapZ()`, comportamento `front`), então uma porta ancorada
+ * na dianteira fica onde está quando o comprimento muda. Ancorar na traseira
+ * faria toda porta andar a cada centímetro digitado.
+ *
+ * O editor mede a partir da borda esquerda do PAINEL, que não é o mesmo datum e
+ * ainda troca de ponta entre as duas laterais. A conversão é feita por quem
+ * chama — `pushDoorsToGeometry()` em `livery-structure.ts` —, que é onde a
+ * convenção do painel mora.
+ *
+ * `height` sobe do PISO: uma porta lateral de baú começa no estrado.
+ */
+export interface DoorSpec {
+  position: number;
+  width: number;
+  height: number;
 }
 
 interface Shell {
@@ -100,6 +157,8 @@ interface Shell {
   min: THREE.Vector3;
   max: THREE.Vector3;
   behaviour: Behaviour;
+  /** Em que face a casca está, quando dá para dizer. Só estas levam porta. */
+  face?: Face;
   /** Só para `ribbed`. */
   rows: number[];
   skirt: Tri[];
@@ -117,6 +176,11 @@ export interface TrailerProfile {
   skirtHeight: number;
   capHeight: number;
   ribCount: number;
+  /**
+   * Onde o pé de uma porta lateral pode nascer: o topo do perfil metálico
+   * inferior mais um respiro. MEDIDO — ver `measureSill()`.
+   */
+  sillY: number;
   z0: number;
   z1: number;
   width: number;
@@ -357,6 +421,658 @@ function clipSlab(t: Tri, lo: number, hi: number): Tri[] {
   return out;
 }
 
+/* ----------------------------------------------------- recorte de portas */
+
+/**
+ * Recorta um triângulo a um semiespaço num eixo, guardando posição e normal.
+ *
+ * Genérico no componente (1 = Y, 2 = Z) para servir tanto ao corte horizontal
+ * do vão quanto ao vertical, sem duas cópias da mesma álgebra. Repare que ele
+ * repete, deliberadamente, as duas correções de `clipSlab()`: interseção só
+ * quando a aresta CRUZA de fato (senão sai ponto duplicado e triângulo de área
+ * zero) e normal renormalizada com queda para a normal geométrica quando o lerp
+ * colapsa. Um vão de porta corta a MESMA pele frisada, então ele herdaria os
+ * mesmos dois defeitos se fosse escrito ingenuamente.
+ */
+function clipComp(t: Tri, comp: 1 | 2, plane: number, keepGreater: boolean): Tri[] {
+  type V = { p: number[]; n: number[] };
+  const dist = (v: V) => (keepGreater ? v.p[comp] - plane : plane - v.p[comp]);
+  const poly: V[] = [0, 1, 2].map((k) => ({
+    p: [t.p[k * 3], t.p[k * 3 + 1], t.p[k * 3 + 2]],
+    n: [t.n[k * 3], t.n[k * 3 + 1], t.n[k * 3 + 2]],
+  }));
+
+  const out: V[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const da = dist(a), db = dist(b);
+    if (da >= -EPS) out.push(a);
+    if ((da > EPS && db < -EPS) || (da < -EPS && db > EPS)) {
+      const d = b.p[comp] - a.p[comp];
+      const s = Math.abs(d) < 1e-12 ? 0 : (plane - a.p[comp]) / d;
+      const p = [0, 1, 2].map((k) => a.p[k] + (b.p[k] - a.p[k]) * s);
+      p[comp] = plane;
+      out.push({ p, n: [0, 1, 2].map((k) => a.n[k] + (b.n[k] - a.n[k]) * s) });
+    }
+  }
+  if (out.length < 3) return [];
+
+  const tris: Tri[] = [];
+  for (let i = 1; i < out.length - 1; i++) {
+    const vs = [out[0], out[i], out[i + 1]];
+    const ax = vs[1].p[0] - vs[0].p[0], ay = vs[1].p[1] - vs[0].p[1], az = vs[1].p[2] - vs[0].p[2];
+    const bx = vs[2].p[0] - vs[0].p[0], by = vs[2].p[1] - vs[0].p[1], bz = vs[2].p[2] - vs[0].p[2];
+    const c0 = ay * bz - az * by, c1 = az * bx - ax * bz, c2 = ax * by - ay * bx;
+    const area2 = c0 * c0 + c1 * c1 + c2 * c2;
+    if (area2 < 1e-18) continue;
+    const gl = Math.sqrt(area2);
+    const p = new Float32Array(9), n = new Float32Array(9);
+    for (let k = 0; k < 3; k++) {
+      p[k * 3] = vs[k].p[0]; p[k * 3 + 1] = vs[k].p[1]; p[k * 3 + 2] = vs[k].p[2];
+      let nx = vs[k].n[0], ny = vs[k].n[1], nz = vs[k].n[2];
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (len < 0.2) { nx = c0 / gl; ny = c1 / gl; nz = c2 / gl; }
+      else { nx /= len; ny /= len; nz /= len; }
+      n[k * 3] = nx; n[k * 3 + 1] = ny; n[k * 3 + 2] = nz;
+    }
+    tris.push({ p, n });
+  }
+  return tris;
+}
+
+/** Longe do retângulo — o teste barato que evita pagar o clipping. */
+function outside(t: Tri, g: DoorRect): boolean {
+  const y = [t.p[1], t.p[4], t.p[7]];
+  const z = [t.p[2], t.p[5], t.p[8]];
+  return Math.min(...y) >= g.y1 - EPS || Math.max(...y) <= g.y0 + EPS
+    || Math.min(...z) >= g.z1 - EPS || Math.max(...z) <= g.z0 + EPS;
+}
+
+/**
+ * Subtrai um retângulo de um triângulo, por faixas — o VÃO da porta lateral.
+ *
+ * A subtração é por faixas e não por diferença booleana (abaixo do vão, acima,
+ * e dentro da faixa de altura, antes e depois), então as quatro partes não se
+ * sobrepõem por construção — o que evita a coplanaridade que este modelo já tem
+ * de sobra.
+ *
+ * ATENÇÃO ao que esta função NÃO faz: ela recorta uma chapa de espessura zero e
+ * não deixa nenhuma superfície na borda do corte. O vão sozinho é um furo
+ * limpo para dentro do baú. Quem fecha é `jambGeometry()`, e as duas andam
+ * sempre juntas — um comentário anterior aqui dizia que esta função não era
+ * usada pela porta lateral, quando `emit()` a chama desde que a feature existe.
+ */
+export function subtractGap(t: Tri, g: DoorRect): Tri[] {
+  if (outside(t, g)) return [t];
+  const out: Tri[] = [];
+  out.push(...clipComp(t, 1, g.y0, false));
+  out.push(...clipComp(t, 1, g.y1, true));
+  for (const band of clipComp(t, 1, g.y0, true)) {
+    for (const inner of clipComp(band, 1, g.y1, false)) {
+      out.push(...clipComp(inner, 2, g.z0, false));
+      out.push(...clipComp(inner, 2, g.z1, true));
+    }
+  }
+  return out;
+}
+
+/** O AVESSO de `subtractGap()`: o pedaço que cai DENTRO do retângulo — é dele
+ *  que sai a FOLHA, recortada da própria pele. */
+export function intersectRect(t: Tri, g: DoorRect): Tri[] {
+  if (outside(t, g)) return [];
+  const out: Tri[] = [];
+  for (const band of clipComp(t, 1, g.y0, true)) {
+    for (const inner of clipComp(band, 1, g.y1, false)) {
+      for (const a of clipComp(inner, 2, g.z0, true)) {
+        out.push(...clipComp(a, 2, g.z1, false));
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * O topo do perfil metálico inferior da lateral — o BATENTE da porta.
+ *
+ * A porta não nasce no piso do baú. Neste modelo o perfil galvanizado da saia
+ * sobe 33,2 mm ACIMA da linha do piso do corpo branco, e uma porta ancorada em
+ * `floorY` nasce dentro dele. Isto é MEDIDO e não constante porque o perfil é do
+ * bake: outro implemento, outro batente.
+ *
+ * POR MATERIAL, e essa é a parte que custou duas medições erradas. A primeira
+ * versão pegava o maior Y de qualquer peça não-branca na faixa da pele e
+ * devolveu 157,9 mm; estreitando a janela para 60 mm, devolveu 67,8. Nos dois
+ * casos o resultado ficou colado no TETO DA JANELA, que é a assinatura de uma
+ * medida que não achou nada e devolveu o próprio limite: a pele lateral tem
+ * ferragem corrida em toda altura (os frisos de rebite em `inox-ferragem` que
+ * `trailer-rig.ts` descreve), então "o mais alto perto do piso" nunca isola o
+ * perfil. Quem isola é o NOME do material — a mesma doutrina de `WHITE_RE` e
+ * `TYRE_RE` no resto do engine.
+ *
+ * A janela em Y continua existindo para recusar a cantoneira de TOPO, que é do
+ * mesmo material e corre a lateral inteira lá em cima.
+ */
+function measureSill(
+  root: THREE.Object3D, cx: number, half: number, floorY: number,
+): number {
+  const v = new THREE.Vector3();
+  const skin = half - 0.06;
+  /* Máximo POR CÉLULA de 250 mm ao longo do baú, e depois a MEDIANA das
+     células. Não o máximo global: o perfil que interessa é o que CORRE a
+     lateral inteira, e o máximo global é sempre uma peça de canto — montante de
+     testeira, batente de traseira — que sobe muito mais alto e existe em dois
+     lugares só. Neste bake os dois valores COINCIDEM em 1,5194 (127,5 mm acima
+     do piso), o que é a resposta certa e também a confirmação de que o perfil
+     corre mesmo de ponta a ponta: ele lapa os 127 mm de baixo da saia lisa de
+     175 mm, e o primeiro friso começa logo acima (1,5669). A votação por célula
+     fica porque é ela que garante isso em vez de supor — num bake com montante
+     de canto mais alto, o máximo global mentiria e a mediana não.
+     É a mesma técnica que `trailer-rig.ts` usa para achar a chapa do pino-rei,
+     e pelo mesmo motivo: a densidade de malha varia de peça para peça, então
+     vota-se por ÁREA (uma célula, um voto) e não por vértice. */
+  const cells = new Map<number, number>();
+  root.updateWorldMatrix(true, true);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!mats.some((m) => !!m && FRAME_MAT_RE.test(m.name || ''))) return;
+    const pos = mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      if (Math.abs(v.x - cx) < skin) continue;
+      if (v.y < floorY - 0.40 || v.y > floorY + 0.30) continue;
+      const k = Math.round(v.z / 0.25);
+      const cur = cells.get(k);
+      if (cur === undefined || v.y > cur) cells.set(k, v.y);
+    }
+  });
+  if (cells.size < 4) {
+    console.warn('[porta] perfil inferior da lateral não encontrado em malha'
+      + ' suficiente — o batente cai na linha do piso, e a porta pode nascer'
+      + ' dentro da cantoneira.');
+    return floorY;
+  }
+  const tops = [...cells.values()].sort((a, b) => a - b);
+  return tops[tops.length >> 1];
+}
+
+
+
+/**
+ * As peças da porta, extraídas DO PRÓPRIO IMPLEMENTO.
+ *
+ * Não há asset novo: manípulo, contra-fecho, fecho de ponta, guia, alavanca,
+ * varão e tala já existem no `trailer.glb`, montados nas portas TRASEIRAS.
+ * Cinco deles batem ao milímetro com o que a porta lateral do modelo da
+ * Ibiporã usa; os outros dois são a mesma família num comprimento diferente e
+ * são extrusões, então esticam exato. Reusá-los faz a textura ser a mesma por
+ * CONSTRUÇÃO — é a mesma malha e o mesmo material, não uma aproximação.
+ *
+ * A PERMUTAÇÃO DE EIXOS É DERIVADA, não escrita. Cada peça está no baú na
+ * orientação da porta traseira, que não é a da lateral; o alvo de
+ * `DoorPartSpec.size` diz quanto ela deve medir em cada eixo DA PORTA, e o
+ * casamento guloso entre as duas ternas dá a permutação. Uma permutação escrita
+ * à mão já entregou um kit inteiro deitado 90° — tamanho certo, eixos trocados,
+ * nenhum erro para denunciar. Derivada da medida, esse defeito não volta.
+ *
+ * Uma permutação ímpar tem determinante −1 e inverte o ENROLAMENTO. Com
+ * `FrontSide` isso não escurece a peça: apaga. Por isso o índice é revertido
+ * junto quando o determinante é negativo.
+ */
+function extractDoorKit(
+  root: THREE.Object3D, bodyWorld: THREE.Box3,
+): Map<DoorPart, DoorKitEntry> {
+  const kit = new Map<DoorPart, DoorKitEntry>();
+  root.updateWorldMatrix(true, true);
+  const inv = root.matrixWorld.clone().invert();
+  const body = bodyWorld.clone().applyMatrix4(inv);
+  const centre = body.getCenter(new THREE.Vector3());
+  const v = new THREE.Vector3();
+
+  /* A JANELA DA BUSCA: a faixa de 60 cm colada à traseira do corpo branco.
+     O kit é o das PORTAS TRASEIRAS, e sem esta janela o casamento por tamanho
+     varria o implemento inteiro — chassi, suspensão, caixa de ferramentas — a
+     caçar a primeira malha com três medidas parecidas. Peças pequenas são as
+     que sofrem: `TRAVA_PINO` (16 × 10 × 15) saía com 2 762 triângulos, ou seja
+     alguma outra coisa do baú, e `PORCA` e `REBITE` trocavam de malha conforme
+     a ordem de travessia. Dentro da janela só existe a porta.
+
+     A folga de 60 cm cobre a ferragem que fica ATRÁS do plano da chapa (o
+     conjunto do varão mora em z −7,50 contra os −7,48 do corpo) com margem, e
+     não chega perto do bogie. */
+  const zBack = body.min.z + 0.60;
+
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry?.attributes?.position) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const pending = DOOR_PARTS.filter((sp) => !kit.has(sp.part)
+      && mats.some((m) => !!m && sp.material.test(m.name || '')));
+    if (!pending.length) return;
+
+    const m4 = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld);
+    const pos = mesh.geometry.attributes.position;
+    const lo = [Infinity, Infinity, Infinity];
+    const hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m4);
+      const c = [v.x, v.y, v.z];
+      for (let k = 0; k < 3; k++) {
+        if (c[k] < lo[k]) lo[k] = c[k];
+        if (c[k] > hi[k]) hi[k] = c[k];
+      }
+    }
+    const size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+    /* Fora da janela: não é peça de porta traseira, seja qual for o tamanho. */
+    if ((lo[2] + hi[2]) / 2 > zBack) return;
+    if ((lo[1] + hi[1]) / 2 < body.min.y - 0.10) return;
+
+    /* ------------------------------------------ QUAL FAMÍLIA FICA COM A MALHA
+       A que MELHOR a descreve entre TODAS — e a comparação é com todas, não só
+       com as que ainda faltam. `GUIA` (100 × 34 × 41,4) e `ENCAIXE`
+       (101,5 × 36,5 × 44) diferem 1,5 · 2,5 · 2,6 mm, ou seja cada uma cabe na
+       malha da outra dentro dos 4 mm de `PART_TOL`. Duas versões erradas disto:
+
+         "a primeira que couber"   a ordem de travessia decidia, e a guia ia
+                                   parar no encaixe;
+         "a melhor entre as que    a primeira malha de guia ia certo para
+          ainda faltam"            `GUIA`; a SEGUNDA malha de guia — há oito na
+                                   traseira — encontrava `ENCAIXE` sozinho na
+                                   lista e ia para lá. O encaixe do varão saía
+                                   com a geometria da guia, 297 triângulos em
+                                   vez de 1707, e o defeito era invisível: duas
+                                   peças de suporte parecidas.
+
+       Comparando com todas, uma malha de guia só pode ser guia. Se `GUIA` já
+       está no kit, ela é DESCARTADA — que é o certo, porque é uma segunda
+       cópia da mesma peça. */
+    const erroDe = (sp: DoorPartSpec) => {
+      const used = [false, false, false];
+      let worst = 0;
+      for (let t = 0; t < 3; t++) {
+        let best = -1, bestErr = Infinity;
+        for (let s = 0; s < 3; s++) {
+          if (used[s]) continue;
+          const e = Math.abs(size[s] - sp.size[t]);
+          if (e < bestErr) { bestErr = e; best = s; }
+        }
+        used[best] = true;
+        if (bestErr > worst) worst = bestErr;
+      }
+      return worst;
+    };
+    let dono: DoorPartSpec | null = null;
+    let donoErr = Infinity;
+    for (const sp of DOOR_PARTS) {
+      if (!mats.some((m) => !!m && sp.material.test(m.name || ''))) continue;
+      const e = erroDe(sp);
+      if (e < donoErr) { donoErr = e; dono = sp; }
+    }
+    if (!dono || donoErr > PART_TOL || kit.has(dono.part)) return;
+
+    for (const sp of [dono]) {
+      /* ------------------------------------------- QUAL EIXO VIRA QUAL EIXO
+         Todas as SEIS permutações são avaliadas, e entre as que cabem na
+         tolerância vence a que põe no eixo de PROFUNDIDADE o eixo em que a peça
+         está mais longe do centro do baú.
+
+         Era um casamento guloso — primeiro eixo do alvo fica com o eixo de
+         origem mais parecido —, e ele é ambíguo justamente nas peças de seção
+         quadrada. O varão (25,1 × 2490 × 25,4) contra o alvo (25, 2490, 25):
+         para o primeiro 25 o guloso escolhia X (erro 0,1) em vez de Z (erro
+         0,4), e X não é a profundidade de uma porta traseira. Daí os dois
+         avisos que este arquivo emitia desde sempre — "VARAO/ANEL: a peça está
+         a −115 mm do centro no eixo de profundidade, perto demais para dizer
+         que lado é fora" —, e daí um kit onde duas famílias saíam por um
+         palpite.
+
+         O critério novo é MEDIDO e não tem empate real: a ferragem das portas
+         traseiras mora a ~7,4 m do centro do baú em Z e a ~0,1 m em X. Quem
+         estiver a 7,4 m é a profundidade. */
+      const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const mid = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+      let perm: number[] | null = null;
+      let bestOff = -1;
+      for (const cand of PERMS) {
+        let fits = true;
+        for (let t = 0; t < 3; t++) {
+          if (Math.abs(size[cand[t]] - sp.size[t]) > PART_TOL) { fits = false; break; }
+        }
+        if (!fits) continue;
+        const off = Math.abs(mid[cand[0]] - centre.getComponent(cand[0]));
+        if (off > bestOff) { bestOff = off; perm = cand; }
+      }
+      if (!perm) continue;
+
+      /* ------------------------------------------------------- O SENTIDO
+         A permutação diz QUAL eixo do baú vira qual eixo da porta. Ela NÃO diz
+         para que LADO — e essa metade faltando é o defeito que a tela relatou
+         como "a ferragem está virada para dentro do baú".
+
+         `perm = [2,1,0]` para a tala, por exemplo, é uma TRANSPOSIÇÃO: sinal
+         −1, determinante −1, ou seja um ESPELHO e não um giro. O código
+         detectava o determinante negativo e revertia o enrolamento — o que faz
+         a peça voltar a ser DESENHADA, e é por isso que o defeito passou: a
+         peça aparecia, com as medidas certas, do avesso. Uma ferragem espelhada
+         é a mesma silhueta com a cara para o outro lado, e a cara dela ficava
+         para dentro da parede.
+
+         O conserto é escolher os SINAIS, não reverter o enrolamento:
+
+           s0  o eixo de profundidade aponta para FORA. Qual lado é fora sai da
+               própria peça: a ferragem das portas TRASEIRAS mora a ~7 m do
+               centro do baú, então o vetor centro→peça, projetado no eixo de
+               origem, é a normal de saída daquele painel. Medido, não suposto —
+               um bake com a traseira em +Z inverte o número e a conta segue.
+           s1  a altura é a altura: o eixo vertical do baú é o vertical da porta.
+           s2  o que sobra, e ele é ESCOLHIDO para fechar determinante +1.
+
+         Com det = +1 a transformação é um GIRO: a peça mantém a mão (ferragem é
+         quiral — uma dobradiça espelhada não existe no estoque) e o enrolamento
+         continua válido sem reversão nenhuma. Para a tala isto dá exatamente
+         `x = −z, y = y, z = x`, que é o giro de −90° em Y que leva um painel
+         virado para a traseira a um painel virado para a lateral direita. */
+      const off = mid[perm[0]] - centre.getComponent(perm[0]);
+      if (Math.abs(off) < 0.5) {
+        console.warn(`[porta] ${sp.part}: a peça de origem está a`
+          + ` ${(off * 1000).toFixed(0)} mm do centro do baú no eixo de`
+          + ' profundidade — perto demais para dizer que lado é fora. Ela sai'
+          + ' com o sentido presumido e pode aparecer virada para dentro.');
+      }
+      const s0 = off < 0 ? -1 : 1;
+      const s1 = 1;
+      /* Sinal da permutação, pela definição: Π_{i<j} (σ(j) − σ(i)). */
+      const parity = (perm[1] - perm[0]) * (perm[2] - perm[0]) * (perm[2] - perm[1]) > 0 ? 1 : -1;
+
+      /* --------------------------------------------- s2: DE QUAL PORTA VEIO
+         As duas portas TRASEIRAS são imagens espelhadas uma da outra, e este
+         laço pega a PRIMEIRA que encontrar — a mão do kit era, até aqui, um
+         cara-ou-coroa da ordem de travessia. A tala é a única peça bem
+         assimétrica no eixo do painel (massa a +3,6 % do centro da caixa na
+         porta esquerda, −3,6 % na direita), então era ela que denunciava, e o
+         varão e os fechos, quase simétricos, saíam plausíveis das duas formas.
+         Daí o relato: "a dobradiça está ao contrário, o resto está como na
+         traseira".
+
+         `sideOf` é o lado da porta de origem: a direção que, naquela porta,
+         aponta para a borda EXTERNA — a que leva a dobradiça. Na lateral essa
+         borda é a TRASEIRA da folha, ou seja −Z (ver `layoutDoor()`). Então o
+         eixo do painel tem de mapear `sideOf` em −Z, e é isso que `s2` diz.
+
+         Derivado por peça, e não por kit: nada garante que tala e manípulo
+         venham da MESMA porta traseira, e um sinal global acertaria uma e
+         erraria a outra. */
+      const panel = perm[2];
+      const lado = mid[panel] - centre.getComponent(panel);
+      let s2: number;
+      if (Math.abs(lado) < 0.3) {
+        /* Peça centrada no baú: não dá para dizer de que porta veio. O varão é
+           o caso — seção 25 × 25 mm, simétrica, e o casamento por tamanho ainda
+           resolve a profundidade dele para o eixo errado. Cai no sinal que fecha
+           det = +1, que para uma peça simétrica é indistinguível do certo. */
+        s2 = parity * s0 * s1;
+      } else {
+        s2 = lado > 0 ? -1 : 1;
+      }
+
+      const geo = mesh.geometry.clone();
+      geo.applyMatrix4(m4);
+      orientGeometry(geo, perm, [s0, s1, s2]);
+      anchorGeometry(geo, sp.anchor);
+      const src = mats.find((m) => !!m && sp.material.test(m.name || '')) as THREE.Material;
+      kit.set(sp.part, { geo, mat: src });
+      /* UMA malha, UMA família. Sem o corte, a malha da guia que também cabia
+         em `ENCAIXE` era gravada nas DUAS — a mesma peça instanciada em dois
+         lugares diferentes, com a medida de um e o nome do outro. */
+      break;
+    }
+  });
+
+  const faltando = DOOR_PARTS.filter((sp) => !kit.has(sp.part)).map((sp) => sp.part);
+  if (faltando.length) {
+    console.warn('[porta] peças não encontradas no implemento:', faltando.join(', '),
+      '— a porta sai sem elas. Este bake não tem a ferragem das portas traseiras'
+      + ' nas medidas esperadas.');
+  }
+  return kit;
+}
+
+/**
+ * Leva uma peça do referencial em que ela foi ASSADA ao referencial da porta.
+ *
+ * `perm` diz qual eixo do baú vira qual eixo da porta; `signs` diz para que
+ * lado. Os dois juntos formam uma matriz de permutação COM SINAL, e o chamador
+ * escolhe os sinais de modo que o determinante seja +1 — ou seja, um giro.
+ *
+ * O determinante pode dar −1, e aí a peça é ESPELHADA — o que é correto e
+ * esperado: as duas portas traseiras são imagens uma da outra, então o kit que
+ * vem de uma delas precisa ser espelhado para servir à lateral e o que vem da
+ * outra não. Quando isso acontece o enrolamento é revertido junto, porque com
+ * `FrontSide` um triângulo invertido não escurece: SOME.
+ *
+ * A diferença para a versão anterior está em QUEM decide. Lá o determinante era
+ * um efeito colateral da permutação de tamanhos — um cara-ou-coroa — e a
+ * reversão de enrolamento era o band-aid que fazia a peça reaparecer, espelhada,
+ * com a cara virada para dentro da parede. Aqui o sinal de cada eixo é escolhido
+ * pela geometria de origem (ver `s0`, `s1`, `s2` em `extractDoorKit()`) e o
+ * determinante é a consequência, não a causa.
+ */
+function orientGeometry(geo: THREE.BufferGeometry, perm: number[], signs: number[]) {
+  const move = (a: THREE.BufferAttribute) => {
+    for (let i = 0; i < a.count; i++) {
+      const c = [a.getX(i), a.getY(i), a.getZ(i)];
+      a.setXYZ(i, signs[0] * c[perm[0]], signs[1] * c[perm[1]], signs[2] * c[perm[2]]);
+    }
+    a.needsUpdate = true;
+  };
+  move(geo.getAttribute('position') as THREE.BufferAttribute);
+  const nrm = geo.getAttribute('normal') as THREE.BufferAttribute | undefined;
+  if (nrm) move(nrm);
+
+  const parity = (perm[1] - perm[0]) * (perm[2] - perm[0]) * (perm[2] - perm[1]) > 0 ? 1 : -1;
+  if (parity * signs[0] * signs[1] * signs[2] < 0) reverseWinding(geo);
+  geo.computeBoundingBox();
+}
+
+/** Inverte a ordem dos triângulos — o par obrigatório de qualquer
+ *  transformação com determinante negativo. */
+function reverseWinding(geo: THREE.BufferGeometry) {
+  const idx = geo.getIndex();
+  if (idx) {
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i); idx.setX(i, idx.getX(i + 2)); idx.setX(i + 2, a);
+    }
+    idx.needsUpdate = true;
+    return;
+  }
+  for (const name of ['position', 'normal', 'uv'] as const) {
+    const a = geo.getAttribute(name) as THREE.BufferAttribute | undefined;
+    if (!a) continue;
+    const n = a.itemSize;
+    const arr = a.array as Float32Array;
+    for (let t = 0; t < a.count; t += 3) {
+      for (let k = 0; k < n; k++) {
+        const i = t * n + k, j = (t + 2) * n + k;
+        const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      }
+    }
+    a.needsUpdate = true;
+  }
+}
+
+/** Leva a geometria à origem contratada. */
+function anchorGeometry(geo: THREE.BufferGeometry, how: 'centro' | 'base') {
+  geo.computeBoundingBox();
+  const b = geo.boundingBox as THREE.Box3;
+  const c = b.getCenter(new THREE.Vector3());
+  geo.translate(-c.x, how === 'base' ? -b.min.y : -c.y, -c.z);
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+}
+
+/* `reverseWinding()` morava aqui, e a remoção dele é o registro do defeito.
+   Ele existia para salvar a peça depois de uma transformação com determinante
+   negativo — mas reverter o enrolamento conserta o DESCARTE, não a orientação:
+   a peça voltava a ser desenhada, espelhada, com a cara virada para dentro da
+   parede. `orientGeometry()` escolhe os sinais para o determinante ser +1, então
+   não sobrou nada para reverter. `mirrorX()` continua revertendo o dela — lá o
+   espelho é INTENCIONAL (a porta é peça de mão) e a reversão é o par correto. */
+
+interface DoorKitEntry { geo: THREE.BufferGeometry; mat: THREE.Material }
+
+/**
+ * O material do BATENTE: o galvanizado do próprio implemento, clonado.
+ *
+ * Mesma doutrina do kit de ferragem — nada de material inventado. O batente
+ * real é o mesmo perfil `metal-galvanizado-mantido` que corre a saia e a
+ * cantoneira, e reusá-lo faz o batente responder ao acabamento e à iluminação
+ * exatamente como o resto do metal do baú, em vez de ser um cinza escolhido a
+ * dedo que descola a cada troca de cenário.
+ *
+ * Clonado e renomeado pelo mesmo motivo que o branco e que `partMaterial()`:
+ * `applyTrailerFinish()` despacha por NOME, e um homônimo seria tratado como a
+ * peça de fábrica.
+ *
+ * `DoubleSide` é decisão, não descuido. O corpo branco é `FrontSide` porque é
+ * chapa de 0,80 mm com face gêmea atrás (ver o construtor); o batente é
+ * superfície ÚNICA, sem par para brigar no z-buffer, e uma face virada ao
+ * contrário aqui não escureceria: SUMIRIA, reabrindo o furo que esta peça
+ * existe para fechar. As normais são escritas em `jambGeometry()`, então o
+ * sombreamento não depende do enrolamento.
+ */
+function makeJambMaterial(
+  root: THREE.Object3D, re: RegExp, rótulo: string, reserva: number,
+  tinta?: number,
+): THREE.Material {
+  let src: THREE.Material | null = null;
+  root.traverse((o) => {
+    if (src) return;
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    src = mats.find((m) => !!m && re.test(m.name || '')) ?? null;
+  });
+  if (!src) {
+    console.warn(`[porta] material do ${rótulo} (${re.source}) não encontrado no`
+      + ' implemento — a peça sai numa cor de reserva. O vão continua fechado;'
+      + ' só o acabamento é que não acompanha o resto do baú.');
+  }
+  const m = (src as THREE.Material | null)?.clone()
+    ?? new THREE.MeshStandardMaterial({ color: reserva, metalness: 0.6, roughness: 0.6 });
+  m.name = `${(src as THREE.Material | null)?.name ?? rótulo}__porta`;
+  m.side = THREE.DoubleSide;
+  /* A ÚNICA decisão de aparência que sobrou nesta feature, e ela está aqui em
+     vez de escondida numa medida.
+   *
+   * No implemento da Ibiporã o marco é `metal-estrutura-principal-padrao` e
+   * renderiza ESCURO — marco e borracha formam juntos a faixa preta de ~130 mm
+   * que se vê na foto de catálogo, e é ela que faz a porta LER como porta. No
+   * nosso `trailer.glb` o material de mesmo nome sai claro, quase igual à
+   * parede: o contorno vira 59 mm de metal branco mais 48 mm de borracha, e a
+   * porta some na lateral.
+   *
+   * A versão anterior tentou consertar isso pela GEOMETRIA — estreitou
+   * `FRAME_WIDTH` de 78,7 para 40 mm "para a proporção do que se vê voltar ao
+   * que a foto mostra". Não voltava, e abria uma fresta de 19 mm para dentro do
+   * baú em toda a volta da porta, porque a borracha só alcança 35,25 mm.
+   * Escurecer o CLONE (que já é renomeado `__porta` e só veste o marco) resolve
+   * o que era o problema de verdade e não mexe em nenhuma cota.
+   *
+   * E o `metalness` desce junto, porque só a cor não escurece nada: num metal
+   * puro a cor tinge o REFLEXO, e o reflexo aqui é um ambiente de sala branca —
+   * o perfil continuava saindo prateado com a cor em 0x2b2e33. Baixando para
+   * 0,35 ele passa a ler como o perfil anodizado escuro que é. */
+  if (tinta !== undefined && 'color' in m) {
+    const s = m as THREE.MeshPhysicalMaterial;
+    s.color.setHex(tinta);
+    s.metalness = Math.min(s.metalness, 0.35);
+    s.roughness = Math.max(s.roughness, 0.55);
+    if (s.metalnessMap) s.metalnessMap = null;
+    if (s.roughnessMap) s.roughnessMap = null;
+    if (s.map) s.map = null;
+    /* E as CAMADAS POR CIMA da cor, que são o motivo de as duas linhas acima
+       não terem bastado nas primeiras tentativas. `clearcoat` é um verniz: ele
+       reflete o ambiente — aqui uma sala branca — por cima de qualquer cor de
+       base, então o perfil continuava saindo com o gradiente espelhado de
+       sempre enquanto o diagnóstico jurava `cor #2b2e33, metalness 0,35`.
+       Escurecer um material sem desligar o verniz dele é escurecer o que não
+       se vê. */
+    if (typeof s.clearcoat === 'number') s.clearcoat = 0;
+    if (typeof s.sheen === 'number') s.sheen = 0;
+    if (typeof s.specularIntensity === 'number') s.specularIntensity = 0.25;
+    if (typeof s.iridescence === 'number') s.iridescence = 0;
+    s.envMapIntensity = Math.min(s.envMapIntensity ?? 1, 0.5);
+    s.needsUpdate = true;
+  }
+  return m;
+}
+
+/**
+ * Espelha uma geometria num eixo. As peças da porta usam os dois:
+ *
+ *   `z`  SEMPRE. O kit sai das portas TRASEIRAS e `orientGeometry()` o entrega
+ *        com a dobradiça apontando para +Z; a porta lateral tem a charneira na
+ *        TRASEIRA (ver `layoutDoor()`). Espelhar só as coordenadas do layout
+ *        deixaria cada peça do avesso no próprio lugar — o punho da tala
+ *        entrando na folha e a chapa de fixação pendurada fora dela.
+ *   `x`  na lateral ESQUERDA, onde "fora" troca de sinal.
+ *
+ * ESPELHA, e não gira, e isso é o ponto: a porta é peça de MÃO. Um giro de 180°
+ * em Y trocaria as pontas mantendo a mão, e o que se quer é a outra mão — a
+ * porta esquerda de um implemento é a imagem refletida da direita, não a mesma
+ * peça virada. Na lateral esquerda os dois espelhos se compõem e o resultado é
+ * um giro; é consequência, não intenção.
+ *
+ * O preço de cada espelho é o ENROLAMENTO: todo triângulo fica ao contrário e,
+ * com `FrontSide`, a peça SOME em vez de escurecer. Por isso o índice é
+ * revertido a cada chamada — dois espelhos revertem duas vezes e voltam ao
+ * lugar, que é exatamente o certo para a composição acima.
+ *
+ * (`wheel-bake` resolve o problema oposto — lá a roda é simétrica e girar é o
+ * certo, e o cabeçalho dele diz "giro, não espelhamento" pelo mesmo motivo
+ * técnico visto do outro lado.)
+ */
+function mirrorAxis(src: THREE.BufferGeometry, axis: 'x' | 'z'): THREE.BufferGeometry {
+  const geo = src.clone();
+  const k = axis === 'x' ? 0 : 2;
+  const flip = (a: THREE.BufferAttribute) => {
+    for (let i = 0; i < a.count; i++) {
+      const c = [a.getX(i), a.getY(i), a.getZ(i)];
+      c[k] = -c[k];
+      a.setXYZ(i, c[0], c[1], c[2]);
+    }
+    a.needsUpdate = true;
+  };
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+  flip(pos);
+  const nrm = geo.getAttribute('normal') as THREE.BufferAttribute | undefined;
+  if (nrm) flip(nrm);
+  const idx = geo.getIndex();
+  if (idx) {
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i);
+      idx.setX(i, idx.getX(i + 2));
+      idx.setX(i + 2, a);
+    }
+    idx.needsUpdate = true;
+  } else {
+    /* Sem índice, reverter significa trocar dois vértices de cada triângulo. */
+    const arr = pos.array as Float32Array;
+    const nar = nrm ? (nrm.array as Float32Array) : null;
+    for (let t = 0; t < pos.count; t += 3) {
+      for (let k = 0; k < 3; k++) {
+        const i = (t + 0) * 3 + k, j = (t + 2) * 3 + k;
+        const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+        if (nar) { const tn = nar[i]; nar[i] = nar[j]; nar[j] = tn; }
+      }
+    }
+  }
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 /* ------------------------------------------------------------ construção */
 
 export class TrailerBody {
@@ -368,6 +1084,21 @@ export class TrailerBody {
   private originals: THREE.Mesh[];
   private dims: TrailerDims;
 
+  /** Portas por face, como o editor as cadastrou. Vazio é o estado de fábrica. */
+  private doors = new Map<Face, DoorSpec[]>();
+  /** A CRISTA do friso de cada lateral — o plano em que a porta é montada. */
+  private skinX: Record<'left' | 'right', number> = { left: 0, right: 0 };
+  /** As peças da porta, extraídas do próprio implemento no construtor. */
+  private kit = new Map<DoorPart, DoorKitEntry>();
+  /** As malhas instanciadas em cena, por `peça|lado`. */
+  private inst = new Map<string, THREE.InstancedMesh>();
+  /** Um clone por material de origem — várias peças dividem `inox-ferragem`. */
+  private partMats = new Map<THREE.Material, THREE.Material>();
+  /** Marco e borracha de cada lateral: duas malhas por face, todas as portas
+   *  juntas. Chave `face|frame` / `face|seal`. */
+  private jambs = new Map<string, THREE.Mesh>();
+  /** Os dois materiais das peças de vão, tirados do próprio implemento. */
+  private jambMat: { frame: THREE.Material } | null = null;
   constructor(root: THREE.Object3D) {
     const { tris, meshes, material } = collect(root);
     if (!tris.length) throw new Error('TrailerBody: nenhuma malha branca encontrada');
@@ -415,6 +1146,9 @@ export class TrailerBody {
         const rows = findRows(group);
         if (rows.length >= MIN_RIB_ROWS) {
           sh.behaviour = 'ribbed';
+          /* +X é `right` — ver o comentário do tipo `Face`. Trocar este teste
+             põe a porta na lateral oposta à desenhada, sem erro nenhum. */
+          sh.face = (b.min.x + b.max.x) / 2 > cx ? 'right' : 'left';
           sh.rows = rows;
           sh.ribs = rows.length - 1;
           const gaps = rows.slice(1).map((y, i) => y - rows[i]);
@@ -427,7 +1161,7 @@ export class TrailerBody {
       }
 
       if (spanZ > bodyL * 0.5) sh.behaviour = 'span';
-      else if (b.max.z < z0 + CAP_BAND) sh.behaviour = 'rear';
+      else if (b.max.z < z0 + CAP_BAND) { sh.behaviour = 'rear'; sh.face = 'rear'; }
       else if (b.min.z > z1 - CAP_BAND) sh.behaviour = 'front';
       else sh.behaviour = 'local';
 
@@ -443,13 +1177,26 @@ export class TrailerBody {
 
     this.profile = {
       pitch, floorY: body.min.y, roofY: body.max.y,
-      skirtHeight, capHeight, ribCount, z0, z1,
+      skirtHeight, capHeight, ribCount,
+      /* ANTES do `rebuild()` que fecha o construtor: ele esconde as malhas
+         brancas de fábrica, e `measureSill()` filtra por `visible` para não
+         medir geometria morta. Medido depois, o filtro passaria a excluir o que
+         já estava excluído por material — inofensivo hoje, e uma armadilha no
+         dia em que o bake trouxer branco e perfil na mesma malha. */
+      sillY: measureSill(root, cx, half, body.min.y) + SILL_CLEARANCE,
+      z0, z1,
       width: body.max.x - body.min.x,
       base: { width: body.max.x - body.min.x, height: baseHeight, length: bodyL },
       shells: this.shells.length,
       ribbedShells: this.shells.filter((s) => s.behaviour === 'ribbed').length,
     };
     this.dims = { ...this.profile.base };
+
+    /* Os dois planos de montagem de porta. São as CRISTAS do friso — o mesmo
+       `body.min.x`/`body.max.x` que define a largura —, medidos e não supostos:
+       `trailer-door.ts` posiciona moldura, borracha e ferragem contra eles em
+       milímetros, e um plano arbitrado erraria as três de uma vez. */
+    this.skinX = { left: body.min.x, right: body.max.x };
 
     const mat = (material as THREE.Material)?.clone() ?? new THREE.MeshStandardMaterial({ color: 0xffffff });
     mat.name = (material?.name ?? 'metalBranco') + '__parametric';
@@ -466,12 +1213,20 @@ export class TrailerBody {
     this.mesh.castShadow = this.mesh.receiveShadow = true;
     this.group.add(this.mesh);
 
+
     /* A geometria está em espaço de MUNDO e o grupo pendura em `root`; sem
        desfazer a matriz de `root`, ela seria aplicada duas vezes e o baú
        apareceria flutuando ao lado do chassi. Desfazer pela matriz (em vez de
        pendurar na cena) mantém o corpo como filho do modelo. */
     this.group.matrixAutoUpdate = false;
     this.group.matrix.copy(root.matrixWorld).invert();
+
+    /* O KIT vem do PRÓPRIO implemento, e é extraído aqui — antes do primeiro
+       `rebuild()`, que já pode precisar dele. Ver `extractDoorKit()`. */
+    this.kit = extractDoorKit(root, new THREE.Box3(body.min.clone(), body.max.clone()));
+    this.jambMat = {
+      frame: makeJambMaterial(root, DOOR_FRAME_MAT_RE, 'marco', 0x2b2e33, 0x2b2e33),
+    };
 
     this.rebuild();
   }
@@ -506,6 +1261,48 @@ export class TrailerBody {
     return skirtHeight + n * pitch + capHeight;
   }
 
+  /**
+   * As portas de uma face. Lista vazia remove todas.
+   *
+   * O vão é ABERTO na chapa e a folha é o pedaço que saiu, deslocado para fora
+   * — nunca uma porta DESENHADA por cima. Uma porta pintada sobre chapa inteira
+   * continua mostrando o friso atravessando o vão, e é o friso que denuncia a
+   * fraude à primeira volta de câmera.
+   *
+   * Guardar a lista aqui (em vez de aplicar e esquecer) é o que faz a porta
+   * sobreviver ao redimensionamento: todo `set()` chama `rebuild()`, e
+   * `rebuild()` relê este mapa. Sem isso, cada centímetro digitado no formulário
+   * fecharia as portas de volta.
+   */
+  setDoors(face: Face, doors: DoorSpec[]) {
+    this.stageDoors(face, doors);
+    this.rebuild();
+    return this;
+  }
+
+  /**
+   * Guarda as portas SEM reconstruir.
+   *
+   * Existe porque `rebuild()` reescreve os atributos do corpo inteiro, e quem
+   * chama de fora do baú costuma ter mais o que refazer depois disso: as chapas
+   * de livery são RECORTADAS do corpo (os triângulos migram para SIDE_L/SIDE_R/
+   * REAR), então um rebuild solto devolve ao corpo os triângulos que já estão
+   * nas chapas e as duas cópias passam a disputar o teste de profundidade — o
+   * "marrom lamacento" que `models.ts` descreve em `buildLiveryPanels()`.
+   *
+   * `models.setTrailerDoors()` usa este método e deixa o rebuild para a
+   * sequência que também redescasca as chapas. Quem quiser só mexer na geometria
+   * (console, sonda) usa `setDoors()` e paga o rebuild na hora.
+   */
+  stageDoors(face: Face, doors: DoorSpec[]) {
+    this.doors.set(face, doors.map((d) => ({ ...d })));
+    return this;
+  }
+
+  getDoors(face: Face): DoorSpec[] {
+    return (this.doors.get(face) ?? []).map((d) => ({ ...d }));
+  }
+
   set(patch: { height?: number; length?: number }): TrailerDims {
     if (patch.height !== undefined) this.dims.height = this.snapHeight(patch.height);
     if (patch.length !== undefined) this.dims.length = patch.length;
@@ -535,12 +1332,83 @@ export class TrailerBody {
       return z1 - (z1 - z) * kz;
     };
 
-    const push = (t: Tri, dy: number, b: Behaviour) => {
+    /* As portas de cada face, já em coordenadas FINAIS.
+
+       `position` é medido da dianteira para trás, e a dianteira (`z1`) é o datum
+       que não anda — por isso uma porta não escorrega quando o baú fica mais
+       comprido. A altura sobe do PISO, que é o outro datum imóvel: a chapa lisa
+       estica a partir dele.
+
+       A CHAPA É RECORTADA, e o `.gltf` COM HIERARQUIA é quem diz: a pele
+       esquerda dele é feita de painéis de 1 m e tem um vão de z 0,2704 a
+       1,3292 — 1 059 mm de abertura para uma folha de 870. A direita é
+       contínua porque naquele implemento a porta só existe do lado esquerdo.
+       Um comentário anterior aqui afirmava o contrário ("a chapa não é
+       recortada") apoiado nos `.zip` de OBJ, que são capturas por chamada de
+       desenho e perderam as matrizes de instância — medir a porta por eles leva
+       a conclusões erradas com cara de certas, e esta foi uma delas.
+
+       O que se vê pela faixa de 94,5 mm em volta da folha é o BATENTE, 73 mm
+       atrás (`JAMB_DEPTH`), e é ele que fecha o vão — ver `jambGeometry()`. A
+       folha é o pedaço da própria pele, então o friso dela continua alinhado
+       com o da parede: é o mesmo friso, no mesmo passo e na mesma fase. */
+    const doorsOf = (face: Face | undefined): { leaf: DoorRect; hole: DoorRect }[] => {
+      const list = face ? this.doors.get(face) : undefined;
+      if (!list?.length || face === 'rear') return [];
+      const out: { leaf: DoorRect; hole: DoorRect }[] = [];
+      for (const d of list) {
+        /* CLAMP AQUI, e não só no editor. `livery-structure.ts` também limita —
+           mas ele limita o que o formulário mostra, e as duas listas são
+           atualizadas por caminhos diferentes: encurtar o baú dispara `set()`,
+           que passa direto por aqui sem repassar as portas. Sem este clamp uma
+           porta ficaria pendurada no ar atrás da traseira nova, e o buraco dela
+           sairia num pedaço de chapa que não existe mais. */
+        const width = Math.min(Math.max(d.width, 0), this.dims.length);
+        const from = Math.min(Math.max(d.position, 0), this.dims.length - width);
+        /* O PÉ É O BATENTE, não o piso. E o topo para debaixo da cantoneira:
+           uma porta que subisse até o teto entraria no perfil galvanizado que
+           corre a lateral inteira. Os dois limites são geometria, não gosto —
+           `sillY` foi medido e `HEAD_DROP` também.
+
+           O TETO DESCONTA O VÃO, não a folha. Quem corta a chapa é `hole`, que
+           é `DOOR_REVEAL` maior que a folha em cada lado; limitar a folha pela
+           cantoneira deixaria o recorte 94,5 mm acima dela, abrindo o vão ATRÁS
+           de um perfil que não se mexe — e o batente, mais fundo ainda, sairia
+           por dentro dele. */
+        const headY = floorY + this.dims.height - HEAD_DROP - DOOR_REVEAL;
+        /* O BATENTE MEDIDO É O PÉ DO VÃO, NÃO O DA FOLHA.
+
+           `sillY` é o topo do perfil galvanizado que corre a lateral inteira, e
+           a porta ASSENTA sobre ele — nenhuma parte dela desce por baixo. Como
+           `holeOf()` abre `DOOR_REVEAL` além da folha nos quatro lados, ancorar
+           a FOLHA em `sillY` punha o recorte 94,5 mm ABAIXO do perfil: o vão
+           atravessava o perfil e a peça de baixo da porta aparecia por cima
+           dele, quando ela tem de aparecer acima. Ancorando o VÃO, a moldura
+           inferior fica apoiada no perfil e a folha começa uma folga acima —
+           que é o que um implemento montado mostra. */
+        const y0 = this.profile.sillY + DOOR_REVEAL;
+        const y1 = Math.min(y0 + Math.max(d.height, 0), headY);
+        const leaf: DoorRect = { y0, y1, z0: z1 - (from + width), z1: z1 - from };
+        const why = rejectReason(leaf);
+        if (why) {
+          console.warn('[porta] porta de', face, 'recusada —', why);
+          continue;
+        }
+        out.push({ leaf, hole: holeOf(leaf) });
+      }
+      return out;
+    };
+
+    /* Uma face por vez: `doorsOf()` roda uma vez por lateral, não uma vez por
+       triângulo. São ~73 mil triângulos e a lista é relida em cada um. */
+    const doorsFor = new Map<Face, { leaf: DoorRect; hole: DoorRect }[]>();
+    for (const face of ['left', 'right'] as const) doorsFor.set(face, doorsOf(face));
+
+    const write = (t: Tri) => {
       for (let k = 0; k < 3; k++) {
-        const x = t.p[k * 3];
-        const y = t.p[k * 3 + 1] + dy;
-        const z = mapZ(t.p[k * 3 + 2], b);
-        pos.push(x, y, z);
+        const y = t.p[k * 3 + 1];
+        const z = t.p[k * 3 + 2];
+        pos.push(t.p[k * 3], y, z);
         nrm.push(t.n[k * 3], t.n[k * 3 + 1], t.n[k * 3 + 2]);
         /* UV de livery: u no comprimento, v na altura, normalizada pelos
            limites CORRENTES — a arte continua casando com a borda após resize. */
@@ -548,30 +1416,129 @@ export class TrailerBody {
       }
     };
 
+    /* A crista de cada lateral, para o achatamento das faixas lisas da folha. */
+    const xCrest = this.skinX;
+
+    /** Triângulos da FOLHA, por face — entram no mesmo buffer branco no fim. */
+    const leafTris: { face: 'left' | 'right'; tris: Tri[] }[] = [
+      { face: 'left', tris: [] }, { face: 'right', tris: [] },
+    ];
+
+    /**
+     * Abre o VÃO e destaca a FOLHA, do mesmo triângulo.
+     *
+     * O vão é 94,5 mm maior que a folha de cada lado — medido: a pele externa
+     * do modelo abre 1 059 mm para uma folha de 870. É essa folga que aparece
+     * como a faixa escura em volta da porta, e é o que faz o friso PARAR na
+     * borda do vão em vez de atravessar a porta.
+     *
+     * A folha é o pedaço da própria pele, recortado no retângulo dela e levado
+     * 5,1 mm para dentro (medido). Sair da pele é o que garante que ela tenha o
+     * MESMO passo e a MESMA fase de friso da parede — uma folha importada de
+     * outro arquivo teria 53,0 mm contra os 53,4 mm daqui e sairia fora de fase
+     * em ~18 mm ao longo da altura.
+     */
+    const emit = (t: Tri, face: Face | undefined) => {
+      const doors = face === 'left' || face === 'right' ? doorsFor.get(face) : undefined;
+      if (!doors?.length) { write(t); return; }
+
+      if (face !== 'left' && face !== 'right') { write(t); return; }
+      const bucket = leafTris.find((l) => l.face === face);
+      const sgn = face === 'right' ? -1 : 1;
+      const dx = sgn * LEAF_INSET;
+      for (const { leaf } of doors) {
+        /* A FOLHA NÃO TEM O FRISO CORRIDO DA PAREDE. Ela sai recortada dela —
+           é o que mantém passo e FASE do friso —, e as quatro faixas lisas
+           medidas no nó 2354 são aplicadas aqui, achatando o relevo para o plano
+           do VALE. É a mesma superfície, sem o vinco, que é o que uma chapa lisa
+           é. Ver `LEAF_FLAT_BANDS`.
+
+           O triângulo é CORTADO na borda da faixa antes de ser achatado. Antes
+           o teste era por triângulo inteiro (`inFlatBand` nos três vértices) e a
+           fileira de friso que cruzasse a borda ficava toda em relevo — degrau
+           serrilhado, porque as bordas são fração da altura e o friso vem da
+           parede, então elas nunca caem numa aresta. */
+        const segs = flatSegments(leaf);
+        for (const whole of intersectRect(t, leaf)) {
+        for (const seg of segs) {
+        for (const piece of clipSlab(whole, seg.lo, seg.hi)) {
+          const q = new Float32Array(piece.p);
+          const flat = seg.flat;
+          for (let k = 0; k < 3; k++) {
+            /* `+ sgn`, e o sinal é o conserto. `sgn` é −1 na lateral DIREITA,
+               onde "fora" é +X; `xCrest − sgn·RIB_RELIEF` levava a faixa lisa
+               para 5,2 mm À FRENTE da crista, e o `dx` de recuo devolvia só
+               5,1 — a faixa ficava rasante com a crista enquanto o resto da
+               folha ficava 5,1 mm atrás dela. Ou seja: uma CHAPA POR CIMA DOS
+               FRISOS, que é exatamente o relato ("está sendo adicionada outra
+               placa acima dos frisos, em vez de apenas não desenhar os frisos
+               nessas áreas"). Com `+ sgn` a faixa cai no plano do VALE, 5,2 mm
+               atrás da crista da folha, que é o que uma chapa sem vinco é. */
+            if (flat) q[k * 3] = xCrest[face] + sgn * RIB_RELIEF;
+            q[k * 3] += dx;
+          }
+          if (flat) {
+            /* Achatado, o vinco some e a normal dele mente: ela ainda aponta
+               para a parede do friso que deixou de existir. A normal de uma
+               chapa lisa é a do painel. */
+            const n = new Float32Array(piece.n);
+            for (let k = 0; k < 3; k++) {
+              n[k * 3] = -sgn; n[k * 3 + 1] = 0; n[k * 3 + 2] = 0;
+            }
+            bucket?.tris.push({ p: q, n });
+          } else {
+            bucket?.tris.push({ p: q, n: piece.n });
+          }
+        }
+        }
+        }
+      }
+
+      /* Um vão de cada vez: o resto de um vira entrada do seguinte, o que faz
+         portas encostadas se comportarem como um vão só. */
+      let parts: Tri[] = [t];
+      for (const { hole } of doors) {
+        const next: Tri[] = [];
+        for (const q of parts) next.push(...subtractGap(q, hole));
+        parts = next;
+        if (!parts.length) return;
+      }
+      for (const q of parts) write(q);
+    };
+
+    const push = (t: Tri, dy: number, b: Behaviour, face?: Face) => {
+      const p = new Float32Array(9);
+      for (let k = 0; k < 3; k++) {
+        p[k * 3] = t.p[k * 3];
+        p[k * 3 + 1] = t.p[k * 3 + 1] + dy;
+        p[k * 3 + 2] = mapZ(t.p[k * 3 + 2], b);
+      }
+      emit({ p, n: t.n }, face);
+    };
+
     for (const sh of this.shells) {
       if (sh.behaviour === 'ribbed') {
         const n = Math.max(1, sh.ribs + extra);
         const y0 = sh.rows[0];
-        for (const t of sh.skirt) push(t, 0, 'ribbed');
+        for (const t of sh.skirt) push(t, 0, 'ribbed', sh.face);
         for (let i = 0; i < n; i++) {
           const dy = y0 + i * pitch;
-          for (const t of sh.unit) push(t, dy, 'ribbed');
+          for (const t of sh.unit) push(t, dy, 'ribbed', sh.face);
         }
-        for (const t of sh.cap) push(t, y0 + n * pitch - sh.rows[sh.rows.length - 1], 'ribbed');
+        for (const t of sh.cap) push(t, y0 + n * pitch - sh.rows[sh.rows.length - 1], 'ribbed', sh.face);
         continue;
       }
 
       if (sh.stretchY) {
         /* Chapa lisa grande: estica em Y. Exato — é plana. */
         for (const t of sh.tris) {
+          const p = new Float32Array(9);
           for (let k = 0; k < 3; k++) {
-            const x = t.p[k * 3];
-            const y = floorY + (t.p[k * 3 + 1] - floorY) * ky;
-            const z = mapZ(t.p[k * 3 + 2], sh.behaviour);
-            pos.push(x, y, z);
-            nrm.push(t.n[k * 3], t.n[k * 3 + 1], t.n[k * 3 + 2]);
-            uv.push((z - zBack) / this.dims.length, (y - floorY) / this.dims.height);
+            p[k * 3] = t.p[k * 3];
+            p[k * 3 + 1] = floorY + (t.p[k * 3 + 1] - floorY) * ky;
+            p[k * 3 + 2] = mapZ(t.p[k * 3 + 2], sh.behaviour);
           }
+          emit({ p, n: t.n }, sh.face);
         }
         continue;
       }
@@ -580,8 +1547,17 @@ export class TrailerBody {
          Esticar dobradiça e fecho junto com a porta seria deformá-los. */
       const cy = (sh.min.y + sh.max.y) / 2;
       const dy = (floorY + (cy - floorY) * ky) - cy;
-      for (const t of sh.tris) push(t, dy, sh.behaviour);
+      for (const t of sh.tris) push(t, dy, sh.behaviour, sh.face);
     }
+
+    /* A folha entra DEPOIS da chapa e no MESMO buffer: mesma malha, mesmo
+       material, mesmo recorte de painel de livery. Numa malha própria ela
+       ficaria de fora de `buildLiveryPanels()` e seria a única parte do baú sem
+       a arte do cliente. */
+    for (const l of leafTris) for (const t of l.tris) write(t);
+
+    this.rebuildJambs(doorsFor);
+    this.rebuildParts(doorsFor);
 
     const geo = this.mesh.geometry as THREE.BufferGeometry;
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -592,10 +1568,181 @@ export class TrailerBody {
     for (const m of this.originals) m.visible = false;
   }
 
+  /** Diagnóstico: que peças o kit trouxe do implemento. */
+  get kitParts(): string[] { return [...this.kit.keys()].sort(); }
+
+  /**
+   * O batente de cada lateral — UMA malha por face, com todas as portas dela.
+   *
+   * Uma malha por face e não uma por porta: são 16 triângulos por porta, e três
+   * portas cadastradas dariam seis nós numa cena que já conta chamada de
+   * desenho. Recriada a cada `rebuild()` em vez de reaproveitada porque a
+   * contagem de vértices muda com o número de portas e o custo é desprezível
+   * perto dos ~73 mil triângulos que o corpo reescreve na mesma passada.
+   *
+   * A malha entra em `this.group`, que já desfaz a matriz de `root` — a
+   * geometria do batente está em espaço de MUNDO, como a do corpo, porque sai
+   * dos mesmos retângulos de `doorsOf()`.
+   */
+  private rebuildJambs(doorsFor: Map<Face, { leaf: DoorRect; hole: DoorRect }[]>) {
+    for (const [key, mesh] of this.jambs) {
+      mesh.geometry.dispose(); mesh.removeFromParent(); this.jambs.delete(key);
+    }
+    if (!this.jambMat) return;
+
+    for (const face of ['left', 'right'] as const) {
+      const doors = doorsFor.get(face) ?? [];
+      if (!doors.length) continue;
+
+      const plane: DoorPlane = {
+        xSkin: this.skinX[face], sign: face === 'right' ? 1 : -1,
+      };
+      /* UMA superfície, o marco. A segunda era um anel de `borracha-preta`
+         desenhado à mão, e ele saiu: a vedação de verdade é peça EXTRAÍDA
+         (`BORRACHA_V`/`BORRACHA_H`), e as duas juntas davam duas borrachas
+         sobrepostas com seções diferentes. Ver `doorFrameGeometry()`. */
+      const acc: Record<'frame', DoorSurface> = {
+        frame: { position: [], normal: [] },
+      };
+      for (const { leaf } of doors) {
+        const q = doorFrameGeometry(leaf, plane);
+        for (const k of ['frame'] as const) {
+          acc[k].position.push(...q[k].position);
+          acc[k].normal.push(...q[k].normal);
+        }
+      }
+
+      for (const k of ['frame'] as const) {
+        const s = acc[k];
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(s.position, 3));
+        geo.setAttribute('normal', new THREE.Float32BufferAttribute(s.normal, 3));
+        /* `uv` zerado, e de propósito: os materiais do bake têm mapas que leem
+           uv0, e um atributo AUSENTE faz o three amostrar lixo em vez de um
+           texel só. Zero é um texel definido — o mesmo argumento que
+           `buildLiveryPanels()` usa ao carregar o uv0 de origem junto. */
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(
+          new Float32Array((s.position.length / 3) * 2), 2));
+        geo.computeBoundingBox();
+        geo.computeBoundingSphere();
+
+        const mesh = new THREE.Mesh(geo, this.jambMat[k]);
+        mesh.name = `PORTA_MARCO_${face === 'right' ? 'R' : 'L'}`;
+        mesh.castShadow = mesh.receiveShadow = true;
+        this.group.add(mesh);
+        this.jambs.set(`${face}|${k}`, mesh);
+      }
+    }
+  }
+
+  /**
+   * As peças de todas as portas, instanciadas.
+   *
+   * `InstancedMesh` por peça e por LADO, e não uma malha por porta: uma porta
+   * leva ~28 rebites, e três portas cadastradas dariam 84 nós numa cena que já
+   * conta draw call. Cada peça vira uma chamada, com as matrizes num buffer.
+   *
+   * As malhas são recriadas quando a CONTAGEM muda e só reescritas quando não
+   * muda — `InstancedMesh` tem contagem fixa na alocação, e realocar a cada
+   * tecla digitada no formulário de medidas é o que se quer evitar.
+   */
+  private rebuildParts(doorsFor: Map<Face, { leaf: DoorRect; hole: DoorRect }[]>) {
+    const wanted = new Map<string, DoorPlacement[]>();
+    for (const face of ['left', 'right'] as const) {
+      const doors = doorsFor.get(face) ?? [];
+      if (!doors.length) continue;
+      const plane: DoorPlane = {
+        xSkin: this.skinX[face], sign: face === 'right' ? 1 : -1,
+      };
+      for (const { leaf } of doors) {
+        for (const pl of layoutDoor(leaf, plane)) {
+          const key = `${pl.part}|${face}`;
+          const list = wanted.get(key);
+          if (list) list.push(pl); else wanted.set(key, [pl]);
+        }
+      }
+    }
+
+
+    /* Some com o que não é mais pedido. */
+    for (const [key, mesh] of this.inst) {
+      if (!wanted.has(key)) { mesh.geometry.dispose(); mesh.removeFromParent(); this.inst.delete(key); }
+    }
+
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();   // identidade: nenhuma peça gira
+    const pos = new THREE.Vector3();
+    const scl = new THREE.Vector3();
+    for (const [key, list] of wanted) {
+      const [part, face] = key.split('|') as [DoorPart, 'left' | 'right'];
+      const entry = this.kit.get(part);
+      if (!entry) continue;
+
+      let mesh = this.inst.get(key);
+      if (!mesh || mesh.count !== list.length) {
+        if (mesh) { mesh.geometry.dispose(); mesh.removeFromParent(); }
+        /* NENHUM espelho em Z aqui, e a ausência é o conserto. Ele já foi
+           aplicado, PEÇA A PEÇA, por `extractDoorKit()`: quem sabe se a peça
+           precisa dele é quem sabe de qual das duas portas traseiras ela veio, e
+           isso só se lê na origem. Um espelho global neste ponto acertava as
+           peças de uma porta e virava as da outra — a dobradiça ao contrário com
+           o resto do kit certo. `x` continua aqui porque é do LADO do baú, não
+           da peça. */
+        const geo = face === 'right' ? entry.geo.clone() : mirrorAxis(entry.geo, 'x');
+        mesh = new THREE.InstancedMesh(geo, this.partMaterial(entry.mat), list.length);
+        mesh.name = `PORTA_${part}_${face === 'right' ? 'R' : 'L'}`;
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.frustumCulled = false;   // a caixa de uma InstancedMesh mal cobre o conjunto
+        this.group.add(mesh);
+        this.inst.set(key, mesh);
+      }
+      for (let i = 0; i < list.length; i++) {
+        const pl = list[i];
+        pos.set(pl.x, pl.y, pl.z);
+        /* Só EXTRUSÕES escalam, e só no PRÓPRIO eixo: o varão em Y, os dois
+           perfis de borracha em Y (montante) e Z (travessa). Esticar uma
+           extrusão no eixo dela é exato. Nenhuma outra peça escala — dobradiça,
+           guia e manípulo são produto físico e não crescem com a porta. */
+        scl.set(1, pl.sy ?? 1, pl.sz ?? 1);
+        mesh.setMatrixAt(i, m4.compose(pos, q, scl));
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  }
+
+  /**
+   * O material de uma peça da porta: o DO IMPLEMENTO, clonado com sufixo.
+   *
+   * Clonado e renomeado pelo mesmo motivo que o branco: `applyTrailerFinish()`
+   * despacha por NOME (ARCHITECTURE.md §6), e um clone homônimo seria repintado
+   * junto com a peça de fábrica. Renomeando, a porta fica com a aparência que o
+   * acabamento já deu ao original e não é tocada de novo.
+   */
+  private partMaterial(src: THREE.Material): THREE.Material {
+    const have = this.partMats.get(src);
+    if (have) return have;
+    const m = src.clone();
+    m.name = `${src.name}__porta`;
+    this.partMats.set(src, m);
+    return m;
+  }
+
   dispose() {
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
+    for (const m of this.inst.values()) { m.geometry.dispose(); m.removeFromParent(); }
+    this.inst.clear();
+    for (const m of this.jambs.values()) { m.geometry.dispose(); m.removeFromParent(); }
+    this.jambs.clear();
+    if (this.jambMat) for (const m of Object.values(this.jambMat)) m.dispose();
+    this.jambMat = null;
+    for (const e of this.kit.values()) e.geo.dispose();
+    this.kit.clear();
+    for (const m of this.partMats.values()) m.dispose();
+    this.partMats.clear();
     this.group.removeFromParent();
     for (const m of this.originals) m.visible = true;
   }
 }
+

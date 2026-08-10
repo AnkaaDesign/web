@@ -8,6 +8,23 @@ import { useTheme } from "@/contexts/theme-context";
 import type { ImplementMeasureCreateFormData } from "../../../schemas";
 import { getApiBaseUrl } from "@/config/api";
 
+/**
+ * Menor altura de porta que a GEOMETRIA aceita, em centímetros.
+ *
+ * Espelha `MIN_DOOR_HEIGHT_GEO` de
+ * `pages/tools/truck-studio/engine/vehicle/trailer-door.ts` (0,90 m), repetido
+ * aqui como número em vez de importado porque aquele módulo arrasta o motor 3D
+ * para dentro do bundle deste formulário.
+ *
+ * Estava 50, e a divergência não era inofensiva: o formulário aceitava 50 cm, o
+ * motor recusava a porta em `rejectReason()` e escrevia o motivo no console —
+ * então o usuário cadastrava a porta, via o campo aceitar o número e não via
+ * porta nenhuma no implemento, sem nada na tela que explicasse. O mínimo da
+ * geometria existe porque abaixo dele a ferragem do fecho se sobrepõe: o
+ * manípulo tem 247 mm e mora a 190 mm da borda.
+ */
+const MIN_DOOR_HEIGHT_CM = 90;
+
 interface ImplementMeasureFormProps {
   selectedSide?: 'left' | 'right' | 'back';
   layouts?: {
@@ -85,8 +102,8 @@ const DoorHeightInput = React.forwardRef<
   React.useImperativeHandle(ref, () => ({
     getValue: () => {
       let cmValue = parseValue(localValue);
-      // Door height must be between 50cm and the layout height
-      cmValue = Math.max(50, Math.min(layoutHeight, cmValue));
+      // Door height must be between MIN_DOOR_HEIGHT_CM and the layout height
+      cmValue = Math.max(MIN_DOOR_HEIGHT_CM, Math.min(layoutHeight, cmValue));
       return Math.round(cmValue);
     }
   }), [localValue, layoutHeight]);
@@ -104,8 +121,8 @@ const DoorHeightInput = React.forwardRef<
 
   const handleBlur = () => {
     const value = parseValue(localValue);
-    // Door height must be between 50cm and the layout height
-    const clampedValue = Math.max(50, Math.min(layoutHeight, value));
+    // Door height must be between MIN_DOOR_HEIGHT_CM and the layout height
+    const clampedValue = Math.max(MIN_DOOR_HEIGHT_CM, Math.min(layoutHeight, value));
     onBlur?.(Math.round(clampedValue));
 
     // Format for display

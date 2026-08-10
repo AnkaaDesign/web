@@ -89,8 +89,13 @@ import {
   LiveryComposer, defaultLayers,
   type DoorSpec, type Face, type LiveryLayer, type LiverySource, type PanelSpec,
 } from './livery-layers';
-import { state, getTrailerDims, setTrailerDims as setTrailerDimsRaw } from './models';
+import {
+  state, getTrailerDims, setTrailerDims as setTrailerDimsRaw, setTrailerDoors,
+} from './models';
 import type { TrailerDims } from './trailer-geometry';
+import {
+  MIN_DOOR_WIDTH, MIN_DOOR_HEIGHT_GEO, DOOR_REVEAL, HEAD_DROP,
+} from './trailer-door';
 
 export type { DoorSpec, LiverySource, PanelSpec };
 
@@ -116,8 +121,20 @@ export const MIN_PANEL_LENGTH = 1.0;
 /** `min={100} max={400}` no campo de altura. */
 export const MIN_PANEL_HEIGHT = 1.0;
 export const MAX_PANEL_HEIGHT = 4.0;
-/** `Math.max(50, Math.min(layoutHeight, …))` no campo de altura de porta. */
-export const MIN_DOOR_HEIGHT = 0.5;
+/**
+ * Altura mínima de porta.
+ *
+ * O formulário React diz `Math.max(50, …)`, ou seja 0,5 m — e é COM ESTE
+ * NÚMERO que a divergência aparecia: `trailer-door.rejectReason()` recusa
+ * qualquer porta abaixo de 0,90 m (a ferragem do fecho não cabe) e devolve o
+ * motivo por `console.warn`, que ninguém lê. O resultado era uma porta de 0,6 m
+ * desenhada no editor, listada nas medidas, e AUSENTE do baú.
+ *
+ * O mínimo daqui passa a ser o da geometria. Uma porta que não pode existir em
+ * 3D não deve poder ser desenhada em 2D — e `implement-measure-form.tsx` tem de
+ * subir o `Math.max(50, …)` para 90 pelo mesmo motivo.
+ */
+export const MIN_DOOR_HEIGHT = MIN_DOOR_HEIGHT_GEO;
 /** A regra dos 2 cm entre Motorista e Sapo, expressa em metros. */
 export const SIDE_WIDTH_TOLERANCE = 0.02;
 
@@ -247,41 +264,71 @@ const isThenable = (v: unknown): v is Promise<DimsResult> =>
   && typeof (v as { then?: unknown }).then === 'function';
 
 /* ---------------- o contrato de portas com a geometria ----------------
-   `rig.setDoors(face, doors)` está sendo implementado em paralelo em
-   `trailer-geometry.ts`, que é ARQUIVO ESPELHADO e não se edita daqui. Enquanto
-   ele não existir, esta chamada simplesmente não acontece — as portas continuam
-   entrando como CAMADA (o vão desenhado na textura), que é metade do trabalho e
-   a metade que já dá para conferir. No dia em que o método aparecer, ele passa a
-   ser chamado sem que nada mude aqui.
+   `rig.setDoors(face, doors)` EXISTE desde que `trailer-geometry.ts` ganhou o
+   recorte de vão e `trailer-door.ts` a moldura, a folha e a ferragem. A detecção
+   por `typeof` continua aqui de propósito: o desktop e o web compartilham este
+   arquivo com builds da geometria que nem sempre andam juntas, e uma build sem
+   o método tem de degradar para "só camada 2D" em vez de estourar.
 
-   O SISTEMA DE COORDENADAS, que é onde isto pode dar errado calado: `position` é
-   medido a partir da borda ESQUERDA DO PAINEL como o editor a mostra — e as duas
-   laterais correm em sentidos opostos (`addLiveryUV()` gera u = (z−minZ)/span na
-   SIDE_L e u = (maxZ−z)/span na SIDE_R; ver os rótulos ◄ TRASEIRA / ◄ FRENTE no
-   palco). É a origem que o usuário enxerga, e é a mesma da textura, então
-   camada e vão não podem divergir. Se `trailer-geometry` interpretar `position`
-   no referencial do VEÍCULO em vez do painel, a conversão é uma linha e está
-   escrita aqui para não precisar ser redescoberta:
-       position_veiculo = (face === 'right') ? length - (position + width) : position
-*/
-type DoorCapableRig = { setDoors?: (face: Face, doors: DoorSpec[]) => void };
+   O SISTEMA DE COORDENADAS, que é onde isto dá errado CALADO — dois datums
+   diferentes, e nenhum deles avisa quando é usado no lugar do outro:
+
+     PAINEL (aqui)      `position` sai da borda esquerda do painel como o editor
+                        a desenha. As duas laterais correm em sentidos opostos:
+                        `addLiveryUV()` gera u = (z−minZ)/span na SIDE_L e
+                        u = (maxZ−z)/span na SIDE_R, então x = 0 é a TRASEIRA na
+                        esquerda e a DIANTEIRA na direita (ver os rótulos
+                        ◄ TRASEIRA / ◄ FRENTE no palco).
+
+     GEOMETRIA (lá)     `position` sai da DIANTEIRA e anda para trás, sempre. É
+                        o único datum que não se mexe: o baú cresce para trás
+                        (`mapZ()`, comportamento `front`), então uma porta
+                        ancorada na dianteira fica onde está quando o
+                        comprimento muda. Ancorada na traseira, ela andaria a
+                        cada centímetro digitado.
+
+   A conversão é a linha abaixo. Um comentário anterior deste arquivo a deixou
+   escrita como `(face === 'right') ? length − (position + width) : position` —
+   que é a distância até a TRASEIRA, não até a dianteira, e portanto a inversa
+   da que a geometria pede. Ficou explícita como código, com nome, porque a
+   versão errada dela é indistinguível da certa até alguém abrir a porta num baú
+   assimétrico e ver que ela está do lado oposto ao do desenho. */
+/* O rig cru só é consultado para saber se ESTA build da geometria tem portas.
+   Quem aplica é `models.setTrailerDoors()`, e não `rig.setDoors()`: recortar um
+   vão reescreve o corpo branco inteiro, e as chapas de livery são recortadas
+   DELE — reconstruir sem redescascar devolve ao corpo os triângulos que já
+   migraram para SIDE_L/SIDE_R e as duas cópias passam a disputar o z-buffer.
+   `setTrailerDoors()` é o que corre a sequência completa. */
+type DoorCapableRig = { stageDoors?: (face: StructureKey, doors: DoorSpec[]) => void };
 
 let doorsUnsupportedWarned = false;
+
+/** `position` do painel → distância da DIANTEIRA, que é o que a geometria usa. */
+function toGeometryDoor(key: StructureKey, d: DoorSpec, length: number): DoorSpec {
+  const fromFront = key === 'left' ? length - (d.position + d.width) : d.position;
+  return { position: Math.max(0, fromFront), width: d.width, height: d.height };
+}
 
 function pushDoorsToGeometry(key: StructureKey, doors: DoorSpec[]) {
   const rig = state.trailerRig as unknown as DoorCapableRig | null;
   if (!rig) return;
-  if (typeof rig.setDoors !== 'function') {
+  /* A TRASEIRA NÃO ENTRA. As portas de trás já existem como geometria de
+     verdade no `trailer.glb` — quatro folhas, com batente, varão e dobradiça.
+     Mandar recortar um vão ali abriria um buraco ATRÁS das portas que já estão
+     lá. O que a traseira tem de portas continua sendo o que o bake trouxe; o
+     cadastro dela vale para a camada 2D, que é o layout da arte. */
+  if (key === 'rear') return;
+  if (typeof rig.stageDoors !== 'function') {
     if (!doorsUnsupportedWarned && doors.length) {
       doorsUnsupportedWarned = true;
-      console.info('[medidas] `rig.setDoors()` ainda não existe nesta build da geometria —'
-        + ' as portas entram só como camada de livery. Nada a fazer: quando'
-        + ' trailer-geometry.ts ganhar o método, o vão passa a ser recortado sozinho.');
+      console.info('[medidas] esta build da geometria não recorta vão de porta —'
+        + ' as portas entram só como camada de livery.');
     }
     return;
   }
   try {
-    rig.setDoors(key as Face, doors.map((d) => ({ ...d })));
+    const length = panels[key].spec.length;
+    setTrailerDoors(key, doors.map((d) => toGeometryDoor(key, d, length)));
   } catch (e: unknown) {
     /* Uma porta que a geometria recusa não pode derrubar a edição de medidas: a
        camada já foi composta e o usuário já viu o vão. */
@@ -412,20 +459,41 @@ export function refreshFromTrailer(): void {
     panels.right.spec.length = d.length;
     panels.rear.spec.length = d.width;
     for (const k of STRUCTURE_KEYS) panels[k].spec.height = d.height;
+    /* O BATENTE, MEDIDO — não um número escrito aqui. `measureSill()` acha o
+       topo do perfil galvanizado da saia em CADA bake, e é sobre ele que o pé
+       da porta assenta no 3D. Lido a cada refresh porque o perfil não é do
+       painel: é do implemento carregado, e trocar de implemento troca a
+       medida. Ver `PanelSpec.doorSill`. */
+    const prof = (state.trailerRig as { profile?: { sillY: number; floorY: number } } | null)?.profile;
+    const sill = prof ? Math.max(0, prof.sillY - prof.floorY) : undefined;
+    for (const k of STRUCTURE_KEYS) panels[k].spec.doorSill = sill;
     clampDoors();
   }
   void recomposeAll();
   emitMeasures();
 }
 
-/** Uma porta não pode passar da borda nem do teto. Mesmo clamp do formulário. */
+/**
+ * Uma porta não pode passar da borda, nem do teto, nem ser menor do que a
+ * geometria aceita.
+ *
+ * O TETO AQUI É O MESMO DO 3D, e é isso que a versão anterior não fazia: ela
+ * limitava a `height`, o painel inteiro, enquanto `doorsOf()` limita a folha à
+ * cantoneira (`HEAD_DROP`) descontando ainda a faixa do vão (`DOOR_REVEAL`) e o
+ * batente (`sill`). Uma porta digitada com a altura do painel era desenhada
+ * inteira no editor e chegava ao baú 44 cm mais baixa, calada — o clamp
+ * acontecia lá, longe de quem estava olhando.
+ */
 function clampDoors() {
   for (const k of STRUCTURE_KEYS) {
-    const { length, height } = panels[k].spec;
-    for (const d of panels[k].spec.doors) {
-      d.width = Math.max(0.01, Math.min(d.width, length));
+    const spec = panels[k].spec;
+    const { length, height } = spec;
+    const sill = k === 'rear' ? 0 : (spec.doorSill ?? 0);
+    const maxH = Math.max(MIN_DOOR_HEIGHT, height - HEAD_DROP - DOOR_REVEAL - sill);
+    for (const d of spec.doors) {
+      d.width = Math.max(MIN_DOOR_WIDTH, Math.min(d.width, length));
       d.position = Math.max(0, Math.min(d.position, length - d.width));
-      d.height = Math.max(MIN_DOOR_HEIGHT, Math.min(d.height, height));
+      d.height = Math.max(MIN_DOOR_HEIGHT, Math.min(d.height, maxH));
     }
   }
 }
@@ -501,11 +569,15 @@ export function setDoorsFor(key: StructureKey, doors: DoorSpec[]): DoorSpec[] {
   return applied;
 }
 
-/** Uma porta nova, com os padrões do formulário (1 m × 1 m), no maior vão. */
+/** Medida padrão de uma porta de serviço: 1,20 × 2,10 m. */
+export const DEFAULT_DOOR_WIDTH = 1.20;
+export const DEFAULT_DOOR_HEIGHT = 2.10;
+
+/** Uma porta nova, na medida padrão, no maior vão livre. */
 export function addDoor(key: StructureKey): DoorSpec[] {
   const { length, doors } = panels[key].spec;
-  const w = Math.min(1.0, length);
-  const h = Math.min(1.0, panels[key].spec.height);
+  const w = Math.min(DEFAULT_DOOR_WIDTH, length);
+  const h = Math.min(DEFAULT_DOOR_HEIGHT, panels[key].spec.height);
   let position = length / 2 - w / 2;
   if (doors.length) {
     /* O maior vão livre, como `addDoor()` do formulário: sem isso a segunda

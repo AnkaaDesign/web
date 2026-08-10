@@ -141,6 +141,21 @@ export interface PanelSpec {
   length: number;
   height: number;
   doors: DoorSpec[];
+  /**
+   * Altura do BATENTE acima do piso, em metros — onde o pé de uma porta
+   * lateral realmente nasce.
+   *
+   * Não é zero e não é constante: no 3D a porta assenta sobre o perfil
+   * galvanizado da saia, que `trailer-geometry.measureSill()` MEDE no bake (135
+   * mm neste). Desenhar a porta a partir do piso, como esta pilha fazia, punha
+   * o retângulo do editor 135 mm abaixo da porta que o cliente vê no baú — erro
+   * pequeno o bastante para passar despercebido na conferência e grande o
+   * bastante para a arte encostar na porta errada.
+   *
+   * Ausente = não há geometria para perguntar (bake sem o branco de fábrica), e
+   * aí o piso é a única resposta honesta.
+   */
+  doorSill?: number;
 }
 
 /* ------------------------------------------------------------ placeholders */
@@ -254,7 +269,7 @@ const CANTONEIRA_DROP = 0.2074;
  *    distância até o teto, que é o que desalinha arte.
  */
 export function defaultLayers(panel: PanelSpec): LiveryLayer[] {
-  const { face, length, height, doors } = panel;
+  const { face, length, height, doors, doorSill } = panel;
   const layers: LiveryLayer[] = [
     { id: 'base', kind: 'base', source: { kind: 'solid', color: '#ffffff' } },
   ];
@@ -286,11 +301,15 @@ export function defaultLayers(panel: PanelSpec): LiveryLayer[] {
     rect: { x: 0, y: height - CANTONEIRA_DROP, w: length, h: CANTONEIRA_H },
   });
 
+  /* A porta nasce no BATENTE, não no piso — ver `doorSill`. A traseira é a
+     exceção: lá as portas são as do bake, do piso ao teto, e não há batente de
+     porta lateral para consultar. */
+  const sill = face === 'rear' ? 0 : (doorSill ?? 0);
   for (const [i, d] of doors.entries()) {
     layers.push({
       id: `door-${i}`, kind: 'door',
       source: { kind: 'svg', markup: '' },
-      rect: { x: d.position, y: 0, w: d.width, h: d.height },
+      rect: { x: d.position, y: sill, w: d.width, h: d.height },
     });
   }
 

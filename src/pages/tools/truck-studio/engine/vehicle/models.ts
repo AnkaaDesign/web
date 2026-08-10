@@ -17,7 +17,7 @@ import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
-import { TrailerRig, type TrailerDims } from './trailer-rig';
+import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './trailer-rig';
 import { swapTrailerWheels } from './wheels';
 import {
   solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
@@ -2417,6 +2417,34 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
     `${dims.length.toFixed(3)} × ${dims.height.toFixed(3)} m ·`,
     rig.ribs.count, 'frisos · testeira z', box.max.z.toFixed(3));
   return dims;
+}
+
+/**
+ * As portas laterais de uma face — a porta BOA, e a única que o editor deve usar.
+ *
+ * Ela não faz nada de novo: guarda a lista no rig e delega a
+ * `setTrailerDims({})`, que é a sequência de oito passos logo acima. Isso é o
+ * PONTO, não preguiça. Recortar um vão reescreve os atributos do corpo branco
+ * inteiro, exatamente como mudar a altura — e todo o resto da sequência vale
+ * igual: o índice velho tem de morrer antes (passo 2), as chapas de livery têm
+ * de ser descartadas e recortadas de novo (passo 3, senão os triângulos que
+ * migraram para SIDE_L/SIDE_R voltam ao corpo e as duas cópias disputam o
+ * z-buffer), a caixa do baú tem de ser rederivada (passo 5) e a arte tem de ser
+ * reatada (passo 8).
+ *
+ * `rig.setDoors()` cru existe e reconstrói na hora — serve ao console e à
+ * sonda, onde não há chapa recortada para desencontrar. Do editor, ele é a
+ * porta errada.
+ *
+ * O patch VAZIO é deliberado: nenhuma medida muda, e `TrailerBody.set({})`
+ * reconstrói assim mesmo. Escrever aqui uma cópia das medidas correntes daria
+ * na mesma e abriria a chance de elas serem lidas de um lugar defasado.
+ */
+export function setTrailerDoors(face: Face, doors: DoorSpec[]): TrailerDims | null {
+  const rig = state.trailerRig;
+  if (!rig) return null;
+  rig.stageDoors(face, doors);
+  return setTrailerDims({});
 }
 
 /** Volta o baú às medidas de fábrica. */

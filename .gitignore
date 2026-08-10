@@ -85,6 +85,7 @@ tools/env-build/_shots_*/
 # conferências lado a lado de cada rodada de calibração (8,9 MB em PNG), e os
 # scripts que as produzem estão versionados logo ao lado.
 tools/trailer-bench/shots/
+tools/trailer-bench/shots-porta/
 
 # Bakes anteriores, em qualquer pasta de asset: são backup, não fonte. Cada
 # rodada de bake deixa um .prev/.bak do tamanho do próprio modelo (o do
