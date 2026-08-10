@@ -432,6 +432,8 @@ export interface QuestionnaireEntryGetManyFormData {
   status?: QuestionnaireEntryStatus | QuestionnaireEntryStatus[];
   questionnaireId?: string;
   respondentId?: string | "me";
+  /** Estado da CAMPANHA, não da ficha — filtra pela relação `questionnaire`. */
+  questionnaireStatus?: QuestionnaireStatus | QuestionnaireStatus[];
 }
 
 // =====================

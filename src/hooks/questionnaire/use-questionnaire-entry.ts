@@ -78,7 +78,13 @@ export function useMyPendingQuestionnaireEntries(
     status: [QUESTIONNAIRE_ENTRY_STATUS.PENDING, QUESTIONNAIRE_ENTRY_STATUS.IN_PROGRESS],
     // Campanha encerrada não aceita mais resposta: mantê-la na fila prendia o
     // usuário num redirect para uma ficha que só devolve 400.
-    where: { ...(extraParams?.where ?? {}), questionnaire: { status: QUESTIONNAIRE_STATUS.OPEN } },
+    //
+    // Vai como param de RAIZ. A tentativa anterior — `where.questionnaire` —
+    // não filtrava nada: o schema do `where` no servidor não tem essa chave e
+    // o zod a descartava em silêncio; e mesmo que tivesse, findManyEntries
+    // sobrescreve `questionnaire` ao montar o where final. Como param de raiz a
+    // condição entra em `where.AND` e sobrevive aos dois.
+    questionnaireStatus: QUESTIONNAIRE_STATUS.OPEN,
     include: extraParams?.include ?? {
       questionnaire: true,
       _count: { select: { answers: true } },
