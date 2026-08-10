@@ -1,0 +1,299 @@
+{
+ "site": {
+  "roadA": 3.25,
+  "roadB": -21.490000000000002,
+  "roadW": 13.0,
+  "edge": 7.12,
+  "medianW": 10.5,
+  "fenceHalf": 150.0,
+  "yard": [
+   -108.75,
+   109.25,
+   -133.0,
+   103.0
+  ],
+  "clearRadius": 26.0,
+  "tallSetback": 45.0,
+  "shiftX": 3.25,
+  "shiftY": -25.0,
+  "serviceRoads": [
+   [
+    9.75,
+    135.25,
+    27.0,
+    35.0
+   ],
+   [
+    -142.75,
+    -27.99,
+    63.0,
+    71.0
+   ],
+   [
+    -106.0,
+    103.0,
+    -44.0,
+    -36.0
+   ]
+  ],
+  "truck": {
+   "w": 2.9,
+   "len": 19.0,
+   "h": 4.1
+  }
+ },
+ "catalog": {
+  "ibc00": {
+   "label": "contêiner 20 pés",
+   "w": 6.1,
+   "d": 2.3,
+   "h": 2.6,
+   "node": "P_ibc00"
+  },
+  "ibc01": {
+   "label": "pipe rack 30 m",
+   "w": 29.75,
+   "d": 10.0,
+   "h": 5.0,
+   "node": "P_ibc01"
+  },
+  "ibc02": {
+   "label": "pipe rack 50 m",
+   "w": 50.28,
+   "d": 16.9,
+   "h": 5.92,
+   "node": "P_ibc02"
+  },
+  "ibc03": {
+   "label": "torre de colunas 38 m",
+   "w": 60.56,
+   "d": 64.73,
+   "h": 37.56,
+   "node": "P_ibc03"
+  },
+  "ibc04": {
+   "label": "unidade de processo 23 m",
+   "w": 42.44,
+   "d": 57.67,
+   "h": 23.43,
+   "node": "P_ibc04"
+  },
+  "ibc05": {
+   "label": "coluna + vaso 29 m",
+   "w": 21.78,
+   "d": 10.55,
+   "h": 29.06,
+   "node": "P_ibc05"
+  },
+  "ibc06": {
+   "label": "bloco de processo 11 m",
+   "w": 12.08,
+   "d": 8.84,
+   "h": 11.19,
+   "node": "P_ibc06"
+  },
+  "ibc07": {
+   "label": "bacia",
+   "w": 6.09,
+   "d": 6.09,
+   "h": 3.12,
+   "node": "P_ibc07"
+  },
+  "ibc09": {
+   "label": "poste de respiro",
+   "w": 1.55,
+   "d": 1.63,
+   "h": 6.02,
+   "node": "P_ibc09"
+  },
+  "ibc10": {
+   "label": "tanque de armazenagem",
+   "w": 11.51,
+   "d": 10.08,
+   "h": 5.72,
+   "node": "P_ibc10"
+  },
+  "ibc11": {
+   "label": "complexo com tubulação 25 m",
+   "w": 30.44,
+   "d": 68.55,
+   "h": 24.92,
+   "node": "P_ibc11"
+  },
+  "ibc12": {
+   "label": "galpão longo",
+   "w": 29.41,
+   "d": 64.36,
+   "h": 5.45,
+   "node": "P_ibc12"
+  },
+  "ibc13": {
+   "label": "conjunto de blocos 11 m",
+   "w": 37.47,
+   "d": 29.59,
+   "h": 11.1,
+   "node": "P_ibc13"
+  },
+  "ibc14": {
+   "label": "armazém de tambores",
+   "w": 22.08,
+   "d": 33.94,
+   "h": 8.23,
+   "node": "P_ibc14"
+  },
+  "ibc15": {
+   "label": "galpão comprido",
+   "w": 16.66,
+   "d": 49.68,
+   "h": 5.83,
+   "node": "P_ibc15"
+  },
+  "booth": {
+   "label": "guarita com cancela",
+   "w": 6.85,
+   "d": 7.46,
+   "h": 3.15,
+   "node": "P_booth"
+  },
+  "cabinet": {
+   "label": "armário de comando",
+   "w": 1.86,
+   "d": 1.42,
+   "h": 3.28,
+   "node": "P_cabinet"
+  },
+  "dock": {
+   "label": "galpão de docas",
+   "w": 18.9,
+   "d": 22.21,
+   "h": 5.73,
+   "node": "P_dock"
+  },
+  "hall_big": {
+   "label": "galpão principal",
+   "w": 35.07,
+   "d": 21.81,
+   "h": 5.73,
+   "node": "P_hall_big"
+  },
+  "mc_00": {
+   "label": "prédio urbano 00",
+   "w": 32.23,
+   "d": 30.42,
+   "h": 11.04,
+   "node": "P_mc_00"
+  },
+  "mc_01": {
+   "label": "prédio urbano 01",
+   "w": 14.74,
+   "d": 30.84,
+   "h": 4.97,
+   "node": "P_mc_01"
+  },
+  "mc_02": {
+   "label": "prédio urbano 02",
+   "w": 17.16,
+   "d": 20.32,
+   "h": 8.2,
+   "node": "P_mc_02"
+  },
+  "mc_03": {
+   "label": "prédio urbano 03",
+   "w": 27.1,
+   "d": 17.81,
+   "h": 7.06,
+   "node": "P_mc_03"
+  },
+  "mc_04": {
+   "label": "prédio urbano 04",
+   "w": 13.81,
+   "d": 32.55,
+   "h": 4.67,
+   "node": "P_mc_04"
+  },
+  "mc_05": {
+   "label": "prédio urbano 05",
+   "w": 9.33,
+   "d": 10.1,
+   "h": 7.34,
+   "node": "P_mc_05"
+  },
+  "mc_06": {
+   "label": "prédio urbano 06",
+   "w": 11.75,
+   "d": 27.11,
+   "h": 4.67,
+   "node": "P_mc_06"
+  },
+  "mc_07": {
+   "label": "prédio urbano 07",
+   "w": 23.26,
+   "d": 26.38,
+   "h": 3.88,
+   "node": "P_mc_07"
+  },
+  "mc_08": {
+   "label": "prédio urbano 08",
+   "w": 8.07,
+   "d": 27.1,
+   "h": 4.41,
+   "node": "P_mc_08"
+  },
+  "mc_09": {
+   "label": "prédio urbano 09",
+   "w": 8.54,
+   "d": 15.27,
+   "h": 6.61,
+   "node": "P_mc_09"
+  },
+  "mc_10": {
+   "label": "prédio urbano 10",
+   "w": 15.49,
+   "d": 16.13,
+   "h": 3.91,
+   "node": "P_mc_10"
+  },
+  "mc_11": {
+   "label": "prédio urbano 11",
+   "w": 8.42,
+   "d": 15.27,
+   "h": 4.22,
+   "node": "P_mc_11"
+  },
+  "mc_12": {
+   "label": "prédio urbano 12",
+   "w": 10.13,
+   "d": 16.13,
+   "h": 3.9,
+   "node": "P_mc_12"
+  },
+  "office": {
+   "label": "escritório de obra",
+   "w": 17.83,
+   "d": 14.0,
+   "h": 4.37,
+   "node": "P_office"
+  },
+  "shed_old": {
+   "label": "armazém antigo",
+   "w": 14.95,
+   "d": 11.39,
+   "h": 4.92,
+   "node": "P_shed_old"
+  },
+  "shed_sm": {
+   "label": "armazém pequeno",
+   "w": 17.44,
+   "d": 12.6,
+   "h": 4.37,
+   "node": "P_shed_sm"
+  },
+  "skip": {
+   "label": "caçamba",
+   "w": 1.65,
+   "d": 3.55,
+   "h": 0.88,
+   "node": "P_skip"
+  }
+ }
+}

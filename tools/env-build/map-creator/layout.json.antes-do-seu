@@ -1,0 +1,606 @@
+{
+ "site": {
+  "roadA": 0.0,
+  "roadB": -24.740000000000002,
+  "roadW": 13.0,
+  "edge": 7.12,
+  "medianW": 10.5,
+  "fenceHalf": 150.0,
+  "yard": [
+   -112.0,
+   106.0,
+   -108.0,
+   128.0
+  ],
+  "clearRadius": 26.0,
+  "tallSetback": 45.0,
+  "serviceRoads": [
+   [
+    7.2,
+    132.0,
+    52.0,
+    60.0
+   ],
+   [
+    -146.0,
+    -32.0,
+    88.0,
+    96.0
+   ]
+  ],
+  "truck": {
+   "w": 2.9,
+   "len": 19.0,
+   "h": 4.1
+  }
+ },
+ "items": [
+  {
+   "key": "dock",
+   "x": 40.0,
+   "y": 16.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "loading docks",
+   "inside": true
+  },
+  {
+   "key": "shed_old",
+   "x": 39.0,
+   "y": -14.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "old warehouse",
+   "inside": true
+  },
+  {
+   "key": "office",
+   "x": 40.0,
+   "y": -40.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "site office",
+   "inside": true
+  },
+  {
+   "key": "shed_sm",
+   "x": 40.0,
+   "y": 42.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "small warehouse",
+   "inside": true
+  },
+  {
+   "key": "hall_big",
+   "x": 48.0,
+   "y": 74.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "main hall + canopy",
+   "inside": true
+  },
+  {
+   "key": "ibc12",
+   "x": 80.0,
+   "y": 18.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "long hall",
+   "inside": true
+  },
+  {
+   "key": "ibc14",
+   "x": 78.0,
+   "y": -46.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "barrel warehouse",
+   "inside": true
+  },
+  {
+   "key": "ibc15",
+   "x": 78.0,
+   "y": 92.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "long shed",
+   "inside": true
+  },
+  {
+   "key": "ibc13",
+   "x": 86.0,
+   "y": -92.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "block cluster 11 m",
+   "inside": true
+  },
+  {
+   "key": "ibc11",
+   "x": 118.0,
+   "y": 20.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "chimney stacks 24 m",
+   "inside": true
+  },
+  {
+   "key": "ibc02",
+   "x": 17.0,
+   "y": 116.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "pipe rack 50 m",
+   "inside": true
+  },
+  {
+   "key": "ibc01",
+   "x": 22.0,
+   "y": -74.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "pipe rack 30 m",
+   "inside": true
+  },
+  {
+   "key": "ibc10",
+   "x": -44.0,
+   "y": -54.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "white storage tank",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -42.0,
+   "y": -68.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "basin",
+   "inside": true
+  },
+  {
+   "key": "ibc06",
+   "x": -66.0,
+   "y": -26.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "process block 11 m",
+   "inside": true
+  },
+  {
+   "key": "mc_00",
+   "x": -72.0,
+   "y": 22.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "office block",
+   "inside": true
+  },
+  {
+   "key": "mc_01",
+   "x": -72.0,
+   "y": 60.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "workshop",
+   "inside": true
+  },
+  {
+   "key": "mc_02",
+   "x": -82.0,
+   "y": -4.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "stores",
+   "inside": true
+  },
+  {
+   "key": "mc_03",
+   "x": -70.0,
+   "y": 102.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "training block",
+   "inside": true
+  },
+  {
+   "key": "ibc05",
+   "x": -96.0,
+   "y": -70.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "column + vessel 29 m",
+   "inside": true
+  },
+  {
+   "key": "ibc04",
+   "x": -118.0,
+   "y": -114.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "process unit + turbine",
+   "inside": true
+  },
+  {
+   "key": "ibc03",
+   "x": -125.0,
+   "y": 112.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "drum racks / walkway 38 m",
+   "inside": true
+  },
+  {
+   "key": "booth",
+   "x": 12.0,
+   "y": 226.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "gate booth",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": -14.0,
+   "y": 224.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "vent pole at the gate",
+   "inside": true
+  },
+  {
+   "key": "dock",
+   "x": 40.0,
+   "y": 108.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "dock shed 2",
+   "inside": true
+  },
+  {
+   "key": "dock",
+   "x": 40.0,
+   "y": 138.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "dock shed 3",
+   "inside": true
+  },
+  {
+   "key": "shed_old",
+   "x": 39.0,
+   "y": -66.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "old warehouse 2",
+   "inside": true
+  },
+  {
+   "key": "shed_sm",
+   "x": 40.0,
+   "y": -92.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "small warehouse 2",
+   "inside": true
+  },
+  {
+   "key": "shed_sm",
+   "x": 40.0,
+   "y": -114.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "small warehouse 3",
+   "inside": true
+  },
+  {
+   "key": "ibc14",
+   "x": 78.0,
+   "y": 136.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "barrel warehouse 2",
+   "inside": true
+  },
+  {
+   "key": "ibc15",
+   "x": 112.0,
+   "y": 100.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "long shed 2",
+   "inside": true
+  },
+  {
+   "key": "ibc12",
+   "x": 124.0,
+   "y": -60.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "long hall 2",
+   "inside": true
+  },
+  {
+   "key": "ibc10",
+   "x": -44.0,
+   "y": -40.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "storage tank 2",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -42.0,
+   "y": -78.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "basin 2",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -42.0,
+   "y": -88.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "basin 3",
+   "inside": true
+  },
+  {
+   "key": "shed_old",
+   "x": -46.0,
+   "y": 120.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "west store",
+   "inside": true
+  },
+  {
+   "key": "office",
+   "x": -46.0,
+   "y": 146.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "west office 2",
+   "inside": true
+  },
+  {
+   "key": "mc_04",
+   "x": -158.0,
+   "y": 272.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_05",
+   "x": -104.0,
+   "y": 276.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_06",
+   "x": -52.0,
+   "y": 270.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_07",
+   "x": 46.0,
+   "y": 274.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_08",
+   "x": 100.0,
+   "y": 270.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_09",
+   "x": 152.0,
+   "y": 276.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_10",
+   "x": -146.0,
+   "y": -270.0,
+   "rot": 180,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_11",
+   "x": -88.0,
+   "y": -274.0,
+   "rot": 180,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "mc_12",
+   "x": -32.0,
+   "y": -268.0,
+   "rot": 180,
+   "scale": 1.0,
+   "note": "distrito vizinho",
+   "inside": false
+  },
+  {
+   "key": "ibc00",
+   "x": 24.0,
+   "y": -28.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "contêiner 0",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 24.0,
+   "y": -34.3,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "contêiner 1",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 24.0,
+   "y": -40.6,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "contêiner 2",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 62.0,
+   "y": 60.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "contêiner 3",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 62.0,
+   "y": 62.5,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "contêiner 4",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 62.0,
+   "y": 65.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "contêiner 5",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -40.0,
+   "y": 74.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "contêiner 6",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -40.0,
+   "y": 76.5,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "contêiner 7",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -58.0,
+   "y": -100.0,
+   "rot": 90,
+   "scale": 1.0,
+   "note": "contêiner 8",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": -38,
+   "y": 44,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "poste 0",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": 58,
+   "y": 104,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "poste 1",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": -60,
+   "y": -96,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "poste 2",
+   "inside": true
+  },
+  {
+   "key": "skip",
+   "x": 30.0,
+   "y": -30.0,
+   "rot": 12,
+   "scale": 1.0,
+   "note": "caçamba 0",
+   "inside": true
+  },
+  {
+   "key": "skip",
+   "x": 56.0,
+   "y": 32.0,
+   "rot": -8,
+   "scale": 1.0,
+   "note": "caçamba 1",
+   "inside": true
+  },
+  {
+   "key": "cabinet",
+   "x": 9.6,
+   "y": 60.0,
+   "rot": 180,
+   "scale": 1.0,
+   "note": "armário 0",
+   "inside": true
+  },
+  {
+   "key": "cabinet",
+   "x": 9.6,
+   "y": -100.0,
+   "rot": 180,
+   "scale": 1.0,
+   "note": "armário 1",
+   "inside": true
+  },
+  {
+   "key": "cabinet",
+   "x": -34.5,
+   "y": 128.0,
+   "rot": 0,
+   "scale": 1.0,
+   "note": "armário 2",
+   "inside": true
+  }
+ ]
+}

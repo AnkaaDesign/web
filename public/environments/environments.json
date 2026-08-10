@@ -29,11 +29,14 @@
             "normalScale": 1.8,
             "macro": {
               "scale": 0.09,
-              "amount": 0.55
+              "amount": 0.72,
+              "break": 0.85
             },
             "brilhoNote": "TRES alavancas, aplicadas JUNTAS em 2026-08-03 contra 'o chao esta muito reflexivo'. (1) normalScale 1.8 — o relevo e o que quebra o lobo especular, e com o padrao 1 o concreto devolvia o ceu inteiro numa direcao so; isto espalha o brilho em vez de apaga-lo. (2) envIntensity 0.35 -> 0.20: agora que existe relevo, da para descer sem achatar. O envNote abaixo mandava NAO SUBIR e continua certo; descer junto com o normal e outra conta. (3) macro (scale 0.09 = mancha de ~89 m sobre um ladrilho de 8 m): o patio repetia o mesmo ladrilho ~22 vezes e o olho achava o ritmo antes da textura. Mexer numa alavanca sozinha ja falhou duas vezes nesta cena — envIntensity foi baixado duas vezes perseguindo isto e nunca resolveu.",
             "repeatNote": "UV_M 8 / repeat 1 = laje de 8 m. Era repeat 9 sobre UV 0..1, ou seja um ladrilho de 20 m.",
-            "envNote": "0.35, INALTERADO de proposito. A causa do 'chao extremamente reflexivo' nao era este numero: com o ladrilho esticado em 20 m o concreto nao tinha microdetalhe nenhum no albedo nem na normal, e sem microdetalhe nada quebra o lobo especular — sobra so o reflexo do ceu, que e exatamente a leitura de superficie polida. Corrigidas as UV, a superficie volta a existir e o brilho deve cair sozinho. A tentacao seguinte e subir o envIntensity de volta agora que o especular esta quebrado (0.45 seria a leitura fisica mais honesta para um patio a ceu aberto); NAO faca isso sem olhar um render do app, porque e mexer para cima justamente no eixo da reclamacao. Se depois de ver a cena o patio parecer chapado demais, ai sim suba — e meça antes e depois. tintRgb continua em 0.5 porque o desgaste em vertex color chega a 1.05 em alguns pontos e a laje estourava para branco em 0.58."
+            "envNote": "0.35, INALTERADO de proposito. A causa do 'chao extremamente reflexivo' nao era este numero: com o ladrilho esticado em 20 m o concreto nao tinha microdetalhe nenhum no albedo nem na normal, e sem microdetalhe nada quebra o lobo especular — sobra so o reflexo do ceu, que e exatamente a leitura de superficie polida. Corrigidas as UV, a superficie volta a existir e o brilho deve cair sozinho. A tentacao seguinte e subir o envIntensity de volta agora que o especular esta quebrado (0.45 seria a leitura fisica mais honesta para um patio a ceu aberto); NAO faca isso sem olhar um render do app, porque e mexer para cima justamente no eixo da reclamacao. Se depois de ver a cena o patio parecer chapado demais, ai sim suba — e meça antes e depois. tintRgb continua em 0.5 porque o desgaste em vertex color chega a 1.05 em alguns pontos e a laje estourava para branco em 0.58.",
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "roughnessFloor": 0.82
           },
           "ASPHALT_ROAD": {
             "diffuse": "textures/asphalt_diff.webp",
@@ -45,7 +48,7 @@
             "normalScale": 1.7,
             "macro": {
               "scale": 0.11,
-              "amount": 0.45
+              "amount": 0.62
             },
             "tintRgb": [
               0.28,
@@ -54,7 +57,9 @@
             ],
             "roughness": 0.94,
             "brilhoNote": "Mesmas tres alavancas do GROUND_CONCRETE, com o asfalto um pouco mais contido: a mancha e menor (scale 0.11 = ~73 m) porque a rua e uma faixa estreita e uma variacao de 90 m nela viraria um degrade de ponta a ponta, e amount 0.45 porque asfalto e mais uniforme que concreto de patio. envIntensity 0.5 -> 0.28: a rua molhada nao existe aqui, e meio ceu refletido num asfalto seco e o que fazia a pista brilhar mais que a lataria.",
-            "repeatNote": "UV_M 8 / repeat 1.333 = ladrilho de 6 m, isotropico. Era repeat 4.2 sobre UV 0..1: 2,9 m de largura por 45,3 m de comprimento na rua interna e 333 x 3,1 m na via de passagem — a mesma textura esticada em duas direcoes diferentes na mesma cena."
+            "repeatNote": "UV_M 8 / repeat 1.333 = ladrilho de 6 m, isotropico. Era repeat 4.2 sobre UV 0..1: 2,9 m de largura por 45,3 m de comprimento na rua interna e 333 x 3,1 m na via de passagem — a mesma textura esticada em duas direcoes diferentes na mesma cena.",
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "roughnessFloor": 0.15
           },
           "CONCRETE_APRON": {
             "diffuse": "textures/concrete_diff.webp",
@@ -67,7 +72,16 @@
               0.71,
               0.68
             ],
-            "aproNote": "2026-08-08 — ESTE MATERIAL MUDOU DE FUNCAO. Nao existem mais lajes de apron (foram removidas em 2026-08-03 porque cada uma se cercava de um degrau de 12 cm sem nada que o explicasse). Agora ele e a SARJETA: a faixa de concreto de 45 cm que corre rente ao asfalto dos dois lados de cada pista, entre a borda da pista e o meio-fio. As UV dela saem do build em x/2 e y/2, entao repeat 1 = ladrilho de 2 m — era repeat 2 sobre a mesma UV, ou seja 1 m, fino demais para uma peca de concreto moldada in loco."
+            "aproNote": "2026-08-08 — ESTE MATERIAL MUDOU DE FUNCAO. Nao existem mais lajes de apron (foram removidas em 2026-08-03 porque cada uma se cercava de um degrau de 12 cm sem nada que o explicasse). Agora ele e a SARJETA: a faixa de concreto de 45 cm que corre rente ao asfalto dos dois lados de cada pista, entre a borda da pista e o meio-fio. As UV dela saem do build em x/2 e y/2, entao repeat 1 = ladrilho de 2 m — era repeat 2 sobre a mesma UV, ou seja 1 m, fino demais para uma peca de concreto moldada in loco.",
+            "macro": {
+              "scale": 0.12,
+              "amount": 0.55,
+              "break": 0.7
+            },
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "envIntensity": 0.18,
+            "roughness": 0.97,
+            "roughnessFloor": 0.78
           },
           "KERB_CONCRETE": {
             "diffuse": "textures/concrete_diff.webp",
@@ -79,7 +93,15 @@
               0.84,
               0.83,
               0.8
-            ]
+            ],
+            "macro": {
+              "scale": 0.14,
+              "amount": 0.45
+            },
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "envIntensity": 0.2,
+            "roughness": 0.95,
+            "roughnessFloor": 0.72
           },
           "LINE_PAINT": {
             "repeat": 1,
@@ -104,7 +126,14 @@
             ],
             "roughness": 0.94,
             "envIntensity": 0.6,
-            "repeatNote": "ESTE usa UV_M_FAR 64, nao 8: o terreno externo tem 1,18 km e com UV_M 8 as UV chegariam a +/-74 antes do repeat, onde um varying mediump (o que uma GPU de celular da a uma UV interpolada) tem passo de ~12 cm e a grama quantiza visivelmente. 64 / 16 = ladrilho de 4 m. ATENCAO 2026-08-08: este material passou a ser SO o campo distante (as faixas `out_*` fora da cerca). A grama de dentro da propriedade e do canteiro central agora e GRASS_NEAR, porque ela usa UV_M 8 e um mesmo material nao pode ter duas escalas de UV."
+            "repeatNote": "ESTE usa UV_M_FAR 64, nao 8: o terreno externo tem 1,18 km e com UV_M 8 as UV chegariam a +/-74 antes do repeat, onde um varying mediump (o que uma GPU de celular da a uma UV interpolada) tem passo de ~12 cm e a grama quantiza visivelmente. 64 / 16 = ladrilho de 4 m. ATENCAO 2026-08-08: este material passou a ser SO o campo distante (as faixas `out_*` fora da cerca). A grama de dentro da propriedade e do canteiro central agora e GRASS_NEAR, porque ela usa UV_M 8 e um mesmo material nao pode ter duas escalas de UV.",
+            "macro": {
+              "scale": 0.05,
+              "amount": 0.55,
+              "break": 0.8
+            },
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "roughnessFloor": 0.55
           },
           "GRASS_NEAR": {
             "diffuse": "textures/grass_diff.webp",
@@ -119,7 +148,14 @@
             ],
             "roughness": 0.93,
             "envIntensity": 0.5,
-            "grassNote": "2026-08-08 — NOVO. A grama de DENTRO da cerca: o canteiro central entre as duas pistas, as faixas de terreno entre a laje e o alambrado, e as manchas de grama espalhadas nelas. Existe separado de GRASS_VERGE por um motivo puramente tecnico e nao estetico: as UV do chao sao metros/UV_M, o campo distante precisa de UV_M 64 por precisao de varying, e o terreno perto precisa de UV_M 8 para o ladrilho nao ficar gigante. Um material so nao pode ter as duas. UV_M 8 / repeat 2 = ladrilho de 4 m, o mesmo tamanho aparente do campo distante — que e o ponto: as duas gramas tem de casar na transicao da cerca. O tom e mais verde e menos seco que o do campo porque esta e grama cortada dentro da planta."
+            "grassNote": "2026-08-08 — NOVO. A grama de DENTRO da cerca: o canteiro central entre as duas pistas, as faixas de terreno entre a laje e o alambrado, e as manchas de grama espalhadas nelas. Existe separado de GRASS_VERGE por um motivo puramente tecnico e nao estetico: as UV do chao sao metros/UV_M, o campo distante precisa de UV_M 64 por precisao de varying, e o terreno perto precisa de UV_M 8 para o ladrilho nao ficar gigante. Um material so nao pode ter as duas. UV_M 8 / repeat 2 = ladrilho de 4 m, o mesmo tamanho aparente do campo distante — que e o ponto: as duas gramas tem de casar na transicao da cerca. O tom e mais verde e menos seco que o do campo porque esta e grama cortada dentro da planta.",
+            "macro": {
+              "scale": 0.07,
+              "amount": 0.62,
+              "break": 0.9
+            },
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "roughnessFloor": 0.55
           },
           "_TREE_BARK_TREE_LEAF_removidos": "2026-08-09 — AS DUAS SAIRAM porque a vegetacao gerada saiu junto. Elas eram slots sem mapa cuja variacao vinha toda do COLOR_0, o que era o melhor possivel enquanto o projeto nao tinha nenhuma textura de folha com alfa. Agora tem: tools/env-build/bake_impostors.py renderiza os modelos CC0 da Poly Haven (jacaranda_tree, island_tree_02, searsia_lucida) ortograficamente sobre filme transparente, e a planta e desenhada em cartoes cruzados com esse PNG RGBA. POR QUE NAO OS MODELOS DIRETO, que era o pedido: medido, jacaranda_tree tem 3.863.832 faces e island_tree_02 tem 1.072.212 — para UMA arvore de 3,4 m. O cinturao tem ~450. Sao assets de render offline, e decimar nao salva: nao ha atlas de folha a preservar, as folhas sao geometria modelada (o glTF declara alphaMode BLEND sobre um JPG sem canal alfa, o que prova), entao um decimador de colapso vira as folhas em pasta. O impostor mantem a aparencia REAL da arvore por 6 triangulos. Os materiais dos cartoes (PLANT_*) carregam a textura embutida e por isso NAO sao declarados aqui — declarar faria set.ts collectSolids trata-los como chao. Eles tambem saem instanciados via EXT_mesh_gpu_instancing, e collectSolids ja ignora InstancedMesh, entao a camera nao desvia de arvore de qualquer jeito.",
           "GRAVEL_SHOULDER": {
@@ -134,7 +170,15 @@
               0.46
             ],
             "roughness": 0.93,
-            "repeatNote": "2026-08-08: passou de 2.667 para 8 junto com a UV do plano `outer`, que foi para UV_M_FAR 64 pelo mesmo motivo de precisao que GRASS_VERGE — o plano tem 1,18 km e em UV_M 8 as UV passavam de +/-74. 64 / 8 = ladrilho de 8 m. Manter 2.667 aqui depois da mudanca de UV daria um ladrilho de 24 m de brita, que e brita nenhuma."
+            "repeatNote": "2026-08-08: passou de 2.667 para 8 junto com a UV do plano `outer`, que foi para UV_M_FAR 64 pelo mesmo motivo de precisao que GRASS_VERGE — o plano tem 1,18 km e em UV_M 8 as UV passavam de +/-74. 64 / 8 = ladrilho de 8 m. Manter 2.667 aqui depois da mudanca de UV daria um ladrilho de 24 m de brita, que e brita nenhuma.",
+            "macro": {
+              "scale": 0.08,
+              "amount": 0.6,
+              "break": 0.75
+            },
+            "macroNote": "2026-08-09: a mancha macro subiu porque o COLOR_0 do chao passou a ser limitado em banda pela malha (ver paint_variation) e largou a oitava de 5 m. Detalhe nessa escala tem de vir daqui, que e por fragmento e nao depende de vertice nenhum — e e tambem o que responde a 'as texturas estao muito padronizadas': o que se via era o ritmo do ladrilho, nao a textura.",
+            "envIntensity": 0.35,
+            "roughnessFloor": 0.45
           },
           "_DIRT_WORN_removido": "2026-08-03: o material DIRT_WORN foi retirado deste bloco JUNTO com os quatro arquivos /textures/dirt_* que ele nomeava. O unico consumidor era o talude de terra em r=240 m, removido antes — ver hazeNote —, e o material nao existe em nenhum dos dois set.glb, entao bindMaterials nunca chegava a buscar nada. Ficar declarado 'porque um proximo build pode precisar' deixou de ser gratis no momento em que as texturas sairam do disco: seria um 404 no dia em que um set exportasse esse nome. Para voltar a usar terra batida, restaure os quatro arquivos E este bloco na mesma mudanca."
         },
@@ -188,7 +232,7 @@
           "Poly Haven CC0: modular_chainlink_fence (so as texturas — a geometria do alambrado e gerada), concrete_road_barrier, utility_box_01, wooden_crate_01, plastic_crate_02, industrial_pastic_container"
         ],
         "licencaNote": "2026-08-08 — OS QUATRO PACOTES NOVOS ENTRARAM COM A LICENCA POR VERIFICAR, igual ao IBC1, e isso e uma pendencia REAL e nao uma formalidade: eles vieram como .zip na pasta de Downloads, sem arquivo de licenca e sem pagina de origem junto. Os assets da Poly Haven sao CC0 e nao tem esse problema. Antes de publicar, confirmar os quatro — e note que as texturas deles estao EMBUTIDAS no set.glb, entao 'e so nao commitar o zip' nao resolve nada."
-        },
+      },
       "scatter": [],
       "roadside": []
     },
@@ -265,7 +309,16 @@
       "thumb": null,
       "hdri": null,
       "backgroundImage": null,
-      "ground": { "type": "cyclorama", "diffuse": null, "rough": null, "normal": null, "repeat": [1, 1] },
+      "ground": {
+        "type": "cyclorama",
+        "diffuse": null,
+        "rough": null,
+        "normal": null,
+        "repeat": [
+          1,
+          1
+        ]
+      },
       "showSkyDome": false,
       "showRoad": false,
       "envRotation": 0,

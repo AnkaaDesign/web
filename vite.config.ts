@@ -3,6 +3,7 @@
 import { defineConfig, type Plugin, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 
@@ -135,10 +136,55 @@ export default defineConfig(({ mode }) => {
       //     mesma origem), em vez de um caminho feliz que só existe local.
       // Apontar `VITE_STUDIO_ASSETS_BASE` para uma origem absoluta continua
       // funcionando e simplesmente não passa por aqui.
+      // O LOCAL GANHA DO REMOTO, e essa regra existe porque sem ela editar um
+      // asset do studio nesta máquina não tem como ser visto nesta máquina.
+      //
+      // `web/public/environments/` continua sendo onde os cenários são
+      // AUTORADOS (`tools/env-build/build_industrial_park.py` escreve o
+      // `set.glb` ali), mas o app pede tudo sob `/studio-assets/v1`, que este
+      // proxy manda para a API. Resultado: reconstruir o distrito e abrir o
+      // localhost mostrava a versão de PRODUÇÃO, sem nenhum erro que dissesse
+      // isso — o arquivo novo estava a dois diretórios de distância do que a
+      // página baixava.
+      //
+      // `bypass` devolvendo um caminho faz o Vite servir de `public/`; devolver
+      // undefined segue para a API. Então o que existe local é servido local e
+      // os ~300 MB que não estão aqui continuam vindo de produção, que é o
+      // arranjo que permite trabalhar num cenário sem baixar a árvore inteira.
       proxy: {
         "/studio-assets": {
           target: apiUrl,
           changeOrigin: true,
+          // NENHUM ASSET DO STUDIO PODE SER FIXADO EM CACHE NO DEV.
+          //
+          // A produção manda `Cache-Control: public, max-age=31536000,
+          // immutable` — correto lá, porque lá o arquivo só muda junto com o
+          // deploy. Em dev é uma armadilha: enquanto este proxy encaminhava
+          // tudo, o navegador guardou a resposta de PRODUÇÃO debaixo do URL do
+          // localhost, por um ano. `immutable` significa "não revalide nunca",
+          // inclusive em F5 — então o dev server passou a ser reconstruído,
+          // servido e ignorado, sem nenhum erro em lugar nenhum. Um cenário
+          // inteiro foi refeito várias vezes contra um arquivo que o navegador
+          // já tinha decidido não perguntar mais.
+          //
+          // Reescrever o cabeçalho na saída do proxy custa uma cópia de rede por
+          // reload e elimina a classe inteira de "reconstruí e não mudou nada".
+          configure(proxy) {
+            proxy.on("proxyRes", (proxyRes) => {
+              proxyRes.headers["cache-control"] = "no-store";
+              delete proxyRes.headers["etag"];
+              delete proxyRes.headers["expires"];
+            });
+          },
+          bypass(req) {
+            const m = (req.url || "").match(/^\/studio-assets\/v\d+(\/[^?]*)/);
+            if (!m) return undefined;
+            const rel = decodeURIComponent(m[1]);
+            if (rel.includes("..")) return undefined;
+            return fs.existsSync(path.join(__dirname, "public", rel))
+              ? rel
+              : undefined;
+          },
         },
       },
     },

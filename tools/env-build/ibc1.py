@@ -65,10 +65,38 @@ ATLAS_OF = {
     2:  "ConcreteLeaks",    # pipe rack truss
     3:  "MetalTrim",        # elevated walkway / pipe bridge, yellow rails
     4:  "MetalTrim",        # process unit, yellow pipe bands
-    5:  "MetalTrim",        # column + vessel
+    # MetalTrim2, NAO MetalTrim, e foi MEDIDO renderizando os cinco atlas.
+    #
+    # Com MetalTrim o corpo do vaso cai numa faixa VERDE-ESCURA do atlas e no
+    # cenario, com a exposicao do app, le como PRETO — foi o relato "precisa
+    # corrigir a textura desse item". O acabamento amarelo caia certo nos
+    # guarda-corpos, o que mascarava o erro: parecia atlas certo com uma peca
+    # escura de proposito.
+    #
+    # Com MetalTrim2 o costado vira aco galvanizado claro e intemperizado, o
+    # amarelo continua caindo exatamente nos guarda-corpos, nas bandas de tubo e
+    # na escada, e a coluna passa a ler como coluna de processo.
+    #
+    # A nota abaixo descartava MetalTrim2 inteiro dizendo que era "close to
+    # MetalTrim but redder" e que dar pele propria a clones custaria material por
+    # objeto. Isso e uma razao de INSTANCIACAO, nao de aparencia, e nunca foi um
+    # argumento para nao testar atlas por modelo — que e o metodo que este mesmo
+    # arquivo documenta. model_10 foi verificado no mesmo teste e continua certo
+    # em MetalTrim (casco branco), entao a troca e so aqui.
+    5:  "MetalTrim2",       # column + vessel
     6:  "ConcreteLeaks",    # process block
     7:  "ConcreteLeaks",    # basin
-    8:  "MetalTrim",        # plant complex, yellow pipe runs
+    # model_8 NAO E UM PREDIO, e chamar de "plant complex" custou uma rodada de
+    # depuracao no lugar errado. Renderizado sozinho, inteiro e sem decimacao,
+    # ele e SO O APARATO: tubulacao amarela, corrimaos, escadas, passarelas e
+    # aros de tanque, com nenhum volume solido embaixo. Sao 10 278 faces em
+    # 2 181 cascas soltas — proporcao de kit de vestimenta, nao de edificacao.
+    #
+    # Solto no patio ele le exatamente como o relato: "tubulacoes espalhadas que
+    # se perderam de uma construcao". Nada se perdeu; a construcao nunca veio no
+    # arquivo. Ele so funciona SOBREPOSTO a um galpao solido (ibc12, hall_big),
+    # que e onde a tubulacao de uma planta de verdade fica.
+    8:  "MetalTrim",        # aparato de planta: tubos, guarda-corpos, escadas
     9:  "ConcreteLeaks",    # vent pole
     10: "MetalTrim",        # storage tank — white shell in the reference
     11: "ConcreteLeaks",    # chimney stacks
@@ -80,13 +108,40 @@ ATLAS_OF = {
 
 DROP = {16}                     # flat plane, no UVs, no purpose
 
+# PECAS QUE SAO UMA CONSTRUCAO SO, PARTIDA EM DOIS ARQUIVOS.
+#
+# MEDIDO NAS COORDENADAS BRUTAS DO .obj, antes de qualquer recentragem:
+#
+#   model_8    x 0.6..31.0   z -28.5..39.9   y 0..24.4
+#   model_11   x 0.8..31.0   z -28.6..40.0   y -0.6..24.1
+#
+# Sao o MESMO objeto, coincidindo a 20 cm nos tres eixos. model_11 e o volume
+# solido; model_8 e o aparato dele — tubulacao, guarda-corpos, escadas,
+# passarelas, aros de tanque — que sozinho nao tem edificacao nenhuma embaixo.
+#
+# POR QUE ISSO QUEBRAVA. import_prototypes recentra CADA modelo na propria
+# pegada. Isso e correto para pecas independentes e destrutivo para duas metades
+# da mesma peca: cada uma vai para o proprio centro e a relacao entre elas
+# morre. Posicionadas depois em coordenadas diferentes, a tubulacao aparece
+# boiando no patio a dezenas de metros do predio a que pertence — que e
+# exatamente o relato "movendo um fez o resto se perder no ar".
+#
+# O pacote inteiro foi autorado numa cena unica, entao quase todos os modelos se
+# sobrepoem em XZ. Isso NAO os torna pares: e so a planta original. O criterio
+# aqui e caixa praticamente IDENTICA, que so este par satisfaz.
+#
+# Mesmo erro ja corrigido no pacote ibp (hall_big + hall_det, ver dl_packs.PAIRS)
+# e nunca aplicado aqui.
+PAIRS = {11: 8}                 # principal -> metade que entra junto
+_PAIRED = set(PAIRS.values())
+
 # Rough identification from the survey render, kept here because the layout
 # table reads by index and an index alone says nothing:
 #   0  20 ft container 6.1x2.3x2.6      1  pipe rack 29.8x10.0x5.0
 #   2  pipe rack 50.3x16.9x5.9          3  column pair + rack 60.6x64.7x37.6
 #   4  process unit 42.4x57.7x23.4      5  tall column 21.8x10.6x29.1
 #   6  process block 12.1x8.8x11.2      7  basin 6.1x6.1x3.1
-#   8  plant complex 30.4x68.5x24.4     9  vent pole 1.6x1.6x6.0
+#   8  APARATO, NAO PREDIO 30.4x68.5    9  vent pole 1.6x1.6x6.0
 #  10  storage tank 11.5x10.1x5.7      11  chimney stacks 30.2x68.6x24.6
 #  12  long hall 29.4x64.4x5.4         13  block cluster 37.5x29.6x11.1
 #  14  barrel warehouse 22.1x33.9x8.2  15  long shed 16.7x49.7x5.8
@@ -136,6 +191,26 @@ def build_atlas(name):
     return m
 
 
+_DL_MOD = None
+
+
+def _load_dl():
+    """dl_packs por caminho, nao por `import` — o build carrega estes modulos
+    com importlib a partir do diretorio do ficheiro, e um `import dl_packs`
+    normal so funciona por acaso de sys.path."""
+    global _DL_MOD
+    if _DL_MOD is None:
+        import importlib.util
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "dl_packs.py")
+        if not os.path.exists(p):
+            return None
+        spec = importlib.util.spec_from_file_location("dl_packs_for_ibc", p)
+        _DL_MOD = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DL_MOD)
+    return _DL_MOD
+
+
 def import_prototypes(log):
     """Import every model once, welded, recentred on its own footprint with the
     floor on z=0.
@@ -150,12 +225,22 @@ def import_prototypes(log):
     for p in sorted(glob.glob(os.path.join(SRC, "model_*.obj")),
                     key=lambda s: int(os.path.basename(s).split("_")[1].split(".")[0])):
         idx = int(os.path.basename(p).split("_")[1].split(".")[0])
-        if idx in DROP:
+        if idx in DROP or idx in _PAIRED:
             continue
         before = set(bpy.data.objects)
         # OBJ is Y-up; Blender is Z-up. The importer converts, so everything
         # downstream is authored in Blender space: X right, Y forward, Z up.
         bpy.ops.wm.obj_import(filepath=p, forward_axis="NEGATIVE_Z", up_axis="Y")
+        # A METADE QUE VEM JUNTO ENTRA AQUI, no MESMO lote e ANTES do join, para
+        # que as duas partam das coordenadas originais compartilhadas e sejam
+        # recentradas UMA VEZ SO, juntas. Recentrar cada uma e o que separava.
+        mate = PAIRS.get(idx)
+        if mate is not None:
+            mp = os.path.join(SRC, "model_%d.obj" % mate)
+            if os.path.exists(mp):
+                bpy.ops.wm.obj_import(filepath=mp, forward_axis="NEGATIVE_Z", up_axis="Y")
+                log("  model_%d + model_%d importados juntos (mesma construcao)"
+                    % (idx, mate))
         fresh = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
         if not fresh:
             log("  model_%d imported nothing" % idx)
@@ -208,6 +293,26 @@ def import_prototypes(log):
 
         ob.data.materials.clear()
         ob.data.materials.append(build_atlas(ATLAS_OF.get(idx, "Container")))
+
+        # ESTE PACK TAMBEM DISPUTA PROFUNDIDADE, e ninguem estava a olhar.
+        #
+        # `separate_coplanar` nasceu no dl_packs e ficou la — so os pacotes DL
+        # passavam por ele. Medido no set.glb exportado, as UNICAS faces do
+        # cenario inteiro em disputa exata (folga 0,00 mm, pegada identica) eram
+        # 44,8 m2 em IBC_15 e outro tanto na duplicata dele: um pack que nunca
+        # tinha sido tratado, a mostrar exatamente o defeito que a funcao existe
+        # para matar. Os DL, que passavam, apareciam todos a 10 mm — separados,
+        # como era suposto.
+        #
+        # E O PROTOTIPO E O SITIO CERTO: as duplicatas do layout partilham a
+        # malha, entao tratar aqui trata todas as copias de uma vez.
+        try:
+            dl = _load_dl()
+            if dl is not None:
+                dl.separate_coplanar(ob, log)
+        except Exception as e:                # nunca vale perder o predio
+            log("  separate_coplanar falhou em %s: %s" % (ob.name, e))
+
         protos[idx] = (ob, (hi.x - lo.x, hi.y - lo.y, hi.z - lo.z))
     log("  prototypes: %d models (%d tris)"
         % (len(protos), sum(len(o.data.polygons) for o, _ in protos.values())))

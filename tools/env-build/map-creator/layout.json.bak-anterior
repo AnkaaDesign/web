@@ -1,0 +1,428 @@
+{
+ "site": {
+  "roadA": 3.25,
+  "roadB": -21.49,
+  "roadW": 13,
+  "edge": 7.12,
+  "medianW": 10.5,
+  "fenceHalf": 150,
+  "yard": [
+   -108.75,
+   109.25,
+   -133,
+   103
+  ],
+  "shiftY": -5,
+  "clearRadius": 26,
+  "tallSetback": 45,
+  "serviceRoads": [
+   [
+    10.45,
+    135.25,
+    27,
+    35
+   ],
+   [
+    -142.75,
+    -28.75,
+    63,
+    71
+   ]
+  ],
+  "truck": {
+   "w": 2.9,
+   "len": 19,
+   "h": 4.1
+  },
+  "shiftNote": "2026-08-09: todo o sitio andou +3.25 em X e -20 em Y. O X poe a origem no centro da FAIXA ESQUERDA da rua A em vez de sobre o eixo; o Y move o caminhao para frente. Os dois so podem ser feitos movendo o cenario, porque o app estaciona o veiculo na origem."
+ },
+ "items": [
+  {
+   "key": "dock",
+   "x": 36.75,
+   "y": 0.5,
+   "rot": 90,
+   "scale": 1,
+   "note": "loading docks",
+   "inside": true
+  },
+  {
+   "key": "office",
+   "x": 34.25,
+   "y": -49,
+   "rot": 270,
+   "scale": 1,
+   "note": "site office",
+   "inside": true
+  },
+  {
+   "key": "hall_big",
+   "x": 30.25,
+   "y": 55,
+   "rot": 0,
+   "scale": 1,
+   "note": "main hall + canopy",
+   "inside": true
+  },
+  {
+   "key": "ibc12",
+   "x": 82.75,
+   "y": -5.5,
+   "rot": 180,
+   "scale": 1,
+   "note": "long hall",
+   "inside": true
+  },
+  {
+   "key": "ibc14",
+   "x": 86.75,
+   "y": -57.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "barrel warehouse",
+   "inside": true
+  },
+  {
+   "key": "ibc15",
+   "x": 76.25,
+   "y": 80,
+   "rot": 0,
+   "scale": 1,
+   "note": "long shed",
+   "inside": true
+  },
+  {
+   "key": "ibc13",
+   "x": 41.75,
+   "y": -78,
+   "rot": 0,
+   "scale": 1,
+   "note": "block cluster 11 m",
+   "inside": true
+  },
+  {
+   "key": "ibc02",
+   "x": 48.75,
+   "y": -110.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "pipe rack 50 m",
+   "inside": true
+  },
+  {
+   "key": "ibc01",
+   "x": 98.25,
+   "y": -105,
+   "rot": 90,
+   "scale": 1,
+   "note": "pipe rack 30 m",
+   "inside": true
+  },
+  {
+   "key": "ibc10",
+   "x": -69.25,
+   "y": -63.5,
+   "rot": 0,
+   "scale": 1.5,
+   "note": "white storage tank",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -39.25,
+   "y": -44,
+   "rot": 0,
+   "scale": 1,
+   "note": "basin",
+   "inside": true
+  },
+  {
+   "key": "ibc06",
+   "x": -42.75,
+   "y": -95,
+   "rot": 0,
+   "scale": 1,
+   "note": "process block 11 m",
+   "inside": true
+  },
+  {
+   "key": "mc_00",
+   "x": -52.75,
+   "y": 10.5,
+   "rot": 90,
+   "scale": 1,
+   "note": "office block",
+   "inside": true
+  },
+  {
+   "key": "mc_01",
+   "x": -52.75,
+   "y": 40,
+   "rot": 90,
+   "scale": 1,
+   "note": "workshop",
+   "inside": true
+  },
+  {
+   "key": "mc_02",
+   "x": -46.75,
+   "y": -20,
+   "rot": 0,
+   "scale": 1,
+   "note": "stores",
+   "inside": true
+  },
+  {
+   "key": "mc_03",
+   "x": -46.25,
+   "y": 92,
+   "rot": 90,
+   "scale": 1,
+   "note": "training block",
+   "inside": true
+  },
+  {
+   "key": "ibc05",
+   "x": -86.25,
+   "y": -4.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "column + vessel 29 m",
+   "inside": true
+  },
+  {
+   "key": "ibc04",
+   "x": -79.75,
+   "y": -72.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "process unit + turbine",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": -10.75,
+   "y": 204,
+   "rot": 0,
+   "scale": 1,
+   "note": "vent pole at the gate",
+   "inside": false
+  },
+  {
+   "key": "dock",
+   "x": 44.75,
+   "y": 80,
+   "rot": 90,
+   "scale": 1,
+   "note": "dock shed 2",
+   "inside": true
+  },
+  {
+   "key": "dock",
+   "x": 44.75,
+   "y": 101,
+   "rot": 90,
+   "scale": 1,
+   "note": "dock shed 3",
+   "inside": true
+  },
+  {
+   "key": "shed_sm",
+   "x": 87.75,
+   "y": -5,
+   "rot": 0,
+   "scale": 1,
+   "note": "small warehouse 2",
+   "inside": true
+  },
+  {
+   "key": "ibc14",
+   "x": -53.75,
+   "y": -114,
+   "rot": 90,
+   "scale": 1,
+   "note": "barrel warehouse 2",
+   "inside": true
+  },
+  {
+   "key": "ibc15",
+   "x": 96.25,
+   "y": 80,
+   "rot": 0,
+   "scale": 1,
+   "note": "long shed 2",
+   "inside": true
+  },
+  {
+   "key": "ibc10",
+   "x": -69.25,
+   "y": -44.5,
+   "rot": 0,
+   "scale": 1.5,
+   "note": "storage tank 2",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -39.25,
+   "y": -54,
+   "rot": 0,
+   "scale": 1,
+   "note": "basin 2",
+   "inside": true
+  },
+  {
+   "key": "ibc07",
+   "x": -39.25,
+   "y": -63.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "basin 3",
+   "inside": true
+  },
+  {
+   "key": "office",
+   "x": -88.25,
+   "y": 18.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "west office 2",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -40.25,
+   "y": -85,
+   "rot": 0,
+   "scale": 1,
+   "note": "contêiner 0",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -40.25,
+   "y": -77,
+   "rot": 9,
+   "scale": 1,
+   "note": "contêiner 1",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -40.25,
+   "y": -81,
+   "rot": 358,
+   "scale": 1,
+   "note": "contêiner 2",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 56.05,
+   "y": 47.3,
+   "rot": 92,
+   "scale": 1,
+   "note": "contêiner 3",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 53.25,
+   "y": 47.5,
+   "rot": 90,
+   "scale": 1,
+   "note": "contêiner 4",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": 50.65,
+   "y": 47.4,
+   "rot": 89,
+   "scale": 1,
+   "note": "contêiner 5",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -36.75,
+   "y": 54,
+   "rot": 0,
+   "scale": 1,
+   "note": "contêiner 6",
+   "inside": true
+  },
+  {
+   "key": "ibc00",
+   "x": -36.75,
+   "y": 56.5,
+   "rot": 0,
+   "scale": 1,
+   "note": "contêiner 7",
+   "inside": true
+  },
+  {
+   "key": "ibc09",
+   "x": -34.75,
+   "y": 24,
+   "rot": 0,
+   "scale": 1,
+   "note": "poste 0",
+   "inside": true
+  },
+  {
+   "key": "skip",
+   "x": 34.75,
+   "y": 15,
+   "rot": 0,
+   "scale": 1,
+   "note": "caçamba 0",
+   "inside": true
+  },
+  {
+   "key": "skip",
+   "x": 36.75,
+   "y": 15,
+   "rot": 0,
+   "scale": 1,
+   "note": "caçamba 1",
+   "inside": true
+  },
+  {
+   "key": "cabinet",
+   "x": 12.85,
+   "y": -120,
+   "rot": 180,
+   "scale": 1,
+   "note": "armário 1",
+   "inside": true
+  },
+  {
+   "key": "dock",
+   "x": 37.25,
+   "y": -24.5,
+   "rot": 90,
+   "scale": 1,
+   "note": "loading docks 2",
+   "inside": true
+  },
+  {
+   "key": "ibc01",
+   "x": 84.25,
+   "y": -105,
+   "rot": 90,
+   "scale": 1,
+   "note": "pipe rack 30 m 2",
+   "inside": true
+  },
+  {
+   "key": "mc_12",
+   "x": 34.25,
+   "y": 21.5,
+   "rot": 90,
+   "scale": 1,
+   "note": "prédio urbano 12",
+   "inside": true
+  }
+ ]
+}

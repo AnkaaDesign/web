@@ -58,10 +58,34 @@ export interface SetMaterialDef {
    * período em metros é 8 / scale — 0.09 dá ~89 m. `amount` é quanto da variação
    * entra (0 = nada, 1 = a mancha inteira).
    */
-  macro?: { scale: number; amount: number };
+  /** `break` = quanto quebrar a periodicidade do PRÓPRIO mapa (0 a 1). Só faz
+   *  sentido em texturas com feição reconhecível — grama, concreto, brita. O
+   *  asfalto não precisa e cada material que o liga paga uma leitura extra. */
+  macro?: { scale: number; amount: number; break?: number };
   /** multiplicadores LINEARES escritos em material.color (mesma semântica de nearGround.tintRgb) */
   tintRgb?: [number, number, number];
   roughness?: number;
+  /**
+   * Piso de rugosidade, 0 a 1, aplicado DEPOIS do mapa: `r = mix(r, 1, floor)`.
+   *
+   * EXISTE PORQUE `roughness` NÃO É O QUE PARECE. Ela é um MULTIPLICADOR do
+   * roughnessMap, então `roughness: 1` lê-se como "totalmente fosco" e significa
+   * apenas "não mexas no mapa". Medido nos mapas que este cenário usa:
+   *
+   *     asfalto   mapa 0,933  x 0,94  ->  0,877
+   *     concreto  mapa 0,514  x 1,00  ->  0,514   <-
+   *     grama     mapa 0,686  x 0,93  ->  0,638
+   *
+   * A laje estava a correr com METADE da rugosidade do asfalto ao lado — 0,51 é
+   * semi-brilhante — e foi isso o "o pátio reflete muita luz". Nenhum ajuste de
+   * `envIntensity` chega lá: essa só escala o AMBIENTE, e o que produz o lençol
+   * de luz numa superfície de 180 m é o lobo especular do SOL, que é luz direta.
+   *
+   * Um multiplicador também não serve: multiplicar 0,51 por qualquer coisa ≤ 1
+   * só desce mais. O que falta é um PISO, e é isto. Com 0,82 o concreto sai a
+   * 0,91 e conserva a variação do mapa, comprimida.
+   */
+  roughnessFloor?: number;
   metalness?: number;
   /** multiplicador do reflexo do ambiente (material.envMapIntensity, padrão 1).
    *  ROUGHNESS SOZINHA NÃO TIRA O BRILHO DO CHÃO. Um dielétrico com roughness
@@ -222,13 +246,164 @@ function getMacroTex(): THREE.Texture {
   return macroTex;
 }
 
+/* TRÊS OITAVAS, E ELAS EXISTEM PORQUE A MALHA DEIXOU DE AS CARREGAR.
+
+   A variação do chão vinha quase toda do COLOR_0, assado por vértice no build.
+   Um A/B de três renders mostrou que era ele — e não o ladrilho — a produzir os
+   "vários quadrados seguidos": com o COLOR_0 branco as manchas desaparecem, com
+   o ladrilho esticado 40× elas ficam. A causa é reconstrução, não ruído: a pista
+   tem célula de 7,9 m e carregava uma oitava de 22 m, isto é 2,8 amostras por
+   período, e interpolar linearmente a essa taxa devolve um mosaico de
+   quadriláteros. O build passou a limitar o COLOR_0 a cinco amostras por
+   período, o que o reduz à mancha LARGA e deixa um buraco no meio e no fino.
+
+   Este é o buraco. O fragmento não tem malha, logo não tem célula: pode carregar
+   qualquer frequência. As três leituras ficam em ~70 m, ~16 m e ~4,5 m de mundo.
+
+   OS MULTIPLICADORES SÃO 4,3 e 15,5 e não são redondos de propósito. Períodos em
+   razão inteira voltam a coincidir depressa e o olho encontra o batimento; em
+   razão irracional só coincidem muito além do sítio. Girar importa tanto quanto
+   escalar — dois campos com o mesmo eixo somam-se num terceiro com o mesmo eixo,
+   e é o eixo comum que se lê como grelha.
+
+   O CONTRASTE É REPOSTO porque a média de três amostras independentes tem 0,59
+   do desvio de uma. Sem repor, trocar uma oitava por três TIRA variação em vez de
+   acrescentar. A reposição é uma curva suave (x/(a+|x|)) e não um corte: um corte
+   duro cria planaltos de tom uniforme com contorno nítido, que é outra vez uma
+   mancha pintada.
+
+   E A RUGOSIDADE ACOMPANHA. Uma mancha que só muda o brilho lê como TINTA — o
+   chão fica com aspecto de pintado de duas cores. O que distingue asfalto gasto
+   de asfalto novo, ou laje húmida de laje seca, é sobretudo quanto ela espelha;
+   levar a mesma máscara à rugosidade é o que transforma a mancha em superfície.
+   O sinal é atenuado (0,35) porque a rugosidade satura muito mais depressa que o
+   albedo: a mesma amplitude ali daria poças. */
+/* Ruido de valor PROCEDURAL — sem periodo nenhum.
+
+   As oitavas media e fina do macro liam o `uMacroMap`, que e um canvas de 256²
+   TILEAVEL. Com os multiplicadores 4,3 e 15,5 sobre um ladrilho de 6 m, a
+   oitava fina repetia o campo inteiro de manchas a cada 3,5 METROS: cinquenta
+   repeticoes identicas ao longo do patio, alinhadas numa grelha. Trocou-se a
+   grelha da malha por uma grelha de textura, e o relato nao mudou.
+
+   Rodar nao salva: uma rede periodica rodada continua periodica; o que a
+   rotacao evita e apenas que ela partilhe eixo com o ladrilho por baixo.
+
+   Isto nao repete. O hash e sobre a celula inteira, entao o campo so se
+   repetiria quando as coordenadas voltassem ao mesmo valor em float — dezenas
+   de quilometros daqui. Custa ~10 operacoes por amostra e nao le textura
+   nenhuma, o que num chao que ocupa meio ecra e mais barato do que o fetch que
+   substitui. */
+const MACRO_NOISE_GLSL = /* glsl */`
+float tsHash( vec2 p ) {
+  vec3 q = fract( vec3( p.x, p.y, p.x ) * vec3( 0.1031, 0.1030, 0.0973 ) );
+  q += dot( q, vec3( q.y, q.z, q.x ) + 33.33 );
+  return fract( ( q.x + q.y ) * q.z );
+}
+float tsNoise( vec2 p ) {
+  vec2 i = floor( p ), f = fract( p );
+  vec2 u = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( tsHash( i ), tsHash( i + vec2( 1.0, 0.0 ) ), u.x ),
+              mix( tsHash( i + vec2( 0.0, 1.0 ) ),
+                   tsHash( i + vec2( 1.0, 1.0 ) ), u.x ), u.y );
+}
+`;
+
+/* QUEBRA DO LADRILHO — e a resposta a "a rua ate que esta boa, mas a grama e o
+   patio estao muito falsos".
+
+   Essa distincao e o diagnostico inteiro. Os periodos de ladrilho sao asfalto
+   6 m, laje 8 m, grama 4 m — a grama repete MAIS depressa que a rua e mesmo
+   assim so a rua passa. A diferenca nao esta no periodo, esta no CONTEUDO: o
+   asfalto e quase sem feicao, e repetir ruido sem feicao e invisivel. A grama
+   tem tufos e a laje tem manchas e juntas — feicoes que o olho reconhece e
+   depois encontra outra vez, a distancia certa, indefinidamente.
+
+   Nenhuma quantidade de variacao POR CIMA resolve isto: multiplicar uma mancha
+   que repete por outra que nao repete continua a deixar a primeira la. O que
+   tem de deixar de repetir e a leitura do proprio mapa.
+
+   A tecnica e a mais barata que funciona: LER O MAPA DUAS VEZES, a segunda numa
+   escala e rotacao incomensuraveis com a primeira, e escolher entre as duas com
+   um campo de ruido de baixa frequencia. Onde o campo esta perto de 0 ou de 1 —
+   que e quase em todo o lado, por causa do smoothstep — ve-se UM dos dois
+   ladrilhos, nitido; a feicao reaparece, mas noutra escala e noutro angulo, e
+   deixa de haver distancia a que ela volte igual.
+
+   As UV das duas leituras sao transformacoes LINEARES de vMapUv, portanto as
+   derivadas de mipmap continuam certas e nao ha costura nem `textureGrad`.
+
+   uMacroBreak vem do manifesto por material, e e zero por omissao: a rua nao
+   precisa e nao paga. */
 const MACRO_GLSL = /* glsl */`
 #ifdef USE_MAP
 {
-  vec3 tsMacro = texture2D( uMacroMap, vMapUv * uMacroScale ).rgb;
+  vec2 tsP = vMapUv * uMacroScale;
+  if ( uMacroBreak > 0.001 ) {
+    vec2 tsUvB = mat2( 0.8090, -0.5878, 0.5878, 0.8090 ) * vMapUv * 0.6180
+               + vec2( 17.31, 9.07 );
+    float tsSel = smoothstep( 0.40, 0.60, tsNoise( tsP * 2.9 + 3.7 ) );
+    diffuseColor.rgb = mix( diffuseColor.rgb,
+                            texture2D( map, tsUvB ).rgb,
+                            tsSel * uMacroBreak );
+  }
+  /* A oitava LARGA fica no mapa: com periodo de 55 a 90 m ela repete duas ou
+     tres vezes no sitio todo, o que nao se le como ritmo, e as manchas
+     desenhadas a mao tem uma forma que o ruido de valor nao tem. */
+  float tsA = texture2D( uMacroMap, tsP ).g;
+  /* DEFORMACAO DE DOMINIO antes das oitavas finas. Ruido de valor numa grelha
+     de inteiros tem curvas de nivel quadradas; empurrar o ponto por um campo
+     proprio e o que transforma quadrado arredondado em mancha com forma. */
+  vec2 tsW = vec2( tsNoise( tsP * 2.7 + 11.3 ),
+                   tsNoise( tsP * 2.7 + 71.7 ) ) - 0.5;
+  vec2 tsQ = tsP + tsW * 0.40;
+  float tsB = tsNoise( mat2( 0.8434, -0.5373, 0.5373, 0.8434 ) * tsQ * 4.3 );
+  float tsC = tsNoise( mat2( 0.2837, -0.9589, 0.9589, 0.2837 ) * tsQ * 15.5 );
+  float tsD = tsNoise( mat2( 0.6570, 0.7539, -0.7539, 0.6570 ) * tsQ * 43.0 );
+  float tsV = tsA * 0.32 + tsB * 0.28 + tsC * 0.24 + tsD * 0.16;
+  // devolver o contraste que a media das tres tirou, sem criar planalto
+  float tsX = ( tsV - 0.5 ) * 1.95;
+  tsV = 0.5 + 0.5 * tsX / ( 0.5 + abs( tsX ) );
+
+  /* E A COR ANDA COM O VALOR, que e o que faltava para isto ler como chao.
+     Ate aqui o macro so multiplicava um CINZENTO: as manchas diferiam em
+     claro/escuro e em mais nada, e um chao que varia so em valor le como uma
+     superficie unica mal iluminada — "padronizada". No mundo real o que muda a
+     mancha e a HUMIDADE e o PO: molhado puxa para o frio e escuro, seco e
+     poeirento puxa para o quente e claro. Sao dois campos independentes: uma
+     zona pode estar clara e fria (betao lavado) ou escura e quente (oleo). Por
+     isso o matiz sai de OUTRA oitava (tsB, girada) e nao do mesmo tsV. */
+  vec3 tsWarm = vec3( 1.07, 1.00, 0.90 );
+  vec3 tsCool = vec3( 0.93, 0.98, 1.08 );
+  vec3 tsTint = mix( tsCool, tsWarm, smoothstep( 0.35, 0.65, tsB ) );
+  vec3 tsMacro = vec3( tsV ) * tsTint;
+  tsMacroK = tsV * 2.0;
   diffuseColor.rgb *= mix( vec3( 1.0 ), tsMacro * 2.0, uMacroAmount );
 }
 #endif
+`;
+
+/* A RUGOSIDADE SÓ SOBE — e a versão anterior fazia o contrário, o que produziu
+   "o pátio reflete muita luz".
+
+   Estava `roughnessFactor *= mix(1, 2 - tsMacroK, amount*0.35)`. Com tsMacroK a
+   ir de 0 a 2, isso dava 0,75 nas manchas CLARAS: um quarto de rugosidade a
+   menos em metade da laje. Numa superfície de 180 m sob sol direto, roughness
+   0,75 num dielétrico é um lençol especular — e o sinal ainda estava trocado,
+   porque quem fica liso é a mancha HÚMIDA (escura), não a seca.
+
+   Agora o intervalo é 0,96 a 1,20: praticamente só endurece. A variação
+   molhado/seco continua a existir, mas com 4 % em vez de 25 %, e o pior caso do
+   erro deixa de ser "a laje virou espelho" e passa a ser "a laje está 4 % mais
+   lisa numa mancha". Num chão, errar para o lado fosco não custa nada. */
+const MACRO_ROUGH_GLSL = /* glsl */`
+  // O PISO PRIMEIRO, e depois a variação — nesta ordem, para que a mancha
+  // molhada/seca module um chão já fosco em vez de decidir se ele é fosco.
+  roughnessFactor = mix( roughnessFactor, 1.0, uRoughFloor );
+#ifdef USE_MAP
+  roughnessFactor *= mix( 1.0, 0.96 + 0.28 * ( tsMacroK * 0.5 ), uMacroAmount );
+#endif
+  roughnessFactor = clamp( roughnessFactor, 0.04, 1.0 );
 `;
 
 /* Depois de <map_fragment>, que é onde `diffuseColor` já tem o albedo do mapa e
@@ -236,21 +411,36 @@ const MACRO_GLSL = /* glsl */`
    o mapa (era `vUv` antes de r152); ela já traz o `repeat` do ladrilho aplicado,
    e é por isso que `uMacroScale` é um multiplicador dela e não um valor
    absoluto. */
-function installMacro(mat: THREE.MeshStandardMaterial, cfg: { scale: number; amount: number }) {
+function installMacro(mat: THREE.MeshStandardMaterial,
+                      cfg: { scale: number; amount: number; break?: number },
+                      roughFloor = 0) {
   const tex = getMacroTex();
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uMacroMap = { value: tex };
     shader.uniforms.uMacroScale = { value: cfg.scale };
     shader.uniforms.uMacroAmount = { value: cfg.amount };
+    shader.uniforms.uMacroBreak = { value: cfg.break ?? 0 };
+    shader.uniforms.uRoughFloor = { value: roughFloor };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\n'
-        + 'uniform sampler2D uMacroMap;\nuniform float uMacroScale;\nuniform float uMacroAmount;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\n' + MACRO_GLSL);
+        + 'uniform sampler2D uMacroMap;\nuniform float uMacroScale;\n'
+        + 'uniform float uMacroAmount;\nuniform float uMacroBreak;\n'
+        + 'uniform float uRoughFloor;\n'
+        + MACRO_NOISE_GLSL)
+      /* `tsMacroK` é declarado FORA do bloco do macro porque quem o consome —
+         a rugosidade — só aparece várias inclusões mais à frente. Vale 1,0 por
+         omissão, que é o neutro, para o caso de USE_MAP não estar definido. */
+      .replace('#include <map_fragment>',
+        'float tsMacroK = 1.0;\n#include <map_fragment>\n' + MACRO_GLSL)
+      .replace('#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\n' + MACRO_ROUGH_GLSL);
   };
   /* Sem isto o three reaproveita o programa do material SEM a injeção (a chave
      de cache não conhece onBeforeCompile), e a variação some em metade dos
-     materiais sem erro nenhum. */
-  mat.customProgramCacheKey = () => 'ts-set-macro-v1';
+     materiais sem erro nenhum.
+     A CHAVE MUDA COM O CÓDIGO INJETADO: mantê-la em v1 depois de mexer no GLSL
+     é pedir ao three que sirva o programa antigo para o material novo. */
+  mat.customProgramCacheKey = () => 'ts-set-macro-v5';
 }
 
 /** Liga os conjuntos PBR do manifesto aos materiais nomeados do .glb. */
@@ -370,7 +560,10 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
       if (typeof def.normalScale === 'number' && mat.normalMap) {
         mat.normalScale.set(def.normalScale, def.normalScale);
       }
-      if (def.macro && typeof def.macro.scale === 'number') installMacro(mat, def.macro);
+      if (def.macro && typeof def.macro.scale === 'number') {
+        installMacro(mat, def.macro,
+          typeof def.roughnessFloor === 'number' ? def.roughnessFloor : 0);
+      }
       mat.needsUpdate = true;
       bound++;
 

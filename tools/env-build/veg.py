@@ -23,7 +23,10 @@
 # and a per-tree hue offset so no two read as the same plant.
 import bpy
 import bmesh
+import glob
+import json
 import math
+import os
 from mathutils import Vector, Matrix
 
 
@@ -137,6 +140,180 @@ def _blob(bm, centre, radius, squash, seed, mat_index=1, rings=5, seg=9):
         c = (b + 1) % seg
         bm.faces.new((top, verts[0][c], verts[0][b])).material_index = mat_index
         bm.faces.new((bot, verts[-1][b], verts[-1][c])).material_index = mat_index
+
+
+IMPOSTORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_src_ph", "impostors")
+
+
+def card_material(name, png):
+    """One impostor sheet, alpha-CUT.
+
+    CUTOUT AND NOT BLEND, and with 450 cards in a belt this is not a preference.
+    Blended alpha needs per-fragment sorting; cards cross each other by
+    construction, so there is no draw order that is right, and the belt would
+    flicker as the camera orbits. Clipped alpha is order-independent and free —
+    the same reasoning the chainlink netting already uses.
+    """
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    b = nt.nodes.get("Principled BSDF")
+    b.inputs["Roughness"].default_value = 0.88
+    b.inputs["Metallic"].default_value = 0.0
+    t = nt.nodes.new("ShaderNodeTexImage")
+    t.image = bpy.data.images.load(png, check_existing=True)
+    t.extension = "CLIP"
+    # ESCURECIDO E ESFRIADO DE PROPOSITO — e a correcao de "as arvores estao
+    # colapsando com o HDR".
+    #
+    # O impostor e assado com luz CHAPADA (bake_impostors), o que e certo: um sol
+    # assado no cartao brigaria com o sol da cena. O efeito colateral e que a
+    # arvore sai clara e sem contraste, e o HDRI `rodovia` tem justamente uma
+    # mata densa no horizonte, na mesma cor e no mesmo valor. Duas superficies do
+    # mesmo valor nao se separam — a copa some dentro da foto.
+    #
+    # Fisicamente a folhagem em primeiro plano DEVE ser mais escura que um fundo
+    # enevoado: a bruma clareia o que esta atras dela, nao o que esta na frente.
+    # A cor da bruma aqui e verde-oliva quente (horizonColor #5a633f, medido do
+    # proprio HDRI), entao puxar a folha para o frio afasta em matiz alem de
+    # afastar em valor. Isto e um MULTIPLICADOR sobre a foto — nao repinta a
+    # arvore, so a recoloca na faixa tonal onde ela e primeiro plano.
+    mix = nt.nodes.new("ShaderNodeMixRGB")
+    mix.blend_type = "MULTIPLY"
+    mix.inputs["Fac"].default_value = 1.0
+    mix.inputs["Color2"].default_value = (0.80, 0.85, 0.79, 1.0)
+    nt.links.new(mix.inputs["Color1"], t.outputs["Color"])
+    nt.links.new(b.inputs["Base Color"], mix.outputs["Color"])
+    nt.links.new(b.inputs["Alpha"], t.outputs["Alpha"])
+    for val in ("CLIP", "DITHERED", "HASHED"):
+        try:
+            m.blend_method = val
+            break
+        except TypeError:
+            continue
+    try:
+        m.alpha_threshold = 0.4
+    except Exception:
+        pass
+    return m
+
+
+def make_card_plant(name, side_mat, top_mat, card_w, card_h, base,
+                    top_w=0.0, crown=0.65, height=0.0, blades=3, seed=0):
+    """A planta como cartoes de impostor: laminas verticais + fardos inclinados.
+
+    WHY CARDS AT ALL. Os originais do Poly Haven tem 1,07 M (island_tree_02) e
+    3,86 M (jacaranda_tree) faces — assets de render offline. O cinturao quer
+    ~450 plantas, o que da meio bilhao de triangulos, e decimar nao e saida:
+    nao ha atlas de folha a preservar (as folhas sao geometria modelada), entao
+    um decimador de colapso transforma folha em pasta. A arvore e FOTOGRAFADA
+    (bake_impostors.py) e desenhada em cartoes.
+
+    A HISTORIA DAS DUAS TENTATIVAS ANTERIORES ESTA AQUI PORQUE ELAS SE ANULAM.
+
+    (1) So laminas verticais. De cima uma lamina vertical NAO TEM AREA — e uma
+        reta. Tres davam tres riscos, cinco davam cinco riscos: "as arvores
+        parecem um X visto de cima, nao um circulo". Nenhum numero de laminas
+        conserta, porque o problema e dimensional.
+
+    (2) Lamina vertical + CARTAO DE COPA HORIZONTAL. De cima resolveu. De lado
+        criou um defeito pior: um plano horizontal iluminado por igual, com
+        silhueta reta, pousado sobre a copa — o render rasante nao deixa duvida,
+        sao GUARDA-SOIS. "As arvores continuam extremamente falsas."
+
+    O QUE RESOLVE OS DOIS AO MESMO TEMPO E INCLINAR. Um plano inclinado de 55°
+    da vertical projeta, visto de cima, uma faixa de sin(55°) = 0,82 do proprio
+    comprimento — area de verdade, nao uma reta — e visto de lado continua sendo
+    uma superficie obliqua, que e o que um galho de folhagem e. Nao ha nenhum
+    angulo em que ele vire um plano reto contra o ceu.
+
+    Os fardos usam a MESMA folha lateral, recortada na UV acima do tronco: um
+    galho nao tem tronco no meio, e recortar tambem tira o ceu vazio do topo da
+    folha, que era o que fazia o cartao horizontal ter silhueta retangular.
+
+    `base` e onde o pe da planta esta na imagem (ver bake_impostors); deslocar
+    por ele e o que poe o tronco no chao em vez de enterra-lo.
+    """
+    me = bpy.data.meshes.new(name)
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    me.materials.append(side_mat)
+    if top_mat is not None:
+        me.materials.append(top_mat)
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    z0 = -base * card_h
+
+    # ---- laminas verticais: tronco e silhueta ---------------------------
+    for i in range(blades):
+        a = math.pi * i / blades + _hash01(seed, i, 401) * 0.35
+        c, s = math.cos(a), math.sin(a)
+        hw = card_w / 2.0
+        # Inclinacao fora do plano: o topo anda `lean * card_h` na direcao da
+        # NORMAL da lamina. E o unico eixo em que mexer produz area vista de
+        # cima; inclinar dentro do plano nao muda nada.
+        lean = (_hash01(seed, i, 409) - 0.5) * 0.32
+        off = (_hash01(seed, i, 419) - 0.5) * card_w * 0.16
+        vs = []
+        for (lx, lz) in ((-hw, 0.0), (hw, 0.0), (hw, card_h), (-hw, card_h)):
+            nrm = off + lean * lz
+            vs.append(bm.verts.new((lx * c - nrm * s, lx * s + nrm * c, z0 + lz)))
+        f = bm.faces.new(vs)
+        f.material_index = 0
+        flip = (i % 2) == 1
+        for l, (u, v) in zip(f.loops, ((1, 0), (0, 0), (0, 1), (1, 1)) if flip
+                             else ((0, 0), (1, 0), (1, 1), (0, 1))):
+            l[uv].uv = (u, v)
+
+    # ---- fardos inclinados: a copa ---------------------------------------
+    #
+    # OS FARDOS USAM A FOLHA DE CIMA, e essa e a terceira coisa que mudou aqui.
+    #
+    # Recortados da folha LATERAL eles ainda tinham duas bordas retas — o corte
+    # da UV passa pelo meio da copa, entao a silhueta contra o ceu era uma reta
+    # de folhas cortadas a faca. Sao as cunhas escuras que sobravam.
+    #
+    # A folha de TOPO nao tem esse problema por construcao: e a copa fotografada
+    # isolada, com alfa rasgado nos QUATRO lados. Inclinada, ela le como um
+    # aglomerado de folhagem visto de esguelha, que e o que um galho e — e nao
+    # existe angulo em que apareca uma aresta reta, porque nao ha nenhuma.
+    if top_mat is not None and top_w > 0.0 and height > 0.0:
+        n_c = 7
+        wc = top_w * 0.52
+        zb = 0.44 * height
+        for i in range(n_c):
+            a = 2.0 * math.pi * i / n_c + _hash01(seed, i, 433) * 0.9
+            phi = math.radians(38.0 + 30.0 * _hash01(seed, i, 439))
+            sc = 0.72 + 0.34 * _hash01(seed, i, 443)
+            r = (math.cos(a), math.sin(a), 0.0)
+            t = (-math.sin(a), math.cos(a), 0.0)
+            hx = (r[0] * math.sin(phi), r[1] * math.sin(phi), math.cos(phi))
+            # o pe do fardo sai do eixo, senao os sete se cruzam todos na mesma
+            # reta e a copa volta a ter um miolo vazio visto de cima
+            o = 0.16 * wc * (0.5 + _hash01(seed, i, 449))
+            cen = (r[0] * o, r[1] * o,
+                   zb + (wc * 0.10) * (_hash01(seed, i, 457) - 0.5))
+            hw = wc * sc / 2.0
+            hh = wc * sc
+            vs = []
+            for (lx, lz) in ((-hw, -hh * 0.5), (hw, -hh * 0.5),
+                             (hw, hh * 0.5), (-hw, hh * 0.5)):
+                vs.append(bm.verts.new((cen[0] + t[0] * lx + hx[0] * lz,
+                                        cen[1] + t[1] * lx + hx[1] * lz,
+                                        cen[2] + hx[2] * lz)))
+            f = bm.faces.new(vs)
+            f.material_index = 1
+            flip = (i % 2) == 1
+            uu = ((1, 0), (0, 0), (0, 1), (1, 1)) if flip else                  ((0, 0), (1, 0), (1, 1), (0, 1))
+            for l, (u, v) in zip(f.loops, uu):
+                l[uv].uv = (u, v)
+
+    bm.to_mesh(me)
+    bm.free()
+    return ob
 
 
 def _smooth(me, angle=1.05):

@@ -38,8 +38,8 @@ EXPOSURE = 1.05
 BIND = {
     "GROUND_CONCRETE": ("concrete", 1.0, (0.50, 0.495, 0.475), 1.0),
     "ASPHALT_ROAD":    ("asphalt", 1.333, (0.28, 0.285, 0.30), 0.94),
-    "CONCRETE_APRON":  ("concrete", 2.0, (0.72, 0.71, 0.68), 0.88),
-    "KERB_CONCRETE":   ("concrete", 1.0, (0.84, 0.83, 0.80), 0.85),
+    "CONCRETE_APRON":  ("concrete", 2.0, (0.72, 0.71, 0.68), 0.97),
+    "KERB_CONCRETE":   ("concrete", 1.0, (0.84, 0.83, 0.80), 0.95),
     "LINE_PAINT":      (None, 1.0, (0.74, 0.72, 0.66), 0.55),
     "GRASS_VERGE":     ("grass", 16.0, (0.42, 0.46, 0.34), 0.94),
     "GRASS_NEAR":      ("grass", 2.0, (0.26, 0.36, 0.17), 0.93),
@@ -60,7 +60,50 @@ SHOTS = [
     # The perimeter: turf band, tree belt, plinth, wire, barbed arms. This is
     # the shot that has to prove the fence is taller AND further, and that the
     # grass in front of it is a band rather than a rectangle.
-    ("h_fence", (55.0, 218.0, 2.0), 88.0, (-0.55, -1.0, 0.32), 34.0),
+    # Mira derivada da cerca ATUAL. Estava fixa em y=218 de quando a propriedade
+    # ia a 250 m; com a cerca em 150 a camera apontava para campo vazio.
+    ("h_fence", (45.0, 118.0, 3.0), 72.0, (-0.5, -1.0, 0.30), 34.0),
+    # A boca da transversal na rua A, de cima e de perto. E o unico
+    # enquadramento que mostra meio-fio, sarjeta, concordancia e o corte do
+    # canteiro ao mesmo tempo — que e onde o defeito vive.
+    ("i_junc", (10.0, -40.0, 0.0), 44.0, (0.25, -0.35, 1.0), 38.0),
+    ("j_junc_low", (13.0, -40.0, 1.2), 26.0, (1.0, -0.75, 0.24), 36.0),
+    # A abertura do canteiro vista de dentro da pista — o "buraco na
+    # interseccao". E o unico enquadramento que mostra ao mesmo tempo o nariz do
+    # canteiro, a sarjeta da travessia e o asfalto da ligacao.
+    ("k_median_gap", (-9.0, -40.0, 1.2), 20.0, (1.2, 0.9, 0.30), 36.0),
+    # As arvores de perto, na altura de quem olha do chao: e assim que o app as
+    # mostra, e nao de cima.
+    ("l_trees", (-9.0, 95.0, 2.0), 34.0, (1.3, -0.9, 0.16), 38.0),
+    # O PATIO EM CHEIO, que e o enquadramento em que a queixa "parece varios
+    # quadrados seguidos" aparece. Nenhum dos outros mostra area grande de laje e
+    # de asfalto ao mesmo tempo e a distancia media, que e onde o campo de
+    # variacao do chao se le como campo em vez de como textura.
+    ("m_yard", (26.0, -26.0, 1.5), 58.0, (1.0, -1.0, 0.42), 34.0),
+    # MC_00 DE FRENTE. E o predio onde `separate_coplanar` mais mexe (centenas
+    # de pecas) e o que tem a fachada mais detalhada — janelas de montante fino,
+    # portas, quadros. Se a funcao rasgar alguma coisa, rasga aqui, e sem este
+    # enquadramento o estrago so aparece no app.
+    ("n_mc00", (-52.8, 5.5, 3.5), 46.0, (0.55, -1.0, 0.30), 34.0),
+    # O MESMO ENQUADRAMENTO DO APP: o veiculo esta na origem e a construcao fica
+    # atras dele, vista de +X e quase ao nivel do olho. E assim que o defeito foi
+    # relatado, e um render de outro angulo nao serve para dizer se ele saiu.
+    ("o_mc_front", (-26.0, 5.0, 2.2), 58.0, (1.0, -0.10, 0.26), 34.0),
+    # As outras duas candidatas do mesmo lado do sitio.
+    ("p_mc02", (-47.2, -25.5, 3.0), 44.0, (1.0, -0.35, 0.28), 34.0),
+    # A FAIXA SUL VISTA DE +Y, que e o que a camera do print mostra: com o
+    # veiculo de lado e a cabine a esquerda, o eixo de vista e -Y e o ecra tem
+    # +X a esquerda. Cobre MC_02, MC_03 e MC_12 de uma vez, para identificar a
+    # construcao pela silhueta em vez de a adivinhar.
+    ("q_south", (6.0, -24.0, 4.0), 112.0, (0.05, 1.0, 0.135), 34.0),
+    # MC_03 de perto, do lado que a camera do app ve (+Y). E a peca do adesivo.
+    ("s_mc03", (39.8, -19.5, 3.0), 34.0, (0.25, 1.0, 0.30), 34.0),
+    # A CAMERA DO APP, reproduzida a partir da unica referencia que ela tem: o
+    # veiculo esta preso na ORIGEM. No print ele aparece de lado, com a cabine a
+    # esquerda, e a construcao fica atras dele — logo a camera olha ao longo de
+    # -X, quase ao nivel do olho. Este enquadramento e o unico que permite dizer
+    # QUAL construcao e, em vez de adivinhar pelo aspecto.
+    ("r_from_truck", (-62.0, 10.0, 4.0), 104.0, (1.0, -0.10, 0.115), 32.0),
 ]
 
 
@@ -79,6 +122,176 @@ def load_tex(nt, stem, kind, non_color):
             t.image = img
             return t
     return None
+
+
+# Variacao macro por FRAGMENTO — o equivalente do MACRO_GLSL de set.ts.
+#
+# ESTE PREVIEW MENTIA POR OMISSAO, e era a omissao que mais importava. O macro e
+# a unica fonte de variacao do chao que nao passa pela malha, e desde que o
+# COLOR_0 foi limitado a cinco amostras por periodo ele passou a carregar TODA a
+# banda media e fina. Um render sem ele mostra um chao muito mais chapado que o
+# que o app desenha — e ajustar o build contra esse render seria ajustar contra
+# uma cena que nao existe.
+#
+# Nao e o mesmo ruido (o motor amostra um canvas 256²; aqui e o Noise do Blender)
+# e nao precisa de ser: o que tem de bater sao os PERIODOS e a amplitude, porque
+# e disso que depende a leitura de "organico" contra "quadriculado". Os tres
+# periodos sao em METROS DE MUNDO, iguais em todos os materiais — sujidade e
+# propriedade do lugar, nao do ladrilho, e assim a mancha atravessa a fronteira
+# entre asfalto e laje em vez de parar nela.
+MACRO_P = ((70.0, 0.40), (16.3, 0.34), (4.5, 0.26))
+
+
+def macro_node(nt, amount):
+    """Devolve um socket de cor que vale ~1.0 em media, para multiplicar."""
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    acc = None
+    hue_fac = None
+    for i, (period, w) in enumerate(MACRO_P):
+        mp = nt.nodes.new("ShaderNodeMapping")
+        mp.inputs["Scale"].default_value = (1.0 / period, 1.0 / period, 1.0 / period)
+        # cada oitava com o seu eixo, como no shader
+        mp.inputs["Rotation"].default_value = (0.0, 0.0, 0.57 * (i + 1))
+        nt.links.new(mp.inputs["Vector"], geo.outputs["Position"])
+        nz = nt.nodes.new("ShaderNodeTexNoise")
+        nz.inputs["Detail"].default_value = 3.0
+        nz.inputs["Roughness"].default_value = 0.5
+        nz.inputs["Scale"].default_value = 1.0
+        nt.links.new(nz.inputs["Vector"], mp.outputs["Vector"])
+        sc = nt.nodes.new("ShaderNodeMath")
+        sc.operation = "MULTIPLY"
+        sc.inputs[1].default_value = w
+        nt.links.new(sc.inputs[0], nz.outputs["Fac"])
+        if i == 1:
+            hue_fac = nz.outputs["Fac"]      # a oitava media conduz o matiz
+        if acc is None:
+            acc = sc.outputs["Value"]
+        else:
+            ad = nt.nodes.new("ShaderNodeMath")
+            ad.operation = "ADD"
+            nt.links.new(ad.inputs[0], acc)
+            nt.links.new(ad.inputs[1], sc.outputs["Value"])
+            acc = ad.outputs["Value"]
+    # repor contraste (a media de tres tem 0,59 do desvio de uma) e centrar em 1
+    ctr = nt.nodes.new("ShaderNodeMath")
+    ctr.operation = "SUBTRACT"
+    ctr.inputs[1].default_value = 0.5
+    nt.links.new(ctr.inputs[0], acc)
+    gain = nt.nodes.new("ShaderNodeMath")
+    gain.operation = "MULTIPLY"
+    gain.inputs[1].default_value = 1.75 * 2.0 * amount
+    nt.links.new(gain.inputs[0], ctr.outputs["Value"])
+    one = nt.nodes.new("ShaderNodeMath")
+    one.operation = "ADD"
+    one.inputs[1].default_value = 1.0
+    nt.links.new(one.inputs[0], gain.outputs["Value"])
+    cl = nt.nodes.new("ShaderNodeClamp")
+    cl.inputs["Min"].default_value = 0.25
+    cl.inputs["Max"].default_value = 1.75
+    nt.links.new(cl.inputs["Value"], one.outputs["Value"])
+    if hue_fac is None:
+        return cl.outputs["Result"]
+    # E O MATIZ, conduzido por OUTRA oitava. Um chao que varia so em valor le
+    # como uma superficie unica mal iluminada; humidade puxa para o frio, po
+    # puxa para o quente, e os dois campos sao independentes um do outro.
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.interpolation = "EASE"
+    ramp.color_ramp.elements[0].position = 0.35
+    ramp.color_ramp.elements[0].color = (0.93, 0.98, 1.08, 1.0)
+    ramp.color_ramp.elements[1].position = 0.65
+    ramp.color_ramp.elements[1].color = (1.07, 1.00, 0.90, 1.0)
+    nt.links.new(ramp.inputs["Fac"], hue_fac)
+    tint = nt.nodes.new("ShaderNodeMixRGB")
+    tint.blend_type = "MULTIPLY"
+    tint.inputs["Fac"].default_value = 1.0
+    nt.links.new(tint.inputs["Color1"], cl.outputs["Result"])
+    nt.links.new(tint.inputs["Color2"], ramp.outputs["Color"])
+    return tint.outputs["Color"]
+
+
+# `amount` por material, espelhando environments.json
+MACRO_AMOUNT = {
+    "GROUND_CONCRETE": 0.72, "ASPHALT_ROAD": 0.62, "CONCRETE_APRON": 0.55,
+    "KERB_CONCRETE": 0.45, "GRASS_VERGE": 0.55, "GRASS_NEAR": 0.62,
+    "GRAVEL_SHOULDER": 0.60,
+}
+
+# `break` por material — a quebra de periodicidade do PROPRIO mapa. Espelha
+# environments.json e, como la, e ZERO no asfalto: uma textura sem feicao nao
+# repete visivelmente e nao vale a leitura extra.
+MACRO_BREAK = {
+    "GROUND_CONCRETE": 0.85, "CONCRETE_APRON": 0.70, "GRASS_VERGE": 0.80,
+    "GRASS_NEAR": 0.90, "GRAVEL_SHOULDER": 0.75,
+}
+
+# `envIntensity` do manifesto. O Cycles nao tem equivalente por material — o
+# HDRI ilumina tudo por igual — entao o preview aproxima-o pelo NIVEL ESPECULAR
+# do Principled, que e o que decide quanto do ambiente volta para a camera.
+#
+# Sem isto o render nao consegue mostrar "o patio reflete muita luz", que e
+# precisamente o defeito a julgar: o preview desenharia a laje com o especular
+# de fabrica (0,5) enquanto o app a desenha a 0,13.
+ENV_INTENSITY = {
+    "GROUND_CONCRETE": 0.13, "ASPHALT_ROAD": 0.28, "CONCRETE_APRON": 0.18,
+    "KERB_CONCRETE": 0.20, "GRASS_VERGE": 0.60, "GRASS_NEAR": 0.50,
+    "GRAVEL_SHOULDER": 0.35,
+}
+
+
+def set_specular(bsdf, level):
+    """Nivel especular, com o nome do socket que esta versao do Blender usa."""
+    for nm in ("Specular IOR Level", "Specular"):
+        if nm in bsdf.inputs:
+            bsdf.inputs[nm].default_value = level
+            return True
+    return False
+
+
+def break_tiling(nt, tex_node, repeat, strength):
+    """Le o mesmo mapa uma segunda vez, noutra escala e angulo, e escolhe entre
+    as duas com ruido de baixa frequencia.
+
+    E o que responde a "a grama e o patio estao muito falsos" enquanto a rua
+    passa: o asfalto e quase sem feicao e repetir ruido sem feicao e invisivel,
+    mas a grama tem tufos e a laje tem manchas — feicoes que o olho reconhece e
+    reencontra a cada 4 e 8 m. Variacao POR CIMA nao apaga isso; o que tem de
+    deixar de repetir e a leitura do mapa.
+    """
+    uvn = nt.nodes.new("ShaderNodeUVMap")
+    uvn.uv_map = "UVMap"
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Scale"].default_value = (repeat * 0.618, repeat * 0.618, 1.0)
+    mp.inputs["Rotation"].default_value = (0.0, 0.0, 0.6283)
+    mp.inputs["Location"].default_value = (17.31, 9.07, 0.0)
+    nt.links.new(mp.inputs["Vector"], uvn.outputs["UV"])
+    alt = nt.nodes.new("ShaderNodeTexImage")
+    alt.image = tex_node.image
+    nt.links.new(alt.inputs["Vector"], mp.outputs["Vector"])
+
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    sel_mp = nt.nodes.new("ShaderNodeMapping")
+    sel_mp.inputs["Scale"].default_value = (1.0 / 26.0,) * 3
+    nt.links.new(sel_mp.inputs["Vector"], geo.outputs["Position"])
+    nz = nt.nodes.new("ShaderNodeTexNoise")
+    nz.inputs["Detail"].default_value = 2.0
+    nz.inputs["Scale"].default_value = 1.0
+    nt.links.new(nz.inputs["Vector"], sel_mp.outputs["Vector"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.interpolation = "EASE"
+    ramp.color_ramp.elements[0].position = 0.40
+    ramp.color_ramp.elements[1].position = 0.60
+    nt.links.new(ramp.inputs["Fac"], nz.outputs["Fac"])
+    fac = nt.nodes.new("ShaderNodeMath")
+    fac.operation = "MULTIPLY"
+    fac.inputs[1].default_value = strength
+    nt.links.new(fac.inputs[0], ramp.outputs["Color"])
+
+    mix = nt.nodes.new("ShaderNodeMixRGB")
+    mix.blend_type = "MIX"
+    nt.links.new(mix.inputs["Fac"], fac.outputs["Value"])
+    nt.links.new(mix.inputs["Color1"], tex_node.outputs["Color"])
+    nt.links.new(mix.inputs["Color2"], alt.outputs["Color"])
+    return mix.outputs["Color"]
 
 
 def bind_ground():
@@ -111,7 +324,12 @@ def bind_ground():
             mix.blend_type = "MULTIPLY"
             mix.inputs["Fac"].default_value = 1.0
             mix.inputs["Color2"].default_value = (tint[0], tint[1], tint[2], 1.0)
-            nt.links.new(mix.inputs["Color1"], d.outputs["Color"])
+            brk = MACRO_BREAK.get(name)
+            if brk:
+                nt.links.new(mix.inputs["Color1"],
+                             break_tiling(nt, d, repeat, brk))
+            else:
+                nt.links.new(mix.inputs["Color1"], d.outputs["Color"])
             # ...and so does COLOR_0, which is the whole ground-variation system
             ca = nt.nodes.new("ShaderNodeVertexColor")
             ca.layer_name = "Col"
@@ -120,7 +338,18 @@ def bind_ground():
             mix2.inputs["Fac"].default_value = 1.0
             nt.links.new(mix2.inputs["Color1"], mix.outputs["Color"])
             nt.links.new(mix2.inputs["Color2"], ca.outputs["Color"])
-            nt.links.new(b.inputs["Base Color"], mix2.outputs["Color"])
+            # ...e o macro por fragmento, que desde a limitacao de banda do
+            # COLOR_0 e quem carrega toda a variacao media e fina.
+            amt = MACRO_AMOUNT.get(name)
+            if amt:
+                mix3 = nt.nodes.new("ShaderNodeMixRGB")
+                mix3.blend_type = "MULTIPLY"
+                mix3.inputs["Fac"].default_value = 1.0
+                nt.links.new(mix3.inputs["Color1"], mix2.outputs["Color"])
+                nt.links.new(mix3.inputs["Color2"], macro_node(nt, amt))
+                nt.links.new(b.inputs["Base Color"], mix3.outputs["Color"])
+            else:
+                nt.links.new(b.inputs["Base Color"], mix2.outputs["Color"])
         r = load_tex(nt, stem, "rough", True)
         if r:
             nt.links.new(r.inputs["Vector"], mapping.outputs["Vector"])
@@ -245,7 +474,17 @@ def main():
     sc.cycles.samples = 40
     sc.cycles.use_denoising = True
     sc.cycles.max_bounces = 3
-    sc.cycles.transparent_max_bounces = 6      # the netting is alpha-cut
+    # 64, NOT 6, and the perimeter render is what forced it. A shadow ray
+    # crossing the tree belt passes through two staggered rows of three crossed
+    # impostor cards plus the chainlink — easily a dozen alpha-cut surfaces —
+    # and when a ray runs out of transparent bounces Cycles terminates it as
+    # OPAQUE. The result was solid black rectangles standing among the trees,
+    # which looks exactly like broken alpha and is not: the impostor sheets are
+    # clean. A renderer setting, not an asset fault.
+    #
+    # It is still worth knowing at runtime: that same overlap is alpha-tested
+    # overdraw on the GPU. It is cheap per pixel and it is not free.
+    sc.cycles.transparent_max_bounces = 64
     sc.render.resolution_x = 1000
     sc.render.resolution_y = 600
     sc.render.image_settings.file_format = "PNG"
