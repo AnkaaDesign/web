@@ -36,6 +36,8 @@ import {
   sceneState, LIGHT_PRESETS, applyPreset, setLightParams,
   setHourOfDay, getHourOfDay, HOUR_MIN, HOUR_MAX, beginLightScrub,
   warmLightPrograms,
+  BACKDROPS, STUDIO_RANGE, isStudioPreset, setStudioParams, getStudioParams,
+  TEMP_NEUTRAL, onRig,
 } from '../scene/scene';
 import { claimPill, paintFrame } from './loader';
 
@@ -91,6 +93,8 @@ const PRESET_TWEEN_MS = 800;
    own keyIntensity. Azimuth is a full circle by definition. */
 const EL_MIN = 2, EL_MAX = 85;
 const BRIGHT_MIN = 15, BRIGHT_MAX = 250;
+/** Teto da chave na face de ESTÚDIO — ver applyFace(). */
+const BRIGHT_MAX_STUDIO = 600;
 
 /* Collapsed state only. The lighting itself is already persisted by scene/scene.ts
    under truckstudio.scene.v3 — duplicating it here would give us two sources of
@@ -238,6 +242,28 @@ let dialHandle!: SVGCircleElement;
 let tilesEl!: HTMLElement;
 let weatherVal!: HTMLElement;
 
+/* ---- face de estúdio ----
+   As LINHAS inteiras, e não só os controles: a troca de face é feita
+   escondendo/mostrando a linha (rótulo + leitura + controle juntos), que é a
+   unidade que o painel desenha. */
+let hourRow!: HTMLElement;
+let weatherRow!: HTMLElement;
+let backdropRow!: HTMLElement;
+let backdropTiles!: HTMLElement;
+let backdropVal!: HTMLElement;
+let fillRow!: HTMLElement;
+let fillInput!: HTMLInputElement;
+let fillVal!: HTMLElement;
+let rimRow!: HTMLElement;
+let rimInput!: HTMLInputElement;
+let rimVal!: HTMLElement;
+let softRow!: HTMLElement;
+let softInput!: HTMLInputElement;
+let softVal!: HTMLElement;
+let tempRow!: HTMLElement;
+let tempInput!: HTMLInputElement;
+let tempVal!: HTMLElement;
+
 let collapsed = false;
 let dragPointer: number | null = null;   // pointerId while the dial is turning
 
@@ -358,6 +384,162 @@ function buildDialRow() {
   return row;
 }
 
+/* ---------------- a face de ESTÚDIO ----------------
+   O MESMO PAINEL, DUAS FACES — e não um segundo painel. O cabeçalho deste
+   arquivo diz por quê com todas as letras: duas superfícies vivas escrevendo o
+   mesmo estado de cena são uma fábrica de bugs, e foi isso que matou a sidebar.
+   Um "painel de estúdio" separado teria de repetir altura, intensidade e posição
+   da chave — que são as MESMAS três coisas — e a primeira divergência entre eles
+   seria um relato de bug que ninguém consegue reproduzir.
+
+   O QUE MUDA ENTRE AS FACES é só o que não tem significado do outro lado:
+
+     cena externa   hora do dia  +  clima
+     estúdio        fundo  +  preenchimento  +  recorte  +  difusão
+
+   e o que fica NAS DUAS é o trio da chave (altura, intensidade, posição), porque
+   uma softbox e um sol são a mesma luz principal vista de dois vocabulários.
+
+   Por isso as linhas são construídas UMA VEZ, na ordem abaixo, e a troca de face
+   é só visibilidade. Reordenar o DOM a cada `syncHud()` faria o painel piscar a
+   cada troca de cenário, e um painel que se remonta perde o foco do teclado no
+   meio de um arrasto.
+
+       hora        ·  só cena externa
+       fundo       ·  só estúdio
+       altura      ·  as duas
+       intensidade ·  as duas
+       posição     ·  as duas
+       preench.    ·  só estúdio
+       recorte     ·  só estúdio
+       difusão     ·  só estúdio
+       clima       ·  só cena externa
+
+   POR QUE A HORA SOME NO ESTÚDIO, e não fica desabilitada: o preset `ciclorama`
+   é `solar: false`, ou seja o relógio JÁ não move a luz dele (ver
+   syncSunToHour em scene/scene.ts). Um controle deslizante que anda e não muda
+   nada é pior do que a ausência dele. */
+
+/* O RÓTULO DA PASTILHA, curto — e o nome inteiro fica no `title`/`aria-label`.
+   ---------------------------------------------------------------------------
+   As pastilhas de clima são todas de UMA palavra ("Ensolarado", "Nublado",
+   "Chuvoso", "Neblina"), e é por isso que `.ts-hud-tile__name` trunca com
+   reticências sem nunca truncar nada. "Cinza escuro" e "Cinza claro" não cabem:
+   medido, saíam como "Cinza es…" e "Cinza cla…", ou seja as DUAS opções de cinza
+   com o mesmo rótulo visível.
+
+   A saída anterior era deixar o nome quebrar em duas linhas só nesta fileira —
+   o que resolvia a leitura e custava a PARIDADE, que é justamente o que o dono
+   do produto pediu ("com o mesmo design"): a fileira de fundos ficava mais alta
+   que a de clima e as duas não se substituíam, uma trocava de lugar com a outra.
+
+   Encurtar resolve as duas coisas de uma vez, e não perde informação porque a
+   informação não está no texto: o DISCO ao lado já é a cor. "Escuro" com um
+   disco cinza-escuro não é ambíguo com "Claro" com um disco cinza-claro. */
+const BACKDROP_TILE_NAME: Record<string, string> = {
+  preto: 'Preto',
+  'cinza-escuro': 'Escuro',
+  'cinza-claro': 'Claro',
+  branco: 'Branco',
+};
+
+/* O ícone de um fundo: uma BADGE QUADRADA na cor, levemente arredondada.
+   ---------------------------------------------------------------------------
+   Mesma caixa de 24, mesma espessura de traço e mesmo tamanho de render (20)
+   das pastilhas de clima — é literalmente o mesmo slot `.ts-hud-tile__ico`, e é
+   isso que faz as duas fileiras serem a MESMA pastilha com desenhos diferentes.
+
+   QUADRADA, E NÃO UM DISCO. Pedido do dono do produto, e a razão está na tela:
+   um fundo de estúdio é uma SUPERFÍCIE, e um disco lê como "cor de tinta" — que
+   é justamente o vocabulário das pastilhas de cor do veículo e da tira de
+   acabamentos. O raio de 4,5 sobre uma caixa de 15,2 é a mesma proporção dos
+   9 px sobre 34 px de `.ts-vbtn`, os botões do topo direito: a badge fica na
+   mesma família de forma dos controles, que é o que o pedido nomeou.
+
+   O `fill` é a única coisa que foge da convenção "traço em currentColor", e tem
+   de fugir: aqui o conteúdo do ícone É a cor. O contorno resolve o mesmo caso
+   que a borda da amostra antiga resolvia — `Preto` (#000) sobre o vidro escuro
+   do painel some sem contorno, e uma pastilha cujo ícone some parece uma
+   pastilha vazia. */
+function backdropIcon(bg: number) {
+  const hex = '#' + bg.toString(16).padStart(6, '0');
+  /* MAIOR que o ícone de clima, e o modificador existe só para isso. Pedido do
+     dono do produto, e ele bate com o que as duas coisas são: um glifo de linha
+     é legível a 18 px porque o que informa é a FORMA, e uma amostra de cor
+     precisa de ÁREA — a diferença entre "Cinza escuro" e "Cinza claro" é de
+     luminância, e num quadrado de 18 px com 1,7 px de contorno sobra pouca cor
+     para comparar. 26 px é o maior que cabe sem a pastilha crescer (o nome e o
+     respiro ocupam o resto da altura). */
+  const span = el('span', 'ts-hud-tile__ico ts-hud-tile__ico--badge');
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="' + hex + '"'
+    + ' stroke="currentColor" stroke-width="1.4" focusable="false" aria-hidden="true">'
+    + '<rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5"/></svg>';
+  return span;
+}
+
+function buildBackdropRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--backdrop');
+
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Fundo'));
+  backdropVal = el('span', 'ts-hud-row__val');
+  top.appendChild(backdropVal);
+  row.appendChild(top);
+
+  /* SEM o modificador `--swatch`. A fileira de fundos é a fileira de clima: as
+     duas se substituem no mesmo lugar do painel conforme o cenário, e um
+     modificador que mudasse tamanho ou altura faria a troca ler como o painel
+     inteiro se remontando. Ver o cabeçalho de BACKDROP_TILE_NAME. */
+  backdropTiles = el('div', 'ts-hud-tiles');
+  backdropTiles.setAttribute('role', 'radiogroup');
+  backdropTiles.setAttribute('aria-label', 'Cor de fundo do estúdio');
+  for (const b of BACKDROPS) {
+    const tile = el('button', 'ts-hud-tile');
+    tile.type = 'button';
+    tile.dataset.backdrop = b.id;
+    tile.setAttribute('role', 'radio');
+    tile.setAttribute('aria-checked', 'false');
+    /* O nome INTEIRO aqui: é o que o mouse lê no hover e o que o leitor de tela
+       anuncia — o encurtamento é só do texto desenhado. */
+    tile.title = b.name;
+    tile.setAttribute('aria-label', b.name);
+    tile.appendChild(backdropIcon(b.bg));
+    tile.appendChild(el('span', 'ts-hud-tile__name', BACKDROP_TILE_NAME[b.id] || b.name));
+    /* Chave discreta → ANIMA, igual às pastilhas de clima. O crossfade entre
+       dois fundos é meio segundo de rampa de albedo, e é o que separa "trocou o
+       fundo" de "a tela piscou". */
+    tile.addEventListener('click', () => {
+      setStudioParams({ backdrop: b.id });
+      paintStudio();
+    });
+    backdropTiles.appendChild(tile);
+  }
+  row.appendChild(backdropTiles);
+  return row;
+}
+
+/* Os três multiplicadores. Um só construtor porque são a MESMA coisa três
+   vezes: um deslizante 0..N cujo 1 é o que o preset autorou. O `centro` do
+   controle é o valor calibrado — mexer é sempre um desvio consciente dele. */
+function buildStudioRange(
+  mod: string, label: string, capA: string, capB: string,
+  range: readonly [number, number],
+  apply: (v: number) => void,
+) {
+  const built = buildRangeRow(mod, label, capA, capB,
+    Math.round(range[0] * 100), Math.round(range[1] * 100), 5, 'low', 'high');
+  built.input.setAttribute('aria-label', label);
+  built.input.addEventListener('input', () => {
+    beginLightScrub();
+    const v = num(built.input.value, 100);
+    apply(v / 100);
+    built.val.textContent = pctText(v);
+    setFill(built.input, v, Math.round(range[0] * 100), Math.round(range[1] * 100));
+  });
+  return built;
+}
+
 function buildWeatherRow() {
   const row = el('div', 'ts-hud-row ts-hud-row--weather');
 
@@ -449,6 +631,7 @@ function build() {
     paintElevation(sceneState.el);
     paintAzimuth(sceneState.az);
   });
+  hourRow = hour.row;
   bodyEl.appendChild(hour.row);
 
   const elev = buildRangeRow(
@@ -491,7 +674,58 @@ function build() {
   bodyEl.appendChild(buildDialRow());
   bindDial();
 
-  bodyEl.appendChild(buildWeatherRow());
+  /* Os três multiplicadores do estúdio, DEPOIS do trio da chave: a leitura é
+     "esta é a luz principal; agora quanto de preenchimento, recorte e difusão
+     em volta dela", que é a ordem em que um fotógrafo monta o set. */
+  const fill = buildStudioRange('fill', 'Preenchimento', 'dim', 'bright',
+    STUDIO_RANGE.fill, (v) => setStudioParams({ fill: v }));
+  fillRow = fill.row; fillInput = fill.input; fillVal = fill.val;
+  bodyEl.appendChild(fillRow);
+
+  const rim = buildStudioRange('rim', 'Recorte', 'dim', 'bright',
+    STUDIO_RANGE.rim, (v) => setStudioParams({ rim: v }));
+  rimRow = rim.row; rimInput = rim.input; rimVal = rim.val;
+  bodyEl.appendChild(rimRow);
+
+  const soft = buildStudioRange('soft', 'Difusão da sombra', 'sunHigh', 'cloud',
+    STUDIO_RANGE.softness, (v) => setStudioParams({ softness: v }));
+  softRow = soft.row; softInput = soft.input; softVal = soft.val;
+  bodyEl.appendChild(softRow);
+
+  /* TEMPERATURA — em KELVIN, e não em porcentagem como os três acima.
+     É a única linha desta face cuja unidade é do mundo e não do preset: "3200 K"
+     quer dizer alguma coisa para quem fotografa, "35 %" não quereria nada. Por
+     isso ela não passa por buildStudioRange() (que fala em fração do autorado) e
+     tem construtor próprio. */
+  const temp = buildRangeRow('temp', 'Temperatura', 'bulb', 'moon',
+    STUDIO_RANGE.temp[0], STUDIO_RANGE.temp[1], 100, 'warm', 'cool');
+  tempRow = temp.row; tempInput = temp.input; tempVal = temp.val;
+  tempInput.setAttribute('aria-label', 'Temperatura de cor da luz');
+  tempInput.addEventListener('input', () => {
+    beginLightScrub();
+    const v = num(tempInput.value, TEMP_NEUTRAL);
+    setStudioParams({ temp: v });
+    paintTemp(v);
+  });
+  bodyEl.appendChild(tempRow);
+
+  /* AS DUAS FILEIRAS DE PASTILHAS, NO MESMO LUGAR — no fim do painel, uma
+     escondida pela outra conforme o cenário (ver syncFaces).
+
+     ESTA ADJACÊNCIA É A FUNCIONALIDADE, não uma arrumação. O `backdropRow`
+     ficava logo abaixo da hora, no TOPO do corpo, e o `weatherRow` no fim: a
+     troca de cenário não substituía uma fileira pela outra, ela tirava um bloco
+     do fim e punha outro no começo — e todos os controles entre os dois
+     saltavam de posição. O pedido do dono do produto foi literal: os cards de
+     fundo do estúdio *"devem substituir os ícones de chuva, ensolarado etc. das
+     outras cenas, com o mesmo design"*. Substituir quer dizer no MESMO lugar e
+     com a MESMA forma; a forma está em `backdropIcon()`, e o lugar é aqui.
+
+     A ordem entre as duas no DOM não importa — nunca estão visíveis juntas. */
+  weatherRow = buildWeatherRow();
+  bodyEl.appendChild(weatherRow);
+  backdropRow = buildBackdropRow();
+  bodyEl.appendChild(backdropRow);
 
   hudRoot.appendChild(bodyEl);
 
@@ -615,11 +849,16 @@ function paintAzimuth(v: number) {
   dialEl.setAttribute('aria-valuetext', text);
 }
 
+/* O TETO VEM DO PRÓPRIO INPUT, e não da constante: ele muda com a face (250 %
+   fora, 600 % no estúdio — ver applyFace), e ler a constante aqui prenderia a
+   leitura e o preenchimento da trilha no valor da cena externa enquanto o
+   controle já aceita mais. */
 function paintBrightness(v: number) {
-  const n = clamp(num(v, 100), BRIGHT_MIN, BRIGHT_MAX);
+  const hi = num(brightInput.max, BRIGHT_MAX);
+  const n = clamp(num(v, 100), BRIGHT_MIN, hi);
   brightInput.value = String(Math.round(n));
   brightVal.textContent = pctText(n);
-  setFill(brightInput, n, BRIGHT_MIN, BRIGHT_MAX);
+  setFill(brightInput, n, BRIGHT_MIN, hi);
 }
 
 function paintPresets() {
@@ -637,12 +876,92 @@ function paintPresets() {
 
 /* The header line is the whole panel's summary — the only thing left on screen
    while it is collapsed, so it carries the two values that answer "what am I
-   looking at": the time and the weather. */
+   looking at": the time and the weather.
+   No estúdio a hora não quer dizer nada (o preset é `solar: false`), então as
+   duas respostas passam a ser outras: qual sala e qual fundo. */
 function paintHint() {
   if (!hintEl) return;
   const preset = LIGHT_PRESETS[sceneState.preset];
+  if (isStudioPreset()) {
+    hintEl.textContent = (preset ? preset.name : 'Estúdio')
+      + ' · ' + getStudioParams().def.name;
+    return;
+  }
   hintEl.textContent = formatHour(getHourOfDay())
     + (preset ? ' · ' + preset.name : '');
+}
+
+/* ---------------- face de estúdio: pintura e troca ---------------- */
+
+/* "5600 K" e, no meio da faixa, "6500 K · neutro" — porque o neutro é a única
+   posição desta régua que tem CONSEQUÊNCIA: é a única em que a cor na tela é a
+   cor que o cliente vai receber. Sem o rótulo, o valor exato em que isso vale
+   seria um número escondido no meio de um controle deslizante. */
+function paintTemp(v: number) {
+  const n = clamp(Math.round(num(v, TEMP_NEUTRAL) / 100) * 100,
+    STUDIO_RANGE.temp[0], STUDIO_RANGE.temp[1]);
+  tempInput.value = String(n);
+  tempVal.textContent = n + ' K' + (n === TEMP_NEUTRAL ? ' · neutro' : '');
+  setFill(tempInput, n, STUDIO_RANGE.temp[0], STUDIO_RANGE.temp[1]);
+  tempRow.classList.toggle('is-neutral', n === TEMP_NEUTRAL);
+}
+
+function paintStudio() {
+  const s = getStudioParams();
+  backdropVal.textContent = s.def.name;
+  for (const tile of backdropTiles.querySelectorAll<HTMLElement>('.ts-hud-tile')) {
+    const on = tile.dataset.backdrop === s.backdrop;
+    tile.classList.toggle('is-on', on);
+    tile.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  const paint = (
+    input: HTMLInputElement, val: HTMLElement,
+    v: number, range: readonly [number, number],
+  ) => {
+    const lo = Math.round(range[0] * 100), hi = Math.round(range[1] * 100);
+    const n = clamp(Math.round(num(v, 1) * 100), lo, hi);
+    input.value = String(n);
+    val.textContent = pctText(n);
+    setFill(input, n, lo, hi);
+  };
+  paint(fillInput, fillVal, s.fill, STUDIO_RANGE.fill);
+  paint(rimInput, rimVal, s.rim, STUDIO_RANGE.rim);
+  paint(softInput, softVal, s.softness, STUDIO_RANGE.softness);
+  paintTemp(s.temp);
+  paintHint();
+}
+
+/**
+ * Mostra a face certa. Chamada por syncHud(), que é o que o orquestrador já roda
+ * depois de toda troca de cenário — e uma troca de cenário é exatamente o que
+ * troca de face.
+ *
+ * `.hidden` é `display:none !important` (core/studio.css), então isto funciona
+ * sem que hud.css precise ter opinião nenhuma sobre as linhas novas.
+ */
+function applyFace() {
+  const studio = isStudioPreset();
+  hudRoot.classList.toggle('is-studio', studio);
+  hourRow.classList.toggle('hidden', studio);
+  weatherRow.classList.toggle('hidden', studio);
+  backdropRow.classList.toggle('hidden', !studio);
+  fillRow.classList.toggle('hidden', !studio);
+  rimRow.classList.toggle('hidden', !studio);
+  softRow.classList.toggle('hidden', !studio);
+  tempRow.classList.toggle('hidden', !studio);
+  /* A INTENSIDADE DA CHAVE GANHA CURSO NO ESTÚDIO. 250 % é o teto certo para uma
+     cena externa — acima disso o sol estoura o céu inteiro —, e é apertado
+     demais para uma softbox, onde subir a chave é uma escolha de contraste e não
+     de hora do dia. Mesmo argumento do relato que abriu as outras três faixas:
+     um controle cujo ideal é o batente não é um controle.
+     O input é reescrito em vez de haver dois: são a MESMA grandeza, e um segundo
+     controle deslizante para ela seria a segunda superfície que este arquivo
+     existe para não ter. */
+  const hi = studio ? BRIGHT_MAX_STUDIO : BRIGHT_MAX;
+  if (brightInput.max !== String(hi)) {
+    brightInput.max = String(hi);
+    paintBrightness(num(sceneState.brightness, 1) * 100);
+  }
 }
 
 /* ---------------- collapse ---------------- */
@@ -674,7 +993,34 @@ export function initHud() {
   const host = $opt('canvas-holder') || root;   // template changed under us — degrade
   host.appendChild(hudRoot);
   syncHud();
+
+  /* ---- A FACE NÃO PODE DEPENDER DE ALGUÉM LEMBRAR DE syncHud() ----
+     O cabeçalho deste arquivo já estabelece a regra: tudo é relido DA CENA,
+     porque `applyEnvironment()` reaplica um preset por baixo e o orquestrador só
+     PROMETE chamar syncHud() depois. Enquanto o painel tinha uma face só, uma
+     promessa quebrada custava um controle desatualizado. Com duas faces ela
+     passa a custar o painel INTEIRO errado — hora do dia e clima num ciclorama,
+     que são controles que não fazem nada ali.
+
+     Foi medido: `applyPreset('ciclorama')` chamado de fora do HUD (o console, um
+     preset novo, qualquer caminho que ainda não exista) trocava a luz e deixava
+     a face antiga na tela.
+
+     `onRig` é o sinal certo porque ele dispara em TODA mudança de rig, inclusive
+     nos quadros de crossfade. A guarda de preset é o que o torna barato: no
+     regime, isto é uma comparação de string por quadro e mais nada. */
+  onRig(() => {
+    if (sceneState.preset === lastFacePreset) return;
+    lastFacePreset = sceneState.preset;
+    applyFace();
+    paintPresets();
+    paintStudio();
+  });
 }
+
+/* O preset da última vez que a face foi decidida. `null` força a primeira
+   passagem do gancho acima a rodar, seja qual for o preset de abertura. */
+let lastFacePreset: string | null = null;
 
 /**
  * Re-read the scene into every control. Called by the orchestrator after an
@@ -692,4 +1038,9 @@ export function syncHud() {
   paintAzimuth(sceneState.az);
   paintBrightness(num(sceneState.brightness, 1) * 100);
   paintPresets();
+  /* DEPOIS de paintPresets(): a face é função do preset em cena, e paintPresets()
+     é quem acabou de lê-lo. paintStudio() por último porque ele repinta o
+     resumo do cabeçalho, que depende das duas coisas. */
+  applyFace();
+  paintStudio();
 }

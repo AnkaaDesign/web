@@ -84,6 +84,7 @@ import { applySet, disposeSet, disposeSetTextures } from './set';
 import { setCyclorama } from './cyclorama';
 import type { SetDef, SetMaterialDef } from './set';
 import { loadGLB } from '../vehicle/models';
+import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { EnvironmentDef, RawBlock } from '../catalog/catalog';
 
@@ -531,6 +532,37 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
   /* O set é o único trabalho assíncrono que sobrou aqui. applyEnvironment() só
      pode dizer "pronto" depois que ele estiver na cena. */
   return setP.then(() => undefined);
+}
+
+/**
+ * Começa a baixar o que este cenário vai custar, sem aplicar nada.
+ *
+ * MORA AQUI porque é AQUI que se sabe o que um cenário custa. O bloco `set` do
+ * manifesto chega como `RawBlock` — catalog.ts o repassa sem olhar, de propósito
+ * — e `resolveSet()` é o único validador dele no engine. Um segundo leitor de
+ * `set.url` em ui/selector.ts seria uma segunda definição do formato, e a
+ * próxima mudança de manifesto entraria num lado e não no outro.
+ *
+ * Ordem intencional: o `set` primeiro. Ele é a geometria do cenário e a única
+ * coisa cuja ausência deixa o caminhão flutuando; o HDRI só falta ao reflexo e
+ * ao fundo, e o poste degrada para a primitiva procedural. Com `MAX_IN_FLIGHT`
+ * em 2, quem entra primeiro é quem termina primeiro.
+ *
+ * NÃO É NECESSARIAMENTE COMPLETO, e isso é aceitável: `scene/set.ts` também
+ * baixa os conjuntos PBR de chão que os materiais nomeados do set pedirem, e
+ * esses caminhos só se conhecem depois de o `.glb` estar parseado e os materiais
+ * casados (`bindMaterials`). Aquecer o set — o maior arquivo — já é o grosso da
+ * espera; as texturas de chão são compartilhadas entre cenários e costumam já
+ * estar no cache do navegador.
+ */
+export function prefetchEnvironment(envDef: EnvironmentDef | null | undefined): void {
+  if (!envDef || typeof envDef !== 'object') return;
+  const set = resolveSet(envDef);
+  prefetch([
+    set ? set.url : null,
+    envDef.hdri,
+    envDef.lamps ? path((envDef.lamps as RawBlock).model) : null,
+  ], 'env');
 }
 
 /**

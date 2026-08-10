@@ -87,6 +87,30 @@ export const STUDIO_HTML = /* html */ `
               <circle cx="12" cy="12" r="2.9"/>
             </svg>
           </button>
+          <!-- TELA CHEIA. Vizinha de "esconder a interface" porque as duas são a
+               mesma classe de comando: não mudam o que o caminhão é, mudam o
+               tamanho que a cena ocupa. Juntas elas são o modo apresentação.
+               O ícone é de SETAS DIAGONAIS, e não de cantoneiras, de propósito:
+               #btn-reset ali ao lado já é quatro cantoneiras com um alvo no meio,
+               e dois glifos de canto na mesma régua de 5 botões leriam como o
+               mesmo comando duas vezes.
+               Os dois caminhos moram no MESMO svg e trocam por CSS na classe
+               "on" — um botão que troca de ícone conforme o estado é o mesmo
+               botão, e montar/desmontar svg no clique perderia o foco do
+               teclado. (Sem crase nenhuma neste arquivo: STUDIO_HTML É um
+               template literal, e uma crase de comentário o encerra no meio.)
+               ui/chrome.ts ESCONDE este botão inteiro quando o navegador não tem
+               a API (iPhone não tem fullscreen de elemento): um controle morto na
+               barra é pior do que um controle ausente. -->
+          <button id="btn-full" class="ts-vbtn ts-vbtn--full hidden" type="button"
+                  title="Tela cheia" aria-label="Entrar em tela cheia" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <g class="ts-ico-in"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></g>
+              <g class="ts-ico-out"><path d="M20 10h-6V4M13 11l7-7M4 14h6v6M11 13l-7 7"/></g>
+            </svg>
+          </button>
           <button id="btn-shot" class="ts-vbtn" type="button" title="Baixar imagem"
                   aria-label="Baixar imagem da cena">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
@@ -95,6 +119,25 @@ export const STUDIO_HTML = /* html */ `
               <path d="M3.4 8.8h3.2l1.3-2.2h8.2l1.3 2.2h3.2a.8.8 0 0 1 .8.8v8.2a.8.8 0 0 1-.8.8
                        H3.4a.8.8 0 0 1-.8-.8V9.6a.8.8 0 0 1 .8-.8Z"/>
               <circle cx="12" cy="13.4" r="3.1"/>
+            </svg>
+          </button>
+          <!-- GRAVAR VÍDEO. Vizinho imediato da câmera porque são a mesma
+               pergunta com duas respostas — "levar esta cena embora" como
+               imagem parada ou como movimento —, e separá-los faria procurar.
+               O ícone é uma CÂMERA DE VÍDEO e não um ponto de gravação: um
+               círculo cheio nesta régua leria como o alvo de #btn-reset, e um
+               ponto vermelho parado significa "gravando" em toda interface que
+               existe — dizer isso com o botão em repouso seria mentir. O estado
+               ligado quem mostra é a pílula #ts-rec, que é vermelha de verdade.
+               ui/chrome.ts ESCONDE este botão quando o navegador não tem
+               MediaRecorder ou captureStream (mesma doutrina de #btn-full). -->
+          <button id="btn-rec" class="ts-vbtn hidden" type="button" title="Gravar vídeo"
+                  aria-label="Gravar um vídeo da cena" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <rect x="2.8" y="6.6" width="12.4" height="10.8" rx="2"/>
+              <path d="M15.2 10.6l4.4-2.7a.7.7 0 0 1 1.1.6v7a.7.7 0 0 1-1.1.6l-4.4-2.7Z"/>
             </svg>
           </button>
           <!-- Ajuste da tinta. Fica na MESMA régua dos outros controles de vista
@@ -152,6 +195,43 @@ export const STUDIO_HTML = /* html */ `
             </span>
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
+          <!-- ACABAMENTOS — teto, paralamas, caixa e Thermo King.
+               DENTRO de #ts-panels e como PRIMEIRO filho, e as duas coisas são
+               decisões:
+               · dentro, porque este grupo já se chama "Design do implemento" e
+                 é exatamente o que estas quatro peças são. Um segundo grupo
+                 flutuante na mesma borda seria um quinto material sobre o
+                 render e uma segunda coluna disputando a mesma âncora;
+               · primeiro, porque a pilha é ancorada pela BASE e cresce para
+                 cima — as duas laterais, que é onde a arte de verdade vai,
+                 continuam no mesmo lugar de sempre.
+               É DELIBERADAMENTE MAIS DISCRETO que os três cards de plotagem: uma
+               tira recolhida com o nome e quatro pontinhos de cor, que só abre
+               no clique. Pedido do dono do produto, e ele está certo — plotagem
+               é o que se vem fazer aqui; acabamento é um ajuste.
+               NÃO tem a classe .preview-card: ui/livery-editor.ts liga um clique
+               em TODA .preview-card para abrir o editor de plotagem, e uma
+               tira de acabamento com aquela classe abriria o editor de uma
+               superfície indefinida. (E nenhuma crase neste arquivo — ver a
+               nota do #btn-full: o template é uma string, e uma crase de
+               comentário a encerra no meio.)
+               As linhas são construídas por ui/trim-panel.ts: elas dependem do
+               estado de vehicle/trim.ts e da paleta, nenhum dos dois disponível
+               na avaliação deste template. -->
+          <div id="ts-trim" class="ts-trim" role="group" aria-label="Acabamentos">
+            <button id="ts-trim-toggle" class="ts-trim__head" type="button"
+                    aria-expanded="false" aria-controls="ts-trim-body"
+                    title="Pintar teto, paralamas, caixa e Thermo King">
+              <span class="ts-trim__title">Acabamentos</span>
+              <span id="ts-trim-dots" class="ts-trim__dots" aria-hidden="true"></span>
+              <span class="ts-trim__chev" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     focusable="false"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+              </span>
+            </button>
+            <div id="ts-trim-body" class="ts-trim__body hidden"></div>
+          </div>
         </div>
 
         <!-- O indicador de BOOTSTRAP: o que se vê entre a página abrir e o
@@ -187,6 +267,26 @@ export const STUDIO_HTML = /* html */ `
           <!-- Sem id: o rótulo é fixo, ninguém o reescreve, e um id que só
                existe na markup é um contrato que o tsc não confere. -->
           <div class="spinner small"></div><span>Gerando imagem…</span>
+        </div>
+        <!-- Pílula da GRAVAÇÃO. Terceira da família (#cab-switching, #ts-shot),
+             nó próprio pelo mesmo motivo que aqueles dois: dono separado.
+             Duas diferenças de propósito em relação às irmãs:
+             1. um PONTO que pulsa, e não um spinner. Um spinner diz "espere"; uma
+                gravação não é uma espera, é um estado em que o usuário age — ele
+                está orbitando o caminhão enquanto isto roda. O ponto vermelho é o
+                vocabulário universal disso.
+             2. ela é CLICÁVEL: o botão de parar mora aqui, e não na régua de
+                view controls. Quem está gravando está olhando o vídeo acontecer,
+                e o alvo de "parar" tem de estar onde o olho já está.
+             ELA NÃO ENTRA NO VÍDEO. Overlay de DOM nunca é composto no canvas, e
+             é por isso que ela também NÃO some com .ts-bare — ao contrário dos
+             cards, esconder a interface durante uma gravação não pode esconder a
+             única coisa que diz que existe uma gravação. -->
+        <div id="ts-rec" class="hidden" role="status" aria-live="polite">
+          <span class="ts-recdot" aria-hidden="true"></span>
+          <span id="ts-rec-text">Gravando…</span>
+          <button id="ts-rec-stop" class="ts-recstop" type="button"
+                  aria-label="Parar a gravação">Parar</button>
         </div>
         <div id="view-hint">Arraste para girar · scroll para zoom · botão direito para mover</div>
       </div>

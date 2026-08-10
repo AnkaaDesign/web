@@ -613,6 +613,30 @@
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
+/* ---------- a régua de TEMPERATURA ----------
+   Mesmo argumento da régua de hora, e é o segundo (e último) controle cuja
+   trilha carrega informação em vez de progresso: ela vai de tungstênio a sombra
+   de céu azul, e pintar esse arco diz o que o controle faz antes de qualquer
+   arrasto. Também não é preenchida, pelo mesmo motivo — um preenchimento por
+   cima esconderia justamente o que ele mostra.
+
+   As paradas são as CORES QUE A CENA VAI TER, e não uma escala decorativa:
+   saem de `kelvinTint()` (scene/presets.ts) nos quatro pontos, então a trilha e
+   a luz não podem discordar. O centro é branco puro porque 6500 K é neutro
+   EXATO — é a posição em que a tinta na tela é a tinta que o cliente recebe, e a
+   trilha tem de deixar isso visível. */
+.truck-studio-root .ts-hud-row--temp .ts-hud-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, #ff9d3f 0%, #ffc98a 22%, #ffffff 63%, #cfe0ff 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.truck-studio-root .ts-hud-row--temp .ts-hud-range::-moz-range-track {
+  background: linear-gradient(90deg, #ff9d3f 0%, #ffc98a 22%, #ffffff 63%, #cfe0ff 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+/* No neutro exato a leitura vira accent: é a única posição desta régua com
+   consequência, e ela tem de ser reconhecível de relance na volta. */
+.truck-studio-root .ts-hud-row--temp.is-neutral .ts-hud-row__val { color: var(--accent); }
+
 /* ---------- thumb ----------
    WebKit lays the thumb out relative to the runnable track's top edge, so it needs an
    explicit margin-top of (track - thumb) / 2 = (6 - 14) / 2 = -4px to sit centred. Firefox
@@ -785,14 +809,38 @@
    hud.ts writes `.is-on` and `aria-pressed`; both are matched so the ring cannot desync from
    the accessibility state. Placed after :hover at matching specificity, so it also wins on a
    hovered selected tile. */
+/* `aria-checked` entra ao lado de `aria-pressed` pelo motivo que a nota acima
+   já dá — o anel não pode dessincronizar do estado acessível — e porque as
+   pastilhas de FUNDO são `role=radio` (uma escolha entre quatro, não quatro
+   liga/desliga independentes), e um rádio anuncia `aria-checked`. */
 .truck-studio-root .ts-hud-tile.is-on,
-.truck-studio-root .ts-hud-tile[aria-pressed="true"] {
+.truck-studio-root .ts-hud-tile[aria-pressed="true"],
+.truck-studio-root .ts-hud-tile[aria-checked="true"] {
   border-color: var(--stroke-2);
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   background-color: rgba(34, 197, 94, 0.16);
   color: var(--accent);
 }
+
+/* ---------- as pastilhas de FUNDO não têm CSS próprio, e é o ponto ----------
+   Elas eram um variante: `.ts-hud-tiles--swatch`, com uma amostra `__chip` de
+   largura inteira no lugar do ícone e uma exceção de quebra de linha no nome.
+   Funcionava, e fazia a fileira de fundos ser mais alta e mais pesada que a de
+   clima — as duas se substituem quando o cenário troca, e substituir com outra
+   forma faz o painel parecer que se remontou.
+
+   O dono do produto pediu o contrário, com todas as letras: os cards de fundo
+   *"devem substituir os ícones de chuva, ensolarado etc. das outras cenas, com o
+   mesmo design"*. Então a cor virou um ÍCONE — um disco em `.ts-hud-tile__ico`,
+   mesmo slot de 18px, mesma caixa de 24, mesmo anel em currentColor (ver
+   `backdropIcon()` em ui/hud.ts) — e o rótulo virou uma palavra, como os quatro
+   climas já eram. Zero regra nova aqui embaixo: as duas fileiras compartilham
+   `.ts-hud-tile` inteiro, então nenhuma correção futura pode alcançar uma e
+   esquecer a outra.
+
+   O caso que a borda da amostra antiga resolvia — `Preto` sumindo no vidro
+   escuro do painel — continua resolvido, pelo anel do próprio ícone. */
 
 /* Keyboard focus gets exactly the ring a mouse user sees when selecting. */
 .truck-studio-root .ts-hud-tile:focus-visible {
@@ -821,6 +869,14 @@
   height: 18px;
 }
 .truck-studio-root .ts-hud-tile__ico svg { width: 100%; height: 100%; }
+/* A amostra de cor do fundo do estúdio — ver `backdropIcon()` em ui/hud.ts para
+   por que ela é maior que um glifo de clima: forma se lê pequena, cor precisa de
+   área. É o ÚNICO desvio entre as duas fileiras, e ele é de tamanho, não de
+   estrutura: mesmo slot, mesma pastilha, mesmo tudo abaixo. */
+.truck-studio-root .ts-hud-tile__ico--badge { width: 26px; height: 26px; }
+@media (max-width: 1180px) {
+  .truck-studio-root .ts-hud-tile__ico--badge { width: 22px; height: 22px; }
+}
 
 /* Every tile also carries a `title`, so a name clipped at the narrowest breakpoint is still
    readable on hover rather than lost. */

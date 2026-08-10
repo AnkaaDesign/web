@@ -1,8 +1,11 @@
 # Truck Studio — arquitetura dos cenários
 
 **Isto é um REGISTRO, não um plano.** O que está escrito aqui já foi feito, ou foi
-deliberadamente **não** feito — e nesse caso o motivo está anotado junto. Existe **um**
-item em aberto e ele tem seção própria ([§3](#3-em-aberto--o-skyhdr-nunca-foi-re-assado)).
+deliberadamente **não** feito — e nesse caso o motivo está anotado junto. Existem **dois**
+itens em aberto: o `sky.hdr` do `distrito-industrial`
+([§3](#3-em-aberto--o-skyhdr-nunca-foi-re-assado)) e a quarta face do livery, que
+vive no `PLANO-2026-08-10.md` ao lado — o único bloco que sobrou dele. A entrega
+de 2026-08-10 está registrada na [§9](#9-a-atualização-de-2026-08-10--sete-pedidos-seis-e-meio-entregues).
 
 Este arquivo se chamava `REAL_ENVIRONMENT_PLAN.md` e abria com *"Status: research + plan.
 No code changed yet."* Isso deixou de ser verdade por volta de 2026-08-03. Foi renomeado
@@ -241,3 +244,200 @@ manifesto; e `scene/lamps.ts` (item 5), que ganhou modelo de luminária de verda
 | `engine/scene/lamps.ts` | luminárias — pool distribuído, escala/orientação pela altura do modelo |
 | `engine/catalog/catalog.ts` | tipos do manifesto |
 | `tools/env-build/*.py` | **a fonte dos cenários**: scripts Blender que geram os `set.glb` |
+
+---
+
+## 9. A atualização de 2026-08-10 — sete pedidos, seis e meio entregues
+
+Esta seção é o destino dos blocos que saíram do `PLANO-2026-08-10.md`. O plano
+segue vivo com **um** bloco (7a, a quarta face do livery) e será apagado quando
+ele sair.
+
+O fio que costura os sete pedidos: o estúdio deixou de ser só um visualizador e
+passou a ser uma ferramenta de **produzir material** — imagem, vídeo e uma
+configuração de produto que se grava.
+
+### 9.1 Tela cheia
+`ui/chrome.ts`. O alvo é `root` e nunca `#canvas-holder` — o editor de plotagem é
+IRMÃO de `#app`, e pedir tela cheia no holder o deixaria fora do elemento em tela
+cheia, ou seja invisível. Prefixos `webkit*` porque o Safari só ganhou a API sem
+prefixo na 16.4. Não é persistido, e não pode ser: tela cheia só se pede dentro
+de um gesto do usuário.
+
+### 9.2 Carregamento especulativo
+`core/prefetch.ts`. **Aquece o cache HTTP, não a cena** — é a decisão que torna o
+bloco seguro: um `fetch()` de baixa prioridade põe os bytes no cache e o
+`GLTFLoader` posterior paga só o parse. Zero mudança em `applyChoice`, na fila de
+aplicações ou em `loadCab()`, nenhum dos quais é reentrante. O implemento (31 MB)
+começa a descer com o usuário ainda no passo 1 do seletor.
+
+### 9.3 Estúdio: luz, fundo e imagem sem fundo
+`scene/cyclorama.ts` · `scene/presets.ts` · `ui/hud.ts` · `scene/capture.ts`.
+O HUD ganhou uma segunda FACE (não um segundo painel — ver o cabeçalho de
+`hud.ts` sobre por que duas superfícies escrevendo o mesmo estado mataram a
+sidebar): no cenário Estúdio a hora e o clima somem e entram fundo, preenchimento,
+recorte, difusão e temperatura. As quatro pastilhas de `BACKDROPS` são pares
+(escala da rampa de albedo, exposição) derivados da tabela de medições do
+ciclorama, não escolhidos no olho. A captura ganhou `background: 'recorte'` —
+alfa preservado, `ShadowMaterial` no piso para o veículo não flutuar, e PNG
+forçado porque WebP com perdas franja a borda alfa.
+
+**Correção de 2026-08-10 (pedido do dono do produto):** as pastilhas de fundo
+eram uma variante própria — `.ts-hud-tiles--swatch`, com uma amostra de largura
+inteira e o nome quebrando em duas linhas. As duas fileiras se SUBSTITUEM quando
+o cenário troca, e substituir com outra forma faz o painel parecer que se
+remontou. Agora a cor é um ÍCONE no mesmo slot de 18 px das pastilhas de clima
+(`backdropIcon()`), o rótulo é de uma palavra como os quatro climas já eram, e a
+fileira ficou ao lado da de clima no fim do corpo — mesmo lugar, mesma forma,
+zero CSS próprio. Ver a nota em `ui/hud.css` seção 6.
+
+### 9.4 Rotação: centro garantido e as duas pontas dentro do quadro
+`scene/scene.ts`, bloco "o GIRO DE APRESENTAÇÃO". O botão era uma linha
+(`controls.autoRotate = !controls.autoRotate`) e os três defeitos relatados eram
+todos consequência de ligar o giro **sem mudar de modo**:
+
+1. ele orbita em volta da MIRA, e a coleira `FOCUS_PAN_F` (0,28 · r) deixa
+   arrastá-la ~3 m — órbita excêntrica. Ligar o giro **recentra** a mira
+   (suavizado, τ 0,20 s) e **congela o pan**;
+2. `minDistance` é 0,40 · r (~3,7 m num conjunto de 19 m), e girar de lá varre
+   nariz e traseira para fora. O giro impõe um **piso** igual a
+   `openingDistance(f.r)` — a mesma conta de `frameAll()`, e a esfera é
+   independente de orientação, então vale nos 360°;
+3. `controls.update()` passou a receber o **dt**. Sem argumento o OrbitControls
+   avança o giro por QUADRO, ou seja meia velocidade a 30 fps. É o que torna
+   `turntablePeriod()` uma promessa em vez de uma estimativa — e é dela que a
+   gravação de "uma volta completa" depende.
+
+O percurso é medido em **ÂNGULO** (`turntableTravel()`), não no relógio: um
+contador de tempo mentiria em toda aba que perde quadros, e é justamente durante
+uma gravação que perder quadros é comum.
+
+### 9.5 Gravar vídeo
+`scene/record.ts` — o IRMÃO de `scene/capture.ts`, e eles fazem o oposto um do
+outro. Uma frase explica todas as diferenças: **`captureStream()` captura o
+canvas que é COMPOSTO.** Não há API que transforme um render target em faixa de
+vídeo, então tudo que a gravação quiser mudar na imagem tem de mudar NA TELA e
+ser desfeito no fim — daí a tarja durante a gravação em 1080p, e daí o vídeo não
+ter fundo transparente (nenhum contêiner do `MediaRecorder` carrega alfa de forma
+confiável; o que resolve de verdade é o fundo preto do ciclorama, §9.3).
+
+Dois modos: **Livre** (o usuário orbita, teto de 60 s) e **Volta completa**, que
+liga o giro com `damping: false` — com amortecimento o começo e o fim são
+acelerados e o laço não fecha — e para sozinho ao completar 2π. Durante a volta,
+`suspendAvoidance(true)`: o desvio das construções vira oscilação de altura com o
+período dos galpões, que é a coisa mais visível de um vídeo de 20 s. A suspensão
+é um flag nosso e **não** `setCameraObstacles(null)`, porque a lista é de
+`scene/set.ts` e devolvê-la daqui erraria se o cenário trocasse no meio.
+
+`pinFrames()` entrou em `scene.ts` para a gravação não depender de
+`ON_DEMAND_RENDERING` continuar `false`: um quadro que o laço decide não desenhar
+é um quadro gravado repetido.
+
+O codec é **sondado**, nunca presumido — `isTypeSupported` na ordem mp4/avc1 →
+webm/vp9 → vp8 —, e a extensão sai do contêiner que ganhou, lido de
+`recorder.mimeType` depois do `start()`.
+
+### 9.6 Configurador de acabamentos
+`vehicle/trim.ts` · `ui/trim-panel.ts` · `vehicle/paint.ts`.
+
+**A mudança estrutural do lote foi em `paint.ts`:** ele era um singleton — um
+`const U` de uniformes de módulo compartilhado por todo material de tinta —, e
+pintar o teto de uma cor e o paralama de outra era impossível por construção.
+Virou `PaintInstance`, uma classe com os próprios uniformes, receita e conjunto
+de materiais. **A superfície pública não mudou uma linha** (`setPaint`,
+`getPaintParams`, `makePaintMaterial`, `_sharedPaint` delegam para
+`defaultPaint`), e o GLSL é byte a byte o mesmo — por isso
+`customProgramCacheKey` continua `v5`: o programa compilado É o mesmo, o que
+deixou de ser compartilhado são os VALORES.
+
+Casar por MATERIAL onde há material próprio e por NÓ onde não há, que é a mesma
+conclusão de `trailerPanelMeshes()`. As medições que corrigiram o plano estão em
+`PLANO-2026-08-10.md` §0 — a mais importante: `inox-ferragem` é o material da
+ferragem do implemento INTEIRO (1 559 976 tri, dos quais 3,6 % na caixa), então a
+caixa casa por nó **mais** uma lista branca de materiais.
+
+**A regra que governa tudo: sem cor escolhida, nada muda.** Teto e Thermo King já
+eram pintados junto com o baú e continuam; paralamas e caixa nunca foram e
+continuam como o bake os entregou. Isso é o que torna a funcionalidade puramente
+aditiva — e é o que obriga `applyTrim()` a rodar DEPOIS de `setPaintTarget()`
+(por `onPaintTargetApplied`), porque aquele escreve a cor do baú em toda malha de
+`trailerPanelMeshes()`, teto e TK inclusive.
+
+A interface é **deliberadamente mais discreta que os liveries**: uma tira
+recolhida dentro de `#ts-panels`, com quatro pontinhos que já respondem "de que
+cor está cada peça" sem ninguém abrir nada.
+
+### 9.7 Arte estrutural em SVG — o fim da foto esticada
+`tools/livery-svg/slice.mjs` (offline) · `vehicle/livery-art.ts` +
+`vehicle/livery-structure.ts` (runtime) · `public/models/vehicles/panels/`
+
+O painel do editor era uma FOTO — `panels/lateral.png` (168 kB) e
+`panels/traseira.png` (540 kB) — esticada sobre a janela. Ela mostrava a
+ferragem certa e NÃO redimensionava: um baú de 8,40 m e um de 15,40 m recebiam a
+mesma imagem, então fita 3M, cantoneira e varões esticavam junto. Peças de
+dimensão FIXA desenhadas com dimensão variável.
+
+**O que substitui é uma GRADE 3×3 POR FACE**, recortada da prancha técnica do
+cliente (5,52 MB de export de Illustrator) em 17 SVGs de 2 a 135 kB, mais um
+manifesto `layout.json`:
+
+```
+┌─────────┬───────────────────┬─────────┐
+│ canto   │  banda de TOPO    │ canto   │  altura FIXA, presa ao TETO
+├─────────┼───────────────────┼─────────┤
+│ montante│  JANELA DE ARTE   │ montante│
+├─────────┼───────────────────┼─────────┤
+│ canto   │  banda de BASE    │ canto   │  altura FIXA, presa ao PISO
+└─────────┴───────────────────┴─────────┘
+  largura                       largura
+  FIXA                          FIXA
+```
+
+É a doutrina de `trailer-assembly.ts` (`roof`/`floor`/`stretch`/`follow`) no
+plano da textura. **Não é o formato do arquivo que resolve o problema, é a
+DECOMPOSIÇÃO:** uma foto é uma imagem só, então mudar de tamanho é uma
+transformação afim sobre tudo que ela contém; a grade são 17 retângulos com
+regras diferentes, e "acompanhar a medida" vira reposicioná-los. Ser vetor é o
+que torna isso barato (nítido em qualquer resolução, 368 kB contra 692 kB), mas
+quem conserta é a separação.
+
+**As bandas das laterais LADRILHAM em vez de esticar**, e é o ponto: a fita 3M
+mora dentro delas, com passo medido de 327,27 u = 1,1584 m (14 segmentos, mín =
+máx). Esticar a banda esticaria a fita. Traseira e testeira NÃO ladrilham — lá a
+banda é uma peça desenhada de ponta a ponta, e ladrilhar a repetiria num painel
+de 2,6 m com um ladrilho de 2,4 m.
+
+**DOIS PLANOS.** A foto era uma moldura com a janela vazada, e a ferragem passava
+POR CIMA do desenho — é o que faz um texto atravessado pela borracha aparecer
+cortado no editor do mesmo jeito que sai no baú. A pilha agora tem dois canvas
+por painel: `.ts-structure` atrás do fabric (a chapa) e `.ts-structure--front`
+na frente (a ferragem). As oito células da borda vão para o plano da frente; o
+miolo da frente existe só na traseira, onde há varões, dobradiças e maçanetas
+sobre a área pintável.
+
+**Calibração:** `k = 15400 / 4350,85 = 3,53954 mm/u`. Confere consigo mesma —
+cantoneira 241 + arte 2364 + rodapé 241 = 2846 mm contra os 804,3 u medidos entre
+os dois trilhos = 2847 mm. E o corpo tem a MESMA altura nas quatro faces, com
+divisões diferentes: lateral 241/2364/241, traseira 190/2438/219, testeira
+241/2381/241.
+
+Quatro armadilhas que o corte descobriu, todas silenciosas:
+
+* **os 814 `path` da prancha usam comandos RELATIVOS** — todos. Um recorte que
+  leia o `d` como pares de coordenadas absolutas mantém tudo: 738 caminhos
+  "dentro" de uma janela de 75 × 13,6 u. `h`/`v` são piores, levam UM número e
+  desalinham o resto do caminho;
+* **o fundo da prancha é uma MESA de 7 443 × 5 136** que intersecta toda janela.
+  Sem descartá-la, uma célula do plano da frente tapa o painel inteiro;
+* **a fita corre POR CIMA do rodapé**, então recortar por retângulo traz o cinza
+  junto — daí o descarte por classe (`drop`);
+* **os 8 `<image>` são 4,5 MB dos 5,5 MB**, e dois deles são tiras de
+  14 898 × 284 px correndo a lateral inteira: exatamente a coisa que estica.
+
+**A resolução segue o tamanho EXIBIDO** (`setPanelDisplaySize`, teto 4 096 px,
+histerese de 1,5×). Era impossível com a foto (2 048 px para qualquer baú).
+
+**O que 7b NÃO fez:** a foto ainda é MEDIDA — `findWindow()` acha o vazado dela
+para posicionar a tela do fabric — mas não é mais DESENHADA quando há arte
+(`--ts-pw-img: none`). Trocar essa medição pela do manifesto é o passo seguinte
+e é independente.

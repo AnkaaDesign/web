@@ -353,9 +353,38 @@ export function makeLamps() {
     spot.castShadow = false;                     // perf: light pools only
     lamp.add(spot, spot.target);
 
-    lampUnits.push({ group: lamp, proc, model, lens, spot, active: true });
+    /* NASCE INATIVO, E ISTO É UMA CORREÇÃO DE DEFEITO.
+       -------------------------------------------------------------------
+       Era `active: true`. Um poste recém-criado ainda NÃO FOI POSICIONADO —
+       `placeLamp()` só roda dentro de `applyLampLayout()` —, então ele fica em
+       (0, 0, 0), que é a origem da cena. A origem é exatamente onde o veículo
+       fica. O resultado é oito mastros empilhados DENTRO do caminhão, e foi o
+       "por que tem um poste de luz dentro do caminhão em todos os mapas?" do
+       relatório.
+
+       O estado ficava de pé porque nada aqui o desfazia: `makeLamps()` devolvia
+       o grupo sem chamar `updateLampFixtures()`, e quem apaga um poste inativo é
+       ela. Até a primeira `setLamps()` — que só acontece quando um cenário é
+       aplicado — a pilha inteira ficava visível.
+
+       A correção é de ESTADO, não de gatilho, e é por isso que ela vale para
+       todos os caminhos: um poste na origem nunca é um poste válido em layout
+       nenhum (o `roadside` põe em x = ±offset com |offset| ≥ 1,5 m; o `yard`,
+       numa elipse). Não existindo mais o estado "visível e não posicionado", não
+       importa qual sequência de chamadas leva até ele.
+
+       Cuidado ao mexer: `active` também é lido por `applyRig()` para decidir a
+       intensidade do spot, e o grupo da unidade NUNCA é escondido (o spot mora
+       nele, e escondê-lo mudaria NUM_SPOT_LIGHTS e recompilaria a cena). Quem
+       some é a geometria — proc, model e lens —, que é o que
+       `updateLampFixtures()` escreve. */
+    lampUnits.push({ group: lamp, proc, model, lens, spot, active: false });
     g.add(lamp);
   }
+  /* Aplica o `active: false` acima à geometria AGORA, em vez de esperar a
+     primeira `setLamps()`. Sem esta linha o campo diria "inativo" e a tela
+     mostraria oito postes — o estado que o bloco acima descreve. */
+  updateLampFixtures();
   return g;
 }
 

@@ -45,40 +45,90 @@
    tinha uma azulada, 0x60646b = 96/100/107) é uma mentira sobre a cor que o
    cliente vai receber. */
 import * as THREE from 'three';
-import { scene, invalidate, invalidateShadows, setInteriorBounds, onFrame } from './scene';
+import {
+  scene, invalidate, invalidateShadows, setInteriorBounds, onFrame, onRig, getRig,
+  controls,
+} from './scene';
 
 /* ---------------- medidas, em metros ----------------
    O conjunto cavalo + implemento tem ~19 m de comprimento e ~4 m de altura, e a
    órbita do estúdio chega a ~25 m do centro. Todo número abaixo sai dessas três
    medidas, não de gosto. */
 
-/** Meia-caixa de órbita, EM TORNO DO RIG (ver CENTRO, abaixo). A sala tem de
- *  conter esta caixa inteira, senão a câmera atravessa a parede e o usuário vê o
- *  ciclorama por fora, que é um saco cinza.
- *  Não dava para deixar a órbita solta: `setVehicleFocus()` calcula
- *  `maxDistance` como 2,6x o raio do rig, e num conjunto cavalo + carreta isso
- *  mede 54,7 m — medido no app, não estimado. Uma sala que contivesse 54,7 m em
- *  todas as direções teria 130 m de vão e 60 m de pé-direito para fotografar um
- *  veículo de 19 m, e aí o fundo fica tão longe que volta a não ter gradiente. */
-const HALF = 30;
-const MAX_Y = 20;
+/* ---------------- A SALA SEGUE A ÓRBITA, E NÃO O CONTRÁRIO ----------------
+   ESTE BLOCO ERA UM CONJUNTO DE CONSTANTES E ESSA ERA A CAUSA DE DOIS DEFEITOS
+   RELATADOS DE UMA VEZ: *"o estúdio parece muito pequeno"* e *"a câmera toda
+   hora fica reposicionando sozinha"*.
 
-/** Raio do piso plano. Deixa ~18 m de chão além da ponta do implemento, que é o
- *  que impede a concordância de aparecer atrás do baú num plano aberto. */
-const R_FLOOR = 36;
-/** Raio da concordância piso→parede. Grande de propósito: é ela que faz o fundo
- *  ser "sem emenda". Abaixo de ~8 m a curva vira uma quina visível. */
+   Eram o MESMO bug. As constantes antigas (meia-caixa 30 m, parede a 50 m) foram
+   dimensionadas quando `setVehicleFocus()` limitava a órbita em `2,6 · r` — uns
+   25 m para este conjunto, e o cabeçalho antigo dizia isso com todas as letras.
+   Depois disso a lente da cena passou a abrir em 30° e `maxDistance` virou
+   `max(2,6 · r, openingDistance(r) · 1,15)`, que num rig de 19 m dá ~38 m.
+
+   O resultado é uma BRIGA POR QUADRO, e ela é exatamente o que o usuário vê:
+
+     · o OrbitControls põe a câmera onde a roda do mouse pediu, até 38 m;
+     · o gancho de `setInteriorBounds()` a puxa de volta para dentro de 30 m;
+     · no quadro seguinte o OrbitControls recompõe a órbita a partir da posição
+       corrigida, e recomeça.
+
+   Ou seja: a câmera se reposiciona sozinha porque duas regras discordam sobre
+   onde ela pode estar. E "parece pequeno" é a outra metade da mesma coisa — a
+   parede fica dentro do alcance útil da órbita.
+
+   A CORREÇÃO NÃO É UM NÚMERO MAIOR, é uma DERIVAÇÃO. A sala passa a ser medida a
+   partir do limite de órbita que scene.ts publica (`controls.maxDistance`), com
+   folga; quando o rig muda de tamanho — outro implemento, outra medida — ela
+   acompanha. Um número cravado aqui volta a divergir na próxima vez que alguém
+   mexer na lente, e a próxima vez não vem com aviso. */
+
+/** Folga entre o alcance máximo da órbita e a parede. A câmera nunca pode
+ *  encostar no fundo: a 1 m dele o gradiente vira um borrão chapado. */
+const WALL_CLEARANCE = 14;
+/** Chão além da parede-tangente, para a concordância não aparecer atrás do baú. */
 const R_FILLET = 14;
-/** Onde a parede vertical termina e começa a concordância do teto. */
-const WALL_TOP = 18;
-/** Raio da concordância parede→teto. */
-const R_CEIL = 12;
+/** Piso mínimo, para um rig pequeno não gerar uma sala apertada. */
+const MIN_WALL_R = 50;
 
-const WALL_R = R_FLOOR + R_FILLET;          // 50 m — a parede fica aqui
-const CEIL_Y = WALL_TOP + R_CEIL;           // 30 m — altura do teto plano
+/** Raio da parede, do piso plano, e o resto do perfil — recalculados a cada
+ *  mudança de órbita por `sizeRoom()`. */
+let WALL_R = MIN_WALL_R;
+let R_FLOOR = MIN_WALL_R - R_FILLET;
+let WALL_TOP = 18;
+let R_CEIL = 12;
+let CEIL_Y = 30;
+/** Meia-caixa de órbita, em torno do RIG. Derivada da parede, nunca o contrário. */
+let HALF = 30;
+let MAX_Y = 20;
 
-/* Confere a folga: o canto mais distante da caixa de órbita está a
-   sqrt(30² + 30²) = 42,4 m do centro, contra 50 m de parede. */
+/**
+ * Redimensiona a sala para conter a órbita corrente com folga.
+ *
+ * @returns true se alguma medida mudou o bastante para valer um rebuild.
+ */
+function sizeRoom(): boolean {
+  /* O alcance da órbita É o requisito. `maxDistance` pode vir `Infinity` antes
+     do primeiro `setVehicleFocus()`; aí o mínimo responde. */
+  const reach = Number.isFinite(controls.maxDistance) ? controls.maxDistance : 0;
+  const wall = Math.max(MIN_WALL_R, Math.ceil((reach + WALL_CLEARANCE) / 5) * 5);
+  if (Math.abs(wall - WALL_R) < 1) return false;
+  WALL_R = wall;
+  R_FLOOR = WALL_R - R_FILLET;
+  /* A parede sobe proporcionalmente ao vão: uma sala larga e baixa lê como
+     garagem, não como estúdio. 0,36 mantém a proporção da sala original
+     (18 m de parede para 50 m de raio). */
+  WALL_TOP = Math.round(WALL_R * 0.36);
+  R_CEIL = Math.round(WALL_R * 0.24);
+  CEIL_Y = WALL_TOP + R_CEIL;
+  /* A CAIXA DE ÓRBITA VEM DA PAREDE, com a folga descontada — é isto que acaba
+     com a briga: ela deixa de poder ser menor que `maxDistance`.
+     `/√2` porque a caixa é quadrada e a parede é redonda: o canto da caixa é o
+     ponto mais distante do centro, e é ele que tem de caber. */
+  HALF = Math.floor(((WALL_R - 2) / Math.SQRT2));
+  MAX_Y = Math.max(8, CEIL_Y - 4);
+  return true;
+}
 
 /** Gomos da revolução. 96 não mostra faceta nem no reflexo do cromado. */
 const SEGMENTS = 96;
@@ -140,7 +190,55 @@ const RAMP: Array<[y: number, v: number]> = [
   [30.0, 0.115],  // teto = difusor
 ];
 
+/* A ESCALA DA RAMPA, escolhida pelo usuário na pastilha de "Fundo".
+   ---------------------------------------------------------------------------
+   1 = a rampa exatamente como está escrita acima, que é o estúdio de hoje. Os
+   quatro valores possíveis moram em `BACKDROPS` (scene/presets.ts), junto do
+   raciocínio de por que um fundo claro precisa de mais recorte e menos
+   exposição.
+
+   ELE CHEGA AQUI PELO RIG, e não por uma chamada. `cycloramaAlbedo` é um campo
+   de `RIG_BASE`, então ele atravessa `lerpRig()` como qualquer outro número: a
+   troca de fundo é um crossfade de 0,8 s de graça, e este módulo não precisa ser
+   importado por scene.ts — o que fecharia um ciclo, já que ele importa scene. */
+let albedo = 1;
+
+/* Abaixo disto não se reconstrói. Durante um crossfade `onRig` dispara a cada
+   quadro, e reescrever ~1 200 vértices 48 vezes para uma diferença que ninguém
+   vê é trabalho puro. 1,5 % da faixa é bem menor do que o passo entre duas
+   pastilhas vizinhas (a menor razão é 1,00 → 2,80), então nenhuma troca é
+   perdida — o que se perde são os degraus intermediários do tween, e para uma
+   rampa de albedo isso significa que o fundo assenta em dois ou três saltos
+   suaves em vez de sessenta idênticos. */
+const ALBEDO_STEP = 0.015;
+
+/* A rampa foi medida numa sala de 30 m de pé-direito, e a sala agora acompanha a
+   órbita (ver `sizeRoom`). As duas metades dela NÃO escalam do mesmo jeito, e
+   confundi-las estragaria justamente o que ela foi medida para dar:
+
+   · até ~11 m os valores são ABSOLUTOS. Eles descrevem a relação com o VEÍCULO —
+     "aos 4 m o fundo tem de ficar abaixo da lataria" —, e um caminhão continua
+     tendo 4 m numa sala de 30 ou de 60 m. Escalar esta metade jogaria fora a
+     separação figura/fundo que a tabela de medições existe para garantir.
+   · daí para cima os valores são a subida rumo ao difusor do teto, e essa é
+     PROPORCIONAL ao pé-direito: numa sala mais alta o clareamento tem de
+     acontecer mais devagar, ou o teto começa dentro do quadro. */
+const RAMP_REF_CEIL = 30;
+const RAMP_PIVOT = 11;
+
 function rampAt(y: number): number {
+  const v = rampBase(remapY(y));
+  return v * albedo;
+}
+
+/** Altura real → altura no referencial em que a rampa foi medida. */
+function remapY(y: number): number {
+  if (y <= RAMP_PIVOT || CEIL_Y <= RAMP_PIVOT) return y;
+  const k = (RAMP_REF_CEIL - RAMP_PIVOT) / (CEIL_Y - RAMP_PIVOT);
+  return RAMP_PIVOT + (y - RAMP_PIVOT) * k;
+}
+
+function rampBase(y: number): number {
   if (y <= RAMP[0][0]) return RAMP[0][1];
   const last = RAMP[RAMP.length - 1];
   if (y >= last[0]) return last[1];
@@ -215,19 +313,93 @@ let shell: THREE.Mesh | null = null;
 let shellGeo: THREE.LatheGeometry | null = null;
 let shellMat: THREE.MeshStandardMaterial | null = null;
 
+/* ---------------- o piso "sem sala" ----------------
+   O fundo PRETO (`albedo: 0` em BACKDROPS) não é uma sala escura: é a AUSÊNCIA
+   de sala. A casca some e a cor de limpeza — preta — vira o fundo. O pedido é
+   que a luz fique só no cavalo e no implemento, e uma superfície de fundo, por
+   mais escura que seja, sempre recebe alguma.
+
+   O que NÃO pode sumir junto é a sombra de contato: sem chão o veículo flutua, e
+   um caminhão flutuando sobre preto lê como recorte mal feito. `ShadowMaterial`
+   é o único material do three que escreve SÓ a máscara de sombra — onde não há
+   sombra ele não desenha nada, então ele dá o apoio sem devolver o fundo.
+
+   Ele é irmão do plano de `scene/capture.ts`, e os dois existem separados de
+   propósito: aquele vive DURANTE uma captura de recorte e some depois; este é
+   estado de cena, e fica de pé enquanto o fundo preto estiver escolhido. */
+let floor: THREE.Mesh | null = null;
+
+function ensureFloor(): THREE.Mesh {
+  if (floor) return floor;
+  const geo = new THREE.PlaneGeometry(R_FLOOR * 2, R_FLOOR * 2);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.ShadowMaterial({ opacity: 0.5 });
+  mat.name = 'CICLORAMA_PISO';
+  floor = new THREE.Mesh(geo, mat);
+  floor.name = 'ciclorama-piso';
+  floor.receiveShadow = true;
+  floor.castShadow = false;
+  floor.matrixAutoUpdate = false;
+  floor.updateMatrix();
+  group.add(floor);
+  return floor;
+}
+
+/** `albedo === 0` → sem sala: casca escondida, piso de sombra no lugar. */
+function applyShellMode() {
+  const bare = albedo <= 0;
+  if (shell) shell.visible = !bare;
+  /* O piso só é CONSTRUÍDO quando alguém escolhe o preto — quem nunca usar esse
+     fundo não paga geometria nenhuma por ele. */
+  if (bare) ensureFloor().visible = true;
+  else if (floor) floor.visible = false;
+  invalidateShadows();
+}
+
+/* Reescreve as cores de vértice a partir da rampa e do albedo corrente.
+   ---------------------------------------------------------------------------
+   Um `Float32Array` de ~3 600 floats e um `needsUpdate` — NENHUMA geometria é
+   reconstruída. A forma da sala não depende do fundo: o que muda é só quanta
+   luz cada anel devolve. Fosse um rebuild de `LatheGeometry`, trocar de fundo
+   custaria uma realocação de buffer de GPU por clique. */
+function paintRamp() {
+  if (!shellGeo) return;
+  const pos = shellGeo.getAttribute('position');
+  const col = shellGeo.getAttribute('color') as THREE.BufferAttribute | undefined;
+  const arr = col ? (col.array as Float32Array) : new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const v = rampAt(pos.getY(i));
+    arr[i * 3] = v; arr[i * 3 + 1] = v; arr[i * 3 + 2] = v;   // neutro exato
+  }
+  if (col) col.needsUpdate = true;
+  else shellGeo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+}
+
+/* Refaz a casca com o perfil corrente. Chamado por `build()` e sempre que
+   `sizeRoom()` disser que a sala mudou de tamanho — o que acontece quando o
+   implemento troca de medidas e a órbita cresce com ele.
+   Um `LatheGeometry` de ~1 200 vértices; refazê-lo é barato e acontece uma vez
+   por mudança de rig, não por quadro. */
+function rebuildShell() {
+  if (!shell) return;
+  const old = shellGeo;
+  shellGeo = new THREE.LatheGeometry(buildProfile(), SEGMENTS);
+  paintRamp();
+  shell.geometry = shellGeo;
+  old?.dispose();
+  if (floor) {
+    const g = floor.geometry;
+    floor.geometry = new THREE.PlaneGeometry(R_FLOOR * 2, R_FLOOR * 2).rotateX(-Math.PI / 2);
+    g.dispose();
+  }
+  invalidateShadows();
+}
+
 function build() {
   if (shell) return;
 
   shellGeo = new THREE.LatheGeometry(buildProfile(), SEGMENTS);
-
-  /* rampa de valor nos vértices */
-  const pos = shellGeo.getAttribute('position');
-  const col = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const v = rampAt(pos.getY(i));
-    col[i * 3] = v; col[i * 3 + 1] = v; col[i * 3 + 2] = v;   // neutro exato
-  }
-  shellGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  paintRamp();
 
   shellMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,          // o valor vem inteiro do COLOR_0
@@ -275,8 +447,15 @@ function syncCenter() {
   if (!group.visible) return;
   const rig = scene.getObjectByName('RIG');
   if (!rig) return;
+  /* A SALA É REMEDIDA ANTES DO CENTRO, e o teste dela vem primeiro no `||`:
+     trocar as medidas do implemento muda `maxDistance` sem mexer na posição do
+     rig, e um `return` antecipado pela comparação de x/z deixaria a sala do
+     tamanho antigo — que é a briga entre a órbita e a caixa que este bloco
+     existe para acabar. */
+  const resized = sizeRoom();
+  if (resized) rebuildShell();
   const x = rig.position.x, z = rig.position.z;
-  if (x === lastX && z === lastZ) return;      // só quando muda de verdade
+  if (!resized && x === lastX && z === lastZ) return;
   lastX = x; lastZ = z;
   group.position.set(x, 0, z);                 // y=0: o piso é o piso do mundo
   group.updateMatrixWorld(true);
@@ -297,7 +476,26 @@ function syncCenter() {
 export function setCyclorama(on: boolean) {
   if (on) build();
   group.visible = on;
-  if (on) { lastX = NaN; lastZ = NaN; syncCenter(); }
+  if (on) {
+    /* O albedo é lido do rig ATUAL, e não esperado do próximo `onRig`.
+       O gancho lá embaixo sai cedo enquanto a sala está escondida — que é o
+       estado em cinco dos seis cenários —, então ao acender ela estaria pintada
+       com o albedo da última vez em que esteve visível, ou com o 1 de fábrica
+       numa primeira visita cujo fundo salvo é "Preto". Um quadro com o fundo
+       errado ao trocar de cenário é exatamente o tipo de coisa que aparece na
+       gravação e em mais lugar nenhum. */
+    const want = Math.max(0, getRig()?.cycloramaAlbedo ?? 1);
+    const modeChanged = (want <= 0) !== (albedo <= 0);
+    if (modeChanged || Math.abs(want - albedo) >= ALBEDO_STEP) {
+      albedo = want;
+      if (albedo > 0) paintRamp();
+    }
+    /* SEMPRE, e não só quando mudou: acender a sala é o momento em que casca e
+       piso entram na cena, e qual dos dois fica de pé é função do albedo
+       corrente — inclusive quando ele é o mesmo de antes. */
+    applyShellMode();
+    lastX = NaN; lastZ = NaN; syncCenter();
+  }
   invalidateShadows();
   invalidate();
 }
@@ -306,6 +504,28 @@ export function setCyclorama(on: boolean) {
    O gancho é barato: duas comparações por quadro e nada mais enquanto o rig
    estiver parado, que é o caso em 100% dos quadros fora de uma troca. */
 onFrame(syncCenter);
+
+/* O FUNDO chega por aqui — ver a nota de `albedo`. `onRig` é disparado na
+   inscrição e a cada quadro de crossfade, então a sala acompanha a escolha do
+   usuário sem que scene.ts precise saber que este módulo existe.
+   A guarda de `group.visible` é o que mantém isto grátis nos cinco cenários que
+   não têm ciclorama: lá o gancho lê um número e volta. */
+onRig((rig) => {
+  if (!group.visible || !shellGeo) return;
+  const want = Math.max(0, rig.cycloramaAlbedo);
+  /* O ZERO É EXATO, e não "abaixo do passo": ele é um MODO (sem sala), não um
+     valor baixo. Deixá-lo passar pelo filtro de ALBEDO_STEP faria a troca para
+     preto depender de quão longe o fundo anterior estava — trocar de
+     `cinza-escuro` (1,0) para preto entraria, e de um preto para outro não. */
+  const modeChanged = (want <= 0) !== (albedo <= 0);
+  if (!modeChanged && Math.abs(want - albedo) < ALBEDO_STEP) return;
+  albedo = want;
+  if (modeChanged) applyShellMode();
+  if (albedo > 0) paintRamp();
+  /* A sala é o que recebe a sombra do veículo, e o valor dela acabou de mudar —
+     o mapa não muda, mas o quadro sim. */
+  invalidate();
+});
 
 /** @returns {boolean} */
 export const isCycloramaOn = () => group.visible;
@@ -316,6 +536,12 @@ export function disposeCyclorama() {
   shellGeo?.dispose();
   shellMat?.dispose();
   shell = null; shellGeo = null; shellMat = null;
+  if (floor) {
+    group.remove(floor);
+    floor.geometry.dispose();
+    (floor.material as THREE.Material).dispose();
+    floor = null;
+  }
   group.visible = false;
   invalidate();
 }

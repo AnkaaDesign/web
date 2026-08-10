@@ -278,28 +278,52 @@ export function defaultLayers(panel: PanelSpec): LiveryLayer[] {
      traseira na SIDE_L e a dianteira na SIDE_R (ver `anchor` em LiveryLayer). */
   const anchor: 'start' | 'end' = face === 'left' ? 'end' : 'start';
 
-  /* Faixa refletiva. Uma presa ao PISO e outra presa ao TETO — nenhuma das duas
-     estica com a altura, porque no 3D elas não esticam: a de baixo é `floor` e
-     a de cima anda junto com o teto (`roof`). Ver `TrailerAssembly`. */
-  for (const [id, y] of [
-    ['stripe-low', FITA_LOW_Y],
-    ['stripe-high', height - FITA_HIGH_DROP],
-  ] as const) {
+  /* ---- A FITA E A CANTONEIRA SÃO PEÇAS DAS LATERAIS, E SÓ DELAS ----
+     Isto era aplicado a TODAS as faces, e na traseira produzia um defeito
+     visível: uma fileira de fita 3M e uma barra cinza atravessando o topo das
+     portas — o "que é essa marca cinza logo abaixo da borracha do livery da
+     traseira?" do relatório.
+
+     As sete constantes acima foram medidas no material `Faixa-3M` e no perfil
+     `metal-galvanizado-mantido` DA LATERAL, e o cabeçalho delas diz isso com
+     todas as letras ("a fita SUPERIOR do modelo são só dois segmentos de canto
+     POR LATERAL"). Nenhuma foi medida na traseira, e a traseira não tem o que
+     elas descrevem: o topo dela é o marco das portas, não uma cantoneira
+     corrida, e o para-choque hachurado de baixo não é fita de passo 583,9 mm.
+
+     Aplicá-las ali era desenhar uma peça que não existe, POR CIMA de uma que
+     existe — a mesma classe de erro que o `scope: 'preview'` deste arquivo
+     evita no 3D, cometida entre 2D e 2D.
+
+     A FRENTE fica de fora pelo mesmo motivo e com uma diferença: lá ninguém
+     mediu ainda. Quando a quarta face entrar, o que decide se ela leva fita e
+     cantoneira é uma medição no bake, não a herança desta lista. */
+  const flank = face === 'left' || face === 'right';
+
+  if (flank) {
+    /* Faixa refletiva. Uma presa ao PISO e outra presa ao TETO — nenhuma das
+       duas estica com a altura, porque no 3D elas não esticam: a de baixo é
+       `floor` e a de cima anda junto com o teto (`roof`). Ver `TrailerAssembly`. */
+    for (const [id, y] of [
+      ['stripe-low', FITA_LOW_Y],
+      ['stripe-high', height - FITA_HIGH_DROP],
+    ] as const) {
+      layers.push({
+        id, kind: 'stripe',
+        source: { kind: 'svg', markup: '' },   // preenchido no render pelo placeholder
+        rect: { x: 0, y, w: length, h: FITA_H },
+        repeat: { pitch: FITA_PITCH, span: FITA_SEG, anchor },
+      });
+    }
+
+    /* Cantoneira de topo — o perfil galvanizado que corre o painel lateral
+       inteiro. Presa ao TETO, como no 3D. */
     layers.push({
-      id, kind: 'stripe',
-      source: { kind: 'svg', markup: '' },   // preenchido no render pelo placeholder
-      rect: { x: 0, y, w: length, h: FITA_H },
-      repeat: { pitch: FITA_PITCH, span: FITA_SEG, anchor },
+      id: 'frame-top', kind: 'frame',
+      source: { kind: 'svg', markup: '' },
+      rect: { x: 0, y: height - CANTONEIRA_DROP, w: length, h: CANTONEIRA_H },
     });
   }
-
-  /* Cantoneira de topo — o perfil galvanizado que corre o painel lateral
-     inteiro. Presa ao TETO, como no 3D. */
-  layers.push({
-    id: 'frame-top', kind: 'frame',
-    source: { kind: 'svg', markup: '' },
-    rect: { x: 0, y: height - CANTONEIRA_DROP, w: length, h: CANTONEIRA_H },
-  });
 
   /* A porta nasce no BATENTE, não no piso — ver `doorSill`. A traseira é a
      exceção: lá as portas são as do bake, do piso ao teto, e não há batente de

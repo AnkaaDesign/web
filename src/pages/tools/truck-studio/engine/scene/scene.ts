@@ -154,12 +154,31 @@ import {
 import {
   VIEW_DIR as CARD_VIEW_DIR, FOV as CARD_FOV, TARGET_H as CARD_TARGET_H,
 } from './view';
-import { LIGHT_PRESETS, RIG_BASE, COLOR_FIELDS, NUM_FIELDS, makeRig } from './presets';
-import type { Rig } from './presets';
+import {
+  LIGHT_PRESETS, RIG_BASE, COLOR_FIELDS, NUM_FIELDS, makeRig,
+  /* `BACKDROPS` NÃO entra aqui: scene.ts não itera a lista, só resolve um id
+     (`backdropOf`) e conhece o padrão. Ela é reexportada logo abaixo para o
+     HUD, e reexportar não consome o binding — importá-la sem usar seria um
+     `noUnusedLocals`. */
+  DEFAULT_BACKDROP, backdropOf,
+  kelvinTint, TEMP_NEUTRAL, TEMP_MIN, TEMP_MAX,
+} from './presets';
+
+/* Reusado a cada resolveRig() de estúdio — que roda por quadro durante um
+   crossfade. Um THREE.Color novo por quadro é lixo por nada. */
+const _tempTint = new THREE.Color();
+import type { Rig, BackdropDef } from './presets';
 
 /* Re-exported so the engine's public surface is unchanged by the split:
    environment.ts and ui/hud.ts import all of these from this module. */
 export { LIGHT_PRESETS, PRESET_ORDER } from './presets';
+/* Idem para os fundos do estúdio: ui/hud.ts monta as pastilhas a partir desta
+   lista, e ele já importa tudo que é de luz DAQUI. Fazê-lo buscar metade em
+   scene.ts e metade em presets.ts seria pedir que a UI conhecesse o corte
+   interno do módulo de cena. */
+export { BACKDROPS, DEFAULT_BACKDROP, backdropOf } from './presets';
+export { TEMP_NEUTRAL, TEMP_MIN, TEMP_MAX } from './presets';
+export type { BackdropDef } from './presets';
 export { setLamps, setLampModel } from './lamps';
 
 export const holder = $('canvas-holder');
@@ -959,6 +978,59 @@ function resolveRig(st: SceneState) {
   rig.keyAz = st.az;
   rig.keyEl = st.el;
   rig.keyIntensity *= st.brightness;
+
+  /* ---- A CAMADA DE ESTÚDIO ----
+     Só nos presets marcados `studio: true` (hoje, só o `ciclorama`). Ela entra
+     AQUI, no fim de resolveRig(), e não em applyRig(), por três consequências
+     que saem de graça: o resultado atravessa `lerpRig()` — então trocar de fundo
+     é um crossfade e não um salto —, entra no `envKey()` do cache de IBL pela
+     mesma porta que todo o resto, e chega aos assinantes de `onRig()`, que é
+     como cyclorama.ts fica sabendo do albedo novo sem ninguém importá-lo.
+
+     São MULTIPLICADORES sobre o que o preset autorou, nunca valores absolutos:
+     o `ciclorama` foi calibrado por medição (ver o cabeçalho dele), e um
+     controle que substituísse aqueles números jogaria a calibração fora no
+     primeiro arrasto. Com multiplicador, o meio da faixa É o preset. */
+  if (LIGHT_PRESETS[id].studio) {
+    const bd = backdropOf(st.backdrop);
+    rig.cycloramaAlbedo = bd.albedo;
+    rig.exposure *= bd.exposure;
+    /* O fundo e a névoa andam JUNTOS — são a mesma coisa vista a duas
+       distâncias, e deixá-los divergir é o que produz uma emenda no horizonte
+       (a mesma razão já anotada no bloco dourado logo acima). As bandas do céu
+       vão junto porque, num cenário sem sala, o domo é o que sobra de fundo. */
+    rig.bgColor.setHex(bd.bg);
+    rig.fogColor.setHex(bd.bg);
+    rig.skyTop.setHex(bd.bg);
+    rig.skyMid.setHex(bd.bg);
+    rig.skyHorizon.setHex(bd.bg);
+    /* O RECORTE é a única luz que ainda desenha um contorno quando figura e
+       fundo têm o mesmo valor, então ele carrega DOIS fatores: o do fundo (que
+       sobe sozinho no claro) e o do usuário. */
+    rig.rimIntensity *= bd.rim * st.rim;
+    /* O PREENCHIMENTO é hemi + ambiente movidos como um só. São a chapa branca
+       do outro lado e a luz que chega igual em toda face: separá-los em dois
+       controles daria ao usuário dois jeitos de achatar a mesma imagem. */
+    rig.hemiIntensity *= st.fill;
+    rig.ambientIntensity *= st.fill;
+    /* A DIFUSÃO da sombra é o que lê como "tamanho da softbox" — o único
+       parâmetro do rig que fala de tamanho de fonte de luz. */
+    rig.shadowRadius *= st.softness;
+    /* TEMPERATURA: a CHAVE e o PREENCHIMENTO, nunca o recorte.
+       Num set real a key e a chapa de rebatimento são a MESMA lâmpada vista de
+       dois lados, então esfriar uma e não a outra seria fisicamente estranho. O
+       recorte é o kicker — uma segunda fonte, autorada fria de propósito para
+       separar a lataria do fundo —, e arrastá-lo junto apagaria a única
+       dominante deliberada da cena. Ver o cabeçalho do preset `ciclorama`.
+       Multiplica, não substitui: em 6500 K o multiplicador é (1,1,1) exato e
+       isto é uma operação nula, o que mantém o neutro do preset intacto. */
+    if (st.temp !== TEMP_NEUTRAL) {
+      kelvinTint(st.temp, _tempTint);
+      rig.keyColor.multiply(_tempTint);
+      rig.hemiSky.multiply(_tempTint);
+      rig.ambientColor.multiply(_tempTint);
+    }
+  }
   return rig;
 }
 
@@ -1066,6 +1138,27 @@ export const LIGHT_DEFAULTS = {
      syncSunToHour() for the full override policy. */
   az: sunAngles(OPEN_HOUR).az, el: sunAngles(OPEN_HOUR).el, brightness: 1,
   azManual: false, elManual: false,
+  /* ---- estúdio ----
+     Lidos só pelos presets `studio: true` (ver a camada em resolveRig). Ficam
+     NESTE objeto, e não numa segunda chave de localStorage, pelo mesmo motivo
+     que ui/hud.ts dá para não persistir a luz duas vezes: duas fontes de verdade
+     para o mesmo estado exigem uma ordem de boot que decida qual ganha.
+
+     E a CHAVE NÃO SOBE PARA v6. O bloco acima explica a regra — restore() valida
+     e limita cada campo em separado, então um blob v5 sem estes três campos
+     entra com os defaults e funciona. Subir a versão jogaria fora o preset, a
+     hora e o brilho de todo mundo para resolver um problema que o leitor
+     validante já resolve. É a mesma decisão que manteve v3 quando o relógio
+     entrou. */
+  backdrop: DEFAULT_BACKDROP,
+  /** preenchimento (hemi + ambiente), como fração do que o preset autorou */
+  fill: 1,
+  /** recorte (rim), idem */
+  rim: 1,
+  /** difusão da sombra (o "tamanho da softbox"), idem */
+  softness: 1,
+  /** temperatura de cor em Kelvin; 6500 = neutro exato, e é o padrão */
+  temp: TEMP_NEUTRAL,
 };
 export const sceneState = { ...LIGHT_DEFAULTS };
 
@@ -1889,6 +1982,105 @@ export function setLightParams(
 }
 
 
+/* ---------------- os controles de ESTÚDIO ----------------
+   A luz de uma sala de estúdio não tem hora do dia nem clima — tem fundo, chave,
+   preenchimento, recorte e difusão. São conceitos DIFERENTES dos de uma cena
+   externa, e é por isso que o HUD troca de face em vez de acrescentar mais
+   linhas: "Hora do dia" num ciclorama é um controle que não pode significar
+   nada.
+
+   O QUE **NÃO** GANHOU CONTROLE, e de propósito: a COR da chave. Esta é a cena
+   em que se julga uma tinta, e o preset a autora em R=G=B exato justamente para
+   não mentir sobre a cor que o cliente vai receber (ver o cabeçalho do
+   `ciclorama`). Um seletor de cor de luz aqui seria a primeira coisa a
+   invalidar o cenário inteiro. Quem quiser luz colorida tem os cenários
+   externos e o ciclo do dia. */
+
+/** As faixas dos três multiplicadores. FONTE ÚNICA — restore() e ui/hud.ts
+ *  leem daqui, e um limite escrito duas vezes é um limite que diverge. */
+/* AS FAIXAS FORAM ABERTAS DEPOIS DE UM RELATO, e o relato é o argumento:
+   *"os controles de iluminação do estúdio estão muito sutis — pra ficar ideal o
+   preenchimento está no máximo, e eu gostaria de poder dar uma extravasada"*.
+
+   Um controle cujo IDEAL é o batente está mal dimensionado por definição: ele
+   não oferece escolha, oferece um degrau. O erro foi tratar o valor autorado
+   como o CENTRO da faixa — o `ciclorama` é calibrado para uma foto de catálogo
+   sóbria, e uma faixa simétrica em torno dele só permite ficar mais sóbrio.
+
+   Agora o autorado (1,0) fica no PRIMEIRO QUARTO e o resto é folga para exagerar
+   de propósito. O mínimo continua sendo zero de verdade — "sem preenchimento" e
+   "sem recorte" são posições legítimas, e são elas que dão a foto de contraste
+   duro. */
+export const STUDIO_RANGE = {
+  /** preenchimento: de só-chave a completamente chapado */
+  fill: [0, 5] as const,
+  /** recorte: de nenhum a um contorno declaradamente exagerado */
+  rim: [0, 5] as const,
+  /** difusão da sombra: de contato duro a softbox de parede inteira */
+  softness: [0.15, 6] as const,
+  /** temperatura de cor, em Kelvin. 6500 é neutro exato — ver kelvinTint(). */
+  temp: [TEMP_MIN, TEMP_MAX] as const,
+};
+
+/** Este preset é uma sala de estúdio? É o que decide a face do HUD. */
+export const isStudioPreset = (id?: string | null): boolean =>
+  !!LIGHT_PRESETS[id || sceneState.preset]?.studio;
+
+export interface StudioParams {
+  backdrop?: string;
+  fill?: number;
+  rim?: number;
+  softness?: number;
+  /** Kelvin. `TEMP_NEUTRAL` (6500) não tinge nada. */
+  temp?: number;
+}
+
+/**
+ * Fundo e as três luzes do estúdio.
+ *
+ * MESMA POLÍTICA DE ANIMAÇÃO de setLightParams(), e pelo mesmo motivo: um
+ * arrasto de controle deslizante tem de acompanhar o polegar, e um tween ficaria
+ * atrás dele. A exceção é o FUNDO, que é uma chave discreta e não um arrasto —
+ * as quatro pastilhas são um crossfade, exatamente como as de clima. É por isso
+ * que a decisão de animar é tomada por CAMPO e não pelo chamador.
+ */
+export function setStudioParams(p: StudioParams, opts?: { animate?: boolean }) {
+  const clamp = (v: number, [lo, hi]: readonly [number, number]) =>
+    THREE.MathUtils.clamp(v, lo, hi);
+  let discrete = false;
+  if (p.backdrop !== undefined) {
+    const bd = backdropOf(p.backdrop);
+    discrete = discrete || bd.id !== sceneState.backdrop;
+    sceneState.backdrop = bd.id;
+  }
+  if (p.fill !== undefined && Number.isFinite(+p.fill)) {
+    sceneState.fill = clamp(+p.fill, STUDIO_RANGE.fill);
+  }
+  if (p.rim !== undefined && Number.isFinite(+p.rim)) {
+    sceneState.rim = clamp(+p.rim, STUDIO_RANGE.rim);
+  }
+  if (p.softness !== undefined && Number.isFinite(+p.softness)) {
+    sceneState.softness = clamp(+p.softness, STUDIO_RANGE.softness);
+  }
+  if (p.temp !== undefined && Number.isFinite(+p.temp)) {
+    sceneState.temp = clamp(+p.temp, STUDIO_RANGE.temp);
+  }
+  beginTween(opts?.animate ?? discrete);
+  save();
+  return getStudioParams();
+}
+
+export function getStudioParams(): Required<StudioParams> & { def: BackdropDef } {
+  return {
+    backdrop: sceneState.backdrop,
+    fill: sceneState.fill,
+    rim: sceneState.rim,
+    softness: sceneState.softness,
+    temp: sceneState.temp,
+    def: backdropOf(sceneState.backdrop),
+  };
+}
+
 /**
  * Show/hide the procedural gradient dome. An HDRI background is drawn by
  * WebGLBackground with depthTest off, so the dome (a BackSide sphere at r=340
@@ -2137,7 +2329,11 @@ export function setInteriorBounds(
      the flank also lets you sit inside the van from the front. So the camera is
      pushed back out of the bodywork every frame, on whichever of X/Z is nearer.
      Never on Y — ejecting downwards would put the camera under the floor. */
-let vehicleFocus: { c: THREE.Vector3; box: THREE.Box3; r: number } | null = null;
+let vehicleFocus: {
+  c: THREE.Vector3; box: THREE.Box3; r: number;
+  /** A MIRA de frameAll(), guardada — ver o porquê em setVehicleFocus(). */
+  aim: THREE.Vector3;
+} | null = null;
 let vehicleFocusHooked = false;
 /* minDistance, as a fraction of the rig radius. Estava em 0.30, que num rig de
    ~18 m deixava a câmera chegar a ~2.8 m do centro — perto o bastante para o
@@ -2201,7 +2397,17 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
   placeKeyLight();
   renderer.shadowMap.needsUpdate = true;
   const r = Math.max(2, box.getSize(new THREE.Vector3()).length() / 2);
-  vehicleFocus = { c, box: box.clone().expandByScalar(FOCUS_SKIN), r };
+  /* A MIRA, e ela NÃO é `c`. frameAll() mira a 48 % da altura da caixa
+     (CARD_TARGET_H) e não no centro geométrico — mirar no meio inclina a câmera
+     para baixo e devolve por outro caminho a vista de cima que VIEW_DIR tirou
+     (ver view.ts). Guardar aqui é o que permite ao giro de apresentação
+     RECENTRAR exatamente onde "enquadrar" recentraria, em vez de inventar um
+     segundo centro que discordaria dele em alguns centímetros.
+     Medida na caixa CRUA: `box` não foi tocado — o `FOCUS_SKIN` abaixo é
+     aplicado num clone. */
+  const aim = c.clone();
+  aim.y = box.min.y + (box.max.y - box.min.y) * CARD_TARGET_H;
+  vehicleFocus = { c, box: box.clone().expandByScalar(FOCUS_SKIN), r, aim };
   controls.minDistance = r * FOCUS_MIN_F;
   /* O limite de afastamento nunca pode ficar aquém da própria pose de abertura,
      senão o clamp do OrbitControls desfaz frameAll() no primeiro quadro. Num
@@ -2247,6 +2453,175 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
       else p.z = (p.z - b.min.z < b.max.z - p.z) ? b.min.z : b.max.z;
     }
   });
+}
+
+/* ---------------- o GIRO DE APRESENTAÇÃO ----------------
+   O botão "girar" existia como uma linha em ui/chrome.ts:
+
+       controls.autoRotate = !controls.autoRotate;
+
+   e é essa linha que produz os três defeitos relatados — "nem sempre está no
+   centro", "as duas pontas nem sempre dentro da cena". Nenhum deles é do
+   OrbitControls; os três são consequências de ligar o giro sem MUDAR DE MODO.
+
+   1. ELE ORBITA EM VOLTA DA MIRA, E A MIRA ANDA. `FOCUS_PAN_F` (0,28 · r) é uma
+      coleira, não uma âncora: dentro dela o botão direito arrasta a mira uns
+      três metros para o lado. Um giro em torno de uma mira deslocada é uma
+      órbita excêntrica — o caminhão varre a tela em vez de girar no lugar. Por
+      isso ligar o giro RECENTRA a mira e CONGELA o pan enquanto ele roda.
+
+   2. O ZOOM PRÓXIMO CORTA AS PONTAS. `minDistance` é 0,40 · r (~3,7 m num
+      conjunto de 19 m), e é assim de propósito: é o que permite chegar perto
+      para conferir a arte. Só que a 3,7 m um conjunto de 19 m não cabe em
+      nenhum azimute, e girar de lá varre nariz e traseira para fora do quadro.
+      Então o giro impõe um PISO de distância — e o piso não é um número novo, é
+      `openingDistance(f.r)`, exatamente a mesma conta que frameAll() usa para
+      pousar a câmera. Consequência: quem não deu zoom não vê nada se mexer, e
+      quem deu vê a câmera recuar até o enquadramento de abertura.
+      A ESFERA É INDEPENDENTE DE ORIENTAÇÃO, então esse piso vale nos 360°: não
+      existe azimute em que o conjunto caiba pior do que na conta.
+
+   3. AS DUAS CORREÇÕES SÃO SUAVIZADAS, e aqui a suavização é permitida — ao
+      contrário da expulsão da carroceria lá em cima, que tem de ser imediata.
+      A diferença é o que cada uma é: aquela é uma PAREDE (a câmera não pode
+      estar dentro do baú, nem por um quadro), esta é uma PREFERÊNCIA DE
+      ENQUADRAMENTO. Um salto de três metros ao apertar "girar" leria como
+      defeito.
+
+   POR QUE `controls.update(dt)` PASSOU A RECEBER O dt (ver o laço lá embaixo):
+   sem argumento, o OrbitControls avança o giro por QUADRO
+   (`2π/60/60 · autoRotateSpeed`), não por segundo — a 30 fps o caminhão gira
+   pela metade da velocidade. Com o dt, o giro passa a ser função do RELÓGIO. A
+   60 fps nada muda (as duas fórmulas dão o mesmo), então isto não é um ajuste
+   de gosto: é a correção que torna `turntablePeriod()` uma promessa em vez de
+   uma estimativa — e é dela que a gravação de "uma volta completa" depende. */
+
+/** Velocidade de fábrica. Período = 60/velocidade → 50 s por volta. */
+const TURN_SPEED_DEFAULT = 1.2;
+/** Constante de tempo da recentragem e do recuo, em segundos. */
+const TURN_EASE_TAU = 0.20;
+/** Abaixo disto a correção acabou; sem o encaixe ela persegue o alvo para sempre. */
+const TURN_SNAP = 1e-4;
+
+const _turnV = new THREE.Vector3();
+let turnPanWas = true;
+let turnDampWas = true;
+let turnHooked = false;
+/** Radianos acumulados desde que o giro foi ligado. Com SINAL. */
+let turnTravel = 0;
+let turnLastAz = 0;
+
+export interface TurntableOptions {
+  /**
+   * `autoRotateSpeed` do three. Negativo inverte o sentido. Período em segundos
+   * = 60 / |velocidade|. Ausente = mantém a atual.
+   */
+  speed?: number;
+  /**
+   * `false` desliga o amortecimento enquanto o giro roda.
+   *
+   * Serve a UM caso e só a ele: uma gravação de volta completa. Com damping, o
+   * início e o fim do giro são acelerados e desacelerados, então o primeiro e o
+   * último quadro não coincidem e o vídeo não fecha o laço. Fora de uma
+   * gravação o damping FICA — ele é o que faz o arrasto manual ter inércia, e
+   * tirá-lo mudaria o tato de toda a órbita.
+   */
+  damping?: boolean;
+}
+
+function turntableFrame(dt: number) {
+  if (!controls.autoRotate) return;
+
+  /* O quanto já girou, medido no ÂNGULO e não no relógio. Um contador de tempo
+     mentiria em toda aba que perde quadros — e é justamente numa gravação, com
+     a GPU ocupada, que perder quadros é comum. O desembrulho de ±π é obrigatório:
+     `getAzimuthalAngle()` volta em (-π, π] e a passagem pela descontinuidade
+     somaria uma volta inteira de uma vez. */
+  const az = controls.getAzimuthalAngle();
+  let d = az - turnLastAz;
+  if (d > Math.PI) d -= 2 * Math.PI;
+  else if (d < -Math.PI) d += 2 * Math.PI;
+  turnTravel += d;
+  turnLastAz = az;
+
+  const f = vehicleFocus;
+  if (!f) return;
+  /* Suavização exponencial com o dt de verdade: a correção anda igual a 30 e a
+     60 fps, ao contrário de um `lerp(0.1)` por quadro. */
+  const k = 1 - Math.exp(-dt / TURN_EASE_TAU);
+
+  if (!controls.target.equals(f.aim)) {
+    controls.target.lerp(f.aim, k);
+    if (controls.target.distanceToSquared(f.aim) < TURN_SNAP) controls.target.copy(f.aim);
+  }
+
+  const floor = openingDistance(f.r);
+  _turnV.subVectors(camera.position, controls.target);
+  const dist = _turnV.length();
+  if (dist > 1e-6 && dist < floor - TURN_SNAP) {
+    _turnV.setLength(dist + (floor - dist) * k);
+    camera.position.copy(controls.target).add(_turnV);
+  }
+}
+
+/**
+ * Liga ou desliga o giro de apresentação.
+ *
+ * É o ÚNICO dono de `controls.autoRotate`. Escrever a flag direto ainda
+ * funciona — `wantsFrame()` a lê e o laço passa a desenhar —, mas pula a
+ * recentragem, o congelamento do pan e o piso de distância, ou seja devolve
+ * exatamente os três defeitos que esta função existe para consertar.
+ *
+ * Idempotente: chamar com o mesmo estado só aplica a velocidade.
+ */
+export function setTurntable(on: boolean, opts: TurntableOptions = {}) {
+  const speed = opts.speed;
+  if (typeof speed === 'number' && Number.isFinite(speed) && speed !== 0) {
+    controls.autoRotateSpeed = speed;
+  } else if (!controls.autoRotateSpeed) {
+    controls.autoRotateSpeed = TURN_SPEED_DEFAULT;
+  }
+
+  const want = !!on;
+  if (want === controls.autoRotate) { invalidate(); return; }
+  controls.autoRotate = want;
+
+  if (want) {
+    /* Guardados para serem DEVOLVIDOS, e não presumidos: o pan pode já estar
+       desligado por outro motivo no dia em que houver um, e restaurar para um
+       `true` cravado religaria algo que ninguém pediu. */
+    turnPanWas = controls.enablePan;
+    turnDampWas = controls.enableDamping;
+    controls.enablePan = false;
+    if (opts.damping === false) controls.enableDamping = false;
+    turnTravel = 0;
+    turnLastAz = controls.getAzimuthalAngle();
+    if (!turnHooked) { turnHooked = true; frameHooks.push(turntableFrame); }
+  } else {
+    controls.enablePan = turnPanWas;
+    controls.enableDamping = turnDampWas;
+  }
+  invalidate();
+}
+
+export const isTurntable = () => controls.autoRotate;
+
+/** Radianos girados desde que o giro foi ligado. Com sinal; 2π é uma volta. */
+export const turntableTravel = () => turnTravel;
+
+/** Segundos por volta na velocidade atual. `Infinity` com o giro parado. */
+export const turntablePeriod = () =>
+  (controls.autoRotateSpeed ? 60 / Math.abs(controls.autoRotateSpeed) : Infinity);
+
+/**
+ * Ajusta a velocidade PELO PERÍODO — que é como um vídeo pensa ("uma volta em
+ * 12 segundos"), e não como o three pensa. O sentido é preservado.
+ */
+export function setTurntablePeriod(seconds: number) {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s <= 0) return;
+  const sign = controls.autoRotateSpeed < 0 ? -1 : 1;
+  controls.autoRotateSpeed = sign * (60 / s);
 }
 
 /* ---------------- desvio das construções ----------------
@@ -2531,6 +2906,36 @@ function trackAvoidance(trueDist: number, floor: number) {
   cutTarget = Math.min(trueDist - allowed, trueDist * CUT_MAX_F);
 }
 
+/* ---------------- suspender o desvio ----------------
+   NUMA VOLTA COMPLETA O DESVIO É UM ARTEFATO, e fora dela não é. `distrito-
+   industrial` tem galpões espalhados pelo pátio; numa órbita de 360° a câmera
+   passa por trás de vários, e a correção sobe e aproxima a cada um. Parado ou
+   arrastando à mão isso é uma melhoria de enquadramento — evita a parede na
+   frente do caminhão. Numa volta gravada vira uma oscilação de altura com o
+   período dos prédios, que é a coisa mais visível de um vídeo de 20 segundos.
+
+   NÃO É `setCameraObstacles(null)`, e isto é deliberado. A lista de obstáculos é
+   de scene/set.ts, que a escreve a cada troca de cenário; zerá-la daqui
+   obrigaria a gravação a guardar e devolver um estado de OUTRO módulo — e a
+   errar quando o cenário trocasse no meio (a devolução restauraria a lista do
+   cenário anterior). Uma suspensão é um flag nosso sobre um estado que continua
+   sendo de quem sempre foi. */
+let avoidSuspended = false;
+
+/**
+ * Pausa o desvio das construções sem tocar na lista de obstáculos.
+ *
+ * Sempre em par, com o `false` num `finally`. Soltar força um novo raio no
+ * quadro seguinte: a câmera pode ter dado a volta inteira e parado exatamente
+ * onde estava, e sem isto o teste de "nada se moveu" concluiria que a correção
+ * já está certa — quando ela acabou de ser zerada pela suspensão.
+ */
+export function suspendAvoidance(on: boolean) {
+  avoidSuspended = !!on;
+  if (!avoidSuspended) { _rayFrom.set(NaN, NaN, NaN); _rayTo.set(NaN, NaN, NaN); }
+  invalidate();
+}
+
 /**
  * Encolhe a distância da câmera até caber antes da primeira construção.
  * Roda DEPOIS dos frameHooks (que são os donos da posição verdadeira) e a
@@ -2550,11 +2955,18 @@ function applyAvoidance(dt: number) {
     bodyExitDistance(_avoidDir.x, _avoidDir.y, _avoidDir.z) + BLOCK_SKIN,
     controls.minDistance, BLOCK_MIN_D);
 
-  /* Nada se moveu ⇒ os ALVOS são os mesmos e nenhum raio precisa ser lançado; a
-     suavização abaixo continua andando com o relógio. É o que torna o custo do
-     raycast proporcional ao MOVIMENTO e não ao tempo: uma cena parada com a
-     chuva ligada continua desenhando quadros e não paga nada por eles. */
-  if (!_rayFrom.equals(controls.target) || !_rayTo.equals(camera.position)) {
+  /* SUSPENSO: os alvos vão a zero e a suavização abaixo — que continua rodando —
+     desfaz a correção com a mesma constante de tempo com que a aplicou. É por
+     isso que suspender não dá salto, e é por isso que a suspensão age AQUI e não
+     desligando `applyAvoidance` inteiro: sair pela porta de cima deixaria a
+     correção CONGELADA no valor em que estava. */
+  if (avoidSuspended) {
+    cutTarget = 0; riseTarget = 0; wasBlocked = false;
+  } else if (!_rayFrom.equals(controls.target) || !_rayTo.equals(camera.position)) {
+    /* Nada se moveu ⇒ os ALVOS são os mesmos e nenhum raio precisa ser lançado; a
+       suavização abaixo continua andando com o relógio. É o que torna o custo do
+       raycast proporcional ao MOVIMENTO e não ao tempo: uma cena parada com a
+       chuva ligada continua desenhando quadros e não paga nada por eles. */
     _rayFrom.copy(controls.target);
     _rayTo.copy(camera.position);
     trackAvoidance(trueDist, floor);
@@ -2687,6 +3099,13 @@ interface SavedScene {
   brightness?: number | string | null;
   azManual?: boolean;
   elManual?: boolean;
+  /* Ausentes num blob v5, e é assim que tem de ser: ver a nota de "a chave NÃO
+     sobe para v6" em LIGHT_DEFAULTS. */
+  backdrop?: string;
+  fill?: number | string | null;
+  rim?: number | string | null;
+  softness?: number | string | null;
+  temp?: number | string | null;
 }
 
 (function restore() {
@@ -2719,7 +3138,20 @@ interface SavedScene {
      the kind of state that gets reported as a rendering bug. */
   sceneState.azManual = !legacy && s.azManual === true;
   sceneState.elManual = !legacy && s.elManual === true;
-  sceneState.brightness = num(s.brightness, 1, 0.15, 2.5);
+  /* Teto 6 e não 2,5: a face de estúdio do HUD vai até 600 % (ver
+     BRIGHT_MAX_STUDIO), e um limite de restauração menor que o alcance do
+     controle silenciosamente rebaixaria a luz de quem gravou uma cena forte —
+     um estado que volta diferente de como foi deixado, sem nada dizendo por quê. */
+  sceneState.brightness = num(s.brightness, 1, 0.15, 6);
+  /* Estúdio. `backdropOf()` já cai no padrão para um id desconhecido, então um
+     blob v5 (que não tem o campo) e um blob com um fundo que foi renomeado
+     seguem o mesmo caminho — que é o que "validar cada campo em separado"
+     quer dizer. As faixas são as mesmas de STUDIO_RANGE, a fonte única. */
+  sceneState.backdrop = backdropOf(s.backdrop).id;
+  sceneState.fill = num(s.fill, 1, STUDIO_RANGE.fill[0], STUDIO_RANGE.fill[1]);
+  sceneState.rim = num(s.rim, 1, STUDIO_RANGE.rim[0], STUDIO_RANGE.rim[1]);
+  sceneState.softness = num(s.softness, 1, STUDIO_RANGE.softness[0], STUDIO_RANGE.softness[1]);
+  sceneState.temp = num(s.temp, TEMP_NEUTRAL, TEMP_MIN, TEMP_MAX);
   syncSunToHour();
   if (sceneState.azManual) sceneState.az = num(s.az, sceneState.az, 0, 360);
   if (sceneState.elManual) sceneState.el = num(s.el, sceneState.el, 2, 85);
@@ -2996,16 +3428,52 @@ const clock = new THREE.Clock();
  *                     changes nothing. That is what makes BOTH shipped scenarios
  *                     idle — `armazem` has no HDRI and therefore does show the
  *                     procedural dome, but its `estudio` preset is cloudiness 0.
- *   autoRotate        ui/chrome.ts's "girar" button writes controls.autoRotate
- *                     directly, with no scene.ts wrapper to hook. Reading the
- *                     flag instead of being told about it means that button
- *                     needs no wiring at all and cannot be forgotten.
+ *   autoRotate        o giro de apresentação. Lido da flag em vez de empurrado:
+ *                     setTurntable() é o dono dela, mas escrevê-la direto
+ *                     também funciona, e um termo que LÊ não tem como ser
+ *                     esquecido por quem escreve.
+ *   framePins         uma gravação de vídeo em curso — ver pinFrames() abaixo.
  */
 function wantsFrame(): boolean {
   if (tweenT < 1) return true;
   if (rigCur && rigCur.rain > 0.02) return true;
   if (skyDome && skyDome.visible && skyU.uCloud.value > 0.01) return true;
+  if (framePins > 0) return true;
   return controls.autoRotate;
+}
+
+/* ---------------- o PINO DE QUADROS ----------------
+   Uma gravação lê o canvas COMPOSTO (`captureStream`), não a cena — então um
+   quadro que o laço decide não desenhar é um quadro que o vídeo grava repetido.
+   Com uma cena parada e `onDemand` ligado isso não é "algum" quadro: é a
+   gravação inteira congelada no primeiro.
+
+   O caso "cena parada" é REAL e não teórico: uma gravação livre, com o usuário
+   pensando antes de arrastar, ou uma cena cujo preset já fundiu e sem chuva
+   nem nuvem. Nenhum outro termo de wantsFrame() cobre isso, porque nenhum
+   deles é sobre QUEM ESTÁ OLHANDO — e uma gravação é exatamente isso.
+
+   ISTO NÃO É UM CONTORNO DA FLAG DE HOJE. `ON_DEMAND_RENDERING` ships `false`,
+   ou seja o laço já desenha sempre e este pino não muda nada agora. Ele existe
+   para que a gravação continue correta no dia em que as três lacunas listadas
+   lá em cima forem fechadas e a flag virar — que é o oposto de escrever
+   `record.ts` presumindo o valor atual e descobrir o defeito um ano depois.
+
+   CONTADOR, e não booleano, pelo mesmo motivo de `drawSuspended`: dois pinos
+   simultâneos (uma gravação e o que vier depois) não podem se desfazer um ao
+   outro no primeiro que soltar. */
+let framePins = 0;
+
+/**
+ * Segura o laço desenhando enquanto algo estiver LENDO os quadros.
+ *
+ * Sempre em par: `pinFrames(true)` … `pinFrames(false)`, e o `false` num
+ * `finally`. Um pino vazado deixa a GPU quente para sempre.
+ */
+export function pinFrames(on: boolean) {
+  if (on) framePins++;
+  else if (framePins > 0) framePins--;
+  invalidate();
 }
 
 export function stopLoop() {
@@ -3031,8 +3499,17 @@ export function startLoop() {
     /* Returns true while the camera is still being transformed — a drag, inertia
        from `enableDamping`, a zoom, autoRotate. This is the ONLY signal that
        says "damping has not settled yet", and it is why the dirty loop does not
-       need to know how long inertia takes. */
-    if (controls.update()) invalidate();
+       need to know how long inertia takes.
+
+       COM O `dt`, E NÃO SEM. É o único uso que o OrbitControls faz do argumento:
+       sem ele o giro automático avança `2π/60/60 · autoRotateSpeed` POR QUADRO,
+       ou seja meia velocidade a 30 fps e o dobro a 120. Com ele o giro passa a
+       ser função do relógio, e é isso que torna `turntablePeriod()` — "uma volta
+       em N segundos" — uma promessa em vez de uma estimativa. A 60 fps as duas
+       fórmulas dão exatamente o mesmo número, então nada muda no caso comum.
+       O `dt` já vem limitado a 0,1 s lá em cima, então uma aba que volta do
+       segundo plano não teleporta o giro. */
+    if (controls.update(dt)) invalidate();
     // hard floor guard — right-click panning can otherwise drag under the ground
     if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
     if (controls.target.y < 0.05) controls.target.y = 0.05;

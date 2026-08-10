@@ -89,6 +89,7 @@ import {
   LiveryComposer, defaultLayers,
   type DoorSpec, type Face, type LiveryLayer, type LiverySource, type PanelSpec,
 } from './livery-layers';
+import { getLiveryArt, onLiveryArtReady, type ArtPiece } from './livery-art';
 import {
   state, getTrailerDims, setTrailerDims as setTrailerDimsRaw, setTrailerDoors,
 } from './models';
@@ -146,6 +147,57 @@ export const SIDE_WIDTH_TOLERANCE = 0.02;
 const PIXELS_PER_METRE = 128;
 const MAX_CANVAS_PX = 2048;
 
+/* ---------------- RESOLUÇÃO SOB DEMANDA ----------------
+   O PROBLEMA, medido: com `PIXELS_PER_METRE` fixo em 128 e o teto de 2 048 px,
+   um painel de 14,6 m sai com 1 869 px de largura. Isso é bom para a miniatura
+   do card e para o palco em 100 %, e insuficiente no zoom de 400 % do editor —
+   onde 1 869 px são esticados sobre ~7 500 px de tela e a fita refletiva, que
+   tem 41 px de altura, vira uma barra borrada.
+
+   Subir a constante não resolve: ela pagaria a resolução do pior caso em TODOS
+   os casos, e um canvas de 8 192 × 1 560 são 51 MB de RAM por painel, três
+   painéis, recompostos a cada centímetro digitado no formulário de medidas.
+
+   O que resolve é a composição seguir o tamanho EXIBIDO. E ela só pode seguir
+   porque a fonte virou VETOR: um SVG rasteriza no tamanho que for pedido, sempre
+   nítido e sempre pelo mesmo custo de banda. Com a foto de antes
+   (`panels/lateral.png`, 2 048 px de largura para qualquer baú) não haveria o
+   que buscar acima daquilo — é literalmente a "criação dos liveries sob demanda"
+   do pedido, e ela é de graça agora e era impossível antes.
+
+   O TETO CONTINUA EXISTINDO, e sobe pouco: 4 096 px é o limite prático de um
+   canvas 2D em máquina modesta e são ~25 MB por painel no pior caso. Acima
+   disso o navegador começa a devolver canvas em branco sem avisar — que é o
+   mesmo modo de falha calado que o `MAX_CANVAS_PX` original evitava. */
+const MAX_CANVAS_PX_ZOOMED = 4096;
+
+/** Largura em pixels de dispositivo com que cada painel está sendo EXIBIDO. */
+const displayedPx: Record<StructureKey, number> = { left: 0, right: 0, rear: 0 };
+
+/**
+ * Diz com quantos pixels de CSS o painel está na tela agora.
+ *
+ * Chamado pelo editor a cada mudança de zoom e a cada resize. `0` (ou nunca
+ * chamado) devolve o comportamento de antes — é o que mantém a miniatura do
+ * card, que é pequena e não tem zoom, exatamente onde estava.
+ *
+ * NÃO recompõe sozinho quando a diferença é pequena: recompor é rasterizar três
+ * SVGs e desenhar a pilha inteira, e o zoom de um editor passa por dezenas de
+ * valores intermediários numa rolagem. O limiar de 1,5× é o que separa "o
+ * usuário mudou de escala" de "o usuário está mexendo na roda".
+ */
+export function setPanelDisplaySize(key: StructureKey, cssPx: number) {
+  const want = Math.max(0, Math.round(cssPx * (globalThis.devicePixelRatio || 1)));
+  const had = displayedPx[key];
+  displayedPx[key] = want;
+  if (!want) return;
+  const now = panels[key].canvas.width;
+  if (now > 0 && want <= now * 1.5 && want >= now / 1.5) return;
+  /* Sobe E desce: um painel que ficou pequeno segurando 4 096 px é 25 MB
+     parados, e o caminho de volta tem de existir ou o pico vira o piso. */
+  if (had !== want) void recompose(key);
+}
+
 /* ---------------- o registro de arte (o ponto de extensão) ---------------- */
 
 /**
@@ -186,6 +238,20 @@ interface PanelState {
   spec: PanelSpec;
   canvas: HTMLCanvasElement;
   composer: LiveryComposer;
+  /**
+   * O plano da FRENTE — a ferragem que passa POR CIMA da arte do cliente.
+   *
+   * Dois canvas e não um, e a razão é a mesma que a foto do painel já tinha: a
+   * cantoneira, a fita, os montantes e (na traseira) os varões e a borracha
+   * central ficam ENTRE o olho e o desenho. É isso que faz um texto atravessado
+   * pela borracha aparecer cortado no editor do mesmo jeito que vai sair no baú
+   * — e uma pilha desenhada só atrás não tem como mostrar isso.
+   *
+   * A tela do fabric fica no meio: `structure` atrás, fabric, `front` na
+   * frente. Ver `mountStructureCanvas`/`mountFrontCanvas`.
+   */
+  front: HTMLCanvasElement;
+  frontComposer: LiveryComposer;
   /** Recomposições em voo; a mais nova ganha (ver recompose). */
   token: number;
 }
@@ -194,9 +260,14 @@ function makePanelState(face: StructureKey, length: number, height: number): Pan
   const canvas = document.createElement('canvas');
   canvas.className = 'ts-structure';
   canvas.width = 4; canvas.height = 4;
+  const front = document.createElement('canvas');
+  front.className = 'ts-structure ts-structure--front';
+  front.width = 4; front.height = 4;
   return {
     spec: { face: face as Face, length, height, doors: [] },
-    canvas, composer: new LiveryComposer(canvas), token: 0,
+    canvas, composer: new LiveryComposer(canvas),
+    front, frontComposer: new LiveryComposer(front),
+    token: 0,
   };
 }
 
@@ -353,9 +424,103 @@ function structuralLayers(spec: PanelSpec): LiveryLayer[] {
     .map((l) => ({ ...l, source: resolveSource(l) }));
 }
 
-function canvasSize(spec: PanelSpec) {
-  const ppm = Math.min(PIXELS_PER_METRE, MAX_CANVAS_PX / Math.max(spec.length, 0.01));
-  return Math.max(24, ppm);
+/**
+ * Pixels por metro deste painel, agora.
+ *
+ * Sem tamanho exibido declarado é a conta de antes: 128 px/m com teto de
+ * 2 048 px. Com ele, a resolução ACOMPANHA a tela — nunca abaixo dos 128 px/m
+ * (o piso é o que a miniatura do card precisa, e ela não declara tamanho) e
+ * nunca acima do teto de canvas. Ver o bloco RESOLUÇÃO SOB DEMANDA.
+ */
+function canvasSize(spec: PanelSpec, key?: StructureKey) {
+  const len = Math.max(spec.length, 0.01);
+  const base = Math.min(PIXELS_PER_METRE, MAX_CANVAS_PX / len);
+  const shown = key ? displayedPx[key] : 0;
+  if (!shown) return Math.max(24, base);
+  /* `shown` é a largura do painel em pixels de dispositivo; dividida pelo
+     comprimento em metros, é exatamente a densidade que a tela está pedindo. */
+  const wanted = Math.min(shown / len, MAX_CANVAS_PX_ZOOMED / len);
+  return Math.max(24, base, wanted);
+}
+
+/* ---------------- a GRADE 3x3, do manifesto para retângulos ----------------
+   Aqui é onde "acompanhar o tamanho definido" acontece, e é uma função pura: o
+   manifesto diz o que cada peça NÃO pode deformar, e esta função resolve o
+   retângulo dela contra a medida do painel AGORA.
+
+   As quatro regras, e o que cada uma preserva:
+
+     anchorY 'roof'   altura fixa, colada no teto      → a cantoneira nunca
+                                                          engorda quando o baú
+                                                          fica mais alto
+     anchorY 'floor'  altura fixa, colada no piso      → idem para o rodapé, e é
+                                                          onde a fita 3M mora
+     anchorX 'start'  largura fixa, colada numa ponta  → o montante de canto
+     anchorX 'end'    largura fixa, colada na outra
+     (nenhuma)        o miolo: estica nos dois eixos
+
+   `tile` liga a REPETIÇÃO no lugar do esticamento. Ele vem preenchido só nas
+   laterais, com o passo medido da fita (1,1584 m). O compositor já sabe
+   ladrilhar — é o mesmo `repeat` que a pilha de placeholders usava —, e a
+   ponta presa (`anchor`) é a mesma do 3D, senão a sobra da divisão cairia na
+   dianteira num lado e na traseira no outro. */
+function frontLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
+  const face = getLiveryArt()?.[key];
+  if (!face) return [];
+  const { length, height } = spec;
+
+  /* As bandas e os montantes que a face declarou, para o miolo saber onde
+     começa. Lidos das próprias peças em vez de repetidos no manifesto: um
+     número escrito duas vezes é um número que diverge. */
+  const sizeOf = (fn: (p: ArtPiece) => boolean, get: (p: ArtPiece) => number | null) => {
+    const p = face.pieces.find(fn);
+    return (p && get(p)) || 0;
+  };
+  const bandTop = sizeOf((p) => p.anchorY === 'roof', (p) => p.h);
+  const bandBottom = sizeOf((p) => p.anchorY === 'floor', (p) => p.h);
+  const postStart = sizeOf((p) => p.anchorX === 'start', (p) => p.w);
+  const postEnd = sizeOf((p) => p.anchorX === 'end', (p) => p.w);
+
+  const out: LiveryLayer[] = [];
+  for (const p of face.pieces) {
+    if (p.plane !== 'front' || !p.markup) continue;
+
+    let rect: { x: number; y: number; w: number; h: number };
+    if (p.anchorY === 'roof') {
+      rect = { x: 0, y: Math.max(0, height - (p.h || 0)), w: length, h: p.h || 0 };
+    } else if (p.anchorY === 'floor') {
+      rect = { x: 0, y: 0, w: length, h: p.h || 0 };
+    } else if (p.anchorX === 'start') {
+      rect = { x: 0, y: 0, w: p.w || 0, h: height };
+    } else if (p.anchorX === 'end') {
+      rect = { x: Math.max(0, length - (p.w || 0)), y: 0, w: p.w || 0, h: height };
+    } else {
+      /* O miolo: o que sobra depois das bandas e dos montantes. Na traseira é
+         onde os varões, as dobradiças e a borracha central são desenhados. */
+      rect = {
+        x: postStart,
+        y: bandBottom,
+        w: Math.max(0, length - postStart - postEnd),
+        h: Math.max(0, height - bandTop - bandBottom),
+      };
+    }
+    if (rect.w <= 0 || rect.h <= 0) continue;
+
+    out.push({
+      id: `art-${key}-${p.id}`,
+      /* `custom` é o topo de LAYER_ORDER, e é o certo: estas peças são a
+         ferragem que fica SOBRE tudo. Elas são compostas num canvas próprio, e
+         portanto a ordem só as ordena entre si — mas mantê-la coerente evita
+         que uma futura fusão dos dois planos inverta a pilha. */
+      kind: 'custom',
+      source: { kind: 'svg', markup: p.markup },
+      rect,
+      ...(p.tile && p.tile > 0.01
+        ? { repeat: { pitch: p.tile, span: p.tile, anchor: face.anchor } }
+        : {}),
+    });
+  }
+  return out;
 }
 
 const structureListeners: ((key: StructureKey) => void)[] = [];
@@ -378,16 +543,29 @@ export function onStructureRedrawn(cb: (key: StructureKey) => void) {
 async function recompose(key: StructureKey): Promise<void> {
   const st = panels[key];
   const mine = ++st.token;
+  const ppm = canvasSize(st.spec, key);
   st.composer
     .setPanel(st.spec)
     .setLayers(structuralLayers(st.spec))
-    .resize(canvasSize(st.spec));
+    .resize(ppm);
   /* `'preview'` EXPLÍCITO, apesar de ser o padrão. É a única chamada de render
      deste módulo e o único lugar onde a decisão "isto não vai para o 3D"
      aparece como código em vez de comentário — escrevê-la por extenso é o que
      faz uma futura troca para `'model'` ser uma edição visível num diff. */
   await st.composer.render({ scope: 'preview' });
   if (mine !== st.token) return;
+
+  /* O PLANO DA FRENTE, na MESMA resolução do de trás. Os dois são esticados
+     sobre exatamente o mesmo retângulo de tela, e uma diferença de densidade
+     entre eles apareceria como a ferragem levemente fora de registro com a
+     chapa — o tipo de desalinhamento de um pixel que se lê como borrão. */
+  st.frontComposer
+    .setPanel(st.spec)
+    .setLayers(frontLayers(key, st.spec))
+    .resize(ppm);
+  await st.frontComposer.render({ scope: 'preview' });
+  if (mine !== st.token) return;
+
   for (const cb of structureListeners) cb(key);
 }
 
@@ -723,6 +901,34 @@ export function mountStructureCanvas(key: StructureKey, wrapper: HTMLElement) {
   wrapper.insertBefore(canvas, wrapper.firstChild);
 }
 
+/* O PLANO DA FRENTE, no palco.
+   A pilha dentro do wrapper do fabric, de trás para a frente:
+
+       .ts-structure         a chapa (este módulo, canvas de trás)
+       lowerCanvasEl         a arte do cliente (fabric)
+       upperCanvasEl         os controles do fabric
+       .ts-structure--front  a ferragem (este módulo, canvas da frente)
+       .guide-svg            a silhueta tracejada
+
+   Entra ANTES da `.guide-svg` e depois dos dois canvas do fabric — ordem de
+   documento, que é o que o fabric respeita (ele não usa z-index nos seus dois).
+   `pointer-events: none` no CSS: a ferragem é desenho, não alvo; sem isso ela
+   comeria todo clique do editor.
+   Idempotente — `showSurface()` e o resize passam por aqui várias vezes. */
+export function mountFrontCanvas(key: StructureKey, wrapper: HTMLElement) {
+  const front = panels[key].front;
+  const guide = wrapper.querySelector('.guide-svg');
+  if (front.parentElement === wrapper && front.nextElementSibling === guide) return;
+  if (guide) wrapper.insertBefore(front, guide);
+  else wrapper.appendChild(front);
+}
+
+/** Diagnóstico: a grade resolvida de um painel, com os retângulos em metros. */
+export const describeFront = (key: StructureKey) =>
+  frontLayers(key, panels[key].spec).map((l) => ({
+    id: l.id, rect: l.rect, repeat: l.repeat,
+  }));
+
 /* NA MINIATURA DO CARD.
    Desenhada ANTES da arte, pelo mesmo motivo do renderOrder no 3D. */
 export function drawStructureInto(
@@ -733,9 +939,23 @@ export function drawStructureInto(
   try { ctx.drawImage(c, 0, 0, w, h); } catch { /* canvas ainda sem conteúdo */ }
 }
 
+/** A ferragem, DEPOIS da arte — o par de `drawStructureInto` na miniatura. */
+export function drawFrontInto(
+  ctx: CanvasRenderingContext2D, key: StructureKey, w: number, h: number,
+) {
+  const c = panels[key].front;
+  if (!c.width || !c.height) return;
+  try { ctx.drawImage(c, 0, 0, w, h); } catch { /* canvas ainda sem conteúdo */ }
+}
+
 /** Diagnóstico para o console: a pilha efetiva de um painel, já resolvida. */
 export const describeStructure = (key: StructureKey) =>
   structuralLayers(panels[key].spec).map((l) => ({
     id: l.id, kind: l.kind, rect: l.rect, repeat: l.repeat,
     art: l.source.kind === 'svg' && !l.source.markup ? 'placeholder' : l.source.kind,
   }));
+
+/* A grade chega DEPOIS do boot (é um `fetch`), e quando chega os três painéis já
+   foram compostos — sem esta linha a ferragem só apareceria na próxima mudança
+   de medida. `recomposeAll()` é idempotente e custa três composições. */
+onLiveryArtReady(() => { void recomposeAll(); });

@@ -331,6 +331,60 @@ export interface Choice {
    * era. Quem manda na cabine é este campo quando ele não é nulo.
    */
   finishId: string | null;
+  /**
+   * Os ACABAMENTOS do implemento — teto, paralamas, caixa e Thermo King —
+   * quando algum foge do padrão. Ver `vehicle/trim.ts`.
+   *
+   * OPCIONAL, E É O PONTO: `trimChoice()` devolve `undefined` enquanto ninguém
+   * mexer numa peça, então a escolha gravada de quem não usa esta funcionalidade
+   * continua byte a byte a de antes dela existir — e `sameRig()` não vê
+   * diferença onde não há.
+   *
+   * NÃO INVALIDA A ESCOLHA quando vem estranho, pela mesma regra que a cor
+   * segue: um acabamento que não faz sentido é um campo a descartar, nunca um
+   * motivo para reabrir o seletor inteiro.
+   */
+  trim?: TrimChoiceRaw;
+}
+
+/**
+ * A forma GRAVADA de um acabamento. Deliberadamente frouxa e local a este
+ * arquivo: `catalog.ts` valida JSON externo e não deve importar `vehicle/*` —
+ * ele é o módulo que TODO o resto lê, e uma aresta para a geometria o
+ * transformaria num nó de dependência do veículo. `vehicle/trim.ts` é quem dá
+ * significado a estes campos; aqui eles são só "hex e booleano".
+ */
+export type TrimChoiceRaw = Record<string, { color?: string; visible?: boolean }>;
+
+/** As quatro chaves que valem — lista branca, igual ao resto de normalizeChoice. */
+const TRIM_KEYS_RAW = ['roof', 'fenders', 'box', 'thermoking'] as const;
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Peneira os acabamentos gravados. `undefined` quando não sobra nada.
+ *
+ * Uma cor que não é hex de 6 dígitos é DESCARTADA em silêncio, e não corrigida:
+ * o único consumidor é `THREE.Color`, que aceita quase tudo e falha calado no
+ * resto — um `'vermelho'` viraria preto e o usuário veria a peça sumir em vez
+ * de ver a escolha ser ignorada.
+ */
+function normalizeTrim(raw: unknown): TrimChoiceRaw | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const src = raw as Raw;
+  const out: TrimChoiceRaw = {};
+  let any = false;
+  for (const key of TRIM_KEYS_RAW) {
+    const v = src[key];
+    if (!v || typeof v !== 'object') continue;
+    const piece = v as Raw;
+    const entry: { color?: string; visible?: boolean } = {};
+    if (typeof piece.color === 'string' && HEX_RE.test(piece.color)) entry.color = piece.color;
+    if (piece.visible === false) entry.visible = false;
+    if (entry.color === undefined && entry.visible === undefined) continue;
+    out[key] = entry;
+    any = true;
+  }
+  return any ? out : undefined;
 }
 
 /** Uma escolha já resolvida contra o catálogo — nenhum id é nulo. */
@@ -344,6 +398,8 @@ export interface ResolvedChoice {
    *  diferença que ele carrega: "nenhum acabamento" é um estado válido — o
    *  normal, aliás —, enquanto "nenhuma cor" não é. */
   finishId: string | null;
+  /** Ausente enquanto as quatro peças estiverem no padrão. Ver `Choice.trim`. */
+  trim?: TrimChoiceRaw;
 }
 
 export interface Catalog {
@@ -918,9 +974,19 @@ function ensureStudioEnvironment(list: EnvironmentDef[]): EnvironmentDef[] {
     /* A MINIATURA DESENHADA É DO MOTOR, e o manifesto não precisa carregá-la.
        Um data-uri de SVG dentro do JSON servido seria um kilobyte de markup
        repetido em cada resposta, ilegível na revisão e duplicado no desktop.
-       Então o manifesto declara `thumb: null` e QUEM PREENCHE é aqui — e uma
-       `thumb` de verdade, no dia em que alguém fotografar o ciclorama, ganha
-       sem que nada disto mude. */
+       Então o manifesto declarava `thumb: null` e QUEM PREENCHIA era aqui — e
+       uma `thumb` de verdade, no dia em que alguém fotografasse o ciclorama,
+       ganharia sem que nada disto mudasse.
+
+       ESSE DIA CHEGOU (2026-08-10): o manifesto agora traz
+       `environments/estudio/thumb.webp`, e este `if` deixou de disparar no
+       caminho normal — o que é exatamente o desenho previsto, não uma linha
+       morta. Ele continua sendo o que segura o cartão no ÚNICO estado em que
+       ainda importa: manifesto fora do ar, quando `loadEnvironments()` cai em
+       FALLBACK_ENVIRONMENTS e não existe servidor de onde buscar .webp
+       nenhuma. Não troque STUDIO_THUMB pelo caminho do arquivo aqui: seria
+       trocar uma miniatura que sempre desenha por um 404 mudo justamente na
+       hora em que a rede é o problema. */
     if (!declared.thumb) declared.thumb = STUDIO_THUMB;
     return list;
   }
@@ -1203,6 +1269,11 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
        um estado que `paintMaterialsOf()` leria como "não pinte" num caminhão
        que não tem outra coisa a mostrar. */
     finishId: finishOf(found.model, wantedFinish)?.id ?? null,
+    /* Espalhado condicionalmente para a chave NÃO EXISTIR quando não há nada a
+       gravar — `trim: undefined` sobreviveria ao `JSON.stringify` como campo
+       ausente, mas apareceria em qualquer comparação de objetos feita antes
+       disso, e `sameRig()` é exatamente uma dessas. */
+    ...(normalizeTrim(c.trim) ? { trim: normalizeTrim(c.trim) } : {}),
   };
 }
 

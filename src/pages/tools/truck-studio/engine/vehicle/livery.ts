@@ -26,8 +26,10 @@ import { initLiveryEditor } from '../ui/livery-editor';
    exclusivamente a arte das telas fabric deste módulo — nada abaixo desta linha
    mudou de dono. */
 import {
-  refreshFromTrailer, mountStructureCanvas, drawStructureInto, onStructureRedrawn,
+  refreshFromTrailer, mountStructureCanvas, mountFrontCanvas, drawStructureInto,
+  drawFrontInto, onStructureRedrawn, setPanelDisplaySize,
 } from './livery-structure';
+import { hasLiveryArt, onLiveryArtReady } from './livery-art';
 
 /* Reexportados para quem já falava com este módulo (studio.ts, o handle de
    depuração) não ter de saber que o editor mudou de arquivo. */
@@ -684,6 +686,13 @@ function installGuide(key: SurfaceKey) {
      fabric não usa z-index nos dois canvas dele, então a ordem de documento é a
      ordem de empilhamento. Chapa estrutural → arte do fabric → silhueta. */
   mountStructureCanvas(key, wrap);
+  /* COM QUANTOS PIXELS o painel está na tela — é o que faz a pilha estrutural
+     recompor na resolução do zoom em vez de numa constante. `installGuide()` é o
+     lugar certo porque ele já roda em toda mudança de escala do palco (é ele que
+     redimensiona a silhueta), então não há um segundo gancho a manter em dia.
+     `getWidth()` é o tamanho em CSS; a densidade de tela quem aplica é
+     `setPanelDisplaySize`. Ver RESOLUÇÃO SOB DEMANDA em ./livery-structure.ts. */
+  setPanelDisplaySize(key, w);
   let svg = wrap.querySelector('.guide-svg');
   if (!svg) {
     svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -693,6 +702,11 @@ function installGuide(key: SurfaceKey) {
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.setAttribute('preserveAspectRatio', 'none');
   svg.innerHTML = guideMarkup(outlines[key], w, h);
+  /* A FERRAGEM, por cima da arte e por baixo da silhueta. Depois da `.guide-svg`
+     existir, para entrar imediatamente antes dela — ver mountFrontCanvas(). É
+     esta camada que substitui o que a foto do painel fazia: a cantoneira, a
+     fita, os montantes e os varões passando SOBRE o desenho do cliente. */
+  mountFrontCanvas(key, wrap);
 }
 
 /* A silhueta em pixels da tela. Alinhar "ao painel" e o encaixe das guias
@@ -740,6 +754,11 @@ export function drawPreview(key: SurfaceKey) {
      a miniatura ser uma promessa honesta do que o editor abre. */
   drawStructureInto(ctx, key, pc.width, pc.height);
   ctx.drawImage(src, 0, 0, pc.width, pc.height);
+  /* E a FERRAGEM por cima da arte, como no palco. Sem esta linha a miniatura
+     mostraria a arte sangrando até a borda da chapa enquanto o editor a mostra
+     cortada pela cantoneira — e a miniatura deixaria de ser uma promessa
+     honesta do que o editor abre, que é a única coisa que ela precisa ser. */
+  drawFrontInto(ctx, key, pc.width, pc.height);
   const poly = outlines[key];
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,.55)';
@@ -945,9 +964,27 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
     root.querySelector<HTMLElement>('.preview-card[data-surface="' + key + '"]'),
     stagePanels[key],
   ];
+  /* A FOTO SAI DE CENA QUANDO HÁ ARTE VETORIAL para esta face.
+     ---------------------------------------------------------------------
+     Ela era a moldura opaca com a janela vazada, e fazia bem uma coisa (a
+     ferragem por cima do desenho) e mal a outra: NÃO redimensiona. Um baú de
+     8,40 m e um de 15,40 m recebiam a mesma imagem esticada, e com ela
+     esticavam a fita 3M, a cantoneira e os varões — peças de dimensão fixa
+     desenhadas com dimensão variável.
+
+     Quem assume é a grade 3×3 (vehicle/livery-art.ts), composta no canvas da
+     FRENTE, que faz o mesmo trabalho e acompanha a medida.
+
+     O QUE A FOTO CONTINUA FAZENDO, e por isso ela não foi apagada: é dela que
+     sai a JANELA — `findWindow()` mede o vazado para posicionar a tela do
+     fabric. Trocar essa medição pela do manifesto é o passo seguinte e é
+     independente; enquanto não for feito, a foto é medida e não é DESENHADA.
+     `none` e não a remoção da variável: `.ts-pw-ready` continua valendo, então
+     a caixa e o recorte da miniatura seguem exatamente os mesmos. */
+  const usingArt = hasLiveryArt(key);
   for (const el of targets) {
     if (!el) continue;
-    el.style.setProperty('--ts-pw-img', 'url("' + PANEL_IMAGE[key] + '")');
+    el.style.setProperty('--ts-pw-img', usingArt ? 'none' : 'url("' + PANEL_IMAGE[key] + '")');
     el.style.setProperty('--ts-pw-ar', String(win.photoAr));
     el.style.setProperty('--ts-pw-x', pct(r.x));
     el.style.setProperty('--ts-pw-y', pct(r.y));
@@ -1196,6 +1233,19 @@ export function initLivery() {
      de uma vez só. Então quem recompõe avisa, e o card se redesenha. Sem isto,
      mudar uma medida atualizaria o 3D e o palco e deixaria o card velho. */
   onStructureRedrawn((k) => schedulePreview(k));
+  /* A grade vetorial chega por `fetch`, DEPOIS de as janelas terem sido
+     publicadas com a foto. Sem esta linha a ferragem apareceria no palco (o
+     canvas da frente compõe sozinho) e a foto continuaria desenhada por cima
+     dela até a próxima mudança de medida — as duas visíveis ao mesmo tempo, uma
+     esticada e a outra não. Republicar é o que troca `--ts-pw-img` para `none`.
+     Ver a nota em `publishWindow`. */
+  onLiveryArtReady(() => {
+    for (const k of SURFACE_KEYS) {
+      const win = windows[k];
+      if (win) publishWindow(k, win);
+      schedulePreview(k);
+    }
+  });
   /* Fora do caminho crítico: são ~4,5 M de pixels varridos, e até a medida
      chegar os cards já estão desenhados com a foto atrás (o fallback). */
   void measurePanelWindows();

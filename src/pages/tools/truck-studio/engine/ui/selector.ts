@@ -58,8 +58,14 @@
 import { root, $opt, isMounted, el, initials } from '../core/dom';
 import {
   catalog, getEnvironment, getManufacturer, getModel, defaultChoice, assetUrl,
-  saveChoice, loadChoice, defaultChassis,
+  saveChoice, loadChoice, defaultChassis, fileOf,
 } from '../catalog/catalog';
+/* O aquecimento de BYTES, ao lado do de imagens que já existia (prefetchRenders).
+   A seta ui/ → core/ já existe (core/dom.ts), e a ui/ → scene/ também
+   (ui/hud.ts, ui/chrome.ts) — nenhuma das duas fecha ciclo, e é aqui, no lugar
+   em que a escolha acontece, que se sabe o que vai ser preciso a seguir. */
+import { prefetch, cancelPrefetch } from '../core/prefetch';
+import { prefetchEnvironment } from '../scene/environment';
 import type { Choice, ResolvedChoice, ChassisDef } from '../catalog/catalog';
 import {
   colorsFor, getColor, defaultColorId, FINISH_LABEL,
@@ -1342,6 +1348,15 @@ function choose(stepIndex: number, id: string) {
 
   if (stepIndex === STEP_INDEX.map) {
     choice.envId = id;
+    /* O CENÁRIO É O PRIMEIRO PASSO E O ÚLTIMO A SER PRECISO — a janela mais
+       larga que este assistente oferece. Daqui até `finish()` faltam quatro
+       cliques (fabricante, modelo, chassi e cor), e o da cor é justamente o que
+       o usuário demora olhando. `set.glb` + HDRI descem nesse tempo.
+       CANCELA O ANTERIOR: repicar o cenário é comum (a trilha de migalhas
+       convida a isso), e um `distrito-industrial` de 7 MB em voo não pode ficar
+       roubando vaga do `armazem` que o usuário acabou de escolher. */
+    cancelPrefetch('env');
+    prefetchEnvironment(getEnvironment(id));
   } else if (stepIndex === STEP_INDEX.manufacturer) {
     /* Switching brands invalidates the model: keeping "S730" highlighted under
        Volvo would be a lie. Re-picking the SAME brand keeps it, which is the
@@ -1383,9 +1398,11 @@ function choose(stepIndex: number, id: string) {
        antigo warmCabPreview(), e custa 1/1000 do que ele custava — nenhuma
        geometria, nenhum contexto WebGL, só o cache HTTP. */
     warmRenders(choice);
+    warmCab(choice);
   } else if (stepIndex === STEP_INDEX.chassis) {
     choice.chassisId = id;
     warmRenders(choice);
+    warmCab(choice);
   } else {
     /* UM PASSO, DOIS TIPOS DE CARD. O passo da cor lista os ACABAMENTOS de
        fábrica antes das tintas (ver `itemsFor`), e o id deles chega prefixado
@@ -1413,6 +1430,36 @@ function warmRenders(choice: Choice) {
   const urls = colorsFor(choice.manufacturerId).slice(0, PER_PAGE * 2).map((c) =>
     renderUrl(found.manufacturer.id, found.model.id, choice.chassisId, c.id));
   prefetchRenders(urls);
+}
+
+/* Começa a baixar a GEOMETRIA do cavalo — o irmão pesado de warmRenders(), que
+   só aquece miniaturas.
+   ---------------------------------------------------------------------------
+   CHAMADO NOS DOIS PASSOS, e a aposta é diferente em cada um:
+
+   - no passo do MODELO ainda não há chassi escolhido, então `defaultChassis()`
+     decide. É uma aposta de verdade — e vale a pena porque a maioria dos
+     modelos tem UM chassi só (aí `seqFor` nem mostra o passo e a aposta é
+     certeza), e porque quando há vários, dois deles costumam apontar para o
+     MESMO `.glb` (os pares byte-idênticos que `resolveChassisFile` documenta);
+   - no passo do CHASSI a aposta acabou: o arquivo é o que vai ser montado.
+
+   `cancelPrefetch('cab')` antes de cada um porque errar a aposta é o caso
+   NORMAL, não a exceção: passear por seis modelos são seis apostas, e sem o
+   cancelamento seriam seis cabines em voo disputando as duas vagas de
+   `MAX_IN_FLIGHT` com o cenário e com o implemento — ou seja, o prefetch
+   atrapalhando a carga que ele existe para adiantar. O que já BAIXOU não é
+   esquecido (ver `cancelPrefetch`), então voltar um passo é grátis. */
+function warmCab(choice: Choice) {
+  const found = getModel(choice.modelId);
+  if (!found) return;
+  const chassis = found.model.chassis.find((c) => c.id === choice.chassisId)
+    || defaultChassis(found.model);
+  if (!chassis) return;
+  const file = fileOf(found.model, chassis);
+  if (!file) return;                    // chassi "Em breve": não há o que baixar
+  cancelPrefetch('cab');
+  prefetch([file], 'cab');
 }
 
 /* ---------------- open / close lifecycle ---------------- */

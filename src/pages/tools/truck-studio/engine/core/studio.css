@@ -384,6 +384,92 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+/* ---------- o segmento de FUNDO, no topo do menu da câmera ----------
+   Duas respostas para uma pergunta → um segmento, não duas linhas de menu. Ele
+   é `role=radiogroup` e não um menu: escolher aqui NÃO tira a foto, qualifica as
+   três linhas de baixo — e é por isso que ele também não pode parecer com elas.
+   Mesma linguagem do `.seg` do editor de plotagem (trilho recuado, pastilha
+   acesa em accent), na escala deste menu. */
+.truck-studio-root .ts-shotseg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  margin: 0 9px 8px;
+  padding: 3px;
+  border: 1px solid var(--stroke);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.truck-studio-root .ts-shotseg__btn {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background 160ms ease, color 160ms ease;
+}
+.truck-studio-root .ts-shotseg__btn:hover { color: var(--text); }
+.truck-studio-root .ts-shotseg__btn.is-on {
+  background: var(--accent);
+  color: #071108;
+}
+.truck-studio-root .ts-shotseg__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- "Capturar imagem" ----------
+   O ÚNICO controle deste painel que produz um arquivo, e por isso o único
+   pintado em accent sólido: tudo o mais aqui só marca uma opção. O filete acima
+   dele separa as duas naturezas — perguntas em cima, ação embaixo —, que é o
+   que impede o olho de ler as três qualidades e o botão como quatro botões
+   iguais.
+   Largura total: um botão de confirmação alinhado à direita numa gaveta de
+   180px fica pequeno demais para o alvo que ele é. */
+.truck-studio-root .ts-shotgo {
+  position: relative;              /* âncora do filete abaixo */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: calc(100% - 18px);
+  margin: 9px 9px 2px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #071108;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+/* O filete: à MESMA largura do botão, e não da gaveta inteira. Ele separa
+   "perguntas" de "ação", e alinhá-lo ao botão é o que faz a separação parecer
+   deliberada em vez de uma borda sobrando. */
+.truck-studio-root .ts-shotgo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  border-top: 1px solid var(--stroke);
+}
+.truck-studio-root .ts-shotgo__ico { display: flex; }
+.truck-studio-root .ts-shotgo:hover {
+  background: #34d36c;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.28);
+}
+.truck-studio-root .ts-shotgo:active { background: var(--accent-solid); }
+.truck-studio-root .ts-shotgo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.truck-studio-root .ts-shotmenu__radios { display: contents; }
+
 .truck-studio-root .ts-shotmenu__item {
   position: relative;
   display: flex;
@@ -498,6 +584,49 @@
     color 220ms ease;
 }
 .truck-studio-root .ts-vbtn svg { display: block; }
+
+/* ---------- TELA CHEIA ----------
+   O ícone do #btn-full traz os DOIS estados no mesmo <svg> (setas para fora,
+   setas para dentro) e o CSS escolhe. Um botão que troca de glifo conforme o
+   estado continua sendo o mesmo botão: remontar o svg no clique perderia o foco
+   do teclado no meio da interação.
+
+   Três regras e não duas: `.ts-vbtn--full .ts-ico-out` casa TAMBÉM quando o
+   botão está `.on`, então a de mostrar precisa de especificidade maior
+   (`.ts-vbtn--full.on`, 0-3-0 contra 0-2-0) para ganhar dela. */
+.truck-studio-root .ts-vbtn--full .ts-ico-out { display: none; }
+.truck-studio-root .ts-vbtn--full.on .ts-ico-out { display: inline; }
+.truck-studio-root .ts-vbtn--full.on .ts-ico-in { display: none; }
+
+/* AS DUAS PSEUDO-CLASSES TÊM DE FICAR EM REGRAS SEPARADAS, e isto é a única
+   armadilha real deste bloco: numa lista de seletores, UM seletor que o
+   navegador não entende invalida a REGRA INTEIRA. Escrever
+   `:fullscreen, :-webkit-full-screen { … }` num Chrome (que não conhece a
+   segunda) descarta as duas, e o sintoma é uma tela cheia com a página em
+   tamanho normal dentro de um retângulo preto — que lê como bug do engine e
+   não como um seletor mal escrito.
+
+   O que a regra faz: `root` normalmente herda a altura do hospedeiro React
+   (`<div className="h-full min-h-0">`). Em tela cheia ele deixa de ter esse pai
+   útil — o agente de usuário o promove a caixa de topo —, então a altura tem de
+   ser dita aqui.
+
+   `background` explícito porque `root` não declara nenhum: fora da tela cheia
+   ele não precisa (o holder é opaco e o canvas o cobre), mas em tela cheia
+   qualquer folga passa a mostrar o ::backdrop preto do navegador. `--bg` e não
+   `--ts-screen-bg` de propósito — a chrome do estúdio é escura NOS DOIS temas
+   (ver a nota dos tokens --ts-screen-* lá em cima), e o modo claro veste só as
+   telas de carga e de erro, que trazem o próprio fundo. */
+.truck-studio-root:fullscreen {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+}
+.truck-studio-root:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+}
 
 /* O ícone sobe para branco puro porque aqui ele é o único conteúdo — não há
    rótulo para carregar o estado. */
@@ -767,6 +896,63 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .truck-studio-root .ts-shotbar__fill { transition: none; }
+}
+
+/* ---------------- a pílula da GRAVAÇÃO ----------------
+   Mesmo desenho das irmãs (#cab-switching, #ts-shot) com duas diferenças que
+   vêm do que ela é, e não de gosto:
+   · fica um degrau ABAIXO delas no eixo Y. Uma gravação convive com a troca de
+     veículo — dá para gravar e o studio ainda estar assentando uma cor —, e
+     duas pílulas no mesmo topo se sobreporiam exatamente no meio da tela;
+   · a borda é vermelha. É o único elemento do estúdio que usa essa cor, e usa
+     porque "gravando" tem um vocabulário visual que já existe e que não vale a
+     pena reinventar em cinza. */
+.truck-studio-root #ts-rec {
+  position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 10;
+  display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text);
+  background: rgba(17, 17, 17, 0.82); border: 1px solid rgba(232, 62, 62, 0.55);
+  padding: 7px 8px 7px 15px; border-radius: 22px; backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  /* Tabular para o cronômetro não dançar a cada segundo — o "1" é mais estreito
+     que os outros dígitos em quase toda fonte de interface. */
+  font-variant-numeric: tabular-nums;
+}
+.truck-studio-root .ts-recdot {
+  width: 9px; height: 9px; flex: none; border-radius: 50%;
+  background: #e83e3e;
+  animation: truck-studio-recpulse 1.4s ease-in-out infinite;
+}
+@keyframes truck-studio-recpulse { 50% { opacity: 0.25; } }
+/* O pulso é decoração; o ponto vermelho sozinho já diz tudo, e é o ponto que
+   fica quando o sistema pede menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-recdot { animation: none; }
+}
+.truck-studio-root .ts-recstop {
+  font: inherit; color: var(--text); cursor: pointer;
+  background: rgba(255, 255, 255, 0.10); border: 1px solid var(--stroke-2);
+  padding: 3px 12px; border-radius: 999px;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.truck-studio-root .ts-recstop:hover { background: rgba(232, 62, 62, 0.24); border-color: rgba(232, 62, 62, 0.6); }
+.truck-studio-root .ts-recstop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------------- o painel do botão de gravar ----------------
+   Reusa por completo as classes do painel da câmera (.ts-shotgroup /
+   .ts-shotmenu / .ts-shotseg / .ts-shotgo): são o MESMO componente — um grupo de
+   perguntas mais um botão que age — e ui/chrome.ts o constrói com a mesma
+   função. O que existe aqui é só o que é próprio da gravação.
+
+   `--ts-recmenu-w` é maior que o da câmera porque as pastilhas de modo carregam
+   duas palavras ("Volta completa") e quebrar em duas linhas dentro de um
+   segmento faria as duas pastilhas terem alturas diferentes. */
+.truck-studio-root .ts-recgroup .ts-shotmenu { width: 264px; }
+/* A nota de duração fica presa ao segmento de modo, não solta no fim do painel:
+   ela QUALIFICA o modo escolhido ("uma volta em ~18 s"), e uma frase longe do
+   controle que ela descreve é uma frase que ninguém liga a nada. */
+.truck-studio-root .ts-recnote {
+  display: block; margin: -2px 2px 10px; font-size: 11px; line-height: 1.35;
+  color: var(--ts-screen-muted);
 }
 
 /* Botão pequeno da barra do editor (o "×" que devolve o fundo ao alumínio).
@@ -1414,3 +1600,197 @@
 .truck-studio-root .keys { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 11px; }
 .truck-studio-root .keys dt { color: var(--accent); font-weight: 600; white-space: nowrap; }
 .truck-studio-root .keys dd { color: var(--muted); }
+
+/* ============================================================
+   ACABAMENTOS — a tira de teto/paralamas/caixa/Thermo King
+   ============================================================
+   Primeiro filho de #ts-panels (ver a nota em core/template.ts), então herda a
+   coluna, o alinhamento à direita e o gap dos cards de plotagem. O que ela NÃO
+   herda é a largura: os cards têm a largura da própria foto — 300px a lateral,
+   menos a traseira — e esta tira acompanha a MAIS LARGA deles em vez de ter uma
+   sua. Uma quarta largura na mesma pilha faria a borda direita, que é o que
+   alinha tudo, parecer irregular.
+
+   O vidro é o MESMO dos cards: os tokens --ts-glass-* do topo deste arquivo,
+   lidos também pelo HUD, pelos badges e pelos view controls. Quatro materiais
+   sobre o render seria um a mais do que a tela suporta ler. */
+.truck-studio-root .ts-trim {
+  flex: none;
+  width: 300px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--ts-glass-bg);
+  backdrop-filter: var(--ts-glass-filter);
+  -webkit-backdrop-filter: var(--ts-glass-filter);
+  box-shadow: var(--ts-glass-shadow);
+  transition: var(--ts-glass-transition), border-color 0.18s ease;
+}
+.truck-studio-root .ts-trim:hover { border-color: var(--accent); }
+/* Aberta ela ganha o vidro "ativo" — o mesmo salto de opacidade que o hover dos
+   cards usa. Um painel aberto sobre um render em movimento precisa de mais
+   fundo do que um recolhido, senão a lista de cores compete com a lataria. */
+.truck-studio-root .ts-trim.is-open {
+  background-color: var(--ts-glass-bg-hover);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
+}
+
+.truck-studio-root .ts-trim__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.truck-studio-root .ts-trim__title {
+  flex: 1;
+  color: var(--ts-screen-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+/* Os quatro pontinhos: a linha recolhida responde "de que cor está cada peça"
+   sem ninguém abrir nada. É a razão de a tira poder nascer fechada. */
+.truck-studio-root .ts-trim__dots { display: flex; gap: 3px; }
+.truck-studio-root .ts-trim__chev {
+  display: flex;
+  color: var(--ts-screen-muted);
+  transition: rotate 180ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+.truck-studio-root .ts-trim.is-open .ts-trim__chev { rotate: 180deg; }
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-trim__chev { transition: none; }
+}
+
+.truck-studio-root .ts-trim__body {
+  padding: 2px 7px 8px;
+  /* Um filete e não uma borda: separa a cabeçalho do corpo sem desenhar uma
+     segunda caixa dentro da caixa. */
+  border-top: 1px solid var(--stroke-2);
+}
+
+.truck-studio-root .ts-trim__row { display: flex; align-items: center; gap: 4px; }
+
+.truck-studio-root .ts-trim__swbtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 6px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.truck-studio-root .ts-trim__swbtn:hover { background: rgba(255, 255, 255, 0.07); }
+.truck-studio-root .ts-trim__swbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.truck-studio-root .ts-trim__swbtn[aria-expanded="true"] { border-color: var(--accent); }
+
+.truck-studio-root .ts-trim__name { flex: none; }
+/* O valor encolhe antes do nome: "Teto" tem de caber sempre, e é o nome de uma
+   cor que pode ter cinco palavras. */
+.truck-studio-root .ts-trim__val {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  color: var(--ts-screen-muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A PASTILHA. Anel interno claro em vez de borda: uma borda externa sobre uma
+   cor escura some no vidro, e sobre uma clara vira contorno. O inset funciona
+   nas duas pontas da paleta. */
+.truck-studio-root .ts-trim__sw {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+.truck-studio-root .ts-trim__sw--dot { width: 9px; height: 9px; }
+/* SEM COR PRÓPRIA é um quadriculado, e não um buraco: um disco transparente
+   sobre vidro escuro leria como "preto" — que é uma cor da paleta. */
+.truck-studio-root .ts-trim__sw.is-empty {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.22) 25%, transparent 25%,
+      transparent 75%, rgba(255, 255, 255, 0.22) 75%) 0 0 / 6px 6px,
+    linear-gradient(45deg, rgba(255, 255, 255, 0.22) 25%, transparent 25%,
+      transparent 75%, rgba(255, 255, 255, 0.22) 75%) 3px 3px / 6px 6px,
+    rgba(255, 255, 255, 0.06);
+}
+
+.truck-studio-root .ts-trim__eye {
+  flex: none;
+  display: flex;
+  padding: 6px;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ts-screen-muted);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+.truck-studio-root .ts-trim__eye:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
+.truck-studio-root .ts-trim__eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* A peça REMOVIDA do produto: o olho fica apagado, e é o único estado desta
+   tira que muda a geometria em cena e não só uma cor. */
+.truck-studio-root .ts-trim__eye.is-off { color: var(--accent); }
+
+/* A GRADE DE CORES. Irmã da linha, largura toda — ver a nota em ui/trim-panel.ts.
+   `auto-fill` com um mínimo em vez de um número de colunas: a paleta vem do
+   banco e não tem tamanho fixo, e uma contagem cravada aqui erraria em toda
+   montadora que tiver uma cor a mais. */
+.truck-studio-root .ts-trim__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+  gap: 3px;
+  margin: 2px 2px 8px;
+  padding: 7px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.30);
+  /* A paleta cresce com o catálogo; sem teto ela empurraria os cards de
+     plotagem para fora do render. Rola DENTRO da grade, como #ts-panels faz. */
+  max-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.truck-studio-root .ts-trim__opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.truck-studio-root .ts-trim__opt:hover { background: rgba(255, 255, 255, 0.09); }
+.truck-studio-root .ts-trim__opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.truck-studio-root .ts-trim__opt.is-on { border-color: var(--accent); }

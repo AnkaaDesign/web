@@ -47,19 +47,24 @@ import type { PaintColorDef } from './catalog/colors';
 import type { FinishDef } from './catalog/catalog';
 import { applyEnvironment, getCurrentEnvironment, disposeEnvironments } from './scene/environment';
 import { disposeReflectionProbe } from './scene/probe';
+import { stopRecording } from './scene/record';
+import * as trim from './vehicle/trim';
+import { loadLiveryArt } from './vehicle/livery-art';
 import {
   initLoader, showLoader, setLoaderProgress, finishLoader, hideLoader,
   claimPill, paintFrame, withPill,
 } from './ui/loader';
 import { initHud, syncHud } from './ui/hud';
 import { initWeather } from './scene/weather';
-import { initUI, setStatus, setCaptureSubject } from './ui/chrome';
+import { initUI, setStatus, setCaptureSubject, exitFullscreen } from './ui/chrome';
 /* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
    ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
    já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
    e um é o suficiente. */
 import { initPaintPanel, setPaintPanelColor, closePaintPanel } from './ui/paint-panel';
+import { initTrimPanel, refreshTrimPanel } from './ui/trim-panel';
 import { root, $ } from './core/dom';
+import { prefetchStats, isWarm } from './core/prefetch';
 import type {
   Choice, ChassisDef, EnvironmentDef, ManufacturerDef, ModelDef,
 } from './catalog/catalog';
@@ -118,6 +123,30 @@ let queueDepth = 0;
 const sameRig = (a: Choice | null, b: Choice | null) =>
   !!a && !!b && a.envId === b.envId && a.modelId === b.modelId
   && a.chassisId === b.chassisId;
+
+/* ---------------- os ACABAMENTOS na escolha gravada ----------------
+   `Choice.trim` é o único campo da escolha que NÃO vem do seletor: quem o
+   escreve é o card de acabamentos, a qualquer momento, sem passar por
+   applyChoice(). Por isso ele não entra em `sameRig` nem em `sameChoice` — ele
+   não decide o que carregar (trocar a cor do teto não custa um byte de rede,
+   exatamente como a cor do cavalo) e não pode fazer um clique repetido deixar de
+   ser repetido.
+
+   O que ele exige é que TODA gravação o carregue, sempre lido de
+   `trim.trimChoice()` na hora — nunca de uma cópia guardada aqui, que é como as
+   duas superfícies passariam a discordar. */
+const withTrim = (choice: Choice): Choice => {
+  const t = trim.trimChoice();
+  return t ? { ...choice, trim: t } : choice;
+};
+
+/* Uma mudança de acabamento grava a escolha ATUAL de novo. Sem isto a cor do
+   teto viveria só até o próximo F5 — e ela é uma decisão de produto, não um
+   estado de sessão. Ver `onTrimChanged` em vehicle/trim.ts para por que a
+   notificação vem por assinatura. */
+trim.onTrimChanged(() => {
+  if (currentChoice) saveChoice(withTrim(currentChoice));
+});
 
 /* "É a mesma escolha, ponto?" — a pergunta do dedupe. A cor ENTRA aqui: sem
    ela, escolher outra cor para o mesmo caminhão seria descartado como repetido
@@ -952,10 +981,14 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     setCaptureSubject([truckLabel(manufacturer.name, model.name), chassis.name, color.name]);
 
     currentChoice = choice;
+    /* Os acabamentos gravados entram na PEÇA que acabou de ser montada. Aqui e
+       não antes: `setTrimChoice()` escreve material em malhas do implemento, e
+       até esta linha o implemento pode ser o do caminhão anterior. */
+    trim.setTrimChoice(choice.trim);
     /* Persiste só o que de fato renderizou: uma escolha que falhou ao carregar
        não pode virar aquela em que a próxima visita entra. (O seletor também
        pode tê-la salvo; saveChoice é idempotente.) */
-    saveChoice(choice);
+    saveChoice(withTrim(choice));
     /* applyEnvironment() reaplica o preset, a hora e a exposição da própria
        cena, então todo controle do HUD de luz está velho no instante em que o
        cenário muda. syncHud() relê a cena em vez de confiar nos últimos valores
@@ -1058,7 +1091,7 @@ function applyChoice(
     const runColor = () => withPill(`Aplicando ${resolved.color.name}…`, () => {
       applyColor(resolved.color);
       currentChoice = resolved.choice;
-      saveChoice(resolved.choice);
+      saveChoice(withTrim(resolved.choice));
       setStatus(`${truckLabel(resolved.manufacturer.name, resolved.model.name)} · ${resolved.color.name}`);
       warnIfUnpaintable(resolved.color);
       return resolved.choice;
@@ -1146,6 +1179,13 @@ async function boot() {
     initWeather();
     initUI();
     initPaintPanel();
+    initTrimPanel();
+    /* A arte estrutural do painel (fita 3M, cantoneira, porta). Sem `await`, e
+       de propósito: são 37 kB que só melhoram o desenho do editor, e nenhum
+       passo do boot depende deles. O que chega antes de o usuário abrir o editor
+       chega a tempo; o que não chegar deixa o placeholder, que é utilizável.
+       Ver o cabeçalho de engine/vehicle/livery-art.ts. */
+    loadLiveryArt();
 
     $('load-text').textContent = 'Carregando catálogo…';
     /* Três listas independentes: o catálogo diz o que o usuário PODE escolher,
@@ -1156,6 +1196,21 @@ async function boot() {
        memória antes de o primeiro grid ser montado. Ele nunca lança e nunca
        bloqueia nada — ausente = todo card cai no placeholder de silhueta. */
     await Promise.all([loadCatalog(), models.loadManifests(), loadColors(), loadRenders()]);
+    /* A tira de acabamentos foi montada ANTES da paleta existir — a grade dela
+       teria saído só com "Como o baú". Repintar aqui é o mesmo padrão que o
+       seletor usa, e custa uma varredura de quatro linhas. */
+    refreshTrimPanel();
+
+    /* O IMPLEMENTO COMEÇA A DESCER AGORA — antes de existir seletor na tela.
+       Ele é carregado em TODO boot (`if (first) weights.trailer = 150` lá em
+       runApply), então isto não é uma aposta: é a mesma transferência, movida
+       para o lado do assistente em vez de depois dele. São 31 MB contra alguns
+       segundos a um minuto de escolha; no caso comum a barra do implemento já
+       nasce cheia.
+       DEPOIS dos manifestos e não antes: `assetUrl()` depende de configuração
+       carregada, e disputar as duas vagas de MAX_IN_FLIGHT com os quatro
+       manifestos atrasaria a única coisa que bloqueia o seletor de abrir. */
+    models.prefetchTrailerAssets();
 
     initSelector();
     initLoader();
@@ -1210,6 +1265,11 @@ async function boot() {
          {kind:'svg', markup})` é o ponto de entrada dos SVGs que o cliente vai
          mandar — dá para provar o encaixe pelo console antes de existir
          qualquer interface para isso. Nada disto toca a textura do baú. */
+      /* O aquecimento de assets. `stats()` responde a única pergunta que
+         importa aqui — "a fila esvazia ANTES do último clique do seletor?" —, e
+         a forma de perguntar é abrir o seletor, escolher devagar e olhar
+         `pendentes`/`emVoo`. Se não zerarem, o gargalo é a rede, não a fila. */
+      prefetch: { stats: prefetchStats, isWarm },
       measures: liveryStructure,
       cabGroup: models.state.cabGroup,
       trailerGroup: models.state.trailerGroup,
@@ -1311,7 +1371,20 @@ export function mountStudio(host: HTMLElement): Promise<void> {
  *  de rota — desmontar a cortina aqui só revelaria uma cena pela metade quando o
  *  usuário voltasse no meio do carregamento. */
 export function unmountStudio() {
+  /* ANTES do stopLoop(), e descartando. Uma gravação em curso vive de quadros
+     que o laço desenha; parar o laço primeiro a deixaria rodando o cronômetro
+     sobre um canvas congelado até bater no teto — e então baixando um arquivo
+     de vários segundos de imagem parada, na cara de uma tela que o usuário já
+     trocou. O descarte é o que separa isso de "parar", que continua entregando
+     o vídeo. Sem efeito quando não há gravação. */
+  stopRecording(true);
   stopLoop();
+  /* ANTES de soltar o `root`. O navegador sai de tela cheia sozinho quando o
+     elemento em tela cheia deixa o documento, mas o quadro entre uma coisa e
+     outra é a rota nova desenhada atrás de uma tela que ainda é da ferramenta
+     anterior. Sair explicitamente elimina esse quadro. Não faz nada quando quem
+     está em tela cheia não é o estúdio — ver a guarda em ui/chrome.ts. */
+  exitFullscreen();
   observer?.disconnect();
   observer = null;
   /* Os dois observadores de tema saem junto com o resto: uma ferramenta que saiu

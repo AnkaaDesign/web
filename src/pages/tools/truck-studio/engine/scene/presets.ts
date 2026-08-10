@@ -26,7 +26,152 @@ export const RIG_BASE = {
   starOpacity: 0, lampIntensity: 0, lampEmissive: 0, lampColor: 0xffb45e,
   wetness: 0, rain: 0, rainColor: 0xc8d6ea,
   nightness: 0, glintBoost: 1.0,
+  /* O ALBEDO DA SALA DE CICLORAMA, como MULTIPLICADOR da rampa autorada em
+     scene/cyclorama.ts. 1 = a rampa como ela está escrita lá.
+
+     Ele é um campo do RIG — e não uma variável solta em cyclorama.ts — por uma
+     razão só, e ela é a que faz o desenho inteiro funcionar: tudo que é campo do
+     rig atravessa `lerpRig()` de graça. Trocar a cor de fundo do estúdio passa a
+     ser um CROSSFADE de 0,8 s como qualquer outra troca de preset, em vez de um
+     salto; e cyclorama.ts recebe o valor pelo `onRig()` que ele já assina, sem
+     que scene.ts precise importá-lo (o que fecharia um ciclo — cyclorama importa
+     scene).
+     Vale só onde há sala; nos outros presets ninguém o lê. */
+  cycloramaAlbedo: 1,
 };
+
+/* ---------------- os fundos do estúdio ----------------
+   As quatro pastilhas de "Fundo" do HUD, e por que cada uma é um PAR e não uma
+   cor.
+
+   `scene/cyclorama.ts` traz uma tabela MEDIDA (varredura de `gl.readPixels` com
+   cavalo, implemento e fundo mascarados em separado) cujo achado central é este:
+   a luminância de uma lataria BRANCA é praticamente insensível à luz — mediana
+   170 com a chave variando 3x, porque um branco já está no ombro da ACES. Logo a
+   separação figura/fundo não se compra subindo a luz; só se compra MEXENDO NO
+   FUNDO. A tabela liga escala de albedo a luminância de fundo:
+
+       escala   fundo   separação (branco − fundo)
+        1.00     137            33
+        0.75     120            50
+        0.55     103            67
+        0.40      88            82
+        0.28      75            95
+
+   A rampa que está escrita em cyclorama.ts É a linha de 0,50 — ou seja, o
+   `albedo: 1` abaixo reproduz exatamente o estúdio de hoje, e o padrão não muda
+   para ninguém.
+
+   OS OUTROS TRÊS SÃO EXTRAPOLADOS DAQUELA TABELA, NÃO MEDIDOS — e isto está
+   escrito porque a diferença importa: os números abaixo são a melhor conta que
+   dá para fazer com o que foi medido, e quem quiser fechá-los tem o método
+   documentado no cabeçalho de cyclorama.ts para remedir. O que NÃO é
+   extrapolação é a FORMA da correção:
+
+   * um fundo CLARO inverte o problema. A lataria branca fica presa em 170 e o
+     fundo passa dela, então a separação vira negativa e o veículo some por
+     cima em vez de por baixo. A resposta é a mesma de um estúdio de verdade:
+     baixar a exposição (tirar o branco do ombro) e SUBIR o recorte, que é a
+     única luz que ainda desenha um contorno quando figura e fundo têm o mesmo
+     valor;
+   * um fundo PRETO não precisa de nada disso — a separação é máxima por
+     construção —, mas ganha um pouco de recorte porque um cavalo escuro contra
+     preto é a única combinação em que o contorno some por baixo. */
+export interface BackdropDef {
+  /** kebab-case, estável (vai para o localStorage) */
+  id: string;
+  /** rótulo pt-BR da pastilha */
+  name: string;
+  /** multiplicador da rampa de cyclorama.ts (1 = como autorada) */
+  albedo: number;
+  /** cor de limpeza, névoa e bandas do céu — o fundo quando não há sala de pé */
+  bg: number;
+  /** multiplicador da exposição do preset */
+  exposure: number;
+  /** multiplicador do recorte (rim) */
+  rim: number;
+}
+
+export const BACKDROPS: readonly BackdropDef[] = [
+  /* PRETO É "SEM SALA", NÃO "SALA ESCURA" — e a diferença é o pedido inteiro.
+     ---------------------------------------------------------------------
+     A primeira versão deste fundo era a rampa a 18 %: um ciclorama cinza bem
+     escuro, ILUMINADO. O dono do produto corrigiu: *"a ideia do fundo preto é
+     não receber luz, a luz ficar somente no cavalo e trailer"*. E ele está
+     certo — um fundo que recebe luz tem gradiente, tem realce de key e clareia
+     quando alguém sobe a intensidade, ou seja não é preto: é cinza variável.
+
+     `albedo: 0` não é "quase nada de albedo", é um SINAL: cyclorama.ts esconde a
+     casca inteira e põe no lugar um piso de `ShadowMaterial`, que escreve só a
+     máscara de sombra. O que sobra na tela é a cor de limpeza (#000, abaixo) e o
+     veículo. Nenhuma superfície de fundo para a luz alcançar.
+
+     O PISO DE SOMBRA É O QUE IMPEDE O CAMINHÃO DE FLUTUAR. Sem chão não há
+     sombra de contato, e sem sombra de contato um veículo sobre preto lê como
+     recorte mal feito. É a mesma peça — e o mesmo motivo — do recorte
+     transparente em scene/capture.ts. */
+  { id: 'preto', name: 'Preto', albedo: 0, bg: 0x000000, exposure: 1.00, rim: 1.20 },
+  /* O DE HOJE, byte a byte: albedo 1 é a rampa como está escrita, e 0x242424 é
+     o `bgColor` que o preset `ciclorama` já traz. Quem nunca tocar na pastilha
+     não vê diferença nenhuma. */
+  { id: 'cinza-escuro', name: 'Cinza escuro', albedo: 1.00, bg: 0x242424, exposure: 1.00, rim: 1.00 },
+  { id: 'cinza-claro', name: 'Cinza claro', albedo: 2.80, bg: 0x6a6a6a, exposure: 0.94, rim: 1.35 },
+  { id: 'branco', name: 'Branco', albedo: 5.00, bg: 0xc4c4c4, exposure: 0.86, rim: 1.60 },
+];
+
+export const DEFAULT_BACKDROP = 'cinza-escuro';
+
+/* ---------------- temperatura de cor ----------------
+   Pedido do dono do produto: *"falta seletores de color temperature, que seria
+   interessante"*. É o controle que faltava para o estúdio ser um estúdio — luz
+   quente e luz fria mudam completamente como uma tinta lê, e é justamente a
+   pergunta que um cliente faz ("como fica no sol? e dentro do galpão?").
+
+   6500 K É EXATAMENTE NEUTRO, e isso é requisito, não arredondamento. Esta é a
+   cena em que se JULGA uma tinta; o preset `ciclorama` autora a chave em R=G=B
+   exato por esse motivo, e um controle de temperatura que passasse por ele
+   deixando um resíduo de cor destruiria a premissa do cenário inteiro sem
+   ninguém perceber. Por isso a conversão é NORMALIZADA pelo próprio valor em
+   6500 K: no meio da faixa o multiplicador é (1, 1, 1) por construção, não por
+   sorte.
+
+   A aproximação é a de Tanner Helland — a mesma que praticamente todo software
+   de foto usa para a régua de Kelvin. Ela não é um corpo negro exato e não
+   precisa ser: o que ela tem de acertar é a FAMÍLIA (2700 K parece lâmpada
+   incandescente, 5000 K parece luz de dia, 7500 K parece sombra azulada), e
+   nisso ela é indistinguível do exato.
+
+   O multiplicador pode passar de 1 num canal — em 7500 K o verde sai ~2 % acima
+   — e isso é ACEITO de propósito. Limitar a 1 achataria o matiz justamente para
+   preservar uma normalização que não é sobre intensidade; 2 % de ganho num canal
+   é invisível ao lado da própria mudança de temperatura, e a intensidade tem
+   controle próprio. */
+export const TEMP_NEUTRAL = 6500;
+export const TEMP_MIN = 2200;
+export const TEMP_MAX = 9000;
+
+function planckRGB(kelvin: number): [number, number, number] {
+  const t = Math.max(1000, Math.min(12000, kelvin)) / 100;
+  const r = t <= 66 ? 255 : 329.698727446 * ((t - 60) ** -0.1332047592);
+  const g = t <= 66
+    ? 99.4708025861 * Math.log(t) - 161.1195681661
+    : 288.1221695283 * ((t - 60) ** -0.0755148492);
+  const b = t >= 66 ? 255
+    : (t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307);
+  const c = (v: number) => Math.min(255, Math.max(0, v)) / 255;
+  return [c(r), c(g), c(b)];
+}
+
+const TEMP_WHITE = planckRGB(TEMP_NEUTRAL);
+
+/** O multiplicador de cor desta temperatura. `TEMP_NEUTRAL` → (1, 1, 1) exato. */
+export function kelvinTint(kelvin: number, out: THREE.Color): THREE.Color {
+  const [r, g, b] = planckRGB(kelvin);
+  return out.setRGB(r / TEMP_WHITE[0], g / TEMP_WHITE[1], b / TEMP_WHITE[2]);
+}
+
+export const backdropOf = (id: string | null | undefined): BackdropDef =>
+  BACKDROPS.find((b) => b.id === id) || BACKDROPS.find((b) => b.id === DEFAULT_BACKDROP)!;
 
 /* Night is a WEATHER-ORTHOGONAL axis: every preset has a dia and a noite face,
    so "overcast at night" and "raining at night" both exist and look right. */
@@ -288,7 +433,7 @@ export const LIGHT_PRESETS: Record<string, LightPreset> = {
      retangulares do RoomEnvironment dão à tinta o realce alongado de softbox
      que um céu em gradiente não tem, e um estúdio não tem sol para orbitar. */
   ciclorama: {
-    name: 'Ciclorama', env: 'room', solar: false,
+    name: 'Ciclorama', env: 'room', solar: false, studio: true,
     dia: {
       /* KEY NEUTRA POR DEFINIÇÃO. Esta é a cena em que se JULGA uma tinta, então
          a luz principal não pode ter dominante nenhuma: R=G=B exato. A "leve
@@ -403,6 +548,20 @@ export interface LightPreset {
   env?: 'room';
   /** false opts the preset out of the clock's sun geometry — see `estudio`. */
   solar?: boolean;
+  /**
+   * Este preset é uma SALA DE ESTÚDIO — tem ciclorama, e portanto tem fundo
+   * escolhível e luz de estúdio em vez de hora do dia e clima.
+   *
+   * É a marca que o HUD lê para trocar de face (ui/hud.ts). Poderia ter sido
+   * `env === 'room'`, e estaria ERRADO: o `estudio` também é `room` e é a luz do
+   * cenário `armazem` — um galpão fechado, sem ciclorama nenhum. Oferecer ali
+   * uma pastilha de "cor de fundo" seria um controle que não muda nada, que é a
+   * pior espécie de controle.
+   *
+   * Também não é "o ciclorama está de pé?": essa pergunta só cyclorama.ts sabe
+   * responder, e scene.ts não pode importá-lo (a seta é a contrária).
+   */
+  studio?: boolean;
 }
 
 /* which rig fields are colours (lerped as THREE.Color) vs plain numbers */

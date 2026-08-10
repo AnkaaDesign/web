@@ -216,6 +216,15 @@ const MAX_SHADOW = 4096;
 /** Amostras de MSAA do alvo de captura — as mesmas que `antialias: true` pede. */
 const WANT_SAMPLES = 4;
 
+/**
+ * O que fica ATRÁS do veículo na imagem.
+ *
+ * `cena` é a captura de sempre: o quadro que está na tela, com cenário, céu e
+ * tudo. `recorte` é o veículo sozinho sobre transparência, com a sombra de
+ * contato preservada — ver o bloco "o fundo transparente".
+ */
+export type CaptureBackground = 'cena' | 'recorte';
+
 export interface CaptureResult {
   blob: Blob;
   /** as dimensões reais da imagem exportada, depois de todos os limites */
@@ -225,12 +234,16 @@ export interface CaptureResult {
   quality: CaptureQuality;
   /** quantos ladrilhos foram renderizados (1 = passe único) */
   tiles: number;
+  /** o fundo que de fato saiu */
+  background: CaptureBackground;
   /** não-nulo quando o preset pedido não coube nesta placa */
   degraded: string | null;
 }
 
 export interface CaptureOptions {
   quality?: CaptureQuality;
+  /** `'recorte'` → veículo sobre transparência. Padrão `'cena'`. */
+  background?: CaptureBackground;
   /** desligar o aumento do mapa de sombra (afordance de console) */
   sharpenShadows?: boolean;
   /** progresso do modo alta: `onTile(feitos, total)` */
@@ -405,21 +418,117 @@ function makeTarget(w: number, h: number): THREE.WebGLRenderTarget {
 
 /**
  * Uma linha de pixels do WebGL vem de baixo para cima; um ImageData vai de cima
- * para baixo. A cópia é por LINHA (`set` de um subarray é memcpy), e o alfa é
- * forçado a opaco depois.
+ * para baixo. A cópia é por LINHA (`set` de um subarray é memcpy).
  *
- * O alfa não é preciosismo: a cena é opaca (o fundo é céu ou cor de limpeza com
- * alfa 1), mas um único pixel com alfa < 255 num PNG vira transparência de
- * verdade no arquivo salvo, e o canvas 2D é `alpha: false` justamente para isso
- * não existir. Escrito byte a byte, não por Uint32: um OR de máscara dependeria
- * da ordem de bytes da máquina.
+ * `opaque` FORÇA o alfa a 255, e é o padrão. Não é preciosismo: numa captura
+ * normal a cena É opaca (o fundo é céu ou cor de limpeza com alfa 1), mas um
+ * único pixel com alfa < 255 vira transparência de verdade no PNG salvo — e o
+ * canvas 2D é `alpha: false` justamente para isso não existir. Escrito byte a
+ * byte, não por Uint32: um OR de máscara dependeria da ordem de bytes da
+ * máquina.
+ *
+ * Com `opaque: false` o alfa ATRAVESSA, que é o recorte transparente. É a
+ * única linha de código que separa uma coisa da outra no caminho de pixels —
+ * ver o bloco "o fundo transparente" lá embaixo para o resto.
  */
-function flipInto(src: Uint8Array, dst: Uint8ClampedArray, w: number, h: number) {
+function flipInto(src: Uint8Array, dst: Uint8ClampedArray, w: number, h: number,
+  opaque = true) {
   const row = w * 4;
   for (let y = 0; y < h; y++) {
     dst.set(src.subarray((h - 1 - y) * row, (h - y) * row), y * row);
   }
-  for (let i = 3; i < dst.length; i += 4) dst[i] = 255;
+  if (opaque) for (let i = 3; i < dst.length; i += 4) dst[i] = 255;
+}
+
+/* ---------------- o fundo transparente ----------------
+   O PEDIDO: "as imagens renderizadas lá tenham fundo transparente, ou pelo menos
+   que possa ser selecionado".
+
+   O QUE ELE **NÃO** CUSTOU, e vale dizer primeiro porque é contraintuitivo:
+   NÃO foi preciso ligar `alpha: true` no WebGLRenderer. Aquilo é uma flag de
+   CONSTRUÇÃO — mudá-la afetaria todo quadro de tela pelo resto da sessão, para
+   servir a um botão apertado algumas vezes por dia. E não é preciso porque esta
+   captura já não desenha no canvas visível: ela renderiza para um
+   `WebGLRenderTarget` com `RGBAFormat`, e **o canal alfa sempre esteve lá**. O
+   que o jogava fora eram três linhas, todas neste arquivo:
+
+     1. `flipInto()` forçava alfa 255 em todo pixel;
+     2. `scene.background` continuava sendo o céu (ou a cor de limpeza);
+     3. o canvas 2D de composição era `{ alpha: false }`.
+
+   O QUE UM RECORTE É. Um caminhão sem fundo não é "a mesma cena sem o céu": é o
+   VEÍCULO e a luz dele, e nada mais. Por isso a isolação é uma LISTA DE
+   PERMISSÃO e não uma lista de exclusão — ficam o grupo `RIG` e as luzes, e todo
+   o resto some. Escrito assim de propósito: uma exclusão por nome
+   (`ts-set`, `ts-ciclorama`, `ts-haze`, domo, estrelas, postes, chuva) estaria
+   incompleta no dia em que a cena ganhasse mais um filho, e o sintoma seria um
+   poste flutuando num PNG que deveria ter só o caminhão. Com permissão, o
+   padrão de qualquer coisa nova é ficar de fora, que é o lado certo de errar.
+
+   A SOMBRA DE CONTATO É O QUE FAZ ISTO SER USÁVEL. Sem o piso do ciclorama não
+   há sombra, e um veículo recortado sem sombra FLUTUA — é a diferença entre um
+   recorte que entra num catálogo e um que precisa ser refeito no Photoshop. O
+   plano abaixo usa `ShadowMaterial`, que é o único material do three que escreve
+   SÓ a máscara de sombra no alfa: onde não há sombra ele não escreve nada, e o
+   fundo continua transparente. Um `MeshBasicMaterial` com opacidade não serviria
+   — ele pintaria o plano inteiro. */
+
+/** Meia-aresta do plano de sombra, em metros. Cobre a órbita inteira do rig. */
+const SHADOW_PLANE_HALF = 40;
+
+let shadowPlane: THREE.Mesh | null = null;
+
+function ensureShadowPlane(): THREE.Mesh {
+  if (shadowPlane) return shadowPlane;
+  const geo = new THREE.PlaneGeometry(SHADOW_PLANE_HALF * 2, SHADOW_PLANE_HALF * 2);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.ShadowMaterial({ opacity: 0.42 });
+  mat.name = 'ts-capture-shadow';
+  shadowPlane = new THREE.Mesh(geo, mat);
+  shadowPlane.name = 'ts-capture-shadow';
+  shadowPlane.receiveShadow = true;
+  shadowPlane.castShadow = false;
+  /* y = 0 é o piso do mundo — `groundAndCenter()` assenta os pneus nele e
+     scene/cyclorama.ts põe o piso da sala no mesmo lugar. */
+  shadowPlane.position.y = 0;
+  return shadowPlane;
+}
+
+/**
+ * Esconde tudo que não é o veículo nem luz, põe o plano de sombra e devolve a
+ * função que desfaz. Sempre chamada dentro de um try/finally.
+ */
+function isolateVehicle(): () => void {
+  const hidden: THREE.Object3D[] = [];
+  const rig = scene.getObjectByName('RIG');
+  for (const child of scene.children) {
+    if (!child.visible) continue;                 // já escondido: não é nosso
+    if (child === rig) continue;
+    if ((child as THREE.Light).isLight) continue;
+    /* O `target` da DirectionalLight é um Object3D solto na cena e cai aqui,
+       escondido junto — e isso é INOFENSIVO, não um descuido: o three lê
+       `target.matrixWorld`, e `updateMatrixWorld()` percorre nós invisíveis. A
+       direção da chave e a caixa de sombra continuam exatamente onde estavam.
+       (Verificado antes de escrever: `renderer.render()` chama
+       `scene.updateMatrixWorld()` sem filtrar por visibilidade; quem filtra é o
+       `projectObject`, que decide o que DESENHAR.) */
+    child.visible = false;
+    hidden.push(child);
+  }
+  const plane = ensureShadowPlane();
+  const centre = rig ? rig.position : null;
+  if (centre) plane.position.set(centre.x, 0, centre.z);
+  scene.add(plane);
+  /* O mapa de sombra tem de ser refeito: o ciclorama saiu da cena e o plano
+     entrou, e os dois são receptores. `needsUpdate` direto porque scene.ts roda
+     com `autoUpdate = false` e o laço está PARADO durante a captura —
+     invalidateShadows() pediria um quadro que ninguém vai desenhar. */
+  renderer.shadowMap.needsUpdate = true;
+  return () => {
+    scene.remove(plane);
+    for (const o of hidden) o.visible = true;
+    renderer.shadowMap.needsUpdate = true;
+  };
 }
 
 /* Um quadro cedido ENTRE ladrilhos, não dentro: mantém a aba responsiva e deixa
@@ -454,14 +563,18 @@ function yieldFrame(): Promise<void> {
 async function renderMosaic(
   cam: THREE.PerspectiveCamera,
   fullW: number, fullH: number, nx: number, ny: number, tileW: number, tileH: number,
+  transparent: boolean,
   onTile?: (done: number, total: number) => void,
 ): Promise<HTMLCanvasElement | null> {
   const out = document.createElement('canvas');
   out.width = fullW;
   out.height = fullH;
-  /* `alpha: false` e `willReadFrequently: false`: a composição é só escrita, e
-     um alvo opaco é metade da banda de memória de um com alfa. */
-  const ctx = out.getContext('2d', { alpha: false });
+  /* `alpha: false` no caminho normal: a composição é só escrita, e um alvo opaco
+     é metade da banda de memória de um com alfa. No recorte ele TEM de ser
+     `true` — um canvas 2D sem alfa força todo pixel a opaco na escrita, então o
+     `putImageData` jogaria fora exatamente a transparência que o render target
+     acabou de produzir. */
+  const ctx = out.getContext('2d', { alpha: transparent });
   if (!ctx) return null;
 
   const total = nx * ny;
@@ -469,8 +582,19 @@ async function renderMosaic(
      também usa alvos — restaurar o que estava é mais barato que assumir. */
   const prevTarget = renderer.getRenderTarget();
   let rt: THREE.WebGLRenderTarget | null = null;
+  /* Guardados ANTES do try, restaurados no finally: o fundo da cena e o alfa de
+     limpeza são globais do renderizador, e uma exceção no meio do mosaico não
+     pode deixar o estúdio com o céu desligado. */
+  const prevBackground = scene.background;
+  const prevClearAlpha = renderer.getClearAlpha();
+  let restoreIsolation: (() => void) | null = null;
 
   try {
+    if (transparent) {
+      restoreIsolation = isolateVehicle();
+      scene.background = null;
+      renderer.setClearAlpha(0);
+    }
     rt = makeTarget(tileW, tileH);
     /* Dois buffers, REUSADOS pelos 16 ladrilhos: um do tamanho do ladrilho para
        a leitura crua e um para o ImageData já virado. */
@@ -497,7 +621,7 @@ async function renderMosaic(
            com o alvo ainda ligado devolveria o buffer não resolvido. */
         renderer.setRenderTarget(null);
         renderer.readRenderTargetPixels(rt, 0, 0, tileW, tileH, src);
-        flipInto(src, dst, tileW, tileH);
+        flipInto(src, dst, tileW, tileH, !transparent);
         ctx.putImageData(new ImageData(dst, tileW, tileH), tx * tileW, ty * tileH);
         done++;
         onTile?.(done, total);
@@ -515,6 +639,9 @@ async function renderMosaic(
   } finally {
     renderer.setRenderTarget(prevTarget);
     rt?.dispose();
+    restoreIsolation?.();
+    scene.background = prevBackground;
+    renderer.setClearAlpha(prevClearAlpha);
   }
 }
 
@@ -539,6 +666,17 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<Captur
     ? opts.quality : DEFAULT_QUALITY;
   let preset = CAPTURE_PRESETS[quality];
   let degraded: string | null = null;
+
+  const background: CaptureBackground = opts.background === 'recorte' ? 'recorte' : 'cena';
+  /* UM RECORTE É SEMPRE PNG. O preset Baixa é WebP com PERDAS a 0.92, e perda
+     numa borda alfa produz franja — pixels meio-transparentes com cor de fundo
+     grudada, que é exatamente o defeito que faz um recorte ser rejeitado. WebP
+     sem perdas resolveria e custaria mais que o PNG nesta escala; PNG é o
+     formato que quem recebe um recorte espera. Reescrito no `preset` local, e
+     não em CAPTURE_PRESETS, que é constante compartilhada. */
+  if (background === 'recorte' && preset.mime !== 'image/png') {
+    preset = { ...preset, mime: 'image/png', ext: 'png', quality: undefined };
+  }
 
   const edgeMax = edgeLimit();
   let { outW, outH } = outputSize(aspect, preset);
@@ -585,7 +723,8 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<Captur
         tiles: t.nx * t.ny,
         canvas: await renderMosaic(
           captureCamera(t.fullW / t.fullH),
-          t.fullW, t.fullH, t.nx, t.ny, t.tileW, t.tileH, opts.onTile,
+          t.fullW, t.fullH, t.nx, t.ny, t.tileW, t.tileH,
+          background === 'recorte', opts.onTile,
         ),
       };
     };
@@ -597,6 +736,7 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<Captur
          usuário pediu uma imagem, e uma imagem menor é uma resposta; um erro não
          é. Só uma vez, e nunca de Média para Média. */
       quality = 'medium';
+      /* Média já é PNG, então o reescrito do recorte não se perde aqui. */
       preset = CAPTURE_PRESETS.medium;
       const s = outputSize(aspect, preset);
       degraded = 'A resolução alta não coube nesta placa; a imagem saiu em '
@@ -614,7 +754,7 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<Captur
       if (blob) degraded = (degraded ? degraded + ' ' : '') + 'WebP indisponível; saiu em PNG.';
     }
     if (!blob) throw new Error('O navegador não conseguiu codificar a imagem.');
-    return { blob, width: outW, height: outH, quality, tiles, degraded };
+    return { blob, width: outW, height: outH, quality, tiles, background, degraded };
   } finally {
     /* NÃO HÁ CÂMERA A RESTAURAR — é o ponto do módulo. O que volta é só o que é
        global: o mapa de sombra e o laço.

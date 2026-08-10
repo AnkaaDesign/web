@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="7063.3 2291.6 21.699999999999818 809" width="21.699999999999818" height="809" preserveAspectRatio="none">
+<!-- testeira — post-end
+     21.7 x 809.0 u = 77 x 2863 mm
+     Recortado de "layout 15,40 para teste.svg" por tools/livery-svg/slice.mjs.
+     Coordenadas ORIGINAIS da prancha; o recorte e o viewBox. -->
+<style>.cls-5,.cls-19,.cls-22{fill: none;}.cls-22{stroke-linecap: round;
+        stroke-linejoin: round;}.cls-22{stroke: #000;}.cls-5,.cls-19{stroke-miterlimit: 22.93;}.cls-19{stroke-width: .5px;}.cls-51{fill: #d2d4d5;}.cls-52{fill: #292929;}.cls-58{fill: url(#Gradiente_sem_nome_15);}.cls-61{fill: url(#Gradiente_sem_nome_18);}.cls-64{fill: url(#Gradiente_sem_nome_17);}.cls-65{fill: url(#Gradiente_sem_nome_16);}.cls-5{stroke: #858789;}.cls-5{stroke-width: .57px;}.cls-19{stroke: #373535;}.cls-22{stroke-width: 1.95px;}</style>
+<defs><linearGradient id="Gradiente_sem_nome_15" data-name="Gradiente sem nome 15" x1="6715.89" y1="2342.37" x2="6715.89" y2="2332.45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_16" data-name="Gradiente sem nome 16" x1="6715.89" y1="2309.89" x2="6715.89" y2="2299.97" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_17" data-name="Gradiente sem nome 17" x1="6715.89" y1="3083.23" x2="6715.89" y2="3073.3" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_18" data-name="Gradiente sem nome 18" x1="6715.89" y1="3050.74" x2="6715.89" y2="3040.82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient></defs>
+<rect class="cls-19" x="6360.67" y="2284.72" width="710.43" height="6.83"/>
+<rect class="cls-52" x="6882.76" y="3100.56" width="196.15" height="70.26"/>
+<line class="cls-22" x1="7078.92" y1="3100.56" x2="7078.92" y2="3163.99"/>
+<rect class="cls-51" x="6368.47" y="2291.55" width="694.83" height="68.15"/>
+<rect class="cls-5" x="6368.47" y="2291.55" width="694.83" height="68.15"/>
+<rect class="cls-58" x="6368.47" y="2333.58" width="694.83" height="9.36"/>
+<rect class="cls-5" x="6368.47" y="2333.58" width="694.83" height="9.36"/>
+<rect class="cls-65" x="6368.47" y="2301.1" width="694.83" height="9.36"/>
+<rect class="cls-5" x="6368.47" y="2301.1" width="694.83" height="9.36"/>
+<rect class="cls-51" x="6368.47" y="3032.4" width="694.83" height="68.15"/>
+<rect class="cls-5" x="6368.47" y="3032.4" width="694.83" height="68.15"/>
+<rect class="cls-64" x="6368.47" y="3074.43" width="694.83" height="9.36"/>
+<rect class="cls-5" x="6368.47" y="3074.43" width="694.83" height="9.36"/>
+<rect class="cls-61" x="6368.47" y="3041.95" width="694.83" height="9.36"/>
+<rect class="cls-5" x="6368.47" y="3041.95" width="694.83" height="9.36"/>
+</svg>

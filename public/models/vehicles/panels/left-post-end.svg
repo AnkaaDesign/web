@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4832.7 2316.7 25.300000000000182 804.3" width="25.300000000000182" height="804.3" preserveAspectRatio="none">
+<!-- lateral esquerda — post-end
+     25.3 x 804.3 u = 90 x 2847 mm
+     Recortado de "layout 15,40 para teste.svg" por tools/livery-svg/slice.mjs.
+     Coordenadas ORIGINAIS da prancha; o recorte e o viewBox. -->
+<style>.cls-17,.cls-19{fill: none;}.cls-49{fill-rule: evenodd;}.cls-17,.cls-19{stroke-miterlimit: 22.93;}.cls-19{stroke-width: .5px;}.cls-51{fill: #d2d4d5;}.cls-49{fill: #292929;}.cls-59{fill: url(#Gradiente_sem_nome_22);}.cls-66{fill: url(#Gradiente_sem_nome_24);}.cls-70{fill: url(#Gradiente_sem_nome_25);}.cls-71{fill: url(#Gradiente_sem_nome_21);}.cls-73{fill: url(#Gradiente_sem_nome_26);}.cls-17,.cls-19{stroke: #373535;}.cls-17{stroke-width: .22px;}.cls-137{fill: #ae3340;}.cls-139{fill: #96989b;}</style>
+<defs><linearGradient id="Gradiente_sem_nome_21" data-name="Gradiente sem nome 21" x1="2657.31" y1="3110.76" x2="2657.31" y2="3100.84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_22" data-name="Gradiente sem nome 22" x1="2657.31" y1="3078.28" x2="2657.31" y2="3068.36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_24" data-name="Gradiente sem nome 24" x1="5027.46" y1="2584.53" x2="4653.36" y2="2860.7" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".4" stop-color="#96989b"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_25" data-name="Gradiente sem nome 25" x1="2657.31" y1="2326.79" x2="2657.31" y2="2336.72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_26" data-name="Gradiente sem nome 26" x1="2657.31" y1="2359.27" x2="2657.31" y2="2369.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient></defs>
+<path class="cls-49" d="M1435.25,3120.88h3412.2l-9.79,10.98-66.71,12.6-213.08.14h-163.57v.11l-234.82.16c-295.44,2.3-598.86,16.84-780.13,53.65H453.59v-77.64h981.66Z"/>
+<path class="cls-19" d="M1435.25,3120.88h3412.2l-9.79,10.98-66.71,12.6-213.08.14h-163.57v.11l-234.82.16c-295.44,2.3-598.86,16.84-780.13,53.65H453.59v-77.64h981.66Z"/>
+<rect class="cls-51" x="481.89" y="3052.73" width="4350.85" height="68.15"/>
+<rect class="cls-17" x="481.89" y="3052.73" width="4350.85" height="68.15"/>
+<rect class="cls-71" x="481.89" y="3101.97" width="4350.85" height="9.36"/>
+<rect class="cls-59" x="481.89" y="3069.49" width="4350.85" height="9.36"/>
+<rect class="cls-66" x="4832.74" y="2316.68" width="25.75" height="804.2"/>
+<rect class="cls-139" x="4838.64" y="2316.68" width="11.34" height="66.43"/>
+<rect class="cls-137" x="4838.64" y="2316.68" width="11.34" height="33.22"/>
+<rect class="cls-139" x="4838.55" y="3029.67" width="11.34" height="66.43"/>
+<rect class="cls-137" x="4838.55" y="3062.89" width="11.34" height="33.22"/>
+<rect class="cls-51" x="481.89" y="2316.68" width="4350.85" height="68.15"/>
+<rect class="cls-17" x="481.89" y="2316.68" width="4350.85" height="68.15"/>
+<rect class="cls-70" x="481.89" y="2326.23" width="4350.85" height="9.36"/>
+<rect class="cls-73" x="481.89" y="2358.71" width="4350.85" height="9.36"/>
+</svg>

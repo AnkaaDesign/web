@@ -16,18 +16,34 @@
                  `livery-doc` owns the document model on top of them — image
                  assets, webfonts, undo/redo, the align/distribute geometry,
                  side mirroring and persistence.
+                 `trim` is the four trim pieces — roof, fenders, toolbox and
+                 Thermo King — each able to carry its OWN paint. That is why
+                 `paint` exports a PaintInstance class rather than the module
+                 singleton it used to be: the uniform block has to be per-coat,
+                 or every material writes the same colour. `trim` never touches
+                 localStorage or the catalog; it publishes changes and studio.ts
+                 persists them, the same edge `onTrailerPanelsRebuilt` uses.
      scene/      the world around it — renderer/rig/ground (scene), and the
                  pieces split out of it: textures, sky, lamps, presets. Plus
                  environment (the HDRI/scenery manifests), set (the modelled 3D
                  scenery those manifests name), weather (rain), probe (the local
-                 reflection cubemap the chrome mirrors) and capture (the
-                 high-resolution PNG export).
+                 reflection cubemap the chrome mirrors), capture (the
+                 high-resolution PNG export) and record (the video one).
+                 `capture` and `record` are siblings that do OPPOSITE things and
+                 must not be merged: capture renders to its own render target and
+                 never touches the live canvas, which is what buys it 7680×4320
+                 and an alpha channel; record can only read the COMPOSED canvas,
+                 because that is all `captureStream()` sees. See record.ts's
+                 header — that one constraint explains every difference between
+                 them.
                  `plate` and `scatter` are gone: they belonged to the photo-backed
                  scenarios deleted on 2026-08-03 — see ARCHITECTURE.md.
      ui/         the DOM chrome: the topbar/view controls (chrome), the card
                  selector — cenário, fabricante, modelo e COR —, the offscreen
                  renderer that draws the cabs onto those cards (preview), the
-                 loading curtain and the lighting HUD. Plus the livery editor's
+                 loading curtain, the lighting HUD and `trim-panel` (the
+                 collapsed strip that paints the four trim pieces). Plus the
+                 livery editor's
                  own interface: `livery-editor` (modal, toolbar, contextual
                  inspector, layers, keyboard) and `livery-guides` (snapping
                  overlay and the centimetre rulers). Each ships its own

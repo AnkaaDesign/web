@@ -15,6 +15,7 @@ import {
 } from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
+import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
 import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './trailer-rig';
@@ -1117,6 +1118,27 @@ export function syncTrailerPaintFromCab() {
   setPaint({});
 }
 
+/* Quem quiser corrigir o material de alguma peça DEPOIS de setPaintTarget().
+   Mesmo desenho — e mesmo motivo — de `onTrailerPanelsRebuilt()`: quem reage é
+   `vehicle/trim.ts`, que já importa ESTE módulo, e uma importação de volta
+   fecharia um ciclo. Um assinante, e ele se inscreve.
+
+   POR QUE O ACABAMENTO TEM DE VIR DEPOIS, e não antes: setPaintTarget('both')
+   escreve `state.trailerPaintMat` em TODA malha de `trailerPanelMeshes()`, e o
+   TETO e a carcaça do THERMO KING estão nessa lista (o primeiro pelo material
+   branco de carroceria, o segundo por `tk-housing-white`). Uma peça com cor
+   própria que fosse aplicada antes seria sobrescrita pela cor do baú no mesmo
+   quadro — e o defeito só apareceria ao trocar "pintar o implemento". */
+type PaintTargetListener = () => void;
+const paintTargetListeners: PaintTargetListener[] = [];
+export function onPaintTargetApplied(cb: PaintTargetListener) {
+  paintTargetListeners.push(cb);
+  return () => {
+    const i = paintTargetListeners.indexOf(cb);
+    if (i >= 0) paintTargetListeners.splice(i, 1);
+  };
+}
+
 export function setPaintTarget(mode: 'cab' | 'both') {
   state.paintTarget = mode === 'both' ? 'both' : 'cab';
   const meshes = trailerPanelMeshes();
@@ -1148,6 +1170,11 @@ export function setPaintTarget(mode: 'cab' | 'both') {
     }
     for (const w of state.frontWalls || []) w.visible = false;
   }
+
+  /* As peças de acabamento com cor própria recuperam a delas — ver o cabeçalho
+     de onPaintTargetApplied(). Antes do invalidate(), porque elas trocam
+     material e o quadro tem de sair com o resultado final. */
+  for (const cb of paintTargetListeners) cb();
 
   /* Trocar o alvo da tinta troca MATERIAL em malhas que já estão na cena, sem
      passar por nenhum carregamento — então nada mais avisaria o laço
@@ -2465,6 +2492,35 @@ export function resetTrailerDims(): TrailerDims | null {
 }
 
 /* ---------------- trailer ---------------- */
+
+/**
+ * Começa a baixar o implemento e os dois acessórios dele, sem montar nada.
+ *
+ * O ÚNICO PREFETCH DO ENGINE QUE NÃO É ESPECULATIVO, e por isso o de maior
+ * retorno: `runApply()` carrega o implemento em TODO boot (`if (first)
+ * weights.trailer = 150`), então estes bytes vão ser pedidos daqui a alguns
+ * segundos de qualquer forma. Chamado assim que os manifestos respondem — com o
+ * usuário ainda no primeiro card do seletor —, os 31 MB descem POR BAIXO da
+ * escolha inteira em vez de depois dela.
+ *
+ * MORA AQUI, e não em studio.ts, porque os três nomes de arquivo são deste
+ * módulo. `WHEEL_ASSET` em particular NÃO pode ser repetido em lugar nenhum: o
+ * `_v2` é uma correção documentada e `wheel_fh16.glb` está queimado (ver a nota
+ * dele). Um prefetch que aquecesse o arquivo errado seria o dobro do download
+ * com zero acerto de cache, e sem sintoma nenhum.
+ *
+ * Os dois `*_meta.json` e o `hitch.json` ficam de FORA de propósito: são
+ * kilobytes, `loadManifests()` já os pediu, e a rota de manifesto responde
+ * `no-cache` — enfileirá-los só tiraria uma vaga das duas de `MAX_IN_FLIGHT`.
+ */
+export function prefetchTrailerAssets(): void {
+  prefetch([
+    VEHICLES_DIR + 'trailer.glb',
+    VEHICLES_DIR + WHEEL_ASSET,
+    VEHICLES_DIR + 'thermoking.glb',
+  ], 'trailer');
+}
+
 export async function loadTrailer(onProgress?: (t: number) => void) {
   const mine = ++trailerGen;
   const trailer = await loadGLB(VEHICLES_DIR + 'trailer.glb', onProgress);

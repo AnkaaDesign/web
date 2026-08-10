@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="481.8 2316.7 327.27 67.80000000000018" width="327.27" height="67.80000000000018" preserveAspectRatio="none">
+<!-- lateral esquerda — band-top
+     327.3 x 67.8 u = 1158 x 240 mm
+     Recortado de "layout 15,40 para teste.svg" por tools/livery-svg/slice.mjs.
+     Coordenadas ORIGINAIS da prancha; o recorte e o viewBox. -->
+<style>.cls-17{fill: none;}.cls-17{stroke-miterlimit: 22.93;}.cls-51{fill: #d2d4d5;}.cls-56{fill: url(#Gradiente_sem_nome_23);}.cls-70{fill: url(#Gradiente_sem_nome_25);}.cls-73{fill: url(#Gradiente_sem_nome_26);}.cls-17{stroke: #373535;}.cls-17{stroke-width: .22px;}.cls-137{fill: #ae3340;}.cls-139{fill: #96989b;}</style>
+<defs><linearGradient id="Gradiente_sem_nome_23" data-name="Gradiente sem nome 23" x1="653.94" y1="2567.73" x2="270.89" y2="2878.47" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".4" stop-color="#96989b"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_25" data-name="Gradiente sem nome 25" x1="2657.31" y1="2326.79" x2="2657.31" y2="2336.72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient><linearGradient id="Gradiente_sem_nome_26" data-name="Gradiente sem nome 26" x1="2657.31" y1="2359.27" x2="2657.31" y2="2369.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606163"/>
+      <stop offset=".58" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient></defs>
+<rect class="cls-56" x="453.59" y="2316.68" width="28.3" height="804.2"/>
+<rect class="cls-51" x="481.89" y="2316.68" width="4350.85" height="68.15"/>
+<rect class="cls-17" x="481.89" y="2316.68" width="4350.85" height="68.15"/>
+<rect class="cls-70" x="481.89" y="2326.23" width="4350.85" height="9.36"/>
+<rect class="cls-73" x="481.89" y="2358.71" width="4350.85" height="9.36"/>
+<rect class="cls-139" x="492.55" y="2340.43" width="75.01" height="13.63"/>
+<rect class="cls-137" x="492.55" y="2340.43" width="37.51" height="13.63"/>
+</svg>

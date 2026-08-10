@@ -215,37 +215,6 @@ function derivedPearlColor(hex: string) {
   return '#' + _tmpB.getHexString(THREE.SRGBColorSpace);
 }
 
-/* Levantados quando uma RECEITA nomeia a cor; a partir daí a derivação não
-   toca mais naquele campo. Voltam a zero quando a receita sai (uma tinta sem
-   curadoria depois de uma com curadoria). */
-let userFlakeColor = false;
-let userPearlColor = false;
-
-function syncDerivedColors() {
-  if (!userFlakeColor) params.flakeColor = derivedFlakeColor(params.color);
-  if (!userPearlColor) {
-    /* A virada derivada, e o MEIO do percurso junto. O laboratório autora os
-       dois; derivando, o meio fica na metade do caminho entre face e virada —
-       que é o que um perolizado de dois tons era antes deste port. */
-    const flip = derivedPearlColor(params.color);
-    params.pearlFlip = flip;
-    params.pearlMid = '#' + _tmpA.set(params.color)
-      .lerp(_tmpB.set(flip), 0.5).getHexString(THREE.SRGBColorSpace);
-  }
-}
-
-/* live parameters */
-const params: PaintParams = { ...PAINT_BASE };
-/** A receita VIVA, copiada. É o que o painel de ajuste lê para se apresentar —
- *  ele nunca guarda uma cópia própria, porque duas cópias divergem. */
-export const getPaintParams = (): PaintParams => ({ ...params });
-syncDerivedColors();               // seed flake/flop tints from the base colour
-
-/* Todo material de tinta vivo. Pertencimento ao CONJUNTO, não casamento de
-   nome: os nomes de origem variam ("carpaint", "CarPaint_01", …) e um teste por
-   substring seria frágil. */
-const materials = new Set<THREE.MeshPhysicalMaterial>();
-
 /**
  * Um ajuste de tinta: a receita inteira, toda opcional.
  *
@@ -260,29 +229,242 @@ export type PaintPatch =
     pearlFlip?: string | null;
   };
 
-/* ---------------- uniformes compartilhados ----------------
-   Todo material de tinta (cabine + baú + parede dianteira) referencia os MESMOS
-   objetos de uniform, então uma escrita atualiza todos ao vivo.
+/** A forma dos uniformes de uma demão. Um objeto DESTES por instância. */
+type PaintUniforms = ReturnType<typeof makeUniforms>;
 
-   Estes são, um a um, os uniformes de `paint-lab.html`. Não é coincidência: o
-   shader abaixo É o do laboratório. Ver o cabeçalho de installPaintShader(). */
-const U = {
-  uFlakeAmount: { value: 0 },
-  uFlakeScale: { value: 300 },
-  uFlakeTilt: { value: 0.38 },
-  uFlakeGloss: { value: 0.07 },
-  uFlakeColor: { value: new THREE.Color(0xffffff) },
-  uFlakePx: { value: 2.4 },
-  uCoatThickness: { value: 0.013 },
-  uPearlAmount: { value: 0 },
-  uPearlTravel: { value: 2.1 },
-  uPearlMid: { value: new THREE.Color(0xffffff) },
-  uPearlFlip: { value: new THREE.Color(0xffffff) },
-  uPeel: { value: 0.09 },
-  uPeelScale: { value: 46 },
-  uPeelDetail: { value: 0.5 },
-};
-export const _sharedPaint = U;   // alça de ajuste (window.__studio)
+/* Os uniformes de `paint-lab.html`, um a um. Não é coincidência: o shader
+   abaixo É o do laboratório. Ver o cabeçalho de installPaintShader(). */
+function makeUniforms() {
+  return {
+    uFlakeAmount: { value: 0 },
+    uFlakeScale: { value: 300 },
+    uFlakeTilt: { value: 0.38 },
+    uFlakeGloss: { value: 0.07 },
+    uFlakeColor: { value: new THREE.Color(0xffffff) },
+    uFlakePx: { value: 2.4 },
+    uCoatThickness: { value: 0.013 },
+    uPearlAmount: { value: 0 },
+    uPearlTravel: { value: 2.1 },
+    uPearlMid: { value: new THREE.Color(0xffffff) },
+    uPearlFlip: { value: new THREE.Color(0xffffff) },
+    uPeel: { value: 0.09 },
+    uPeelScale: { value: 46 },
+    uPeelDetail: { value: 0.5 },
+  };
+}
+
+/* ---------------- UMA DEMÃO DE TINTA ----------------
+   ISTO ERA UM SINGLETON, E É A ÚNICA MUDANÇA ESTRUTURAL DESTE ARQUIVO.
+
+   O que existia: um `const U` de módulo com os uniformes, um `const params` com
+   a receita e um `Set` de materiais — os três compartilhados por TODO material
+   de tinta. `applyToMaterials()` percorria o conjunto e escrevia a MESMA cor em
+   todos. Enquanto a única pergunta foi "de que cor é o caminhão", isso estava
+   certo: cabine, baú e parede dianteira são uma pintura só.
+
+   O que mudou: o configurador de acabamentos pinta TETO, PARALAMAS, CAIXA e
+   THERMO KING cada um da sua cor. Com uniformes de módulo isso é impossível por
+   construção — não é uma limitação da interface, é uma do material.
+
+   POR QUE UMA CLASSE E NÃO UM MAPA DE RECEITAS. Os uniformes têm de ser objetos
+   DIFERENTES por demão: `Object.assign(shader.uniforms, U)` faz o material
+   apontar para os mesmos objetos, e é essa identidade que faz uma escrita
+   atualizar todos os materiais ao vivo. Um mapa `cor → params` continuaria com
+   um `U` só e continuaria pintando tudo igual.
+
+   O QUE ISTO **NÃO** MUDA, e é o ponto de a refatoração ser segura:
+   · a superfície pública do arquivo — `setPaint`, `getPaintParams`,
+     `makePaintMaterial`, `isPaintMaterial`, `forgetPaintMaterial` e
+     `_sharedPaint` seguem exatamente com a assinatura de antes, delegando para
+     `defaultPaint`. `studio.ts`, `models.ts` e `ui/paint-panel.ts` não mudam
+     uma linha;
+   · o GLSL. É byte a byte o mesmo, e por isso `customProgramCacheKey` continua
+     `v5`: o programa compilado É o mesmo — o que deixou de ser compartilhado
+     são os VALORES que ele lê, que é justamente o que o three já guarda por
+     material. Subir a chave aqui recompilaria o mundo sem trocar um caractere
+     de shader. */
+class PaintInstance {
+  /** Os uniformes desta demão. Todo material dela aponta para ESTES objetos. */
+  readonly uniforms: PaintUniforms = makeUniforms();
+
+  private readonly params: PaintParams = { ...PAINT_BASE };
+
+  /* Todo material vivo desta demão. Pertencimento ao CONJUNTO, não casamento de
+     nome: os nomes de origem variam ("carpaint", "CarPaint_01", …) e um teste
+     por substring seria frágil. */
+  private readonly materials = new Set<THREE.MeshPhysicalMaterial>();
+
+  /* Levantados quando uma RECEITA nomeia a cor; a partir daí a derivação não
+     toca mais naquele campo. Voltam a zero quando a receita sai (uma tinta sem
+     curadoria depois de uma com curadoria). */
+  private userFlakeColor = false;
+  private userPearlColor = false;
+
+  constructor() {
+    this.syncDerivedColors();      // seed flake/flop tints from the base colour
+  }
+
+  private syncDerivedColors() {
+    const p = this.params;
+    if (!this.userFlakeColor) p.flakeColor = derivedFlakeColor(p.color);
+    if (!this.userPearlColor) {
+      /* A virada derivada, e o MEIO do percurso junto. O laboratório autora os
+         dois; derivando, o meio fica na metade do caminho entre face e virada —
+         que é o que um perolizado de dois tons era antes deste port. */
+      const flip = derivedPearlColor(p.color);
+      p.pearlFlip = flip;
+      p.pearlMid = '#' + _tmpA.set(p.color)
+        .lerp(_tmpB.set(flip), 0.5).getHexString(THREE.SRGBColorSpace);
+    }
+  }
+
+  /** A receita VIVA, copiada. */
+  get(): PaintParams { return { ...this.params }; }
+
+  /* ---------------- parâmetros → material/uniformes ----------------
+     UM PARA UM com a receita. Não há mais nenhuma conversão de escala aqui além
+     de `gloss → clearcoatRoughness`, que é a mesma fórmula do laboratório
+     (glossToCoat). Toda tradução que existia antes — `flakeSize` virando
+     frequência, `flakeGlint` virando ganho, `pearlSharp` virando expoente — era
+     um lugar a mais para o estúdio divergir do laboratório em silêncio. */
+  private applyToMaterials() {
+    const p = this.params;
+    const U = this.uniforms;
+
+    /* Mesma curva do laboratório: gloss 1 → verniz de vitrine, gloss 0 →
+       acetinado. O three trava clearcoatRoughness perto de 0.0525 internamente,
+       então o topo da faixa já é o mais liso que a engine desenha. */
+    const ccRough = 0.02 + 0.42 * (1 - clamp01(p.gloss));
+
+    const col = new THREE.Color(p.color);
+    for (const m of this.materials) {
+      m.color.copy(col);
+      m.metalness = clamp01(p.metalness);
+      m.roughness = clamp01(p.roughness);
+      m.clearcoat = 1.0;
+      m.clearcoatRoughness = ccRough;
+    }
+
+    U.uPearlAmount.value = clamp01(p.pearlAmount);
+    U.uPearlMid.value.set(p.pearlMid || '#ffffff');
+    U.uPearlFlip.value.set(p.pearlFlip || '#ffffff');
+    /* Piso 0.2: o expoente vai para o denominador do percurso e um valor perto
+       de zero faz a virada cobrir a peça inteira de uma vez. */
+    U.uPearlTravel.value = Math.max(0.2, p.pearlTravel);
+
+    U.uFlakeAmount.value = clamp01(p.flakeAmount);
+    U.uFlakeColor.value.set(p.flakeColor || '#ffffff');
+    U.uFlakeScale.value = Math.max(1, p.flakeDensity);
+    U.uFlakeTilt.value = Math.max(0, p.flakeTilt);
+    U.uFlakeGloss.value = clamp01(p.flakeGloss);
+    U.uFlakePx.value = Math.max(0.5, p.flakePx);
+    U.uCoatThickness.value = Math.max(0, p.coatThickness);
+
+    U.uPeel.value = Math.max(0, p.peel);
+    U.uPeelScale.value = Math.max(1, p.peelScale);
+    U.uPeelDetail.value = Math.max(0, p.peelDetail);
+  }
+
+  /**
+   * O ÚNICO ajustador. Um funil, porque as conversões são acopladas.
+   *
+   * Aceita uma receita do laboratório inteira. Campos ausentes ficam como
+   * estão; `null` em `flakeColor`/`pearlFlip` significa VOLTE A DERIVAR do hex.
+   */
+  set(partial?: PaintPatch): PaintParams {
+    const p: PaintPatch = partial || {};
+    const params = this.params;
+    if (p.finish && p.finish !== params.finish) {
+      const f: PaintFinish = PAINT_FINISHES.includes(p.finish) ? p.finish : 'metallic';
+      Object.assign(params, PAINT_DEFAULTS_BY_FINISH[f], { finish: f });
+      this.syncDerivedColors();
+    }
+
+    /* ANTES do laço: syncDerivedColors() lá embaixo só respeita o que já foi
+       declarado explícito, e uma receita que chega junto com a cor tem de ganhar
+       dela. */
+    if (p.flakeColor !== undefined) this.userFlakeColor = p.flakeColor !== null;
+    if (p.pearlFlip !== undefined) this.userPearlColor = p.pearlFlip !== null;
+
+    for (const [k, v] of Object.entries(p) as [keyof PaintParams, never][]) {
+      if (k === 'finish') continue;
+      if (v === null || v === undefined) continue;   // "derive", não "pinte de null"
+      if (k in params) params[k] = v;
+    }
+    if (p.color !== undefined) this.syncDerivedColors();
+    if (p.flakeColor === null || p.pearlFlip === null) this.syncDerivedColors();
+
+    this.applyToMaterials();
+    return this.get();
+  }
+
+  /* `_srcColor` is accepted and deliberately ignored: newly created paint
+     materials are re-driven from the CURRENT params by the applyToMaterials()
+     below, so the imported colour would only ever be overwritten. Callers still
+     pass it because they read it off the source material. */
+  makeMaterial(_srcColor?: THREE.Color, srcMap?: THREE.Texture | null) {
+    const m = new THREE.MeshPhysicalMaterial({
+      name: 'carpaint',
+      color: new THREE.Color(this.params.color),
+      map: srcMap || null,
+      metalness: 0.1,
+      roughness: 0.34,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      /* rip geometry has arbitrary winding — a FrontSide paint material culls
+         inward-wound faces and reads as see-through (verified root cause) */
+      side: THREE.DoubleSide,
+    });
+    m.envMapIntensity = 1.3;
+    if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+    installPaintShader(m, this.uniforms);
+    this.materials.add(m);
+    this.applyToMaterials();
+    return m;
+  }
+
+  /** Called when a cab is swapped out and its materials disposed. */
+  forget(m: THREE.Material) {
+    this.materials.delete(m as THREE.MeshPhysicalMaterial);
+  }
+
+  has(m: THREE.Material) {
+    return this.materials.has(m as THREE.MeshPhysicalMaterial);
+  }
+}
+
+/* ---------------- as demãos ----------------
+   A PADRÃO é a pintura do veículo: cabine + baú + parede dianteira. Era o
+   singleton, e continua sendo quem responde por toda a API antiga.
+
+   As outras nascem sob demanda em `vehicle/trim.ts`, uma por peça de acabamento
+   que ganhe cor própria — e SÓ então: uma peça sem cor escolhida não instancia
+   nada e continua exatamente como o bake a entregou (ou, no caso do teto e do
+   Thermo King, seguindo a cor do baú, que é o que ela já fazia). */
+const defaultPaint = new PaintInstance();
+
+/* Toda demão viva, para as perguntas que valem para QUALQUER tinta. Hoje só
+   `isPaintMaterial` precisa disso, e precisa mesmo: `applyTrailerFinish()` a usa
+   para NÃO mexer em material de tinta ao ajustar o acabamento das outras peças,
+   e um paralama pintado que não estivesse nesta lista levaria uma rugosidade de
+   ferragem por cima da tinta. */
+const instances = new Set<PaintInstance>([defaultPaint]);
+
+/** Cria uma demão independente. Ver o cabeçalho de PaintInstance. */
+export function createPaintInstance(): PaintInstance {
+  const p = new PaintInstance();
+  instances.add(p);
+  return p;
+}
+export type { PaintInstance };
+
+/** A receita VIVA da demão padrão, copiada. É o que o painel de ajuste lê para
+ *  se apresentar — ele nunca guarda uma cópia própria, porque duas cópias
+ *  divergem. */
+export const getPaintParams = (): PaintParams => defaultPaint.get();
+
+/** Os uniformes da demão padrão — alça de ajuste (window.__studio). */
+export const _sharedPaint = defaultPaint.uniforms;
 
 /**
  * Chamado pelo rig da cena a cada quadro. HOJE NÃO FAZ NADA, e isso é
@@ -303,80 +485,16 @@ export const _sharedPaint = U;   // alça de ajuste (window.__studio)
 export function setKeyLight(_dirView: THREE.Vector3, _colorLinear: THREE.Color,
   _boost?: number) { /* ver acima */ }
 
-/* ---------------- parâmetros → material/uniformes ----------------
-   UM PARA UM com a receita. Não há mais nenhuma conversão de escala aqui além
-   de `gloss → clearcoatRoughness`, que é a mesma fórmula do laboratório
-   (glossToCoat). Toda tradução que existia antes — `flakeSize` virando
-   frequência, `flakeGlint` virando ganho, `pearlSharp` virando expoente — era
-   um lugar a mais para o estúdio divergir do laboratório em silêncio. */
-function applyToMaterials() {
-  const p = params;
-
-  /* Mesma curva do laboratório: gloss 1 → verniz de vitrine, gloss 0 → acetinado.
-     O three trava clearcoatRoughness perto de 0.0525 internamente, então o topo
-     da faixa já é o mais liso que a engine desenha. */
-  const ccRough = 0.02 + 0.42 * (1 - clamp01(p.gloss));
-
-  const col = new THREE.Color(p.color);
-  for (const m of materials) {
-    m.color.copy(col);
-    m.metalness = clamp01(p.metalness);
-    m.roughness = clamp01(p.roughness);
-    m.clearcoat = 1.0;
-    m.clearcoatRoughness = ccRough;
-  }
-
-  U.uPearlAmount.value = clamp01(p.pearlAmount);
-  U.uPearlMid.value.set(p.pearlMid || '#ffffff');
-  U.uPearlFlip.value.set(p.pearlFlip || '#ffffff');
-  /* Piso 0.2: o expoente vai para o denominador do percurso e um valor perto de
-     zero faz a virada cobrir a peça inteira de uma vez. */
-  U.uPearlTravel.value = Math.max(0.2, p.pearlTravel);
-
-  U.uFlakeAmount.value = clamp01(p.flakeAmount);
-  U.uFlakeColor.value.set(p.flakeColor || '#ffffff');
-  U.uFlakeScale.value = Math.max(1, p.flakeDensity);
-  U.uFlakeTilt.value = Math.max(0, p.flakeTilt);
-  U.uFlakeGloss.value = clamp01(p.flakeGloss);
-  U.uFlakePx.value = Math.max(0.5, p.flakePx);
-  U.uCoatThickness.value = Math.max(0, p.coatThickness);
-
-  U.uPeel.value = Math.max(0, p.peel);
-  U.uPeelScale.value = Math.max(1, p.peelScale);
-  U.uPeelDetail.value = Math.max(0, p.peelDetail);
-}
-
 /**
- * O ÚNICO ajustador. Um funil, porque as conversões são acopladas.
+ * O ÚNICO ajustador da demão PADRÃO — cabine, baú e parede dianteira.
  *
  * Aceita uma receita do laboratório inteira. Campos ausentes ficam como estão;
  * `null` em `flakeColor`/`pearlFlip` significa VOLTE A DERIVAR do hex.
+ *
+ * As peças de acabamento com cor própria têm cada uma a SUA demão e não passam
+ * por aqui — ver `vehicle/trim.ts`.
  */
-export function setPaint(partial?: PaintPatch): PaintParams {
-  const p: PaintPatch = partial || {};
-  if (p.finish && p.finish !== params.finish) {
-    const f: PaintFinish = PAINT_FINISHES.includes(p.finish) ? p.finish : 'metallic';
-    Object.assign(params, PAINT_DEFAULTS_BY_FINISH[f], { finish: f });
-    syncDerivedColors();
-  }
-
-  /* ANTES do laço: syncDerivedColors() lá embaixo só respeita o que já foi
-     declarado explícito, e uma receita que chega junto com a cor tem de ganhar
-     dela. */
-  if (p.flakeColor !== undefined) userFlakeColor = p.flakeColor !== null;
-  if (p.pearlFlip !== undefined) userPearlColor = p.pearlFlip !== null;
-
-  for (const [k, v] of Object.entries(p) as [keyof PaintParams, never][]) {
-    if (k === 'finish') continue;
-    if (v === null || v === undefined) continue;   // "derive", não "pinte de null"
-    if (k in params) params[k] = v;
-  }
-  if (p.color !== undefined) syncDerivedColors();
-  if (p.flakeColor === null || p.pearlFlip === null) syncDerivedColors();
-
-  applyToMaterials();
-  return getPaintParams();
-}
+export const setPaint = (partial?: PaintPatch): PaintParams => defaultPaint.set(partial);
 
 /* ---------------- GLSL ----------------
    ESTE SHADER É O DE `paint-lab.html`, PORTADO SEM ALTERAÇÃO DE MODELO.
@@ -577,7 +695,12 @@ if( uPeel > 0.001 ){
 #endif
 `;
 
-function installPaintShader(m: THREE.MeshPhysicalMaterial) {
+/* Os uniformes vêm por ARGUMENTO, e não de um `const` de módulo: é essa linha
+   que separa uma demão da outra. `Object.assign` faz o material apontar para os
+   MESMOS objetos da instância, e é essa identidade compartilhada que faz uma
+   escrita em `applyToMaterials()` atualizar ao vivo todos os materiais daquela
+   demão — e só os daquela. */
+function installPaintShader(m: THREE.MeshPhysicalMaterial, U: PaintUniforms) {
   m.onBeforeCompile = (shader: THREE.WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
@@ -596,37 +719,23 @@ function installPaintShader(m: THREE.MeshPhysicalMaterial) {
   m.customProgramCacheKey = () => 'truckstudio-paint-v5';
 }
 
-/* `_srcColor` is accepted and deliberately ignored: newly created paint
-   materials are re-driven from the CURRENT params by the setPaint({}) that
-   follows, so the imported colour would only ever be overwritten. Callers
-   still pass it because they read it off the source material. */
-export function makePaintMaterial(_srcColor?: THREE.Color, srcMap?: THREE.Texture | null) {
-  const m = new THREE.MeshPhysicalMaterial({
-    name: 'carpaint',
-    color: new THREE.Color(params.color),
-    map: srcMap || null,
-    metalness: 0.1,
-    roughness: 0.34,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.05,
-    /* rip geometry has arbitrary winding — a FrontSide paint material culls
-       inward-wound faces and reads as see-through (verified root cause) */
-    side: THREE.DoubleSide,
-  });
-  m.envMapIntensity = 1.3;
-  if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
-  installPaintShader(m);
-  materials.add(m);
-  applyToMaterials();
-  return m;
+/** Um material da demão PADRÃO. Ver `PaintInstance.makeMaterial`. */
+export const makePaintMaterial = (srcColor?: THREE.Color, srcMap?: THREE.Texture | null) =>
+  defaultPaint.makeMaterial(srcColor, srcMap);
+
+/* Called when a cab is swapped out and its materials disposed.
+   Percorre TODAS as demãos: quem descarta um material não sabe — nem deveria
+   saber — de que demão ele era, e um material esquecido só na padrão ficaria
+   pendurado no `Set` de uma peça de acabamento pelo resto da sessão. */
+export function forgetPaintMaterial(m: THREE.Material) {
+  for (const inst of instances) inst.forget(m);
 }
 
-/* Called when a cab is swapped out and its materials disposed. */
-export function forgetPaintMaterial(m: THREE.Material) {
-  materials.delete(m as THREE.MeshPhysicalMaterial);
-}
 /* Registry membership, not a name match — source material names vary
-   ("carpaint", "CarPaint_01", …) and a substring test would be fragile. */
+   ("carpaint", "CarPaint_01", …) and a substring test would be fragile.
+   QUALQUER demão conta: a pergunta que os dois chamadores fazem é "isto é
+   tinta?", nunca "isto é a tinta do veículo?". */
 export function isPaintMaterial(m: THREE.Material) {
-  return materials.has(m as THREE.MeshPhysicalMaterial);
+  for (const inst of instances) if (inst.has(m)) return true;
+  return false;
 }
