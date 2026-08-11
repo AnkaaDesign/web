@@ -1,8 +1,9 @@
-import { useParams, Navigate } from "react-router-dom";
-import { IconBriefcase, IconLoader2 } from "@tabler/icons-react";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { IconBriefcase, IconCheck, IconLoader2, IconX } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { usePosition } from "../../../../hooks";
+import { usePosition, usePositionMutations } from "../../../../hooks";
+import type { PositionUpdateFormData } from "../../../../schemas";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
@@ -10,9 +11,14 @@ import { PositionForm } from "@/components/personnel-department/position/form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PositionEditPage = () => {
-  usePageTracker({ title: "Page", icon: "star" });
+  usePageTracker({ title: "Editar Cargo", icon: "briefcase" });
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { updateAsync, updateMutation } = usePositionMutations();
 
+  // Sem `include`: o include padrão do repositório já traz a remuneração vigente
+  // (remunerations desc take 1), de onde a api deriva o campo virtual `remuneration`
+  // que o formulário usa para pré-preencher o valor atual.
   const {
     data: position,
     isLoading,
@@ -20,6 +26,16 @@ export const PositionEditPage = () => {
   } = usePosition(id || "", {
     enabled: !!id,
   });
+
+  const handleSubmit = async (data: PositionUpdateFormData) => {
+    if (!id) return;
+    await updateAsync({ id, data });
+    navigate(routes.personnelDepartment.positions.details(id));
+  };
+
+  const handleCancel = () => {
+    navigate(id ? routes.personnelDepartment.positions.details(id) : routes.personnelDepartment.positions.root);
+  };
 
   if (!id) {
     return <Navigate to={routes.personnelDepartment.positions.root} replace />;
@@ -46,6 +62,26 @@ export const PositionEditPage = () => {
     return <Navigate to={routes.personnelDepartment.positions.root} replace />;
   }
 
+  const actions = [
+    {
+      key: "cancel",
+      label: "Cancelar",
+      icon: IconX,
+      onClick: handleCancel,
+      variant: "outline" as const,
+      disabled: updateMutation.isPending,
+    },
+    {
+      key: "submit",
+      label: "Salvar",
+      icon: IconCheck,
+      onClick: () => document.getElementById("position-form-submit")?.click(),
+      variant: "default" as const,
+      disabled: updateMutation.isPending,
+      loading: updateMutation.isPending,
+    },
+  ];
+
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -60,10 +96,11 @@ export const PositionEditPage = () => {
             { label: position?.data?.name || "Cargo", href: routes.personnelDepartment.positions.details(id) },
             { label: "Editar" },
           ]}
+          actions={actions}
           className="flex-shrink-0"
         />
         <div className="flex-1 overflow-y-auto pb-6">
-          <PositionForm mode="update" position={position?.data as any} />
+          <PositionForm mode="update" position={position?.data as any} onSubmit={handleSubmit} isSubmitting={updateMutation.isPending} />
         </div>
       </div>
     </PrivilegeRoute>

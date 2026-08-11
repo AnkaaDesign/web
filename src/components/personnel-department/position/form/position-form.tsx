@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconCheck, IconLoader2, IconX, IconBriefcase } from "@tabler/icons-react";
+import { IconBriefcase } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionCreateFormData, PositionUpdateFormData } from "../../../../schemas";
@@ -11,7 +11,6 @@ import { routes } from "../../../../constants";
 import { usePositionMutations } from "../../../../hooks";
 
 import { Form } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { NameInput } from "./name-input";
@@ -62,7 +61,10 @@ export function PositionForm(props: PositionFormProps) {
           }
         : {
             name: props.position.name,
-            remuneration: undefined, // Remuneration is optional for updates
+            // Remuneração atual (campo virtual da api, derivado do último registro
+            // de remuneração). Pré-preenchida para o usuário ver o valor vigente —
+            // o histórico só ganha um novo registro se o valor for alterado.
+            remuneration: props.position.remuneration ?? undefined,
             bonifiable: props.position.bonifiable,
             salaryFloor: props.position.salaryFloor ?? null,
             insalubrityDegree: props.position.insalubrityDegree ?? INSALUBRITY_DEGREE.NONE,
@@ -143,14 +145,6 @@ export function PositionForm(props: PositionFormProps) {
     }
   };
 
-  const handleCancel = () => {
-    if (props.mode === "create") {
-      navigate(routes.personnelDepartment.positions.root);
-    } else {
-      navigate(routes.personnelDepartment.positions.details(props.position.id));
-    }
-  };
-
   return (
     <Form {...form}>
       <form id="position-form" onSubmit={form.handleSubmit(handleSubmit)}>
@@ -186,28 +180,18 @@ export function PositionForm(props: PositionFormProps) {
 
               <InsalubrityDegreeSelect disabled={isSubmitting} />
 
-              <BonifiableToggle control={form.control} disabled={isSubmitting} />
-
-              <HazardPayToggle control={form.control} disabled={isSubmitting} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <BonifiableToggle control={form.control} disabled={isSubmitting} />
+                <HazardPayToggle control={form.control} disabled={isSubmitting} />
+              </div>
 
               {props.mode === "update" && (
                 <p className="text-sm text-muted-foreground">
-                  Nota: Ao atualizar a remuneração, um novo registro será criado no histórico. Deixe em branco para manter a remuneração atual.
+                  Nota: a remuneração exibida é a vigente. Um novo registro só será criado no histórico se você alterar o valor.
                 </p>
               )}
             </CardContent>
           </Card>
-
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
-              <IconX className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
-              {isSubmitting ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
-              {props.mode === "create" ? "Criar" : "Salvar"}
-            </Button>
-          </div>
         </div>
       </form>
     </Form>

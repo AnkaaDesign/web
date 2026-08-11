@@ -505,7 +505,9 @@ export const positionUpdateSchema = z
   .object({
     name: createNameSchema(1, 100, "Nome do cargo").optional(),
     hierarchy: z.number().int("Hierarquia deve ser um número inteiro").min(0, "Hierarquia deve ser maior ou igual a zero").max(999, "Hierarquia deve ser menor que 1000").optional().nullable(),
-    remuneration: z.number().min(0, "Remuneração deve ser maior ou igual a zero").max(999999.99, "Remuneração deve ser menor que R$ 1.000.000,00").optional(),
+    // Nullable: o formulário de edição pré-preenche a remuneração vigente e um
+    // campo de moeda limpo emite null. null/ausente = manter a remuneração atual.
+    remuneration: z.number().min(0, "Remuneração deve ser maior ou igual a zero").max(999999.99, "Remuneração deve ser menor que R$ 1.000.000,00").nullable().optional(),
     bonifiable: z.boolean().optional(),
     salaryFloor: z.number().min(0, "Piso salarial deve ser maior ou igual a zero").max(999999.99, "Piso salarial deve ser menor que R$ 1.000.000,00").nullable().optional(),
     allowBelowFloor: z.boolean().optional().default(false),

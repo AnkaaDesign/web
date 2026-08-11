@@ -1,5 +1,5 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface HazardPayToggleProps {
   control: any;
@@ -16,15 +16,15 @@ export function HazardPayToggle({ control, disabled }: HazardPayToggleProps) {
       control={control}
       name="hazardPay"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-          <div className="space-y-0.5">
-            <FormLabel className="text-base">Periculosidade (NR-16)</FormLabel>
-            <FormDescription>Adicional de 30% sobre o salário-base. Mutuamente exclusivo com insalubridade.</FormDescription>
-          </div>
+        <FormItem className="flex h-full flex-row items-start gap-3 space-y-0 rounded-lg border border-border/50 bg-muted/20 p-4">
           <FormControl>
-            <Switch checked={field.value || false} onCheckedChange={field.onChange} disabled={disabled} />
+            <Checkbox checked={!!field.value} onCheckedChange={field.onChange} disabled={disabled} className="mt-0.5" />
           </FormControl>
-          <FormMessage />
+          <div className="space-y-1 leading-none">
+            <FormLabel className="cursor-pointer">Periculosidade (NR-16)</FormLabel>
+            <FormDescription>Adicional de 30% sobre o salário-base. Mutuamente exclusivo com insalubridade.</FormDescription>
+            <FormMessage />
+          </div>
         </FormItem>
       )}
     />
