@@ -26,6 +26,7 @@ import {
   IconCut,
   IconLayout,
   IconTrash,
+  IconTruck,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -191,18 +192,32 @@ export interface PrepTable {
 function useSplitClusters(
   enabled: boolean,
   priv?: SECTOR_PRIVILEGES,
+  showAwaitingLogistics = false,
 ): { tables: PrepTable[]; tasks: Task[]; isLoading: boolean; error: unknown } {
   // FINANCIAL gets a SINGLE table of completed-awaiting-settlement tasks: no status filter — the
   // server's `shouldDisplayForFinancial` scope selects them (faithful to the legacy single financial
   // table). Status-bucketing them (as the generic split does) would AND-out every COMPLETED task and
   // leave financial with an empty Agenda. Everyone else keeps the production / preparation split.
   const isFinancial = priv === SECTOR_PRIVILEGES.FINANCIAL;
-  const scope: Record<string, boolean> =
+  const baseScope: Record<string, boolean> =
     priv === SECTOR_PRIVILEGES.DESIGNER
       ? { shouldDisplayForDesigner: true }
       : isFinancial
         ? { shouldDisplayForFinancial: true }
         : { shouldDisplayInPreparation: true };
+
+  // A task whose production work is done but that logistics has not checked out / finished yet stays
+  // IN_PRODUCTION (the API never auto-completes it). It is not actionable by anyone but logistics, and
+  // leaving it on the board reads as "still in production" — so drop it for everyone else, unless the
+  // user explicitly opts back in via the header toggle.
+  //
+  // FINANCIAL is deliberately exempt: its Agenda is the completed-awaiting-settlement list, and nearly
+  // every task there has finished production by definition — applying the flag would empty the board.
+  const isLogistic = priv === SECTOR_PRIVILEGES.LOGISTIC;
+  const scope: Record<string, boolean> =
+    isLogistic || isFinancial || showAwaitingLogistics
+      ? baseScope
+      : { ...baseScope, excludeAwaitingLogistics: true };
 
   // Both hooks always run (rules-of-hooks); the unused one is just disabled.
   const prod = useTasksBucket([TASK_STATUS.IN_PRODUCTION], enabled && !isFinancial, scope);
@@ -273,7 +288,10 @@ export function TaskPreparationPage() {
   const priv = (user as { sector?: { privileges?: SECTOR_PRIVILEGES } } | undefined)?.sector?.privileges;
   const { deleteAsync } = useTaskMutations();
   const { batchDeleteAsync } = useTaskBatchMutations();
-  const { tables, tasks, isLoading, error } = useSplitClusters(true, priv);
+  // Opt-in escape hatch for the "aguardando logística" hide (see useSplitClusters). Off by default so
+  // the board only shows what the viewer can still act on; toggled on to chase a task stuck in check-out.
+  const [showAwaitingLogistics, setShowAwaitingLogistics] = useState(false);
+  const { tables, tasks, isLoading, error } = useSplitClusters(true, priv, showAwaitingLogistics);
   // Attention system: register loaded tasks so rules evaluate them, and re-render on any
   // attention/presence change so getRowClassName reflects the live blink phase.
   useRegisterAttentionEntities("TASK", tasks);
@@ -282,6 +300,10 @@ export function TaskPreparationPage() {
   const { open: openSendWarning } = useSendWarning();
   // Legacy gave WAREHOUSE no context menu and no export/share button (read-only view).
   const isWarehouse = priv === SECTOR_PRIVILEGES.WAREHOUSE;
+  // Logistics already sees these tasks (they own the check-out); FINANCIAL is exempt from the hide
+  // entirely, so neither needs the toggle.
+  const canToggleAwaitingLogistics =
+    priv !== SECTOR_PRIVILEGES.LOGISTIC && priv !== SECTOR_PRIVILEGES.FINANCIAL;
 
   const currentUserId = (user as { id?: string } | undefined)?.id;
   const columns = useMemo(() => createTaskPreparationColumns({ currentUserId }), [currentUserId]);
@@ -419,6 +441,34 @@ export function TaskPreparationPage() {
   );
 
   const canCreate = canEditTasks(user as never);
+
+  const headerActions = useMemo(() => {
+    const actions = [
+      ...(canToggleAwaitingLogistics
+        ? [
+            {
+              key: "toggle-awaiting-logistics",
+              label: showAwaitingLogistics ? "Ocultar aguardando logística" : "Mostrar aguardando logística",
+              icon: IconTruck,
+              onClick: () => setShowAwaitingLogistics((v) => !v),
+              variant: (showAwaitingLogistics ? "secondary" : "outline") as const,
+            },
+          ]
+        : []),
+      ...(canCreate
+        ? [
+            {
+              key: "create-task",
+              label: "Criar Tarefa",
+              icon: IconPlus,
+              onClick: () => navigate(routes.production.preparation.create),
+              variant: "default" as const,
+            },
+          ]
+        : []),
+    ];
+    return actions.length ? actions : undefined;
+  }, [canToggleAwaitingLogistics, showAwaitingLogistics, canCreate, navigate]);
 
   // --- workflow context-menu actions (direct mutations; faithful to the legacy right-click menu) ---
   const canEdit = canEditTasks(user as never);
@@ -923,19 +973,7 @@ export function TaskPreparationPage() {
                 { label: "Produção", href: routes.production.root },
                 { label: "Agenda" },
               ]}
-              actions={
-                canCreate
-                  ? [
-                      {
-                        key: "create-task",
-                        label: "Criar Tarefa",
-                        icon: IconPlus,
-                        onClick: () => navigate(routes.production.preparation.create),
-                        variant: "default" as const,
-                      },
-                    ]
-                  : undefined
-              }
+              actions={headerActions}
             />
           </div>
         </div>

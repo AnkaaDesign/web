@@ -24,6 +24,7 @@ import {
   IconTrash,
   IconHandClick,
   IconClipboardList,
+  IconTruck,
   IconCalendar,
   IconAlertTriangle,
 } from "@tabler/icons-react";
@@ -149,6 +150,10 @@ export function TaskScheduleTablePage() {
   const isDesigner = priv === SECTOR_PRIVILEGES.DESIGNER;
   const isProductionManager = priv === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
   const isLogisticOrCommercial = priv === SECTOR_PRIVILEGES.LOGISTIC || priv === SECTOR_PRIVILEGES.COMMERCIAL;
+  // Opt-in escape hatch for the "aguardando logística" hide applied to the task query below. Off by
+  // default; logistics never needs it because the hide does not apply to them.
+  const [showAwaitingLogistics, setShowAwaitingLogistics] = useState(false);
+  const canToggleAwaitingLogistics = priv !== SECTOR_PRIVILEGES.LOGISTIC;
   const isTeamLeaderUser = user ? isTeamLeader(user as never) : false;
   const canDelete = canDeleteTasks(user as never);
   const canFinish = canFinishTask(user as never);
@@ -183,11 +188,17 @@ export function TaskScheduleTablePage() {
   const productionSectors = useMemo(() => (sectorsData?.data ?? []) as { id: string; name: string }[], [sectorsData]);
 
   // All production-bound tasks, loaded once (client-mode). Grouping/sort/search happen per table.
+  //
+  // A task whose production work is finished stays IN_PRODUCTION until logistics does the check-out and
+  // finishes it (the API never auto-completes). On a production schedule board that reads as "still being
+  // worked on", so it is dropped for everyone except logistics — who own that remaining step. The toggle
+  // below puts it back for anyone chasing a task stuck in check-out.
   const { data: response, isLoading } = useTasks({
     status: SCHEDULE_STATUS,
     limit: 1000,
     include: SCHEDULE_LIST_INCLUDE,
     orderBy: { term: "asc" },
+    ...(priv === SECTOR_PRIVILEGES.LOGISTIC || showAwaitingLogistics ? {} : { excludeAwaitingLogistics: true }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   } as never);
@@ -790,6 +801,19 @@ export function TaskScheduleTablePage() {
             { label: "Produção", href: routes.production.root },
             { label: "Cronograma" },
           ]}
+          actions={
+            canToggleAwaitingLogistics
+              ? [
+                  {
+                    key: "toggle-awaiting-logistics",
+                    label: showAwaitingLogistics ? "Ocultar aguardando logística" : "Mostrar aguardando logística",
+                    icon: IconTruck,
+                    onClick: () => setShowAwaitingLogistics((v) => !v),
+                    variant: (showAwaitingLogistics ? "secondary" : "outline") as const,
+                  },
+                ]
+              : undefined
+          }
         />
       </div>
 

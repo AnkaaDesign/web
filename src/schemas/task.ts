@@ -840,6 +840,9 @@ export const taskGetManySchema = z
     // Preparation display logic filter
     shouldDisplayInPreparation: z.boolean().optional(),
     preparationExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from preparation completion check
+    // Hides tasks whose production work is finished and that only await the logistics
+    // check-out/finish. Root-level flag, forwarded RAW like the ones above.
+    excludeAwaitingLogistics: z.boolean().optional(),
     preparationDesignerOnly: z.boolean().optional(), // Designer view: only check ARTWORK service order for completion
     // Boolean status convenience filters
     isOverdue: z.boolean().optional(),
