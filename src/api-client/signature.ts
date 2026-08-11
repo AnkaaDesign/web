@@ -97,10 +97,15 @@ export const signatureService = {
    *
    * `responseType: "blob"` e não uma URL direta: a rota é autenticada, e um
    * `window.open` não carregaria o cabeçalho de autorização.
+   *
+   * `customerId` recorta nota e boleto para um dos clientes do faturamento —
+   * sem ele, um faturamento de dois clientes entrega a nota e o boleto dos dois
+   * a quem pediu o dossiê de um só.
    */
-  downloadDossier: (quoteId: string) =>
+  downloadDossier: (quoteId: string, customerId?: string | null) =>
     apiClient.get(`/signature-envelopes/quote/${quoteId}/dossie.pdf`, {
       responseType: "blob",
+      ...(customerId ? { params: { cliente: customerId } } : {}),
     }),
 
   /** Resumo da coleta pela chave do orçamento — alimenta /cliente/orcamento/:id. */
@@ -165,7 +170,7 @@ export const signatureService = {
  * social brasileira tem acento. O `filename=` puro é o recuo, e vem sem acento
  * por construção — a especificação o define como ISO-8859-1.
  */
-function filenameFromDisposition(header: unknown): string | null {
+export function filenameFromDisposition(header: unknown): string | null {
   if (typeof header !== "string") return null;
   const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
   if (utf8?.[1]) {

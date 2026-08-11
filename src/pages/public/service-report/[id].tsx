@@ -7,6 +7,7 @@ import { setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { projectInstallments } from "@/utils/installment-projection";
 import { dossierArchiveFilename, dossierPdfFilename } from "@/utils/document-filename";
+import { filenameFromDisposition } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -303,7 +304,12 @@ export function PublicServiceReportPage() {
   const handleExportPdf = async () => {
     try {
       toast.info("Gerando PDF...");
-      const url = `${apiUrl}/assinatura/publico/orcamento/${quote.id}/dossie.pdf`;
+      // O cliente do recorte viaja junto: esta página já mostra na tela só os
+      // serviços, a nota e o boleto do cliente escolhido, e o PDF vinha com os
+      // documentos de todos os clientes do faturamento.
+      const url =
+        `${apiUrl}/assinatura/publico/orcamento/${quote.id}/dossie.pdf` +
+        (selectedCustomerId ? `?cliente=${encodeURIComponent(selectedCustomerId)}` : "");
       const res = await fetch(url);
       if (!res.ok) {
         // 400 = ainda não há envelope concluído para este orçamento.
@@ -314,11 +320,15 @@ export function PublicServiceReportPage() {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      // O número é o do ORÇAMENTO, não o `serialNumber`: a série identifica o
-      // implemento, e usá-la aqui fazia dois documentos do mesmo cliente
-      // chegarem numerados por sistemas diferentes. O .zip logo abaixo leva o
-      // MESMO nome, só com outra extensão.
-      a.download = dossierPdfFilename(quote.task?.customer, quote.budgetNumber);
+      // O nome vem do servidor quando ele anuncia um: no dossiê recortado quem
+      // nomeia é o cliente do recorte, e `quote.task.customer` é sempre o da
+      // tarefa. O recuo é o mesmo nome de antes — o número é o do ORÇAMENTO, não
+      // o `serialNumber` (a série identifica o implemento, e usá-la aqui fazia
+      // dois documentos do mesmo cliente chegarem numerados por sistemas
+      // diferentes). O .zip logo abaixo leva o MESMO nome, só com outra extensão.
+      a.download =
+        filenameFromDisposition(res.headers.get("content-disposition")) ??
+        dossierPdfFilename(quote.task?.customer, quote.budgetNumber);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

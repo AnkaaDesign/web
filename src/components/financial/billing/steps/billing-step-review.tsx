@@ -956,7 +956,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   // Mesmo dossiê do servidor usado na página da tarefa: páginas do
                   // orçamento ASSINADO + fotos + notas + boletos. Ver
                   // `exportTaskDossiePdf`.
-                  onClick={() => void exportTaskDossiePdf(task)}
+                  //
+                  // O `filterCustomerId` do seletor lá em cima vai JUNTO: sem
+                  // ele, escolher um cliente filtrava a tela e o PDF continuava
+                  // saindo com a nota e o boleto dos dois.
+                  onClick={() => void exportTaskDossiePdf(task, filterCustomerId)}
                 >
                   <IconDownload className="h-3.5 w-3.5" />
                   Baixar PDF

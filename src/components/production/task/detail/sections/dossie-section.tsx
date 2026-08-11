@@ -4,7 +4,7 @@ import { useFileViewer } from "@/components/common/file";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { SERVICE_ORDER_TYPE } from "@/constants";
 import { getApiBaseUrl } from "@/utils/file";
-import { signatureService } from "@/api-client/signature";
+import { signatureService, filenameFromDisposition } from "@/api-client/signature";
 import { dossierPdfFilename } from "@/utils/document-filename";
 import { toast } from "@/components/ui/sonner";
 import type { Task } from "@/types";
@@ -49,24 +49,33 @@ export async function downloadAllDossieFiles(serviceOrders: DossieServiceOrder[]
  * Depende de haver coleta de assinaturas CONCLUÍDA: sem ela não existe
  * documento assinado, e o servidor responde 400 com essa explicação — que é
  * repassada ao usuário em vez de virar um PDF reconstruído em silêncio.
+ *
+ * `customerId` recorta nota e boleto para um dos clientes do faturamento. As
+ * páginas do orçamento saem inteiras mesmo assim: o assinado é um contrato só,
+ * com o escopo inteiro, e recortá-lo por pagador significaria entregar uma
+ * reconstrução no lugar do documento assinado.
  */
-export async function exportTaskDossiePdf(task: Task): Promise<void> {
+export async function exportTaskDossiePdf(task: Task, customerId?: string | null): Promise<void> {
   if (!task.quoteId) {
     toast.error("Esta tarefa não tem orçamento vinculado.");
     return;
   }
   try {
     toast.info("Montando o dossiê…");
-    const res = await signatureService.downloadDossier(task.quoteId);
+    const res = await signatureService.downloadDossier(task.quoteId, customerId);
     const blob = res.data as Blob;
     const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    // Razão social + "Dossiê" + número do orçamento — o mesmo nome que o
-    // servidor anuncia no `Content-Disposition`. Antes era o nome de EXIBIÇÃO da
-    // tarefa (que cai na placa do caminhão, ou em "Sem nome") e sem número
-    // nenhum: dois dossiês do mesmo cliente colidiam na pasta de Downloads.
-    a.download = dossierPdfFilename(task.customer, task.quote?.budgetNumber);
+    // O nome que o SERVIDOR anunciou, e só depois o remontado aqui. Os dois são
+    // "razão social + Dossiê + número", mas no dossiê recortado por cliente quem
+    // nomeia é o cliente do recorte — e `task.customer` é sempre o da tarefa, o
+    // que faria os dois dossiês de um faturamento de dois clientes chegarem com
+    // o mesmo nome. (Antes daqui já se usou o nome de EXIBIÇÃO da tarefa, que cai
+    // na placa do caminhão e não tem número nenhum.)
+    a.download =
+      filenameFromDisposition(res?.headers?.["content-disposition"]) ??
+      dossierPdfFilename(task.customer, task.quote?.budgetNumber);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
