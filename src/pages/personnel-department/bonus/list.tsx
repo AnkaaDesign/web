@@ -190,8 +190,13 @@ interface BonusRow {
   // Period statistics (same for all rows in the period)
   totalCollaborators?: number;
 
-  // Proporcionalidade no período (26→25)
-  eligibilityWeight: number;        // [0,1] — 1 = período inteiro
+  // Proporcionalidade no período (26→25). São DOIS eixos que se multiplicam:
+  // quanto do período a pessoa esteve CONTRATADA (temporalWeight) e quanto
+  // esteve DISPONÍVEL (absenceFactor, afastamento médico acima da franquia).
+  eligibilityWeight: number;        // [0,1] — PESO FINAL = temporal × afastamento
+  temporalWeight?: number | null;   // só o eixo do vínculo (admissão/demissão)
+  absenceFactor?: number | null;    // 1 = ausência dentro da franquia de 40%
+  absentDays?: number | null;       // dias-equivalentes de afastamento médico
   eligibleDays?: number | null;     // dias úteis elegíveis
   periodBusinessDays?: number | null; // dias úteis do período
   periodDivisor?: number | null;    // divisor B1 do período (fracionário)
@@ -438,9 +443,28 @@ function BonusTableComponent({
         if (row.eligibilityWeight >= 1) {
           return <span className="text-muted-foreground">—</span>;
         }
+        // O tooltip precisa explicar O QUE reduziu a proporção. São dois eixos
+        // e eles se multiplicam: dizer só "22 de 22 dias úteis" ao lado de uma
+        // proporção de 48% (alguém contratado o mês inteiro mas afastado por
+        // atestado em mais de 40% dos dias) é uma linha que se contradiz.
+        const parts: string[] = [];
+        if (row.eligibleDays != null && row.periodBusinessDays != null) {
+          const vinculoLabel = `${row.eligibleDays} de ${row.periodBusinessDays} dias úteis`;
+          parts.push(
+            row.absenceFactor != null && row.absenceFactor < 1
+              ? `Vínculo: ${vinculoLabel}`
+              : vinculoLabel,
+          );
+        }
+        if (row.absenceFactor != null && row.absenceFactor < 1) {
+          const dias = row.absentDays != null ? `${row.absentDays} dia(s) ` : "";
+          parts.push(
+            `Afastamento médico: ${dias}(${Math.round((1 - row.absenceFactor) * 100)}% dos dias elegíveis) — acima da franquia de 40%`,
+          );
+        }
         const daysLabel =
-          row.eligibleDays != null && row.periodBusinessDays != null
-            ? `${row.eligibleDays} de ${row.periodBusinessDays} dias úteis`
+          parts.length > 0
+            ? parts.join(" · ")
             : "Proporção de dias úteis elegíveis no período";
         return (
           <Tooltip>
@@ -846,6 +870,9 @@ export default function BonusListPage() {
         totalCollaborators: totalCollaborators,   // Total bonifiable users
 
         eligibilityWeight,
+        temporalWeight: bonus.temporalWeight != null ? toNumber(bonus.temporalWeight, 1) : null,
+        absenceFactor: bonus.absenceFactor != null ? toNumber(bonus.absenceFactor, 1) : null,
+        absentDays: bonus.absentDays != null ? toNumber(bonus.absentDays, 0) : null,
         eligibleDays: bonus.eligibleDays ?? null,
         periodBusinessDays: bonus.periodBusinessDays ?? null,
         periodDivisor,

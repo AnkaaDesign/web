@@ -48,8 +48,24 @@ export interface Bonus extends BaseEntity {
   // Quem trabalha o período inteiro tem peso 1; quem é desligado ou efetivado no
   // meio conta a fração de dias úteis trabalhados. O peso multiplica o bônus
   // individual E é a parcela da pessoa no divisor B1 do período.
-  /** [0,1]. 1 = período inteiro. 0,95 = elegível em 95% dos dias úteis. */
+  /**
+   * [0,1]. PESO FINAL: `temporalWeight × absenceFactor`.
+   *
+   * São DOIS eixos que se multiplicam — quanto do período a pessoa esteve
+   * CONTRATADA e quanto esteve DISPONÍVEL. 1 = período inteiro e disponível.
+   */
   eligibilityWeight?: DecimalValue | number;
+  /** Só o eixo do vínculo: `eligibleDays / periodBusinessDays`. */
+  temporalWeight?: DecimalValue | number | null;
+  /**
+   * Fator de disponibilidade. 1 quando o afastamento médico ficou dentro da
+   * franquia de 40% dos dias elegíveis; senão `1 - fração`. Quem chega a 0
+   * (afastado o período inteiro) não aparece na lista — sai do cálculo.
+   * Férias, folga e compensação NÃO reduzem este fator.
+   */
+  absenceFactor?: DecimalValue | number | null;
+  /** Dias-equivalentes de afastamento médico dentro da janela elegível. */
+  absentDays?: DecimalValue | number | null;
   /** Dias úteis em que esteve elegível dentro do período. */
   eligibleDays?: number | null;
   /** Dias úteis do período (seg–sex menos feriados nacionais). */
@@ -274,8 +290,14 @@ export interface LiveBonus {
   /** True when the live response was served from the stale SWR tier (age > 30 min). */
   isStale?: boolean;
   // ---- Proporcionalidade temporal (mesmos campos do Bonus salvo) ----
-  /** [0,1]. 1 = período inteiro. 0,95 = elegível em 95% dos dias úteis. */
+  /** [0,1]. PESO FINAL = `temporalWeight × absenceFactor`. */
   eligibilityWeight?: number;
+  /** Só o eixo do vínculo (admissão/demissão). */
+  temporalWeight?: number | null;
+  /** Fator de disponibilidade (afastamento médico). Ver o tipo Bonus acima. */
+  absenceFactor?: number | null;
+  /** Dias-equivalentes de afastamento médico dentro da janela elegível. */
+  absentDays?: number | null;
   /** Dias úteis em que esteve elegível dentro do período. */
   eligibleDays?: number | null;
   /** Dias úteis do período (seg–sex menos feriados nacionais). */
