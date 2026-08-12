@@ -41,6 +41,7 @@ import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGE
 import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
 import { useAuth } from "../../../../contexts/auth-context";
+import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
 import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Button } from "@/components/ui/button";
@@ -3986,7 +3987,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} customerId={task.customerId ?? undefined} />
+                      <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} customerId={task.customerId ?? undefined} canViewFinancials={canViewAirbrushingFinancials(user)} />
                     </CardContent>
                   </AccordionContent>
                 </Card>

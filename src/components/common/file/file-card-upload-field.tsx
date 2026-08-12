@@ -78,6 +78,13 @@ export interface FileCardUploadFieldProps {
     onChange: (status: string) => void;
     disabled: boolean;
     layout: "card" | "list";
+    /**
+     * Se o arquivo já existe no servidor. O mapa de status é chaveado por File ID,
+     * que só existe depois do upload — um status escolhido antes disso não teria
+     * como ser enviado e seria descartado em silêncio. Quem renderiza o controle
+     * usa isto para desabilitá-lo enquanto o upload não termina.
+     */
+    uploaded: boolean;
   }) => React.ReactNode;
   maxFiles?: number;
   maxSize?: number;
@@ -436,6 +443,7 @@ export function FileCardUploadField({
               onChange: handleStatusChange,
               disabled,
               layout: "card",
+              uploaded: Boolean(file.uploaded),
             })}
         </div>
       </div>
@@ -636,6 +644,7 @@ export function FileCardUploadField({
                         onChange: handleStatusChange,
                         disabled,
                         layout: "list",
+                        uploaded: Boolean(file.uploaded),
                       })}
                     </div>
                   )}

@@ -15,11 +15,15 @@ export function LayoutFileUploadField({ showStatus = true, ...props }: LayoutFil
     <FileCardUploadField
       {...props}
       showStatus={showStatus}
-      renderStatus={({ value, onChange, disabled, layout }) => (
+      renderStatus={({ value, onChange, disabled, layout, uploaded }) => (
         <LayoutStatusSelector
           value={value}
           onChange={onChange}
-          disabled={disabled}
+          // O mapa `layoutStatuses` é chaveado por File ID, que só passa a existir
+          // depois do upload. Deixar o seletor ativo antes disso seria um controle
+          // que aceita a escolha e a descarta no submit — um layout recém-solto
+          // nasce Rascunho e só pode ser aprovado quando já estiver no servidor.
+          disabled={disabled || !uploaded}
           {...(layout === "card"
             ? { className: "w-full", triggerClassName: "h-8 w-full justify-between" }
             : {})}

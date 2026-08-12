@@ -1,12 +1,23 @@
 import { useFormContext, useWatch } from "react-hook-form";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { PainterSelector } from "./painter-selector";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
+import {
+  AIRBRUSHING_STATUS,
+  AIRBRUSHING_STATUS_LABELS,
+  AIRBRUSHING_PAYMENT_STATUS,
+  AIRBRUSHING_PAYMENT_STATUS_LABELS,
+  AIRBRUSHING_DUE_DATE_RULE,
+  AIRBRUSHING_DUE_DATE_RULE_LABELS,
+  PAYMENT_METHOD,
+  PAYMENT_METHOD_LABELS,
+} from "../../../../constants";
+import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, resolveAirbrushingDueDate } from "@/utils/airbrushing";
+import { formatDate } from "@/utils/date";
 
 interface AirbrushingFormFieldsProps {
   control: any;
@@ -37,6 +48,26 @@ export function AirbrushingFormFields({ control, disabled, initialPainter, canVi
     value,
     label: AIRBRUSHING_PAYMENT_STATUS_LABELS[value],
   }));
+
+  const paymentMethodOptions: ComboboxOption[] = Object.values(PAYMENT_METHOD).map((value) => ({
+    value,
+    label: PAYMENT_METHOD_LABELS[value],
+  }));
+
+  const dueDateRuleOptions: ComboboxOption[] = Object.values(AIRBRUSHING_DUE_DATE_RULE).map((value) => ({
+    value,
+    label: AIRBRUSHING_DUE_DATE_RULE_LABELS[value],
+  }));
+
+  // A prévia do vencimento usa a MESMA referência do servidor: término real quando
+  // existe, término previsto enquanto o serviço não acabou.
+  const dueDateRule = useWatch({ control, name: "dueDateRule" }) ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
+  const paymentTermDays = useWatch({ control, name: "paymentTermDays" });
+  const dueDayOfMonth = useWatch({ control, name: "dueDayOfMonth" });
+  const finishDate = useWatch({ control, name: "finishDate" });
+  const finishedAt = useWatch({ control, name: "finishedAt" });
+
+  const previewDueDate = resolveAirbrushingDueDate({ dueDateRule, paymentTermDays, dueDayOfMonth }, finishedAt ?? finishDate);
 
   return (
     <div className="space-y-4">
@@ -133,6 +164,136 @@ export function AirbrushingFormFields({ control, disabled, initialPainter, canVi
           />
         )}
       </div>
+
+      {/* Row 2b: Payment configuration — how the painter is paid and when it falls due.
+          Both feed Contas a Pagar directly ("Forma" and "Vencimento"), so they sit with
+          the payment status rather than with the schedule dates. */}
+      {canViewFinancials && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={control}
+            name="paymentMethod"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Forma de Pagamento</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value ?? undefined}
+                    onValueChange={(value) => field.onChange(value ?? null)}
+                    options={paymentMethodOptions}
+                    placeholder="Selecione a forma de pagamento"
+                    searchable={false}
+                    clearable
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="dueDateRule"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Regra de Vencimento</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Cada regra consome um campo diferente; limpar os outros evita que
+                      // um valor órfão de uma regra anterior volte a valer se o usuário
+                      // trocar de ideia duas vezes (mesmo cascade-clear do formulário de pedido).
+                      if (value !== AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) setValue("paymentTermDays", null, { shouldDirty: true });
+                      if (value !== AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH) setValue("dueDayOfMonth", null, { shouldDirty: true });
+                      if (value !== AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE) setValue("dueDate", null, { shouldDirty: true });
+                    }}
+                    options={dueDateRuleOptions}
+                    placeholder="Selecione a regra"
+                    searchable={false}
+                    clearable={false}
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {dueDateRule === AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH && (
+            <FormField
+              control={control}
+              name="paymentTermDays"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prazo após o Término</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={field.value ?? ""}
+                      onChange={(value) => field.onChange(value === "" || value === null || value === undefined ? null : Number(value))}
+                      placeholder={String(AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS)}
+                      disabled={disabled}
+                      className="bg-transparent"
+                    />
+                  </FormControl>
+                  <FormDescription>Dias corridos após o término do serviço. Em branco usa {AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS} dias.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {dueDateRule === AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH && (
+            <FormField
+              control={control}
+              name="dueDayOfMonth"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dia do Vencimento</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={field.value ?? ""}
+                      onChange={(value) => field.onChange(value === "" || value === null || value === undefined ? null : Number(value))}
+                      placeholder="1-31"
+                      disabled={disabled}
+                      className="bg-transparent"
+                    />
+                  </FormControl>
+                  <FormDescription>Próximo dia {field.value || "X"} a partir do término. Meses curtos usam o último dia.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {dueDateRule === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE && (
+            <FormField control={control} name="dueDate" render={({ field }) => <DateTimeInput field={field} label="Data de Vencimento" mode="date" context="end" disabled={disabled} />} />
+          )}
+
+          {/* Prévia do que o servidor vai gravar. Some quando não há término de
+              referência — nesse caso a aerografia entra em Contas a Pagar sem vencimento. */}
+          {dueDateRule !== AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE && (
+            <div className="md:col-span-2 -mt-1">
+              {previewDueDate ? (
+                <p className="text-xs text-muted-foreground">
+                  Vencimento previsto: <span className="font-medium text-foreground">{formatDate(previewDueDate)}</span>
+                  {!finishedAt && " (a partir do término previsto; a data se firma quando a aerografia for concluída)"}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Sem data de término, a aerografia aparece em Contas a Pagar sem vencimento.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Row 3: Planned dates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

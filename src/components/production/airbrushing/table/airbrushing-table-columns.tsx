@@ -3,6 +3,7 @@ import {
   SECTOR_PRIVILEGES,
   AIRBRUSHING_STATUS_LABELS,
   AIRBRUSHING_PAYMENT_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
@@ -178,6 +179,36 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
         ) : (
           muted("—")
         ),
+    },
+    {
+      id: "paymentMethod",
+      header: "Forma",
+      accessorKey: "paymentMethod",
+      enableSorting: true,
+      size: 140,
+      minSize: 110,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Forma de Pagamento",
+        requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
+        exportValue: (row) => (row.paymentMethod ? PAYMENT_METHOD_LABELS[row.paymentMethod] : ""),
+      },
+      cell: ({ row }) => (row.original.paymentMethod ? <span className="text-sm">{PAYMENT_METHOD_LABELS[row.original.paymentMethod]}</span> : muted("—")),
+    },
+    {
+      id: "dueDate",
+      header: "Vencimento",
+      accessorKey: "dueDate",
+      enableSorting: true,
+      size: 140,
+      minSize: 120,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Vencimento",
+        requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
+        exportValue: (row) => (row.dueDate ? formatDate(row.dueDate) : ""),
+      },
+      cell: ({ row }) => (row.original.dueDate ? <span className="text-sm tabular-nums">{formatDate(row.original.dueDate)}</span> : muted("—")),
     },
     {
       id: "startDate",

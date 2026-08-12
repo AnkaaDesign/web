@@ -60,9 +60,14 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_PAYMENT_STATUS_LABELS,
+  AIRBRUSHING_DUE_DATE_RULE,
+  AIRBRUSHING_DUE_DATE_RULE_LABELS,
+  PAYMENT_METHOD,
+  PAYMENT_METHOD_LABELS,
   TASK_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
+import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS } from "@/utils/airbrushing";
 import type { Airbrushing } from "../../../../types";
 import { AirbrushingFilesSection } from "./airbrushing-files-section";
 // Resolve each Layout wrapper to its backing File (id/filename/path) — shared with the
@@ -101,6 +106,38 @@ export function AirbrushingDetailPage() {
   const canEdit = canEditAirbrushings(user);
   const canDelete = canDeleteAirbrushings(user);
   const canRelease = canReleaseAirbrushings(user);
+  // Aprovar/reprovar layout é decisão comercial — mesma regra de canApproveLayouts no
+  // servidor, que ignora em SILÊNCIO (200, sem mudança) quem não pode. Esconder o
+  // controle aqui é o que evita o clique que parece funcionar e não faz nada.
+  const canApproveLayouts = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]);
+
+  /**
+   * fileId → LayoutStatus. A seção de layouts trabalha com os Files (é o File que baixa e
+   * gera miniatura), mas o status mora no WRAPPER Layout — este mapa é a ponte entre os dois.
+   */
+  const getAirbrushingLayoutStatuses = useCallback((a: Airbrushing): Record<string, string> => {
+    const entries = ((a.layouts ?? []) as any[])
+      .map((layout) => [layout?.file?.id ?? layout?.fileId ?? layout?.id, layout?.status])
+      .filter(([fileId, status]) => Boolean(fileId && status));
+    return Object.fromEntries(entries);
+  }, []);
+
+  /**
+   * O mapa `layoutStatuses` é chaveado por File ID e a API o aplica sobre os layouts
+   * JÁ vinculados — por isso não vai `layoutIds` junto: mandar a lista seria um
+   * `set` completo da relação, e um save de status acabaria reescrevendo anexos.
+   */
+  const handleLayoutStatusChange = useCallback(
+    async (fileId: string, status: string) => {
+      if (!id) return;
+      try {
+        await updateAsync({ id, data: { layoutStatuses: { [fileId]: status } } as any });
+      } catch {
+        // O interceptor global já mostra o erro; o refetch da mutation devolve o valor antigo.
+      }
+    },
+    [id, updateAsync],
+  );
   // The "Produção" dashboard (`pages/production/root.tsx`) is gated to FINANCIAL/ADMIN,
   // while this detail page also admits PRODUCTION/ACCOUNTING/COMMERCIAL. Render the
   // ancestor crumb as a plain label for those users instead of a link into a denied page.
@@ -349,6 +386,84 @@ export function AirbrushingDetailPage() {
               }
             : undefined,
         },
+        {
+          id: "paymentMethod",
+          label: "Forma de Pagamento",
+          icon: IconCreditCard,
+          dataType: "enum",
+          requiredPrivilege: MONEY_GATE,
+          editablePrivilege: MONEY_GATE,
+          accessor: (a) => a.paymentMethod ?? null,
+          render: (a) => <div className="flex items-center justify-end">{a.paymentMethod ? PAYMENT_METHOD_LABELS[a.paymentMethod] : "-"}</div>,
+          edit: canEdit
+            ? {
+                get: (a) => a.paymentMethod ?? null,
+                enum: { values: Object.values(PAYMENT_METHOD), labels: PAYMENT_METHOD_LABELS },
+                onCommit: async (v, a) => {
+                  await updateAsync({ id: a.id, data: { paymentMethod: (v as PAYMENT_METHOD) || null } });
+                },
+              }
+            : undefined,
+        },
+        {
+          id: "dueDateRule",
+          label: "Regra de Vencimento",
+          icon: IconCalendar,
+          dataType: "enum",
+          requiredPrivilege: MONEY_GATE,
+          editablePrivilege: MONEY_GATE,
+          accessor: (a) => a.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+          render: (a) => {
+            const rule = a.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
+            // A regra sozinha não diz nada — o que interessa é o parâmetro dela.
+            const detail =
+              rule === AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH
+                ? `${a.paymentTermDays ?? AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS} dias após o término`
+                : rule === AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH
+                  ? a.dueDayOfMonth
+                    ? `Todo dia ${a.dueDayOfMonth}`
+                    : AIRBRUSHING_DUE_DATE_RULE_LABELS[rule]
+                  : AIRBRUSHING_DUE_DATE_RULE_LABELS[rule];
+            return <div className="flex items-center justify-end">{detail}</div>;
+          },
+          edit: canEdit
+            ? {
+                get: (a) => a.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+                enum: { values: Object.values(AIRBRUSHING_DUE_DATE_RULE), labels: AIRBRUSHING_DUE_DATE_RULE_LABELS },
+                onCommit: async (v, a) => {
+                  // Trocar a regra sem dar o campo que ela consome é 400 no servidor
+                  // (assertDueDateConfig). Semeia um valor sensato para que a troca
+                  // sozinha nunca falhe: o dia de hoje, ou o prazo padrão.
+                  const rule = v as AIRBRUSHING_DUE_DATE_RULE;
+                  const data: Record<string, unknown> = { dueDateRule: rule };
+                  if (rule === AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH && !a.dueDayOfMonth) data.dueDayOfMonth = new Date().getDate();
+                  if (rule === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE && !a.dueDate) data.dueDate = a.dueDate ?? new Date();
+                  await updateAsync({ id: a.id, data: data as any });
+                },
+              }
+            : undefined,
+        },
+        // Vencimento é MATERIALIZADO pelo servidor a partir da regra — só é editável à
+        // mão na regra "Data específica"; nas outras, editar aqui seria escrever um
+        // valor que o próximo save recalcularia por cima.
+        {
+          id: "dueDate",
+          label: "Vencimento",
+          icon: IconCalendar,
+          dataType: "date",
+          requiredPrivilege: MONEY_GATE,
+          editablePrivilege: MONEY_GATE,
+          accessor: (a) => a.dueDate ?? null,
+          edit:
+            canEdit && (airbrushing?.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE
+              ? {
+                  get: (a) => a.dueDate ?? null,
+                  onCommit: async (v, a) => {
+                    await updateAsync({ id: a.id, data: { dueDate: (v as Date) ?? null } });
+                  },
+                }
+              : undefined,
+        },
         // paidAt is server-stamped when paymentStatus becomes PAID — read-only.
         { id: "paidAt", label: "Pago em", icon: IconCalendar, dataType: "datetime", requiredPrivilege: MONEY_GATE, accessor: (a) => a.paidAt ?? null },
       ],
@@ -434,6 +549,9 @@ export function AirbrushingDetailPage() {
             viewMode={layoutsView}
             onViewModeChange={setLayoutsView}
             hideToolbar
+            layoutStatusByFileId={getAirbrushingLayoutStatuses(a)}
+            canApproveLayouts={canApproveLayouts}
+            onLayoutStatusChange={handleLayoutStatusChange}
             emptyIcon={IconPhoto}
             emptyTitle="Nenhum layout cadastrado"
             emptyDescription="Esta aerografia não possui layouts anexados."

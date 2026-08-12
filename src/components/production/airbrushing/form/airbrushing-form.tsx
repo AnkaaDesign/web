@@ -9,6 +9,7 @@ import {
   routes,
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
+  AIRBRUSHING_DUE_DATE_RULE,
   AIRBRUSHING_STATUS_LABELS,
   AIRBRUSHING_PAYMENT_STATUS_LABELS,
   FAVORITE_PAGES,
@@ -292,6 +293,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       layoutIds: [],
       status: AIRBRUSHING_STATUS.PREPARATION,
       paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+      paymentMethod: null,
+      dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+      paymentTermDays: null,
+      dueDayOfMonth: null,
+      dueDate: null,
       // Create-mode multi-config (MultiAirbrushingSelector). Seeded with one empty row.
       airbrushings: mode === "create" ? [makeEmptyAirbrushing()] : [],
     } as any,
@@ -312,6 +318,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       description: airbrushing.description ?? null,
       status: airbrushing.status,
       paymentStatus: airbrushing.paymentStatus ?? AIRBRUSHING_PAYMENT_STATUS.PENDING,
+      paymentMethod: airbrushing.paymentMethod ?? null,
+      dueDateRule: airbrushing.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+      paymentTermDays: airbrushing.paymentTermDays ?? null,
+      dueDayOfMonth: airbrushing.dueDayOfMonth ?? null,
+      dueDate: airbrushing.dueDate ?? null,
       taskId: airbrushing.taskId,
       painterId: airbrushing.painterId ?? null,
       receiptIds: airbrushing.receipts?.map((f) => f.id) || [],
@@ -847,6 +858,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                             control={form.control}
                             disabled={isSubmitting}
                             customerId={selectedTaskResponse?.data?.customer?.id || undefined}
+                            canViewFinancials={canViewFinancials}
                           />
                         </CardContent>
                       </Card>

@@ -39,6 +39,12 @@ type LayoutStatusMap = Record<string, string>;
 export interface AirbrushingConfig {
   status?: any;
   paymentStatus?: any;
+  /** Forma de pagamento + regra de vencimento — viram as colunas Forma/Vencimento em Contas a Pagar. */
+  paymentMethod?: string | null;
+  dueDateRule?: string | null;
+  paymentTermDays?: number | null;
+  dueDayOfMonth?: number | null;
+  dueDate?: any;
   price?: number | null;
   description?: string | null;
   startDate?: any;
@@ -88,6 +94,11 @@ export async function createAirbrushingForTasks(
     const base: Record<string, any> = {
       status: config.status,
       paymentStatus: config.paymentStatus,
+      paymentMethod: config.paymentMethod ?? null,
+      dueDateRule: config.dueDateRule ?? undefined,
+      paymentTermDays: config.paymentTermDays ?? null,
+      dueDayOfMonth: config.dueDayOfMonth ?? null,
+      dueDate: config.dueDate ?? null,
       price: config.price ?? null,
       // `|| null` (not `??`): collapses "" to null so a blank textarea clears the field rather than
       // sending an empty string through the FormData helper.

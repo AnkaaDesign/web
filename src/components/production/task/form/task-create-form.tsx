@@ -31,6 +31,7 @@ import {
   SECTOR_PRIVILEGES,
 } from "../../../../constants";
 import { useAuth } from "../../../../contexts/auth-context";
+import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1156,7 +1157,7 @@ export const TaskCreateForm = () => {
                       </AccordionTrigger>
                       <AccordionContent>
                         <CardContent className="pt-0">
-                          <MultiAirbrushingSelector control={form.control} disabled={isSubmitting} customerId={customerIdValue || undefined} />
+                          <MultiAirbrushingSelector control={form.control} disabled={isSubmitting} customerId={customerIdValue || undefined} canViewFinancials={canViewAirbrushingFinancials(user)} />
                         </CardContent>
                       </AccordionContent>
                     </Card>

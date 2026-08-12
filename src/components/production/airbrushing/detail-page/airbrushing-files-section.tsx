@@ -4,6 +4,8 @@ import { IconLayoutGrid, IconList } from "@tabler/icons-react";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { FileItem, type FileViewMode, useFileViewer } from "@/components/common/file";
+import { LayoutStatusBadge, LayoutStatusSelector } from "@/components/production/task/layout";
+import { LAYOUT_STATUS } from "@/constants/enums";
 
 interface AirbrushingFilesSectionProps {
   files: AnkaaFile[];
@@ -18,6 +20,15 @@ interface AirbrushingFilesSectionProps {
   onViewModeChange?: (mode: FileViewMode) => void;
   /** Hide the internal grid/list toolbar (e.g. when the toggle is lifted into the section header). */
   hideToolbar?: boolean;
+  /**
+   * fileId → LayoutStatus. Presente só na seção de LAYOUTS: recibos e notas fiscais são
+   * Files puros e não têm fluxo de aprovação. Quando informado, cada arquivo ganha a pílula
+   * de status; quem pode aprovar troca o status ali mesmo, sem abrir o formulário.
+   */
+  layoutStatusByFileId?: Record<string, string>;
+  /** Só COMERCIAL/ADMIN — espelha canApproveLayouts no servidor, que ignora em silêncio quem não pode. */
+  canApproveLayouts?: boolean;
+  onLayoutStatusChange?: (fileId: string, status: string) => void;
 }
 
 /**
@@ -26,7 +37,19 @@ interface AirbrushingFilesSectionProps {
  * app-level file viewer. Mirrors order-documents-section.tsx; reused for layouts, invoices,
  * and receipts.
  */
-export function AirbrushingFilesSection({ files, emptyIcon: EmptyIcon, emptyTitle, emptyDescription, defaultViewMode = "list", viewMode: controlledViewMode, onViewModeChange, hideToolbar = false }: AirbrushingFilesSectionProps) {
+export function AirbrushingFilesSection({
+  files,
+  emptyIcon: EmptyIcon,
+  emptyTitle,
+  emptyDescription,
+  defaultViewMode = "list",
+  viewMode: controlledViewMode,
+  onViewModeChange,
+  hideToolbar = false,
+  layoutStatusByFileId,
+  canApproveLayouts = false,
+  onLayoutStatusChange,
+}: AirbrushingFilesSectionProps) {
   const [internalViewMode, setInternalViewMode] = useState<FileViewMode>(defaultViewMode);
   const viewMode = controlledViewMode ?? internalViewMode;
   const setViewMode = onViewModeChange ?? setInternalViewMode;
@@ -52,9 +75,55 @@ export function AirbrushingFilesSection({ files, emptyIcon: EmptyIcon, emptyTitl
       {files.length > 0 ? (
         <div className="max-h-[420px] overflow-y-auto">
           <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-            {files.map((file) => (
-              <FileItem key={file.id} file={file} viewMode={viewMode} onPreview={handleFileClick} />
-            ))}
+            {files.map((file) => {
+              const status = layoutStatusByFileId?.[file.id];
+              if (!layoutStatusByFileId) {
+                return <FileItem key={file.id} file={file} viewMode={viewMode} onPreview={handleFileClick} />;
+              }
+
+              const canSetStatus = canApproveLayouts && Boolean(onLayoutStatusChange);
+
+              // GRID: pílula sobreposta à miniatura (mesma posição do layout de tarefa),
+              // e o seletor logo abaixo do tile para quem aprova. O seletor precisa
+              // existir NOS DOIS modos — grid é o padrão desta seção, e deixá-lo só na
+              // lista esconderia a aprovação atrás de um toggle de visualização.
+              if (viewMode === "grid") {
+                return (
+                  <div key={file.id} className="flex flex-col gap-1">
+                    <div className="relative">
+                      <FileItem file={file} viewMode={viewMode} onPreview={handleFileClick} />
+                      <div className="pointer-events-none absolute left-1 top-1">
+                        <LayoutStatusBadge status={status} showDraft className="h-4 px-1 text-[9px] leading-none shadow-sm" />
+                      </div>
+                    </div>
+                    {canSetStatus && (
+                      <LayoutStatusSelector
+                        value={status ?? LAYOUT_STATUS.DRAFT}
+                        onChange={(next) => onLayoutStatusChange!(file.id, next)}
+                        className="w-full"
+                        triggerClassName="h-7 w-full justify-between text-xs"
+                      />
+                    )}
+                  </div>
+                );
+              }
+
+              // LISTA: o controle vai à direita, onde há espaço horizontal.
+              return (
+                <div key={file.id} className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <FileItem file={file} viewMode={viewMode} onPreview={handleFileClick} />
+                  </div>
+                  <div className="shrink-0">
+                    {canSetStatus ? (
+                      <LayoutStatusSelector value={status ?? LAYOUT_STATUS.DRAFT} onChange={(next) => onLayoutStatusChange!(file.id, next)} triggerClassName="h-8" />
+                    ) : (
+                      <LayoutStatusBadge status={status} showDraft />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (

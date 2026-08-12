@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import type { DateRange } from "react-day-picker";
 import { useController } from "react-hook-form";
 import { IconPlus, IconTrash, IconPhoto } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
@@ -11,7 +12,16 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileSuggestions } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
+import {
+  AIRBRUSHING_STATUS,
+  AIRBRUSHING_STATUS_LABELS,
+  AIRBRUSHING_PAYMENT_STATUS,
+  AIRBRUSHING_PAYMENT_STATUS_LABELS,
+  AIRBRUSHING_DUE_DATE_RULE,
+  AIRBRUSHING_DUE_DATE_RULE_LABELS,
+  PAYMENT_METHOD,
+  PAYMENT_METHOD_LABELS,
+} from "../../../../constants";
 import { PainterSelector } from "@/components/production/airbrushing/form/painter-selector";
 
 interface MultiAirbrushingSelectorProps {
@@ -22,12 +32,23 @@ interface MultiAirbrushingSelectorProps {
   // Customer of the task — scopes the airbrushing-layout recommendations to files that
   // were previously used as AIRBRUSHING layouts for this customer (separate from task layouts).
   customerId?: string;
+  /**
+   * Se o usuário pode ver dinheiro. Este seletor vive FORA de DataTable/DetailPage, então
+   * não herda nem o gate de privilégio nem o olho de `usePricingVisible` — o preço, o status
+   * e a configuração de pagamento precisam ser gateados aqui, à mão.
+   */
+  canViewFinancials?: boolean;
 }
 
 interface AirbrushingItem {
   id: string;
   status: string;
   paymentStatus: string;
+  paymentMethod?: string | null;
+  dueDateRule?: string | null;
+  paymentTermDays?: number | null;
+  dueDayOfMonth?: number | null;
+  dueDate?: Date | null;
   price: number | null;
   description: string | null;
   startDate: Date | null;
@@ -45,6 +66,8 @@ interface AirbrushingItem {
   receiptIds?: string[];
   invoiceIds?: string[];
   layoutIds?: string[];
+  /** fileId → LayoutStatus, para os layouts já enviados desta configuração. */
+  layoutStatuses?: Record<string, string>;
   uploading?: boolean;
   error?: string;
 }
@@ -105,6 +128,11 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
 
   return {
     id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
+    paymentMethod: airbrushing.paymentMethod ?? null,
+    dueDateRule: airbrushing.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+    paymentTermDays: airbrushing.paymentTermDays ?? null,
+    dueDayOfMonth: airbrushing.dueDayOfMonth ?? null,
+    dueDate: airbrushing.dueDate ?? null,
     status: airbrushing.status || AIRBRUSHING_STATUS.PREPARATION,
     paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
     price: airbrushing.price || null,
@@ -129,11 +157,20 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
     receiptIds: airbrushing.receiptIds || uploadedIds(receiptFiles),
     invoiceIds: airbrushing.invoiceIds || uploadedIds(invoiceFiles),
     layoutIds: airbrushing.layoutIds || uploadedIds(layouts),
+    // Semeia o mapa com o status que veio do servidor. Sem isto, um save que não
+    // mexeu em layout nenhum reenviaria o mapa vazio e todo layout voltaria a Rascunho.
+    layoutStatuses:
+      airbrushing.layoutStatuses ??
+      Object.fromEntries(
+        layouts
+          .filter((f: any) => (f.uploadedFileId || f.id) && f.status)
+          .map((f: any) => [f.uploadedFileId || f.id, f.status as string]),
+      ),
   };
 };
 
 export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, MultiAirbrushingSelectorProps>(
-  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId }, ref) => {
+  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId, canViewFinancials = true }, ref) => {
     // Use controller to properly manage form field
     const { field } = useController({
       name: "airbrushings" as any,
@@ -198,6 +235,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           id: airbrushing.id, // Preserve ID for sync back
           status: airbrushing.status,
           paymentStatus: airbrushing.paymentStatus,
+          paymentMethod: airbrushing.paymentMethod ?? null,
+          dueDateRule: airbrushing.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+          paymentTermDays: airbrushing.paymentTermDays ?? null,
+          dueDayOfMonth: airbrushing.dueDayOfMonth ?? null,
+          dueDate: airbrushing.dueDate ?? null,
           price: airbrushing.price,
           description: airbrushing.description,
           startDate: airbrushing.startDate,
@@ -209,6 +251,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           receiptIds: airbrushing.receiptIds || [],
           invoiceIds: airbrushing.invoiceIds || [],
           layoutIds: airbrushing.layoutIds || [],
+          // Lista de campos ESCRITA À MÃO: um campo que não estiver aqui é descartado
+          // em silêncio no caminho da tarefa, por mais que exista no estado e no schema.
+          layoutStatuses: airbrushing.layoutStatuses || {},
           // Include the actual files for submission with the form
           receiptFiles: airbrushing.receiptFiles,
           invoiceFiles: airbrushing.invoiceFiles,
@@ -236,6 +281,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         id: `airbrushing-${crypto.randomUUID()}`,
         status: AIRBRUSHING_STATUS.PREPARATION,
         paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+        paymentMethod: null,
+        dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+        paymentTermDays: null,
+        dueDayOfMonth: null,
+        dueDate: null,
         price: null,
         description: null,
         startDate: null,
@@ -250,6 +300,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         receiptIds: [],
         invoiceIds: [],
         layoutIds: [],
+        layoutStatuses: {},
       };
       setAirbrushings((prev) => [...prev, newAirbrushing]);
     }, []);
@@ -286,6 +337,22 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       },
       [updateAirbrushing],
     );
+
+    /**
+     * Status por layout, chaveado por File ID — o mesmo formato que a API espera em
+     * `layoutStatuses`. Só arquivos já enviados chegam aqui: o seletor fica inerte
+     * enquanto o upload não termina, justamente porque antes disso não existe File ID
+     * para servir de chave.
+     */
+    const handleLayoutStatusChange = useCallback((airbrushingId: string, fileId: string, status: string) => {
+      // Merge, não replace: `updateAirbrushing` só aceita um patch pronto, e aqui é
+      // preciso ler o mapa anterior para não perder o status dos outros layouts.
+      setAirbrushings((prev) =>
+        prev.map((airbrushing) =>
+          airbrushing.id === airbrushingId ? { ...airbrushing, layoutStatuses: { ...(airbrushing.layoutStatuses ?? {}), [fileId]: status } } : airbrushing,
+        ),
+      );
+    }, []);
 
     // Expose methods via ref
     useImperativeHandle(
@@ -372,21 +439,23 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                         disabled={disabled}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <FormLabel>Preço</FormLabel>
-                      <Input
-                        type="currency"
-                        value={airbrushing.price ?? undefined}
-                        onChange={(value) => {
-                          updateAirbrushing(airbrushing.id, {
-                            price: typeof value === 'number' ? value : null,
-                          });
-                        }}
-                        disabled={disabled}
-                        placeholder="R$ 0,00"
-                        className="bg-transparent"
-                      />
-                    </div>
+                    {canViewFinancials && (
+                      <div className="space-y-2">
+                        <FormLabel>Preço</FormLabel>
+                        <Input
+                          type="currency"
+                          value={airbrushing.price ?? undefined}
+                          onChange={(value) => {
+                            updateAirbrushing(airbrushing.id, {
+                              price: typeof value === 'number' ? value : null,
+                            });
+                          }}
+                          disabled={disabled}
+                          placeholder="R$ 0,00"
+                          className="bg-transparent"
+                        />
+                      </div>
+                    )}
                   </div>
                   {!isEditMode && (
                     <Button
@@ -480,9 +549,101 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   />
                 </div>
 
+                {/* Forma de pagamento + regra de vencimento. São o que Contas a Pagar
+                    exibe nas colunas "Forma" e "Vencimento"; configurar aqui evita ter
+                    de reabrir cada aerografia depois de criá-la. */}
+                {canViewFinancials && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <FormLabel>Forma de Pagamento</FormLabel>
+                      <Combobox
+                        value={airbrushing.paymentMethod ?? undefined}
+                        onValueChange={(value) => updateAirbrushing(airbrushing.id, { paymentMethod: (value as string) ?? null })}
+                        options={Object.values(PAYMENT_METHOD).map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }))}
+                        placeholder="Forma de pagamento"
+                        searchable={false}
+                        clearable
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FormLabel>Regra de Vencimento</FormLabel>
+                      <Combobox
+                        value={airbrushing.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH}
+                        onValueChange={(value) =>
+                          updateAirbrushing(airbrushing.id, {
+                            dueDateRule: value as string,
+                            // Cada regra consome um campo diferente — zera os outros.
+                            paymentTermDays: value === AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH ? airbrushing.paymentTermDays ?? null : null,
+                            dueDayOfMonth: value === AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH ? airbrushing.dueDayOfMonth ?? null : null,
+                            dueDate: value === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE ? airbrushing.dueDate ?? null : null,
+                          })
+                        }
+                        options={Object.values(AIRBRUSHING_DUE_DATE_RULE).map((value) => ({ value, label: AIRBRUSHING_DUE_DATE_RULE_LABELS[value] }))}
+                        placeholder="Regra de vencimento"
+                        searchable={false}
+                        clearable={false}
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      {(airbrushing.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) === AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH && (
+                        <>
+                          <FormLabel>Prazo após o Término</FormLabel>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={365}
+                            value={airbrushing.paymentTermDays ?? ""}
+                            onChange={(value) => updateAirbrushing(airbrushing.id, { paymentTermDays: value === null || value === "" ? null : Number(value) })}
+                            disabled={disabled}
+                            placeholder="7"
+                            className="bg-transparent"
+                          />
+                        </>
+                      )}
+                      {airbrushing.dueDateRule === AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH && (
+                        <>
+                          <FormLabel>Dia do Vencimento</FormLabel>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={airbrushing.dueDayOfMonth ?? ""}
+                            onChange={(value) => updateAirbrushing(airbrushing.id, { dueDayOfMonth: value === null || value === "" ? null : Number(value) })}
+                            disabled={disabled}
+                            placeholder="1-31"
+                            className="bg-transparent"
+                          />
+                        </>
+                      )}
+                      {airbrushing.dueDateRule === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE && (
+                        <DateTimeInput
+                          field={{
+                            value: airbrushing.dueDate ?? null,
+                            // O input é `mode="date"`, então nunca entrega um DateRange —
+                            // a assinatura larga vem do tipo compartilhado do componente.
+                            onChange: (value: Date | DateRange | null) => updateAirbrushing(airbrushing.id, { dueDate: value instanceof Date ? value : null }),
+                            // Estas linhas não vivem num react-hook-form; o estado é local
+                            // ao seletor, então não há nada para tocar no blur.
+                            onBlur: () => {},
+                            name: `airbrushing-${airbrushing.id}-dueDate`,
+                          }}
+                          label="Data de Vencimento"
+                          mode="date"
+                          context="end"
+                          disabled={disabled}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Layouts — same uploader as the main task layout (card look, PDF/EPS/AI
-                    accepted). Airbrushing layouts have NO status, so the picker is hidden.
-                    Receipts/NFes are intentionally omitted here. */}
+                    accepted), COM o seletor de status: um layout de aerografia carrega o
+                    mesmo fluxo Rascunho/Aprovado/Reprovado do layout de tarefa, e é ele que
+                    decide o que chega ao aerografista. Recibos/NFs ficam de fora daqui.
+                    O seletor só fica ativo depois que o arquivo sobe (ver LayoutFileUploadField). */}
                 <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                   <FormLabel className="flex items-center gap-2">
                     <IconPhoto className="h-4 w-4" />
@@ -490,7 +651,8 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   </FormLabel>
                   <LayoutFileUploadField
                     onFilesChange={(files) => handleLayoutsChange(airbrushing.id, files)}
-                    showStatus={false}
+                    onStatusChange={(fileId, status) => handleLayoutStatusChange(airbrushing.id, fileId, status)}
+                    showStatus
                     existingFiles={airbrushing.layouts}
                     maxFiles={20}
                     showPreview={true}
