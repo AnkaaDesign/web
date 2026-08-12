@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { recurrentPayableService } from "@/api-client/recurrent-payable";
 import { orderKeys, recurrentPayableKeys, reconciliationKeys } from "@/hooks/common/query-keys";
 import type {
+  CreateOneOffPayablePayload,
   CreateRecurrentPayablePayload,
   PayRecurrentOccurrencePayload,
   RecurrentPayableListParams,
@@ -82,6 +83,17 @@ export function useRecurrentPayableMutations() {
     onSuccess: () => invalidate(),
   });
 
+  // One-off (conta avulsa). Also invalidates the unified payables query (keyed
+  // under orderKeys.all) so the new row appears in Contas a Pagar immediately.
+  const createOneOffMutation = useMutation({
+    mutationFn: (body: CreateOneOffPayablePayload) =>
+      recurrentPayableService.createOneOffPayable(body).then((r) => r.data),
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({
       id,
@@ -145,6 +157,8 @@ export function useRecurrentPayableMutations() {
   return {
     create: createMutation.mutate,
     createAsync: createMutation.mutateAsync,
+    createOneOff: createOneOffMutation.mutate,
+    createOneOffAsync: createOneOffMutation.mutateAsync,
     update: updateMutation.mutate,
     updateAsync: updateMutation.mutateAsync,
     delete: deleteMutation.mutate,
@@ -157,6 +171,7 @@ export function useRecurrentPayableMutations() {
     unignoreAsync: unignoreMutation.mutateAsync,
     isLoading:
       createMutation.isPending ||
+      createOneOffMutation.isPending ||
       updateMutation.isPending ||
       deleteMutation.isPending ||
       payMutation.isPending ||
@@ -171,6 +186,7 @@ export function useRecurrentPayableMutations() {
       unignoreMutation.error,
     // Individual mutation states
     createMutation,
+    createOneOffMutation,
     updateMutation,
     deleteMutation,
     payMutation,

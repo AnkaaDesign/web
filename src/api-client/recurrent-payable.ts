@@ -1,5 +1,6 @@
 import { apiClient } from "./axiosClient";
 import type {
+  CreateOneOffPayablePayload,
   CreateRecurrentPayablePayload,
   PayRecurrentOccurrencePayload,
   PayRecurrentOccurrenceResponse,
@@ -28,6 +29,12 @@ export const recurrentPayableService = {
 
   createRecurrentPayable: (body: CreateRecurrentPayablePayload) =>
     apiClient.post<RecurrentPayableMutationResponse>(basePath, body),
+
+  // One-off payable (conta avulsa) — the quick-create modal on Contas a Pagar.
+  // Server-side this is a `frequency: ONCE` payable plus its single occurrence,
+  // so it settles and reconciles like every other row.
+  createOneOffPayable: (body: CreateOneOffPayablePayload) =>
+    apiClient.post<RecurrentPayableMutationResponse>(`${basePath}/one-off`, body),
 
   updateRecurrentPayable: (id: string, body: UpdateRecurrentPayablePayload) =>
     apiClient.put<RecurrentPayableMutationResponse>(`${basePath}/${id}`, body),

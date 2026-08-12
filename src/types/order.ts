@@ -576,6 +576,13 @@ export interface PayableRow {
    * totals, and revertible via the row action.
    */
   ignored?: boolean;
+  /**
+   * RECURRENT_PAYABLE rows only — this is a ONE-OFF bill (conta avulsa) created
+   * from the quick-create modal, not a recurring one. It is stored as a
+   * `frequency: ONCE` RecurrentPayable so it settles/reconciles through the same
+   * pipeline, but it must never be badged "Recorrente" in the UI.
+   */
+  oneOff?: boolean;
   /** Competence the row belongs to (YYYY-MM) — payroll/tax/recurring. */
   competence?: string | null;
   /** Deep-link target for RECONCILIATION/SCHEDULE settle actions. */

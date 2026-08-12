@@ -101,6 +101,9 @@ const formSchema = z
     pixKey: z.string().max(500, { message: "Chave Pix muito longa" }).optional(),
     expectsNf: z.boolean(),
     isActive: z.boolean(),
+    // Opt-in to the ONE retroactive write the API allows (see the field in the
+    // form below). Never sent unless the user actually turns "emite nota" off.
+    applyExpectsNfToPast: z.boolean().default(false),
   })
   .refine((d) => d.amountKind !== "FIXED" || (typeof d.fixedAmount === "number" && d.fixedAmount > 0), {
     message: "Informe o valor fixo (maior que zero)",
@@ -134,6 +137,7 @@ const EMPTY_DEFAULTS: FormData = {
   pixKey: "",
   expectsNf: false,
   isActive: true,
+  applyExpectsNfToPast: false,
 };
 
 export interface RecurrentPayableFormState {
@@ -183,13 +187,18 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
         amountKind: payable.amountKind,
         fixedAmount: payable.fixedAmount != null ? Number(payable.fixedAmount) : undefined,
         estimatedAmount: payable.estimatedAmount != null ? Number(payable.estimatedAmount) : undefined,
-        frequency: payable.frequency || SCHEDULE_FREQUENCY.MONTHLY,
+        // ONCE is the one-off (conta avulsa) cadence — it is never offered here and
+        // the API rejects updating one through this endpoint, so it can only appear
+        // if a caller hands us the wrong payable. Fall back rather than crash.
+        frequency:
+          payable.frequency && payable.frequency !== "ONCE" ? payable.frequency : SCHEDULE_FREQUENCY.MONTHLY,
         dueDayOfMonth: payable.dueDayOfMonth ?? undefined,
         daysOfWeek: payable.daysOfWeek ?? [],
         paymentMethod: (payable.paymentMethod as PAYMENT_METHOD | null) ?? undefined,
         pixKey: payable.pixKey ?? "",
         expectsNf: payable.expectsNf,
         isActive: payable.isActive,
+        applyExpectsNfToPast: false,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,8 +212,12 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
   const amountKind = useWatch({ control: form.control, name: "amountKind" });
   const frequency = useWatch({ control: form.control, name: "frequency" });
   const paymentMethod = useWatch({ control: form.control, name: "paymentMethod" });
+  const expectsNf = useWatch({ control: form.control, name: "expectsNf" });
   const isWeekly = WEEKLY_FREQUENCIES.includes(frequency);
   const isPix = paymentMethod === PAYMENT_METHOD.PIX;
+  // Only meaningful when an EXISTING bill that expected notes stops expecting
+  // them — a brand-new bill has no closed competences to reach back into.
+  const isTurningExpectsNfOff = !!payable?.expectsNf && !expectsNf;
 
   const handleSubmit = (data: FormData) => {
     const cnpjDigits = (data.payeeCnpj ?? "").replace(/\D/g, "");
@@ -235,6 +248,11 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
       expectsNf: data.expectsNf,
       isActive: data.isActive,
     };
+    // Only ever sent alongside an actual expectsNf → false edit; the API ignores
+    // it otherwise, but not sending it keeps the payload honest about intent.
+    if (payable && payable.expectsNf && !data.expectsNf && data.applyExpectsNfToPast) {
+      (payload as CreateRecurrentPayablePayload & { applyExpectsNfToPast?: boolean }).applyExpectsNfToPast = true;
+    }
     onSubmit(payload, payable?.id);
   };
 
@@ -627,6 +645,37 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                   </FormItem>
                 )}
               />
+
+              {/* Every edit is strictly forward-looking: only occurrences due AFTER
+                  today are re-planned or re-priced. Turning "emite nota fiscal" OFF
+                  is the single sanctioned exception — a bill that never issues one
+                  would otherwise leave its already-reconciled occurrences stuck at
+                  "Aguardando nota" forever. It has to be asked for, so it only
+                  appears when the switch is actually being turned off on an
+                  existing bill, and it starts unchecked. */}
+              {isTurningExpectsNfOff && (
+                <FormField
+                  control={form.control}
+                  name="applyExpectsNfToPast"
+                  render={({ field }) => (
+                    <FormItem className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                      <label className="flex items-center justify-between gap-2 cursor-pointer">
+                        <span className="text-sm">
+                          Aplicar também às competências já fechadas
+                          <span className="block text-xs text-muted-foreground">
+                            Altera ocorrências PASSADAS que ainda aguardam nota. Sem isto, apenas as
+                            ocorrências com vencimento a partir de amanhã são afetadas.
+                          </span>
+                        </span>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} />
+                        </FormControl>
+                      </label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

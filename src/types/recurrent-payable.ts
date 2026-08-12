@@ -13,6 +13,10 @@ export type AmountKind = "FIXED" | "VARIABLE";
 // Recurrence cadence accepted by the api dto. WEEKLY/BIWEEKLY are sub-monthly
 // (use daysOfWeek); the rest are monthly-family (use dueDayOfMonth).
 export type RecurrentFrequency =
+  // ONCE = a one-off bill (conta avulsa). Not offered in the recurrent form —
+  // it is only produced by the quick-create modal on Contas a Pagar, and every
+  // schedule-driven path server-side skips it.
+  | "ONCE"
   | "WEEKLY"
   | "BIWEEKLY"
   | "MONTHLY"
@@ -121,7 +125,37 @@ export interface CreateRecurrentPayablePayload {
   isActive: boolean;
 }
 
-export type UpdateRecurrentPayablePayload = Partial<CreateRecurrentPayablePayload>;
+export type UpdateRecurrentPayablePayload = Partial<CreateRecurrentPayablePayload> & {
+  /**
+   * Opt in to ALSO clearing "espera nota" on competences already closed.
+   *
+   * Every other edit is strictly forward-looking (only occurrences due AFTER
+   * today are re-planned or re-priced). This one flag is the single sanctioned
+   * retroactive write: a bill that never issues a note would otherwise leave its
+   * already-reconciled occurrences stuck at "Aguardando nota" forever. Defaults
+   * to false and the form ships it unchecked.
+   */
+  applyExpectsNfToPast?: boolean;
+};
+
+/**
+ * A ONE-OFF payable (conta avulsa) — the quick-create modal. No cadence, no
+ * amountKind: just who/what/how much/when.
+ */
+export interface CreateOneOffPayablePayload {
+  name: string;
+  description?: string | null;
+  payeeName?: string | null;
+  payeeCnpj?: string | null;
+  payeeCpf?: string | null;
+  pixKey?: string | null;
+  categoryId: string;
+  amount: number;
+  /** Calendar date, YYYY-MM-DD. The API anchors it to São Paulo midnight. */
+  dueDate: string;
+  paymentMethod?: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
+  expectsNf: boolean;
+}
 
 export interface RecurrentPayableListParams {
   isActive?: boolean;
