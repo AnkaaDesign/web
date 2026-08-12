@@ -14,8 +14,9 @@ import * as fabric from 'fabric';
 import { root, $, isMounted, evTarget } from '../core/dom';
 import { VEHICLES_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
-import { invalidate } from '../scene/scene';
+import { invalidate, scene } from '../scene/scene';
 import { setPaintTarget } from './models';
+import { takeFaceSnapshots, type FaceSnapshot } from './livery-snapshot';
 import { setStatus } from '../ui/chrome';
 import { initLiveryEditor } from '../ui/livery-editor';
 /* A REPRESENTAÇÃO do painel — faixa refletiva, cantoneira e vãos de porta
@@ -27,7 +28,7 @@ import { initLiveryEditor } from '../ui/livery-editor';
    mudou de dono. */
 import {
   refreshFromTrailer, mountStructureCanvas, mountFrontCanvas, drawStructureInto,
-  drawFrontInto, onStructureRedrawn, setPanelDisplaySize,
+  drawFrontInto, onStructureRedrawn, setPanelDisplaySize, setSnapshotFront,
 } from './livery-structure';
 import { hasLiveryArt, onLiveryArtReady } from './livery-art';
 
@@ -96,10 +97,39 @@ export const setActiveKey = (k: SurfaceKey) => { activeSurface = k; };
 export const otherSide = (key: SurfaceKey): SurfaceKey | null =>
   key === 'left' ? 'right' : key === 'right' ? 'left' : null;
 
+/* ---------------- COMO AS DUAS LATERAIS SE CHAMAM ----------------
+   "Motorista" e "Passageiro", nunca "esquerda" e "direita" — decisão do dono
+   do produto, e ela tem razão de ofício: esquerda e direita dependem de onde
+   quem fala está. De frente para o caminhão, a lateral do motorista está à
+   direita de quem olha; de dentro da cabine, à esquerda. Um pintor que recebe
+   "logo na lateral esquerda" tem 50 % de chance de aplicar do lado errado, e
+   errar isso custa uma película inteira.
+   Motorista e Passageiro não têm essa ambiguidade: são referências ao VEÍCULO.
+   É o mesmo vocabulário que a regra dos 2 cm já usava
+   (`checkSideWidths` em livery-structure.ts).
+
+   AS CHAVES INTERNAS CONTINUAM `left`/`right`, e devem continuar: elas nomeiam
+   as malhas do bake (SIDE_L/SIDE_R), o `uv1`, as faces da geometria e as três
+   telas do fabric. Renomear a chave por causa do rótulo seria trocar um termo
+   ambíguo na tela por um renome arriscado no motor. Esta tabela é a ponte.
+
+   ONDE MAIS O NOME APARECE, e por que não sai tudo daqui: as abas, os cards e
+   o título do espelhamento são HTML estático (`core/template.ts`), e o painel
+   de medidas tem a própria cópia (`FACE_LABEL` em ui/livery-measures.ts)
+   porque aquele arquivo não pode importar este — o ciclo livery ↔ livery-editor
+   já existe de propósito e um basta. Mudar o vocabulário mexe nos três; o
+   comentário de lá aponta para cá. */
+export const SIDE_LABEL: Record<SurfaceKey, string> = {
+  left: 'Motorista', right: 'Passageiro', rear: 'Traseira',
+};
+
+/* As legendas não falam mais em "silhueta tracejada": ela saiu do desenho (ver
+   `installGuide`). O que substitui a frase é o que substituiu a linha — a
+   ferragem do próprio implemento, desenhada por cima da arte. */
 export const CAPTIONS: Record<SurfaceKey, string> = {
-  left: 'Lateral esquerda · pintura fica dentro da silhueta tracejada',
-  right: 'Lateral direita · pintura fica dentro da silhueta tracejada',
-  rear: 'Portas traseiras · pintura fica dentro da silhueta tracejada',
+  left: 'Lado do motorista · a ferragem passa por cima da pintura, como no baú',
+  right: 'Lado do passageiro · a ferragem passa por cima da pintura, como no baú',
+  rear: 'Portas traseiras · a ferragem passa por cima da pintura, como no baú',
 };
 
 /* ---------------- escala real ----------------
@@ -431,11 +461,98 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
   return overlay;
 }
 
+/* ---------------- snapshots do próprio modelo ----------------
+   O pano de fundo e a ferragem do editor saem de fotos ortográficas do baú EM
+   CENA (livery-snapshot.ts), refeitas a cada rebuild. Enquanto um snapshot
+   existe para a face, a foto estática e a grade por peças do manifesto saem
+   de cena — a fonte é o modelo, e só ele. */
+const snapshots: Partial<Record<SurfaceKey, FaceSnapshot>> = {};
+export const hasSnapshot = (key: SurfaceKey): boolean => !!snapshots[key];
+/** Diagnóstico (bancada): o snapshot corrente de uma face, se houver. */
+export const getSnapshot = (key: SurfaceKey): FaceSnapshot | null => snapshots[key] ?? null;
+
+/* As URLs de objeto do fundo. Um `URL.createObjectURL` segura o Blob VIVO até
+   alguém revogar; três faces a cada rebuild, e um arrasto de medida faz muitos
+   rebuilds — sem isto o vazamento é de megabytes por minuto. A revogação é
+   ADIADA porque o CSS pode estar no meio de buscar a imagem anterior: revogar
+   na troca deixaria o palco branco por um quadro. */
+const bgUrls: Partial<Record<SurfaceKey, string>> = {};
+function replaceBgUrl(key: SurfaceKey, next: string) {
+  const old = bgUrls[key];
+  bgUrls[key] = next;
+  if (old && old !== next) setTimeout(() => URL.revokeObjectURL(old), 10000);
+}
+
+/** Uma refotografia em voo por face; a mais nova ganha (as fotos agora cedem
+ *  quadros, então duas podem se cruzar num arrasto de medida). */
+let snapToken = 0;
+
+/**
+ * Refotografa as três faces do implemento corrente e republica janelas,
+ * ferragem e área pintável.
+ *
+ * ASSÍNCRONA — ver `takeFaceSnapshots()`. Quem chama não espera: o palco
+ * continua mostrando o retrato anterior até o novo chegar, que é o
+ * comportamento certo para um editor (nunca fica em branco) e o que tira ~0,7 s
+ * do bloqueio de thread que um "adicionar porta" causava.
+ */
+export async function refreshSnapshots(trailerRoot: THREE.Object3D) {
+  if (!isMounted()) return;
+  trailerForSnapshots = trailerRoot;
+  const mine = ++snapToken;
+  await takeFaceSnapshots(scene, trailerRoot, (key, snap) => {
+    if (mine !== snapToken) return;
+    replaceBgUrl(key, snap.bg);
+    snapshots[key] = snap;
+    /* A ÁREA PINTÁVEL MEDIDA NA FOTO GANHA DA MEDIDA POR CAIXA DE MALHA.
+       `measurePaintable()` decide por bounding box e erra quando uma malha
+       agrupa peças espalhadas (ver o `console.warn` lá); o retrato mede a
+       ferragem pixel a pixel, no MESMO sistema de coordenadas da tela. As
+       `outlines` são [u, v-do-PÉ]; a foto conta v do topo. */
+    const p = snap.paint;
+    outlines[key] = [
+      [p.u0, 1 - p.v1], [p.u1, 1 - p.v1], [p.u1, 1 - p.v0], [p.u0, 1 - p.v0],
+    ];
+    measuredOutline[key] = true;
+    setSnapshotFront(key, snap.front);
+    const win = windows[key];
+    publishWindow(key, win ?? { photoAr: snap.ar, x: 0, y: 0, w: 1, h: 1 });
+    sizePreviewCanvas(key);
+    installGuide(key);
+    /* O palco tem de ser REENQUADRADO: a caixa da tela sai de `snap.box`, e a
+       foto nova pode ter outra (mudou a altura, entrou uma porta). Sem isto o
+       registro só se corrigiria no próximo resize da janela. */
+    if (key === activeSurface) resizeStage?.(key);
+    drawPreview(key);
+  });
+}
+
+/* O reenquadramento do palco é do EDITOR (ele é quem sabe o zoom corrente), e
+   este módulo é importado por ele — a seta aponta para cá. Então o editor
+   injeta a função, do mesmo jeito que studio.ts injeta o aplicador de medidas. */
+let resizeStage: ((key: SurfaceKey) => void) | null = null;
+export function setStageResizer(fn: (key: SurfaceKey) => void) { resizeStage = fn; }
+
 export function attachOverlays(trailerRoot: THREE.Object3D) {
   const byName: Record<string, SurfaceKey> = { SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear' };
+  /* As calotas de rebite da emenda, filhas da chapa. Ver o bloco abaixo. */
+  const rivetsOf: Record<string, SurfaceKey> = { SIDE_L_RIVETS: 'left', SIDE_R_RIVETS: 'right' };
   trailerRoot.traverse(node => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
+    /* A ARTE TAMBÉM COBRE OS REBITES — pedido de 2026-08-12, com print: "as
+       logos aplicadas na lateral também devem ser aplicadas nos rebites, não
+       apenas nas chapas". É o comportamento do adesivo real, que é aplicado
+       por cima das cabeças e continua por elas sem quebra.
+       Nada de caso especial no material: `models.addPlateRivets()` dá à calota
+       a MESMA `uv1` da chapa (normalizada pela caixa DELA), então a mesma
+       sobreposição transparente que veste o painel veste o rebite. Sem `uv1`
+       — bake fundido, que não gera rebite — não há o que vestir. */
+    const rk = rivetsOf[o.name];
+    if (rk) {
+      if (o.geometry?.getAttribute('uv1')) makeLiveryOverlay(o, textures[rk]);
+      return;
+    }
     const key = byName[o.name];
     if (!key) return;
     makeLiveryOverlay(o, textures[key]);
@@ -446,9 +563,24 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
     syncSurfaceAspect(key);
     /* E a silhueta segue o METAL que corre por cima da chapa, remedido agora:
        a cantoneira acompanha o teto e o friso fica no piso, então a faixa
-       pintável muda de fração a cada altura. Ver `measurePaintable()`. */
-    measurePaintable(trailerRoot, o, key);
+       pintável muda de fração a cada altura. Ver `measurePaintable()`.
+
+       SÓ ENQUANTO O RETRATO NÃO TIVER MEDIDO. Esta varredura percorre as ~2 150
+       malhas do implemento com matriz e caixa por malha, três vezes (uma por
+       face), dentro do bloco síncrono de um recorte de porta — e o número que
+       ela produz é jogado fora assim que a foto chega, porque `snap.paint` mede
+       a mesma coisa pixel a pixel e nos dois eixos. Pagar por ele a cada
+       rebuild é alongar um congelamento para calcular uma degradação. */
+    if (!measuredOutline[key]) measurePaintable(trailerRoot, o, key);
   });
+  /* O PAINEL DO EDITOR SAI DO PRÓPRIO MODELO — ver livery-snapshot.ts. Depois
+     das sobreposições existirem (o snapshot as esconde durante a foto).
+     SEM `await`, e é o ponto: as fotos custam ~0,7 s e cedem quadros; segurar
+     o rebuild por elas é justamente o congelamento que se está removendo. Até
+     chegarem, o palco segue com o retrato anterior e as `outlines` seguem com
+     a medida por caixa de malha logo acima — as duas se corrigem quando a foto
+     nova aterrissa. */
+  void refreshSnapshots(trailerRoot);
   /* As duas superfícies que mostram a janela do painel dependem da faixa
      medida (é ela que diz onde a tela se encaixa na foto), então a publicação
      é refeita aqui — no boot a foto ainda pode não ter chegado, e aí
@@ -466,7 +598,12 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
      número inteiro de frisos volta para os campos do editor e a representação
      do painel é recomposta. Nenhuma malha nova é criada: a representação é 2D,
      e o 3D continua recebendo só a arte, pelas sobreposições acima. */
-  refreshFromTrailer();
+  /* AS MEDIDAS DA CHAPA VÃO JUNTO — ver `drawSpec()` lá. `measurePanel()`
+     acabou de rodar para as três faces logo acima, então `PANEL_MM` está
+     fresco; é ele, e não `dims`, que descreve o retângulo que `uv1` normaliza. */
+  refreshFromTrailer({
+    left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right }, rear: { ...PANEL_MM.rear },
+  });
 }
 
 /* ---------------- quando a textura precisa subir para a GPU ----------------
@@ -493,6 +630,17 @@ const DIRTY_EVENTS = [
 const FALLBACK_OUTLINE = [[0.015, 0.015], [0.985, 0.015], [0.985, 0.985], [0.015, 0.985]];
 const outlines: Record<SurfaceKey, number[][]> =
   { left: FALLBACK_OUTLINE, right: FALLBACK_OUTLINE, rear: FALLBACK_OUTLINE };
+/**
+ * A silhueta desta face saiu do RETRATO (alfa da ferragem), e não de um palpite.
+ *
+ * O tracejado do palco só é desenhado quando isto é `true`, e a regra é a lição
+ * da vez em que ele foi removido: um contorno vindo de `measurePaintable()`
+ * (caixas de malha) ou do quadrado unitário do manifesto é lido pelo cliente
+ * como limite de área pintável e o faz recuar de chapa que ele podia usar.
+ * Melhor não desenhar nada do que desenhar uma promessa que o baú não cumpre.
+ */
+const measuredOutline: Record<SurfaceKey, boolean> =
+  { left: false, right: false, rear: false };
 
 /* ---------------- ONDE A CHAPA BRANCA REALMENTE APARECE ----------------
    A silhueta tracejada é a promessa que o editor faz ao cliente: "pinte aqui e
@@ -560,8 +708,21 @@ const RAIL_SPAN = 0.5;
 /** Um vão menor que isto não é área de arte; é fresta entre ferragens. */
 const MIN_BAND = 0.15;
 
-/** Faixa pintável medida, em fração do painel a partir do PÉ. `null` = não deu
- *  para medir e vale o que veio do manifesto. */
+/**
+ * Faixa pintável medida, em fração do painel a partir do PÉ. `null` = não deu
+ * para medir e vale o que veio do manifesto.
+ *
+ * DEGRADAÇÃO, e não mais a fonte. Quem manda hoje é `snap.paint` — a área lida
+ * no ALFA do passe da frente do retrato (ver `refreshSnapshots`), que é medida
+ * no mesmo sistema de coordenadas da tela e não depende de nenhuma inferência
+ * sobre o que é "perfil corrido". Isto aqui continua existindo para o bake que
+ * não tem chapa branca para fotografar.
+ *
+ * O EIXO HORIZONTAL SAIU DAQUI. Havia um `measuredU` gêmeo, com os montantes, e
+ * o único consumidor dele era o vazado da foto — que deixou de existir quando o
+ * retrato foi para trás da arte. Um valor que ninguém lê é um valor que ninguém
+ * percebe estar errado; a versão que vale agora vem do alfa, nos dois eixos.
+ */
 const measured: Partial<Record<SurfaceKey, [number, number]>> = {};
 
 function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: SurfaceKey) {
@@ -655,7 +816,11 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
 
   const v0 = (bestLo - pb.min.y) / spanY, v1 = (bestHi - pb.min.y) / spanY;
   measured[key] = [v0, v1];
-  outlines[key] = [[0, v0], [1, v0], [1, v1], [0, v1]];
+
+  /* SÓ SE O RETRATO AINDA NÃO FALOU. Ele mede a mesma coisa pixel a pixel e nos
+     DOIS eixos; sobrescrever com a versão por caixa de malha seria trocar a
+     medida certa pela aproximação que ela substituiu. */
+  if (!measuredOutline[key]) outlines[key] = [[0, v0], [1, v0], [1, v1], [0, v1]];
 
   /* Só reclama quando o véu come mais de um terço do painel. As duas faixas
      legítimas — o friso da saia e a cantoneira de topo — somam ~340 mm de
@@ -668,15 +833,10 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   }
 }
 
-function guideMarkup(poly: number[][], w: number, h: number) {
-  const pts = poly.map(([u, v]) => [u * w, (1 - v) * h]);
-  const path = 'M ' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') + ' Z';
-  const sw = Math.max(2, w / 480);
-  return `
-    <path d="M0 0 H${w} V${h} H0 Z ${path}" fill="rgba(8,10,16,.5)" fill-rule="evenodd"/>
-    <path d="${path}" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="${sw}"
-      stroke-dasharray="${sw * 4} ${sw * 3}" vector-effect="non-scaling-stroke"/>`;
-}
+/* `guideMarkup()` foi removida junto com a silhueta — ver o bloco em
+   `installGuide()`. `outlines[]` continua sendo calculado porque `outlineFrame()`
+   o expõe para o encaixe das guias de arrasto em `ui/livery-guides.ts`, que é
+   outro consumidor e não desenha véu nenhum. */
 
 function installGuide(key: SurfaceKey) {
   const fab = surfaces[key];
@@ -701,7 +861,31 @@ function installGuide(key: SurfaceKey) {
   }
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.setAttribute('preserveAspectRatio', 'none');
-  svg.innerHTML = guideMarkup(outlines[key], w, h);
+  /* O TRACEJADO NÃO É DESENHADO — e a medida por trás dele continua valendo.
+     ---------------------------------------------------------------------
+     São duas coisas diferentes e vale separá-las, porque só uma saiu.
+
+     A MEDIDA ficou, e ficou melhor: a área livre agora é lida no ALFA do passe
+     da frente do retrato (`measurePaintRect`, em livery-snapshot.ts) — um pixel
+     coberto ali é um pixel em que a arte some atrás de metal, no mesmo sistema
+     de coordenadas da tela. Ela alimenta o encaixe de arrasto
+     (`outlineFrame()` em ui/livery-guides.ts) e o "Alinhar ao painel"
+     (livery-doc.ts), e é o que faz encostar um objeto no frame ser exato: sem
+     folga e sem corte, que é o pedido.
+
+     O DESENHO saiu, a pedido: *"não quero que tenha aquelas linhas tracejadas
+     indicando onde pode se desenhar, não é necessário"*. E ele de fato deixou
+     de ser: enquanto a moldura era uma foto esticada com um buraco retangular,
+     o tracejado era a única pista de onde a ferragem ia cair; agora a própria
+     ferragem está desenhada por cima da arte, na silhueta exata do modelo. O
+     limite se vê olhando o painel — a linha só repetia, com menos precisão, o
+     que a imagem já diz.
+
+     O elemento continua existindo, e VAZIO de propósito: `mountFrontCanvas()`
+     se ancora nele para entrar imediatamente antes, e o wrapper do fabric não
+     usa z-index — a ordem de documento É a ordem de empilhamento. Removê-lo
+     mudaria a pilha, não só o desenho. */
+  svg.innerHTML = '';
   /* A FERRAGEM, por cima da arte e por baixo da silhueta. Depois da `.guide-svg`
      existir, para entrar imediatamente antes dela — ver mountFrontCanvas(). É
      esta camada que substitui o que a foto do painel fazia: a cantoneira, a
@@ -725,11 +909,16 @@ export function outlineFrame(key: SurfaceKey) {
    `measurePaintable()` tiver um número para a face, o manifesto só serve de
    degradação para quando não houver chapa recortada para medir. */
 export function setOutlines(meta: OutlineMeta | null) {
-  if (!measured.left && meta && Array.isArray(meta.outlineSide) && meta.outlineSide.length >= 3) {
+  /* E o RETRATO ganha do manifesto pelo mesmo motivo, com mais força ainda:
+     ele é medido no implemento que está na tela, com as portas e a altura que
+     ele tem agora. Ver `measuredOutline`. */
+  if (!measured.left && !measuredOutline.left
+    && meta && Array.isArray(meta.outlineSide) && meta.outlineSide.length >= 3) {
     outlines.left = meta.outlineSide;
     outlines.right = meta.outlineSide;
   }
-  if (!measured.rear && meta && Array.isArray(meta.outlineRear) && meta.outlineRear.length >= 3) {
+  if (!measured.rear && !measuredOutline.rear
+    && meta && Array.isArray(meta.outlineRear) && meta.outlineRear.length >= 3) {
     outlines.rear = meta.outlineRear;
   }
   for (const k of SURFACE_KEYS) { installGuide(k); drawPreview(k); }
@@ -759,19 +948,10 @@ export function drawPreview(key: SurfaceKey) {
      cortada pela cantoneira — e a miniatura deixaria de ser uma promessa
      honesta do que o editor abre, que é a única coisa que ela precisa ser. */
   drawFrontInto(ctx, key, pc.width, pc.height);
-  const poly = outlines[key];
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,.55)';
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  poly.forEach(([u, v]: number[], i: number) => {
-    const x = u * pc.width, y = (1 - v) * pc.height;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-  });
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+  /* E NADA DE TRACEJADO — nem aqui nem no palco (ver `installGuide`). A
+     miniatura mostra a mesma pilha do editor, e essa igualdade é a única coisa
+     que ela precisa ser; uma linha que só existisse no card faria o card
+     prometer um limite que o editor não desenha. */
 }
 
 function schedulePreview(key: SurfaceKey) {
@@ -982,15 +1162,63 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
      `none` e não a remoção da variável: `.ts-pw-ready` continua valendo, então
      a caixa e o recorte da miniatura seguem exatamente os mesmos. */
   const usingArt = hasLiveryArt(key);
+  /* SEM A FOTO, A JANELA É A CHAPA — e este é o elo que quebrava a garantia.
+     ---------------------------------------------------------------------
+     `canvasRect()` estica a tela para que a FAIXA PINTÁVEL caia sobre o vazado
+     da foto. Isso fazia sentido enquanto a foto era desenhada: ela era a
+     moldura, e a tela tinha de encaixar no buraco dela. Com a grade vetorial no
+     lugar da foto, a moldura passou a ser DESENHADA em metros sobre a mesma
+     caixa do painel — mas a tela continuava sendo posicionada pelo vazado de
+     uma fotografia de um baú de dimensões fixas. Duas réguas, e a arte no
+     editor deixou de indicar onde a arte cai no baú.
+
+     `addLiveryUV()` normaliza `uv1` de 0 a 1 sobre a caixa INTEIRA da chapa
+     recortada. Então a tela tem de cobrir a caixa inteira, sem deslocamento:
+     `uv1 (0,0)` é o canto superior da chapa, e é ali que o canto superior da
+     tela precisa estar. É isso que faz um quadrado posto no topo esquerdo do
+     painel sair no topo esquerdo da chapa branca — e não 18 mm abaixo dela,
+     nem recuado pela altura da cantoneira.
+
+     A razão também sai da chapa (`PANEL_MM`, medido em `measurePanel()`) e não
+     da foto: são baús de comprimentos diferentes, e `win.photoAr` é a razão de
+     UMA fotografia. */
+  const p = PANEL_MM[key];
+  /* O SNAPSHOT DO MODELO GANHA DE TUDO: o fundo é o próprio baú corrente, e a
+     caixa da chapa dentro dele veio da mesma geometria que `uv1` normaliza —
+     registro por construção. A foto estática e o modo "sem foto" da grade por
+     peças ficam como degradação para quando não há chapa para fotografar. */
+  const snap = snapshots[key];
+  const box = snap ? snap.box : usingArt ? { x: 0, y: 0, w: 1, h: 1 } : r;
+  const ar = snap ? snap.ar : usingArt && p.h > 0 ? p.w / p.h : win.photoAr;
+  const img = snap ? 'url("' + snap.bg + '")'
+    : usingArt ? 'none' : 'url("' + PANEL_IMAGE[key] + '")';
   for (const el of targets) {
     if (!el) continue;
-    el.style.setProperty('--ts-pw-img', usingArt ? 'none' : 'url("' + PANEL_IMAGE[key] + '")');
-    el.style.setProperty('--ts-pw-ar', String(win.photoAr));
-    el.style.setProperty('--ts-pw-x', pct(r.x));
-    el.style.setProperty('--ts-pw-y', pct(r.y));
-    el.style.setProperty('--ts-pw-w', pct(r.w));
-    el.style.setProperty('--ts-pw-h', pct(r.h));
+    el.style.setProperty('--ts-pw-img', img);
+    el.style.setProperty('--ts-pw-ar', String(ar));
+    el.style.setProperty('--ts-pw-x', pct(box.x));
+    el.style.setProperty('--ts-pw-y', pct(box.y));
+    el.style.setProperty('--ts-pw-w', pct(box.w));
+    el.style.setProperty('--ts-pw-h', pct(box.h));
     el.classList.add('ts-pw-ready');
+    /* O RETRATO VAI ATRÁS DA ARTE; a foto estática ia na frente.
+       ------------------------------------------------------------------
+       A foto era uma MOLDURA com um buraco retangular, e por isso tinha de
+       ficar por cima. O retrato não é moldura: é o baú inteiro, chapa
+       incluída. Posto por cima ele esconderia o desenho; o buraco que se
+       abrisse nele para deixar o desenho aparecer só poderia ser um
+       retângulo, e a ferragem não é retangular.
+
+       Atrás, a pilha vira a do baú de verdade e cada pixel tem UMA fonte:
+          retrato (a chapa, com emenda, friso e rebite)
+          arte do cliente             — a tela do fabric, transparente
+          ferragem do plano da frente — o mesmo render, com a chapa em
+                                        depth-only: a silhueta EXATA do que
+                                        passa na frente da pele
+       É por isso que a classe existe, e é por isso que ela é ligada aqui e
+       não no CSS: só este ponto sabe se há retrato ou se a face degradou
+       para a foto antiga. */
+    el.classList.toggle('ts-pw-behind', !!snap);
   }
   /* A MINIATURA TEM DE RECORTAR, e é consequência direta da conta acima.
      `canvasRect()` devolve de propósito uma tela MAIOR que a janela — ela cobre
@@ -1031,19 +1259,27 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
 /* Mede uma vez por ARQUIVO: as duas laterais usam a mesma foto, e varrer 1,7 M
    de pixels duas vezes para chegar ao mesmo número é trabalho jogado fora. */
 async function measurePanelWindows() {
-  const byUrl = new Map<string, Promise<PanelWindow | null>>();
+  const byUrl = new Map<string, Promise<PanelWindow | null | 'ausente'>>();
   await Promise.all(SURFACE_KEYS.map(async (key) => {
     const url = PANEL_IMAGE[key];
     let job = byUrl.get(url);
     if (!job) {
-      job = loadImage(url).then((img) => (img ? findWindow(img) : null));
+      job = loadImage(url).then((img) => (img ? findWindow(img) : 'ausente' as const));
       byUrl.set(url, job);
     }
     const win = await job;
+    /* A FOTO NÃO EXISTIR É O ESTADO NORMAL, e por isso isto não reclama.
+       `panels/lateral.png` e `panels/traseira.png` saíram do pacote de assets
+       quando o painel passou a ser fotografado do próprio modelo em tempo de
+       execução (livery-snapshot.ts). O 404 é esperado; um `console.warn` por
+       face a cada boot mandaria alguém procurar um arquivo que foi removido de
+       propósito. O que continua merecendo aviso é a foto que EXISTE e veio
+       opaca — aí a degradação de verdade está quebrada. */
+    if (win === 'ausente') return;
     if (!win) {
-      console.warn('[truck-studio] a foto do painel "' + key + '" não tem janela vazada —'
-        + ' o desenho segue POR CIMA dela (comportamento antigo). Exporte o PNG com o'
-        + ' painel transparente para o desenho entrar por baixo da ferragem.');
+      console.warn('[truck-studio] a foto de degradação do painel "' + key + '" existe mas'
+        + ' não tem janela vazada. Ela só é usada em bake sem chapa branca para'
+        + ' fotografar; exporte o PNG com o painel transparente ou remova-o.');
       return;
     }
     publishWindow(key, win);
@@ -1075,7 +1311,41 @@ let paintedImplement = false;
 
 function syncImplementColor() {
   root.style.setProperty('--ts-implement', paintedImplement ? cabPaintHex : IMPLEMENT_WHITE);
+  scheduleRepaintSnapshot();
 }
+
+/* ---------------- A CHAPA MUDOU DE COR: REFOTOGRAFAR ----------------
+   `--ts-implement` era a chapa: um retângulo de CSS atrás da tela, e trocar a
+   variável bastava. Com o retrato atrás da arte (ver `.ts-pw-behind` em
+   core/studio.css) a chapa passou a ser a FOTOGRAFIA, e uma variável de CSS não
+   pinta uma fotografia. Ligar "pintar o implemento com a cor do cavalo"
+   deixaria o painel branco no editor e vermelho no baú.
+
+   Então a foto é refeita — e DEBOUNCED, porque a cor chega por
+   `setCabPaintColor()` a cada aplicação de tinta e o usuário passeia pela
+   paleta. Trezentos milissegundos é o tempo de assentar uma escolha; abaixo
+   disso seriam três renders por clique.
+
+   Só quando há tinta em jogo: com o implemento branco a foto já está certa, e
+   um rebuild inteiro para reconfirmar branco é trabalho por nada. O `wasPainted`
+   garante o caminho de VOLTA — desligar a caixa também tem de refotografar. */
+let repaintTimer: ReturnType<typeof setTimeout> | null = null;
+let wasPainted = false;
+function scheduleRepaintSnapshot() {
+  if (!paintedImplement && !wasPainted) return;
+  wasPainted = paintedImplement;
+  const trailer = trailerForSnapshots;
+  if (!trailer || !isMounted()) return;
+  if (repaintTimer) clearTimeout(repaintTimer);
+  repaintTimer = setTimeout(() => {
+    repaintTimer = null;
+    void refreshSnapshots(trailer);
+  }, 300);
+}
+
+/** O implemento corrente, guardado por `attachOverlays()` — é o sujeito das
+ *  refotografias que não vêm de um rebuild (a troca de cor, acima). */
+let trailerForSnapshots: THREE.Object3D | null = null;
 
 /** A tinta escolhida para o cavalo; studio.ts chama a cada aplicação de cor. */
 export function setCabPaintColor(hex: string | null | undefined) {
@@ -1133,13 +1403,16 @@ const zoomOf = (key: SurfaceKey) => lastZoom[key];
 export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
   const fab = surfaces[key];
   const win = windows[key];
+  const snap = snapshots[key];
   const panel = stagePanels[key];
   const stage = $('modal-stage');
   const maxW = stage.clientWidth - 40, maxH = stage.clientHeight - 52;
   if (maxW <= 0 || maxH <= 0) return;         // modal ainda sem layout
   lastZoom[key] = zoom;
 
-  const outerAr = win ? win.photoAr : fab.getWidth() / fab.getHeight();
+  /* A RAZÃO DO PALCO É A DA FOTO, sempre — ela é esticada em `100% 100%` sobre
+     esta caixa, e uma razão diferente a deformaria. */
+  const outerAr = snap ? snap.ar : win ? win.photoAr : fab.getWidth() / fab.getHeight();
   let w = maxW, h = w / outerAr;
   if (h > maxH) { h = maxH; w = h * outerAr; }
   w *= zoom; h *= zoom;
@@ -1160,10 +1433,41 @@ export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
      Com a faixa medida em 1,7266…3,9614 de um painel 1,3919…4,1688, a arte
      subia 9,74 % da altura da janela — 218 mm de baú. O cliente punha o texto
      com folga sobre o trilho no editor e o encontrava cortado por ele no 3D.
-     Agora as duas caixas saem da mesma função e o editor mostra a posição real. */
-  const r = win ? canvasRect(key, win) : null;
+     Agora as duas caixas saem da mesma função e o editor mostra a posição real.
+
+     ------------------------------------------------------------------------
+     E COM O RETRATO NO LUGAR DA FOTO, A CAIXA É `snap.box` — NADA MAIS.
+     Este era o defeito que sobrou, e ele é o "parece que tem uns 3 modelos
+     remontados ali". `canvasRect()` ainda esticava a tela por `1/faixa
+     pintável` para encaixá-la num vazado que não existe mais: o palco não tem
+     foto estática (`panels/lateral.png` nem está mais no pacote de assets — a
+     medição 404 em silêncio), então `win` degradava para o quadrado unitário e
+     a conta virava altura ÷ 0,879.
+
+     MEDIDO na bancada (`checks-livery-registro.mjs`, antes desta linha), com o
+     palco em 961 × 194,9 px:
+
+         chapa no retrato   x 0,53 %  y 1,75 %  w 98,93 %  h 92,47 %
+         tela do fabric     x 0,53 %  y 1,75 %  w 100,0 %  h 113,72 %
+         desvio                                  +1,1 %    +23,0 %
+
+     Vinte e três por cento a mais de altura, com a origem certa: a arte e a
+     ferragem do plano da frente iam ficando cada vez mais abaixo da ferragem
+     do retrato conforme se descia o painel, e as duas apareciam juntas na
+     tela — dois trilhos, duas cantoneiras, dois para-choques. Na traseira o
+     mesmo com +13,7 % de altura e +6,2 % de largura.
+
+     Há um segundo efeito, e ele explica "não parece com o modelo": a caixa
+     resultante tinha razão 4,336 enquanto o buffer da tela tem 5,278 (a razão
+     da chapa), ou seja tudo era mostrado 22 % mais alto do que sai no baú.
+     Círculo virava elipse NA TELA.
+
+     `snap.box` é a caixa da chapa medida NO MESMO RENDER que produziu a foto,
+     então usá-la fecha o registro por construção — e devolve à tela a razão da
+     chapa, que é o que faz um quadrado do editor sair quadrado no baú. */
+  const box = snap ? snap.box : win ? canvasRect(key, win) : null;
   fab.setDimensions(
-    { width: (r ? w * r.w : w) + 'px', height: (r ? h * r.h : h) + 'px' },
+    { width: (box ? w * box.w : w) + 'px', height: (box ? h * box.h : h) + 'px' },
     { cssOnly: true },
   );
   fab.calcOffset();

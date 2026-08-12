@@ -37,6 +37,7 @@ import {
   MIN_DOOR_HEIGHT, MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT, MIN_PANEL_LENGTH,
   addDoor, getImplementMeasures, getPanelSpec, isLengthEditable,
   onMeasuresChanged, removeDoor, setImplementMeasures, updateDoor,
+  isGeometryBusy, onGeometryBusy,
 } from '../vehicle/livery-structure';
 
 /* Nada de importar ../vehicle/livery daqui. O motor já carrega um ciclo de
@@ -44,8 +45,13 @@ import {
    Quem chama passa a face ativa; este módulo não a descobre sozinho. */
 let currentKey: StructureKey = 'left';
 
+/* Os rótulos das faces são de `vehicle/livery` — ver `SIDE_LABEL` lá, e a razão
+   de não serem "esquerda/direita". Este arquivo não pode importar aquele (o
+   motor já carrega um ciclo de propósito, e um basta), então a tabela é
+   REDECLARADA. É o mesmo padrão dos limites do formulário no topo de
+   `livery-structure.ts`: repetido, nomeado, e num só lugar por arquivo. */
 const FACE_LABEL: Record<StructureKey, string> = {
-  left: 'Lateral esquerda', right: 'Lateral direita', rear: 'Traseira',
+  left: 'Motorista', right: 'Passageiro', rear: 'Traseira',
 };
 
 /* ---------------- a máscara do formulário de medidas ---------------- */
@@ -231,12 +237,29 @@ function build() {
   const actions = document.createElement('div');
   actions.className = 'btn-row';
   const add = document.createElement('button');
-  add.className = 'mini ghost';
+  add.className = 'mini ghost ms-door-add';
   add.type = 'button';
   add.textContent = '+ Adicionar porta';
   add.addEventListener('click', () => { addDoor(currentKey); });
   actions.appendChild(add);
   el.appendChild(actions);
+
+  /* O CARREGAMENTO DO VÃO MORA AQUI, e não na pílula de estado.
+     ---------------------------------------------------------------------
+     Recortar um vão de porta reescreve o corpo branco inteiro e leva alguns
+     segundos (ver o bloco em studio.ts). O estúdio já tem dois indicadores
+     para trabalho longo — a pílula `#cab-switching` e o véu do viewport —, e
+     os dois ficam ATRÁS de `#editor-modal`: z-index 9 e 0 contra 9999. Ou
+     seja, são invisíveis exatamente na tela em que este botão vive.
+
+     Então o estado é desenhado no próprio inspetor, ao lado do controle que o
+     causou, que é onde o olho já está. `livery-structure` publica o booleano
+     (`onGeometryBusy`) e studio.ts o liga e desliga. */
+  const busy = document.createElement('p');
+  busy.className = 'insp-hint ms-busy';
+  busy.textContent = 'Abrindo o vão no baú…';
+  el.appendChild(busy);
+  applyBusy();
 
   const note = document.createElement('p');
   note.className = 'insp-hint ms-note';
@@ -245,6 +268,30 @@ function build() {
     + 'marcações provisórias: entram como arte real assim que os SVGs chegarem, '
     + 'sem nenhuma outra mudança.';
   el.appendChild(note);
+}
+
+/**
+ * Liga/desliga o estado ocupado sem remontar a árvore.
+ *
+ * Desabilitar os controles de porta não é enfeite: um segundo clique em
+ * "+ Adicionar porta" durante o recorte enfileiraria outro recorte de três
+ * segundos, e o usuário — que não vê nada acontecer — clica de novo. É o
+ * caminho conhecido para um congelamento de dez segundos a partir de um
+ * congelamento de três.
+ *
+ * Os campos de MEDIDA continuam vivos de propósito: eles já têm coalescência
+ * própria (`DIMS_QUIET_MS`) e travá-los tiraria do usuário a única coisa que
+ * ele pode fazer enquanto espera.
+ */
+function applyBusy() {
+  const el = body();
+  const on = isGeometryBusy();
+  el.classList.toggle('is-busy', on);
+  const note = el.querySelector<HTMLElement>('.ms-busy');
+  if (note) note.classList.toggle('hidden', !on);
+  for (const b of el.querySelectorAll<HTMLButtonElement>('.ms-door-add, .ms-door-del')) {
+    b.disabled = on;
+  }
 }
 
 /** Só os números, para não roubar o foco de quem está digitando. */
@@ -277,5 +324,8 @@ export function initLiveryMeasures() {
   /* Uma inscrição só, e ela cobre os dois caminhos: a edição feita aqui e a
      volta da geometria com a altura ajustada ao friso. */
   onMeasuresChanged(() => syncMeasures());
+  /* E o estado ocupado, que não passa por `onMeasuresChanged`: ele começa e
+     termina sem que medida nenhuma mude. */
+  onGeometryBusy(() => applyBusy());
   syncMeasures(currentKey);
 }

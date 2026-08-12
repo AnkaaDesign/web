@@ -89,9 +89,12 @@ import {
   LiveryComposer, defaultLayers,
   type DoorSpec, type Face, type LiveryLayer, type LiverySource, type PanelSpec,
 } from './livery-layers';
-import { getLiveryArt, onLiveryArtReady, type ArtPiece } from './livery-art';
+import {
+  getLiveryArt, hasLiveryArt, onLiveryArtReady, pieceSource, type ArtPiece,
+} from './livery-art';
 import {
   state, getTrailerDims, setTrailerDims as setTrailerDimsRaw, setTrailerDoors,
+  getPlateGrid,
 } from './models';
 import type { TrailerDims } from './trailer-geometry';
 import {
@@ -372,6 +375,57 @@ const isThenable = (v: unknown): v is Promise<DimsResult> =>
    `setTrailerDoors()` é o que corre a sequência completa. */
 type DoorCapableRig = { stageDoors?: (face: StructureKey, doors: DoorSpec[]) => void };
 
+/* ---------------- O RECORTE DE VÃO TAMBÉM É COALESCIDO ----------------
+   Mesmo contrato do `DimsApplier` logo acima, e pela mesma razão medida:
+   `setTrailerDoors()` delega a `setTrailerDims({})`, que é a sequência
+   destrutiva de oito passos — descarta as três chapas, reconstrói o corpo
+   branco com o vão aberto, recorta as chapas de novo, semeia rebite, recongela
+   matriz, repinta e reata a arte. Cronometrado na bancada
+   (`checks-livery-registro.mjs`): **2 932 ms de thread principal presa** num
+   único "+ Adicionar porta".
+
+   O pedido do dono do produto é literal: "prefiro que tenha um loading de
+   carregamento de porta do que ele travar". Um indicador só é honesto se ele
+   chegar a PINTAR antes do bloqueio, e para isso quem aplica precisa poder
+   dizer "aceitei, ainda não fiz" — que é o que a injeção deste aplicador
+   compra. studio.ts entrega a versão que acende o véu, cede quadros ao
+   navegador e só então recorta.
+
+   A camada 2D NÃO espera por nada disso: `setDoorsFor()` recompõe o painel
+   antes de chamar aqui, então a porta aparece no desenho no mesmo quadro do
+   clique. O que carrega é o baú. */
+type DoorsApplier = (face: StructureKey, doors: DoorSpec[]) => void;
+let applyDoors: DoorsApplier = (face, doors) => { setTrailerDoors(face, doors); };
+
+/** studio.ts entrega aqui a versão com estado de carregamento. */
+export function setDoorsApplier(fn: DoorsApplier) { applyDoors = fn; }
+
+/* ---------------- "o baú ainda está sendo recortado" ----------------
+   A pílula de estado (`#cab-switching`, z-index 9) e o véu do viewport
+   (`#canvas-holder.is-rebuilding`) ficam AMBOS atrás de `#editor-modal`, que é
+   z-index 9999 — e o botão "+ Adicionar porta" mora dentro do modal. Ou seja:
+   o indicador que o resize já tinha é invisível exatamente na tela onde a porta
+   é adicionada.
+
+   Então o estado é publicado também aqui, e o inspetor de medidas o desenha.
+   Um booleano e uma lista de ouvintes; quem aplica (studio.ts) liga e desliga. */
+let geometryBusy = false;
+const busyListeners: ((on: boolean) => void)[] = [];
+
+export const isGeometryBusy = () => geometryBusy;
+
+export function onGeometryBusy(cb: (on: boolean) => void) {
+  busyListeners.push(cb);
+  return () => { const i = busyListeners.indexOf(cb); if (i >= 0) busyListeners.splice(i, 1); };
+}
+
+/** Só studio.ts chama — é ele quem sabe quando o recorte começa e termina. */
+export function setGeometryBusy(on: boolean) {
+  if (geometryBusy === on) return;
+  geometryBusy = on;
+  for (const cb of busyListeners) cb(on);
+}
+
 let doorsUnsupportedWarned = false;
 
 /** `position` do painel → distância da DIANTEIRA, que é o que a geometria usa. */
@@ -399,7 +453,7 @@ function pushDoorsToGeometry(key: StructureKey, doors: DoorSpec[]) {
   }
   try {
     const length = panels[key].spec.length;
-    setTrailerDoors(key, doors.map((d) => toGeometryDoor(key, d, length)));
+    applyDoors(key, doors.map((d) => toGeometryDoor(key, d, length)));
   } catch (e: unknown) {
     /* Uma porta que a geometria recusa não pode derrubar a edição de medidas: a
        camada já foi composta e o usuário já viu o vão. */
@@ -418,10 +472,79 @@ function pushDoorsToGeometry(key: StructureKey, doors: DoorSpec[]) {
  * Note que ela é RECALCULADA, nunca remendada. É o que garante que apagar uma
  * porta não deixe o vão dela para trás.
  */
-function structuralLayers(spec: PanelSpec): LiveryLayer[] {
+function structuralLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
+  /* AS DUAS TRASEIRAS AMONTOADAS.
+     ---------------------------------------------------------------------
+     Existem DOIS compositores por face: este, com os placeholders derivados
+     das medidas (`stripe-low`, `stripe-high`, `frame-top`, `door-*`), e o da
+     frente, com a arte medida no bake. Enquanto a arte não existia, só este
+     desenhava. Quando `layout.json` passou a trazer cantoneira, trilho e
+     ferragem, os dois passaram a desenhar A MESMA COISA em lugares quase
+     iguais — e a traseira apareceu duas vezes, uma por cima da outra, com dois
+     para-choques.
+
+     Onde há arte para a face, o papel é dela: a arte é MEDIDA no implemento e
+     o placeholder é um desenho de posse. Sobra para esta pilha o que a arte
+     não cobre — hoje, as PORTAS, que dependem de onde o usuário as põe e por
+     isso não podem ser uma peça de grade fixa. */
+  const art = hasLiveryArt(key) || !!snapFront[key];
+  /* E A PORTA TAMBÉM SAI, quando ela é GEOMETRIA.
+     ---------------------------------------------------------------------
+     A exceção acima ("sobra para esta pilha o que a arte não cobre — hoje, as
+     PORTAS") valia enquanto a arte era uma grade de peças fixas do manifesto,
+     que não sabe onde o usuário pôs a porta. O retrato sabe: ele fotografa o
+     baú DEPOIS do recorte do vão, com o marco, a folha e a ferragem no lugar.
+     Nas laterais, então, desenhar a camada `door` é desenhar a porta uma
+     segunda vez, deslocada da primeira — mais um dos "modelos remontados".
+
+     A TRASEIRA continua com a camada, e é o mesmo motivo de sempre por outro
+     lado: `pushDoorsToGeometry()` não manda porta para o fundo (as quatro
+     folhas já vêm no bake e recortar um vão ali abriria um buraco atrás
+     delas), então ali o desenho 2D é a ÚNICA representação que existe. */
+  const doorsAreGeometry = !!snapFront[key] && key !== 'rear'
+    && typeof (state.trailerRig as unknown as DoorCapableRig | null)?.stageDoors === 'function';
   return defaultLayers(spec)
     .filter((l) => l.kind !== 'base')
+    .filter((l) => !art || l.kind === 'door')
+    .filter((l) => !(doorsAreGeometry && l.kind === 'door'))
     .map((l) => ({ ...l, source: resolveSource(l) }));
+}
+
+/* ---------------- a ferragem VINDA DO MODELO ----------------
+   Quando `livery-snapshot.ts` fotografa o baú, a ferragem da frente chega
+   pronta: um recorte exatamente na caixa da chapa. Ele substitui a grade por
+   peças INTEIRA — manifesto, âncoras, fases e as emendas procedurais — porque
+   tudo isso já está NA foto, na posição em que o modelo corrente realmente
+   tem. Uma camada, registro por construção.
+
+   E ELE NÃO PASSA MAIS PELO COMPOSITOR.
+   ---------------------------------------------------------------------------
+   O compositor rasteriza numa densidade sua (`canvasSize`), e a do recorte é
+   outra: o retrato da lateral sai a 190 px/m e o canvas estrutural ficava em
+   ~140 px/m. Passar a foto por ali era reamostrá-la para BAIXO e depois
+   esticá-la de volta para a tela — a ferragem chegava borrada, e borrada é
+   exatamente o que faz o editor "não parecer com o modelo".
+
+   Como é a ÚNICA camada da frente quando existe (ver `frontLayers`), não há o
+   que compor: o canvas passa a ter o tamanho do recorte e recebe um `drawImage`
+   1:1. O CSS estica esse canvas sobre a mesma caixa de sempre, com a
+   interpolação do navegador, que é o melhor resultado possível e custa zero. */
+const snapFront: Partial<Record<StructureKey, HTMLCanvasElement>> = {};
+
+/** Recebe a ferragem fotografada de uma face e a põe no plano da frente. */
+export function setSnapshotFront(key: StructureKey, crop: HTMLCanvasElement) {
+  snapFront[key] = crop;
+  const st = panels[key];
+  /* O plano da frente é escrito AQUI e não em `recompose()`: ele não depende
+     de medida nenhuma, e refazê-lo a cada recomposição seria copiar 6 MB de
+     pixels por centímetro digitado. */
+  if (crop.width > 1 && crop.height > 1) {
+    st.front.width = crop.width;
+    st.front.height = crop.height;
+    const fx = st.front.getContext('2d');
+    if (fx) { fx.clearRect(0, 0, crop.width, crop.height); fx.drawImage(crop, 0, 0); }
+  }
+  void recompose(key);
 }
 
 /**
@@ -464,9 +587,85 @@ function canvasSize(spec: PanelSpec, key?: StructureKey) {
    ladrilhar — é o mesmo `repeat` que a pilha de placeholders usava —, e a
    ponta presa (`anchor`) é a mesma do 3D, senão a sobra da divisão cairia na
    dianteira num lado e na traseira no outro. */
+/* ---------------- as EMENDAS DE CHAPA no desenho do painel ----------------
+   A lateral do baú é feita de chapas verticais de 1 m REMONTADAS, e o 3D as
+   modela de verdade: `models.buildLiveryPanels()` desloca a aba, inclina as
+   normais e semeia a coluna de rebites — e publica a GRADE em
+   `getPlateGrid()`. Aqui a mesma grade vira desenho, nos MESMOS lugares:
+   emenda a emenda pela distância medida da ponta dianteira, rebite a rebite
+   pelas alturas medidas dos rebaixos. Nada é reinventado — se o 3D mudar de
+   passo, o editor muda junto, porque a fonte é uma só.
+
+   Sobre a ARTE, e não sob ela, porque é assim no baú: o vinil cobre a emenda
+   e o relevo aparece através dele. `scope` fica no padrão `preview` — no 3D
+   a emenda é GEOMETRIA, e pintá-la também na textura a desenharia duas vezes. */
+
+/** O desenho de UMA emenda: linha da borda, meia-luz da aba e os rebites. */
+function plateSeamSvg(
+  wMm: number, hMm: number, lapMm: number, frontIsRight: boolean, rowsMm: number[],
+): string {
+  const cx = wMm / 2;
+  const dir = frontIsRight ? 1 : -1;
+  const rivetX = cx + dir * (lapMm / 2);
+  const dots = rowsMm.map((r) => {
+    const y = hMm - r;
+    return `<circle cx="${rivetX}" cy="${y.toFixed(1)}" r="8" fill="#c9cdd1"
+      stroke="rgba(30,34,40,.35)" stroke-width="1.2"/>
+    <circle cx="${rivetX - 2}" cy="${(y - 2).toFixed(1)}" r="3.2" fill="rgba(255,255,255,.55)"/>`;
+  }).join('');
+  /* A aba (lado da FRENTE) um fio mais clara, a borda dela uma linha escura e
+     um fio de luz rente — o que uma emenda de 0,9 mm faz sob luz de estúdio. */
+  const lap0 = frontIsRight ? cx : cx - lapMm;
+  return `<svg viewBox="0 0 ${wMm} ${hMm}" width="${wMm}" height="${hMm}"
+    xmlns="http://www.w3.org/2000/svg">
+    <rect x="${lap0}" y="0" width="${lapMm}" height="${hMm}" fill="rgba(255,255,255,.06)"/>
+    <rect x="${cx - 1}" y="0" width="2" height="${hMm}" fill="rgba(22,26,31,.30)"/>
+    <rect x="${cx + dir * 1.4 - 0.7}" y="0" width="1.4" height="${hMm}" fill="rgba(255,255,255,.35)"/>
+    ${dots}
+  </svg>`;
+}
+
+/** As camadas de emenda de um painel lateral, da grade publicada pelo 3D. */
+function plateLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
+  if (key === 'rear') return [];
+  const grid = getPlateGrid();
+  if (!grid || !grid.seamsFromFront.length) return [];
+  const { length, height } = spec;
+  /* A janela desenhada de cada emenda: aba inteira mais uma folga de sombra. */
+  const W = Math.max(0.09, grid.lap * 2);
+  /* No painel, a FRENTE é `x = length` na face esquerda (u corre do rear) e
+     `x = 0` na direita — o mesmo espelho de `addLiveryUV()`. */
+  const frontIsRight = key === 'left';
+  const hMm = Math.max(1, Math.round(height * 1000));
+  const rowsMm = grid.rivetRowsFromBottom.map((r) => r * 1000);
+  const markup = plateSeamSvg(Math.round(W * 1000), hMm, Math.round(grid.lap * 1000),
+    frontIsRight, rowsMm);
+  const out: LiveryLayer[] = [];
+  for (const [i, d] of grid.seamsFromFront.entries()) {
+    const x = frontIsRight ? length - d : d;
+    if (x < 0.05 || x > length - 0.05) continue;
+    out.push({
+      id: `plate-seam-${i}`, kind: 'custom',
+      source: { kind: 'svg', markup },
+      rect: { x: x - W / 2, y: 0, w: W, h: height },
+    });
+  }
+  return out;
+}
+
 function frontLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
+  /* O SNAPSHOT DO MODELO DISPENSA O COMPOSITOR: a foto da ferragem já traz
+     trilho, fita com a fase do bake, montantes, varões, dobradiças, emendas e
+     rebites — nos lugares em que o modelo corrente os tem —, e ela é escrita
+     direto no canvas por `setSnapshotFront()`, 1:1. Compor peças por cima
+     disso seria desenhar tudo duas vezes; passar a própria foto pelo
+     compositor a reamostraria. Lista vazia é a resposta certa. */
+  if (snapFront[key]) return [];
   const face = getLiveryArt()?.[key];
-  if (!face) return [];
+  /* Sem manifesto ainda dá painel: as emendas de chapa vêm da GEOMETRIA
+     (getPlateGrid), não da arte — um manifesto que falhou de baixar não pode
+     apagar as chapas do desenho. */
+  if (!face) return plateLayers(key, spec);
   const { length, height } = spec;
 
   /* As bandas e os montantes que a face declarou, para o miolo saber onde
@@ -476,24 +675,52 @@ function frontLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
     const p = face.pieces.find(fn);
     return (p && get(p)) || 0;
   };
-  const bandTop = sizeOf((p) => p.anchorY === 'roof', (p) => p.h);
-  const bandBottom = sizeOf((p) => p.anchorY === 'floor', (p) => p.h);
+  /* O miolo começa onde as bandas ACABAM, e "acabar" depende do `y` de cada
+     uma — não da altura dela. A banda de baixo nasce abaixo do piso, então o
+     topo dela é `y + h` (0,1275 m, não os 0,21 de altura); a de cima declara
+     em `y` o quanto o pé dela fica abaixo do teto, que já É a folga a
+     descontar. Usar a ALTURA nos dois casos punha o miolo 82,5 mm alto na
+     traseira e comia a área de arte. */
+  const bandTop = sizeOf((p) => p.anchorY === 'roof', (p) => p.y);
+  const bandBottom = sizeOf((p) => p.anchorY === 'floor', (p) => (p.h == null ? null : p.y + p.h));
   const postStart = sizeOf((p) => p.anchorX === 'start', (p) => p.w);
   const postEnd = sizeOf((p) => p.anchorX === 'end', (p) => p.w);
 
   const out: LiveryLayer[] = [];
   for (const p of face.pieces) {
-    if (p.plane !== 'front' || !p.markup) continue;
+    if (p.plane !== 'front') continue;
+    /* A fonte decide o schema, não este arquivo: `@1` entrega markup vetorial,
+       `@2` entrega o render do próprio bake. `null` é peça que não carregou —
+       a célula fica vazia e as outras continuam. */
+    const source = pieceSource(p);
+    if (!source) continue;
 
+    /* `p.y` É HONRADO, e é isso que põe cada peça na altura do bake.
+       ---------------------------------------------------------------------
+       No schema @2 o `y` é medido do PISO e pode ser NEGATIVO: o trilho
+       inferior nasce 82,5 mm abaixo dele (só 127 dos seus 210 mm entram no
+       painel) e a fita 3M mora inteira na saia. Antes daqui, toda peça de
+       `anchorY:'floor'` era desenhada A PARTIR do piso e esticada até `p.h`
+       — o trilho subia 82,5 mm a mais que no implemento e a fita aparecia
+       acima do piso, onde ela não está. Era a divergência que se lia como
+       "o painel não bate com o baú".
+
+       Não é preciso recortar a imagem: `LiveryComposer` põe o retângulo em
+       `canvas.height − (y + h) · py`, então um `y` negativo cai FORA do
+       canvas e o próprio contexto 2D descarta o excedente — o recorte é o
+       mesmo que a chapa faz no 3D, e de graça.
+
+       Em `anchorY:'roof'` o `y` tem a outra semântica que o manifesto
+       declara: quanto o PÉ da peça fica abaixo do TETO. */
     let rect: { x: number; y: number; w: number; h: number };
     if (p.anchorY === 'roof') {
-      rect = { x: 0, y: Math.max(0, height - (p.h || 0)), w: length, h: p.h || 0 };
+      rect = { x: 0, y: height - p.y, w: length, h: p.h || 0 };
     } else if (p.anchorY === 'floor') {
-      rect = { x: 0, y: 0, w: length, h: p.h || 0 };
+      rect = { x: 0, y: p.y, w: length, h: p.h || 0 };
     } else if (p.anchorX === 'start') {
-      rect = { x: 0, y: 0, w: p.w || 0, h: height };
+      rect = { x: 0, y: p.y, w: p.w || 0, h: p.h ?? height - p.y };
     } else if (p.anchorX === 'end') {
-      rect = { x: Math.max(0, length - (p.w || 0)), y: 0, w: p.w || 0, h: height };
+      rect = { x: Math.max(0, length - (p.w || 0)), y: p.y, w: p.w || 0, h: p.h ?? height - p.y };
     } else {
       /* O miolo: o que sobra depois das bandas e dos montantes. Na traseira é
          onde os varões, as dobradiças e a borracha central são desenhados. */
@@ -513,13 +740,37 @@ function frontLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
          portanto a ordem só as ordena entre si — mas mantê-la coerente evita
          que uma futura fusão dos dois planos inverta a pilha. */
       kind: 'custom',
-      source: { kind: 'svg', markup: p.markup },
+      source,
       rect,
+      /* `span` é a largura DESENHADA de um ladrilho, e ausente vale o passo
+         inteiro. Com ele o trilho e a fita ladrilham no MESMO passo sem se
+         confundir: o trilho ocupa a casa toda, a fita ocupa 300 mm dos 584 e
+         deixa o trilho nu aparecer entre um segmento e o próximo — que é
+         exatamente o que o bake mostra. Antes daqui sair do manifesto, `span`
+         era forçado a `pitch` e a fita saía corrida.
+
+         `phase` desloca a treliça para o LUGAR MEDIDO: o manifesto declara a
+         distância da ponta dianteira ao centro da unidade mais próxima, e o
+         `from`/`to` que o compositor aceita é como essa âncora entra — na face
+         em que a frente é `x = length` (anchor 'end'), pelo `to`; na outra,
+         pelo `from`. Sem fase, o ladrilho ancora na borda e pode sair até um
+         passo inteiro do bake. */
       ...(p.tile && p.tile > 0.01
-        ? { repeat: { pitch: p.tile, span: p.tile, anchor: face.anchor } }
+        ? {
+          repeat: {
+            pitch: p.tile, span: p.span ?? p.tile, anchor: face.anchor,
+            ...(p.phase !== undefined
+              ? (face.anchor === 'end'
+                ? { to: rect.x + rect.w - p.phase + (p.span ?? p.tile) / 2 }
+                : { from: rect.x + p.phase - (p.span ?? p.tile) / 2 })
+              : {}),
+          },
+        }
         : {}),
     });
   }
+
+  out.push(...plateLayers(key, spec));
   return out;
 }
 
@@ -544,9 +795,24 @@ async function recompose(key: StructureKey): Promise<void> {
   const st = panels[key];
   const mine = ++st.token;
   const ppm = canvasSize(st.spec, key);
+  const back = structuralLayers(key, drawSpec(key, st.spec));
+  /* PILHA VAZIA, CANVAS MÍNIMO. Nas laterais com retrato não sobra camada
+     nenhuma para o plano de trás (a chapa está na foto e as portas viraram
+     geometria), e o compositor alocaria mesmo assim um canvas do tamanho do
+     painel — ~2 050 × 390 px por face, redesenhado a cada centímetro digitado,
+     para ficar transparente. Quatro pixels dizem a mesma coisa de graça. */
+  if (!back.length && snapFront[key]) {
+    /* A guarda `snapFront` importa: sem retrato, uma pilha de trás vazia é
+       normal (a chapa vem do manifesto) e o plano da FRENTE ainda tem de ser
+       composto lá embaixo. Sair cedo aqui o deixaria em branco. */
+    if (st.canvas.width !== 4) { st.canvas.width = 4; st.canvas.height = 4; }
+    else st.canvas.getContext('2d')?.clearRect(0, 0, 4, 4);
+    for (const cb of structureListeners) cb(key);
+    return;
+  }
   st.composer
-    .setPanel(st.spec)
-    .setLayers(structuralLayers(st.spec))
+    .setPanel(drawSpec(key, st.spec))
+    .setLayers(back)
     .resize(ppm);
   /* `'preview'` EXPLÍCITO, apesar de ser o padrão. É a única chamada de render
      deste módulo e o único lugar onde a decisão "isto não vai para o 3D"
@@ -555,16 +821,23 @@ async function recompose(key: StructureKey): Promise<void> {
   await st.composer.render({ scope: 'preview' });
   if (mine !== st.token) return;
 
-  /* O PLANO DA FRENTE, na MESMA resolução do de trás. Os dois são esticados
-     sobre exatamente o mesmo retângulo de tela, e uma diferença de densidade
-     entre eles apareceria como a ferragem levemente fora de registro com a
-     chapa — o tipo de desalinhamento de um pixel que se lê como borrão. */
-  st.frontComposer
-    .setPanel(st.spec)
-    .setLayers(frontLayers(key, st.spec))
-    .resize(ppm);
-  await st.frontComposer.render({ scope: 'preview' });
-  if (mine !== st.token) return;
+  /* O PLANO DA FRENTE.
+     Com RETRATO ele já está escrito, em resolução própria e 1:1 — ver
+     `setSnapshotFront()`. Deixar o compositor passar aqui redimensionaria o
+     canvas e apagaria a foto, que é a única coisa que este arquivo não pode
+     fazer.
+     Sem retrato, vale a grade por peças, e aí a regra antiga continua: MESMA
+     resolução do plano de trás, porque os dois são esticados sobre exatamente
+     o mesmo retângulo de tela e uma diferença de densidade entre eles aparece
+     como ferragem fora de registro com a chapa. */
+  if (!snapFront[key]) {
+    st.frontComposer
+      .setPanel(drawSpec(key, st.spec))
+      .setLayers(frontLayers(key, drawSpec(key, st.spec)))
+      .resize(ppm);
+    await st.frontComposer.render({ scope: 'preview' });
+    if (mine !== st.token) return;
+  }
 
   for (const cb of structureListeners) cb(key);
 }
@@ -630,7 +903,46 @@ export const isLengthEditable = (key: StructureKey) => key !== 'rear';
  * quando as chapas nascem, e a cada recorte posterior. É por aqui que a altura
  * ajustada aos frisos volta para os campos.
  */
-export function refreshFromTrailer(): void {
+/**
+ * A medida da CHAPA RECORTADA de cada face, em metros — a régua do DESENHO.
+ *
+ * Por que ela não é `dims`, que já está ali do lado: `dims.height` é uma
+ * RECONSTRUÇÃO — `skirtHeight + ribCount * pitch + capHeight`, ver
+ * `trailer-geometry.ts` —, e o passo médio multiplicado por 45 frisos acumula
+ * 18 mm contra o vão real piso→teto. Medido: base 2,795 m contra 2,777 m de
+ * chapa. Dezoito milímetros em 2,8 m são 0,65 %, o suficiente para a cantoneira
+ * desenhada não cobrir a cantoneira modelada e para o topo da arte cair abaixo
+ * do topo do branco.
+ *
+ * Quem manda no destino do pixel é `addLiveryUV()`, e ele normaliza sobre a
+ * caixa da chapa. Então é a caixa da chapa que tem de ser a régua de quem
+ * desenha — `dims` continua sendo a medida do IMPLEMENTO, que é o que o
+ * formulário edita e o que o 3D redimensiona. São duas grandezas diferentes e o
+ * defeito era terem um campo só.
+ */
+const skin: Partial<Record<StructureKey, { length: number; height: number }>> = {};
+
+/** A régua de desenho de uma face: a chapa, se já medida; senão as dims. */
+const drawSpec = (key: StructureKey, spec: PanelSpec): PanelSpec => {
+  const s = skin[key];
+  return s && s.height > 0.05 && s.length > 0.05
+    ? { ...spec, length: s.length, height: s.height }
+    : spec;
+};
+
+export function refreshFromTrailer(
+  panelMM?: Partial<Record<StructureKey, { w: number; h: number }>>,
+): void {
+  /* As chapas vêm de `livery.attachOverlays()`, que acabou de medi-las com
+     `measurePanel()`. O parâmetro existe em vez de um import porque a seta de
+     dependência é `livery.ts → livery-structure.ts`; puxá-la de volta fecharia
+     um ciclo. */
+  if (panelMM) {
+    for (const k of STRUCTURE_KEYS) {
+      const m = panelMM[k];
+      if (m && m.w > 50 && m.h > 50) skin[k] = { length: m.w / 1000, height: m.h / 1000 };
+    }
+  }
   const d = getTrailerDims();
   if (d) {
     panels.left.spec.length = d.length;
@@ -741,9 +1053,15 @@ export function setDoorsFor(key: StructureKey, doors: DoorSpec[]): DoorSpec[] {
   }));
   clampDoors();
   const applied = getDoors(key);
-  pushDoorsToGeometry(key, applied);
+  /* O 2D PRIMEIRO, e a ordem é a correção: `pushDoorsToGeometry()` podia levar
+     quase três segundos de thread presa, e ela vinha ANTES — a lista de portas
+     do inspetor e o desenho do painel só apareciam depois que o baú tinha
+     terminado de ser reconstruído. Do lado de quem clica, isso é o botão que
+     não responde. Recompor e avisar antes custa um quadro e faz a porta surgir
+     no ato; o recorte 3D vai atrás, com indicador. */
   void recompose(key);
   emitMeasures();
+  pushDoorsToGeometry(key, applied);
   return applied;
 }
 
@@ -878,7 +1196,11 @@ export function checkSideWidths(left: ImplementLayout, right: ImplementLayout): 
   const a = sum(left), b = sum(right), diff = Math.abs(a - b);
   if (diff <= SIDE_WIDTH_TOLERANCE) return null;
   return `O layout possui diferença de largura maior que 2 cm entre os lados. `
-    + `Lado Motorista: ${(a * 100).toFixed(0)} cm, Lado Sapo: ${(b * 100).toFixed(0)} cm `
+    /* "Passageiro" e não "Sapo": o apelido é do chão de fábrica e não aparece
+       em mais nenhum lugar da interface desde que os lados passaram a se chamar
+       Motorista e Passageiro (ver `SIDE_LABEL` em ./livery.ts). Uma mensagem de
+       erro que usa um terceiro vocabulário obriga quem a lê a traduzir. */
+    + `Lado Motorista: ${(a * 100).toFixed(0)} cm, Lado Passageiro: ${(b * 100).toFixed(0)} cm `
     + `(diferença de ${(diff * 100).toFixed(1)} cm).`;
 }
 
@@ -950,7 +1272,7 @@ export function drawFrontInto(
 
 /** Diagnóstico para o console: a pilha efetiva de um painel, já resolvida. */
 export const describeStructure = (key: StructureKey) =>
-  structuralLayers(panels[key].spec).map((l) => ({
+  structuralLayers(key, panels[key].spec).map((l) => ({
     id: l.id, kind: l.kind, rect: l.rect, repeat: l.repeat,
     art: l.source.kind === 'svg' && !l.source.markup ? 'placeholder' : l.source.kind,
   }));

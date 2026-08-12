@@ -74,7 +74,7 @@
   {
    "key": "ibc13",
    "x": 38.5,
-   "y": -58,
+   "y": -52.0,
    "rot": 0,
    "scale": 1,
    "note": "block cluster 11 m",
@@ -155,7 +155,7 @@
   {
    "key": "mc_03",
    "x": 36.5,
-   "y": 5.5,
+   "y": 12.7,
    "rot": 90,
    "scale": 1,
    "note": "training block",
@@ -384,6 +384,24 @@
    "rot": 90,
    "scale": 1,
    "note": "prédio urbano 12",
+   "inside": true
+  },
+  {
+   "key": "booth",
+   "x": -8.34,
+   "y": 159.0,
+   "rot": 0,
+   "scale": 1.25,
+   "note": "portaria 1 (canteiro, pista A)",
+   "inside": true
+  },
+  {
+   "key": "booth",
+   "x": -17.01,
+   "y": 159.0,
+   "rot": 180,
+   "scale": 1.25,
+   "note": "portaria 2 (espelhada, pista B)",
    "inside": true
   }
  ]

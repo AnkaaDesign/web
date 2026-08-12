@@ -15,6 +15,15 @@ export const RIG_BASE = {
   keyColor: 0xffefe1, keyIntensity: 3.1, keyAz: 38, keyEl: 52,
   shadowIntensity: 1.0, shadowRadius: 2.0,
   rimColor: 0xbfd6ff, rimIntensity: 0.35,
+  /* A ELEVAÇÃO DO RECORTE, em graus. Ela era CRAVADA em applyRig() — a posição
+     do rim saía de `22·cos(0,6)` no plano e `y = 14`, ou seja 37,6°, e 38 aqui
+     reproduz a mesma direção.
+     Virou campo do rig quando se tentou baixá-la no `ciclorama` para tirar o
+     recorte do chão. A tentativa foi REJEITADA pela bancada (o bloco do preset
+     conta o porquê: a luz rasante cai na direção de espelho do piso polido e
+     estoura), mas o campo fica: ele documenta que este ângulo é uma ESCOLHA e
+     dá onde mexer a quem for testar um kicker com queda. */
+  rimEl: 38,
   hemiSky: 0x8fb8f0, hemiGround: 0x514c44, hemiIntensity: 0.35,
   ambientColor: 0x6f7d90, ambientIntensity: 0.10,
   fogColor: 0xb8d8f5, fogDensity: 0.0028,
@@ -26,6 +35,27 @@ export const RIG_BASE = {
   starOpacity: 0, lampIntensity: 0, lampEmissive: 0, lampColor: 0xffb45e,
   wetness: 0, rain: 0, rainColor: 0xc8d6ea,
   nightness: 0, glintBoost: 1.0,
+  /* O NÍVEL DAS LUZES DO VEÍCULO, 0..1. Calculado por resolveRig() a partir da
+     HORA (e não da altura do sol) e guardado aqui pelo mesmo motivo que
+     `golden`: para atravessar lerpRig() como qualquer outro campo, de modo que
+     trocar de preset às 19h seja um crossfade e não um salto. Quem o escreve nos
+     materiais é applyRig(), via vehicle/lights.ts — e é lá que está o porquê de
+     18:00 em vez de `nightness`. */
+  vehLights: 0,
+  /* O PESO DO SOL BAIXO, calculado por resolveRig() e guardado AQUI para poder
+     ser tweenado como qualquer outro campo do rig.
+
+     Ele já existia como variável local (`g`), aplicada a keyColor, skyHorizon,
+     fogColor e bgColor e depois descartada. Descartá-lo era o bug do céu verde:
+     `applyRig()` pinta a bruma de horizonte com `set.horizonColor` quando o
+     cenário declara um — e essa cor é uma amostra de MEIO-DIA (ver o horizonNote
+     do environments.json). Com o override, o entardecer avermelhava a névoa do
+     preset e a casca de bruma continuava na cor medida ao meio-dia: às 18/19 h o
+     `distrito-industrial` ficava com um céu OLIVA (#5a633f) por cima de um sol
+     laranja. Sendo campo do rig, o peso atravessa `lerpRig()` de graça e chega a
+     applyRig() já casado com a pose que está sendo aplicada — que é o requisito,
+     porque applyRig roda por quadro de tween e não por evento. */
+  golden: 0,
   /* O ALBEDO DA SALA DE CICLORAMA, como MULTIPLICADOR da rampa autorada em
      scene/cyclorama.ts. 1 = a rampa como ela está escrita lá.
 
@@ -38,6 +68,22 @@ export const RIG_BASE = {
      scene).
      Vale só onde há sala; nos outros presets ninguém o lê. */
   cycloramaAlbedo: 1,
+  /* O PISO E O REFLEXO SAÍRAM DE DENTRO DE `cycloramaAlbedo`, e a razão é uma
+     medição: com UM multiplicador só para as duas superfícies, as pastilhas
+     `Cinza claro` e `Branco` entregavam o piso em 245 e em 255 de luminância —
+     ou seja SATURADO, uma folha branca sem reflexo, sem sombra e sem chão.
+
+     Elas não podem compartilhar um número porque não são a mesma superfície:
+     a casca é papel fosco (`roughness` 0,97) e o piso é concreto polido com um
+     termo especular SOMADO por cima (floor-reflection.ts). Multiplicar os dois
+     por 5 leva o papel de 0,036 a 0,18 — que ainda é cinza — e o piso de 0,132
+     a 0,66, que com o reflexo em cima passa de 1,0 e corta no branco.
+
+     `cycloramaGloss` cai conforme o piso clareia, e isso é o que a foto de um
+     estúdio mostra: num ciclorama branco o difuso domina e o reflexo lê como
+     um véu; num ciclorama escuro ele é a única coisa que o chão tem. */
+  cycloramaFloor: 1,
+  cycloramaGloss: 1,
 };
 
 /* ---------------- os fundos do estúdio ----------------
@@ -77,13 +123,52 @@ export const RIG_BASE = {
    * um fundo PRETO não precisa de nada disso — a separação é máxima por
      construção —, mas ganha um pouco de recorte porque um cavalo escuro contra
      preto é a única combinação em que o contorno some por baixo. */
+/* ---------------- O QUE A SEGUNDA RODADA MEDIU, E POR QUE A TABELA MUDOU ----
+   Os quatro fundos foram fotografados na bancada (`checks-estudio-diag.mjs`,
+   pose lateral, mediana de luminância em três faixas do quadro). O resultado:
+
+     fundo           parede   sujeito   PISO
+     preto              4,7     129,7      0
+     cinza-escuro      53,8     183,9    171,4
+     cinza-claro       90,5     209,0    245,5
+     branco           118,0     218,9    255,0   ← SATURADO
+
+   Duas leituras, e as duas são o relato do dono do produto ("as cores não
+   funcionam bem, não refletem no piso, só nas paredes"):
+
+   1. NO CLARO E NO BRANCO O PISO ESTOURA. 245 e 255 não são "um piso claro",
+      são a AUSÊNCIA de piso: sem reflexo, sem sombra de contato, sem a
+      variação da laje. O caminhão passa a flutuar numa folha de papel — e é
+      por isso que a pastilha parece não fazer nada no chão: ela faz demais, e
+      o que ela produz não tem informação nenhuma.
+   2. MESMO NO PADRÃO O PISO ESTÁ COLADO NO SUJEITO. 171,4 contra 183,9 são
+      doze níveis de separação. O cabeçalho de cyclorama.ts estabelece a regra
+      contrária com todas as letras — "o fundo tem de ficar abaixo da lataria" —
+      e ela vale para o chão pelo mesmo motivo que vale para a parede.
+
+   A CORREÇÃO É SEPARAR AS DUAS SUPERFÍCIES (ver `cycloramaFloor` em RIG_BASE) e
+   escolher o piso pelo ALVO e não pela razão: um piso de estúdio fica entre a
+   parede e o sujeito, nunca acima do sujeito. Os alvos abaixo, em luminância:
+
+     fundo           parede    PISO    sujeito (preso em ~185 pelo ombro ACES)
+     cinza-escuro     ~50      ~120
+     cinza-claro      ~95      ~150
+     branco          ~140      ~175
+
+   `albedo` do claro e do branco desceu junto (2,80 → 2,30 e 5,00 → 3,80): a
+   escala antiga vinha da tabela de separação medida numa parede que ainda era
+   o CHÃO do cenário, e com o piso próprio ela passava do ponto. */
 export interface BackdropDef {
   /** kebab-case, estável (vai para o localStorage) */
   id: string;
   /** rótulo pt-BR da pastilha */
   name: string;
-  /** multiplicador da rampa de cyclorama.ts (1 = como autorada) */
+  /** multiplicador da rampa de PAREDE de cyclorama.ts (1 = como autorada) */
   albedo: number;
+  /** multiplicador do albedo do PISO — ver `cycloramaFloor` em RIG_BASE */
+  floor: number;
+  /** quanto do reflexo planar entra (1 = como autorado) */
+  gloss: number;
   /** cor de limpeza, névoa e bandas do céu — o fundo quando não há sala de pé */
   bg: number;
   /** multiplicador da exposição do preset */
@@ -110,13 +195,17 @@ export const BACKDROPS: readonly BackdropDef[] = [
      sombra de contato, e sem sombra de contato um veículo sobre preto lê como
      recorte mal feito. É a mesma peça — e o mesmo motivo — do recorte
      transparente em scene/capture.ts. */
-  { id: 'preto', name: 'Preto', albedo: 0, bg: 0x000000, exposure: 1.00, rim: 1.20 },
-  /* O DE HOJE, byte a byte: albedo 1 é a rampa como está escrita, e 0x242424 é
-     o `bgColor` que o preset `ciclorama` já traz. Quem nunca tocar na pastilha
-     não vê diferença nenhuma. */
-  { id: 'cinza-escuro', name: 'Cinza escuro', albedo: 1.00, bg: 0x242424, exposure: 1.00, rim: 1.00 },
-  { id: 'cinza-claro', name: 'Cinza claro', albedo: 2.80, bg: 0x6a6a6a, exposure: 0.94, rim: 1.35 },
-  { id: 'branco', name: 'Branco', albedo: 5.00, bg: 0xc4c4c4, exposure: 0.86, rim: 1.60 },
+  /* `gloss: 0` porque não há piso polido para receber o termo — quem fica de pé
+     é o `ShadowMaterial`. E o TETO sai junto com a casca (ver applyShellMode):
+     a primeira versão deixava laje, vigas, painéis acesos e quatro dezenas de
+     spots pendurados no vazio preto, que é a sala inteira menos as paredes. */
+  { id: 'preto', name: 'Preto', albedo: 0, floor: 0, gloss: 0, bg: 0x000000, exposure: 1.00, rim: 1.25 },
+  /* A PAREDE é a de hoje byte a byte (albedo 1 = a rampa como está escrita), e
+     0x242424 é o `bgColor` que o preset `ciclorama` já traz. O que mudou é o
+     PISO: 0,58 tira os doze níveis de colagem medidos contra a lataria. */
+  { id: 'cinza-escuro', name: 'Cinza escuro', albedo: 1.00, floor: 0.58, gloss: 0.85, bg: 0x242424, exposure: 1.00, rim: 1.00 },
+  { id: 'cinza-claro', name: 'Cinza claro', albedo: 2.30, floor: 0.95, gloss: 0.70, bg: 0x6a6a6a, exposure: 0.94, rim: 1.30 },
+  { id: 'branco', name: 'Branco', albedo: 3.80, floor: 1.30, gloss: 0.55, bg: 0xc4c4c4, exposure: 0.88, rim: 1.55 },
 ];
 
 export const DEFAULT_BACKDROP = 'cinza-escuro';
@@ -448,7 +537,25 @@ export const LIGHT_PRESETS: Record<string, LightPreset> = {
       /* O RECORTE. Subiu de 0.62 para 0.88 e é a peça que separa a lataria do
          fundo agora que o fundo ficou escuro. Frio de propósito, e é a ÚNICA
          dominante autorada nesta cena: contra uma key neutra ele lê como o
-         contorno de uma segunda fonte, que é o que um kicker é. */
+         contorno de uma segunda fonte, que é o que um kicker é.
+
+         RASANTE FOI TENTADO E REJEITADO — `rimEl: 13`, e a bancada matou a
+         ideia. O raciocínio era bom no papel: a 38° a direcional cobre os 120 m
+         de chão com cos 0,61 e a lateral do baú com 0,79; a 13° os dois trocam
+         de lado (0,22 e 0,97), então o recorte desenharia contorno em vez de
+         acender o set. O que a conta ignora é o ESPECULAR. O piso tem
+         `roughness` 0,22, e uma câmera de foto de veículo olha o chão de cima
+         para baixo num ângulo raso — a direção de espelho dela sai rasante,
+         que é exatamente onde uma luz a 13° está. A foto voltou com uma PLUMA
+         BRANCA SATURADA subindo do chão diante da cabine, azulada como o
+         próprio rim. E o ganho nem apareceu: o sujeito melhorou 7,8 → 4,3.
+         A 38° o realce especular do rim no piso cai longe da lente.
+
+         O QUE FICA EM ABERTO: uma direcional não tem queda com a distância,
+         então ela ilumina os 120 m de piso com a mesma força que ilumina o
+         caminhão, e é por isso que varrer o Recorte ainda move mais o chão que
+         o sujeito. O conserto de verdade é um kicker com QUEDA (um spot mirado
+         no conjunto), não um ângulo. */
       rimColor: 0xccd9f2, rimIntensity: 0.88,
       /* FILL, e estritamente neutro. O hemi é a chapa branca do outro lado. */
       hemiSky: 0x9c9c9c, hemiGround: 0x3a3a3a, hemiIntensity: 0.32,
@@ -485,8 +592,19 @@ export const LIGHT_PRESETS: Record<string, LightPreset> = {
          a sonda captura escala o que o implemento reflete, na mesma direção.
          A exposição desce junto (1.06 -> 0.95) para tirar o branco do ombro da
          ACES: medido, a 1.06 a lataria branca ficava presa em ~198 de luminância
-         mesmo variando a key em 3x — que é a definição de "estourado". */
-      envIntensity: 0.85, exposure: 0.95,
+         mesmo variando a key em 3x — que é a definição de "estourado".
+
+         0,85 -> 1,15 QUANDO O AMBIENTE DEIXOU DE SER O RoomEnvironment. Este
+         número é uma ESCALA sobre uma textura, então ele só tem significado
+         junto com a textura que escala — e ela trocou: `buildStudioEnv()`
+         (scene/scene.ts) desenha a sala DESTE cenário, que é um ciclorama
+         escuro, no lugar da caixa branca do addon do three. Medido, a troca
+         levou a parede de 53,8 para 34,5 de luminância e o sujeito de 183,9
+         para 154,4 sem que nada mais mudasse: não é escurecimento de projeto, é
+         a mesma escala aplicada a uma fonte com um terço da radiância. Subir
+         aqui devolve o nível SEM devolver a caixa branca fantasma — que era o
+         que achatava a modelagem e punha um borrão claro num canto do piso. */
+      envIntensity: 1.15, exposure: 0.95,
     },
     noite: {
       /* A face noite de um ciclorama não é "de noite": é o mesmo estúdio com a
@@ -505,7 +623,9 @@ export const LIGHT_PRESETS: Record<string, LightPreset> = {
       skyTop: 0x131313, skyMid: 0x161616, skyHorizon: 0x1a1a1a,
       skyMidPos: 0.5, skyBias: 1.0,
       skyHaloColor: 0xffffff, skyHalo: 0.02, skyDisc: 0.0, cloudiness: 0,
-      envIntensity: 0.70, exposure: 1.06,
+      /* 0,70 -> 0,95 pela mesma razão que a face dia subiu: o ambiente deixou de
+         ser a caixa branca do RoomEnvironment e passou a ser a própria sala. */
+      envIntensity: 0.95, exposure: 1.06,
       nightness: 1, glintBoost: 1.3,
       /* Sem poste: um ciclorama não tem luminária de rua, e acender uma aqui
          jogaria uma dominante quente na única cena que existe para não ter

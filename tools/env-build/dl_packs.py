@@ -489,7 +489,7 @@ def _separate_pass(ob, step, tol):
         groups.setdefault((round(cn.x, 2), round(cn.y, 2), round(cn.z, 2)),
                           []).append((cd, p, n))
 
-    push, face_push = {}, {}
+    push, face_push, split_push = {}, {}, {}
     for key, items in groups.items():
         if len(items) < 2:
             continue
@@ -540,13 +540,66 @@ def _separate_pass(ob, step, tol):
                 # compartilha com a face que ele cobre — se compartilhasse,
                 # seria a mesma superficie e nao haveria duas.
                 #
-                if vi_ & vj_:
-                    continue
+                welded = bool(vi_ & vj_)
                 ou = min(bi[2], bj[2]) - max(bi[0], bj[0])
                 ov = min(bi[3], bj[3]) - max(bi[1], bj[1])
                 if ou <= 0.0 or ov <= 0.0:
                     continue
                 if ou * ov < 0.30 * min(ai, aj):
+                    continue
+                if welded:
+                    # ---- A QUINTA VERSAO, E O QUE AS QUATRO ANTERIORES NAO VIAM
+                    #
+                    # `if vi_ & vj_: continue` estava aqui com o argumento de que
+                    # "um painel aplicado nunca compartilha vertice com a face que
+                    # ele cobre". Nestes ripes ele partilha, e com frequencia: a
+                    # porta vem SOLDADA no contorno, um vertice do caixilho e
+                    # tambem vertice da parede. O par nem chegava a ser examinado.
+                    #
+                    # Medido no set.glb desta build (audit_decals.py): 41 faces em
+                    # MC_00, 11 em MC_01, mais booth, cabinet, dock, office,
+                    # shed_sm, skip e quatro IBC — todas com folga 0,0 mm. Sao
+                    # exatamente as portas e os adesivos que o utilizador aponta a
+                    # cintilar, e a razao de `audit_coplanar --all` dar ZERO e que
+                    # aquele ficheiro so procura PEGADA IDENTICA.
+                    #
+                    # PORQUE E SEGURO AGORA, e nao era antes. O perigo de mexer
+                    # numa face soldada e deformar a parede junto (vertice
+                    # partilhado) — foi assim que "corrigir uma quebrou outra".
+                    # Duas condicoes tornam o caso decidivel:
+                    #
+                    #   * a pequena tem de ser mesmo PEQUENA (<= 30 % da grande).
+                    #     E este o teste que decide, e sozinho ele ja resolve o
+                    #     caso perigoso: dois triangulos do mesmo quad tem areas
+                    #     iguais (razao 1) e sao recusados aqui. Duas celulas
+                    #     vizinhas de uma parede subdividida ja tinham sido
+                    #     recusadas acima, pelo teste de area de sobreposicao —
+                    #     vizinhas encostam, e a sobreposicao das caixas delas e
+                    #     uma fatia de largura zero.
+                    #   * CONTENCAO, mas permitindo ENCOSTAR. A primeira versao
+                    #     desta correcao exigia a pequena estritamente dentro da
+                    #     grande, com 4 mm de folga nos quatro lados, e isso
+                    #     deixou passar 97 das 200 faces: um vidro dentro do
+                    #     caixilho, uma porta assente na soleira e um painel no
+                    #     topo da parede ficam RENTES a um dos lados. A margem e
+                    #     agora negativa — a pequena pode encostar, so nao pode
+                    #     transbordar.
+                    #
+                    # E a face e DESTACADA antes de ser empurrada, para que o
+                    # empurrao nao viaje pelos vertices partilhados ate a parede.
+                    # O contorno fica com 1 cm de reveal — que e o que uma porta
+                    # tem em obra, e invisivel a 30 m.
+                    small_is_i = ai <= aj
+                    sb, lb = (bi, bj) if small_is_i else (bj, bi)
+                    if not (ai <= 0.30 * aj or aj <= 0.30 * ai):
+                        continue
+                    m = 0.004
+                    if not (sb[0] > lb[0] - m and sb[1] > lb[1] - m
+                            and sb[2] < lb[2] + m and sb[3] < lb[3] + m):
+                        continue
+                    small_p, nd = (pi_, ni) if small_is_i else (pj_, nj)
+                    nd = _outward(nd, small_p.center, ctr)
+                    split_push.setdefault(small_p.index, []).append(nd)
                     continue
                 if si == sj:
                     # mesma casca: mover a casca levaria a parede junto, entao
@@ -565,6 +618,35 @@ def _separate_pass(ob, step, tol):
                     (round(nd.x, 2), round(nd.y, 2), round(nd.z, 2))] = nd
 
     moved = 0
+    # ---- as SOLDADAS primeiro: destacar e so depois empurrar ---------------
+    #
+    # A ordem importa. `split_edges` reescreve a tabela de vertices, entao tudo
+    # o que dependa de indices de vertice (face_push, push, verts_of) tem de ser
+    # aplicado ANTES ou recalculado depois. Aqui destaca-se e empurra-se dentro
+    # do mesmo bmesh, e os outros dois lacos continuam a trabalhar sobre indices
+    # de FACE, que split_edges preserva.
+    if split_push:
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bm.faces.ensure_lookup_table()
+        tgt = [(bm.faces[fi], dirs) for fi, dirs in split_push.items()
+               if fi < len(bm.faces)]
+        if tgt:
+            bmesh.ops.split_edges(
+                bm, edges=list({e for f, _ in tgt for e in f.edges}))
+            for f, dirs in tgt:
+                off = Vector((0.0, 0.0, 0.0))
+                for v in dirs:
+                    off += v
+                if off.length < 1e-9:
+                    continue
+                off = off.normalized() * step
+                for v in f.verts:
+                    v.co += off
+                moved += 1
+            bm.to_mesh(me)
+            me.update()
+        bm.free()
     for fi, dirs in face_push.items():
         off = Vector((0.0, 0.0, 0.0))
         for v in dirs:
@@ -806,9 +888,34 @@ def split_midcentury(ob, log, min_span=4.0):
     return out
 
 
+def _load_cache():
+    import importlib.util
+    import sys
+    if "protos_cache" in sys.modules:
+        return sys.modules["protos_cache"]
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "protos_cache.py")
+    if not os.path.exists(p):
+        return None
+    spec = importlib.util.spec_from_file_location("protos_cache", p)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["protos_cache"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def import_prototypes(log):
     """key -> (object, (sx, sy, sz)). `midcentury` is returned exploded as
     `mc_00`, `mc_01`, ... one entry per building."""
+    # SEM OS PACKS, A CACHE — ver protos_cache.py e a nota gemea em ibc1.py.
+    if not os.path.isdir(SRC):
+        cache = _load_cache()
+        if cache is not None:
+            _ibc, dl = cache.load_buildings(log=lambda m: log("  " + m))
+            if dl:
+                return dl
+        log("  _src_dl ausente e sem cache — 0 prototipos")
+        return {}
+
     protos = {}
     done = set()
     for key, (folder, idx, up, unit, basecolor, extra) in PACKS.items():

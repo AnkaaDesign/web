@@ -76,12 +76,14 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import {
   pmrem, applyPreset, setTimeOfDay, setHourOfDay, OPEN_HOUR,
-  setExternalEnvironment, setExposureBase,
+  setExternalEnvironment, setExposureBase, getNightness,
   setSkyDomeVisible, setLamps, setLampModel,
   setHorizonHaze, setHorizonTint, setInteriorBounds,
 } from './scene';
 import { applySet, disposeSet, disposeSetTextures } from './set';
 import { setCyclorama } from './cyclorama';
+import { setSkyPair, disposeSkyBlend } from './skyblend';
+import { disposeLampSiteLenses } from './lamps';
 import type { SetDef, SetMaterialDef } from './set';
 import { loadGLB } from '../vehicle/models';
 import { prefetch } from '../core/prefetch';
@@ -113,6 +115,17 @@ const MAX_CACHE = 3;
    (disposeSetTextures). */
 interface CacheEntry {
   rt: THREE.WebGLRenderTarget | null;
+  /* O PAR DE CÉUS, e por que ele guarda o equirect CRU quando `rt` não guarda.
+     -------------------------------------------------------------------------
+     Um cenário com `hdriNight` atravessa de um plate para o outro em função da
+     hora (scene/skyblend.ts), e cada mistura é um passe que LÊ os dois lados —
+     então aqui o equirect não pode ser descartado depois de assar, como
+     `toPmrem()` faz no caminho de um plate só. O que fica de fora do cache é o
+     alvo da mistura e o PMREM dele: são 41 MB, valem para UMA cena por vez, e
+     skyblend os solta na troca. Voltar ao cenário reassa em ~20 ms a partir
+     destes dois, que é o que se quer guardar (o download e a decodificação). */
+  dia?: THREE.DataTexture | null;
+  noite?: THREE.DataTexture | null;
 }
 /** @type {Map<string, CacheEntry>} */
 const cache = new Map<string, CacheEntry>();
@@ -259,11 +272,14 @@ function loadLampModel(url: string,
 function disposeEntry(entry: CacheEntry | null | undefined) {
   if (!entry) return;
   /* dispose the RENDER TARGET, not just rt.texture — the texture alone leaves
-     the framebuffer and its attachment allocated.
-     É a única coisa que uma entrada possui: o PMREM foi gerado a partir de um
-     equirect que toPmrem() já descartou, e as texturas do set pertencem a
-     set.ts. */
+     the framebuffer and its attachment allocated. */
   if (entry.rt) entry.rt.dispose();
+  /* E os dois equirects crus do par de céus, que uma entrada com `hdriNight`
+     possui de verdade (ver CacheEntry). No caminho de um plate só não há nada
+     aqui: toPmrem() descarta o equirect ao assar. As texturas do set nunca são
+     nossas — pertencem a set.ts, que tem descarte próprio. */
+  if (entry.dia) entry.dia.dispose();
+  if (entry.noite) entry.noite.dispose();
 }
 
 function touch(id: string, entry: CacheEntry) {
@@ -293,6 +309,17 @@ export function disposeEnvironments() {
      carregado, e descartar uma que ainda está montada renderiza lixo. */
   setLampModel(null);                 // null ⇒ volta às primitivas procedurais
   setLamps(null);                     // null ⇒ a fileira embutida
+  /* Os vidros das luminárias do cenário. `setLamps(null)` já os tira de cena
+     (o layout volta a `roadside`), mas a geometria própria deles fica alocada —
+     e este é o ponto de SAÍDA, onde ela tem de morrer. */
+  disposeLampSiteLenses();
+  /* E o par de céus: o alvo da mistura mais o PMREM dele são 41 MB, e eles NÃO
+     estão no cache (só os dois equirects crus estão — ver CacheEntry). Sem esta
+     linha o descarte diferido soltaria tudo menos justamente a maior parte.
+     DEPOIS de setExternalEnvironment(null): é ele que desliga
+     `scene.environment`, e descartar um render target ainda ligado à cena deixa
+     o three amostrando textura morta até o próximo quadro. */
+  disposeSkyBlend();
   for (const entry of cache.values()) disposeEntry(entry);
   cache.clear();
   /* Seguro aqui e em nenhum outro lugar: todo material que ainda podia apontar
@@ -387,7 +414,10 @@ function resolveSet(envDef: EnvironmentDef): SetDef | null {
 
 function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
   lampModel: THREE.Object3D | null, onSetProgress?: (f: number) => void) {
-  const hasHdri = !!(entry && entry.rt);
+  /* "Tem foto de céu?" — e um PAR conta, senão a bruma do horizonte e o domo
+     procedural decidiriam pelo caminho errado num cenário que tem os dois
+     plates e nenhum `rt`. */
+  const hasHdri = !!(entry && (entry.rt || (entry.dia && entry.noite)));
 
   /* A 3D SET IS THE WHOLE NEAR FIELD, AND THAT IS THE POINT.
      `set` (scene/set.ts) brings real modelled ground, kerbs, painted lines and
@@ -489,7 +519,28 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
 
   const rot = num(envDef.envRotation, 0);
 
-  if (hasHdri) {
+  /* O PAR DE CÉUS PRIMEIRO, porque ele produz as duas texturas que vão ser
+     ligadas. `setSkyPair()` devolve null se faltar um lado — e aí o `||` abaixo
+     cai no caminho de sempre, com o plate único. */
+  const par = (entry.dia && entry.noite)
+    ? setSkyPair(entry.dia, entry.noite, getNightness()) : null;
+  if (!par) disposeSkyBlend();
+
+  if (par) {
+    /* FUNDO E REFLEXO DE FONTES DIFERENTES, e é o ponto do esquema: o fundo é o
+       equirect misturado (reescrito a cada mudança de hora, portanto liso) e o
+       reflexo é o PMREM dele (reassado por taxa). Ver scene/skyblend.ts.
+
+       `blurriness` NÃO é repassado: `scene.backgroundBlurriness` só age sobre
+       textura CubeUV, e o fundo aqui é equirect cru. Nenhum cenário com par
+       declara desfoque (o distrito tem 0), e passar um valor que não faz nada
+       seria pior que não passar. */
+    setExternalEnvironment(par.env, {
+      background: par.bg,
+      rotation: rot,
+      intensity: num(envDef.envIntensity, 1),
+    });
+  } else if (hasHdri) {
     /* `!`: `hasHdri` É `!!(entry && entry.rt)` — o tsc não propaga a narrowing
        através do booleano intermediário. */
     const tex = entry.rt!.texture;
@@ -561,6 +612,10 @@ export function prefetchEnvironment(envDef: EnvironmentDef | null | undefined): 
   prefetch([
     set ? set.url : null,
     envDef.hdri,
+    /* DEPOIS do de dia, e essa ordem é a que importa: com MAX_IN_FLIGHT em 2,
+       quem entra primeiro termina primeiro, e o céu que abre a cena é o de dia
+       (o estúdio abre às 17:45). */
+    envDef.hdriNight,
     envDef.lamps ? path((envDef.lamps as RawBlock).model) : null,
   ], 'env');
 }
@@ -592,6 +647,7 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
 
   const id = String(envDef.id || 'env');
   const hdriPath = path(envDef.hdri);
+  const nightPath = hdriPath ? path(envDef.hdriNight) : null;
 
   let entry = cache.get(id) || null;
   let cacheable = true;               // false only for a freshly FAILED HDRI
@@ -607,7 +663,7 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
      Eram 2..N mapas de chão avulsos entre o HDRI e o poste até 2026-08-03; o
      `ground` do manifesto nomeia hoje um TIPO e nenhum arquivo, e quem baixa
      textura de chão é set.ts, contado no slot do set. */
-  const HDRI_SLOT = 0, LAMP_SLOT = 1, SET_SLOT = 2;
+  const HDRI_SLOT = 0, LAMP_SLOT = 1, SET_SLOT = 2, NIGHT_SLOT = 3;
   /* PESO DO SET, e por que ele é estimado em vez de medido. O tamanho real só é
      conhecido depois do HEAD/GET, e pedir um HEAD por cenário para acertar a
      barra custaria um round trip antes de qualquer byte útil. A estimativa sai
@@ -628,6 +684,11 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
     (!entry && hdriPath) ? W_HDRI : 0,
     (lampHref && !lampModels.has(lampHref)) ? W_PROP : 0,
     setDefForWeight ? (W_SET_GLB + setMapCount * W_MAP) : 0,
+    /* O plate de noite é do MESMO tamanho do de dia (mesma série, mesmo 2k), e a
+       barra tem de saber disso: sem este slot o cenário chegaria a 100 % com
+       5,6 MB ainda no fio, e o estúdio abriria com o céu de dia até o segundo
+       download terminar. */
+    (!entry && nightPath) ? W_HDRI : 0,
   ];
   const track = makeTracker(weights, report);
 
@@ -637,7 +698,7 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
 
   /* HDRI e modelo do poste em PARALELO — são independentes, e o pequeno pega
      carona de graça. */
-  const [hdr, lampObj] = await Promise.all([
+  const [hdr, lampObj, hdrNight] = await Promise.all([
     (!entry && hdriPath)
       ? loadHdr(assetUrl(hdriPath), e => track.set(HDRI_SLOT, fraction(e)))
         .then(t => { track.set(HDRI_SLOT, 1); return t; })
@@ -647,20 +708,32 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
       ? loadLampModel(lampHref, f => track.set(LAMP_SLOT, f))
         .then(o => { track.set(LAMP_SLOT, 1); return o; })
       : Promise.resolve(null),
+    (!entry && nightPath)
+      ? loadHdr(assetUrl(nightPath), e => track.set(NIGHT_SLOT, fraction(e)))
+        .then(t => { track.set(NIGHT_SLOT, 1); return t; })
+      : Promise.resolve(null),
   ]);
 
   if (!entry) {
-    /* O equirect cru só sobrevivia para o domo projetado amostrar direto; sem
-       domo, toPmrem() o descarta nos dois caminhos (sucesso e falha) e não há
-       nada a soltar aqui. */
-    entry = { rt: hdr ? toPmrem(hdr) : null };
+    if (hdr && hdrNight) {
+      /* PAR COMPLETO: os dois crus ficam vivos e quem assa é skyblend, na hora
+         de aplicar — porque o peso da mistura depende da HORA, e a hora só é
+         conhecida depois de applyPreset()/setHourOfDay() em applyToScene(). */
+      entry = { rt: null, dia: hdr, noite: hdrNight };
+    } else {
+      /* UM PLATE SÓ, inclusive quando o de noite falhou: o equirect cru não
+         sobrevive a toPmrem() (nos dois caminhos, sucesso e falha) e a noite
+         volta a ser o plate de dia escurecido, que é o degrade correto. */
+      if (hdrNight) hdrNight.dispose();
+      entry = { rt: hdr ? toPmrem(hdr) : null };
+    }
 
     /* Do NOT cache a FAILED HDRI: caching it would make one dropped packet
        permanent for the whole session (the engine outlives the React page), and
        the user's only recourse would be a full reload. A successful load, or an
        environment that never wanted an HDRI, is cached even if a newer apply
        has already overtaken us — the bytes are decoded either way. */
-    cacheable = !hdriPath || !!entry.rt;
+    cacheable = !hdriPath || !!entry.rt || !!entry.dia;
     if (cacheable) touch(id, entry);
   }
 

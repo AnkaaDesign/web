@@ -130,8 +130,22 @@ const tyreMats: THREE.MeshStandardMaterial[] = [];
       /* A roda autorada sai intocada — é a regra nova (FH16_WHEEL_RE). */
       if (/-fh16(\.\d+)?$/i.test(m.name || '')) { tyreMats.push(m); continue; }
       if (/^borracha|aparabarro|^pneu/i.test(m.name || '')) m.envMapIntensity = 0.3;
-      else if (/galvanizado|estrutura-principal|^inox|metal-pouco-polido|metal-claro|^aro-rodas/i
-        .test(m.name || '')) {
+      /* A FERRAGEM DE INOX (2026-08-12). No app, `splitTrailerHardware()`
+         CLONA este material por MALHA antes do acabamento e só o trilho
+         (z-span ≥ 2 m) fica com o piso de 0,62. Esta varredura é por MATERIAL,
+         então ela não tem como reproduzir a divisão — e trata a família
+         inteira como ferragem.
+
+         A aproximação é boa AQUI e só aqui: esta bancada existe para o A/B da
+         RODAGEM, e o que ela enquadra é o rodado. As 27 malhas de trilho
+         (flanco e proteção de piso) saem 0,32 mais polidas do que no app e
+         nenhuma delas aparece no quadro. Quem for fotografar o FLANCO por esta
+         bancada precisa da divisão de verdade, não desta linha. */
+      else if (/^inox-ferragem$|^metal-pouco-polido$/i.test(m.name || '')) {
+        m.metalness = 1;
+        m.roughness = Math.min(m.roughness ?? 1, 0.30);
+        m.envMapIntensity = 1.0;
+      } else if (/galvanizado|estrutura-principal|^aro-rodas/i.test(m.name || '')) {
         if (!m.roughnessMap) m.roughness = Math.max(m.roughness ?? 0, 0.62);
         m.envMapIntensity = 1.0;
       }

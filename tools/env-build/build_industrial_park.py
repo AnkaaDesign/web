@@ -58,11 +58,22 @@ import math
 import os
 import random
 import struct
+import sys
 import importlib.util
 from mathutils import Vector, Matrix
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT_DIR = r"C:\Users\Kennedy\Documents\repositories\web\public\environments\distrito-industrial"
+
+# O DESTINO E RELATIVO AO PROPRIO ARQUIVO, e nao um caminho absoluto do Windows.
+#
+# Era `C:\Users\Kennedy\Documents\repositories\web\public\...`. Num checkout
+# Linux isso nao e um caminho invalido — e um NOME DE ARQUIVO valido: o export
+# escrevia um arquivo chamado `C:\Users\...\set.glb` dentro do diretorio de
+# trabalho e a build terminava anunciando sucesso, com o set.glb de verdade
+# intacto. Mesmo modo de falha do FENCE_SRC: nada quebra, so nada acontece.
+# PARK_OUT_DIR continua a permitir apontar para outro lugar quando for preciso.
+OUT_DIR = os.environ.get("PARK_OUT_DIR") or os.path.normpath(
+    os.path.join(HERE, "..", "..", "public", "environments", "distrito-industrial"))
 OUT = os.path.join(OUT_DIR, "set.glb")
 
 # ---------------------------------------------------------------------------
@@ -73,8 +84,91 @@ OUT = os.path.join(OUT_DIR, "set.glb")
 CLEAR_RADIUS = 26.0
 
 ROAD_W = 13.0               # carriageway: 2 x 5 m lanes + shoulders
-ROAD_LEN = 1180.0           # runs the FULL ground, so it never ends on screen
+ROAD_LEN = 1180.0           # o comprimento do CHAO; ver ROAD_Y0/ROAD_Y1
 ROAD_CROWN = 0.055          # fall from centreline to channel
+
+# ---------------------------------------------------------------------------
+# ONDE A VIA INTERNA COMECA E ACABA — e por que ela deixou de correr 1180 m.
+#
+# Ela e uma RUA INTERNA e corria os 1180 m do chao, entrando na bruma pelas duas
+# pontas. O comentario original defendia isso ("a road that simply stops is the
+# most artificial thing a ground plane can do") e estava a responder a pergunta
+# errada: o problema nunca foi a rua PARAR, foi ela parar EM NADA. Uma rua que
+# se dissolve na neblina nos dois sentidos nao diz para onde vai, e uma via
+# interna de planta que atravessa 1,2 km de campo aberto nao e uma via interna.
+#
+# Agora cada ponta termina em algo que a EXPLICA:
+#
+#   NORTE  ela sai pelo portao e, 78 m depois, morre numa RODOVIA que cruza o
+#          campo de leste a oeste. E a rodovia que continua ate a bruma — e ela
+#          pode, porque e o que uma rodovia faz. A saida da planta passa a ter
+#          destino em vez de horizonte.
+#
+#   SUL    ela NAO sai da propriedade. Termina num BALAO dentro do sitio, que e
+#          como uma via de servico termina quando o que ela serve acaba: dando
+#          onde virar. Sem isto o lado sul tinha portao, guarita e 440 m de
+#          asfalto para chegar ao nada.
+#
+# Os numeros sao escolhidos contra a orbita, contra a laje e contra a cerca, nao
+# por gosto: o balao fica a 105 m da origem (a camera vai a ~31 m) e inteiro
+# dentro do patio, e a rodovia fica 86 m FORA da cerca.
+HIGHWAY_Y = 236.0           # eixo da rodovia
+HIGHWAY_W = 15.0            # pista da rodovia, um pouco mais larga que a interna
+HIGHWAY_SHOULDER = 5.0      # acostamento + talude de brita, de cada lado
+
+# -105 E NAO -116, E O NUMERO SAI DA LAJE. Com o centro em -116 o disco chegava
+# a y=-137,5 e a laje acaba em YARD_Y0 = -133: quatro metros e meio de balao
+# ficavam POR CIMA da faixa de turfa, com a grama (a +1 cm) a furar o asfalto
+# (a -5 cm). Aparecia no render t_balao como uma mancha castanha no bordo sul.
+# O centro e agora derivado do que o contem, com 6 m de folga para a guia e para
+# a variacao do relevo — ver ROUNDABOUT_FIT, que FALHA a build se isto voltar a
+# nao caber.
+ROUNDABOUT_CY = -105.0      # centro do balao
+# O DISCO TEM DE CABER NO RECORTE DA LAJE, e nao cabia — este era o "ainda esta
+# sem os meio fios da parte externa da rotatoria".
+#
+# `add_slab` abre no patio um corredor de 38,98 m (as duas pistas mais o
+# canteiro), ou seja 19,49 m de meia-largura. Com RO 21,5 o disco transbordava
+# 2,01 m para cada lado, e ali a LAJE (+7 cm) passa por cima do asfalto do balao
+# (-5 cm) e ganha o teste de profundidade: os flancos leste e oeste do balao
+# ficavam cobertos de betao, com a guia externa enterrada por baixo. Nao havia
+# guia a acrescentar — havia guia escondida.
+#
+# 10,5 + 8,5 = 19,0, que deixa 32 cm de folga para a propria guia (17 cm) e para
+# a ondulacao do terreno. A pista circulatoria perde 1 m de largura e continua
+# com 8,5 m, que e mais do que os 7 m de uma rotatoria de duas faixas.
+#
+# O RAIO EXTERNO E QUE E FIXO, E A ILHA E QUE ANDA DENTRO DELE.
+#
+# "diminua o diametro do circulo central da rotatoria". A tentacao e encolher o
+# balao inteiro, e nao da: o bordo do disco tem de continuar a alcancar a ponta
+# das duas pistas. A pista A vai a x=9,75 e a B a x=-27,99, ou seja 18,87 m do
+# centro — com RO abaixo disso o asfalto da pista morre ANTES do disco e o
+# leque de aproximacao nasce sem borda onde assentar. Por cima, RO+guia tem de
+# caber nos 19,49 m do recorte da laje (a verificacao logo abaixo). Sobra a
+# janela [18,9 .. 19,3] e RO fica onde estava.
+#
+# Entao o que encolhe e a ILHA, e a pista circulatoria fica com o que ela
+# larga: 21 m de diametro passam a 15, e a circulatoria vai de 8,5 para 11,5 m.
+# Larga para uma rotatoria de rua, certa para esta: quem a usa e um conjunto de
+# 19 m que precisa de raio para inverter, que e o motivo de o balao existir.
+ROUNDABOUT_RI = 7.5         # ilha central (grama, com guia)
+ROUNDABOUT_W = 11.5         # pista circulatoria
+ROUNDABOUT_RO = ROUNDABOUT_RI + ROUNDABOUT_W
+
+# A ponta sul das duas pistas. Fica ao NORTE do circulo inteiro: o leque de
+# aproximacao (build_roundabout) e que liga a reta ao arco, e ele so pode ser uma
+# superficie regrada valida se a reta estiver toda fora do disco. O ponto mais ao
+# norte do disco esta em ROUNDABOUT_CY + ROUNDABOUT_RO; 1,5 m de folga garante
+# que nenhum vertice do leque nasca invertido.
+ROAD_Y0 = ROUNDABOUT_CY + ROUNDABOUT_RO + 1.5
+# E a ponta norte morre no bordo do pavimento da rodovia.
+ROAD_Y1 = HIGHWAY_Y - HIGHWAY_W / 2.0
+# A garganta do entroncamento: o canteiro morre num nariz este tanto antes da
+# rodovia e o asfalto ocupa o corredor inteiro dai em diante. E o que da lugar
+# para convergir ao entrar, e sem isso o canteiro encosta dorso-a-dorso na
+# rodovia (ver a nota junto a `breaks`).
+MEDIAN_THROAT = 22.0
 
 GUTTER_W = 0.45             # concrete channel, flush with the asphalt
 KERB_W = 0.17               # the face you see
@@ -98,6 +192,18 @@ MEDIAN_W = 10.5
 _EDGE = ROAD_W / 2.0 + GUTTER_W + KERB_W
 # relativo a rua A, senao mover uma abre ou fecha o canteiro
 ROAD_B_X = ROAD_A_X - (2.0 * _EDGE + MEDIAN_W)
+
+# O RECORTE QUE add_slab ABRE NO PATIO, e a meia-largura dele. O balao tem de
+# caber aqui dentro (ver ROUNDABOUT_RI) e este e o unico sitio onde as duas
+# constantes se encontram, entao e aqui que a verificacao mora — falhar a build
+# e o unico modo de falha que nao se descobre tarde, olhando um render.
+CORRIDOR_HALF = (ROAD_A_X + _EDGE - (ROAD_B_X - _EDGE)) / 2.0
+if ROUNDABOUT_RO + KERB_W >= CORRIDOR_HALF:
+    raise SystemExit(
+        "o balao transborda o recorte da laje: RO+guia %.2f m contra %.2f m de "
+        "meia-largura do corredor. A laje (+7 cm) cobriria o asfalto do balao "
+        "(-5 cm) nos flancos, e com ele a guia externa."
+        % (ROUNDABOUT_RO + KERB_W, CORRIDOR_HALF))
 
 # Property line. The fence stands here.
 #
@@ -127,6 +233,21 @@ YARD_HALF = 150.0
 # deixaria as pecas do sul fora do piso.
 YARD_X0, YARD_X1 = -108.75, 109.25
 YARD_Y0, YARD_Y1 = -133.0, 103.0
+
+# O BALAO TEM DE CABER NA LAJE, e isto falha a build quando nao cabe.
+#
+# Nao e zelo: o modo de falha e SILENCIOSO e ja aconteceu. Com o centro em
+# -116 o disco passava 4,5 m alem de YARD_Y0 e ficava por cima da faixa de
+# turfa; nada no build reclamou, o log deu "balao: r 21.5 m" e o defeito so
+# apareceu ao olhar o render — grama a furar asfalto. As duas constantes vivem
+# 30 linhas separadas, entao qualquer mexida numa delas volta a poder abrir
+# isto. A folga de 6 m cobre a guia da ilha e a ondulacao do terreno.
+ROUNDABOUT_FIT = ROUNDABOUT_CY - ROUNDABOUT_RO - 6.0
+if ROUNDABOUT_FIT < YARD_Y0:
+    raise SystemExit(
+        "o balao nao cabe na laje: bordo sul em %.1f m contra YARD_Y0 %.1f m. "
+        "Suba ROUNDABOUT_CY ou desca YARD_Y0."
+        % (ROUNDABOUT_CY - ROUNDABOUT_RO, YARD_Y0))
 
 # The engine's camera.far is 600 m and the horizon-haze shell sits at 570 m, so
 # the ground has to reach PAST the haze or its own edge shows as a lit band
@@ -313,7 +434,19 @@ def on_paving(x, y):
     the gate. Grass growing across an asphalt road is exactly as wrong as it
     sounds, and it was doing it on both roads at both ends of the site.
     """
-    if ROAD_B_X - _EDGE - 1.5 <= x <= ROAD_A_X + _EDGE + 1.5:
+    # O CORREDOR SO E CORREDOR ONDE HA VIA, e ele corria os 1180 m do chao.
+    #
+    # A faixa de exclusao ia de y=-590 a y=+590, quando a via morre no balao em
+    # y=-124. O efeito estava no fundo do enquadramento do estudio: a turfa a sul
+    # tem 17 m de largura e 218 de comprimento, e os 42 m centrais dela — os que
+    # ficam mesmo por tras do balao, que e para onde a camera olha por cima do
+    # implemento — eram os unicos do perimetro inteiro onde nao podia nascer
+    # arvore nenhuma. Era o "nessa area deve ter arvores, nessa parte de grama".
+    #
+    # Ao sul do balao quem responde e o teste da laje, logo abaixo: ate YARD_Y0
+    # ha betao (o rabo do corredor) e dai para fora ha turfa, que e plantavel.
+    if (ROAD_B_X - _EDGE - 1.5 <= x <= ROAD_A_X + _EDGE + 1.5
+            and ROUNDABOUT_CY - ROUNDABOUT_RO - 2.0 <= y <= ROAD_Y1 + 8.0):
         return True
     return (YARD_X0 - 2.0 <= x <= YARD_X1 + 2.0
             and YARD_Y0 - 2.0 <= y <= YARD_Y1 + 2.0)
@@ -790,6 +923,37 @@ MEDIAN_GAP_R = 2.0
 MED_TUCK = KERB_W / 2.0
 
 
+# ---------------------------------------------------------------------------
+# QUEM ATRAVESSA O CANTEIRO — e a resposta e NINGUEM, num sitio so.
+#
+# O canteiro deixou de abrir para a transversal (ver `breaks`, em build_ground),
+# e a correcao foi aplicada tres vezes em tres sitios: `gap_mouths` esvaziou,
+# `_channel_runs` parou de abrir a canaleta de dentro e `build_service_roads`
+# parou de deitar asfalto no trecho do meio. Cada um desses sitios anotou-se a
+# si proprio como "o ultimo".
+#
+# NAO ERAM TRES, ERAM CINCO. `build_median_noses` continuava a atravessar o
+# canteiro de lado a lado com guia e sarjeta em CADA transversal que cruzasse o
+# par de pistas, e o forro de asfalto continuava a ser emitido por baixo da
+# grama — o teste dele (`[] if not breaks else ...`) ja nao dizia o que dizia,
+# porque `breaks` ganhou o nariz norte e deixou de poder ser vazio. O que se via
+# era exatamente o que os outros tres cortes existiam para tirar: DOIS friso
+# escuros a cortar o canteiro de ponta a ponta, 40 m a frente do caminhao, sem
+# travessia nenhuma entre eles.
+#
+# Nao ha aqui condicao nova: ha UMA leitura, e as quatro pecas da travessia
+# (vao do canteiro, quinas, nariz e forro) passam a le-la. Reabrir a travessia
+# volta a ser uma linha — devolver as transversais que atravessam —, e as quatro
+# voltam juntas em vez de tres delas.
+def median_crossings():
+    """As transversais que ATRAVESSAM o canteiro: (x0, x1, y0, y1).
+
+    Vazia enquanto o canteiro correr inteiro. Devolver aqui as de SERVICE_ROADS
+    que cruzam as duas pistas reabre a travessia com tudo o que ela precisa.
+    """
+    return []
+
+
 def svc_spans(x0, x1):
     """Parte um trecho de via interna nos pedacos que NAO ficam sobre uma pista.
 
@@ -831,15 +995,28 @@ def mouths():
     que ja custou uma correcao. Uma abertura de canteiro nao e uma boca com
     meio-fio, e nao deve virar uma.
     """
+    # E A BOCA VOLTADA PARA O CANTEIRO NAO EXISTE MAIS.
+    #
+    # Este era o segundo sitio do mesmo defeito, e foi o que sobrou depois de
+    # fechar `_channel_runs`: o canteiro deixou de abrir, mas a transversal
+    # continuava a declarar boca no lado INTERNO de cada pista — e uma boca traz
+    # consigo o vao na canaleta e o arco de `build_service_kerbs`. O resultado e
+    # o meio-fio do canteiro interrompido por um retangulo de cantos
+    # arredondados no meio da grama, com a grama inteira por baixo.
+    #
+    # Uma via que nao pode atravessar o canteiro nao tem boca do lado dele: ela
+    # entra e sai pela direita. `inner` sai da posicao das duas pistas.
+    med_x = (ROAD_A_X + ROAD_B_X) / 2.0
     out = []
     for x0, x1, y0, y1 in SERVICE_ROADS:
         for sx0, sx1 in svc_spans(x0, x1):
             if sx1 - sx0 < FLARE_MIN_SPAN:
                 continue
             for cx in (ROAD_A_X, ROAD_B_X):
-                if abs(sx0 - (cx + ROAD_W / 2.0)) < 0.5:
+                inner = -1 if cx > med_x else 1
+                if inner != 1 and abs(sx0 - (cx + ROAD_W / 2.0)) < 0.5:
                     out.append((cx, 1, cx + ROAD_W / 2.0, y0, y1))
-                if abs(sx1 - (cx - ROAD_W / 2.0)) < 0.5:
+                if inner != -1 and abs(sx1 - (cx - ROAD_W / 2.0)) < 0.5:
                     out.append((cx, -1, cx - ROAD_W / 2.0, y0, y1))
     return out
 
@@ -855,17 +1032,13 @@ def gap_mouths():
     ali diria "nao cruze" no unico ponto onde cruzar e o proposito) e quem
     constroi o arco e build_median_noses e nao build_service_kerbs.
     """
-    out = []
-    for x0, x1, y0, y1 in SERVICE_ROADS:
-        for sx0, sx1 in svc_spans(x0, x1):
-            if sx1 - sx0 >= FLARE_MIN_SPAN:
-                continue
-            for cx in (ROAD_A_X, ROAD_B_X):
-                if abs(sx0 - (cx + ROAD_W / 2.0)) < 0.5:
-                    out.append((cx, 1, cx + ROAD_W / 2.0, y0, y1))
-                if abs(sx1 - (cx - ROAD_W / 2.0)) < 0.5:
-                    out.append((cx, -1, cx - ROAD_W / 2.0, y0, y1))
-    return out
+    # VAZIO DESDE QUE O CANTEIRO DEIXOU DE ABRIR. A abertura do canteiro foi
+    # fechada (ver a nota em `breaks`, em build_ground), e estas quatro quinas
+    # so existem para arrematar essa abertura: sem ela, o que elas desenhariam
+    # seria meio-fio em arco no meio da grama. A funcao fica — com a construcao
+    # inteira preservada — porque reabrir a travessia e uma linha em `breaks`, e
+    # entao ela volta a ser precisa exactamente como esta.
+    return []
 
 
 MOUTHS = None            # preenchido no primeiro uso; SERVICE_ROADS ja existe
@@ -1052,6 +1225,15 @@ def clear_scene():
 
 
 def thin_prototypes(ibc):
+    # A CACHE JA VEM DECIMADA e redecimar nao e inofensivo: IBC_THIN tira 55 % do
+    # model_3, e 45 % de 45 % deixa a torre de colunas com 20 % da malha — o que
+    # em decimador de colapso nao e uma torre mais leve, e papel amassado.
+    # prototypes.glb e exportado DEPOIS desta funcao (export_editor.py chama
+    # thin_prototypes antes de registar), entao o que esta na cache ja passou.
+    cache = sys.modules.get("protos_cache")
+    if cache is not None and cache.USED_CACHE.get("buildings"):
+        log("  prototipos vieram da cache — thin_prototypes ignorado (ja aplicado)")
+        return
     for idx, ratio in IBC_THIN.items():
         entry = ibc.get(idx)
         if not entry:
@@ -1509,6 +1691,51 @@ def reuv(ob, uv_scale=8.0):
     me.update()
 
 
+def _corridor_tail(name, cw0, cw1, y0, material, uv_scale, z_fn, seed):
+    """A laje que fecha o corredor viario a SUL do balao.
+
+    O bordo de cima nao e uma recta, e o ARCO SUL do disco do balao: para cada
+    abscissa, a laje sobe ate onde o asfalto do balao comeca. Feito com uma
+    recta, ou sobrava a meia-lua entre a recta e o circulo (brita a vista), ou a
+    laje passava POR CIMA do lobo sul do balao — e a laje esta 12 cm acima da
+    pista, portanto ganharia o teste de profundidade e poria uma tampa de betao
+    sobre o retorno. E o mesmo par de erros que o docstring de add_slab conta
+    ter custado as duas pistas inteiras.
+    """
+    cols = 34
+    rows = 5
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    grid = []
+    for c in range(cols + 1):
+        x = cw0 + (cw1 - cw0) * c / float(cols)
+        dx = x - ROUNDABOUT_CX
+        under = ROUNDABOUT_RO * ROUNDABOUT_RO - dx * dx
+        y_top = ROUNDABOUT_CY - math.sqrt(under) if under > 0.0 else ROUNDABOUT_CY
+        y_top = max(y_top, y0 + 0.5)
+        col = []
+        zf = z_fn or yard_surface
+        for r in range(rows + 1):
+            y = y0 + (y_top - y0) * r / float(rows)
+            col.append(bm.verts.new((x, y, zf(x, y))))
+        grid.append(col)
+    for c in range(cols):
+        for r in range(rows):
+            bm.faces.new((grid[c][r], grid[c][r + 1],
+                          grid[c + 1][r + 1], grid[c + 1][r]))
+    for f in bm.faces:
+        for l in f.loops:
+            l[uv].uv = (l.vert.co.x / uv_scale, l.vert.co.y / uv_scale)
+    me = bpy.data.meshes.new("%s_tail" % name)
+    ob = bpy.data.objects.new("%s_tail" % name, me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(material)
+    paint_variation(ob, seed=seed + 2.4)
+    return [ob]
+
+
 def add_slab(name, x0, x1, y0, y1, material, cell=4.5, uv_scale=8.0, z_fn=None,
              seed=1.0):
     """A rectangle of ground WITH THE ROAD CORRIDOR CUT OUT.
@@ -1532,12 +1759,36 @@ def add_slab(name, x0, x1, y0, y1, material, cell=4.5, uv_scale=8.0, z_fn=None,
     they never contested it in the first place.
     """
     cw0, cw1 = ROAD_B_X - _EDGE, ROAD_A_X + _EDGE
+    out = []
+
+    # O RECORTE SO VALE ONDE O CORREDOR TEM DONO, e isso deixou de ser sempre.
+    #
+    # Ele corria a ALTURA INTEIRA do retangulo, porque quando foi escrito a pista
+    # tambem corria os 1180 m. Com ela a terminar no balao, o corredor a sul dele
+    # ficou sem dono nenhum — nem pista, nem sarjeta, nem canteiro, nem laje — e
+    # o que aparecia por baixo era a brita do campo, 37 cm abaixo. Dava-se em
+    # DOIS sitios de uma vez: nos ~26 m de laje entre o balao e YARD_Y0, e na
+    # faixa de turfa `turf_s` inteira, que fica toda a sul do disco. A mancha
+    # castanha ao lado do balao em t_balao.png era a soma das duas.
+    road_lo = ROUNDABOUT_CY - ROUNDABOUT_RO
+    if y1 <= road_lo or y0 >= ROAD_Y1:
+        w, d = x1 - x0, y1 - y0
+        if w > 0.5 and d > 0.5:
+            ob = add_grid("%s_0" % name, w, d, material,
+                          cx=(x0 + x1) / 2.0, cy=(y0 + y1) / 2.0,
+                          cuts=max(2, int(w / cell)), cuts_y=max(2, int(d / cell)),
+                          uv_scale=uv_scale, z_fn=z_fn)
+            paint_variation(ob, seed=seed)
+            out.append(ob)
+        return out
+
     spans = []
     if x0 < cw0:
         spans.append((x0, min(x1, cw0)))
     if x1 > cw1:
         spans.append((max(x0, cw1), x1))
-    out = []
+    if y0 < road_lo:
+        out += _corridor_tail(name, cw0, cw1, y0, material, uv_scale, z_fn, seed)
     for i, (a, b) in enumerate(spans):
         w, d = b - a, y1 - y0
         if w <= 0.5 or d <= 0.5:
@@ -1967,14 +2218,19 @@ def build_markings(m_line):
             # _channel_runs que abre o meio-fio — entao a reta acaba onde o arco
             # comeca, por construcao e nao por ajuste.
             side = 1 if sx > 0 else -1
-            for a0, a1 in _channel_runs(cx, side, -MARK_MAX_R, MARK_MAX_R):
+            # ...e agora ela para tambem onde a PISTA para. MARK_MAX_R continua a
+            # valer como teto (ver acima), mas a pista deixou de ser simetrica em
+            # torno da origem: com o limite so em +/-240 a tinta seguia 147 m
+            # alem do balao, pintando bordo sobre a brita do campo.
+            for a0, a1 in _channel_runs(cx, side, max(-MARK_MAX_R, ROAD_Y0),
+                                        min(MARK_MAX_R, ROAD_Y1)):
                 y = a0
                 while y < a1 - 0.5:
                     seg = min(20.0, a1 - y)
                     h = 0.35 + 0.65 * fbm(cx / 30.0, y / 30.0, 977, 3)
                     q.append((cx + sx, y + seg / 2, 0.14, seg, 0.0, h))
                     y += seg
-        _dashes(cx, q, -MARK_MAX_R, MARK_MAX_R)
+        _dashes(cx, q, max(-MARK_MAX_R, ROAD_Y0), min(MARK_MAX_R, ROAD_Y1))
     mouth_edge_marks(q)
 
     # ---- the gate: stop bar and crossing ---------------------------------
@@ -2089,11 +2345,46 @@ def _channel_runs(cx, side, lo=None, hi=None):
     # A ultima rede continua sendo a largura da via: uma travessia que por algum
     # motivo nao produza boca nenhuma ainda tem de furar a canaleta, senao volta
     # o meio-fio atravessado no meio da rua.
+    # A CANALETA DE DENTRO NAO ABRE MAIS, e e o "meio fio do canteiro central
+    # continua atravessando".
+    #
+    # Enquanto a transversal cruzava o par de pistas, as QUATRO canaletas tinham
+    # de abrir: as duas de fora para ela entrar, as duas de dentro para ela
+    # atravessar o canteiro. O canteiro foi fechado (ver `breaks`), mas este
+    # laco continuou a abrir as quatro — e o resultado e um canteiro de grama
+    # inteiro com o meio-fio dele interrompido no meio, que le exatamente como
+    # uma travessia que ficou por acabar.
+    #
+    # `inner` e o lado que olha para o canteiro: em A e o oeste (side -1), em B
+    # o leste (+1). Derivado da posicao das duas pistas, nao escrito a mao.
+    med_x = (ROAD_A_X + ROAD_B_X) / 2.0
+    inner = -1 if cx > med_x else 1
     for x0, x1, sy0, sy1 in SERVICE_ROADS:
+        if side == inner:
+            continue
         if x0 - 0.6 <= e <= x1 + 0.6:
             gaps.append((sy0 - GUTTER_W - KERB_W, sy1 + GUTTER_W + KERB_W))
-    lo = -YARD_HALF if lo is None else lo
-    hi = YARD_HALF if hi is None else hi
+    # A CANALETA SO EXISTE ONDE A PISTA EXISTE. O limite inferior era -YARD_HALF
+    # (a cerca sul) de quando a pista atravessava a propriedade de lado a lado;
+    # com ela a terminar no balao, meio-fio e sarjeta seguiam em frente e
+    # ATRAVESSAVAM o disco inteiro — dois riscos escuros a cortar a ilha central,
+    # que e o que t_balao.png mostrava. O topo continua na cerca: da porteira
+    # para fora a via e rural, com acostamento de brita e sem guia.
+    # E ELA VAI ATE AO BORDO DO BALAO, NAO ATE ROAD_Y0.
+    #
+    # ROAD_Y0 e onde acaba o PAVIMENTO RECTO das pistas; dali ao arco vai o
+    # leque, que e asfalto na mesma e continua a ser uma via com bordo. Parar a
+    # canaleta na recta deixava esses 2 a 18 m (conforme a abscissa) sem guia
+    # nenhuma dos dois lados de cada pista — metade do "faltando uma parte do
+    # meio fio" mora aqui, a outra metade no proprio anel (ver rb_mouths).
+    #
+    # Cada canaleta para no arco DA PROPRIA ABSCISSA, e e isso que a faz
+    # encontrar a guia do anel exactamente no ponto em que o anel a larga: as
+    # duas leem o mesmo circulo no mesmo x.
+    if lo is None:
+        arc = rb_arc_y(e)
+        lo = max(arc if arc is not None else ROAD_Y0, -YARD_HALF)
+    hi = min(ROAD_Y1, YARD_HALF) if hi is None else hi
     runs, a = [], lo
     for g0, g1 in _merge(gaps):
         if g0 > a:
@@ -2364,11 +2655,12 @@ def build_median_noses(kerbs, kuv, gutters, guv):
     # um quarto de circulo de _corner_arc, o MESMO que a boca do entroncamento
     # usa, com R = MEDIAN_GAP_R. Nas duas pontas do arco os raios caem sobre a
     # fiada longitudinal (u=0) e sobre o nariz reto (u=1) por construcao.
+    #
+    # E ELE SO EXISTE ONDE HA TRAVESSIA. Ver `median_crossings`: com o canteiro
+    # fechado, um nariz e guia mais sarjeta a atravessar grama intacta.
     x_lo, x_hi = ROAD_B_X + ROAD_W / 2.0, ROAD_A_X - ROAD_W / 2.0
     R = MEDIAN_GAP_R
-    for ri, (x0, x1, y0, y1) in enumerate(SERVICE_ROADS):
-        if not (x0 < ROAD_B_X and x1 > ROAD_A_X):
-            continue
+    for ri, (x0, x1, y0, y1) in enumerate(median_crossings()):
         for ci, (yc, sgn) in enumerate(((y0, -1.0), (y1, 1.0))):
             yg = yc + sgn * GUTTER_W
             yb = yc + sgn * (GUTTER_W + KERB_W)
@@ -2576,11 +2868,38 @@ def build_ground():
     # ---- the two carriageways -------------------------------------------
     # Spanning the whole ground, because a road that simply stops is the most
     # artificial thing a ground plane can do. Cambered, not flat: see road_z.
+    # DE ROAD_Y0 A ROAD_Y1, e nao mais os 1180 m do chao: ver o bloco de
+    # ROAD_Y0. Os cortes ao longo caem proporcionalmente ao novo comprimento —
+    # manter 150 num trecho de 322 m dava 2,1 m de celula contra os 7,9 m de
+    # antes, e a celula da malha e o que limita a banda do COLOR_0
+    # (paint_variation): mais cortes teriam MUDADO a aparencia do asfalto de
+    # tabela, que e o defeito que 12-textura-rua-principal.png documenta.
+    _road_len = ROAD_Y1 - ROAD_Y0
+    _road_cy = (ROAD_Y0 + ROAD_Y1) / 2.0
+
+    # O ABAULAMENTO ACHATA-SE NA BOCA DA RODOVIA.
+    #
+    # Uma pista abaulada tem o eixo 5,5 cm acima do bordo; a rodovia que ela
+    # encontra tem, no bordo dela, exactamente essa cota mais baixa. Encostadas
+    # sem mais nada, as duas deixam um degrau de 5,5 cm ao longo de toda a boca —
+    # o risco escuro atravessado no entroncamento em v_rodovia.png. Em obra o
+    # abaulamento da via secundaria morre contra o bordo da principal, e e isso:
+    # nos ultimos 12 m o perfil transversal vai a plano na cota do bordo.
+    JOIN_BLEND = 12.0
+
+    def _road_join_z(x, y, c):
+        z = road_z(x, c)
+        d = ROAD_Y1 - y
+        if d >= JOIN_BLEND:
+            return z
+        t = 1.0 - max(0.0, d) / JOIN_BLEND
+        t = t * t * (3.0 - 2.0 * t)
+        return z + (-ROAD_CROWN - z) * t
+
     for nm, cx in (("road_a", ROAD_A_X), ("road_b", ROAD_B_X)):
-        # 10 across for the camber, 150 along for the wear field: the ratio a
-        # 13 x 1180 m strip actually needs.
-        r = add_grid(nm, ROAD_W, ROAD_LEN, m_road, cx=cx, cuts=10, cuts_y=150,
-                     uv_scale=8.0, z_fn=lambda x, y, c=cx: road_z(x, c))
+        r = add_grid(nm, ROAD_W, _road_len, m_road, cx=cx, cy=_road_cy,
+                     cuts=10, cuts_y=max(2, int(_road_len / 7.9)),
+                     uv_scale=8.0, z_fn=lambda x, y, c=cx: _road_join_z(x, y, c))
         paint_variation(r, seed=2.2 if cx == ROAD_A_X else 2.7,
                         road_wear=True, cx=cx)
 
@@ -2607,14 +2926,42 @@ def build_ground():
     # Ver o comentario de MED_TUCK — e o que impede a corda do canteiro de abrir
     # fresta contra a corda da guia no arco da quina.
     _nose = GUTTER_W + KERB_W - MED_TUCK
-    breaks = sorted((y0 - _nose, y1 + _nose) for x0, x1, y0, y1 in SERVICE_ROADS
-                    if x0 < ROAD_B_X and x1 > ROAD_A_X)
-    segs, a = [], -ROAD_LEN / 2.0
+    # O CANTEIRO DEIXOU DE ABRIR PARA A TRANSVERSAL.
+    #
+    # A abertura existia para a transversal poder ATRAVESSAR o par de pistas — e
+    # ela so precisava de atravessar enquanto nao havia onde inverter o sentido.
+    # Com o balao no fim da via interna, quem vem por uma pista e quer a outra
+    # inverte no retorno, que e como um par de pistas com canteiro funciona na
+    # vida real: as transversais entram e saem pela direita e o canteiro corre
+    # inteiro. Fechar a abertura tambem devolve ao canteiro os 8 m de grama que a
+    # travessia comia mesmo em frente ao caminhao, que e onde a camera olha.
+    #
+    # Nada mais muda: as bocas de entroncamento (`mouths`), a guia e a sarjeta
+    # continuam a abrir onde a transversal encontra CADA pista — o que sai e so a
+    # travessia do meio.
+    breaks = [(y0, y1) for _x0, _x1, y0, y1 in median_crossings()]
+    # O CANTEIRO VIVE ENTRE AS DUAS PISTAS, entao ele tem os limites delas. Ao
+    # sul ele para antes do leque do balao (ROAD_Y0): num balao o canteiro
+    # central acaba na entrada e as duas pistas fundem-se na circulatoria —
+    # deixar a grama chegar ao arco seria desenhar um canteiro entrando no balao.
+    # O NARIZ NORTE E UM VAO COMO OS OUTROS, e por isso entra em `breaks`.
+    #
+    # O canteiro nao pode ir dorso-a-dorso com a rodovia: numa boca em T as duas
+    # pistas alargam antes do entroncamento e o canteiro morre num nariz, dando
+    # a garganta por onde se converge para entrar. Terminado a direito, ele
+    # aparecia como um rectangulo verde encostado ao asfalto da rodovia — foi o
+    # que f_gate.png mostrou. Declarado aqui como vao, ele ganha de graca o
+    # mesmo recuo de raio que os narizes das transversais ja tem.
+    breaks = sorted(breaks + [(ROAD_Y1 - MEDIAN_THROAT, ROAD_Y1 + 1.0)])
+    segs, a = [], ROAD_Y0
     for b0, b1 in breaks:
+        if b1 <= ROAD_Y0 or b0 >= ROAD_Y1:
+            continue
         if b0 > a:
             segs.append((a, b0))
         a = max(a, b1)
-    segs.append((a, ROAD_LEN / 2.0))
+    if a < ROAD_Y1:
+        segs.append((a, ROAD_Y1))
     # ---- e o VAO TEM QUINA ARREDONDADA -----------------------------------
     #
     # O corte reto de ponta a ponta deixava o canteiro em esquadro nas quatro
@@ -2646,18 +2993,41 @@ def build_ground():
         # pontas do canteiro no limite do sitio nao encostam em vao nenhum.
         gap_lo = any(abs(s0 - b1) < 1e-6 for _b0, b1 in breaks)
         gap_hi = any(abs(s1 - b0) < 1e-6 for b0, _b1 in breaks)
-        # 8 cortes davam 1,3 m de coluna: UMA dentro de um recuo de 1,38 m, ou
-        # seja um chanfro reto. r/5 e o mesmo passo angular que o asfalto usa.
-        cuts = 8 if not (gap_lo or gap_hi) else \
-            max(8, int(MEDIAN_W / (_r_bak / 5.0)))
+        # ---- A PONTA SUL E A ILHA DIVISORIA DO BALAO -----------------------
+        #
+        # O canteiro acabava a direito em ROAD_Y0, e o que ficava entre essa
+        # recta e o arco era leque — asfalto de lado a lado, sem nada a separar
+        # a entrada de uma pista da entrada da outra. Um par de pistas nao entra
+        # assim num balao: o canteiro afina e morre CONTRA o anel, e e essa
+        # ponta que da a guia onde o anel fecha (ver rb_mouths).
+        #
+        # A ponta vai ate meia guia ALEM do bordo do pavimento, e nao ate ele: a
+        # guia do anel ocupa [RO, RO+17 cm], entao com a grama a acabar em
+        # RO+8,5 cm ela fica debaixo do meio da pedra. E o mesmo MED_TUCK das
+        # quinas, e pela mesma razao — dois poligonos inscritos no mesmo circulo
+        # com passos diferentes nao coincidem, e a corda que sobra tem de cair
+        # SOB um solido em vez de ao lado dele.
+        nose_s = abs(s0 - ROAD_Y0) < 1e-6
+        _r_nose = ROUNDABOUT_RO + KERB_W / 2.0
+        # 16 colunas dao 66 cm de passo: a flecha da corda contra o arco fica em
+        # 3 mm, ou seja um vigesimo da largura da guia que a cobre.
+        cuts = 8 if not (gap_lo or gap_hi or nose_s) else \
+            max(16 if nose_s else 8, int(MEDIAN_W / (_r_bak / 5.0)))
         med = add_grid("median_%d" % i, MEDIAN_W, s1 - s0, m_near,
                        cx=med_cx, cy=(s0 + s1) / 2.0,
                        cuts=cuts, cuts_y=max(2, int((s1 - s0) / 8.0)),
                        uv_scale=8.0, z_fn=median_z)
-        if gap_lo or gap_hi:
+        if gap_lo or gap_hi or nose_s:
             for v in med.data.vertices:
                 on_lo = gap_lo and abs(v.co.y - s0) < 1e-4
                 on_hi = gap_hi and abs(v.co.y - s1) < 1e-4
+                on_nose = nose_s and abs(v.co.y - s0) < 1e-4
+                if on_nose:
+                    arc = rb_arc_y(v.co.x, _r_nose)
+                    if arc is not None and arc < v.co.y:
+                        v.co.y = arc
+                        v.co.z = median_z(v.co.x, v.co.y)
+                    continue
                 if not (on_lo or on_hi):
                     continue
                 off = _med_recuo(v.co.x)
@@ -2685,9 +3055,11 @@ def build_ground():
     # DERIVADO, NAO POSICIONADO — a licao de `outer`. A cota e o MENOR entre a do
     # canteiro e a da via menos 5 cm, entao nao existe relevo que faca este forro
     # emergir por cima do que ele forra, seja qual for a rampa do entroncamento.
-    for x0, x1, y0, y1 in SERVICE_ROADS:
-        if not (x0 < ROAD_B_X and x1 > ROAD_A_X):
-            continue
+    # O FORRO SO EXISTE ONDE HA VAO — e o teste disso e `median_crossings`, nao
+    # `breaks`. Enquanto era `if not breaks`, o nariz norte (que entra em
+    # `breaks` sempre) mantinha o forro vivo: 607 vertices de asfalto emitidos
+    # por baixo de grama intacta, em cada transversal, para sempre.
+    for x0, x1, y0, y1 in median_crossings():
         ax0 = ROAD_B_X + ROAD_W / 2.0 - 0.4
         ax1 = ROAD_A_X - ROAD_W / 2.0 + 0.4
         ay0, ay1 = y0 - MEDIAN_GAP_R - 0.4, y1 + MEDIAN_GAP_R + 0.4
@@ -2699,11 +3071,496 @@ def build_ground():
         paint_variation(lin, seed=9.9)
 
     build_service_roads(m_road, m_line)
+    build_highway(m_road, m_gravel, m_line)
+    build_roundabout(m_road, m_near, m_kerb, m_line)
     build_markings(m_line)
     build_kerbs(m_kerb, m_gutter)
     build_yard_edge(m_kerb)
     build_outland(m_grass)
     return m_near
+
+
+ROUNDABOUT_CX = (ROAD_A_X - _EDGE + ROAD_B_X + _EDGE) / 2.0
+ROUNDABOUT_CROWN = 0.05
+
+
+def roundabout_z(x, y):
+    """A cota do pavimento do balao. Cai para fora, como um balao real drena."""
+    r = math.hypot(x - ROUNDABOUT_CX, y - ROUNDABOUT_CY)
+    t = min(1.0, r / max(ROUNDABOUT_RO, 1e-6))
+    return -ROUNDABOUT_CROWN * t * t
+
+
+def in_roundabout(x, y, pad=0.0):
+    return math.hypot(x - ROUNDABOUT_CX, y - ROUNDABOUT_CY) <= ROUNDABOUT_RO + pad
+
+
+def rb_arc_y(x, r=None):
+    """A ordenada do bordo NORTE do disco nesta abscissa, ou None fora dele.
+
+    O bordo norte e onde TUDO o que vem do norte tem de morrer: o asfalto das
+    duas pistas, a canaleta de cada uma delas e a ponta do canteiro. Enquanto
+    cada uma dessas pecas parava numa RECTA (em ROAD_Y0), o que ficava entre a
+    recta e o circulo era o leque — e o leque nao tem guia, entao a metade norte
+    do bordo do balao corria sem meio-fio nenhum. E o "na rotatoria esta
+    faltando uma parte do meio fio", medido: 173 graus de vao contra 187 de
+    guia, ou seja mais de metade do anel.
+    """
+    rr = ROUNDABOUT_RO if r is None else r
+    dx = x - ROUNDABOUT_CX
+    under = rr * rr - dx * dx
+    return ROUNDABOUT_CY + math.sqrt(under) if under > 0.0 else None
+
+
+def rb_rel(a):
+    """O angulo `a` do circulo, medido a partir do NORTE (+y), em [-pi, pi]."""
+    return math.atan2(math.cos(a), math.sin(a))
+
+
+def rb_mouths():
+    """Os vaos do bordo do balao, em `rb_rel`: UM POR PISTA, e nao um so.
+
+    O vao era calculado sobre o CORREDOR INTEIRO — as duas pistas mais o
+    canteiro entre elas —, porque era isso que o leque cobria. Num par de pistas
+    com canteiro central o que entra no balao sao duas bocas de 13 m com uma
+    ilha divisoria entre elas; a ilha e a ponta do proprio canteiro, e e ela que
+    da a guia onde fechar o anel.
+
+    Os limites saem das mesmas constantes que desenham a via: a boca vai da
+    borda do canteiro (ROAD_x -/+ _EDGE, que e o dorso da guia interna) a borda
+    externa do pavimento (ROAD_x -/+ ROAD_W/2). Assim a guia do anel comeca
+    exactamente onde a canaleta longitudinal a vem buscar.
+    """
+    out = []
+    for cx, inner in ((ROAD_B_X, +1.0), (ROAD_A_X, -1.0)):
+        rels = []
+        for xx in (cx + inner * _EDGE, cx - inner * ROAD_W / 2.0):
+            s = (xx - ROUNDABOUT_CX) / ROUNDABOUT_RO
+            rels.append(math.asin(max(-1.0, min(1.0, s))))
+        out.append((min(rels), max(rels)))
+    return out
+
+
+def rb_in_mouth(rel, pad=0.0):
+    for lo, hi in rb_mouths():
+        if lo - pad <= rel <= hi + pad:
+            return True
+    return False
+
+
+def build_roundabout(m_road, m_near, m_kerb, m_line):
+    """O retorno no fim da via interna.
+
+    TRES SUPERFICIES, E A ORDEM ENTRE ELAS E O DESENHO INTEIRO. A tentacao e
+    fazer a pista circulatoria como um ANEL e encostar as duas pistas nele; o
+    encontro de um retangulo com um anel nao fecha sem recortar o retangulo, e
+    recortar geometria de grade e onde este arquivo ja se queimou (ver o
+    median_gap_liner, que existe porque quatro superficies "encostavam"). Aqui:
+
+      1. o pavimento e um DISCO CHEIO, nao um anel. Nada tem de encostar em nada
+         no meio dele.
+      2. a ilha central e GRAMA POR CIMA do disco, retida por guia — que e
+         exatamente a relacao que o canteiro ja tem com a pista, e portanto uma
+         relacao ja provada nesta cena em vez de uma nova.
+      3. entre a ponta reta das pistas e o arco do disco vai um LEQUE: uma
+         superficie regrada de uma borda a outra. E o que uma aproximacao de
+         balao e na vida real — a pista abre em leque ao chegar —, e como as
+         duas bordas sao dadas, ela nao pode abrir fresta contra nenhuma.
+
+    UM LEQUE POR PISTA, E NAO UM SO PELO CORREDOR INTEIRO — e esta e a correcao
+    de 2026-08-10. O leque unico dizia, em geometria, que as duas pistas se
+    fundem antes de entrar; a consequencia era que o bordo NORTE do balao,
+    173 graus dele, nao tinha onde ter guia — o asfalto ia de um flanco ao outro
+    e morria contra a laje numa aresta nua. Era "na rotatoria esta faltando uma
+    parte do meio fio", e era mais de metade do anel.
+
+    Um par de pistas com canteiro central entra num balao por DUAS bocas, com a
+    ponta do canteiro entre elas. Entao: um leque por pista, a ilha divisoria e
+    a ponta do proprio canteiro (build_ground, `nose_s`), e a guia do anel abre
+    so nas duas bocas (rb_mouths) em vez de em todo o norte.
+    """
+    seg = 96
+
+    # ---- 1. o disco -------------------------------------------------------
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    hub = bm.verts.new((ROUNDABOUT_CX, ROUNDABOUT_CY,
+                        roundabout_z(ROUNDABOUT_CX, ROUNDABOUT_CY)))
+    rings = []
+    # Aneis concentricos ate ao bordo: um leque de triangulos a partir do centro
+    # daria celulas de 21 m na borda, e o COLOR_0 do chao e limitado em banda
+    # pela celula da malha (ver paint_variation) — uma celula de 21 m nao carrega
+    # variacao nenhuma.
+    steps = 7
+    for k in range(1, steps + 1):
+        r = ROUNDABOUT_RO * k / float(steps)
+        ring = []
+        for i in range(seg):
+            a = 2.0 * math.pi * i / seg
+            x = ROUNDABOUT_CX + r * math.cos(a)
+            y = ROUNDABOUT_CY + r * math.sin(a)
+            ring.append(bm.verts.new((x, y, roundabout_z(x, y))))
+        rings.append(ring)
+    for i in range(seg):
+        j = (i + 1) % seg
+        bm.faces.new((hub, rings[0][i], rings[0][j]))
+    for k in range(steps - 1):
+        for i in range(seg):
+            j = (i + 1) % seg
+            bm.faces.new((rings[k][i], rings[k + 1][i], rings[k + 1][j], rings[k][j]))
+    for f in bm.faces:
+        for l in f.loops:
+            l[uv].uv = (l.vert.co.x / 8.0, l.vert.co.y / 8.0)
+    me = bpy.data.meshes.new("rb_pave")
+    ob = bpy.data.objects.new("rb_pave", me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(m_road)
+    paint_variation(ob, seed=12.3)
+
+    # ---- 2. o leque de aproximacao, UM POR PISTA -------------------------
+    #
+    # As abscissas de cada leque sao as da PISTA, e nao as do corredor: entre as
+    # duas fica a ponta do canteiro (a ilha divisoria), que e grama e nao
+    # asfalto. Ver o docstring.
+    cols = 24
+    rows = 6
+    for ai, (ax0, ax1) in enumerate(((ROAD_B_X - ROAD_W / 2.0,
+                                      ROAD_B_X + ROAD_W / 2.0),
+                                     (ROAD_A_X - ROAD_W / 2.0,
+                                      ROAD_A_X + ROAD_W / 2.0))):
+        bm = bmesh.new()
+        uv = bm.loops.layers.uv.new("UVMap")
+        grid = []
+        for c in range(cols + 1):
+            x = ax0 + (ax1 - ax0) * c / float(cols)
+            # y do arco nesta abscissa. Fora do disco em x, cai para o proprio
+            # ROAD_Y0 e a coluna do leque tem comprimento zero — o que e o
+            # comportamento certo nas duas pontas.
+            arc = rb_arc_y(x)
+            y_arc = arc if arc is not None else ROAD_Y0
+            col = []
+            for r in range(rows + 1):
+                t = r / float(rows)
+                y = ROAD_Y0 + (y_arc - ROAD_Y0) * t
+                # A COTA INTERPOLA ENTRE AS DUAS SUPERFICIES QUE ELE LIGA. A
+                # pista e abaulada em torno do proprio eixo e o balao cai para
+                # fora; assentar o leque numa das duas leis deixaria um degrau
+                # de ate 5,5 cm na outra ponta, que e a altura de uma sarjeta.
+                cx = road_cx(x)
+                z_road = road_z(x, cx) if cx is not None else -ROAD_CROWN
+                z = z_road + (roundabout_z(x, y) - z_road) * t
+                col.append(bm.verts.new((x, y, z)))
+            grid.append(col)
+        for c in range(cols):
+            for r in range(rows):
+                a, b = grid[c][r], grid[c][r + 1]
+                d, e = grid[c + 1][r], grid[c + 1][r + 1]
+                if (a.co - b.co).length < 1e-5 and (d.co - e.co).length < 1e-5:
+                    continue
+                bm.faces.new((a, b, e, d))
+        for f in bm.faces:
+            for l in f.loops:
+                l[uv].uv = (l.vert.co.x / 8.0, l.vert.co.y / 8.0)
+        me = bpy.data.meshes.new("rb_apron_%d" % ai)
+        ob = bpy.data.objects.new("rb_apron_%d" % ai, me)
+        bpy.context.collection.objects.link(ob)
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(m_road)
+        paint_variation(ob, seed=12.9 + ai * 0.6)
+
+    # ---- 3. a ilha central: grama por cima, retida por guia ---------------
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    isl_z = median_z(ROUNDABOUT_CX, ROUNDABOUT_CY)
+    hub = bm.verts.new((ROUNDABOUT_CX, ROUNDABOUT_CY, isl_z))
+    prev = None
+    for k in range(1, 4):
+        r = ROUNDABOUT_RI * k / 3.0
+        ring = []
+        for i in range(seg):
+            a = 2.0 * math.pi * i / seg
+            x = ROUNDABOUT_CX + r * math.cos(a)
+            y = ROUNDABOUT_CY + r * math.sin(a)
+            ring.append(bm.verts.new((x, y, median_z(x, y))))
+        if prev is None:
+            for i in range(seg):
+                bm.faces.new((hub, ring[i], ring[(i + 1) % seg]))
+        else:
+            for i in range(seg):
+                j = (i + 1) % seg
+                bm.faces.new((prev[i], ring[i], ring[j], prev[j]))
+        prev = ring
+    for f in bm.faces:
+        for l in f.loops:
+            l[uv].uv = (l.vert.co.x / 8.0, l.vert.co.y / 8.0)
+    me = bpy.data.meshes.new("rb_island")
+    ob = bpy.data.objects.new("rb_island", me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(m_near)
+    paint_variation(ob, seed=13.4)
+
+    # ---- a guia da ilha, em pedras, como todas as outras do sitio ---------
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    n_stone = max(24, int(2.0 * math.pi * ROUNDABOUT_RI / KERB_SEG))
+    for i in range(n_stone):
+        a0 = 2.0 * math.pi * i / n_stone
+        a1 = 2.0 * math.pi * (i + 1) / n_stone - 0.012      # a junta
+        pts = []
+        for a in (a0, a1):
+            ca, sa = math.cos(a), math.sin(a)
+            back = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RI) * ca,
+                           ROUNDABOUT_CY + (ROUNDABOUT_RI) * sa, 0.0))
+            front = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RI + KERB_W) * ca,
+                            ROUNDABOUT_CY + (ROUNDABOUT_RI + KERB_W) * sa, 0.0))
+            top = median_z(back.x, back.y) + KERB_REVEAL
+            low = roundabout_z(front.x, front.y) - 0.02
+            pts.append((back, front, top, low))
+        (b0, f0, t0, l0), (b1, f1, t1, l1) = pts
+        vs = [bm.verts.new((b0.x, b0.y, t0)), bm.verts.new((f0.x, f0.y, t0)),
+              bm.verts.new((f0.x, f0.y, l0)), bm.verts.new((b1.x, b1.y, t1)),
+              bm.verts.new((f1.x, f1.y, t1)), bm.verts.new((f1.x, f1.y, l1))]
+        f_top = bm.faces.new((vs[0], vs[1], vs[4], vs[3]))   # dorso
+        f_face = bm.faces.new((vs[1], vs[2], vs[5], vs[4]))  # face vista
+        s0 = ROUNDABOUT_RI * a0
+        s1 = ROUNDABOUT_RI * a1
+        # As faces sao guardadas na hora em que nascem. `bm.faces[-1]` exige a
+        # tabela de indices actualizada e levanta "outdated internal index
+        # table" — e reconstruir a tabela por pedra num anel de 68 seria pagar
+        # por uma referencia que ja se tem.
+        for f, coords in ((f_top, ((s0, 0.0), (s0, KERB_W),
+                                   (s1, KERB_W), (s1, 0.0))),
+                          (f_face, ((s0, 0.0), (s0, 0.14),
+                                    (s1, 0.14), (s1, 0.0)))):
+            for l, c in zip(f.loops, coords):
+                l[uv].uv = c
+    # ---- E A GUIA DE FORA, que faltava ------------------------------------
+    #
+    # "na rotatoria voce colocou os meio fios, mas na parte do patio nao e ficou
+    # muito rigido a curva". As duas queixas sao a mesma: sem guia, o asfalto do
+    # balao morria contra a laje numa aresta nua de 135 lados, e uma aresta nua e
+    # sempre o que le como poligono. Uma guia dá borda a curva — e e tambem o que
+    # ha em obra, porque e ela que retem a laje 12 cm acima da pista.
+    #
+    # A fiada abre onde o leque entra: ali a pista continua, e por-lhe guia
+    # atravessada seria fechar a propria entrada do balao.
+    #
+    # DOIS VAOS, UM POR PISTA — era UM, pelo corredor inteiro, e por isso 173
+    # dos 360 graus do anel nao tinham guia. Ver rb_mouths: os limites saem das
+    # bordas de cada pista, entao mexer na largura da via continua a abrir a
+    # guia certa, e o trecho ENTRE as duas bocas (a frente da ilha divisoria)
+    # passa a ser fiada como qualquer outro pedaco do anel.
+    n_out = max(48, int(2.0 * math.pi * ROUNDABOUT_RO / KERB_SEG))
+    for i in range(n_out):
+        a0 = 2.0 * math.pi * i / n_out
+        a1 = 2.0 * math.pi * (i + 1) / n_out - 0.010
+        am = (a0 + a1) / 2.0
+        if rb_in_mouth(rb_rel(am)):
+            continue
+        pts = []
+        for a in (a0, a1):
+            ca, sa = math.cos(a), math.sin(a)
+            front = Vector((ROUNDABOUT_CX + ROUNDABOUT_RO * ca,
+                            ROUNDABOUT_CY + ROUNDABOUT_RO * sa, 0.0))
+            back = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RO + KERB_W) * ca,
+                           ROUNDABOUT_CY + (ROUNDABOUT_RO + KERB_W) * sa, 0.0))
+            # O QUE ESTA PEDRA RETEM DEPENDE DE ONDE ELA ESTA. Em quase todo o
+            # anel e a laje; na frente da ilha divisoria e o CANTEIRO, que corre
+            # 5 cm mais alto e com outro relevo. Ler a laje ali poria o dorso
+            # abaixo da grama que ele contem — a guia desaparecia exactamente no
+            # trecho que esta correcao existe para acrescentar.
+            top = (median_z(back.x, back.y)
+                   if ROAD_B_X + _EDGE <= back.x <= ROAD_A_X - _EDGE
+                   and back.y > ROUNDABOUT_CY
+                   else yard_surface(back.x, back.y)) + KERB_REVEAL
+            low = roundabout_z(front.x, front.y) - 0.02
+            pts.append((back, front, top, low))
+        (b0, f0, t0, l0), (b1, f1, t1, l1) = pts
+        vs = [bm.verts.new((b0.x, b0.y, t0)), bm.verts.new((f0.x, f0.y, t0)),
+              bm.verts.new((f0.x, f0.y, l0)), bm.verts.new((b1.x, b1.y, t1)),
+              bm.verts.new((f1.x, f1.y, t1)), bm.verts.new((f1.x, f1.y, l1))]
+        f_top = bm.faces.new((vs[0], vs[1], vs[4], vs[3]))
+        f_face = bm.faces.new((vs[1], vs[2], vs[5], vs[4]))
+        s0, s1 = ROUNDABOUT_RO * a0, ROUNDABOUT_RO * a1
+        for f, coords in ((f_top, ((s0, 0.0), (s0, KERB_W), (s1, KERB_W), (s1, 0.0))),
+                          (f_face, ((s0, 0.0), (s0, 0.14), (s1, 0.14), (s1, 0.0)))):
+            for l, c in zip(f.loops, coords):
+                l[uv].uv = c
+
+    me = bpy.data.meshes.new("rb_kerb")
+    ob = bpy.data.objects.new("rb_kerb", me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(m_kerb)
+
+    # ---- a marcacao: DUAS voltas, e as duas CIRCULAM ----------------------
+    #
+    # "a faixa deveria ser circulando a rotatoria, nao no meio da rua". Havia
+    # uma volta so, encostada a ilha, e a 100 m ela le como um anel solto no
+    # meio de um descampado de asfalto: nada marcava a BORDA da pista
+    # circulatoria, que e a linha que da forma ao retorno visto de longe.
+    #
+    # Uma rotatoria tem as duas. A INTERNA e continua — a ilha nunca e cortada.
+    # A EXTERNA acompanha o bordo do pavimento e ABRE nas entradas, pelos mesmos
+    # dois arcos que abrem a guia externa (rb_mouths), para nao dizer "nao entre"
+    # exatamente onde entrar e o proposito.
+    marks = []
+    for r_line, skip_entry in ((ROUNDABOUT_RI + KERB_W + 0.55, False),
+                               (ROUNDABOUT_RO - 0.45, True)):
+        n_arc = max(72, int(2.0 * math.pi * r_line / 1.1))
+        for i in range(n_arc):
+            a0 = 2.0 * math.pi * i / n_arc
+            a1 = 2.0 * math.pi * (i + 1) / n_arc
+            am = (a0 + a1) / 2.0
+            if skip_entry and rb_in_mouth(rb_rel(am)):
+                continue
+            x = ROUNDABOUT_CX + r_line * math.cos(am)
+            y = ROUNDABOUT_CY + r_line * math.sin(am)
+            ln = r_line * (a1 - a0) * 1.06
+            h = 0.35 + 0.65 * fbm(x / 30.0, y / 30.0, 977, 3)
+            marks.append((x, y, 0.12, ln, math.degrees(am), h))
+    # ---- AS FAIXAS DA APROXIMACAO, que faltavam --------------------------
+    #
+    # "alem de tambem estar faltando as faixas da rua". As marcacoes das pistas
+    # param em ROAD_Y0 (onde o pavimento delas acaba) e dai para o balao ficavam
+    # 23 m de asfalto sem uma linha — justamente o troco em que o condutor tem
+    # de saber onde e a sua faixa. Sao tres coisas, todas sobre o leque:
+    #   * a linha de bordo de cada pista, prolongada ate ao arco;
+    #   * o eixo tracejado a morrer 6 m antes (num balao as faixas fundem-se);
+    #   * a linha de RETENCAO na entrada, em arco, que e o "de a preferencia".
+    for cx in (ROAD_A_X, ROAD_B_X):
+        for sx in (-ROAD_W / 2 + 0.42, ROAD_W / 2 - 0.42):
+            x = cx + sx
+            dx = x - ROUNDABOUT_CX
+            under = ROUNDABOUT_RO * ROUNDABOUT_RO - dx * dx
+            y_arc = ROUNDABOUT_CY + math.sqrt(under) if under > 0 else ROAD_Y0
+            y = y_arc + 0.6
+            while y < ROAD_Y0 + 0.4:
+                seg = min(4.0, ROAD_Y0 + 0.4 - y)
+                if seg < 0.4:
+                    break
+                h = 0.35 + 0.65 * fbm(x / 30.0, y / 30.0, 977, 3)
+                marks.append((x, y + seg / 2.0, 0.14, seg, 0.0, h))
+                y += seg
+        # eixo tracejado ate 6 m do arco
+        under = ROUNDABOUT_RO * ROUNDABOUT_RO - (cx - ROUNDABOUT_CX) ** 2
+        y_arc = ROUNDABOUT_CY + math.sqrt(under) if under > 0 else ROAD_Y0
+        _dashes(cx, marks, y_arc + 6.0, ROAD_Y0 + 0.4)
+
+    if marks:
+        add_marks("rb_markings", m_line, marks, seg_len=0.8, dz=0.012,
+                  z_fn=lambda x, y: (roundabout_z(x, y) if in_roundabout(x, y)
+                                     else road_z(x, road_cx(x) or 0.0)))
+    _mo = rb_mouths()
+    log("  balao: r %.1f m (ilha %.1f, circulatoria %.1f), 2 bocas de %.0f m, "
+        "guia aberta em %.0f de 360 graus, %d pedras na ilha"
+        % (ROUNDABOUT_RO, ROUNDABOUT_RI, ROUNDABOUT_W, ROAD_W,
+           math.degrees(sum(hi - lo for lo, hi in _mo)), n_stone))
+
+
+def build_highway(m_road, m_gravel, m_line):
+    """A rodovia que cruza a saida da planta.
+
+    ELA E A UNICA COISA NA CENA QUE PODE CORRER ATE A BRUMA, e e por isso que ela
+    existe: a via interna deixou de o fazer (ver ROAD_Y0/ROAD_Y1) e alguma coisa
+    tem de explicar para onde vai um caminhao que sai pelo portao. Uma rodovia
+    que se perde no horizonte nao le como defeito — le como rodovia.
+
+    Corre a GROUND inteira em x, 86 m ao norte da cerca, com acostamento de brita
+    dos dois lados e eixo tracejado. O pavimento e abaulado em torno do proprio
+    eixo, pela mesma road_z das outras pistas, so que no eixo transposto.
+    """
+    half = HIGHWAY_W / 2.0
+
+    def hz(x, y):
+        t = min(1.0, abs(y - HIGHWAY_Y) / half)
+        return -ROAD_CROWN * t * t
+
+    r = add_grid("highway", GROUND, HIGHWAY_W, m_road, cx=0.0, cy=HIGHWAY_Y,
+                 cuts=150, cuts_y=10, uv_scale=8.0, z_fn=hz)
+    paint_variation(r, seed=14.2, road_wear=True, cx=0.0)
+
+    # Acostamento de brita, e ele TALUDA ATE O CAMPO em vez de acabar em degrau.
+    #
+    # O bordo do pavimento esta a ~-9,5 cm e o campo a -28 cm e caindo: uma
+    # faixa plana de brita deixa um degrau de ~19 cm correndo 1,2 km ao lado da
+    # rodovia, que a 200 m le como uma fita clara com sombra propria. Alargado
+    # para 5 m e interpolando de uma cota a outra, o mesmo material passa a ser
+    # o talude que uma estrada rural tem de facto.
+    for sy in (-1.0, 1.0):
+        w = HIGHWAY_SHOULDER
+        cy = HIGHWAY_Y + sy * (half + w / 2.0)
+        y_in = HIGHWAY_Y + sy * half
+
+        def _sz(x, y, _sy=sy, _yin=y_in, _w=w):
+            t = min(1.0, max(0.0, abs(y - _yin) / _w))
+            t = t * t * (3.0 - 2.0 * t)
+            return (-ROAD_CROWN - 0.04) + (outland_z(x, y) - 0.06
+                                           - (-ROAD_CROWN - 0.04)) * t
+
+        s = add_grid("hw_shoulder_%s" % ("n" if sy > 0 else "s"),
+                     GROUND, w, m_gravel, cx=0.0, cy=cy,
+                     cuts=120, cuts_y=4, uv_scale=64.0, z_fn=_sz)
+        paint_variation(s, seed=14.6 + sy)
+
+    # ---- a garganta: o corredor inteiro em asfalto na aproximacao ---------
+    #
+    # Entre o nariz do canteiro e a rodovia nao ha canteiro, ha pavimento. Este
+    # e o mesmo papel do `median_gap_liner` nas transversais e do `rb_apron` no
+    # balao: sob o vao do canteiro tem de haver uma superficie de pleno direito,
+    # senao cada fresta entre pista, sarjeta e grama mostra o que estiver por
+    # baixo — aqui, a brita do campo 63 cm abaixo.
+    tx0 = ROAD_B_X - ROAD_W / 2.0 - 0.4
+    tx1 = ROAD_A_X + ROAD_W / 2.0 + 0.4
+    ty0 = ROAD_Y1 - MEDIAN_THROAT - MEDIAN_GAP_R - 0.4
+    th = add_grid("hw_throat", tx1 - tx0, ROAD_Y1 - ty0, m_road,
+                  cx=(tx0 + tx1) / 2.0, cy=(ty0 + ROAD_Y1) / 2.0,
+                  cuts=16, cuts_y=8, uv_scale=8.0,
+                  z_fn=lambda x, y: min(road_z(x, road_cx(x)) if road_cx(x) is not None
+                                        else -ROAD_CROWN,
+                                        median_z(x, y)) - 0.05)
+    paint_variation(th, seed=15.4)
+
+    marks = []
+    # eixo tracejado, com o vao aberto onde as duas pistas internas chegam
+    y = HIGHWAY_Y
+    x = -GROUND / 2.0
+    while x < GROUND / 2.0:
+        ln = 4.0
+        gap = 8.0
+        near_junction = any(abs(x - cx) < ROAD_W * 0.9 for cx in (ROAD_A_X, ROAD_B_X))
+        if not near_junction:
+            h = 0.35 + 0.65 * fbm(x / 30.0, y / 30.0, 977, 3)
+            marks.append((x + ln / 2.0, y, ln, 0.16, 0.0, h))
+        x += ln + gap
+    # linhas de bordo continuas, abertas nas duas bocas
+    for sy in (-1.0, 1.0):
+        ey = HIGHWAY_Y + sy * (half - 0.42)
+        x = -GROUND / 2.0
+        while x < GROUND / 2.0:
+            seg = 20.0
+            xm = x + seg / 2.0
+            # so o lado sul e cortado: e por ele que a via interna entra
+            if sy < 0 and any(abs(xm - cx) < ROAD_W * 0.85
+                              for cx in (ROAD_A_X, ROAD_B_X)):
+                x += seg
+                continue
+            h = 0.35 + 0.65 * fbm(xm / 30.0, ey / 30.0, 977, 3)
+            marks.append((xm, ey, seg, 0.14, 0.0, h))
+            x += seg
+    # e a barra de PARE de cada pista interna, no bordo da rodovia
+    for cx in (ROAD_A_X, ROAD_B_X):
+        marks.append((cx, ROAD_Y1 - 1.2, ROAD_W - 0.9, 0.42, 0.0, 0.9))
+    add_marks("hw_markings", m_line, marks, seg_len=1.0, dz=0.012,
+              z_fn=lambda x, y: hz(x, y) if abs(y - HIGHWAY_Y) <= half
+              else road_z(x, road_cx(x) or 0.0))
+    log("  rodovia: %.0f m em y=%.0f, %d marcacoes" % (GROUND, HIGHWAY_Y, len(marks)))
 
 
 def build_outland(m_grass):
@@ -2740,6 +3597,158 @@ def build_outland(m_grass):
                       z_fn=outland_z)
         paint_variation(ob, seed=5.7)
     log("  outland: 4 bands, soft relief ramping in past the fence")
+    build_farmland()
+
+
+# ---------------------------------------------------------------------------
+# A LAVOURA — o que estava fora da cerca e por que quatro planos verdes nao
+# resolviam o horizonte.
+#
+# O relato e "o blur comeca muito cedo e fica muito falso". A bruma nao comecava
+# cedo: ela comeca em r=570 m e o chao vai a 590, exatamente como foi desenhado.
+# O que comecava cedo era a INFORMACAO. Passada a cerca havia 440 m de um unico
+# plano de grama com um campo de ruido por cima — nenhuma borda, nenhuma
+# estrutura, nada com tamanho conhecido. Um plano sem escala nao le como
+# distancia; le como neblina que comecou. Por isso qualquer valor de `haze`
+# parecia errado: nao havia nada por tras dela para ser revelado.
+#
+# O que da profundidade a um campo aberto real e a PARCELA. Talhoes de tamanhos
+# diferentes, cada um com a sua cultura, o seu tom e a SUA DIRECAO DE PLANTIO,
+# separados por carreadores. As linhas de plantio de um talhao convergem para o
+# ponto de fuga dele e nao para o do vizinho, e e essa discordancia entre vizinhos
+# que o olho le como quilometros. Custa uma malha e nenhuma textura nova.
+#
+# NADA AQUI E INSTANCIADO, e isso e uma medicao e nao uma economia: a orbita para
+# em ~31 m e a lavoura comeca a 150 m, entao nenhuma planta desta area chega a
+# ter 2 px de altura. Geometria por pe de soja seria orcamento gasto onde nem o
+# mipmap chega. O que se ve a 150-590 m e tom, borda e direcao de linha — e as
+# tres cabem no COLOR_0.
+# ---------------------------------------------------------------------------
+# (tom base, forca da listra de plantio, passo da linha em metros)
+CROPS = [
+    ((0.30, 0.42, 0.16), 0.16, 1.9),     # soja fechada, verde escuro
+    ((0.44, 0.52, 0.21), 0.20, 1.7),     # soja mais clara
+    ((0.58, 0.58, 0.28), 0.22, 2.2),     # soja secando, amarelando
+    ((0.62, 0.55, 0.36), 0.15, 3.0),     # palhada / restolho
+    ((0.46, 0.38, 0.28), 0.26, 2.6),     # solo preparado, linha de grade forte
+    ((0.36, 0.46, 0.22), 0.12, 2.0),     # pasto, quase sem linha
+]
+
+
+def _outland_free(x, y, pad=0.0):
+    """Ha lavoura em (x, y)? Nao dentro da cerca, nem sob a rodovia, nem sob a
+    faixa que liga o portao a ela."""
+    if max(abs(x), abs(y)) <= YARD_HALF + pad:
+        return False
+    if abs(y - HIGHWAY_Y) <= HIGHWAY_W / 2.0 + HIGHWAY_SHOULDER + pad + 1.0:
+        return False
+    if YARD_HALF <= y <= ROAD_Y1 + pad:
+        for cx in (ROAD_A_X, ROAD_B_X):
+            if abs(x - cx) <= ROAD_W / 2.0 + 2.0 + pad:
+                return False
+    return True
+
+
+def build_farmland():
+    m_crop = mat("CROP_FIELD", (0.38, 0.44, 0.20, 1), 0.95)
+    lim = GROUND / 2.0 - 6.0
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    col = bm.loops.layers.float_color.new("Col")
+
+    n_parcel = 0
+    # Grade IRREGULAR: as linhas da grade sao sorteadas em vez de uniformes, e
+    # depois cada talhao ainda recua as suas bordas. Uma grade regular de 440 m
+    # de campo aberto le como um tabuleiro, que e o defeito oposto ao que isto
+    # veio resolver.
+    def _lines(a, b, lo, hi, s):
+        out, t = [a], a
+        i = 0
+        while t < b:
+            t += lo + (hi - lo) * _hash01(i, s, 733)
+            i += 1
+            out.append(min(t, b))
+        return out
+
+    xs = _lines(-lim, lim, 95.0, 210.0, 11)
+    ys = _lines(-lim, lim, 95.0, 210.0, 23)
+
+    for iy in range(len(ys) - 1):
+        for ix in range(len(xs) - 1):
+            x0, x1 = xs[ix], xs[ix + 1]
+            y0, y1 = ys[iy], ys[iy + 1]
+            # o carreador entre talhoes: 3 a 7 m de borda que nao e plantada
+            m = 3.0 + 4.0 * _hash01(ix, iy, 337)
+            x0, x1, y0, y1 = x0 + m, x1 - m, y0 + m, y1 - m
+            if x1 - x0 < 25.0 or y1 - y0 < 25.0:
+                continue
+            # O talhao inteiro tem de estar livre. Testar so o centro deixava
+            # meio talhao por cima da rodovia.
+            if not all(_outland_free(px, py, 2.0)
+                       for px in (x0, (x0 + x1) / 2.0, x1)
+                       for py in (y0, (y0 + y1) / 2.0, y1)):
+                continue
+            k = int(_hash01(ix, iy, 401) * len(CROPS)) % len(CROPS)
+            tint, stripe, pitch = CROPS[k]
+            ang = math.radians(_hash01(ix, iy, 419) * 180.0)
+            ca, sa = math.cos(ang), math.sin(ang)
+            # ~14 m por celula: fino o bastante para o talhao acompanhar o
+            # relevo do outland_z (que chega a +/-1,5 m) e grosso o bastante
+            # para 40 talhoes nao custarem uma malha de cidade.
+            nx = max(2, int((x1 - x0) / 14.0))
+            ny = max(2, int((y1 - y0) / 14.0))
+            grid = []
+            for j in range(ny + 1):
+                row = []
+                for i in range(nx + 1):
+                    x = x0 + (x1 - x0) * i / nx
+                    y = y0 + (y1 - y0) * j / ny
+                    row.append(bm.verts.new((x, y, outland_z(x, y) + 0.02)))
+                grid.append(row)
+            for j in range(ny):
+                for i in range(nx):
+                    f = bm.faces.new((grid[j][i], grid[j][i + 1],
+                                      grid[j + 1][i + 1], grid[j + 1][i]))
+                    for l in f.loops:
+                        p = l.vert.co
+                        l[uv].uv = (p.x / 64.0, p.y / 64.0)
+                        # A LISTRA E A LINHA DE PLANTIO, projetada no eixo do
+                        # talhao. Uma onda de periodo `pitch` nao sobrevive a uma
+                        # celula de 14 m, e nao precisa: o que se le a 200 m e o
+                        # BATIMENTO dela contra o relevo, mais a mudanca de
+                        # direcao de um talhao para o outro. O termo de baixa
+                        # frequencia e que carrega a leitura.
+                        s = p.x * ca + p.y * sa
+                        row_hi = 0.5 + 0.5 * math.sin(s * (2.0 * math.pi / pitch))
+                        row_lo = 0.5 + 0.5 * math.sin(s * (2.0 * math.pi / 21.0))
+                        v = 1.0 + stripe * (row_lo - 0.5) * 2.0 \
+                            + stripe * 0.35 * (row_hi - 0.5) * 2.0
+                        # e a irregularidade do proprio talhao: falha de plantio,
+                        # baixada mais verde, cabeceira mais rala
+                        v *= 0.86 + 0.28 * fbm(p.x / 55.0, p.y / 55.0, 613, 3)
+                        l[col] = (tint[0] * v, tint[1] * v, tint[2] * v, 1.0)
+            n_parcel += 1
+
+    me = bpy.data.meshes.new("farmland")
+    ob = bpy.data.objects.new("farmland", me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(m_crop)
+    # A CAMADA TEM DE FICAR ACTIVA, senao nada disto chega ao .glb. Mesmo
+    # armadilha que paint_variation documenta: o exportador grava a camada de cor
+    # ACTIVA, e uma acabada de criar nao e activa por si. Aqui o COLOR_0 nao e
+    # variacao — e a propria cultura de cada talhao —, entao perde-lo nao daria
+    # um campo mais chapado, daria um campo BRANCO.
+    try:
+        attr = me.color_attributes.get("Col")
+        if attr is not None:
+            me.color_attributes.active_color = attr
+            me.color_attributes.render_color_index = me.color_attributes.find("Col")
+    except Exception as e:
+        log("    lavoura: nao consegui activar o COLOR_0 (%s)" % e)
+    log("  lavoura: %d talhoes de %d culturas, %d faces"
+        % (n_parcel, len(CROPS), len(me.polygons)))
 
 
 # ---------------------------------------------------------------------------
@@ -2857,10 +3866,12 @@ def build_fence(m_kerb):
                 x, y, ax, ay = YARD_HALF, t, 0.0, 1.0
             else:
                 x, y, ax, ay = -YARD_HALF, t, 0.0, 1.0
-            # Gates where each carriageway crosses the line. Only the north and
-            # south runs are crossed; the east and west runs are continuous.
-            if side in (0, 1) and (abs(t - ROAD_A_X) < ROAD_W * 0.75
-                                   or abs(t - ROAD_B_X) < ROAD_W * 0.75):
+            # Gates where each carriageway crosses the line. SO O LADO NORTE:
+            # desde que a via interna termina no balao (ver ROAD_Y0), nada
+            # atravessa a divisa sul, e um vao de 20 m no arame por onde nao
+            # passa rua nenhuma e simplesmente um buraco na cerca.
+            if side == 0 and (abs(t - ROAD_A_X) < ROAD_W * 0.75
+                              or abs(t - ROAD_B_X) < ROAD_W * 0.75):
                 continue
             base = grass_z(x, y)
             a = Vector((x - ax * FENCE_PITCH / 2, y - ay * FENCE_PITCH / 2, base))
@@ -2919,8 +3930,16 @@ def build_fence(m_kerb):
         n = int((YARD_HALF * 2) / step)
         for i in range(n):
             t = -YARD_HALF + (i + 0.5) * step
-            if side in (0, 1) and (abs(t - ROAD_A_X) < ROAD_W * 0.75
-                                   or abs(t - ROAD_B_X) < ROAD_W * 0.75):
+            # SO O LADO NORTE ABRE, e este `continue` tinha ficado para tras.
+            #
+            # build_fence ja passou a fechar a divisa sul (a via interna termina
+            # no balao), mas o rodape continuou a saltar os dois lados: onde a
+            # cerca voltou a existir, ela ficava assente em coisa nenhuma e o
+            # arame descia direto na turfa. E exatamente o "precisa do rodape
+            # onde era uma cerca aberta". O teste tem de ser o MESMO dos dois
+            # lacos, senao volta a divergir.
+            if side == 0 and (abs(t - ROAD_A_X) < ROAD_W * 0.75
+                              or abs(t - ROAD_B_X) < ROAD_W * 0.75):
                 continue
             if side == 0:
                 cx, cy, w, d = t, YARD_HALF, step, 0.26
@@ -2968,7 +3987,10 @@ def build_gates(wire, post):
     n = 0
     for cx in (ROAD_A_X, ROAD_B_X):
         half = ROAD_W * 0.75
-        for sy in (1.0, -1.0):
+        # UM PORTAO SO, e ele e o do norte. Ver a nota gemea em build_fence: a
+        # divisa sul deixou de ser atravessada, entao um portao la seria um
+        # portao para lado nenhum.
+        for sy in (1.0,):
             y = sy * YARD_HALF
             base = grass_z(cx, y)
             # ---- gate posts: heavier and taller than a fence post ---------
@@ -2977,9 +3999,21 @@ def build_gates(wire, post):
                 _tube(bm, Vector((px, y, base - 0.5)),
                       Vector((px, y, base + FENCE_H + 0.75)), 0.13, 8, 1)
             # ---- the leaf, parked open along the fence line ---------------
-            leaf_w = half * 1.05
-            x0 = cx + half + 0.55
-            x1 = x0 + leaf_w
+            #
+            # ELA RECOLHE PARA FORA, E ISSO ERA UM BUG MEDIDO. `x0 = cx + half`
+            # mandava as DUAS folhas para leste. Na pista A isso e o lado de fora
+            # e esta certo; na pista B o lado de fora e OESTE, e a folha ia parar
+            # em x -11,19..-0,95 — ou seja atravessava o canteiro inteiro
+            # (-14,37..-3,87) e ainda entrava na pista A (que comeca em -3,25).
+            # E a "grade que esta ultrapassando a rua".
+            #
+            # E ELA COBRE A ABERTURA. Tinha `half * 1.05` = 10,2 m para um vao de
+            # 19,5 m: uma folha que, fechada, deixaria metade do portao aberto —
+            # que e o que se le como "muito pequena" mesmo estando recolhida.
+            out = 1.0 if cx > (ROAD_A_X + ROAD_B_X) / 2.0 else -1.0
+            leaf_w = 2.0 * half * 0.96
+            x_in = cx + out * (half + 0.55)
+            x0, x1 = min(x_in, x_in + out * leaf_w), max(x_in, x_in + out * leaf_w)
             zt = base + FENCE_H - 0.15
             zb = base + 0.22
             # frame: bottom rail (which is what the leaf runs on), top rail,
@@ -3026,6 +4060,22 @@ def build_service_roads(m_road, m_line):
     for x0, x1, y0, y1 in SERVICE_ROADS:
         d = y1 - y0
         for (sx0, sx1) in svc_spans(x0, x1):
+            # A TRANSVERSAL NAO ATRAVESSA MAIS O CANTEIRO, e este e o terceiro e
+            # ultimo sitio do mesmo defeito.
+            #
+            # `svc_spans` parte a transversal nos trechos que nao sao pista: um
+            # a oeste, um a leste, e o do MEIO, que corre dentro do canteiro. Com
+            # o canteiro fechado (ver `breaks`) esse trecho do meio ficou a ser
+            # construido por baixo da grama — asfalto a -3 cm, forro a -8 cm e
+            # grama a +7 cm, portanto invisivel. O que se VE e o que vem com ele:
+            # a guia a +12 cm e a sarjeta, um retangulo de cantos arredondados
+            # pousado no meio do canteiro, que e o "meio fio da divisao que o
+            # canteiro central tinha ainda esta la".
+            #
+            # Medido: svc_03 com 378 vertices, median_gap_liner com 607, gutters
+            # com 96 e kerbs com 312, todos entre x -14,4 e -3,9.
+            if ROAD_B_X + ROAD_W / 2.0 - 0.5 <= sx0 and sx1 <= ROAD_A_X - ROAD_W / 2.0 + 0.5:
+                continue
             # Resolucao em X bem mais fina que o necessario para a cota: quem
             # pede e a CONCORDANCIA abaixo, que so pode ser tao curva quanto o
             # numero de colunas dentro do raio. Em Y sobe para 4 cortes porque a
@@ -3254,6 +4304,33 @@ def build_yard_edge(m_kerb):
 # real dual carriageways for exactly the same reason, so the rule that protects
 # the camera is the rule that makes the median correct.
 # ---------------------------------------------------------------------------
+def plantable(x, y, pad=1.5):
+    """Ha GRAMA em (x, y)? A pergunta que faltava a plantacao.
+
+    `on_paving` sozinho nao chega: ele conhece o corredor viario e a laje, e nao
+    conhece nem o balao (que e um disco, nao um retangulo) nem as vias internas
+    nem a rodovia. Somados, sao as quatro superficies onde apareceu arvore.
+
+    A folga existe porque uma arvore nao e um ponto: a copa tem 2 a 3 m de raio
+    e o tronco tem de ficar longe o suficiente do bordo para a copa nao pairar
+    sobre a pista.
+    """
+    if on_paving(x, y):
+        return False
+    if in_roundabout(x, y, pad):
+        return False
+    if on_service_road(x, y, pad):
+        return False
+    if abs(y - HIGHWAY_Y) <= HIGHWAY_W / 2.0 + HIGHWAY_SHOULDER + pad:
+        return False
+    # o corredor das duas pistas onde ele corre FORA da cerca (portao -> rodovia)
+    if YARD_HALF <= y <= ROAD_Y1 + pad:
+        for cx in (ROAD_A_X, ROAD_B_X):
+            if abs(x - cx) <= ROAD_W / 2.0 + 2.0 + pad:
+                return False
+    return True
+
+
 def plant(m_grass):
     veg = _load("veg")
 
@@ -3361,14 +4438,59 @@ def plant(m_grass):
     # renders perfectly at any distance and is also what a real junction verge
     # looks like — sight lines are kept clear for the same reason the camera
     # needs them clear.
+    # A ALAMEDA VIVE NO CANTEIRO, LOGO TEM OS LIMITES DELE.
+    #
+    # Ela corria de y=-300 a y=+300 de quando o canteiro corria os 1180 m. Com o
+    # canteiro entre ROAD_Y0 e ROAD_Y1, tudo fora disso ficava plantado em chao
+    # nu — e o render f_gate mostrou o resultado exacto: uma arvore de 9 m de pe
+    # NO MEIO DO ASFALTO DA RODOVIA, e outra sobre a pista interna. `surface_z`
+    # devolve uma cota para qualquer (x, y), entao nada nesta funcao tinha como
+    # perceber que ali ja nao havia canteiro por baixo.
+    #
+    # A folga de 14 m nas duas pontas nao e decorativa: ao sul e o leque do
+    # balao, ao norte e a linha de visao de quem espera para entrar na rodovia.
+    # Arvore em nariz de canteiro de entroncamento tapa exactamente o que o
+    # condutor precisa de ver, que e a mesma razao por que a alameda ja se
+    # afastava 78 m do cruzamento junto ao caminhao.
     med_x = (ROAD_A_X - _EDGE + ROAD_B_X + _EDGE) / 2.0
-    y = -300.0
+    MED_TREE_EDGE = 14.0
+    # A ALAMEDA ABRE NA PORTARIA, e a folga sai de onde a guarita ESTA, nao de um
+    # numero escrito aqui.
+    #
+    # A guarita mora no canteiro, entre as duas pistas, e a alameda corre por
+    # cima dela: as duas arvores mais proximas nasciam praticamente na porta,
+    # tapando a cabine e a cancela — que e o unico ponto do cenario onde alguem
+    # tem mesmo de ver. Uma portaria e o oposto de um sitio arborizado; a
+    # visibilidade e a funcao dela.
+    #
+    # A posicao vem da cena porque quem a decide e o `layout.json` do editor: se
+    # a guarita for arrastada, a clareira anda com ela. 16 m e o raio que tira as
+    # duas vizinhas imediatas (a alameda tem passo de 10 a 14 m) e devolve a
+    # fiada logo a seguir.
+    BOOTH_CLEAR = 16.0
+    booths = [o.matrix_world.translation.copy() for o in bpy.data.objects
+              if o.type == "MESH" and is_booth(o)]
+    if booths:
+        log("  alameda: clareira de %.0f m em torno de %d guarita(s)"
+            % (BOOTH_CLEAR, len(booths)))
+
+    def near_booth(x, y):
+        return any(math.hypot(x - b.x, y - b.y) < BOOTH_CLEAR for b in booths)
+
+    y = ROAD_Y0 + MED_TREE_EDGE
     i = 0
-    while y < 300.0:
+    # O TECTO E O FIM DO CANTEIRO, NAO O FIM DA PISTA, e a diferenca sao os 22 m
+    # de garganta: com o limite em ROAD_Y1 as ultimas arvores caiam entre o
+    # nariz do canteiro e a rodovia, isto e em cima do asfalto da garganta. Uma
+    # delas aparece de pe no meio do entroncamento em v_rodovia.png.
+    while y < ROAD_Y1 - MEDIAN_THROAT - MED_TREE_EDGE:
         i += 1
         jx = med_x + (_hash01(int(y), 1, 83) - 0.5) * (MEDIAN_W - 4.0)
         if abs(y) < 78.0:
             y += 12.0
+            continue
+        if near_booth(jx, y):
+            y += 10.0 + 4.0 * _hash01(i, 2, 91)
             continue
         put(trees[i % len(trees)], jx, y, "med_tree_%d" % i, 1.0, on_grass=False)
         n_tree += 1
@@ -3384,16 +4506,57 @@ def plant(m_grass):
     # job. Two staggered rows on a 7-10 m pitch close into a canopy the way a
     # planted screen does, and because every tree is a linked duplicate of one of
     # six meshes, tripling the count costs nodes and no geometry at all.
-    step = 7.0
+    # TRES FIADAS, NAO DUAS, e passo mais curto. O pedido e "mais densidade de
+    # arvores ao redor, na parte interna, onde tem gramado", e a faixa de turfa
+    # entre a laje e o arame tem 17 a 41 m de largura conforme o lado — cabem
+    # tres fiadas com folga. A terceira entra ATRAS das outras duas (mais perto
+    # do arame) para o cinturao ganhar profundidade em vez de so ficar mais
+    # cheio: uma cortina de duas fiadas le como sebe, de tres le como mata.
+    #
+    # O CUSTO CONTINUA A SER ZERO EM GEOMETRIA. Cada arvore e uma duplicata
+    # ligada de uma de seis malhas e sai instanciada por EXT_mesh_gpu_instancing,
+    # entao passar de 259 para ~430 plantas acrescenta nos e matrizes, nao
+    # vertices — que e a mesma conta que justificou passar de uma fiada para duas.
+    # AS FIADAS SAO MEDIDAS CONTRA A FAIXA DE TURFA DE CADA LADO, e nao contra a
+    # cerca — e este era o lado SUL careca.
+    #
+    # As tres fiadas estavam em cotas fixas (139, 130 e 120 m do centro), o que
+    # supunha uma faixa de turfa igual nos quatro lados. Ela nao e: a laje acaba
+    # em y=+103 ao norte e em y=-133 ao SUL, entao ao sul a turfa tem 17 m
+    # enquanto os outros lados tem 41 a 47. As fiadas de 130 e de 120 caiam
+    # inteiras EM CIMA DA LAJE, `plantable` recusava-as, e da terceira fiada
+    # sobrava metade — uma so, e furada. Vista do estudio isso e exactamente o
+    # trecho de fundo por tras do balao, que e para onde a camera olha por cima
+    # do implemento: "nessa area deve ter arvores, nessa parte de grama".
+    #
+    # Agora cada lado le a PROPRIA faixa: do bordo da laje (mais 3 m, que e a
+    # folga da copa contra o betao) ate 4 m aquem do arame. O cinturao continua
+    # a ser uma cortina e nao um bosque porque a faixa usada e limitada a 30 m —
+    # os lados largos mantem as fiadas juntas, perto do arame, que e onde elas
+    # ocluem o horizonte; o lado sul usa os 10 m que tem e ganha as tres.
+    BELT_ROWS = 3
+    BELT_DEPTH = 30.0        # quanto da faixa o cinturao ocupa, no maximo
+    _band_inner = (YARD_Y1, -YARD_Y0, YARD_X1, -YARD_X0)
+
+    def belt_row(side, row):
+        b1 = YARD_HALF - 4.0
+        b0 = max(_band_inner[side] + 3.0, b1 - BELT_DEPTH)
+        w = (b1 - b0) / float(BELT_ROWS)
+        return b1 - (row + 0.5) * w, w
+
+    step = 5.6
     k = 0
-    for row, (ring, phase) in enumerate(((YARD_HALF - 13.0, 0.0),
-                                         (YARD_HALF - 27.0, step * 0.5))):
+    for row, phase in enumerate((0.0, step * 0.5, step * 0.25)):
         for side in range(4):
+            ring, band_w = belt_row(side, row)
             t = -ring + phase
             while t < ring:
                 k += 1
                 jitter = (_hash01(int(t), side * 7 + row, 131) - 0.5) * 7.0
-                depth = ring - 7.0 * _hash01(side, int(t) + row, 151)
+                # O DESVIO EM PROFUNDIDADE E O DA PROPRIA FIADA. Eram 7 m fixos:
+                # numa faixa de 10 m isso atira metade da fiada para fora dela,
+                # ou para cima da laje (recusada) ou para cima do arame.
+                depth = ring + (_hash01(side, int(t) + row, 151) - 0.5) * band_w * 0.7
                 if side == 0:
                     x, y2 = t + jitter, depth
                 elif side == 1:
@@ -3403,18 +4566,37 @@ def plant(m_grass):
                 else:
                     x, y2 = -depth, t + jitter
                 t += step + 3.0 * _hash01(k, side, 171)
-                # keep the gates and both carriageways clear
-                if side in (0, 1) and (abs(x - ROAD_A_X) < 16.0
-                                       or abs(x - ROAD_B_X) < 16.0):
+                # ARVORE SO ONDE HA GRAMA — e a regra e o CHAO, nao a distancia.
+                #
+                # Isto era `abs(x - ROAD_A_X) < 16`, uma faixa de exclusao em
+                # torno das duas pistas. Enquanto a pista atravessava a
+                # propriedade de lado a lado o efeito coincidia com o certo; ao
+                # tirar a exclusao do lado sul (onde ja nao ha saida) o que
+                # apareceu foi arvore de pe NO ASFALTO DO BALAO e no meio do
+                # patio — porque nada nesta funcao perguntava o que havia por
+                # baixo. `grass_z` devolve uma cota para qualquer (x, y), entao
+                # a planta assenta feliz sobre betao.
+                #
+                # `plantable` pergunta ao proprio chao. Mantem o portao livre
+                # como antes, e passa a manter livres tambem o balao, o patio,
+                # as vias internas e a rodovia — sem precisar de saber onde eles
+                # estao.
+                if not plantable(x, y2):
+                    continue
+                if side == 0 and (abs(x - ROAD_A_X) < 16.0
+                                  or abs(x - ROAD_B_X) < 16.0):
                     continue
                 put(trees[k % len(trees)], x, y2, "belt_tree_%d" % k, 1.12)
                 n_tree += 1
                 if _hash01(k, 4, 191) > 0.15:
-                    put(bushes[k % len(bushes)],
-                        x + 5.0 * (_hash01(k, 6, 211) - 0.5) * 2,
-                        y2 + 5.0 * (_hash01(k, 7, 221) - 0.5) * 2,
-                        "belt_bush_%d" % k)
-                    n_bush += 1
+                    bx = x + 5.0 * (_hash01(k, 6, 211) - 0.5) * 2
+                    by = y2 + 5.0 * (_hash01(k, 7, 221) - 0.5) * 2
+                    # O ARBUSTO TEM DE SER TESTADO NO SITIO DELE. Ele e deslocado
+                    # ate 5 m da arvore, entao herdar o "pode plantar" dela poe
+                    # arbusto no asfalto ao lado de uma arvore correcta.
+                    if plantable(bx, by, 0.8):
+                        put(bushes[k % len(bushes)], bx, by, "belt_bush_%d" % k)
+                        n_bush += 1
 
     # ---- grass patches on the turf band, and weeds at the slab edge ------
     # Irregular discs, never rectangles — see veg.grass_patch for why that is
@@ -3454,6 +4636,8 @@ def plant(m_grass):
         else:
             y = YARD_Y0 + (YARD_Y1 - YARD_Y0) * _hash01(i, 23, 263)
             x = (YARD_X1 + 1.5) if e < 0.75 else (YARD_X0 - 1.5)
+        if not plantable(x, y, 0.4):
+            continue
         put(bushes[i % len(bushes)], x, y, "weed_%02d" % i, 0.42)
         n_bush += 1
 
@@ -3511,6 +4695,144 @@ def make_mast(name, material, height=9.5):
     return ob
 
 
+def is_booth(ob):
+    """A guarita, seja ela o prototipo ou uma copia do layout.
+
+    E DUAS FAMILIAS DE NOME, e essa e a armadilha que custou uma build inteira.
+    `layout_from_file` usa o PROPRIO objeto do pacote na primeira vez que uma
+    chave aparece — ele chama-se `DL_booth` — e a partir da segunda clona com
+    `"%s_%03d" % (key, n)`, ou seja `booth_040`. Quem filtrar por um dos dois
+    encontra exatamente metade das guaritas, e a segunda (que existe justamente
+    porque foi duplicada) fica sem cancela e com arvore em cima.
+    """
+    return ob.name.startswith("DL_booth") or ob.name.startswith("booth_")
+
+
+def build_gate_booms():
+    """A CANCELA DE CADA GUARITA, gerada — e a do rip nao serve.
+
+    O PROBLEMA MEDIDO. A guarita e uma peca inteira do pacote `ibp`, cancela
+    incluida, e a cancela dela tem 3,78 m: nasce no x local 0,4 e morre em 3,42,
+    o que em mundo (escala 1,25) a faz parar em x = -4,84. A borda da pista A
+    esta em -3,25. Ou seja: a cancela do modelo nao chega a pista — fecha um
+    metro e meio de canteiro e para no ar. E o "a barra esta muito pequena", e
+    nao e questao de gosto, e de nao alcancar aquilo que existe para fechar.
+
+    POR QUE GERAR EM VEZ DE ESTICAR. Esticar a casca do rip por 3x esticaria
+    junto a UV dela, e a UV e onde moram as faixas vermelhas e brancas: uma
+    cancela de 12 m com quatro faixas de 3 m le como um poste pintado, nao como
+    uma cancela. Gerada, a faixa e GEOMETRIA — um bloco por faixa, 0,9 m cada —
+    e o comprimento deixa de ter relacao com a textura. E a mesma decisao (e o
+    mesmo tipo de peca) de `make_mast`, `build_fence` e `build_gates`.
+
+    ONDE ELA ACABA. Na borda DE LA da pista, e nao no eixo. A primeira versao
+    parava no eixo por um argumento de transito (uma cancela por faixa) e o
+    veredicto foi imediato e correto: "nao cobrem nem metade da rua". Numa
+    portaria de planta a cancela fecha a PISTA, porque o que ela controla e a
+    entrada e nao a faixa — e uma barra que morre no meio do asfalto le como
+    barra partida. Sao 13,6 m de vao, longos para uma cancela de rua e certos
+    para uma de 13 m de pista, que e a que existe aqui.
+
+    O PIVO SAI DA CAIXA DA PROPRIA GUARITA, e nao de um afastamento escrito. Com
+    as duas cabines lado a lado no canteiro sobra menos de um metro entre elas e
+    o bordo, e um pivo posicionado por numero fixo ora ficava dentro da cabine
+    ora dentro da pista. Medida a caixa depois de tirar o braco do rip, o pivo
+    fica 55 cm alem da face externa: o contrapeso (50 cm) cabe entre ele e a
+    parede, e a barra nasce onde a barra nasce em obra — encostada a guarita, do
+    lado de fora.
+
+    O SENTIDO SAI DA ROTACAO DA GUARITA, nao de uma tabela: a guarita 1 esta a
+    0 graus e olha para leste (pista A), a 2 esta a 180 e olha para oeste (pista
+    B). Espelhar a guarita no `layout.json` espelha a cancela junto, que e o que
+    "duplique e espelhe" tem de significar para as duas metades baterem.
+    """
+    booths = [o for o in bpy.data.objects if o.type == "MESH" and is_booth(o)]
+    if not booths:
+        return 0
+
+    # ---- 1. fora a cancela do rip -----------------------------------------
+    #
+    # A malha e PARTILHADA pelas duas guaritas (duplicata ligada), entao isto
+    # corre uma vez e vale para as duas. O corte e em x local > 0,5: a cabine
+    # inteira — telhado, guarda-corpo, degrau — acaba em 0,35, e tudo o que
+    # existe alem disso e o braco e o contrapeso dele. Medido casca a casca.
+    me = booths[0].data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    old = [f for f in bm.faces if f.calc_center_median().x > 0.5]
+    if old:
+        bmesh.ops.delete(bm, geom=old, context="FACES")
+        bm.to_mesh(me)
+        me.update()
+    bm.free()
+
+    # ---- 2. a cancela gerada ----------------------------------------------
+    red = mat("GATE_BOOM_RED", (0.38, 0.03, 0.03, 1.0), 0.45)
+    white = mat("GATE_BOOM_WHITE", (0.80, 0.80, 0.80, 1.0), 0.45)
+    STRIPE = 0.90            # uma faixa
+    ARM_Z = 1.05             # altura do braco sobre o piso
+    ARM_R = 0.075            # meia-espessura
+    bms = (bmesh.new(), bmesh.new())
+    uvs = [b.loops.layers.uv.new("UVMap") for b in bms]
+
+    def box(bm, uv, x0, x1, y0, y1, z0, z1):
+        v = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+        for p in v:
+            p.co.x = x0 if p.co.x < 0 else x1
+            p.co.y = y0 if p.co.y < 0 else y1
+            p.co.z = z0 if p.co.z < 0 else z1
+        for f in bm.faces:
+            for l in f.loops:
+                if not l[uv].uv.length:
+                    l[uv].uv = (l.vert.co.x * 0.5, l.vert.co.z * 0.5)
+
+    n = 0
+    for ob in booths:
+        bx, by = ob.matrix_world.translation.x, ob.matrix_world.translation.y
+        # +1 = o braco sai para leste (pista A); -1 para oeste (pista B)
+        east = math.cos(ob.rotation_euler.z) >= 0.0
+        sgn = 1.0 if east else -1.0
+        cx = ROAD_A_X if east else ROAD_B_X
+        bpy.context.view_layer.update()
+        lo, hi = world_bbox(ob)
+        pivot = (hi.x if east else lo.x) + sgn * 0.55
+        tip = cx + sgn * ROAD_W / 2.0   # a borda de la da pista servida
+        span = abs(tip - pivot)
+        base = median_z(pivot, by)
+        # ---- pivo: coluna + contrapeso ------------------------------------
+        box(bms[1], uvs[1], min(pivot, pivot + sgn * 0.22),
+            max(pivot, pivot + sgn * 0.22), by - 0.16, by + 0.16,
+            base, base + ARM_Z + 0.28)
+        box(bms[1], uvs[1], min(pivot - sgn * 0.50, pivot),
+            max(pivot - sgn * 0.50, pivot), by - 0.13, by + 0.13,
+            base + ARM_Z - 0.14, base + ARM_Z + 0.14)
+        # ---- o braco, uma faixa por bloco ---------------------------------
+        k = 0
+        d = 0.0
+        while d < span - 0.05:
+            seg = min(STRIPE, span - d)
+            a = pivot + sgn * d
+            b = pivot + sgn * (d + seg)
+            # o braco AFINA para a ponta, como um braco real: o momento cai
+            r = ARM_R * (1.0 - 0.35 * (d / max(span, 1e-6)))
+            box(bms[k % 2], uvs[k % 2], min(a, b), max(a, b),
+                by - r, by + r, base + ARM_Z - r, base + ARM_Z + r)
+            d += seg
+            k += 1
+        n += 1
+        log("  cancela: guarita em (%.1f, %.1f) fecha %.1f m ate o eixo da pista"
+            % (bx, by, span))
+
+    for bm, m, nm in ((bms[0], red, "gate_boom_a"), (bms[1], white, "gate_boom_b")):
+        mesh = bpy.data.meshes.new(nm)
+        o = bpy.data.objects.new(nm, mesh)
+        bpy.context.collection.objects.link(o)
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.materials.append(m)
+    return n
+
+
 def dress(props):
     """Lamps, barriers and yard clutter — the things that say the site is used.
 
@@ -3525,9 +4847,17 @@ def dress(props):
     # which is how a single line of columns lights a dual carriageway — and
     # clear of the near field for the same reason the trees are.
     med_x = (ROAD_A_X - _EDGE + ROAD_B_X + _EDGE) / 2.0
+    # A FILEIRA ACOMPANHA A PISTA, e nao mais um alcance fixo. Com y = k*34 ate
+    # +/-272 havia mastro a 179 m ao sul do fim da via (o balao) e a 44 m ao
+    # norte da rodovia: postes de iluminacao viaria plantados no campo, sem via
+    # nenhuma por baixo. `MAST_EDGE` deixa o ultimo poste antes da ponta em vez
+    # de em cima dela.
+    MAST_EDGE = 8.0
     for k in range(-8, 9):
         y = k * 34.0
         if abs(y) < 60.0:
+            continue
+        if not (ROAD_Y0 + MAST_EDGE <= y <= ROAD_Y1 - MAST_EDGE):
             continue
         d = clone(mast, "mast_m_%d" % k)
         d.rotation_mode = "XYZ"
@@ -3543,6 +4873,8 @@ def dress(props):
     for k in range(-4, 7):
         y = k * 38.0 + 12.0
         if abs(y) < 60.0:
+            continue
+        if not (ROAD_Y0 + MAST_EDGE <= y <= ROAD_Y1 - MAST_EDGE):
             continue
         x = ROAD_A_X + _EDGE + 1.1
         d = clone(mast, "mast_e_%d" % k)
@@ -3562,10 +4894,15 @@ def dress(props):
         # broken staircase lying on the floor. A barrier belongs where a vehicle
         # would otherwise hit something. Beside a tank in open yard, nothing
         # would.
+        # ...E "AO PE DO PORTAO" PASSOU A SER O PORTAO DE VERDADE. O y estava
+        # fixo em 214,0 de quando a cerca ficava a 250 m; com YARD_HALF em 150 os
+        # dez blocos estavam 64 m ALEM do arame, alinhados no meio do campo
+        # aberto, a proteger exactamente o mesmo nada que a fiada removida acima
+        # protegia. Derivado de YARD_HALF, como a barra de "pare" ja e.
         for k in range(10):
             d = clone(barrier[0], "bar_g_%d" % k)
             x = ROAD_A_X + _EDGE + 1.0
-            y = 214.0 + k * 1.62
+            y = YARD_HALF - 14.0 + k * 1.62
             d.location = (x, y, surface_z(x, y) - 0.04)
             d.rotation_mode = "XYZ"
             d.rotation_euler = (0, 0, math.radians(90))
@@ -3658,9 +4995,21 @@ def audit_placement():
     # standing on the truck. Both were the audit's own bug, and an audit that
     # invents faults is worse than no audit, because the fixes are real.
     bpy.context.view_layer.update()
+    # PLANT_BARK/PLANT_LEAF ENTRARAM AQUI, e a ausencia deles era uma auditoria
+    # a gritar lobo 212 vezes por build.
+    #
+    # A lista sempre dispensou a vegetacao — `TREE_BARK`/`TREE_LEAF` estao ca
+    # desde o inicio. So que as arvores geradas foram substituidas pelas do pack
+    # e os materiais passaram a chamar-se PLANT_*, o que reinscreveu 555 plantas
+    # numa auditoria que mede a BASE DA CAIXA ENVOLVENTE contra o terreno. A
+    # caixa de uma arvore comeca na ponta da raiz — tree_pk_1 desce a -1,28 m —,
+    # entao toda arvore correctamente plantada era reportada SUNK, e as tres
+    # linhas TALL que importam ficavam enterradas em 212 linhas que nao.
+    # Enterrar a raiz E o comportamento certo; ver protos_cache.PLANT_SINK.
     ground = {"GROUND_CONCRETE", "ASPHALT_ROAD", "CONCRETE_APRON", "KERB_CONCRETE",
               "LINE_PAINT", "GRASS_VERGE", "GRASS_NEAR", "GRAVEL_SHOULDER",
-              "TREE_BARK", "TREE_LEAF", "FENCE_WIRE", "FENCE_POST"}
+              "TREE_BARK", "TREE_LEAF", "PLANT_BARK", "PLANT_LEAF",
+              "FENCE_WIRE", "FENCE_POST"}
     rows = []
     for o in bpy.data.objects:
         if o.type != "MESH" or not o.data or not o.data.polygons:
@@ -3908,6 +5257,99 @@ def patch_glb_alpha(path, cutoff=0.38):
            len(chk), "" if not bad else "  FALHOU em %s" % bad))
 
 
+# ---------------------------------------------------------------------------
+# O QUE A REDE DE DECALQUES NAO APANHA — peca a peca, depois de vista.
+#
+# `audit_decals` exige que a caixa 2D da face pequena esteja INTEIRA dentro da
+# caixa da face grande (o `sx0 > bx0 - 0.01 and sx1 < bx1 + 0.01 ...` de
+# `_pass`). Uma peca assente EM CIMA DA EMENDA entre dois paineis de parede
+# coplanares nao esta contida em nenhum dos dois: as duas comparacoes sao
+# rejeitadas, a peca passa a rede inteira, e o ficheiro sai com folga zero.
+#
+# MEDIDO, e e o caso que originou esta tabela — a porta do 2o andar do MC_02,
+# relatada como "piscando" num print do app:
+#
+#   porta   1,215 x 2,468 m, base em z 3,627 (o nivel do passadico)
+#           plano y = -2,159 local, x de -0,658 a  0,557
+#   parede  chega ali em DOIS paineis, com a emenda em x = -0,499 local
+#           (11,55 m2 a oeste dela, 12,81 m2 a leste)
+#
+# A porta atravessa a emenda, logo nao cabe em nenhum dos dois paineis, e
+# `audit_decals -- --prefix=MC_` imprimia "TOTAL: 0 faces em disputa" com ela a
+# 0,07 mm da parede.
+#
+# ISSO CORRIGE TAMBEM A NOTA DE audit_decals.py:62, que e o unico facto citado
+# para justificar CLEAR = 50 mm: ela diz que esta porta "ficou a 18,4 mm e
+# CONTINUOU a cintilar". Nao continuou por causa do limiar — aquela funcao nunca
+# chegou a move-la.
+#
+# A TABELA E EM COORDENADAS LOCAIS DA PECA, de proposito: o prototipo e
+# recentrado na propria pegada com o piso em z=0 (ver `place`), entao mover a
+# peca no layout.json ou roda-la nao invalida a entrada. E cada linha declara o
+# que espera encontrar; quando nao encontra, a build GRITA, em vez de exportar
+# em silencio um cenario que voltou a cintilar.
+#
+# QUANDO ESTE BLOCO TEM DE SAIR: se `audit_decals` passar a testar sobreposicao
+# de area em vez de contencao em caixa, ele apanha esta porta sozinho e a
+# entrada aqui empurra-a uma segunda vez. Nesse dia, apagar a linha.
+LIFT_BY_HAND = [
+    dict(piece="MC_02", note="porta do 2o andar, sobre o passadico",
+         local=(-0.050, -2.159, 4.856), radius=1.0, normal=(0.0, 1.0, 0.0),
+         max_area=4.0, push=0.050, faces=2, area=3.00),
+]
+
+
+def lift_by_hand():
+    """Afasta da parede as pecas listadas em LIFT_BY_HAND, e SO essas."""
+    for e in LIFT_BY_HAND:
+        obs = [o for o in bpy.data.objects
+               if o.type == "MESH" and o.data and o.data.polygons
+               and (o.name == e["piece"]
+                    or o.name.startswith(e["piece"] + "."))]
+        if not obs:
+            log("  LIFT FALHOU: nao ha peca %s na cena" % e["piece"])
+            continue
+        n = Vector(e["normal"]).normalized()
+        p = Vector(e["local"])
+        for ob in obs:
+            me = ob.data
+            hit = [f.index for f in me.polygons
+                   if f.area <= e["max_area"]
+                   and abs(f.normal.dot(n)) > 0.999
+                   and (f.center - p).length <= e["radius"]]
+            got = sum(me.polygons[i].area for i in hit)
+            if len(hit) != e["faces"] or abs(got - e["area"]) > 0.1 * e["area"]:
+                log("  LIFT FALHOU em %s (%s): esperava %d faces / %.2f m2, "
+                    "achou %d / %.2f m2 — a peca mudou, reveja a entrada"
+                    % (ob.name, e["note"], e["faces"], e["area"],
+                       len(hit), got))
+                continue
+            # CORTAR PRIMEIRO, MOVER DEPOIS, que e a ordem de
+            # `lift_welded_decals`: se um vertice for partilhado com a parede,
+            # mover sem cortar arrasta a parede junto.
+            #
+            # E O SENTIDO VEM DA TABELA, NAO DE `f.normal`. Nestes ripes o
+            # enrolamento da face e arbitrario, e metade das vezes a normal
+            # aponta para dentro — ai o empurrao ENTERRA a porta, e o defeito
+            # deixa de ser "cintila" para ser "desapareceu", que e pior porque
+            # nao se ve. `normal` acima e a direcao para FORA, medida.
+            bm = bmesh.new()
+            bm.from_mesh(me)
+            bm.faces.ensure_lookup_table()
+            fs = [bm.faces[i] for i in hit]
+            bmesh.ops.split_edges(
+                bm, edges=list({ed for f in fs for ed in f.edges}))
+            d = n * e["push"]
+            for f in fs:
+                for v in f.verts:
+                    v.co += d
+            bm.to_mesh(me)
+            me.update()
+            bm.free()
+            log("  %s: %s — %d faces (%.2f m2) afastadas %.0f mm"
+                % (ob.name, e["note"], len(hit), got, e["push"] * 1000.0))
+
+
 def main():
     clear_scene()
     ibc1 = _load("ibc1")
@@ -3932,9 +5374,39 @@ def main():
     log("planting")
     plant(m_near)
     dress(props)
+    # DEPOIS de `layout`, porque ela le a posicao e a rotacao das guaritas que
+    # o layout.json pos na cena — e ANTES da separacao de decalques, para que a
+    # cancela gerada passe pela mesma rede que todo o resto.
+    build_gate_booms()
 
     log("placement audit")
     audit_placement()
+
+    log("separacao de decalques")
+    # A ULTIMA REDE CONTRA O CINTILAR, e ela corre AQUI e nao num passo a mao.
+    #
+    # `separate_coplanar` trata o prototipo no import e apanha a maioria; o que
+    # sobra sao os pares que so existem depois de tudo montado, e os que a
+    # propria separacao descobre ao afastar a peca de cima. Medido nesta cena:
+    # 200 -> 98 -> 38 -> 1 -> 0. Corrigir isto sobre o .glb, depois, funcionava
+    # exatamente ate a build seguinte reescrever o ficheiro.
+    try:
+        _dec = _load("audit_decals")
+        # OITO PASSAGENS, e nao quatro. Com a folga-alvo em 50 mm cada
+        # afastamento descobre mais do que descobria com 12: a serie medida
+        # passou de 200/98/38/1/0 para 626/322/92/57/..., ou seja quatro
+        # passagens deixavam 57 faces por tratar. Uma passagem que nao acha nada
+        # sai do laco, entao o custo de pedir oito e zero quando quatro chegam.
+        _n = _dec.sweep([o for o in bpy.data.objects
+                         if o.type == "MESH" and o.data and o.data.polygons],
+                        log=lambda m: log("  " + m), rounds=8)
+        log("  %d faces coplanares afastadas" % _n)
+    except Exception as e:
+        log("  audit_decals falhou (%s) — exportando sem" % e)
+
+    # DEPOIS da rede, e nao antes: estas sao exatamente as pecas que ela nao ve,
+    # e correr aqui garante que nenhuma passagem dela desfaz o afastamento.
+    lift_by_hand()
 
     log("export")
     group_instances()

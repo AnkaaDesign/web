@@ -79,8 +79,29 @@ export interface ArtPiece {
   anchorY?: 'roof' | 'floor' | 'stretch';
   /** Largura de UM ladrilho, em metros. Ausente/0 = a peça estica. */
   tile?: number;
-  /** Preenchido depois do download. Sem isto a peça não é desenhada. */
+  /**
+   * Largura DESENHADA de um ladrilho, em metros. Ausente = o passo inteiro.
+   *
+   * É o que separa o trilho da fita: os dois ladrilham no mesmo passo, mas
+   * entre um segmento de fita e o próximo há trilho nu aparecendo. Sem isto a
+   * fita seria desenhada encostada, que é o defeito que a foto tinha.
+   */
+  span?: number;
+  /**
+   * FASE da treliça: distância da ponta DIANTEIRA do painel ao centro da
+   * unidade mais próxima, módulo do passo, em metros.
+   *
+   * Sem ela o ladrilho ancora na borda do painel — e o bake não ancora: os
+   * pares de rebite do trilho ficam a 690 mm da testeira, presos à frente como
+   * tudo no 3D. Um passo inteiro de erro possível entre editor e baú.
+   */
+  phase?: number;
+  /** Densidade com que a peça foi fotografada. Só diagnóstico. */
+  pxPerM?: number;
+  /** Preenchido depois do download, no schema @1 (peça vetorial). */
   markup?: string;
+  /** Preenchido depois do download, no schema @2 (render do próprio bake). */
+  src?: string;
 }
 
 export interface ArtFace {
@@ -96,6 +117,23 @@ export type ArtLayout = Record<string, ArtFace>;
 
 const MANIFEST = 'panels/layout.json';
 
+/* OS DOIS SCHEMAS, e por que ambos continuam válidos.
+   ---------------------------------------------------------------------------
+   `@1` são as peças recortadas da prancha de Illustrator (`tools/livery-svg`):
+   vetor, leve, e CHAPADO — a cantoneira sai uma barra cinza com gradiente e a
+   fita 3M um retângulo vermelho. `@2` são renders ortográficos do PRÓPRIO
+   `trailer.glb` (`tools/livery-render`): a fita sai com os microprismas, o
+   trilho com o perfil galvanizado, e o miolo da traseira com os varões e as
+   travas de verdade. É a mesma grade, com a mesma semântica de âncora — o que
+   muda é de onde vem o pixel e, em `@2`, que existe `span` além de `tile`.
+
+   Aceitar os dois não é indecisão: a troca é um `layout.json` publicado, e
+   manter o leitor capaz de ler o anterior é o que permite voltar atrás sem
+   rebuild. O que continua FATAL é um schema DESCONHECIDO — âncoras com outros
+   nomes desenhariam um painel plausível e errado, que é o pior modo de falha
+   para uma ferramenta de conferência. */
+const SCHEMAS = new Set(['truck-studio/livery-art@1', 'truck-studio/livery-art@2']);
+
 let layout: ArtLayout | null = null;
 let started = false;
 
@@ -104,7 +142,21 @@ export const getLiveryArt = (): ArtLayout | null => layout;
 
 /** Há arte utilizável para esta face? É o que decide se a foto sai de cena. */
 export const hasLiveryArt = (face: string): boolean =>
-  !!layout?.[face]?.pieces.some((p) => !!p.markup);
+  !!layout?.[face]?.pieces.some((p) => !!p.markup || !!p.src);
+
+/**
+ * A peça como o compositor a consome, ou `null` se ela não carregou.
+ *
+ * Existe para que `livery-structure.ts` não precise saber qual schema produziu
+ * a grade: uma peça vetorial e um render do bake entram na mesma pilha, pelo
+ * mesmo caminho. Quem escolhe é o campo que veio preenchido.
+ */
+export const pieceSource = (p: ArtPiece):
+{ kind: 'svg'; markup: string } | { kind: 'image'; src: string } | null => {
+  if (p.src) return { kind: 'image', src: p.src };
+  if (p.markup) return { kind: 'svg', markup: p.markup };
+  return null;
+};
 
 const listeners: (() => void)[] = [];
 /** Avisa que a grade mudou — quem desenha o painel recompõe. */
@@ -118,6 +170,40 @@ export function onLiveryArtReady(cb: () => void) {
    como se fosse uma faixa refletiva. O teste é de CONTEÚDO e não de
    `content-type` justamente porque é o servidor que mente no cabeçalho aí. */
 const looksLikeSvg = (s: string) => /^\s*(?:<\?xml|<svg|<!--)/.test(s) && s.includes('<svg');
+
+/* O mesmo teste, para o schema @2: os oito bytes de assinatura do PNG. Vale a
+   mesma doutrina — é de CONTEÚDO e não de `content-type`, porque quem mente no
+   cabeçalho é justamente o servidor que devolve o `index.html` da SPA no lugar
+   de um 404. Um `<!doctype html>` aceito como imagem viraria uma peça que não
+   decodifica e um buraco silencioso no painel. */
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const looksLikePng = (b: ArrayBuffer) => {
+  if (b.byteLength < PNG_MAGIC.length) return false;
+  const head = new Uint8Array(b, 0, PNG_MAGIC.length);
+  return PNG_MAGIC.every((v, i) => head[i] === v);
+};
+
+/**
+ * Baixa UMA peça e preenche o campo que o schema dela usa.
+ *
+ * O `objectURL` não é revogado: a grade vive enquanto a página viver, e o
+ * compositor redesenha o painel a cada mudança de medida — revogar depois do
+ * primeiro desenho deixaria as recomposições seguintes sem imagem. São 19
+ * peças, e o custo de mantê-las é o próprio tamanho dos PNGs.
+ */
+async function fetchPiece(piece: ArtPiece, url: string): Promise<void> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (/\.png$/i.test(piece.file)) {
+    const buf = await r.arrayBuffer();
+    if (!looksLikePng(buf)) throw new Error('resposta não é PNG');
+    piece.src = URL.createObjectURL(new Blob([buf], { type: 'image/png' }));
+    return;
+  }
+  const markup = await r.text();
+  if (!looksLikeSvg(markup)) throw new Error('resposta não é SVG');
+  piece.markup = markup;
+}
 
 /**
  * Baixa o manifesto e as peças. Idempotente, sem `await` para quem chama.
@@ -147,7 +233,7 @@ export function loadLiveryArt() {
          tolerada: um manifesto de outra versão tem outros nomes de âncora, e
          desenhá-lo "do jeito que der" produziria um painel plausível e errado —
          o pior modo de falha possível para uma ferramenta de conferência. */
-      if (doc.schema && doc.schema !== 'truck-studio/livery-art@1') {
+      if (doc.schema && !SCHEMAS.has(doc.schema)) {
         throw new Error(`schema desconhecido: ${doc.schema}`);
       }
       const faces = doc.faces;
@@ -155,12 +241,7 @@ export function loadLiveryArt() {
       for (const face of Object.values(faces)) {
         for (const piece of face.pieces) {
           jobs.push(
-            fetch(assetUrl(VEHICLES_DIR + 'panels/' + piece.file))
-              .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
-              .then((markup) => {
-                if (!looksLikeSvg(markup)) throw new Error('resposta não é SVG');
-                piece.markup = markup;
-              })
+            fetchPiece(piece, assetUrl(VEHICLES_DIR + 'panels/' + piece.file))
               .catch((e: unknown) => {
                 /* Uma peça que falta deixa um buraco naquela célula e não
                    derruba as outras dezesseis — o painel fica incompleto e
@@ -176,7 +257,7 @@ export function loadLiveryArt() {
       for (const cb of listeners) cb();
       const total = Object.values(faces).reduce((n, f) => n + f.pieces.length, 0);
       const got = Object.values(faces)
-        .reduce((n, f) => n + f.pieces.filter((p) => p.markup).length, 0);
+        .reduce((n, f) => n + f.pieces.filter((p) => p.markup || p.src).length, 0);
       console.info(`[livery] arte do painel: ${got}/${total} peças em`
         + ` ${Object.keys(faces).length} faces.`);
     })

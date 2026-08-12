@@ -37,21 +37,38 @@
 
    Só que dentro dos 80 nós dela há seis materiais, e eles não são todos chapa:
 
-       56 148 tri   59 malhas   inox-ferragem           ← a chapa
+       56 148 tri   59 malhas   inox-ferragem           ← a FERRAGEM
        45 341 tri    2 malhas   plastico-preto
-       30 575 tri   10 malhas   caixa-estrutura-preta
+       30 575 tri   10 malhas   caixa-estrutura-preta   ← o quadro
         2 240 tri    6 malhas   metal-preto
-        1 332 tri    1 malha    plastico-cinza-polido
-        1 300 tri    2 malhas   metal-claro             ← a chapa
+        1 332 tri    1 malha    plastico-cinza-polido   ← a FOLHA
+        1 300 tri    2 malhas   metal-claro             ← lábio + forro
 
    `PAINTABLE` é o filtro, e ele é a POLÍTICA da peça, não um detalhe: pintar a
-   caixa pinta a CHAPA dela; o plástico preto, a estrutura preta e o cinza
-   polido continuam pretos e cinzas, que é o que acontece numa cabine de pintura
-   de verdade. A parte que este código não sabe fazer é separar a chapa da
-   DOBRADIÇA — as duas são `inox-ferragem` e o bake não as distingue. Se um dia
-   isso incomodar, o conserto é no bake (dar nome próprio à ferragem), não aqui:
-   qualquer tentativa de separá-las por geometria seria exatamente o tipo de
-   heurística que o resto deste diretório evita.
+   caixa pinta a CHAPA dela; o plástico preto e a estrutura preta continuam
+   pretos, que é o que acontece numa cabine de pintura de verdade.
+
+   ---------------------------------------------------------------------------
+   QUEM É A CHAPA MUDOU EM 2026-08-12, e a versão anterior estava errada nas
+   duas pontas.
+
+   Ela dizia `inox-ferragem|metal-claro`, e o comentário aqui registrava a
+   limitação com todas as letras: "a parte que este código não sabe fazer é
+   separar a chapa da DOBRADIÇA — as duas são `inox-ferragem`". Ou seja, escolher
+   uma cor para a caixa pintava as dobradiças, os parafusos e os suportes dela.
+   Isso passou de incômodo a contradição quando o pedido de produto (2026-08-12)
+   fixou que toda a ferragem do implemento é INOX — ver `splitStainlessHardware()`
+   em `models.ts`.
+
+   E o pior: a FOLHA — a face inteira que se vê da caixa, 1 030 × 581 mm — é
+   `plastico-cinza-polido` e NÃO estava na lista. Escolher uma cor para a caixa
+   deixava justamente a caixa como estava e pintava a ferragem em volta.
+
+   O conserto não precisou do bake, ao contrário do que esta nota previa: os
+   dois materiais da chapa são EXCLUSIVOS dela (medido — `plastico-cinza-polido`
+   tem 1 malha no implemento inteiro e `metal-claro` tem 2, as três dentro da
+   caixa), então casar por nome aqui é tão estável quanto casar por nó lá em
+   cima. A ferragem sai da lista e fica inox, como o produto pede.
 
    ---------------------------------------------------------------------------
    A REGRA QUE GOVERNA TUDO: SEM COR ESCOLHIDA, NADA MUDA
@@ -73,6 +90,7 @@
 import * as THREE from 'three';
 import {
   state, onPaintTargetApplied, onTrailerPanelsRebuilt, setPaintTarget,
+  TRAILER_BOX_NODE_RE,
 } from './models';
 import { createPaintInstance } from './paint';
 import type { PaintInstance, PaintPatch } from './paint';
@@ -120,11 +138,16 @@ const anyMat = (mats: (THREE.Material | null)[], re: RegExp) =>
    o esconde — e só gastaria uma troca de material. */
 const ROOF_NODE_RE = /^teto-externo/i;
 const FENDER_MAT_RE = /^paralamas$/i;
-/* Os dois nomes de nó que o bake dá à caixa. O `#Caixa-Ferrmantas-modelo-1padrao`
-   é o nó-pai e os `Caixa-ferrmantas-modelo1_pNN` são as 79 peças; o
-   `caixa-plastico-ferramentas` é a bandeja interna. */
-const BOX_NODE_RE = /caixa-ferrmantas|caixa-plastico-ferramentas/i;
-const BOX_PAINTABLE_RE = /inox-ferragem|metal-claro/i;
+/* Os dois nomes de nó que o bake dá à caixa vêm de `models.ts`, que também
+   precisa deles para tirar a ferragem da caixa do inox do implemento
+   (`splitTrailerHardware`). Duas cópias de "como se acha a caixa" divergiriam
+   no primeiro re-bake, e o sintoma seria uma metade da peça obedecendo ao card
+   de acabamentos e a outra não. */
+const BOX_NODE_RE = TRAILER_BOX_NODE_RE;
+/* A CHAPA da caixa: a folha e as duas peças de fechamento dela. A ferragem
+   (`inox-ferragem`) saiu daqui de propósito — ver o bloco A CAIXA. Âncoras
+   `^…$` porque a exclusividade medida é DESTES dois nomes. */
+const BOX_PAINTABLE_RE = /^plastico-cinza-polido$|^metal-claro$/i;
 const TK_MAT_RE = /tk-housing-white/i;
 
 /** Um nó casa a peça se ELE ou algum ancestral casar — as malhas são netas. */

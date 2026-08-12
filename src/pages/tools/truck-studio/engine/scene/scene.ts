@@ -148,8 +148,19 @@ import {
 } from './textures';
 import { skyU, makeSkyDome, makeStars } from './sky';
 import {
+  setSeeThroughTarget, updateSeeThrough, getSeeThrough, takeSeeThroughShadowDirty,
+} from './seethrough';
+import { updateSkyBlend, hasSkyPair, getSkyBlend } from './skyblend';
+import {
+  setVehicleLightsLevel, getVehicleLights, setVehicleLightsRigRefresh,
+} from '../vehicle/lights';
+import { updateVehicleBeams, getVehicleBeams } from '../vehicle/beams';
+import { getRetroreflective } from '../vehicle/retroreflect';
+import { getHeadlightCover } from '../vehicle/headlight-cover';
+import { getLampHalos } from '../vehicle/halo';
+import {
   lampUnits, lampModelEmissive, makeLamps, applyLampLayout, setLampRigRefresh,
-  getLampLensMat, getLampIntensityScale,
+  getLampLensMat, getLampIntensityScale, getLampBeamGain, vehBeams,
 } from './lamps';
 import {
   VIEW_DIR as CARD_VIEW_DIR, FOV as CARD_FOV, TARGET_H as CARD_TARGET_H,
@@ -180,6 +191,13 @@ export { BACKDROPS, DEFAULT_BACKDROP, backdropOf } from './presets';
 export { TEMP_NEUTRAL, TEMP_MIN, TEMP_MAX } from './presets';
 export type { BackdropDef } from './presets';
 export { setLamps, setLampModel } from './lamps';
+/* O ESTADO DO POOL DE POSTES, e por que ele é reexportado agora: `getLampInfo()`
+   existia desde a extração de lamps.ts com um docstring dizendo
+   "getEnvironmentObjects() reports this" — e NADA a chamava. Era diagnóstico
+   morto. A rodada do layout `set` (o cenário traz a torre, nós trazemos a luz)
+   tem uma pergunta que só se responde medindo — o refletor está DENTRO da
+   luminária que ele acende? —, então ela vira porta de bancada. */
+export { getLampInfo } from './lamps';
 
 export const holder = $('canvas-holder');
 
@@ -228,7 +246,32 @@ export const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // shadow.radius only works with PCFSoft
+/* ---- POR QUE NÃO É `PCFSoftShadowMap`, E O COMENTÁRIO QUE ESTAVA AQUI ----
+   A linha dizia "shadow.radius only works with PCFSoft". É o contrário, e o
+   preço era um controle inteiro do HUD que não fazia nada.
+
+   O `getShadow()` do three (shadowmap_pars_fragment.glsl.js, r179) tem três
+   ramos, e só DOIS leem `shadowRadius`:
+
+     SHADOWMAP_TYPE_PCF        17 amostras espalhadas por ±shadowRadius texels
+     SHADOWMAP_TYPE_PCF_SOFT   tent 3x3 de UM texel, `shadowRadius` não aparece
+     SHADOWMAP_TYPE_VSM        borrão separável de raio `shadowRadius`
+
+   MEDIDO na bancada antes da troca: varrer "Difusão da sombra" de 0,15 a 6
+   mudava a luminância da parede, do sujeito e do piso em 0,0 / 0,0 / 0,0 —
+   zero, nas três faixas. E não era só o controle do estúdio: `shadowRadius` é
+   campo de preset, então os 2,0 do `ensolarado`, os 9,0 do `nublado` e os 12,0
+   do `chuvoso` também nunca saíram do papel. Um dia nublado projetava a mesma
+   sombra dura de um meio-dia de sol.
+
+   PCF E NÃO VSM. O VSM borra o próprio mapa e por isso é o único que dá
+   penumbra realmente larga, mas ele guarda MOMENTOS em vez de profundidade e
+   vaza luz onde dois casters se sobrepõem — o que aqui é o par cavalo +
+   implemento, o tempo inteiro. PCF custa 17 amostras contra as 9 do
+   PCF_SOFT (o mapa é redesenhado só quando sujo, ver `autoUpdate` abaixo) e o
+   raio é honesto: a 3072² sobre ±24 m são 64 texels/m, então `radius` 2 é uma
+   penumbra de 3 cm e `radius` 12 é de 19 cm. */
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 /* THE SHADOW MAP IS NOT REDRAWN EVERY FRAME.
    ---------------------------------------------------------------------------
@@ -489,6 +532,33 @@ key.castShadow = true;                             // permanently — never togg
    limit; three would clamp it too, but silently, and then these numbers would
    be a lie. */
 const SHADOW_HALF = 24;
+/* O PASSO LARGO, e por que ele precisou existir.
+   ---------------------------------------------------------------------------
+   Com ±24 m nenhuma CONSTRUÇÃO do cenário jamais entrou no mapa: a mais próxima
+   do foco no Distrito Industrial está a 39 m. O relato — "nenhuma construção ou
+   árvore tem sombra" — não era defeito de `castShadow`, de material nem de
+   receptor; era a caixa. Medido na bancada, com um cubo de controle posto no
+   lugar do caminhão: ele projeta uma sombra impecável, e o galpão ao lado, com
+   a mesma bandeira, não projeta nada.
+
+   ±60 m cobre o miolo edificado do cenário (galpões, contêineres, cerca, a
+   linha de árvores) e custa 3,9 cm/texel contra 1,56 — e não ±90, que foi
+   testado junto e entrega praticamente a mesma imagem por 5,9 cm/texel.
+
+   NÃO É FIXO, e é aqui que o raciocínio do bloco acima continua valendo: a
+   densidade de perto é o produto. O passo largo só entra quando a câmera se
+   afasta o bastante para as construções estarem em quadro — e aí o caminhão
+   ocupa uma fração da tela, onde 3,9 cm/texel não se lê. Ver `tuneShadowSpan()`. */
+const SHADOW_HALF_WIDE = 60;
+/* O bias VIVE EM UNIDADES DE TEXEL, e esta é a armadilha que custou três
+   rodadas de bancada: alargar a caixa sem escalar os dois números apaga TODAS
+   as sombras, inclusive a do caminhão. A 11° de elevação do `ensolarado` o
+   contato é rasantíssimo, e um `normalBias` de 2 cm que valia 1,3 texel a ±24 m
+   vale 0,34 a ±60 — a sombra vaza por baixo do próprio objeto (peter-panning) e
+   some. Foi por isso que as primeiras tentativas de alargar pareceram provar
+   que "alargar não adianta". Adianta; só não sozinho. */
+const SHADOW_BIAS = -0.0004;
+const SHADOW_NORMAL_BIAS = 0.02;
 const SHADOW_MAP_SIZE = Math.min(3072, renderer.capabilities.maxTextureSize || 3072);
 key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 key.shadow.camera.left = -SHADOW_HALF; key.shadow.camera.right = SHADOW_HALF;
@@ -499,8 +569,8 @@ key.shadow.camera.top = SHADOW_HALF; key.shadow.camera.bottom = -SHADOW_HALF;
    shadow test entirely. An ortho depth range is linear, so 1..90 instead of
    4..90 widens it by 3.5 % and the existing bias values keep their meaning. */
 key.shadow.camera.near = 1; key.shadow.camera.far = 90;
-key.shadow.bias = -0.0004;
-key.shadow.normalBias = 0.02;
+key.shadow.bias = SHADOW_BIAS;
+key.shadow.normalBias = SHADOW_NORMAL_BIAS;
 key.shadow.radius = 2;
 scene.add(key, key.target);
 
@@ -534,6 +604,21 @@ scene.add(key, key.target);
    recebe a caixa do conjunto medida DEPOIS do engate (`focusOnRig()` em
    studio.ts) e já é seguida de `invalidateShadows()`. */
 const KEY_ORBIT_R = 26;
+/** Meia-caixa de sombra em vigor. Ver `tuneShadowSpan()`. */
+let shadowHalf = SHADOW_HALF;
+/* A DISTÂNCIA DA LUZ TAMBÉM É FUNÇÃO DA CAIXA, e esta foi a terceira peça.
+   ---------------------------------------------------------------------------
+   A ortográfica de sombra nasce NA POSIÇÃO da luz e mede `near`/`far` dali. Com
+   a luz a 26 m do foco, um galpão a 40 m DO LADO DO SOL fica ATRÁS do plano da
+   luz — distância negativa, fora de near/far, nunca entra no mapa de
+   profundidade por mais que se alargue a caixa. Recuar é de graça para a
+   ILUMINAÇÃO, porque uma direcional só lê `position − target` (é o mesmo
+   argumento que já autoriza transladar luz e alvo juntos, acima); só muda de
+   onde a câmera de sombra olha.
+
+   3,4 × a meia-caixa põe a luz fora de qualquer canto dela com folga, e o piso
+   de `KEY_ORBIT_R` preserva exatamente a geometria de fábrica no passo fechado. */
+const keyDistance = () => Math.max(KEY_ORBIT_R, shadowHalf * 3.4);
 /** Direção UNITÁRIA do alvo para a luz. É ela que sombreia, não `key.position`
  *  — que a partir daqui carrega o deslocamento do conjunto somado. */
 const _keyDir = new THREE.Vector3(0, 1, 0);
@@ -542,7 +627,7 @@ const _shadowFocus = new THREE.Vector3();
 
 /** Repõe luz e alvo em torno de `_shadowFocus`, preservando `_keyDir`. */
 function placeKeyLight() {
-  key.position.copy(_keyDir).multiplyScalar(KEY_ORBIT_R).add(_shadowFocus);
+  key.position.copy(_keyDir).multiplyScalar(keyDistance()).add(_shadowFocus);
   key.target.position.copy(_shadowFocus);
   /* A câmera de sombra lê `light.matrixWorld` e `light.target.matrixWorld`, não
      `position`. Os dois nós ficaram FORA do congelamento de `models.ts` e
@@ -552,6 +637,52 @@ function placeKeyLight() {
      o passe de sombra desse quadro já use a pose nova. */
   key.updateMatrixWorld(true);
   key.target.updateMatrixWorld(true);
+}
+
+/* ---- A TROCA DE PASSO DA CAIXA DE SOMBRA ----
+   As três grandezas — meia-caixa, distância da luz e bias — TÊM de andar
+   juntas; é a lição das rodadas de bancada que precederam isto, em que mexer
+   numa só sempre pareceu provar que o conserto não funcionava. Esta é a única
+   função que as escreve.
+
+   `radius` NÃO entra aqui de propósito: ele é do preset (`applyRig` escreve
+   `rig.shadowRadius` a cada clima) e é medido em TEXELS, então a maciez em
+   metros já acompanha a caixa sozinha. Escrevê-lo aqui criaria um segundo dono
+   do mesmo campo — exatamente o defeito que o bloco do `envMapIntensity` na
+   molhagem documenta. */
+function setShadowSpan(half: number) {
+  if (half === shadowHalf) return;
+  shadowHalf = half;
+  const k = half / SHADOW_HALF;
+  const cam = key.shadow.camera;
+  cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
+  /* `far` cobre a luz recuada MAIS a caixa inteira; `near` fica em 1 pelo mesmo
+     motivo de sempre (o chão sob sol rasante encosta no plano próximo). */
+  cam.far = keyDistance() * 2 + half * 2;
+  cam.updateProjectionMatrix();
+  key.shadow.bias = SHADOW_BIAS * k;
+  key.shadow.normalBias = SHADOW_NORMAL_BIAS * k;
+  placeKeyLight();
+  renderer.shadowMap.needsUpdate = true;
+  invalidate();
+}
+
+/* HISTERESE, e ela não é enfeite: cada troca de passo custa um passe de sombra
+   inteiro sobre o cenário, e um limiar seco faria a órbita repintar o mapa a
+   cada quadro em que o usuário passeasse em cima dele. A banda morta de 6 m é
+   larga o bastante para o arrasto normal não a atravessar de ida e volta.
+
+   O critério é a distância da câmera ao FOCO, não o cenário em si: perto, o
+   produto é o contato do pneu no chão e nada mais cabe no quadro; longe, o
+   caminhão vira uma fração da tela e quem manda na leitura é o distrito. O
+   estúdio (ciclorama) nunca sai do passo fechado porque a órbita lá não chega
+   a 30 m — e é o que preserva bit a bit o que já estava aprovado. */
+const SHADOW_STEP_OUT = 30;
+const SHADOW_STEP_IN = 24;
+function tuneShadowSpan() {
+  const d = camera.position.distanceTo(_shadowFocus);
+  if (shadowHalf === SHADOW_HALF) { if (d > SHADOW_STEP_OUT) setShadowSpan(SHADOW_HALF_WIDE); }
+  else if (d < SHADOW_STEP_IN) setShadowSpan(SHADOW_HALF);
 }
 
 /* cool counter-light from behind: separates the bodywork from the sky and
@@ -663,26 +794,79 @@ let curWetness = 0;
    mirror. */
 /* `rough: null` is a real member of the type, not an absent field — see above. */
 interface WetProfile { mul: number; rough: number | null; }
+/* CHOVE NA CENA INTEIRA, e ate 2026-08-11 chovia so no chao.
+   ---------------------------------------------------------------------------
+   Duas lacunas, e as duas vinham da mesma premissa — "uma parede nao faz poca",
+   que e verdade e nao era a pergunta:
+
+   1. AS CONSTRUCOES NUNCA MOLHAVAM. `surfaceOf()` devolvia null para tudo que
+      nao casasse com GROUND_NAME_RE, e um material sem familia nem chega a
+      `registerGroundMaterials`. No `Chuvoso` o parque industrial inteiro ficava
+      seco por baixo de chuva forte, com a rua espelhando ao lado — que e a
+      leitura de cenario de papelao, e nenhum ajuste no chao a corrige.
+   2. A GRAMA MOLHAVA SO DE COR. `rough: null` deixava a rugosidade intocada, e
+      grama encharcada e justamente o que ganha brilho: a lamina fica coberta de
+      um filme de agua e devolve o ceu na rasante. So escurecer 28 % da a
+      leitura de "grama de outra especie", nao de grama molhada.
+
+   `built` e a familia nova, e e deliberadamente CONTIDA: 0.86 de multiplicador
+   contra 0.25 do asfalto. Parede molha e escorre — o que a chuva lhe faz e
+   sobretudo um brilho de filme, nao um encharcado. Errar para o escuro aqui
+   custa a cena inteira, porque sao 200 mil triangulos de fachada. */
 const WET_PROFILE = {
   asphalt: { mul: 0.25, rough: 0.42 },
   concrete: { mul: 0.35, rough: 0.50 },
   gravel: { mul: 0.45, rough: 0.60 },
   dirt: { mul: 0.50, rough: 0.66 },
-  grass: { mul: 0.72, rough: null },
+  /* 0.72 -> 0.66 e rugosidade 0.74: a grama escurece um pouco mais e passa a
+     ter filme. NAO desce mais que isso — grama e o unico chao com geometria
+     implicita (o tufo esta no normal map), e uma rugosidade de asfalto ali
+     acende um realce especular por tufo que le como plastico. */
+  grass: { mul: 0.66, rough: 0.74 },
+  built: { mul: 0.86, rough: 0.68 },
 } satisfies Record<string, WetProfile>;
 /** The surface kinds a manifest may name; the keys of WET_PROFILE. */
 type NearSurface = keyof typeof WET_PROFILE;
 const wetProfile = new Map<THREE.MeshStandardMaterial, WetProfile>();
 
 /* Materials that take the PUDDLE MASK while wet, and the tiling each one needs
-   for it. The mask's rut positions are authored as fractions of one tile, so
-   "one tile across the carriageway, one every 68 m along it" is what makes the
-   puddles land in the wheel tracks on BOTH road surfaces — the procedural strip
-   (0..1 UVs over 12 x 340 m) and the near band (UVs in world metres, hence the
-   1/12 and the 0.5 offset that recentres x = −6..6 onto 0..1).
-   These two materials are also the ONLY ones whose `.roughnessMap` applyWetness
-   writes; everything else is bound by setGroundMaps()/setNearGround(). Two
-   writers on one slot would race. */
+   for it. Estes sao tambem os UNICOS materiais cujo `.roughnessMap` a
+   applyWetness escreve; o resto e ligado por bindMaterials(). Dois donos do
+   mesmo slot dariam corrida.
+
+   PUDDLE_SPAN — A POCA TEM ESCALA PROPRIA, e nao a do ladrilho do material.
+   ---------------------------------------------------------------------------
+   Era `spec.u = spec.v = rep`, ou seja a mascara herdava o ladrilho do chao: no
+   asfalto do Distrito isso e 6 m, e as 90 pocas do canvas repetiam INTEIRAS,
+   iguais, de 6 em 6 metros nos dois eixos. Medido na propria mascara: 423 das
+   512 colunas com agua, agrupadas em quatro bandas — porque 78 % das pocas
+   eram presas as fracoes de `RUTS`, que sao as trilhas de pneu de um ladrilho
+   que E a seccao da pista no asfalto PROCEDURAL. Num cenario com `set` o
+   ladrilho e um quadrado de 6 m e essas quatro fracoes nao correspondem a
+   trilha nenhuma: sobra um pente listrado, repetido. Era essa a leitura de
+   "as pocas sao muito padrao e repetitivas".
+
+   O PERIODO TEM DE FICAR ACIMA DA CELULA, e este numero ja foi ao valor errado
+   uma vez — vale a pena o porque, porque o raciocinio que o levou la e
+   plausivel e esta errado.
+
+   Quem tira a periodicidade e o ladrilhamento estocastico de set.ts, e ele so
+   descorrelata ENTRE celulas: dentro de uma celula a textura ladrilha
+   normalmente. Dai a deducao "entao o periodo tem de ser IGUAL a celula, senao
+   ou a poca e picotada na fronteira ou a mascara repete dentro da celula". Foi
+   posto em 1 por causa dela, e o resultado no app foi PIOR em todo o lado,
+   inclusive no patio, que ja estava aprovado.
+
+   O que a deducao nao pesa e que os dois defeitos NAO CUSTAM O MESMO. Uma poca
+   cortada na fronteira de uma celula tem borda suave (os pesos vao ao cubo, a
+   mistura e estreita) e le-se como poca com forma estranha; uma mascara que
+   repete DENTRO da celula le-se como grade, que e a queixa original. Entre
+   picotar e repetir, picota-se.
+
+   3.5 da 21 m no asfalto, 28 m no patio e 14 m na grama, contra celulas de
+   7,8/9,6/4,8 m — ou seja periodo ~2,9x a celula em todos, que e a proporcao
+   validada no patio. Mexer aqui sem mexer em uBreakCell muda essa proporcao. */
+const PUDDLE_SPAN = 3.5;
 interface PuddleSpec { u: number; v: number; ox: number; tex: THREE.CanvasTexture | null; }
 const puddleSpec = new Map<THREE.MeshStandardMaterial, PuddleSpec>();
 
@@ -803,10 +987,11 @@ export function registerGroundMaterials(entries: GroundMatEntry[]) {
        autorado — applyWetness() atribuiria `null`. */
     if (e.mat.roughnessMap) baseRoughMap.set(e.mat, e.mat.roughnessMap);
     if (e.road) {
-      /* As calhas da máscara são autoradas como fração de UM ladrilho, então a
-         poça só cai na trilha do pneu se o `repeat` do material entrar aqui. */
+      /* A poça tem escala própria — ver PUDDLE_SPAN. O `repeat` do material
+         entra só como referência do que é um ladrilho neste chão. */
       const [u, v] = e.tile || [1, 1];
-      puddleSpec.set(e.mat, { u, v, ox: 0, tex: null });
+      puddleSpec.set(e.mat,
+        { u: u / PUDDLE_SPAN, v: v / PUDDLE_SPAN, ox: 0, tex: null });
     }
     mats.push(e.mat);
   }
@@ -963,6 +1148,10 @@ function resolveRig(st: SceneState) {
        with it — `nublado` and `chuvoso` stay grey at dusk, as they should). */
     const g = goldenAt(st.hour) * (1 - n)
       * (1 - 0.65 * THREE.MathUtils.clamp(rig.cloudiness, 0, 1));
+    /* Publicado no rig ANTES do corte de 0,002, para que o campo seja sempre o
+       peso verdadeiro desta hora e não "o peso, quando alguém o usou". Quem o lê
+       é gradePlateColor(), na bruma medida — ver RIG_BASE.golden. */
+    rig.golden = g;
     if (g > 0.002) {
       rig.keyColor.lerp(GOLDEN, 0.85 * g);
       rig.skyHaloColor.lerp(GOLDEN, 0.70 * g);
@@ -979,6 +1168,28 @@ function resolveRig(st: SceneState) {
   rig.keyEl = st.el;
   rig.keyIntensity *= st.brightness;
 
+  /* AS LUZES DO VEÍCULO, PELO RELÓGIO. Um motorista acende o farol pela hora e
+     pelo hábito, não quando o sol cruza −3° — e neste cenário o sol se põe às
+     18,4 h, então amarrar isto a `nightness` deixaria as lanternas em um quarto
+     de brilho justamente às 18:00. A rampa de 36 minutos de relógio lê como
+     alguém acendendo; instantâneo estalaria. Ver vehicle/lights.ts. */
+  /* E TAMBÉM PELA INTENSIDADE DA CENA, a pedido: *"quando a intensidade da luz da
+     cena do studio estiver abaixo de 20% tambem deve acender as lanternas"*.
+     É a mesma leitura de operação que justifica o relógio — o que acende um farol
+     é ESTAR ESCURO, e no estúdio escurecer é baixar a chave, não adiantar o
+     ponteiro. As duas rampas entram por MÁXIMO e não por soma: às 21:00 com a
+     chave no talo as lanternas já estão a pleno, e somar as levaria a 2 (o clamp
+     de `setVehicleLightsLevel()` cortaria, mas o `vehLights` do rig é lido por
+     `lampsWanted()` e por `beams.ts`, e um valor fora de 0..1 vazando por ali é o
+     tipo de coisa que aparece meses depois).
+     A rampa é 0,20 → 0,08 e não um degrau em 0,20: um corte seco estalaria no
+     meio do arrasto do controle, que é exatamente o que a rampa do relógio existe
+     para evitar. */
+  const escuro = 1 - THREE.MathUtils.smoothstep(
+    st.brightness, VEH_LIGHTS_DIM_FULL, VEH_LIGHTS_DIM_ON);
+  rig.vehLights = Math.max(
+    THREE.MathUtils.smoothstep(st.hour, VEH_LIGHTS_ON, VEH_LIGHTS_FULL), escuro);
+
   /* ---- A CAMADA DE ESTÚDIO ----
      Só nos presets marcados `studio: true` (hoje, só o `ciclorama`). Ela entra
      AQUI, no fim de resolveRig(), e não em applyRig(), por três consequências
@@ -994,6 +1205,10 @@ function resolveRig(st: SceneState) {
   if (LIGHT_PRESETS[id].studio) {
     const bd = backdropOf(st.backdrop);
     rig.cycloramaAlbedo = bd.albedo;
+    /* O PISO E O REFLEXO SÃO CAMPOS PRÓPRIOS, e não `albedo` reaproveitado —
+       ver o bloco de medição em BACKDROPS. */
+    rig.cycloramaFloor = bd.floor;
+    rig.cycloramaGloss = bd.gloss;
     rig.exposure *= bd.exposure;
     /* O fundo e a névoa andam JUNTOS — são a mesma coisa vista a duas
        distâncias, e deixá-los divergir é o que produz uma emenda no horizonte
@@ -1013,6 +1228,23 @@ function resolveRig(st: SceneState) {
        controles daria ao usuário dois jeitos de achatar a mesma imagem. */
     rig.hemiIntensity *= st.fill;
     rig.ambientIntensity *= st.fill;
+    /* E O AMBIENTE ENTRA JUNTO, que é a correção do relato de que o controle
+       "quase não altera nada".
+       MEDIDO: varrer o Preenchimento de 0 a 5 movia o sujeito de 182,9 para
+       187,7 — QUATRO NÍVEIS E MEIO em 255, na faixa inteira do controle. A
+       conta explica: hemi 0,32 e ambiente 0,09 contra uma chave de 3,4 é 12 %
+       do rig, e o termo que faltava é maior que os dois juntos —
+       `scene.environmentIntensity` vale 0,82 e sozinho responde por 17 níveis
+       no sujeito e 49 no piso (medido apagando-o).
+       Fisicamente é o mesmo termo: o preenchimento de um estúdio NÃO é uma
+       lâmpada, é a luz que a sala inteira devolve, e num renderizador isso é o
+       IBL. Um controle de preenchimento que não move o IBL move 12 % do
+       preenchimento.
+       A curva é `0,25 + 0,75·f^0,75`: em 1 ela vale 1,000 por construção (o
+       preset calibrado fica intacto), em 0 sobra 0,25 — não zero, senão o
+       verniz perde o realce e a tinta deixa de ser julgável — e em 5 chega a
+       2,76, que é a "extravasada" que o relato pediu. */
+    rig.envIntensity *= 0.25 + 0.75 * Math.pow(Math.max(0, st.fill), 0.75);
     /* A DIFUSÃO da sombra é o que lê como "tamanho da softbox" — o único
        parâmetro do rig que fala de tamanho de fonte de luz. */
     rig.shadowRadius *= st.softness;
@@ -1131,6 +1363,18 @@ for (const old of ['truckstudio.scene.v1', 'truckstudio.scene.v2', 'truckstudio.
    por isso que basta mudar a hora: sunAngles() reposiciona a chave sozinha. */
 export const OPEN_HOUR = 17.75;
 
+/* A HORA EM QUE AS LUZES DO VEÍCULO ACENDEM, e a hora em que estão cheias.
+   Pedido do dono do produto: *"faca com que elas acendam a partir das 18:00"*.
+   O 18,6 é a rampa — 36 minutos de relógio, dois passos e meio do controle. */
+const VEH_LIGHTS_ON = 18.0, VEH_LIGHTS_FULL = 18.6;
+/* A chave da cena: apagadas de 20 % para cima, a pleno no FIM DO CURSO.
+   ⚠️ 0,15 e não 0,08 porque **o controle não chega a 8 %**: o cursor de
+   intensidade do HUD anda de 15 % a 250 % do preset (ver hud.ts). Uma rampa que
+   só fechasse abaixo do mínimo alcançável deixaria as lanternas em meia-luz no
+   ponto mais escuro que o usuário consegue pedir — e o pedido é que ali elas
+   estejam acesas. */
+const VEH_LIGHTS_DIM_ON = 0.20, VEH_LIGHTS_DIM_FULL = 0.15;
+
 export const LIGHT_DEFAULTS = {
   preset: 'dourado', timeOfDay: 'dia' as TimeOfDay, hour: OPEN_HOUR,
   /* az/el are DERIVED from `hour`; these are just what the clock says at 17:45.
@@ -1205,7 +1449,12 @@ export const pmrem = new THREE.PMREMGenerator(renderer);
    working set of one exploration session — a preset and its dusk band, plus the
    one before it — and a miss is a canvas draw plus one PMREM bake, i.e. the
    10-40 ms this module already schedules behind a 380 ms debounce. */
-const ENV_CACHE_MAX = 8;
+/* 8 → 12 quando o estúdio ganhou IBL próprio: a chave dele carrega fundo,
+   temperatura E pose da chave (ver envKey), então uma sessão de ajuste visita
+   bem mais entradas que os seis presets do céu. Doze cadeias de 1,5 MB são
+   18 MB — o mesmo custo de duas texturas de lataria — e a alternativa é reassar
+   um PMREM toda vez que o usuário volta uma pastilha atrás. */
+const ENV_CACHE_MAX = 12;
 const envCache = new Map<string, THREE.WebGLRenderTarget>();
 
 /* ---------------- external environment (environment.ts) ----------------
@@ -1236,6 +1485,23 @@ const ENV_NIGHT_STEPS = 3;
 
 function envKey(st: SceneState) {
   const p = LIGHT_PRESETS[st.preset];
+  /* O ESTÚDIO TEM CHAVE PRÓPRIA, e ela é a lista do que buildStudioEnv() de
+     fato desenha: fundo, temperatura e a POSE da chave. O que NÃO entra é o
+     Preenchimento — ele mora em `scene.environmentIntensity`, ou seja escala a
+     mesma textura em vez de mudá-la — nem a Intensidade da chave, que só abre o
+     halo. Pôr qualquer um dos dois aqui trocaria um multiplicador de graça por
+     uma reassadura de PMREM a cada quadro de arrasto.
+     A pose é QUANTIZADA em 30° de azimute e 15° de altura: mais fino faria o
+     cache girar durante um arrasto do dial, e mais grosso deixaria o realce do
+     cromado parado enquanto a sombra anda. */
+  if (p?.studio) {
+    const az = Math.round((((st.az % 360) + 360) % 360) / 30) % 12;
+    return 'studio:' + st.backdrop
+      + ':k' + Math.round(st.temp / 600)
+      + ':a' + az
+      + ':e' + Math.round(st.el / 15)
+      + ':n' + Math.round(nightnessAt(st.hour) * ENV_NIGHT_STEPS);
+  }
   if (p && p.env === 'room') return 'room';
   return st.preset + ':n' + Math.round(nightnessAt(st.hour) * ENV_NIGHT_STEPS);
 }
@@ -1326,6 +1592,268 @@ function buildSkyEnv(rig: Rig) {
   return rt;
 }
 
+/* ===========================================================================
+   O IBL DO ESTÚDIO — uma FOTOGRAFIA EQUIRRETANGULAR DA PRÓPRIA SALA
+   ===========================================================================
+   O QUE ELE SUBSTITUI, E POR QUE. `envKey()` devolvia `'room'` para todo preset
+   `env: 'room'`, e `'room'` é o `RoomEnvironment` do addon do three: uma caixa
+   BRANCA com painéis emissivos, assada uma vez e reusada para sempre. Ela era o
+   ambiente do ciclorama em TODAS as combinações — mesmo cubemap no fundo preto e
+   no fundo branco, a 2200 K e a 9000 K, com a chave a leste ou a oeste.
+
+   MEDIDO (checks-estudio-diag.mjs, apagando `scene.environmentIntensity`): esse
+   ambiente fixo vale 27 níveis de luminância na parede, 17 no sujeito e 49 no
+   piso. É mais do que a faixa INTEIRA do controle de Preenchimento (4,8) e mais
+   do que a do Recorte no sujeito (7,8). Ou seja: o maior termo de luz do
+   cenário era o único que nenhum controle alcançava — e é essa a razão física
+   de o relato ser *"as cores não refletem no cenário"*. A pastilha repintava a
+   parede e o chão, e o que a lataria REFLETIA continuava sendo uma caixa branca
+   de estúdio genérico.
+
+   A REGRA DESTE DESENHO: o ambiente é uma FOTO DA SALA QUE ESTÁ NA TELA. Não
+   uma aproximação de energia, não uma caixa de estúdio: os mesmos valores que o
+   ciclorama, o piso e o teto entregam ao quadro, escritos num equirretangular.
+   Segue-se de graça tudo o que faltava — o fundo branco devolve luz de fundo
+   branco, 2800 K esquenta o que o verniz reflete, e mover a chave move o realce
+   no cromado.
+
+   O QUE ELE DESENHA, de baixo para cima:
+
+     · o PISO, do nadir até o horizonte;
+     · a PAREDE, uma rampa de valor com o ponto mais escuro na altura do
+       veículo — a mesma forma da tabela de cyclorama.ts;
+     · os QUATRO PLANOS da sala, por uma modulação de cos(4·azimute). Uma sala
+       quadrada devolve quatro valores diferentes, e é essa diferença que o olho
+       (e o cromado) leem como "sala" em vez de "gradiente";
+     · as BARRAS DO TETO, cada uma como o ARCO que ela realmente subtende — ver
+       o bloco delas abaixo. São elas que dão à tinta o realce alongado de
+       softbox que o RoomEnvironment dava por acidente e no lugar errado;
+     · a SOFTBOX DA CHAVE, um RETÂNGULO em (keyAz, keyEl). Retângulo e não
+       disco: a forma do realce especular É a forma da fonte, e é por isso que
+       um verniz fotografado em estúdio tem risco reto e não bolinha;
+     · a CHAPA DE PREENCHIMENTO, do outro lado, baixa e larga.
+
+   POR QUE NÃO A SONDA (scene/probe.ts), que capturaria a sala de verdade: ela
+   custa seis faces em resolução cheia sobre 6 M de triângulos mais um PMREM, e
+   teria de rodar a cada clique de pastilha. Este canvas custa 256×128 pixels
+   desenhados em 2D e cabe no mesmo cache LRU do céu procedural.
+
+   Ele NÃO importa scene/cyclorama.ts nem scene/ceiling.ts — a seta é a
+   contrária (os dois importam este arquivo). Tudo que ele precisa saber chega
+   pelo RIG: `cycloramaAlbedo`, `cycloramaFloor`, `keyColor` (já tingido pela
+   temperatura em resolveRig), `keyAz`/`keyEl` e `hemiIntensity`. */
+
+/** Uma radiância linear + um matiz → a string de preenchimento do canvas 2D. */
+const _envTint = new THREE.Color();
+function envInk(level: number, tint: THREE.Color, alpha = 1) {
+  /* Só o MATIZ da luz entra; o VALOR é o `level`, que descreve a superfície.
+     Sem a normalização, uma chave a 0xccd9f2 escureceria a sala 20 % só por ser
+     azulada — e a mesma sala sob duas temperaturas mudaria de brilho em vez de
+     mudar de cor. */
+  _envTint.copy(tint);
+  const m = Math.max(_envTint.r, _envTint.g, _envTint.b) || 1;
+  const enc = (v: number) => {
+    const x = THREE.MathUtils.clamp((v * level) / m, 0, 1);
+    return Math.round(255 * (x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1 / 2.4) - 0.055));
+  };
+  return `rgba(${enc(_envTint.r)},${enc(_envTint.g)},${enc(_envTint.b)},${alpha})`;
+}
+
+/* AS MEDIDAS DA SALA QUE O IBL PRECISA CONHECER, em metros e do ponto de vista
+   de quem está no meio dela — a altura do olho de uma foto de veículo.
+   Elas ESPELHAM scene/ceiling.ts (laje a 14 m, vãos de 16,2 m, barras de 3,6 m
+   de largura e 61 m de comprimento) e são repetidas aqui em vez de importadas
+   porque scene.ts não pode depender de scene/**: os dois módulos do teto
+   importam ESTE. Uma divergência aqui não quebra nada — ela só desafina o
+   realce em relação ao teto que se vê —, e é por isso que a repetição paga. */
+const IBL_ROOM = {
+  /** altura da laje acima do olho */
+  ceil: 12,
+  /** meia-largura da grelha de barras */
+  half: 34,
+  /** passo entre barras */
+  pitch: 16.2,
+  /** largura de uma barra */
+  bankW: 3.6,
+};
+
+function buildStudioEnv(rig: Rig) {
+  const W = 256, H = 128;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = ctx2d(c);
+  const tint = rig.keyColor;
+  const albedo = Math.max(0, rig.cycloramaAlbedo);
+  const floorMul = Math.max(0, rig.cycloramaFloor);
+
+  /* Direção → pixel, na MESMA convenção de buildSkyEnv(): u percorre o azimute
+     e v vai do zênite (0) ao nadir (H). */
+  const px = (azDeg: number) => ((((azDeg / 360) % 1) + 1) % 1) * W;
+  const py = (elDeg: number) => (0.5 - elDeg / 180) * H;
+
+  /* ---- 1. a rampa vertical: piso, concordância, parede, laje ----
+     Os valores são RADIÂNCIA LINEAR e são os alvos de tela da tabela de
+     BACKDROPS convertidos de volta: 120/255 de sRGB ≈ 0,18 linear no piso,
+     50/255 ≈ 0,032 na parede à altura do veículo. */
+  const wallLow = 0.030 * albedo;        // altura do veículo — o ponto mais escuro
+  const wallHigh = 0.052 * albedo;       // subindo rumo ao difusor
+  const floorLvl = 0.150 * floorMul;
+  /* A laje é escura POR DESENHO (ceiling.ts a autora em 0x191919), e ela clareia
+     um pouco com o fundo porque um ciclorama branco devolve luz nela. */
+  const deck = 0.010 + 0.005 * albedo;
+
+  const ramp = g.createLinearGradient(0, 0, 0, H);
+  ramp.addColorStop(0.00, envInk(deck, tint));
+  ramp.addColorStop(0.28, envInk(deck, tint));            // teto, até ~50° de elevação
+  ramp.addColorStop(0.36, envInk(wallHigh, tint));        // alto da parede
+  ramp.addColorStop(0.50, envInk(wallLow, tint));         // horizonte = altura do veículo
+  ramp.addColorStop(0.56, envInk(0.060 * albedo, tint));  // concordância, o ricochete do piso
+  ramp.addColorStop(0.70, envInk(floorLvl, tint));
+  ramp.addColorStop(1.00, envInk(floorLvl * 0.92, tint)); // sob os pés, um respiro
+  g.fillStyle = ramp;
+  g.fillRect(0, 0, W, H);
+
+  /* ---- 2. os quatro planos ----
+     ±9 % em cos(4·az), centrado nas quinas. É pouco de propósito: o que se quer
+     é que um cromado girando encontre QUATRO faces e três quinas, não que a sala
+     fique listrada. Só na metade de cima — o piso é um plano só. */
+  for (let x = 0; x < W; x++) {
+    const k = Math.cos((x / W) * 8 * Math.PI);
+    if (Math.abs(k) < 0.02) continue;
+    g.fillStyle = k > 0 ? 'rgba(255,255,255,' + (0.09 * k).toFixed(3) + ')'
+      : 'rgba(0,0,0,' + (0.09 * -k).toFixed(3) + ')';
+    g.fillRect(x, 0, 1, H * 0.56);
+  }
+
+  /* ---- 3. AS BARRAS DO TETO, cada uma como o arco que ela subtende ----
+     Uma barra é uma reta `x = xi` a `ceil` metros de altura, correndo em z. De
+     quem está no meio da sala, a direção para o ponto (xi, ceil, z) tem
+
+         elevação = atan(ceil / √(xi² + z²))      azimute = atan2(xi, z)
+
+     e conforme z corre de −L a +L o par descreve um ARCO: ele nasce no
+     horizonte de um lado, sobe até `atan(ceil/|xi|)` bem em cima e desce no
+     horizonte do outro. É essa a assinatura de um teto de estúdio num
+     equirretangular, e é ela que um verniz devolve como risco comprido —
+     "o realce alongado de softbox" que o cabeçalho do preset `ciclorama` pede.
+     Desenhar duas faixas horizontais no lugar seria mais barato e daria o
+     realce ERRADO: um risco que não se encurva não pertence a um teto.
+
+     A largura do traço cai com a distância porque é ângulo, não metro. */
+  const bankLevel = 0.90;
+  const lanes: number[] = [];
+  for (let i = -4; i <= 4; i++) {
+    const x = (i + 0.5) * IBL_ROOM.pitch;
+    if (Math.abs(x) < IBL_ROOM.half) lanes.push(x);
+  }
+  g.save();
+  g.lineCap = 'round';
+  for (const xi of lanes) {
+    for (const pass of [0, 1]) {
+      /* Duas passadas: um halo largo e fraco, e o núcleo. Sem o halo a barra
+         vira um risco duro que o PMREM transforma em serrilhado nos níveis
+         borrados. */
+      g.strokeStyle = envInk(bankLevel, tint, pass ? 1 : 0.35);
+      let prevX = NaN, prevY = 0;
+      for (let s = 0; s <= 48; s++) {
+        const z = -IBL_ROOM.half + (2 * IBL_ROOM.half * s) / 48;
+        const flat = Math.hypot(xi, z);
+        const d = Math.hypot(flat, IBL_ROOM.ceil);
+        const el = Math.atan2(IBL_ROOM.ceil, flat) * 180 / Math.PI;
+        const az = Math.atan2(xi, z) * 180 / Math.PI;
+        const x = px(az), y = py(el);
+        /* A largura angular da barra, em pixels do canvas (W pixels = 360°). */
+        const wdeg = (IBL_ROOM.bankW / d) * 180 / Math.PI;
+        g.lineWidth = Math.max(1, (wdeg / 360) * W) * (pass ? 1 : 2.6);
+        /* O salto de azimute na costura do canvas quebraria o traço numa
+           horizontal atravessando a imagem inteira. */
+        if (!Number.isNaN(prevX) && Math.abs(x - prevX) < W * 0.5) {
+          g.beginPath();
+          g.moveTo(prevX, prevY);
+          g.lineTo(x, y);
+          g.stroke();
+        }
+        prevX = x; prevY = y;
+      }
+    }
+  }
+  g.restore();
+
+  /* ---- 4. a SOFTBOX DA CHAVE ----
+     Um retângulo de bordas macias em (keyAz, keyEl), LARGO E BAIXO: é o formato
+     que se usa para um veículo de 19 m, e é a forma dele que o verniz devolve
+     como risco reto.
+
+     ELE É PEQUENO, E A PRIMEIRA VERSÃO NÃO ERA — este bloco é a correção de um
+     defeito que a bancada fotografou. Com um halo de raio `bw · 2,4 · 1,9` a
+     partir de 46° de elevação, a "softbox" cobria do zênite até abaixo do
+     horizonte, ou seja era uma nuvem clara em metade da esfera. O piso, com
+     `roughness` 0,22, resolve o ambiente quase como espelho na direção rasante:
+     o resultado na tela foi um BORRÃO BRANCO SATURADO no chão diante da cabine,
+     de borda dura — exatamente o artefato que o comentário de
+     `envMapIntensity` no piso descreve para o RoomEnvironment, reintroduzido
+     pela porta da frente.
+
+     Uma softbox de estúdio subtende 20 a 30 graus, não 150. E o núcleo fica em
+     0,85 e não em 1,0: um canvas de 8 bits satura em 1,0, e uma fonte saturada
+     perde a borda — é ela que faz o realce ter FORMA em vez de virar mancha.
+     `keyIntensity` abre só o halo, porque é isso que uma fonte mais forte faz
+     numa foto: o núcleo já está no teto do formato. */
+  {
+    const cx = px(rig.keyAz), cy = py(rig.keyEl);
+    const bw = W * 0.072, bh = H * 0.048;
+    const halo = 1 + 0.35 * THREE.MathUtils.clamp(rig.keyIntensity / 3.4 - 1, 0, 2);
+    g.save();
+    for (const dx of [-W, 0, W]) {                 // a costura de azimute
+      g.setTransform(1, 0, 0, 1, dx, 0);
+      const hg = g.createRadialGradient(cx, cy, bw * 0.5, cx, cy, bw * 1.9 * halo);
+      hg.addColorStop(0, envInk(0.30, tint, 0.45));
+      hg.addColorStop(1, envInk(0.30, tint, 0));
+      g.fillStyle = hg;
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = envInk(0.85, tint, 0.45);
+      g.fillRect(cx - bw * 0.68, cy - bh * 0.68, bw * 1.36, bh * 1.36);
+      g.fillStyle = envInk(0.85, tint);
+      g.fillRect(cx - bw / 2, cy - bh / 2, bw, bh);
+    }
+    g.restore();
+  }
+
+  /* ---- 5. a CHAPA DE PREENCHIMENTO ----
+     Do outro lado da chave, baixa e bem maior que a softbox: é uma parede de
+     isopor, não uma lâmpada. Ela segue `hemiIntensity`, que é o que o controle
+     de Preenchimento move — então baixar o preenchimento fecha a sombra também
+     no que a lataria REFLETE, e não só no que ela recebe.
+
+     Ela ficou em 18 % da largura do canvas (65°, uma chapa de 8 m a 7 m) contra
+     os 30 % da primeira versão. Pelo mesmo motivo da softbox, e com um agravante
+     próprio: a 18° de elevação ela cai EM CHEIO na direção de espelho de uma
+     câmera de foto de veículo, que é a que menos perdoa uma fonte grande
+     demais. */
+  {
+    const fill = THREE.MathUtils.clamp(rig.hemiIntensity / 0.32, 0, 4);
+    if (fill > 0.02) {
+      const cx = px(rig.keyAz + 180), cy = py(22);
+      g.save();
+      for (const dx of [-W, 0, W]) {
+        g.setTransform(1, 0, 0, 1, dx, 0);
+        const fg = g.createRadialGradient(cx, cy, 0, cx, cy, W * 0.18);
+        fg.addColorStop(0, envInk(0.20 * Math.min(1.8, fill), rig.hemiSky, 0.80));
+        fg.addColorStop(1, envInk(0.20 * Math.min(1.8, fill), rig.hemiSky, 0));
+        g.fillStyle = fg;
+        g.fillRect(0, 0, W, H);
+      }
+      g.restore();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  const rt = pmrem.fromEquirectangular(tex);
+  tex.dispose();
+  return rt;
+}
+
 /* Insert-or-touch, then evict from the front. A Map iterates in insertion order,
    so delete-then-set is the whole LRU. Never frees the one currently bound to
    `scene.environment`: that would leave the renderer sampling a released target,
@@ -1377,7 +1905,9 @@ function refreshEnvironment(rig: Rig, immediate: boolean) {
       return;
     }
     let rt: THREE.WebGLRenderTarget;
-    if (k === 'room') {
+    if (k.startsWith('studio:')) {
+      rt = buildStudioEnv(rig);
+    } else if (k === 'room') {
       /* RoomEnvironment is a whole Scene — a lathe of BoxGeometries, two
          MeshStandardMaterials and a PointLight — built for one purpose: to be
          PHOTOGRAPHED by the PMREM. Nothing samples it afterwards, and dropping it
@@ -1481,11 +2011,24 @@ const _tintGraded = new THREE.Color();
 function gradePlateColor(out: THREE.Color, src: THREE.Color, rig: Rig) {
   const n = THREE.MathUtils.clamp(rig.nightness, 0, 1);
   const k = Math.min(1, Math.max(0, rig.envIntensity)) * (1 - 0.94 * n);
-  return out.setRGB(
+  out.setRGB(
     src.r * k * (1 - 0.18 * n),
     src.g * k * (1 - 0.10 * n),
     src.b * k,
   );
+  /* E O MESMO AVERMELHAMENTO DE SOL BAIXO QUE resolveRig() DÁ AO rig.fogColor.
+     Sem esta linha o bloco acima só cobria o eixo da NOITE, e o buraco era
+     exatamente a faixa que o usuário relatou: às 18/19 h `nightnessAt` ainda é
+     baixo (o sol só se põe às 18,4 h), então a grade de noite é quase a
+     identidade — enquanto goldenAt já vale ~0,7 e a névoa do preset já está
+     laranja. A cor medida ficava sozinha em pé no matiz do meio-dia.
+
+     O mesmo 0,50 do fogColor, e pela razão que aquele comentário dá: névoa e
+     bruma são a mesma coisa vista a duas distâncias, e deixá-las divergir é o
+     que faz emenda no horizonte. */
+  const g = THREE.MathUtils.clamp(rig.golden, 0, 1);
+  if (g > 0.002) out.lerp(GOLDEN, 0.50 * g);
+  return out;
 }
 
 /* ---- MODO ARRASTO DO MAPA DE SOMBRA ----
@@ -1554,10 +2097,17 @@ function applyRig(rig: Rig) {
   key.shadow.intensity = THREE.MathUtils.clamp(rig.shadowIntensity, 0, 1);
   key.shadow.radius = Math.max(0.5, rig.shadowRadius);
 
-  /* rim sits opposite the key and a little higher */
+  /* O RECORTE FICA DO OUTRO LADO DA CHAVE, e a ALTURA dele agora é do preset.
+     Ela era cravada — `y = 14` sobre um raio de 22·cos(0,6) = 18,15, ou seja
+     37,6° — e é isso que `rimEl: 38` reproduz. Ver o bloco de `rimEl` em
+     presets.ts para a medição que a tirou daqui. */
+  const rimEl = rig.rimEl * Math.PI / 180;
   const rimAz = azr + Math.PI * 0.78;
+  const rimR = 22;
   rim.position.set(
-    22 * Math.cos(0.6) * Math.sin(rimAz), 14, 22 * Math.cos(0.6) * Math.cos(rimAz)
+    rimR * Math.cos(rimEl) * Math.sin(rimAz),
+    rimR * Math.sin(rimEl),
+    rimR * Math.cos(rimEl) * Math.cos(rimAz),
   );
   rim.color.copy(rig.rimColor);
   rim.intensity = Math.max(0, rig.rimIntensity);
@@ -1601,6 +2151,12 @@ function applyRig(rig: Rig) {
      photograph the way it may over-drive a synthetic gradient. */
   if (externalEnv) {
     const k = Math.max(0, rig.envIntensity);
+    /* O PAR DE CÉUS ANDA AQUI, no único lugar por onde toda entrada pública de
+       luz passa (ver o comentário de invalidate() no fim desta função). É de
+       graça quando não há par, e quando há, o fundo atravessa liso e o PMREM é
+       reassado por taxa — scene/skyblend.ts. */
+    const comPar = hasSkyPair();
+    if (comPar) updateSkyBlend(rig.nightness);
     /* NIGHT OVER A DAYLIGHT PHOTOGRAPH.
        Every HDRI in the acervo was shot in daylight, and the preset system has
        no way to make a photograph set. Before this, midnight left
@@ -1623,10 +2179,27 @@ function applyRig(rig: Rig) {
        ENV 0.40 — the reflections. Deliberately far milder: this term is also
        doing half the LIGHTING of the truck, and taking it to the background's
        floor leaves black paint with no form. 0.35 * 0.40 = 0.14 keeps a dim sky
-       in the clearcoat while the lamps (240-295 cd) take over as the key. */
+       in the clearcoat while the lamps (240-295 cd) take over as the key.
+
+       COM PAR DE CÉUS OS DOIS PISOS SUBIREM, e não é afrouxamento: os 0,06/0,40
+       existem para fazer uma FOTO DE DIA passar por noite, e essa é a premissa
+       que o par derruba. O plate de noite já tem um terço da luminância média do
+       de dia (0,310 contra 0,717 — medido), já é azul (B/R 1,46 contra 1,40) e
+       já tem lua e estrela no lugar de cúmulo iluminado, ou seja: o conteúdo é
+       que faz a leitura de noite, não o multiplicador.
+
+       Somar os dois esmagamentos daria 0,06 x 0,43 = 0,026 do céu de dia — um
+       buraco preto onde deveria haver céu, e o oposto do defeito que se está
+       consertando. Os números novos recompõem o produto: 0,22 x 0,43 = 0,095 de
+       fundo (contra 0,043 de antes, mas agora com estrutura de noite) e
+       0,55 x 0,43 = 0,24 de reflexo (contra 0,40, mais escuro de propósito —
+       quem virou a chave são as luminárias, e o brilho do céu no verniz tem de
+       ceder para elas aparecerem). */
     const nf = THREE.MathUtils.clamp(rig.nightness, 0, 1);
-    scene.environmentIntensity = extEnvIntensity * k * THREE.MathUtils.lerp(1, 0.40, nf);
-    scene.backgroundIntensity = extEnvIntensity * Math.min(1, k) * THREE.MathUtils.lerp(1, 0.06, nf);
+    const pisoEnv = comPar ? 0.55 : 0.40;
+    const pisoBg = comPar ? 0.22 : 0.06;
+    scene.environmentIntensity = extEnvIntensity * k * THREE.MathUtils.lerp(1, pisoEnv, nf);
+    scene.backgroundIntensity = extEnvIntensity * Math.min(1, k) * THREE.MathUtils.lerp(1, pisoBg, nf);
   } else {
     scene.environmentIntensity = Math.max(0, rig.envIntensity);
   }
@@ -1683,8 +2256,18 @@ function applyRig(rig: Rig) {
        sets the flag; this stays the single writer of the value.
        lampIntensityScale is the (h/LAMP_HEIGHT)² inverse-square compensation
        for a per-scene mounting height; it is 1 at the authored height. */
-    u.spot.intensity = u.active ? Math.max(0, rig.lampIntensity) * getLampIntensityScale() : 0;
+    u.spot.intensity = u.active
+      ? Math.max(0, rig.lampIntensity) * getLampIntensityScale() * getLampBeamGain()
+      : 0;
   }
+
+  /* AS LUZES DO CAVALO E DO IMPLEMENTO. Um número por material emissivo de
+     lâmpada, e o módulo é quem sabe quais são — ver vehicle/lights.ts. */
+  setVehicleLightsLevel(rig.vehLights);
+  /* E OS FEIXES, na mesma linha e com o mesmo número, porque são a mesma coisa
+     vista dos dois lados: `lights.ts` acende a LENTE e `beams.ts` põe a poça de
+     luz no chão. Depois, nunca antes — beams.ts lê as lâmpadas já medidas. */
+  updateVehicleBeams(rig.vehLights);
 
   applyWetness(THREE.MathUtils.clamp(rig.wetness, 0, 1));
 
@@ -1722,12 +2305,21 @@ function applyRig(rig: Rig) {
 
    This remains the SINGLE writer of SpotLight.visible. */
 const LAMP_ON_LEVEL = 6, LAMP_OFF_LEVEL = 1.5;
+/* E O VEÍCULO TAMBÉM PEDE O POOL, desde que os feixes dele moram nele. Sem esta
+   segunda condição o preset `ciclorama` — que autora `lampIntensity: 0` — deixaria
+   as doze `SpotLight` fora da cena e o farol do caminhão não iluminaria nada às
+   21 h, embora a lente estivesse acesa. O limiar é baixo (0,02 de `vehLights`, ou
+   seja poucos segundos depois das 18:00) pela mesma razão que o dos postes: a
+   bandeira tem de ser jogada enquanto o resultado ainda é invisível, para que o
+   que o usuário vê subir seja `intensity`, que é uniforme e não recompila nada. */
+const VEH_BEAM_ON_LEVEL = 0.02;
 /* Seeded true to match SpotLight's own construction default, or the first call
    would short-circuit as a no-op and leave eight lit spots in a daylit scene. */
 let lampsOn = true;
 
 /** Does this rig want the pool live, given where the pool already is? */
-function lampsWanted(intensity: number) {
+function lampsWanted(intensity: number, vehLights = 0) {
+  if (vehLights > VEH_BEAM_ON_LEVEL) return true;
   return lampsOn ? intensity > LAMP_OFF_LEVEL : intensity > LAMP_ON_LEVEL;
 }
 
@@ -1736,6 +2328,14 @@ function setLampsEnabled(on: boolean) {
   lampsOn = on;
   for (const u of lampUnits) {
     if (u.spot.visible !== on) u.spot.visible = on;
+  }
+  /* AS DOZE JUNTAS. Os quatro feixes do veículo moram no mesmo pool exatamente
+     para que a contagem seja binária: deixá-los fora deste laço criaria um
+     terceiro valor de NUM_SPOT_LIGHTS (8) e, com ele, uma terceira configuração
+     de shader que `warmLightPrograms()` não pré-compila — o travamento no
+     controle de hora voltaria pela porta dos fundos. */
+  for (const s of vehBeams) {
+    if (s.visible !== on) s.visible = on;
   }
   invalidate();
 }
@@ -1830,7 +2430,7 @@ function beginTween(animate: boolean) {
     rigFrom = makeRig(RIG_BASE);
     rigTo = next;
     tweenT = 1;
-    setLampsEnabled(lampsWanted(next.lampIntensity));
+    setLampsEnabled(lampsWanted(next.lampIntensity, next.vehLights));
     applyRig(rigCur);
     refreshEnvironment(rigCur, true);
     return;
@@ -1839,13 +2439,13 @@ function beginTween(animate: boolean) {
   if (!animate) {
     lerpRig(rigCur, next, next, 1);
     tweenT = 1;
-    setLampsEnabled(lampsWanted(next.lampIntensity));
+    setLampsEnabled(lampsWanted(next.lampIntensity, next.vehLights));
     applyRig(rigCur);
   } else {
     rigFrom = makeRig(RIG_BASE);
     lerpRig(rigFrom, rigCur, rigCur, 1);        // snapshot the current pose
     tweenT = 0;
-    if (lampsWanted(next.lampIntensity)) setLampsEnabled(true);   // grow early
+    if (lampsWanted(next.lampIntensity, next.vehLights)) setLampsEnabled(true);   // grow early
   }
   refreshEnvironment(next, false);
   /* Redundant on every branch — applyRig() already invalidated, and the animated
@@ -1866,7 +2466,7 @@ export function updateLighting(dt: number) {
     tweenT = Math.min(1, tweenT + dt / tweenDur);
     lerpRig(rigCur, rigFrom, rigTo, easeInOutCubic(tweenT));
     applyRig(rigCur);
-    if (tweenT >= 1) setLampsEnabled(lampsWanted(rigTo.lampIntensity));   // shrink late
+    if (tweenT >= 1) setLampsEnabled(lampsWanted(rigTo.lampIntensity, rigTo.vehLights));   // shrink late
   } else if (rigCur) {
     /* the paint uniforms are VIEW space, so they must refresh as the camera
        orbits even when the rig itself is static */
@@ -2375,6 +2975,34 @@ const _fv = new THREE.Vector3();
  * e emenda `invalidateShadows()` logo em seguida). Ver o bloco de
  * `placeKeyLight()` para o que a caixa centrada na origem estava cortando fora.
  */
+/**
+ * A PEGADA DO CONJUNTO NO CHÃO — (centro x, centro z, meio-lado x, meio-lado z),
+ * em metros de mundo. `null` enquanto não há veículo.
+ *
+ * Existe para a OCLUSÃO DE CONTATO do piso do estúdio (scene/floor-reflection.ts,
+ * chamada por scene/cyclorama.ts). O mapa de sombra cobre a luz DIRECIONAL, e
+ * era só isso que escurecia o chão sob a carreta; o hemi, o ambiente e o IBL
+ * chegavam embaixo dela com a força que têm no meio da sala. Numa foto de
+ * estúdio esses três são a maior parte da luz do piso, e é justamente a falta
+ * deles debaixo do veículo que o olho lê como CONTATO. Sem isso o caminhão
+ * flutua, que é o que as fotos da bancada mostravam.
+ *
+ * Sai daqui e não de vehicle/models.ts porque `vehicleFocus` já é a caixa do
+ * conjunto medida DEPOIS do engate, e é ela que a sombra e a órbita já usam:
+ * uma segunda medição seria uma segunda verdade sobre onde o caminhão está.
+ */
+export function vehicleFootprint(): { cx: number; cz: number; hx: number; hz: number } | null {
+  const f = vehicleFocus;
+  if (!f) return null;
+  const b = f.box;
+  return {
+    cx: (b.min.x + b.max.x) / 2,
+    cz: (b.min.z + b.max.z) / 2,
+    hx: (b.max.x - b.min.x) / 2,
+    hz: (b.max.z - b.min.z) / 2,
+  };
+}
+
 export function setVehicleFocus(box: THREE.Box3 | null) {
   /* Same reason as setInteriorBounds(): the ejection runs in a frame hook. */
   invalidate();
@@ -2384,6 +3012,7 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
     controls.maxDistance = Infinity;
     /* Sem conjunto, a caixa volta para a origem — é onde o cenário está. */
     _shadowFocus.set(0, 0, 0);
+    setSeeThroughTarget(null);
     placeKeyLight();
     renderer.shadowMap.needsUpdate = true;
     return;
@@ -2397,6 +3026,12 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
   placeKeyLight();
   renderer.shadowMap.needsUpdate = true;
   const r = Math.max(2, box.getSize(new THREE.Vector3()).length() / 2);
+  /* Quem atravessa protege ESTE volume — mesma caixa, mesmo instante em que a
+     caixa de sombra é recentrada. A CAIXA, e não centro-e-raio: o teste é de
+     silhueta em tela, e uma esfera de 9,5 m em volta de um conjunto de 19 × 2,6
+     × 4 m tem oito metros de ar em cima do teto e dos lados — quem julgasse pela
+     esfera apagaria o galpão que passa ACIMA do caminhão. Ver seethrough.ts. */
+  setSeeThroughTarget(box);
   /* A MIRA, e ela NÃO é `c`. frameAll() mira a 48 % da altura da caixa
      (CARD_TARGET_H) e não no centro geométrico — mirar no meio inclina a câmera
      para baixo e devolve por outro caminho a vista de cima que VIEW_DIR tirou
@@ -2741,8 +3376,34 @@ const _rc = new THREE.Raycaster();
  * São as malhas em si, e não caixas: ver o cabeçalho acima para por que a caixa
  * envolvente não serve neste set.
  */
-export function setCameraObstacles(list: THREE.Object3D[] | null) {
-  obstacles = list && list.length ? list.slice() : [];
+/** Estado de quem atravessa e da mistura de céus, para o console e a bancada. */
+export { getSeeThrough };
+export { getSkyBlend };
+/** Estado das luzes do veículo, para o console e para a bancada. */
+export { getVehicleLights, getVehicleBeams, getRetroreflective, getHeadlightCover };
+/** O derrame aditivo das lanternas. Ver vehicle/halo.ts. */
+export { getLampHalos };
+
+export function setCameraObstacles(_list: THREE.Object3D[] | null) {
+  /* O DESVIO ESTÁ DESLIGADO, e esta linha é o interruptor.
+     -------------------------------------------------------------------------
+     A órbita não foge mais das construções: ela ATRAVESSA, e quem fica entre a
+     lente e o veículo é dissolvido por `seethrough.ts`. Decisão do dono do
+     produto, e ela tem uma razão de cenário além da de câmera — enquanto a
+     câmera desviava, o cenário precisava ser autorado para não atrapalhar, que
+     é a origem do vão de 130 m na fileira de postes deste set.
+
+     A lista continua CHEGANDO (set.ts a monta e a passa) e o maquinário abaixo
+     continua inteiro e testado; o que não acontece é ele ser alimentado, e com
+     `obstacles` vazio `hitAlong()` devolve Infinity e `applyAvoidance()` é um
+     no-op de duas comparações. Religar é trocar esta linha por
+     `list && list.length ? list.slice() : []`.
+
+     Nada aqui liga ou desliga o atravessar: quem sabe se o cenário tem o que
+     dissolver é `seethrough.ts`, que monta a própria lista por MALHA e por
+     ALTURA — este `list` é uma coleta por família de material, que é justamente
+     o recorte que deixava a faixa da pista entrar. */
+  obstacles = [];
   /* O recuo E a subida suavizados eram medidos contra o cenário que saiu. */
   avoidCut = NaN; cutTarget = 0;
   riseNow = NaN; riseTarget = 0; wasBlocked = false;
@@ -3086,6 +3747,12 @@ export function setExposureBase(v: number) {
    unit it just parked or re-fitted picks up the current rig pose immediately
    instead of staying lit until the next preset change. */
 setLampRigRefresh(() => { if (rigCur) applyRig(rigCur); });
+/* E o mesmo para as LUZES DO VEÍCULO: redimensionar o implemento move as duas
+   faces de que a cor de cada lanterna depende, e `TrailerRig.set()` não passa por
+   applyRig() nenhum. Sem este gatilho a carreta alongada ficaria com as lanternas
+   traseiras âmbar até a próxima mudança de hora. Mesmo padrão de lamps.ts, pela
+   mesma razão: quem escreve é applyRig(), e applyRig() só roda em tween. */
+setVehicleLightsRigRefresh(() => { if (rigCur) applyRig(rigCur); });
 
 /* The persisted blob, as WRITTEN — nothing here is trusted; restore() validates
    and clamps every field. Widened where a hand edit could plausibly land
@@ -3546,6 +4213,15 @@ export function startLoop() {
        suavização anda com o RELÓGIO, e pular a atualização faria a correção
        saltar de uma vez quando o desenho voltasse. */
     applyAvoidance(dt);
+    /* Também depois dos hooks, e pela mesma razão: o passo da caixa de sombra e
+       o túnel de transparência são função da posição da câmera, e a posição só
+       é verdadeira aqui. */
+    tuneShadowSpan();
+    if (updateSeeThrough(camera, dt)) invalidate();
+    /* A sombra de quem está sendo atravessado dissolve junto (ver o bloco A
+       SOMBRA SAI COM O OBJETO em seethrough.ts), e o mapa de sombra deste engine
+       só se redesenha quando alguém pede. */
+    if (takeSeeThroughShadowDirty()) renderer.shadowMap.needsUpdate = true;
 
     /* Checked AFTER the hooks and BEFORE the dirty counter is spent: a frame
        skipped because the scene graph is deliberately wrong must not consume the

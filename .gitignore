@@ -86,12 +86,20 @@ tools/env-build/_shots_*/
 # scripts que as produzem estão versionados logo ao lado.
 tools/trailer-bench/shots/
 tools/trailer-bench/shots-porta/
+tools/trailer-bench/shots-resize/
+
+# E a mesma regra para a bancada do estúdio e a da livery, que seguem a mesma
+# convenção `shots*/` ao lado dos scripts: `tools/studio-bench/shots/` sozinha
+# tem 108 MB de PNG de conferência — mais que todos os assets do repo somados.
+tools/studio-bench/shots/
+tools/livery-render/shots-map/
 
 # Bakes anteriores, em qualquer pasta de asset: são backup, não fonte. Cada
 # rodada de bake deixa um .prev/.bak do tamanho do próprio modelo (o do
 # distrito-industrial tem 36 MB), e sem isto eles reaparecem como arquivo novo
 # a cada `git status`.
 *.glb.bak
+*.glb.bak-*
 *.glb.prev*
 *.glb.pre-*
 *.glb.bake*

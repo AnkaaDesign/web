@@ -30,7 +30,7 @@
    strings custaria centenas de MB. */
 
 import * as THREE from 'three';
-import { WHITE_RE } from './trailer-geometry';
+import { WHITE_RE, LOW_FRAME_TOP } from './trailer-geometry';
 
 /** Grade de solda, em metros. 0,5 mm: fino para separar peças, grosso o
  *  bastante para a chave caber em 45 bits num modelo de 15 m. */
@@ -651,7 +651,66 @@ export class TrailerAssembly {
     this.buildSkirtRepeats(root);
     this.lowerRivets(root);
     this.bindFamilies();
+    this.pinLowFrame();
     this.stats.repeats = this.repeats.length;
+  }
+
+  /**
+   * Prende ao PISO a ferragem do frame inferior que sobrou em `follow`.
+   *
+   * O QUE FOI MEDIDO (checks-corner-moves, h220 → baú 2,795 m encolhido para
+   * 2,2 m): os parafusos das pontas do trilho galvanizado no canto dianteiro
+   * (x ±1241, z 7109…7192, y +140…144 do piso) desciam 34 mm; as travas
+   * laterais (x ±1310 — FORA da crista do trilho, visíveis) desciam 42 mm; a
+   * ferragem baixa da face traseira (engates, borrachas, parafusaria em
+   * +145…435) descia 40…84 mm. Tudo isso com o trilho, a fita 3M e a soleira
+   * PARADOS — porque estes são 'floor' e aqueles caíam em 'follow'. Peças da
+   * MESMA montagem física em regras diferentes: é o degrau do canto e o
+   * "frame inferior indo para baixo" do relato.
+   *
+   * A regra certa é a física: o que mora inteiro na faixa do frame inferior
+   * (`LOW_FRAME_TOP` acima do piso) é aparafusado em estrutura presa ao piso
+   * e NÃO se move com a altura.
+   *
+   * O teste é a CAIXA INTEIRA na faixa, e isso é uma escolha MEDIDA, não um
+   * detalhe: o painel de conexões da traseira é um empilhado contínuo de
+   * +150 a +447 (chapas, engates, parafusos), com o segmento de vedação
+   * mais baixo no MEIO dele (centro +361) e o parafuso mais baixo de
+   * dobradiça também (+327) — nenhuma linha horizontal atravessa aquilo sem
+   * rasgar uma montagem (o corte por CENTRO foi ensaiado: prendia o corpo
+   * do engate em cy 208 e deixava as tampas dele em cy 250 caindo 53 mm ao
+   * lado — um rasgo NOVO, pior que o afundamento uniforme de sempre). Pela
+   * caixa inteira, quem atravessa a linha fica como está, o painel traseiro
+   * desce uniforme e coeso como sempre desceu, e o que o relato aponta — a
+   * ferragem do canto e das laterais, que mora INTEIRA na faixa — é preso.
+   *
+   * Roda DEPOIS de `buildRepeats`/`bindFamilies`: o parafuso mais baixo das
+   * dobradiças já foi reivindicado pela treliça da família (`repeated`/
+   * `latch`) e não passa por aqui. E NÃO há teste de forma: uma primeira
+   * versão poupava "perfil esbelto" e o falso positivo eram os GANCHOS de
+   * engate (x ±1310, finos), que ficavam em `follow` e desciam 42 mm
+   * separando-se do corpo preso ao lado deles — vedação de verdade nem
+   * alcança a faixa (o corrido vertical tem 423 mm e não cabe inteiro
+   * abaixo de +250).
+   */
+  private pinLowFrame() {
+    const top = this.ref.floorY + LOW_FRAME_TOP;
+    for (const piece of this.pieces) {
+      /* A MARCA DE `trailer-bake-fixes.ts`, e ela existe porque a faixa acima
+         é uma APROXIMAÇÃO da física, não a física. A trava e a borracha da
+         porta traseira foram subidas um friso a pedido do cliente e o topo
+         delas passou de +250 mm — pela faixa cairiam na regra proporcional e
+         desceriam ~50 mm num baú de 2,2 m, saindo justamente do friso em que
+         foram postas. A régua delas passou a ser a grade do friso, que nasce
+         no piso e marcha de passo fixo; então o datum delas é o piso, e quem
+         sabe disso é quem as moveu. */
+      const pinned = piece.mesh.userData.tsFloorAnchored === true;
+      for (const p of piece.parts) {
+        if (p.y !== 'follow' || p.repeated || p.latch || p.below) continue;
+        if (!pinned && p.max.y > top) continue;
+        p.y = 'floor';
+      }
+    }
   }
 
   /* --------------------------------------------------- conjuntos repetidos */
@@ -782,6 +841,32 @@ export class TrailerAssembly {
         im.name = `REPEAT_${lat.axis}_${lat.slots}`;
         im.castShadow = im.receiveShadow = true;
         im.frustumCulled = false;
+        /* NASCE VAZIO, e isto NÃO é zelo — é o conserto de um defeito visível.
+           -------------------------------------------------------------------
+           `new InstancedMesh(g, m, cap)` entrega `cap` instâncias em matriz
+           IDENTIDADE (three r155+ termina o construtor com
+           `for (i…) setMatrixAt(i, _identity)`; r179 em disco:
+           three.core.js:25663). Identidade não é degenerada: cada instância
+           desenha o molde INTEIRO na origem local da malha. Como as matrizes de
+           instância só são escritas em `set()` — que só roda num resize —, todo
+           conjunto ficava com a capacidade cheia empilhada num ponto só desde o
+           boot; e como a matriz local aqui é `inv(root.matrixWorld)`, esse ponto
+           cai no CHÃO depois que o conjunto é posicionado.
+
+           MEDIDO no app, na bancada, antes deste conserto: 342 instâncias em
+           identidade sobre 12 conjuntos, todas em (0, −0,024, 10,442) — fita
+           `Faixa-3M`, suporte preto e lente de lanterna sobrepostos, 24 mm
+           abaixo do piso, na linha de centro. É a "lasca no chão" do relato.
+           Sumia sozinha ao mexer na medida (o primeiro `set()` escreve as
+           matrizes) e voltava no boot seguinte.
+
+           Com `count = 0` o renderer não emite chamada nenhuma
+           (`renderInstances` sai em `primcount === 0`), `raycast` itera zero
+           vezes e a caixa do conjunto sai vazia — que é a verdade até o primeiro
+           `set()`, quando quem está na tela são as cascas ORIGINAIS. `set()`
+           reescreve a contagem sozinho, e o teto do laço de lá é `r.cap`, a
+           capacidade guardada, nunca `mesh.count` (ver o campo `cap`). */
+        im.count = 0;
         /* A geometria do molde está em MUNDO; desfaz a matriz de `root` para
            o conjunto poder pendurar no modelo sem transformar duas vezes. */
         im.matrixAutoUpdate = false;
@@ -891,6 +976,9 @@ export class TrailerAssembly {
       im.name = `REPEAT_skirt_${lat.slots}`;
       im.castShadow = im.receiveShadow = true;
       im.frustumCulled = false;
+      /* Vazio até o primeiro `set()` — o bloco em `buildRepeats()` explica por
+         quê, e é ESTE conjunto (a fita `Faixa-3M` da saia) que aparecia no chão. */
+      im.count = 0;
       im.matrixAutoUpdate = false;
       im.matrix.copy(inv);
       root.add(im);
@@ -1134,6 +1222,8 @@ export class TrailerAssembly {
       im.name = `RIVET_LOW_${side > 0 ? 'R' : 'L'}`;
       im.castShadow = im.receiveShadow = true;
       im.frustumCulled = false;
+      /* Vazio até o primeiro `set()` — ver o bloco em `buildRepeats()`. */
+      im.count = 0;
       im.matrixAutoUpdate = false;
       im.matrix.copy(inv);
       root.add(im);
@@ -1284,12 +1374,20 @@ export class TrailerAssembly {
    * cada vértice. O resultado é a fita inteira pintada de uma cor só, fosca e
    * sem relevo: exatamente "as faixas ficam acinzentadas, opacas".
    *
-   * E o defeito só aparecia AO MEXER NA MEDIDA porque o `InstancedMesh` nasce
-   * com `instanceMatrix` zerada (todas as instâncias degeneradas, invisíveis) e
-   * `TrailerAssembly` não roda `set()` no construtor: até o primeiro resize
-   * quem estava na tela era a casca ORIGINAL, com a UV dela. O primeiro `set()`
-   * colapsa as originais e entrega a cena às instâncias — e é aí que a fita
-   * troca de aparência.
+   * E o defeito só aparecia AO MEXER NA MEDIDA porque `TrailerAssembly` não
+   * roda `set()` no construtor: até o primeiro resize quem estava na tela era a
+   * casca ORIGINAL, com a UV dela. O primeiro `set()` colapsa as originais e
+   * entrega a cena às instâncias — e é aí que a fita troca de aparência.
+   *
+   * ATENÇÃO À RAZÃO PELA QUAL O CONJUNTO NÃO APARECE ANTES DISSO: é `count = 0`
+   * posto na construção, e NÃO "a `instanceMatrix` nasce zerada". Esta segunda
+   * frase estava escrita aqui e é FALSA no three em uso — o construtor de
+   * `InstancedMesh` termina pondo IDENTIDADE em toda instância (r155+;
+   * three.core.js:25663 na r179). Enquanto se acreditou nela, a capacidade
+   * inteira de todo conjunto ficou desenhada empilhada na origem da malha, que
+   * `inv(root.matrixWorld)` põe no chão: 342 instâncias medidas em
+   * (0, −0,024, 10,442), a lasca de fita refletiva no asfalto. Ver o bloco de
+   * `buildRepeats()`.
    *
    * Pelo bake atual isto vale para 76 primitivas de `Faixa-3M` e mais
    * `lanterna-pisca-quadrado(LEDs)`, `metal-galvanizado-mantido`, `borracha` e

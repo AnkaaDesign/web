@@ -70,6 +70,50 @@ export type { DoorRect, DoorPlane };
 /** Material da parte branca, medido no arquivo. */
 export const WHITE_RE = /Cor_padrao_branco|metalBranco/i;
 
+/**
+ * Topo da faixa do FRAME INFERIOR, medido do piso (m).
+ *
+ * O frame inferior — trilho galvanizado, travas, engates e a parafusaria de
+ * tudo isso — é ferragem APARAFUSADA em estrutura presa ao piso: mudar a
+ * altura do baú não a move. A regra proporcional ('follow' no conjunto,
+ * "peça pequena" no branco) foi feita para ferragem de porta, que mora no
+ * meio da parede e acompanha; aplicada à base ela AFUNDA o frame quando o
+ * baú encolhe. Medido na bancada (checks-corner-moves, h220): parafusos das
+ * pontas do trilho −34 mm, travas e ganchos laterais (x ±1310, FORA da
+ * crista do trilho, visíveis) −42 mm, ferragem baixa da traseira −40 mm —
+ * com trilho, fita 3M e soleira parados. É o "degrau no encontro" do canto
+ * dianteiro e o "frame inferior indo para baixo" do relato.
+ *
+ * 0,25 m é o `END_CAP` do conjunto, e a igualdade é o argumento: é a faixa
+ * em que os MEMBROS VERTICAIS (poste de canto, montante do frame) ficam
+ * rígidos por construção — então tudo que está aparafusado ali dentro tem de
+ * ficar rígido junto, senão desce em relação ao próprio membro que o segura.
+ * Acima dela o membro começa a comprimir e a regra proporcional volta a ser
+ * a aproximação certa. O corte exige a peça INTEIRA na faixa — quem a
+ * atravessa fica como está, porque peça que cruza a linha pertence a uma
+ * montagem que continua para cima e prendê-la pela metade rasga a montagem
+ * (ver a nota de `pinLowFrame()` em trailer-assembly.ts, com o ensaio que
+ * provou isso). E abaixo dela NENHUM segmento de vedação cabe inteiro (o
+ * corrido vertical tem 423 mm), então o corte não alcança borracha nenhuma
+ * — quem mora inteiro aqui é frame, e frame não sai do lugar.
+ */
+export const LOW_FRAME_TOP = 0.25;
+
+/**
+ * Centro da PARTE LISA do friso, medido de cada passo da grade (`floorY +
+ * skirtHeight + k · pitch`). **46,7 mm — a medida** (`checks-perfil.mjs`): a
+ * lisa tem ~27 mm e fica centrada aí, no plano crista − 5,3 mm.
+ *
+ * ELE NÃO É `valeInfo.row0 + valeH / 2`, e a diferença de 33 mm já custou uma
+ * rodada. `valeInfo` devolve onde `findRows()` MARCA a fileira — o começo da
+ * unidade ladrilhada —, não o meio da faixa lisa que o olho vê; somar meia
+ * altura ali cai em cima da CRISTA. Quem precisa do centro da lisa usa esta
+ * constante: `models.measureValeRows()` para a coluna de rebites da emenda
+ * (aprovada em foto) e `trailer-bake-fixes.ts` para a ferragem da porta
+ * traseira, que tem de assentar no mesmo lugar que os rebites.
+ */
+export const RIB_FLAT_CENTER = 0.0467;
+
 /** Perfil galvanizado da saia lateral — é o topo dele que dá o batente. */
 const FRAME_MAT_RE = /metal-galvanizado-mantido/i;
 
@@ -1113,6 +1157,16 @@ export class TrailerBody {
 
   /** Portas por face, como o editor as cadastrou. Vazio é o estado de fábrica. */
   private doors = new Map<Face, DoorSpec[]>();
+  /**
+   * Os VÃOS do último `rebuild()`, por face — a saída de `doorsOf()`, guardada.
+   *
+   * Guardada e não recalculada: `doorsOf()` aplica dois clamps (o comprimento
+   * corrente e a cantoneira) e ancora o pé no batente medido, e quem lê isto de
+   * fora precisa do MESMO retângulo, não de um parecido. O consumidor é
+   * `models.buildLiveryPanels()`, que usa o vão para não cravar rebite de
+   * emenda em cima da porta — ver `addPlateRivets()`.
+   */
+  private doorHoles = new Map<Face, DoorRect[]>();
   /** A CRISTA do friso de cada lateral — o plano em que a porta é montada. */
   private skinX: Record<'left' | 'right', number> = { left: 0, right: 0 };
   /** A grade do friso de cada lateral, para ancorar as faixas lisas da folha
@@ -1292,6 +1346,26 @@ export class TrailerBody {
       const ys = [t.p[1], t.p[4], t.p[7]];
       if (Math.max(...ys) <= sh.rows[0] + EPS) { sh.skirt.push(t); continue; }
       if (Math.min(...ys) >= sh.rows[R] - EPS) { sh.cap.push(t); continue; }
+
+      /* QUEM CRUZA A FRONTEIRA ENTRA RECORTADO — não descartado. Um triângulo
+         que atravessa `rows[0]` não é saia (max > rows[0]), não é arremate e
+         quase nunca alcança o slab da unidade do MEIO: a versão que só tinha
+         os três baldes o jogava fora, e a pele parametrica ficava com um RASGO
+         horizontal de 1-2 mm exatamente em rows[0] — o ladrilho i=0 recomeça
+         ali, mas a saia parava um triângulo antes. MEDIDO na bancada
+         (checks-banda2, 2026-08-11): "linha preta" a 175 mm do pé da chapa,
+         raio horizontal atravessa até o galvanizado da longarina a 66 mm, e
+         raio subindo de baixo (o ângulo de quem olha um baú do chão) vaza
+         pelo vão; o bake original é CONTÍNUO na mesma altura. O gêmeo em
+         `rows[R]` fica atrás da cantoneira, mas é o mesmo defeito. A parte
+         que invade o campo dos ladrilhos é descartada de propósito: aquela
+         faixa é reposta pela cópia da unidade, com o MESMO perfil. */
+      if (Math.min(...ys) < sh.rows[0] - EPS) {
+        for (const c of clipSlab(t, sh.min.y - 1, sh.rows[0])) sh.skirt.push(c);
+      }
+      if (Math.max(...ys) > sh.rows[R] + EPS) {
+        for (const c of clipSlab(t, sh.rows[R], sh.max.y + 1)) sh.cap.push(c);
+      }
       for (const c of clipSlab(t, lo, hi)) {
         const p = new Float32Array(c.p);
         for (let k = 0; k < 3; k++) p[k * 3 + 1] = (p[k * 3 + 1] - lo) * sy;
@@ -1316,6 +1390,23 @@ export class TrailerBody {
   }
 
   get current(): TrailerDims { return { ...this.dims }; }
+
+  /**
+   * A grade do friso — onde cada REBAIXO (a parte lisa entre frisos) começa e
+   * quanto ele mede. É a régua dos rebites das emendas de chapa
+   * (`models.addPlateRivets`): rebite fora do centro do rebaixo é o defeito
+   * que a foto denuncia primeiro. Medida no bake, réplica exata do que o
+   * `rebuild()` ladrilha.
+   */
+  /** Os vãos de porta da face, como o último `rebuild()` os abriu. */
+  getDoorHoles(face: Face): DoorRect[] {
+    return (this.doorHoles.get(face) ?? []).map((r) => ({ ...r }));
+  }
+
+  get valeInfo(): { row0: number; pitch: number; valeH: number } | null {
+    const g = this.ribGrid.left ?? this.ribGrid.right;
+    return g ? { ...g } : null;
+  }
 
   snapHeight(h: number): number {
     const { skirtHeight, capHeight, pitch } = this.profile;
@@ -1476,6 +1567,10 @@ export class TrailerBody {
        triângulo. São ~73 mil triângulos e a lista é relida em cada um. */
     const doorsFor = new Map<Face, DoorCut[]>();
     for (const face of ['left', 'right'] as const) doorsFor.set(face, doorsOf(face));
+    this.doorHoles.clear();
+    for (const [face, cuts] of doorsFor) {
+      this.doorHoles.set(face, cuts.map((c) => ({ ...c.hole })));
+    }
 
     const write = (t: Tri) => {
       for (let k = 0; k < 3; k++) {
@@ -1599,9 +1694,17 @@ export class TrailerBody {
       }
 
       /* Peça pequena: forma preservada, centro levado à posição proporcional.
-         Esticar dobradiça e fecho junto com a porta seria deformá-los. */
+         Esticar dobradiça e fecho junto com a porta seria deformá-los.
+
+         EXCETO a peça que mora INTEIRA na faixa do frame inferior: essa é
+         ferragem da base, presa ao piso — o piso é o datum imóvel, e levá-la
+         à posição proporcional é o que afundava o frame quando o baú
+         encolhia (ver LOW_FRAME_TOP; o mesmo corte vale para o conjunto
+         não-branco em `pinLowFrame()`, trailer-assembly.ts). */
       const cy = (sh.min.y + sh.max.y) / 2;
-      const dy = (floorY + (cy - floorY) * ky) - cy;
+      const dy = sh.max.y <= floorY + LOW_FRAME_TOP
+        ? 0
+        : (floorY + (cy - floorY) * ky) - cy;
       for (const t of sh.tris) push(t, dy, sh.behaviour, sh.face);
     }
 
@@ -1738,7 +1841,31 @@ export class TrailerBody {
         xSkin: this.skinX[face], sign: face === 'right' ? 1 : -1,
       };
       for (const { leaf } of doors) {
-        for (const pl of layoutDoor(leaf, plane)) {
+        /* A CHARNEIRA VAI PARA A DIANTEIRA, NOS DOIS LADOS.
+           -----------------------------------------------------------------
+           `layoutDoor()` monta a porta com a dobradiça em `leaf.z0` (a
+           traseira) e o varão em `leaf.z1`, e o cabeçalho dele defende essa
+           escolha com os renders de catálogo. O Kennedy corrigiu em
+           2026-08-12, com print dos dois flancos: "as dobradiças das portas
+           dos dois lados do implemento devem sempre estar para o lado frontal
+           do implemento". Quem fabrica decide, e a medida original do `.gltf`
+           com hierarquia concorda — o inventário no topo de `trailer-door.ts`
+           diz "4 dobradiças, borda DIANTEIRA".
+
+           O conserto é um espelho em Z do CONJUNTO, e tem de ser nos dois
+           lugares ao mesmo tempo: as coordenadas do layout (aqui) e a
+           geometria de cada peça (`mirrorAxis(geo, 'z')` lá embaixo). Só as
+           coordenadas deixaria cada peça do avesso no lugar certo — o punho da
+           tala entrando na folha —, que é exatamente o que o cabeçalho de
+           `mirrorAxis()` avisa. `anchorGeometry()` centra todas as peças em Z,
+           então o espelho da geometria é uma virada no próprio lugar.
+
+           NÃO foi feito dentro de `layoutDoor()` de propósito: aquele arquivo
+           é ESPELHADO com `truck-studio-desktop`, e esta cópia não tem como
+           sincronizar a outra. */
+        const zMid = leaf.z0 + leaf.z1;
+        for (const raw of layoutDoor(leaf, plane)) {
+          const pl = { ...raw, z: zMid - raw.z };
           /* A instância de TOPO de uma peça de ponta é ESPELHADA na vertical
              (`flipY`), e espelho é geometria — não cabe na matriz de uma
              InstancedMesh sem inverter o enrolamento da chamada inteira. Cada
@@ -1776,6 +1903,12 @@ export class TrailerBody {
            o resto do kit certo. `x` continua aqui porque é do LADO do baú, não
            da peça. */
         let geo = face === 'right' ? entry.geo.clone() : mirrorAxis(entry.geo, 'x');
+        /* O par do espelho de coordenadas lá em cima — a charneira na
+           DIANTEIRA. `extractDoorKit()` entrega o kit com a borda da dobradiça
+           apontando para −Z, uma peça de cada vez (é lá que se sabe de qual
+           porta traseira ela veio); este espelho é do CONJUNTO e vira as duas
+           metades juntas, então ele compõe com aquele em vez de brigar. */
+        geo = mirrorAxis(geo, 'z');
         /* O espelho VERTICAL da instância de topo — composto com o de lado
            quando os dois se aplicam; cada `mirrorAxis` reverte o enrolamento
            do seu espelho, então a composição fecha sozinha. */

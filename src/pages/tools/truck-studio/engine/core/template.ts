@@ -178,20 +178,20 @@ export const STUDIO_HTML = /* html */ `
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
           <button type="button" class="ts-panel preview-card" data-surface="left"
-                  title="Editar a lateral esquerda">
+                  title="Editar o lado do motorista">
             <span class="ts-panel__media"><canvas id="prev-left" width="600" height="101"></canvas></span>
             <span class="ts-panel__body">
               <span class="ts-panel__label">Lateral</span>
-              <span class="ts-panel__name">Esquerda</span>
+              <span class="ts-panel__name">Motorista</span>
             </span>
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
           <button type="button" class="ts-panel preview-card" data-surface="right"
-                  title="Editar a lateral direita">
+                  title="Editar o lado do passageiro">
             <span class="ts-panel__media"><canvas id="prev-right" width="600" height="101"></canvas></span>
             <span class="ts-panel__body">
               <span class="ts-panel__label">Lateral</span>
-              <span class="ts-panel__name">Direita</span>
+              <span class="ts-panel__name">Passageiro</span>
             </span>
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
@@ -304,11 +304,11 @@ export const STUDIO_HTML = /* html */ `
              são legitimamente assimétricas (o Thermo King fica de um lado só, e
              as fitas 3M não devem ser espelhadas: ver CONVENTIONS.md). -->
         <div class="tabs" id="surface-tabs">
-          <button class="tab active" data-surface="left">Lateral esquerda<i class="sync-dot"></i></button>
-          <button class="tab" data-surface="right">Lateral direita<i class="sync-dot"></i></button>
+          <button class="tab active" data-surface="left">Motorista<i class="sync-dot"></i></button>
+          <button class="tab" data-surface="right">Passageiro<i class="sync-dot"></i></button>
           <button class="tab" data-surface="rear">Traseira</button>
         </div>
-        <div class="editor-caption" id="editor-caption">Lateral esquerda</div>
+        <div class="editor-caption" id="editor-caption">Lado do motorista</div>
         <button id="btn-mirror" class="ghost" title="Copiar esta arte para a outra lateral">↔ Espelhar</button>
         <button id="btn-help" class="ghost" title="Atalhos do teclado">?</button>
         <button id="modal-close" class="ghost" title="Fechar (Esc)">✕ Fechar</button>
@@ -537,11 +537,11 @@ export const STUDIO_HTML = /* html */ `
         </aside>
       </div>
 
-      <div class="modal-foot" id="modal-foot">Dica: arraste e solte uma imagem em qualquer lugar do painel · a linha tracejada é a silhueta real do painel</div>
+      <div class="modal-foot" id="modal-foot">Dica: arraste e solte uma imagem em qualquer lugar do painel · o painel é um retrato do implemento carregado, com as medidas e as portas dele</div>
     </div>
 
     <div class="popover hidden" id="mirror-pop">
-      <h4 id="mirror-pop-title">Espelhar para a lateral direita</h4>
+      <h4 id="mirror-pop-title">Espelhar para o lado do passageiro</h4>
       <label class="radio-row"><input type="radio" name="mirror-mode" value="keep" checked />
         <span><b>Manter a leitura</b><em>Textos e logos ficam legíveis dos dois lados, no mesmo ponto do implemento.</em></span></label>
       <label class="radio-row"><input type="radio" name="mirror-mode" value="reflect" />

@@ -10,7 +10,7 @@
 # read as padronizado in the app and fine in the preview.
 #
 # So this binds the same maps with the same repeat and tint the manifest
-# declares, lights with the same rodovia HDRI at the same envRotation, and
+# declares, lights with the same HDRI at the same envRotation, and
 # frames with view.ts's own VIEW_DIR. What comes out is close to the app.
 #
 # AXES. The app is Y-up and this file is Z-up: app (x, y, z) is Blender
@@ -27,25 +27,65 @@ from mathutils import Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 TEX = os.path.join(WEB, "public", "textures")
-HDR = os.path.join(WEB, "public", "environments", "rodovia", "sky.hdr")
 OUT = os.path.join(HERE, "_shots_park")
+MANIFEST = os.path.join(WEB, "public", "environments", "environments.json")
+ENV_ID = "distrito-industrial"
 
-ENV_ROTATION = 4.7124
-EXPOSURE = 1.05
+# ---------------------------------------------------------------------------
+# A CONFIGURACAO E LIDA DO MANIFESTO, e nao mais copiada dele.
+#
+# Este arquivo existe para que "o preview nao possa discordar do app", e no
+# entanto trazia uma segunda copia, a mao, de tudo o que o app le do
+# environments.json: caminho do HDRI, repeat, tint, roughness, macro e
+# envIntensity de cada material. Uma copia a mao de dados que mudam SEMPRE
+# diverge, e esta ja tinha divergido em tres pontos ao mesmo tempo:
+#
+#   * `HDR` apontava para environments/rodovia/sky.hdr, que deixou de ser o
+#     HDRI do cenario;
+#   * `CONCRETE_APRON` estava com repeat 2.0 contra 1.0 no manifesto (o aproNote
+#     documenta a mudanca de 2 para 1 — o preview ficou na versao velha);
+#   * `TREE_BARK`/`TREE_LEAF` continuavam declarados depois de os materiais
+#     terem passado a chamar-se PLANT_*, ou seja o preview pintava dois slots
+#     que nao existem e nenhum dos dois que existem.
+#
+# Um preview que mente sobre a escala do ladrilho e sobre qual e o ceu e pior do
+# que nenhum, porque e com ele que se assina "esta corrigido".
+# ---------------------------------------------------------------------------
+def _manifest():
+    import json
+    with open(MANIFEST, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+    for e in doc.get("environments", []):
+        if e.get("id") == ENV_ID:
+            return e
+    raise SystemExit("cenario %r nao esta no manifesto" % ENV_ID)
+
+
+ENV = _manifest()
+_SET = ENV.get("set") or {}
+_MATS = {k: v for k, v in (_SET.get("materials") or {}).items()
+         if isinstance(v, dict)}
+
+HDR = os.path.join(WEB, "public", *ENV["hdri"].split("/"))
+ENV_ROTATION = float(ENV.get("envRotation") or 0.0)
+EXPOSURE = float(ENV.get("exposure") or 1.0)
+
+# O `stem` sai do nome do arquivo de difuso declarado: "textures/grass_diff.webp"
+# -> "grass". E o mesmo par que load_tex() remonta para achar rough/nor/ao.
+def _stem(d):
+    p = d.get("diffuse")
+    if not p:
+        return None
+    base = os.path.basename(p)
+    return base.split("_diff")[0] if "_diff" in base else base.split(".")[0]
+
 
 # name -> (texture stem or None, repeat, tint, roughness)
-# Mirrors environments.json `set.materials` for distrito-industrial.
 BIND = {
-    "GROUND_CONCRETE": ("concrete", 1.0, (0.50, 0.495, 0.475), 1.0),
-    "ASPHALT_ROAD":    ("asphalt", 1.333, (0.28, 0.285, 0.30), 0.94),
-    "CONCRETE_APRON":  ("concrete", 2.0, (0.72, 0.71, 0.68), 0.97),
-    "KERB_CONCRETE":   ("concrete", 1.0, (0.84, 0.83, 0.80), 0.95),
-    "LINE_PAINT":      (None, 1.0, (0.74, 0.72, 0.66), 0.55),
-    "GRASS_VERGE":     ("grass", 16.0, (0.42, 0.46, 0.34), 0.94),
-    "GRASS_NEAR":      ("grass", 2.0, (0.26, 0.36, 0.17), 0.93),
-    "GRAVEL_SHOULDER": ("gravel", 8.0, (0.50, 0.49, 0.46), 0.93),
-    "TREE_BARK":       (None, 1.0, (0.20, 0.16, 0.13), 0.92),
-    "TREE_LEAF":       (None, 1.0, (0.19, 0.26, 0.11), 0.88),
+    name: (_stem(d), float(d.get("repeat", 1.0)),
+           tuple(d.get("tintRgb") or (1.0, 1.0, 1.0)),
+           float(d.get("roughness", 0.9)))
+    for name, d in _MATS.items()
 }
 
 SHOTS = [
@@ -57,6 +97,27 @@ SHOTS = [
     ("e_park", (-52.0, 55.0, 1.5), 62.0, (1.90, -1.05, 0.62), 34.0),
     ("f_gate", (0.0, 232.0, 3.0), 62.0, (1.60, -1.40, 0.55), 34.0),
     ("g_top", (0.0, 10.0, 0.0), 470.0, (0.30, -0.30, 1.0), 40.0),
+    # ---- as duas pontas novas da via interna --------------------------------
+    # O BALAO, de cima e de perto. Tem de mostrar as tres coisas ao mesmo tempo:
+    # o leque de aproximacao a abrir, a guia da ilha, e que nao ha fresta entre o
+    # disco e o patio a volta.
+    # O ENQUADRAMENTO DO KENNEDY, e ele existe porque `t_balao` (de cima) deixou
+    # passar tres defeitos que so aparecem daqui: a folha do portao atravessada
+    # na rua, o meio-fio do canteiro interrompido e a marcacao a ler como um anel
+    # solto. Um render de cima mostra a PLANTA e esconde a leitura; a camera do
+    # app esta atras do caminhao, quase ao nivel do olho, e e essa que decide.
+    ("t0_balao_app", (-9.0, -55.0, 1.0), 78.0, (0.10, 1.0, 0.42), 34.0),
+    ("t_balao", (-9.1, -116.0, 0.0), 92.0, (0.30, -0.45, 1.0), 38.0),
+    # e do chao, que e como o app o mostra ao girar para sul
+    ("u_balao_low", (-9.1, -104.0, 1.6), 46.0, (0.55, -1.0, 0.22), 36.0),
+    # A RODOVIA E O ENTRONCAMENTO, de cima: nariz do canteiro, garganta, barras
+    # de pare e o acostamento a taludar para a lavoura.
+    ("v_rodovia", (-4.0, 228.0, 0.0), 108.0, (0.25, -0.55, 1.0), 38.0),
+    # A PORTARIA no portao, da rua.
+    ("w_portaria", (14.0, 140.0, 2.0), 34.0, (1.0, 0.85, 0.30), 36.0),
+    # A LAVOURA CONTRA O HORIZONTE, que e a pergunta "o blur comeca cedo?".
+    # Rasante de dentro do sitio para fora, sobre a cerca.
+    ("x_horizonte", (0.0, 60.0, 3.2), 26.0, (0.15, 1.0, 0.045), 34.0),
     # The perimeter: turf band, tree belt, plinth, wire, barbed arms. This is
     # the shot that has to prove the fence is taller AND further, and that the
     # grass in front of it is a band rather than a rectangle.
@@ -104,6 +165,23 @@ SHOTS = [
     # -X, quase ao nivel do olho. Este enquadramento e o unico que permite dizer
     # QUAL construcao e, em vez de adivinhar pelo aspecto.
     ("r_from_truck", (-62.0, 10.0, 4.0), 104.0, (1.0, -0.10, 0.115), 32.0),
+    # ---- OS DOIS AZIMUTES DO PRINT, e existem porque o azimute ja foi deduzido
+    # errado duas vezes a partir da pose do veiculo.
+    #
+    # A regra que os fixa: a CABINE fica na ponta +Y do conjunto. Logo, num print
+    # em que a cabine aparece a ESQUERDA, +Y aponta para a esquerda do ecra, o
+    # eixo de vista e +X, e o que esta atras do veiculo e o bloco LESTE (MC_03,
+    # MC_12, IBC_12). Com a cabine a DIREITA e o inverso: vista para -X e o que
+    # se ve e o bloco OESTE (MC_02, MC_00, os tanques).
+    ("y_leste_app", (8.0, 0.0, 2.0), 42.0, (-1.0, 0.30, 0.26), 34.0),
+    ("z_oeste_app", (-14.0, -8.0, 2.0), 46.0, (1.0, 0.30, 0.26), 34.0),
+    # O MESMO MC_02, mas de NORDESTE: e o angulo do print em que ele continuava
+    # a cintilar depois de o MC_03 ja estar limpo, e nenhum dos outros o cobre.
+    ("z2_mc02_ne", (-47.2, -25.5, 4.0), 44.0, (1.0, 0.55, 0.34), 34.0),
+    # AS DUAS GUARITAS E AS DUAS CANCELAS, de cima. O enquadramento rasante
+    # (w_portaria) mostra uma de cada vez e foi por isso que a cancela curta
+    # passou: de cima ve-se se ela ALCANCA a pista, que e a unica pergunta.
+    ("w2_praca", (-9.1, 126.0, 0.0), 54.0, (0.55, -0.70, 1.0), 38.0),
 ]
 
 
@@ -210,19 +288,16 @@ def macro_node(nt, amount):
 
 
 # `amount` por material, espelhando environments.json
-MACRO_AMOUNT = {
-    "GROUND_CONCRETE": 0.72, "ASPHALT_ROAD": 0.62, "CONCRETE_APRON": 0.55,
-    "KERB_CONCRETE": 0.45, "GRASS_VERGE": 0.55, "GRASS_NEAR": 0.62,
-    "GRAVEL_SHOULDER": 0.60,
-}
+MACRO_AMOUNT = {n: float((d.get("macro") or {}).get("amount", 0.0))
+                for n, d in _MATS.items()
+                if (d.get("macro") or {}).get("amount")}
 
 # `break` por material — a quebra de periodicidade do PROPRIO mapa. Espelha
 # environments.json e, como la, e ZERO no asfalto: uma textura sem feicao nao
 # repete visivelmente e nao vale a leitura extra.
-MACRO_BREAK = {
-    "GROUND_CONCRETE": 0.85, "CONCRETE_APRON": 0.70, "GRASS_VERGE": 0.80,
-    "GRASS_NEAR": 0.90, "GRAVEL_SHOULDER": 0.75,
-}
+MACRO_BREAK = {n: float((d.get("macro") or {}).get("break", 0.0))
+               for n, d in _MATS.items()
+               if (d.get("macro") or {}).get("break")}
 
 # `envIntensity` do manifesto. O Cycles nao tem equivalente por material — o
 # HDRI ilumina tudo por igual — entao o preview aproxima-o pelo NIVEL ESPECULAR
@@ -231,11 +306,8 @@ MACRO_BREAK = {
 # Sem isto o render nao consegue mostrar "o patio reflete muita luz", que e
 # precisamente o defeito a julgar: o preview desenharia a laje com o especular
 # de fabrica (0,5) enquanto o app a desenha a 0,13.
-ENV_INTENSITY = {
-    "GROUND_CONCRETE": 0.13, "ASPHALT_ROAD": 0.28, "CONCRETE_APRON": 0.18,
-    "KERB_CONCRETE": 0.20, "GRASS_VERGE": 0.60, "GRASS_NEAR": 0.50,
-    "GRAVEL_SHOULDER": 0.35,
-}
+ENV_INTENSITY = {n: float(d["envIntensity"]) for n, d in _MATS.items()
+                 if d.get("envIntensity") is not None}
 
 
 def set_specular(bsdf, level):
@@ -362,10 +434,14 @@ def bind_ground():
             nt.links.new(nm.inputs["Color"], nr.outputs["Color"])
             nt.links.new(b.inputs["Normal"], nm.outputs["Normal"])
         n += 1
-    # the two paint/foliage slots still want their COLOR_0 multiplied in
-    for name in ("LINE_PAINT", "TREE_LEAF", "TREE_BARK"):
+    # A tinta ainda quer o COLOR_0 multiplicado. A vegetacao NAO entra aqui: os
+    # materiais PLANT_* trazem a textura embutida no set.glb (folha com alfa e
+    # casca), entao reescrever a Base Color deles apagaria a folha e deixaria o
+    # cartao chapado. Era o que acontecia com TREE_LEAF/TREE_BARK, que ja nem
+    # existem — ver a nota no topo.
+    for name in ("LINE_PAINT",):
         m = bpy.data.materials.get(name)
-        if not m:
+        if not m or name not in BIND:
             continue
         nt = m.node_tree
         b = nt.nodes.get("Principled BSDF")
@@ -397,7 +473,7 @@ def world_hdri():
         nt.links.new(env.inputs["Vector"], mp.outputs["Vector"])
         nt.links.new(bg.inputs["Color"], env.outputs["Color"])
         bg.inputs["Strength"].default_value = 1.0
-        log("world: rodovia HDRI")
+        log("world: HDRI %s" % os.path.basename(HDR))
     else:
         bg.inputs["Color"].default_value = (0.42, 0.5, 0.62, 1)
         log("world: HDRI MISSING, flat sky")

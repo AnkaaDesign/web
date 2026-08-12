@@ -1,209 +1,262 @@
 {
-  "schema": "truck-studio/livery-art@1",
-  "source": "layout 15,40 para teste.svg",
-  "unitMm": 3.53954,
-  "note": "Grade 3x3 por face. `anchorX`/`anchorY` dizem o que NÃO deforma; `tile` é a largura em metros de um ladrilho da banda (o passo da fita 3M nas laterais). w/h nulos significam \"acompanhe a medida do painel\".",
+  "schema": "truck-studio/livery-art@2",
+  "source": "models/vehicles/trailer.glb — renders ortográficos por elemento (tools/livery-render)",
+  "note": "Grade por face, MEDIDA do bake. `anchorX`/`anchorY` dizem o que NÃO deforma; `tile` é o passo de ladrilho em metros e `span` a largura desenhada de um ladrilho (fita: segmento < passo). Em peças presas ao teto, `y` é quanto o PÉ da peça fica abaixo do TETO; nas demais, é medido do PISO (negativo = desce para a saia; o compositor recorta). w/h nulos = acompanhe a medida do painel.",
   "faces": {
     "left": {
-      "designLength": 15.6802,
-      "designHeight": 2.8469,
+      "designLength": 14.6559,
+      "designHeight": 2.777,
       "anchor": "end",
       "pieces": [
         {
-          "id": "band-top",
+          "id": "rail-bottom",
           "plane": "front",
-          "file": "left-band-top.svg",
+          "file": "left-rail-bottom.png",
           "x": 0,
-          "y": 2.6069,
+          "y": -0.0825,
           "w": null,
-          "h": 0.24,
-          "anchorY": "roof",
-          "tile": 1.1584
-        },
-        {
-          "id": "band-bottom",
-          "plane": "front",
-          "file": "left-band-bottom.svg",
-          "x": 0,
-          "y": 0,
-          "w": null,
-          "h": 0.2428,
+          "h": 0.21,
           "anchorY": "floor",
-          "tile": 1.1584
+          "tile": 0.3,
+          "pxPerM": 1600
         },
         {
-          "id": "post-start",
+          "id": "cap-top",
           "plane": "front",
-          "file": "left-post-start.svg",
+          "file": "left-cap-top.png",
           "x": 0,
-          "y": 0,
-          "w": 0.1904,
-          "h": null,
-          "anchorX": "start"
+          "y": 0.2074,
+          "w": null,
+          "h": 0.21,
+          "anchorY": "roof",
+          "tile": 0.3,
+          "pxPerM": 1600
         },
         {
-          "id": "post-end",
+          "id": "tape-low",
           "plane": "front",
-          "file": "left-post-end.svg",
+          "file": "left-tape-low.png",
           "x": 0,
-          "y": 0,
-          "w": 0.0896,
+          "y": -0.0519,
+          "w": null,
+          "h": 0.05,
+          "anchorY": "floor",
+          "tile": 0.5839,
+          "span": 0.308,
+          "pxPerM": 1601
+        },
+        {
+          "id": "post-rear",
+          "plane": "front",
+          "file": "left-post-rear.png",
+          "x": 0,
+          "y": -0.083,
+          "w": 0.1735,
           "h": null,
-          "anchorX": "end"
+          "anchorX": "start",
+          "pxPerM": 1429
+        },
+        {
+          "id": "post-front",
+          "plane": "front",
+          "file": "left-post-front.png",
+          "x": 0,
+          "y": -0.083,
+          "w": 0.1421,
+          "h": null,
+          "anchorX": "end",
+          "pxPerM": 1429
         }
       ]
     },
     "right": {
-      "designLength": 15.6837,
-      "designHeight": 2.8469,
+      "designLength": 14.6559,
+      "designHeight": 2.7769,
       "anchor": "start",
       "pieces": [
         {
-          "id": "band-top",
+          "id": "rail-bottom",
           "plane": "front",
-          "file": "right-band-top.svg",
+          "file": "right-rail-bottom.png",
           "x": 0,
-          "y": 2.6047,
+          "y": -0.0825,
           "w": null,
-          "h": 0.2421,
-          "anchorY": "roof",
-          "tile": 1.1584
-        },
-        {
-          "id": "band-bottom",
-          "plane": "front",
-          "file": "right-band-bottom.svg",
-          "x": 0,
-          "y": 0,
-          "w": null,
-          "h": 0.2407,
+          "h": 0.21,
           "anchorY": "floor",
-          "tile": 1.1584
+          "tile": 0.3,
+          "pxPerM": 1600
         },
         {
-          "id": "post-start",
+          "id": "cap-top",
           "plane": "front",
-          "file": "right-post-start.svg",
+          "file": "right-cap-top.png",
           "x": 0,
-          "y": 0,
-          "w": 0.0927,
-          "h": null,
-          "anchorX": "start"
+          "y": 0.2074,
+          "w": null,
+          "h": 0.21,
+          "anchorY": "roof",
+          "tile": 0.3,
+          "pxPerM": 1600
         },
         {
-          "id": "post-end",
+          "id": "tape-low",
           "plane": "front",
-          "file": "right-post-end.svg",
+          "file": "right-tape-low.png",
           "x": 0,
-          "y": 0,
-          "w": 0.1908,
+          "y": -0.0519,
+          "w": null,
+          "h": 0.05,
+          "anchorY": "floor",
+          "tile": 0.5839,
+          "span": 0.308,
+          "pxPerM": 1601
+        },
+        {
+          "id": "post-rear",
+          "plane": "front",
+          "file": "right-post-rear.png",
+          "x": 0,
+          "y": -0.083,
+          "w": 0.1735,
           "h": null,
-          "anchorX": "end"
+          "anchorX": "end",
+          "pxPerM": 1429
+        },
+        {
+          "id": "post-front",
+          "plane": "front",
+          "file": "right-post-front.png",
+          "x": 0,
+          "y": -0.083,
+          "w": 0.1421,
+          "h": null,
+          "anchorX": "start",
+          "pxPerM": 1429
         }
       ]
     },
     "rear": {
-      "designLength": 2.6086,
-      "designHeight": 2.8469,
+      "designLength": 2.5896,
+      "designHeight": 2.5771,
       "anchor": "start",
       "pieces": [
         {
           "id": "band-top",
           "plane": "front",
-          "file": "rear-band-top.svg",
+          "file": "rear-band-top.png",
           "x": 0,
-          "y": 2.6571,
+          "y": 0.1267,
           "w": null,
-          "h": 0.1897,
-          "anchorY": "roof"
+          "h": 0.13,
+          "anchorY": "roof",
+          "pxPerM": 1558
         },
         {
           "id": "band-bottom",
           "plane": "front",
-          "file": "rear-band-bottom.svg",
+          "file": "rear-band-bottom.png",
           "x": 0,
-          "y": 0,
+          "y": -0.2801,
           "w": null,
-          "h": 0.2191,
-          "anchorY": "floor"
+          "h": 0.7401,
+          "anchorY": "floor",
+          "pxPerM": 1558
+        },
+        {
+          "id": "bumper",
+          "plane": "front",
+          "file": "rear-bumper.png",
+          "x": 0,
+          "y": -1.1347,
+          "w": null,
+          "h": 0.153,
+          "anchorY": "floor",
+          "pxPerM": 1558
         },
         {
           "id": "post-start",
           "plane": "front",
-          "file": "rear-post-start.svg",
+          "file": "rear-post-start.png",
           "x": 0,
-          "y": 0,
-          "w": 0.1016,
+          "y": -0.083,
+          "w": 0.27,
           "h": null,
-          "anchorX": "start"
+          "anchorX": "end",
+          "pxPerM": 1533
         },
         {
           "id": "post-end",
           "plane": "front",
-          "file": "rear-post-end.svg",
+          "file": "rear-post-end.png",
           "x": 0,
-          "y": 0,
-          "w": 0.103,
+          "y": -0.083,
+          "w": 0.27,
           "h": null,
-          "anchorX": "end"
+          "anchorX": "start",
+          "pxPerM": 1533
         },
         {
           "id": "centre",
           "plane": "front",
-          "file": "rear-centre.svg",
+          "file": "rear-centre.png",
           "x": 0,
           "y": 0,
           "w": null,
           "h": null,
           "anchorX": "stretch",
-          "anchorY": "stretch"
+          "anchorY": "stretch",
+          "pxPerM": 1600
         }
       ]
     },
     "front": {
-      "designLength": 2.6122,
-      "designHeight": 2.8635,
+      "designLength": 2.5896,
+      "designHeight": 2.7569,
       "anchor": "start",
       "pieces": [
         {
           "id": "band-top",
           "plane": "front",
-          "file": "front-band-top.svg",
+          "file": "front-band-top.png",
           "x": 0,
-          "y": 2.6224,
+          "y": 0.2074,
           "w": null,
-          "h": 0.241,
-          "anchorY": "roof"
+          "h": 0.21,
+          "anchorY": "roof",
+          "pxPerM": 1558
         },
         {
           "id": "band-bottom",
           "plane": "front",
-          "file": "front-band-bottom.svg",
+          "file": "front-band-bottom.png",
           "x": 0,
-          "y": 0,
+          "y": -0.1025,
           "w": null,
-          "h": 0.2414,
-          "anchorY": "floor"
+          "h": 0.21,
+          "anchorY": "floor",
+          "pxPerM": 1558
         },
         {
           "id": "post-start",
           "plane": "front",
-          "file": "front-post-start.svg",
+          "file": "front-post-start.png",
           "x": 0,
-          "y": 0,
-          "w": 0.0761,
+          "y": -0.083,
+          "w": 0.47,
           "h": null,
-          "anchorX": "start"
+          "anchorX": "start",
+          "pxPerM": 1438
         },
         {
           "id": "post-end",
           "plane": "front",
-          "file": "front-post-end.svg",
+          "file": "front-post-end.png",
           "x": 0,
-          "y": 0,
-          "w": 0.0768,
+          "y": -0.083,
+          "w": 0.47,
           "h": null,
-          "anchorX": "end"
+          "anchorX": "end",
+          "pxPerM": 1438
         }
       ]
     }

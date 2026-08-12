@@ -78,6 +78,47 @@ export function setLampRigRefresh(fn: () => void) { rigRefresh = fn; }
    standing emissive would otherwise glow at noon. */
 export const LAMP_COUNT = 8;
 
+/* ---------------- AS QUATRO VAGAS DO VEÍCULO ----------------
+   O pedido foi *"quero que elas realmente emitam luz"*, e a resposta tinha de
+   caber DENTRO da restrição do cabeçalho: `NUM_SPOT_LIGHTS` é chave de cache de
+   programa, então uma `SpotLight` criada quando o farol acende recompilaria a
+   cena inteira no meio do arrasto do controle de hora.
+
+   Então o pool cresceu de 8 para 12 e as quatro últimas são do VEÍCULO — dois
+   faróis e duas lanternas traseiras, posicionados por `vehicle/beams.ts` a partir
+   das lâmpadas que `vehicle/lights.ts` mediu. O que importa é o INVARIANTE, e ele
+   não mudou: a contagem continua sendo uma constante de módulo, continua havendo
+   exatamente DUAS configurações de shader (0 e 12), e `warmLightPrograms()`
+   continua pré-compilando as duas atrás da cortina de carregamento.
+
+   ELAS NÃO SÃO `LampUnit`, e isso é de propósito: uma unidade de poste carrega
+   mastro, luminária e vidro, e `applyRig()` escreve a intensidade de todas elas a
+   partir de `rig.lampIntensity`. Um feixe de caminhão não tem fixture nenhum e a
+   intensidade dele vem de `rig.vehLights`, que é outro número e outra rampa.
+   Misturá-las na mesma lista faria o laço de `applyRig()` apagar o farol toda vez
+   que o cenário pedisse postes fracos. São dois arrays, um dono cada.
+
+   O que elas COMPARTILHAM com os postes é a bandeira `visible`, e só ela:
+   `setLampsEnabled()` em scene.ts continua sendo o único escritor dela e agora
+   percorre as catorze. É o que mantém a contagem binária.
+
+   FORAM 4 E VIRARAM 6, por um relato: *"a da traseira do cavalo nao afeta o
+   implemento"*. As duas vagas novas são a traseira do CAVALO — que, com uma
+   carreta engatada, tem a parede dianteira do baú a ~2 m dela e não estava
+   pintando nada nela. Não é a mesma coisa que o par da cauda: aquele mora no
+   extremo do comboio e joga no asfalto; este mora NO MEIO dele e joga numa
+   parede. Com o cavalo sozinho as duas ficam apagadas, porque aí a traseira do
+   cavalo JÁ é a cauda e o par de lá dá conta. */
+export const VEH_BEAM_COUNT = 6;
+
+/**
+ * Os feixes do veículo. Vazio até `makeLamps()`; escrito por `vehicle/beams.ts`.
+ *
+ * ⚠️ NUNCA escreva `visible` aqui — ver a nota acima. Só `intensity`, `color`,
+ * `position`, `angle`, `penumbra` e `distance`, que são uniformes.
+ */
+export const vehBeams: THREE.SpotLight[] = [];
+
 /* Mounting geometry. A main-road lantern is 8-10 m up on a 2-2.5 m bracket;
    these are the middle of both bands and every fixture is fitted to them. */
 export const LAMP_HEIGHT = 9.0;         // metres, ground to the top of the luminaire
@@ -88,6 +129,36 @@ const LAMP_OUTREACH = 2.2;       // metres the luminaire reaches over the road
    tilting the axis 1.6 m over 9 m (10°) is the cheap stand-in — it slides the
    pool toward the lane instead of parking it in the gutter. */
 const LAMP_AIM_OFFSET = 1.6;
+
+/* ---------------- ABERTURA E GANHO DO FEIXE ----------------
+   Pedido: *"faca com que as luzes dos postes de luz seja mais abertas e levemente
+   mais fortes"*.
+
+   O ângulo autorado era 0,85 rad (48,7° de meio-ângulo, 97° de cone) e saiu de uma
+   conta honesta — `atan(10/9)` para um poste de 9 m cobrir uma poça de ~20 m. O
+   pedido quer a poça MAIOR, então 1,05 rad (60°/120°) põe o alcance em
+   `9 · tan(60°) = 15,6 m` de raio.
+
+   E ABRIR ESCURECE, o que é a parte que não se pode esquecer: a `SpotLight` do
+   three distribui a MESMA intensidade pelo cone, então um cone maior espalha o
+   mesmo fluxo por mais área. A razão de ângulo sólido entre os dois é
+   `(1 − cos 1,05) / (1 − cos 0,85) = 0,5024 / 0,3400 = 1,478`, ou seja abrir sem
+   compensar deixaria a poça 1,5x mais fraca — o oposto do pedido.
+
+   Então o ganho é 1,478 (para EMPATAR) x 1,2 (o "levemente mais forte") = 1,77. */
+const LAMP_ANGLE = 1.05;
+const LAMP_BEAM_GAIN = 1.77;
+
+/**
+ * O ganho do feixe, para `applyRig()` multiplicar junto com a compensação de
+ * altura.
+ *
+ * SEPARADO de `getLampIntensityScale()` de propósito, e não somado nele: aquele é
+ * a correção física `(h/9)²` de uma altura de montagem diferente, e este é uma
+ * escolha de composição. Juntá-los faria a próxima pessoa que mexer na altura
+ * pensar que está mexendo no gosto, e vice-versa.
+ */
+export function getLampBeamGain() { return LAMP_BEAM_GAIN; }
 
 /**
  * One pole. Every unit is built in the SAME canonical local frame — base at
@@ -115,16 +186,108 @@ interface LampGeo {
 /** The pole layout a scene asks for; see setLamps(). */
 export interface LampLayout {
   enabled: boolean;
-  layout: 'roadside' | 'yard';
+  layout: 'roadside' | 'yard' | 'set';
   spacing: number;
   offset: number;
   count: number;
   height: number;
 }
 
+/* ---------------- O CENÁRIO TRAZ O POSTE, NÓS TRAZEMOS A LUZ ----------------
+   O terceiro layout, `'set'`, e por que ele existe.
+
+   `distrito-industrial` MODELA os próprios postes: onze torres de 10 m com
+   braço e luminária, no `set.glb`. Até 2026-08-11 o manifesto dele dizia
+   `lamps: { enabled: false }` com a justificativa de que "a fileira procedural
+   duplicaria a iluminação" — e a justificativa estava certa quanto à GEOMETRIA e
+   errada quanto à LUZ, porque medido no arquivo:
+
+     · as onze torres usam o material `FENCE_POST`, o mesmo do mourão do
+       alambrado, e
+     · o `set.glb` não tem UM material emissivo.
+
+   Ou seja: aquelas luminárias nunca acenderam. À noite o distrito ficava com
+   onze postes apagados e nenhuma fonte além do céu, que é a metade que faltava
+   do "somente escurecer nao fica bom".
+
+   A divisão que este layout implementa: o cenário é dono do FIXTURE (mastro,
+   braço, luminária — modelados, com a licença deles) e este módulo é dono da
+   LUZ (o refletor e o vidro aceso). Nada é desenhado duas vezes, e nada é
+   inventado: as posições, a altura, o alcance do braço e o tamanho da lente vêm
+   MEDIDOS da geometria do set, por `scenery.ts`, que é quem já realinha as
+   torres.
+
+   O POOL CONTINUA SENDO 8 e a razão está no cabeçalho: `NUM_SPOT_LIGHTS` é
+   chave de cache de programa. Com onze torres, os oito refletores vão para as
+   oito MAIS PRÓXIMAS do veículo e as três restantes ficam sem luz própria — a
+   mais distante fica a 150 m, onde um refletor rende dois pixels. O que TODAS
+   ganham é o vidro aceso, que é geometria emissiva e não custa luz nenhuma; é
+   ele que dá a fileira de pontos alaranjados descendo a rua. */
+export interface LampSite {
+  /** Eixo do mastro, em mundo. */
+  x: number; z: number;
+  /** Base do mastro, em mundo — as torres deste set nascem a y ≈ 0,01. */
+  y: number;
+  /** Para onde o braço aponta, horizontal e normalizado. */
+  aimX: number; aimZ: number;
+  /**
+   * A malha do MASTRO, para o vidro poder ser amarrado ao veredito dela.
+   *
+   * Sem isto o vidro aceso sobrevive ao poste: atravessar a torre apaga o mastro
+   * (que recebe a injeção de `seethrough.ts`) e deixa o vidro FLUTUANDO no céu,
+   * porque ele é geometria nossa e não recebeu injeção nenhuma. Foi fotografado
+   * na bancada às 20:00. Quem faz o vínculo é set.ts, depois de medir — ver
+   * `bindSeeThroughSatellite()`.
+   */
+  host: THREE.Object3D | null;
+}
+
+/** As medidas do fixture do cenário, em metros de mundo. */
+export interface LampSiteGeo {
+  /** Ponto mais alto da luminária, do chão. Entra em lampHeight. */
+  height: number;
+  /** Deslocamento horizontal do centro da luminária em relação ao mastro. */
+  outreach: number;
+  /** Altura da FACE DE BAIXO da luminária — é ali que o vidro fica. */
+  lensY: number;
+  /** Meia-medida do vidro ao longo do braço. */
+  lensR: number;
+  /**
+   * Meia-medida ATRAVÉS do braço — MEDIDA, não derivada de aspecto.
+   *
+   * Ela já era calculada por `medirLuminaria()` em scenery.ts e era descartada
+   * na saída, e é isso que produzia o relato *"o vidro não está batendo"*: sem
+   * ela a largura vinha de `LAMP_LENS_ASPECT`, que é a proporção da luminária
+   * PROCEDURAL. Medido no set: 0,437 × 2 × 0,55 = 0,481 de largura contra 0,42
+   * da carcaça — o vidro transbordava 3 cm por lado, e a carcaça ainda é
+   * TRONCADA, então na face de baixo a sobra era maior ainda.
+   */
+  lensT: number;
+  /**
+   * Inclinação da face de baixo, em RADIANOS — positiva quando ela SOBE indo
+   * para fora do mastro.
+   *
+   * Existe porque a luminária deste set é uma CUNHA: medido, a face sobe 0,17 m
+   * ao longo de 0,84 m de alcance, ou seja 11,3°. Um vidro horizontal sob ela
+   * encosta na ponta de dentro e fica 17 cm pendurado no ar na ponta de fora —
+   * que é o relato *"a angulacao"*. Uma luminária plana devolve 0 e nada muda.
+   */
+  lensTilt: number;
+}
+
 export const lampUnits: LampUnit[] = [];
 let lampLensMat: THREE.MeshStandardMaterial | null = null;
 let lampPoleMat: THREE.MeshStandardMaterial | null = null;
+
+/* Os vidros das luminárias do CENÁRIO. Um grupo próprio, em coordenadas de
+   mundo, e não filhos das torres: `arranjarCenario()` roda depois do recuo e o
+   set não se mexe mais, então a posição de mundo é estável — e pendurá-los na
+   árvore do set faria o descarte dele levar embora malhas que são nossas. */
+let siteLensGroup: THREE.Group | null = null;
+let lampSites: LampSite[] = [];
+let lampSiteGeo: LampSiteGeo | null = null;
+/** Quantos vidros de cenário caber; onze neste set, folga para o próximo. */
+const LAMP_SITE_MAX = 32;
 
 /* Fixture state. `lampProto` is a prepared, scaled, oriented template that is
    cloned into each unit; `lampModelSrc` is the object scene/environment.ts handed us,
@@ -169,6 +332,21 @@ const LAMP_PROC_GEO: LampGeo = {
   lensR: 0.30,
 };
 const LAMP_LENS_ASPECT = 0.55;
+/**
+ * O quanto o vidro do CENÁRIO se recolhe para dentro da face de baixo.
+ *
+ * 0,88 e não 1,0 porque a medida é da face inteira e a moldura da luminária faz
+ * parte dela: um vidro do tamanho exato do recorte encosta na borda e, com a
+ * carcaça troncada deste set, aparece transbordando quando visto de baixo — que é
+ * de onde se olha um poste. 6 % de folga por lado é menos que a espessura da
+ * moldura de qualquer luminária real e resolve os dois casos.
+ */
+const LENS_INSET = 0.88;
+
+/* Temporários da montagem do vidro de cenário — ver rebuildSiteLenses(). */
+const _eulerLente = new THREE.Euler();
+const _qLente = new THREE.Quaternion();
+const _eixoZ = new THREE.Vector3(0, 0, 1);
 let lampModelGeo: LampGeo | null = null;
 
 /* MOUNTING HEIGHT IS DATA NOW, and the intensity has to follow it.
@@ -338,9 +516,9 @@ export function makeLamps() {
     lamp.add(proc, model, lens);
 
     /* Beam shape, from a real luminaire rather than from taste:
-         angle 0.85 rad (48.7° half, 97° full) — a 9 m mount lighting a ~20 m
-           pool wants atan(10/9) = 48°, and 70-100° full is the band cutoff
-           optics actually cover.
+         angle LAMP_ANGLE — hoje 1,05 rad (60° half, 120° full), aberto a pedido;
+           ver o bloco ABERTURA E GANHO DO FEIXE, que explica por que abrir exige
+           compensar a intensidade.
          penumbra 0.65 — a reflector with a physically large source has no hard
            cone edge; 0 would draw a visible disc rim on the asphalt.
          decay 2 — inverse square, which is what three's photometric path
@@ -349,7 +527,7 @@ export function makeLamps() {
            untouched (0.999 at 9 m) and just closes the tail off cleanly.
        Everything about the spot's PLACEMENT is written by updateLampFixtures(),
        because it follows the fixture. */
-    const spot = new THREE.SpotLight(0xffb45e, 0, 55, 0.85, 0.65, 2);
+    const spot = new THREE.SpotLight(0xffb45e, 0, 55, LAMP_ANGLE, 0.65, 2);
     spot.castShadow = false;                     // perf: light pools only
     lamp.add(spot, spot.target);
 
@@ -381,6 +559,28 @@ export function makeLamps() {
     lampUnits.push({ group: lamp, proc, model, lens, spot, active: false });
     g.add(lamp);
   }
+  /* AS QUATRO VAGAS DO VEÍCULO — ver o bloco de VEH_BEAM_COUNT. Nascem com
+     intensidade 0 e em (0,0,0); quem as põe no lugar é `vehicle/beams.ts`, com as
+     lâmpadas já medidas. Ficam neste grupo pelo mesmo motivo que os postes: é o
+     grupo que entra e sai da cena inteiro, e é sobre ele que `setLampsEnabled()`
+     escreve a bandeira que mantém `NUM_SPOT_LIGHTS` binário.
+     `castShadow` fica em false, como nos postes: um farol que projeta sombra
+     custaria dois mapas de sombra por quadro para iluminar asfalto vazio. */
+  vehBeams.length = 0;
+  for (let i = 0; i < VEH_BEAM_COUNT; i++) {
+    const s = new THREE.SpotLight(0xffffff, 0, 40, 0.5, 0.5, 2);
+    s.castShadow = false;
+    g.add(s, s.target);
+    vehBeams.push(s);
+  }
+
+  /* O grupo dos vidros do CENÁRIO, vazio e vivo desde o começo: ele é filho do
+     grupo dos postes, então entra e sai da cena com ele, mas as malhas dentro
+     ficam em coordenadas de MUNDO (o grupo nunca é transformado). */
+  siteLensGroup = new THREE.Group();
+  siteLensGroup.name = 'ts-lamp-site-lenses';
+  g.add(siteLensGroup);
+
   /* Aplica o `active: false` acima à geometria AGORA, em vez de esperar a
      primeira `setLamps()`. Sem esta linha o campo diria "inativo" e a tela
      mostraria oito postes — o estado que o bloco acima descreve. */
@@ -388,12 +588,125 @@ export function makeLamps() {
   return g;
 }
 
+/**
+ * Declara as luminárias que o CENÁRIO trouxe. `null` esquece.
+ *
+ * Chamado por `scenery.ts`, que é quem mede as torres do set (e quem as
+ * realinha). Reconstrói os vidros e reposiciona o pool — mas só tem efeito
+ * visível quando o manifesto pediu `layout: 'set'`; um cenário que traz torres e
+ * pede a fileira procedural continua recebendo a fileira procedural.
+ */
+export function setLampSites(sites: LampSite[] | null, geo: LampSiteGeo | null) {
+  lampSites = sites && geo ? sites.slice(0, LAMP_SITE_MAX) : [];
+  lampSiteGeo = lampSites.length ? geo : null;
+  if (sites && geo && sites.length > LAMP_SITE_MAX) {
+    console.info('[lamps] ' + sites.length + ' luminárias no cenário; '
+      + LAMP_SITE_MAX + ' recebem vidro aceso.');
+  }
+  /* A ALTURA MEDIDA MANDA — ver a nota em setLamps(). Ela chega aqui, depois
+     daquela chamada, então é aqui que a compensação E = I/h² fica correta. */
+  if (lampSiteGeo && lampLayout.layout === 'set') {
+    lampHeight = THREE.MathUtils.clamp(lampSiteGeo.height, 3, 16);
+    lampLayout.height = lampHeight;
+    lampIntensityScale = (lampHeight / LAMP_HEIGHT) ** 2;
+  }
+  rebuildSiteLenses();
+  applyLampLayout();
+  /* A intensidade do spot é de applyRig(), que só roda em tween — sem isto uma
+     unidade recém-posicionada ficaria apagada até a próxima troca de preset. */
+  rigRefresh();
+}
+
+/* Geometria do vidro de cenário: uma caixa rasa, e não o cilindro do pool. A
+   luminária modelada deste set é retangular (0,874 x 0,42 m medidos), e um disco
+   dentro de um recorte retangular deixa quatro cantos escuros exatamente onde o
+   olho procura a lâmpada. Uma só, compartilhada pelos onze. */
+let siteLensGeo: THREE.BoxGeometry | null = null;
+
+/** Vidro ↔ mastro, para set.ts amarrar um ao veredito do outro. */
+const siteLensPairs: { mesh: THREE.Mesh; host: THREE.Object3D | null }[] = [];
+
+/** Os pares vidro/mastro do cenário corrente. Ver `LampSite.host`. */
+export function getLampLensPairs() { return siteLensPairs.slice(); }
+
+function rebuildSiteLenses() {
+  const g = siteLensGroup;
+  if (!g) return;
+  siteLensPairs.length = 0;
+  for (const c of [...g.children]) {
+    g.remove(c);
+    /* A geometria e o material são COMPARTILHADOS — descartar aqui apagaria os
+       vidros dos irmãos e o do pool. Quem os solta é disposeLampSiteLenses(). */
+  }
+  const geo = lampSiteGeo;
+  if (!geo || !lampSites.length || !lampLensMat) return;
+  if (!siteLensGeo) siteLensGeo = new THREE.BoxGeometry(1, 1, 1);
+  for (const s of lampSites) {
+    const m = new THREE.Mesh(siteLensGeo, lampLensMat);
+    /* O vidro fica 1 cm ABAIXO da face de baixo da luminária, pela mesma razão
+       que o do pool: coincidente com ela seria z-fighting, e dentro dela não
+       apareceria de lado — e é de lado que se olha um poste da beira do pátio.
+       Era 2 cm; caiu para 1 porque com o retângulo agora INSCRITO na face (ver
+       abaixo) a chapa não precisa mais descer para ser vista pela beirada. */
+    m.position.set(
+      s.x + s.aimX * geo.outreach,
+      geo.lensY + s.y,
+      s.z + s.aimZ * geo.outreach,
+    );
+    /* ⚠️ `-s.aimZ`, e o sinal É UM CONSERTO. A rotação em Y do three leva o +X
+       local a (cos θ, 0, −sin θ), então o θ que põe o +X sobre (aimX, 0, aimZ) é
+       `atan2(−aimZ, aimX)`. Estava `atan2(aimZ, aimX)`, que é o ESPELHO disso: o
+       vidro saía girado −2θ em relação ao braço. Passou despercebido porque nos
+       onze postes deste set o braço é ±X exato (aimZ = 0), onde os dois valores
+       coincidem em 0 e π — mas qualquer set com o mastro em diagonal, ou com a
+       raiz girada, poria o vidro atravessado. `placeLamp()` e o ramo `set` de
+       `applyLampLayout()` já usavam a conta certa para o braço −X; agora as três
+       concordam.
+       E DEPOIS A INCLINAÇÃO, multiplicada À DIREITA para girar em torno do eixo
+       LOCAL z — que, depois do yaw, é o eixo ATRAVÉS do braço. Girar em torno do
+       z de mundo poria o vidro de lado nos postes voltados para −X. */
+    m.quaternion.setFromEuler(_eulerLente.set(0, Math.atan2(-s.aimZ, s.aimX), 0));
+    m.quaternion.multiply(
+      _qLente.setFromAxisAngle(_eixoZ, geo.lensTilt || 0));
+    /* x ao longo do braço, z através dele — as DUAS medidas agora vêm da face de
+       baixo da luminária (ver `lensT`), inscritas nela por `LENS_INSET` para o
+       vidro nunca transbordar a carcaça. 4 cm de espessura para ele existir de
+       lado. */
+    m.scale.set(geo.lensR * 2 * LENS_INSET, 0.04, geo.lensT * 2 * LENS_INSET);
+    /* 1 cm PARA FORA DA FACE, e o deslocamento é no eixo local (`translateY`
+       respeita a rotação acima) — não em Y de mundo. Coincidente com a carcaça
+       seria z-fighting; deslocar no Y de mundo devolveria a folga em cunha que
+       este bloco inteiro existe para fechar. */
+    m.translateY(-0.01);
+    m.castShadow = false;
+    m.receiveShadow = false;
+    g.add(m);
+    siteLensPairs.push({ mesh: m, host: s.host });
+  }
+}
+
+/** Solta a geometria própria dos vidros de cenário. O material é do pool. */
+export function disposeLampSiteLenses() {
+  setLampSites(null, null);
+  if (siteLensGeo) { siteLensGeo.dispose(); siteLensGeo = null; }
+}
+
 /* Put the lens and the spot where the ACTIVE fixture's luminaire is, and show
    exactly one fixture. The unit group itself is never hidden — the spot lives
    on it, and hiding it would flip NUM_SPOT_LIGHTS. */
 function updateLampFixtures() {
-  const useModel = lampFixture === 'model' && !!lampProto;
-  const geo = (useModel && lampModelGeo) || LAMP_PROC_GEO;
+  /* O CENÁRIO GANHA DE TUDO quando ele traz as torres: nenhum fixture nosso é
+     desenhado, nem o vidro do pool (os vidros de cenário estão no lugar dele, e
+     dois no mesmo ponto seriam z-fighting). Sobra o refletor. */
+  const useSite = lampLayout.layout === 'set' && !!lampSiteGeo && lampSites.length > 0;
+  const useModel = !useSite && lampFixture === 'model' && !!lampProto;
+  const geo = useSite
+    ? {
+      outreach: lampSiteGeo!.outreach,
+      lensY: lampSiteGeo!.lensY,
+      lensR: lampSiteGeo!.lensR,
+    }
+    : ((useModel && lampModelGeo) || LAMP_PROC_GEO);
   /* Our lens stands down when the fixture brought its own emissive: that one is
      modelled to fit its housing and is already following the clock (applyRig
      drives it), so adding a second glow would only be a disc in the wrong
@@ -406,13 +719,18 @@ function updateLampFixtures() {
      same scale on everything derived from it. The AIM offset scales too: it is
      a 10° tilt expressed as a lateral offset at the mounting height, so
      leaving it fixed would make a 5 m lamp squint 18° instead. */
-  const s = lampHeight / LAMP_HEIGHT;
+  /* A MEDIDA DO CENÁRIO JÁ É ABSOLUTA, então não há escala a aplicar nela: `s`
+     existe para normalizar um TEMPLATE autorado a LAMP_HEIGHT, e o fixture do
+     set não é template nenhum — ele está lá, com a altura que tem. A compensação
+     de altura continua valendo e vive em `lampIntensityScale`, que é outra
+     coisa (E = I/h², não uma escala de geometria). */
+  const s = useSite ? 1 : lampHeight / LAMP_HEIGHT;
   for (const u of lampUnits) {
-    u.proc.visible = u.active && !useModel;
-    u.model.visible = u.active && useModel;
+    u.proc.visible = u.active && !useSite && !useModel;
+    u.model.visible = u.active && !useSite && useModel;
     u.proc.scale.setScalar(s);
     u.model.scale.setScalar(s);
-    u.lens.visible = u.active && !ownLens;
+    u.lens.visible = u.active && !useSite && !ownLens;
     u.lens.position.set(-geo.outreach * s, geo.lensY * s, 0);
     u.lens.scale.set(geo.lensR * s, 0.22 * s, geo.lensR * LAMP_LENS_ASPECT * s);
     /* The spot originates AT THE LENS — 6 cm below it, so the housing is never
@@ -713,6 +1031,39 @@ function placeLamp(unit: LampUnit, x: number, z: number, aimX: number, aimZ: num
 
 export function applyLampLayout() {
   const o = lampLayout;
+
+  /* AS OITO MAIS PRÓXIMAS DO VEÍCULO, e não as oito primeiras da lista. O
+     veículo fica em torno da origem do cenário e as torres correm 272 m em z;
+     pegar as primeiras deixaria o caminhão no escuro com oito refletores a 200 m
+     de distância. `siteRank()` ordena por distância à origem e é reavaliada a
+     cada `setLampSites()` — ou seja, uma vez por carga de cenário. */
+  if (o.layout === 'set' && lampSiteGeo && lampSites.length) {
+    const ordem = lampSites
+      .map((s, i) => ({ i, d: s.x * s.x + s.z * s.z }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, LAMP_COUNT);
+    for (let i = 0; i < LAMP_COUNT; i++) {
+      const u = lampUnits[i];
+      const alvo = o.enabled ? ordem[i] : undefined;
+      u.active = !!alvo;
+      if (!alvo) continue;
+      const s = lampSites[alvo.i];
+      /* A base do grupo vai na base do MASTRO — as torres deste set nascem 1 a
+         2 cm acima do zero, e ignorar isso poria o refletor 2 cm fora da
+         luminária, o que não muda nada; mas manter a medida é o que faz o vidro
+         e o refletor concordarem quando o próximo cenário tiver terreno. */
+      u.group.position.set(s.x, s.y, s.z);
+      /* placeLamp() gira para o braço LOCAL −X apontar no aim; aqui a geometria
+         do cenário já está no lugar e o que se orienta é só o refletor, então a
+         mesma conta serve — o `outreach` positivo de LampSiteGeo é lido pelo
+         mesmo `-geo.outreach` de updateLampFixtures(). */
+      const len = Math.hypot(s.aimX, s.aimZ) || 1;
+      u.group.rotation.y = Math.atan2(s.aimZ / len, -s.aimX / len);
+    }
+    updateLampFixtures();
+    return;
+  }
+
   const yard = o.layout === 'yard';
   /* The manifest reads `count` as poles PER SIDE for a roadside row, so a
      two-row layout wants twice as many units. Either way it lands in the fixed
@@ -783,14 +1134,24 @@ export function applyLampLayout() {
 export function setLamps(opts: Partial<LampLayout> & { modelScale?: number } | null) {
   const o = opts || {};
   const num = (v: unknown, d: number) => (Number.isFinite(+(v as number)) ? +(v as number) : d);
+  const layout = o.layout === 'yard' ? 'yard'
+    : o.layout === 'set' ? 'set' : 'roadside';
   lampLayout = {
     enabled: opts ? o.enabled !== false : true,
-    layout: o.layout === 'yard' ? 'yard' : 'roadside',
+    layout,
     spacing: Math.max(6, num(o.spacing, LAMP_DEFAULTS.spacing)),
     offset: Math.max(1.5, num(o.offset, LAMP_DEFAULTS.offset)),
     count: Math.max(1, Math.round(num(o.count, LAMP_COUNT))),
+    /* NO LAYOUT DO CENÁRIO A ALTURA É MEDIDA, NÃO AUTORADA. A torre está no
+       `.glb` com 10,03 m; deixar o manifesto declarar outra coisa poria o
+       refletor fora da luminária que se está tentando acender. A medida chega
+       DEPOIS deste ponto na carga (applyToScene chama setLamps antes de
+       applySet), então o número do manifesto vale até `setLampSites()` corrigir
+       — e ela refaz esta conta. */
     height: THREE.MathUtils.clamp(
-      num(o.height, num(o.modelScale, 1) * LAMP_HEIGHT), 3, 16),
+      layout === 'set' && lampSiteGeo
+        ? lampSiteGeo.height
+        : num(o.height, num(o.modelScale, 1) * LAMP_HEIGHT), 3, 16),
   };
   lampHeight = lampLayout.height;
   /* E = I/h². The presets author I against LAMP_HEIGHT, so this is what keeps a
@@ -815,5 +1176,10 @@ export function getLampInfo() {
     lampLayout: { ...lampLayout }, lampPoolSize: LAMP_COUNT,
     lampFixture, lampHeight, lampRefHeight: LAMP_HEIGHT, lampIntensityScale,
     lampGeometry: { ...((lampFixture === 'model' && lampModelGeo) || LAMP_PROC_GEO) },
+    /* As luminárias que o CENÁRIO trouxe, e o que foi medido nelas. É por aqui
+       que a bancada confere que o refletor está dentro da luminária. */
+    lampSites: lampSites.length,
+    lampSiteGeo: lampSiteGeo ? { ...lampSiteGeo } : null,
+    lampSiteLenses: siteLensGroup ? siteLensGroup.children.length : 0,
   };
 }

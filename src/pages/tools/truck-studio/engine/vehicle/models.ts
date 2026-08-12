@@ -19,6 +19,8 @@ import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
 import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './trailer-rig';
+import { RIB_FLAT_CENTER } from './trailer-geometry';
+import { TRIM_WIDTH } from './trailer-door';
 import { swapTrailerWheels } from './wheels';
 import {
   solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
@@ -239,9 +241,13 @@ rigGroup.name = 'RIG';
    caminhão aponta para o -Z, então recuar (dar ré) é aumentar z. 4 = os 12 da
    primeira posição mais os 10 de recuo, menos 18 de avanço. */
 export const RIG_PLACEMENT = { z: 4, yaw: Math.PI };
+/** Estado corrente da colocação — ver o gancho no fim de setRigPlacement(). */
+let placementOn = false;
 
 /** Liga (true) ou suspende (false) o lugar do conjunto no cenário. */
 function setRigPlacement(on: boolean) {
+  const voltando = on && !placementOn;
+  placementOn = on;
   rigGroup.position.set(0, 0, on ? RIG_PLACEMENT.z : 0);
   rigGroup.rotation.set(0, on ? RIG_PLACEMENT.yaw : 0, 0);
   /* rigGroup roda com `matrixAutoUpdate = false` (ver freezeMatrices), então a
@@ -252,6 +258,16 @@ function setRigPlacement(on: boolean) {
      ordem entre um e outro nunca importa. */
   rigGroup.updateMatrix();
   rigGroup.updateWorldMatrix(true, true);
+  /* ⚠️ **É AQUI QUE AS LUZES PASSAM A TER ONDE MEDIR.** Todo caminho de carga
+     suspende a colocação (`setRigPlacement(false)`), faz as contas de engate em
+     espaço de mundo e restaura no fim. Antes desta linha ninguém avisava
+     `lights.ts` de que o conjunto tinha ido para o lugar: as faces continuavam
+     as da última medida — no pior caso as do espaço LOCAL —, e a régua de cor por
+     fragmento passava a comparar mundo com local. Traseira laranja, letreiro do
+     teto dourado, feixe do farol na escada da cabine.
+     Só na SUBIDA da bandeira, para não remedir de graça nas três chamadas
+     seguidas de `false` que uma carga faz. */
+  if (voltando) invalidateVehicleLightBounds();
 }
 
 /* ---------------- static matrices ----------------
@@ -562,6 +578,8 @@ export function cabDefFor(
    Os nomes continuam saindo DESTE módulo (reexport abaixo), então nada que
    importava `setupCommon`/`isPaintableMaterial` daqui precisou mudar. */
 export { setupCommon, isPaintableMaterial } from './material-setup';
+import { notarTransparenciaForcada } from './headlight-cover';
+import { invalidateVehicleLightBounds, unregisterVehicleLights } from './lights';
 
 /* App-side transparency audit: ONLY real glass may be transparent. Anything
    else flagged transparent (rip artifacts, loader quirks) is forced opaque.
@@ -608,6 +626,14 @@ function auditTransparency(root: THREE.Object3D, label: string) {
         std.needsUpdate = true;
         decals.push(m.name || '(sem nome)');
       } else {
+        /* ⚠️ AVISA ANTES DE FECHAR. A capa do farol dos Scania de cabine nova é
+           `f_bumper_mat_0005_plastic_glossy` — nome nenhum de vidro —, então esta
+           regra a fechava e o conjunto óptico ficava enterrado atrás de um painel
+           opaco, aceso a 40 de radiância e invisível. Foi o relato *"a lanterna
+           frontal tem feixe de luz, mas nao sai da lanterna frontal do cavalo em
+           si, ela esta apagada"*. Quem reabre — e SÓ na janela do farol, medida —
+           é `vehicle/headlight-cover.ts`; aqui o veredito não muda. */
+        notarTransparenciaForcada(m);
         m.transparent = false;
         m.opacity = 1;
         m.depthWrite = true;
@@ -858,6 +884,12 @@ function groundAndCenter(
    never be skipped: a paint material left in that registry keeps receiving
    every setPaint() write for the rest of the session. */
 function disposeTree(root: THREE.Object3D) {
+  /* ⚠️ AVISA O REGISTRO DE LUZES ANTES DE SOLTAR QUALQUER COISA. `lights.ts`
+     parou de usar "não tem pai" como sinal de morte — entre `setupCommon()` e o
+     `add()` no grupo a raiz fica destacada por alguns milissegundos, e um
+     `applyRig()` nessa janela apagava o cavalo do registro para sempre. Quem
+     sabe que uma raiz morreu é quem a mata, e é esta função. */
+  unregisterVehicleLights(root);
   const shared = !!root.userData?.tsSharedSource;
   root.traverse((node) => {
     const o = node as THREE.Mesh;
@@ -966,8 +998,11 @@ function trailerPanelMeshes() {
     state.trailer.traverse((node) => {
       const o = node as THREE.Mesh;
       if (!o.isMesh) return;
-      /* As três chapas RECORTADAS pelo bake, que já vêm com nome próprio. */
-      if (/^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) { out.push(o); return; }
+      /* As três chapas RECORTADAS pelo bake, que já vêm com nome próprio —
+         e os REBITES das emendas junto: no baú real eles são pintados com a
+         chapa (pedido de 2026-08-11). Soleira e arremate ficam de fora, como
+         o trilho galvanizado que eles arrematam. */
+      if (/^(SIDE_L|SIDE_R|REAR|SIDE_[LR]_RIVETS)$/.test(o.name)) { out.push(o); return; }
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       if (mats.some((m) => m && (m.name || '').toLowerCase().includes(TK_PAINT_SUB))) {
         out.push(o); return;
@@ -1653,9 +1688,238 @@ const TRAILER_LAMP_RE = /lanterna|led-|painel-curva|sinaleira|sinaleita/i;
 /* Rubber scatters nearly everything it does not absorb; at full env strength the
    seals and mudflaps mirror the sky and read as polished plastic. */
 const TRAILER_RUBBER_RE = /^borracha|aparabarro|^pneu/i;
-/* Large mill-finish members: rails, posts, frame, hardware. Every one is
-   `metalness: 1`, so each is a mirror of the environment until told otherwise. */
-const TRAILER_STRUCT_METAL_RE = /galvanizado|estrutura-principal|^inox|metal-pouco-polido|metal-claro|^aro-rodas/i;
+/* Large mill-finish members: rails, posts, frame. Every one is
+   `metalness: 1`, so each is a mirror of the environment until told otherwise.
+
+   TRÊS NOMES SAÍRAM DAQUI EM 2026-08-12, e cada um por um motivo diferente:
+
+     `^inox` e `metal-pouco-polido`   são a FERRAGEM — dobradiça, varão, trava,
+                                      a chapa da marca na traseira. Ver
+                                      `splitTrailerHardware()`: o bake dá um
+                                      material só a três famílias que não têm o
+                                      mesmo acabamento, e quem as separa é a
+                                      MEDIDA, não o nome.
+     `metal-claro`                    não é membro estrutural nenhum: são as
+                                      duas chapas da caixa de cozinha. Ver
+                                      `BOX_SHELL_RE`.
+
+   O `$` nas duas âncoras que sobraram é o que impede os clones de voltarem para
+   este ramo — `inox-ferragem__polido` não casa `^inox-ferragem$`, e é essa
+   diferença de uma letra que faz a divisão valer. */
+const TRAILER_STRUCT_METAL_RE =
+  /galvanizado|estrutura-principal|^aro-rodas|^inox-ferragem$|^metal-pouco-polido$/i;
+
+/* ---------------- A FERRAGEM DE INOX, separada do trilho de usinagem --------
+   Pedido de produto (2026-08-12): "todas essas dobradiças, varão, travas da
+   traseira e também aquela placa com o recorte Ankaa devem ser inox, inclusive
+   da lateral".
+
+   ELAS JÁ ERAM `inox-ferragem`. O que as fazia ler como chapa branca fosca era
+   o bloco acima: `TRAILER_STRUCT_METAL_RE` casava `^inox` e forçava
+   `roughness ≥ 0.62` em tudo o que casasse. O piso está certo para o que ele
+   foi escrito — o trilho de 14,5 m que corre o flanco é galvanizado de
+   usinagem, ACETINADO, e o bloco lá em cima registra a medição que provou isso.
+   Só que o mesmo material carrega as duas coisas.
+
+   MEDIDO no `trailer.glb`: 1 158 malhas em `inox-ferragem` + `metal-pouco-
+   polido`, e a distribuição do vão em Z é BIMODAL, sem nada no meio:
+
+     1 131 malhas   z-span < 0,50 m   ferragem (dobradiça, varão, trava, tala,
+                                      cabeçote, guia, parafuso, a placa da
+                                      traseira com 810 × 230 × 54 mm)
+        27 malhas   z-span ≥ 2,58 m   trilho (2 × capping strip de 14,55 m,
+                                      4 × friso de flanco de 14,47 m,
+                                      11 × proteção de piso de 14,32 m,
+                                      10 × cantoneira de teto de 2,58…3,00 m)
+
+   Um corte em 2,0 m cai no meio de um vazio de 2,08 m — não é um limiar
+   escolhido, é o único lugar onde ele cabe. E é em Z de propósito: o defeito
+   que o piso de 0,62 existe para tapar é o horizonte do ambiente desenhando
+   uma linha ao longo de uma peça que corre o COMPRIMENTO do baú. O varão tem
+   2,49 m e passa por aqui como ferragem porque ele corre em Y — 25 mm em Z.
+
+   A caixa é a de `Box3.applyMatrix4()`, ou seja a caixa de uma caixa girada,
+   estritamente maior que a real. Aqui isso não custa nada: os números acima
+   foram medidos pelo mesmo método conservador, então o vazio de 2,08 m já é o
+   vazio do pior caso. */
+const STAINLESS_FAMILY_RE = /^inox-ferragem$|^metal-pouco-polido$/i;
+/** O sufixo do clone polido. Duplo sublinhado como `__porta` em
+ *  `trailer-geometry.ts`, e pelo mesmo motivo: `metal-galvanizado-polido` e
+ *  `plastico-cinza-polido` terminam em `-polido` com UM traço e não podem cair
+ *  no ramo do inox por homonímia. */
+const STAINLESS_SUFFIX = '__polido';
+const TRAILER_STAINLESS_RE = /__polido$/;
+/** …e o da ferragem que é da CAIXA, que não é inox — ver `BOX_HARDWARE_*`. */
+const BOX_HW_SUFFIX = '__caixa';
+const BOX_HARDWARE_RE = /__caixa$/;
+/** Acima disto em Z a peça é trilho, não ferragem. Ver a medição acima. */
+const STAINLESS_RAIL_Z = 2.0;
+/**
+ * A rugosidade do inox: **0,30 — o escalar do próprio bake.**
+ *
+ * `inox-ferragem` chega do rip com `metalness 1, roughness 0.3`, que é
+ * exatamente um inox escovado; era o piso de 0,62 que o apagava. Aplicado como
+ * TETO (`Math.min`) e não como atribuição, porque `metal-pouco-polido` — as
+ * quatro travas de porta — chega com 1,0 e precisa descer até aqui, enquanto
+ * um bake futuro que declarasse 0,2 continuaria mais polido do que este número
+ * manda, que é o que "o bake sabe da própria peça" significa.
+ */
+const STAINLESS_ROUGHNESS = 0.30;
+
+/**
+ * Os dois nós que o bake dá à caixa de cozinha.
+ *
+ * Exportado porque `vehicle/trim.ts` casa a MESMA peça (é ele quem oferece
+ * "Caixa de ferramentas" no card de acabamentos) e duas cópias de "como se acha
+ * a caixa" divergiriam no primeiro re-bake. `#Caixa-Ferrmantas-modelo-1padrao`
+ * é o nó-pai das 79 peças e `caixa-plastico-ferramentas` é a bandeja interna.
+ */
+export const TRAILER_BOX_NODE_RE = /caixa-ferrmantas|caixa-plastico-ferramentas/i;
+
+/** O nó ou algum ancestral dele casa, parando na raiz do implemento. */
+function underTrailerNode(o: THREE.Object3D, root: THREE.Object3D, re: RegExp): boolean {
+  for (let n: THREE.Object3D | null = o; n; n = n.parent) {
+    if (re.test(n.name || '')) return true;
+    if (n === root) break;
+  }
+  return false;
+}
+
+/**
+ * Divide o material único da ferragem nas TRÊS famílias que ele carrega.
+ *
+ * O bake tem um `inox-ferragem` só e três acabamentos dentro dele:
+ *
+ *   TRILHO      z ≥ 2 m         fica com o material original e com o acetinado
+ *                               de usinagem que `TRAILER_STRUCT_METAL_RE` dá.
+ *   CAIXA       dentro do nó    a ferragem da caixa de cozinha NÃO é inox — na
+ *               da caixa        foto de catálogo ela é preta, do mesmo tom do
+ *                               quadro. Vira `…__caixa`.
+ *   FERRAGEM    o resto         dobradiça, varão, trava, a chapa da traseira.
+ *                               Vira `…__polido`.
+ *
+ * A ordem dos testes importa: a caixa é decidida ANTES do tamanho, porque a
+ * ferragem dela também é pequena e cairia no inox por não ser trilho.
+ *
+ * RODA ANTES DE `buildTrailerRig()`, e isso é contrato, não preferência:
+ * `TrailerBody` extrai o kit da porta lateral no construtor
+ * (`extractDoorKit()`) e guarda a REFERÊNCIA do material de cada peça. Uma
+ * divisão feita depois trocaria o material das malhas da traseira e deixaria o
+ * kit apontando para o material velho — a porta lateral sairia fosca enquanto a
+ * traseira brilha, que é justamente o "inclusive da lateral" do pedido.
+ *
+ * Os valores dos clones são escritos por `applyTrailerFinish()`, que roda
+ * depois: aqui só se decide QUEM é quem. Como o kit guarda o mesmo objeto, a
+ * correção de lá o alcança sem que este arquivo precise saber dela.
+ */
+function splitTrailerHardware(root: THREE.Object3D): void {
+  root.updateWorldMatrix(true, true);
+  const toLocal = root.matrixWorld.clone().invert();
+  const clones = new Map<string, THREE.Material>();
+  const m4 = new THREE.Matrix4();
+  const box = new THREE.Box3();
+  let polished = 0, boxed = 0, rails = 0;
+
+  const variantOf = (m: THREE.Material, suffix: string): THREE.Material => {
+    const key = m.uuid + suffix;
+    let c = clones.get(key);
+    if (!c) {
+      c = m.clone();
+      c.name = (m.name || 'inox') + suffix;
+      clones.set(key, c);
+    }
+    return c;
+  };
+
+  root.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.geometry) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (!mats.some((m) => !!m && STAINLESS_FAMILY_RE.test(m.name || ''))) return;
+
+    let suffix: string;
+    if (underTrailerNode(o, root, TRAILER_BOX_NODE_RE)) {
+      suffix = BOX_HW_SUFFIX; boxed++;
+    } else {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const bb = o.geometry.boundingBox;
+      if (!bb) return;
+      box.copy(bb).applyMatrix4(m4.multiplyMatrices(toLocal, o.matrixWorld));
+      if (box.max.z - box.min.z >= STAINLESS_RAIL_Z) { rails++; return; }
+      suffix = STAINLESS_SUFFIX; polished++;
+    }
+    const swap = (m: THREE.Material | null) =>
+      (m && STAINLESS_FAMILY_RE.test(m.name || '') ? variantOf(m, suffix) : m);
+    o.material = Array.isArray(o.material)
+      ? o.material.map(swap) as THREE.Material[]
+      : swap(o.material) as THREE.Material;
+  });
+
+  console.info('[ferragem] dividida —', polished, 'malhas de inox ·',
+    boxed, 'da caixa ·', rails, `de trilho intocadas (z ≥ ${STAINLESS_RAIL_Z} m) ·`,
+    clones.size, 'material(is) clonado(s):',
+    [...clones.values()].map((m) => m.name).join(', ') || '(nenhum)');
+}
+
+/* ---------------- A CAIXA DE COZINHA É ESCURA ----------------
+   Pedido de produto (2026-08-12), com a foto de catálogo da Resfri Ar como
+   referência: "a parte frontal dessa caixa de cozinha deve ser preta" e, na
+   volta, "não deve ser um preto puro, e a ferragem também deve ser um cinza bem
+   escuro quase preto, como na referência".
+
+   O bake entrega a caixa com a FOLHA branca, e a folha é a face inteira que se
+   vê do lado de fora. Quem a carrega são dois materiais, e nenhum dos dois é
+   usado em mais nada no implemento — MEDIDO:
+
+     plastico-cinza-polido   1 malha    a FOLHA (1 332 tri, 1 030 × 581 mm,
+                                        27 mm de espessura, na face de fora)
+     metal-claro             2 malhas   o lábio inferior corrido (1 142 mm) e o
+                                        forro de 1 mm por dentro da folha
+
+   Estar sozinhos é o que torna o casamento por nome seguro aqui, e é por isso
+   que as âncoras são `^…$`: qualquer parente futuro do nome fica de fora até
+   alguém medir de novo.
+
+   OS DOIS TONS, E DE ONDE SAIU CADA UM
+   ---------------------------------------------------------------------------
+   Amostrado na própria foto de catálogo (média 3×3, sRGB):
+
+     folha, face frontal   #535353 … #858585   (média #5b5b5a)
+     montante do quadro    #141414
+     cantoneira iluminada  #52504c
+     strap da dobradiça    #000000
+     trava inferior        #383838
+
+   A leitura que importa não é o valor absoluto — é uma foto de estúdio, o pixel
+   traz a luz junto —, é a RELAÇÃO: a folha é um cinza escuro nitidamente mais
+   claro que a ferragem e o quadro, que são quase pretos. Foi exatamente essa
+   diferença que a primeira rodada perdeu ao pintar a folha com o preto do
+   quadro, e é o que o segundo pedido corrige.
+
+   A FERRAGEM NÃO É ESCOLHIDA: é o `baseColorFactor` de `caixa-estrutura-preta`,
+   o quadro da própria caixa — #1d1f22 em sRGB, que já é o "cinza bem escuro
+   quase preto" pedido. Copiar o vizinho é o que garante que ferragem e quadro
+   saiam na mesma tinta sem ninguém arbitrar um hex.
+
+   A FOLHA, essa, é DECISÃO DE APARÊNCIA e fica registrada como tal: #3b3b3d,
+   ~3,2× o quadro em luz linear, que é a ordem de grandeza que a foto mostra
+   entre a face da folha e o montante. Um número, não uma escala de outro. */
+const BOX_SHELL_RE = /^plastico-cinza-polido$|^metal-claro$/i;
+/** A folha: #3b3b3d em sRGB, LINEAR como o glTF declara `baseColorFactor`. */
+const BOX_SHELL_COLOR: [number, number, number] = [0.043735, 0.043735, 0.046665];
+/**
+ * A ferragem da caixa: o `baseColorFactor` de `caixa-estrutura-preta`, cru.
+ *
+ * Ela chega aqui vinda de `inox-ferragem` (metalness 1), e a metalicidade TEM
+ * de cair: num condutor a cor base tinge o REFLEXO em vez de ser albedo, então
+ * um #1d1f22 metálico não é uma peça preta — é um espelho escuro, e num tom
+ * tão baixo ele lê como buraco. Aço pintado é dielétrico, e é isso que a foto
+ * mostra: strap fosco, sem estrutura de reflexo.
+ */
+const BOX_HARDWARE_COLOR: [number, number, number] = [0.012286, 0.013702, 0.015996];
+/** O acabamento das duas: fosco de tinta, sem a menor pretensão de espelho. */
+const BOX_PAINT_METALNESS = 0;
+const BOX_PAINT_ROUGHNESS = 0.44;
 /* A RODA DO FH16 NÃO É RIP DO IMPLEMENTO — e por isso nada aqui pode encostar
    nela.
    ---------------------------------------------------------------------------
@@ -1805,6 +2069,40 @@ function applyTrailerFinish(root: THREE.Object3D) {
            no horizon to draw. */
         m.envMapIntensity = 1.0;
         log.push(`${name}: rug ≥0.62, env 1.0`);
+      } else if (TRAILER_STAINLESS_RE.test(name)) {
+        /* O INOX, e ele é o RAMO CURTO de propósito: nada aqui contraria o
+           rip, só se deixa de apagar o que ele já dizia. `metalness: 1` é
+           reafirmado porque o teto de rugosidade sozinho não salvaria um bake
+           que declarasse a peça dielétrica, e um inox dielétrico lê como
+           plástico cinza — o defeito exato que o bloco das lanternas descreve,
+           ao contrário.
+
+           E O TETO MORDE MESMO COM `roughnessMap`, ao contrário do PISO do
+           ramo acima — a assimetria é do multiplicador, não de gosto. Com mapa,
+           o escalar MULTIPLICA o canal verde: um piso de 0,62 não pode ser
+           imposto (levantar o multiplicador acima de 1 estoura o mapa e some
+           com a variação dele), mas um teto de 0,30 é exatamente "o mesmo mapa,
+           três vezes mais polido" — o desenho escovado sobrevive, a peça deixa
+           de ser fosca. Isto não é hipotético: `metal-pouco-polido`, que são as
+           QUATRO travas de porta do pedido, é a única desta família com
+           `metallicRoughnessTexture`, e a primeira rodada as deixou em
+           roughness 1 justamente por pular o mapa. */
+        m.metalness = 1;
+        m.roughness = Math.min(m.roughness ?? 1, STAINLESS_ROUGHNESS);
+        m.envMapIntensity = 1.0;
+        log.push(`${name}: inox, rug ≤${STAINLESS_ROUGHNESS}, env 1.0`);
+      } else if (BOX_HARDWARE_RE.test(name) || BOX_SHELL_RE.test(name)) {
+        /* LINEAR, e é a mesma conversão que o GLTFLoader faz ao ler
+           `baseColorFactor`. Passar o hex por `setHex()` levaria o número por
+           sRGB e entregaria um cinza ~4× mais claro do que o do quadro ao
+           lado — visível justamente onde folha e quadro se encostam. */
+        const hw = BOX_HARDWARE_RE.test(name);
+        m.color.setRGB(...(hw ? BOX_HARDWARE_COLOR : BOX_SHELL_COLOR),
+          THREE.LinearSRGBColorSpace);
+        m.metalness = BOX_PAINT_METALNESS;
+        m.roughness = BOX_PAINT_ROUGHNESS;
+        m.envMapIntensity = 1.0;
+        log.push(`${name}: ${hw ? 'ferragem da caixa' : 'folha da caixa'}`);
       } else if (TRAILER_RUBBER_RE.test(name)) {
         m.envMapIntensity = 0.3;
         log.push(`${name}: env 0.3`);
@@ -1926,6 +2224,43 @@ function applyProbeEnvGain() {
    so this reads the value for the frame being applied, not the previous one. */
 onRig(applyProbeEnvGain);
 
+/* ---- TROCAR O FUNDO DO ESTÚDIO INVALIDA A SONDA ----
+   O bloco acima lista os eventos que RE-CAPTURAM: novo cenário, nova cabine,
+   implemento movido. Faltava o mais óbvio do ciclorama: mudar a COR DA SALA.
+
+   O ganho por razão de `environmentIntensity` não cobre este caso, e é
+   importante entender por quê: ele escala o cubo antigo, ou seja mantém uma
+   foto da sala CINZA e a clareia. Mas a mudança que uma pastilha de fundo faz
+   não é de nível, é de CONTEÚDO — a sala inteira em volta do veículo trocou de
+   valor, e o que a lataria reflete é a sala. Sem uma captura nova, escolher
+   "Branco" deixava o implemento espelhando um estúdio cinza um pouco mais
+   claro. É a metade da queixa "as cores não refletem no cenário" que sobrou
+   depois de o IBL do estúdio (scene.ts) resolver a outra.
+
+   COM ATRASO, E É OBRIGATÓRIO. A captura são seis faces sobre a cena inteira
+   mais um PMREM, e `onRig` dispara a cada quadro dos 0,8 s de crossfade — sem o
+   debounce isto seriam ~48 capturas por clique. O disparo cai DEPOIS de a
+   rampa assentar, que é também quando a sala que ele vai fotografar é a final. */
+let backdropSeen = NaN;
+let probeTimer: ReturnType<typeof setTimeout> | 0 = 0;
+
+onRig((rig) => {
+  /* A assinatura do fundo em um número. `cycloramaAlbedo` sozinho não bastaria:
+     o piso tem multiplicador próprio desde a recalibração das pastilhas. */
+  const sig = rig.cycloramaAlbedo * 8 + rig.cycloramaFloor;
+  if (!Number.isFinite(backdropSeen)) { backdropSeen = sig; return; }
+  if (Math.abs(sig - backdropSeen) < 0.02) return;
+  backdropSeen = sig;
+  if (probeTimer) clearTimeout(probeTimer);
+  probeTimer = setTimeout(() => {
+    probeTimer = 0;
+    /* Só onde há sala. Nos cinco cenários sem ciclorama estes campos ficam no
+       valor de fábrica e nunca se mexem, então este caminho não é alcançado —
+       mas a guarda é o que garante que continue assim se algum dia forem. */
+    if (state.cab || state.trailer) refreshVehicleReflection();
+  }, 900);
+});
+
 export function refreshVehicleReflection() {
   const trailer = state.trailer;
   /* Basta UMA das metades: o cavalo também amostra a sonda agora, então uma
@@ -2021,6 +2356,500 @@ export function refreshVehicleReflection() {
 const LIVERY_SKIN_SIDE = 0.04;
 const LIVERY_SKIN_REAR = 0.10;
 
+/* ---------------- as CHAPAS da lateral: remonte e rebites ----------------
+   A lateral não é uma chapa única de 14,7 m: é uma sequência de chapas
+   verticais REMONTADAS — a da frente cobre a de trás por alguns centímetros, a
+   borda da aba desenha uma linha vertical sutil, e uma coluna de rebites prende
+   a emenda no rebaixo de cada friso. As fotos de referência (2026-08-11)
+   mostram exatamente isso: o vinco em "S" da aba acompanhando o perfil e um
+   rebite por rebaixo.
+
+   O PASSO É 1 000 mm, MEDIDO — não os "cerca de 120 cm" do relato. O próprio
+   bake diz onde as emendas ficam: os montantes internos da lateral
+   (`metal-estrutura-principal-padrao`) estão em u 1033 + k·1000, e os PARES de
+   rebite do trilho inferior repetem no mesmo passo (inventário 2026-08-11,
+   `tools/livery-render/inv.mjs`). Emenda fora desse passo deixaria rebite sem
+   montante por trás — o tipo de mentira que uma foto de perto denuncia.
+
+   A grade é PRESA À FRENTE, como tudo neste baú (`mapZ` prende a testeira; o
+   comprimento cresce para trás): a primeira emenda fica a um metro cheio da
+   ponta dianteira da chapa e o resto marcha para trás de metro em metro.
+   Esticar o baú acrescenta chapas na traseira — as existentes não andam.
+
+   O REMONTE é geometria, não textura: as chapas de livery são recortadas a
+   cada resize, então deslocar vértices aqui recalcula tudo de graça — e a
+   `LiveryUV` (u = z, v = y) nem percebe o degrau em x, o que é exatamente o
+   comportamento do vinil de verdade aplicado por cima de uma emenda. A arte
+   corre contínua; a emenda aparece por SOMBREAMENTO, porque as normais da
+   parede da borda são inclinadas junto com o degrau. */
+const PLATE_PITCH = 1.0;
+/**
+ * Distância da ponta DIANTEIRA da chapa à PRIMEIRA emenda.
+ *
+ * ERA 620,2 mm — a cota do primeiro montante interno do bake, que punha cada
+ * emenda em cima de um montante (eles correm a 620,2 + k·1000 mm da testeira).
+ * O efeito colateral era a sequência MEDIDA em 2026-08-11:
+ *
+ *     620 | 1000 | 1000 | … | 1036        (frente → trás, baú de fábrica)
+ *
+ * ou seja uma chapa PARTIDA de 620 mm logo na testeira e as inteiras marchando
+ * dali para trás. Foi o que o Kennedy reprovou com print: "estão começando as
+ * inteiras na parte de trás, e a parte quebrada, caso tenha, fica na frente —
+ * deveria ser o contrário". A fábrica assenta chapa inteira a partir da
+ * testeira e corta a última; agora a grade faz isso, e a sobra cai na traseira.
+ *
+ * O PREÇO, anotado de propósito para quem vier depois: o passo da chapa é
+ * IGUAL ao passo do montante, então deslocar a fase em 380 mm tira TODAS as
+ * emendas de cima dos montantes de uma vez — a coluna de rebites da emenda
+ * deixa de ter montante atrás dela. É uma troca deliberada a pedido de quem
+ * fabrica o implemento, não uma medida que se perdeu.
+ */
+const PLATE_FROM_FRONT = PLATE_PITCH;
+/** Altura do degrau do remonte. Não é a chapa nua (0,8 mm): a borda da aba
+ *  leva a DOBRA (o hem), e é ela que a foto de referência mostra saltada —
+ *  2,2 mm é o que faz o "S" da emenda aparecer a 3 m como aparece no baú. */
+const PLATE_T = 0.0022;
+/** Largura da aba que cobre a chapa de trás — ~30 mm MEDIDOS nas fotos de
+ *  referência do usuário (2026-08-11), não os 45 estimados antes. */
+const PLATE_LAP = 0.030;
+/** Largura da parede da borda. É ela que desenha a linha vertical. */
+const PLATE_DROP = 0.0018;
+/** Sem emenda a menos disto de uma ponta do painel. */
+const PLATE_END_CLEAR = 0.30;
+
+/** As emendas de um painel, em z LOCAL, da grade presa à frente. */
+function plateSeams(zFront: number, zRear: number): number[] {
+  const out: number[] = [];
+  for (let s = zFront - PLATE_FROM_FRONT; s > zRear + PLATE_END_CLEAR; s -= PLATE_PITCH) {
+    if (s < zFront - PLATE_END_CLEAR) out.push(+s.toFixed(4));
+  }
+  return out;
+}
+
+/**
+ * O perfil do remonte em um z: deslocamento para FORA e a inclinação dd/dz.
+ *
+ * REMONTAR É INCLINAR A CHAPA INTEIRA — correção de 2026-08-11, com print:
+ * a primeira versão levantava só uma aba de 30 mm na borda, e isso lia como
+ * um calombo correndo o baú ("essa elevação"). Na chapa real o pé dianteiro
+ * assenta na estrutura e a borda traseira CAVALGA a chapa seguinte: a chapa
+ * toda sobe linearmente de 0 a T ao longo do metro (0,13° — invisível como
+ * inclinação) e devolve os 2,2 mm numa parede curta na emenda, que é a única
+ * linha que o olho vê. Contínuo de propósito: salto abriria fresta na malha.
+ */
+function plateProfile(
+  z: number, seams: number[], zFront: number,
+): { d: number; slope: number } {
+  /* A parede da borda, logo ATRÁS de cada emenda. */
+  for (const s of seams) {
+    if (z >= s - PLATE_DROP && z < s) {
+      const f = (z - (s - PLATE_DROP)) / PLATE_DROP;
+      return { d: PLATE_T * f, slope: PLATE_T / PLATE_DROP };
+    }
+  }
+  /* O miolo da chapa: acha as bordas do painel dela e interpola. `seams` vem
+     em ordem decrescente (da frente para trás). */
+  let front = zFront;
+  let rear = Number.NEGATIVE_INFINITY;
+  for (const s of seams) {
+    if (s > z) front = s;                  // a última emenda ainda à frente
+    else { rear = s; break; }
+  }
+  const span = isFinite(rear) ? front - rear : PLATE_PITCH;
+  const d = Math.min(PLATE_T, Math.max(0, PLATE_T * ((front - z) / Math.max(span, 0.2))));
+  return { d, slope: 0 };
+}
+
+/**
+ * Recorta a sopa de triângulos de um painel nos planos das emendas e aplica o
+ * remonte: x anda `d(z)` para fora, e a normal inclina em z por `−dd/dz`.
+ *
+ * O recorte vem ANTES do deslocamento porque `d(z)` é linear POR TRECHO: com
+ * vértice em cada quebra, deslocar vértices reproduz a função exatamente — sem
+ * recorte, um triângulo de 3 m atravessando a emenda interpolaria o degrau ao
+ * longo dele inteiro e a linha viraria um borrão de 3 m.
+ */
+function applyPlateLap(
+  k: { p: number[]; n: number[]; u: number[] }, sgnOut: number, seams: number[],
+  holes: { y0: number; y1: number; z0: number; z1: number }[] = [],
+) {
+  if (!seams.length) return;
+  /* A FOLHA DA PORTA É UMA CHAPA SÓ — pedido de 2026-08-12: "tire também a
+     emenda da porta, a folha da porta é uma folha única".
+   *
+   * Ela é o pedaço da própria pele que saiu do vão (ver `doorsOf()` em
+   * trailer-geometry.ts), então migra para o painel de livery junto com a
+   * parede e vinha levando o remonte inteiro — emenda e degrau atravessando a
+   * folha. Numa porta real não há emenda: é uma chapa recortada.
+   *
+   * O teste é o VÃO, e ele basta: a parede foi cortada ali, então a única
+   * geometria de pele dentro do retângulo do vão é a folha. E ela mora com
+   * 94,4 mm de folga (`DOOR_REVEAL`) das bordas dele, então nenhum triângulo
+   * fica meio dentro — não há descontinuidade para tratar, o marco é a quebra
+   * física entre as duas chapas. */
+  const inDoor = (y: number, z: number) =>
+    holes.some((h) => z > h.z0 && z < h.z1 && y > h.y0 && y < h.y1);
+  /* Só as duas quebras da parede de cada emenda: com a inclinação correndo a
+     chapa INTEIRA, `d` é linear entre emendas e a interpolação dos vértices
+     originais já a reproduz exata — não há mais aba nem rampa para recortar. */
+  const cuts: number[] = [];
+  for (const s of seams) cuts.push(s - PLATE_DROP, s);
+
+  /* Limites da sopa: a frente é o datum da grade, e os envelopes zeram o
+     remonte onde a chapa é PRESA — atrás da cantoneira (topo), atrás do
+     trilho (pé) e sob o montante traseiro. Era a chapa "ultrapassando o frame
+     metálico" do relato: 2,2 mm para fora exatamente onde um perfil de poucos
+     milímetros deveria cobri-la. */
+  let yLo = Infinity, yHi = -Infinity, zLo = Infinity, zHi = -Infinity;
+  for (let i = 0; i < k.p.length; i += 3) {
+    const y = k.p[i + 1], z = k.p[i + 2];
+    if (y < yLo) yLo = y;
+    if (y > yHi) yHi = y;
+    if (z < zLo) zLo = z;
+    if (z > zHi) zHi = z;
+  }
+  const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  /* Rampas LONGAS (17-18 cm): o desvanecimento curto de 5 cm criava um vinco
+     horizontal na borda do envelope (~130-180 mm do pe) que lia como "a linha
+     continua" (print 2026-08-11). Espalhado, o gradiente e invisivel. */
+  const envAt = (y: number, z: number) =>
+    inDoor(y, z) ? 0
+      : clamp01((y - yLo - 0.13) / 0.17)
+        * clamp01((yHi - 0.21 - y) / 0.18)
+        * clamp01((z - zLo) / 0.15);
+
+  type V = [number, number, number, number, number, number, number, number]; // p3 n3 uv2
+  const lerp = (a: V, b: V, t: number): V =>
+    a.map((v, i) => v + (b[i] - v) * t) as V;
+
+  /* Sutherland–Hodgman contra cada plano z = c, dos dois lados. Polígonos
+     convexos continuam convexos; o leque no fim triangula. */
+  const clip = (poly: V[], c: number, keepBelow: boolean): V[] => {
+    const out: V[] = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const da = keepBelow ? c - a[2] : a[2] - c;
+      const db = keepBelow ? c - b[2] : b[2] - c;
+      if (da >= 0) out.push(a);
+      if ((da >= 0) !== (db >= 0)) out.push(lerp(a, b, da / (da - db)));
+    }
+    return out;
+  };
+
+  cuts.sort((a, b) => a - b);
+  const p2: number[] = [], n2: number[] = [], u2: number[] = [];
+  const tris = k.p.length / 9;
+  for (let t = 0; t < tris; t++) {
+    let polys: V[][] = [[0, 1, 2].map((j) => [
+      k.p[t * 9 + j * 3], k.p[t * 9 + j * 3 + 1], k.p[t * 9 + j * 3 + 2],
+      k.n[t * 9 + j * 3], k.n[t * 9 + j * 3 + 1], k.n[t * 9 + j * 3 + 2],
+      k.u[t * 6 + j * 2], k.u[t * 6 + j * 2 + 1],
+    ] as V)];
+    /* Só os planos que ATRAVESSAM este triângulo: quase toda a chapa mora no
+       miolo de alguma placa e não cruza emenda nenhuma — cortá-la contra os
+       ~56 planos das 14 emendas seria pagar o recorte inteiro para não mudar
+       nada. */
+    const zMin = Math.min(k.p[t * 9 + 2], k.p[t * 9 + 5], k.p[t * 9 + 8]);
+    const zMax = Math.max(k.p[t * 9 + 2], k.p[t * 9 + 5], k.p[t * 9 + 8]);
+    /* E a folha não é recortada nem em vértice: com `envAt` zerada ali o corte
+       já não deixaria degrau nenhum, mas uma chapa única também não tem por que
+       ganhar uma fileira de vértices no meio. */
+    const yMin = Math.min(k.p[t * 9 + 1], k.p[t * 9 + 4], k.p[t * 9 + 7]);
+    const yMax = Math.max(k.p[t * 9 + 1], k.p[t * 9 + 4], k.p[t * 9 + 7]);
+    const whole = holes.some((h) => zMin >= h.z0 && zMax <= h.z1
+      && yMin >= h.y0 && yMax <= h.y1);
+    for (const c of whole ? [] : cuts) {
+      if (c <= zMin || c >= zMax) continue;
+      const next: V[][] = [];
+      for (const poly of polys) {
+        const lo = clip(poly, c, true);
+        const hi = clip(poly, c, false);
+        if (lo.length >= 3) next.push(lo);
+        if (hi.length >= 3) next.push(hi);
+      }
+      polys = next;
+    }
+    for (const poly of polys) {
+      /* O trecho do polígono decide a inclinação — avaliada no CENTROIDE,
+         porque as bordas estão exatamente sobre as quebras. */
+      const zc = poly.reduce((s, v) => s + v[2], 0) / poly.length;
+      const yc = poly.reduce((s, v) => s + v[1], 0) / poly.length;
+      const slope = plateProfile(zc, seams, zHi).slope * envAt(yc, zc);
+      const disp = poly.map((v) => {
+        const { d } = plateProfile(
+          /* z do vértice, puxado 1 µm para o centroide: um vértice NA quebra
+             pertence aos dois trechos, e é o do seu polígono que vale. */
+          v[2] + Math.sign(zc - v[2]) * 1e-6, seams, zHi);
+        const dv = d * envAt(v[1], v[2]);
+        const nx = v[3], ny = v[4];
+        let nz = v[5];
+        if (slope > 0.05) {
+          nz -= slope * Math.abs(nx);
+          const l = Math.hypot(nx, ny, nz) || 1;
+          return [v[0] + sgnOut * dv, v[1], v[2], nx / l, ny / l, nz / l, v[6], v[7]] as V;
+        }
+        return [v[0] + sgnOut * dv, v[1], v[2], nx, ny, nz, v[6], v[7]] as V;
+      });
+      for (let i = 1; i + 1 < disp.length; i++) {
+        for (const v of [disp[0], disp[i], disp[i + 1]]) {
+          p2.push(v[0], v[1], v[2]);
+          n2.push(v[3], v[4], v[5]);
+          u2.push(v[6], v[7]);
+        }
+      }
+    }
+  }
+  k.p = p2; k.n = n2; k.u = u2;
+}
+
+/**
+ * A coluna de rebites de cada emenda — um por REBAIXO de friso, como nas
+ * fotos. Os rebaixos são MEDIDOS na própria sopa: histograma do x mais
+ * externo por faixa de 2 mm de altura; rebaixo é onde a superfície recua mais
+ * de 2,5 mm da crista. Nada de perfil teórico: é a chapa que acabou de ser
+ * recortada que diz onde ela é funda.
+ */
+/**
+ * Mede as fileiras de rebite na sopa AINDA SEM REMONTE — a ordem importa: a
+ * inclinacao da chapa mexe em x ate 2,2 mm, da grandeza do proprio relevo do
+ * friso, e medir depois dela contamina a regua de profundidade (a rodada que
+ * mediu numa janela estreita pos-remonte achou ZERO fileiras: a pele extrudada
+ * quase nao tem vertice fora dos planos de corte).
+ *
+ * Com a sopa intacta, a amostra e o painel INTEIRO: o x mais externo por faixa
+ * de 2 mm de altura e denso e limpo. As alturas saem da regua publica do rig
+ * (`floorY + skirtHeight + k*pitch`), e o CENTRO de cada rebaixo e medido
+ * rebaixo a rebaixo — um `valeH` unico deixava rebite encostado na borda da
+ * parte lisa ("ainda nao estao perfeitamente nos centros", com print).
+ */
+function measureValeRows(
+  k: { p: number[]; n: number[] }, sgnOut: number,
+): { rows: { y: number; d: number }[]; yMin: number; yMax: number } {
+  const BIN = 0.002;
+  const outer = new Map<number, number>();
+  let yMin = Infinity, yMax = -Infinity;
+  for (let i = 0; i < k.p.length; i += 3) {
+    const x = k.p[i], y = k.p[i + 1];
+    if (y < yMin) yMin = y;
+    if (y > yMax) yMax = y;
+    /* SO a pele que olha para o LADO: nas pontas o painel enrola para o
+       montante e essa curva, vista por altura, poe x de CRISTA em todo
+       rebaixo — foi o que derrubou 45 fileiras para 7. O wrap olha para ±z;
+       o friso olha para ±x. */
+    if (Math.abs(k.n[i]) < 0.7) continue;
+    const bin = Math.round(y / BIN);
+    const d = sgnOut * x;
+    if (!(d <= (outer.get(bin) ?? -Infinity))) outer.set(bin, d);
+  }
+  const rows: { y: number; d: number }[] = [];
+  if (!outer.size) return { rows, yMin, yMax };
+  const crest = Math.max(...outer.values());
+
+
+  /* FORMULA FECHADA, sem deteccao — o fim de uma saga medida em quatro
+     rodadas (2026-08-11): a sopa PRE-remonte e ESPARSA (391 bins em 1390;
+     vertice so nas quebras de perfil — o bin do centro da lisa NEM EXISTE),
+     entao qualquer detector de contiguidade ou de plano oscila entre pares,
+     buracos e zero. Os quatro numeros necessarios ja foram MEDIDOS
+     (checks-perfil.mjs): a lisa de ~27 mm fica centrada a `RIB_FLAT_CENTER` de
+     cada passo da grade do rig, no plano crista − 5,3 mm. O rebuild ladrilha a
+     MESMA unidade, entao a fase vale em qualquer altura. A constante mora em
+     `trailer-geometry.ts` porque a ferragem da porta traseira assenta na MESMA
+     regua (`trailer-bake-fixes.ts`) — e um segundo numero por perto foi
+     exatamente o que pos aquela peca em cima da crista. */
+  const prof = state.trailerRig?.profile ?? null;
+  if (prof && prof.ribCount) {
+    const row0 = prof.floorY + prof.skirtHeight;
+    const dFlat = crest - 0.0053;
+    /* n = −1 INCLUSO (prints do usuário, 2026-08-11): o último friso de baixo
+       da chapa — o rebaixo ANTERIOR a row0, centro a row0 − 6,7 mm ≈ +168 mm
+       do pé, logo acima do trilho — ficava sem rebite porque o laço nascia em
+       n = 0. O guarda de yMin + 0,14 continua filtrando o que cair no trilho
+       (n = −2 daria +115 mm). */
+    for (let n = -1; ; n++) {
+      const y = row0 + RIB_FLAT_CENTER + n * prof.pitch;
+      if (y > yMax - 0.20) break;
+      if (y < yMin + 0.14) continue;
+      rows.push({ y, d: dFlat });
+    }
+  }
+  return { rows, yMin, yMax };
+}
+
+/**
+ * Faixa em z que uma PORTA proíbe à coluna de rebites da emenda.
+ *
+ * PEDIDO DO KENNEDY, 2026-08-12, com print: "a porta não deve ter rebites, e
+ * quando uma fileira de rebite for pegar no frame metálico da porta, não deve
+ * ser gerada".
+ *
+ * As duas frases viram UMA regra, e é uma regra só de Z: todo rebite de uma
+ * coluna divide o z da emenda que o gerou (`oz = sSeam + 12 mm`), então ou a
+ * coluna inteira cai sobre a porta ou nenhum rebite dela encosta nela. Não há
+ * caso intermediário para tratar — e uma coluna que atravessasse a folha,
+ * cortada só no trecho do vão, deixaria dois cotocos de rebite colados no
+ * marco, que é justamente o que o print reprova.
+ *
+ * A faixa é o VÃO (`hole`, que já inclui o recuo do marco) mais a moldura
+ * galvanizada (`TRIM_WIDTH`) e o raio da calota, para que nem a borda da
+ * cabeça toque o arremate.
+ */
+const RIVET_DOME_R = 0.009;
+function seamHitsDoor(z: number, holes: { z0: number; z1: number }[]): boolean {
+  const pad = TRIM_WIDTH + RIVET_DOME_R;
+  return holes.some((h) => z >= h.z0 - pad && z <= h.z1 + pad);
+}
+
+function addPlateRivets(
+  _trailer: THREE.Object3D, panel: THREE.Mesh,
+  vales: { rows: { y: number; d: number }[]; yMin: number; yMax: number },
+  sgnOut: number, seams: number[], holes: { z0: number; z1: number }[] = [],
+): { y: number; d: number }[] {
+  const { rows, yMin, yMax } = vales;
+  /* A emenda continua desenhada onde a porta está — é chapa, e a chapa passa
+     por trás do marco. O que some é só a COLUNA DE REBITES. */
+  const live = seams.filter((s) => !seamHitsDoor(s + 0.012, holes));
+  if (!live.length || !rows.length) return [];
+
+  /* A cabeça: calota de 17 mm, achatada, apontada para fora. O material é o
+     `inox-ferragem` do próprio bake — o rebite tem de envelhecer junto com a
+     ferragem, não com a tinta. */
+  /* MATERIAL PROPRIO, NUNCA CLONE DO BAKE — licao de 2026-08-11: os clones
+     de `inox-ferragem`/galvanizado carregam junto os ganchos de shader que o
+     acabamento/tinta pendura nos materiais do bake, e um gancho cujo uniform
+     ninguem vincula compila no renderer da bancada e falha no do app — 644
+     rebites presentes na cena do Kennedy e nenhum no quadro. Um material
+     autocontido nao tem essa classe de defeito. */
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xd7dadd, metalness: 0.85, roughness: 0.3,
+  });
+  mat.name = 'livery-rebite';
+
+  /* A CABECA PASSA DA CRISTA — medido na sessao do Kennedy (2026-08-11): com
+     calota de 3,4 mm o apex ficava vale + 6,2 mm, 1 mm ABAIXO do plano das
+     cristas (relevo 5,2 mm) — visivel de frente (a bancada fotografa
+     ortogonal) e ENGOLIDO pelas cristas em qualquer vista obliqua, que e como
+     o estudio e usado. Calota de ~5 mm poe o apex ~2,5 mm acima da crista,
+     como nas fotos de referencia. */
+  const dome = new THREE.SphereGeometry(0.009, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.rotateZ(sgnOut > 0 ? -Math.PI / 2 : Math.PI / 2);
+  dome.scale(0.58, 1, 1);
+
+  /* GEOMETRIA FUNDIDA, nao InstancedMesh — decisao de 2026-08-11, com prova:
+     na sessao do Kennedy (Firefox, RX 570) as 644 instancias existiam na cena
+     (contadas pelo console) e NENHUMA chegava ao quadro, com warning de
+     `drawElementsInstanced` no console. 644 calotas x ~60 tris ~= 40 k
+     triangulos — nada numa cena de 5,4 M — e a malha unica tem caixa real,
+     culling correto e zero caminho especial de driver. */
+  const bPos = dome.getAttribute('position') as THREE.BufferAttribute;
+  const bNor = dome.getAttribute('normal') as THREE.BufferAttribute;
+  const bIdx = dome.getIndex() as THREE.BufferAttribute;
+  const vc = bPos.count, ic = bIdx.count;
+  const total = live.length * rows.length;
+  const P = new Float32Array(vc * 3 * total);
+  const Nn = new Float32Array(vc * 3 * total);
+  const I = new (vc * total > 65535 ? Uint32Array : Uint16Array)(ic * total);
+  const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  let n = 0;
+  for (const sSeam of live) {
+    for (const r of rows) {
+      /* Sobre a borda que cavalga, 12 mm a frente da emenda; a cabeca assenta
+         no fundo do rebaixo mais a inclinacao local da chapa (os envelopes
+         zeram o remonte perto do trilho e da cantoneira). */
+      const env = clamp01((r.y - yMin - 0.13) / 0.05)
+        * clamp01((yMax - 0.21 - r.y) / 0.06);
+      const ox = sgnOut * (r.d + PLATE_T * env + 0.0006);
+      const oy = r.y;
+      const oz = sSeam + 0.012;
+      for (let v = 0; v < vc; v++) {
+        const o3 = (n * vc + v) * 3;
+        P[o3] = bPos.getX(v) + ox;
+        P[o3 + 1] = bPos.getY(v) + oy;
+        P[o3 + 2] = bPos.getZ(v) + oz;
+        Nn[o3] = bNor.getX(v);
+        Nn[o3 + 1] = bNor.getY(v);
+        Nn[o3 + 2] = bNor.getZ(v);
+      }
+      for (let i = 0; i < ic; i++) I[n * ic + i] = bIdx.getX(i) + n * vc;
+      n++;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(Nn, 3));
+  geo.setIndex(new THREE.BufferAttribute(I, 1));
+  /* A LIVERYUV DA CHAPA, ESTENDIDA ÀS CALOTAS — pedido de 2026-08-12: "as
+     logos aplicadas na lateral também devem ser aplicadas nos rebites, não
+     apenas nas chapas". É o que um adesivo faz: ele é aplicado por cima da
+     emenda e das cabeças, e a arte continua por elas sem quebra.
+   *
+   * A normalização é a da CHAPA, nunca a da própria calota — `addLiveryUV()`
+   * normaliza pela caixa da geometria que recebe, e uma calota tem 18 mm: a
+   * arte inteira caberia dentro de cada rebite. Por isso a caixa vem do painel,
+   * e o resto é a MESMA fórmula (u cresce com +z só na esquerda, v conta do
+   * teto). Se `addLiveryUV()` mudar, isto muda junto.
+   *
+   * As posições já estão no espaço do painel — `panel.add(inst)` sem
+   * deslocamento —, então não há conversão nenhuma pelo caminho. */
+  const pg = panel.geometry as THREE.BufferGeometry;
+  pg.computeBoundingBox();
+  const pb = pg.boundingBox;
+  if (pb) {
+    const spanZ = Math.max(1e-6, pb.max.z - pb.min.z);
+    const spanY = Math.max(1e-6, pb.max.y - pb.min.y);
+    const left = sgnOut < 0;
+    const uv = new Float32Array(vc * total * 2);
+    for (let i = 0; i < vc * total; i++) {
+      const y = P[i * 3 + 1], z = P[i * 3 + 2];
+      uv[i * 2] = left ? (z - pb.min.z) / spanZ : (pb.max.z - z) / spanZ;
+      uv[i * 2 + 1] = (pb.max.y - y) / spanY;
+    }
+    geo.setAttribute('uv1', new THREE.BufferAttribute(uv, 2));
+  }
+  const inst = new THREE.Mesh(geo, mat);
+  inst.name = panel.name + '_RIVETS';
+  inst.userData.rivets = total;
+  inst.castShadow = true;
+  panel.add(inst);
+  return rows;
+}
+
+/* A SOLEIRA (LIVERY_SILL_[LR]) FOI APOSENTADA — diff bake-cru × runtime,
+ * 2026-08-11. O trailer.glb de PRODUÇÃO é IDÊNTICO ao local (sha256
+ * 59c890bd…07e0), então a base "perfeita" do print do usuário é o próprio
+ * bake — e a sonda crua (scratchpad prod-compare/baseprobe.ts, par de
+ * tools/studio-bench/checks-base-corner-diff.mjs) mediu que abaixo do pé do
+ * trilho (−102 rel. piso) o bake NÃO TEM geometria nenhuma até o chassi a
+ * ~821 mm: o vão aberto É o visual de produção (lê como sombra do chassi).
+ * Trilho (−102..+107), fita 3M (−71..−22) e pele (pé −20, visível de +108)
+ * do runtime registram 1:1 com o cru; a soleira era a ÚNICA divergência.
+ *
+ * Na vista baixa do canto traseiro (print 2, o "buraco preto no canto"), o
+ * fan oblíquo (ψ25/45°, subindo 15/30 %) morria numa PLACA CHAPADA a 30 mm
+ * onde o bake mostra o chassi modulado a 130..620 mm e a lanterna lateral
+ * (@5..20, z +150..250 do fim) — o buraco era o CONTRASTE entre a placa e a
+ * janela final descoberta (inset de 72,8 mm até o marco, medido pelo agente
+ * do canto: o trilho termina 72,8 mm antes da traseira e 42,2 mm antes da
+ * frente). SEM a soleira, fatias horizontais e fan ficam IDÊNTICOS ao bake,
+ * banda a banda. Se uma "risca preta" voltar a incomodar, MEDIR primeiro:
+ * o slot aberto é o estado aprovado de produção — a resposta não é uma placa
+ * nova (histórico completo deste bloco no git; o hem de 14 mm caiu pelo
+ * mesmo motivo, ver checks-base-align 2026-08-11). O regex de limpeza do
+ * rebuild mantém LIVERY_SILL_[LR] de propósito, para matar soleiras de
+ * builds anteriores vivas na mesma sessão. */
+
+/** A grade corrente, para o editor 2D desenhar as MESMAS emendas e rebites —
+ *  ver `livery-structure.ts`. Distâncias em metros; `seamsFromFront` medido da
+ *  ponta dianteira do painel, `rivetRowsFromBottom` do pé da chapa. */
+export interface PlateGrid {
+  pitch: number;
+  lap: number;
+  seamsFromFront: number[];
+  rivetRowsFromBottom: number[];
+}
+let plateGrid: PlateGrid | null = null;
+export const getPlateGrid = (): PlateGrid | null => plateGrid;
+
 /** The exporter's layout, vertex for vertex — see exportTrailer.js addLiveryUV.
  *  v runs DOWNWARDS because the CanvasTexture is built with flipY = false; u runs
  *  the way each panel reads from outside, which is mirrored between the flanks.
@@ -2049,7 +2878,9 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     const o = node as THREE.Mesh;
     if (o.isMesh && /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) already = true;
   });
-  if (already) return;                         // merged bake: the exporter did it
+  /* Bake fundido traz as chapas prontas — e SEM grade de emendas, então quem
+     leu a grade do implemento anterior não pode continuar acreditando nela. */
+  if (already) { plateGrid = null; return; }
 
   const sources: THREE.Mesh[] = [];
   trailer.traverse((node) => {
@@ -2124,8 +2955,20 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
       b2.fromBufferAttribute(pos, i1).applyMatrix4(p.mat);
       c.fromBufferAttribute(pos, i2).applyMatrix4(p.mat);
       let where: 'SIDE_L' | 'SIDE_R' | 'REAR' | null = null;
-      if (Math.min(a.x, b2.x, c.x) >= box.max.x - LIVERY_SKIN_SIDE) where = 'SIDE_R';
-      else if (Math.max(a.x, b2.x, c.x) <= box.min.x + LIVERY_SKIN_SIDE) where = 'SIDE_L';
+      const minX = Math.min(a.x, b2.x, c.x);
+      const maxX = Math.max(a.x, b2.x, c.x);
+      /* SÓ O SLAB, e a hipótese descartada fica registrada: suspeitou-se que
+         as três tiras corridas a 1083/1868/2673 mm (mapprobe, seção F) eram
+         DOBRAS da pele excluídas por mergulharem além dos 40 mm — e que a
+         fronteira era a "linha horizontal" do relato. MEDIDO no app
+         (checks-livery.mjs, footprint 2026-08-11): as tiras têm x constante a
+         66 mm da crista — são FITAS DE RECOBRIMENTO das emendas de curso,
+         atrás de uma pele que o corpo paramétrico reconstrói CONTÍNUA. Não
+         tocam a crista, nenhum critério de "encostar" as pega, e não devem
+         mesmo entrar: ficam invisíveis atrás da chapa. Um critério extra aqui
+         seria um no-op hoje e um risco de capturar returns de porta amanhã. */
+      if (minX >= box.max.x - LIVERY_SKIN_SIDE) where = 'SIDE_R';
+      else if (maxX <= box.min.x + LIVERY_SKIN_SIDE) where = 'SIDE_L';
       if (!where && Math.max(a.z, b2.z, c.z) <= box.min.z + LIVERY_SKIN_REAR) {
         e1.subVectors(b2, a); e2.subVectors(c, a);
         fn.crossVectors(e1, e2).normalize();
@@ -2178,8 +3021,40 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     strippedTris += drop.size;
   }
 
+  /* AS EMENDAS DE CHAPA, antes de a sopa virar geometria — ver o bloco
+     "as CHAPAS da lateral" acima. A grade é presa à FRENTE do painel, então é
+     medida na própria sopa de cada lado; a traseira não tem emenda (as folhas
+     das portas são chapas inteiras). */
+  const seamsOf: Partial<Record<'SIDE_L' | 'SIDE_R', number[]>> = {};
+  const valesOf: Partial<Record<'SIDE_L' | 'SIDE_R',
+    { rows: { y: number; d: number }[]; yMin: number; yMax: number }>> = {};
+  /* OS VÃOS DE PORTA, UMA VEZ SÓ. Duas coisas os consultam — o remonte (a
+     folha é chapa única) e a coluna de rebites (nem na folha nem no marco) —,
+     e as duas têm de ver o MESMO retângulo. Vêm do `TrailerBody`, que é quem os
+     abriu: recalculá-los aqui seria uma segunda verdade sobre onde a porta
+     está, e ela divergiria no primeiro clamp de comprimento. */
+  const holesOf = (key: 'SIDE_L' | 'SIDE_R') =>
+    state.trailerRig?.body.getDoorHoles(key === 'SIDE_R' ? 'right' : 'left') ?? [];
+  let gridFront = 0;
+  for (const key of ['SIDE_L', 'SIDE_R'] as const) {
+    const k = keep[key];
+    if (!k.p.length) continue;
+    let zLo = Infinity, zHi = -Infinity;
+    for (let i = 2; i < k.p.length; i += 3) {
+      if (k.p[i] < zLo) zLo = k.p[i];
+      if (k.p[i] > zHi) zHi = k.p[i];
+    }
+    const seams = plateSeams(zHi, zLo);
+    seamsOf[key] = seams;
+    /* As fileiras de rebite saem da sopa INTACTA — ver measureValeRows(). */
+    valesOf[key] = measureValeRows(k, key === 'SIDE_R' ? 1 : -1);
+    applyPlateLap(k, key === 'SIDE_R' ? 1 : -1, seams, holesOf(key));
+    if (key === 'SIDE_L') gridFront = zHi;
+  }
+
   const srcMat = (Array.isArray(sources[0].material) ? sources[0].material[0] : sources[0].material) as THREE.MeshStandardMaterial;
   const report: string[] = [];
+  plateGrid = null;
   for (const key of ['SIDE_L', 'SIDE_R', 'REAR'] as const) {
     const k = keep[key];
     if (!k.p.length) { report.push(`${key}: VAZIO`); continue; }
@@ -2199,10 +3074,28 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     mesh.castShadow = true;                    // it IS the skin now, not an overlay
     mesh.receiveShadow = true;
     trailer.add(mesh);
+    /* Os rebites da emenda, um por rebaixo — e a grade publicada para o editor
+       2D desenhar as MESMAS emendas nas MESMAS alturas. */
+    if (key !== 'REAR') {
+      const seams = seamsOf[key] ?? [];
+      const sgn = key === 'SIDE_R' ? 1 : -1;
+      const rows = addPlateRivets(trailer, mesh,
+        valesOf[key] ?? { rows: [], yMin: 0, yMax: 0 }, sgn, seams, holesOf(key));
+      if (key === 'SIDE_L' && seams.length) {
+        let yLo = Infinity;
+        for (let i = 1; i < k.p.length; i += 3) if (k.p[i] < yLo) yLo = k.p[i];
+        plateGrid = {
+          pitch: PLATE_PITCH, lap: PLATE_LAP,
+          seamsFromFront: seams.map((s) => +(gridFront - s).toFixed(4)),
+          rivetRowsFromBottom: rows.map((r) => +(r.y - yLo).toFixed(4)),
+        };
+      }
+    }
     report.push(`${key}: ${k.p.length / 9} tris`);
   }
   console.info('[livery] chapas recortadas do corpo —', report.join(' · '),
-    `· ${strippedTris} triângulos removidos de ${strippedMeshes} malhas de origem`);
+    `· ${strippedTris} triângulos removidos de ${strippedMeshes} malhas de origem`,
+    plateGrid ? `· ${plateGrid.seamsFromFront.length + 1} chapas de ${PLATE_PITCH} m` : '');
 }
 
 /* ---------------- baú paramétrico ----------------
@@ -2277,7 +3170,7 @@ function disposeLiveryPanels(trailer: THREE.Object3D) {
   const doomed: THREE.Mesh[] = [];
   trailer.traverse((node) => {
     const o = node as THREE.Mesh;
-    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) doomed.push(o);
+    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR|LIVERY_SILL_[LR]|LIVERY_HEM_[LR])$/.test(o.name)) doomed.push(o);
   });
   for (const panel of doomed) {
     panel.traverse((node) => {
@@ -2285,6 +3178,14 @@ function disposeLiveryPanels(trailer: THREE.Object3D) {
       if (o === panel || !o.isMesh) return;
       const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
       for (const m of mats) if (!isSharedMat(m)) { forgetPaintMaterial(m); m.dispose(); }
+      /* E o material ORIGINAL de um filho pintado (o rebite guarda o inox em
+         `origMat` quando a tinta assume) — sem isto ele vazaria por resize. */
+      const om = o.userData?.origMat as THREE.Material | undefined;
+      if (om && !isSharedMat(om)) { forgetPaintMaterial(om); om.dispose(); }
+      /* A sobreposição de arte COMPARTILHA a geometria da chapa (liberada
+         abaixo, no dono); os rebites da emenda têm a própria calota e ela
+         morreria órfã a cada resize sem esta linha. */
+      if (o.geometry && o.geometry !== panel.geometry) o.geometry.dispose();
     });
     panel.clear();                       // solta as sobreposições antes do resto
     panel.geometry.dispose();
@@ -2539,6 +3440,12 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
   const box = groundAndCenter(trailer, bodyPanelPred(trailer),
     (o: THREE.Mesh) => tyreSet.has(o), tyres ? tyres.minY : undefined);
   auditTransparency(trailer, 'trailer');     // glass blends, decals alphaTest
+  /* A FERRAGEM SE DIVIDE AQUI — inox, caixa e trilho —, e a posição é
+     contrato: o construtor de `TrailerBody` (dentro de buildTrailerRig) extrai
+     o kit da porta lateral e guarda a referência do material de cada peça.
+     Dividir depois deixaria a lateral com o material velho. Ver
+     `splitTrailerHardware()`. */
+  splitTrailerHardware(trailer);
   /* O BAÚ PARAMÉTRICO ENTRA AQUI — depois do assentamento (as duas metades
      medem em espaço de mundo e esta é a pose de referência de toda medida
      posterior), antes do acabamento e do recorte das chapas. Ver

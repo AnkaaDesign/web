@@ -79,44 +79,133 @@ export function makeAsphaltCanvas(withLines: boolean) {
   return c;
 }
 
-/* Puddle mask, used as a roughnessMap when the road is wet: water pools in the
-   wheel-track depressions, so most blobs are pinned to the ruts. three reads
-   the GREEN channel only and MULTIPLIES it by material.roughness, so white
-   means "as rough as the material says" (damp film) and dark means mirror. */
+/* Puddle mask, used as a roughnessMap when the ground is wet. three reads the
+   GREEN channel only and MULTIPLIES it by material.roughness, so white means
+   "as rough as the material says" (damp film) and dark means mirror.
+
+   ÁGUA NÃO É CARIMBO — POR QUE ISTO DEIXOU DE SER 90 ELIPSES.
+   ---------------------------------------------------------------------------
+   O que havia: 90 elipses de gradiente radial, `rot` SEMPRE 0, com 78 % delas
+   presas a quatro frações fixas (`RUTS`). Três defeitos medidos na própria
+   máscara, e os três aparecem como "as poças são muito padrão e repetitivas":
+
+   1. TODA POÇA ERA A MESMA POÇA. Mesmo gradiente, mesma razão de eixos, nunca
+      girada. O olho reconhece a forma na primeira e depois só a reencontra.
+   2. AS QUATRO CALHAS VIRARAM UM PENTE. As frações de `RUTS` são as trilhas de
+      pneu de um ladrilho que É a secção da pista — verdade no asfalto
+      PROCEDURAL, falso num cenário com `set`, onde o ladrilho é um quadrado.
+      Medido: 423 das 512 colunas com água, em quatro bandas verticais.
+   3. NÃO ERA POÇA, ERA DILÚVIO. Somando as áreas, as 90 elipses cobriam mais de
+      duas vezes o ladrilho: a pista inteira era espelho com listras claras no
+      meio, e não uma pista com poças.
+
+   O que há agora: um CAMPO DE ALTURA, que é o que decide onde água fica parada
+   na vida real. fBm periódico de quatro oitavas, anisotrópico (a grade é mais
+   grossa ao longo de v, então a lâmina se alonga na direção da via, como
+   escorrimento), mais um segundo campo bem largo que faz umas zonas alagarem
+   mais que outras. A água é o que está ABAIXO de um nível.
+
+   E O NÍVEL SAI DA COBERTURA, NÃO DE UM PALPITE. `COVER` diz quanto do chão
+   fica com água e o limiar é o quantil correspondente do próprio campo — um
+   histograma, não um número mágico. Mexer na forma do ruído não muda mais a
+   quantidade de água por acidente, que era o modo de falha do carimbo.
+
+   TILEÁVEL POR CONSTRUÇÃO: a rede de cada oitava é indexada em módulo, então
+   não há costura e não é preciso desenhar três vezes para atravessar a borda.
+   O que impede o ladrilho de se ver é o ladrilhamento estocástico de set.ts —
+   a máscara entra como `roughnessMap` e passa pela mesma `tsTiled()`. */
+const PUDDLE_COVER = 0.16;   // fração do chão com lâmina de água
+const PUDDLE_EDGE = 0.042;   // largura da orla molhada, em unidades do campo
+
 export function makePuddleCanvas() {
   const S = 512;
   const c = document.createElement('canvas'); c.width = c.height = S;
   const g = ctx2d(c);
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, S, S);
-  const blob = (x: number, y: number, rx: number, ry: number, rot: number) => {
-    const grad = g.createRadialGradient(0, 0, 0, 0, 0, 1);
-    grad.addColorStop(0, 'rgba(20,20,20,1)');
-    grad.addColorStop(0.62, 'rgba(20,20,20,.92)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.save();
-    g.translate(x, y);
-    g.rotate(rot);
-    g.scale(rx, ry);
-    g.fillStyle = grad;
-    g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill();
-    g.restore();
+
+  /* Semeado, e não `Math.random`: esta máscara é um ASSET. Com o gerador global
+     ela mudava a cada carregamento, e "está diferente do print que te mandei"
+     é uma pergunta impossível de responder. */
+  let seed = 0x9e3779b9 | 0;
+  const rnd = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  for (let i = 0; i < 90; i++) {
-    /* ~78 % of puddles sit in a rut; the rest are scattered */
-    const inRut = Math.random() < 0.78;
-    const x = inRut
-      ? RUTS[(Math.random() * RUTS.length) | 0] * S + (Math.random() - 0.5) * 34
-      : Math.random() * S;
-    const y = Math.random() * S;
-    const rx = 10 + Math.random() * 26;
-    const ry = rx * (2.2 + Math.random() * 2.6);      // elongated along the road
-    /* draw three times so blobs wrap across the seam in both axes */
-    for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
-      if (Math.abs(x + dx - S / 2) > S || Math.abs(y + dy - S / 2) > S) continue;
-      blob(x + dx, y + dy, rx, ry, 0);
+
+  /* Uma oitava: rede aleatória de gx × gy amostrada com suavização de Hermite.
+     Os índices são tomados em módulo — é isso que fecha a costura. */
+  const octave = (gx: number, gy: number) => {
+    const lat = new Float32Array(gx * gy);
+    for (let i = 0; i < lat.length; i++) lat[i] = rnd();
+    const out = new Float32Array(S * S);
+    for (let y = 0; y < S; y++) {
+      const fy = (y / S) * gy, y0 = Math.floor(fy), ty = fy - y0;
+      const uy = ty * ty * (3 - 2 * ty);
+      const ra = (y0 % gy) * gx, rb = ((y0 + 1) % gy) * gx;
+      for (let x = 0; x < S; x++) {
+        const fx = (x / S) * gx, x0 = Math.floor(fx), tx = fx - x0;
+        const ux = tx * tx * (3 - 2 * tx);
+        const xa = x0 % gx, xb = (x0 + 1) % gx;
+        const a = lat[ra + xa] * (1 - ux) + lat[ra + xb] * ux;
+        const b = lat[rb + xa] * (1 - ux) + lat[rb + xb] * ux;
+        out[y * S + x] = a * (1 - uy) + b * uy;
+      }
     }
+    return out;
+  };
+
+  const fbm = (gx: number, gy: number, oct: number) => {
+    const acc = new Float32Array(S * S);
+    let amp = 1, norm = 0;
+    for (let o = 0; o < oct; o++) {
+      const f = octave(gx << o, gy << o);
+      for (let i = 0; i < acc.length; i++) acc[i] += amp * f[i];
+      norm += amp; amp *= 0.5;
+    }
+    for (let i = 0; i < acc.length; i++) acc[i] /= norm;
+    return acc;
+  };
+
+  /* gy < gx: menos células ao longo de v, logo a feição fica ESTICADA nessa
+     direção — que é a da via. É o único resquício de "a água segue a pista", e
+     agora é anisotropia do campo em vez de quatro colunas fixas.
+
+     6 x 3 EM QUATRO OITAVAS, e chegou a ser 3 x 2 em três. A troca foi feita
+     junto com PUDDLE_SPAN = 1 e as duas juntas pioraram a cena — ver o bloco de
+     PUDDLE_SPAN em scene.ts. Com o período de volta em 3.5 ladrilhos, a lâmina
+     maior daqui mede ~1/6 do período: 3,5 m no asfalto, 4,7 m no pátio, 2,3 m
+     na grama. Mexer nesta malha sem mexer no PUDDLE_SPAN muda o tamanho da poça
+     em metros, porque quem converte fração em metro é ele. */
+  const h = fbm(6, 3, 4);
+  const zone = fbm(2, 2, 2);
+  for (let i = 0; i < h.length; i++) h[i] += 0.09 * (zone[i] - 0.5) * 2;
+
+  /* Limiar por COBERTURA: histograma de 1024 caixas e acumulado até COVER. */
+  const BINS = 1024;
+  const hist = new Int32Array(BINS);
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < h.length; i++) { if (h[i] < lo) lo = h[i]; if (h[i] > hi) hi = h[i]; }
+  const span = Math.max(1e-6, hi - lo);
+  for (let i = 0; i < h.length; i++) {
+    hist[Math.min(BINS - 1, ((h[i] - lo) / span * BINS) | 0)]++;
   }
+  const alvo = PUDDLE_COVER * h.length;
+  let acc = 0, bin = 0;
+  while (bin < BINS - 1 && acc + hist[bin] < alvo) { acc += hist[bin]; bin++; }
+  const lim = lo + (bin / BINS) * span;
+
+  const img = g.createImageData(S, S);
+  const d = img.data;
+  for (let i = 0; i < h.length; i++) {
+    const t = Math.min(1, Math.max(0, (h[i] - (lim - PUDDLE_EDGE)) / PUDDLE_EDGE));
+    /* 20 = espelho (a água preenche o poro), 255 = a rugosidade do material. */
+    const v = 255 - (1 - t) * 235;
+    const k = i * 4;
+    d[k] = d[k + 1] = d[k + 2] = v;
+    d[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
   return c;
 }
 

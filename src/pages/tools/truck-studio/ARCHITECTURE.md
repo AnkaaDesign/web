@@ -441,3 +441,699 @@ histerese de 1,5×). Era impossível com a foto (2 048 px para qualquer baú).
 para posicionar a tela do fabric — mas não é mais DESENHADA quando há arte
 (`--ts-pw-img: none`). Trocar essa medição pela do manifesto é o passo seguinte
 e é independente.
+
+---
+
+## 10. A rodada de 2026-08-11 — a noite, e a câmera que atravessa
+
+Quatro pedidos numa frase do dono do produto: **arrumar árvore e poste sem
+precisar desviar deles, atravessar o cenário em vez de fugir dele, trocar o céu
+por um de noite de verdade, e acender as luzes** — dos postes e do caminhão, "a
+partir das 18:00". Os quatro estão amarrados por uma decisão só, e é ela que
+explica a ordem: **a câmera parou de desviar.**
+
+### 10.1 O desvio saiu; a transparência entrou — `scene/seethrough.ts`
+
+Até aqui `applyAvoidance()` puxava a câmera para perto e a levantava quando um
+galpão entrava na frente do produto. Funcionava, e cobrava dois preços: a câmera
+se mexia sozinha (o usuário arrasta para um lado e o enquadramento vai para
+outro) e **o cenário tinha de ser autorado em volta disso** — a origem do vão de
+128 m na fileira de postes deste set é exatamente essa. O maquinário do desvio
+continua inteiro e testado no arquivo; o que não acontece mais é ele ser
+alimentado (`setCameraObstacles` entrega lista vazia, e o cabeçalho lá diz como
+religar).
+
+**A v1 do substituto foi reprovada assim que foi vista rodando**, e vale
+registrar por quê, porque o desenho atual é a resposta ponto a ponto. Ela abria
+um túnel CILÍNDRICO entre a lente e o veículo e dissolvia por FRAGMENTO:
+
+| defeito relatado | causa |
+|---|---|
+| *"levemente transparente mas ainda mostrando um pouco da construção"* | a queda radial deixa a maior parte da área em MEIO caminho — estado permanente, não transição |
+| *"nem mesmo faz sentido somente parte de uma arvore ficar transparente"* | o cilindro corta a copa onde passa |
+| *"isso esta sendo aplicado a faixa no chao da rua"* | quem recebia o tratamento era a família de molhagem `built`, e `surfaceOf()` devolve `built` para todo material cujo nome não casa a lista de chão — `LINE_PAINT` não casa |
+
+A v2 troca o eixo do problema: **a decisão é por OBJETO, é binária, e sai da CPU.**
+O shader recebe um número por objeto e mais nada.
+
+* **Quem pode tapar** é quem tem ALTURA (o mesmo 0,35 m de `SHADOW_CAST_MIN_H` —
+  o que projeta sombra é o que tapa) **e não é superfície de chão pela
+  DECLARAÇÃO do manifesto**. As duas condições são necessárias: a altura sozinha
+  deixava passar `kerbs` e `farmland`, cujas caixas envolventes são altas porque
+  acompanham o relevo; a declaração sozinha deixaria passar `LINE_PAINT`, que o
+  manifesto nomeia mas cuja família o nome não revela.
+* **Quem decide** é a silhueta em TELA: o retângulo do objeto em NDC encostando no
+  do veículo, mais profundidade. É a definição literal de "está atrapalhando", e
+  é o que o cilindro tentava aproximar — mal, porque um cilindro de raio fixo
+  cobre um cone visual que se abre.
+* **Como um número por objeto chega ao shader**, que é o ponto difícil: as 11
+  torres deste set são 11 NÓS apontando para a MESMA malha glTF, logo dividem
+  geometria E material. Uniforme por material apagaria as onze; atributo por
+  vértice também (geometria compartilhada). Então cada malha ganha um **clone do
+  próprio material** — texturas por referência, mesmo programa, ~65 clones. A
+  vegetação é a exceção e usa `InstancedBufferAttribute`, porque ali quem precisa
+  de valor próprio é a INSTÂNCIA.
+* **Histerese**, e não é refinamento: sem ela um poste que raspa o contorno da
+  carreta troca de lado a cada quadro e o valor fica pendurado no meio da rampa —
+  a mesma transparência parcial, por outro caminho. Medido antes de existir:
+  `mast_m_2` estacionado em 0,04 com a câmera parada.
+* **A sombra do que você atravessa continua inteira**, de propósito: o passe de
+  sombra usa o `MeshDepthMaterial`, que não recebe a injeção. É o que separa
+  "consigo ver o caminhão" de "o cenário sumiu".
+
+### 10.2 Onde árvore e poste ficam — `scene/scenery.ts`
+
+Liberada a amarra da câmera, o arranjo pode ser o de um lugar de verdade, e é
+lido da geometria do próprio set — nunca de números cravados. Árvore vai em
+canteiro (`median_*`, alinhada, passo de 14 m: alameda, não bosque) e em grama
+(`turf_*`, por área), com porte repartido — 15 m no canteiro de 10,5 m entre duas
+pistas não existe. Poste mantém as duas linhas de x e ganha passo constante em z,
+alternando os lados: o vão caiu de **128 m para 27,2 m**.
+
+**Três defeitos do `.glb` que só apareceram ao medir:**
+
+1. **`InstancedMesh` não nasce zerado, nasce em IDENTIDADE** (r155+) — já
+   registrado na rodada anterior, e é o que fazia 342 instâncias empilhadas na
+   origem local virarem uma "lasca" no chão.
+2. **Quatro dos seis postes do lado oeste tinham o braço virado para fora da
+   rua.** Passou por detalhe enquanto a luminária era geometria apagada; deixou
+   de passar quando ela virou luz. A correção não copia rotação de vizinho —
+   deriva do lado (o braço aponta para o eixo da rua) e **verifica no mundo em vez
+   de supor no nó**.
+3. **O pareamento casca/copa pelo sufixo `_1` é ambíguo**, e essa é a mais
+   silenciosa das três. O GLTFLoader batiza a segunda primitiva de `tree_pk_3`
+   como `tree_pk_3_1` — mas o índice do protótipo TAMBÉM pode ser 1, então
+   `tree_pk_1` (a casca do protótipo 1) e `tree_pk_1_1` (a copa dele) caíam em
+   chaves diferentes. Consequência dupla: no plantio os dois pedaços ficavam com
+   altura zero e eram descartados, ou seja **quatro dos dez protótipos
+   continuavam nas posições de fábrica, em cima do asfalto** — o defeito que o
+   módulo existe para consertar; e no atravessar recebiam vereditos independentes,
+   a meia árvore. O par passou a ser **estrutural** (irmãos sob o `Group` de
+   primitivas). Instâncias plantadas: **416 → 593**.
+
+### 10.3 Dois céus, um mapa — `scene/skyblend.ts`
+
+*"somente escurecer nao fica bom"*, e está certo: a noite era o plate de DIA com
+`backgroundIntensity` em 6 % e `environmentIntensity` em 40 %. Escurecer não tira
+o cúmulo iluminado por baixo, não tira o degradê quente do poente e não põe
+estrela nem lua. Foto subexposta não vira noite.
+
+O par é `kloppenheim_06_puresky` (dia) e `kloppenheim_02_puresky` (noite) — **a
+mesma série**, medida em três eixos (ver `CREDITS.md` §1.0): a lua está a 5,0° do
+sol em azimute, logo o `envRotation` de 4,7124 serve aos dois; a luminância média
+é 43 % da de dia, logo o plate já escurece sozinho; e o pico é 55 633 contra 33,
+logo o peso da noite entra por `smoothstep(0,25…0,95)` e não linear — numa
+interpolação reta haveria meia lua de 28 mil unidades num céu de poente.
+
+**Um alvo intermediário serve aos dois consumidores**, e é isso que torna o
+esquema barato: `scene.environment` e `scene.background` aceitam UMA textura
+cada, então a mistura acontece antes, num passe de tela cheia. O FUNDO é o
+próprio alvo (reescrito a cada mudança, sub-milissegundo ⇒ atravessa liso) e o
+REFLEXO é o PMREM dele, **limitado por taxa** (110 ms, passos de 1/12). O
+descasamento é invisível porque o fundo é estrutura e o reflexo é ambiente
+difuso; inverter a divisão seria imediatamente visível. Reusar o alvo do PMREM
+(`fromEquirectangular(tex, rt)`) é o que dispensa reapontar `scene.environment`.
+
+Com o plate certo no lugar, **os pisos de `nightness` subiram**: 0,06 → 0,22 no
+fundo e 0,40 → 0,55 no reflexo. Somar os dois esmagamentos daria 2,6 % do céu de
+dia — um buraco preto onde deveria haver céu.
+
+### 10.4 O cenário traz o poste, o engine traz a luz — `scene/lamps.ts`
+
+O manifesto do distrito dizia `lamps: { enabled: false }` com a justificativa de
+que "a fileira procedural duplicaria a iluminação". Certa quanto à GEOMETRIA,
+errada quanto à LUZ: as onze torres usam o material `FENCE_POST` — o mesmo mourão
+do alambrado — e **o `set.glb` não tem um único material emissivo**. Aquelas
+luminárias nunca acenderam.
+
+`layout: 'set'` faz a divisão certa. Posição, altura (10,03 m), alcance do braço
+(1,94 m) e tamanho do vidro são **medidos** por `scenery.ts`; `lamps.ts` esconde
+as próprias primitivas e põe o refletor e o vidro aceso nas luminárias do set. O
+pool continua sendo 8 (`NUM_SPOT_LIGHTS` é chave de cache de programa, e
+`warmLightPrograms()` pré-compila as duas configurações na tela de carregamento),
+então os oito refletores vão para as oito torres MAIS PRÓXIMAS do veículo — a
+mais distante fica a 150 m, onde um refletor rende dois pixels. O vidro aceso vai
+nas onze, porque é geometria emissiva e não custa luz.
+
+**O vidro tem de sumir COM o poste.** Atravessar uma torre apaga o mastro no
+shader, e o vidro é geometria do engine: sem vínculo, ele fica aceso flutuando no
+céu. Foi fotografado na bancada às 20:00. `bindSeeThroughSatellite()` amarra um ao
+veredito do outro.
+
+### 10.5 As luzes do veículo, às 18:00 — `vehicle/lights.ts`
+
+A tentação é uma lista de nomes, e ela não sobrevive ao acervo: os materiais de
+luz aparecem com **47 nomes distintos** nos 49 bakes de cavalo, de cinco
+convenções diferentes de quem ripou — inclusive um `parasol_mat_0002_faror` com
+"farol" escrito errado em sueco. Uma lista falharia em silêncio no próximo
+chassi, e a falha é invisível (ninguém abre o app às 20 h para conferir 58
+chassis).
+
+O que todos têm em comum vem do autor do modelo: **`emissiveFactor` não-preto e
+`emissiveTexture` — 145 de 145 ocorrências**, e todo bake tem pelo menos uma. É a
+mesma doutrina que `paint.ts` usa para achar a tinta: perguntar ao asset. E é o
+`emissiveTexture` que torna a regra SEGURA — o brilho já vem localizado, então
+mesmo um material com nome de lataria (o MAN tem `cabin_mat_0003_color` emissivo)
+só acende onde o autor pintou a lâmpada. Não existe o modo de falha "um painel
+inteiro brilhando".
+
+O implemento é o caso contrário — oito materiais de lanterna e **zero** emissivo
+autorado — e ali o nome é o único sinal, confiável porque é UM arquivo versionado
+com o produto. As capas de acrílico (`alphaMode: BLEND`, opacidade 0,06) ficam de
+fora por TRANSPARÊNCIA e não por nome, porque `lanterna-interna-lente` também tem
+"lente" no nome e é a placa.
+
+**Por que 18:00 e não `nightness`:** um motorista acende o farol pelo relógio, e
+neste cenário o sol se põe às 18,4 h — amarrar à altura do sol deixaria as
+lanternas em um quarto de brilho justamente às 18:00. A rampa de 36 minutos lê
+como alguém acendendo. O nível mora no RIG (`RIG_BASE.vehLights`) para atravessar
+`lerpRig()` como qualquer outro campo. **Registrar também as APAGA**, o que
+corrige de passagem as lanternas de todos os 49 bakes brilhando ao meio-dia.
+
+**O que fica de fora, de propósito: FEIXE.** Um farol que joga cone no asfalto
+seriam mais duas `SpotLight`, e isso muda `NUM_SPOT_LIGHTS` — quebraria a
+pré-compilação para todos os cenários, inclusive os de dia. Se for pedido, o
+caminho é ENTRAR no pool de `lamps.ts`.
+
+### 10.6 A bancada
+
+`tools/studio-bench/checks-noite.mjs` — 60 travas, e três delas pegaram defeito
+que revisão não pegaria: a transparência parcial estacionada (histerese), os
+quatro protótipos sem par (pareamento estrutural) e o vidro de 40 cm acima da
+luminária (o mastro tem 40 cm ENTERRADOS abaixo da origem do nó, e subtrair
+`baseY` mede a altura do pedaço de geometria, que não é a altura de nada no
+mundo). O agrupamento casca/copa é **reimplementado** na bancada de propósito: se
+ela importasse a regra do engine, uma regra errada passaria por estar de acordo
+consigo mesma — que é exatamente o que o sufixo `_1` fazia.
+
+## 11. A rodada de 2026-08-12 — o canteiro central passou a ser curado
+
+Pedido do dono do produto, sobre o canteiro central do distrito e **só** sobre
+ele: fora *"as árvores que têm a raiz exposta e estão flutuando"*, fora *"todas
+as mini árvores e os arbustos"*, fora *"as árvores com o tronco esbranquiçado"* —
+e *"nos canteiros ao redor manter como está"*.
+
+### 11.1 Por que o acervo não responde por nome
+
+As quatro descrições são visuais, e o `.glb` não ajuda: **`PLANT_BARK` é UM
+material só para as dez espécies**, então o que separa o plátano do eucalipto não
+é nome nem material — é a região do atlas que as UVs de cada protótipo pegam. A
+informação só existe nos pixels e na geometria. `vetoNoCanteiro()`
+(`scene/scenery.ts`) mede as três coisas:
+
+| critério | medida | valores das dez espécies |
+| --- | --- | --- |
+| **porte** | altura da união casca+copa | arbustos 1,6…2,6 m · árvores 7,5…13,0 m |
+| **raiz aparente** | raio da casca **abaixo de `y = 0` local**, ÷ altura | `tree_pk_5` 0,274 · `tree_pk_0` 0,176 ‖ demais 0,043…0,059 |
+| **casca esbranquiçada** | luminância linear **e** saturação do albedo do tronco, ponderadas por área de triângulo | `tree_pk_2` 0,153/0,04 · `tree_pk_1` 0,135/0,10 ‖ `tree_pk_3` 0,116/0,18 · `tree_pk_0` 0,100/0,21 |
+
+Os três cortes caem em **buracos do histograma**, não em ajuste fino: a raiz
+separa por um fator três, e no albedo cada eixo sozinho já separaria — exigir os
+dois (claro **E** cinza, que é o que "esbranquiçado" quer dizer) só garante que
+a reprovação exige as duas medidas de acordo.
+
+**`y = 0` local é a linha de chão** porque foi ali que o autor da árvore pôs o
+terreno: o que está abaixo é raiz, feita para ser enterrada. Como o plantio
+ancora pelo pé do **tronco** (§10.2), esse pedaço sobe inteiro para cima da
+grama — e é exatamente essa a "aranha de raízes" fotografada.
+
+**O albedo é lido em tempo de carga**, com um `drawImage` de 128² do atlas (16 px
+por célula de um atlas 8×8), uma vez por cenário. O atlas vem **dentro** do
+`.glb`, então o canvas nunca é de outra origem e a armadilha de CORS que
+`vehicle/livery.ts` documenta para as fotos de painel não alcança aqui. Ainda
+assim, sem pixels a medida **abstém-se** em vez de reprovar: canteiro pelado é
+pior que canteiro com uma espécie a mais.
+
+### 11.2 O veto só tira canteiro — nunca empurra para a grama
+
+A assimetria é o que atende *"manter como está"* nos canteiros ao redor: a
+espécie perde o destino que só tinha dentro do canteiro e **mantém** o que já
+tinha fora dele. Arbusto continua na grama (que já era o destino de ~97 % deles);
+`tree_pk_0/1/2` não tinham outro destino e deixam de ser plantadas — 593 → 530
+instâncias, as 63 todas do canteiro.
+
+⚠️ **Tirar o canteiro da lista de alvos NÃO BASTA.** As caixas envolventes das
+faixas **se sobrepõem** — a ilha da rotatória (`rb_island`) fica dentro de uma
+faixa de grama —, então sortear "na grama" ainda punha planta na ilha. E o teste
+tem de ser contra a extensão **crua** da faixa, não contra a recuada de `INSET`:
+um arbusto sobrou no canteiro por estar dentro do meio-fio e fora da caixa
+recuada, na orla de 1,2 m entre as duas.
+
+### 11.3 A parede de troncos era empilhamento, não passo
+
+O passo de 14 m estava certo. O que estava errado é que **cada espécie alinhada
+percorria a faixa inteira sozinha**, e como a estação é `t = (i + 0,5) / n` — a
+mesma conta para todas —, as quatro espécies aprovadas caíam nos **mesmos**
+pontos, separadas só pelo jitter de ±1,6 m: quatro troncos numa caixa de 3,2 m a
+cada 14 m. As espécies da alameda passaram a dividir as estações em round-robin.
+Com uma única espécie aprovada (o estado de hoje) o laço é idêntico ao anterior;
+o menor vão entre troncos do canteiro subiu de **3,2 m possíveis para 12,1 m
+medidos**.
+
+### 11.4 A bancada
+
+`tools/studio-bench/checks-canteiro.mjs` imprime a **ficha medida** de cada
+espécie ao lado do veredito e de onde ela foi plantada, e trava: nenhuma espécie
+vetada dentro de um canteiro, todo tronco do canteiro de espécie aprovada, o
+canteiro não pelado, a grama com a mesma população, nada fora de faixa e nenhum
+empilhamento. As medidas são **reimplementadas** na bancada pelo mesmo motivo de
+§10.6.
+
+⚠️ **Duas armadilhas de câmera novas, e as duas mentiam com a pose "ok".**
+`setVehicleFocus()` prende `controls.target` a um raio do rig e
+`setInteriorBounds()` prende lente e mira dentro dos ~58 m do pátio — ambas em
+`frameHook`, ou seja **depois** do `lookAt()` do check, e o `controls.update()`
+do laço reaponta a câmera. A lente ficava exatamente onde se pediu e olhava para
+o **caminhão**: a foto do pé da árvore saiu uma foto do baú. As duas são soltas
+no começo das fotos, e a conferência de pose passou a incluir a **mira**.
+
+---
+
+## 12. A rodada de 2026-08-12 — as luzes que faltavam acender
+
+> Continuação direta da §10.5. O relato que abriu a rodada foi *"o implemento e o
+> cavalo possui muitas lanternas que ainda nao emitem luzes"*, e a auditoria do
+> acervo mostrou que não era afinação: era a GRANULARIDADE da decisão.
+
+### 12.1 A medida que derrubou a premissa: geometria FUNDIDA por material
+
+Varridos os 57 bakes em disco (49 cavalos + `trailer.glb` + `iveco_sway_metallica`),
+com um leitor do chunk JSON do glTF e as caixas dos accessors de POSITION:
+
+| medida | valor |
+|---|---|
+| bakes com material de luz espalhado por > 30 % do comprimento | **37 de 57** |
+| bakes em que UM material cobre 93–100 % | 12 |
+| pior caso | `cabin_mat_0006_color` do MAN TGX: z −3,06…3,84, **uma primitiva**, e o **único** material emissivo externo do arquivo |
+
+Nos bakes de cavalo há **uma primitiva por material**. Farol, delimitadora de
+teto, lanterna de lateral e lanterna traseira do MAN moram na MESMA malha, com o
+MESMO material. Não existe cor por material que sirva a isso — e o plano herdado
+(clonar material por grupo de posição, §4.3 da passagem de bastão) também não,
+porque **não há grupos**: é uma malha só.
+
+Então a cor passou a ser resolvida **por fragmento**, no shader, a partir da
+posição de mundo do pixel. É a única granularidade que a geometria do acervo
+admite, e ela resolve o implemento junto — `lanterna-pequena-cantos-redondo(VERMELHO)`
+tem peças na frente E atrás.
+
+### 12.2 A régua é em METROS da face, não em fração do comprimento
+
+`vehicle/lights.ts` mede as duas faces de cada raiz e o shader decide pela
+DISTÂNCIA do fragmento a elas. A alternativa (`zRel` normalizado, 0,20/0,80) foi
+medida e reprovada nos dois sentidos:
+
+- as **seis delimitadoras do rufo** do implemento estão em z local −6,19…5,96 com
+  as faces em −7,50 e 7,25. Em `zRel` isso é 0,09…0,90, ou seja duas das seis
+  cruzariam os limiares e sairiam BRANCA e VERMELHA no meio de uma fileira de
+  seis iguais. Em metros todas estão a 1,29–1,31 m das faces e as seis saem
+  ÂMBAR, que é o pedido (*"delimitadoras do rufo: âmbar na lateral"*);
+- o cluster do farol do FH 2021 tem 0,56 m de profundidade em z, e a régua em
+  metros mantém o conjunto inteiro branco em qualquer chassi — 4x2 ou 6x4.
+
+E o DATUM são as próprias lâmpadas, não a caixa da raiz: a caixa é cacheada
+(`geometry.boundingBox`, `InstancedMesh.boundingBox`) e nenhum dos dois é
+invalidado quando `TrailerAssembly.set()` reescreve os vértices. Medido, a
+diferença entre os dois datums é 1 cm no implemento e 1 cm no MAN — e o datum das
+lâmpadas dá de graça a propriedade de que a lâmpada mais dianteira e a mais
+traseira caem exatamente sobre as faces.
+
+### 12.3 Quem decide se é pisca: a PEÇA, não o material
+
+O relato *"na lateral possui 4 lanternas em cada lateral, abaixo frame metalico"*
+tinha uma causa de uma linha:
+
+```
+material `lanterna-pisca-quadrado(LEDs)`  × 10 primitivas
+  peças  `lanterna-lateral-chassis(leds)-001…010`
+         x = ±1,30 · y = 1,28 (SOB o frame) · z = 4,17 … −7,21  (5 por lado)
+```
+
+O material chama "pisca" e a peça é `lanterna-lateral-chassis`: quem autorou
+reusou o material do pisca quadrado nas lanternas de POSIÇÃO da lateral. Os
+piscas de verdade são `lanterna-pisca-circular-D/E`, em z = 7,24.
+
+⚠️ E o nome do nó vem como `<peça>_<material>_<n>`, então testar o nó cru daria o
+mesmo veredito que testar o material. `nomeDaPeca()` tira o sufixo ancorado no
+fim — nunca todas as ocorrências, porque em `lanterna-pisca-circular-E_lanterna-pisca-circular_0`
+a peça REALMENTE se chama pisca.
+
+A regra: **quando a peça tem nome próprio de lâmpada, é ela que diz; senão vale o
+material**, e o que é excluído pelo material passa por `readmitirPontaEscura()`.
+Essa rede de segurança existe porque `r_light_mat_0000_animated_blinkers_col` é a
+malha INTEIRA do conjunto traseiro em 6 bakes Scania e o ÚNICO material de luz da
+traseira deles — apagá-lo deixava aqueles caminhões sem lanterna traseira. A régua
+é 1,20 m até a lâmpada acesa mais próxima, e ela sai de quatro medidas:
+
+| caso | z | acesa mais próxima | veredito |
+|---|---|---|---|
+| VW Titan `truck_mat_0001_pisca` | −2,24…−2,16 | farol a 0,55 m | fica apagado |
+| Scania S 2024e `r_bumper…blinkers` | 3,22…3,29 | 1,46 m | **volta** |
+| Scania R/S 2016 `r_light…blinkers` | 3,14…3,20 | 2,90 m | **volta** |
+| implemento `lanterna-pisca-circular` | 7,24 | sobreposta | fica apagado |
+
+⚠️ **A readmissão roda ANTES do cálculo das faces**, e a ordem inversa é um defeito
+silencioso que a bancada não pega (ela carrega o Volvo, que não tem o caso). No
+Scania a lâmpada devolvida É o conjunto traseiro, em z 3,14…3,20, e a acesa mais
+traseira que sobrava era o `sideskirt` em 0,24: com as faces calculadas antes, a
+traseira readmitida ficaria a 2,9 m da "face de trás" e sairia ÂMBAR — a correção
+entregaria o defeito que ela existe para corrigir.
+
+### 12.4 "interna" era EMBUTIDA, não "de dentro do baú"
+
+As seis ovais do rufo saíam brancas porque `INTERNA_RE` casava `interna` em
+`lanterna-interna-lente` e as classificava como luz de carga. Medido: x = ±1,21,
+y = 4,04 — quina superior EXTERNA, ao longo dos 12 m. São delimitadoras laterais.
+A palavra saiu do regex.
+
+### 12.5 A fita reflete — `vehicle/retroreflect.ts` (NOVO)
+
+Um retrorrefletor devolve a luz **para a fonte**, então o lóbulo é em torno de
+`L`, não de `reflect(-L, N)`. A conta é sobre o ÂNGULO DE OBSERVAÇÃO, e as luzes
+saem das próprias do three (`getSpotLightInfo()` etc.), não de um uniforme nosso —
+o que faz o farol do cavalo acender a fita do implemento de graça.
+
+⚠️ **Helper de GLSL vai em `<common>`, corpo vai no ponto de injeção.**
+`<lights_fragment_end>` fica DENTRO de `void main()` e GLSL não admite função
+aninhada: pôr a função ali dá `ERROR: '{' : syntax error` em todo material de
+fita, e o `tsc` e o esbuild passam limpos. `<common>` é onde `struct IncidentLight`
+é declarada, e o three só resolve os `#include` DEPOIS de `onBeforeCompile`.
+
+### 12.6 As lâmpadas emitem — `vehicle/beams.ts` (NOVO)
+
+O pool de `lamps.ts` cresceu de **8 para 12**: 8 postes + 4 do veículo (2 faróis,
+2 lanternas traseiras). Não é luz nova, é vaga reservada — `NUM_SPOT_LIGHTS`
+continua sendo constante de módulo e `warmLightPrograms()` continua pré-compilando
+exatamente duas configurações.
+
+E `lampsWanted()` passou a olhar `vehLights` além de `lampIntensity`: sem isso o
+preset `ciclorama` (que autora `lampIntensity: 0`) deixaria as doze fora da cena e
+o farol não emitiria nada às 21 h. Duas condições, UM interruptor — um terceiro
+estado seria uma terceira configuração de shader.
+
+### 12.7 O vidro da luminária não batia porque a luminária é uma CUNHA
+
+Relato: *"a luz do poste, a posicao dela, oque seria o vidro, nao esta batendo
+corretamente como deveria, a angulacao"*. A sonda `checks-poste-vidro.mjs` mediu
+nos onze postes e o perfil por faixas de altura (36 vértices ao todo) explicou:
+
+```
+y 9,692          a 1,626        t ±0,21    ← ponta de dentro, EMBAIXO
+y 9,826…9,860    a 1,593…1,769  t ±0,21
+y 9,860…9,894    a 2,467        t ±0,21    ← ponta de fora, NO ALTO
+y 9,994…10,028   a 2,434        t ±0,21
+```
+
+A carcaça sobe 0,17 m ao longo de 0,84 m de alcance — **11,3°** — e o vidro era
+uma caixa HORIZONTAL: encostava numa ponta e ficava 17 cm no ar na outra. Mais
+dois defeitos somados: `lensT` era medido e **descartado** na saída de
+`medirLuminaria()` (a largura vinha de `LAMP_LENS_ASPECT`, constante da luminária
+PROCEDURAL: 0,437 × 2 × 0,55 = 0,481 contra 0,42 da carcaça), e `outreach` era a
+MÉDIA dos vértices além do corte, que inclui o tubo do braço e puxava o centro
+9 cm para dentro.
+
+| medida | antes | depois |
+|---|---|---|
+| desvio do vidro em planta | 0,093 m | **0,001 m** |
+| largura do vidro × carcaça | 0,48 × 0,42 | **0,37 × 0,42** |
+| alcance do braço | 1,94 m | **2,03 m** |
+| inclinação do vidro | 0° | **11,3°**, a da face |
+
+⚠️ **REGRA REUSÁVEL, e ela custou uma tentativa inteira: numa peça INCLINADA,
+faixa de altura não recorta a face — recorta o comprimento.** Medir "o quinto de
+baixo" da luminária devolveu 0,21 m de comprimento contra 0,87 m do conjunto, o
+que parece um erro de conta e não é: num sólido em cunha, cortar por ALTURA
+seleciona uma fatia ao longo do ALCANCE. A medida certa de uma face inclinada é o
+PLANO dela (menor y por faixa de alcance, reta ajustada), nunca uma faixa. Vale
+para qualquer coisa deste engine que meça superfície por corte de altura.
+
+Achado de brinde, ainda latente: `rebuildSiteLenses()` fazia
+`rotation.y = atan2(aimZ, aimX)`, o ESPELHO do correto `atan2(-aimZ, aimX)` —
+inofensivo enquanto o braço é ±X exato (aimZ = 0) e errado por −2θ em qualquer set
+com mastro em diagonal ou raiz girada. Corrigido; `placeLamp()` e o ramo `set` de
+`applyLampLayout()` já usavam a conta certa.
+
+### 12.8 Os três relatos da tarde — e o que cada um era de fato
+
+**"tem o feixe de luz, mas nao sai da frontal".** O feixe estava CERTO: medido, a
+fonte nasce em z −0,82, que é exatamente a face dianteira do conjunto, e o cone
+cai no asfalto à frente. Quem estava apagada era a LENTE. A pilha de acertos já
+dizia por quê desde a rodada anterior — `cabin_mat_0006_glass_ex` na frente, com
+opacidade 0,8 —, e o que faltava não era nível (2,2 → 8 → 40 sem diferença: o
+tonemap roda ANTES da mistura) e sim GRANULARIDADE, a mesma lição de §12.1: a capa
+é **uma malha só** (`cabin_p7`, y 0,53…3,83 — para-brisa, janela e capa de farol),
+então a decisão desce para o fragmento. `vehicle/headlight-cover.ts` clareia a capa
+**só dentro da caixa do farol** (medida por `lights.ts`) e **só na proporção de
+`vehLights`**. O para-brisa não muda (ele começa em y ~1,8; a caixa do farol
+termina em 1,35 com folga) e de dia nada muda em lugar nenhum.
+
+**"essa da frontal do implemento nao acende".** Medido na face dianteira do baú
+(z local 7,25): `lanterna-pisca-circular-E` em x 1,12…1,21 e `-D` em
+x −1,21…−1,12, y 1,32…1,41 — uma redonda de 9 cm em cada quina inferior da frente.
+Um **semirreboque não tem seta dianteira**: aquilo é lanterna de POSIÇÃO, e quem
+autorou reusou a peça do pisca circular, do mesmo jeito que reusou o material do
+pisca quadrado nas dez da lateral. Segunda régua de readmissão, geométrica e não
+nominal: **raiz SEM farol + lâmpada na face dianteira**. Ela não devolve seta
+nenhuma do cavalo (aquelas raízes têm farol) nem seta traseira de implemento.
+Cor: âmbar, porque a lente é âmbar — mesma doutrina do `(VERMELHO)`.
+
+⚠️ E o caminho "a peça diz pisca" **deixou de ser terminal**. Ele descartava o
+material na hora, então a régua acima nunca via a lanterna que ela existe para
+acender. Agora os dois casos vão para a lista de espera e `readmitirPontaEscura()`
+decide com as matrizes de mundo já valendo. O campo `piscaPorPeca` mantém as duas
+réguas separadas: a da "ponta escura" continua NÃO valendo quando a peça afirma
+ser seta — ela existe para material de nome errado em conjunto fundido, onde a
+peça não opina.
+
+**"a da traseira do cavalo nao afeta o implemento".** Verdade: o par da cauda mora
+no extremo do comboio e joga no asfalto. A traseira do CAVALO fica no meio dele,
+com a parede dianteira do baú a ~2 m — superfície branca, grande e perto. Duas
+vagas novas (pool **12 → 14**), com o alvo na ALTURA da lanterna e não no chão, e
+apagadas quando não há implemento (aí a traseira do cavalo já É a cauda).
+
+### 12.9 A bancada
+
+`checks-noite.mjs` ganhou as travas de lanterna de posição, delimitadora do rufo,
+feixe e fita, e **perdeu** a trava "nenhum material com pisca no nome acende" — ela
+mascarava justamente o defeito de §12.3. `checks-poste-vidro.mjs` é sonda nova.
+
+⚠️ **Uma sonda não pode posar a câmera e depois rodar quadros.** Medido: o laço
+reancora a órbita no veículo (`controls.target` volta para (0,33 · 2,30 · 5,88),
+`maxDistance` 43,4 m) e `OrbitControls.update()` roda sem consultar `enabled`. Um
+pedido a 72 m do veículo virava 43 m no quadro seguinte. A ordem certa é assentar
+a luz primeiro e posar por último, chamando `captureViewport()` sem um único
+`B.frame()` no meio — ela chama `stopLoop()` e renderiza com a câmera como está.
+
+---
+
+## 13. A rodada de 2026-08-12 — o painel do editor virou o próprio baú
+
+Cinco relatos numa mensagem, e quatro deles são **o mesmo defeito**: *"parece que
+tem uns 3 modelos remontados ali"*, *"não parece com o modelo 3D"*, *"o quadrado
+não fica alinhado"*, *"fica cortado ou com espaço até o frame"*. O quinto é
+separado: *"adicionar uma porta trava"*.
+
+### 13.1 O defeito único: TRÊS retângulos onde só pode haver um
+
+`vehicle/livery-snapshot.ts` já fotografava o implemento em ortográfica a cada
+rebuild (§ da rodada anterior), e o card já usava essa foto em registro exato. O
+**palco do editor**, não: ele ainda dimensionava a tela do fabric por
+`canvasRect()`, uma conta herdada da foto estática que esticava a tela por
+`1 / faixa pintável` para encaixá-la num vazado que **não existe mais** —
+`panels/lateral.png` saiu do pacote de assets, então a medição 404 em silêncio e
+`win` degradava para o quadrado unitário.
+
+MEDIDO na bancada (`tools/studio-bench/checks-livery-registro.mjs`), palco de
+961 × 194,9 px, ANTES:
+
+| | x | y | w | h |
+|---|---|---|---|---|
+| chapa no retrato | 0,53 % | 1,75 % | 98,93 % | 92,47 % |
+| tela do fabric | 0,53 % | 1,75 % | **100,0 %** | **113,72 %** |
+
+**+23,0 % de altura com a origem certa.** A arte e o plano da frente iam ficando
+cada vez mais abaixo da ferragem do retrato conforme se descia o painel, e as
+duas apareciam juntas: dois trilhos, duas cantoneiras, dois para-choques. Na
+traseira, +13,7 % de altura e +6,2 % de largura.
+
+E um segundo efeito que explica "não parece com o modelo": a caixa resultante
+tinha razão 4,336 contra 5,278 do buffer da tela (a razão da chapa) — **tudo era
+mostrado 22 % mais alto do que sai no baú**. Círculo virava elipse na tela.
+
+A correção é uma linha de doutrina: **a caixa da tela é `snap.box` e nada mais.**
+Ela vem do mesmo render que produziu a foto, então o registro fecha por
+construção. Depois: desvio 0 nos quatro números, nas duas faces, e **também
+depois de adicionar uma porta** (o palco se reenquadra sozinho via
+`setStageResizer`, porque o retrato é assíncrono e a caixa da chapa muda).
+
+### 13.2 O retrato foi para TRÁS da arte
+
+A foto estática era uma **moldura**: opaca em volta, vazada no meio, e por isso
+tinha de ficar na frente. O retrato é o baú inteiro — chapa incluída. Na frente
+ele esconderia o desenho, e o buraco que se abrisse nele só poderia ser um
+RETÂNGULO enquanto a ferragem que precisa cobrir a arte tem silhueta de perfil.
+Pior: ele repintava a mesma ferragem que o plano da frente já desenhava.
+
+Atrás (`.ts-pw-behind`, ligada por `publishWindow()`), cada pixel tem **uma
+fonte só**:
+
+```
+retrato                 a chapa como ela é — emenda, friso, rebite, cor corrente
+tela do fabric          a arte do cliente, transparente
+.ts-structure--front    o MESMO render com a chapa em depth-only
+```
+
+A oclusão deixou de ser aproximada por um retângulo e passou a ser a do modelo.
+
+### 13.3 A área pintável agora é LIDA, não inferida
+
+O passe da frente já é a resposta: um pixel com alfa ali é um pixel em que a arte
+some atrás de metal. `measurePaintRect()` lê o alfa do recorte e anda **das
+bordas para dentro** até a primeira linha/coluna livre — recuo do FRAME, não
+"maior vão livre", porque vão de porta, varão e borracha central são obstruções
+INTERIORES e o adesivo passa por cima delas.
+
+Medido no `trailer.glb`: lateral 74 / 11 mm nos montantes, 210 mm de cantoneira,
+131 mm de trilho — os 210 batem com `cap-top.h = 0,21` do manifesto e os 131 com
+a faixa 0–127 mm que `measurePaintable()` já apontava. Traseira 92 / 92 / 129 /
+13 mm.
+
+Isso **aposenta** `measurePaintable()` (caixas de malha, com o `console.warn` que
+existia porque ela erra) para degradação. O encaixe de arrasto e o "Alinhar ao
+painel" já leem `outlineFrame()`, então é essa medida que faz encostar um objeto
+no frame ser exato — sem folga e sem corte, que é o pedido.
+
+**O tracejado NÃO é desenhado**, e a distinção importa: a MEDIDA ficou, o
+DESENHO saiu a pedido (*"não quero aquelas linhas tracejadas"*). Ele deixou de
+ser necessário no mesmo movimento que o tornou preciso — enquanto a moldura era
+uma foto esticada com um buraco retangular, a linha era a única pista de onde a
+ferragem ia cair; com a ferragem desenhada por cima da arte na silhueta exata do
+modelo, o limite se vê olhando o painel.
+
+### 13.4 O quadro fecha no frame; a luz é própria e fixa
+
+Duas correções pedidas olhando a tela.
+
+**Enquadramento.** As margens de contexto eram 8 / 5 / **18** cm — e os 18 cm de
+baixo punham para-lama, lanterna de chassi e sombra de rodado na foto. O quadro
+passa a fechar no FRAME, e cada margem tem uma peça que a justifica:
+
+| | lateral | traseira | o que ela traz |
+|---|---|---|---|
+| lados | **15 cm** | 3 cm | o montante de canto tem 142–174 mm e entra só 5–80 mm na chapa: quase toda a peça fica AO LADO dela ("o frame da frente não está mostrando") |
+| topo | 1 cm | 1 cm | a cantoneira já está dentro da chapa |
+| pé | **9 cm** | **31 cm** | o trilho lateral nasce 82,5 mm abaixo do piso; na traseira, ver abaixo |
+
+⚠️ **A margem conta da CAIXA DA CHAPA, e na traseira ela não chega ao piso.**
+`PANEL_MM.rear` mede 2 577 mm num baú de 2 790 — a chapa termina ~213 mm acima
+do piso, porque as folhas são geometria própria e descem além dela. Cada
+centímetro pedido só começa a valer depois de vencer esse degrau, e foi ele que
+fez 15 e depois 21 cm continuarem cortando acima da faixa refletiva inferior. A
+bancada mede a fração de pixel VERMELHO da faixa, e o degrau aparece como um
+salto: 21 cm → 1,5 %, 27 cm → 12,9 %, 34 cm → 13,4 % ("passando muito"). 31 cm
+fecham rente ao pé dela.
+
+**Luz.** O painel é um DOCUMENTO: tem de sair igual às três da tarde e às onze
+da noite. As luzes da cena são apagadas durante o disparo e entra um
+`RoomEnvironment` neutro **assado no próprio renderizador do snapshot** — uma
+textura de render-target não atravessa contexto WebGL, então o ambiente vindo do
+renderizador principal chegava VAZIO, e é por isso que o metal fechava preto.
+
+**E não entra nenhuma direcional**, que é o achado do terceiro ajuste.
+`vehicle/retroreflect.ts` soma na fita 3M um lóbulo
+`Σ_luzes cor·(N·L)·(0,30 + ganho·(L·V)⁴)` percorrendo `directionalLights[]`,
+`pointLights[]` e `spotLights[]`. A pose óbvia para fotografar um painel — chave
+perto do eixo da lente — põe `L·V ≈ 1` e dispara o lóbulo inteiro: **a fita
+estoura em branco e perde o vermelho**, e subir a exposição para clarear a chapa
+piorava isso na mesma proporção. `HemisphereLight` e `scene.environment` não
+entram naqueles laços, então com só esses dois o termo retro é zero por
+construção. O relevo continua legível porque IBL não é luz chapada.
+
+**Duas causas foram encontradas ATRÁS da luz**, e as duas explicam relatos que
+pareciam de exposição:
+
+* **o metal renderizava preto.** `models.refreshVehicleReflection()` prende em
+  cada material do veículo o cubemap da sonda local, assado no renderizador
+  PRINCIPAL. Um material com `envMap` próprio ignora `scene.environment`, e a
+  textura de um render-target não atravessa contexto de WebGL — aqui ela chega
+  vazia. Metal quase não tem difusa: sem nada para refletir, ele não tem nada.
+  A correção é trocar o `envMap` (nunca `null`, que mudaria `USE_ENVMAP` e
+  recompilaria ~2 150 programas por face);
+* **as três faces viam ambientes diferentes.** O `RoomEnvironment` é uma
+  CAIXA, com painéis emissivos em posições fixas. Sob a mesma exposição, a
+  lateral do motorista olhava para uma parede e a do passageiro para outra —
+  "esse lado está muito bom, mas esse está um pouco estourado". A correção é
+  girar o ambiente pelo azimute da face (`scene.environmentRotation` **e**
+  `material.envMapRotation`, senão metade do baú fica fora de fase com a
+  outra).
+
+E uma coisa que NÃO se faz: cravar `envMapIntensity` igual em todo material. Foi
+tentado "para as três responderem igual" e o frame preto fosco da traseira, que
+tem ganho baixo por autoria, passou a refletir a sala e virou CINZA. O ganho por
+material é parte do modelo; um retrato do modelo não o reescreve.
+
+Calibrado por medida, com a MEDIANA da chapa (a média era puxada por varões e
+fechos que cruzam a área da traseira):
+
+| | mediana (motorista/passageiro/traseira) | estourado | veredito |
+|---|---|---|---|
+| chave 1,15 · env 0,85 | 218 / — / 170 (média) | 0 % | "muito escuros" |
+| chave 1,55 · env 1,35 · exp 1,3 | 241 / — / 215 (média) | 0 % | "estourado; fita branca" |
+| sem direcional · gradiente uniforme | 209 / 209 / 209 | 0 % | metal preto (gradiente LDR não renderiza) |
+| **RoomEnvironment girado + envMap trocado** | **234 / 238 / 239** | **0 %** | ✓ |
+
+O último aparo é o único empírico do arquivo: a folha da porta tem albedo mais
+alto que a chapa do corpo e ficava em 247 ("muito esbranquiçada"). A 247 ela
+está no OMBRO do ACES, onde a curva quase não anda — cortar 14 % da exposição
+moveu UM nível, e foi preciso cortar ~metade (`EXPOSURE_TRIM.rear = 0,52`).
+
+### 13.5 A porta: 2 932 ms → 0,9 ms no clique
+
+`models.setTrailerDoors()` delega a `setTrailerDims({})` — a sequência
+destrutiva de oito passos — porque recortar um vão reescreve o corpo branco
+inteiro. Não dá para deixá-la barata sem reescrever a geometria paramétrica, e
+não foi isso que se pediu: *"prefiro que tenha um loading do que ele travar"*.
+
+O que mudou é **o que acontece antes** e **o que sai do caminho**:
+
+* `setDoorsFor()` recompõe o 2D e avisa o inspetor **antes** de chamar a
+  geometria — a porta aparece no desenho no quadro do clique;
+* o recorte é coalescido e adiado 60 ms (`setDoorsApplier`, injetado por
+  studio.ts como o de medidas), tempo de o estado ocupado PINTAR;
+* o indicador mora no **inspetor**, não na pílula: `#cab-switching` (z 9) e o véu
+  do viewport ficam atrás de `#editor-modal` (z 9999), ou seja eram invisíveis
+  exatamente na tela do botão. Os controles de porta desabilitam junto — um
+  segundo clique enfileirava outro recorte de três segundos;
+* `refreshSnapshots()` virou assíncrona, cede um quadro **antes** de cada face
+  (com o `await` no fim do laço a primeira face dividia tarefa com o recorte) e
+  troca `toDataURL` por `toBlob` + object URL;
+* `measurePaintable()` só roda enquanto o retrato não mediu — eram três
+  varreduras de ~2 150 malhas por rebuild para produzir um número descartado.
+
+| | antes | depois |
+|---|---|---|
+| bloqueio no clique | 2 932 ms | **0,9 ms** |
+| maior quadro sem pintar | 2 932 ms | **987 ms** (o recorte, com indicador) |
+| `attachOverlays` | 136 ms | **2,7 ms** |
+| `refreshSnapshots` síncrono | 723 ms | **1,1 ms** |
+
+Os ~700 ms que sobram são `rig.set()` + `buildLiveryPanels()`, e ficam.
+
+### 13.6 Motorista e Passageiro, nunca esquerda e direita
+
+Esquerda e direita dependem de onde quem fala está: de frente para o caminhão a
+lateral do motorista está à direita de quem olha; de dentro da cabine, à
+esquerda. Um pintor que recebe "logo na lateral esquerda" tem 50 % de chance de
+aplicar do lado errado, e errar isso custa uma película. As **chaves internas
+continuam `left`/`right`** — elas nomeiam SIDE_L/SIDE_R, a `uv1` e as três telas
+do fabric. O que muda é rótulo: `SIDE_LABEL` (vehicle/livery.ts), `FACE_LABEL`
+(ui/livery-measures.ts, cópia porque aquele arquivo não pode importar este) e o
+HTML de `core/template.ts`.
+
+### 13.7 A bancada
+
+`checks-livery-registro.mjs` (NOVO) decide tudo isto por retângulo e por
+milissegundo: caixa do palco contra `snap.box`, razão contra razão, recuo do
+frame em mm, histograma de luminância da chapa, bloqueio no clique e **maior
+quadro sem pintar** — que é o único número honesto de "trava?", porque o usuário
+não sente a soma do trabalho, sente o intervalo em que a tela não responde.

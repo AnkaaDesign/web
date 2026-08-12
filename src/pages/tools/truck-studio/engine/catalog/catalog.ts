@@ -57,6 +57,14 @@ export interface EnvironmentDef {
   /** equirect .hdr; null → céu procedural */
   hdri: string | null;
   ground: GroundDef;
+  /**
+   * Equirect de NOITE do mesmo local, para a dissolvência do céu.
+   *
+   * Ausente ⇒ a noite continua sendo o plate de dia escurecido, que é o
+   * comportamento de sempre e o degrade correto: um cenário sem par não pode
+   * ficar sem céu. Ver scene/skyblend.ts.
+   */
+  hdriNight: string | null;
   /** false → o HDRI é o céu */
   showSkyDome: boolean;
   /** manter pista/acostamento/grama procedurais */
@@ -685,6 +693,9 @@ function normalizeEnvironment(input: unknown): EnvironmentDef | null {
     subtitle: str(raw.subtitle, ''),
     thumb: nullableStr(raw.thumb),
     hdri,
+    /* SÓ com `hdri`: um plate de noite sozinho não tem par com que atravessar, e
+       aceitá-lo faria skyblend.setSkyPair() devolver null a cada troca de hora. */
+    hdriNight: hdri ? nullableStr(raw.hdriNight) : null,
     ground: normalizeGround(raw.ground),
     /* sem HDRI o céu procedural é obrigatório, senão o fundo fica preto */
     showSkyDome: bool(raw.showSkyDome, !hdri),

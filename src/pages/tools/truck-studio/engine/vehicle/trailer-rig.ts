@@ -50,7 +50,9 @@
 import * as THREE from 'three';
 import { TrailerBody, type TrailerDims, type DoorSpec, type Face } from './trailer-geometry';
 import { TrailerAssembly } from './trailer-assembly';
+import { applyBakeFixes } from './trailer-bake-fixes';
 import { deriveImplementHitch, type ImplementHitch, type ImplementMeasurements } from './coupling';
+import { invalidateVehicleLightBounds } from './lights';
 
 export type { TrailerDims };
 export type { ImplementHitch };
@@ -133,6 +135,18 @@ export class TrailerRig {
     root.add(this.body.group);
 
     const p = this.body.profile;
+    /* AS CORREÇÕES DO BAKE, e a ordem delas é o contrato: depois de
+       `TrailerBody` (que é quem mede a grade do friso, régua da ferragem da
+       porta) e ANTES de `TrailerAssembly` (que congela `piece.base` no
+       construtor e reescreve a partir dela em todo `set()` — corrigir depois
+       daria uma correção que o primeiro resize apaga). Ver
+       `trailer-bake-fixes.ts`. */
+    applyBakeFixes(root, {
+      floorY: p.floorY, roofY: p.roofY, z0: p.z0, z1: p.z1,
+      halfWidth: p.base.width / 2,
+      vale: this.body.valeInfo,
+    });
+
     this.assembly = new TrailerAssembly(root, {
       floorY: p.floorY, roofY: p.roofY, z0: p.z0, z1: p.z1,
       baseHeight: p.base.height, baseLength: p.base.length,
@@ -193,6 +207,12 @@ export class TrailerRig {
        reescreveu milhões deles — e é o que substitui "o pino fica parado"
        (uma suposição) por "o pino está aqui" (uma medida). */
     this.measureAnchors();
+    /* E as LUZES remedem. A cor de cada lanterna sai da distância dela às duas
+       faces do baú, em metros, e as duas faces acabaram de se mexer: sem isto um
+       baú alongado de 12 para 15 m deixaria as lanternas traseiras a 3 m da face
+       que a medida anterior registrou, ou seja âmbar em vez de vermelhas. Só
+       marca; quem remede é a próxima escrita, dentro de applyRig(). */
+    invalidateVehicleLightBounds();
     return d;
   }
 

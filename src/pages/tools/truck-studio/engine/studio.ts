@@ -31,6 +31,7 @@ import * as liveryStructure from './vehicle/livery-structure';
 import * as catalogMod from './catalog/catalog';
 import * as selector from './ui/selector';
 import * as environment from './scene/environment';
+import * as cyclorama from './scene/cyclorama';
 import * as loader from './ui/loader';
 import {
   loadCatalog, loadChoice, saveChoice, defaultChoice,
@@ -711,6 +712,78 @@ function applyTrailerDimsDebounced(
    pela porta crua. */
 liveryStructure.setDimsApplier((patch) => applyTrailerDimsDebounced(patch));
 
+/* ---------------- O VÃO DE PORTA, COM CARREGAMENTO ----------------
+   MEDIDO (`tools/studio-bench/checks-livery-registro.mjs`): um "+ Adicionar
+   porta" prendia a thread principal por **2 932 ms**. O motivo está no
+   cabeçalho de `models.setTrailerDoors()` e não é acidental — recortar um vão
+   reescreve o corpo branco inteiro, então ele delega a `setTrailerDims({})`,
+   que é a mesma sequência destrutiva de oito passos de um redimensionamento.
+
+   O pedido é explícito: "prefiro que tenha um loading de carregamento de porta
+   do que ele travar". Não dá para tornar o recorte barato sem reescrever a
+   geometria paramétrica, e reescrevê-la não é o que se pediu. O que dá — e é o
+   que muda a experiência — é fazer o trabalho ACONTECER DEPOIS DE O AVISO
+   APARECER, e fazer tudo o que não depende dele acontecer ANTES:
+
+     · a porta entra no desenho 2D no quadro do clique (`setDoorsFor` recompõe
+       antes de chamar aqui);
+     · o inspetor entra em estado ocupado e desabilita os controles de porta,
+       porque um segundo clique durante o recorte enfileiraria outro;
+     · o véu do viewport e a pílula sobem, para quem estiver fora do editor;
+     · só então, num `setTimeout`, o recorte roda.
+
+   COALESCE PELO MESMO MOTIVO DAS MEDIDAS: arrastar a largura de uma porta
+   emite um commit por campo, e três recortes seguidos são nove segundos. O
+   último pedido de cada face ganha; não há fila.
+
+   POR QUE UMA JANELA CURTA (60 ms) e não os 260 ms das medidas: medida se
+   digita, porta se clica. Um clique não tem valores intermediários a descartar,
+   e 260 ms de espera depois de um clique são 260 ms em que o botão parece
+   morto. Sessenta é o bastante para o navegador pintar o estado ocupado e para
+   fundir os commits em rajada de um mesmo gesto. */
+const DOORS_QUIET_MS = 60;
+let doorsTimer: ReturnType<typeof setTimeout> | null = null;
+const doorsPending = new Map<liveryStructure.StructureKey, liveryStructure.DoorSpec[]>();
+let doorsPill: { release(): void } | null = null;
+
+function endDoorsBusy() {
+  setViewportBusy(false);
+  doorsPill?.release();
+  doorsPill = null;
+  liveryStructure.setGeometryBusy(false);
+}
+
+function flushTrailerDoors() {
+  doorsTimer = null;
+  const batch = [...doorsPending.entries()];
+  doorsPending.clear();
+  try {
+    for (const [face, doors] of batch) models.setTrailerDoors(face, doors);
+  } catch (e) {
+    /* Um vão que a geometria recusa não pode deixar o inspetor desabilitado e
+       o viewport embaçado para sempre — o usuário ficaria sem caminho de volta
+       e sem saber por quê. */
+    console.error('[truck-studio] falha ao recortar o vão de porta', e);
+  } finally {
+    endDoorsBusy();
+  }
+}
+
+function applyTrailerDoorsDebounced(
+  face: liveryStructure.StructureKey, doors: liveryStructure.DoorSpec[],
+) {
+  doorsPending.set(face, doors);
+  if (!doorsPill) {
+    doorsPill = claimPill('Abrindo o vão no baú…');
+    setViewportBusy(true);
+    liveryStructure.setGeometryBusy(true);
+  }
+  if (doorsTimer) clearTimeout(doorsTimer);
+  doorsTimer = setTimeout(flushTrailerDoors, DOORS_QUIET_MS);
+}
+
+liveryStructure.setDoorsApplier(applyTrailerDoorsDebounced);
+
 async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean) {
   const { choice, env, model, chassis, manufacturer, color, finish } = resolved;
   /* 'Highline · 6x4' — o chassi é um passo do seletor agora, então tudo que
@@ -1246,6 +1319,11 @@ async function boot() {
       catalog: catalogMod,
       selector,
       environment,
+      /* A SALA DE ESTÚDIO, para ajuste pelo console e para a bancada.
+         O que se mexe daqui na prática é `setFloorReflection(false)` — a
+         segunda passada de renderização do piso polido é o único item caro
+         do cenário, e é assim que se mede o que ele custa. */
+      cyclorama,
       loader,
       applyChoice,
       uniforms: paint._sharedPaint,

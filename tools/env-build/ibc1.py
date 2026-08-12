@@ -211,6 +211,29 @@ def _load_dl():
     return _DL_MOD
 
 
+_CACHE_MOD = None
+
+
+def _load_cache():
+    """protos_cache pelo mesmo caminho, e pelo mesmo motivo."""
+    global _CACHE_MOD
+    if _CACHE_MOD is None:
+        import importlib.util
+        import sys
+        if "protos_cache" in sys.modules:
+            _CACHE_MOD = sys.modules["protos_cache"]
+            return _CACHE_MOD
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "protos_cache.py")
+        if not os.path.exists(p):
+            return None
+        spec = importlib.util.spec_from_file_location("protos_cache", p)
+        _CACHE_MOD = importlib.util.module_from_spec(spec)
+        sys.modules["protos_cache"] = _CACHE_MOD
+        spec.loader.exec_module(_CACHE_MOD)
+    return _CACHE_MOD
+
+
 def import_prototypes(log):
     """Import every model once, welded, recentred on its own footprint with the
     floor on z=0.
@@ -221,6 +244,20 @@ def import_prototypes(log):
     re-measure the AABB after every rotation to undo exactly that).
     """
     from mathutils import Vector, Matrix
+
+    # SEM O PACK, A CACHE. Ver protos_cache.py: `_src_ibc1` e gitignorado e nao
+    # existe fora da maquina onde o pack foi baixado. Cair para dicionario vazio
+    # aqui nao dava erro nenhum — dava um distrito sem predio nenhum, que e o
+    # mesmo modo de falha silencioso que o FENCE_SRC ja custou uma build.
+    if not glob.glob(os.path.join(SRC, "model_*.obj")):
+        cache = _load_cache()
+        if cache is not None:
+            ibc, _dl = cache.load_buildings(log=lambda m: log("  " + m))
+            if ibc:
+                return ibc
+        log("  _src_ibc1 ausente e sem cache — 0 prototipos")
+        return {}
+
     protos = {}
     for p in sorted(glob.glob(os.path.join(SRC, "model_*.obj")),
                     key=lambda s: int(os.path.basename(s).split("_")[1].split(".")[0])):

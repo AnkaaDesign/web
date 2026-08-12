@@ -16,6 +16,8 @@
        node tools/studio-bench/bench.mjs            # roda e imprime o relatório
        node tools/studio-bench/bench.mjs --keep     # deixa o servidor de pé
        node tools/studio-bench/bench.mjs --shot x.png   # e salva um print
+       node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-estudio.mjs
+                                                    # o caminhão de verdade, na placa
 
    Ela reusa três decisões de `tools/studio-render/serve.mjs`, e o cabeçalho de
    lá as explica: esbuild vindo do vite (para não acrescentar dependência), o
@@ -152,19 +154,71 @@ async function startServer(port = 0) {
 /* ---------------- o navegador, por CDP cru ----------------
    Sem Playwright: o `chrome-headless-shell` do cache dele já está no disco, e o
    protocolo que precisamos são quatro comandos. Uma dependência a menos numa
-   ferramenta interna é uma razão a menos para ela parar de rodar. */
-const SHELL = join(process.env.HOME, 'Library/Caches/ms-playwright'
-  + '/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell');
+   ferramenta interna é uma razão a menos para ela parar de rodar.
+
+   O shell é PROCURADO no cache, não cravado: o caminho antigo apontava a build
+   1234 do macOS e a bancada só rodava naquela máquina — a mesma armadilha que
+   `trailer-bench/shoot-door.mjs` já tinha matado do lado do Playwright. */
+import { readdirSync, statSync } from 'node:fs';
+
+function findShell() {
+  const home = process.env.USERPROFILE || process.env.HOME;
+  const roots = [
+    join(home, 'Library', 'Caches', 'ms-playwright'),
+    join(home, '.cache', 'ms-playwright'),
+    join(home, 'AppData', 'Local', 'ms-playwright'),
+  ];
+  for (const root of roots) {
+    let entries = [];
+    try { entries = readdirSync(root); } catch { continue; }
+    const builds = entries.filter((d) => /^chromium_headless_shell-\d+$/.test(d))
+      .sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
+    for (const b of builds) {
+      for (const rel of [
+        ['chrome-headless-shell-mac-arm64', 'chrome-headless-shell'],
+        ['chrome-headless-shell-mac-x64', 'chrome-headless-shell'],
+        ['chrome-headless-shell-linux64', 'chrome-headless-shell'],
+        ['chrome-linux', 'headless_shell'],
+        ['chrome-linux64', 'headless_shell'],
+        ['chrome-headless-shell-win64', 'chrome-headless-shell.exe'],
+        ['chrome-win64', 'chrome-headless-shell.exe'],
+      ]) {
+        const p = join(root, b, ...rel);
+        try { statSync(p); return p; } catch { /* próximo */ }
+      }
+    }
+  }
+  throw new Error('chrome-headless-shell não encontrado no cache do Playwright');
+}
+const SHELL = findShell();
+
+/* SwiftShader é o padrão porque é o que roda em QUALQUER máquina — inclusive um
+   CI sem placa. Mas ele é um rasterizador de software: o implemento de verdade
+   (2 151 malhas, 5,4 M triângulos) leva minutos por quadro nele, e é por isso
+   que `--geometry` existe com um aviso e que o padrão é uma caixa.
+
+   `--gpu` troca o backend para a placa da máquina via ANGLE/OpenGL. MEDIDO
+   nesta estação (Radeon RX 570): o mesmo quadro que o SwiftShader não fecha sai
+   a ~36 fps, o que é a diferença entre "dá para olhar a cena" e "não dá". Use-o
+   para julgar APARÊNCIA — luz, chão, reflexo — e deixe o padrão para as
+   verificações de fato, que não dependem de placa e têm de rodar em todo lugar.
+
+   `--use-angle=gl` e não `vulkan`: os dois funcionam aqui, mas o caminho GL é o
+   que o Chromium usa em desktop Linux quando a placa é aceita, ou seja é o mais
+   próximo do que o usuário final vê. */
+const GPU_ARGS = ['--use-gl=angle', '--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'];
+const SOFT_ARGS = ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader',
+  '--enable-unsafe-swiftshader'];
 
 async function launch() {
   const proc = spawn(SHELL, [
-    '--headless', '--no-sandbox', '--disable-gpu', '--hide-scrollbars',
+    '--headless', '--no-sandbox', '--hide-scrollbars',
     '--remote-debugging-port=0', '--window-size=1440,900',
-    /* SwiftShader: sem isto o headless não tem WebGL2 e o engine morre no
+    /* Sem um destes o headless não tem WebGL2 e o engine morre no
        `new WebGLRenderer()`, que roda no tempo de import. */
-    '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+    ...(flag('gpu') ? GPU_ARGS : SOFT_ARGS),
     'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  ], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, DISPLAY: process.env.DISPLAY || ':1' } });
 
   const wsUrl = await new Promise((ok, fail) => {
     let buf = '';
@@ -229,15 +283,20 @@ async function main() {
   const logs = [];
   ws.addEventListener('message', (ev) => {
     const m = JSON.parse(ev.data);
-    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') {
-      logs.push(m.params.args.map((a) => a.value ?? a.description).join(' '));
+    if (m.method === 'Runtime.consoleAPICalled'
+      && (m.params.type === 'error' || flag('verbose'))) {
+      logs.push(`[${m.params.type}] `
+        + m.params.args.map((a) => a.value ?? a.description).join(' '));
     }
   });
 
   await send('Page.enable', {}, sessionId).catch(() => {});
   await send('Runtime.evaluate', { expression: `location.href = '${server.url}'` }, sessionId);
 
-  const checks = await readFile(join(HERE, 'checks.mjs'), 'utf8');
+  /* `--checks arquivo.mjs` roda OUTRA sequência no lugar da padrão — é o que
+     permite usar a mesma bancada para investigações pontuais (o resize, por
+     exemplo) sem inchar o checks.mjs de verificação de regressão. */
+  const checks = await readFile(join(HERE, opt('checks', 'checks.mjs')), 'utf8');
   const ready = await evalIn(send, sessionId,
     'return await new Promise(r => { const t=setInterval(()=>{ if(window.__bench){clearInterval(t);r(true);} },100); setTimeout(()=>{clearInterval(t);r(false);},30000); });');
   if (!ready) throw new Error('__bench não apareceu — o boot falhou (veja o console da página)');
@@ -246,14 +305,23 @@ async function main() {
 
   let bad = 0;
   for (const [name, value] of report) {
-    const ok = value === true;
+    /* Um valor `data:image/...` é uma IMAGEM produzida pelo check — vai para o
+       disco, não para o terminal (um dataURL de 2 MB no stdout não informa). */
+    if (typeof value === 'string' && value.startsWith('data:image/')) {
+      const ext = value.startsWith('data:image/webp') ? '.webp' : '.png';
+      const file = join(HERE, 'shots', name.replace(/[^\w.-]+/g, '_') + ext);
+      await (await import('node:fs/promises')).mkdir(join(HERE, 'shots'), { recursive: true });
+      await writeFile(file, Buffer.from(value.split(',')[1], 'base64'));
+      console.log(`  =    ${name} → ${file}`);
+      continue;
+    }
     const info = value === true || value === false ? '' : ' → ' + JSON.stringify(value);
     if (value === false) bad++;
     console.log(`  ${value === true ? 'ok  ' : value === false ? 'FALHA' : '=   '} ${name}${info}`);
   }
   if (logs.length) {
-    console.log('\nconsole.error da página:');
-    for (const l of logs.slice(0, 10)) console.log('   ', l);
+    console.log('\nconsole da página:');
+    for (const l of logs.slice(-40)) console.log('   ', l);
   }
 
   const shot = opt('shot', null);

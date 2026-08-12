@@ -142,6 +142,7 @@ import * as THREE from 'three';
 import {
   renderer, scene, camera, holder, getKeyLight, startLoop, stopLoop, invalidateShadows,
 } from './scene';
+import { renderCycloramaReflection } from './cyclorama';
 import { root } from '../core/dom';
 
 /** Os três presets, pelo id que a interface e o localStorage usam. */
@@ -595,6 +596,18 @@ async function renderMosaic(
       scene.background = null;
       renderer.setClearAlpha(0);
     }
+    /* O REFLEXO DO PISO, UMA VEZ, PARA O MOSAICO INTEIRO.
+       Ele é desenhado por um gancho de quadro, e durante a captura o laço está
+       PARADO — sem esta linha o piso do estúdio refletiria o último
+       enquadramento vivo em vez do da foto, que é um defeito que só aparece
+       depois de salvar. Aqui e não dentro do laço de ladrilhos por duas razões:
+       a matriz de textura tem de descrever o quadro COMPLETO (por isso antes do
+       primeiro `setViewOffset()`), e refazer a passada por ladrilho custaria
+       dezesseis renderizações da cena inteira por foto.
+       No recorte transparente `isolateVehicle()` já escondeu a sala, e a função
+       devolve false sozinha. */
+    renderCycloramaReflection(cam);
+
     rt = makeTarget(tileW, tileH);
     /* Dois buffers, REUSADOS pelos 16 ladrilhos: um do tamanho do ladrilho para
        a leitura crua e um para o ImageData já virado. */

@@ -19,6 +19,8 @@
    models.ts reexporta o que já exportava daqui, então nada que o importava
    precisou mudar. */
 import * as THREE from 'three';
+import { registerVehicleLights } from './lights';
+import { registerRetroreflective } from './retroreflect';
 
 /* ---------------- material / mesh setup ---------------- */
 const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
@@ -281,6 +283,15 @@ export function maskOnly(tex: THREE.Texture | null | undefined): THREE.Texture |
 
 export function setupCommon(root: THREE.Object3D) {
   setShadowCasters(root);
+  /* AS LUZES, e é aqui porque é aqui que TODA raiz de veículo passa — cavalo,
+     implemento, Thermo King e roda avulsa. Ver vehicle/lights.ts: o registro
+     também as deixa APAGADAS, que corrige as lanternas brilhando ao meio-dia em
+     todos os 49 bakes. */
+  registerVehicleLights(root);
+  /* E as FITAS REFLETIVAS, pelo mesmo motivo de estar aqui: é o ponto por onde
+     toda raiz passa. Ver vehicle/retroreflect.ts — a fita não emite, ela devolve
+     a luz na direção de onde ela veio, e sem fonte continua apagada. */
+  registerRetroreflective(root);
   root.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;

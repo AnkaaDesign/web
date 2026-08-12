@@ -13,7 +13,7 @@ import * as fabric from 'fabric';
 import { $, $$, evTarget, isMounted } from '../core/dom';
 import {
   surfaces, SURFACE_KEYS, active, activeKey, setActiveKey, otherSide,
-  CAPTIONS, DEFAULT_BG, markDirty, sizeModalCanvas, stagePanels,
+  CAPTIONS, SIDE_LABEL, DEFAULT_BG, markDirty, sizeModalCanvas, stagePanels, setStageResizer,
   pxToCm, cmToPx, panelMM, mmPerPx,
 } from '../vehicle/livery';
 import type { SurfaceKey } from '../vehicle/livery';
@@ -602,16 +602,20 @@ function bindToolbar() {
 /* ---------------- espelhar ---------------- */
 function bindMirror() {
   const pop = () => $('mirror-pop');
-  const label = () => (activeKey() === 'left' ? 'lateral direita' : 'lateral esquerda');
+  /* O DESTINO, não a face ativa: "Espelhar para o lado do passageiro". O nome
+     sai de `SIDE_LABEL` (vehicle/livery.ts) e nunca de um literal aqui —
+     "esquerda/direita" é ambíguo em cima de um caminhão, e o lugar onde essa
+     decisão está escrita é lá. */
+  const label = () => (SIDE_LABEL[otherSide(activeKey()) ?? 'rear'] || '').toLowerCase();
 
   $('btn-mirror').addEventListener('click', (e) => {
     e.stopPropagation();
     if (activeKey() === 'rear') return;
-    $('mirror-pop-title').textContent = `Espelhar para a ${label()}`;
+    $('mirror-pop-title').textContent = `Espelhar para o ${label()}`;
     const dst = otherSide(activeKey());
     const n = dst ? surfaces[dst].getObjects().length : 0;
     $('mirror-warn').textContent = n
-      ? `⚠ A arte atual da ${label()} (${n} ${n === 1 ? 'objeto' : 'objetos'}) será substituída. Ctrl+Z desfaz.`
+      ? `⚠ A arte atual do ${label()} (${n} ${n === 1 ? 'objeto' : 'objetos'}) será substituída. Ctrl+Z desfaz.`
       : '';
     pop().classList.remove('hidden');
   });
@@ -821,6 +825,17 @@ export function initLiveryEditor() {
   $('modal-close').addEventListener('click', closeEditor);
   modal().addEventListener('pointerdown', (e) => { if (e.target === modal()) closeEditor(); });
   window.addEventListener('resize', () => { if (isOpen()) resize(); });
+
+  /* O RETRATO CHEGA DEPOIS, E O PALCO TEM DE ACOMPANHAR.
+     A caixa da tela do fabric sai de `snap.box` (ver `sizeModalCanvas`), e o
+     retrato é assíncrono desde que deixou de travar a página: uma porta nova ou
+     uma altura nova mudam a caixa da chapa, e a foto com a caixa nova aterrissa
+     alguns quadros depois. Sem este reenquadramento o palco ficaria com a
+     medida do retrato ANTERIOR até o próximo resize de janela — que é o mesmo
+     desencontro que este trabalho está removendo, só que atrasado.
+     Injetado porque a seta de import aponta daqui para `vehicle/livery`, e só
+     este arquivo sabe o zoom corrente. */
+  setStageResizer((key) => { if (isOpen() && key === activeKey()) resize(); });
 
   /* ANTES do laço abaixo, de propósito: os handlers do fabric disparam na ordem
      de registro, e o encaixe (que roda no object:modified) precisa ajustar a

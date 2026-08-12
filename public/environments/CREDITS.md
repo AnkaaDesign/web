@@ -35,6 +35,35 @@ Divisão nova, que é a padrão de VFX:
 
 ## 1. Cenários (HDRI + fundo tonemapeado)
 
+### 1.0 O que está EM USO hoje (2026-08-11)
+
+A tabela histórica logo abaixo é dos três cenários só-HDRI que saíram em 2026-08-03.
+O acervo vivo é este:
+
+| id | papel | asset | autor | arquivo |
+|---|---|---|---|---|
+| `distrito-industrial` | céu de **dia** | [Kloppenheim 06 (Pure Sky)](https://polyhaven.com/a/kloppenheim_06_puresky) | Greg Zaal | `sky.hdr` 2k, 4,43 MB, md5 `590a829b3cf71216451655e601d542c6` |
+| `distrito-industrial` | céu de **noite** | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) | Greg Zaal | `sky-night.hdr` 2k, 5,56 MB, md5 `60bfe04a56522962933359cf4410f32c` |
+| `armazem` | — | nenhum (`hdri: null`) | — | iluminado pelas faixas Emissive da própria casca |
+| `estudio` | — | nenhum | — | IBL gerado em código (`buildStudioEnv()`) |
+
+**Por que os dois são da MESMA série, e por que isso não é preferência.** O par
+atravessa um para o outro em função da hora (`scene/skyblend.ts`), e uma dissolvência
+entre dois lugares diferentes é imediatamente visível: muda a altura do tripé, muda o
+horizonte, muda o norte. Sendo a mesma série muda só a hora — que é exatamente o que se
+quer mostrar. Três medidas confirmam o casamento:
+
+| medida | dia (`06`) | noite (`02`) | por que importa |
+|---|---|---|---|
+| fonte em `u` | 0,613 (sol) | 0,599 (lua) | 5,0° de diferença ⇒ o mesmo `envRotation` 4,7124 serve aos dois |
+| luminância média ponderada por sólido | 0,717 | 0,310 | 43 % ⇒ o plate JÁ escurece; daí os pisos de `nightness` terem subido |
+| pico | 33,0 (disco domado do `_puresky`) | 55 633 (lua, ~3 texels) | daí o peso da noite entrar por `smoothstep(0,25…0,95)` e não linear |
+
+Medidas feitas com o leitor de RGBE de `tools/env-build` (decodifica RLE e pondera por
+`sin θ`); reproduzíveis. Os md5 conferidos contra `api.polyhaven.com/files/`.
+
+### 1.1 Histórico — os três cenários só-HDRI (removidos em 2026-08-03)
+
 | id | asset | autor | arquivos |
 |---|---|---|---|
 | `rodovia` | [Rural Asphalt Road](https://polyhaven.com/a/rural_asphalt_road) | Alexander Scholten | `hdr` 2k (5,75 MB) + `tonemapped` 8k reduzido a 4k (2,36 MB) |

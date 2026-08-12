@@ -599,6 +599,23 @@ def build_prototypes(n_tree=6, n_bush=4, log=_log):
     o pack. Os nomes comecam com `tree_`/`bush_` porque e por esse prefixo que
     group_instances() decide o que instanciar."""
     if not os.path.isdir(SRC):
+        # SEM O PACK, A CACHE. Devolver ([], []) aqui nao deixava o distrito
+        # careca — deixava-o com os IMPOSTORES DE CARTAO, que e a regressao que
+        # 08-arvores-de-perto.png documenta: um cartao cruzado resolve a
+        # silhueta a 60 m e nao resolve nada a 10 m. Ver protos_cache.py.
+        import importlib.util
+        import sys
+        p = os.path.join(HERE, "protos_cache.py")
+        mod = sys.modules.get("protos_cache")
+        if mod is None and os.path.exists(p):
+            spec = importlib.util.spec_from_file_location("protos_cache", p)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["protos_cache"] = mod
+            spec.loader.exec_module(mod)
+        if mod is not None:
+            trees, bushes = mod.load_plants(log=log)
+            if trees:
+                return trees, bushes
         log("sem %s — nada a importar" % SRC)
         return [], []
     leaf_png = leaf_atlas_rgba(log=log)

@@ -34,6 +34,11 @@ import type { GroundMatEntry, GroundSurface } from './scene';
 import { loadGLB } from '../vehicle/models';
 import { assetUrl } from '../catalog/catalog';
 import { canvasTex, makeMacroCanvas } from './textures';
+import { arranjarCenario } from './scenery';
+import {
+  installSeeThroughOnSet, measureSeeThrough, clearSeeThrough, bindSeeThroughSatellite,
+} from './seethrough';
+import { getLampLensPairs } from './lamps';
 
 /** Um conjunto PBR ligado a um material nomeado do .glb. */
 export interface SetMaterialDef {
@@ -58,10 +63,18 @@ export interface SetMaterialDef {
    * período em metros é 8 / scale — 0.09 dá ~89 m. `amount` é quanto da variação
    * entra (0 = nada, 1 = a mancha inteira).
    */
-  /** `break` = quanto quebrar a periodicidade do PRÓPRIO mapa (0 a 1). Só faz
-   *  sentido em texturas com feição reconhecível — grama, concreto, brita. O
-   *  asfalto não precisa e cada material que o liga paga uma leitura extra. */
-  macro?: { scale: number; amount: number; break?: number };
+  /**
+   * `break` LIGA O LADRILHAMENTO ESTOCÁSTICO, e desde 2026-08-11 é LIGA/DESLIGA
+   * (qualquer valor ≥ 0.5 liga) em vez de uma força de mistura. A razão está
+   * medida no cabeçalho de `TILE_GLSL`: misturar meio ladrilho periódico com
+   * meio aperiódico deixa metade da grelha de pé, e era exatamente isso que
+   * fazia "ainda está padronizado" sobreviver a todo ajuste deste número.
+   *
+   * `cell` é o tamanho da célula de sorteio, EM LADRILHOS (padrão 1.2). Célula
+   * menor troca de sorteio mais vezes e mistura mais; maior deixa trechos
+   * contíguos maiores. Só é lido quando `break` está ligado.
+   */
+  macro?: { scale: number; amount: number; break?: number; cell?: number };
   /** multiplicadores LINEARES escritos em material.color (mesma semântica de nearGround.tintRgb) */
   tintRgb?: [number, number, number];
   roughness?: number;
@@ -102,7 +115,11 @@ export interface SetMaterialDef {
    * OPCIONAL: sem ele, set.ts infere pelo NOME do material (ver SURFACE_BY_NAME),
    * o que já acerta os cenários atuais. Autore quando o nome mentir.
    */
-  surface?: 'asphalt' | 'concrete' | 'gravel' | 'dirt' | 'grass';
+  /* `built` entra na lista porque `surfaceOf()` já o aceita (via WET_SURFACES) e
+     porque ele é a única declaração possível de "isto é construção, não chão" —
+     o que agora decide também quem pode ficar transparente na frente do veículo
+     (ver installSeeThroughOnSet). Faltava aqui: o tipo nasceu antes da família. */
+  surface?: 'asphalt' | 'concrete' | 'gravel' | 'dirt' | 'grass' | 'built';
 }
 
 export interface SetDef {
@@ -309,44 +326,129 @@ float tsNoise( vec2 p ) {
 }
 `;
 
-/* QUEBRA DO LADRILHO — e a resposta a "a rua ate que esta boa, mas a grama e o
-   patio estao muito falsos".
+/* LADRILHAMENTO ESTOCASTICO — e a substituicao MEDIDA da quebra de duas
+   leituras que estava aqui, que ficou pelo caminho por duas razoes concretas.
 
-   Essa distincao e o diagnostico inteiro. Os periodos de ladrilho sao asfalto
-   6 m, laje 8 m, grama 4 m — a grama repete MAIS depressa que a rua e mesmo
-   assim so a rua passa. A diferenca nao esta no periodo, esta no CONTEUDO: o
-   asfalto e quase sem feicao, e repetir ruido sem feicao e invisivel. A grama
-   tem tufos e a laje tem manchas e juntas — feicoes que o olho reconhece e
-   depois encontra outra vez, a distancia certa, indefinidamente.
+   O QUE HAVIA. Ler o mapa duas vezes (a segunda a 0,618 da escala e girada 36
+   graus) e escolher entre as duas por um campo de ruido. Duas objecoes, ambas
+   verificadas portando este GLSL para NumPy e medindo a AUTOCORRELACAO da
+   imagem deslocada de exactamente UM ladrilho, sobre 60 x 60 m de grama:
 
-   Nenhuma quantidade de variacao POR CIMA resolve isto: multiplicar uma mancha
-   que repete por outra que nao repete continua a deixar a primeira la. O que
-   tem de deixar de repetir e a leitura do proprio mapa.
+     ladrilho puro   r = +0,991
+     esta quebra     r = +0,660     <- tirava um terco da periodicidade
+     estocastico     r = +0,004
 
-   A tecnica e a mais barata que funciona: LER O MAPA DUAS VEZES, a segunda numa
-   escala e rotacao incomensuraveis com a primeira, e escolher entre as duas com
-   um campo de ruido de baixa frequencia. Onde o campo esta perto de 0 ou de 1 —
-   que e quase em todo o lado, por causa do smoothstep — ve-se UM dos dois
-   ladrilhos, nitido; a feicao reaparece, mas noutra escala e noutro angulo, e
-   deixa de haver distancia a que ela volte igual.
+   1. AS DUAS LEITURAS SAO PERIODICAS. Uma transformacao LINEAR de vMapUv da
+      outro papel de parede, de periodo 6,47 m em vez de 4 m. Misturar dois
+      papeis de parede da um terceiro: o olho acha os dois.
+   2. O SELETOR TROCA LONGE DEMAIS. O periodo dele e uMacroScale * 2.9 sobre a
+      UV, o que no GRASS_NEAR da 19,7 m contra um ladrilho de 4 m — quase CINCO
+      ladrilhos identicos lado a lado antes de trocar de variante.
 
-   As UV das duas leituras sao transformacoes LINEARES de vMapUv, portanto as
-   derivadas de mipmap continuam certas e nao ha costura nem `textureGrad`.
+   O QUE HA AGORA (Heitz & Neyret 2018, "High-Performance By-Example Noise"):
+   uma grelha triangular cobre o plano, cada VERTICE dela sorteia um
+   deslocamento proprio de UV, e o fragmento mistura as tres leituras pelos
+   pesos baricentricos. Nao ha periodo nenhum por construcao — o campo so
+   repetiria se o hash de duas celulas coincidisse.
 
-   uMacroBreak vem do manifesto por material, e e zero por omissao: a rua nao
-   precisa e nao paga. */
+   TRES DETALHES QUE NAO SAO OPCIONAIS:
+
+   * VARIANCIA. Somar tres amostras independentes por pesos que somam 1 REDUZ o
+     contraste (a media de N amostras tem 1/sqrt(N) do desvio). Medido: o blend
+     linear entregava 89 % do contraste do ladrilho puro, e o resultado lia-se
+     como "chapado" — trocar uma queixa por outra. A reposicao de Heitz,
+     (soma - media) * inversesqrt(dot(w,w)) + media, devolve 100,0 %. A `media`
+     sai do mip 1x1 do proprio mapa, que e uma leitura sempre em cache.
+   * DERIVADAS. O deslocamento e constante DENTRO da celula, entao dFdx do UV
+     deslocado explode em cima da fronteira e o mipmap escolheria o nivel
+     errado numa linha de 1 px. Por isso as leituras sao `texture2DGradEXT` com
+     as derivadas do UV NAO deslocado.
+   * PESOS AO CUBO. Baricentrico puro mistura em quase toda a area e as feicoes
+     ficam fantasmagoricas. Elevando ao cubo e renormalizando, a maior parte do
+     sitio ve UMA leitura nitida e so as fronteiras misturam.
+
+   CUSTO, e e o motivo de isto ser por material: tres leituras por mapa mais a
+   media, ou seja 16 fetches por fragmento de chao contra 4. `break` liga; quem
+   nao precisa nao paga. */
+const TILE_GLSL = /* glsl */`
+vec2 tsHash2( vec2 p ) {
+  vec3 q = fract( vec3( p.x, p.y, p.x ) * vec3( 0.1031, 0.1030, 0.0973 ) );
+  q += dot( q, vec3( q.y, q.z, q.x ) + 33.33 );
+  return fract( vec2( ( q.x + q.y ) * q.z, ( q.z + q.y ) * q.x ) );
+}
+
+/* Estado da celula, calculado UMA vez por fragmento (em <map_fragment>) e lido
+   por todos os mapas depois. Os valores iniciais sao o caso neutro: peso todo
+   na primeira leitura, deslocamento zero, reposicao 1 — ou seja, exactamente a
+   leitura simples, para o caso de USE_MAP nao estar definido e tsCells() nunca
+   correr. */
+vec3 tsCellW = vec3( 1.0, 0.0, 0.0 );
+vec2 tsCellO1 = vec2( 0.0 ), tsCellO2 = vec2( 0.0 ), tsCellO3 = vec2( 0.0 );
+float tsCellN = 1.0;
+
+void tsCells( vec2 uv ) {
+  /* 3.4641 = 2*sqrt(3): leva a grelha triangular a celulas de lado 1 na UV.
+     uBreakCell mede a celula EM LADRILHOS, e vMapUv ja esta em ladrilhos. */
+  vec2 s = uv * ( 3.4641016 / max( 0.05, uBreakCell ) );
+  vec2 k = vec2( s.x - 0.5773503 * s.y, 1.1547005 * s.y );
+  vec2 b = floor( k );
+  vec2 f = k - b;
+  float z = 1.0 - f.x - f.y;
+  vec3 w;
+  vec2 v1, v2, v3;
+  if ( z > 0.0 ) {
+    w = vec3( z, f.y, f.x );
+    v1 = b; v2 = b + vec2( 0.0, 1.0 ); v3 = b + vec2( 1.0, 0.0 );
+  } else {
+    w = vec3( -z, 1.0 - f.y, 1.0 - f.x );
+    v1 = b + vec2( 1.0, 1.0 ); v2 = b + vec2( 1.0, 0.0 ); v3 = b + vec2( 0.0, 1.0 );
+  }
+  w = w * w * w;                       // ver "PESOS AO CUBO" no cabecalho
+  w /= ( w.x + w.y + w.z );
+  tsCellW = w;
+  tsCellN = inversesqrt( max( 1e-4, dot( w, w ) ) );
+  tsCellO1 = tsHash2( v1 );
+  tsCellO2 = tsHash2( v2 );
+  tsCellO3 = tsHash2( v3 );
+}
+
+/* Le QUALQUER mapa do material pela mesma celula — e "a mesma celula" e o
+   ponto: se o albedo trocasse de sorteio noutro sitio que o relevo, via-se a
+   costura de um contra o outro. */
+vec4 tsBlend( sampler2D t, vec2 uv ) {
+  if ( uBreakOn < 0.5 ) return texture2D( t, uv );
+  vec2 dx = dFdx( uv ), dy = dFdy( uv );
+  return tsCellW.x * texture2DGradEXT( t, uv + tsCellO1, dx, dy )
+       + tsCellW.y * texture2DGradEXT( t, uv + tsCellO2, dx, dy )
+       + tsCellW.z * texture2DGradEXT( t, uv + tsCellO3, dx, dy );
+}
+
+/* COM reposicao de variancia — e ela NAO serve para todo o mapa.
+   ---------------------------------------------------------------------------
+   A reposicao multiplica o desvio em relacao a media por ate 1,73 (o pior caso,
+   no centro de um triangulo). Num mapa de DETALHE isso e exactamente o que se
+   quer: devolve o contraste que a media de tres amostras tirou. Num mapa que e
+   uma MASCARA — o AO, e a poca enquanto chove — e um erro, e um erro com
+   assinatura propria: o fator depende so dos pesos, os pesos sao periodicos na
+   malha de celulas, e um AO empurrado acima de 1 ACENDE o ambiente. O resultado
+   e uma constelacao de clarões do tamanho da celula, todos com a mesma forma —
+   ou seja, troca-se a grade do ladrilho pela grade das celulas, que foi o que o
+   primeiro corte desta mudanca pos no ecra.
+
+   Por isso: detalhe (albedo, normal) por aqui; mascara (rugosidade, AO) por
+   tsBlend, que e a media ponderada e nao inventa amplitude. O clamp e cinto e
+   suspensorio para o albedo, onde a reposicao ainda pode passar de 1. */
+vec4 tsTiled( sampler2D t, vec2 uv ) {
+  if ( uBreakOn < 0.5 ) return texture2D( t, uv );
+  vec4 mu = texture2DLodEXT( t, vec2( 0.5 ), 20.0 );
+  return clamp( ( tsBlend( t, uv ) - mu ) * tsCellN + mu, 0.0, 1.0 );
+}
+`;
+
 const MACRO_GLSL = /* glsl */`
 #ifdef USE_MAP
 {
   vec2 tsP = vMapUv * uMacroScale;
-  if ( uMacroBreak > 0.001 ) {
-    vec2 tsUvB = mat2( 0.8090, -0.5878, 0.5878, 0.8090 ) * vMapUv * 0.6180
-               + vec2( 17.31, 9.07 );
-    float tsSel = smoothstep( 0.40, 0.60, tsNoise( tsP * 2.9 + 3.7 ) );
-    diffuseColor.rgb = mix( diffuseColor.rgb,
-                            texture2D( map, tsUvB ).rgb,
-                            tsSel * uMacroBreak );
-  }
   /* A oitava LARGA fica no mapa: com periodo de 55 a 90 m ela repete duas ou
      tres vezes no sitio todo, o que nao se le como ritmo, e as manchas
      desenhadas a mao tem uma forma que o ruido de valor nao tem. */
@@ -411,36 +513,107 @@ const MACRO_ROUGH_GLSL = /* glsl */`
    o mapa (era `vUv` antes de r152); ela já traz o `repeat` do ladrilho aplicado,
    e é por isso que `uMacroScale` é um multiplicador dela e não um valor
    absoluto. */
+/* AS QUATRO INCLUSOES SAO SUBSTITUIDAS, e nao emendadas — e essa e a diferenca
+   que faz a correcao chegar ao que se ve.
+
+   A versao anterior so mexia em `diffuseColor`, dentro de <map_fragment>. Mas o
+   three le cada mapa na SUA inclusao e com a SUA varying:
+
+     map          <map_fragment>          vMapUv
+     roughnessMap <roughnessmap_fragment> vRoughnessMapUv
+     normalMap    <normal_fragment_maps>  vNormalMapUv
+     aoMap        <aomap_fragment>        vAoMapUv
+
+   Entao a cor da grama deixava de repetir e o RELEVO dela continuava a repetir
+   de 4 em 4 m, sem rotacao, no sitio inteiro. Com o sol do estudio a ~11 graus
+   de elevacao quem desenha um tufo e a normal, nao o albedo — ou seja, a
+   correcao nunca tocou no canal que produz a queixa. As quatro passam agora
+   pela mesma `tsTiled()`, com a mesma celula.
+
+   PORQUE COPIAR O CORPO DAS INCLUSOES em vez de emendar depois delas: nao ha
+   ponto de emenda — o valor lido e consumido na mesma linha. O corpo copiado e
+   o do three 0.179.1. O do <aomap_fragment> deixa de fora os ramos de
+   USE_CLEARCOAT e USE_SHEEN, que sao de MeshPhysicalMaterial e nao existem aqui
+   (a assinatura desta funcao so aceita MeshStandardMaterial); se algum dia um
+   chao vier fisico, o `#else` continua a ser o chunk original inteiro. */
+const TILE_ROUGH_INCLUDE = /* glsl */`
+float roughnessFactor = roughness;
+#ifdef USE_ROUGHNESSMAP
+  roughnessFactor *= tsBlend( roughnessMap, vRoughnessMapUv ).g;
+#endif
+`;
+
+const TILE_NORMAL_INCLUDE = /* glsl */`
+#ifdef USE_NORMALMAP_TANGENTSPACE
+  {
+    vec3 tsMapN = tsTiled( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+    tsMapN.xy *= normalScale;
+    normal = normalize( tbn * tsMapN );
+  }
+#else
+  #include <normal_fragment_maps>
+#endif
+`;
+
+const TILE_AO_INCLUDE = /* glsl */`
+#ifdef USE_AOMAP
+  {
+    float tsAO = ( tsBlend( aoMap, vAoMapUv ).r - 1.0 ) * aoMapIntensity + 1.0;
+    reflectedLight.indirectDiffuse *= tsAO;
+    #if defined( USE_ENVMAP ) && defined( STANDARD )
+      float tsDotNV = saturate( dot( geometryNormal, geometryViewDir ) );
+      reflectedLight.indirectSpecular *= computeSpecularOcclusion( tsDotNV, tsAO, material.roughness );
+    #endif
+  }
+#endif
+`;
+
 function installMacro(mat: THREE.MeshStandardMaterial,
-                      cfg: { scale: number; amount: number; break?: number },
+                      cfg: { scale: number; amount: number; break?: number; cell?: number },
                       roughFloor = 0) {
   const tex = getMacroTex();
+  /* LIGA/DESLIGA, e não uma força de mistura — ver o comentário do campo em
+     `SetMaterialDef.macro`. Um manifesto antigo com 0.55..0.9 continua a ligar,
+     que é o que ele queria dizer. */
+  const breakOn = (cfg.break ?? 0) >= 0.5 ? 1 : 0;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uMacroMap = { value: tex };
     shader.uniforms.uMacroScale = { value: cfg.scale };
     shader.uniforms.uMacroAmount = { value: cfg.amount };
     shader.uniforms.uMacroBreak = { value: cfg.break ?? 0 };
+    shader.uniforms.uBreakOn = { value: breakOn };
+    shader.uniforms.uBreakCell = { value: cfg.cell ?? 1.2 };
     shader.uniforms.uRoughFloor = { value: roughFloor };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\n'
         + 'uniform sampler2D uMacroMap;\nuniform float uMacroScale;\n'
         + 'uniform float uMacroAmount;\nuniform float uMacroBreak;\n'
+        + 'uniform float uBreakOn;\nuniform float uBreakCell;\n'
         + 'uniform float uRoughFloor;\n'
-        + MACRO_NOISE_GLSL)
+        + MACRO_NOISE_GLSL + TILE_GLSL)
       /* `tsMacroK` é declarado FORA do bloco do macro porque quem o consome —
          a rugosidade — só aparece várias inclusões mais à frente. Vale 1,0 por
-         omissão, que é o neutro, para o caso de USE_MAP não estar definido. */
+         omissão, que é o neutro, para o caso de USE_MAP não estar definido.
+         `tsCells()` corre AQUI, antes de qualquer leitura de mapa, porque é
+         quem publica a célula que as outras três inclusões vão ler. */
       .replace('#include <map_fragment>',
-        'float tsMacroK = 1.0;\n#include <map_fragment>\n' + MACRO_GLSL)
+        'float tsMacroK = 1.0;\n'
+        + '#ifdef USE_MAP\n'
+        + '  tsCells( vMapUv );\n'
+        + '  diffuseColor *= tsTiled( map, vMapUv );\n'
+        + '#endif\n'
+        + MACRO_GLSL)
       .replace('#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\n' + MACRO_ROUGH_GLSL);
+        TILE_ROUGH_INCLUDE + MACRO_ROUGH_GLSL)
+      .replace('#include <normal_fragment_maps>', TILE_NORMAL_INCLUDE)
+      .replace('#include <aomap_fragment>', TILE_AO_INCLUDE);
   };
   /* Sem isto o three reaproveita o programa do material SEM a injeção (a chave
      de cache não conhece onBeforeCompile), e a variação some em metade dos
      materiais sem erro nenhum.
      A CHAVE MUDA COM O CÓDIGO INJETADO: mantê-la em v1 depois de mexer no GLSL
      é pedir ao three que sirva o programa antigo para o material novo. */
-  mat.customProgramCacheKey = () => 'ts-set-macro-v5';
+  mat.customProgramCacheKey = () => `ts-set-macro-v6:${breakOn}`;
 }
 
 /** Liga os conjuntos PBR do manifesto aos materiais nomeados do .glb. */
@@ -463,21 +636,31 @@ const SURFACE_BY_NAME: [RegExp, GroundSurface][] = [
   [/concrete|concreto|kerb|meio.?fio/i, 'concrete'],
 ];
 
-/** Um material só entra na molhagem se for CHÃO. Uma parede não faz poça. */
+/** O que conta como CHÃO — quem casa aqui pode empoçar; o resto molha e brilha. */
 const GROUND_NAME_RE = /ground|floor|chao|chão|road|asphalt|asfalto|grass|grama|verge|gravel|brita|dirt|terra|apron|kerb|piso/i;
 
-function surfaceOf(name: string, def: SetMaterialDef): GroundSurface | null {
+/* NENHUM MATERIAL DO CENÁRIO FICA DE FORA DA CHUVA.
+   ---------------------------------------------------------------------------
+   Esta função devolvia `null` para tudo que não fosse chão, e um material sem
+   família nem chega a `registerGroundMaterials` — ou seja, no `Chuvoso` as
+   construções, os tanques e a cerca ficavam SECOS sob chuva forte, com a rua
+   espelhando ao lado. A premissa que produziu isso ("uma parede não faz poça")
+   continua verdadeira e continua aplicada: o que muda é que deixar de empoçar
+   passou a significar `road: false`, e não ficar fora da molhagem. */
+function surfaceOf(name: string, def: SetMaterialDef): GroundSurface {
   if (def.surface && def.surface in WET_SURFACES) return def.surface;
-  if (!GROUND_NAME_RE.test(name)) return null;
-  for (const [re, kind] of SURFACE_BY_NAME) if (re.test(name)) return kind;
+  const ground = GROUND_NAME_RE.test(name);
+  for (const [re, kind] of SURFACE_BY_NAME) {
+    if (re.test(name)) return ground ? kind : 'built';
+  }
   /* É chão, mas de família desconhecida: concreto é o meio-termo seguro — nem
      o espelho do asfalto molhado, nem a recusa da grama em brilhar. */
-  return 'concrete';
+  return ground ? 'concrete' : 'built';
 }
 
 /** As chaves aceitas em `surface`; espelha WET_PROFILE de scene.ts. */
 const WET_SURFACES = {
-  asphalt: 1, concrete: 1, gravel: 1, dirt: 1, grass: 1,
+  asphalt: 1, concrete: 1, gravel: 1, dirt: 1, grass: 1, built: 1,
 } as const;
 
 async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMaterialDef>,
@@ -491,18 +674,36 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
      quando o chão está pronto — as duas coisas exigem varrer a árvore primeiro. */
   interface Job { mat: THREE.MeshStandardMaterial; def: SetMaterialDef; rep: number; }
   const jobs: Job[] = [];
+  /* TODO MATERIAL DO SET MOLHA, e não só os do manifesto.
+     -------------------------------------------------------------------------
+     Fica registrado porque a distinção volta a morder quem mexer aqui: `jobs` é
+     a lista de quem tem PBR autorado para CARREGAR, e ela é legitimamente um
+     subconjunto — não há textura para buscar de quem o manifesto não nomeia.
+     Ela vinha sendo usada também como a lista de quem entra na MOLHAGEM, e aí o
+     recorte é o errado: o manifesto do Distrito nomeia 12 materiais e todos são
+     de chão, então as 21 famílias restantes — `DL_*` (galpões, escritório,
+     guarita, doca), `IBC_*`, `FENCE_*`, `GATE_BOOM_*` e as duas de vegetação,
+     `PLANT_BARK` e `PLANT_LEAF` — nunca chegavam a `registerGroundMaterials` e
+     ficavam SECAS sob chuva forte, com a rua espelhando ao lado.
+
+     `surfaceOf()` já sabe responder por elas desde que a família `built` foi
+     criada: sem nome de chão, a resposta é `built`. Faltava perguntar — e a
+     pergunta hoje é feita na varredura de MALHAS lá embaixo, que é onde os
+     clones do módulo de atravessar também aparecem. */
+  const semDef: SetMaterialDef = {};
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const m of mats) {
       const mat = m as THREE.MeshStandardMaterial;
-      if (!mat || seen.has(mat)) continue;
+      /* `isMeshStandardMaterial`: a molhagem escreve `roughness`, `color` e
+         `envMapIntensity`, que um `MeshBasicMaterial` não tem. */
+      if (!mat || seen.has(mat) || !mat.isMeshStandardMaterial) continue;
       seen.add(mat);
       const def = defs[mat.name];
-      if (!def) continue;
-      const rep = typeof def.repeat === 'number' && def.repeat > 0 ? def.repeat : 1;
-      jobs.push({ mat, def, rep });
+      const rep = def && typeof def.repeat === 'number' && def.repeat > 0 ? def.repeat : 1;
+      if (def) jobs.push({ mat, def, rep });
     }
   });
 
@@ -547,7 +748,7 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
      não põe a raiz na cena antes disto voltar. */
   await Promise.all(pending);
 
-  for (const { mat, def, rep } of jobs) {
+  for (const { mat, def } of jobs) {
     {
       if (Array.isArray(def.tintRgb) && def.tintRgb.length === 3) {
         mat.color.setRGB(def.tintRgb[0], def.tintRgb[1], def.tintRgb[2]);
@@ -566,53 +767,120 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
       }
       mat.needsUpdate = true;
       bound++;
-
-      /* DEPOIS de tudo acima: o que a molhagem fotografa como "seco" é o estado
-         já configurado pelo manifesto. Fotografar antes gravaria os padrões do
-         three e o cenário perderia o próprio envIntensity na primeira chuva. */
-      const surface = surfaceOf(mat.name, def);
-      if (surface) {
-        ground.push({
-          mat,
-          surface,
-          /* Só a via recebe máscara de poça: água empoça na trilha do pneu, não
-             no meio da grama. */
-          road: surface === 'asphalt' || surface === 'concrete',
-          /* O `repeat` do material É quantos ladrilhos cobrem a superfície, que
-             é a unidade em que as calhas da máscara foram autoradas. */
-          tile: [rep, rep],
-        });
-      }
     }
   }
+
+  /* ENTRE o manifesto e o registro da molhagem, e as duas vizinhanças são
+     obrigatórias — ver o cabeçalho de `installSeeThroughOnSet()`. Depois do
+     manifesto porque o clone de material tem de sair já com tinta, rugosidade e
+     macro; antes do registro porque a molhagem tem de encontrar OS CLONES, ou a
+     chuva pararia de alcançar as construções. */
+  const see = installSeeThroughOnSet(root, (m) => {
+    /* "É SUPERFÍCIE DE CHÃO?" — pela DECLARAÇÃO, e só depois pelo nome.
+       Nomeado no manifesto ⇒ é chão, salvo se declarar `surface: 'built'`. É a
+       regra que tira `KERB_CONCRETE`, `CROP_FIELD`, `GRASS_VERGE` e
+       `GRAVEL_SHOULDER` do atravessar mesmo com caixa alta — ver o segundo
+       critério em installSeeThroughOnSet(). Não nomeado ⇒ sobra o nome, e
+       `surfaceOf()` já sabe responder. */
+    const nome = m.name || '';
+    const def = defs[nome];
+    if (def) return def.surface !== 'built';
+    return surfaceOf(nome, semDef) !== 'built';
+  });
+
+  /* DEPOIS do laço acima, e não dentro dele: o que a molhagem fotografa como
+     "seco" é o estado já configurado pelo manifesto. Fotografar antes gravaria
+     os padrões do three e o cenário perderia o próprio envIntensity na primeira
+     chuva.
+
+     E varre MALHA, não `todos`. `todos` é a lista de materiais como o GLB os
+     entregou, e o passo acima acabou de substituir o material de cada malha que
+     pode tapar o veículo por um clone com uniforme próprio: registrar `todos`
+     deixaria a molhagem escrevendo em materiais que não estão mais em cena
+     nenhuma — as construções voltariam a ficar secas sob chuva forte, que é o
+     defeito que a família `built` consertou horas antes desta rodada. O nome
+     sobrevive ao clone, então `defs[mat.name]` continua respondendo. */
+  const jaRegistrado = new Set<THREE.Material>();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      const mat = m as THREE.MeshStandardMaterial;
+      if (!mat || !mat.isMeshStandardMaterial || jaRegistrado.has(mat)) continue;
+      jaRegistrado.add(mat);
+      const def = defs[mat.name] || semDef;
+      const rep = typeof def.repeat === 'number' && def.repeat > 0 ? def.repeat : 1;
+      const surface = surfaceOf(mat.name, def);
+      ground.push({
+        mat,
+        surface,
+        /* QUEM EMPOÇA É QUEM É CHÃO — todas as famílias de chão, e não só as
+           duas duras. Água parada é função de a superfície ser horizontal e
+           reter, não de ser asfalto: um pátio de brita alaga, terra batida
+           alaga primeiro que tudo, e grama encharcada tem lâmina de água entre
+           os tufos. O que fica de fora é `built`, e aí a premissa antiga vale
+           inteira: uma parede não faz poça. */
+        road: surface !== 'built',
+        /* O `repeat` do material É quantos ladrilhos cobrem a superfície; a
+           poça tem escala própria a partir daí (ver PUDDLE_SPAN em scene.ts). */
+        tile: [rep, rep],
+      });
+    }
+  });
   /* UMA chamada, com o conjunto completo: registerGroundMaterials() substitui o
      registro anterior inteiro, então chamar por material deixaria só o último. */
   registerGroundMaterials(ground);
+  console.info('[set] atravessar: '
+    + `${see.comuns} malhas + ${see.instanciadas} instanciadas; `
+    + `de fora ${see.chao} rasas e ${see.chaoAlto} de superfície de chão`);
   return bound;
 }
 
 /**
  * Sombras.
  *
- * `castShadow` em TUDO seria caro e errado: o mapa de sombra do rig cobre a
- * vizinhança do caminhão, não 600 m de pátio, então um prédio a 90 m só
- * consumiria resolução do atlas sem projetar nada visível. Chão sempre
- * RECEBE (é onde a sombra do caminhão cai); geometria vertical dentro do raio
- * do mapa também PROJETA.
+ * O CRITÉRIO É TER ALTURA, e não estar perto — a troca que fez as construções
+ * voltarem a projetar.
+ *
+ * A regra anterior era um raio de 60 m em torno da ORIGEM, com o argumento de
+ * que "um prédio a 90 m só consumiria resolução do atlas sem projetar nada
+ * visível". O argumento é bom e a instrumentação é que estava errada, por três
+ * motivos que só aparecem juntos:
+ *
+ *   1. A CAIXA NÃO MORA NA ORIGEM. Ela é centrada no CONJUNTO (`_shadowFocus`,
+ *      z ≈ 8,6 m e andando com o engate), então um raio medido da origem não
+ *      corresponde a coberto nenhum.
+ *   2. QUEM JÁ FAZ ESSA PODA É O THREE. `WebGLShadowMap` testa a esfera
+ *      envolvente de cada objeto contra o frustum da câmera de sombra a cada
+ *      passe (`_frustum.intersectsObject`) — o MESMO teste, contra a caixa que
+ *      de fato vigora, e refeito quando ela muda. Uma bandeira fixa só pode
+ *      discordar dele, e discordava: 42 das 86 malhas verticais do Distrito
+ *      nasciam com `castShadow = false`.
+ *   3. ELA ERA MEDIDA CEDO DEMAIS. `setupShadows()` rodava antes de
+ *      `group.add(root)` (a matriz ainda sem o pai) e antes de
+ *      `applyPushback()`, que AINDA MOVE as construções altas. Hoje o defeito
+ *      não se manifesta — medido, zero divergências —, mas é uma armadilha
+ *      armada: a chamada agora fica depois das duas, onde o mundo é o mundo.
+ *
+ * Fica então o que a bandeira sempre deveria ter dito: chão sempre RECEBE (é
+ * onde a sombra cai) e só o que tem ALTURA projeta. Uma laje de asfalto de
+ * 600 m não vira sombra de ninguém e sai da lista — que era o custo que o raio
+ * existia para evitar.
  */
-const SHADOW_CAST_RADIUS = 60;
+const SHADOW_CAST_MIN_H = 0.35;
 
 function setupShadows(root: THREE.Object3D) {
-  const c = new THREE.Vector3();
+  const box = new THREE.Box3();
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || !mesh.geometry) return;
     mesh.receiveShadow = true;
-    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
-    const bs = mesh.geometry.boundingSphere;
-    if (!bs) return;
-    c.copy(bs.center).applyMatrix4(mesh.matrixWorld);
-    mesh.castShadow = Math.hypot(c.x, c.z) - bs.radius < SHADOW_CAST_RADIUS;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const local = mesh.geometry.boundingBox;
+    if (!local || local.isEmpty()) return;
+    box.copy(local).applyMatrix4(mesh.matrixWorld);
+    mesh.castShadow = box.max.y - box.min.y >= SHADOW_CAST_MIN_H;
   });
 }
 
@@ -768,6 +1036,9 @@ export function disposeSet() {
   /* As caixas são de MUNDO e valiam para esta geometria: mantê-las depois de ela
      sair prenderia a câmera contra prédios que não estão mais na cena. */
   setCameraObstacles(null);
+  /* Idem para o que atravessa: as listas guardam malha e caixa em mundo, e uma
+     malha descartada continuaria sendo julgada a cada quadro. */
+  clearSeeThrough();
   stats = { meshes: 0, triangles: 0, materials: 0, bound: 0 };
 }
 
@@ -863,8 +1134,6 @@ export async function applySet(def: SetDef | null | undefined,
     disposeTree(root);
     return currentUrl !== null;
   }
-  setupShadows(root);
-
   let meshes = 0, triangles = 0;
   const mats = new Set<THREE.Material>();
   root.traverse((o) => {
@@ -885,6 +1154,31 @@ export async function applySet(def: SetDef | null | undefined,
      câmera desviaria das construções onde elas estavam. */
   const pushed = applyPushback(root, def!);
   if (pushed) console.info(`[set] recuo aplicado a ${pushed} malhas altas`);
+  /* ENTRE o recuo e as sombras, e as duas vizinhanças importam: o plantio lê as
+     faixas de grama em MUNDO (logo depois do recuo, que é a última coisa a
+     mover construção) e a bandeira de sombra lê a caixa das árvores e postes
+     JÁ no lugar novo. Trocar a ordem deixa copa sem sombra. */
+  const arranjo = arranjarCenario(root);
+  console.info('[set] cenário arranjado', arranjo);
+  /* DEPOIS do arranjo, e é a ordem que faz o mecanismo apontar para onde as
+     coisas estão: o plantio reescreve TODAS as matrizes de instância e o
+     realinhamento move os onze postes, então medir antes guardaria as posições
+     de fábrica — o teste apagaria árvores que não estão mais lá e deixaria
+     opacas as que estão. Ver measureSeeThrough(). */
+  console.info('[set] atravessar medido', measureSeeThrough(root));
+  /* E DEPOIS DE MEDIR, o vínculo dos vidros das luminárias aos mastros. Ele tem
+     de ser aqui porque só aqui os dois lados existem: `arranjarCenario()` acabou
+     de criar os vidros (via setLampSites) e `measureSeeThrough()` acabou de
+     montar a lista de sólidos onde os mastros estão. Sem ele, atravessar uma
+     torre apaga o poste e deixa o vidro aceso flutuando no céu. */
+  let vidros = 0;
+  for (const par of getLampLensPairs()) {
+    if (bindSeeThroughSatellite(par.host, par.mesh)) vidros++;
+  }
+  if (vidros) console.info(`[set] ${vidros} vidros de luminária amarrados ao mastro`);
+  /* DEPOIS do recuo, e não antes: a bandeira de sombra é lida da caixa em
+     MUNDO, e o recuo é a última coisa que muda essa caixa. Ver setupShadows(). */
+  setupShadows(root);
   setCameraObstacles(collectSolids(root, def!));
   stats = { meshes, triangles, materials: mats.size, bound };
   return true;

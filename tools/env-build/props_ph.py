@@ -80,9 +80,54 @@ def _decimate(ob, budget, log):
     log("    %-9s decimated %d -> %d faces" % (ob.name[:9], n, len(ob.data.polygons)))
 
 
+def _cache():
+    import importlib.util
+    import sys
+    if "protos_cache" in sys.modules:
+        return sys.modules["protos_cache"]
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "protos_cache.py")
+    if not os.path.exists(p):
+        return None
+    spec = importlib.util.spec_from_file_location("protos_cache", p)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["protos_cache"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# AS TEXTURAS DA CERCA SAO REDIRECIONADAS NO IMPORT DO MODULO, e tem de ser aqui.
+#
+# _fence_mats() le WIRE_ALPHA e POSTS_DIFF como CONSTANTES DE MODULO, uma so vez,
+# no momento em que constroi o material. Redirecionar dentro de import_props
+# seria tarde: build_fence corre depois, mas quem le sao os nomes globais, e um
+# `props.WIRE_ALPHA` ja resolvido nao muda. Sem isto a cerca sai cinzenta e opaca
+# — sem alfa de tela — que e pior do que sem cerca, porque parece um muro.
+if not os.path.exists(WIRE_ALPHA):
+    _m = _cache()
+    if _m is not None:
+        _w, _p = _m.fence_textures()
+        if _w:
+            WIRE_ALPHA = _w
+        if _p:
+            POSTS_DIFF = _p
+        # POSTS_NRM fica como esta de proposito: _fence_mats() nao o usa, e
+        # apontar um difuso para um slot de normal e como se cria relevo que
+        # contradiz a propria sombra pintada (ver a nota do dl_packs sobre atlas
+        # assados).
+
+
 def import_props(log, keys=None):
     """key -> (object, (sx, sy, sz)), each centred on its footprint with its
     base on z=0 and an identity transform."""
+    if not os.path.isdir(ROOT):
+        mod = _cache()
+        if mod is not None:
+            out = mod.load_props(log=lambda m: log("  " + m))
+            if out:
+                return out
+        log("  _src_ph ausente e sem cache — 0 props")
+        return {}
+
     out = {}
     for key, (folder, target_h, budget) in PROPS.items():
         if keys and key not in keys:

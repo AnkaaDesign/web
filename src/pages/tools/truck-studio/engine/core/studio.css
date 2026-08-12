@@ -1109,6 +1109,37 @@
   pointer-events: none;
 }
 .truck-studio-root .ts-panel__media canvas { display: block; width: 100%; height: auto; }
+
+/* ---------- o RETRATO do baú vai ATRÁS da arte ----------
+   `.ts-pw-behind` é ligada por `publishWindow()` (vehicle/livery.ts) só quando
+   a face tem um retrato ortográfico do implemento corrente
+   (vehicle/livery-snapshot.ts). A regra padrão acima — foto POR CIMA, com a
+   janela vazada — continua valendo para quem não tem, que é o bake sem chapa
+   branca para fotografar.
+
+   POR QUE A INVERSÃO. A foto estática era uma MOLDURA: opaca em volta e
+   transparente no meio, então ela tinha de ficar na frente para a ferragem
+   passar sobre o desenho. O retrato não é moldura, é o baú inteiro — chapa,
+   emenda, rebite e ferragem na mesma imagem. Na frente ele esconderia a arte, e
+   o buraco que se abrisse nele só poderia ser um RETÂNGULO enquanto a ferragem
+   que precisa cobrir a arte tem silhueta de perfil metálico.
+
+   Atrás, a pilha fica igual à do baú e cada pixel tem uma fonte só:
+       retrato          a chapa como ela é, com o relevo e a cor correntes
+       tela do fabric   a arte do cliente, transparente
+       .ts-structure--front   o MESMO render com a chapa em depth-only, ou
+                              seja exatamente o que passa na frente da pele
+   A oclusão deixa de ser aproximada por um retângulo e passa a ser a do modelo.
+
+   `background-color` transparente na tela é obrigatório junto: a chapa deixou
+   de ser um retângulo de CSS (`--ts-implement`) e passou a ser a fotografia. */
+.truck-studio-root .ts-panel.ts-pw-behind .ts-panel__media {
+  background-image: var(--ts-pw-img);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+.truck-studio-root .ts-panel.ts-pw-behind .ts-panel__media::after { content: none; }
+.truck-studio-root .ts-panel.ts-pw-behind .ts-panel__media canvas { background: transparent; }
 /* A traseira é quase quadrada (0,81 de foto): com os 300px da lateral ela teria
    370px de altura sozinha e empurraria as duas laterais para fora do render.
    Estreita, ela fica com ~185px — a mesma ordem de grandeza dos outros dois
@@ -1279,6 +1310,14 @@
 /* A chapa do editor. Mesma variável do card, então os dois mostram a mesma cor
    de baú sem ninguém sincronizar nada. */
 .truck-studio-root .stage-panel .canvas-container { background: var(--ts-implement, #ffffff); }
+/* …e o palco com RETRATO segue a mesma inversão do card — ver o bloco lá. */
+.truck-studio-root .stage-panel.ts-pw-behind {
+  background-image: var(--ts-pw-img);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+.truck-studio-root .stage-panel.ts-pw-behind::after { content: none; }
+.truck-studio-root .stage-panel.ts-pw-behind .canvas-container { background: transparent; }
 /* A REPRESENTAÇÃO 2D do painel — faixa refletiva, cantoneira, vãos de porta,
    tudo derivado das MEDIDAS (vehicle/livery-structure.ts). É o que substitui a
    foto estática do painel no que ela não sabe fazer: redimensionar. Não tem
@@ -1512,6 +1551,29 @@
    se edita (a largura padrão de 2,60 m). Ele fica legível, só sem cursor. */
 .truck-studio-root .ms-num:disabled { opacity: 0.55; cursor: not-allowed; }
 .truck-studio-root .ms-note { opacity: 0.75; }
+/* ---------- "abrindo o vão no baú…" ----------
+   O indicador do recorte de porta mora AQUI porque a pílula de estado e o véu
+   do viewport ficam atrás de `#editor-modal` — ver o bloco em
+   ui/livery-measures.ts. É a mesma linguagem do resto do inspetor (um
+   `.insp-hint`), com o ponto pulsante que o estúdio já usa para "trabalhando".
+   `hidden` é aplicado pelo JS; a regra abaixo só cuida da aparência. */
+.truck-studio-root .ms-busy {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--accent); font-weight: 600;
+}
+.truck-studio-root .ms-busy::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); animation: ts-ms-pulse 1s ease-in-out infinite;
+}
+@keyframes ts-ms-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+/* Enquanto o baú recorta, os controles de PORTA saem de cena — um segundo
+   clique enfileiraria outro recorte de três segundos. As MEDIDAS continuam
+   editáveis: elas já coalescem sozinhas, e travá-las tiraria do usuário a
+   única coisa que ele pode fazer enquanto espera. */
+.truck-studio-root #measures-body .ms-door-add:disabled,
+.truck-studio-root #measures-body .ms-door-del:disabled {
+  opacity: 0.4; pointer-events: none;
+}
 .truck-studio-root .mini-ctl { flex-direction: column; align-items: stretch; gap: 3px; font-size: 10.5px; }
 .truck-studio-root .btn-row { display: flex; gap: 6px; }
 .truck-studio-root .btn-row.end { justify-content: flex-end; margin-top: 4px; }
