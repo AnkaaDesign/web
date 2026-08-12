@@ -41,14 +41,38 @@ export interface SimulatedUser {
 // touched are stored; everything else is rebuilt from the fresh user fetch.
 export type RowOverride = { positionId?: string; performanceLevel?: number };
 
-// Read the current monthly remuneration off a position. Backend populates the
-// virtual `remuneration` field from the current MonetaryValue; fall back to the
-// newest history row. Performance level never affects base remuneration.
+// Read the current monthly remuneration off a position. The backend populates the
+// virtual `remuneration` field from the current MonetaryValue; the fallback below
+// resolves it from the loaded history rows. NEVER take `remunerations[0]`: an
+// `include: { remunerations: true }` comes back unordered and the first row is
+// usually the OLDEST — that's what made this table show 2024 salaries. The row
+// flagged `current` wins; otherwise the newest by effectiveDate/createdAt.
+// Performance level never affects base remuneration.
 export const getPositionRemuneration = (position?: {
   remuneration?: number;
-  remunerations?: Array<{ value: number }>;
+  remunerations?: Array<{ value: number; current?: boolean; effectiveDate?: string | Date; createdAt?: string | Date }>;
 } | null): number => {
-  return position?.remuneration ?? position?.remunerations?.[0]?.value ?? 0;
+  if (typeof position?.remuneration === "number" && position.remuneration > 0) return position.remuneration;
+
+  const rows = position?.remunerations;
+  if (!rows || rows.length === 0) return position?.remuneration ?? 0;
+
+  const time = (value?: string | Date) => {
+    if (!value) return 0;
+    const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    return isNaN(ms) ? 0 : ms;
+  };
+
+  const currentRows = rows.filter((r) => r.current === true);
+  const candidates = currentRows.length > 0 ? currentRows : rows;
+  const best = candidates.reduce((acc, row) => {
+    const accEffective = time(acc.effectiveDate);
+    const rowEffective = time(row.effectiveDate);
+    if (rowEffective !== accEffective) return rowEffective > accEffective ? row : acc;
+    return time(row.createdAt) > time(acc.createdAt) ? row : acc;
+  });
+
+  return best.value ?? 0;
 };
 
 // Signed currency for delta columns / totals.
