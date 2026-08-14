@@ -307,18 +307,26 @@ export const ATTENTION_RULES: AttentionRule[] = [
   },
 
   // ── Produção ────────────────────────────────────────────────────────────────
-  {
-    id: "airbrushing.waiting-production",
-    name: "Aerografia aguardando produção",
-    entityType: "AIRBRUSHING",
-    enabled: true,
-    priority: 15,
-    targetSectors: [SECTOR_PRIVILEGES.PRODUCTION],
-    predicate: { op: "eq", field: "status", value: AIRBRUSHING_STATUS.WAITING_PRODUCTION },
-    target: { level: "row" },
-    ack: "onView",
-    cadence: cadence({ tone: "soft" }),
-  },
+  //
+  // VAZIA DE PROPÓSITO: PRODUCTION não tem regra de atenção. `attention-audience.test.ts`
+  // trava isso — se um dia uma regra voltar a mirar o setor, o teste quebra antes do deploy.
+  //
+  // Havia `airbrushing.waiting-production` (`targetSectors: [PRODUCTION]`, aerografia em
+  // WAITING_PRODUCTION). Duas coisas a condenaram:
+  //
+  //   1. A audiência não conseguia abrir o que a regra apontava. No APP o gate da Aerografia
+  //      é `production && isTeamLeader`, e o chão de fábrica perdeu a página em 29/07/2026,
+  //      um dia depois de a regra nascer. O filtro de audiência (aqui, na API e no Flutter)
+  //      conhece UM privilégio; TEAM_LEADER é virtual (`sector.leaderId`), então "só o líder"
+  //      não é exprimível — ou a fábrica inteira recebe, ou ninguém.
+  //   2. Ninguém em PRODUCTION podia resolvê-la. Quem move WAITING_PRODUCTION -> IN_PRODUCTION
+  //      é o AEROGRAFISTA (`kPainterStatusTransitions`), e AIRBRUSHING é outro setor. Alerta
+  //      que o público não pode encerrar é o "permanently unresolvable alert" que a regra de
+  //      seleção deste arquivo proíbe.
+  //
+  // Zerar `targetSectors` não seria conserto: lista vazia = TODO setor (ver `ruleApplies`).
+  // Se a fila voltar a avisar, é o pintor — e escopada ao próprio (`painterId`), como
+  // `ppe-delivery.awaiting-my-signature` faz com `userId`.
 
   // ── Comercial / Financeiro ──────────────────────────────────────────────────
   //

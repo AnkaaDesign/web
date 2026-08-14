@@ -182,6 +182,16 @@ export class OrderService {
     return response.data;
   }
 
+  /**
+   * Detach ONE receipt. Counterpart of attachReceipts — use this to change or remove a
+   * comprovante instead of the generic PUT with `receiptIds` (a `set`: full replace,
+   * and WAREHOUSE/ADMIN-only, so accounting could never fix its own attachment).
+   */
+  async detachReceipt(id: string, fileId: string): Promise<OrderUpdateResponse> {
+    const response = await apiClient.delete<OrderUpdateResponse>(`${this.basePath}/${id}/receipts/${fileId}`);
+    return response.data;
+  }
+
   async batchMarkAwaitingPayment(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
     const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/mark-awaiting-payment`, data, { params: query });
     return response.data;
@@ -407,6 +417,7 @@ export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData)
 export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);
 export const markOrderInstallmentPaid = (installmentId: string, query?: OrderQueryFormData) => orderService.markInstallmentPaid(installmentId, query);
 export const attachOrderReceipts = (id: string, data: FormData, query?: OrderQueryFormData) => orderService.attachReceipts(id, data, query);
+export const detachOrderReceipt = (id: string, fileId: string) => orderService.detachReceipt(id, fileId);
 export const batchMarkOrdersAwaitingPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkAwaitingPayment(data, query);
 export const batchMarkOrdersPaid = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkPaid(data, query);
 export const requestOrderPayment = (id: string, query?: OrderQueryFormData) => orderService.requestPayment(id, query);

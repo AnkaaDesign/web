@@ -19,6 +19,7 @@ import {
   markOrderPaid,
   markOrderInstallmentPaid,
   attachOrderReceipts,
+  detachOrderReceipt,
   batchMarkOrdersAwaitingPayment,
   batchMarkOrdersPaid,
   requestOrderPayment,
@@ -339,6 +340,16 @@ export const useOrderMutations = (options?: {
     },
   });
 
+  // Detach ONE comprovante. Same financial gate as the attach above, so whoever
+  // indexed a receipt can also replace a wrong one — the generic PUT :id that would
+  // otherwise be needed for this is WAREHOUSE/ADMIN-only.
+  const detachReceiptMutation = useMutation({
+    mutationFn: ({ id, fileId }: { id: string; fileId: string }) => detachOrderReceipt(id, fileId),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
   // ADMIN: PENDING → AWAITING_PAYMENT (Requisitar Pagamento) and its reverse.
   const requestPaymentMutation = useMutation({
     mutationFn: (id: string) => requestOrderPayment(id),
@@ -391,6 +402,8 @@ export const useOrderMutations = (options?: {
     markInstallmentPaidAsync: markInstallmentPaidMutation.mutateAsync,
     attachReceipts: attachReceiptsMutation.mutate,
     attachReceiptsAsync: attachReceiptsMutation.mutateAsync,
+    detachReceipt: detachReceiptMutation.mutate,
+    detachReceiptAsync: detachReceiptMutation.mutateAsync,
     requestPayment: requestPaymentMutation.mutate,
     requestPaymentAsync: requestPaymentMutation.mutateAsync,
     cancelPaymentRequest: cancelPaymentRequestMutation.mutate,

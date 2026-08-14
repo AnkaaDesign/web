@@ -2,8 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconPlus, IconExternalLink, IconEdit, IconProgressCheck, IconTrash, IconAlertTriangle, IconPlayerPlay, IconCheck } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
-import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
-import { cn } from "@/lib/utils";
+import { presenceRowClassFor, usePresenceVersion } from "@/lib/attention";
 import type { DataTableRowAction, DataTableFilterDef, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import {
   AlertDialog,
@@ -190,17 +189,11 @@ export function AirbrushingTablePage() {
   const airbrushings = useMemo(() => (response as { data?: Airbrushing[] } | undefined)?.data ?? [], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
 
-  // Attention. `airbrushing.waiting-production` lit the sidebar entry for this page while the page
-  // itself registered nothing and marked no row — so the blink led here and then said nothing.
-  // Registering locally also means the ring clears the moment someone moves a row out of
-  // WAITING_PRODUCTION, instead of on the next summary poll.
-  useRegisterAttentionEntities("AIRBRUSHING", airbrushings);
-  useAttentionVersion();
+  // Presença ("alguém está editando") apenas. A aerografia não tem MAIS regra de atenção —
+  // `airbrushing.waiting-production` foi removida (ver lib/attention/rules.ts, seção Produção),
+  // então registrar as linhas aqui não produziria marcação nenhuma.
   usePresenceVersion();
-  const getRowClassName = useCallback(
-    (a: Airbrushing) => cn(attentionRowClassFor("AIRBRUSHING", a.id), presenceRowClassFor("AIRBRUSHING", a.id)),
-    [],
-  );
+  const getRowClassName = useCallback((a: Airbrushing) => presenceRowClassFor("AIRBRUSHING", a.id), []);
 
   // Export "all": re-page the whole filtered set (the table only holds the current page). The API caps
   // `limit` at 100, so page through it rather than requesting everything at once.

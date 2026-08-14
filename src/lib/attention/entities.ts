@@ -67,11 +67,9 @@ export const ATTENTION_ENTITIES: AttentionEntityDescriptor[] = [
     // how one entity type serves three different sectors.
     navPaths: [routes.inventory.ppe.deliveries.root, routes.occupationalHealth.ppe.deliveries.root, routes.personal.myPpes.root],
   },
-  {
-    entityType: "AIRBRUSHING",
-    label: "aerografia",
-    navPaths: [routes.production.airbrushings.root],
-  },
+  // AIRBRUSHING saiu junto com a sua única regra (ver rules.ts, seção Produção). Um descritor
+  // sem regra é inerte — `getActiveTypes` só considera tipos COM regra —, mas ficaria aqui
+  // insinuando um alerta que não existe mais.
   {
     entityType: "TASK_QUOTE",
     label: "orçamento",

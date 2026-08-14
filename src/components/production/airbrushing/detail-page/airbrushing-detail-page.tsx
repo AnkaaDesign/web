@@ -26,6 +26,8 @@ import {
   IconReceiptTax,
   IconDownload,
   IconEye,
+  IconPaperclip,
+  IconLoader2,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
@@ -33,6 +35,8 @@ import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFileViewer, type FileViewMode } from "@/components/common/file";
+import { useToast } from "@/hooks/common/use-toast";
+import { createAirbrushingFormData } from "@/utils/form-data-helper";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
@@ -51,10 +55,13 @@ import {
   canEditAirbrushings,
   canDeleteAirbrushings,
   canReleaseAirbrushings,
+  canSettleAirbrushingPayment,
   AIRBRUSHING_FINANCE_PRIVILEGES,
 } from "@/utils/permissions/entity-permissions";
 import { getUsers } from "@/api-client";
 import { useAirbrushing, useAirbrushingMutations } from "../../../../hooks";
+import { useAttachAirbrushingReceipts, useDetachAirbrushingReceipt } from "../../../../hooks/production/use-airbrushing";
+import { AttachReceiptsDialog } from "@/components/financial/common/attach-receipts-dialog";
 import { useAirbrushingNfse } from "../../../../hooks/production/use-airbrushing-nfse";
 import {
   routes,
@@ -106,17 +113,58 @@ const muted = <span className="text-muted-foreground">—</span>;
  * aerografia tem UM visual só (ícone à esquerda, nome e tamanho no meio, ações dentro do
  * card, à direita), seja ele DANFSe, XML ou recibo.
  */
-function AirbrushingReceiptsBlock({ files }: { files: AnkaaFile[] }) {
+function AirbrushingReceiptsBlock({
+  airbrushingId,
+  files,
+  canManage,
+  onRemove,
+  removingId,
+}: {
+  airbrushingId: string;
+  files: AnkaaFile[];
+  canManage: boolean;
+  onRemove: (file: AnkaaFile) => void;
+  removingId: string | null;
+}) {
   const { actions } = useFileViewer();
+  const { toast } = useToast();
+  const [attachOpen, setAttachOpen] = useState(false);
+  const attachReceipts = useAttachAirbrushingReceipts();
+
+  const handleAttach = async (selected: File[]) => {
+    try {
+      await attachReceipts.mutateAsync({ id: airbrushingId, data: createAirbrushingFormData({}, { receipts: selected }) });
+      toast({ title: "Comprovante anexado", variant: "success" });
+      setAttachOpen(false);
+    } catch {
+      toast({ title: "Não foi possível anexar o comprovante", variant: "error" });
+    }
+  };
 
   return (
-    <SubBlock title="Recibos do pagamento">
+    <SubBlock
+      title="Recibos do pagamento"
+      action={
+        canManage ? (
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setAttachOpen(true)}>
+            <IconPaperclip className="h-4 w-4" />
+            Anexar comprovante
+          </Button>
+        ) : undefined
+      }
+    >
+      <AttachReceiptsDialog
+        open={attachOpen}
+        onOpenChange={setAttachOpen}
+        onConfirm={handleAttach}
+        isPending={attachReceipts.isPending}
+        description="Anexe o comprovante do pagamento desta aerografia. Os comprovantes já anexados são mantidos."
+      />
       {files.length === 0 ? (
-        // Quem anexa o recibo é o Contas a Pagar, ao registrar o pagamento
-        // (`attachAirbrushingReceipts`) — o formulário da aerografia não tem seletor de
-        // recibo. Dizer isso evita a caçada por um botão de anexar que não existe aqui.
         <p className="py-1 text-sm text-muted-foreground">
-          Nenhum recibo anexado. O recibo é anexado pelo Contas a Pagar ao registrar o pagamento.
+          {canManage
+            ? "Nenhum recibo anexado. Anexe o comprovante aqui ou ao registrar o pagamento no Contas a Pagar."
+            : "Nenhum recibo anexado. O recibo é anexado pelo Contas a Pagar ao registrar o pagamento."}
         </p>
       ) : (
         <div className="space-y-2 py-1">
@@ -140,6 +188,18 @@ function AirbrushingReceiptsBlock({ files }: { files: AnkaaFile[] }) {
                   >
                     <IconDownload className="h-4 w-4" />
                   </Button>
+                  {canManage && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 shrink-0 p-0 text-destructive hover:text-destructive"
+                      onClick={() => onRemove(file)}
+                      disabled={removingId === file.id}
+                      title="Remover recibo"
+                    >
+                      {removingId === file.id ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconTrash className="h-4 w-4" />}
+                    </Button>
+                  )}
                 </>
               }
             />
@@ -156,6 +216,7 @@ export function AirbrushingDetailPage() {
   const location = useLocation();
   const { user } = useAuth();
   const { hasAnyPrivilegeAccess } = usePrivileges();
+  const { toast } = useToast();
   const { deleteMutation, updateAsync } = useAirbrushingMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // Grid/list view for the Layouts section — lifted here so the toggle can live in the
@@ -165,6 +226,12 @@ export function AirbrushingDetailPage() {
   const canEdit = canEditAirbrushings(user);
   const canDelete = canDeleteAirbrushings(user);
   const canRelease = canReleaseAirbrushings(user);
+  // Liquidar pagamento (marcar/desmarcar pago, mexer no comprovante) é mais amplo que
+  // canEdit: o ACCOUNTING chega aqui pelo Contas a Pagar e pode PUT :id e
+  // PUT :id/receipts no servidor, mas não edita status/preço/pintor nem exclui.
+  const canSettlePayment = canSettleAirbrushingPayment(user);
+  const [removingReceiptId, setRemovingReceiptId] = useState<string | null>(null);
+  const { mutateAsync: detachReceiptAsync } = useDetachAirbrushingReceipt();
   // Aprovar/reprovar layout é decisão comercial — mesma regra de canApproveLayouts no
   // servidor, que ignora em SILÊNCIO (200, sem mudança) quem não pode. Esconder o
   // controle aqui é o que evita o clique que parece funcionar e não faz nada.
@@ -252,6 +319,29 @@ export function AirbrushingDetailPage() {
   const canSeeMoney = hasAnyPrivilegeAccess(MONEY_GATE);
   const { data: nfseResponse } = useAirbrushingNfse(id ?? "", { enabled: !!id && canSeeMoney });
   const nfse = nfseResponse?.data ?? null;
+
+  /**
+   * Desanexa UM comprovante pelo endpoint dedicado. NÃO usa o PUT genérico com
+   * `receiptIds`: aquele é um `set` do Prisma (substituição total da relação), então
+   * dependeria da lista inteira estar hidratada e apagaria anexos em silêncio se a tela
+   * estivesse com estado velho. O File em si não é apagado (o ACCOUNTING nem tem
+   * privilégio para DELETE /files/:id) — o varredor de órfãos recolhe depois.
+   */
+  const handleRemoveReceipt = useCallback(
+    async (file: AnkaaFile) => {
+      if (!airbrushing) return;
+      setRemovingReceiptId(file.id);
+      try {
+        await detachReceiptAsync({ id: airbrushing.id, fileId: file.id });
+        toast({ title: "Comprovante removido", variant: "success" });
+      } catch {
+        toast({ title: "Não foi possível remover o comprovante", variant: "error" });
+      } finally {
+        setRemovingReceiptId(null);
+      }
+    },
+    [airbrushing, detachReceiptAsync, toast],
+  );
 
   const handleDelete = async () => {
     if (!airbrushing) return;
@@ -450,7 +540,11 @@ export function AirbrushingDetailPage() {
               </Badge>
             </div>
           ),
-          edit: canEdit
+          // Liquidar/estornar é do time de dinheiro, não de quem edita a aerografia —
+          // por isso `canSettlePayment` e não `canEdit`. Sem esse OR o ACCOUNTING via a
+          // página em modo leitura e não conseguia desfazer um pagamento que o próprio
+          // servidor já autoriza (PUT :id inclui ACCOUNTING).
+          edit: canEdit || canSettlePayment
             ? {
                 get: (a) => a.paymentStatus ?? null,
                 enum: {
@@ -583,7 +677,9 @@ export function AirbrushingDetailPage() {
       ],
       // Os recibos entram ABAIXO da linha de campos: comprovante e pagamento na mesma
       // seção. O gate continua sendo o da seção (MONEY_GATE) — mudou o lugar, não quem vê.
-      render: (a) => <AirbrushingReceiptsBlock files={a.receipts ?? []} />,
+      render: (a) => (
+        <AirbrushingReceiptsBlock airbrushingId={a.id} files={a.receipts ?? []} canManage={canSettlePayment} onRemove={handleRemoveReceipt} removingId={removingReceiptId} />
+      ),
     });
 
     // --- NFS-e do Aerografista (financial-only) ---
@@ -759,7 +855,10 @@ export function AirbrushingDetailPage() {
     // (e alimenta os badges do cabeçalho da seção fiscal).
     nfse,
     canEdit,
+    canSettlePayment,
     canManageNfse,
+    handleRemoveReceipt,
+    removingReceiptId,
     updateAsync,
     confirmPaymentChange,
     loadPainters,
@@ -809,9 +908,7 @@ export function AirbrushingDetailPage() {
     <>
       <DetailPage<Airbrushing>
         detailKey="airbrushing-detail"
-        // Attention: `airbrushing.waiting-production` acks `onView`, so opening this page is the
-        // acknowledgement and the queue row goes quiet until the record matches again.
-        attention={{ entityType: "AIRBRUSHING" }}
+        // Sem `attention`: a aerografia não tem regra (ver lib/attention/rules.ts, seção Produção).
         data={airbrushing}
         isLoading={isLoading}
         error={error ? "Aerografia não encontrada" : undefined}

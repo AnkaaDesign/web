@@ -108,7 +108,11 @@ export function OrderDetailPage() {
   const { user } = useAuth();
   const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
-  const { isAdmin } = usePrivileges();
+  const { isAdmin, hasAnyPrivilegeAccess } = usePrivileges();
+  // Anexar/remover comprovante segue os papéis dos endpoints dedicados de recibo, que
+  // são MAIS amplos que a edição do pedido — o financeiro/contabilidade indexa o
+  // comprovante ao liquidar sem ganhar direito de editar o pedido.
+  const canManageReceipts = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.WAREHOUSE]);
   const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync, requestPaymentAsync } = useOrderMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
@@ -564,14 +568,17 @@ export function OrderDetailPage() {
       render: (o) => <OrderPaymentExtras order={o} />,
     });
 
-    // --- Comprovantes (only when the order has files, like the legacy side card) ---
-    if ((order?.receipts?.length || 0) > 0) {
+    // --- Comprovantes ---
+    // Rendered even when empty for whoever can manage receipts: an empty section IS the
+    // place to attach the first one. For everyone else it stays hidden when empty, like
+    // the legacy side card.
+    if ((order?.receipts?.length || 0) > 0 || canManageReceipts) {
       list.push({
         id: "documents",
         label: "Comprovantes",
         icon: IconReceipt,
         span: 1,
-        render: (o) => <OrderDocumentsSection order={o} />,
+        render: (o) => <OrderDocumentsSection order={o} canManageReceipts={canManageReceipts} />,
       });
     }
 
@@ -601,7 +608,7 @@ export function OrderDetailPage() {
 
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.receipts?.length, order?.supplier, order?.paymentResponsible, order?.paymentMethod, orderActions, canEdit, isCancelled, isReceivedOrCancelled, updateAsync, markPaidAsync, markAwaitingPaymentAsync, confirmPaymentChange, loadSuppliers, loadUsers]);
+  }, [order?.receipts?.length, order?.supplier, order?.paymentResponsible, order?.paymentMethod, orderActions, canEdit, canManageReceipts, isCancelled, isReceivedOrCancelled, updateAsync, markPaidAsync, markAwaitingPaymentAsync, confirmPaymentChange, loadSuppliers, loadUsers]);
 
   const actions = useMemo<PageAction[]>(() => {
     if (!order) return [];

@@ -517,7 +517,11 @@ export function FileUploadField({
 
   if (variant === "compact") {
     return (
-      <div className={cn("space-y-3 w-full", className)}>
+      // min-w-0: dentro de um DialogContent (grid) ou de um flex, o item tem
+      // min-width:auto e NÃO encolhe abaixo do conteúdo — um nome de arquivo longo sem
+      // espaços (ex.: a chave de 44 dígitos de uma NF-e) estoura o modal inteiro para a
+      // direita, e o `truncate` da linha nunca chega a valer. Isto libera o encolhimento.
+      <div className={cn("space-y-3 w-full min-w-0", className)}>
         {/* Compact Rectangle Upload Area */}
         <div
           {...getRootProps()}
@@ -658,7 +662,8 @@ export function FileUploadField({
 
   // Full variant (similar to original FileUploader but with rectangle focus)
   return (
-    <div className={cn("space-y-4", className)}>
+    // min-w-0 pelo mesmo motivo da variante compacta acima.
+    <div className={cn("space-y-4 min-w-0", className)}>
       {/* Rectangle Dropzone */}
       <div
         {...getRootProps()}

@@ -12,6 +12,7 @@ import {
   IconArrowRight,
   IconGift,
   IconCategory,
+  IconReceipt,
 } from "@tabler/icons-react";
 
 import type { ClearanceState, PayableRow, PayableState } from "../../../types";
@@ -27,6 +28,7 @@ import { DataTable, type DataTableRowAction } from "@/components/ui/datatable";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
 import { PaymentAmountDialog } from "./payment-amount-dialog";
 import { MarkPaidDialog } from "./mark-paid-dialog";
+import { ManageReceiptsDialog } from "./manage-receipts-dialog";
 import { buildPayableColumns, isOverdueRow } from "./payables-columns";
 import { createAirbrushingFormData, createOrderFormData } from "@/utils/form-data-helper";
 import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
@@ -35,7 +37,7 @@ import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-pa
 // UNCLEARED is the cross-cutting "Pago mas não conciliado" bucket — it filters on
 // the conciliação axis (PAID && clearanceState UNCLEARED), NOT on paymentState, so
 // it overlaps the PAID bucket on purpose. It is the key 3-5 day-window view.
-type PayableBucketKey = "AWAITING" | "OVERDUE" | "PARTIAL" | "EXPECTED" | "PAID" | "UNCLEARED";
+type PayableBucketKey = "AWAITING" | "OVERDUE" | "PARTIAL" | "EXPECTED" | "PAID" | "IGNORED" | "UNCLEARED";
 
 const PAYABLE_BUCKETS: Record<
   PayableBucketKey,
@@ -46,15 +48,16 @@ const PAYABLE_BUCKETS: Record<
   PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10" },
   EXPECTED: { label: "Previsto", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10" },
   PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10" },
+  IGNORED: { label: "Ignorados", Icon: IconBan, tone: "text-neutral-500 bg-neutral-500/10" },
   UNCLEARED: { label: "Pago, aguardando conciliação", Icon: IconClock, tone: "text-amber-600 bg-amber-500/10" },
 };
 
 // "UNCLEARED" (Pago, aguardando conciliação) is hidden for now — the payables
 // reconciliation workflow is still being decided. Restore it here to bring the
 // card back.
-const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID"];
-// Default view: every open/overdue/forecast obligation; paid-this-month and the
-// awaiting-conciliação view are opt-in (click the card).
+const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID", "IGNORED"];
+// Default view: every open/overdue/forecast obligation; paid-this-month, os ignorados
+// e a visão awaiting-conciliação são opt-in (clique no card).
 const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED"];
 
 // Cards always kept on screen for a stable at-a-glance summary, even when the
@@ -72,6 +75,26 @@ const STATE_TO_BUCKET: Record<PayableState, Exclude<PayableBucketKey, "UNCLEARED
   EXPECTED: "EXPECTED",
   PAID: "PAID",
 };
+
+/**
+ * Bucket EXCLUSIVO da linha (eixo de asserção). Ignorada sai do bucket de estado e vai
+ * para IGNORED — não fica nos dois.
+ *
+ * É isso que faz o card "Ignorados" esconder por padrão sem inventar um filtro
+ * subtrativo: IGNORED está fora de DEFAULT_BUCKETS, então a linha some do padrão e
+ * volta ao clicar no card, com o filtro continuando um OR de inclusões.
+ *
+ * Também conserta uma contagem errada: uma ocorrência ignorada chega com
+ * paymentState AWAITING_PAYMENT (payables.service força `expected = false` quando
+ * ignorada), então ela inflava o card "Aguardando Pagamento" — contra o que o próprio
+ * servidor faz no summary, o doc do tipo e o tooltip da linha ("não entra nos totais").
+ *
+ * `ignored` só existe para RECURRENT_PAYABLE (é `RecurrentPayableOccurrence.status ===
+ * CANCELLED`); pedido/aerografia/imposto nunca têm o campo, logo nunca caem aqui.
+ */
+function bucketOf(row: PayableRow): PayableBucketKey {
+  return row.ignored ? "IGNORED" : STATE_TO_BUCKET[row.paymentState];
+}
 
 // A row belongs to the "Pago mas não conciliado" bucket when it is asserted PAID
 // but no confirming bank line has cleared it yet.
@@ -166,6 +189,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
 
   // Order/airbrushing payable awaiting confirmation + optional comprovante.
   const [markPaidRow, setMarkPaidRow] = useState<PayableRow | null>(null);
+  const [manageReceiptsRow, setManageReceiptsRow] = useState<PayableRow | null>(null);
   const [markPaidPending, setMarkPaidPending] = useState(false);
 
   // Keep the selected month shareable in the URL.
@@ -239,14 +263,16 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       PARTIAL: { count: 0, total: 0 },
       EXPECTED: { count: 0, total: 0 },
       PAID: { count: 0, total: 0 },
+      IGNORED: { count: 0, total: 0 },
       UNCLEARED: { count: 0, total: 0 },
     };
     for (const row of monthRows) {
-      const bucket = STATE_TO_BUCKET[row.paymentState];
+      const bucket = bucketOf(row);
       out[bucket].count += 1;
       out[bucket].total += row.amount;
       // UNCLEARED cross-cuts: a PAID-but-unconfirmed row is counted here too.
-      if (isAwaitingClearance(row)) {
+      // Uma linha ignorada não é dívida, então também não entra neste eixo.
+      if (!row.ignored && isAwaitingClearance(row)) {
         out.UNCLEARED.count += 1;
         out.UNCLEARED.total += row.amount;
       }
@@ -277,20 +303,23 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     const active = new Set(buckets);
     // A row matches if its assertion-axis bucket is active OR (the conciliação
     // bucket is active and the row is paid-but-unconfirmed).
-    return monthRows.filter(
-      (row) => active.has(STATE_TO_BUCKET[row.paymentState]) || (active.has("UNCLEARED") && isAwaitingClearance(row)),
-    );
+    return monthRows.filter((row) => active.has(bucketOf(row)) || (active.has("UNCLEARED") && !row.ignored && isAwaitingClearance(row)));
   }, [monthRows, buckets]);
 
-  // Default order — the most urgent open payables lead: anything vencida by date
-  // first (even if the server hasn't flipped its state yet), then the same rank
-  // the old table used, then by due date. The DataTable's own column sorting
-  // takes over the moment the user clicks a header.
+  // Ordem padrão: status de pagamento primeiro, vencimento depois. As mais urgentes
+  // lideram — o que já venceu POR DATA entra como OVERDUE mesmo que o servidor ainda
+  // não tenha virado o estado. Ignoradas vão SEMPRE para o fim, antes de qualquer
+  // outro critério: não são dívida, e sem essa chave uma ignorada vencida subia ao
+  // topo da tabela via o rank de vencida. A ordenação por coluna do DataTable assume
+  // assim que o usuário clica num cabeçalho.
   const sortedRows = useMemo(() => {
     const rows = [...bucketRows];
     rows.sort((a, b) => {
-      const rankA = isOverdueRow(a) ? -1 : payableRank(a.paymentState);
-      const rankB = isOverdueRow(b) ? -1 : payableRank(b.paymentState);
+      const ignoredA = Number(!!a.ignored);
+      const ignoredB = Number(!!b.ignored);
+      if (ignoredA !== ignoredB) return ignoredA - ignoredB;
+      const rankA = payableRank(!a.ignored && isOverdueRow(a) ? "OVERDUE" : a.paymentState);
+      const rankB = payableRank(!b.ignored && isOverdueRow(b) ? "OVERDUE" : b.paymentState);
       if (rankA !== rankB) return rankA - rankB;
       const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
       const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
@@ -500,6 +529,46 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         },
       },
       {
+        // Contrapartida do "Marcar como pago" da aerografia. Sem parcelas (só o pedido
+        // tem `installmentId`), e o `paidAt` é limpo pelo próprio repositório ao voltar
+        // para PENDING — basta mandar o paymentStatus. A linha continua alcançável: uma
+        // aerografia paga permanece no Contas a Pagar durante o mês do pagamento.
+        key: "airbrushing-undo-paid",
+        label: "Desfazer pagamento",
+        icon: <IconProgressCheck className="h-4 w-4" />,
+        hidden: (rows) => {
+          const r = one(rows);
+          return !r || r.source !== "AIRBRUSHING" || r.paymentState !== "PAID";
+        },
+        onClick: (rows) => {
+          const r = one(rows);
+          if (r) {
+            runAction(async () => {
+              await updateAirbrushingAsync({ id: r.id, data: { paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING } });
+              // As mutações de aerografia não estão sob orderKeys.all, então a query de
+              // payables não invalida sozinha — mesmo motivo do refetch no marcar-pago.
+              await refetch();
+            });
+          }
+        },
+      },
+      {
+        // Editar comprovantes sem sair da lista. Vale para PAGO e para EM ABERTO: anexar
+        // o comprovante errado e precisar trocar é justamente o caso que motivou isto,
+        // e ele só aparece depois de pago.
+        key: "manage-receipts",
+        label: "Comprovantes",
+        icon: <IconReceipt className="h-4 w-4" />,
+        hidden: (rows) => {
+          const r = one(rows);
+          return !r || (r.source !== "ORDER" && r.source !== "AIRBRUSHING");
+        },
+        onClick: (rows) => {
+          const r = one(rows);
+          if (r) setManageReceiptsRow(r);
+        },
+      },
+      {
         key: "payroll-settle",
         label: "Marcar folha como paga",
         icon: <IconCash className="h-4 w-4" />,
@@ -589,6 +658,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
           3: "lg:grid-cols-3",
           4: "lg:grid-cols-4",
           5: "lg:grid-cols-5",
+          6: "lg:grid-cols-6",
         };
         return (
           <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-2 flex-shrink-0", lgCols[visibleBuckets.length] ?? "lg:grid-cols-4")}>
@@ -663,6 +733,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         isPending={markPaidPending}
         onConfirm={confirmMarkPaid}
       />
+
+      {/* Editar comprovantes (anexar/remover) de um pedido ou aerografia direto da lista.
+          Só monta com linha selecionada — a busca dos recibos acontece ao abrir. */}
+      <ManageReceiptsDialog row={manageReceiptsRow} onOpenChange={(open) => !open && setManageReceiptsRow(null)} />
     </div>
   );
 }

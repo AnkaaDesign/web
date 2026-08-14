@@ -74,10 +74,15 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
  * Exportado porque a seção "Preço & Pagamento" usa o MESMO bloco para os recibos — o
  * objetivo é que documento de aerografia tenha um visual só, não um por seção.
  */
-export function SubBlock({ title, children }: { title: string; children: React.ReactNode }) {
+export function SubBlock({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <section className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
+      {/* Sem `action` o cabeçalho fica idêntico ao que sempre foi (só o h4), então os
+          blocos da nota fiscal não mudam de aparência ao ganhar este parâmetro. */}
+      <div className="mb-1 flex min-h-[1.5rem] items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
+        {action}
+      </div>
       {children}
     </section>
   );

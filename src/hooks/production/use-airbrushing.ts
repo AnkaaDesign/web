@@ -88,6 +88,22 @@ export function useAttachAirbrushingReceipts() {
   });
 }
 
+/**
+ * Desanexa UM comprovante da aerografia (endpoint dedicado, lado financeiro).
+ * Trocar = anexar o novo + remover o antigo, cada um numa chamada de intenção única —
+ * nenhuma delas passa pelo `receiptIds` do PUT genérico, que substitui a relação toda.
+ */
+export function useDetachAirbrushingReceipt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fileId }: { id: string; fileId: string }) => airbrushingService.detachReceipt(id, fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: airbrushingKeys.all });
+      queryClient.invalidateQueries({ queryKey: fileKeys.all });
+    },
+  });
+}
+
 // Hook for getting airbrushings by task
 export const useAirbrushingsByTask = createSpecializedQueryHook<{ taskId: string; params?: Partial<AirbrushingGetManyFormData> }, AirbrushingGetManyResponse>({
   queryKeyFn: ({ taskId, params }) => airbrushingKeys.byTask(taskId, params),

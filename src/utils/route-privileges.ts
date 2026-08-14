@@ -219,6 +219,11 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.production.airbrushings.list]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
   [routes.production.airbrushings.create]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
   [routes.production.airbrushings.edit(":id")]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
+  // Detail is DELIBERATELY wider than list/edit: Contas a Pagar links straight here to
+  // settle the painter payment, so ACCOUNTING needs the detail without the list.
+  // MUST stay byte-identical to the PrivilegeRoute in pages/production/airbrushing/details/[id].tsx —
+  // a route missing from this map falls back to ADMIN-only (see the default at the bottom).
+  [routes.production.airbrushings.details(":id")]: ["PRODUCTION", "FINANCIAL", "ACCOUNTING", "COMMERCIAL", "ADMIN"],
 
   // Cut-related routes - PRODUCTION/DESIGNER/PLOTTING and WAREHOUSE (execute cuts: start/finish)
   [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "WAREHOUSE", "ADMIN"],

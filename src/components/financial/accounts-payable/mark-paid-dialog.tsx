@@ -45,7 +45,9 @@ export function MarkPaidDialog({ open, onOpenChange, payeeName, amount, isPendin
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
+        {/* min-w-0: item de grid do DialogContent — sem isso um nome de arquivo longo
+            sem espaços alarga o modal em vez de truncar. */}
+        <div className="space-y-2 min-w-0">
           <Label className="text-sm font-medium">Comprovante (opcional)</Label>
           <FileUploadField
             onFilesChange={setReceipts}

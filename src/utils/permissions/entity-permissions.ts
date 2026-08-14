@@ -277,6 +277,20 @@ export function canViewAirbrushingFinancials(user: PermissionUser | null): boole
   return hasAnyPrivilege(user, [...AIRBRUSHING_FINANCE_PRIVILEGES]);
 }
 
+/**
+ * Quem pode LIQUIDAR o pagamento da aerografia — marcar/desmarcar pago e anexar ou
+ * trocar o comprovante. Espelha exatamente `PUT /airbrushings/:id` e
+ * `PUT /airbrushings/:id/receipts` no back (ADMIN/COMMERCIAL/FINANCIAL/ACCOUNTING).
+ *
+ * Deliberadamente SEPARADO de `canEditAirbrushings` (ADMIN/COMMERCIAL/FINANCIAL): o
+ * ACCOUNTING liquida pagamento a partir do Contas a Pagar, mas não abre a aerografia
+ * para mexer em status, preço, pintor ou exclusão.
+ */
+export function canSettleAirbrushingPayment(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [...AIRBRUSHING_FINANCE_PRIVILEGES]);
+}
+
 // =====================
 // OBSERVATION PERMISSIONS
 // =====================

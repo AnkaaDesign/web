@@ -92,6 +92,16 @@ export class AirbrushingService {
     return response.data;
   }
 
+  /**
+   * Desanexa UM comprovante. Contrapartida do attachReceipts — use este para trocar ou
+   * remover, nunca o PUT genérico com `receiptIds` (que é um `set`: substitui a relação
+   * inteira e exige a lista completa hidratada).
+   */
+  async detachReceipt(id: string, fileId: string): Promise<AirbrushingUpdateResponse> {
+    const response = await apiClient.delete<AirbrushingUpdateResponse>(`${this.basePath}/${id}/receipts/${fileId}`);
+    return response.data;
+  }
+
   async deleteAirbrushing(id: string): Promise<AirbrushingDeleteResponse> {
     const response = await apiClient.delete<AirbrushingDeleteResponse>(`${this.basePath}/${id}`);
     return response.data;
@@ -143,6 +153,7 @@ export const createAirbrushing = (data: AirbrushingCreateFormData | FormData, qu
 export const updateAirbrushing = (id: string, data: AirbrushingUpdateFormData | FormData, query?: AirbrushingQueryFormData) => airbrushingService.updateAirbrushing(id, data, query);
 export const deleteAirbrushing = (id: string) => airbrushingService.deleteAirbrushing(id);
 export const attachAirbrushingReceipts = (id: string, data: FormData, query?: AirbrushingQueryFormData) => airbrushingService.attachReceipts(id, data, query);
+export const detachAirbrushingReceipt = (id: string, fileId: string) => airbrushingService.detachReceipt(id, fileId);
 
 // Batch Operations
 export const batchCreateAirbrushings = (data: AirbrushingBatchCreateFormData, query?: AirbrushingQueryFormData) => airbrushingService.batchCreateAirbrushings(data, query);
