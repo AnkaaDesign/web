@@ -15,15 +15,18 @@ export function LayoutFileUploadField({ showStatus = true, ...props }: LayoutFil
     <FileCardUploadField
       {...props}
       showStatus={showStatus}
-      renderStatus={({ value, onChange, disabled, layout, uploaded }) => (
+      renderStatus={({ value, onChange, disabled, layout }) => (
         <LayoutStatusSelector
           value={value}
           onChange={onChange}
-          // O mapa `layoutStatuses` é chaveado por File ID, que só passa a existir
-          // depois do upload. Deixar o seletor ativo antes disso seria um controle
-          // que aceita a escolha e a descarta no submit — um layout recém-solto
-          // nasce Rascunho e só pode ser aprovado quando já estiver no servidor.
-          disabled={disabled || !uploaded}
+          // ATIVO TAMBÉM ANTES DO UPLOAD. O mapa `layoutStatuses` é chaveado por File ID,
+          // que só existe depois que o arquivo sobe — mas o status escolhido agora NÃO se
+          // perde: ele fica no próprio arquivo (`file.status`) e cada caminho de submissão
+          // o traduz para o que a API espera (`newLayoutStatuses`, um array na MESMA ordem
+          // dos blobs, ou o remapeamento id-temporário → File ID em quem sobe os arquivos
+          // antes de salvar). Sem isso era preciso salvar a tarefa/aerografia só para
+          // poder aprovar o layout que se acabou de anexar.
+          disabled={disabled}
           {...(layout === "card"
             ? { className: "w-full", triggerClassName: "h-8 w-full justify-between" }
             : {})}

@@ -558,11 +558,17 @@ export const FinancialBudgetCreatePage = () => {
       const uploadedLayoutIds: string[] = [...layoutIds];
       const remappedLayoutStatuses: Record<string, string> = {};
       const localIdToRealFileId: Record<string, string> = {};
+      // O seletor chaveia por `uploadedFileId || id`, e grava a escolha também no próprio
+      // objeto File — ler os três cobre tanto o layout já enviado quanto o recém-solto,
+      // cujo status precisa sobreviver ao upload que acontece logo abaixo.
+      const statusForFile = (file: (typeof layouts)[number]): string | undefined =>
+        layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id] ?? file.status;
       for (const file of layouts) {
+        const status = statusForFile(file);
         if (file.uploaded && file.uploadedFileId) {
           localIdToRealFileId[file.id] = file.uploadedFileId;
-          if (layoutStatuses[file.id]) {
-            remappedLayoutStatuses[file.uploadedFileId] = layoutStatuses[file.id];
+          if (status) {
+            remappedLayoutStatuses[file.uploadedFileId] = status;
           }
         } else if (!file.error) {
           try {
@@ -570,8 +576,8 @@ export const FinancialBudgetCreatePage = () => {
             if (response.success && response.data) {
               uploadedLayoutIds.push(response.data.id);
               localIdToRealFileId[file.id] = response.data.id;
-              if (layoutStatuses[file.id]) {
-                remappedLayoutStatuses[response.data.id] = layoutStatuses[file.id];
+              if (status) {
+                remappedLayoutStatuses[response.data.id] = status;
               }
             }
           } catch (error: any) {

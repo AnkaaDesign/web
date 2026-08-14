@@ -371,11 +371,17 @@ export const TaskCreateForm = () => {
         // Upload artwork files that haven't been uploaded yet
         const layoutIds: string[] = [...uploadedFileIds];
         const remappedLayoutStatuses: Record<string, string> = {};
+        // O seletor chaveia por `uploadedFileId || id` e grava a escolha também no próprio
+        // objeto File — ler os três é o que faz o status de um layout RECÉM-ANEXADO
+        // sobreviver ao upload logo abaixo, em vez de exigir salvar e aprovar depois.
+        const statusForFile = (file: FileWithPreview): string | undefined =>
+          layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id] ?? file.status;
         for (const file of uploadedFiles) {
+          const status = statusForFile(file);
           if (file.uploaded && file.uploadedFileId) {
             // Already uploaded - keep existing ID and remap status
-            if (layoutStatuses[file.id]) {
-              remappedLayoutStatuses[file.uploadedFileId] = layoutStatuses[file.id];
+            if (status) {
+              remappedLayoutStatuses[file.uploadedFileId] = status;
             }
           } else if (!file.error) {
             try {
@@ -383,8 +389,8 @@ export const TaskCreateForm = () => {
               if (response.success && response.data) {
                 layoutIds.push(response.data.id);
                 // Remap artwork status from local file ID to backend File ID
-                if (layoutStatuses[file.id]) {
-                  remappedLayoutStatuses[response.data.id] = layoutStatuses[file.id];
+                if (status) {
+                  remappedLayoutStatuses[response.data.id] = status;
                 }
               }
             } catch (error: any) {

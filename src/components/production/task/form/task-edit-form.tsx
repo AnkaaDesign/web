@@ -185,6 +185,44 @@ function planAirbrushingReconciliation(
   const rowInvoices = (a: any): any[] => a.invoiceFiles ?? a.invoices ?? [];
   const rowLayouts = (a: any): any[] => a.layouts ?? [];
 
+  // ---------- Status de layout (Rascunho / Aprovado / Reprovado) ----------
+  // O status viaja por DOIS canais, porque um layout que ainda não subiu não tem File ID
+  // no cliente (ele nasce no servidor, durante o upload):
+  //   • já persistido → mapa `fileId → status`;
+  //   • recém-anexado → array na MESMA ordem dos blobs, casado por índice no servidor.
+  // Sem os dois, aprovar um layout de aerografia pelo formulário da tarefa não gravava
+  // nada: o plano de reconciliação só mandava `layoutIds` e o status era descartado.
+  // 'DRAFT' é o default explícito dos dois lados para que a comparação abaixo seja exata.
+  const statusOf = (f: any, map: Record<string, string>): string =>
+    map[f.uploadedFileId] ?? map[f.fileId] ?? map[f.id] ?? f.status ?? "DRAFT";
+  const rowLayoutStatuses = (a: any): Record<string, string> => {
+    const map = (a.layoutStatuses ?? {}) as Record<string, string>;
+    const out: Record<string, string> = {};
+    for (const f of rowLayouts(a)) {
+      if (!f || isPendingUpload(f)) continue;
+      const fileId = f.uploadedFileId || f.fileId || f.id;
+      if (fileId) out[fileId] = statusOf(f, map);
+    }
+    return out;
+  };
+  const rowNewLayoutStatuses = (a: any): string[] => {
+    const map = (a.layoutStatuses ?? {}) as Record<string, string>;
+    return newFilesOf(rowLayouts(a)).map((f: any) => statusOf(f, map));
+  };
+  const origLayoutStatuses = (orig: any): Record<string, string> =>
+    Object.fromEntries(
+      (orig?.layouts || [])
+        .map((l: any) => [l.fileId || l.file?.id || l.id, l.status ?? "DRAFT"])
+        .filter(([fileId]: [string]) => !!fileId),
+    );
+  const sameStatuses = (a: Record<string, string>, b: Record<string, string>): boolean => {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) if (a[k] !== b[k]) return false;
+    return true;
+  };
+  const layoutStatusesChanged = (a: any, orig: any): boolean =>
+    !sameStatuses(rowLayoutStatuses(a), origLayoutStatuses(orig));
+
   // A brand-new row is only worth creating if it carries real data (guards the default
   // empty row `mapDataToForm` seeds so it never counts as a change / phantom airbrushing).
   const isMeaningful = (a: any): boolean =>
@@ -217,6 +255,9 @@ function planAirbrushingReconciliation(
     if (!sameIds(uploadedIds(rowInvoices(a)), origFileIds(orig.invoices))) return true;
     if (!sameIds(uploadedIds(rowLayouts(a)), origFileIds(orig.layouts))) return true;
     if (newFilesOf(rowReceipts(a)).length > 0 || newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0) return true;
+    // Aprovar/reprovar um layout é uma alteração REAL da linha, mesmo sem trocar arquivo
+    // nenhum — sem isto o save não gerava requisição e o status voltava ao recarregar.
+    if (layoutStatusesChanged(a, orig)) return true;
     return false;
   };
 
@@ -228,11 +269,19 @@ function planAirbrushingReconciliation(
   // tarefa (`buildAirbrushingPayload`): campo novo entra lá e vale para todos os caminhos.
   const buildData = (a: any): Record<string, any> => buildAirbrushingPayload(a);
 
-  const buildFileData = (a: any): Record<string, any> => ({
-    receiptIds: uploadedIds(rowReceipts(a)),
-    invoiceIds: uploadedIds(rowInvoices(a)),
-    layoutIds: uploadedIds(rowLayouts(a)),
-  });
+  const buildFileData = (a: any): Record<string, any> => {
+    const layoutStatuses = rowLayoutStatuses(a);
+    const newLayoutStatuses = rowNewLayoutStatuses(a);
+    return {
+      receiptIds: uploadedIds(rowReceipts(a)),
+      invoiceIds: uploadedIds(rowInvoices(a)),
+      layoutIds: uploadedIds(rowLayouts(a)),
+      // Multipart exige o mapa embrulhado num array (o preprocess do backend desembrulha);
+      // o array por índice vai cru, alinhado aos blobs de `files.layouts`.
+      layoutStatuses: Object.keys(layoutStatuses).length > 0 ? [layoutStatuses] : undefined,
+      newLayoutStatuses: newLayoutStatuses.length > 0 ? newLayoutStatuses : undefined,
+    };
+  };
 
   // Did the user actually change which files are attached? Only then may the attachment
   // arrays be transmitted at all — a row whose files are untouched never sends them, so a
@@ -258,8 +307,12 @@ function planAirbrushingReconciliation(
       // (preserving its status/payment/timestamps otherwise).
       keptIds.add(a.id);
       if (rowChanged(a, orig)) {
+        // O endpoint em LOTE ignora `layoutIds`/`layoutStatuses` de propósito (ver
+        // airbrushing.service.ts), então uma mudança só de status também precisa sair pelo
+        // endpoint individual — senão o save "dá certo" e o status não muda.
         const touchesFiles = filesChanged(a, orig) || newFilesOf(rowReceipts(a)).length > 0 ||
-          newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0;
+          newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0 ||
+          layoutStatusesChanged(a, orig);
         toUpdate.push({
           id: a.id,
           data: touchesFiles ? { ...buildData(a), ...buildFileData(a) } : buildData(a),
@@ -1888,16 +1941,22 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             }
           });
 
-          // Build newLayoutStatuses for NEW files being uploaded (array matching new files order)
-          const newLayoutStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
-          uploadedFiles.forEach((file) => {
-            if (!file.uploaded && !file.uploadedFileId) {
-              // New file being uploaded - get status from layoutStatuses state or default to DRAFT
-              const fileId = file.uploadedFileId || file.name || file.id; // Use name or id as fallback for new files
-              const status = layoutStatuses[fileId] || file.status || 'DRAFT';
-              newLayoutStatuses.push(status as 'DRAFT' | 'APPROVED' | 'REPROVED');
-            }
-          });
+          // Status dos layouts NOVOS, casado por ÍNDICE no servidor com os blobs enviados.
+          // Derivado da MESMA lista que vira `files.layouts` (ver acima) — montar o array a
+          // partir de outro filtro abria a chance de os índices desalinharem e um layout
+          // receber o status do vizinho.
+          //
+          // A chave em `layoutStatuses` para um arquivo ainda não enviado é o id temporário
+          // (`file.id`) — é o que o seletor de status manda em `onStatusChange`. O fallback
+          // `file.status` cobre a mutação que o próprio card faz no objeto File.
+          const newLayoutStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = (
+            newLayouts.filter(f => f instanceof File) as FileWithPreview[]
+          ).map(
+            file =>
+              (layoutStatuses[file.id] ||
+                file.status ||
+                'DRAFT') as 'DRAFT' | 'APPROVED' | 'REPROVED',
+          );
 
           console.log('[Task Update] 📦 FormData - Layout statuses debug:', {
             uploadedFilesCount: uploadedFiles.length,

@@ -59,6 +59,21 @@ export const airbrushingLayoutStatuses = (a: any): Record<string, string> | unde
 };
 
 /**
+ * Status dos layouts que AINDA NÃO subiram, na MESMA ordem em que os blobs entram no
+ * multipart — é assim que o servidor casa cada status com o File ID que ele acabou de
+ * criar (`newLayoutStatuses[i]` ↔ `layouts[i]`), já que o cliente não tem esse id.
+ *
+ * A contrapartida de `airbrushingLayoutStatuses`, que só cuida dos arquivos já enviados.
+ * Sem os dois, aprovar um layout recém-anexado exigia salvar primeiro e voltar depois.
+ */
+export const airbrushingNewLayoutStatuses = (a: any): string[] | undefined => {
+  const news = newFilesOf(a?.layouts);
+  if (news.length === 0) return undefined;
+  const map = (a?.layoutStatuses ?? {}) as Record<string, string>;
+  return news.map((f: any) => map[f.id] || f.status || "DRAFT");
+};
+
+/**
  * A linha carrega alguma configuração que FOGE dos padrões (pagamento ou status)?
  *
  * Sem isto, uma linha preenchida SÓ com forma de pagamento/vencimento era considerada vazia e
@@ -126,6 +141,8 @@ export interface AirbrushingConfig {
   newReceipts?: File[];
   newInvoices?: File[];
   newLayouts?: File[];
+  /** Status de cada blob de `newLayouts`, na MESMA ordem (o servidor casa por índice). */
+  newLayoutStatuses?: string[];
 }
 
 /** A single target for the copy: the task plus its customer (for file-organization context). */
@@ -168,6 +185,11 @@ export async function createAirbrushingForTasks(
         ...base,
         // Wrap in an array for multipart serialization (backend preprocess unwraps).
         layoutStatuses: layoutStatuses ? [layoutStatuses] : undefined,
+        // Status dos blobs novos, casados por índice com `newLayouts` no servidor.
+        newLayoutStatuses:
+          newLayouts.length > 0 && config.newLayoutStatuses?.length
+            ? newLayouts.map((_, i) => config.newLayoutStatuses![i] || 'DRAFT')
+            : undefined,
       };
       const formData = createAirbrushingFormData(
         data,
@@ -197,6 +219,8 @@ const buildRowPayload = (a: any, taskId: string, multipart: boolean): Record<str
     layoutIds: uploadedIds(a.layouts),
     // Multipart exige o mapa embrulhado num array (o preprocess do backend desembrulha).
     layoutStatuses: layoutStatuses ? (multipart ? [layoutStatuses] : layoutStatuses) : undefined,
+    // Só faz sentido junto dos blobs: fora do multipart não há arquivo novo nenhum.
+    newLayoutStatuses: multipart ? airbrushingNewLayoutStatuses(a) : undefined,
     taskId,
   };
 };

@@ -688,6 +688,9 @@ export const airbrushingCreateSchema = z
       z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
       z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
     ]).optional(),
+    // Status dos layouts que sobem NESTA requisição, na mesma ordem dos blobs — o cliente
+    // não tem o File ID deles (nasce no servidor), então o casamento é por índice.
+    newLayoutStatuses: z.array(z.enum(['DRAFT', 'APPROVED', 'REPROVED'])).optional(),
   })
   .transform(toFormData);
 
@@ -723,6 +726,9 @@ export const airbrushingUpdateSchema = z
       z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
       z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
     ]).optional(),
+    // Status dos layouts que sobem NESTA requisição, na mesma ordem dos blobs — o cliente
+    // não tem o File ID deles (nasce no servidor), então o casamento é por índice.
+    newLayoutStatuses: z.array(z.enum(['DRAFT', 'APPROVED', 'REPROVED'])).optional(),
   })
   .transform(toFormData);
 

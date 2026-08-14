@@ -907,8 +907,12 @@ const FinancialBudgetDetailPageInner = () => {
       // The status dropdown keys onStatusChange by `uploadedFileId || id`, so a
       // persisted artwork's status lands under its File id while a brand-new file's
       // lands under its local id. Read BOTH so neither case is missed.
+      // `file.status` fecha o caso do arquivo recém-solto: o card grava a escolha no
+      // próprio objeto File, então ela sobrevive mesmo que o mapa acima não a tenha.
       const statusForFile = (file: FileWithPreview): string | undefined =>
-        layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id];
+        layoutStatuses[(file as any).uploadedFileId] ??
+        layoutStatuses[file.id] ??
+        file.status;
       for (const file of layouts) {
         if (file.uploaded && file.uploadedFileId) {
           uploadedLayoutIds.push(file.uploadedFileId);

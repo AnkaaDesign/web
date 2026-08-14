@@ -79,10 +79,11 @@ export interface FileCardUploadFieldProps {
     disabled: boolean;
     layout: "card" | "list";
     /**
-     * Se o arquivo já existe no servidor. O mapa de status é chaveado por File ID,
-     * que só existe depois do upload — um status escolhido antes disso não teria
-     * como ser enviado e seria descartado em silêncio. Quem renderiza o controle
-     * usa isto para desabilitá-lo enquanto o upload não termina.
+     * Se o arquivo já existe no servidor (tem File ID). NÃO serve para desabilitar o
+     * controle: um arquivo recém-solto também pode receber status, que fica gravado no
+     * próprio arquivo (`file.status`) e viaja no submit junto com o blob. Serve para
+     * quem precisa distinguir os dois casos ao MONTAR o payload — status de arquivo já
+     * enviado vai no mapa `fileId → status`, status de arquivo novo vai por ordem.
      */
     uploaded: boolean;
   }) => React.ReactNode;

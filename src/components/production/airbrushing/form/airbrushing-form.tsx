@@ -498,7 +498,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       // recibos nem notas fiscais, omitir os campos é o que preserva os anexos existentes.
       const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...data } = form.getValues() as Record<string, any>;
 
-      const newLayouts = layouts.filter((f) => !f.uploaded);
+      // `instanceof File` além de `!uploaded`: é exatamente o que o helper de FormData
+      // anexa como blob, e `newLayoutStatuses` abaixo casa por ÍNDICE com essa lista —
+      // derivar as duas de filtros diferentes deixaria um layout com o status do vizinho.
+      const newLayouts = layouts.filter((f) => !f.uploaded && f instanceof File);
       const existingLayoutIds = layouts.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
       const hasNewFiles = newLayouts.length > 0;
@@ -516,6 +519,13 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       });
 
       const layoutStatusesMap = Object.keys(existingLayoutStatusesMap).length > 0 ? existingLayoutStatusesMap : undefined;
+
+      // Status dos layouts NOVOS, na mesma ordem em que os blobs entram no multipart — é
+      // por índice que o servidor casa cada status com o File ID que ele acabou de criar.
+      // Sem isto, aprovar um layout recém-anexado exigia salvar e reabrir o formulário.
+      const newLayoutStatuses: LayoutStatus[] = newLayouts.map(
+        (f) => layoutStatuses[f.id] || f.status || "DRAFT",
+      );
 
       // ---------- CREATE: fan the airbrushing config(s) out over every selected task ----------
       // Each MEANINGFUL config × each task = one airbrushing (mirrors the cut wizard's
@@ -572,6 +582,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           layoutIds: existingLayoutIds,
           // Wrap in array for FormData serialization (backend preprocess unwraps).
           layoutStatuses: layoutStatusesMap ? [layoutStatusesMap] : undefined,
+          newLayoutStatuses: newLayoutStatuses.length > 0 ? newLayoutStatuses : undefined,
         };
 
         const formData = createAirbrushingFormData(

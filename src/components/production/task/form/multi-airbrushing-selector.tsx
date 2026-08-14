@@ -72,6 +72,10 @@ const convertFilesToFileWithPreview = (files: any[]): FileWithPreview[] => {
       uploaded: true,
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl || undefined,
+      // Layouts vêm achatados do servidor com o status do Layout junto (recibos e notas
+      // simplesmente não têm). Sem carregá-lo aqui, todo layout já aprovado reaparecia
+      // como "Rascunho" no formulário e o mapa semeado em `layoutStatuses` nascia vazio.
+      status: file.status || undefined,
     }) as FileWithPreview;
   });
 };
@@ -318,9 +322,10 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     /**
      * Status por layout, chaveado por File ID — o mesmo formato que a API espera em
-     * `layoutStatuses`. Só arquivos já enviados chegam aqui: o seletor fica inerte
-     * enquanto o upload não termina, justamente porque antes disso não existe File ID
-     * para servir de chave.
+     * `layoutStatuses`. Arquivos AINDA NÃO enviados também chegam aqui, mas sob o id
+     * temporário do card: no submit, `airbrushingNewLayoutStatuses` os converte no array
+     * `newLayoutStatuses`, alinhado por índice aos blobs, que é como o servidor casa cada
+     * status com o File ID que ele acabou de criar.
      */
     const handleLayoutStatusChange = useCallback((airbrushingId: string, fileId: string, status: string) => {
       // Merge, não replace: `updateAirbrushing` só aceita um patch pronto, e aqui é
@@ -380,7 +385,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                      accepted), COM o seletor de status: um layout de aerografia carrega o
                      mesmo fluxo Rascunho/Aprovado/Reprovado do layout de tarefa, e é ele que
                      decide o que chega ao aerografista. Recibos/NFs ficam de fora daqui.
-                     O seletor só fica ativo depois que o arquivo sobe (ver LayoutFileUploadField).
+                     O seletor fica ativo já no arquivo recém-solto (ver LayoutFileUploadField).
                      Vai como SLOT para que o rótulo e a posição saiam de `AirbrushingFields` —
                      é o que mantém cadastro e edição idênticos. */
                   layoutsSlot={
