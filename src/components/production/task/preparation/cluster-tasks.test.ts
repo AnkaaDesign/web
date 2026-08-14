@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { detachClusterTask, expandClusterTasks, resolveClusterActionRows, type ClusteredTask } from "./cluster-tasks";
+import { clusterTasks, detachClusterTask, expandClusterTasks, resolveClusterActionRows, type ClusteredTask } from "./cluster-tasks";
 import type { Task } from "@/types";
 
 const task = (id: string) => ({ id, name: "SEM Limite 5,50" }) as Task;
+
+/** A task with a name and an optional forecast date ("Previsão"). */
+const named = (id: string, name: string, forecastDate?: string) =>
+  ({ id, name, ...(forecastDate ? { forecastDate: new Date(forecastDate) } : {}) }) as Task;
 
 /** A cluster parent as `clusterTasks` builds it: itself + siblings carried on `__group`. */
 const cluster = (ids: string[]): ClusteredTask => {
@@ -49,5 +53,50 @@ describe("cluster action targeting", () => {
   it("expandClusterTasks still de-duplicates a parent selected alongside its children", () => {
     const ids = expandClusterTasks([parent, task("b") as ClusteredTask, task("c") as ClusteredTask]).map((t) => t.id);
     expect(ids).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("clusterTasks only groups tasks WITHOUT a Previsão", () => {
+  /** Each row as `id(+N)` — `+N` marks a cluster parent hiding N siblings. */
+  const shape = (rows: ClusteredTask[]) =>
+    rows.map((r) => (r.__children?.length ? `${r.id}+${r.__children.length}` : r.id));
+
+  it("clusters a run of similar names with no forecast date", () => {
+    const rows = clusterTasks([named("a", "Framento"), named("b", "Framento"), named("c", "Framento")]);
+    expect(shape(rows)).toEqual(["a+2"]);
+    expect(expandClusterTasks(rows).map((t) => t.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("does NOT cluster the same run once the forecast dates are filled", () => {
+    // The regression: a collapsed parent shows only its OWN Previsão and drags its siblings along
+    // when the table sorts by that column, so filled forecasts must stay on their own rows.
+    const rows = clusterTasks([
+      named("a", "Framento", "2026-08-17T18:00:00"),
+      named("b", "Framento", "2026-08-17T18:00:00"),
+      named("c", "Framento", "2026-08-18T18:00:00"),
+    ]);
+    expect(shape(rows)).toEqual(["a", "b", "c"]);
+  });
+
+  it("a forecast in the middle breaks the run without swallowing it", () => {
+    const rows = clusterTasks([
+      named("a", "Framento"),
+      named("b", "Framento", "2026-08-17T18:00:00"),
+      named("c", "Framento"),
+      named("d", "Framento"),
+      named("e", "Framento"),
+    ]);
+    expect(shape(rows)).toEqual(["a", "b", "c+2"]);
+  });
+
+  it("keeps forecast rows in their sorted position around a cluster", () => {
+    const rows = clusterTasks([
+      named("early", "Rodobeca 14,70", "2026-08-14T17:00:00"),
+      named("a", "Marquespan 9,50"),
+      named("b", "Marquespan 9,50"),
+      named("c", "Marquespan 9,50"),
+      named("late", "Nimbus", "2026-08-31T18:00:00"),
+    ]);
+    expect(shape(rows)).toEqual(["early", "a+2", "late"]);
   });
 });

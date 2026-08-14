@@ -10,12 +10,29 @@ import type { Task } from "@/types";
 export type ClusteredTask = Task & { __children?: Task[]; __group?: Task[] };
 
 /**
+ * A task may only join a name-cluster while it has NO forecast date ("Previsão").
+ *
+ * A collapsed parent renders its OWN Previsão (the cell reads `row.original`, it does not aggregate)
+ * and the whole cluster moves as one block when the table is sorted by that column. So clustering a
+ * task that HAS a Previsão either hides its date behind the parent's or hoists date-less siblings
+ * above rows that do have one — the "tarefas sem previsão na frente das com previsão" bug. Rows with
+ * a Previsão therefore always stand on their own; only the date-less tail collapses into clusters.
+ */
+function isClusterable(task: Task): boolean {
+  if (!task.forecastDate) return true;
+  // A garbage/unparseable value is no forecast at all (it renders as "-" too).
+  return Number.isNaN(new Date(task.forecastDate).getTime());
+}
+
+/**
  * Group consecutive tasks with near-identical names (Levenshtein ≥ 0.95, runs of ≥ 3) into a parent
  * carrying its siblings as children — mirrors the legacy preparation grouping, but as a flat
  * parent→children array the new DataTable can render natively. Sort order is preserved.
+ *
+ * Only tasks WITHOUT a forecast date cluster — see {@link isClusterable}.
  */
 export function clusterTasks(tasks: Task[]): ClusteredTask[] {
-  const groups = groupSequentialTasks(tasks, 3, 0.95);
+  const groups = groupSequentialTasks(tasks, 3, 0.95, isClusterable);
   const out: ClusteredTask[] = [];
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];

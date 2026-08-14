@@ -80,12 +80,19 @@ export interface TaskGroup {
  * Group tasks with similar names, but only when they are consecutive in the sorted list.
  * This ensures grouping respects the current sort order — tasks that are separated
  * by a different task in the sorted results will NOT be grouped together.
+ *
+ * `isGroupable` gates which tasks may take part in a run at all: a task it rejects is always emitted
+ * as a `single`, and it also breaks a run in progress. Callers use it to keep rows whose own values
+ * matter (e.g. a filled forecast date) out of collapsed groups, since a collapsed parent shows only
+ * its OWN values and drags every sibling along when the table is sorted.
+ *
  * Returns an array of TaskGroup objects that can be rendered.
  */
 export function groupSequentialTasks(
   tasks: Task[],
   minGroupSize: number = 3,
-  similarityThreshold: number = 0.95
+  similarityThreshold: number = 0.95,
+  isGroupable: (task: Task) => boolean = () => true
 ): TaskGroup[] {
   if (tasks.length === 0) return [];
 
@@ -95,9 +102,20 @@ export function groupSequentialTasks(
   let runStart = 0;
 
   while (runStart < tasks.length) {
-    // Extend the run as long as consecutive tasks are similar to the first task in the run
+    // A task excluded from grouping stands alone and never anchors a run
+    if (!isGroupable(tasks[runStart])) {
+      result.push({ type: 'single', task: tasks[runStart] });
+      runStart++;
+      continue;
+    }
+
+    // Extend the run as long as consecutive tasks are groupable AND similar to the run's first task
     let runEnd = runStart + 1;
-    while (runEnd < tasks.length && shouldGroupTasks(tasks[runStart], tasks[runEnd], similarityThreshold)) {
+    while (
+      runEnd < tasks.length &&
+      isGroupable(tasks[runEnd]) &&
+      shouldGroupTasks(tasks[runStart], tasks[runEnd], similarityThreshold)
+    ) {
       runEnd++;
     }
 
