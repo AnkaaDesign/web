@@ -29,7 +29,7 @@
    antigos. Sem isso, cada set carregaria a sua própria cópia do mesmo asfalto
    4k: o `distrito-industrial` fecha em 7,8 MB porque o chão dele pesa zero. */
 import * as THREE from 'three';
-import { getProfile } from '../core/quality';
+import { getProfile, groundVariant } from '../core/quality';
 import { scene, renderer, registerGroundMaterials, setCameraObstacles } from './scene';
 import type { GroundMatEntry, GroundSurface } from './scene';
 import { loadGLB } from '../vehicle/models';
@@ -178,6 +178,71 @@ function cloneFor(base: THREE.Texture, repeat: number): THREE.Texture {
   return t;
 }
 
+/* ---------------- A VARIANTE DOS CONJUNTOS DE CHÃO ----------------
+   `textures/grass_nor.jpg` → `textures/grass_nor@1k.jpg`, quando — e SÓ quando —
+   `groundVariant()` devolve um sufixo. Ele já vem aparado pelo que o manifesto
+   declara existir no servidor (ver "VARIANTES DE ASSET" em core/quality.ts), e
+   por isso não há aqui nenhum retry, nenhum `onerror` e nenhuma sonda: a
+   declaração é a prova de que os arquivos subiram.
+
+   O QUE ESTÁ EM JOGO, medido: os 16 mapas 2048² deste cenário são **341,3 MB de
+   VRAM**, o maior bloco isolado da cena inteira — à frente do implemento e do
+   alvo do reflexo do piso. Sem mexer neles, o nível Baixo continua carregando
+   ~1 GB de textura e só desenha esse 1 GB mais depressa.
+
+   O QUE '@1k' CUSTA, e o número é NÃO UNIFORME (medido arquivo a arquivo, ver a
+   tabela de `ColdProfile.groundVariant`): 7 dos 16 passam folgado (erro médio
+   ≤ 3,7/255) e QUATRO reprovam — `concrete_diff`, `grass_ao`, `grass_nor` e
+   `gravel_nor`, com erro de 12,0 a 13,1. São ruído de alta frequência quase
+   branco: reduzi-los não borra, muda a ESTATÍSTICA DO GRÃO, e o olho lê isso
+   como "material errado". Aparece primeiro na fronteira `GRASS_NEAR` junto ao
+   caminhão, que tem `repeat 2` e por isso lê mip 0 a distância média.
+
+   ⚠️ NÃO ENTRA EM `assetUrl()`. Aquela função é a junção de TODA URL do engine —
+   `.glb`, `.hdr`, `.json`, miniaturas de cartão — e o sufixo só existe para os
+   mapas de chão. Reescrever lá pediria `set@1k.glb`, que não existe.
+
+   ⚠️ '@ktx2' NÃO ESTÁ IMPLEMENTADO, e isto é honesto e não uma omissão. Ele não
+   é só outra resolução: muda a extensão para `.ktx2` E exige um `KTX2Loader`
+   (com o `basis_transcoder.wasm` ao lado), enquanto `texLoader` aqui é um
+   `THREE.TextureLoader`. Os arquivos também não existem na árvore, então
+   `setAvailableVariants()` nunca vai liberar o sufixo e este caminho é
+   inalcançável hoje. Se alguém liberar sem o carregador, o `console.warn` abaixo
+   dispara UMA vez e a URL sai sem sufixo — degrada para os arquivos de sempre em
+   vez de pedir 16 arquivos que não existem.
+   ⚠️⚠️ E quando for implementado: **código primeiro, assets depois.** Para KTX2
+   dentro de `.glb`, `KHR_texture_basisu` entra em `extensionsRequired` e o
+   `GLTFLoader` LANÇA se o `KTX2Loader` não estiver registrado — um asset
+   publicado antes do código não degrada, quebra. É o inverso da ordem registrada
+   para a troca de assets do estúdio.
+
+   ⚠️ É FUNÇÃO, chamada no momento da carga. Guardar o sufixo num const de módulo
+   o congelaria no nível em que a página abriu — a mesma armadilha que
+   `textureAnisotropy()` teve de virar função para não ter, e a razão pela qual
+   `groundVariant()` também é função em core/quality.ts. */
+let avisouKtx2 = false;
+
+function groundTexUrl(p: string): string {
+  const v = groundVariant();
+  if (!v) return assetUrl(p);
+  if (v === '@ktx2') {
+    if (!avisouKtx2) {
+      avisouKtx2 = true;
+      console.warn('[set] variante @ktx2 declarada, mas não há KTX2Loader neste '
+        + 'módulo — usando as texturas de sempre. Ver groundTexUrl().');
+    }
+    return assetUrl(p);
+  }
+  /* Sufixo ANTES da extensão, e só quando o último segmento tem uma. Um caminho
+     absoluto de terceiro (`https://…`) ou um `data:` fica intocado: o sufixo é
+     convenção da nossa árvore de assets, e reescrever fora dela é um 404 mudo. */
+  if (/^[a-z][a-z0-9+.-]*:/i.test(p) || p.includes('?') || p.includes('#')) return assetUrl(p);
+  const ponto = p.lastIndexOf('.');
+  const barra = p.lastIndexOf('/');
+  if (ponto <= barra + 1) return assetUrl(p);
+  return assetUrl(p.slice(0, ponto) + v + p.slice(ponto));
+}
+
 /**
  * Carrega uma textura de chão do set.
  *
@@ -220,7 +285,15 @@ function loadTex(url: string, srgb: boolean, repeat: number,
         /* O TETO VEM DO PERFIL (2026-08-13) e no nível Alto continua sendo o
            máximo do dispositivo para o albedo — ou seja, esta linha faz o que
            sempre fez para quem aguenta. O `min` com a capacidade do adaptador
-           fica: o perfil declara a INTENÇÃO, o device impõe o fato. */
+           fica: o perfil declara a INTENÇÃO, o device impõe o fato.
+
+           ⚠️ LIDO NA CARGA, E INERTE NO MEIO DA SESSÃO — e isso é decisão, não
+           esquecimento. Trocar `anisotropy` numa textura já residente exige
+           `needsUpdate`, que faz o three RE-SUBIR a imagem inteira: seriam
+           centenas de MB de upload no meio de um arrasto para mudar um filtro.
+           O cabeçalho de core/quality.ts já registra que a anisotropia "não é
+           reaplicada a textura já carregada"; o que ela pega é a PRÓXIMA carga
+           (troca de cenário, ou a cortina de uma mudança fria). */
         const cap = getProfile().anisotropyGround;
         t.anisotropy = srgb ? Math.min(cap, renderer.capabilities.getMaxAnisotropy())
           : Math.min(cap, 8, renderer.capabilities.getMaxAnisotropy());
@@ -732,20 +805,29 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
   for (const { mat, def, rep } of jobs) {
     /* As atribuições acontecem NO CALLBACK, não antes: atribuir uma textura
        ainda vazia é exatamente o bug que esta correção remove. */
+    /* `groundTexUrl()` e não `assetUrl()`: são estas quatro linhas — e só elas —
+       que pedem os mapas de chão, que é onde a variante de resolução existe. Ver
+       o bloco de `groundTexUrl()`.
+       ⚠️ A chave do `texCache` é a URL (`url + '|' + s/l`), então cada variante é
+       naturalmente uma entrada distinta e não há nada a fazer lá — mas note o
+       corolário: se o nível mudar entre duas cargas de cenário, as duas
+       variantes do mesmo mapa podem coexistir no cache até `disposeSetTextures()`
+       passar. É a troca certa (nunca servir a resolução errada), e o custo só
+       aparece em quem troca de qualidade e de cenário na mesma sessão. */
     if (def.diffuse) {
-      const p = loadTex(assetUrl(def.diffuse), true, rep, slot());
+      const p = loadTex(groundTexUrl(def.diffuse), true, rep, slot());
       pending.push(p.then((t) => { if (t) mat.map = t; }));
     }
     if (def.rough) {
-      const p = loadTex(assetUrl(def.rough), false, rep, slot());
+      const p = loadTex(groundTexUrl(def.rough), false, rep, slot());
       pending.push(p.then((t) => { if (t) mat.roughnessMap = t; }));
     }
     if (def.normal) {
-      const p = loadTex(assetUrl(def.normal), false, rep, slot());
+      const p = loadTex(groundTexUrl(def.normal), false, rep, slot());
       pending.push(p.then((t) => { if (t) mat.normalMap = t; }));
     }
     if (def.ao) {
-      const p = loadTex(assetUrl(def.ao), false, rep, slot());
+      const p = loadTex(groundTexUrl(def.ao), false, rep, slot());
       pending.push(p.then((t) => { if (t) mat.aoMap = t; }));
     }
   }

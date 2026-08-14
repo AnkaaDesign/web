@@ -237,6 +237,31 @@ export function setShadowCasters(root: THREE.Object3D) {
     /* Sphere.applyMatrix4 escala o raio pelo maior fator de escala da matriz —
        é a conversão para mundo que interessa aqui. */
     const diameter = _casterSphere.copy(bs).applyMatrix4(o.matrixWorld).radius * 2;
+    /* ---------------- A MEDIDA FICA GUARDADA (2026-08-14) ----------------
+       Uma linha, e ela é o que torna o LOD por tamanho em tela (`vehicle/lod.ts`)
+       gratuito: este laço já percorre as 2 157 malhas do implemento com as
+       matrizes de mundo válidas e já paga o `computeBoundingSphere()`. Sem esta
+       atribuição o número era calculado, usado na linha seguinte e jogado fora,
+       e quem quisesse o mesmo diâmetro teria de repetir a varredura inteira —
+       inclusive o `updateMatrixWorld(true)` acima, que é o caro.
+
+       ⚠️ **É UMA COTA SUPERIOR, e o consumidor tem de saber disso.** O número é
+       `boundingSphere.radius * 2` levado para mundo por `Sphere.applyMatrix4`,
+       que escala o raio pelo MAIOR fator de escala da matriz. Ou seja: numa
+       matriz com escala não uniforme ele superestima o eixo menor, e a esfera
+       envolvente já é, por definição, maior que a caixa que os vértices ocupam
+       (uma chapa de 1 m x 1 cm tem esfera de ~1 m de diâmetro). O mesmo aviso
+       que o bloco SHADOW CASTERS ARE CHOSEN BY SIZE dá para a medida offline
+       vale aqui: o valor RUNTIME nunca é menor que o real, então quem corta por
+       ele corta de MENOS — nunca de mais. Para um corte de qualidade (esconder)
+       essa é a direção segura do erro.
+
+       ⚠️ E ELE ENVELHECE COM QUEM REESCALA. Quem mexer na escala de um nó depois
+       daqui — `trailer-assembly.ts` ao redimensionar o baú é o caso real — tem de
+       chamar `setShadowCasters()` de novo, e não por causa deste campo: o
+       `castShadow` da linha abaixo ficaria igualmente errado. Ou seja, não há um
+       dever novo; há um segundo consumidor do dever que já existia. */
+    o.userData.tsWorldDiameter = diameter;
     o.castShadow = diameter >= SHADOW_CASTER_MIN_M;
     if (o.castShadow) cast++; else skip++;
   });

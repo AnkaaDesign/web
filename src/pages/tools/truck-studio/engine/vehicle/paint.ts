@@ -57,7 +57,7 @@ import { clamp01 } from '../core/dom';
    o three —, então esta aresta não pode fechar ciclo com `scene.ts`, que é a
    propriedade que este arquivo precisa preservar (ver a nota de acyclicidade no
    topo de scene.ts). É a mesma classe de dependência que `core/dom` já é. */
-import { getProfile, onQualityChange } from '../core/quality';
+import { getProfile, onQualityChange, onScaleChange } from '../core/quality';
 
 /* ---------------- parameter space ----------------
    Everything the UI can touch, normalised 0..1 (or a hex colour). This object
@@ -502,13 +502,51 @@ export function createPaintInstance(): PaintInstance {
    que a captura liga e desliga em volta de 16 ladrilhos. Ver o `finally` em
    scene/capture.ts — ele é obrigatório: uma escala deixada para trás faria o
    floco da TELA ser escolhido com o pixel da foto. */
+/* ---------------- O PISO DE 1 SAIU DAQUI, E ISSO É UMA MUDANÇA REAL ----------
+   A versão anterior fazia `Math.max(1, k)`, com a justificativa — correta para o
+   caso dela — de que *"uma captura MENOR que a tela não pode ENGROSSAR o
+   floco"*. Só que essa é uma regra da CAPTURA, e ela estava escrita na função
+   genérica.
+
+   Com a escala de render passando a existir (`core/quality.ts` → `renderScale`),
+   a TELA também precisa de valores abaixo de 1, e pelo mesmo motivo que a
+   captura precisa de valores acima: `fwidth()` mede o pixel do BUFFER, e o
+   buffer deixou de ser o mesmo em todos os níveis. A 0,65 de escala um pixel de
+   buffer cobre 1,54× mais mundo, o floco escolhe uma oitava mais grossa, e o
+   grão da lataria MUDA quando o controlador dinâmico troca de degrau — no meio
+   de um arrasto, que é quando o usuário está olhando a tinta.
+
+   O piso foi para o chamador da captura, onde a regra dele continua valendo. */
 let pxScale = 1;
 export function setPaintPixelScale(k: number) {
-  const v = Math.max(1, Number.isFinite(k) ? k : 1);
+  /* Limites largos e simétricos: 0,25 cobre a menor escala de render possível
+     com folga, 8 cobre a captura Alta numa tela pequena. Fora disso é erro de
+     chamador, e cair no extremo é melhor que propagar um NaN para um uniforme. */
+  const v = Math.min(8, Math.max(0.25, Number.isFinite(k) && k > 0 ? k : 1));
   if (v === pxScale) return;
   pxScale = v;
   for (const p of instances) p.uniforms.uPxScale.value = v;
 }
+
+/* ---------------- A ESCALA DE RENDER ANCORA O FLOCO ----------------
+   O `uPxScale` existe para que o floco tenha uma referência ESTÁVEL de pixel —
+   é literalmente o que o bloco acima e o de `capture.ts` dizem. A escala de
+   render é a segunda coisa que mexe nessa referência, e a única que mexe nela
+   CONTINUAMENTE.
+
+   Ancorar na resolução do nível Alta (escala 1) é o que faz o grão da tinta ser
+   o mesmo em todos os níveis e não piscar quando o controlador dinâmico sobe ou
+   desce um degrau. A alternativa — deixar `fwidth` mandar — seria melhor para o
+   antisserrilhamento puro (numa resolução menor, uma oitava mais grossa é de
+   fato a escolha que menos cintila), e foi rejeitada porque o defeito que ela
+   produz é pior: um floco que muda de granulação sozinho, no meio do arrasto, é
+   exatamente o relato *"os flakes metálicos ficam muito grandes"* na forma
+   dinâmica.
+
+   ⚠️ A captura SOBRESCREVE isto enquanto roda e restaura no `finally`. A ordem
+   funciona porque ela guarda `paintPixelScale()` ANTES de escrever — ou seja,
+   guarda o valor de tela já com a escala aplicada — e devolve exatamente esse. */
+onScaleChange((s) => setPaintPixelScale(s));
 /** Diagnóstico (bancada). */
 export const paintPixelScale = () => pxScale;
 export type { PaintInstance };

@@ -18,6 +18,10 @@
    That callback is the ONLY thing this module knows about the rig, and it is
    what lets the pool live here without an import cycle. */
 import * as THREE from 'three';
+/* MÓDULO FOLHA — `core/quality.ts` não importa nada do engine, exatamente para
+   poder ser lido daqui e de `scene/scene.ts` sem fechar ciclo. Ver a nota de
+   aciclicidade no topo de scene.ts. */
+import { coldProfile } from '../core/quality';
 
 /* Registered by scene.ts at module init; a no-op until then, which is correct —
    before the first tween there is no rig pose to re-drive. */
@@ -33,12 +37,16 @@ export function setLampRigRefresh(fn: () => void) { rigRefresh = fn; }
    ever MOVES poles, hides pole MESHES, and marks units inactive; the inactive
    ones are darkened through `intensity` (a uniform, free) inside applyRig().
    The single writer of SpotLight.visible stays setLampsEnabled(), tied to the
-   day/night switch — an explicit, infrequent user action. Keeping 8 spotlights
+   day/night switch — an explicit, infrequent user action. Keeping 14 spotlights
    permanently live would tax every fragment of every material all day.
 
-   Consequence, and it is the point: the spot count is a compile-time constant
-   of this module. Switching environment never recompiles anything. The
+   Consequence, and it is the point: the spot count is a constant of this module
+   FOR THE WHOLE SESSION. Switching environment never recompiles anything. The
    manifest's `count` is clamped into the pool rather than resizing it.
+
+   ⚠️ "Por sessão" e não "de compilação", desde o pool por nível de qualidade:
+   o tamanho vem de `coldProfile().spotPool` (14/6/0) e só muda sob a cortina,
+   por `setSpotPool()`. Ver o bloco daquela função.
 
    ---------------------------------------------------------------------------
    WHAT STANDS UNDER THE SPOT
@@ -78,18 +86,20 @@ export function setLampRigRefresh(fn: () => void) { rigRefresh = fn; }
    standing emissive would otherwise glow at noon. */
 export const LAMP_COUNT = 8;
 
-/* ---------------- AS QUATRO VAGAS DO VEÍCULO ----------------
+/* ---------------- AS SEIS VAGAS DO VEÍCULO ----------------
    O pedido foi *"quero que elas realmente emitam luz"*, e a resposta tinha de
    caber DENTRO da restrição do cabeçalho: `NUM_SPOT_LIGHTS` é chave de cache de
    programa, então uma `SpotLight` criada quando o farol acende recompilaria a
    cena inteira no meio do arrasto do controle de hora.
 
-   Então o pool cresceu de 8 para 12 e as quatro últimas são do VEÍCULO — dois
-   faróis e duas lanternas traseiras, posicionados por `vehicle/beams.ts` a partir
-   das lâmpadas que `vehicle/lights.ts` mediu. O que importa é o INVARIANTE, e ele
-   não mudou: a contagem continua sendo uma constante de módulo, continua havendo
-   exatamente DUAS configurações de shader (0 e 12), e `warmLightPrograms()`
-   continua pré-compilando as duas atrás da cortina de carregamento.
+   Então o pool cresceu de 8 para 14 e as seis últimas são do VEÍCULO — dois
+   faróis, duas lanternas traseiras e o par da traseira do cavalo (ver o fim
+   deste bloco), posicionados por `vehicle/beams.ts` a partir das lâmpadas que
+   `vehicle/lights.ts` mediu. O que importa é o INVARIANTE, e ele não mudou: a
+   contagem continua sendo uma constante POR SESSÃO, continua havendo exatamente
+   DUAS configurações de shader (0 e o tamanho do pool da sessão), e
+   `warmLightPrograms()` continua pré-compilando as duas atrás da cortina de
+   carregamento.
 
    ELAS NÃO SÃO `LampUnit`, e isso é de propósito: uma unidade de poste carrega
    mastro, luminária e vidro, e `applyRig()` escreve a intensidade de todas elas a
@@ -100,7 +110,8 @@ export const LAMP_COUNT = 8;
 
    O que elas COMPARTILHAM com os postes é a bandeira `visible`, e só ela:
    `setLampsEnabled()` em scene.ts continua sendo o único escritor dela e agora
-   percorre as catorze. É o que mantém a contagem binária.
+   percorre as catorze — ou as seis, ou nenhuma, conforme o pool da sessão (ver
+   `setSpotPool()`). É o que mantém a contagem binária.
 
    FORAM 4 E VIRARAM 6, por um relato: *"a da traseira do cavalo nao afeta o
    implemento"*. As duas vagas novas são a traseira do CAVALO — que, com uma
@@ -118,6 +129,83 @@ export const VEH_BEAM_COUNT = 6;
  * `position`, `angle`, `penumbra` e `distance`, que são uniformes.
  */
 export const vehBeams: THREE.SpotLight[] = [];
+
+/* ---------------- O POOL DE SPOTLIGHTS É POR NÍVEL DE QUALIDADE ------------
+   E ele é FRIO: 14 / 6 / 0 conforme `coldProfile().spotPool`.
+
+   POR QUE ISTO EXISTE. O laço de luz do three é `#pragma unroll_loop_start`, ou
+   seja são **14 cópias literais** no shader de todo material da cena, e em
+   superfície pintada cada cópia paga `BRDF_GGX` **mais** `BRDF_GGX_Clearcoat`
+   porque a tinta fixa `clearcoat = 1`. Estimado: ~1 400 ALU por fragmento de
+   lataria à noite, ~35 % do orçamento de um UHD 630. É o maior custo por
+   fragmento noturno do engine.
+
+   ⚠️ **O POOL NÃO PODE VARIAR DENTRO DE UMA MESMA CONFIGURAÇÃO DE SHADER.** O
+   invariante que o cabeçalho inteiro defende é que existam exatamente DUAS
+   contagens de `NUM_SPOT_LIGHTS` numa sessão — 0 e o tamanho do pool —, porque
+   `warmLightPrograms()` (scene.ts) pré-compila EXATAMENTE essas duas atrás da
+   cortina. Uma terceira contagem apareceria como o travamento do controle de
+   hora voltando pela porta dos fundos.
+
+   A SAÍDA, e é por isso que este módulo ganhou uma função em vez de um `if`: as
+   luzes fora do pool não são escondidas, são **DESPAREADAS DO GRAFO**. O three
+   junta as luzes com `traverseVisible()`, então uma `SpotLight` sem pai não é
+   contada — nem visível, nem invisível, simplesmente não existe para o
+   `NUM_SPOT_LIGHTS`. Escondê-las em vez disso daria no mesmo para a contagem,
+   mas deixaria `setLampsEnabled()` com dois donos da mesma bandeira.
+
+   O QUE FICA, E É POR ISSO QUE A NOITE CONTINUA LEGÍVEL:
+     14 — como sempre foi.
+      6 — saem os 8 REFLETORES dos postes. O mastro, a luminária e sobretudo o
+          VIDRO ACESO continuam desenhados: são geometria emissiva e não custam
+          luz nenhuma. Some a poça no asfalto, fica a fileira de pontos
+          alaranjados descendo a rua.
+      0 — nem os feixes do veículo. As lanternas continuam acesas porque
+          `vehicle/lights.ts` as acende por material emissivo, não por luz.
+
+   ⚠️ OS OBJETOS CONTINUAM EXISTINDO em `lampUnits[i].spot` e em `vehBeams`, e
+   isso não é desperdício: `vehicle/beams.ts` sai cedo com
+   `if (vehBeams.length < VEH_BEAM_COUNT) return 0`, e `applyRig()` escreve
+   `u.spot.color`/`u.spot.intensity` sem consultar pai nenhum. Destruí-las
+   obrigaria os dois a aprender um segundo estado; despareá-las não obriga
+   ninguém a aprender nada. */
+export const SPOT_POOL_FULL = 14;
+
+let spotPool: number = SPOT_POOL_FULL;
+/** O grupo que `makeLamps()` devolve — é dele que os feixes penduram. */
+let lampRoot: THREE.Group | null = null;
+
+/** Quantas `SpotLight` estão de fato no grafo agora. */
+export const activeSpotPool = () => spotPool;
+
+/**
+ * Ajusta o pool ao tamanho pedido (14, 6 ou 0), desapareando o que sobra.
+ *
+ * ⚠️ NÃO escreve `visible` — quem escreve é `setLampsEnabled()` em scene.ts, e
+ * ele continua sendo o único escritor. Quem chamar isto DEPOIS do boot tem de
+ * reaplicar a bandeira nas luzes que acabaram de voltar ao grafo (é o que
+ * `applyColdSpotPool()` faz em scene.ts) e, na mesma cortina, rodar
+ * `warmLightPrograms()` de novo: a contagem mudou, logo as duas configurações
+ * pré-compiladas mudaram.
+ *
+ * Qualquer valor fora de {14, 6, 0} é aparado para o degrau imediatamente
+ * abaixo — um pool "9" seria uma terceira configuração de shader.
+ */
+export function setSpotPool(n: number) {
+  const want = n >= SPOT_POOL_FULL ? SPOT_POOL_FULL : n >= VEH_BEAM_COUNT ? VEH_BEAM_COUNT : 0;
+  spotPool = want;
+  const poles = want >= SPOT_POOL_FULL;
+  for (const u of lampUnits) {
+    if (poles) { if (u.spot.parent !== u.group) u.group.add(u.spot, u.spot.target); }
+    else if (u.spot.parent) u.spot.parent.remove(u.spot, u.spot.target);
+  }
+  const beams = want >= VEH_BEAM_COUNT;
+  const root = lampRoot;
+  for (const s of vehBeams) {
+    if (beams) { if (root && s.parent !== root) root.add(s, s.target); }
+    else if (s.parent) s.parent.remove(s, s.target);
+  }
+}
 
 /* Mounting geometry. A main-road lantern is 8-10 m up on a 2-2.5 m bracket;
    these are the middle of both bands and every fixture is fitted to them. */
@@ -483,6 +571,7 @@ function makeLampPrimitives(mats: { pole: THREE.Material; housing: THREE.Materia
 
 export function makeLamps() {
   const g = new THREE.Group();
+  lampRoot = g;
   /* THE LENS MATERIAL. `color` is nearly black so the disc is invisible by day
      and the emissive term is the whole of it at night; applyRig() drives both
      emissiveIntensity (from `lampEmissive`) and emissive (from `lampColor`, so
@@ -559,7 +648,7 @@ export function makeLamps() {
     lampUnits.push({ group: lamp, proc, model, lens, spot, active: false });
     g.add(lamp);
   }
-  /* AS QUATRO VAGAS DO VEÍCULO — ver o bloco de VEH_BEAM_COUNT. Nascem com
+  /* AS SEIS VAGAS DO VEÍCULO — ver o bloco de VEH_BEAM_COUNT. Nascem com
      intensidade 0 e em (0,0,0); quem as põe no lugar é `vehicle/beams.ts`, com as
      lâmpadas já medidas. Ficam neste grupo pelo mesmo motivo que os postes: é o
      grupo que entra e sai da cena inteiro, e é sobre ele que `setLampsEnabled()`
@@ -580,6 +669,13 @@ export function makeLamps() {
   siteLensGroup = new THREE.Group();
   siteLensGroup.name = 'ts-lamp-site-lenses';
   g.add(siteLensGroup);
+
+  /* O POOL DA SESSÃO, escolhido AQUI e não na construção de cada luz: as 14
+     `SpotLight` já nasceram e já estão penduradas, e `setSpotPool()` só
+     desapareia o que o nível não pede. Fazê-lo depois de tudo montado é o que
+     mantém UM caminho de construção — o boot e uma troca fria sob cortina
+     passam pela mesma função, e não por dois ramos que podem divergir. */
+  setSpotPool(coldProfile().spotPool);
 
   /* Aplica o `active: false` acima à geometria AGORA, em vez de esperar a
      primeira `setLamps()`. Sem esta linha o campo diria "inativo" e a tela
@@ -966,8 +1062,9 @@ function prepareLampModel(src: THREE.Object3D): { proto: THREE.Object3D; geo: La
  * the assetless path shows and what a failed download must fall back to — this
  * function never throws and never leaves a unit without a fixture.
  *
- * The pool of LAMP_COUNT SpotLights is NOT touched: the same eight lights stay
- * in the scene at the same visibility, only what is modelled around them
+ * The pool of SpotLights is NOT touched: the same lights stay in the scene at
+ * the same visibility (or stay OUT of it, when the quality level's pool leaves
+ * the poles unlit — ver `setSpotPool()`), only what is modelled around them
  * changes. `setLampsEnabled()` remains the single writer of SpotLight.visible.
  *
  * The clones share geometry and materials with `src`, which scene/environment.ts owns
@@ -1174,6 +1271,10 @@ export function getLampIntensityScale() { return lampIntensityScale; }
 export function getLampInfo() {
   return {
     lampLayout: { ...lampLayout }, lampPoolSize: LAMP_COUNT,
+    /* O pool de `SpotLight` de fato no grafo — 14, 6 ou 0. É o número que o
+       three vê como `NUM_SPOT_LIGHTS`, e é por ele que a bancada confere que o
+       nível de qualidade saiu do papel. Ver `setSpotPool()`. */
+    spotPool: activeSpotPool(), spotPoolFull: SPOT_POOL_FULL,
     lampFixture, lampHeight, lampRefHeight: LAMP_HEIGHT, lampIntensityScale,
     lampGeometry: { ...((lampFixture === 'model' && lampModelGeo) || LAMP_PROC_GEO) },
     /* As luminárias que o CENÁRIO trouxe, e o que foi medido nelas. É por aqui

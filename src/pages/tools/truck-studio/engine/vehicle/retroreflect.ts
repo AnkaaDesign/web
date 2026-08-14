@@ -72,7 +72,64 @@
 
    ⚠️ NADA DE CRASE NOS BLOCOS DE GLSL. São template strings de JS, e uma crase de
    citação em comentário fecha o literal — já quebrou o bundle três vezes neste
-   projeto. */
+   projeto.
+
+   ===========================================================================
+   O CUSTO POR FRAGMENTO — a auditoria, o que ela pediu, e por que UMA das duas
+   coisas foi feita e a outra NÃO. (2026-08-14)
+
+   A AUDITORIA DE DESEMPENHO mediu este bloco como o maior desperdício por
+   fragmento do motor: com 14 `SpotLight` no pool ele roda um SEGUNDO laço
+   completo sobre elas, com `getSpotLightInfo()` inteiro por luz (~20 ALU) mais
+   `tsRetroTermo` (~11 ALU, com um `pow`), ou seja ~450-550 ALU por fragmento de
+   fita, RECOMPUTANDO o que o material já computou em `<lights_fragment_begin>`.
+   O número está certo. A conclusão que se tirou dele não, e vale escrever por
+   inteiro para ninguém a refazer.
+
+   O CONSERTO PEDIDO ERA um uniforme `uNivel` amarrado a `rig.vehLights` que
+   fizesse o bloco sair cedo, com o argumento de que *"de dia a fita já apaga sem
+   fonte, então isso é ganho sem custo visual em ~2/3 do uso"*.
+
+   ⚠️ **ELE NÃO FOI FEITO, E O MOTIVO É QUE ELE NÃO ECONOMIZARIA NADA.** Medido
+   na fonte, não estimado:
+
+     · `scene/scene.ts:setLampsEnabled()` é o ÚNICO escritor de
+       `SpotLight.visible` e move os 14 spots JUNTOS — os 8 postes e os feixes do
+       veículo no mesmo laço, e o cabeçalho de `scene/lamps.ts` diz que é de
+       propósito, para a contagem ser BINÁRIA;
+     · `WebGLRenderer.projectObject()` (three r179) começa com
+       `if ( object.visible === false ) return;`, então uma luz invisível nunca
+       chega a `pushLight()` e não conta;
+     · `replaceLightNums()` (r179) troca o TOKEN `NUM_SPOT_LIGHTS` por esse
+       literal ANTES de compilar.
+
+     Ou seja: de dia `NUM_SPOT_LIGHTS` é **0**, o `#if ( NUM_SPOT_LIGHTS > 0 )`
+     abaixo é falso e **o laço de spots nem existe no binário**. O uniforme
+     fecharia exatamente na hora em que não há nada para fechar.
+
+   E ELE AINDA COBRARIA UMA REGRESSÃO VISUAL, por dois caminhos:
+
+     1. O laço que SOBRA de dia é o de DIRECIONAIS, e a direcional de dia é o
+        SOL. Com `tsLuz.color` já multiplicado pela intensidade (~3,1 na chave) e
+        o lóbulo valendo 0,30 + 2,6·cos⁴, a fita ganha da ordem de 3,7x o albedo
+        em `directSpecular` ao meio-dia — que é precisamente a leitura "esta fita
+        é muito mais clara que a chapa ao lado". Um gate por `vehLights` apagaria
+        isso, e apagaria a fita de TODA foto diurna.
+     2. Existe um estado alcançável em que os spots estão ACESOS e `vehLights` é
+        0: um preset noturno (`lampIntensity` 140…295) com o relógio no meio do
+        dia. Ali o gate faria a fita ignorar lâmpadas visivelmente acesas.
+
+   O QUE FOI FEITO, porque é exatamente equivalente e estritamente mais barato:
+   o `pow` do lóbulo virou multiplicação — ver `lobuloGLSL()`.
+
+   O QUE FICA REGISTRADO PARA QUEM VOLTAR: o custo noturno é REAL e é o preço da
+   função. Reduzi-lo de verdade exige parar de RECOMPUTAR — ou seja, injetar
+   dentro do laço desenrolado de `<lights_fragment_begin>`, com
+   `UNROLLED_LOOP_INDEX`, aproveitando o `directLight` que o material já montou.
+   Isso apagaria os ~20 ALU de `getSpotLightInfo()` por luz e deixaria só os ~9
+   do termo, ou seja ~2/3 do custo — e é uma injeção bem mais invasiva, com o
+   `#pragma` que este arquivo hoje evita de propósito. É trabalho de verdade, não
+   um uniforme. */
 import * as THREE from 'three';
 
 /**
@@ -105,6 +162,36 @@ const RETRO_GANHO = 2.6;
 /** O piso "esta superfície é fita", ainda multiplicado por N·L e pela cor da luz. */
 const RETRO_BASE = 0.30;
 
+/**
+ * O LÓBULO SEM `pow`, quando dá — e com `RETRO_K = 4` sempre dá.
+ *
+ * ⚠️ Isto NÃO é micro-otimização de gosto: o termo é avaliado **uma vez por luz
+ * por fragmento de fita**, ou seja 16 vezes numa noite de pool cheio (14 spots +
+ * 2 direcionais). GLSL não tem sobrecarga inteira de `pow`, então
+ * `pow( x, 4.0 )` compila como `exp2( 4.0 * log2( x ) )` — duas instruções de
+ * função especial, tipicamente de taxa 1/4 na integrada que este trabalho existe
+ * para atender. Em multiplicação são DUAS MULT de taxa cheia. ESTIMADO em ~6
+ * ciclos a menos por luz, ~96 por fragmento de fita à noite; não medido em
+ * hardware.
+ *
+ * E é **exatamente** equivalente, não uma aproximação: `observacao` já vem
+ * clampado em `max(…, 0.0)`, e para x ≥ 0 e expoente inteiro par a identidade é
+ * literal. Ela ainda é mais ROBUSTA — `log2(0.0)` é comportamento indefinido em
+ * GLSL, e `observacao` vale exatamente 0 em todo fragmento que olha a fita de
+ * lado, que é a metade do tempo.
+ *
+ * O `pow` fica como reserva para quem for calibrar `RETRO_K` fora dos pares: o
+ * número continua um botão, não uma constante enterrada no shader.
+ */
+function lobuloGLSL(k: number): string {
+  if (Number.isInteger(k) && k >= 2 && k <= 8 && k % 2 === 0) {
+    /* x^k com k par = (x²)^(k/2), e (x²) é um temporário só. */
+    const fatores = new Array(k / 2).fill('ob2').join(' * ');
+    return `float ob2 = observacao * observacao;\n  float lobulo = ${fatores};`;
+  }
+  return `float lobulo = pow( observacao, ${k.toFixed(4)} );`;
+}
+
 /* ⚠️ ESTA FUNÇÃO ENTRA DEPOIS DE `<common>`, NÃO NO PONTO DA INJEÇÃO — e não é
    estilo, é a única posição que compila. `<lights_fragment_end>` fica DENTRO de
    `void main()`, e GLSL não admite função aninhada: pôr o corpo ali dá
@@ -119,9 +206,14 @@ vec3 tsRetroTermo( const in vec3 luzCor, const in vec3 luzDir,
   const in vec3 n, const in vec3 v ) {
   float entrada = max( dot( n, luzDir ), 0.0 );
   float observacao = max( dot( luzDir, v ), 0.0 );
-  return luzCor * entrada * ( TS_RETRO_BASE + TS_RETRO_GANHO * pow( observacao, TS_RETRO_K ) );
+  TS_RETRO_LOBULO
+  return luzCor * entrada * ( TS_RETRO_BASE + TS_RETRO_GANHO * lobulo );
 }
 `;
+
+/** O trecho do lóbulo, resolvido UMA vez no tempo de import — `RETRO_K` é uma
+ *  constante de módulo, então recalcular por material seria trabalho repetido. */
+const LOBULO = lobuloGLSL(RETRO_K);
 
 /** O mesmo bloco, com o `#include` que ele substitui recolocado na frente. */
 const PARS = '#include <common>\n' + PARS_SOLTO;
@@ -197,9 +289,14 @@ function injetar(mat: THREE.MeshStandardMaterial) {
       : frag.replace('void main(', PARS_SOLTO + '\nvoid main(');
     shader.fragmentShader = frag
       .replace('#include <lights_fragment_end>', MAIN)
+      /* O LÓBULO É UM TRECHO, NÃO UM NÚMERO — ver `lobuloGLSL()`. Ele entra antes
+         dos números porque a forma `pow` ainda carrega o expoente por dentro, e
+         trocar a ordem faria o `TS_RETRO_K` de antigamente reaparecer sem dono.
+         (Aquele token deixou de existir: o expoente agora ou virou multiplicação
+         ou já foi impresso pelo próprio `lobuloGLSL()`.) */
+      .replace(/TS_RETRO_LOBULO/g, LOBULO)
       .replace(/TS_RETRO_BASE/g, num(RETRO_BASE))
-      .replace(/TS_RETRO_GANHO/g, num(RETRO_GANHO))
-      .replace(/TS_RETRO_K/g, num(RETRO_K));
+      .replace(/TS_RETRO_GANHO/g, num(RETRO_GANHO));
   };
   /* Sem isto o three serve o programa CACHEADO, sem a injeção, para o segundo
      material em diante — a chave de cache dele não conhece onBeforeCompile. */
@@ -242,5 +339,10 @@ export function registerRetroreflective(root: THREE.Object3D | null | undefined)
 
 /** Para o console e para a bancada. */
 export function getRetroreflective() {
-  return { materiais: contados, k: RETRO_K, ganho: RETRO_GANHO, base: RETRO_BASE };
+  return {
+    materiais: contados, k: RETRO_K, ganho: RETRO_GANHO, base: RETRO_BASE,
+    /* Confere, do console, que o lóbulo saiu sem `pow`. Se alguém mexer em
+       `RETRO_K` e isto virar `false`, o custo por luz subiu — ver `lobuloGLSL()`. */
+    lobuloSemPow: !LOBULO.includes('pow('),
+  };
 }

@@ -1,5 +1,14 @@
-/* Truck Studio — the floating lighting HUD (#ts-hud).
+/* Truck Studio — the floating HUD (#ts-hud).
    engine/ui/hud.ts owns the markup and the wiring; this file owns the look.
+
+   DUAS SEÇÕES NO MESMO VIDRO, e a divisão é doutrinária antes de ser visual: ILUMINAÇÃO é
+   decisão autoral (muda a foto, e a foto é o produto) e CONFIGURAÇÕES é decisão de máquina
+   (`core/quality.ts`: *"o perfil só mexe em AMOSTRAGEM, nunca em decisão visual autorada"*).
+   Ter as duas na mesma lista de controles contradizia a regra na interface. Cada seção tem
+   cabeçalho, ícone, `role=group` rotulado e estado de recolhimento próprios; a de
+   configurações abre fechada. Ver o cabeçalho da seção correspondente em hud.ts para por que
+   isto não virou um segundo painel flutuante (resposta curta: os quatro cantos de
+   #canvas-holder já têm dono).
 
    This panel replaces the sidebar's "Iluminação" block. It floats over the 3D render in the
    top-left of #canvas-holder, directly under the scene card (.ts-mapbadge), and it is
@@ -233,8 +242,41 @@
    text and drop it to 13.333px system font; studio.css restates font-family and cursor on
    `button` but not the rest. Kept neutral rather than given a chip look, because it has to
    be equally correct for the header row and for a weather tile — the tiles opt in to their
-   own surface in section 6. */
-.truck-studio-root #ts-hud button {
+   own surface in section 6.
+
+   ⚠️ `:where(#ts-hud)` E NÃO `#ts-hud`, E ISSO É A CORREÇÃO DE UM DEFEITO VIVO.
+   ---------------------------------------------------------------------------
+   A frase acima — "the tiles opt in to their own surface in section 6" — descreve a
+   intenção, e a especificidade a derrotava havia tempo. `.truck-studio-root #ts-hud button`
+   pontua (1,1,1); `.truck-studio-root .ts-hud-tile` pontua (0,2,0), e um id vence qualquer
+   número de classes. Ou seja, TUDO que a pastilha declarava e este bloco também declarava
+   era descartado:
+
+     · `background-color` da pastilha  perdia para o `background: transparent` daqui —
+       as pastilhas de clima e de fundo não tinham superfície nenhuma;
+     · `border-color: var(--stroke-2)`  perdia para `border: 1px solid transparent`;
+     · `color: var(--accent)` da pastilha SELECIONADA perdia para `color: inherit`;
+     · `border-radius: 0` e `border-bottom` de `.ts-hud__head` perdiam também — o cabeçalho
+       ficava com cantos de 9px e sem o filete que separa o título do corpo.
+
+   O anel de seleção sobrevivia porque `outline` não é declarado aqui, e é só por isso que
+   nada disso parecia quebrado: a pastilha escolhida ainda se via.
+
+   `:where()` contribui ZERO para a especificidade, então este bloco cai para (0,1,1) e vira
+   o PISO que ele sempre quis ser — qualquer regra `.ts-hud-*` (0,2,0) passa a vencê-lo, sem
+   que nenhuma delas precise carregar o id. O alcance não muda: continua sendo só o que está
+   dentro de #ts-hud. `:disabled` abaixo continua ganhando das pastilhas por trazer uma
+   pseudo-classe própria, que é o que se quer — um botão desabilitado não deve receber a
+   superfície de um botão vivo.
+
+   ⚠️ O ALCANCE PASSOU A INCLUIR `#ts-cfg` (2026-08-14), porque as fileiras de
+   qualidade mudaram de casa: elas moram agora no card que já tem "Cores" e
+   "Em cena". Sem esta segunda entrada as pastilhas ali herdariam o botão do
+   navegador — `appearance`, fonte e alinhamento próprios —, e a mesma fileira
+   ficaria com duas aparências conforme o painel. `:where()` continua
+   contribuindo ZERO, então acrescentar um seletor aqui não muda a
+   especificidade nem devolve o defeito que este bloco acabou de consertar. */
+.truck-studio-root :where(#ts-hud, #ts-cfg) button {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid transparent;
@@ -245,13 +287,12 @@
   text-align: left;
   cursor: pointer;
 }
-/* Nothing in hud.ts disables a control today, and this is kept anyway — unlike the
-   speculative selectors that came out of this file's neighbours in the same pass. The
-   difference is that this is a STATE of an element that exists, not a rule waiting on an
-   element that does not: `disabled` is one line of JS away (a preset row with no
-   environment loaded is the obvious future caller), the UA paints its own grey the moment
-   it appears, and there is no markup contract here to drift out of sync with. */
-.truck-studio-root #ts-hud button:disabled {
+/* Esta regra era especulativa ("nothing in hud.ts disables a control today") e foi mantida
+   com o argumento de que `disabled` estava a uma linha de JS de distância. Estava mesmo:
+   a seção de Configurações desabilita o botão de "Aplicar agora" quando não há caminho de
+   recarga registrado, e o deslizante de escala de render quando o modo é automático. Duas
+   das três coisas que a nota antiga previa como "caller futuro" já existem. */
+.truck-studio-root :where(#ts-hud, #ts-cfg) button:disabled {
   opacity: 0.42;
   cursor: default;
   pointer-events: none;
@@ -299,6 +340,35 @@
 }
 .truck-studio-root .ts-hud__head:hover {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* ---------- o SEGUNDO cabeçalho: Configurações ----------
+   O painel passou a hospedar duas seções irmãs no mesmo vidro — ver o cabeçalho da seção
+   de Configurações em hud.ts para por que elas não são dois painéis flutuantes (a coluna
+   esquerda de #canvas-holder já está cheia, e os vizinhos moram em arquivos que aquele
+   trabalho não podia tocar).
+
+   O filete de cima é o que separa o CORPO de iluminação do cabeçalho de configurações.
+   Ele é declarado sempre, e não só quando o corpo acima está aberto: com o corpo fechado,
+   o cabeçalho de iluminação perde o filete de baixo (regra `aria-expanded` adiante) e este
+   assume o papel de única linha entre os dois — nunca há duas, nunca há zero.
+
+   Mesma pontuação (0,2,0) da regra base logo acima, então quem vence é a ORDEM. Tem de
+   ficar depois. */
+.truck-studio-root .ts-hud__head--cfg {
+  border-top: 1px solid var(--stroke);
+}
+
+/* ---------- recolhimento dirigido por aria-expanded ----------
+   Com DOIS cabeçalhos, uma classe de estado na raiz (`is-collapsed`) girava as duas setas e
+   revelava os dois resumos. `aria-expanded` já era escrito por applyCollapsed() /
+   applyCfgCollapsed(), é por seção por definição, e usá-lo como gancho torna impossível a
+   seta dessincronizar do estado que o leitor de tela anuncia — o mesmo argumento que fez
+   `aria-checked` entrar ao lado de `.is-on` na seção 6.
+
+   (0,3,0) contra os (0,2,0) da regra base, então isto vence sem precisar do id. */
+.truck-studio-root .ts-hud__head[aria-expanded="false"] {
+  border-bottom-color: transparent;
 }
 /* One ring. The header has no border of its own to pin, so the outline is the only thing
    drawn. The offset is NEGATIVE because the header meets the panel's rounded corners and a
@@ -362,7 +432,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.truck-studio-root #ts-hud.is-collapsed .ts-hud__hint { display: block; }
+/* Por seção, e não pela raiz — ver a nota sobre aria-expanded acima. O resumo de
+   Configurações ("Auto · média · 78 %", mais "pendente" quando há mudança fria esperando)
+   responde a mesma pergunta que o de iluminação responde: o que estou olhando, sem abrir. */
+.truck-studio-root .ts-hud__head[aria-expanded="false"] .ts-hud__hint { display: block; }
 
 /* Disclosure idiom: the glyph hud.ts draws points DOWN, at the body it opens. Collapsed it
    turns to point right, at content that is no longer there. `rotate` rather than a transform,
@@ -383,14 +456,17 @@
 }
 .truck-studio-root .ts-hud__chev svg { width: 100%; height: 100%; }
 .truck-studio-root .ts-hud__head:hover .ts-hud__chev { color: var(--text); }
-.truck-studio-root #ts-hud.is-collapsed .ts-hud__chev { rotate: -90deg; }
+.truck-studio-root .ts-hud__head[aria-expanded="false"] .ts-hud__chev { rotate: -90deg; }
 
-/* hud.ts hides the body with the global `.hidden`, so all that is left here is the chrome
-   that goes with it: release the scroll box (a collapsed panel must shrink to its header,
-   not keep reserving height) and drop the divider, which would otherwise hang under the
-   header as a stray hairline with nothing beneath it. */
-.truck-studio-root #ts-hud.is-collapsed { max-height: none; }
-.truck-studio-root #ts-hud.is-collapsed .ts-hud__head { border-bottom-color: transparent; }
+/* hud.ts hides each body with the global `.hidden`, so all que sobra aqui é a moldura que
+   acompanha: soltar a caixa de rolagem quando o painel encolheu até os dois cabeçalhos.
+
+   ⚠️ AS DUAS CLASSES JUNTAS, e não `is-collapsed` sozinha. Com duas seções, soltar o
+   `max-height` porque a ILUMINAÇÃO fechou deixaria o painel crescer sem teto sempre que
+   alguém abrisse o bloco de diagnóstico com a luz recolhida — exatamente o caso em que ele
+   é mais alto. (1,2,0) contra os (1,1,0) da regra base da seção 1; a ordem também favorece.
+   O filete sob cada cabeçalho é tratado por `aria-expanded`, na seção 2. */
+.truck-studio-root #ts-hud.is-collapsed.is-cfg-collapsed { max-height: none; }
 
 /* ============================================================
    3. Body and rows
@@ -904,6 +980,150 @@
 }
 
 /* ============================================================
+   6b. Configurações — notas, tabelas de leitura e o botão de recarga
+   ============================================================ */
+
+/* O CORPO DA SEGUNDA SEÇÃO herda `.ts-hud__body` inteiro, e isso é a decisão, não uma
+   economia: os dois corpos têm o mesmo respiro, o mesmo padding e a mesma caixa de rolagem,
+   então nenhuma correção futura pode alcançar um e esquecer o outro — o mesmo argumento que
+   fez as pastilhas de FUNDO não ganharem CSS próprio na seção 6.
+
+   Consequência aceita: com as duas seções abertas num painel curto, os dois corpos são
+   itens flex `1 1 auto` e dividem a altura, cada um com a própria barra. A alternativa
+   seria uma rolagem só, e ela custaria os cabeçalhos fixos — que são o que permite fechar
+   uma seção sem procurar por ela. Fechar a iluminação devolve a altura inteira ao
+   diagnóstico, e é para isso que o recolhimento por seção existe.
+   Nenhuma declaração aqui: o modificador existe só como gancho de leitura para quem for
+   inspecionar o DOM. */
+
+/* ---------- nota ----------
+   A linha de prosa curta que explica um controle ou marca uma armadilha. É um <span> com
+   `display:block`, e não um <p>: a fileira de escala de render é um <label> (buildRangeRow),
+   e o modelo de conteúdo de <label> é phrasing content — um <p> ali seria HTML inválido,
+   ainda que o DOM construído em JS nunca passe pelo reparo do parser.
+
+   9px é o menor tamanho usado no painel, um degrau abaixo do rótulo de fileira (9,5px):
+   estas linhas são para LER quando se precisa delas, nunca para varrer. E, ao contrário do
+   rótulo, elas quebram em várias linhas — daí `line-height` maior e nada de `nowrap`. */
+.truck-studio-root .ts-hud-note {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* O aviso de mudança fria pendente. Âmbar, e não o verde do accent: accent nesta interface
+   quer dizer "selecionado / é aqui que a luz está", e reusá-lo para um alerta faria a
+   fileira parecer a opção escolhida. Âmbar é a mesma cor que a ponta de sol acesa da régua
+   de hora já usa (--ts-hud-cap--sun.is-on, #ffc978), então não é paleta nova. */
+.truck-studio-root .ts-hud-note--warn { color: #ffc978; }
+
+/* A leitura em pixels — "1920×1080 → 1498×842 desenhados". Dígitos de largura fixa pelo
+   mesmo motivo de `.ts-hud-row__val`: ela é reescrita a cada degrau da escala, e dígitos
+   proporcionais fariam a linha inteira andar de lado. Um pouco mais clara que uma nota
+   comum porque ela é um VALOR, não uma explicação. */
+.truck-studio-root .ts-hud-note--px {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- tabela de leitura ----------
+   Um <dl> de verdade, em duas colunas: nome à esquerda, número à direita. A semântica não é
+   enfeite — um leitor de tela anuncia "parede, 12,4 ms" como um par, enquanto duas colunas
+   de <span> seriam duas listas soltas que só o olho junta.
+
+   `minmax(0, auto)` na primeira coluna e não `auto`: a string do adaptador na tabela de
+   hardware é longa, e uma trilha `auto` cresceria com ela e empurraria a coluna de valores
+   para fora dos 200px do painel. O reset do estúdio já zera a margem do <dd>. */
+.truck-studio-root .ts-hud-stats {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.truck-studio-root .ts-hud-stat__k {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.truck-studio-root .ts-hud-stat__v {
+  min-width: 0;
+  color: var(--text);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Mesma razão de `.ts-hud-row__val`: o bloco de diagnóstico reescreve estes nós duas
+     vezes por segundo, e dígitos proporcionais fariam a coluna tremer. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* A tabela de HARDWARE não pisca (é escrita uma vez) e o valor mais importante dela é uma
+   STRING longa, não um número. Alinhada à esquerda, portanto: um nome de adaptador
+   truncado à direita perde o final ("… Graphics"), truncado com o texto encostado à
+   esquerda perde a mesma coisa mas continua começando onde o olho procura. */
+.truck-studio-root .ts-hud-stats--hw .ts-hud-stat__v { text-align: left; }
+
+/* ---------- botão de linha ----------
+   O único botão do painel que não é uma pastilha. Ele não pode SER uma pastilha porque
+   pastilha é escolha entre pares (`role=radio`, uma de quatro) e isto é uma AÇÃO única e
+   destrutiva de estado — solta a cena e a reconstrói. Larga, centralizada e com rótulo
+   inteiro, para que a diferença entre "escolher" e "executar" seja visível antes do clique.
+
+   Superfície e hover são exatamente os da pastilha, porque continuam sendo o mesmo vidro.
+   (0,2,0) já basta agora que o reset de botão da seção 1 caiu para (0,1,1). */
+.truck-studio-root .ts-hud-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 9px;
+  background-color: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+/* Hover: BORDA + SUPERFÍCIE, nunca elevação nem escala — a regra permanente deste arquivo.
+   `:disabled` da seção 1 traz uma pseudo-classe própria e `pointer-events: none`, então o
+   botão desabilitado nunca chega aqui. */
+.truck-studio-root .ts-hud-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+/* Um anel. A borda é fixada de volta em --stroke-2 para não desenhar uma segunda linha
+   concêntrica logo dentro do outline — mesma regra das pastilhas. */
+.truck-studio-root .ts-hud-btn:focus-visible {
+  border-color: var(--stroke-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-hud-btn:focus:not(:focus-visible) { outline: none; }
+
+/* A fileira de mudança pendente ganha um pouco mais de respiro entre a nota e o botão: são
+   dois blocos com pesos diferentes de leitura, e o `gap: 5px` padrão da fileira os cola. */
+.truck-studio-root .ts-hud-row--cold { gap: 7px; }
+
+/* ============================================================
    7. Entry animation
    ============================================================ */
 
@@ -1025,7 +1245,8 @@
   .truck-studio-root .ts-hud-dial,
   .truck-studio-root .ts-hud-dial__ray,
   .truck-studio-root .ts-hud-dial__handle,
-  .truck-studio-root .ts-hud-tile {
+  .truck-studio-root .ts-hud-tile,
+  .truck-studio-root .ts-hud-btn {
     transition-duration: 0.01ms;
   }
   /* Separate rules, one engine each: a shared list would be dropped whole by both. */

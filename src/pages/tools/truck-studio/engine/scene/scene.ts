@@ -148,7 +148,10 @@ import { $ } from '../core/dom';
    `pixelRatioCap` tem de estar respondido antes disso. `core/quality.ts` não
    importa nada do engine justamente para poder ser importado aqui sem fechar
    ciclo. */
-import { getProfile, onQualityChange, reportFrameTime } from '../core/quality';
+import {
+  getProfile, onQualityChange, onScaleChange, reportFrameTime,
+  coldProfile, markColdApplied,
+} from '../core/quality';
 import {
   canvasTex, ctx2d, makePuddleCanvas,
 } from './textures';
@@ -167,6 +170,7 @@ import { getLampHalos } from '../vehicle/halo';
 import {
   lampUnits, lampModelEmissive, makeLamps, applyLampLayout, setLampRigRefresh,
   getLampLensMat, getLampIntensityScale, getLampBeamGain, vehBeams,
+  setSpotPool, activeSpotPool,
 } from './lamps';
 import {
   VIEW_DIR as CARD_VIEW_DIR, FOV as CARD_FOV, TARGET_H as CARD_TARGET_H,
@@ -230,7 +234,23 @@ export const holder = $('canvas-holder');
    longer allowed under 0.08, the same expression gives well under 0.1 mm — an
    order of magnitude finer than anything defight.js left coincident. */
 export const renderer = new THREE.WebGLRenderer({
-  antialias: true,
+  /* DO PERFIL FRIO, e no nível Alto ele vale `true` — ou seja, esta linha faz
+     exatamente o que `antialias: true` fazia antes, e é assim que se verifica
+     que o teto não se mexeu.
+
+     Ele é lido AQUI, no escopo de módulo, e é por isso que `core/quality.ts`
+     não pode importar nada do engine: `antialias` é parâmetro de CONSTRUTOR e
+     não há segunda chance. Trocá-lo depois exige um contexto novo — ver a nota
+     de `applyQualityProfile()`.
+
+     ⚠️ HOJE OS TRÊS NÍVEIS PEDEM `true`, e isso é uma conclusão medida, não uma
+     omissão: esta cena é limitada por SHADER DE FRAGMENTO (um fragmento de
+     lataria à noite custa ~2 800 ALU), e MSAA sombreia uma vez por PIXEL, não
+     por amostra. Logo MSAA 4× a `renderScale` 0,65 desenha 0,88 M fragmentos
+     com arestas boas, contra 2,07 M com arestas serrilhadas sem MSAA a 1,0 —
+     mais barato no recurso dominante E mais bonito. O campo existe no perfil
+     porque a conta pode virar noutro hardware, não porque ela já virou. */
+  antialias: coldProfile().antialias,
   /* THE DISCRETE GPU, EXPLICITLY. Unset, this is `'default'`, and on a dual-GPU
      laptop `'default'` is where the browser is free to hand back the integrated
      adapter — which for a 9–10 M triangle scene with a 3072² shadow pass is the
@@ -256,7 +276,13 @@ export const renderer = new THREE.WebGLRenderer({
    preenchimento escala com o QUADRADO deste número, o que faz dele o botão
    dominante de qualquer adaptação: entre um 4K a DPR 2 e um 1080p a DPR 1 há
    16× de pixels, decididos aqui. */
-renderer.setPixelRatio(Math.min(devicePixelRatio, getProfile().pixelRatioCap));
+/* Idêntico ao `effectivePixelRatio()` lá embaixo, e escrito à mão aqui porque
+   `renderScale` é um `let` declarado depois — chamá-lo daqui seria ler uma
+   variável na zona morta temporal, que é a mesma armadilha de içamento que o
+   bloco de `busyUntil` documenta. O valor é transitório de qualquer forma: o
+   `resize()` do fim deste módulo roda no import e recalcula por este caminho. */
+renderer.setPixelRatio(
+  Math.min(devicePixelRatio, getProfile().pixelRatioCap) * getProfile().renderScale);
 renderer.shadowMap.enabled = true;
 /* ---- POR QUE NÃO É `PCFSoftShadowMap`, E O COMENTÁRIO QUE ESTAVA AQUI ----
    A linha dizia "shadow.radius only works with PCFSoft". É o contrário, e o
@@ -279,11 +305,28 @@ renderer.shadowMap.enabled = true;
    PCF E NÃO VSM. O VSM borra o próprio mapa e por isso é o único que dá
    penumbra realmente larga, mas ele guarda MOMENTOS em vez de profundidade e
    vaza luz onde dois casters se sobrepõem — o que aqui é o par cavalo +
-   implemento, o tempo inteiro. PCF custa 17 amostras contra as 9 do
-   PCF_SOFT (o mapa é redesenhado só quando sujo, ver `autoUpdate` abaixo) e o
-   raio é honesto: a 3072² sobre ±24 m são 64 texels/m, então `radius` 2 é uma
-   penumbra de 3 cm e `radius` 12 é de 19 cm. */
-renderer.shadowMap.type = THREE.PCFShadowMap;
+   implemento, o tempo inteiro. O raio é honesto: a 3072² sobre ±24 m são
+   64 texels/m, então `radius` 2 é uma penumbra de 3 cm e `radius` 12 é de 19 cm.
+
+   ⚠️ CORREÇÃO DE UM NÚMERO QUE ESTAVA AQUI. A linha dizia "PCF custa 17
+   amostras contra as 9 do PCF_SOFT". Contadas no three r179
+   (`shadowmap_pars_fragment.glsl.js`), o ramo PCF_SOFT tem 4 taps diretos +
+   4 pares em `mix` + 1 `mix` aninhado de 4 = **16 taps**; o `1.0/9.0` que
+   aparece no arquivo é PESO DE NORMALIZAÇÃO, não contagem. Ou seja PCF_SOFT
+   custa 16 contra 17 — **ele não é um degrau intermediário de custo**, e ainda
+   por cima ignora `shadow.radius`. Como barateamento ele não existe; quem
+   precisa de barato precisa de `BasicShadowMap`, que é 1 tap.
+
+   POR ISSO O TIPO PASSOU A VIR DO PERFIL FRIO. Ele continua sendo `#define` e
+   continua recompilando a cena inteira — por isso é FRIO e só muda sob cortina,
+   nunca pelo medidor. No nível Alto e Médio ele vale `PCFShadowMap`, exatamente
+   como sempre valeu. */
+renderer.shadowMap.type = coldProfile().shadowType === 'basic'
+  ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+/* A partir daqui o contexto de GPU vivo REALMENTE tem a assinatura fria do
+   nível — os dois parâmetros que não têm segunda chance já foram gastos. É
+   isto que faz `coldPending()` responder `false` num boot limpo. */
+markColdApplied();
 
 /* THE SHADOW MAP IS NOT REDRAWN EVERY FRAME.
    ---------------------------------------------------------------------------
@@ -460,7 +503,7 @@ export const isOnDemandRendering = () => onDemand;
 /* DRAW SUSPENSION — for the windows where the scene graph is deliberately WRONG.
    ---------------------------------------------------------------------------
    warmLightPrograms() mounts the light configuration we are NOT about to render
-   (eight spotlights on, in daylight) so the driver compiles it now instead of
+   (the whole pool on, in daylight) so the driver compiles it now instead of
    under the user's thumb at dusk. That used to be safe for free: `renderer
    .compile()` is synchronous, so the flip and the restore lived in one task and
    no frame could ever be presented between them. `compileAsync` breaks exactly
@@ -469,6 +512,41 @@ export const isOnDemandRendering = () => onDemand;
    A counter rather than a boolean so nested or overlapping suspensions cannot
    have one release re-enable drawing for the other. */
 let drawSuspended = 0;
+
+/**
+ * Segura o laço enquanto o grafo estiver deliberadamente errado, e devolve a
+ * função que solta.
+ *
+ * A alça pública do contador acima, para quem está FORA deste módulo — hoje
+ * `applyColdQuality()` em studio.ts, que desapareia luzes, troca o filtro de
+ * sombra e solta o cenário em três instruções seguidas. Sem isto o laço pode
+ * apresentar um quadro no meio dessas três.
+ *
+ * ⚠️ SEMPRE EM `try/finally`, e a função devolvida é IDEMPOTENTE de propósito:
+ * um contador que não volta a zero é uma viewport congelada para sempre, e o
+ * sintoma (uma cena que parou de responder ao mouse) não aponta para cá.
+ */
+export function suspendDraw(): () => void {
+  drawSuspended++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    drawSuspended--;
+    /* Obrigatório: enquanto suspenso o laço não gastou invalidação nenhuma, e a
+       cena pode ter mudado inteira no intervalo. */
+    invalidate();
+  };
+}
+
+/** Instante do fim do último `render()`, ou 0 quando a cadeia de quadros
+ *  desenhados foi rompida (quadro pulado ou desenho suspenso).
+ *
+ *  Declarado aqui, no topo, e não junto do laço: `startLoop()` fecha sobre ele e
+ *  os `return` do meio do laço o zeram, então ele é estado do MÓDULO, não da
+ *  função — e um `let` içado para depois do primeiro leitor cairia na zona morta
+ *  temporal, que é a armadilha que o bloco de `busyUntil` documenta. */
+let lastDrawnAt = 0;
 
 export const scene = new THREE.Scene();
 
@@ -657,6 +735,16 @@ const SHADOW_NORMAL_BIAS = 0.02;
    ver `applyQualityProfile()`. */
 const SHADOW_MAP_SIZE = Math.min(getProfile().shadowMapSize,
   renderer.capabilities.maxTextureSize || 3072);
+/* O LADO VIVO do mapa, que não é a constante acima: `applyQualityProfile()`
+   realoca o alvo quando o nível muda, e o bias precisa saber disso — ver
+   `shadowTexelScale()`. A constante continua sendo o valor de ABERTURA; esta é
+   o estado. */
+let shadowMapSide = SHADOW_MAP_SIZE;
+/* A resolução em que `SHADOW_BIAS` e `SHADOW_NORMAL_BIAS` foram calibrados. Não
+   é `SHADOW_MAP_SIZE` — essa depende do nível em que a página abriu, e usá-la
+   como referência faria a calibração significar coisas diferentes conforme o
+   nível de abertura, que é o mesmo defeito de outra forma. */
+const SHADOW_BIAS_REF_SIZE = 3072;
 key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 key.shadow.camera.left = -SHADOW_HALF; key.shadow.camera.right = SHADOW_HALF;
 key.shadow.camera.top = SHADOW_HALF; key.shadow.camera.bottom = -SHADOW_HALF;
@@ -666,8 +754,34 @@ key.shadow.camera.top = SHADOW_HALF; key.shadow.camera.bottom = -SHADOW_HALF;
    shadow test entirely. An ortho depth range is linear, so 1..90 instead of
    4..90 widens it by 3.5 % and the existing bias values keep their meaning. */
 key.shadow.camera.near = 1; key.shadow.camera.far = 90;
-key.shadow.bias = SHADOW_BIAS;
-key.shadow.normalBias = SHADOW_NORMAL_BIAS;
+
+/* ---------------- O BIAS, E O SEGUNDO FATOR QUE FALTAVA ----------------
+   O bloco de `SHADOW_BIAS` acima já explica que o bias VIVE EM UNIDADES DE
+   TEXEL e que alargar a caixa sem escalar os dois números apaga todas as
+   sombras. `setShadowSpan()` respeitava isso — mas só metade.
+
+   O TAMANHO DO TEXEL TEM DOIS FATORES, e só um estava sendo compensado:
+
+       metros por texel = (2 · meia-caixa) / lado_do_mapa
+
+   `setShadowSpan()` escalava por `half / SHADOW_HALF`, ou seja pelo NUMERADOR.
+   O denominador — o lado do mapa — passou a variar quando o perfil de qualidade
+   ganhou `shadowMapSize`, e ninguém escalou por ele. Consequência medida na
+   aritmética: descer de 3072² para 1024² triplica os metros por texel, então um
+   `normalBias` de 2 cm que valia 1,3 texel passa a valer 0,43 — e 0,43 texel é
+   exatamente o regime de peter-panning que este bloco existe para evitar.
+
+   Ou seja: **o nível Baixo provavelmente já vinha vazando a sombra por baixo do
+   próprio objeto**, e o sintoma (sombra que descola do pneu) seria lido como
+   "a qualidade baixa é feia" em vez de "o bias está errado". Composto com o
+   passo largo de ±60 m o fator chegava a 1/9.
+
+   Os dois fatores se multiplicam, e esta é a única função que os escreve. */
+function applyShadowBias() {
+  const k = (shadowHalf / SHADOW_HALF) * (SHADOW_BIAS_REF_SIZE / shadowMapSide);
+  key.shadow.bias = SHADOW_BIAS * k;
+  key.shadow.normalBias = SHADOW_NORMAL_BIAS * k;
+}
 key.shadow.radius = 2;
 scene.add(key, key.target);
 
@@ -703,6 +817,12 @@ scene.add(key, key.target);
 const KEY_ORBIT_R = 26;
 /** Meia-caixa de sombra em vigor. Ver `tuneShadowSpan()`. */
 let shadowHalf = SHADOW_HALF;
+/* PRIMEIRA ESCRITA DO BIAS, e ela tem de ficar AQUI e não lá em cima junto do
+   resto do rig: `applyShadowBias()` lê `shadowHalf`, e um `let` lido antes da
+   própria declaração é zona morta temporal. A função é declaração hoisted, o
+   estado não — a mesma armadilha de içamento que o bloco de `busyUntil`
+   documenta, e a razão de esta linha existir separada. */
+applyShadowBias();
 /* A DISTÂNCIA DA LUZ TAMBÉM É FUNÇÃO DA CAIXA, e esta foi a terceira peça.
    ---------------------------------------------------------------------------
    A ortográfica de sombra nasce NA POSIÇÃO da luz e mede `near`/`far` dali. Com
@@ -750,15 +870,17 @@ function placeKeyLight() {
 function setShadowSpan(half: number) {
   if (half === shadowHalf) return;
   shadowHalf = half;
-  const k = half / SHADOW_HALF;
   const cam = key.shadow.camera;
   cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
   /* `far` cobre a luz recuada MAIS a caixa inteira; `near` fica em 1 pelo mesmo
      motivo de sempre (o chão sob sol rasante encosta no plano próximo). */
   cam.far = keyDistance() * 2 + half * 2;
   cam.updateProjectionMatrix();
-  key.shadow.bias = SHADOW_BIAS * k;
-  key.shadow.normalBias = SHADOW_NORMAL_BIAS * k;
+  /* DELEGADO, e não escrito aqui: o bias tem DOIS fatores (a meia-caixa e o
+     lado do mapa) e escrever um deles neste ponto foi exatamente o que deixou o
+     outro esquecido quando o perfil de qualidade ganhou `shadowMapSize`. Um
+     dono só. */
+  applyShadowBias();
   placeKeyLight();
   renderer.shadowMap.needsUpdate = true;
   invalidate();
@@ -1969,8 +2091,8 @@ function cacheEnv(k: string, rt: THREE.WebGLRenderTarget) {
 /**
  * Free every cached procedural IBL except the one on screen.
  *
- * Not called from the render path — this is deferred-teardown material (see
- * scheduleIdleRelease). Safe at any time: a later refreshEnvironment() simply
+ * Not called from the render path — this is deferred-teardown material (o dono
+ * é `releaseScene()` em studio.ts). Safe at any time: a later refreshEnvironment() simply
  * misses and rebakes, which is the same 10-40 ms a first visit to that preset
  * already pays.
  */
@@ -2404,14 +2526,15 @@ function applyRig(rig: Rig) {
 const LAMP_ON_LEVEL = 6, LAMP_OFF_LEVEL = 1.5;
 /* E O VEÍCULO TAMBÉM PEDE O POOL, desde que os feixes dele moram nele. Sem esta
    segunda condição o preset `ciclorama` — que autora `lampIntensity: 0` — deixaria
-   as doze `SpotLight` fora da cena e o farol do caminhão não iluminaria nada às
+   as catorze `SpotLight` fora da cena e o farol do caminhão não iluminaria nada às
    21 h, embora a lente estivesse acesa. O limiar é baixo (0,02 de `vehLights`, ou
    seja poucos segundos depois das 18:00) pela mesma razão que o dos postes: a
    bandeira tem de ser jogada enquanto o resultado ainda é invisível, para que o
    que o usuário vê subir seja `intensity`, que é uniforme e não recompila nada. */
 const VEH_BEAM_ON_LEVEL = 0.02;
 /* Seeded true to match SpotLight's own construction default, or the first call
-   would short-circuit as a no-op and leave eight lit spots in a daylit scene. */
+   would short-circuit as a no-op and leave the whole pool lit in a daylit
+   scene. */
 let lampsOn = true;
 
 /** Does this rig want the pool live, given where the pool already is? */
@@ -2426,11 +2549,17 @@ function setLampsEnabled(on: boolean) {
   for (const u of lampUnits) {
     if (u.spot.visible !== on) u.spot.visible = on;
   }
-  /* AS DOZE JUNTAS. Os quatro feixes do veículo moram no mesmo pool exatamente
+  /* AS CATORZE JUNTAS. Os seis feixes do veículo moram no mesmo pool exatamente
      para que a contagem seja binária: deixá-los fora deste laço criaria um
      terceiro valor de NUM_SPOT_LIGHTS (8) e, com ele, uma terceira configuração
      de shader que `warmLightPrograms()` não pré-compila — o travamento no
-     controle de hora voltaria pela porta dos fundos. */
+     controle de hora voltaria pela porta dos fundos.
+
+     ⚠️ E CONTINUA BINÁRIO COM O POOL POR NÍVEL, porque o pool não esconde: ele
+     DESAPAREIA (ver `setSpotPool()` em lamps.ts). Escrever `visible` numa
+     `SpotLight` que não tem pai é inofensivo — `traverseVisible()` nunca chega
+     nela —, então este laço continua sendo o mesmo em qualquer pool e as duas
+     configurações da sessão continuam sendo 0 e `activeSpotPool()`. */
   for (const s of vehBeams) {
     if (s.visible !== on) s.visible = on;
   }
@@ -2438,12 +2567,79 @@ function setLampsEnabled(on: boolean) {
 }
 
 /**
+ * Ajusta o pool de `SpotLight` ao que o nível de qualidade vigente pede.
+ *
+ * FRIO E SÓ SOB CORTINA. Mexer aqui move `NUM_SPOT_LIGHTS`, que é chave de cache
+ * de programa de TODO material da cena — é o mesmo engasgo que
+ * `warmLightPrograms()` existe para pagar adiantado, e por isso quem chama tem
+ * de estar atrás da cortina e tem de rodar `warmLightPrograms()` depois: as duas
+ * configurações a pré-compilar acabaram de mudar.
+ *
+ * Chamado por `studio.ts` dentro de `applyColdQuality()`, e por mais ninguém.
+ * O boot não precisa dele — `makeLamps()` já nasce no pool do nível.
+ *
+ * @returns true se a contagem mudou de fato (ou seja, se há o que recompilar).
+ */
+export function applyColdSpotPool(): boolean {
+  const want = coldProfile().spotPool;
+  if (want === activeSpotPool()) return false;
+  setSpotPool(want);
+  /* E ESTA FUNÇÃO CONTINUA SENDO O DONO DA BANDEIRA. As luzes que acabaram de
+     voltar ao grafo trazem o `visible` de quando saíram; sem esta reconciliação
+     um pool que cresce à noite entraria com faróis apagados até a próxima
+     travessia de 18:00. `setLampsEnabled()` sai cedo quando o estado não mudou,
+     então não dá para delegar a ele. */
+  for (const u of lampUnits) u.spot.visible = lampsOn;
+  for (const s of vehBeams) s.visible = lampsOn;
+  invalidate();
+  return true;
+}
+
+/**
+ * Troca o filtro do mapa de sombra (`pcf` ↔ `basic`) — o outro botão frio que
+ * dá para aplicar sem contexto novo.
+ *
+ * ⚠️ **`shadowMap.type` É UM `#define`, E O THREE NÃO INVALIDA NADA SOZINHO.**
+ * O tipo entra na chave de cache do programa, mas `WebGLRenderer` só remonta um
+ * programa quando o MATERIAL se diz sujo — trocar o campo e não varrer a cena
+ * deixa toda superfície já compilada amostrando a sombra pelo filtro ANTIGO, em
+ * silêncio, até que alguma outra coisa marque aquele material. Daí a varredura
+ * abaixo, que é cara (centenas de materiais recompilando) e é exatamente por
+ * isso que isto é FRIO e mora sob a cortina.
+ *
+ * O ganho que ela compra é o maior por fragmento do engine: `basic` é 1 tap
+ * contra os 17 do PCF, ~20 % do sampler de um UHD 630. O custo, dito por
+ * inteiro, está em `core/quality.ts` — a borda da sombra vira uma escada de um
+ * texel e `shadow.radius` deixa de existir.
+ *
+ * @returns true se o tipo mudou de fato.
+ */
+export function applyColdShadowType(): boolean {
+  const want = coldProfile().shadowType === 'basic'
+    ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+  if (renderer.shadowMap.type === want) return false;
+  renderer.shadowMap.type = want;
+  scene.traverse((o) => {
+    const mats = (o as THREE.Mesh).material;
+    if (!mats) return;
+    if (Array.isArray(mats)) { for (const m of mats) m.needsUpdate = true; }
+    else mats.needsUpdate = true;
+  });
+  /* O mapa em si não muda de forma, mas o que o LÊ mudou — e com
+     `autoUpdate = false` ninguém redesenha nada sem pedir. */
+  renderer.shadowMap.needsUpdate = true;
+  invalidate();
+  return true;
+}
+
+/**
  * Compile BOTH light configurations now, so the hour slider never has to.
  *
  * THE STALL ON THE TIME SLIDER IS A SHADER RECOMPILE, and this is where it comes
- * from. setLampsEnabled() flips SpotLight.visible on the whole pole pool at the
+ * from. setLampsEnabled() flips SpotLight.visible on the whole pool at the
  * day↔night crossing; WebGLRenderer gathers lights with traverseVisible(), so
- * that moves NUM_SPOT_LIGHTS 0↔8 — which is part of the program CACHE KEY of
+ * that moves NUM_SPOT_LIGHTS 0↔14 — ou 0↔6 no nível Médio, e nada no Baixo; ver
+ * a guarda de pool zero logo abaixo — which is part of the program CACHE KEY of
  * every material in the scene. Crossing dusk therefore recompiles the set (a
  * 176k-triangle industrial estate), the implement's ~50 materials and the cab,
  * synchronously, in the middle of a pointer drag. It is a once-per-session cost
@@ -2471,6 +2667,21 @@ function setLampsEnabled(on: boolean) {
  * simply moves to the first visible frame, which is the bug this exists to fix.
  */
 export async function warmLightPrograms(): Promise<void> {
+  /* ---- POOL ZERO: NÃO HÁ SEGUNDA CONFIGURAÇÃO, E ESPERAR POR ELA SERIA
+     ESPERAR POR NADA ----
+     No nível Baixo `coldProfile().spotPool` é 0 e `setSpotPool()` desapareou as
+     catorze luzes. `NUM_SPOT_LIGHTS` é 0 nas duas pontas da bandeira, ou seja
+     inverter `lampsOn` produz exatamente a MESMA chave de programa: a primeira
+     `compilePrograms()` compilaria a cena inteira de novo por nada e, num driver
+     sem `KHR_parallel_shader_compile` ou numa aba que o usuário acabou de trocar,
+     seguraria a cortina pelos 8 s inteiros do `COMPILE_TIMEOUT_MS` — o pior caso
+     justamente no hardware mais fraco, que é quem cai no pool 0.
+     Uma passada só, então: a configuração que vai ser desenhada. */
+  if (activeSpotPool() === 0) {
+    try { await compilePrograms(); } catch (_) { /* ignore */ }
+    invalidate();
+    return;
+  }
   const was = lampsOn;
   /* The scene is about to be deliberately wrong for as long as the compile
      takes, and unlike the old synchronous compile() that window now contains
@@ -4111,6 +4322,80 @@ export function frameAll(groups: THREE.Object3D[]) {
    the app chrome (sidebar collapse), so a zero-sized holder is a normal state —
    resizing to 0×0 would drop the drawing buffer and divide the aspect by zero.
    mountStudio() re-runs this and keeps a ResizeObserver on the holder. */
+/* ---------------- A RESOLUÇÃO EFETIVA, NUM LUGAR SÓ ----------------
+   `min(dpr, cap) · escala`, e a multiplicação é o conserto.
+
+   O QUE ESTAVA ERRADO. Havia só o TETO: `min(devicePixelRatio, cap)`, com o cap
+   valendo 2 / 1,5 / 1 por nível. Num monitor a `devicePixelRatio` 1 — que é a
+   esmagadora maioria dos desktops, e é o hardware que esta passagem existe para
+   atender — `min(1, 2)`, `min(1, 1.5)` e `min(1, 1)` são o MESMO número. O
+   botão que o próprio perfil chamava de dominante ("o custo de preenchimento
+   escala com o QUADRADO disto") era inerte exatamente onde precisava agir, e o
+   rótulo do HUD prometia "Resolução 1×" como se fosse uma redução.
+
+   POR QUE DENTRO DO `pixelRatio` E NÃO EM `setSize(w·s, h·s, false)`. As duas
+   funcionam; esta não tem consumidor a consertar. `setSize(w, h)` continua
+   escrevendo o CSS certo (com `updateStyle:false` o estilo da chamada ANTERIOR
+   fica de pé, e um recolhimento de sidebar deixaria o canvas com tamanho velho);
+   `camera.aspect` é indiferente porque a escala se cancela; e
+   `floor-reflection.ts` dimensiona o alvo dele por `getSize() × getPixelRatio()`,
+   ou seja acompanha de graça.
+
+   POR QUE A ESCALA É VARIÁVEL DE MÓDULO. Ela tem de ser lida por `resize()` E
+   por `applyQualityProfile()`, senão um dos dois apaga o outro em silêncio: o
+   `ResizeObserver` do holder chama `resize()` a cada recolhimento de sidebar, e
+   uma troca de nível chama `applyQualityProfile()`. `record.ts` também desfaz o
+   buffer de gravação chamando `resize()`, e isso compõe corretamente com uma
+   variável de módulo — e seria clobberado por qualquer escrita direta. */
+let renderScale = getProfile().renderScale;
+
+/** O `pixelRatio` que o renderer deve ter agora. Um lugar só, por desenho. */
+const effectivePixelRatio = () =>
+  Math.min(devicePixelRatio, getProfile().pixelRatioCap) * renderScale;
+
+/* ---------------- A ESCALA É APLICADA NO INÍCIO DO QUADRO ----------------
+   ⚠️ E NÃO NO GANCHO, e esta é a correção de uma PISCADA relatada.
+
+   O caminho errado, que é o óbvio: `onScaleChange` aplica na hora. Só que quem
+   dispara o gancho é o controlador dinâmico, dentro de `reportFrameTime()` —
+   que o laço chama **depois** do `render()`. A sequência resultante é:
+
+     quadro N:  render()  →  medidor  →  setScale  →  setSize
+                                                       ↑ o canvas é LIMPO aqui
+     …o compositor apresenta o quadro N…              ← e o que ele apresenta
+                                                        é o buffer em branco
+     quadro N+1: desenha no buffer novo
+
+   Ou seja: escrever em `canvas.width` descarta o conteúdo, e entre esse
+   descarte e o próximo desenho existe uma apresentação. O resultado é um flash
+   branco de um quadro a cada degrau de resolução — e como o controlador tem
+   cadência de ~1 s, ele aparece como "está dando umas piscadas às vezes",
+   exatamente o relato.
+
+   O gancho passa a só ANOTAR. Quem aplica é o laço, no topo da iteração, antes
+   dos ganchos e do `render()` — assim a realocação e o desenho acontecem no
+   MESMO quadro e não há apresentação entre os dois.
+
+   Corolário para quem for mexer: qualquer coisa que realoque o drawing buffer
+   tem de entrar por aqui. `resize()` é a exceção legítima — ele responde a um
+   evento do DOM, fora do laço, e ali o navegador já está reapresentando de
+   qualquer forma. */
+let pendingScale: number | null = null;
+onScaleChange((s) => { pendingScale = s; invalidate(); });
+
+/** Aplica a escala anotada, se houver. Chamado do topo do laço. */
+function flushPendingScale() {
+  if (pendingScale === null) return;
+  renderScale = pendingScale;
+  pendingScale = null;
+  const w = holder.clientWidth, h = holder.clientHeight;
+  if (!w || !h) return;
+  renderer.setPixelRatio(effectivePixelRatio());
+  renderer.setSize(w, h);
+  /* O buffer novo nasce em branco e ESTE quadro é quem o preenche — mas a
+     sombra vive num alvo próprio, que a realocação não toca. */
+}
+
 export function resize() {
   const w = holder.clientWidth, h = holder.clientHeight;
   if (!w || !h) return;
@@ -4122,7 +4407,7 @@ export function resize() {
      multiplies by whatever the ratio currently is, so this has to come first.
      Cheap by construction: three's setPixelRatio() early-outs on an unchanged
      value, so the common case is one comparison. */
-  renderer.setPixelRatio(Math.min(devicePixelRatio, getProfile().pixelRatioCap));
+  renderer.setPixelRatio(effectivePixelRatio());
   renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
@@ -4150,44 +4435,27 @@ resize();
    flicking to another page and back pays nothing; a user who left for good stops
    pinning half a gigabyte of VRAM for the rest of the browser session.
 
-   The mechanism lives here because scene.ts is the only module every other one
-   can already reach without inverting an import edge (see the acyclicity note at
-   the top of the file). The POLICY — which disposers, in what order — belongs to
-   studio.ts, which is the module that knows what is mounted. */
-const IDLE_RELEASE_MS = 60_000;
-let idleReleaseTimer: ReturnType<typeof setTimeout> | 0 = 0;
+   O MECANISMO NÃO MORA MAIS AQUI, E A REMOÇÃO É A DECISÃO — não um esquecimento.
+   ---------------------------------------------------------------------------
+   Havia aqui um `scheduleIdleRelease(fn, ms)` / `cancelIdleRelease()` /
+   `isIdleReleasePending()`, exportados e **sem um único chamador em toda a
+   árvore** (conferido em `web/src` e em `web/tools`). O argumento de projeto
+   escrito acima — "o mecanismo mora aqui porque scene.ts é o módulo que todo
+   mundo já alcança" — não sobreviveu ao contato com o problema: a política
+   (quais descartadores, em que ordem, e com que escolha reaplicar depois) é tão
+   inseparável do timer que `studio.ts` acabou escrevendo o timer junto com ela
+   — `RELEASE_MS`, `releaseTimer`, `cancelRelease()`, `releaseScene()` e
+   `releasedChoice`, armados em `unmountStudio()` e cancelados em
+   `mountStudio()`.
 
-/**
- * Run `fn` once, `ms` from now, unless cancelIdleRelease() gets there first.
- *
- * Call it from unmountStudio(); call cancelIdleRelease() from mountStudio().
- * Replaces any release already pending rather than queueing a second one, so
- * two unmounts in a row still schedule exactly one teardown.
- *
- * `fn` must be safe to run against a detached, non-rendering studio and must
- * leave the engine re-mountable — every disposer this is meant for already is
- * (they degrade the scene back to procedural rather than breaking it).
- */
-export function scheduleIdleRelease(fn: () => void, ms: number = IDLE_RELEASE_MS) {
-  cancelIdleRelease();
-  idleReleaseTimer = setTimeout(() => {
-    idleReleaseTimer = 0;
-    /* A failed disposer must not take the timer's owner down with it: by
-       definition nobody is awaiting this, so a throw here would surface as an
-       unhandled rejection minutes after the user left the page. */
-    try { fn(); } catch (err) {
-      console.warn('[truck-studio] liberação diferida de memória falhou', err);
-    }
-  }, ms);
-}
+   Ou seja: o caminho ADOTADO é o de studio.ts, e ele é melhor por uma razão que
+   a versão genérica não tinha como ter — `releaseScene()` sabe adiar enquanto
+   `queueDepth > 0` e sabe guardar a escolha para reconstruir. Um agendador que
+   só recebe um `fn` não sabe nem uma coisa nem outra.
 
-/** Call from mountStudio(). Idempotent. */
-export function cancelIdleRelease() {
-  if (idleReleaseTimer) { clearTimeout(idleReleaseTimer); idleReleaseTimer = 0; }
-}
-
-/** True while a deferred teardown is armed — i.e. the studio is off the page. */
-export const isIdleReleasePending = () => idleReleaseTimer !== 0;
+   Fica registrado para que a próxima pessoa não reescreva o genérico achando
+   que ele falta. Se algum dia um SEGUNDO dono precisar do mesmo prazo, é de
+   studio.ts que se extrai — não daqui. */
 
 /* ---------------- instrumentation ----------------
    `renderer.info` is free (three keeps these counters whether or not anyone
@@ -4309,13 +4577,24 @@ export function pinFrames(on: boolean) {
    sombra na hora, e na anisotropia no próximo carregamento. */
 function applyQualityProfile() {
   const p = getProfile();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, p.pixelRatioCap));
+  /* A escala vem junto do teto — ver `effectivePixelRatio()`. Sem ela esta
+     função apagaria a escala corrente toda vez que o nível mudasse, e o
+     controlador dinâmico só a recuperaria no próximo degrau. */
+  renderScale = p.renderScale;
+  renderer.setPixelRatio(effectivePixelRatio());
   const w = holder.clientWidth, h = holder.clientHeight;
   if (w && h) renderer.setSize(w, h);
 
   const size = Math.min(p.shadowMapSize, renderer.capabilities.maxTextureSize || 3072);
   if (key.shadow.mapSize.x !== size) {
     key.shadow.mapSize.set(size, size);
+    shadowMapSide = size;
+    /* O BIAS ANDA COM O MAPA. Esta linha é o conserto do defeito descrito em
+       `applyShadowBias()`: realocar o alvo muda os metros por texel, e um bias
+       calibrado para 3072² vale um terço de texel a 1024² — a sombra vaza por
+       baixo do objeto e some. A versão anterior desta função escrevia `mapSize`
+       e não tocava no bias. */
+    applyShadowBias();
     /* O alvo VELHO tem de morrer, senão o three continua a desenhar no de antes
        e o `mapSize` novo não sai do papel. `dispose()` no mapa faz o renderer
        realocar no próximo passe de sombra. */
@@ -4329,6 +4608,9 @@ onQualityChange(applyQualityProfile);
 
 export function stopLoop() {
   renderer.setAnimationLoop(null);
+  /* A cadeia se rompe junto com o laço: remontar depois de uma troca de rota não
+     pode entregar ao medidor o intervalo entre a última rota e esta. */
+  lastDrawnAt = 0;
 }
 
 export function startLoop() {
@@ -4337,6 +4619,11 @@ export function startLoop() {
      restored viewport is the frame that has to land. */
   invalidate();
   renderer.setAnimationLoop(() => {
+    /* PRIMEIRA COISA DO QUADRO, e a posição é o conserto — ver o bloco de
+       `flushPendingScale()`. Realocar o drawing buffer o limpa, então a
+       realocação tem de acontecer no mesmo quadro que o desenho, nunca depois
+       dele. */
+    flushPendingScale();
     /* A backgrounded tab returns one huge dt, which would complete every tween
        in a single frame (a visible jump) and teleport the rain field. */
     const dt = Math.min(clock.getDelta(), 0.1);
@@ -4410,8 +4697,13 @@ export function startLoop() {
     /* Checked AFTER the hooks and BEFORE the dirty counter is spent: a frame
        skipped because the scene graph is deliberately wrong must not consume the
        invalidation that was asking for a correct one. */
-    if (drawSuspended > 0) return;
-    if (!draw) return;
+    /* A CADEIA DE QUADROS DESENHADOS SE ROMPE AQUI, e é isto que torna a régua
+       de tempo de parede honesta sob um laço sob demanda: o próximo quadro
+       desenhado não terá antecessor imediato, então ele não gera amostra. Sem
+       esta linha, uma cena parada por meio minuto entregaria "30 000 ms por
+       quadro" ao medidor no instante em que alguém encostasse no mouse. */
+    if (drawSuspended > 0) { lastDrawnAt = 0; return; }
+    if (!draw) { lastDrawnAt = 0; return; }
     if (dirtyFrames > 0) dirtyFrames--;
     /* Pay the deferred shadow refresh a light scrub skipped — see shadowStale.
        Here rather than in applyRig() because "the drag is over" is a fact about
@@ -4426,33 +4718,57 @@ export function startLoop() {
     for (const fn of drawHooks) fn(dt);
     const t0 = performance.now();
     renderer.render(scene, camera);
+    const t1 = performance.now();
     /* ---------------- O MEDIDOR DO PERFIL DE QUALIDADE ----------------
-       AQUI E EM NENHUM OUTRO LUGAR, por dois motivos que se somam:
+       AQUI E EM NENHUM OUTRO LUGAR, porque é depois do `return` do laço sujo —
+       ou seja **só em quadro DESENHADO**. Um quadro pulado custa ~0 ms;
+       alimentá-lo faria a média despencar com a cena parada, e o adaptador
+       concluiria que a máquina é um foguete justamente quando ela não está
+       fazendo nada.
 
-       1. É depois do `return` do laço sujo, ou seja **só em quadro DESENHADO**.
-          Um quadro pulado custa ~0 ms; alimentá-lo ao medidor faria a média
-          despencar com a cena parada e o adaptador concluiria que a máquina é
-          um foguete justamente quando ela não está fazendo nada — e então
-          subiria o nível de quem não aguenta.
-       2. Mede o `render()` e não o quadro inteiro. O que está fora dele
-          (`controls.update`, os ganchos, o desvio) é trabalho de CPU que não
-          muda com o perfil, e incluí-lo diluiria o sinal que o perfil pode
-          realmente mexer.
+       ---------------------------------------------------------------------
+       A RÉGUA MUDOU (2026-08-14), E ESTA É A CORREÇÃO QUE FAZ O RESTO VALER
 
-       `performance.now()` mede o tempo de SUBMISSÃO, não o de execução na GPU —
-       o driver é assíncrono. Isso subestima uma cena limitada por GPU, e é
-       aceito de propósito: a alternativa honesta seria uma consulta de
-       temporizador (`EXT_disjoint_timer_query`), que não existe na maioria dos
-       navegadores por privacidade. Na prática a submissão satura junto com a
-       GPU quando a fila enche, que é exatamente o regime em que o rebaixamento
-       interessa.
+       Até aqui o medidor passava `performance.now() - t0`, ou seja SÓ o
+       `render()`, com o argumento de que "o que está fora dele é trabalho de
+       CPU que não muda com o perfil". **A premissa é falsa exatamente no
+       hardware que o perfil existe para atender**, e por duas vias:
+
+         · numa máquina limitada por CPU o que domina está FORA do `render()` —
+           `updateSeeThrough()` percorre ~650 objetos 60×/s (e roda até em
+           quadro pulado), mais a submissão de ~2 400 chamadas e o passe de
+           sombra. O medidor não via nada disso;
+         · `performance.now()` em volta do `render()` mede SUBMISSÃO, não
+           execução. Com `setAnimationLoop` preso ao vsync, uma GPU saturada
+           deixa o bloqueio no swap, fora do `render()`. O medidor lia "está
+           tudo bem" numa máquina a 20 fps.
+
+       A régua honesta é o tempo de PAREDE entre dois quadros desenhados
+       CONSECUTIVOS: ela inclui CPU, GPU, compositor e swap, que é o que a
+       pessoa na frente da tela sente.
+
+       ⚠️ **CONSECUTIVOS é a palavra que carrega a correção.** Sob o laço sob
+       demanda, o intervalo entre um quadro desenhado e o próximo pode conter
+       minutos de cena parada — e passar isso como tempo de quadro seria uma
+       mentira ainda maior que a anterior, na direção oposta. Por isso
+       `lastDrawnAt` é ZERADO em todo quadro que não desenha (ver o `return` de
+       `!draw` acima), e a amostra só sai quando o quadro anterior também
+       desenhou.
+
+       O tempo de submissão continua sendo medido e continua sendo enviado, mas
+       como SEGUNDO canal: comparado com o de parede, ele é o que distingue
+       "limitado por GPU/submissão" de "limitado por CPU fora do render" — e
+       essa é a diferença entre baixar resolução (que resolve o primeiro) e
+       baixar contagem de objetos (que é a única coisa que resolve o segundo).
 
        O `busy` é a trava contra aprender a coisa errada. Todos os termos são
        picos CONHECIDOS: uma gravação em curso (`framePins`), um crossfade de
        preset (`tweenT`), e a janela de carga que `warmUp()` marca. Adaptar em
        cima de um pico conhecido faria o nível cair toda vez que o usuário
        trocasse de caminhão — que é o momento em que ele mais está olhando. */
-    reportFrameTime(performance.now() - t0,
+    const wall = lastDrawnAt ? t1 - lastDrawnAt : 0;
+    lastDrawnAt = t1;
+    reportFrameTime(wall, t1 - t0,
       framePins > 0 || tweenT < 1 || performance.now() < busyUntil);
   });
 }

@@ -257,6 +257,12 @@ export function rebuildLampHalos(sitios: HaloSite[], pai: THREE.Object3D | null)
     const cap = Math.max(32, sitios.length * 2);
     malha = new THREE.InstancedMesh(geo, mat, cap);
     malha.name = 'ts-lamp-halos-mesh';
+    /* JÁ NASCE NO ESTADO DO NÍVEL — ver `setLampHaloLevel()`. Uma malha nova de
+       dia entraria visível e desenharia ~40 quadrados de alfa 0 até a próxima
+       escrita de nível. Na prática `setVehicleLightsLevel()` chama as duas em
+       sequência, mas depender dessa ordem é depender de um arquivo que não é
+       este. */
+    malha.visible = uNivel.value > 0;
     malha.frustumCulled = false;      // a caixa da instância não cobre o billboard
     malha.castShadow = false;
     malha.receiveShadow = false;
@@ -286,9 +292,45 @@ export function rebuildLampHalos(sitios: HaloSite[], pai: THREE.Object3D | null)
   return sitios.length;
 }
 
-/** Acende/apaga o derrame. `n` é o mesmo `rig.vehLights` da lâmpada. */
+/** Acende/apaga o derrame. `n` é o mesmo `rig.vehLights` da lâmpada.
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ E DE DIA A MALHA SAI DA CENA (2026-08-14), porque um uniforme em 0 não é o
+ * mesmo que não desenhar.
+ *
+ * Este material é `AdditiveBlending` + `transparent` + `depthWrite: false` +
+ * `DoubleSide`, sem `discard`. Com `haloNivel` em 0 as ~40 instâncias continuam
+ * sendo submetidas, rasterizadas e MISTURADAS somando exatamente zero: o
+ * hardware paga a interpolação, o `length()`, a multiplicação e um
+ * read-modify-write no framebuffer por fragmento coberto, para não mudar um
+ * pixel. E cada quadrado é grande de propósito (raio de até 46 x 30 cm, empurrado
+ * para a frente do olho), então a área coberta não é desprezível — é overdraw
+ * transparente, a categoria que o perfil de qualidade já trata como cara em
+ * `rainRipples`.
+ *
+ * `visible` resolve: `WebGLRenderer.projectObject()` sai na primeira linha
+ * (`if ( object.visible === false ) return;`) e a malha não entra na render list.
+ *
+ * ⚠️ **É a MALHA que é escondida, nunca o GRUPO** — e a diferença importa.
+ * `isolateVehicle()` em `scene/capture.ts` percorre `scene.children` e usa
+ * *"já invisível ⇒ não é meu"* como posse. O que está em `scene.children` é o
+ * `grupo`; escondê-lo aqui faria a captura em recorte transparente decidir que o
+ * grupo não é dela e deixá-lo escondido depois — um halo que some para sempre
+ * depois de uma foto. Escondendo a malha, que é NETA da cena, aquela heurística
+ * continua vendo o grupo exatamente como antes.
+ *
+ * CONFERIDO que nada mais depende de a malha estar desenhando: o grupo pendura
+ * na CENA de propósito, fora de tudo que MEDE (ver o bloco em
+ * `rebuildLampHalos()` — `frameAll()`, a sonda de reflexo e o atravessar todos
+ * medem caixas, e `Box3.setFromObject()` respeita `visible`, então esconder só
+ * reforça o que já se queria); `getLampHalos()` lê `malha.count` e as posições
+ * guardadas, não a visibilidade; e `rebuildLampHalos()` escreve matrizes e
+ * atributos, que independem de estar visível.
+ */
 export function setLampHaloLevel(n: number) {
-  uNivel.value = THREE.MathUtils.clamp(n, 0, 1) * HALO_PICO;
+  const v = THREE.MathUtils.clamp(n, 0, 1) * HALO_PICO;
+  uNivel.value = v;
+  if (malha) malha.visible = v > 0;
 }
 
 /* As posições, guardadas só para o diagnóstico. É delas que sai a trava mais
@@ -301,7 +343,11 @@ let ultimos: HaloSite[] = [];
 export function getLampHalos() {
   return {
     sitios: quantos,
+    /* `desenhados` é a CONTAGEM da instanciada; `visivel` é se ela chega a ser
+       submetida. De dia o certo é `desenhados: 40, visivel: false` — ver
+       `setLampHaloLevel()`. */
     desenhados: malha ? malha.count : 0,
+    visivel: malha ? malha.visible : false,
     nivel: Math.round((uNivel.value / HALO_PICO) * 100) / 100,
     pico: HALO_PICO,
     escala: HALO_ESCALA,

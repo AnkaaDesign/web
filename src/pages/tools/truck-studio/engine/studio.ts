@@ -23,7 +23,8 @@ import * as THREE from 'three';
 import * as sceneMod from './scene/scene';
 import { scene, camera, controls, renderer, frameAll, startLoop, stopLoop, resize,
          setVehicleFocus, invalidate, invalidateShadows, warmLightPrograms,
-         releaseProceduralEnvCache } from './scene/scene';
+         releaseProceduralEnvCache, getRenderStats,
+         applyColdSpotPool, applyColdShadowType, suspendDraw } from './scene/scene';
 import * as models from './vehicle/models';
 import * as paint from './vehicle/paint';
 import * as livery from './vehicle/livery';
@@ -33,7 +34,11 @@ import * as selector from './ui/selector';
 import * as environment from './scene/environment';
 import {
   qualityInfo, setQualityMode, qualityLevel, qualityMode, getProfile,
+  coldPending, coldProfile, appliedColdProfile, markColdApplied,
+  setAvailableVariants, renderScale, setRenderScale, scaleBand,
+  frameTimeEma, submitTimeEma,
 } from './core/quality';
+import { ENVIRONMENTS_DIR } from './core/paths';
 import * as captureMod from './scene/capture';
 import * as cyclorama from './scene/cyclorama';
 import * as loader from './ui/loader';
@@ -59,7 +64,7 @@ import {
   initLoader, showLoader, setLoaderProgress, finishLoader, hideLoader,
   claimPill, paintFrame, withPill,
 } from './ui/loader';
-import { initHud, syncHud } from './ui/hud';
+import { initHud, syncHud, setColdApplyHandler } from './ui/hud';
 import { initWeather } from './scene/weather';
 import { initUI, setStatus, setCaptureSubject, exitFullscreen } from './ui/chrome';
 /* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
@@ -1261,6 +1266,191 @@ function releaseScene() {
   }
 }
 
+/* ---------------- A CORTINA PARA MUDANÇAS FRIAS ----------------
+   O perfil de qualidade tem dois tipos de botão (ver `core/quality.ts`): os
+   QUENTES, que `applyQualityProfile()` em scene.ts escreve na hora e o medidor
+   pode mexer sozinho, e os FRIOS — `spotPool`, `shadowType`, `groundVariant`,
+   `hdrVariant`, `antialias` —, que mudam um `#define`, uma chave de cache de
+   programa ou uma URL de asset. Um botão frio trocado no meio de um arrasto é
+   uma recompilação da cena inteira debaixo do polegar do usuário, que é
+   exatamente o defeito que a adaptação automática existe para evitar.
+
+   Então: o MEDIDOR nunca toca neles, `coldPending()` acusa a divergência, e a
+   aplicação é um ATO — este. Ela reusa, tijolo por tijolo, a máquina que a
+   liberação diferida já tinha: solta o cenário, zera `currentChoice` para o
+   dedupe de `applyChoice()` não descartar a reconstrução como repetida, e
+   reaplica a MESMA escolha pelo caminho normal, sob a cortina. Nenhum caminho
+   novo de carga foi inventado, e é isso que faz esta função ser curta.
+
+   O QUE CADA CAMPO CUSTA AQUI:
+     spotPool      `applyColdSpotPool()` desapareia/reapareia as `SpotLight`.
+                   Barato, mas move `NUM_SPOT_LIGHTS` — por isso vem ANTES da
+                   reconstrução, para o `warmLightPrograms()` de dentro de
+                   `runApply()` pré-compilar já o par novo.
+     shadowType    `applyColdShadowType()` troca o `#define` e varre a cena
+                   marcando material sujo. Caro, e por isso mesmo sob cortina.
+     ground/hdr    saem de graça: `groundVariant()`/`hdrVariant()` são lidas no
+                   MOMENTO da carga, e a carga é justamente o que vai acontecer.
+
+   ⚠️ **`antialias` NÃO TEM COMO SER APLICADO, E ISTO NÃO É UMA OMISSÃO.** Ele é
+   parâmetro de CONSTRUTOR do `WebGLRenderer`, que nasce no escopo de módulo de
+   `scene.ts` — não existe, em toda a árvore, um `dispose()` ou um
+   `forceContextLoss()`, e `controls`, `record.ts` e `capture.ts` guardam
+   referência ao `renderer.domElement`. Recriar o renderer é uma refatoração
+   grande e arriscada, e inventá-la aqui seria trocar um botão de qualidade por
+   uma classe inteira de defeitos de ciclo de vida.
+
+   Hoje isso não bloqueia nada: **os três níveis pedem `antialias: true`** (é uma
+   conclusão medida — MSAA sombreia uma vez por PIXEL e esta cena é limitada por
+   fragmento; ver `ColdProfile.antialias`). Se algum dia um nível pedir `false`,
+   esta função avisa e recusa em vez de subir uma cortina que não mudaria nada. */
+
+/** Uma aplicação fria em curso — reentrar sobreporia duas reconstruções. */
+let coldApplying = false;
+
+/** Os campos frios que ESTA função consegue aplicar sem contexto novo. */
+function coldPendingApplicable(): boolean {
+  const want = coldProfile(), got = appliedColdProfile();
+  return want.spotPool !== got.spotPool
+    || want.shadowType !== got.shadowType
+    || want.groundVariant !== got.groundVariant
+    || want.hdrVariant !== got.hdrVariant;
+}
+
+/**
+ * Aplica a assinatura fria do nível vigente, reconstruindo a cena sob a cortina.
+ *
+ * @returns `true` se a cena foi reconstruída; `false` quando não havia nada
+ *   pendente, quando o pendente é só `antialias` (que exige recarregar a página)
+ *   ou quando não há escolha montada para reaplicar.
+ */
+export async function applyColdQuality(): Promise<boolean> {
+  if (!coldPending()) return false;
+  if (coldApplying) return false;
+
+  if (!coldPendingApplicable()) {
+    /* Sobra só o `antialias`. Recusar é a resposta honesta: uma cortina de
+       segundos que devolve exatamente a mesma imagem é pior que uma frase. */
+    console.warn('[truck-studio] a única diferença fria pendente é `antialias`,'
+      + ' que é parâmetro de construtor do WebGLRenderer — recarregue a página'
+      + ' para que ele valha.');
+    setStatus('Qualidade: esta mudança exige recarregar a página');
+    return false;
+  }
+
+  coldApplying = true;
+  /* Um `release` armado no meio disto liberaria o cenário por baixo da
+     reconstrução. */
+  cancelRelease();
+  try {
+    /* A FILA PRIMEIRO. `releaseScene()` adia enquanto `queueDepth > 0` — e se
+       ele adiar, nós seguiríamos em frente reconstruindo sobre uma cena que
+       ninguém soltou. Esvaziar antes é o que faz o resto desta função poder ser
+       linear. O laço tem teto porque `applyQueue` é reatribuída a cada
+       `enqueue()`: esperar a fila de agora não impede alguém de empurrar outra
+       coisa, e um `while (queueDepth)` sem teto seria uma espera sem fim se a
+       interface estivesse despejando trabalho. */
+    for (let i = 0; i < 4 && queueDepth > 0; i++) await applyQueue.catch(() => null);
+
+    const base = currentChoice || releasedChoice;
+    if (!base) {
+      console.warn('[truck-studio] nada montado — não há o que reconstruir.');
+      return false;
+    }
+
+    /* ---- A JANELA DESTRUTIVA ----
+       Três instruções que deixam o grafo deliberadamente errado (luzes
+       desapareadas, materiais marcados sujos, cenário descartado). Nenhum quadro
+       pode ser apresentado no meio delas.
+
+       O `release` sai LOGO DEPOIS de `applyChoice()` ser chamada, e não no fim:
+       `applyChoice` → `enqueue` → `applyQueue.then(run)` agenda um MICROTASK, e
+       `runApply()` chama `showLoader()` antes do primeiro `await` dele. Ou seja
+       a cortina sobe antes de o navegador poder pintar qualquer coisa, e segurar
+       `drawSuspended` além deste ponto só faria o quadro de aquecimento de
+       `runApply()` (a fase "Renderizando o primeiro quadro…") não desenhar — que
+       é justamente o engasgo que aquela fase existe para pagar adiantado. */
+    const resume = suspendDraw();
+    /* IIFE e não um `let` solto: com um `try/finally` no meio, o verificador de
+       fluxo do TypeScript não consegue provar que a variável foi atribuída
+       depois do bloco, e o `!` que calaria o erro é exatamente o tipo de
+       silenciamento que esconde o caso em que ela de fato não foi. */
+    const apply = (() => {
+      try {
+        applyColdSpotPool();
+        applyColdShadowType();
+        releaseScene();
+        /* `releaseScene()` guardou a escolha em `releasedChoice` e zerou
+           `currentChoice` — é isso que faz o dedupe de `applyChoice()` não
+           descartar a reconstrução. Limpar `releasedChoice` aqui é o mesmo passo
+           que `mountStudio()` dá: sem ele, uma saída de rota depois desta
+           reconstrução tentaria reconstruir de novo. */
+        const again = releasedChoice || base;
+        releasedChoice = null;
+        return applyChoice(again);
+      } finally {
+        resume();
+      }
+    })();
+
+    const done = await apply;
+    if (!done) {
+      /* A cena ficou sem cenário e a linha de estado já carrega o erro. Não
+         marcar o frio como aplicado é o que mantém `coldPending()` dizendo a
+         verdade — o contexto NÃO tem a assinatura nova. */
+      console.warn('[truck-studio] a reconstrução fria falhou; a qualidade fria segue pendente.');
+      return false;
+    }
+    /* SÓ AQUI, e só quem reconstruiu chama. Ver `markColdApplied()`. */
+    markColdApplied();
+    console.info('[truck-studio] qualidade fria aplicada:', appliedColdProfile());
+    return true;
+  } finally {
+    coldApplying = false;
+  }
+}
+
+/* ---------------- AS VARIANTES DE TEXTURA QUE O SERVIDOR DECLARA ----------
+   `coldProfile()` só emite `@ktx2`/`@1k` quando o MANIFESTO diz que os arquivos
+   existem — ver o bloco VARIANTES DE ASSET em `core/quality.ts`. A alternativa
+   (pedir e degradar no 404) custaria 16 requisições perdidas por boot enquanto
+   o deploy não chega e, pior, esconderia um deploy pela metade.
+
+   ⚠️ LIDO AQUI, E NÃO EM `catalog.ts`, e a razão é de escopo desta rodada, não
+   de projeto: `normalizeEnvironment()` valida a LISTA de cenários e descarta as
+   chaves de RAIZ do arquivo, e `textureVariants` é chave de raiz. O lugar certo
+   é `loadEnvironments()` devolver o bloco cru junto com a lista; enquanto isso
+   não acontece, esta função relê o mesmo arquivo com `cache: 'force-cache'` —
+   `fetchJSON()` acabou de buscá-lo com `no-cache`, ou seja de revalidá-lo, então
+   esta segunda leitura sai do cache do navegador e não é uma segunda viagem à
+   rede.
+
+   ⚠️ E HÁ UM SEGUNDO DECLARANTE: `declararVariantes()` em `scene/environment.ts`
+   lê `set.textureVariants` a cada troca de cenário, pelo mesmo motivo (não
+   alcançava a raiz). Os dois compõem porque este roda UMA vez, no boot, antes de
+   qualquer cenário — e porque aquele, de propósito, não limpa a lista quando a
+   chave está ausente. Se algum dia os dois discordarem, o de lá ganha por ser o
+   último a escrever, e a saída é a mesma para os dois: `catalog.ts` repassar a
+   raiz e as duas funções morrerem juntas.
+
+   NUNCA LANÇA E NUNCA BLOQUEIA UMA DECISÃO: sem o arquivo, sem a chave ou com a
+   chave malformada, o padrão vazio significa "só os arquivos de sempre", que é o
+   comportamento de antes desta linha existir. */
+async function loadTextureVariants(): Promise<void> {
+  try {
+    const r = await fetch(assetUrl(ENVIRONMENTS_DIR + 'environments.json'),
+      { cache: 'force-cache' });
+    if (!r.ok) return;
+    const j = await r.json() as { textureVariants?: unknown };
+    if (Array.isArray(j?.textureVariants)) {
+      setAvailableVariants(j.textureVariants.filter((s): s is string => typeof s === 'string'));
+    }
+  } catch (e) {
+    console.info('[truck-studio] sem `textureVariants` no manifesto —'
+      + ' as texturas de sempre.', errText(e));
+  }
+}
+
 async function boot() {
   try {
     livery.initLivery();
@@ -1284,6 +1474,13 @@ async function boot() {
        memória antes de o primeiro grid ser montado. Ele nunca lança e nunca
        bloqueia nada — ausente = todo card cai no placeholder de silhueta. */
     await Promise.all([loadCatalog(), models.loadManifests(), loadColors(), loadRenders()]);
+    /* DEPOIS do catálogo (o arquivo já está no cache do navegador) e ANTES de
+       qualquer carga de cenário: `groundVariant()`/`hdrVariant()` são lidas no
+       momento em que a URL do mapa é montada, então declarar as variantes
+       depois disso deixaria o primeiro cenário baixando os arquivos de sempre e
+       os seguintes baixando os comprimidos — meio deploy, que é exatamente o
+       estado que o manifesto existe para tornar impossível. */
+    await loadTextureVariants();
     /* O card de configurações foi montado ANTES de existir cavalo ou implemento
        em cena, então o segmentado "Em cena" saiu com as duas opções de metade
        desabilitadas. Repintar aqui é o mesmo padrão que o seletor usa, e custa
@@ -1304,6 +1501,20 @@ async function boot() {
     initSelector();
     initLoader();
     initHud();
+    /* A PORTA EXPLÍCITA do botão "Aplicar" da qualidade fria. `ui/hud.ts` tem uma
+       rede de segurança que vai buscar `window.__studio.quality.applyCold`, mas o
+       handle de console só é instalado no FIM do boot — depois do primeiro
+       `applyChoice`, que é uma cortina inteira. Registrar aqui fecha essa janela,
+       e a inversão de dependência é o que impede o ciclo: `ui/hud.ts` é importado
+       POR este arquivo, então quem entrega a função é quem já está de pé.
+
+       ⚠️ EMBRULHADA e não passada crua: o contrato de lá é
+       `() => void | Promise<void>` e esta devolve `Promise<boolean>` — e
+       `Promise<boolean>` NÃO é atribuível a `Promise<void>` (a regra de
+       "retorno void aceita qualquer coisa" do TypeScript só vale quando o
+       retorno alvo é exatamente `void`, não uma união que o contém). O `await`
+       aqui é o que mantém o botão podendo esperar a cortina descer. */
+    setColdApplyHandler(async () => { await applyColdQuality(); });
     /* A fase de catálogo acabou, e daqui em diante a tela pertence ao seletor ou
        à cortina — aposente o spinner de bootstrap para ele nunca ficar debaixo
        de nenhum dos dois. */
@@ -1351,13 +1562,50 @@ async function boot() {
          de que a imagem baixada sai no teto mesmo com a vista no piso — ver
          `tools/studio-bench/checks-qualidade.mjs`. */
       capture: captureMod,
+      /* O handle acompanha o que o perfil GANHOU nesta rodada, e isso não é
+         cosmética: é a bancada (`tools/studio-bench/checks-qualidade.mjs`) que
+         lê daqui, e um afordance que não alcança o botão dominante deixa de
+         medir o botão dominante.
+           `renderScale`/`setRenderScale`/`scaleBand` — a escala de render, que é
+             o multiplicador que o custo de preenchimento segue ao QUADRADO. Era
+             o único jeito de medir "quanto disto é resolução".
+           `frameTimeEma`/`submitTimeEma` — os dois canais do medidor. Próximos
+             um do outro = limitado por GPU/submissão; parede muito maior =
+             limitado por CPU fora do `render()` ou por espera de vsync, e aí
+             baixar resolução não devolve nada.
+           `coldPending`/`applyCold` — a assinatura fria pendente e o ato de
+             aplicá-la. Ver `applyColdQuality()`.
+           `stats` — `renderer.info` já ordenado (chamadas, triângulos,
+             programas). Era alcançável só por `renderer.info` cru. */
       quality: {
         info: qualityInfo,
         set: setQualityMode,
         get level() { return qualityLevel(); },
         get mode() { return qualityMode(); },
         profile: getProfile,
+        cold: coldProfile,
+        appliedCold: appliedColdProfile,
+        get renderScale() { return renderScale(); },
+        setRenderScale,
+        scaleBand,
+        get frameTimeEma() { return frameTimeEma(); },
+        get submitTimeEma() { return submitTimeEma(); },
+        get coldPending() { return coldPending(); },
+        applyCold: applyColdQuality,
+        stats: getRenderStats,
       },
+      /* Também no topo, porque a pergunta "quantas chamadas de desenho custa
+         isto?" é anterior a qualquer nível de qualidade — ela é o número de que
+         toda decisão de scene.ts é argumentada, e até aqui só `renderer.info`
+         cru a alcançava. */
+      getRenderStats,
+      /* TAMBÉM NO TOPO, e não só em `quality.applyCold`: `ui/hud.ts` procura a
+         porta nesta ordem — `__studio.applyColdQuality`, depois
+         `__studio.quality.applyCold`, depois `__studio.quality.applyColdQuality`.
+         Publicar as duas primeiras custa uma referência e tira do caminho a
+         classe de defeito em que o botão "Aplicar" da interface não encontra a
+         função e não faz nada, em silêncio. */
+      applyColdQuality,
       applyChoice,
       uniforms: paint._sharedPaint,
       /* O redimensionamento do baú, pela porta que costura livery e câmera —

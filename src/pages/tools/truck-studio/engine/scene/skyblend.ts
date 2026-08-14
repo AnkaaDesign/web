@@ -34,6 +34,8 @@
        de desfoque, 10 a 40 ms), então ele é LIMITADO POR TAXA: no máximo um a
        cada 110 ms, e só quando a mistura andou um passo de 1/12. Numa varredura
        do dia à noite são doze reassaduras em vez de uma por evento de ponteiro.
+       (Os dois números são os do nível ALTO; desde 2026-08-14 quem os dita é o
+       perfil de qualidade — ver o bloco `passos()`/`minMs()` abaixo.)
 
    O DESCASAMENTO É INVISÍVEL, e é por isso que a divisão funciona: o fundo é
    estrutura (nuvem, lua, horizonte) e o olho o segue; o reflexo é um termo de
@@ -65,11 +67,56 @@
    6 % passou a ser escuro demais. Ver NIGHT_BG/NIGHT_ENV em scene.ts. */
 import * as THREE from 'three';
 import { renderer, pmrem, invalidate } from './scene';
+import { getProfile } from '../core/quality';
 
-/** Passos de mistura em que o PMREM é reassado. Doze numa varredura inteira. */
-const PASSOS = 12;
-/** Piso entre duas reassaduras, em ms. ~9 por segundo no pior arrasto. */
-const MIN_MS = 110;
+/* ---------------------------------------------------------------------------
+   A TAXA DE REASSADURA VEM DO PERFIL DE QUALIDADE (2026-08-14)
+
+   Eram duas constantes — `PASSOS = 12` e `MIN_MS = 110` —, e o cabeçalho já
+   dizia por que elas são o botão certo: cada assadura custa 10 a 40 ms, então
+   uma varredura completa do relógio são DOZE picos desses. Metade dos passos é
+   metade dos picos, e a defasagem do céu misturado é invisível pelo argumento
+   deste próprio arquivo (ver "O DESCASAMENTO É INVISÍVEL"): o fundo é reescrito
+   a cada quadro de tween e continua liso; o que atrasa é só o reflexo, que é um
+   termo difuso mais um realce desfocado.
+
+     Alta  12 passos / 110 ms   — como sempre foi.
+     Média  8 passos / 150 ms
+     Baixa  6 passos / 200 ms   — metade dos picos, e cada pico ~4× mais barato
+                                  quando `hdrVariant` = '@1k' entra junto (o
+                                  custo do PMREM escala com a ÁREA; ver
+                                  `ColdProfile.hdrVariant` em core/quality.ts).
+
+   ⚠️ SÃO FUNÇÕES, E NÃO CONSTANTES LIDAS UMA VEZ. O nível muda no meio da
+   sessão — pelo medidor ou por escolha do usuário — e um `const` de módulo
+   congelaria a taxa no nível em que a página abriu. É a mesma armadilha que
+   `textureAnisotropy()` teve de virar função para não ter. Por serem lidas a
+   cada chamada, este módulo NÃO precisa assinar `onQualityChange`.
+
+   ⚠️⚠️ E `PASSOS` É ARITMÉTICA DE QUANTIZAÇÃO, não um contador — o que faz dele
+   uma armadilha de verdade quando muda no meio do caminho. `passoAssado` guarda
+   `round(peso · PASSOS)`, e a comparação `passo === passoAssado` é o que decide
+   PULAR uma assadura. Com o número de passos mudando, um índice gravado na
+   régua velha pode COINCIDIR com um índice da régua nova em pesos diferentes, e
+   aí a assadura seria pulada por engano — o reflexo ficaria preso num degrau
+   até o próximo movimento do relógio, e no fim de um arrasto "o próximo
+   movimento" pode não vir. Daí `passosAssados`: o índice só vale enquanto a
+   régua que o produziu for a mesma. Uma troca de nível força uma reassadura, o
+   que é o lado certo de errar (uma assadura a mais, nunca um céu preso).
+
+   O ERRO EM REPOUSO, dito por inteiro e sem maquiagem: com a mistura parada, o
+   reflexo corresponde ao peso em que o degrau foi cruzado, não ao peso final —
+   erro de até 1/(2·PASSOS) da mistura. Isso JÁ EXISTIA com 12 passos (±4,2 %);
+   com 6 ele dobra para ±8,3 %. Sobre um envmap difuso já borrado pelo PMREM
+   isso é indistinguível, e é exatamente a mesma aposta que os 110 ms de atraso
+   fazem — só que em amplitude em vez de em tempo.
+   --------------------------------------------------------------------------- */
+
+/** Passos de mistura em que o PMREM é reassado. Doze numa varredura inteira, no
+ *  nível Alto. */
+const passos = () => Math.max(1, getProfile().pmremSteps);
+/** Piso entre duas reassaduras, em ms. ~9 por segundo no pior arrasto (Alta). */
+const minMs = () => getProfile().pmremMinMs;
 
 /* A janela em que a noite entra, em unidades de `nightness`. Ver o cabeçalho:
    o 0,25 é o que mantém a lua fora do céu de poente. */
@@ -114,6 +161,9 @@ let quadMat: THREE.ShaderMaterial | null = null;
 /** Mistura corrente (já com a curva aplicada) e a última que foi para o PMREM. */
 let pesoAtual = 0;
 let passoAssado = -1;
+/** Com QUANTOS passos `passoAssado` foi calculado. Ver o aviso da quantização
+ *  no topo: um índice só é comparável com outro da mesma régua. */
+let passosAssados = 0;
 let ultimoBake = 0;
 let pendente: ReturnType<typeof setTimeout> | 0 = 0;
 
@@ -231,7 +281,8 @@ export function setSkyPair(d: THREE.Texture | null, n: THREE.Texture | null,
 
   montarQuad();
   pesoAtual = pesoDe(nightness);
-  passoAssado = Math.round(pesoAtual * PASSOS);
+  passosAssados = passos();
+  passoAssado = Math.round(pesoAtual * passosAssados);
   ultimoBake = performance.now();
   pintar();
   assar();
@@ -255,12 +306,18 @@ export function updateSkyBlend(nightness: number) {
   pintar();
   invalidate();
 
-  const passo = Math.round(pesoAtual * PASSOS);
-  if (passo === passoAssado) return;
+  /* A RÉGUA É LIDA UMA VEZ POR CHAMADA, e o índice só é comparável com um
+     índice da MESMA régua — ver o aviso da quantização no topo. Nível trocado
+     ⇒ `passo === passoAssado` não pode mais autorizar um pulo. */
+  const ps = passos();
+  const espera = minMs();
+  const passo = Math.round(pesoAtual * ps);
+  if (passo === passoAssado && ps === passosAssados) return;
   const agora = performance.now();
-  if (agora - ultimoBake >= MIN_MS) {
+  if (agora - ultimoBake >= espera) {
     if (pendente) { clearTimeout(pendente); pendente = 0; }
     passoAssado = passo;
+    passosAssados = ps;
     ultimoBake = agora;
     assar();
     invalidate();
@@ -270,11 +327,15 @@ export function updateSkyBlend(nightness: number) {
   pendente = setTimeout(() => {
     pendente = 0;
     if (!alvo) return;
-    passoAssado = Math.round(pesoAtual * PASSOS);
+    /* RELIDO aqui dentro, e não capturado: entre o agendamento e o disparo cabe
+       uma troca de nível, e o índice tem de ser gravado na régua que valia na
+       hora de assar. */
+    passosAssados = passos();
+    passoAssado = Math.round(pesoAtual * passosAssados);
     ultimoBake = performance.now();
     assar();
     invalidate();
-  }, MIN_MS - (agora - ultimoBake));
+  }, espera - (agora - ultimoBake));
 }
 
 /**
@@ -289,6 +350,7 @@ export function disposeSkyBlend() {
   dia = null;
   noite = null;
   passoAssado = -1;
+  passosAssados = 0;
 }
 
 /** Há um par montado? É o liga/desliga que scene.ts consulta em applyRig(). */
@@ -300,6 +362,11 @@ export function getSkyBlend() {
     ativo: !!alvo,
     peso: pesoAtual,
     passoAssado,
+    /* A régua vigente e a que produziu `passoAssado`. Divergirem é normal logo
+       depois de uma troca de nível e some na próxima assadura. */
+    passos: passos(),
+    passosAssados,
+    minMs: minMs(),
     bakes,
     tamanho: alvo ? [alvo.width, alvo.height] : null,
   };
