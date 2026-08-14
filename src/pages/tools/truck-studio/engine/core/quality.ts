@@ -1160,6 +1160,87 @@ export function setQualityMode(next: QualityMode) {
   /* `setLevel` sai cedo quando o nível não muda, mas o MODO mudou — e a
      interface pinta o modo. */
   emit();
+  /* E O FRIO VAI JUNTO — ver `setColdApplier()`. Só aqui, porque só aqui houve
+     um ATO do usuário. */
+  agendarFrio();
+}
+
+/* ---------------------------------------------------------------------------
+   O FRIO APLICADO POR ATO DO USUÁRIO
+
+   O DEFEITO QUE ISTO CONSERTA, e ele foi medido antes de ser consertado.
+
+   O pool de refletores e o filtro de sombra são FRIOS: mudar de nível reescreve
+   o que o nível PEDE e não toca no que está no ar. Até aqui nada aplicava a
+   diferença — sobrava um botão "aplicar agora" no painel, que ninguém que não
+   soubesse da existência dele iria clicar.
+
+   O resultado prático era o pior possível: **escolher "Média" parecia fazer
+   alguma coisa** (os botões quentes agiam na hora) **e deixava a maior alavanca
+   intocada.** Medido na bancada, na Vega 8: o pool de 14 para 0 vale
+   **120,4 ms → 50,1 ms, ou seja 2,4×** — mais que todos os botões quentes
+   somados. Um usuário que descesse de nível recebia uma fração do que o nível
+   promete e concluiria, de novo, que o seletor não faz nada.
+
+   ⚠️ **E O MEDIDOR CONTINUA PROIBIDO DE LEVANTAR CORTINA.** Este gatilho está em
+   `setQualityMode()` e em nenhum outro lugar; `setLevel()`, que é por onde o
+   adaptador automático desce e sobe, não o chama. A regra não mudou — ela só
+   passou a ter a exceção que sempre teve por escrito: *quem clicou pediu, e pode
+   pagar uma cortina; quem não clicou não pode ser interrompido.*
+
+   POR QUE UM CALLBACK E NÃO UMA CHAMADA DIRETA: este módulo é FOLHA e tem de
+   continuar sendo — `scene.ts` o importa no escopo de módulo para responder
+   `antialias` antes de o renderer existir. Importar `studio.ts` daqui fecharia o
+   ciclo e daria `ReferenceError` no boot. Então quem sabe reconstruir se
+   REGISTRA, e este módulo só sabe que existe alguém.
+
+   POR QUE ADIADO: clicar Alta → Média → Baixa em dois segundos são três atos, e
+   três cortinas seriam uma punição por explorar o controle. A espera curta
+   deixa o usuário assentar numa escolha antes de pagar por ela. E ela é
+   REARMADA a cada ato, então só o último vale. */
+type ColdApplier = () => void | Promise<unknown>;
+let coldApplier: ColdApplier | null = null;
+let frioTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Espera antes de levantar a cortina. Curta o bastante para parecer resposta
+ *  ao clique, longa o bastante para absorver alguém percorrendo os quatro
+ *  botões. */
+const FRIO_DEBOUNCE_MS = 700;
+
+/**
+ * Registra quem sabe reconstruir a cena sob a cortina.
+ *
+ * `studio.ts` chama isto uma vez, com `applyColdQuality`. Sem registro nada
+ * quebra: o perfil segue funcionando com os botões quentes, `coldPending()`
+ * segue verdadeiro e o botão do painel de Configurações continua sendo o
+ * caminho manual — que é exatamente o comportamento de antes desta função.
+ */
+export function setColdApplier(fn: ColdApplier | null) {
+  coldApplier = fn;
+}
+
+function agendarFrio() {
+  if (!coldApplier) return;
+  if (frioTimer) clearTimeout(frioTimer);
+  frioTimer = setTimeout(() => {
+    frioTimer = null;
+    /* Reconferido AGORA, e não quando foi agendado: entre o clique e este
+       instante o usuário pode ter voltado ao nível de origem, e aí não há
+       diferença nenhuma a aplicar — levantar cortina para não mudar nada é o
+       defeito que `applyColdQuality()` já recusa para o caso do `antialias`. */
+    if (!coldPending()) return;
+    try {
+      void coldApplier?.();
+    } catch (e) {
+      console.warn('[qualidade] falha ao aplicar a parte fria', e);
+    }
+  }, FRIO_DEBOUNCE_MS);
+}
+
+/** Cancela uma aplicação fria agendada. Para quem vai desmontar a cena — uma
+ *  cortina que sobe depois da rota trocar reconstrói o que ninguém está vendo. */
+export function cancelPendingColdApply() {
+  if (frioTimer) { clearTimeout(frioTimer); frioTimer = null; }
 }
 
 /** Diagnóstico legível — o que a bancada, o painel de configurações e o console

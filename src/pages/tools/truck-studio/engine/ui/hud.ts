@@ -286,9 +286,7 @@ let weatherVal!: HTMLElement;
    adaptador automático pode disparar ANTES de o painel existir (o medidor roda no
    laço, o HUD é construído sob demanda). A guarda de nulo em cada pintor é o que
    cobre essa janela; um `!` aqui seria mentira de tipo. */
-let cfgHead: HTMLButtonElement | null = null;
 let cfgHint: HTMLElement | null = null;
-let cfgBody: HTMLElement | null = null;
 
 let qualityVal: HTMLElement | null = null;
 let qualityTiles: HTMLElement | null = null;
@@ -338,7 +336,6 @@ let collapsed = false;
    está errada. Um bloco de diagnóstico permanentemente aberto num painel de
    200 px empurraria os controles de luz para dentro de uma barra de rolagem em
    troca de números que ninguém está lendo. */
-let cfgCollapsed = true;
 let dragPointer: number | null = null;   // pointerId while the dial is turning
 
 /* ---------------- persistence ---------------- */
@@ -354,13 +351,12 @@ function loadCollapsed() {
        "fechada" — que é o padrão acima. `!!undefined` já faria isso; o teste
        explícito existe para que um `false` gravado seja respeitado em vez de
        cair no padrão junto com o ausente. */
-    if (typeof data.cfg === 'boolean') cfgCollapsed = data.cfg;
   } catch { /* storage bloqueado: os padrões valem */ }
 }
 
 function saveCollapsed() {
   try {
-    localStorage.setItem(HUD_KEY, JSON.stringify({ v: 2, collapsed, cfg: cfgCollapsed }));
+    localStorage.setItem(HUD_KEY, JSON.stringify({ v: 2, collapsed }));
   } catch { /* private mode / quota — the panel still works, just forgets */ }
 }
 
@@ -1383,6 +1379,19 @@ export function buildQualitySection(): DocumentFragment {
   if (DEV) {
     frag.appendChild(buildDiagRow());
     frag.appendChild(buildHardwareRow());
+    /* O TIQUE COMEÇA COM A SEÇÃO, e o dono dele é esta função porque é ela que
+       constrói as fileiras que ele pinta. `startDiag()` é idempotente (sai cedo
+       se já há temporizador), o que importa porque `trim-panel.ts` reconstrói o
+       card inteiro a cada `paint()` — uma troca de veículo, por exemplo.
+
+       O tique se encerra sozinho: `paintDiag()` sai cedo quando os nós saíram do
+       documento, e em produção nada disto existe no bundle. */
+    startDiag();
+  } else {
+    /* Sem diagnóstico não há o que pintar em intervalo. Chamado por segurança:
+       um build que trocasse de modo em tempo de execução (não existe hoje) não
+       pode deixar um temporizador de dev vivo. */
+    stopDiag();
   }
   return frag;
 }
@@ -1392,6 +1401,10 @@ export function buildQualitySection(): DocumentFragment {
    que é o único estado desta seção que alguém precisaria descobrir sem ter aberto
    nada. */
 function paintCfgHint() {
+  /* O cabeçalho que este resumo alimentava era o da seção de Configurações
+     dentro do painel de luz, e ele não existe mais. A função fica porque
+     `paintCfg()` a chama e porque o card de `trim-panel.ts` pode querer o mesmo
+     resumo um dia; enquanto `cfgHint` for nulo ela é uma comparação. */
   if (!cfgHint) return;
   const mode = qualityMode();
   const parts = [
@@ -1414,22 +1427,15 @@ function paintCfg() {
   paintCfgHint();
 }
 
-function applyCfgCollapsed() {
-  if (!cfgHead || !cfgBody) return;
-  hudRoot.classList.toggle('is-cfg-collapsed', cfgCollapsed);
-  cfgBody.classList.toggle('hidden', cfgCollapsed);
-  cfgHead.setAttribute('aria-expanded', cfgCollapsed ? 'false' : 'true');
-  cfgHead.title = cfgCollapsed ? 'Mostrar configurações' : 'Ocultar configurações';
-  /* O tique do diagnóstico só existe enquanto alguém pode ver o resultado. */
-  if (cfgCollapsed) stopDiag();
-  else { paintCfg(); startDiag(); }
-}
+/* ⚠️ O RECOLHIMENTO DA SEÇÃO SAIU DAQUI, e com ele `cfgHead`/`cfgBody`.
+   As fileiras de qualidade moram agora em `ui/trim-panel.ts`, dentro de um card
+   que tem o próprio recolhimento — manter um segundo mecanismo aqui era guardar
+   estado para uma superfície que este arquivo não desenha mais.
 
-function setCfgCollapsed(v: boolean) {
-  cfgCollapsed = !!v;
-  applyCfgCollapsed();
-  saveCollapsed();
-}
+   O que ficou: `paintCfg()`, chamado por `syncHud()` e pelos ganchos de
+   qualidade, porque os PINTORES continuam sendo daqui (é aqui que mora o estado
+   que `onQualityChange`/`onScaleChange` repintam). E `startDiag()`/`stopDiag()`,
+   que o `trim-panel` aciona ao abrir e fechar o card. */
 
 function build() {
   hudRoot = el('aside', 'ts-hud');
@@ -1616,7 +1622,6 @@ function build() {
 
   loadCollapsed();
   applyCollapsed();
-  applyCfgCollapsed();
 }
 
 /* ---------------- dial interaction ---------------- */

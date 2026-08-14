@@ -36,6 +36,7 @@ import {
   qualityInfo, setQualityMode, qualityLevel, qualityMode, getProfile,
   coldPending, coldProfile, appliedColdProfile, markColdApplied,
   setAvailableVariants, renderScale, setRenderScale, scaleBand,
+  setColdApplier, cancelPendingColdApply,
   frameTimeEma, submitTimeEma,
 } from './core/quality';
 import { ENVIRONMENTS_DIR } from './core/paths';
@@ -1515,6 +1516,18 @@ async function boot() {
        retorno alvo é exatamente `void`, não uma união que o contém). O `await`
        aqui é o que mantém o botão podendo esperar a cortina descer. */
     setColdApplyHandler(async () => { await applyColdQuality(); });
+    /* E O MESMO CAMINHO, DISPARADO POR ATO DO USUÁRIO — ver `setColdApplier()`
+       em core/quality.ts para o porquê e para os números.
+
+       Sem isto, escolher "Média" aplicava só os botões quentes e deixava o pool
+       de refletores onde estava: medido na bancada, o pool sozinho vale 2,4×.
+       O botão do painel continua existindo para o caminho manual; este gatilho é
+       o que faz o caso comum (clicar num nível) fazer o que o nível promete.
+
+       ⚠️ O REGISTRO É AQUI, e não no topo do módulo, de propósito: só existe
+       cena para reconstruir depois de `initHud()`/`applyChoice`, e um gatilho
+       armado antes disso encontraria `currentChoice` nulo. */
+    setColdApplier(() => applyColdQuality());
     /* A fase de catálogo acabou, e daqui em diante a tela pertence ao seletor ou
        à cortina — aposente o spinner de bootstrap para ele nunca ficar debaixo
        de nenhum dos dois. */
@@ -1737,6 +1750,10 @@ export function unmountStudio() {
      trocou. O descarte é o que separa isso de "parar", que continua entregando
      o vídeo. Sem efeito quando não há gravação. */
   stopRecording(true);
+  /* Uma aplicação fria agendada e não disparada reconstruiria a cena depois de
+     a rota já ter trocado — cortina no ar sobre uma tela que ninguém está
+     vendo, e trabalho de GPU pago por nada. */
+  cancelPendingColdApply();
   stopLoop();
   /* ANTES de soltar o `root`. O navegador sai de tela cheia sozinho quando o
      elemento em tela cheia deixa o documento, mas o quadro entre uma coisa e

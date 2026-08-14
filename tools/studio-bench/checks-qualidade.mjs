@@ -103,6 +103,22 @@ async function retrato(n = 8) {
 const marca = (nome, ok, detalhe) =>
   out.push([nome, ok ? `ok — ${detalhe}` : `${detalhe}  <<<`]);
 
+/**
+ * Troca de nível e ESPERA A PARTE FRIA ASSENTAR.
+ *
+ * ⚠️ Desde 14/08 um ato do usuário dispara a reconstrução sob cortina depois de
+ * ~700 ms (ver `setColdApplier()` em core/quality.ts). Medir antes disso lê uma
+ * cena em transição, e medir DURANTE lê uma cena meio desmontada — foi o que
+ * fez a versão anterior deste arquivo comparar Alta-sem-refletores contra
+ * Alta-com-catorze e concluir um ganho de 2,2× que não existia.
+ */
+async function nivel(l) {
+  Q.set(l);
+  for (let i = 0; i < 60; i++) await B.frame();      // cobre o debounce
+  await B.until(() => !Q.coldPending, 180000);       // e a cortina
+  for (let i = 0; i < 20; i++) await B.frame();
+}
+
 /* ---------------- 0. a sonda ---------------- */
 const info0 = Q.info();
 const hw = info0.hardware;
@@ -128,7 +144,7 @@ if (hw.integrated || hw.weakHint) {
 }
 
 /* ---------------- 1. O TETO NÃO SE MEXEU ---------------- */
-Q.set('alta');
+await nivel('alta');
 const alto = await retrato();
 const frioAlto = Q.info().frio ? Q.info().frio.pedido : null;
 
@@ -152,12 +168,41 @@ for (const [nome, got, want] of teto) {
     got === want ? `ok (${got})` : `${got} — esperado ${want}  <<< O TETO MUDOU`]);
 }
 if (frioAlto) {
-  out.push(['ALTO = o de sempre · MSAA',
-    frioAlto.antialias === true ? 'ok (ligado)' : 'DESLIGADO  <<< O TETO MUDOU']);
-  out.push(['ALTO = o de sempre · pool de spots',
-    frioAlto.spotPool === 14 ? 'ok (14)' : `${frioAlto.spotPool}  <<< O TETO MUDOU`]);
-  out.push(['ALTO = o de sempre · filtro de sombra',
-    frioAlto.shadowType === 'pcf' ? 'ok (pcf)' : `${frioAlto.shadowType}  <<< O TETO MUDOU`]);
+  /* ⚠️ ESTE BLOCO LIA A COISA ERRADA E PASSAVA MENTINDO (corrigido 14/08).
+     `Q.info().frio.pedido` é o que o NÍVEL pede; o que está no ar é
+     `frio.aplicado`. Como o pool de refletores e o filtro de sombra são FRIOS,
+     um `set('alta')` no meio da sessão muda o pedido e NÃO muda o aplicado —
+     então este teste dizia "ok (14)" com a cena rodando a ZERO refletores.
+
+     Isso não é hipótese: medido nesta bancada, com a sonda pondo o boot em
+     'baixa', `set('alta')` deixou `pedido: 14` e `aplicado: 0`, com zero
+     SpotLight na cena. Um A/B de desempenho feito em cima disso comparou
+     HEAD-sem-luz contra versões-com-luz e atribuiu 2,2× de ganho ao código
+     errado.
+
+     A régua honesta é o APLICADO, e a contagem de `SpotLight` de verdade
+     confere se até ele está dizendo a verdade. */
+  const frioAplicado = Q.info().frio ? Q.info().frio.aplicado : null;
+  const spotsVivos = (() => {
+    let n = 0;
+    S.scene.traverse((o) => {
+      if (!o.isSpotLight) return;
+      let v = o.visible, p = o.parent;
+      while (v && p) { v = p.visible; p = p.parent; }
+      if (v) n++;
+    });
+    return n;
+  })();
+  out.push(['ALTO = o de sempre · MSAA (aplicado)',
+    frioAplicado && frioAplicado.antialias === true ? 'ok (ligado)' : 'DESLIGADO  <<<']);
+  out.push(['ALTO = o de sempre · pool de spots (APLICADO)',
+    frioAplicado && frioAplicado.spotPool === 14
+      ? 'ok (14)'
+      : `${frioAplicado && frioAplicado.spotPool} — pedido ${frioAlto.spotPool}`
+        + `  <<< FRIO PENDENTE: a medida abaixo NÃO é o nível Alto`]);
+  out.push(['SpotLights de fato na cena', spotsVivos]);
+  out.push(['ALTO = o de sempre · filtro de sombra (aplicado)',
+    frioAplicado && frioAplicado.shadowType === 'pcf' ? 'ok (pcf)' : `${frioAplicado && frioAplicado.shadowType}  <<<`]);
 } else {
   out.push(['perfil FRIO', 'não exposto no handle — não pude conferir o teto frio']);
 }
@@ -166,7 +211,7 @@ out.push(['ALTO · chamadas / triângulos',
   `${alto.calls.toLocaleString('pt-BR')} / ${alto.tris.toLocaleString('pt-BR')}`]);
 
 /* ---------------- 2. O PISO EXISTE — e este é O teste ---------------- */
-Q.set('baixa');
+await nivel('baixa');
 const baixo = await retrato();
 
 /* ⚠️ **O TESTE QUE A VERSÃO ANTERIOR NÃO TINHA, E QUE TERIA PEGO O DEFEITO.**
@@ -228,7 +273,7 @@ marca('BAIXO · as chamadas de desenho caíram',
   + ` (${alto.calls ? Math.round((1 - baixo.calls / alto.calls) * 100) : 0} % a menos)`);
 
 /* ---------------- 3. E VOLTA ---------------- */
-Q.set('alta');
+await nivel('alta');
 const volta = await retrato();
 marca('volta ao ALTO · buffer devolvido',
   volta.px === alto.px, `${volta.bufW}×${volta.bufH}`);
