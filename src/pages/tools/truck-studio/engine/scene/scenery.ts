@@ -28,8 +28,9 @@
 
      · ÁRVORE VAI EM CANTEIRO E EM GRAMA. As faixas vêm do set: `median_0` é o
        canteiro central de 10,5 m entre as duas pistas, `turf_*` são as faixas
-       de grama do perímetro. Nada é plantado em asfalto ou concreto porque
-       nenhuma dessas malhas entra na lista de canteiros.
+       de grama do perímetro. E ONDE ELAS ESTÃO É MEDIDO NA MALHA, não na caixa
+       envolvente dela — a caixa mentia, e a mentira punha árvore no meio da
+       rotatória. Ver o bloco O CHÃO QUE EXISTE, E NÃO A CAIXA DELE.
      · E O CANTEIRO CENTRAL É CURADO. Ele é o que fica ao lado do produto na
        foto, e o dono do produto vetou nele quatro coisas: raiz exposta, mini
        árvore, arbusto e tronco esbranquiçado. As faixas de grama continuam
@@ -81,47 +82,244 @@ const GRAMA_RE = /^turf_/i;
    modelagem; 1,2 m é a distância que uma muda real guarda do bordo. */
 const INSET = 1.2;
 
+/* ===========================================================================
+   A CAIXA ENVOLVENTE NÃO É A FAIXA, e foi ela que pôs árvore na ROTATÓRIA.
+
+   Relato: *"as arvores estao no meio da rotatoria, deveriam estar no grama
+   proximo a cerca"*. A faixa plantável era um `Box3` — e um `Box3` só diz a
+   verdade sobre a malha quando a malha é um retângulo cheio. Medido nas duas
+   malhas que este set tem e que não são:
+
+     · `turf_e_tail` e `turf_w_tail` fecham o corredor viário a SUL do balão, e
+       o bordo norte delas NÃO é reto: é o arco sul do disco (R 19 m, centro
+       x −9,12 · z 105). A caixa das duas, porém, é x −28,6…10,4 · z 105…133 —
+       936 m² úteis cada uma, dos quais mais de METADE é a rotatória. Sortear
+       "dentro da caixa" era sortear em cima do asfalto do balão.
+     · E AS DUAS ESTÃO SOTERRADAS. Elas nascem na cota da grama (+1 cm) sob o
+       `yard_tail`, que é GROUND_CONCRETE na cota da laje (+7 cm) e tem
+       exatamente a mesma pegada. Ou seja: geometria que NUNCA aparece, e que
+       mesmo assim pesava 5,2 % do sorteio — as duas juntas, porque `add_slab`
+       emite o rabo do corredor também para as bandas leste e oeste, que não
+       encostam nele (ver `_corridor_tail` no gerador; lá está a outra metade
+       desta correção, para quando o set for reconstruído).
+
+   O resultado medido no plantio de hoje: 21 das 530 plantas dentro do disco de
+   19 m — três `tree_pk_5` de 13 m a 9,7…11,0 m do centro, ou seja na pista
+   circulatória — e outras 8 sobre o concreto do rabo. Vinte e nove instâncias
+   plantadas em pavimento, todas pelas duas faixas fantasma.
+
+   ===========================================================================
+   ENTÃO A FAIXA PASSA A SER A MALHA, AMOSTRADA NUMA GRELHA. Uma passada
+   rasteriza os triângulos de cada faixa em células de 60 cm e guarda, por
+   célula, a COTA da grama e QUEM é o dono; outra passada faz o mesmo com o
+   pavimento. Uma célula só é plantável se
+
+     1. a grama daquela faixa cobre a célula de facto (mata o arco da rotatória
+        e, de quebra, os cantos da caixa quadrada de uma ilha REDONDA);
+     2. nenhum pavimento está por cima dela (mata as duas faixas soterradas);
+     3. e ela está a `INSET` de qualquer célula que falhe 1 ou 2 — o recuo do
+        meio-fio deixa de ser um encolhimento da caixa e passa a ser um recuo do
+        contorno de verdade, que é o que ele sempre quis dizer.
+
+   DUAS CONSEQUÊNCIAS QUE NÃO SÃO EFEITO COLATERAL, e sim o motivo de a grelha
+   valer o que custa:
+
+     · A ÁREA passa a ser a plantável de facto (nº de células × 0,36 m²) em vez
+       da área da caixa. É ela que reparte as instâncias, então uma faixa côncava
+       deixa de pedir mais árvores do que tem chão para elas.
+     · E O SORTEIO NÃO PRECISA MAIS SER REJEITADO. Sorteia-se uma CÉLULA e um
+       ponto dentro dela: cada tentativa acerta. Some com isso o laço de oito
+       tentativas e a lista de caixas de canteiro que ele consultava — a
+       sobreposição de caixas que aquilo defendia não existe quando cada célula
+       tem um dono só (ganha a grama mais alta, que é a que se vê). */
+
+/** Lado da célula da grelha de chão, em metros. */
+const CELULA = 0.6;
+/** Materiais que são PAVIMENTO: onde eles estiverem por cima, não se planta. */
+const DURO_RE = /CONCRETE|ASPHALT|KERB|PAVER|LINE_PAINT/i;
+/**
+ * Espessura máxima de uma malha para ela contar como chão.
+ *
+ * Sem isto o campo (`outer`, 1,9 m de relevo) e o talude entrariam na conta de
+ * "o que está por cima da grama" por causa de um pico a 400 m dali. Toda a
+ * pavimentação deste set mede menos de 45 cm de cima a baixo.
+ */
+const LAJE_MAX = 1.5;
+/**
+ * Folga na comparação de cotas. A laje está 6 cm acima da grama aqui, e as duas
+ * ondulam — 2 cm é o que separa "soterrado" de ruído de amostragem.
+ */
+const SOTERRADO = 0.02;
+
+interface Grelha {
+  x0: number;
+  z0: number;
+  nx: number;
+  nz: number;
+  /** Índice da faixa dona da célula, +1. Zero é "nenhuma". */
+  dono: Int16Array;
+  /** Cota da grama mais alta na célula. */
+  topo: Float32Array;
+  /** Cota do pavimento mais alto na célula. */
+  duro: Float32Array;
+}
+
 interface Faixa {
+  /** O que esta faixa escreve em `Grelha.dono`. Sobrevive ao descarte das vazias. */
+  id: number;
   min: THREE.Vector2;
   max: THREE.Vector2;
-  /**
-   * A extensão CRUA da malha, sem o `INSET`.
-   *
-   * As duas caixas existem porque servem a perguntas opostas: `min`/`max` dizem
-   * "onde eu POSSO plantar" (recuado do meio-fio), e `bMin`/`bMax` dizem "até
-   * onde esta faixa VAI" — que é o que responde "esta planta está no canteiro?".
-   * Usar a recuada para a segunda pergunta deixa uma orla de 1,2 m por onde
-   * escapa exatamente o que o veto queria barrar. Aconteceu: um arbusto sobrou
-   * no canteiro porque estava DENTRO do meio-fio e FORA da caixa recuada.
-   */
-  bMin: THREE.Vector2;
-  bMax: THREE.Vector2;
-  /** Área útil, em m² — é ela que reparte as instâncias entre as faixas. */
+  /** Células plantáveis desta faixa, índices dentro da grelha. */
+  celulas: Int32Array;
+  /** Área plantável de verdade, em m² — é ela que reparte as instâncias. */
   area: number;
   canteiro: boolean;
 }
 
+/** Este ponto é célula plantável DESTA faixa? */
+function naFaixa(g: Grelha, f: Faixa, x: number, z: number) {
+  const i = Math.floor((x - g.x0) / CELULA);
+  const j = Math.floor((z - g.z0) / CELULA);
+  if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) return false;
+  return g.dono[j * g.nx + i] === f.id;
+}
+
+/**
+ * Marca na grelha as células cobertas pelos triângulos de `mesh`, guardando a
+ * maior cota vista em cada uma.
+ *
+ * O teste é o CENTRO da célula dentro do triângulo, mais as células dos três
+ * vértices — sem estas últimas um triângulo menor que a célula não marcaria
+ * nada, e a malha de meio-fio deste set é feita de pedras de 17 cm.
+ */
+function rasterizar(mesh: THREE.Mesh, g: Grelha, alvo: Float32Array,
+  dono: Int16Array | null, id: number) {
+  const geo = mesh.geometry;
+  const pos = geo.getAttribute('position');
+  if (!pos) return;
+  const idx = geo.index;
+  const n = idx ? idx.count : pos.count;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const marca = (ix: number, iz: number, y: number) => {
+    if (ix < 0 || iz < 0 || ix >= g.nx || iz >= g.nz) return;
+    const k = iz * g.nx + ix;
+    if (y <= alvo[k]) return;
+    alvo[k] = y;
+    if (dono) dono[k] = id;
+  };
+  for (let t = 0; t + 2 < n; t += 3) {
+    a.fromBufferAttribute(pos, idx ? idx.getX(t) : t).applyMatrix4(mesh.matrixWorld);
+    b.fromBufferAttribute(pos, idx ? idx.getX(t + 1) : t + 1).applyMatrix4(mesh.matrixWorld);
+    c.fromBufferAttribute(pos, idx ? idx.getX(t + 2) : t + 2).applyMatrix4(mesh.matrixWorld);
+    const yMax = Math.max(a.y, b.y, c.y);
+    marca(Math.floor((a.x - g.x0) / CELULA), Math.floor((a.z - g.z0) / CELULA), a.y);
+    marca(Math.floor((b.x - g.x0) / CELULA), Math.floor((b.z - g.z0) / CELULA), b.y);
+    marca(Math.floor((c.x - g.x0) / CELULA), Math.floor((c.z - g.z0) / CELULA), c.y);
+    const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x, c.x) - g.x0) / CELULA));
+    const i1 = Math.min(g.nx - 1, Math.ceil((Math.max(a.x, b.x, c.x) - g.x0) / CELULA));
+    const j0 = Math.max(0, Math.floor((Math.min(a.z, b.z, c.z) - g.z0) / CELULA));
+    const j1 = Math.min(g.nz - 1, Math.ceil((Math.max(a.z, b.z, c.z) - g.z0) / CELULA));
+    if (i1 < i0 || j1 < j0) continue;
+    /* Baricêntricas em XZ. `den` zero é triângulo degenerado ou de pé — os dois
+       não cobrem chão nenhum e já foram marcados pelos vértices. */
+    const d1x = b.x - a.x, d1z = b.z - a.z;
+    const d2x = c.x - a.x, d2z = c.z - a.z;
+    const den = d1x * d2z - d2x * d1z;
+    if (Math.abs(den) < 1e-9) continue;
+    for (let j = j0; j <= j1; j++) {
+      const pz = g.z0 + (j + 0.5) * CELULA;
+      for (let i = i0; i <= i1; i++) {
+        const px = g.x0 + (i + 0.5) * CELULA;
+        const rx = px - a.x, rz = pz - a.z;
+        const u = (rx * d2z - d2x * rz) / den;
+        const v = (d1x * rz - rx * d1z) / den;
+        if (u < 0 || v < 0 || u + v > 1) continue;
+        marca(i, j, yMax);
+      }
+    }
+  }
+}
+
 function coletarFaixas(root: THREE.Object3D) {
   const box = new THREE.Box3();
-  const faixas: Faixa[] = [];
+  const cruas: { mesh: THREE.Mesh; min: THREE.Vector2; max: THREE.Vector2; canteiro: boolean }[] = [];
+  const duros: THREE.Mesh[] = [];
   root.updateMatrixWorld(true);
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || !mesh.geometry) return;
     const nome = mesh.name || '';
     const canteiro = CANTEIRO_RE.test(nome);
-    if (!canteiro && !GRAMA_RE.test(nome)) return;
+    if (canteiro || GRAMA_RE.test(nome)) {
+      box.setFromObject(mesh);
+      if (box.isEmpty()) return;
+      const min = new THREE.Vector2(box.min.x + INSET, box.min.z + INSET);
+      const max = new THREE.Vector2(box.max.x - INSET, box.max.z - INSET);
+      if (max.x <= min.x || max.y <= min.y) return;    // faixa estreita demais
+      cruas.push({ mesh, min, max, canteiro });
+      return;
+    }
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    if (!DURO_RE.test((mat as THREE.Material)?.name || '')) return;
     box.setFromObject(mesh);
-    if (box.isEmpty()) return;
-    const min = new THREE.Vector2(box.min.x + INSET, box.min.z + INSET);
-    const max = new THREE.Vector2(box.max.x - INSET, box.max.z - INSET);
-    if (max.x <= min.x || max.y <= min.y) return;      // faixa estreita demais
-    faixas.push({ min, max,
-      bMin: new THREE.Vector2(box.min.x, box.min.z),
-      bMax: new THREE.Vector2(box.max.x, box.max.z),
-      area: (max.x - min.x) * (max.y - min.y), canteiro });
+    if (box.isEmpty() || box.max.y - box.min.y > LAJE_MAX) return;
+    duros.push(mesh);
   });
-  return faixas;
+  if (!cruas.length) return { faixas: [] as Faixa[], grelha: null as Grelha | null };
+
+  /* A grelha cobre só o que pode ser plantado. `highway` e `outer` atravessam
+     1 180 m e ficam quase todos fora dela — o recorte por triângulo abaixo é o
+     que impede uma malha dessas de custar o mapa inteiro. */
+  const x0 = Math.min(...cruas.map((f) => f.min.x - INSET)) - CELULA;
+  const z0 = Math.min(...cruas.map((f) => f.min.y - INSET)) - CELULA;
+  const x1 = Math.max(...cruas.map((f) => f.max.x + INSET)) + CELULA;
+  const z1 = Math.max(...cruas.map((f) => f.max.y + INSET)) + CELULA;
+  const nx = Math.max(1, Math.ceil((x1 - x0) / CELULA));
+  const nz = Math.max(1, Math.ceil((z1 - z0) / CELULA));
+  const g: Grelha = { x0, z0, nx, nz,
+    dono: new Int16Array(nx * nz),
+    topo: new Float32Array(nx * nz).fill(-Infinity),
+    duro: new Float32Array(nx * nz).fill(-Infinity) };
+  cruas.forEach((f, i) => rasterizar(f.mesh, g, g.topo, g.dono, i + 1));
+  for (const m of duros) rasterizar(m, g, g.duro, null, 0);
+
+  /* PRIMEIRO o que é chão de grama à vista, DEPOIS o recuo. Fazer as duas numa
+     passada só ergueria o recuo contra células que a passada ainda não tinha
+     visitado. */
+  const vivo = new Uint8Array(nx * nz);
+  for (let k = 0; k < vivo.length; k++) {
+    vivo[k] = g.dono[k] && g.duro[k] < g.topo[k] - SOTERRADO ? 1 : 0;
+  }
+  const r = Math.round(INSET / CELULA);
+  const anel: number[] = [];
+  for (let dj = -r; dj <= r; dj++) {
+    for (let di = -r; di <= r; di++) {
+      if (Math.hypot(di, dj) * CELULA <= INSET) anel.push(dj * nx + di);
+    }
+  }
+  const listas: number[][] = cruas.map(() => []);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      if (!vivo[k]) continue;
+      if (i < r || j < r || i >= nx - r || j >= nz - r) continue;
+      let ok = true;
+      for (const d of anel) if (!vivo[k + d]) { ok = false; break; }
+      if (ok) listas[g.dono[k] - 1].push(k);
+      else g.dono[k] = 0;
+    }
+  }
+  /* Quem sobrou sem célula nenhuma deixa de ser faixa — é o destino das duas
+     `turf_*_tail` soterradas, e é assim que uma faixa fantasma some em vez de
+     ser tratada por nome. */
+  const faixas: Faixa[] = [];
+  cruas.forEach((f, i) => {
+    if (!listas[i].length) return;
+    faixas.push({ id: i + 1, min: f.min, max: f.max, canteiro: f.canteiro,
+      celulas: Int32Array.from(listas[i]),
+      area: listas[i].length * CELULA * CELULA });
+  });
+  return { faixas, grelha: g };
 }
 
 /* ---------------- os protótipos ----------------
@@ -466,7 +664,7 @@ const PASSO_CANTEIRO = 14;
 /** Jitter do alinhamento — sem ele a fileira lê como régua, com muito lê como mato. */
 const JITTER_CANTEIRO = 1.6;
 
-function plantar(protos: Proto[], faixas: Faixa[]) {
+function plantar(protos: Proto[], faixas: Faixa[], grelha: Grelha) {
   const canteiros = faixas.filter((f) => f.canteiro);
   const gramas = faixas.filter((f) => !f.canteiro);
   const rand = rng(SEED);
@@ -522,7 +720,13 @@ function plantar(protos: Proto[], faixas: Faixa[]) {
 
     if (alinhado) {
       /* ALAMEDA: passo fixo ao longo do eixo LONGO da faixa, com o tronco no
-         meio da largura e um jitter pequeno nos dois eixos. */
+         meio da largura e um jitter pequeno nos dois eixos.
+
+         A ESTAÇÃO PODE CAIR FORA DA GRAMA e aí ela é PULADA, não empurrada. O
+         canteiro deste set é um retângulo e nenhuma cai, mas o eixo longo de uma
+         faixa côncava passa por onde ela não existe — e uma alameda com um vão
+         lê como árvore que morreu, enquanto uma com um tronco deslocado para o
+         lado lê como erro de plantio. */
       for (const f of alvos) {
         const lx = f.max.x - f.min.x, lz = f.max.y - f.min.y;
         const aoLongoDeZ = lz >= lx;
@@ -538,6 +742,7 @@ function plantar(protos: Proto[], faixas: Faixa[]) {
           const jz = (rand() - 0.5) * 2 * JITTER_CANTEIRO;
           const x = (aoLongoDeZ ? meio : along) + jx;
           const z = (aoLongoDeZ ? along : meio) + jz;
+          if (!naFaixa(grelha, f, x, z)) continue;
           usados.push(matrizDe(p, x, z, rand, q, pos, esc, eixoY));
         }
       }
@@ -545,32 +750,21 @@ function plantar(protos: Proto[], faixas: Faixa[]) {
       /* MASSA: sorteio por área, para uma faixa três vezes maior receber três
          vezes mais árvores em vez de o mesmo tanto.
 
-         E O SORTEIO É REJEITADO QUANDO CAI NO CANTEIRO, para uma espécie vetada
-         lá. Tirar o canteiro da lista de alvos NÃO BASTA, e isso foi medido: as
-         caixas envolventes das faixas SE SOBREPÕEM — a ilha da rotatória
-         (`rb_island`, x −16,6…−1,6 · z 98…113) fica dentro de uma faixa de
-         grama —, então sortear "na grama" ainda põe planta na ilha. Um arbusto
-         escapou por aí. */
+         SORTEIA-SE UMA CÉLULA, e é por isso que não há mais rejeição aqui. A
+         célula já é chão de grama à vista e recuada do bordo (ver a grelha, lá
+         em cima), e ela tem UM dono só — então "sortear na grama" não tem como
+         cair no canteiro, que era o que o laço de oito tentativas defendia com
+         caixas envolventes que se sobrepunham. */
       const total = alvos.reduce((s, f) => s + f.area, 0) || 1;
       const quantas = Math.min(p.cap, Math.max(1, p.cap));
-      const vetado = !!vetoNoCanteiro(p) && canteiros.length > 0;
       for (let i = 0; i < quantas; i++) {
-        let x = 0, z = 0, serve = false;
-        /* Oito tentativas: com o canteiro ocupando menos de 2 % da área
-           sorteável, a chance de oito seguidas caírem nele é nula na prática —
-           e se caírem, a instância é PULADA em vez de plantada no canteiro. */
-        for (let tent = 0; tent < 8 && !serve; tent++) {
-          let r = rand() * total;
-          let f = alvos[0];
-          for (const cand of alvos) { r -= cand.area; f = cand; if (r <= 0) break; }
-          x = f.min.x + rand() * (f.max.x - f.min.x);
-          z = f.min.y + rand() * (f.max.y - f.min.y);
-          /* Contra a extensão CRUA do canteiro, e não contra a recuada — ver o
-             porquê no campo `bMin` de `Faixa`. */
-          serve = !vetado || !canteiros.some(
-            (c) => x >= c.bMin.x && x <= c.bMax.x && z >= c.bMin.y && z <= c.bMax.y);
-        }
-        if (!serve) continue;
+        let r = rand() * total;
+        let f = alvos[0];
+        for (const cand of alvos) { r -= cand.area; f = cand; if (r <= 0) break; }
+        const k = f.celulas[Math.min(f.celulas.length - 1,
+          Math.floor(rand() * f.celulas.length))];
+        const x = grelha.x0 + (k % grelha.nx + rand()) * CELULA;
+        const z = grelha.z0 + (Math.floor(k / grelha.nx) + rand()) * CELULA;
         usados.push(matrizDe(p, x, z, rand, q, pos, esc, eixoY));
       }
     }
@@ -940,12 +1134,13 @@ function realinharPostes(root: THREE.Object3D) {
  * @returns o que foi mexido, para o log de carga.
  */
 export function arranjarCenario(root: THREE.Object3D) {
-  const faixas = coletarFaixas(root);
+  const t0 = performance.now();
+  const { faixas, grelha } = coletarFaixas(root);
   const protos = coletarProtos(root);
   /* ANTES de plantar: é o veto do canteiro que decide o destino, e ele lê o
      albedo. Depois seria tarde. */
   medirAlbedos(protos);
-  if (faixas.length && protos.length) plantar(protos, faixas);
+  if (faixas.length && grelha && protos.length) plantar(protos, faixas, grelha);
   const postes = realinharPostes(root);
   root.updateMatrixWorld(true);
   /* Quem foi barrado do canteiro e por quê — sai no log de carga porque é a
@@ -957,6 +1152,13 @@ export function arranjarCenario(root: THREE.Object3D) {
     .map((v) => `${v.nome}: ${v.veto}`);
   return {
     faixas: faixas.length,
+    /* A área PLANTÁVEL, e não a das caixas: é o número que denuncia uma faixa
+       que a caixa envolvente inventou. Ver o cabeçalho da grelha. */
+    areaPlantavel: Math.round(faixas.reduce((s, f) => s + f.area, 0)),
+    /* O custo, no log de carga: a grelha é a única parte disto que cresce com o
+       tamanho do cenário, e um número no log é o que impede que ela cresça sem
+       ninguém ver. */
+    ms: Math.round(performance.now() - t0),
     protos: protos.length,
     plantas: protos.reduce((s, p) => s + (p.malhas[0]?.count || 0), 0),
     ...postes,

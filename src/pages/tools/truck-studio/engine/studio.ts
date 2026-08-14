@@ -31,6 +31,10 @@ import * as liveryStructure from './vehicle/livery-structure';
 import * as catalogMod from './catalog/catalog';
 import * as selector from './ui/selector';
 import * as environment from './scene/environment';
+import {
+  qualityInfo, setQualityMode, qualityLevel, qualityMode, getProfile,
+} from './core/quality';
+import * as captureMod from './scene/capture';
 import * as cyclorama from './scene/cyclorama';
 import * as loader from './ui/loader';
 import {
@@ -405,11 +409,12 @@ function applyColor(color: PaintColorDef) {
   lastColor = color;
   syncBadgeColor();
   /* O laço sujo (scene.ts) só desenha quando alguém diz que a imagem mudou, e
-     esta é uma das três lacunas que a nota de ON_DEMAND_RENDERING lista por
-     nome: o atalho de só-cor pula o pipeline de carregamento de propósito, e com
-     ele pula o warmUp() que invalida em todos os outros caminhos — a tinta
-     trocaria de material sem trocar a imagem. Aqui e não em runColor() porque os
-     DOIS caminhos passam por esta função. */
+     desde 2026-08-13 ele está LIGADO — o que era uma dívida anotada virou o
+     caminho normal. Esta era a terceira das lacunas que a nota de
+     ON_DEMAND_RENDERING listava por nome: o atalho de só-cor pula o pipeline de
+     carregamento de propósito, e com ele pula o warmUp() que invalida em todos
+     os outros caminhos — a tinta trocaria de material sem trocar a imagem.
+     Aqui e não em runColor() porque os DOIS caminhos passam por esta função. */
   invalidate();
 }
 
@@ -743,7 +748,7 @@ liveryStructure.setDimsApplier((patch) => applyTrailerDimsDebounced(patch));
    fundir os commits em rajada de um mesmo gesto. */
 const DOORS_QUIET_MS = 60;
 let doorsTimer: ReturnType<typeof setTimeout> | null = null;
-const doorsPending = new Map<liveryStructure.StructureKey, liveryStructure.DoorSpec[]>();
+const doorsPending = new Map<liveryStructure.DoorFaceKey, liveryStructure.DoorSpec[]>();
 let doorsPill: { release(): void } | null = null;
 
 function endDoorsBusy() {
@@ -770,7 +775,7 @@ function flushTrailerDoors() {
 }
 
 function applyTrailerDoorsDebounced(
-  face: liveryStructure.StructureKey, doors: liveryStructure.DoorSpec[],
+  face: liveryStructure.DoorFaceKey, doors: liveryStructure.DoorSpec[],
 ) {
   doorsPending.set(face, doors);
   if (!doorsPill) {
@@ -1058,6 +1063,16 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        não antes: `setTrimChoice()` escreve material em malhas do implemento, e
        até esta linha o implemento pode ser o do caminhão anterior. */
     trim.setTrimChoice(choice.trim);
+    /* E a escolha de VISTA (conjunto / só cavalo / só implemento) é reescrita
+       nos grupos: a troca de caminhão acabou de repovoá-los, e um grupo novo
+       nasce visível. Sem esta linha, quem estivesse olhando só o implemento
+       veria o cavalo reaparecer com o controle ainda dizendo o contrário. */
+    models.applyVehicleView();
+    /* E o card se redesenha: as cores das peças acabaram de ser hidratadas e as
+       duas metades do conjunto acabaram de existir — até esta linha o segmentado
+       "Em cena" estava com as duas opções de metade desabilitadas, porque no
+       boot não havia nem cavalo nem implemento para mostrar sozinhos. */
+    refreshTrimPanel();
     /* Persiste só o que de fato renderizou: uma escolha que falhou ao carregar
        não pode virar aquela em que a próxima visita entra. (O seletor também
        pode tê-la salvo; saveChoice é idempotente.) */
@@ -1269,9 +1284,10 @@ async function boot() {
        memória antes de o primeiro grid ser montado. Ele nunca lança e nunca
        bloqueia nada — ausente = todo card cai no placeholder de silhueta. */
     await Promise.all([loadCatalog(), models.loadManifests(), loadColors(), loadRenders()]);
-    /* A tira de acabamentos foi montada ANTES da paleta existir — a grade dela
-       teria saído só com "Como o baú". Repintar aqui é o mesmo padrão que o
-       seletor usa, e custa uma varredura de quatro linhas. */
+    /* O card de configurações foi montado ANTES de existir cavalo ou implemento
+       em cena, então o segmentado "Em cena" saiu com as duas opções de metade
+       desabilitadas. Repintar aqui é o mesmo padrão que o seletor usa, e custa
+       uma varredura de três seções. */
     refreshTrimPanel();
 
     /* O IMPLEMENTO COMEÇA A DESCER AGORA — antes de existir seletor na tela.
@@ -1325,6 +1341,23 @@ async function boot() {
          do cenário, e é assim que se mede o que ele custa. */
       cyclorama,
       loader,
+      /* O PERFIL DE QUALIDADE, pelo console e pela bancada.
+         `quality.info()` responde as três perguntas de uma vez — que hardware a
+         sonda viu, em que nível a cena está e quantos ms o medidor mediu — e é
+         por onde se diagnostica "por que a imagem piorou sozinha".
+         `quality.set('alta')` congela; `quality.set('auto')` devolve ao
+         medidor. */
+      /* A CAPTURA, pelo console e pela bancada. É por aqui que se prova a regra
+         de que a imagem baixada sai no teto mesmo com a vista no piso — ver
+         `tools/studio-bench/checks-qualidade.mjs`. */
+      capture: captureMod,
+      quality: {
+        info: qualityInfo,
+        set: setQualityMode,
+        get level() { return qualityLevel(); },
+        get mode() { return qualityMode(); },
+        profile: getProfile,
+      },
       applyChoice,
       uniforms: paint._sharedPaint,
       /* O redimensionamento do baú, pela porta que costura livery e câmera —

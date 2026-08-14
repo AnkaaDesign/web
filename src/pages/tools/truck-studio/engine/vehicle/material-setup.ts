@@ -21,6 +21,9 @@
 import * as THREE from 'three';
 import { registerVehicleLights } from './lights';
 import { registerRetroreflective } from './retroreflect';
+/* Folha, e por isso importável de qualquer lugar sem risco de ciclo — ver o
+   cabeçalho de `core/quality.ts`. */
+import { getProfile } from '../core/quality';
 
 /* ---------------- material / mesh setup ---------------- */
 const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
@@ -141,8 +144,20 @@ export function materialNamesOf(root: THREE.Object3D): string[] {
    rather than an optimisation — it costs sampler bandwidth and nothing else.
    No `needsUpdate` is needed: this runs before the first render, so the textures
    have not been uploaded yet and the value is read at upload time. three clamps
-   it to the device's own maximum there too, so 8 is a ceiling, never a demand. */
-export const TEXTURE_ANISOTROPY = 8;
+   it to the device's own maximum there too, so 8 is a ceiling, never a demand.
+
+   ---------------------------------------------------------------------------
+   PASSOU A SER LIDO DO PERFIL (2026-08-13), e continua valendo 8 no nível Alto —
+   ou seja, nada mudou para quem aguenta. FUNÇÃO e não mais constante porque o
+   nível pode mudar no meio da sessão, e um valor congelado no tempo de import
+   entregaria a anisotropia do nível em que a página abriu para sempre.
+
+   Ela é lida no momento em que cada textura é preparada, então o valor novo
+   vale para o que CARREGAR depois — trocar de caminhão ou de cenário. As
+   texturas já na GPU ficam como estão, de propósito: reamostrá-las exigiria um
+   reupload de ~200 texturas no meio de um arrasto, que é exatamente o engasgo
+   que a adaptação existe para evitar. */
+export const textureAnisotropy = () => getProfile().anisotropyVehicle;
 
 /* SHADOW CASTERS ARE CHOSEN BY SIZE — and here is the arithmetic, so the number
    below survives the next person who reads it.
@@ -304,7 +319,7 @@ export function setupCommon(root: THREE.Object3D) {
       const m = raw as THREE.MeshStandardMaterial;
       m.envMapIntensity = 1.35;
       for (const tex of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap]) {
-        if (tex) tex.anisotropy = TEXTURE_ANISOTROPY;
+        if (tex) tex.anisotropy = textureAnisotropy();
       }
       const isGlass = GLASS_RE.test(m.name || '');
       if (isGlass) {

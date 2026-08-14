@@ -888,6 +888,21 @@
   white-space: nowrap;
 }
 
+/* PASTILHA SÓ DE TEXTO — a fileira de qualidade.
+   As outras três fileiras de pastilha (clima, fundo) carregam um ícone em cima
+   do nome, e o `.ts-hud-tile` base reserva a altura desse ícone. Aqui não há
+   ícone: "Auto / Alta / Média / Baixa" são quatro palavras, e um ícone para
+   cada seria decoração inventada — não existe desenho honesto para "média
+   qualidade". Sem o modificador, as quatro pastilhas ficariam com um vão vazio
+   do tamanho de um ícone e a fileira leria como se algo não tivesse carregado.
+   O padding vertical volta a ser simétrico porque não há mais nada acima do
+   texto para equilibrar. */
+.truck-studio-root .ts-hud-tile--text {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  justify-content: center;
+}
+
 /* ============================================================
    7. Entry animation
    ============================================================ */

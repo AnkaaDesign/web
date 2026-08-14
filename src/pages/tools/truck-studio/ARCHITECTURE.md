@@ -112,6 +112,14 @@ Quem for mexer nisso: a pasta `/environments/rodovia/` hoje contém **só** `sky
 existe unicamente para servir de céu ao `distrito-industrial`. Assar um HDR próprio para
 o `distrito-industrial` é o que finalmente permite apagá-la.
 
+> ✅ **CASO FECHADO EM 2026-08-10, e esta seção inteira é histórica.** O HDR próprio FOI
+> assado. Reconferido no manifesto em 2026-08-13: `distrito-industrial` aponta para
+> `environments/distrito-industrial/sky.hdr` + `sky-night.hdr`, e `serra` reusa esse mesmo
+> par. `environments/rodovia/sky.hdr` (5,5 MB) **só aparece em texto de nota** — está
+> órfão e pode ser apagado. O `hdriNote` do manifesto registra a troca e por quê (o plate
+> antigo tinha o sol a 45,4° — meio-dia — contra um estúdio que abre às 17:45, e uma linha
+> de árvores sem escala; o novo é um `_puresky`).
+
 > ⚠️ **O `removedNote` de `environments.json` está desatualizado neste ponto.** Ele avisa
 > que `/environments/patio-logistico/` "NÃO pode ser apagada" porque o `armazem` usaria o
 > `sky.hdr` dela. Isso mudou: `patio-logistico/` **foi** apagada por inteiro e o `armazem`
@@ -167,6 +175,14 @@ no `distrito-industrial`.
 O que fez a conta fechar não foi decimação agressiva: foi o set **não carregar textura
 nenhuma** (§2).
 
+> **⚠️ ESTES NÚMEROS SÃO DE 2026-08-03 E CADUCARAM.** Medido em 2026-08-12/13:
+> `distrito-industrial/set.glb` é **18,1 MB** e traz **36 imagens** (~133 MB de VRAM);
+> `serra/set.glb`, que entrou no lugar do `armazem`, é **12,0 MB** com **66 imagens**
+> (~191 MB). O alvo de 35 MB por cenário continua batido, mas com folga bem menor do que
+> este parágrafo comemora — e a frase "o set não carrega textura nenhuma" continua
+> verdadeira só para o **chão** (que vem dos conjuntos compartilhados), não para o arquivo.
+> É essa mudança de premissa que reabre a §6.
+
 ---
 
 ## 6. Pipeline de asset (`gltf-transform`)
@@ -176,6 +192,18 @@ daqui. O motivo é §2: os sets viajam sem textura, então a pressão de memóri
 justificava KTX2 nunca chegou. **Não existe `KTX2Loader` no projeto** e não há razão atual
 para adicionar um. Só `/vendor/draco/` é vendorizado (`config/assets.ts` →
 `dracoDecoderDir: "/vendor/draco/"`).
+
+> **⚠️ A PREMISSA ACIMA CAIU — e a conclusão volta a estar em aberto.** Era verdade em
+> 2026-08-03. Hoje os sets TRAZEM textura (ver a nota no fim da §5) e a pressão de VRAM
+> chegou: medida em 2026-08-13, a cena de referência fica em **~857 MB** depois de uma
+> passagem de redimensionamento que já tirou 290 MB do acervo — e **358 MB disso são os
+> dezesseis mapas 2048² de chão**, que foram passados por um portão de erro medido e **não
+> têm folga nenhuma** para reduzir. Empacotá-los em ORM também não fecha a conta (as duas
+> medições estão em `OTIMIZACAO-2026-08-13.md` §3). Ou seja: para o maior item isolado do
+> orçamento, KTX2 deixou de ser "sem efeito" e passou a ser a **única** saída conhecida.
+> O que NÃO mudou é o cuidado: UASTC é quase sem perdas, ETC1S não é, e qualquer passo
+> novo tem de respeitar as armadilhas registradas logo abaixo (nada de `quantize`, nada de
+> `resize`, nada de `dedup` sem `--materials false`).
 
 O que continua valendo é a receita:
 
@@ -679,6 +707,11 @@ tem de ser contra a extensão **crua** da faixa, não contra a recuada de `INSET
 um arbusto sobrou no canteiro por estar dentro do meio-fio e fora da caixa
 recuada, na orla de 1,2 m entre as duas.
 
+> Esta rejeição por caixa **deixou de existir** em §11.5: com a grelha, cada
+> célula tem um dono só e "sortear na grama" não tem como cair no canteiro. O
+> parágrafo fica porque a sobreposição das caixas continua sendo verdade — ela é
+> a razão de a caixa não servir para nada disto.
+
 ### 11.3 A parede de troncos era empilhamento, não passo
 
 O passo de 14 m estava certo. O que estava errado é que **cada espécie alinhada
@@ -706,6 +739,59 @@ empilhamento. As medidas são **reimplementadas** na bancada pelo mesmo motivo d
 do laço reaponta a câmera. A lente ficava exatamente onde se pediu e olhava para
 o **caminhão**: a foto do pé da árvore saiu uma foto do baú. As duas são soltas
 no começo das fotos, e a conferência de pose passou a incluir a **mira**.
+
+### 11.5 A caixa envolvente não é a faixa — as árvores da rotatória
+
+> Relato: *"as arvores estao no meio da rotatoria, deveriam estar no grama
+> proximo a cerca"*. Data: 2026-08-13.
+
+O plantio sorteava dentro do `Box3` da faixa, e um `Box3` só diz a verdade sobre
+a malha quando a malha é um **retângulo cheio**. Duas malhas deste set não são:
+
+| | medida |
+|---|---|
+| `turf_e_tail` / `turf_w_tail` | caixa x −28,6…10,4 · z 105…133 · **936 m² úteis cada** |
+| bordo norte real das duas | o **arco sul** do balão (R 19 m, centro x −9,12 · z 105) — mais de metade da caixa é a rotatória |
+| cota delas | +1 cm (grama) **sob** o `yard_tail` de betão a +7 cm — geometria que nunca aparece |
+| peso no sorteio | **5,2 %** da área "de grama", as duas juntas |
+
+E são **duas** porque `add_slab` emitia o rabo do corredor também para as bandas
+leste e oeste da turfa, que nunca encostam nele: duas lajes idênticas e
+coincidentes, 680 vértices cada. O gerador foi corrigido junto
+(`build_industrial_park.py`), mas a correção que vale para o `.glb` em disco é a
+do engine.
+
+Resultado medido pela bancada, **antes**: 29 plantas em pavimento, **21 delas
+dentro do disco de 19 m** — incluindo três `tree_pk_5` de 13 m a 9,7…11,0 m do
+centro, ou seja na pista circulatória.
+
+**A faixa passou a ser a malha, amostrada numa grelha de 60 cm.** Uma passada
+rasteriza os triângulos de cada faixa (cota da grama + dono da célula), outra faz
+o mesmo com o pavimento (materiais `CONCRETE|ASPHALT|KERB|PAVER|LINE_PAINT`, e só
+lajes de menos de 1,5 m de espessura, ou o campo entraria na conta por causa de
+um pico a 400 m). Uma célula é plantável se **a grama daquela faixa a cobre**, se
+**nada duro está por cima dela** e se ela está a `INSET` de qualquer célula que
+falhe as duas primeiras — o recuo do meio-fio deixou de ser um encolhimento da
+caixa e passou a ser um recuo do contorno de verdade.
+
+Três consequências que são o motivo de a grelha valer o que custa:
+
+1. a **área** passou a ser a plantável de facto (36 345 m²), não a das caixas —
+   uma faixa côncava deixou de pedir mais árvores do que tem chão para elas;
+2. o **sorteio deixou de ser rejeitado**: sorteia-se uma célula e um ponto dentro
+   dela, e cada tentativa acerta. Saíram o laço de oito tentativas e a rejeição
+   por caixa de canteiro do ⚠️ de §11.2;
+3. uma faixa que fica **sem célula nenhuma deixa de ser faixa** — é como as duas
+   `turf_*_tail` soterradas somem, sem que nenhum nome seja citado em código.
+
+**Depois:** 9 faixas → 7, nenhuma planta sobre pavimento, nenhuma dentro do
+balão fora da ilha, as mesmas 530 instâncias e a mesma curadoria de canteiro
+(§11.2 continua a passar). Custo: **46 ms** por carga de cenário, uma vez.
+
+`tools/studio-bench/checks-rotatoria.mjs` é a trava, e ela **não pergunta pela
+caixa**: desce um raio de 5 m de altura sobre cada tronco e olha em que material
+ele bate primeiro. É a mesma pergunta que a foto responde, feita de um jeito que
+não depende de nenhuma decisão do módulo verificado.
 
 ---
 
@@ -1137,3 +1223,142 @@ milissegundo: caixa do palco contra `snap.box`, razão contra razão, recuo do
 frame em mm, histograma de luminância da chapa, bloqueio no clique e **maior
 quadro sem pintar** — que é o único número honesto de "trava?", porque o usuário
 não sente a soma do trabalho, sente o intervalo em que a tela não responde.
+
+---
+
+## 14. A rodada de 2026-08-13 — a pintura que apagava a própria definição
+
+Nove pedidos numa sessão, e um DEFEITO que apareceu no meio deles e era maior
+que todos: **com "pintar o implemento com a cor do cavalo" ligado, todo recorte
+de geometria destruía as chapas de livery e não recriava nenhuma.**
+
+### 14.1 O defeito raiz, e por que ele era invisível na leitura
+
+O relato foi modesto — *"adicionei uma segunda porta, ela foi adicionada no
+modelo 3d, mas não atualizou no livery"* —, e a bancada
+(`checks-porta2-diag-0813.mjs`) mostrou o tamanho real:
+
+```
+  102ms  retrato#1 / 0 vãos / 1 malha SIDE_L / ocioso
+  555ms  retrato#2 / 0 vãos / 1 malha SIDE_L / ocioso
+  — clique "+ Adicionar porta" —
+ 3142ms  retrato#2 / 1 vão  / 0 malhas SIDE_L / ocioso      ← as chapas SUMIRAM
+ + "[livery] nenhuma malha do corpo branco" e "[paint] front wall not found"
+```
+
+**A causa é circular, e é isso que a torna invisível numa revisão de código:**
+`trailerPanelMeshes()` reconhece a carroceria pelo MATERIAL branco de fábrica, e
+`setPaintTarget('both')` troca esse material por `carpaint` em todas elas. A
+partir daí nada no arquivo consegue mais reconhecer a carroceria — inclusive as
+três funções que precisam reconhecê-la para RECRIAR as chapas
+(`bodyPanelPred`, `buildLiveryPanels`, `buildFrontWallOverlay`). **A pintura
+apagava a definição de "o que é carroceria".**
+
+O estrago ia muito além da porta: sem chapa não há arte no baú, não há retrato
+para o editor (o palco congela na última foto), não há parede dianteira
+pintável, e `bboxOfMatching(bodyPanelPred)` devolve caixa VAZIA — que é o que o
+engate e a montagem do Thermo King leem.
+
+**A resposta NÃO é casar também por `carpaint`**: aquele material está
+igualmente no teto e na carcaça do Thermo King, e incluí-los na carroceria
+devolveria a caixa grande demais — o defeito que o cabeçalho de `bodyPanelPred`
+já registra ter custado 0,83 m no engate. O que identifica a carroceria é o que
+ela ERA, e isso já estava guardado: `factoryMaterials()` lê `userData.origMat`
+(escrito por `setPaintTarget` antes de trocar) e `trimOrigMat` (idem em
+`vehicle/trim.ts`), nessa ordem. Trava: `checks-pintura-chapa-0813.mjs`.
+
+### 14.2 A cor da FACE ganha da cor do cavalo
+
+*"selecionei pintar da mesma cor do cavalo nas laterais, e na frente e traseira
+selecionei a cor preta"*. As duas camadas são independentes e se empilham — a
+CHAPA (o material do 3D, vale para o implemento inteiro) e o FUNDO (o
+`backgroundColor` de UMA tela do fabric, que vira textura e é desenhado por
+cima). O que estava errado era `setBackgroundsForPaint()`, apagado: ligar a
+caixa LIMPAVA o fundo das quatro telas. Fazia sentido quando `DEFAULT_BG` era
+branco; com ele transparente não há nada a limpar — só o que o usuário escolheu,
+e isso é para manter.
+
+A interface passou a dizer a pilha em vez de um valor: duas linhas da MESMA
+forma (pastilha · nome · estado), que é a do card de Configurações
+(`.ts-cfg__row`) — o estúdio inteiro tem um jeito só de dizer "isto tem uma cor".
+
+### 14.3 O texto mole no baú era resolução, e a lateral era a pior das quatro
+
+*"o texto que eu coloco pelo próprio livery fica tão ruim a qualidade"*. É
+magnificação pura: a lateral estava a 2048 px / 14 655 mm = **140 px/m**, uma
+letra de 40 cm virava 56 px de textura e aparecia com ~130 px na tela. E o número
+denuncia a origem: a traseira sempre esteve a **377 px/m** — a lateral, que é a
+face grande e a que se olha de perto, tinha a pior resolução do conjunto por
+herança dos tamanhos literais de `core/template.ts`, que vinham de medir uma
+FOTO que nem existe mais.
+
+Lateral 140 → **280 px/m**, traseira e testeira 377 → **566**. O teto de textura
+subiu de 4 096 para 8 192 px e passou a ser **sondado** (`probeHardware()
+.maxTextureSize`), senão ele mordia no primeiro baú e rebaixava a densidade de
+volta.
+
+### 14.4 O floco metálico da FOTO é escolhido com o pixel da FOTO
+
+*"no render em qualidade máxima os flakes metálicos ficam muito grandes"*. O
+shader escolhe a oitava do floco — e quanto dele é desenhado DISCRETO em vez de
+dissolvido em rugosidade — a partir de `fwidth()`, que mede o pixel do BUFFER em
+curso. A captura "Alta" desenha 7680 px de aresta, então o mesmo floco de 3,3 mm
+passa de sub-pixel (invisível, virou brilho) a ~4 px (visível, e grande). Não é
+o floco que cresceu: é a resolução que finalmente o resolveu.
+
+`uPxScale` multiplica o pixel de referência pela razão de resolução, e a captura
+o liga e desliga em volta dos 16 ladrilhos. Com 1 (a tela) nada muda, byte a
+byte. Chave de programa v5 → v6.
+
+### 14.5 O TETO virou uma face de livery
+
+*"deve adicionar um livery para o teto"*. Ele é a face mais SIMPLES das cinco,
+não a mais complexa: sem porta, sem fita refletiva, sem cantoneira, sem
+para-choque — `defaultLayers()` sai cedo e a pilha estrutural fica vazia.
+
+**Ele não é RECORTADO**, e é a única da lista que não é: `TrailerBody.rebuild()`
+já escreve os triângulos do teto num buffer próprio (`TRAILER_ROOF`), justamente
+para o teto poder trocar de material sozinho. O que faltava era `uv1`, e é o que
+`tagRoofLiveryUV()` faz — no mesmo passo em que as outras quatro são recortadas,
+porque a geometria dele é reescrita a cada medida.
+
+Duas consequências que valem registro:
+
+* **`u` e `v` do teto saem do plano XZ**; `y` não entra em nada. Fixada a
+  leitura "de cima, traseira à esquerda", `v` está determinado e não é escolha:
+  com a lente em −Y e o +Z à direita da tela, o para-cima é o +X, e como `v`
+  cresce para baixo ele corre de `max.x` para `min.x`;
+* **a sobreposição de arte precisou de limpeza**. As quatro chapas são malhas
+  novas a cada recorte; o teto SOBREVIVE, e sem `userData.liveryOverlay` + a
+  remoção no topo de `makeLiveryOverlay()` cada mudança de medida penduraria mais
+  uma cópia translúcida coplanar — o teto escurecendo a cada centímetro digitado.
+
+### 14.6 O Thermo King virou camada, e Configurações encolheu
+
+*"em vez de ter a configuração de teto e thermo king em configurações, devem
+estar em liveries"* · *"no livery da frontal, o thermo king deve ser uma camada
+como a base"*. O teto virou face (a cor dele é o Fundo dela); o Thermo King
+virou uma linha fixa na lista de camadas da TESTEIRA, que é a única face em que
+ele aparece. A diferença de mecanismo (o Fundo é textura, ele é uma demão do 3D)
+é nossa e não do usuário — para quem desenha, as duas são "coisas que têm cor
+nesta face".
+
+**A capacidade continua inteira em `vehicle/trim.ts`** (`paintable: true` nas
+duas): o que saiu do card foi a PERGUNTA, não a resposta. `TRIM_PAINT_KEYS`
+segue descrevendo o motor e o card passou a filtrar com `CARD_PAINT_KEYS`.
+Paralamas fica — ele não é superfície plotável e não teria para onde ir.
+
+### 14.7 Arrastar o painel, e o zoom que não era onde se pensava
+
+O palco ganhou arrasto: o botão esquerdo MOVE a vista quando não há objeto sob o
+cursor (perguntado ao próprio fabric, `findTarget`), ⇧ + arrastar continua sendo
+o laço de seleção, e um clique seco no vazio seleciona a camada Fundo. A decisão
+mora em `takes()` (ui/livery-editor.ts) e o clique-no-vazio em `end()`, porque o
+palco ENGOLE o `pointerdown` e o fabric nunca vê o gesto.
+
+E o zoom: `FOCUS_MIN_F` subiu duas vezes sem resolver o relato porque **não era
+ele que governava**. `minDistance` é uma esfera em volta da MIRA, e a mira pode
+ser arrastada `FOCUS_PAN_F · r`; quem segura a lente longe da LATARIA é
+`FOCUS_SKIN`, a expulsão da caixa, que estava em 0,45 m. Os dois subiram
+(1,00 · r e 1,50 m) e a bancada `checks-zoom-0813.mjs` mede o que importa —
+folga mínima medida em oito azimutes, com a mira no pior lugar possível.

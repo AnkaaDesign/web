@@ -49,7 +49,7 @@
    cliente vai receber. */
 import * as THREE from 'three';
 import {
-  scene, camera, invalidate, invalidateShadows, setInteriorBounds, onFrame, onRig, getRig,
+  scene, camera, invalidate, invalidateShadows, setInteriorBounds, onFrame, onDrawFrame, onRig, getRig,
   controls, vehicleFootprint,
 } from './scene';
 import { setStudioCeiling, sizeStudioCeiling, disposeStudioCeiling } from './ceiling';
@@ -58,6 +58,7 @@ import {
   disposeFloorReflection, setFloorReflectionAmount, setFloorReflectionFade,
   setFloorContact,
 } from './floor-reflection';
+import { getProfile } from '../core/quality';
 
 /* ---------------- medidas, em metros ----------------
    O conjunto cavalo + implemento tem ~19 m de comprimento e ~4 m de altura, e a
@@ -1000,9 +1001,26 @@ onFrame(syncCenter);
    OS GANCHOS DE QUADRO RODAM ANTES do `renderer.render()` do laço — é isso que
    torna este o lugar certo e não uma coincidência: o alvo do reflexo fica pronto
    no mesmo quadro em que o piso vai lê-lo. Um reflexo desenhado depois seria o
-   quadro anterior, e num giro isso é um borrão de um quadro de atraso. */
-onFrame(() => {
+   quadro anterior, e num giro isso é um borrão de um quadro de atraso.
+
+   `onDrawFrame` E NÃO `onFrame`, e a diferença passou a valer dinheiro quando o
+   laço virou sob demanda. Este gancho é a única SEGUNDA PASSADA COMPLETA da
+   cena que o engine tem — 14,1 fps, medidos em `floor-reflection.ts`. Em
+   `onFrame` ele rodaria também nos quadros que o laço decide não desenhar, ou
+   seja sessenta vezes por segundo com a cena parada, preenchendo um alvo que
+   ninguém vai amostrar: o cenário Estúdio pagaria o laço contínuo inteiro sem
+   receber nenhuma economia dele. A lista de desenho roda no mesmo ponto do
+   quadro (depois da câmera estar na pose verdadeira, antes do `render()` do
+   laço), só que apenas quando há quadro. */
+onDrawFrame(() => {
   if (!group.visible || !gloss || !gloss.visible) return;
+  /* O NÍVEL BAIXO NÃO PAGA A SEGUNDA PASSADA. É o item mais caro do cenário
+     mais caro (14,1 fps medidos), e a nota de `QualityProfile.floorReflection`
+     explica por que ele é liga/desliga em vez de escala: reduzi-lo devolve meio
+     fps e cobra uma silhueta que cintila no giro. Lido por quadro em vez de
+     empurrado por `onQualityChange` porque é uma leitura de booleano — e um
+     termo que LÊ não tem como ficar dessincronizado de quem escreve. */
+  if (!getProfile().floorReflection) return;
   renderFloorReflection(camera, group.position.y, gloss);
 });
 
@@ -1045,6 +1063,12 @@ export {
  */
 export function renderCycloramaReflection(cam: THREE.PerspectiveCamera): boolean {
   if (!group.visible || !gloss || !gloss.visible) return false;
+  /* SEM O GATE DO PERFIL DE QUALIDADE, e a ausência é o ponto — não um
+     esquecimento. Este é o caminho da CAPTURA, e a regra do perfil (ver o
+     cabeçalho de `core/quality.ts`) é que a imagem baixada sai sempre no teto:
+     um PC fraco pode ter uma vista 3D sem reflexo e ainda assim baixar a mesma
+     foto que o PC bom baixa, só demorando mais para gerá-la. O gancho de quadro
+     lá em cima, que é o que o usuário ARRASTA, é o único que consulta o nível. */
   renderFloorReflection(cam, group.position.y, gloss);
   return true;
 }

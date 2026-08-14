@@ -143,6 +143,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { setKeyLight } from '../vehicle/paint';
 import { $ } from '../core/dom';
+/* MÓDULO FOLHA, IMPORTADO NO TOPO — e a posição é o ponto, não o acaso. O
+   renderer nasce no escopo deste módulo (ver a primeira linha do cabeçalho), e
+   `pixelRatioCap` tem de estar respondido antes disso. `core/quality.ts` não
+   importa nada do engine justamente para poder ser importado aqui sem fechar
+   ciclo. */
+import { getProfile, onQualityChange, reportFrameTime } from '../core/quality';
 import {
   canvasTex, ctx2d, makePuddleCanvas,
 } from './textures';
@@ -244,7 +250,13 @@ export const renderer = new THREE.WebGLRenderer({
      grows an `await` between the render and the readback, this has to come
      back. */
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* O TETO DO DPR VEM DO PERFIL, e no nível Alto ele vale 2 — ou seja, esta linha
+   faz exatamente o que `Math.min(devicePixelRatio, 2)` fazia antes do perfil
+   existir, e é assim que se verifica que o teto não se mexeu. O custo de
+   preenchimento escala com o QUADRADO deste número, o que faz dele o botão
+   dominante de qualquer adaptação: entre um 4K a DPR 2 e um 1080p a DPR 1 há
+   16× de pixels, decididos aqui. */
+renderer.setPixelRatio(Math.min(devicePixelRatio, getProfile().pixelRatioCap));
 renderer.shadowMap.enabled = true;
 /* ---- POR QUE NÃO É `PCFSoftShadowMap`, E O COMENTÁRIO QUE ESTAVA AQUI ----
    A linha dizia "shadow.radius only works with PCFSoft". É o contrário, e o
@@ -297,9 +309,40 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
 
+/* ---------------- A JANELA DE "NÃO APRENDA COM ISTO" ----------------
+   Os primeiros quadros depois de uma carga são os mais caros da sessão e os
+   menos representativos dela: o driver está compilando programas, subindo
+   texturas e montando buffers de vértice. Um medidor de qualidade que os
+   engolisse rebaixaria o nível toda vez que o usuário trocasse de caminhão ou
+   de cenário — e voltaria a subir dez segundos depois, com a imagem mudando
+   duas vezes à toa. É o pior comportamento possível, porque o que o usuário
+   percebe é a IMAGEM MUDANDO, não o número de quadros.
+
+   Tempo e não contagem de quadros: o que passa aqui é trabalho de DRIVER, e ele
+   não anda no ritmo do rAF.
+
+   DECLARADO AQUI EM CIMA, e não junto de `markBusy()` lá embaixo, por uma razão
+   mecânica: `invalidateShadows()` é chamada durante a AVALIAÇÃO deste módulo, e
+   uma `let` só existe a partir da linha dela. A função é içada, a variável não
+   — o par declarado no fim daria `ReferenceError` na carga, e só em algumas
+   ordens de importação, que é a pior classe de defeito que existe. */
+let busyUntil = 0;
+const BUSY_MS = 3000;
+
+/** Diz ao medidor de qualidade para ignorar os próximos segundos. */
+export function markBusy(ms = BUSY_MS) {
+  busyUntil = Math.max(busyUntil, performance.now() + ms);
+}
+
 /** Redraw the shadow map on the next frame. Call after moving/showing a caster. */
 export function invalidateShadows() {
   renderer.shadowMap.needsUpdate = true;
+  /* UM CASTER SE MEXEU, e na esmagadora maioria das vezes isso quer dizer que
+     algo acabou de CARREGAR — os chamadores são deliberadamente poucos e todos
+     são bordas de carga/visibilidade (o próprio comentário acima diz isso). Ou
+     seja, este é exatamente o lugar onde a janela de "não aprenda com isto" já
+     está sendo aberta de graça, sem uma linha nova em nenhum chamador. */
+  markBusy();
   /* A caster moved, so by definition the picture changed. Folding the repaint in
      here rather than asking every caller to pair the two is what makes the whole
      class of "invalidated the shadow, forgot the frame" bug unrepresentable —
@@ -336,33 +379,52 @@ holder.appendChild(renderer.domElement);
        autoRotate. See wantsFrame(), which is the whole predicate in one place.
 
    ---------------------------------------------------------------------------
-   IT SHIPS OFF, AND THIS IS EXACTLY WHY.
+   IT SHIPS ON — 2026-08-13. WHAT HAD TO BE TRUE FIRST, AND HOW IT WAS CHECKED.
 
-   Every mutation point inside THIS file is covered. The engine's other modules
-   are not, and three of the gaps are shipped controls that would look BROKEN,
-   not merely stale:
+   Every mutation point inside THIS file was always covered. What kept the flag
+   off was the engine's OTHER modules, and the note that stood here listed three
+   gaps that would have looked BROKEN, not merely stale. The three were closed
+   one at a time, by whoever was in the neighbourhood, and nobody came back to
+   flip the switch. Re-audited across all 59 modules before flipping:
 
-     1. vehicle/livery.ts — the fabric plotting editor. The three livery
-        CanvasTextures are marked `needsUpdate` from ONE place, a fabric
-        `after:render` handler, and fabric fires that from its own pointer
-        handlers and its own rAF. Nothing in this repo calls it. With no
-        invalidate there, drawing on the trailer never reaches the 3D view.
-     2. vehicle/models.ts `setPaintTarget()`, reached from livery.ts's "pintar o
-        implemento" checkbox. It swaps the trailer's materials and flips the
-        front-wall overlays without passing through any scene.ts entry point.
-     3. studio.ts `applyChoice()`'s colour-only fast path (`runColor`). It skips
-        the load pipeline on purpose — and with it warmUp(), which is what
-        invalidates on every other path — so picking a new colour would change
-        the materials and not the picture.
+     1. vehicle/livery.ts — the fabric plotting editor.  CLOSED at livery.ts's
+        `after:render` handler, which calls `invalidate(3)` right after marking
+        the three CanvasTextures. Three frames and not one, because the texture
+        upload can land on the next.
+     2. vehicle/models.ts `setPaintTarget()`.  CLOSED — it ends in `invalidate()`,
+        deliberately AFTER the front-wall overlay swap so the repaint includes it.
+     3. studio.ts `applyChoice()`'s colour-only fast path (`runColor`).  CLOSED
+        in `applyColor()`, which is where BOTH paths meet — the note there says
+        so explicitly, and that is why it is not in `runColor()`.
 
-   Wire those three to `invalidate()` and this can be flipped to `true`. Nothing
-   else in the engine is unreachable: every other external mutation either ends
-   in a scene.ts setter (environment.ts, hud.ts, chrome.ts, lamps.ts, set.ts) or
-   is awaited by studio.ts's runApply(), which finishes on warmUp() →
-   invalidateShadows() → invalidate(). `controls.autoRotate`, which chrome.ts
-   writes directly with no wrapper, is read by wantsFrame() rather than pushed,
-   so it needs no wiring at all. */
-const ON_DEMAND_RENDERING = false;
+     4. THE FOURTH GAP, WHICH THAT LIST NEVER HAD. `ui/paint-panel.ts` drives
+        `paint.setPaint()` on every slider drag and could not invalidate from
+        inside: `vehicle/paint.ts` is a dependency SINK (it imports `three` and
+        nothing else) and inverting that edge would close a cycle with this file
+        and throw at boot. Fixed on the CALLER side, which is the only side that
+        can: the panel imports `invalidate` from here, exactly as `hud.ts` and
+        `chrome.ts` already do. Without this, dragging any control on "Ajuste da
+        tinta" would change the uniforms and not the screen.
+
+   AND ONE THING THAT WAS NOT AN INVALIDATION AT ALL — see `onDrawFrame` below.
+   `cyclorama.ts` registered the floor-reflection pass, a full second render of
+   the scene, as an `onFrame` hook; those run even on skipped frames, so the
+   Estúdio scenario would have paid the whole continuous loop and collected none
+   of the saving. That hook moved to the draw list.
+
+   Nothing else in the engine is unreachable: every other external mutation
+   either ends in a scene.ts setter (environment.ts, hud.ts, chrome.ts, lamps.ts,
+   set.ts, trim.ts) or is awaited by studio.ts's runApply(), which finishes on
+   warmUp() → invalidateShadows() → invalidate(). The HUD's own writes all land
+   in `beginTween()`, which pins the loop through `tweenT` for the whole
+   crossfade. `controls.autoRotate`, which chrome.ts writes directly with no
+   wrapper, is read by wantsFrame() rather than pushed, so it needs no wiring.
+
+   IF A CONTROL EVER LOOKS FROZEN, this flag is the first suspect and
+   `__studio.lighting.setOnDemandRendering(false)` is the one-keystroke answer
+   that tells you whether it is: if the control works with the loop continuous,
+   what is missing is an `invalidate()` at whatever that control writes. */
+const ON_DEMAND_RENDERING = true;
 
 /* Live override for A/B-ing the two loops from the console
    (`__studio.lighting.setOnDemandRendering(true)`) without a rebuild. The
@@ -501,6 +563,34 @@ const CAM_MIN_Y = 0.15;                            // pan guard: camera stays ab
 const frameHooks: ((dt: number) => void)[] = [];
 const rigHooks: ((rig: Rig) => void)[] = [];
 export function onFrame(fn: (dt: number) => void) { frameHooks.push(fn); }
+
+/* ---------------- ganchos de QUADRO DESENHADO ----------------
+   `onFrame()` roda SEMPRE, inclusive no quadro que o laço decidiu pular, e a
+   nota do laço explica por quê: os ganchos de lá são grampos (a caixa do
+   interior, a expulsão da carroceria, a casca de bruma seguindo a câmera) e um
+   estado que eles não puderam corrigir seria um estado que o PRÓXIMO quadro
+   desenhado renderiza errado. Aquela nota também diz o que aquilo pressupõe:
+   *"são umas poucas operações de vetor, não uma chamada de desenho"*.
+
+   O REFLEXO DO PISO QUEBRA ESSA PREMISSA, e quebra em grande estilo: ele é uma
+   SEGUNDA PASSADA COMPLETA da cena (`floor-reflection.ts` →
+   `renderer.render(scene, reflector)`), registrada como gancho de quadro por
+   `cyclorama.ts`. Custo medido pelo próprio arquivo: 14,1 fps. Num laço sob
+   demanda ele rodaria sessenta vezes por segundo com a cena parada, para
+   preencher um alvo que ninguém vai amostrar — ou seja, o cenário Estúdio
+   pagaria o preço inteiro do laço contínuo e não receberia nenhuma das
+   economias. A flag pareceria ligada e não estaria.
+
+   Daí a segunda lista. Um gancho aqui roda DEPOIS de `applyAvoidance()` e
+   `tuneShadowSpan()` — a câmera já está na posição verdadeira, que é o que um
+   reflexo precisa — e IMEDIATAMENTE ANTES do `renderer.render()` do laço, que é
+   o que garante que o alvo é preenchido no MESMO quadro em que o piso o lê. Um
+   reflexo de um quadro atrás, num giro, é um borrão; já foi medido e recusado.
+
+   A REGRA, para quem for registrar o próximo: se o gancho DESENHA, ele é
+   `onDrawFrame`. Se ele CORRIGE ESTADO, é `onFrame`. */
+const drawHooks: ((dt: number) => void)[] = [];
+export function onDrawFrame(fn: (dt: number) => void) { drawHooks.push(fn); }
 export function onRig(fn: (rig: Rig) => void) {
   rigHooks.push(fn);
   /* Fired immediately so a late subscriber is not one preset change behind —
@@ -559,7 +649,14 @@ const SHADOW_HALF_WIDE = 60;
    que "alargar não adianta". Adianta; só não sozinho. */
 const SHADOW_BIAS = -0.0004;
 const SHADOW_NORMAL_BIAS = 0.02;
-const SHADOW_MAP_SIZE = Math.min(3072, renderer.capabilities.maxTextureSize || 3072);
+/* 3072 no nível Alto — o mesmo número de sempre, e ele continua sendo aparado
+   pelo `maxTextureSize` do adaptador dentro de `getProfile()`. O TIPO do mapa
+   (`PCFShadowMap`) NÃO entra no perfil: ele é `#define` e trocá-lo recompilaria
+   a cena inteira, que é o engasgo que a adaptação automática existe para
+   evitar. O tamanho é só realocação de alvo, e por isso é trocável a quente —
+   ver `applyQualityProfile()`. */
+const SHADOW_MAP_SIZE = Math.min(getProfile().shadowMapSize,
+  renderer.capabilities.maxTextureSize || 3072);
 key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 key.shadow.camera.left = -SHADOW_HALF; key.shadow.camera.right = SHADOW_HALF;
 key.shadow.camera.top = SHADOW_HALF; key.shadow.camera.bottom = -SHADOW_HALF;
@@ -2938,13 +3035,49 @@ let vehicleFocusHooked = false;
 /* minDistance, as a fraction of the rig radius. Estava em 0.30, que num rig de
    ~18 m deixava a câmera chegar a ~2.8 m do centro — perto o bastante para o
    enquadramento virar um close de painel de porta, sem veículo reconhecível na
-   tela e com a distorção de perspectiva do FOV de 45° esticando a lataria. Em
-   0.40 o limite fica em ~3.7 m, que ainda encosta o suficiente para inspecionar
-   um detalhe da arte e ainda lê como caminhão.
+   tela e com a distorção de perspectiva esticando a lataria. Foi para 0.40
+   (~3.7 m) e de lá para 0.60 (~5.5 m), a pedido, com o mesmo argumento uma
+   escala acima: *"diminuir o zoom in máximo, está muito alto"*.
+
+   POR QUE O NÚMERO SUBIU DE NOVO, e por que ele não é uma questão de gosto: a
+   câmera abre em CARD_FOV = 30°, ou seja uma TELEOBJETIVA. Quanto mais longa a
+   lente, mais perto o mesmo enquadramento acontece — a distância mínima que
+   ainda mostra "um caminhão" cresce junto. O 0.40 tinha sido calibrado quando a
+   lente era de 45° e sobreviveu à troca sem ser recalculado; em 30° ele deixa a
+   câmera entrar em cima da chapa. Em 0.60 o limite ainda encosta o suficiente
+   para inspecionar um detalhe da arte (um logo de 40 cm ocupa meia tela) e
+   nunca vira um close sem referência.
+
+   E ELE VALE PARA A METADE, NÃO SÓ PARA O CONJUNTO: `r` é o raio da caixa em
+   FOCO, e desde 2026-08-13 essa caixa é a do que está visível (só o cavalo, só
+   o implemento). Como a fração é da caixa, o limite acompanha — um implemento
+   sozinho tem raio menor e deixa chegar proporcionalmente mais perto, que é o
+   certo.
+
    Não é o único limitador: FOCUS_SKIN empurra a câmera para fora da carroceria
    todo quadro, porque minDistance é uma ESFERA e não sabe dizer "fora de uma
-   caixa de 15 m" (ver o cabeçalho acima). */
-const FOCUS_MIN_F = 0.40;   // minDistance, as a fraction of the rig radius
+   caixa de 15 m" (ver o cabeçalho acima).
+
+   E SUBIU UMA TERCEIRA VEZ, 0.60 -> 0.80, pelo mesmo relato de 2026-08-13:
+   *"precisa diminuir o zoom in máximo, está chegando muito perto do caminhão"*.
+   O que o número significa em imagem, num conjunto de 19 m (r ~9,5 m) e com a
+   lente de 30° com que a cena abre:
+
+       0.60 · r = 5,7 m   ⇒  4,3 m de altura no quadro  (o baú e pouco mais)
+       0.80 · r = 7,6 m   ⇒  4,1 m … 5,8 m de altura    (o baú com folga em cima
+                              e embaixo, ainda lendo o texto de uma plotagem)
+
+   Continua perto o bastante para conferir um detalhe da arte — um logotipo de
+   40 cm ocupa ~1/10 da altura da tela, ou seja ~100 px num monitor de 1080 —,
+   e deixa de ser um close de chapa sem referência de veículo.
+
+   E UMA QUARTA VEZ, 0.80 -> 1.00, com o relato repetido (*"o zoom in máximo
+   continua extremamente alto"*) e o diagnóstico corrigido: este número não era
+   o que estava governando. Ver `FOCUS_SKIN` logo abaixo — é ele que decide a
+   distância até a LATARIA, e ele subiu junto. Este aqui passa a valer 1,00 · r
+   (~9,5 m num conjunto de 19 m, ~5,1 m de altura no quadro) para que o limite
+   ESFÉRICO também deixe de permitir um close com a mira centrada. */
+const FOCUS_MIN_F = 1.00;   // minDistance, as a fraction of the rig radius
 /* maxDistance, idem — mas agora é um PISO, não a palavra final: ver o
    Math.max() em setVehicleFocus(). O 2.60 foi calculado para uma lente de 45°
    (é o que o cabeçalho acima ainda descreve); a câmera passou a abrir em
@@ -2963,7 +3096,19 @@ const FOCUS_MAX_F = 2.60;
    existir, sem deixar a órbita sair do pátio útil. */
 const OPEN_ZOOM_OUT = 1.15;
 const FOCUS_PAN_F = 0.28;   // how far the target may be panned off centre
-const FOCUS_SKIN = 0.45;    // metres of clearance kept outside the bodywork
+/* Folga mantida FORA da carroceria — e é ELE, não `minDistance`, quem responde
+   "quão perto do caminhão dá para chegar".
+   ---------------------------------------------------------------------------
+   `minDistance` é uma esfera em volta da MIRA, e a mira pode ser arrastada
+   `FOCUS_PAN_F · r` (uns 2,7 m num conjunto de 19 m) para cima da lataria. Com
+   a mira encostada num flanco, "a 7,6 m da mira" pode ser a centímetros da
+   chapa — e o que finalmente segura a câmera é esta expulsão da caixa. Por isso
+   subir só `FOCUS_MIN_F` não resolveu o relato: ele mudou o raio da esfera e
+   não o que estava governando.
+   0,45 → 1,50 m. A 1,5 m, com a lente de 30° com que a cena abre, o quadro tem
+   0,80 m de altura — ainda um detalhe (um logotipo de 40 cm ocupa meia tela),
+   mas com a chapa inteira em foco em vez de a lente atravessando o friso. */
+const FOCUS_SKIN = 1.50;    // metres of clearance kept outside the bodywork
 const _fv = new THREE.Vector3();
 
 /**
@@ -3977,7 +4122,7 @@ export function resize() {
      multiplies by whatever the ratio currently is, so this has to come first.
      Cheap by construction: three's setPixelRatio() early-outs on an unchanged
      value, so the common case is one comparison. */
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, getProfile().pixelRatioCap));
   renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
@@ -4120,11 +4265,12 @@ function wantsFrame(): boolean {
    nem nuvem. Nenhum outro termo de wantsFrame() cobre isso, porque nenhum
    deles é sobre QUEM ESTÁ OLHANDO — e uma gravação é exatamente isso.
 
-   ISTO NÃO É UM CONTORNO DA FLAG DE HOJE. `ON_DEMAND_RENDERING` ships `false`,
-   ou seja o laço já desenha sempre e este pino não muda nada agora. Ele existe
-   para que a gravação continue correta no dia em que as três lacunas listadas
-   lá em cima forem fechadas e a flag virar — que é o oposto de escrever
-   `record.ts` presumindo o valor atual e descobrir o defeito um ano depois.
+   ESTE PINO PASSOU A SEGURAR PESO EM 2026-08-13. Ele foi escrito quando
+   `ON_DEMAND_RENDERING` ainda era `false` — ou seja, quando o laço desenhava
+   sempre e o pino não mudava nada —, justamente para que a gravação continuasse
+   correta no dia em que a flag virasse, em vez de `record.ts` presumir o valor
+   da época e o defeito aparecer um ano depois. A flag virou; sem este pino, uma
+   gravação de cena parada seria o primeiro quadro repetido do começo ao fim.
 
    CONTADOR, e não booleano, pelo mesmo motivo de `drawSuspended`: dois pinos
    simultâneos (uma gravação e o que vier depois) não podem se desfazer um ao
@@ -4142,6 +4288,44 @@ export function pinFrames(on: boolean) {
   else if (framePins > 0) framePins--;
   invalidate();
 }
+
+
+/* ---------------- APLICAR O PERFIL A QUENTE ----------------
+   Chamado quando o nível muda — pela escolha do usuário ou pelo medidor. Tudo
+   aqui é botão QUENTE: nenhuma destas linhas recompila um shader, e é essa
+   propriedade que torna a adaptação automática segura. A prova é por
+   construção: `setPixelRatio` e `setSize` mexem no buffer, `mapSize` realoca um
+   alvo, e `anisotropy` é estado de amostrador. Nenhum é `#define`.
+
+   O que NÃO está aqui, e não pode estar: `antialias` (parâmetro de construtor),
+   `NUM_SPOT_LIGHTS` (chave de cache de programa) e `shadowMap.type` (`#define`).
+
+   A ANISOTROPIA NÃO É REAPLICADA às texturas já carregadas, e isso é uma
+   escolha, não um esquecimento: varrer todo material do veículo e do cenário
+   marcando `needsUpdate` forçaria um reupload de ~200 texturas no meio de um
+   arrasto — exatamente o engasgo que se está tentando evitar. O valor novo vale
+   para o que carregar DEPOIS (troca de caminhão, troca de cenário), que é
+   quando ele custa zero. Quem mudou de nível vê a mudança na resolução e na
+   sombra na hora, e na anisotropia no próximo carregamento. */
+function applyQualityProfile() {
+  const p = getProfile();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, p.pixelRatioCap));
+  const w = holder.clientWidth, h = holder.clientHeight;
+  if (w && h) renderer.setSize(w, h);
+
+  const size = Math.min(p.shadowMapSize, renderer.capabilities.maxTextureSize || 3072);
+  if (key.shadow.mapSize.x !== size) {
+    key.shadow.mapSize.set(size, size);
+    /* O alvo VELHO tem de morrer, senão o three continua a desenhar no de antes
+       e o `mapSize` novo não sai do papel. `dispose()` no mapa faz o renderer
+       realocar no próximo passe de sombra. */
+    key.shadow.map?.dispose();
+    key.shadow.map = null;
+    renderer.shadowMap.needsUpdate = true;
+  }
+  invalidate();
+}
+onQualityChange(applyQualityProfile);
 
 export function stopLoop() {
   renderer.setAnimationLoop(null);
@@ -4237,6 +4421,38 @@ export function startLoop() {
       renderer.shadowMap.needsUpdate = true;
       shadowStale = false;
     }
+    /* Só agora, e nunca antes do `return` acima: o que está aqui DESENHA. Ver a
+       nota de `onDrawFrame`. */
+    for (const fn of drawHooks) fn(dt);
+    const t0 = performance.now();
     renderer.render(scene, camera);
+    /* ---------------- O MEDIDOR DO PERFIL DE QUALIDADE ----------------
+       AQUI E EM NENHUM OUTRO LUGAR, por dois motivos que se somam:
+
+       1. É depois do `return` do laço sujo, ou seja **só em quadro DESENHADO**.
+          Um quadro pulado custa ~0 ms; alimentá-lo ao medidor faria a média
+          despencar com a cena parada e o adaptador concluiria que a máquina é
+          um foguete justamente quando ela não está fazendo nada — e então
+          subiria o nível de quem não aguenta.
+       2. Mede o `render()` e não o quadro inteiro. O que está fora dele
+          (`controls.update`, os ganchos, o desvio) é trabalho de CPU que não
+          muda com o perfil, e incluí-lo diluiria o sinal que o perfil pode
+          realmente mexer.
+
+       `performance.now()` mede o tempo de SUBMISSÃO, não o de execução na GPU —
+       o driver é assíncrono. Isso subestima uma cena limitada por GPU, e é
+       aceito de propósito: a alternativa honesta seria uma consulta de
+       temporizador (`EXT_disjoint_timer_query`), que não existe na maioria dos
+       navegadores por privacidade. Na prática a submissão satura junto com a
+       GPU quando a fila enche, que é exatamente o regime em que o rebaixamento
+       interessa.
+
+       O `busy` é a trava contra aprender a coisa errada. Todos os termos são
+       picos CONHECIDOS: uma gravação em curso (`framePins`), um crossfade de
+       preset (`tweenT`), e a janela de carga que `warmUp()` marca. Adaptar em
+       cima de um pico conhecido faria o nível cair toda vez que o usuário
+       trocasse de caminhão — que é o momento em que ele mais está olhando. */
+    reportFrameTime(performance.now() - t0,
+      framePins > 0 || tweenT < 1 || performance.now() < busyUntil);
   });
 }

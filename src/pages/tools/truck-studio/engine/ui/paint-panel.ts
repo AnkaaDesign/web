@@ -39,6 +39,26 @@ import {
 } from '../vehicle/paint';
 import { getColor, saveColorRecipe, canPersistColors, FINISH_LABEL } from '../catalog/colors';
 import { setStatus } from './chrome';
+/* O PEDIDO DE QUADRO MORA AQUI, E NÃO EM `vehicle/paint.ts`.
+   ---------------------------------------------------------------------------
+   O laço de `scene/scene.ts` desenha sob demanda: quem muda o que a câmera vê
+   tem de dizer que mudou, senão o quadro não vem. `setPaint()` muda uniformes —
+   ou seja, muda a imagem — e mesmo assim NÃO invalida, e isso é deliberado:
+   `paint.ts` é um sumidouro de dependência (importa `three` e mais nada), e
+   inverter essa aresta fecharia um ciclo com `scene.ts` e daria `ReferenceError`
+   no boot. Ver a nota de acyclicidade no topo de `scene.ts`.
+   Então quem chama é quem pede o quadro. Esta é a ÚNICA superfície que escreve
+   na tinta ao vivo, então é aqui que a dívida fecha — e o resto da interface já
+   importa da cena desta mesma forma (`hud.ts`, `chrome.ts`). */
+import { invalidate } from '../scene/scene';
+
+/** Escreve na tinta E pede o quadro que mostra o resultado. Todo `setPaint()`
+ *  deste arquivo passa por aqui — um caminho só, para não haver o quarto lugar
+ *  que esqueceu de invalidar. */
+function paint(patch: Partial<PaintParams>) {
+  setPaint(patch);
+  invalidate();
+}
 
 /* Os parâmetros que o painel expõe. É `PaintParams` menos `flakePx`, que é alvo
    de ANTIALIASING em pixels de tela e não uma propriedade da tinta — não há o
@@ -222,7 +242,7 @@ function buildRow(f: Field): HTMLElement {
      slider de tinta que só aplica ao soltar obriga a arrastar às cegas. */
   input.addEventListener('input', () => {
     const v: number | string = isColorKey(f) ? input.value : Number(input.value);
-    setPaint({ [f.key]: v } as Partial<PaintParams>);
+    paint({ [f.key]: v } as Partial<PaintParams>);
     if (!isColorKey(f)) val.textContent = fmt(Number(input.value), f);
   });
   row.appendChild(input);
@@ -269,7 +289,7 @@ function build() {
   reset.setAttribute('type', 'button');
   reset.setAttribute('title', 'Volta aos valores de fábrica desta família de tinta');
   reset.addEventListener('click', () => {
-    setPaint(PAINT_DEFAULTS_BY_FINISH[getPaintParams().finish]);
+    paint(PAINT_DEFAULTS_BY_FINISH[getPaintParams().finish]);
     sync();
     setStatus('Ajuste devolvido ao padrão do acabamento');
   });
@@ -279,7 +299,7 @@ function build() {
   discard.setAttribute('type', 'button');
   discard.setAttribute('title', 'Volta ao que está gravado nesta cor');
   discard.addEventListener('click', () => {
-    if (baseline) setPaint(baseline);
+    if (baseline) paint(baseline);
     sync();
     setStatus('Ajuste descartado');
   });

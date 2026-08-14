@@ -40,6 +40,11 @@ import {
   TEMP_NEUTRAL, onRig,
 } from '../scene/scene';
 import { claimPill, paintFrame } from './loader';
+/* O perfil de qualidade. Módulo FOLHA — ver o cabeçalho de `core/quality.ts`. */
+import {
+  qualityMode, qualityLevel, setQualityMode, onQualityChange,
+  LEVEL_LABEL, type QualityMode,
+} from '../core/quality';
 
 /* ---------------- trocar de preset SEM engasgo ----------------
    Um clique de preset abre um tween de 0,8 s ≈ 48 quadros, e CADA UM redesenha
@@ -241,6 +246,13 @@ let dialRay!: SVGLineElement;
 let dialHandle!: SVGCircleElement;
 let tilesEl!: HTMLElement;
 let weatherVal!: HTMLElement;
+/* ---- qualidade ----
+   Sem `!` porque `paintQuality()` é chamado por `onQualityChange`, que o
+   adaptador automático pode disparar ANTES de o painel existir (o medidor roda
+   no laço, o HUD é construído sob demanda). A guarda de nulo em `paintQuality()`
+   é o que cobre essa janela — um `!` aqui seria mentira de tipo. */
+let qualityVal: HTMLElement | null = null;
+let qualityTiles: HTMLElement | null = null;
 
 /* ---- face de estúdio ----
    As LINHAS inteiras, e não só os controles: a troca de face é feita
@@ -519,6 +531,79 @@ function buildBackdropRow() {
   return row;
 }
 
+/* ---------------- QUALIDADE ----------------
+   QUATRO POSIÇÕES: Automático · Alta · Média · Baixa.
+
+   POR QUE ISTO EXISTE NA INTERFACE, E NÃO SÓ NO CONSOLE. Adaptação silenciosa é
+   um defeito, e este arquivo já rejeitou essa forma uma vez: a nota de
+   `warnIfUnpaintable()` diz que *"um usuário informado é um bug relatado, um
+   usuário calado é um bug perdido"*. Vale igual aqui — alguém cuja imagem
+   piorou sozinha e que não sabe por quê vai relatar "o estúdio está borrado",
+   que é um defeito impossível de diagnosticar. Com o controle visível, a mesma
+   pessoa relata "ele caiu para Baixo sozinho", que é uma frase acionável.
+
+   EM AUTOMÁTICO O RÓTULO MOSTRA ONDE ELE ESTÁ (`Automático · média`), porque
+   "automático" sozinho não responde a pergunta que a pessoa tem.
+
+   ESCOLHER UM NOME CONGELA O ADAPTADOR, e isso é um direito: quem escolheu Alta
+   num PC fraco escolheu ver 20 quadros por segundo. O medidor nem é consultado
+   depois — ver `setQualityMode()`. */
+function buildQualityRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--quality');
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Qualidade'));
+  qualityVal = el('span', 'ts-hud-row__val');
+  top.appendChild(qualityVal);
+  row.appendChild(top);
+
+  qualityTiles = el('div', 'ts-hud-tiles');
+  qualityTiles.setAttribute('role', 'radiogroup');
+  qualityTiles.setAttribute('aria-label', 'Qualidade da imagem');
+  const OPTS: { id: QualityMode; name: string; title: string }[] = [
+    { id: 'auto', name: 'Auto', title: 'Ajusta sozinho pelo desempenho medido' },
+    { id: 'alta', name: 'Alta', title: 'Resolução cheia, sombra 3072², reflexo do piso' },
+    { id: 'media', name: 'Média', title: 'Resolução 1,5×, sombra 2048²' },
+    { id: 'baixa', name: 'Baixa', title: 'Resolução 1×, sombra 1024², sem reflexo nem casca de laranja' },
+  ];
+  for (const o of OPTS) {
+    const tile = el('button', 'ts-hud-tile ts-hud-tile--text');
+    tile.type = 'button';
+    tile.dataset.quality = o.id;
+    tile.setAttribute('role', 'radio');
+    tile.setAttribute('aria-checked', 'false');
+    tile.title = o.title;
+    tile.setAttribute('aria-label', o.name + ' — ' + o.title);
+    tile.appendChild(el('span', 'ts-hud-tile__name', o.name));
+    tile.addEventListener('click', () => { setQualityMode(o.id); paintQuality(); });
+    qualityTiles.appendChild(tile);
+  }
+  row.appendChild(qualityTiles);
+  return row;
+}
+
+/* O ADAPTADOR MUDA O NÍVEL SOZINHO, e o rótulo tem de ir junto — senão o painel
+   diria "Automático · alta" com a cena rodando em Baixo, que é pior do que não
+   ter o controle. Registrado no escopo do módulo, uma vez: o gancho sobrevive ao
+   painel ser construído depois, porque `paintQuality()` sai cedo enquanto ele
+   não existe. */
+onQualityChange(() => paintQuality());
+
+function paintQuality() {
+  if (!qualityVal || !qualityTiles) return;
+  const mode = qualityMode();
+  const level = qualityLevel();
+  /* Em automático o nível EFETIVO vai junto; num nível fixo ele seria a mesma
+     palavra duas vezes. */
+  qualityVal.textContent = mode === 'auto'
+    ? 'Automático · ' + LEVEL_LABEL[level].toLowerCase()
+    : LEVEL_LABEL[level];
+  for (const tile of qualityTiles.querySelectorAll<HTMLElement>('.ts-hud-tile')) {
+    const on = tile.dataset.quality === mode;
+    tile.classList.toggle('is-on', on);
+    tile.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+}
+
 /* Os três multiplicadores. Um só construtor porque são a MESMA coisa três
    vezes: um deslizante 0..N cujo 1 é o que o preset autorou. O `centro` do
    controle é o valor calibrado — mexer é sempre um desvio consciente dele. */
@@ -726,6 +811,7 @@ function build() {
   bodyEl.appendChild(weatherRow);
   backdropRow = buildBackdropRow();
   bodyEl.appendChild(backdropRow);
+  bodyEl.appendChild(buildQualityRow());
 
   hudRoot.appendChild(bodyEl);
 
@@ -1043,4 +1129,5 @@ export function syncHud() {
      resumo do cabeçalho, que depende das duas coisas. */
   applyFace();
   paintStudio();
+  paintQuality();
 }

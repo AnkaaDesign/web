@@ -53,6 +53,11 @@
 */
 import * as THREE from 'three';
 import { clamp01 } from '../core/dom';
+/* SUMIDOURO CONTINUA SENDO SUMIDOURO. `core/quality.ts` não importa NADA — nem
+   o three —, então esta aresta não pode fechar ciclo com `scene.ts`, que é a
+   propriedade que este arquivo precisa preservar (ver a nota de acyclicidade no
+   topo de scene.ts). É a mesma classe de dependência que `core/dom` já é. */
+import { getProfile, onQualityChange } from '../core/quality';
 
 /* ---------------- parameter space ----------------
    Everything the UI can touch, normalised 0..1 (or a hex colour). This object
@@ -242,6 +247,10 @@ function makeUniforms() {
     uFlakeGloss: { value: 0.07 },
     uFlakeColor: { value: new THREE.Color(0xffffff) },
     uFlakePx: { value: 2.4 },
+    /* Quantos pixels de SAÍDA vale um pixel deste render. 1 na tela; na captura
+       em 7680 é 4, porque o mosaico desenha quatro vezes mais pixels por metro
+       de lataria. Ver `setPaintPixelScale()`. */
+    uPxScale: { value: 1 },
     uCoatThickness: { value: 0.013 },
     uPearlAmount: { value: 0 },
     uPearlTravel: { value: 2.1 },
@@ -360,7 +369,16 @@ class PaintInstance {
     U.uFlakePx.value = Math.max(0.5, p.flakePx);
     U.uCoatThickness.value = Math.max(0, p.coatThickness);
 
-    U.uPeel.value = Math.max(0, p.peel);
+    /* A CASCA DE LARANJA É O TRECHO MAIS CARO DESTE SHADER, e o nível Baixo não
+       a paga. São quatro avaliações de `pPeelHeight` por fragmento — duas de
+       `pNoise` cada — para produzir o efeito mais SUTIL dos três acima de ~2 m
+       de distância. O ramo `if( uPeel > 0.001 )` já existe no GLSL, então zerar
+       o uniforme não é um valor pequeno sendo calculado à toa: é o bloco inteiro
+       saltado pelo controle de fluxo.
+
+       Uniforme e não `#define`: trocável a quente, sem recompilar nada — que é o
+       que permite ao adaptador automático mexer nisto. */
+    U.uPeel.value = getProfile().orangePeel ? Math.max(0, p.peel) : 0;
     U.uPeelScale.value = Math.max(1, p.peelScale);
     U.uPeelDetail.value = Math.max(0, p.peelDetail);
   }
@@ -450,12 +468,49 @@ const defaultPaint = new PaintInstance();
    ferragem por cima da tinta. */
 const instances = new Set<PaintInstance>([defaultPaint]);
 
+/* TODA DEMÃO VIVA REAGE À TROCA DE NÍVEL, e é por isso que este gancho fica
+   aqui, sobre `instances`, e não dentro de `PaintInstance`.
+   ---------------------------------------------------------------------------
+   `applyToMaterials()` lê o perfil para decidir a casca de laranja, mas ela só
+   roda quando alguém chama `set()`. Sem este gancho, o nível poderia cair para
+   Baixo e a casca continuaria acesa até o usuário mexer numa cor — ou seja o
+   rebaixamento não aconteceria justamente na máquina que precisa dele.
+   `set()` sem argumento é um reaplicar puro: ele não altera parâmetro nenhum
+   (o laço de `Object.entries` de um objeto vazio não itera) e termina em
+   `applyToMaterials()`, que é exatamente o que se quer. */
+onQualityChange(() => { for (const p of instances) p.set(); });
+
 /** Cria uma demão independente. Ver o cabeçalho de PaintInstance. */
 export function createPaintInstance(): PaintInstance {
   const p = new PaintInstance();
   instances.add(p);
+  p.uniforms.uPxScale.value = pxScale;      // uma demão nova nasce no regime atual
   return p;
 }
+
+/* ---------------- O PIXEL DE REFERÊNCIA DO FLOCO ----------------
+   Escala de resolução: quantos pixels de saída vale um pixel do render em curso.
+   1 na tela; `alturaDaCaptura / alturaDoCanvas` durante uma captura.
+
+   MORA AQUI E NÃO NA RECEITA porque não é uma propriedade da TINTA — é do
+   render. Duas demãos diferentes na mesma cena têm receitas diferentes e a
+   MESMA escala de resolução, sempre; guardá-la por instância seria abrir a
+   possibilidade de elas discordarem sobre em que buffer estão sendo desenhadas.
+
+   POR QUE UM ESTADO GLOBAL E NÃO UM PARÂMETRO DE `set()`: `set()` reescreve a
+   receita e passa por `applyToMaterials()`; isto é um interruptor de uma linha
+   que a captura liga e desliga em volta de 16 ladrilhos. Ver o `finally` em
+   scene/capture.ts — ele é obrigatório: uma escala deixada para trás faria o
+   floco da TELA ser escolhido com o pixel da foto. */
+let pxScale = 1;
+export function setPaintPixelScale(k: number) {
+  const v = Math.max(1, Number.isFinite(k) ? k : 1);
+  if (v === pxScale) return;
+  pxScale = v;
+  for (const p of instances) p.uniforms.uPxScale.value = v;
+}
+/** Diagnóstico (bancada). */
+export const paintPixelScale = () => pxScale;
 export type { PaintInstance };
 
 /** A receita VIVA da demão padrão, copiada. É o que o painel de ajuste lê para
@@ -529,6 +584,7 @@ varying vec3 vPaintWPos;
 uniform float uFlakeAmount; uniform float uFlakeScale; uniform float uFlakeTilt;
 uniform float uFlakeGloss;  uniform vec3  uFlakeColor;
 uniform float uFlakePx;     uniform float uCoatThickness;
+uniform float uPxScale;
 uniform float uPearlAmount; uniform float uPearlTravel;
 uniform vec3  uPearlMid;    uniform vec3  uPearlFlip;
 uniform float uPeel;        uniform float uPeelScale;  uniform float uPeelDetail;
@@ -628,7 +684,39 @@ if( uFlakeAmount > 0.001 ){
   // graça; proceduralmente escolhemos a oitava cujas células caem perto de
   // uFlakePx pixels e cruzamos para a próxima, então aproximar SUBDIVIDE em vez
   // de ampliar uma célula até virar mancha.
-  float wpx   = max( length( fwidth( fPos ) ), 1e-6 );
+  //
+  // uPxScale: O PIXEL DE REFERÊNCIA É O DA IMAGEM DE SAÍDA, NÃO O DESTE RENDER.
+  // -------------------------------------------------------------------------
+  // Relato de 2026-08-13: *"no render (foto tirada) quando em qualidade máxima,
+  // os flakes metálicos ficam muito grandes"*. Ele é literal e a causa é toda
+  // esta linha.
+  //
+  // ATENCAO: NADA DE CRASE DAQUI PARA BAIXO. Este bloco de GLSL vive dentro de
+  // uma template literal de JS, e uma crase num comentario fecha a string —
+  // esbuild falha com "Expected ; but found fwidth" e nao com um erro de shader.
+  //
+  // fwidth() mede o tamanho de um pixel DO BUFFER que está sendo desenhado. A
+  // captura "Alta" desenha 7680 px de aresta em 16 ladrilhos (scene/capture.ts),
+  // ou seja quatro vezes mais pixels por metro de lataria do que a tela — então
+  // wpx cai a 1/4 e as duas contas abaixo mudam de regime:
+  //
+  //   px = wpx*sA  … células por pixel      tela ~1,2   captura ~0,3
+  //   aa = 1/(1+px²·1,2)  … quanto do floco é DISCRETO
+  //                                          tela ~0,38  captura ~0,93
+  //
+  // A célula continua com o mesmo tamanho FÍSICO (uFlakeScale = 300/m, ou seja
+  // 3,3 mm — cem vezes um floco de alumínio de verdade). Na tela isso não
+  // aparece porque ela é sub-pixel e o ramo estatístico do fim desta função a
+  // dissolve em rugosidade; na captura ela passa a ocupar ~4 px, o ramo discreto
+  // domina, e os 3,3 mm ficam VISÍVEIS. Não é o floco que cresceu — é a
+  // resolução que finalmente o resolveu.
+  //
+  // Multiplicar o pixel de referência pela razão de resolução faz a oitava E a
+  // mistura discreto/estatístico serem escolhidas com o pixel da IMAGEM FINAL.
+  // A foto passa a ter exatamente o floco da tela, só que desenhado com quatro
+  // vezes mais amostras — que é o que "a mesma imagem, mais nítida" quer dizer.
+  // Com uPxScale = 1 (o caso da tela) nada muda, byte a byte.
+  float wpx   = max( length( fwidth( fPos ) ), 1e-6 ) * uPxScale;
   float ideal = 1.0 / ( wpx * uFlakePx );
   float lod   = clamp( log2( max( ideal/uFlakeScale, 1e-4 ) ), 0.0, 6.0 );
   float l0    = floor( lod );
@@ -715,8 +803,9 @@ function installPaintShader(m: THREE.MeshPhysicalMaterial, U: PaintUniforms) {
         '#include <clearcoat_normal_fragment_maps>\n' + PAINT_ORANGEPEEL);
   };
   /* Sobe a cada mudança no GLSL injetado: um programa em cache com a versão
-     anterior continuaria rodando. v5 = o port do laboratório. */
-  m.customProgramCacheKey = () => 'truckstudio-paint-v5';
+     anterior continuaria rodando. v5 = o port do laboratório; v6 = `uPxScale`,
+     o pixel de referência da IMAGEM DE SAÍDA (ver PAINT_SURFACE). */
+  m.customProgramCacheKey = () => 'truckstudio-paint-v6';
 }
 
 /** Um material da demão PADRÃO. Ver `PaintInstance.makeMaterial`. */

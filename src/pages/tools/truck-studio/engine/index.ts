@@ -16,8 +16,10 @@
                  `livery-doc` owns the document model on top of them — image
                  assets, webfonts, undo/redo, the align/distribute geometry,
                  side mirroring and persistence.
-                 `trim` is the four trim pieces — roof, fenders, toolbox and
-                 Thermo King — each able to carry its OWN paint. That is why
+                 `trim` is the four configurable pieces — roof, fenders,
+                 kitchen box and Thermo King. Three of them carry their OWN
+                 paint (the box lost its colour on 2026-08-13, by request) and
+                 two can be dropped from the product. Per-piece paint is why
                  `paint` exports a PaintInstance class rather than the module
                  singleton it used to be: the uniform block has to be per-coat,
                  or every material writes the same colour. `trim` never touches
@@ -42,7 +44,9 @@
                  selector — cenário, fabricante, modelo e COR —, the offscreen
                  renderer that draws the cabs onto those cards (preview), the
                  loading curtain, the lighting HUD and `trim-panel` (the
-                 collapsed strip that paints the four trim pieces). Plus the
+                 collapsible CONFIGURAÇÕES card: per-piece colour pickers, which
+                 items ship with the implement, and whether the scene shows the
+                 whole rig, only the tractor or only the implement). Plus the
                  livery editor's
                  own interface: `livery-editor` (modal, toolbar, contextual
                  inspector, layers, keyboard) and `livery-guides` (snapping

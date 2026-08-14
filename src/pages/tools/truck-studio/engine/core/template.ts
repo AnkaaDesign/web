@@ -168,15 +168,33 @@ export const STUDIO_HTML = /* html */ `
              buffer: livery.ts os resolve na avaliação do módulo, então eles têm
              de existir AQUI, e não serem criados por JS depois. -->
         <div id="ts-panels" role="group" aria-label="Design do implemento">
-          <button type="button" class="ts-panel ts-panel--rear preview-card" data-surface="rear"
-                  title="Editar as portas traseiras">
-            <span class="ts-panel__media square"><canvas id="prev-rear" width="300" height="300"></canvas></span>
-            <span class="ts-panel__body">
-              <span class="ts-panel__label">Portas</span>
-              <span class="ts-panel__name">Traseira</span>
-            </span>
-            <span class="ts-panel__edit" aria-hidden="true">Editar</span>
-          </button>
+          <!-- AS DUAS PONTAS DIVIDEM UMA LINHA — pedido de 2026-08-13, literal:
+               "adicionar um livery da frontal, AO LADO do livery da traseira".
+               E é o arranjo certo pela geometria: as duas são quase quadradas
+               (a traseira já vinha com 150px justamente para não virar um bloco
+               alto), então lado a lado elas ocupam a mesma largura de UM card
+               de lateral e a pilha continua com a borda direita alinhada.
+               Empilhadas, seriam ~370px de altura para duas chapas de 2,6 m. -->
+          <div class="ts-panels__pair">
+            <button type="button" class="ts-panel ts-panel--end preview-card" data-surface="rear"
+                    title="Editar as portas traseiras">
+              <span class="ts-panel__media square"><canvas id="prev-rear" width="300" height="300"></canvas></span>
+              <span class="ts-panel__body">
+                <span class="ts-panel__label">Portas</span>
+                <span class="ts-panel__name">Traseira</span>
+              </span>
+              <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+            </button>
+            <button type="button" class="ts-panel ts-panel--end preview-card" data-surface="front"
+                    title="Editar a testeira">
+              <span class="ts-panel__media square"><canvas id="prev-front" width="300" height="300"></canvas></span>
+              <span class="ts-panel__body">
+                <span class="ts-panel__label">Testeira</span>
+                <span class="ts-panel__name">Frente</span>
+              </span>
+              <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+            </button>
+          </div>
           <button type="button" class="ts-panel preview-card" data-surface="left"
                   title="Editar o lado do motorista">
             <span class="ts-panel__media"><canvas id="prev-left" width="600" height="101"></canvas></span>
@@ -195,42 +213,68 @@ export const STUDIO_HTML = /* html */ `
             </span>
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
-          <!-- ACABAMENTOS — teto, paralamas, caixa e Thermo King.
-               DENTRO de #ts-panels e como PRIMEIRO filho, e as duas coisas são
-               decisões:
-               · dentro, porque este grupo já se chama "Design do implemento" e
-                 é exatamente o que estas quatro peças são. Um segundo grupo
-                 flutuante na mesma borda seria um quinto material sobre o
-                 render e uma segunda coluna disputando a mesma âncora;
-               · primeiro, porque a pilha é ancorada pela BASE e cresce para
-                 cima — as duas laterais, que é onde a arte de verdade vai,
-                 continuam no mesmo lugar de sempre.
-               É DELIBERADAMENTE MAIS DISCRETO que os três cards de plotagem: uma
-               tira recolhida com o nome e quatro pontinhos de cor, que só abre
-               no clique. Pedido do dono do produto, e ele está certo — plotagem
-               é o que se vem fazer aqui; acabamento é um ajuste.
+          <!-- O TETO — pedido de 2026-08-13: "deve adicionar um livery para o
+               teto". Card de LATERAL e não de ponta, e a razão é a proporção: o
+               teto tem o COMPRIMENTO do baú por 2,6 m de largura (razão ~5,7),
+               que é praticamente a da lateral (5,3). Num media quadrado ele
+               sairia como um risco no meio do card.
+               POR ÚLTIMO na pilha de plotagens: é a face que menos se vê e a
+               última que se resolve, e a ordem do card é a ordem do trabalho.
+               A cor do teto MORA AQUI agora — é o Fundo desta face —, e foi por
+               isso que ela saiu do card Configurações. -->
+          <button type="button" class="ts-panel preview-card" data-surface="roof"
+                  title="Editar o teto">
+            <span class="ts-panel__media"><canvas id="prev-roof" width="600" height="106"></canvas></span>
+            <span class="ts-panel__body">
+              <span class="ts-panel__label">Teto</span>
+              <span class="ts-panel__name">Visto de cima</span>
+            </span>
+            <span class="ts-panel__edit" aria-hidden="true">Editar</span>
+          </button>
+          <!-- CONFIGURAÇÕES — cores de peça, o que entra no produto e o que
+               fica em cena.
+               Chamava-se "Acabamentos" e o nome saiu a pedido (2026-08-13): o
+               card deixou de ser só a paleta de quatro peças e passou a carregar
+               também a VISIBILIDADE (Thermo King e caixa de cozinha) e a VISTA
+               (conjunto / só cavalo / só implemento). "Acabamento" descreve uma
+               dessas três coisas.
+               DENTRO de #ts-panels, e é a mesma razão de sempre: um segundo
+               grupo flutuante na mesma borda seria um quinto material sobre o
+               render e uma segunda coluna disputando a mesma âncora. Por
+               ÚLTIMO na pilha, ou seja colado no canto inferior direito: é o
+               card que abre e fecha, e a pilha cresce para CIMA — aberto, ele
+               empurra as plotagens em vez de saltar sobre elas.
+               RECOLHIDO por padrão, com a resposta na própria linha fechada:
+               as pastilhas das peças pintadas. Quem só quer conferir não abre.
                NÃO tem a classe .preview-card: ui/livery-editor.ts liga um clique
-               em TODA .preview-card para abrir o editor de plotagem, e uma
-               tira de acabamento com aquela classe abriria o editor de uma
-               superfície indefinida. (E nenhuma crase neste arquivo — ver a
-               nota do #btn-full: o template é uma string, e uma crase de
-               comentário a encerra no meio.)
-               As linhas são construídas por ui/trim-panel.ts: elas dependem do
-               estado de vehicle/trim.ts e da paleta, nenhum dos dois disponível
-               na avaliação deste template. -->
-          <div id="ts-trim" class="ts-trim" role="group" aria-label="Acabamentos">
-            <button id="ts-trim-toggle" class="ts-trim__head" type="button"
-                    aria-expanded="false" aria-controls="ts-trim-body"
-                    title="Pintar teto, paralamas, caixa e Thermo King">
-              <span class="ts-trim__title">Acabamentos</span>
-              <span id="ts-trim-dots" class="ts-trim__dots" aria-hidden="true"></span>
-              <span class="ts-trim__chev" aria-hidden="true">
+               em TODA .preview-card para abrir o editor de plotagem, e este card
+               com aquela classe abriria o editor de uma superfície indefinida.
+               (E nenhuma crase neste arquivo — ver a nota do #btn-full: o
+               template é uma string, e uma crase de comentário a encerra no
+               meio.)
+               O corpo é construído por ui/trim-panel.ts: ele depende do estado
+               de vehicle/trim.ts e de qual metade do conjunto está carregada,
+               nenhum dos dois disponível na avaliação deste template. -->
+          <div id="ts-cfg" class="ts-cfg" role="group" aria-label="Configurações">
+            <button id="ts-cfg-toggle" class="ts-cfg__head" type="button"
+                    aria-expanded="false" aria-controls="ts-cfg-body"
+                    title="Cores das peças, o que entra no produto e o que fica em cena">
+              <span class="ts-cfg__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                     stroke-width="1.7" stroke-linecap="round" focusable="false">
+                  <path d="M3.6 7.4h10M17.4 7.4h3M3.6 16.6h3.4M11 16.6h9.4"/>
+                  <circle cx="15.4" cy="7.4" r="2.4"/><circle cx="9" cy="16.6" r="2.4"/>
+                </svg>
+              </span>
+              <span class="ts-cfg__title">Configurações</span>
+              <span id="ts-cfg-dots" class="ts-cfg__dots" aria-hidden="true"></span>
+              <span class="ts-cfg__chev" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                      focusable="false"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
               </span>
             </button>
-            <div id="ts-trim-body" class="ts-trim__body hidden"></div>
+            <div id="ts-cfg-body" class="ts-cfg__body hidden"></div>
           </div>
         </div>
 
@@ -307,6 +351,12 @@ export const STUDIO_HTML = /* html */ `
           <button class="tab active" data-surface="left">Motorista<i class="sync-dot"></i></button>
           <button class="tab" data-surface="right">Passageiro<i class="sync-dot"></i></button>
           <button class="tab" data-surface="rear">Traseira</button>
+          <!-- Sem ponto de sincronia: espelhar é entre as duas LATERAIS, e a
+               testeira não tem par (ver otherSide() em vehicle/livery.ts). -->
+          <button class="tab" data-surface="front">Frente</button>
+          <!-- O TETO, sem ponto de sincronia: espelhar é entre as duas LATERAIS
+               e ele não tem par (ver otherSide() em vehicle/livery.ts). -->
+          <button class="tab" data-surface="roof">Teto</button>
         </div>
         <div class="editor-caption" id="editor-caption">Lado do motorista</div>
         <button id="btn-mirror" class="ghost" title="Copiar esta arte para a outra lateral">↔ Espelhar</button>
@@ -314,26 +364,34 @@ export const STUDIO_HTML = /* html */ `
         <button id="modal-close" class="ghost" title="Fechar (Esc)">✕ Fechar</button>
       </header>
 
-      <!-- Sem formas básicas e sem desenho à mão livre: o que se faz aqui é
+      <!-- A BARRA SÓ TEM FERRAMENTA E VISTA, e chegar a isso levou duas
+           limpezas.
+           Sem formas básicas e sem desenho à mão livre: o que se faz aqui é
            COMPOR — texto, logo e o alinhamento entre eles. Um retângulo e um
            traço de lápis não são pintura de frota, e ocupavam a barra que agora
-           é do desfazer. Cor, camada e tudo que é propriedade DE UM OBJETO
-           mudou-se para o inspetor à direita, que sabe o que está selecionado. -->
+           é do desfazer.
+           E sem "Fundo" e sem "Pintar o implemento": os dois são PROPRIEDADES DA
+           CHAPA, não ferramentas, e agora moram juntos na seção Fundo do
+           inspetor — que é o que a lista de Camadas abre quando se clica na
+           camada mais baixa. Ver a seção data-for="bg" abaixo.
+           O que sobra tem uma ordem legível: CRIAR (texto, logo) · REPETIR
+           (duplicar, excluir) · DESFAZER · LIMPAR · VER (zoom, guias). -->
       <div class="modal-toolbar">
         <button class="tool" data-act="text"><span>T</span>Texto</button>
         <button class="tool" data-act="logo"><span>▣</span>Logo</button>
+        <span class="tb-sep"></span>
         <button class="tool" data-act="duplicate"><span>⧉</span>Duplicar</button>
         <button class="tool" data-act="delete"><span>🗑</span>Excluir</button>
         <span class="tb-sep"></span>
         <button class="tool" data-act="undo" title="Desfazer (Ctrl+Z)"><span>↶</span>Desfazer</button>
         <button class="tool" data-act="redo" title="Refazer (Ctrl+Shift+Z)"><span>↷</span>Refazer</button>
-        <span class="tb-sep"></span>
         <button class="tool" data-act="clear"><span>⌫</span>Limpar</button>
-        <span class="tb-sep"></span>
-        <label class="tb-ctl"><span>Fundo</span><input type="color" id="bgcolor" value="#ffffff" />
-          <button class="mini ghost" id="bg-clear" title="Voltar ao alumínio original">×</button></label>
-        <span class="tb-sep"></span>
-        <label class="tb-ctl"><span>Zoom</span>
+        <!-- Empurra o grupo de VISTA para a direita da barra: as duas metades
+             respondem perguntas diferentes (o que eu faço · como eu olho), e um
+             vão é mais legível que um terceiro filete. -->
+        <span class="tb-gap"></span>
+        <label class="tb-ctl" title="Também com a roda do mouse sobre o painel">
+          <span>Zoom</span>
           <select id="stage-zoom" class="select tb-select">
             <option value="fit" selected>Ajustar</option>
             <option value="1.5">150 %</option>
@@ -343,18 +401,6 @@ export const STUDIO_HTML = /* html */ `
           </select></label>
         <label class="tb-ctl tb-chk-inline" title="Encaixe em bordas, centros e outros objetos (segure Shift para suspender)">
           <input type="checkbox" id="snap-toggle" checked /><span>Guias</span></label>
-        <span class="tb-sep"></span>
-        <!-- "Pintar o implemento" mora AQUI, e não junto da escolha de cor: a cor
-             é do cavalo, e estendê-la ao baú é uma decisão sobre o IMPLEMENTO —
-             tomada olhando para o painel que vai receber a tinta.
-             Ligado, o fundo BRANCO das telas sai (o branco é o baú, e ele
-             esconderia a tinta por cima): é assim que o branco passa a refletir
-             a cor escolhida para o cavalo. Ver livery.ts→setBackgroundsForPaint()
-             e models.ts→setPaintTarget(). -->
-        <label class="tb-ctl tb-chk" title="Estende a pintura do cavalo às laterais, à traseira e à frente do baú">
-          <input type="checkbox" id="paint-trailer" />
-          <span>Pintar o implemento com a cor do cavalo</span>
-        </label>
       </div>
 
       <!-- A tela de desenho fica DENTRO da foto do painel de verdade, e por
@@ -404,6 +450,29 @@ export const STUDIO_HTML = /* html */ `
               </div>
               <div class="stage-panel hidden" id="stage-rear">
                 <div class="panel-window"><canvas id="fabric-rear" width="977" height="1024"></canvas></div>
+              </div>
+              <!-- A TESTEIRA. Semente 956x1024: a chapa da frente mede
+                   2 590 x 2 777 mm (razão 0,9327), contra os 2 590 x 2 716 da
+                   traseira — ela vai do piso ao teto, enquanto a traseira
+                   termina no pé das folhas das portas. Como as irmãs, isto vale
+                   só para o primeiro quadro: syncSurfaceAspect() redimensiona o
+                   buffer pela chapa MEDIDA assim que ela existe. -->
+              <div class="stage-panel hidden" id="stage-front">
+                <div class="panel-window"><canvas id="fabric-front" width="956" height="1024"></canvas></div>
+              </div>
+              <!-- O TETO. Semente 4096x724: a chapa mede 14 655 x 2 590 mm
+                   (razao 5,658) e a densidade dele e a da lateral — ver
+                   PX_PER_MM em vehicle/livery.ts. Como as irmas, isto vale so
+                   para o primeiro quadro: syncSurfaceAspect() redimensiona o
+                   buffer pela chapa MEDIDA assim que ela existe.
+                   As legendas de ponta sao as MESMAS da lateral do motorista, e
+                   nao por acaso: o teto e mapeado no mesmo sentido que ela
+                   (u = z crescente), entao a traseira fica a esquerda nos dois.
+                   Ver o ramo ROOF de addLiveryUV() em vehicle/models.ts. -->
+              <div class="stage-panel hidden" id="stage-roof">
+                <span class="edge-label edge-start">◄ TRASEIRA</span>
+                <span class="edge-label edge-end">FRENTE ►</span>
+                <div class="panel-window"><canvas id="fabric-roof" width="4096" height="724"></canvas></div>
               </div>
             </div>
             <div id="drop-hint">Solte a imagem para adicionar</div>
@@ -455,6 +524,114 @@ export const STUDIO_HTML = /* html */ `
               </span>
             </label>
           </section>
+
+          <!-- O FUNDO DO PAINEL, como qualquer outro objeto selecionado.
+               data-for="bg" é um token que NÃO vem de selMode(): o fundo não é
+               um objeto do fabric (é o backgroundColor da tela), então não há
+               seleção que o produza. Quem o liga é o clique na camada fixa da
+               lista — ver bgSelected em ui/livery-editor.ts.
+               O controle é o MESMO de "Cor" da tipografia, de propósito: é a
+               mesma pergunta ("de que cor é isto?") e o pedido foi literal —
+               "quando clicar deve ter um color picker de opção, como os textos
+               que eu crio têm". -->
+          <section class="panel insp hidden" data-for="bg">
+            <h3 class="panel-title"><span>Fundo</span><b class="panel-hint" id="bg-state"></b></h3>
+            <!-- AS DUAS PINTURAS DA CHAPA, JUNTAS — pedido de 2026-08-13: "o
+                 pintar implemento com a cor da cabine deve estar junto com a
+                 pintura da chapa".
+                 Elas respondem a MESMA pergunta ("de que cor é a chapa por baixo
+                 da arte?") por dois caminhos:
+                 · a de cima é a do VEÍCULO — estende ao baú a tinta escolhida
+                   para o cavalo, vale para o implemento inteiro, e é a mesma cor
+                   que o 3D aplica;
+                 · a de baixo é a desta FACE — uma cor chapada na tela do fabric,
+                   por cima da chapa, e ela vai para a textura do baú.
+
+                 AS DUAS SÃO UMA PILHA, NÃO UMA ESCOLHA EXCLUSIVA, e é isso que
+                 a forma passou a dizer (pedido: "a seleção de pintar da mesma
+                 cor do implemento deve ser sobrescrita por seleção de cor").
+                 A de baixo GANHA onde existe; onde não existe, a de cima
+                 aparece. Ver o bloco em livery.ts→bindTrailerPaint().
+
+                 POR QUE AS DUAS LINHAS SÃO IGUAIS: elas eram um checkbox
+                 tracejado de duas linhas e um seletor de cor nativo solto ao
+                 lado de um rótulo — dois controles de espécies diferentes
+                 respondendo à mesma pergunta, e o pedido foi tornar isso coeso.
+                 Agora as duas são a MESMA linha (pastilha · nome · estado), que
+                 é a mesma forma do card de Configurações do estúdio
+                 (.ts-cfg__row, ui/trim-panel.ts) — o estúdio inteiro passa a
+                 ter um jeito só de dizer "isto tem uma cor".
+
+                 ⚠️ NADA DE CRASE NESTE ARQUIVO. O template inteiro é uma
+                 template literal de JS: uma crase dentro de um comentário HTML
+                 fecha a string e o esbuild falha com "Expected ; but found ...".
+
+                 O <label> em volta do checkbox é OBRIGATÓRIO: setSpecialEdition()
+                 esconde a linha inteira por closest('label') quando o caminhão
+                 é uma edição especial — lá não existe tinta de cavalo a
+                 estender. -->
+            <div class="bg-list">
+              <label class="bg-row" id="bg-row-cab"
+                     title="Estende a pintura do cavalo ao implemento inteiro. As faces com cor própria continuam com ela.">
+                <input type="checkbox" id="paint-trailer" class="bg-check" />
+                <span class="bg-chip"><span class="bg-sw bg-sw--cab"></span></span>
+                <span class="bg-name">Cor do cavalo</span>
+                <span class="bg-val">todo o baú</span>
+              </label>
+              <div class="bg-row" id="bg-row-face">
+                <!-- A PASTILHA É O SELETOR — mesma construção da linha de cor do
+                     card de Configurações: o <input type="color"> mora dentro
+                     dela, transparente e do tamanho dela. A caixa nativa não
+                     aceita border-radius de forma consistente entre navegadores,
+                     e um clique na pastilha é o gesto que o estúdio já usa. -->
+                <span class="bg-chip">
+                  <span class="bg-sw is-empty" id="bg-sw"></span>
+                  <input type="color" id="bgcolor" class="bg-picker" value="#ffffff"
+                         aria-label="Cor de fundo desta face" />
+                </span>
+                <span class="bg-name">Só esta face</span>
+                <span class="bg-val" id="bg-val">—</span>
+                <button class="bg-reset" id="bg-clear" type="button"
+                        title="Voltar para a chapa do baú" aria-label="Voltar para a chapa do baú">×</button>
+              </div>
+            </div>
+            <p class="insp-hint" id="bg-hint"></p>
+          </section>
+
+          <!-- O THERMO KING, COMO CAMADA DA TESTEIRA.
+               Pedido de 2026-08-13: "no livery da frontal, o thermo king deve
+               ser uma camada como a base". Ele é uma peça de PRODUTO montada na
+               parede dianteira, não um objeto de desenho — então entra na lista
+               de camadas do mesmo jeito que o Fundo entra: linha fixa, no pé, e
+               ao clicar abre esta seção.
+               A cor não vai para a tela do fabric: vai para vehicle/trim.ts, que
+               tem a demão própria da carcaça (esmalte SÓLIDO, ver o bloco SOLID
+               lá). É a mesma linha visual do Fundo de propósito — as duas
+               respondem "de que cor é isto?". -->
+          <section class="panel insp hidden" data-for="tk">
+            <h3 class="panel-title"><span>Thermo King</span><b class="panel-hint" id="tk-state"></b></h3>
+            <div class="bg-list">
+              <div class="bg-row" id="tk-row">
+                <span class="bg-chip">
+                  <span class="bg-sw is-empty" id="tk-sw"></span>
+                  <input type="color" id="tk-color" class="bg-picker" value="#ffffff"
+                         aria-label="Cor da carcaça do Thermo King" />
+                </span>
+                <span class="bg-name">Cor da carcaça</span>
+                <span class="bg-val" id="tk-val">—</span>
+                <button class="bg-reset" id="tk-clear" type="button"
+                        title="Voltar para a cor do baú" aria-label="Voltar para a cor do baú">×</button>
+              </div>
+            </div>
+            <p class="insp-hint">Sem cor própria a carcaça acompanha o baú. A
+              pintura dela é sempre SÓLIDA — é o que sai de uma cabine de pintura,
+              e não a metálica da montadora.</p>
+          </section>
+
+          <!-- O TETO. Ele é uma FACE de livery desde 2026-08-13 (aba Teto), e a
+               cor dele é o Fundo daquela face — não há seção própria aqui. Esta
+               nota existe para quem vier procurar "onde foi parar a cor do teto"
+               depois de ela sair do card Configurações. -->
 
           <section class="panel insp hidden" data-for="image">
             <h3 class="panel-title"><span>Imagem</span><b class="panel-hint" id="img-name"></b></h3>
@@ -525,7 +702,7 @@ export const STUDIO_HTML = /* html */ `
                selecionado: ela vale com ou sem seleção.
                O conteúdo é montado por ui/livery-measures.ts — ele depende do
                número de portas cadastradas, que muda em tempo de execução. -->
-          <section class="panel insp" data-for="always">
+          <section class="panel insp" data-for="always" id="measures-card">
             <h3 class="panel-title"><span>Medidas do implemento</span><b class="panel-hint" id="measures-face"></b></h3>
             <div id="measures-body"></div>
           </section>
@@ -566,6 +743,10 @@ export const STUDIO_HTML = /* html */ `
         <dt>Delete</dt><dd>Excluir</dd>
         <dt>T</dt><dd>Novo texto</dd>
         <dt>⇧ (segurar)</dt><dd>Suspende o encaixe nas guias</dd>
+        <dt>Arrastar o painel</dt><dd>Move a vista — no vazio, no botão do meio ou com Espaço</dd>
+        <dt>⇧ + arrastar</dt><dd>Laço de seleção (vários objetos)</dd>
+        <dt>Roda</dt><dd>Aproximar no cursor · ⇧ + roda corre o comprimento</dd>
+        <dt>Clique no painel</dt><dd>Seleciona a camada Fundo</dd>
         <dt>Esc</dt><dd>Desselecionar · fechar</dd>
       </dl>
     </div>

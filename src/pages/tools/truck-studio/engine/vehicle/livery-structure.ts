@@ -103,15 +103,48 @@ import {
 
 export type { DoorSpec, LiverySource, PanelSpec };
 
-/** As três faces pintáveis. Mesmas chaves de `SurfaceKey` em ./livery.ts. */
-export type StructureKey = 'left' | 'right' | 'rear';
-export const STRUCTURE_KEYS: StructureKey[] = ['left', 'right', 'rear'];
+/** As CINCO faces pintáveis. Mesmas chaves de `SurfaceKey` em ./livery.ts.
+ *
+ *  O TETO entrou em 2026-08-13 (*"deve adicionar um livery para o teto"*), e ele
+ *  é a face mais SIMPLES das cinco, não a mais complexa: não tem porta, não tem
+ *  fita refletiva, não tem cantoneira nem para-choque. `defaultLayers()` sai
+ *  cedo para ele e a pilha estrutural fica vazia — ver o bloco lá. O que ele
+ *  tem é chapa e arte, que é exatamente o que um livery de teto é. */
+export type StructureKey = 'left' | 'right' | 'rear' | 'front' | 'roof';
+export const STRUCTURE_KEYS: StructureKey[] = ['left', 'right', 'rear', 'front', 'roof'];
 
-/** O lado como o formulário de medidas o chama (`back`, não `rear`). */
+/**
+ * As faces de PONTA: painel curto, sem comprimento editável — elas medem a
+ * LARGURA do baú, que é padrão — e sem vão de porta recortável.
+ *
+ * PREDICADO DE TIPO, e não um booleano solto: é ele que estreita `StructureKey`
+ * para as duas faces que a GEOMETRIA aceita como porta. `setTrailerDoors()`
+ * recebe `Face` (left|right|rear, de trailer-rig.ts), a testeira nunca esteve
+ * nessa lista e a traseira é recusada logo na entrada — sem o predicado, a
+ * quarta face passaria pelo compilador e explodiria no `applyDoors`.
+ */
+export type EndFaceKey = 'rear' | 'front';
+/** As faces em que uma porta pode ser recortada no baú. */
+export type DoorFaceKey = 'left' | 'right';
+export const isEndFace = (k: StructureKey): k is EndFaceKey => k === 'rear' || k === 'front';
+
+/**
+ * O lado como o formulário de medidas o chama (`back`, não `rear`).
+ *
+ * A TESTEIRA NÃO TEM LADO DE FORMULÁRIO, e é correto que não tenha: o
+ * formulário de medidas cadastra porta, e a frente não leva porta — nem no 3D
+ * (o pino-rei e a testeira são o datum que não anda) nem no 2D. `keyToSide()`
+ * a mapeia para `back` porque as duas descrevem a mesma medida, a largura do
+ * baú; quem chama nunca pergunta pela frente.
+ */
 export type MeasureSide = 'left' | 'right' | 'back';
 
 export const sideToKey = (s: MeasureSide): StructureKey => (s === 'back' ? 'rear' : s);
-export const keyToSide = (k: StructureKey): MeasureSide => (k === 'rear' ? 'back' : k);
+/* O TETO também não tem lado de formulário, pela mesma razão da testeira e uma a
+   mais: ele não tem porta NENHUMA, nem cadastrada nem de bake. Cai em `back`
+   como ela — as duas descrevem a largura do baú — e nada pergunta por ele. */
+export const keyToSide = (k: StructureKey): MeasureSide =>
+  (k === 'left' || k === 'right' ? k : 'back');
 
 /* ---------------- limites, todos vindos do formulário de medidas ------------
    Os números abaixo NÃO são inventados aqui: são os mesmos de
@@ -175,7 +208,9 @@ const MAX_CANVAS_PX = 2048;
 const MAX_CANVAS_PX_ZOOMED = 4096;
 
 /** Largura em pixels de dispositivo com que cada painel está sendo EXIBIDO. */
-const displayedPx: Record<StructureKey, number> = { left: 0, right: 0, rear: 0 };
+const displayedPx: Record<StructureKey, number> = {
+  left: 0, right: 0, rear: 0, front: 0, roof: 0,
+};
 
 /**
  * Diz com quantos pixels de CSS o painel está na tela agora.
@@ -282,6 +317,11 @@ const panels: Record<StructureKey, PanelState> = {
   left: makePanelState('left', 14.7, 2.78),
   right: makePanelState('right', 14.7, 2.78),
   rear: makePanelState('rear', 2.6, 2.78),
+  front: makePanelState('front', 2.6, 2.78),
+  /* O TETO É DEITADO: o "comprimento" dele é o do baú e a "altura" é a LARGURA.
+     As duas grandezas são as do painel na tela, não as do mundo — é a mesma
+     convenção que a lateral usa (lá a altura é a do baú). */
+  roof: makePanelState('roof', 14.7, 2.6),
 };
 
 export const structureCanvas = (key: StructureKey) => panels[key].canvas;
@@ -394,7 +434,7 @@ type DoorCapableRig = { stageDoors?: (face: StructureKey, doors: DoorSpec[]) => 
    A camada 2D NÃO espera por nada disso: `setDoorsFor()` recompõe o painel
    antes de chamar aqui, então a porta aparece no desenho no mesmo quadro do
    clique. O que carrega é o baú. */
-type DoorsApplier = (face: StructureKey, doors: DoorSpec[]) => void;
+type DoorsApplier = (face: DoorFaceKey, doors: DoorSpec[]) => void;
 let applyDoors: DoorsApplier = (face, doors) => { setTrailerDoors(face, doors); };
 
 /** studio.ts entrega aqui a versão com estado de carregamento. */
@@ -429,7 +469,7 @@ export function setGeometryBusy(on: boolean) {
 let doorsUnsupportedWarned = false;
 
 /** `position` do painel → distância da DIANTEIRA, que é o que a geometria usa. */
-function toGeometryDoor(key: StructureKey, d: DoorSpec, length: number): DoorSpec {
+function toGeometryDoor(key: DoorFaceKey, d: DoorSpec, length: number): DoorSpec {
   const fromFront = key === 'left' ? length - (d.position + d.width) : d.position;
   return { position: Math.max(0, fromFront), width: d.width, height: d.height };
 }
@@ -441,8 +481,14 @@ function pushDoorsToGeometry(key: StructureKey, doors: DoorSpec[]) {
      verdade no `trailer.glb` — quatro folhas, com batente, varão e dobradiça.
      Mandar recortar um vão ali abriria um buraco ATRÁS das portas que já estão
      lá. O que a traseira tem de portas continua sendo o que o bake trouxe; o
-     cadastro dela vale para a camada 2D, que é o layout da arte. */
-  if (key === 'rear') return;
+     cadastro dela vale para a camada 2D, que é o layout da arte.
+     A TESTEIRA muito menos: ela carrega o pino-rei e é o datum imóvel do baú
+     (ver `mapZ` em trailer-geometry.ts). Porta ali não existe como produto.
+     E O TETO menos ainda. O teste é por INCLUSÃO das duas faces que a geometria
+     aceita, e não por exclusão das que ela recusa: `applyDoors` recebe
+     `DoorFaceKey`, e uma face nova que entrasse em `StructureKey` passaria por
+     um `!isEndFace()` sem o compilador dizer nada. */
+  if (key !== 'left' && key !== 'right') return;
   if (typeof rig.stageDoors !== 'function') {
     if (!doorsUnsupportedWarned && doors.length) {
       doorsUnsupportedWarned = true;
@@ -501,7 +547,7 @@ function structuralLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
      lado: `pushDoorsToGeometry()` não manda porta para o fundo (as quatro
      folhas já vêm no bake e recortar um vão ali abriria um buraco atrás
      delas), então ali o desenho 2D é a ÚNICA representação que existe. */
-  const doorsAreGeometry = !!snapFront[key] && key !== 'rear'
+  const doorsAreGeometry = !!snapFront[key] && !isEndFace(key)
     && typeof (state.trailerRig as unknown as DoorCapableRig | null)?.stageDoors === 'function';
   return defaultLayers(spec)
     .filter((l) => l.kind !== 'base')
@@ -627,7 +673,9 @@ function plateSeamSvg(
 
 /** As camadas de emenda de um painel lateral, da grade publicada pelo 3D. */
 function plateLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
-  if (key === 'rear') return [];
+  /* Só as LATERAIS são remontadas de chapas de 1 m; traseira e testeira são
+     chapa inteira. `getPlateGrid()` também só publica a grade das laterais. */
+  if (isEndFace(key)) return [];
   const grid = getPlateGrid();
   if (!grid || !grid.seamsFromFront.length) return [];
   const { length, height } = spec;
@@ -886,6 +934,7 @@ export function getImplementMeasures(): ImplementMeasures {
     length: panels.left.spec.length,
     doors: {
       left: getDoors('left'), right: getDoors('right'), rear: getDoors('rear'),
+      front: getDoors('front'), roof: getDoors('roof'),
     },
     resizable: !!state.trailerRig,
   };
@@ -893,7 +942,7 @@ export function getImplementMeasures(): ImplementMeasures {
 
 /** O comprimento editável de uma face. A traseira é a LARGURA do baú, que é
  *  padrão 2,60 m e não entra na edição (ver engine/index.ts). */
-export const isLengthEditable = (key: StructureKey) => key !== 'rear';
+export const isLengthEditable = (key: StructureKey) => !isEndFace(key);
 
 /**
  * Reancora as medidas na geometria — a única direção em que elas viajam de
@@ -948,6 +997,7 @@ export function refreshFromTrailer(
     panels.left.spec.length = d.length;
     panels.right.spec.length = d.length;
     panels.rear.spec.length = d.width;
+    panels.front.spec.length = d.width;
     for (const k of STRUCTURE_KEYS) panels[k].spec.height = d.height;
     /* O BATENTE, MEDIDO — não um número escrito aqui. `measureSill()` acha o
        topo do perfil galvanizado da saia em CADA bake, e é sobre ele que o pé
@@ -978,7 +1028,7 @@ function clampDoors() {
   for (const k of STRUCTURE_KEYS) {
     const spec = panels[k].spec;
     const { length, height } = spec;
-    const sill = k === 'rear' ? 0 : (spec.doorSill ?? 0);
+    const sill = isEndFace(k) ? 0 : (spec.doorSill ?? 0);
     const maxH = Math.max(MIN_DOOR_HEIGHT, height - HEAD_DROP - DOOR_REVEAL - sill);
     for (const d of spec.doors) {
       d.width = Math.max(MIN_DOOR_WIDTH, Math.min(d.width, length));

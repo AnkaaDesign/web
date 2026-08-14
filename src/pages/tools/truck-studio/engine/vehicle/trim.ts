@@ -1,7 +1,21 @@
-/* Os ACABAMENTOS: teto, paralamas, caixa de ferramentas e Thermo King.
+/* As CONFIGURAÇÕES de peça: teto, paralamas, caixa de cozinha e Thermo King.
    ---------------------------------------------------------------------------
-   Quatro peças que o cliente escolhe pintar SEPARADAMENTE do baú — e, no caso da
-   caixa e do Thermo King, escolhe não ter.
+   Quatro peças que o cliente configura à parte do baú — três que ele escolhe
+   PINTAR separadamente, e duas que ele escolhe NÃO TER.
+
+   QUEM PINTA E QUEM SÓ APARECE/SOME (pedido de produto, 2026-08-13):
+
+     Teto          cor própria · sempre no produto
+     Paralamas     cor própria · sempre no produto
+     Thermo King   cor própria · pode ser removido
+     Caixa         SEM cor     · pode ser removida
+
+   A caixa PERDEU a cor, e a remoção é deliberada, não uma simplificação: o
+   pedido foi literal ("não precisa ter pintura da caixa de cozinha mais"). A
+   maquinaria de casar a chapa dela continua aqui inteira — `BOX_PAINTABLE_RE` e
+   o filtro por material em `applyTrim()` — porque é ela que documenta o que foi
+   MEDIDO no bake, e porque devolver a cor à caixa um dia é trocar
+   `paintable: false` por `true`. O que sai é a OPÇÃO, não o conhecimento.
 
    NÃO FOI PRECISO MODELAR NADA. A hipótese de partida era abrir o `trailer.glb`
    no Blender para separar as peças; abrindo o chunk JSON do glTF (2 151 malhas,
@@ -84,14 +98,14 @@
 
    A consequência prática é a ordem de aplicação, e ela é a única sutileza deste
    arquivo: `applyTrim()` roda DEPOIS de `setPaintTarget()`, por assinatura em
-   `onPaintTargetApplied()`. Quem segue o corpo e não tem cor própria é deixado
-   EM PAZ — o material certo já foi escrito por quem é dono dele. Ver
-   `restoreOf()`. */
+   `onPaintTargetApplied()`. Ver `restoreOf()`, que é onde essa ordem vira
+   regra. */
 import * as THREE from 'three';
 import {
   state, onPaintTargetApplied, onTrailerPanelsRebuilt, setPaintTarget,
-  TRAILER_BOX_NODE_RE,
+  adoptProbeMaterial, TRAILER_BOX_NODE_RE,
 } from './models';
+import { TRAILER_ROOF_MESH } from './trailer-geometry';
 import { createPaintInstance } from './paint';
 import type { PaintInstance, PaintPatch } from './paint';
 import { invalidate } from '../scene/scene';
@@ -122,7 +136,9 @@ interface TrimSpec {
    * Dentro de uma malha casada, quais materiais recebem tinta. Ausente = todos.
    * Só a caixa precisa — ver o bloco A CAIXA.
    */
-  paintable?: RegExp;
+  paintMats?: RegExp;
+  /** A peça aceita cor própria? `false` = ela só aparece/some. */
+  paintable: boolean;
   /** A peça pode ser removida do produto? */
   hideable: boolean;
   /** Sem cor própria, ela segue a cor do baú? Ver a regra acima. */
@@ -137,6 +153,25 @@ const anyMat = (mats: (THREE.Material | null)[], re: RegExp) =>
    branco, e ele é o forro. Pintá-lo não aparece de lugar nenhum — o teto fechado
    o esconde — e só gastaria uma troca de material. */
 const ROOF_NODE_RE = /^teto-externo/i;
+/* E O TETO DE VERDADE É O DO CORPO PARAMÉTRICO, quando ele existe.
+   ---------------------------------------------------------------------------
+   Este é o conserto do defeito mais teimoso deste arquivo, e o relato dele era
+   exatamente "o teto não está sendo pintado aqui, mas quando aplico uma pintura
+   geral ele é pintado".
+
+   A causa: `TrailerBody.rebuild()` (trailer-geometry.ts) ESCONDE as malhas
+   brancas de fábrica — `teto-externo` entre elas — e passa a desenhar o corpo
+   inteiro a partir da própria geometria. A cor escolhida aqui era escrita numa
+   malha invisível, com `invalidate()` e tudo, e a tela não mudava. A pintura
+   geral funcionava porque ela casa por MATERIAL (`trailerPanelMeshes()`) e
+   alcança a malha gerada, que é onde o teto de fato está.
+
+   Trocar material não alcança um subconjunto de triângulos, então a saída foi
+   dar ao teto uma MALHA. `rebuild()` agora escreve os triângulos de
+   `teto-externo` num buffer próprio, `TRAILER_ROOF`, com o mesmo material do
+   corpo — invisível de olho nu, e um alvo real para a troca. Esta linha é o que
+   liga as duas pontas. */
+const ROOF_MESH_RE = new RegExp(`^${TRAILER_ROOF_MESH}$`);
 const FENDER_MAT_RE = /^paralamas$/i;
 /* Os dois nomes de nó que o bake dá à caixa vêm de `models.ts`, que também
    precisa deles para tirar a ferragem da caixa do inox do implemento
@@ -164,20 +199,30 @@ function selfOrAncestor(o: THREE.Object3D, re: RegExp): boolean {
 const SPECS: Record<TrimKey, TrimSpec> = {
   roof: {
     label: 'Teto',
-    match: (o) => ROOF_NODE_RE.test(o.name) || selfOrAncestor(o, ROOF_NODE_RE),
+    /* As DUAS formas do teto — a malha gerada quando há corpo paramétrico e o
+       nó de fábrica quando não há. Nunca as duas ao mesmo tempo: onde o
+       paramétrico existe, `teto-externo` está escondido e `applyTrim()` nem o
+       enxerga (ver `visibleInScene`). */
+    match: (o) => ROOF_MESH_RE.test(o.name)
+      || ROOF_NODE_RE.test(o.name) || selfOrAncestor(o, ROOF_NODE_RE),
+    paintable: true,
     hideable: false,
     followsBody: true,
   },
   fenders: {
     label: 'Paralamas',
     match: (_o, mats) => anyMat(mats, FENDER_MAT_RE),
+    paintable: true,
     hideable: false,
     followsBody: false,
   },
   box: {
-    label: 'Caixa de ferramentas',
+    label: 'Caixa de cozinha',
     match: (o) => selfOrAncestor(o, BOX_NODE_RE),
-    paintable: BOX_PAINTABLE_RE,
+    /* Continua declarada e não é mais alcançada — ver o bloco do cabeçalho
+       sobre a caixa ter perdido a cor. É a memória de qual material é chapa. */
+    paintMats: BOX_PAINTABLE_RE,
+    paintable: false,
     hideable: true,
     followsBody: false,
   },
@@ -186,6 +231,7 @@ const SPECS: Record<TrimKey, TrimSpec> = {
     match: (_o, mats) => anyMat(mats, TK_MAT_RE),
     /* A unidade INTEIRA, e não só a chapa que `match` casou — ver `hideRoot`. */
     hideRoot: () => state.tk,
+    paintable: true,
     hideable: true,
     followsBody: true,
   },
@@ -214,13 +260,40 @@ const pieces: Record<TrimKey, TrimPiece> = {
 const paints = new Map<TrimKey, PaintInstance>();
 const materials = new Map<TrimKey, THREE.MeshPhysicalMaterial>();
 
+/**
+ * O ACABAMENTO DE UMA PEÇA É SÓLIDO, sempre — e isto é regra de produto.
+ *
+ * `PaintInstance` nasce com a receita padrão do veículo, que é METÁLICA
+ * (`PAINT_BASE.finish = 'metallic'` em ./paint.ts): 88 % de metalicidade,
+ * 55 % de floco e um resto de pérola. Faz sentido para a cabine — é o que a
+ * montadora entrega — e não faz nenhum aqui: teto, paralama e carcaça de
+ * Thermo King são pintados em cabine com esmalte liso, e a peça saía cintilando
+ * ao lado de um baú fosco. O relato foi direto: *"o seletor de cores faz com que
+ * sejam cores perolizadas / metálicas, mas devem ser sempre sólidas"*.
+ *
+ * Aplicado na CRIAÇÃO da demão e repetido a cada `set()`. Na criação porque
+ * `makeMaterial()` já escreve os parâmetros correntes no material, e um primeiro
+ * quadro metálico apareceria antes de a cor chegar; a cada `set()` porque
+ * `PaintInstance.set()` só reaplica o preset quando o acabamento MUDA, então
+ * repetir é barato e é o que impede uma receita futura de deixar a peça
+ * metálica sem ninguém pedir.
+ */
+const SOLID: PaintPatch = { finish: 'solid' };
+
 function paintOf(key: TrimKey): THREE.MeshPhysicalMaterial {
   let mat = materials.get(key);
   if (!mat) {
     const inst = createPaintInstance();
+    inst.set(SOLID);
     paints.set(key, inst);
     mat = inst.makeMaterial();
     mat.name = `carpaint-${key}`;
+    /* A SONDA, e sem ela a peça sai LAVADA. Esta demão nasce no primeiro clique
+       que pede a cor — muito depois de `refreshVehicleReflection()` ter passado
+       pelo veículo —, então ela não tem `envMap` próprio e cai no HDRI cru do
+       céu. Com tinta escura isso é a diferença entre preto e cinza; ver o bloco
+       de `probeTex` em models.ts, onde o mesmo defeito foi medido no baú. */
+    adoptProbeMaterial(mat);
     materials.set(key, mat);
   }
   return mat;
@@ -236,6 +309,12 @@ export const getTrim = (): Record<TrimKey, TrimPiece> => ({
 
 export const trimLabel = (key: TrimKey) => SPECS[key].label;
 export const trimHideable = (key: TrimKey) => SPECS[key].hideable;
+/** A peça aceita cor própria? A caixa de cozinha não aceita mais. */
+export const trimPaintable = (key: TrimKey) => SPECS[key].paintable;
+/** As peças que a interface oferece para PINTAR, na ordem em que ela as mostra. */
+export const TRIM_PAINT_KEYS: TrimKey[] = TRIM_KEYS.filter((k) => SPECS[k].paintable);
+/** As peças que a interface oferece para REMOVER do produto. */
+export const TRIM_HIDE_KEYS: TrimKey[] = TRIM_KEYS.filter((k) => SPECS[k].hideable);
 /** Sem cor própria, a peça segue o baú? A interface diz uma frase para cada
  *  caso — "Como o baú" contra "Original" —, e as duas são a verdade. */
 export const trimFollowsBody = (key: TrimKey) => SPECS[key].followsBody;
@@ -258,10 +337,11 @@ function warnHidden(key: TrimKey) {
   warned.add(key);
   console.warn(
     `[trim] "${SPECS[key].label}" recebeu cor, mas todas as malhas dela estão`
-    + ' ESCONDIDAS — o baú paramétrico assumiu e desenha o branco numa malha'
-    + ' única gerada (trailer-geometry.ts, TrailerBody.rebuild →'
-    + ' `originals.visible = false`). A cor está aplicada e não aparece.'
-    + ' Conserto: grupos de geometria no corpo paramétrico. Ver applyTrim().',
+    + ' ESCONDIDAS — provavelmente o corpo paramétrico as absorveu'
+    + ' (trailer-geometry.ts, TrailerBody.rebuild → `originals.visible = false`).'
+    + ' A cor está aplicada e não aparece.'
+    + ' Conserto: dar à peça uma malha própria no corpo paramétrico, como o teto'
+    + ` tem (${TRAILER_ROOF_MESH}). Ver applyTrim().`,
   );
 }
 
@@ -284,21 +364,40 @@ function meshesOf(key: TrimKey): THREE.Mesh[] {
 /**
  * O material a devolver quando a peça PERDE a cor própria.
  *
- * `null` significa "não mexa" — e é a resposta certa para teto e Thermo King:
- * `setPaintTarget()` acabou de rodar e já escreveu neles o material correto
- * (a tinta do baú, ou o branco de fábrica). Devolver um material lembrado aqui
- * seria devolver um valor VELHO por cima de um recém-calculado, e o defeito
- * apareceria só depois de alternar "pintar o implemento" com o teto colorido.
- *
- * Para paralamas e caixa a resposta é o material do bake, guardado em
- * `trimOrigMat` — uma chave PRÓPRIA, deliberadamente diferente do `origMat` que
+ * `trimOrigMat` é uma chave PRÓPRIA, deliberadamente diferente do `origMat` que
  * `setPaintTarget()` usa. Se as duas fossem a mesma, o laço de restauração de lá
  * ("toda malha com origMat volta ao original") desfaria a pintura do paralama
  * toda vez que alguém desligasse "pintar o implemento".
+ *
+ * `null` = não mexa: ninguém pintou esta malha, então o material que está nela é
+ * o que quem é dono dele acabou de escrever.
+ *
+ * ---------------------------------------------------------------------------
+ * QUEM SEGUE O CORPO PRECISA DE UMA RESPOSTA, e a versão anterior devolvia
+ * `null` para teto e Thermo King por raciocinar que `setPaintTarget()` já teria
+ * escrito o material certo neles. Ele escreve — mas só no ramo `'both'`. Com a
+ * pintura do implemento DESLIGADA, que é o padrão, o ramo `'cab'` só restaura
+ * malhas que tenham `origMat`, e uma peça que nunca passou por `'both'` não tem.
+ *
+ * O resultado era uma cor que não saía: escolher azul para o Thermo King e
+ * depois voltar para "Como o baú" deixava o Thermo King azul, sem nada na tela
+ * dizendo por quê. Medido no caminho `cab` puro, que é onde a maioria das
+ * sessões vive.
+ *
+ * A resposta certa é explícita e depende do alvo da tinta AGORA:
+ *
+ *   'both'  a tinta do baú — `state.trailerPaintMat`, o mesmo material que
+ *           `setPaintTarget()` acabou de pôr em todas as chapas;
+ *   'cab'   o material de fábrica, que é `origMat` quando ele existe (a peça já
+ *           passou por 'both' alguma vez) e `trimOrigMat` quando não.
  */
 function restoreOf(key: TrimKey, mesh: THREE.Mesh): THREE.Material | THREE.Material[] | null {
-  if (SPECS[key].followsBody) return null;
-  return (mesh.userData.trimOrigMat as THREE.Material | THREE.Material[] | undefined) ?? null;
+  const factory = (mesh.userData.trimOrigMat
+    ?? mesh.userData.origMat) as THREE.Material | THREE.Material[] | undefined;
+  if (SPECS[key].followsBody && state.paintTarget === 'both') {
+    return state.trailerPaintMat ?? factory ?? null;
+  }
+  return factory ?? null;
 }
 
 /**
@@ -314,7 +413,11 @@ export function applyTrim() {
     const spec = SPECS[key];
     const piece = pieces[key];
     const meshes = meshesOf(key);
-    const wantPaint = !!piece.color;
+    /* `spec.paintable` entra na conta e não só no desenho da interface: uma
+       escolha GRAVADA antes de a caixa perder a cor ainda traz o hex dela, e
+       sem esta guarda ela voltaria pintada num app que não oferece mais como
+       despintar. Ver `normalizeChoice()` — a gravação não filtra, o motor sim. */
+    const wantPaint = spec.paintable && !!piece.color;
 
     /* A VISIBILIDADE PRIMEIRO, e ela é da PEÇA, não das malhas pintáveis dela.
        Quando há `hideRoot`, esconde-se o conjunto num nó só — é o que faz o
@@ -333,7 +436,7 @@ export function applyTrim() {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         /* O filtro de material é por MALHA, não por peça: dentro da caixa
            convivem chapa e plástico preto, e só a chapa é pintada. */
-        if (spec.paintable && !anyMat(mats, spec.paintable)) continue;
+        if (spec.paintMats && !anyMat(mats, spec.paintMats)) continue;
         if (!mesh.userData.trimOrigMat) mesh.userData.trimOrigMat = mesh.material;
         mesh.material = paintOf(key);
       } else {
@@ -350,33 +453,19 @@ export function applyTrim() {
        ninguém a informa. */
     if (wantPaint) {
       const inst = paints.get(key);
-      if (inst) inst.set({ ...(piece.recipe || {}), color: piece.color as string });
+      if (inst) inst.set({ ...SOLID, ...(piece.recipe || {}), color: piece.color as string });
       /* PINTOU ALGUMA COISA QUE ESTÁ NA TELA?
          ---------------------------------------------------------------
-         Esta pergunta existe por causa do TETO, e o defeito que ele expôs é o
-         mais traiçoeiro deste arquivo: `teto-externo` casa, recebe o material
-         de tinta, `invalidate()` roda — e a tela não muda. A cor é aplicada
-         numa malha INVISÍVEL.
+         Esta pergunta nasceu do TETO, e o defeito que ela denunciava está
+         CONSERTADO — `TRAILER_ROOF` existe justamente para isso (ver
+         `ROOF_MESH_RE`). Ela fica porque a classe de defeito não é do teto: é
+         de qualquer peça cujas malhas o corpo paramétrico venha a absorver num
+         re-bake. Uma cor aceita que não muda um pixel é a pior falha possível
+         aqui, e um aviso por peça e por sessão é barato.
 
-         A causa está em `trailer-geometry.ts`: quando o baú paramétrico assume
-         (qualquer edição de medida ou de porta), `TrailerBody.rebuild()`
-         termina com `for (const m of this.originals) m.visible = false` e passa
-         a desenhar UMA malha só, gerada, no lugar de todas as brancas de
-         fábrica — e `collect()` recolhe como "original" toda malha cujo
-         material case `WHITE_RE`, o que inclui o teto (`Cor_padrao_branco`).
-         O teto que se vê deixa de ser um nó e passa a ser um punhado de
-         triângulos dentro do corpo gerado.
-
-         Trocar material não alcança um subconjunto de triângulos: o conserto
-         de verdade é dar ao corpo paramétrico um SEGUNDO grupo de geometria
-         (`addGroup`) com os triângulos de teto e um array de materiais — e isso
-         tem de sobreviver a cada `rebuild()` e conviver com o
-         `setPaintTarget()`, que hoje escreve um material único na malha.
-
-         Enquanto isso não existe, o mínimo é NÃO MENTIR: um controle que
-         aceita a cor e não muda nada é pior do que um que se recusa e diz por
-         quê. */
-      if (meshes.length && !meshes.some((m) => visibleInScene(m))) {
+         A peça ESCONDIDA de propósito não conta: quem tirou o Thermo King do
+         produto não quer ler que a cor dele não aparece. */
+      if (piece.visible && meshes.length && !meshes.some((m) => visibleInScene(m))) {
         warnHidden(key);
       }
     }
@@ -427,6 +516,36 @@ export function setTrim(key: TrimKey, patch: Partial<TrimPiece>): TrimPiece {
 }
 
 /**
+ * Muda SÓ O TOM de uma peça que já está pintada — o caminho do arrasto.
+ *
+ * Existe porque o card de configurações passou a ter um seletor de cor de
+ * verdade (2026-08-13, a pedido: as pastilhas pré-definidas saíram), e um
+ * seletor de cor emite `input` a cada pixel que o dedo anda dentro dele. Cada
+ * um desses eventos, por `setTrim()`, custa um `setPaintTarget()` inteiro:
+ * varrer as ~2 150 malhas do implemento, restaurar materiais, reconstruir o
+ * overlay da testeira e reaplicar as quatro peças. Trinta vezes por segundo.
+ *
+ * Quando a peça JÁ TEM cor, nada disso é necessário — o material dela existe,
+ * está na malha certa, e a única coisa que muda é um uniforme. Então este
+ * caminho escreve na demão e pede um quadro, e mais nada.
+ *
+ * Devolve `false` quando não pôde ser barato (a peça não tem cor ainda, ou não
+ * pinta), e aí quem chama passa por `setTrim()`. NÃO avisa os ouvintes: gravar
+ * a escolha a cada quadro de um arrasto encheria o localStorage de estados
+ * intermediários que ninguém escolheu — quem arrasta comita no fim.
+ */
+export function setTrimColorLive(key: TrimKey, hex: string): boolean {
+  const piece = pieces[key];
+  if (!SPECS[key].paintable || !piece.color) return false;
+  const inst = paints.get(key);
+  if (!inst) return false;
+  piece.color = hex;
+  inst.set({ ...SOLID, ...(piece.recipe || {}), color: hex });
+  invalidate();
+  return true;
+}
+
+/**
  * Aplica a escolha inteira de uma vez — o caminho da HIDRATAÇÃO.
  *
  * NÃO avisa os ouvintes, e isso é deliberado: quem chama é quem acabou de LER a
@@ -438,7 +557,10 @@ export function setTrimChoice(choice: TrimChoice | null | undefined) {
   for (const key of TRIM_KEYS) {
     const p = choice?.[key];
     const piece = pieces[key];
-    piece.color = (p && p.color) || null;
+    /* A cor de uma peça que não pinta mais é DESCARTADA na hidratação, e não só
+       ignorada em `applyTrim()`: sem isto ela voltaria ao disco na primeira
+       gravação e sobreviveria a mudança de produto para sempre. */
+    piece.color = (SPECS[key].paintable && p && p.color) || null;
     piece.recipe = (p && p.recipe) || null;
     /* Ausente = visível. Uma escolha gravada antes de a peça poder ser escondida
        não pode fazê-la sumir. */
@@ -477,8 +599,13 @@ export function trimChoice(): TrimSaved | undefined {
   let any = false;
   for (const key of TRIM_KEYS) {
     const p = pieces[key];
-    if (!p.color && p.visible) continue;
-    out[key] = { ...(p.color ? { color: p.color } : {}), ...(p.visible ? {} : { visible: false }) };
+    /* A cor de uma peça que não pinta mais não é gravada — mesmo par de
+       `setTrimChoice()`. Sem isto, um `Choice` antigo com a caixa colorida
+       sobreviveria a cada gravação e `sameRig()` continuaria vendo diferença
+       onde o produto não tem mais nenhuma. */
+    const color = trimPaintable(key) ? p.color : null;
+    if (!color && p.visible) continue;
+    out[key] = { ...(color ? { color } : {}), ...(p.visible ? {} : { visible: false }) };
     any = true;
   }
   return any ? out : undefined;

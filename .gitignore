@@ -111,6 +111,13 @@ public/models/vehicles/trailer_old_probe.glb
 # 950 mil linhas de texto que o app nunca serve.
 tools/env-build/_src_*/
 
+# Etapas intermédias dos builds de cenário. Cada `--stage` grava um .blend com a
+# cena inteira dentro (o do `serra` tem 78 a 83 MB por etapa, ~400 MB no total),
+# e existem por UM motivo: permitir reexecutar uma etapa sem repetir as
+# anteriores. São CACHE — quem tem o script e a fonte reconstrói tudo.
+tools/env-build/_work_*/
+tools/env-build/_reports/
+
 # Bytecode do Python dos scripts de build de cenário (tools/env-build).
 __pycache__/
 *.pyc

@@ -500,12 +500,19 @@ const FALLBACK_ENVIRONMENTS: Raw[] = [STUDIO_ENVIRONMENT];
    (renderiza só o texto) — nunca assuma URL de imagem aqui.
 
    NA MESMA FORMA DO MANIFESTO, e isso é o ponto: `file` com o caminho do
-   arquivo, exatamente como um `brands.json` de verdade escreveria. As quatro
-   geometrias de produção herdadas (`scania.glb`, `volvo.glb`, `iveco.glb`,
-   `iveco_sway_metallica.glb`) NÃO têm caminho especial em lugar nenhum do
-   código — elas são apenas `file`s como quaisquer outros. Um segundo caminho
-   para "os modelos antigos" seria a indireção do `cabs.json` voltando pela
-   porta dos fundos. */
+   arquivo, exatamente como um `brands.json` de verdade escreveria. As
+   geometrias herdadas NÃO têm caminho especial em lugar nenhum do código — elas
+   são apenas `file`s como quaisquer outros. Um segundo caminho para "os modelos
+   antigos" seria a indireção do `cabs.json` voltando pela porta dos fundos.
+
+   SOBRARAM DUAS, E POR ISSO ESTA LISTA É O QUE SEGURA OS DOIS ARQUIVOS NO
+   DISCO. Eram quatro; `iveco.glb` e `iveco_sway_metallica.glb` foram apagados
+   em 2026-08-13 por não ter nenhum campo `file` apontando para eles (o S-Way
+   Metallica é o mesmo caminhão de `models/trucks/iveco_metallica_4x2.glb`, que
+   é menor, tem Draco e a mesma arte M72 assada). `scania.glb` e `volvo.glb`
+   ficam porque ESTA lista os referencia: são o acervo mínimo com a API fora do
+   ar, e apagá-los deixaria o estúdio offline sem nenhum caminhão. Quem for
+   limpar assets de novo: procure `file` no `brands.json` E aqui. */
 const FALLBACK_MANUFACTURERS: Raw[] = [
   {
     id: 'scania', name: 'Scania', logo: null, accent: '#041E42',

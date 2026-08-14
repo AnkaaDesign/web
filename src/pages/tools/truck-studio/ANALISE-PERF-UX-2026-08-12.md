@@ -1,9 +1,39 @@
 # Truck Studio — análise de desempenho e usabilidade (2026-08-12)
 
-**ISTO É UMA ANÁLISE, NÃO UM REGISTRO.** Nada aqui foi implementado. O
-`ARCHITECTURE.md` ao lado é o registro do que existe; este arquivo é o
-levantamento do que *poderia* melhorar, com as medidas que sustentam cada
-afirmação e o risco de cada mexida. Onde eu não medi, está escrito "estimado".
+**ISTO É UMA ANÁLISE, NÃO UM REGISTRO.** O `ARCHITECTURE.md` ao lado é o
+registro do que existe; este arquivo é o levantamento do que *poderia* melhorar,
+com as medidas que sustentam cada afirmação e o risco de cada mexida. Onde eu
+não medi, está escrito "estimado".
+
+> ## ⚠️ PARTE DISTO JÁ FOI FEITA — leia `OTIMIZACAO-2026-08-13.md` primeiro
+>
+> Uma passagem em 2026-08-13 implementou a Fase 1 (o laço sob demanda) e uma
+> variante medida da Fase 3 (texturas). **Onde os dois documentos discordarem, o
+> de 13/08 vale** — ele mediu, este estimou. O que mudou de status:
+>
+> * **§2.1 — FEITO.** `ON_DEMAND_RENDERING = true`. A 4ª lacuna
+>   (`ui/paint-panel.ts`) foi fechada, e apareceu uma QUINTA coisa que este
+>   documento não previu: o reflexo do piso era um gancho de `onFrame`, ou seja
+>   uma segunda renderização completa da cena rodando também em quadro pulado.
+>   Sem mover esse gancho, ligar a flag não teria economizado nada no Estúdio.
+>   Medido na placa: 405 M triângulos/s → 0 com a cena parada.
+> * **§2.2, "normal maps JPG → WebP, trivial" — ERRADO, e a medição está no
+>   doc novo.** O dano de croma já está gravado no JPEG; transcodificar não o
+>   desfaz. Lossless triplica o download, com perdas soma uma segunda geração.
+> * **§2.2/§3.5, redimensionar os conjuntos de chão — NÃO CEDE.** Passados por
+>   um portão de erro medido, os dezesseis mapas estão no tamanho certo.
+>   Empacotar AO+rugosidade num ORM também não fecha (lossless +12 MB de
+>   download; com perdas o AO da grama erra 4 %). Para o chão sobra KTX2.
+> * **§2.3 — parcialmente FEITO por outro caminho.** Não houve fusão nem
+>   decimação. A medição achou algo melhor: **1 302 das 2 157 primitivas do
+>   implemento têm carga Draco byte a byte IDÊNTICA**. Deduplicadas no arquivo
+>   (−8,8 MB de download, geometria intocada). Compartilhá-las em tempo de
+>   execução é o maior ganho ainda na mesa e tem um perigo com nome — ver §4 do
+>   doc novo.
+> * **§1.2 — os números caíram.** O acervo saiu de 2 034 para 1 744 MB de VRAM;
+>   a cena de referência, de ~972 para ~857 MB.
+> * **§3 (perfil adaptativo), §3.6 (LOD), §4.1 (perda de contexto) — CONTINUAM
+>   ABERTOS** e continuam válidos como escritos.
 
 O pedido que originou o documento: *"ache pontos para aumentar a performance e
 usabilidade… no meu PC, que é bom, não está ruim, então manteria uma qualidade

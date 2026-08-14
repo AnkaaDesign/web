@@ -1,6 +1,15 @@
 import { useEffect, useRef } from "react";
 
-import { mountStudio, unmountStudio } from "./engine";
+/* O ENGINE NÃO É MAIS IMPORTADO ESTATICAMENTE, e a mudança é a porteira de
+   WebGL — ver ./webgl-gate.ts. `scene/scene.ts` constrói o `WebGLRenderer` no
+   escopo de módulo, então um import estático faz o renderer nascer junto com
+   este arquivo: numa máquina sem WebGL2 a rota quebra com a tela de erro
+   genérica do app, antes de qualquer código nosso poder dizer o que houve.
+   Com `await import()` existe um ANTES, e é nele que a sonda roda.
+   `catalog/colors` continua estático de propósito: ele é folha (importa só um
+   `type` de paint.ts, apagado na compilação) e precisa estar ligado à API antes
+   do primeiro uso. */
+import { checkWebGL, renderGate } from "./webgl-gate";
 import { setColorProvider, setColorPersister, FINISH_FROM_API } from "./engine/catalog/colors";
 import { updatePaint } from "@/api-client/paint";
 import "./engine/core/studio.css";
@@ -306,8 +315,41 @@ export const TruckStudioPage = () => {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    void mountStudio(host);
-    return () => unmountStudio();
+
+    /* `dead` cobre a corrida do StrictMode e a de quem sai da rota antes de o
+       chunk do engine chegar: sem ela, `unmountStudio` poderia ser chamado
+       sobre um engine que ainda não montou, ou o engine montaria dentro de um
+       host já descartado. */
+    let dead = false;
+    let unmount: (() => void) | null = null;
+    let closeGate: (() => void) | null = null;
+
+    const boot = async () => {
+      /* O import é o que constrói o renderer. Só acontece depois da sonda. */
+      const engine = await import("./engine");
+      if (dead) return;
+      unmount = engine.unmountStudio;
+      void engine.mountStudio(host);
+    };
+
+    const verdict = checkWebGL();
+    if (verdict.kind === "ok") {
+      void boot();
+    } else {
+      /* `software` deixa seguir — o estúdio funciona, só devagar, e a decisão é
+         de quem está na frente da tela. `none` não oferece saída porque não há:
+         sem WebGL2 o engine não sobe. */
+      closeGate = renderGate(
+        host, verdict,
+        verdict.kind === "software" ? () => { void boot(); } : undefined,
+      );
+    }
+
+    return () => {
+      dead = true;
+      closeGate?.();
+      unmount?.();
+    };
   }, []);
 
   useEffect(() => {

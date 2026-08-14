@@ -10,11 +10,11 @@
    funções. É por isso que os elementos abaixo vêm de core/dom (já avaliado) e
    não há nenhuma chamada de topo. */
 import * as fabric from 'fabric';
-import { $, $$, evTarget, isMounted } from '../core/dom';
+import { $, $$, evTarget, isMounted, root } from '../core/dom';
 import {
   surfaces, SURFACE_KEYS, active, activeKey, setActiveKey, otherSide,
   CAPTIONS, SIDE_LABEL, DEFAULT_BG, markDirty, sizeModalCanvas, stagePanels, setStageResizer,
-  pxToCm, cmToPx, panelMM, mmPerPx,
+  pxToCm, cmToPx, panelMM, mmPerPx, cabPaintColor, isImplementPainted,
 } from '../vehicle/livery';
 import type { SurfaceKey } from '../vehicle/livery';
 import {
@@ -28,6 +28,11 @@ import { initSnapping, setSnapEnabled, drawRulers, resizeSnapLayers } from './li
    ../vehicle/livery (o ciclo desta dupla já é um a mais do que se quer), então é
    este arquivo que lhe diz qual face está ativa. */
 import { initLiveryMeasures, syncMeasures } from './livery-measures';
+/* A CARCAÇA DO THERMO KING é uma PEÇA, não um objeto de desenho: a cor dela vai
+   para a demão própria de `vehicle/trim.ts`. Importar daqui não fecha ciclo —
+   `trim.ts` fala com `models`/`paint`/`scene` e nunca com `ui/*`. */
+import { getTrim, setTrim, setTrimColorLive } from '../vehicle/trim';
+import { state as vehicleState } from '../vehicle/models';
 
 type AnyObj = fabric.FabricObject & {
   id?: string | null; name?: string; locked?: boolean; assetId?: string; renamed?: boolean;
@@ -39,11 +44,274 @@ const cm1 = (v: number) => (Math.round(v * 10) / 10).toString().replace('.', ','
 
 let alignFrame: 'selection' | 'outline' = 'selection';
 let zoom: string = 'fit';
+/**
+ * O FUNDO está selecionado.
+ *
+ * Ele não é um objeto do fabric — é `canvas.backgroundColor` —, então nenhuma
+ * seleção de tela pode representá-lo e `selMode()` nunca o devolveria. Esta
+ * bandeira é a seleção dele, e é ela que faz o inspetor mostrar `data-for="bg"`
+ * no lugar de `data-for="none"`.
+ *
+ * Vive fora de `syncInspector()` porque quem a liga é o clique na camada e quem
+ * a desliga é QUALQUER seleção de verdade — as duas coisas são exclusivas por
+ * construção (selecionar o fundo descarta a seleção do fabric), e é isso que
+ * impede o inspetor de mostrar duas respostas ao mesmo tempo.
+ */
+let bgSelected = false;
+/**
+ * A camada do THERMO KING está selecionada — só existe na testeira.
+ *
+ * Mesma natureza de `bgSelected` e pelo mesmo motivo: ele não é um objeto do
+ * fabric (é uma PEÇA do produto, com demão própria em vehicle/trim.ts), então
+ * nenhuma seleção de tela o produz. As duas bandeiras são exclusivas entre si e
+ * com a seleção do fabric — quem liga uma desliga a outra, em `selectBackground`
+ * / `selectThermoKing` / `syncInspector`.
+ */
+let tkSelected = false;
 let syncing = false;                       // impede que o inspetor ecoe a própria escrita
 let clipboard: Record<string, unknown>[] | null = null;
 
 const zoomFactor = () => (zoom === 'fit' ? 1 : parseFloat(zoom) || 1);
 const resize = () => { sizeModalCanvas(activeKey(), zoomFactor()); drawRulers(); };
+
+/* ---------------- ZOOM CONTÍNUO ----------------
+   O `<select>` dava cinco degraus (Ajustar, 150, 200, 300, 400 %), e a roda do
+   mouse não fazia nada sobre o painel — num baú de 14,7 m em que a arte é
+   medida em centímetros, chegar perto era escolher entre 200 % e 300 %.
+
+   `1` É O AJUSTE, não 100 % da chapa: `sizeModalCanvas()` recebe um MULTIPLICADOR
+   sobre o enquadramento que já cabe na caixa do palco. Por isso o piso é 1 —
+   abaixo dele o painel já está inteiro na tela e sobraria moldura vazia — e o
+   teto é 8, que num painel lateral põe a fita 3M de 50 mm em ~14 px de tela. */
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 8;
+/** Passo por "clique" de roda. Exponencial e não aditivo: a percepção de zoom é
+ *  multiplicativa, e um passo fixo anda demais perto de 1 e de menos perto de 8. */
+const ZOOM_WHEEL_K = 0.0016;
+
+/**
+ * Escreve um fator de zoom qualquer e põe o `<select>` em dia.
+ *
+ * A roda produz valores que não estão na lista, e um `<select>` cujo `value`
+ * não casa com nenhuma `<option>` fica com o texto EM BRANCO — o controle
+ * pareceria quebrado no meio de um gesto. Então um valor fora da lista ganha uma
+ * opção própria, rotulada com a porcentagem; um valor que casa com um degrau
+ * reusa o degrau, para o menu continuar dizendo "200 %" quando ele foi escolhido
+ * pelo menu.
+ */
+function setZoomFactor(f: number): number {
+  const v = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, f));
+  const sel = $<HTMLSelectElement>('stage-zoom');
+  const live = () => sel.querySelector<HTMLOptionElement>('option.zoom-live');
+  const preset = [...sel.options].find((o) => !o.classList.contains('zoom-live')
+    && (o.value === 'fit' ? v <= 1.0005 : Math.abs(parseFloat(o.value) - v) < 0.005));
+  if (preset) {
+    live()?.remove();
+    zoom = preset.value;
+    sel.value = preset.value;
+  } else {
+    let opt = live();
+    if (!opt) {
+      opt = document.createElement('option');
+      opt.className = 'zoom-live';
+      sel.appendChild(opt);
+    }
+    zoom = String(v);
+    opt.value = zoom;
+    opt.textContent = Math.round(v * 100) + ' %';
+    sel.value = zoom;
+  }
+  resize();
+  return v;
+}
+
+/**
+ * Zoom pela roda, ANCORADO NO CURSOR.
+ *
+ * Sem a âncora o palco cresce a partir do canto do contêiner de rolagem e o
+ * detalhe que a pessoa estava olhando escapa da tela a cada clique de roda — num
+ * painel de 14,7 m isso é a diferença entre aproximar e se perder. A conta é a
+ * de sempre: o ponto sob o cursor, em coordenadas do CONTEÚDO, tem de continuar
+ * sob o cursor depois da escala.
+ *
+ * SHIFT ROLA NA HORIZONTAL em vez de aproximar, e não é um enfeite: a rolagem
+ * vertical nativa foi tomada pelo zoom, e é justamente num painel lateral
+ * ampliado que percorrer o comprimento é o gesto mais frequente.
+ */
+function bindWheelZoom() {
+  const stage = $('modal-stage');
+  stage.addEventListener('wheel', (e: WheelEvent) => {
+    if (!isOpen()) return;
+    /* `deltaX` puro é o gesto de trackpad de duas dedos na horizontal — deixa
+       passar, é rolagem de verdade. */
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    if (e.shiftKey) {
+      e.preventDefault();
+      stage.scrollLeft += e.deltaY;
+      return;
+    }
+    e.preventDefault();
+    const before = zoomFactor();
+    const rect = stage.getBoundingClientRect();
+    const px = e.clientX - rect.left + stage.scrollLeft;
+    const py = e.clientY - rect.top + stage.scrollTop;
+    const after = setZoomFactor(before * Math.exp(-e.deltaY * ZOOM_WHEEL_K));
+    if (after === before) return;
+    const k = after / before;
+    stage.scrollLeft = px * k - (e.clientX - rect.left);
+    stage.scrollTop = py * k - (e.clientY - rect.top);
+  }, { passive: false });
+}
+
+/* ---------------- ARRASTAR O PALCO ----------------
+   Pedido de 2026-08-13: *"no livery devo ser capaz de pegar e arrastar o
+   livery, em caso de dar zoom"*. Ampliar já funcionava (roda ancorada no
+   cursor, `bindWheelZoom`); o que faltava era MOVER — a 400 % num painel de
+   14,7 m, chegar ao outro logotipo era caçar a barra de rolagem.
+
+   O BOTÃO ESQUERDO SOBRE O PAINEL ARRASTA, e chegar a isso levou duas versões.
+   A primeira deixava o esquerdo para o LAÇO DE SELEÇÃO do fabric e oferecia
+   espaço, botão do meio e a moldura xadrez. O relato foi *"o drag and drop do
+   livery não está funcionando"* — e ele está certo sobre o que importa: quem
+   ampliou o painel para 400 % põe o cursor SOBRE o desenho e arrasta, não sobre
+   a moldura, e não descobre um atalho de teclado que ninguém mostrou.
+
+   O que decide quem fica com o gesto é O QUE ESTÁ SOB O CURSOR, perguntado ao
+   próprio fabric (`findTarget`):
+
+     tem objeto embaixo   → o fabric leva (arrastar o objeto continua igual)
+     não tem              → o PALCO leva, e a vista se move
+     ⇧ + arrastar         → o fabric leva de qualquer jeito: é o laço de
+                            seleção, que assim não se perde
+     botão do meio        → o palco, sempre — nem chega ao fabric
+     ESPAÇO + arrastar    → o palco, sempre, inclusive por cima de um objeto
+
+   Um CLIQUE sem arrasto no vazio continua selecionando o Fundo — ver `end()`
+   abaixo, que é onde essa decisão passou a morar.
+
+   CAPTURA, E NÃO BOLHA. O fabric escuta `pointerdown` no upperCanvasEl; um
+   ouvinte de bolha no palco só saberia do gesto depois de o laço de seleção já
+   ter começado. Na fase de captura o palco vê primeiro e, quando toma o gesto,
+   `stopPropagation()` impede o laço de nascer. */
+let panning = false;
+/** Quanto o último gesto de palco andou, em pixels. */
+let panMoved = 0;
+let panId = -1;
+let panX = 0, panY = 0;
+let panPicked = false;      // o gesto começou no VAZIO do painel?
+let spaceHeld = false;
+
+function bindStagePan() {
+  const stage = $('modal-stage');
+
+  const onPanel = (e: PointerEvent) =>
+    !!(e.target as HTMLElement | null)?.closest?.('.stage-panel');
+
+  /* Tem objeto do fabric sob o cursor? `findTarget` é o MESMO caminho que o
+     fabric usa para decidir o que arrastar, então perguntar a ele é a única
+     forma de as duas decisões não divergirem — um teste próprio erraria em
+     objeto girado, em texto com contorno e dentro de uma seleção múltipla.
+     Protegido: se uma versão futura do fabric mudar a assinatura, o palco
+     devolve o gesto em vez de derrubar o editor. */
+  const hitsObject = (e: PointerEvent) => {
+    try {
+      const c = active() as unknown as { findTarget(ev: PointerEvent): unknown };
+      return typeof c.findTarget === 'function' ? !!c.findTarget(e) : true;
+    } catch { return true; }
+  };
+
+  const takes = (e: PointerEvent) => {
+    if (e.button === 1) return true;
+    if (e.button !== 0) return false;
+    if (spaceHeld) return true;
+    if (!onPanel(e)) return true;             // a moldura xadrez não seleciona nada
+    if (e.shiftKey) return false;             // ⇧ = laço de seleção, do fabric
+    return !hitsObject(e);
+  };
+
+  stage.addEventListener('pointerdown', (e: PointerEvent) => {
+    panMoved = 0;
+    if (!isOpen() || !takes(e)) { panPicked = false; return; }
+    panning = true; panId = e.pointerId;
+    panX = e.clientX; panY = e.clientY;
+    /* Só um gesto que começou no VAZIO DO PAINEL vira "selecionar o Fundo" no
+       fim. Um que começou na moldura, ou com o botão do meio, é navegação pura
+       e não tem por que mexer na seleção. */
+    panPicked = e.button === 0 && onPanel(e);
+    /* A CAPTURA É OPCIONAL, e por isso protegida: `setPointerCapture` lança
+       `NotFoundError` quando o `pointerId` não é de um ponteiro ativo — o que
+       acontece com evento sintético (a bancada) e em alguns caminhos de caneta.
+       Sem ela o arrasto ainda funciona enquanto o cursor estiver sobre o palco;
+       com a exceção subindo, o gesto morria na entrada. */
+    try { stage.setPointerCapture?.(e.pointerId); } catch { /* segue sem captura */ }
+    stage.classList.add('is-panning');
+    e.stopPropagation();
+    e.preventDefault();
+  }, { capture: true });
+
+  /* O deslocamento é medido em CLIENTE e não por `movementX`: com captura de
+     ponteiro o Firefox zera o `movement*` no primeiro evento depois da captura,
+     e o palco dava um pulo no começo de cada arrasto. */
+  stage.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!panning || e.pointerId !== panId) return;
+    const dx = e.clientX - panX, dy = e.clientY - panY;
+    panX = e.clientX; panY = e.clientY;
+    panMoved += Math.abs(dx) + Math.abs(dy);
+    stage.scrollLeft -= dx;
+    stage.scrollTop -= dy;
+    e.preventDefault();
+  }, { capture: true });
+
+  /* ---------------- CLICAR NO CAMINHÃO É SELECIONAR O FUNDO ----------------
+     Pedido de 2026-08-13: *"no livery, o background é uma camada, então quando
+     clico no truck deve selecionar a camada do background"*.
+
+     MORA AQUI, e não num `click` do palco, porque o palco agora ENGOLE o
+     pointerdown do vazio (`stopPropagation` acima). Sem isso o fabric nunca vê
+     o gesto, nunca dispara `selection:cleared`, e clicar fora de um objeto
+     deixaria a seleção anterior de pé — o defeito seria "não consigo
+     desselecionar". Então quem descarta a seleção é este bloco, que é o único
+     que sabe que o gesto foi um clique e não um arrasto. */
+  const end = (e: PointerEvent) => {
+    if (!panning || e.pointerId !== panId) return;
+    panning = false; panId = -1;
+    try { stage.releasePointerCapture?.(e.pointerId); } catch { /* nunca capturou */ }
+    stage.classList.remove('is-panning');
+    if (!panPicked || panMoved > 4) return;
+    const c = active();
+    c.discardActiveObject();
+    c.requestRenderAll();
+    selectBackground();
+  };
+  stage.addEventListener('pointerup', end, { capture: true });
+  stage.addEventListener('pointercancel', end, { capture: true });
+  /* O botão do meio abre o menu de colar do Linux e rola em auto-scroll no
+     Windows. Nenhum dos dois é o que se pediu. */
+  stage.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+
+  /* ESPAÇO. Fora de `bindKeys()` de propósito: lá o `typing` já derrubou o
+     evento antes (um espaço dentro de um texto é um espaço), e aqui a guarda
+     precisa ser a mesma mas com a resposta oposta — sair sem marcar nada. */
+  const typingNow = () => {
+    const ao = active().getActiveObject();
+    const tag = (document.activeElement as HTMLElement | null)?.tagName || '';
+    return !!(ao && (ao as fabric.IText).isEditing) || /^(INPUT|TEXTAREA|SELECT)$/.test(tag);
+  };
+  const setSpace = (on: boolean) => {
+    if (spaceHeld === on) return;
+    spaceHeld = on;
+    stage.classList.toggle('can-pan', on);
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== ' ' || !isMounted() || !isOpen() || typingNow()) return;
+    e.preventDefault();                 // senão a página rola por baixo do modal
+    setSpace(true);
+  });
+  document.addEventListener('keyup', (e) => { if (e.key === ' ') setSpace(false); });
+  /* Trocar de aba com o espaço apertado nunca entrega o `keyup`, e o palco
+     ficaria em modo de arrasto para sempre. */
+  window.addEventListener('blur', () => setSpace(false));
+}
 
 const selObjects = () => active().getActiveObjects();
 
@@ -54,8 +322,13 @@ function selMode(objs: fabric.FabricObject[]): 'none' | 'text' | 'image' | 'mult
 }
 
 function syncPanels(objs: fabric.FabricObject[]) {
-  const tokens = new Set<string>([selMode(objs)]);
-  if (objs.length && objs.every(isText)) tokens.add('text');
+  /* `bg` SUBSTITUI o modo de seleção, não se soma a ele: com o fundo escolhido
+     não há objeto nenhum ativo, e deixar `none` no conjunto mostraria a seção
+     "Painel" ("selecione um objeto…") logo acima da cor do fundo — duas
+     respostas para a mesma pergunta. */
+  const tokens = new Set<string>(
+    tkSelected ? ['tk'] : bgSelected ? ['bg'] : [selMode(objs)]);
+  if (!bgSelected && !tkSelected && objs.length && objs.every(isText)) tokens.add('text');
   for (const p of $$('#inspector .insp')) {
     const list = (p.dataset.for || '').split(' ');
     p.classList.toggle('hidden', !(list.includes('always') || list.some((t) => tokens.has(t))));
@@ -295,14 +568,247 @@ function defaultName(o: fabric.FabricObject): string {
 
 let dragSrcIndex: number | null = null;
 
+/**
+ * A CAMADA FIXA DO FUNDO — o pé da lista, em todas as quatro faces.
+ *
+ * Ela sempre existiu como estado (`canvas.backgroundColor`) e nunca existiu como
+ * camada: a única forma de saber que havia um fundo pintado era reparar no campo
+ * "Fundo" da barra de ferramentas, entre o zoom e as guias. Uma cor que cobre o
+ * painel inteiro e não aparece na lista de camadas é a definição de estado
+ * invisível.
+ *
+ * NO PÉ porque é onde ela está: `getObjects()` vem de baixo para cima e a lista
+ * é desenhada invertida, então o último elemento é a camada mais baixa — e não
+ * há nada abaixo do fundo. NÃO é arrastável, não renomeia, não tem cadeado e não
+ * tem olho: nenhuma dessas quatro operações existe para um `backgroundColor`, e
+ * um controle que não faz nada é pior do que a ausência dele. Apagar o fundo é o
+ * botão do inspetor, que é onde a cor é escolhida.
+ */
+function backgroundRow(): HTMLElement {
+  const c = active();
+  const bg = typeof c.backgroundColor === 'string' ? c.backgroundColor : '';
+  const row = document.createElement('div');
+  row.className = 'layer-row layer-row--bg' + (bgSelected ? ' on' : '');
+
+  /* Um vão do tamanho do punho de arrasto das outras linhas. Sem ele o ícone do
+     fundo ficaria 15 px à esquerda do ícone de todas as outras camadas, e a
+     lista leria como duas listas. */
+  const pad = document.createElement('span');
+  pad.className = 'lyr-grip is-fixed';
+  pad.setAttribute('aria-hidden', 'true');
+
+  /* A PASTILHA MOSTRA A COR EFETIVA, não só a própria — a camada Fundo é o que
+     o olho vê no painel, e sem cor própria o que ele vê é a chapa. Herdada tem
+     desenho próprio (anel tracejado): a cor é a mesma da linha "Cor do cavalo"
+     do inspetor, e nada distinguiria "escolhi vermelho" de "estou seguindo o
+     vermelho do cavalo" se as duas fossem um quadrado cheio igual. */
+  const painted = isImplementPainted();
+  const chip = document.createElement('span');
+  chip.className = 'lyr-swatch'
+    + (bg ? '' : painted ? ' is-inherited' : ' is-empty');
+  if (bg) chip.style.background = bg;
+  else if (painted) chip.style.background = cabPaintColor();
+
+  const name = document.createElement('span');
+  name.className = 'lyr-name lyr-name--fixed';
+  name.textContent = 'Fundo';
+
+  const state = document.createElement('span');
+  state.className = 'lyr-meta';
+  state.textContent = bg ? bg : painted ? 'cor do cavalo' : 'chapa do baú';
+
+  row.append(pad, chip, name, state);
+  row.title = bg
+    ? 'Esta face tem cor própria e ignora a cor do cavalo — clique para trocar'
+    : 'A camada mais baixa do painel — clique para escolher a cor';
+  row.addEventListener('click', () => selectBackground());
+  return row;
+}
+
+/**
+ * Põe a seção do fundo em dia com a tela ativa.
+ *
+ * Roda em TODA sincronização do inspetor, e não só quando a seção está visível:
+ * ela é montada uma vez e escondida por CSS (o inspetor nunca remonta — ver a
+ * nota do `<aside id="inspector">` no template), então um valor velho ficaria
+ * lá esperando o próximo clique na camada. Barato: meia dúzia de nós.
+ *
+ * ---------------------------------------------------------------------------
+ * O QUE ESTA SEÇÃO DIZ MUDOU EM 2026-08-13, junto com a regra.
+ *
+ * Antes ela mostrava um valor: o hex, ou "sem fundo". Agora ela mostra a PILHA,
+ * porque é a pilha que responde à pergunta do usuário ("por que esta face está
+ * preta e aquela está verde?"):
+ *
+ *   linha 1  Cor do cavalo  ·  ligada/desligada, vale para o baú inteiro
+ *   linha 2  Só esta face   ·  quando tem cor, GANHA da linha 1
+ *   título   a resposta efetiva desta face, em duas palavras
+ *   rodapé   a frase que liga as duas — e ela muda com o estado, senão seria
+ *            um texto fixo que descreve um caso só
+ *
+ * A cor semeada no seletor quando a face não tem cor própria é a EFETIVA (a do
+ * cavalo, se ligada), e não `#ffffff`: um `<input type="color">` não tem estado
+ * vazio, e abrir o seletor no branco quando o baú está vermelho oferece como
+ * ponto de partida justamente a cor que ninguém tem.
+ */
+function syncBackground() {
+  const raw = active().backgroundColor;
+  const bg = typeof raw === 'string' ? raw : '';
+  const painted = isImplementPainted();
+  const chapa = painted ? cabPaintColor() : '#ffffff';
+
+  $<HTMLInputElement>('bgcolor').value = bg || chapa;
+  const sw = $('bg-sw');
+  sw.classList.toggle('is-empty', !bg);
+  sw.style.background = bg || '';
+  $('bg-val').textContent = bg ? 'Personalizada' : 'Sem cor';
+  $('bg-row-face').classList.toggle('is-on', !!bg);
+  ($('bg-clear') as HTMLButtonElement).disabled = !bg;
+
+  $('bg-state').textContent = bg ? 'cor própria' : painted ? 'cor do cavalo' : 'chapa branca';
+  $('bg-hint').textContent = bg
+    ? (painted
+      ? 'Esta face tem cor própria e ignora a cor do cavalo. As faces sem cor'
+        + ' própria continuam seguindo o cavalo.'
+      : 'Esta face tem cor própria. As faces sem cor própria mostram a chapa'
+        + ' branca do baú.')
+    : (painted
+      ? 'Sem cor própria, esta face mostra a chapa — que está com a cor do'
+        + ' cavalo. Escolher uma cor aqui sobrescreve isso só nesta face.'
+      : 'Sem cor própria, esta face mostra a chapa branca do baú.');
+}
+
+/** Aplica uma cor de fundo (ou `''` = sem fundo). */
+function setBackground(value: string, commit: boolean) {
+  const c = active(), key = activeKey();
+  c.backgroundColor = value;
+  markDirty(key);
+  c.requestRenderAll();
+  syncBackground();
+  /* A LISTA DE CAMADAS SÓ NO COMMIT. `input` chega a cada pixel percorrido
+     dentro do seletor nativo, e remontar a lista inteira a cada um deles é
+     reconstruir DOM sessenta vezes por segundo para mudar um quadradinho de
+     13 px — enquanto o palco, que é onde o olho está, já mostra a cor ao vivo. */
+  if (commit) { history.push(key); renderLayers(); }
+}
+
+/** Seleciona o FUNDO: descarta a seleção da tela e abre a seção dele. */
+function selectBackground() {
+  const c = active();
+  c.discardActiveObject();
+  c.requestRenderAll();
+  bgSelected = true;
+  tkSelected = false;
+  syncInspector();
+}
+
+/* ---------------- A CAMADA DO THERMO KING ----------------
+   Pedido de 2026-08-13: *"no livery da frontal, o thermo king deve ser uma
+   camada como a base"*. Ele já tinha cor — no card Configurações, do outro lado
+   da tela — e o pedido é de LUGAR: quem está desenhando a testeira está olhando
+   para a unidade, e a cor dela pertence àquela tela.
+
+   É a mesma construção da camada Fundo, com uma diferença que é o ponto: o
+   Fundo é `canvas.backgroundColor` e vira TEXTURA; o Thermo King é uma PEÇA com
+   demão própria (`vehicle/trim.ts`), e a cor dele vai para o material do 3D. As
+   duas aparecem na mesma lista porque, para quem desenha, as duas são "coisas
+   que têm cor nesta face" — a diferença de mecanismo é nossa, não dele.
+
+   SÓ NA TESTEIRA, e não é arbitrário: a unidade é montada na parede dianteira
+   (ver `placeThermoKing()` em models.ts) e não aparece em nenhuma outra face. */
+const tkPresent = () => activeKey() === 'front' && !!vehicleState.tk;
+
+/** Seleciona o THERMO KING. */
+function selectThermoKing() {
+  const c = active();
+  c.discardActiveObject();
+  c.requestRenderAll();
+  tkSelected = true;
+  bgSelected = false;
+  syncInspector();
+}
+
+/** A linha fixa do Thermo King, logo acima do Fundo. */
+function thermoKingRow(): HTMLElement {
+  const piece = getTrim().thermoking;
+  const hex = piece.color;
+  /* Sem cor própria ele SEGUE O BAÚ (`followsBody: true` em trim.ts), e o baú é
+     a cor do cavalo quando a tinta está ligada. A pastilha mostra a cor
+     EFETIVA, com o anel tracejado de "herdada" — mesma convenção da camada
+     Fundo, ver `backgroundRow()`. */
+  const painted = isImplementPainted();
+  const row = document.createElement('div');
+  row.className = 'layer-row layer-row--fixed' + (tkSelected ? ' on' : '');
+
+  const pad = document.createElement('span');
+  pad.className = 'lyr-grip is-fixed';
+  pad.setAttribute('aria-hidden', 'true');
+
+  const chip = document.createElement('span');
+  chip.className = 'lyr-swatch' + (hex ? '' : painted ? ' is-inherited' : '');
+  chip.style.background = hex || (painted ? cabPaintColor() : '#ffffff');
+
+  const name = document.createElement('span');
+  name.className = 'lyr-name lyr-name--fixed';
+  name.textContent = 'Thermo King';
+
+  const state = document.createElement('span');
+  state.className = 'lyr-meta';
+  state.textContent = hex ? hex : 'como o baú';
+
+  row.append(pad, chip, name, state);
+  row.title = 'A unidade de refrigeração — clique para escolher a cor da carcaça';
+  row.addEventListener('click', () => selectThermoKing());
+  return row;
+}
+
+/** Põe a seção do Thermo King em dia. Mesmo contrato de `syncBackground()`. */
+function syncThermoKing() {
+  const piece = getTrim().thermoking;
+  const hex = piece.color;
+  const painted = isImplementPainted();
+  $<HTMLInputElement>('tk-color').value = hex || (painted ? cabPaintColor() : '#ffffff');
+  const sw = $('tk-sw');
+  sw.classList.toggle('is-empty', !hex);
+  sw.style.background = hex || '';
+  $('tk-val').textContent = hex ? 'Personalizada' : 'Como o baú';
+  $('tk-row').classList.toggle('is-on', !!hex);
+  ($('tk-clear') as HTMLButtonElement).disabled = !hex;
+  $('tk-state').textContent = hex ? 'cor própria' : 'como o baú';
+}
+
+/**
+ * Escreve a cor da carcaça.
+ *
+ * `live` é o ARRASTO dentro do seletor nativo, que emite `input` a cada pixel
+ * percorrido: ele passa por `setTrimColorLive()`, que só reescreve o uniforme da
+ * demão. O caminho normal (`setTrim`) varre as ~2 150 malhas do implemento e
+ * custaria isso trinta vezes por segundo — ver o bloco daquela função.
+ */
+function setThermoKingColor(value: string | null, live: boolean) {
+  if (live && value) {
+    if (setTrimColorLive('thermoking', value)) { syncThermoKing(); return; }
+  }
+  setTrim('thermoking', { color: value });
+  syncThermoKing();
+  renderLayers();
+}
+
 function renderLayers() {
   const c = active(), list = $('layer-list');
   const objs = c.getObjects();
   const activeSet = new Set(c.getActiveObjects());
   $('layer-count').textContent = objs.length ? `${objs.length} ${objs.length === 1 ? 'item' : 'itens'}` : '';
   list.innerHTML = '';
+  /* As camadas FIXAS do pé da lista, na ordem em que estão no produto: a
+     unidade fica montada SOBRE a parede, então ela vem acima do Fundo. */
+  const fixedRows = () => {
+    if (tkPresent()) list.appendChild(thermoKingRow());
+    list.appendChild(backgroundRow());
+  };
   if (!objs.length) {
     list.innerHTML = '<div class="layer-empty">Nenhum objeto neste painel.</div>';
+    fixedRows();
     return;
   }
 
@@ -384,6 +890,8 @@ function renderLayers() {
 
     list.appendChild(row);
   });
+
+  fixedRows();
 }
 
 function setLocked(o: AnyObj, v: boolean) {
@@ -402,7 +910,25 @@ function syncInspector() {
   try {
     const c = active(), key = activeKey();
     const objs = c.getActiveObjects();
+    /* Qualquer seleção de verdade desfaz a do fundo. É aqui e não no listener de
+       cada evento do fabric porque TODO caminho que muda a seleção termina
+       chamando esta função — clique na tela, marquee, atalho, lista de camadas —
+       e uma bandeira desligada em quatro lugares diverge no quinto. */
+    if (objs.length) { bgSelected = false; tkSelected = false; }
+    /* A unidade só existe na testeira: trocar de aba com ela selecionada
+       deixaria o inspetor mostrando a carcaça enquanto o palco mostra a
+       lateral. */
+    if (tkSelected && !tkPresent()) tkSelected = false;
     syncPanels(objs);
+    /* DEPOIS de `syncPanels()`, e é obrigatório nessa ordem: o card de medidas é
+       `data-for="always"`, então aquele laço o REEXIBE a cada sincronização — e
+       no teto ele tem de ficar escondido (ver o bloco em ui/livery-measures.ts).
+       Sem esta linha, selecionar um objeto no teto trazia de volta um formulário
+       de portas para uma face que não tem porta. Barato: só reconstrói quando a
+       assinatura muda. */
+    syncMeasures();
+    syncBackground();
+    syncThermoKing();
 
     const dims = panelMM(key), mm = mmPerPx(key);
     $('panel-dims').textContent = `${cm1(dims.w / 10)} × ${cm1(dims.h / 10)} cm`;
@@ -473,14 +999,18 @@ function syncInspector() {
 function updateFoot(objs: fabric.FabricObject[]) {
   const foot = $('modal-foot'), key = activeKey(), c = active();
   if (!objs.length) {
-    foot.textContent = 'Dica: arraste e solte uma imagem em qualquer lugar do painel · a linha tracejada é a silhueta real do painel';
+    foot.textContent = 'Dica: arraste o painel para movê-lo · roda do mouse aproxima'
+      + ' · ⇧ + arrastar seleciona vários · clique no painel seleciona o Fundo'
+      + ' · solte uma imagem em qualquer lugar para adicioná-la';
     return;
   }
   const r = (objs.length === 1 ? objs[0] : c.getActiveObject() as fabric.FabricObject).getBoundingRect();
   const parts = [`${cm1(pxToCm(r.width, key, 'x'))} × ${cm1(pxToCm(r.height, key, 'y'))} cm`];
-  if (key !== 'rear') {
+  if (key === 'left' || key === 'right') {
     /* x=0 é a TRASEIRA na lateral esquerda e a FRENTE na direita: addLiveryUV()
-       inverte o u entre os lados para o desenho ler certo nos dois. */
+       inverte o u entre os lados para o desenho ler certo nos dois.
+       Só as LATERAIS têm esta leitura: numa face de ponta "distância da frente"
+       é a espessura do baú, e dizer isso é ruído. */
     const fromFrontPx = key === 'left' ? c.getWidth() - (r.left + r.width) : r.left;
     parts.push(`${cm1(pxToCm(fromFrontPx, key, 'x') / 100)} m da frente`);
   }
@@ -495,7 +1025,11 @@ function updateToolbarState() {
   ($$('[data-act="redo"]')[0] as HTMLButtonElement).disabled = !history.canRedo(key);
   ($$('[data-act="delete"]')[0] as HTMLButtonElement).disabled = !n;
   ($$('[data-act="duplicate"]')[0] as HTMLButtonElement).disabled = !n;
-  ($('btn-mirror') as HTMLButtonElement).disabled = key === 'rear';
+  /* Espelhar é uma operação entre as DUAS LATERAIS; nem a traseira nem a
+     testeira têm par. `otherSide()` é quem sabe disso — perguntar a ele em vez
+     de listar as faces sem par é o que impede uma quinta face de nascer com o
+     botão ligado sem destino. */
+  ($('btn-mirror') as HTMLButtonElement).disabled = !otherSide(key);
   updateSyncDots();
 }
 
@@ -583,19 +1117,65 @@ function bindToolbar() {
     syncInspector();
   });
 
+  /* O FUNDO, agora no INSPETOR. `input` acompanha o arrasto dentro do seletor
+     nativo sem gravar no histórico; `change` é a escolha, e é ela que empilha um
+     desfazer. Mesmo par que o card de configurações usa, e pelo mesmo motivo:
+     um passo de histórico por pixel percorrido encheria a pilha de 40 estados
+     com um gesto só. */
   $('bgcolor').addEventListener('input', (e) => {
-    const c = active();
-    c.backgroundColor = evTarget<HTMLInputElement>(e).value;
-    markDirty(activeKey()); c.requestRenderAll();
+    setBackground(evTarget<HTMLInputElement>(e).value, false);
   });
-  $('bgcolor').addEventListener('change', () => history.push(activeKey()));
-  $('bg-clear').addEventListener('click', () => {
-    const c = active();
-    c.backgroundColor = '';
-    markDirty(activeKey()); c.requestRenderAll(); history.push(activeKey());
+  $('bgcolor').addEventListener('change', (e) => {
+    setBackground(evTarget<HTMLInputElement>(e).value, true);
+  });
+  $('bg-clear').addEventListener('click', (e) => { e.stopPropagation(); setBackground('', true); });
+
+  /* A LINHA INTEIRA ABRE O SELETOR, e não só a pastilha de 22 px.
+     Pedido de 2026-08-13: *"quando clicar no card do seletor de cor deve abrir o
+     picker, não somente no color picker em si"*. O alvo passa a ser o que se
+     lê como um controle — a linha —, que é a mesma regra que a linha de cima já
+     tinha de graça por ser um `<label>` em volta do checkbox.
+
+     Aqui não dá para usar `<label for>`: o seletor JÁ mora dentro de um
+     elemento próprio (a pastilha), e envolver a linha num segundo rótulo faria
+     o botão "×" disparar o seletor junto — por isso ele para a propagação
+     acima, e por isso o clique DENTRO da pastilha sai cedo (lá o input nativo
+     já recebeu o clique, e um `.click()` por cima abriria e fecharia). */
+  $('bg-row-face').addEventListener('click', (e) => {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest('.bg-chip') || t?.closest('.bg-reset')) return;
+    $<HTMLInputElement>('bgcolor').click();
   });
 
-  $('stage-zoom').addEventListener('change', (e) => { zoom = evTarget<HTMLSelectElement>(e).value; resize(); });
+  /* ---- Thermo King: o mesmo par input/change e a mesma linha clicável ---- */
+  $('tk-color').addEventListener('input', (e) => {
+    setThermoKingColor(evTarget<HTMLInputElement>(e).value, true);
+  });
+  $('tk-color').addEventListener('change', (e) => {
+    setThermoKingColor(evTarget<HTMLInputElement>(e).value, false);
+  });
+  $('tk-clear').addEventListener('click', (e) => {
+    e.stopPropagation();
+    setThermoKingColor(null, false);
+  });
+  $('tk-row').addEventListener('click', (e) => {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest('.bg-chip') || t?.closest('.bg-reset')) return;
+    $<HTMLInputElement>('tk-color').click();
+  });
+
+  /* "Pintar o implemento" é de vehicle/livery.ts (ele mexe no material do 3D e
+     no fundo das QUATRO telas de uma vez), mas agora mora nesta seção — então o
+     inspetor tem de se redesenhar quando ele muda, ou a camada Fundo continuaria
+     anunciando a cor que `setBackgroundsForPaint()` acabou de tirar. Segundo
+     ouvinte no mesmo elemento, registrado DEPOIS do de lá (initLivery() roda
+     antes de initLiveryEditor()), então lê o estado já aplicado. */
+  $('paint-trailer').addEventListener('change', () => { syncBackground(); renderLayers(); });
+
+  $('stage-zoom').addEventListener('change', (e) => {
+    const v = evTarget<HTMLSelectElement>(e).value;
+    setZoomFactor(v === 'fit' ? 1 : parseFloat(v) || 1);
+  });
   $('snap-toggle').addEventListener('change', (e) => setSnapEnabled(evTarget<HTMLInputElement>(e).checked));
 }
 
@@ -610,7 +1190,7 @@ function bindMirror() {
 
   $('btn-mirror').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (activeKey() === 'rear') return;
+    if (!otherSide(activeKey())) return;
     $('mirror-pop-title').textContent = `Espelhar para o ${label()}`;
     const dst = otherSide(activeKey());
     const n = dst ? surfaces[dst].getObjects().length : 0;
@@ -656,8 +1236,29 @@ export function showSurface(key: SurfaceKey) {
   syncMeasures(key);
 }
 
+/**
+ * A PÍLULA DE CARREGAMENTO TEM DE ATRAVESSAR O MODAL.
+ *
+ * `#cab-switching` é o indicador padrão de "espere um pouco" do estúdio — troca
+ * de caminhão, troca de cenário, preset de luz, redimensionamento do baú — e ele
+ * é `position: absolute` dentro de `#canvas-holder`, com z-index 9. O modal do
+ * editor é `position: fixed; z-index: 9999`, ou seja a pílula ficava ATRÁS dele.
+ *
+ * Consequência: "+ Adicionar porta" dispara um recorte de ~3 s de thread
+ * presa e o único aviso visível era uma linha no inspetor. O pedido foi direto —
+ * *"quando adicionar porta deve ter o mesmo loading que há quando está
+ * carregando o mapa"* —, e a resposta certa não é um segundo indicador, é fazer
+ * ESTE aparecer: a marca no root troca a pílula para `fixed` acima do modal
+ * enquanto o editor está aberto (regra em core/studio.css).
+ *
+ * No root e não no modal porque a pílula não é filha do modal — ela é filha do
+ * canvas-holder, e o seletor precisa de um ancestral comum aos dois.
+ */
+const markEditorOpen = (on: boolean) => root.classList.toggle('ts-editing', on);
+
 export function openEditor(key?: SurfaceKey) {
   modal().classList.remove('hidden');
+  markEditorOpen(true);
   showSurface(key || activeKey());
 }
 
@@ -667,6 +1268,7 @@ export function closeEditor() {
   $('mirror-pop').classList.add('hidden');
   $('help-pop').classList.add('hidden');
   modal().classList.add('hidden');
+  markEditorOpen(false);
 }
 
 /* ---------------- arrastar e soltar ---------------- */
@@ -723,7 +1325,12 @@ function bindKeys() {
     const mod = e.metaKey || e.ctrlKey;
 
     if (e.key === 'Escape') {
+      /* TRÊS DEGRAUS, e o do meio nasceu com a seleção do fundo: ele é uma
+         seleção de verdade para o inspetor, então fechar o modal por cima dele
+         seria fechar com algo selecionado — o único caso em que Esc pularia um
+         passo. */
       if (ao) { c.discardActiveObject(); c.requestRenderAll(); syncInspector(); }
+      else if (bgSelected || tkSelected) { bgSelected = tkSelected = false; syncInspector(); }
       else closeEditor();
       return;
     }
@@ -810,6 +1417,8 @@ export function initLiveryEditor() {
   bindMirror();
   bindDnD();
   bindKeys();
+  bindWheelZoom();
+  bindStagePan();
   /* Depois dos binds e antes dos ouvintes do fabric: ele monta DOM dentro do
      inspetor e se inscreve nas mudanças de medida, e nada aqui em baixo depende
      disso ter acontecido. */

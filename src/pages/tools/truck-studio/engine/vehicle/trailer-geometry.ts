@@ -161,6 +161,22 @@ export interface Tri {
   p: Float32Array;
   /** 9 floats: normais correspondentes, em espaço de mundo. */
   n: Float32Array;
+  /**
+   * Veio da CHAPA DE TETO (`teto-externo`)?
+   *
+   * Existe por uma razão só, e ela é de produto: o teto é pintável
+   * separadamente do baú (ver `vehicle/trim.ts`), e trocar o material de um
+   * SUBCONJUNTO de triângulos não é uma operação que exista. Enquanto o corpo
+   * paramétrico desenhava tudo numa malha só, escolher uma cor para o teto
+   * aplicava a tinta numa malha `teto-externo` que `rebuild()` tinha acabado de
+   * ESCONDER — a cor era aceita e não aparecia.
+   *
+   * Marcado na COLETA, por nome do nó de origem, e não inferido depois por
+   * normal ou por altura: `shellsOf()` solda por vértice e pode juntar o teto às
+   * paredes na mesma casca, então o critério tem de sobreviver à decomposição —
+   * e sobrevive, porque anda no triângulo.
+   */
+  roof?: boolean;
 }
 
 /**
@@ -238,6 +254,21 @@ export interface TrailerProfile {
 
 /* ------------------------------------------------------------------ coleta */
 
+/** O nó da CHAPA DE TETO no bake. `-externo` e não `teto`: o `teto-interno` é o
+ *  forro, tem o mesmo branco e não se vê de fora. Mesma expressão que
+ *  `vehicle/trim.ts` usa para casar a peça no bake fundido — as duas descrevem
+ *  a mesma coisa e divergir faria o teto pintar num caminho e não no outro. */
+const ROOF_NODE_RE = /^teto-externo/i;
+
+/** O nó casa se ELE ou algum ancestral casar — a malha é neta do grupo do teto. */
+function nodeOrAncestor(o: THREE.Object3D, re: RegExp, stop: THREE.Object3D): boolean {
+  for (let n: THREE.Object3D | null = o; n; n = n.parent) {
+    if (re.test(n.name || '')) return true;
+    if (n === stop) break;
+  }
+  return false;
+}
+
 function collect(root: THREE.Object3D): {
   tris: Tri[]; meshes: THREE.Mesh[]; material: THREE.Material | null;
 } {
@@ -252,6 +283,7 @@ function collect(root: THREE.Object3D): {
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     if (!mats.some((m) => WHITE_RE.test(m.name))) return;
 
+    const isRoof = nodeOrAncestor(mesh, ROOF_NODE_RE, root);
     meshes.push(mesh);
     material ??= mats.find((m) => WHITE_RE.test(m.name)) ?? null;
 
@@ -277,7 +309,7 @@ function collect(root: THREE.Object3D): {
           n[k * 3] = v.x; n[k * 3 + 1] = v.y; n[k * 3 + 2] = v.z;
         }
       }
-      tris.push({ p, n });
+      tris.push(isRoof ? { p, n, roof: true } : { p, n });
     }
   });
   return { tris, meshes, material };
@@ -462,7 +494,7 @@ function clipSlab(t: Tri, lo: number, hi: number): Tri[] {
       else { nx /= len; ny /= len; nz /= len; }
       n[k * 3] = nx; n[k * 3 + 1] = ny; n[k * 3 + 2] = nz;
     }
-    out.push({ p, n });
+    out.push(t.roof ? { p, n, roof: true } : { p, n });
   }
   return out;
 }
@@ -521,7 +553,7 @@ function clipComp(t: Tri, comp: 1 | 2, plane: number, keepGreater: boolean): Tri
       else { nx /= len; ny /= len; nz /= len; }
       n[k * 3] = nx; n[k * 3 + 1] = ny; n[k * 3 + 2] = nz;
     }
-    tris.push({ p, n });
+    tris.push(t.roof ? { p, n, roof: true } : { p, n });
   }
   return tris;
 }
@@ -1146,9 +1178,34 @@ function mirrorAxis(src: THREE.BufferGeometry, axis: 'x' | 'y' | 'z'): THREE.Buf
 
 /* ------------------------------------------------------------ construção */
 
+/**
+ * O nome da malha de TETO do corpo paramétrico.
+ *
+ * Exportado porque três módulos precisam reconhecê-la pelo nome e nenhum deles
+ * pode importar a classe: `vehicle/trim.ts` (para pintá-la sozinha),
+ * `vehicle/models.ts` (para não a tratar como fonte de recorte de livery) e o
+ * descarte de chapas. Um literal repetido em quatro arquivos é como um renome
+ * de malha vira um teto que deixa de aceitar cor sem nenhum erro.
+ */
+export const TRAILER_ROOF_MESH = 'TRAILER_ROOF';
+
 export class TrailerBody {
   readonly profile: TrailerProfile;
   readonly mesh: THREE.Mesh;
+  /**
+   * O TETO, malha PRÓPRIA — e é isso que o torna pintável separadamente.
+   *
+   * Mesma geometria de sempre, mesmo material, mesmo lugar: o que muda é que os
+   * triângulos de `teto-externo` saem num buffer só deles em vez de dissolvidos
+   * no corpo. Duas chamadas de desenho no lugar de uma, e em troca `trim.ts`
+   * ganha um alvo real para trocar de material — trocar material é uma operação
+   * de MALHA, e enquanto o teto não fosse uma, a cor escolhida para ele era
+   * escrita numa malha de fábrica que `rebuild()` já tinha escondido.
+   *
+   * Fica INVISÍVEL quando o bake não tem chapa de teto branca (`rebuild()`
+   * decide), e nesse caso nada aponta para ela.
+   */
+  readonly roof: THREE.Mesh;
   readonly group = new THREE.Group();
 
   private shells: Shell[] = [];
@@ -1300,6 +1357,16 @@ export class TrailerBody {
     this.mesh.name = 'TRAILER_BODY';
     this.mesh.castShadow = this.mesh.receiveShadow = true;
     this.group.add(this.mesh);
+
+    /* O TETO COMPARTILHA O MATERIAL, e é de propósito: sem cor própria ele tem
+       de ser indistinguível do resto da chapa, e duas instâncias do mesmo
+       material branco divergiriam na primeira correção de acabamento que
+       `applyTrailerFinish()` fizesse por nome. Quando `trim.ts` lhe dá uma cor,
+       ele TROCA a referência desta malha — o material do corpo fica intacto. */
+    this.roof = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+    this.roof.name = TRAILER_ROOF_MESH;
+    this.roof.castShadow = this.roof.receiveShadow = true;
+    this.group.add(this.roof);
 
 
     /* A geometria está em espaço de MUNDO e o grupo pendura em `root`; sem
@@ -1477,6 +1544,13 @@ export class TrailerBody {
     const pos: number[] = [];
     const nrm: number[] = [];
     const uv: number[] = [];
+    /* O TETO EM BUFFER SEPARADO — ver `Tri.roof` e `this.roof`. Dois arrays e
+       não dois grupos de geometria: `buildLiveryPanels()` reescreve o índice
+       desta malha e chama `clearGroups()` no caminho, então grupos não
+       sobreviveriam ao primeiro recorte de chapa. */
+    const rPos: number[] = [];
+    const rNrm: number[] = [];
+    const rUv: number[] = [];
 
     /* Mapa de Z por comportamento. `front` fica parado porque é ele que carrega
        o pino-rei: alongar mexendo na dianteira desengataria o conjunto. */
@@ -1573,14 +1647,17 @@ export class TrailerBody {
     }
 
     const write = (t: Tri) => {
+      const P = t.roof ? rPos : pos;
+      const N = t.roof ? rNrm : nrm;
+      const U = t.roof ? rUv : uv;
       for (let k = 0; k < 3; k++) {
         const y = t.p[k * 3 + 1];
         const z = t.p[k * 3 + 2];
-        pos.push(t.p[k * 3], y, z);
-        nrm.push(t.n[k * 3], t.n[k * 3 + 1], t.n[k * 3 + 2]);
+        P.push(t.p[k * 3], y, z);
+        N.push(t.n[k * 3], t.n[k * 3 + 1], t.n[k * 3 + 2]);
         /* UV de livery: u no comprimento, v na altura, normalizada pelos
            limites CORRENTES — a arte continua casando com a borda após resize. */
-        uv.push((z - zBack) / this.dims.length, (y - floorY) / this.dims.height);
+        U.push((z - zBack) / this.dims.length, (y - floorY) / this.dims.height);
       }
     };
 
@@ -1663,7 +1740,7 @@ export class TrailerBody {
         p[k * 3 + 1] = t.p[k * 3 + 1] + dy;
         p[k * 3 + 2] = mapZ(t.p[k * 3 + 2], b);
       }
-      emit({ p, n: t.n }, face);
+      emit({ p, n: t.n, roof: t.roof }, face);
     };
 
     for (const sh of this.shells) {
@@ -1688,7 +1765,7 @@ export class TrailerBody {
             p[k * 3 + 1] = floorY + (t.p[k * 3 + 1] - floorY) * ky;
             p[k * 3 + 2] = mapZ(t.p[k * 3 + 2], sh.behaviour);
           }
-          emit({ p, n: t.n }, sh.face);
+          emit({ p, n: t.n, roof: t.roof }, sh.face);
         }
         continue;
       }
@@ -1751,6 +1828,18 @@ export class TrailerBody {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.computeBoundingBox();
     geo.computeBoundingSphere();
+
+    /* O TETO. Um bake sem `teto-externo` branco simplesmente não produz
+       triângulo nenhum aqui, e a malha fica invisível em vez de vazia na cena —
+       uma malha sem posições dispara aviso de bounding sphere NaN no three. */
+    const rGeo = this.roof.geometry as THREE.BufferGeometry;
+    rGeo.setAttribute('position', new THREE.Float32BufferAttribute(rPos, 3));
+    rGeo.setAttribute('normal', new THREE.Float32BufferAttribute(rNrm, 3));
+    rGeo.setAttribute('uv', new THREE.Float32BufferAttribute(rUv, 2));
+    rGeo.computeBoundingBox();
+    rGeo.computeBoundingSphere();
+    this.roof.visible = rPos.length > 0;
+
     for (const m of this.originals) m.visible = false;
   }
 
@@ -1954,6 +2043,10 @@ export class TrailerBody {
 
   dispose() {
     this.mesh.geometry.dispose();
+    this.roof.geometry.dispose();
+    /* O material é COMPARTILHADO com o teto (ver o construtor), então uma
+       liberação só. O que o teto pode ter de próprio é a tinta de acabamento, e
+       ela é de `vehicle/trim.ts` — que a reusa entre implementos. */
     (this.mesh.material as THREE.Material).dispose();
     for (const m of this.inst.values()) { m.geometry.dispose(); m.removeFromParent(); }
     this.inst.clear();

@@ -12,10 +12,11 @@
 import * as THREE from 'three';
 import * as fabric from 'fabric';
 import { root, $, isMounted, evTarget } from '../core/dom';
+import { probeHardware } from '../core/quality';
 import { VEHICLES_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
 import { invalidate, scene } from '../scene/scene';
-import { setPaintTarget } from './models';
+import { setPaintTarget, state as vehicleState } from './models';
 import { takeFaceSnapshots, type FaceSnapshot } from './livery-snapshot';
 import { setStatus } from '../ui/chrome';
 import { initLiveryEditor } from '../ui/livery-editor';
@@ -36,8 +37,18 @@ import { hasLiveryArt, onLiveryArtReady } from './livery-art';
    depuração) não ter de saber que o editor mudou de arquivo. */
 export { openEditor, closeEditor, showSurface } from '../ui/livery-editor';
 
-/** The three paintable trailer panels. Every per-surface map is keyed by this. */
-export type SurfaceKey = 'left' | 'right' | 'rear';
+/**
+ * As QUATRO chapas plotáveis do baú. Todo mapa por superfície é chaveado por
+ * isto.
+ *
+ * A TESTEIRA (`front`) entrou em 2026-08-13 — *"precisa adicionar um livery da
+ * frontal, ao lado do livery da traseira"*. Ela já era pintável; o que faltava
+ * era uma malha própria com `uv1` para a arte pousar, e é isso que
+ * `models.buildLiveryPanels()` passou a recortar. Daqui para baixo ela é uma
+ * face como as outras: mesma tela do fabric, mesma textura, mesmo retrato,
+ * mesmo card.
+ */
+export type SurfaceKey = 'left' | 'right' | 'rear' | 'front' | 'roof';
 
 /** The subset of trailer_meta.json this module reads. */
 export interface OutlineMeta {
@@ -78,22 +89,36 @@ export const DEFAULT_BG = '';
    `contextTopDirty` é o que faz o próprio fabric limpar a camada de cima no
    render seguinte — sem marcar, a alça velha ficaria como rastro. */
 function makeFab(el: HTMLCanvasElement) {
-  const c = new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
+  const c = new fabric.Canvas(el, {
+    preserveObjectStacking: true,
+    backgroundColor: DEFAULT_BG,
+    /* MÃO ABERTA ONDE NÃO HÁ OBJETO. Desde 2026-08-13 arrastar o vazio do
+       painel MOVE A VISTA (ver `takes()` em ui/livery-editor.ts), e o cursor
+       tem de dizer isso. Aqui e não no CSS porque o fabric escreve `cursor`
+       INLINE no upperCanvasEl a cada movimento — o `defaultCursor` dele é
+       'default', e um inline nunca perde para uma folha de estilo. Sobre um
+       objeto ele continua escrevendo 'move' sozinho, que é o certo. */
+    defaultCursor: 'grab',
+  });
   (c as unknown as { skipControlsDrawing: boolean }).skipControlsDrawing = true;
   return c;
 }
 export const fabLeft = makeFab($<HTMLCanvasElement>('fabric-left'));
 export const fabRight = makeFab($<HTMLCanvasElement>('fabric-right'));
 export const fabRear = makeFab($<HTMLCanvasElement>('fabric-rear'));
+export const fabFront = makeFab($<HTMLCanvasElement>('fabric-front'));
+export const fabRoof = makeFab($<HTMLCanvasElement>('fabric-roof'));
 
-export const surfaces: Record<SurfaceKey, fabric.Canvas> = { left: fabLeft, right: fabRight, rear: fabRear };
-export const SURFACE_KEYS: SurfaceKey[] = ['left', 'right', 'rear'];
+export const surfaces: Record<SurfaceKey, fabric.Canvas> = {
+  left: fabLeft, right: fabRight, rear: fabRear, front: fabFront, roof: fabRoof,
+};
+export const SURFACE_KEYS: SurfaceKey[] = ['left', 'right', 'rear', 'front', 'roof'];
 let activeSurface: SurfaceKey = 'left';
 export const active = () => surfaces[activeSurface];
 export const activeKey = () => activeSurface;
 export const setActiveKey = (k: SurfaceKey) => { activeSurface = k; };
 
-/** A outra lateral do baú — a traseira não tem par. */
+/** A outra lateral do baú — traseira e testeira não têm par. */
 export const otherSide = (key: SurfaceKey): SurfaceKey | null =>
   key === 'left' ? 'right' : key === 'right' ? 'left' : null;
 
@@ -120,7 +145,8 @@ export const otherSide = (key: SurfaceKey): SurfaceKey | null =>
    já existe de propósito e um basta. Mudar o vocabulário mexe nos três; o
    comentário de lá aponta para cá. */
 export const SIDE_LABEL: Record<SurfaceKey, string> = {
-  left: 'Motorista', right: 'Passageiro', rear: 'Traseira',
+  left: 'Motorista', right: 'Passageiro', rear: 'Traseira', front: 'Frente',
+  roof: 'Teto',
 };
 
 /* As legendas não falam mais em "silhueta tracejada": ela saiu do desenho (ver
@@ -130,6 +156,17 @@ export const CAPTIONS: Record<SurfaceKey, string> = {
   left: 'Lado do motorista · a ferragem passa por cima da pintura, como no baú',
   right: 'Lado do passageiro · a ferragem passa por cima da pintura, como no baú',
   rear: 'Portas traseiras · a ferragem passa por cima da pintura, como no baú',
+  /* A frente tem um obstáculo que nenhuma outra face tem, e ele não é ferragem:
+     é o Thermo King, montado na testeira e cobrindo a parte de cima dela. Ele
+     aparece no retrato (é geometria em cena) e some quando o cliente o tira do
+     produto pelo card de configurações — então a legenda não promete uma área
+     livre, só diz onde olhar. */
+  front: 'Testeira · o Thermo King, quando há, fica por cima desta chapa',
+  /* O TETO É VISTO DE CIMA, e a legenda diz as duas coisas que mudam com isso:
+     ele não tem ferragem por cima (a cantoneira é a junção com a lateral e é
+     vista de lado) e ninguém o vê do chão — quem o vê é drone, prédio e a foto
+     aérea da frota. */
+  roof: 'Teto · visto de cima, com a traseira à esquerda',
 };
 
 /* ---------------- escala real ----------------
@@ -143,6 +180,14 @@ const PANEL_MM: Record<SurfaceKey, { w: number; h: number }> = {
   left: { w: 14655, h: 2777 },
   right: { w: 14655, h: 2777 },
   rear: { w: 2590, h: 2716 },
+  /* A testeira é a largura do baú pela altura CHEIA — ao contrário da traseira,
+     que termina no piso das folhas e por isso mede 2 716. Semente; a chapa
+     recortada corrige em `measurePanel()`. */
+  front: { w: 2590, h: 2777 },
+  /* O TETO É DEITADO: `w` é o COMPRIMENTO do baú e `h` é a LARGURA dele. Não é
+     a mesma altura das outras quatro — nenhuma dimensão do teto é vertical.
+     Semente; `measurePanel()` corrige pela chapa. */
+  roof: { w: 14655, h: 2590 },
 };
 
 export const panelMM = (key: SurfaceKey) => PANEL_MM[key];
@@ -185,25 +230,80 @@ export const cmToPx = (cm: number, key: SurfaceKey, axis: 'x' | 'y' = 'y') => cm
    · `pxToCm` passa a dar o mesmo em 'x' e em 'y' — a régua em centímetros
      deixa de mentir 11,4 % na largura das letras.
 
-   A densidade é o que a lateral de fábrica já usava (2048 px / 14 655 mm), para
-   não degradar a resolução de quem já desenhou. O teto de 4096 px protege o
-   limite de textura da GPU; se ele morder (baú acima de ~29 m, fora da faixa
-   editável), a densidade cai e AÍ sim a arte é reescalada — uniformemente, por
-   `rescaleObjects()`, que é uma reamostragem correta e não um `putImageData`
-   de tamanhos diferentes. */
+   A densidade nasceu sendo a que cada tela já tinha na medida de fábrica, para
+   não degradar a resolução de quem já tivesse desenhado — e foi ELEVADA em
+   2026-08-13, porque era ela a causa do texto mole no baú. Ver o bloco
+   seguinte. O teto protege o limite de textura da GPU; se ele morder (baú acima
+   de ~29 m, fora da faixa editável), a densidade cai e AÍ sim a arte é
+   reescalada — uniformemente, por `remapObjects()`, que é uma reamostragem
+   correta e não um `putImageData` de tamanhos diferentes. */
 
-/** Pixels por MILÍMETRO de chapa, por face. Os dois valores são a densidade que
- *  cada tela já tinha na medida de fábrica — 2048 px na lateral de 14 655 mm e
- *  1024 px na traseira de 2 716 mm —, de modo que ninguém perca resolução na
- *  troca. Cada face tem a sua porque a traseira é 5x menor que a lateral: uma
- *  densidade só deixaria a traseira com 362 px de largura. */
+/* ---------------- A LATERAL ESTAVA A METADE DA DENSIDADE DA TRASEIRA -------
+   Relato de 2026-08-13, com print de perto: *"o texto que eu coloco pelo
+   próprio livery, por que fica tão ruim a qualidade?"*. É magnificação pura, e
+   a conta fecha com o print:
+
+     densidade da lateral    2048 px / 14 655 mm = 140 px/m
+     letra de 40 cm          40 cm × 140 px/m    =  56 px de textura
+     a mesma letra na foto   ~130 px de tela               ⇒ ampliada 2,3×
+
+   Uma textura ampliada 2,3× é interpolada e não tem como não sair mole: não é
+   filtro, não é anisotropia (já são 8), não é o fabric. É que não há pixel.
+
+   E o número denuncia sozinho de onde veio: a traseira sempre esteve a
+   1024/2716 = 377 px/m, ou seja **2,7× mais densa que a lateral**. As duas
+   densidades foram herdadas dos tamanhos literais que as telas tinham em
+   core/template.ts, e aqueles vieram de medir a FOTO `panels/lateral.png` — um
+   arquivo que nem existe mais. A lateral é a face grande, a que se olha de
+   perto e onde o nome da frota é escrito; ela estava com a pior resolução do
+   conjunto por acidente de história.
+
+   O QUE MUDA: a lateral dobra (140 → 280 px/m), e a traseira e a testeira
+   sobem 50 % (377 → 566). A letra de 40 cm passa de 56 px para 112 px de
+   textura — praticamente 1:1 com o print do relato.
+
+   O CUSTO, medido em bytes de textura no baú de fábrica (14,70 × 2,79 m):
+
+     lateral   2048×388 (3,2 MB) → 4096×776 (12,7 MB)   ×2 faces
+     traseira   977×1024 (4,0 MB) → 1465×1536 ( 9,0 MB)   ×2 faces
+
+   De ~14 MB para ~44 MB de textura de livery, mipmaps à parte. É um acréscimo
+   real e é a única forma conhecida de responder ao relato — o resto da pilha
+   (anisotropia, filtro, `mm/px` isotrópico) já estava certo.
+
+   E O TETO PRECISOU SUBIR JUNTO, senão nada disto acontece: com 4 096 px o
+   teto passaria a morder no PRIMEIRO baú (14,65 m × 0,2795 = 4 096), e
+   `canvasFor()` rebaixaria a densidade de volta ao que era. O teto agora é
+   8 192 px, LIMITADO PELO QUE A PLACA ACEITA — `probeHardware().maxTextureSize`
+   é o `MAX_TEXTURE_SIZE` do WebGL2 real, e uma máquina que só dê 4 096 recebe
+   4 096 em vez de uma textura que o driver recusa. Com 8 192 o teto volta a
+   ficar fora da faixa editável (morde a partir de ~29,3 m). */
+
+/** Pixels por MILÍMETRO de chapa, por face. Cada face tem a sua porque a
+ *  traseira é 5× menor que a lateral: uma densidade só deixaria a traseira com
+ *  725 px de largura. Ver o bloco acima para de onde saem os números. */
 const PX_PER_MM: Record<SurfaceKey, number> = {
-  left: 2048 / 14655,
-  right: 2048 / 14655,
-  rear: 1024 / 2716,
+  left: 4096 / 14655,
+  right: 4096 / 14655,
+  rear: 1536 / 2716,
+  /* A MESMA da traseira: as duas são chapas estreitas da mesma ordem de
+     grandeza, e uma densidade diferente entre elas faria a arte copiada de uma
+     para a outra mudar de nitidez sem mudar de tamanho. */
+  front: 1536 / 2716,
+  /* A DENSIDADE DA LATERAL, e não a da traseira: o teto tem o COMPRIMENTO do
+     baú, então é ele que decide o tamanho da tela. Com a densidade da traseira
+     um teto de 14,7 m pediria 8 293 px e bateria no teto de textura. */
+  roof: 4096 / 14655,
 };
-/** Teto por eixo, para não estourar o limite de textura da GPU. */
-const MAX_TEX_PX = 4096;
+/**
+ * Teto por eixo, para não estourar o limite de textura da GPU.
+ *
+ * Sondado, nunca presumido: o mínimo que o WebGL2 GARANTE é 2 048, e uma
+ * textura acima do `MAX_TEXTURE_SIZE` da placa é recusada pelo driver — a
+ * chapa ficaria PRETA, sem erro visível. Memoizado porque `probeHardware()`
+ * também é (um canvas descartável, uma vez por sessão).
+ */
+const texCeiling = () => Math.min(8192, probeHardware().maxTextureSize || 4096);
 /** Piso, para a tela nunca ficar degenerada durante o boot. */
 const MIN_TEX_PX = 64;
 
@@ -221,11 +321,12 @@ const MIN_TEX_PX = 64;
  */
 function canvasFor(key: SurfaceKey, p: { w: number; h: number }) {
   const ar = p.w / Math.max(1e-6, p.h);
+  const ceil = texCeiling();
   /* Densidade nominal, rebaixada só se o teto de textura morder. */
   const d = Math.min(
     PX_PER_MM[key],
-    MAX_TEX_PX / Math.max(1, p.w),
-    MAX_TEX_PX / Math.max(1, p.h),
+    ceil / Math.max(1, p.w),
+    ceil / Math.max(1, p.h),
   );
   const wide = ar >= 1;
   const short0 = Math.round((wide ? p.h : p.w) * d);
@@ -235,7 +336,7 @@ function canvasFor(key: SurfaceKey, p: { w: number; h: number }) {
     const s = short0 + k;
     if (s < MIN_TEX_PX) continue;
     const long = Math.round(wide ? s * ar : s / ar);
-    if (long < MIN_TEX_PX || long > MAX_TEX_PX) continue;
+    if (long < MIN_TEX_PX || long > ceil) continue;
     const cand = wide ? { width: long, height: s } : { width: s, height: long };
     const err = Math.abs(cand.width / cand.height - ar) / ar;
     if (err < bestErr) { bestErr = err; best = cand; }
@@ -249,7 +350,9 @@ function canvasFor(key: SurfaceKey, p: { w: number; h: number }) {
  *  Guardar só a largura (como antes) cegava justamente o eixo que muda quando o
  *  usuário mexe na ALTURA — que é o caso relatado. */
 const prevPanel: Record<SurfaceKey, { w: number; h: number }> = {
-  left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right }, rear: { ...PANEL_MM.rear },
+  left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right },
+  rear: { ...PANEL_MM.rear }, front: { ...PANEL_MM.front },
+  roof: { ...PANEL_MM.roof },
 };
 
 /**
@@ -389,7 +492,11 @@ export function aspectError(key: SurfaceKey): number {
   return Math.abs(canvas - panel) / panel;
 }
 
-/* u corre no Z nas laterais e no X na traseira; v sempre no Y.
+/** As faces de PONTA — traseira e testeira. O painel delas corre no X; o das
+ *  laterais corre no Z. Uma pergunta só, feita em quatro lugares. */
+export const isEndFace = (key: SurfaceKey) => key === 'rear' || key === 'front';
+
+/* u corre no Z nas laterais e no X nas pontas; v sempre no Y.
    Espelha addLiveryUV() em ./models.ts — se aquilo mudar, isto muda junto.
 
    Mede a chapa INTEIRA, que é o que `addLiveryUV` normaliza: `uv1` vai de 0 a 1
@@ -401,8 +508,13 @@ function measurePanel(mesh: THREE.Mesh, key: SurfaceKey) {
   const size = (g.boundingBox as THREE.Box3).getSize(new THREE.Vector3());
   mesh.updateWorldMatrix(true, false);
   const s = mesh.getWorldScale(new THREE.Vector3());
-  const w = key === 'rear' ? size.x * s.x : size.z * s.z;
-  const h = size.y * s.y;
+  /* O TETO NÃO TEM DIMENSÃO VERTICAL, e é a única face de que isso vale: as
+     duas medidas dele saem do plano XZ. Ler `size.y` ali devolveria a ESPESSURA
+     da chapa (uns 20 mm) como "altura do painel", e a régua em centímetros do
+     editor passaria a mentir por duas ordens de grandeza. */
+  const roof = key === 'roof';
+  const w = roof || !isEndFace(key) ? size.z * s.z : size.x * s.x;
+  const h = roof ? size.x * s.x : size.y * s.y;
   if (w > 0.05 && h > 0.05) PANEL_MM[key] = { w: Math.round(w * 1000), h: Math.round(h * 1000) };
 }
 
@@ -417,7 +529,11 @@ function makeTex(el: HTMLCanvasElement) {
 export const texLeft = makeTex(fabLeft.lowerCanvasEl);
 export const texRight = makeTex(fabRight.lowerCanvasEl);
 export const texRear = makeTex(fabRear.lowerCanvasEl);
-const textures: Record<SurfaceKey, THREE.CanvasTexture> = { left: texLeft, right: texRight, rear: texRear };
+export const texFront = makeTex(fabFront.lowerCanvasEl);
+export const texRoof = makeTex(fabRoof.lowerCanvasEl);
+const textures: Record<SurfaceKey, THREE.CanvasTexture> = {
+  left: texLeft, right: texRight, rear: texRear, front: texFront, roof: texRoof,
+};
 
 /* ---------------- 3D overlays ----------------
    Não há registro dos overlays criados. Havia um `liveryMeshes` colecionando os
@@ -446,6 +562,19 @@ const textures: Record<SurfaceKey, THREE.CanvasTexture> = { left: texLeft, right
  * anything. The bias was still there; there was simply nothing left to draw with
  * it. Everything else about the two states is identical. */
 function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
+  /* ---- UMA SOBREPOSIÇÃO POR CHAPA, SEMPRE ----
+     As quatro chapas recortadas são malhas NOVAS a cada recorte, então nelas
+     esta função nunca encontra nada. O TETO é outro caso: `TRAILER_ROOF`
+     pertence ao corpo paramétrico e SOBREVIVE ao rebuild, então sem esta
+     limpeza cada mudança de medida penduraria mais uma cópia da arte nele — e
+     N cópias translúcidas coplanares somam alfa, escurecendo o teto a cada
+     centímetro digitado, além de vazarem material e programa de shader. */
+  for (const child of [...mesh.children]) {
+    if (!(child as THREE.Mesh).userData?.liveryOverlay) continue;
+    mesh.remove(child);
+    const m = (child as THREE.Mesh).material as THREE.Material | THREE.Material[];
+    for (const one of Array.isArray(m) ? m : [m]) one?.dispose();
+  }
   texture.channel = 1;
   const mat = new THREE.MeshStandardMaterial({
     map: texture,
@@ -455,6 +584,7 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
   });
   if (mat.map) mat.map.channel = 1;
   const overlay = new THREE.Mesh(mesh.geometry, mat);
+  overlay.userData.liveryOverlay = true;      // ver a limpeza no topo da função
   overlay.renderOrder = 2;
   mesh.add(overlay);
   overlay.position.set(0, 0, 0);
@@ -524,7 +654,7 @@ export async function refreshSnapshots(trailerRoot: THREE.Object3D) {
        registro só se corrigiria no próximo resize da janela. */
     if (key === activeSurface) resizeStage?.(key);
     drawPreview(key);
-  });
+  }, [vehicleState.cabGroup]);
 }
 
 /* O reenquadramento do palco é do EDITOR (ele é quem sabe o zoom corrente), e
@@ -534,7 +664,13 @@ let resizeStage: ((key: SurfaceKey) => void) | null = null;
 export function setStageResizer(fn: (key: SurfaceKey) => void) { resizeStage = fn; }
 
 export function attachOverlays(trailerRoot: THREE.Object3D) {
-  const byName: Record<string, SurfaceKey> = { SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear' };
+  const byName: Record<string, SurfaceKey> = {
+    SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear', FRONT: 'front',
+    /* O TETO NÃO É RECORTADO: `TRAILER_ROOF` é malha do corpo paramétrico e
+       chega aqui pelo mesmo caminho das outras só porque `tagRoofLiveryUV()`
+       lhe deu `uv1` no passo anterior. Ver `LiveryPanelName` em models.ts. */
+    TRAILER_ROOF: 'roof',
+  };
   /* As calotas de rebite da emenda, filhas da chapa. Ver o bloco abaixo. */
   const rivetsOf: Record<string, SurfaceKey> = { SIDE_L_RIVETS: 'left', SIDE_R_RIVETS: 'right' };
   trailerRoot.traverse(node => {
@@ -555,6 +691,14 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
     }
     const key = byName[o.name];
     if (!key) return;
+    /* SEM `uv1` NÃO HÁ ONDE A ARTE POUSAR, e é o teto que torna esta guarda
+       necessária: as quatro chapas recortadas nascem com `uv1` por construção
+       (`buildLiveryPanels` a escreve ao criar a malha), mas o teto é uma malha
+       do corpo paramétrico que recebe a dela num passo separado
+       (`tagRoofLiveryUV`). Num bake sem branco recortável esse passo não tem o
+       que marcar, a malha fica vazia — e um material com `map.channel = 1`
+       sobre uma geometria sem o canal 1 amostra lixo em vez de não desenhar. */
+    if (!o.geometry?.getAttribute('uv1')) return;
     makeLiveryOverlay(o, textures[key]);
     measurePanel(o, key);          // a régua em cm sai daqui, não de um número escrito à mão
     /* E a TELA segue a chapa que acabou de ser medida. Sem esta linha o buffer
@@ -602,7 +746,8 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
      acabou de rodar para as três faces logo acima, então `PANEL_MM` está
      fresco; é ele, e não `dims`, que descreve o retângulo que `uv1` normaliza. */
   refreshFromTrailer({
-    left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right }, rear: { ...PANEL_MM.rear },
+    left: { ...PANEL_MM.left }, right: { ...PANEL_MM.right },
+    rear: { ...PANEL_MM.rear }, front: { ...PANEL_MM.front },
   });
 }
 
@@ -612,8 +757,10 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
    Condicionar needsUpdate a uma revisão de CONTEÚDO, em vez de a cada
    after:render, é o que impede o watchdog de 4 s de reenviar ~11 MB de textura
    para sempre com o estúdio parado. */
-const rev: Record<SurfaceKey, number> = { left: 0, right: 0, rear: 0 };
-const uploaded: Record<SurfaceKey, number> = { left: -1, right: -1, rear: -1 };
+const rev: Record<SurfaceKey, number> = { left: 0, right: 0, rear: 0, front: 0, roof: 0 };
+const uploaded: Record<SurfaceKey, number> = {
+  left: -1, right: -1, rear: -1, front: -1, roof: -1,
+};
 
 export function markDirty(key: SurfaceKey) { rev[key]++; }
 export function markAllDirty() { for (const k of SURFACE_KEYS) rev[k]++; }
@@ -628,8 +775,10 @@ const DIRTY_EVENTS = [
 
 /* ---------------- panel outline guides ---------------- */
 const FALLBACK_OUTLINE = [[0.015, 0.015], [0.985, 0.015], [0.985, 0.985], [0.015, 0.985]];
-const outlines: Record<SurfaceKey, number[][]> =
-  { left: FALLBACK_OUTLINE, right: FALLBACK_OUTLINE, rear: FALLBACK_OUTLINE };
+const outlines: Record<SurfaceKey, number[][]> = {
+  left: FALLBACK_OUTLINE, right: FALLBACK_OUTLINE,
+  rear: FALLBACK_OUTLINE, front: FALLBACK_OUTLINE, roof: FALLBACK_OUTLINE,
+};
 /**
  * A silhueta desta face saiu do RETRATO (alfa da ferragem), e não de um palpite.
  *
@@ -640,7 +789,7 @@ const outlines: Record<SurfaceKey, number[][]> =
  * Melhor não desenhar nada do que desenhar uma promessa que o baú não cumpre.
  */
 const measuredOutline: Record<SurfaceKey, boolean> =
-  { left: false, right: false, rear: false };
+  { left: false, right: false, rear: false, front: false, roof: false };
 
 /* ---------------- ONDE A CHAPA BRANCA REALMENTE APARECE ----------------
    A silhueta tracejada é a promessa que o editor faz ao cliente: "pinte aqui e
@@ -732,16 +881,17 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   const spanY = pb.max.y - pb.min.y;
   if (!(spanY > 0.2)) return;
 
-  const rear = key === 'rear';
+  const end = isEndFace(key);
   /* Eixo NORMAL à chapa e eixo em que ela CORRE. */
-  const n: 'x' | 'z' = rear ? 'z' : 'x';
-  const r: 'x' | 'z' = rear ? 'x' : 'z';
+  const n: 'x' | 'z' = end ? 'z' : 'x';
+  const r: 'x' | 'z' = end ? 'x' : 'z';
   /* A FACE EXTERNA da chapa, e o sentido de "para fora".
      Não é convenção nova: é a MESMA regra que recortou o painel em
      `buildLiveryPanels()` — SIDE_R sai do maior x, SIDE_L do menor, REAR do
-     menor z. Usar o plano MÉDIO aqui, como esta função fazia, apagava a
-     distinção entre "perfil aparafusado na pele" e "estrutura por dentro". */
-  const dir = key === 'right' ? 1 : -1;
+     menor z e FRONT do MAIOR z. Usar o plano MÉDIO aqui, como esta função
+     fazia, apagava a distinção entre "perfil aparafusado na pele" e "estrutura
+     por dentro". */
+  const dir = key === 'right' || key === 'front' ? 1 : -1;
   const face = dir > 0 ? pb.max[n] : pb.min[n];
   const lo = pb.min[r], hi = pb.max[r];
   const runLen = hi - lo;
@@ -768,14 +918,14 @@ function measurePaintable(trailerRoot: THREE.Object3D, panel: THREE.Mesh, key: S
   trailerRoot.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh || !o.visible || !o.geometry) return;
-    if (o === panel || /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) return;
+    if (o === panel || /^(SIDE_L|SIDE_R|REAR|FRONT)$/.test(o.name)) return;
     /* E as SOBREPOSIÇÕES DE ARTE, que são filhas das chapas e compartilham a
        geometria delas. Sem esta linha a primeira candidata é a própria arte —
        caixa idêntica à do painel, cobertura 100 % — e a medição conclui que
        não existe faixa livre nenhuma. Foi o que aconteceu na primeira
        execução: `outlineFrame` voltou o painel inteiro, que é justamente a
        promessa errada que esta função existe para desfazer. */
-    if (o.parent && /^(SIDE_L|SIDE_R|REAR)$/.test(o.parent.name)) return;
+    if (o.parent && /^(SIDE_L|SIDE_R|REAR|FRONT)$/.test(o.parent.name)) return;
     /* O branco é a própria chapa (e o corpo paramétrico atrás dela): não é
        obstáculo, é o que se está pintando. */
     const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -929,8 +1079,11 @@ const prevEls: Record<SurfaceKey, HTMLCanvasElement> = {
   left: $<HTMLCanvasElement>('prev-left'),
   right: $<HTMLCanvasElement>('prev-right'),
   rear: $<HTMLCanvasElement>('prev-rear'),
+  front: $<HTMLCanvasElement>('prev-front'),
+  roof: $<HTMLCanvasElement>('prev-roof'),
 };
-const prevPending: Record<SurfaceKey, boolean> = { left: false, right: false, rear: false };
+const prevPending: Record<SurfaceKey, boolean> =
+  { left: false, right: false, rear: false, front: false, roof: false };
 
 export function drawPreview(key: SurfaceKey) {
   const pc = prevEls[key];
@@ -1029,6 +1182,19 @@ const PANEL_IMAGE: Record<SurfaceKey, string> = {
   left: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
   right: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
   rear: assetUrl(VEHICLES_DIR + 'panels/traseira.png'),
+  /* NÃO EXISTE, e é o estado certo. As fotos de degradação saíram do pacote
+     quando o painel passou a ser fotografado do próprio modelo
+     (livery-snapshot.ts) — as duas acima também dão 404 hoje, em silêncio e de
+     propósito (ver `measurePanelWindows`). Apontar a testeira para a foto da
+     TRASEIRA seria pior do que não ter nenhuma: um bake sem chapa branca cairia
+     na degradação e mostraria as portas de trás no card da frente. */
+  front: assetUrl(VEHICLES_DIR + 'panels/frente.png'),
+  /* O TETO NUNCA TEVE FOTO e nunca vai ter: as fotos de degradação eram
+     recortes da prancha do cliente, e a prancha não desenha o teto. Apontar
+     para um arquivo que não existe é o mesmo estado das quatro acima — 404 em
+     silêncio, `windows.roof` fica indefinido, e o palco cai no caminho sem
+     foto. Ver `measurePanelWindows()`. */
+  roof: assetUrl(VEHICLES_DIR + 'panels/teto.png'),
 };
 
 /* Sem medida ainda (ou foto sem janela): a tela ocupa a caixa inteira e a foto
@@ -1137,6 +1303,53 @@ function canvasRect(key: SurfaceKey, win: PanelWindow) {
   return { x: win.x, y: win.y - (1 - v1) * h, w: win.w, h };
 }
 
+/* ---------------- OS DOIS CARDS DE PONTA TÊM DE SAIR DO MESMO TAMANHO -------
+   Traseira e testeira ficam lado a lado na pilha, e saíam com alturas
+   diferentes: 201,4 px contra 211,1 px, medidos na bancada. Dois cards irmãos
+   com 10 px de diferença lêem como defeito de layout, e é o relato que chegou.
+
+   A CAUSA NÃO É UM DEFEITO — é geometria, e ela está certa. A caixa da
+   miniatura recebe `aspect-ratio: var(--ts-pw-ar)`, e essa razão é a do RETRATO
+   ortográfico da face. Os dois retratos têm enquadramentos diferentes porque as
+   duas faces são diferentes, e cada margem daqui foi medida contra um pedido do
+   dono do produto (ver M_BOTTOM e D_OUT em vehicle/livery-snapshot.ts):
+
+     traseira   0,915   margem inferior de 31 cm, para fechar rente ao pé da
+                        faixa refletiva da travessa — a chapa traseira termina
+                        213 mm ACIMA do piso e cada centímetro só passa a valer
+                        depois de vencer esse degrau
+     testeira   0,861   22 cm embaixo (a travessa dianteira inteira) e uma fatia
+                        de profundidade de 0,75 m em vez de 0,30, porque o
+                        THERMO KING tem 451 mm e com 30 cm ele saía decepado
+
+   ENTÃO O CONSERTO NÃO É IGUALAR O ENQUADRAMENTO: seria desfazer três rodadas
+   de calibração com o dono do produto para ganhar simetria de layout. O
+   conserto é de APRESENTAÇÃO — as duas miniaturas passam a dividir a MESMA
+   CAIXA, a mais alta das duas, e o retrato mais baixo é centrado nela com uma
+   faixa vazia em cima e embaixo. Nada é esticado, nada é cortado, e o
+   enquadramento de cada face continua exatamente o que foi medido.
+
+   VALE SÓ PARA O CARD. No palco do editor cada face aparece sozinha e ocupa o
+   que tem para ocupar; letterboxar lá seria pôr tarja onde ninguém pediu.
+
+   A ORDEM DE CHEGADA É ASSÍNCRONA — os dois retratos são renderizados um de
+   cada vez —, então a caixa comum só é conhecida depois do segundo. Quando ele
+   chega, o primeiro é REPUBLICADO: sem isso o par ficaria com a caixa do que
+   chegou primeiro, que é metade do conserto. */
+const END_KEYS = ['rear', 'front'] as const;
+type EndKey = (typeof END_KEYS)[number];
+const isEnd = (k: SurfaceKey): k is EndKey => k === 'rear' || k === 'front';
+/** A razão publicada por face de ponta, para descobrir a caixa comum. */
+const endAr: Partial<Record<EndKey, number>> = {};
+/** A caixa que cada face de ponta JÁ aplicou — a trava da republicação. */
+const appliedBox: Partial<Record<EndKey, number>> = {};
+
+/** A caixa comum do par: a MAIS ALTA das duas, ou seja a menor razão l/a. */
+function pairAspect(): number | null {
+  const vals = END_KEYS.map((k) => endAr[k]).filter((v): v is number => !!v && v > 0);
+  return vals.length ? Math.min(...vals) : null;
+}
+
 function publishWindow(key: SurfaceKey, win: PanelWindow) {
   windows[key] = win;
   const r = canvasRect(key, win);
@@ -1192,14 +1405,37 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
   const ar = snap ? snap.ar : usingArt && p.h > 0 ? p.w / p.h : win.photoAr;
   const img = snap ? 'url("' + snap.bg + '")'
     : usingArt ? 'none' : 'url("' + PANEL_IMAGE[key] + '")';
+  /* A CAIXA COMUM DO PAR DE PONTA — ver o bloco acima.
+     `k` é a fração da altura da caixa que o retrato desta face ocupa, e `off` a
+     tarja de cima. Numa face que não é de ponta, ou antes de o segundo retrato
+     chegar, `k` vale 1 e tudo abaixo se reduz aos valores de sempre — ou seja
+     esta mudança é inerte fora do par. */
+  if (isEnd(key)) endAr[key] = ar;
+  const boxAr = isEnd(key) ? (pairAspect() ?? ar) : ar;
+  /* `boxAr <= ar` sempre (a caixa é a mais alta), então `k <= 1`. O `min` é
+     cinto e suspensório contra um arredondamento devolver 1,0000001 e gerar uma
+     tarja negativa. */
+  const k = Math.min(1, boxAr / ar);
+  const off = (1 - k) / 2;
   for (const el of targets) {
     if (!el) continue;
+    /* O PALCO FICA DE FORA do letterbox: `stagePanels[key]` mostra uma face
+       sozinha e não tem irmã com quem se alinhar. */
+    const letterbox = el !== stagePanels[key] && k < 1;
     el.style.setProperty('--ts-pw-img', img);
-    el.style.setProperty('--ts-pw-ar', String(ar));
+    el.style.setProperty('--ts-pw-ar', String(letterbox ? boxAr : ar));
     el.style.setProperty('--ts-pw-x', pct(box.x));
-    el.style.setProperty('--ts-pw-y', pct(box.y));
+    /* O retrato deixou de ocupar a caixa inteira, então tudo que era medido
+       CONTRA O RETRATO — a caixa da chapa inclusive — encolhe junto e desce
+       pela tarja. Sem compor as duas coisas, a arte sairia de registro com a
+       fotografia, que é o defeito que o letterbox existiria para não causar. */
+    el.style.setProperty('--ts-pw-y', pct(letterbox ? off + box.y * k : box.y));
     el.style.setProperty('--ts-pw-w', pct(box.w));
-    el.style.setProperty('--ts-pw-h', pct(box.h));
+    el.style.setProperty('--ts-pw-h', pct(letterbox ? box.h * k : box.h));
+    /* Como a FOTOGRAFIA é desenhada dentro da caixa. Fora do letterbox são os
+       100%/0 de sempre, e a regra do CSS continua idêntica ao que era. */
+    el.style.setProperty('--ts-pw-bgh', pct(letterbox ? k : 1));
+    el.style.setProperty('--ts-pw-bgy', pct(letterbox ? off : 0));
     el.classList.add('ts-pw-ready');
     /* O RETRATO VAI ATRÁS DA ARTE; a foto estática ia na frente.
        ------------------------------------------------------------------
@@ -1234,6 +1470,25 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
     '.preview-card[data-surface="' + key + '"] .ts-panel__media',
   );
   if (media) media.style.overflow = 'hidden';
+
+  /* O IRMÃO DE PONTA É REPUBLICADO quando a caixa comum muda de valor.
+     Os dois retratos chegam um de cada vez, então o primeiro é publicado contra
+     uma caixa que só conhece a si mesmo; quando o segundo entra e a caixa fica
+     mais alta, o primeiro precisa refazer a conta ou o par continua desigual —
+     que é exatamente o defeito que este bloco existe para consertar.
+     `appliedBox` é o que impede o vaivém: sem ele os dois se republicariam para
+     sempre, cada um disparando o outro. Com ele, a segunda passada vê a caixa
+     já aplicada, não faz nada, e a recursão morre em um nível. */
+  if (isEnd(key)) {
+    appliedBox[key] = boxAr;
+    const other: EndKey = key === 'rear' ? 'front' : 'rear';
+    const otherWin = windows[other];
+    if (otherWin && endAr[other] !== undefined && appliedBox[other] !== boxAr) {
+      publishWindow(other, otherWin);
+      sizePreviewCanvas(other);
+      drawPreview(other);
+    }
+  }
 }
 
 function loadImage(url: string): Promise<HTMLImageElement | null> {
@@ -1304,13 +1559,26 @@ function sizePreviewCanvas(key: SurfaceKey) {
    O que aparece ATRÁS da arte, pela janela: o baú branco de fábrica ou, quando
    "pintar o implemento" está ligado, a mesma tinta do cavalo. Uma variável CSS
    porque os dois lugares que a mostram (card e editor) são desenhados por CSS,
-   e porque assim não há um segundo estado a manter em sincronia. */
+   e porque assim não há um segundo estado a manter em sincronia.
+
+   SÃO DUAS VARIÁVEIS, e a segunda nasceu com a linha "Cor do cavalo" do
+   inspetor (2026-08-13). Ela precisa mostrar a pastilha da tinta do cavalo
+   MESMO COM A OPÇÃO DESLIGADA — é a resposta à pergunta "de que cor o baú
+   ficaria se eu ligar isto?", e uma pastilha branca ali não responderia nada.
+   Ou seja: `--ts-implement` é o que a chapa É agora, e `--ts-cabpaint` é o que
+   o cavalo tem. Só a primeira pinta a chapa. */
 const IMPLEMENT_WHITE = '#ffffff';
 let cabPaintHex = IMPLEMENT_WHITE;
 let paintedImplement = false;
 
+/** A tinta escolhida para o cavalo, em hex. A interface pinta a pastilha dela. */
+export const cabPaintColor = () => cabPaintHex;
+/** "Pintar o implemento com a cor do cavalo" está ligado? */
+export const isImplementPainted = () => paintedImplement;
+
 function syncImplementColor() {
   root.style.setProperty('--ts-implement', paintedImplement ? cabPaintHex : IMPLEMENT_WHITE);
+  root.style.setProperty('--ts-cabpaint', cabPaintHex);
   scheduleRepaintSnapshot();
 }
 
@@ -1388,8 +1656,10 @@ export function setSpecialEdition(on: boolean) {
 }
 
 /* ---------------- palco ---------------- */
-export const stagePanels: Record<SurfaceKey, HTMLElement> =
-  { left: $('stage-left'), right: $('stage-right'), rear: $('stage-rear') };
+export const stagePanels: Record<SurfaceKey, HTMLElement> = {
+  left: $('stage-left'), right: $('stage-right'),
+  rear: $('stage-rear'), front: $('stage-front'), roof: $('stage-roof'),
+};
 
 /* Duas caixas, não uma: a FOTO é o que ocupa o palco, e a tela é a janela dentro
    dela. Antes só existia a tela, e era ela que era enquadrada.
@@ -1397,7 +1667,9 @@ export const stagePanels: Record<SurfaceKey, HTMLElement> =
    porque com uma letra de 20 cm o usuário vai querer chegar perto dela. */
 /** O zoom com que cada palco foi enquadrado pela última vez. `syncSurfaceAspect()`
  *  precisa dele para refazer o enquadramento sem que o editor tenha de avisar. */
-const lastZoom: Record<SurfaceKey, number> = { left: 1, right: 1, rear: 1 };
+const lastZoom: Record<SurfaceKey, number> = {
+  left: 1, right: 1, rear: 1, front: 1, roof: 1,
+};
 const zoomOf = (key: SurfaceKey) => lastZoom[key];
 
 export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
@@ -1473,53 +1745,57 @@ export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
   fab.calcOffset();
 }
 
-/* When the trailer panels are painted with the cab color, the livery canvases'
-   solid white default background would hide the paint — switch backgrounds to
-   transparent while painted, and restore the previous background after. */
-/* The stashed background lives in a WeakMap rather than on the canvas: fabric's
-   Canvas has no slot for it, and a side table keeps the "was it stashed at all?"
-   question (which DEFAULT_BG vs. restore turns on) explicit. */
-const bgBeforePaint = new WeakMap<fabric.Canvas, string | fabric.TFiller | undefined>();
-
-export function setBackgroundsForPaint(painted: boolean) {
-  for (const c of Object.values(surfaces)) {
-    if (painted) {
-      bgBeforePaint.set(c, c.backgroundColor);
-      c.backgroundColor = '';
-    } else {
-      const prev = bgBeforePaint.get(c);
-      c.backgroundColor = (prev === undefined || prev === null) ? DEFAULT_BG : prev;
-      bgBeforePaint.delete(c);
-    }
-    c.renderAll();
-  }
-}
-
 /* ---------------- "pintar o implemento com a cor do cavalo" ----------------
-   O controle mora na barra do editor grande, e não junto da escolha de cor: a
-   cor é do CAVALO (passo do seletor), e estendê-la ao baú é uma decisão sobre o
-   IMPLEMENTO — tomada olhando para o painel que vai receber a tinta.
+   O controle mora na seção Fundo do inspetor, junto da cor da face, porque as
+   duas respondem a MESMA pergunta ("de que cor é a chapa por baixo da arte?")
+   por dois caminhos. E desde 2026-08-13 elas respondem em ORDEM, que é o que
+   este bloco existe para registrar.
 
-   As duas metades têm de andar juntas, e é por isso que estão na mesma função:
-   models.setPaintTarget('both') troca o material dos painéis do baú pela tinta
-   do cavalo, e setBackgroundsForPaint(true) tira o fundo BRANCO das telas do
-   fabric — sem isso o branco continuaria desenhado POR CIMA da tinta e o
-   implemento seguiria branco na tela. Desligar restaura o branco de fábrica.
-   Ligar/desligar não mexe em nada que o usuário tenha desenhado: o que sai e
-   volta é só o fundo. */
+   A COR DA FACE GANHA DA COR DO CAVALO. Pedido, literal: *"a seleção de pintar
+   da mesma cor do implemento deve ser sobrescrita por seleção de cor — por
+   exemplo, selecionei pintar da mesma cor do cavalo nas laterais, e na frente e
+   traseira selecionei a cor preta"*. As duas camadas são independentes e se
+   empilham:
+
+     CHAPA (o veículo)    setPaintTarget('both') troca o material das chapas do
+                          baú pela tinta do cavalo. Vale para o implemento
+                          INTEIRO — inclusive o que nenhuma face de livery cobre
+                          (soleira, bainha, teto, parede dianteira). É uma
+                          decisão sobre o produto, não sobre um painel.
+     FUNDO (a face)       `canvas.backgroundColor` de UMA tela do fabric. Vira
+                          textura do overlay daquela chapa, então é desenhado
+                          POR CIMA da tinta. Vazio = a chapa aparece.
+
+   O QUE ESTAVA ERRADO era `setBackgroundsForPaint()`, apagado aqui: ligar a
+   caixa LIMPAVA o fundo das quatro telas (guardando os valores numa WeakMap
+   para devolver ao desligar). Ou seja, a camada de cima era destruída pela de
+   baixo — escolher preto na traseira e depois ligar a tinta do cavalo apagava o
+   preto, e não havia como ter as duas coisas ao mesmo tempo, que é exatamente o
+   caso do pedido. A limpeza fazia sentido quando `DEFAULT_BG` era BRANCO: ali o
+   fundo padrão era tinta opaca e esconderia a cor do cavalo em todas as faces.
+   Com `DEFAULT_BG = ''` (ver o bloco lá em cima) o fundo padrão já é
+   transparente, então não há nada a limpar — só há o que o usuário escolheu, e
+   isso é para manter.
+
+   Ligar/desligar não mexe em NADA das telas: o que muda é só o material do 3D e
+   a chapa que o editor desenha atrás da arte. */
 function bindTrailerPaint() {
   $('paint-trailer').addEventListener('change', (e) => {
     const { checked } = evTarget<HTMLInputElement>(e);
     setPaintTarget(checked ? 'both' : 'cab');
-    setBackgroundsForPaint(checked);
     /* A chapa que aparece pela janela do painel segue a mesma decisão: ligado,
        o baú é da cor do cavalo, e o editor tem de mostrar a arte sobre ELA — um
        desenho que sumia no branco pode gritar sobre o vermelho, e vice-versa. */
     paintedImplement = checked;
     syncImplementColor();
-    setStatus(checked
+    /* As faces com cor própria continuam com ela, e o status diz isso: sem a
+       contagem, alguém que tenha preto na traseira liga a opção, vê a traseira
+       continuar preta e lê como falha. */
+    const own = SURFACE_KEYS.filter((k) => !!surfaces[k].backgroundColor).length;
+    const kept = own ? ` · ${own} ${own === 1 ? 'face mantém' : 'faces mantêm'} a cor própria` : '';
+    setStatus((checked
       ? 'Pintura aplicada à cabine e ao implemento (incluindo a frente)'
-      : 'Pintura somente na cabine');
+      : 'Pintura somente na cabine') + kept);
   });
 }
 

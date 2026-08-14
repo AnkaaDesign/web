@@ -185,7 +185,8 @@ export function normalizeTextScale(o: fabric.FabricObject): boolean {
 const HIST_LIMIT = 40;
 type Stack = { u: string[]; r: string[] };
 const hist: Record<SurfaceKey, Stack> = {
-  left: { u: [], r: [] }, right: { u: [], r: [] }, rear: { u: [], r: [] },
+  left: { u: [], r: [] }, right: { u: [], r: [] },
+  rear: { u: [], r: [] }, front: { u: [], r: [] }, roof: { u: [], r: [] },
 };
 let restoring = false;
 export const isRestoring = () => restoring;

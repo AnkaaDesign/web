@@ -51,7 +51,13 @@ let currentKey: StructureKey = 'left';
    REDECLARADA. É o mesmo padrão dos limites do formulário no topo de
    `livery-structure.ts`: repetido, nomeado, e num só lugar por arquivo. */
 const FACE_LABEL: Record<StructureKey, string> = {
-  left: 'Motorista', right: 'Passageiro', rear: 'Traseira',
+  left: 'Motorista', right: 'Passageiro', rear: 'Traseira', front: 'Frente',
+  /* O TETO ENTRA NA TABELA E SAI DO PAINEL. Ele é `StructureKey` desde
+     2026-08-13 (é uma face de livery), mas não tem medida própria: comprimento
+     e altura são do baú, largura é a largura, e porta ele não leva. O rótulo
+     existe para o tipo fechar e para o dia em que houver o que medir ali; quem
+     esconde a seção é `syncMeasures()`. */
+  roof: 'Teto',
 };
 
 /* ---------------- a máscara do formulário de medidas ---------------- */
@@ -180,6 +186,15 @@ function build() {
     onCommit: (v) => setImplementMeasures({ length: v }),
   }));
 
+  /* A TESTEIRA NÃO CADASTRA PORTA, e por isso o bloco inteiro sai — cabeçalho,
+     lista e o botão de adicionar. Não é uma face pobre: é a face que carrega o
+     pino-rei, o datum imóvel do baú (ver `mapZ` em trailer-geometry.ts), e
+     `pushDoorsToGeometry()` a recusa do outro lado. Um "+ Adicionar porta" que
+     desenha um vão no 2D e não abre nada no 3D é pior do que a ausência dele.
+     A traseira FICA: lá o cadastro alimenta a camada de layout, que é a única
+     representação que aquelas portas têm no editor. */
+  if (currentKey === 'front') return;
+
   const title = document.createElement('h4');
   title.className = 'sub-title';
   title.textContent = `Portas · ${FACE_LABEL[currentKey]}`;
@@ -244,16 +259,21 @@ function build() {
   actions.appendChild(add);
   el.appendChild(actions);
 
-  /* O CARREGAMENTO DO VÃO MORA AQUI, e não na pílula de estado.
+  /* O CARREGAMENTO DO VÃO, AO LADO DO BOTÃO QUE O CAUSOU.
      ---------------------------------------------------------------------
      Recortar um vão de porta reescreve o corpo branco inteiro e leva alguns
-     segundos (ver o bloco em studio.ts). O estúdio já tem dois indicadores
-     para trabalho longo — a pílula `#cab-switching` e o véu do viewport —, e
-     os dois ficam ATRÁS de `#editor-modal`: z-index 9 e 0 contra 9999. Ou
-     seja, são invisíveis exatamente na tela em que este botão vive.
+     segundos (ver o bloco em studio.ts).
 
-     Então o estado é desenhado no próprio inspetor, ao lado do controle que o
-     causou, que é onde o olho já está. `livery-structure` publica o booleano
+     Isto NASCEU como o único indicador possível: a pílula `#cab-switching` e o
+     véu do viewport ficavam ATRÁS de `#editor-modal` (z-index 9 e 0 contra
+     9999), ou seja invisíveis exatamente na tela em que este botão vive. Em
+     2026-08-13 a pílula passou a atravessar o modal (`.ts-editing` em
+     core/studio.css), a pedido — "quando adicionar porta deve ter o mesmo
+     loading que há quando está carregando o mapa".
+
+     ELE FICA MESMO ASSIM, e não é duplicação: a pílula diz que o APP está
+     trabalhando, no topo da tela; esta linha diz por que ESTE botão, aqui
+     embaixo à direita, está apagado. `livery-structure` publica o booleano
      (`onGeometryBusy`) e studio.ts o liga e desliga. */
   const busy = document.createElement('p');
   busy.className = 'insp-hint ms-busy';
@@ -312,6 +332,16 @@ function syncValues() {
  */
 export function syncMeasures(key?: StructureKey) {
   if (key) currentKey = key;
+  /* ---- O TETO NÃO TEM MEDIDA PRÓPRIA, então a seção inteira some nele ----
+     Comprimento e altura do baú são os MESMOS que a lateral já edita, largura
+     é a largura, e porta o teto não leva — nem cadastrada nem de bake. Repetir
+     ali os dois campos da lateral seria oferecer uma segunda porta de entrada
+     para o mesmo número, e dois campos que escrevem o mesmo estado são a
+     definição de divergir.
+     Esconder e não desabilitar: um formulário cinza convida a tentar. */
+  const card = document.getElementById('measures-card');
+  if (card) card.classList.toggle('hidden', currentKey === 'roof');
+  if (currentKey === 'roof') return;
   const m = getImplementMeasures();
   const next = `${currentKey}|${getPanelSpec(currentKey).doors.length}|${m.resizable}`;
   const faceTag = $('measures-face');

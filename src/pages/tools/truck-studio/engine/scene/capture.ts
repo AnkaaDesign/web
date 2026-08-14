@@ -144,6 +144,8 @@ import {
 } from './scene';
 import { renderCycloramaReflection } from './cyclorama';
 import { root } from '../core/dom';
+import { ceilingShadowMapSize } from '../core/quality';
+import { setPaintPixelScale, paintPixelScale } from '../vehicle/paint';
 
 /** Os três presets, pelo id que a interface e o localStorage usam. */
 export type CaptureQuality = 'low' | 'medium' | 'high';
@@ -589,8 +591,61 @@ async function renderMosaic(
   const prevBackground = scene.background;
   const prevClearAlpha = renderer.getClearAlpha();
   let restoreIsolation: (() => void) | null = null;
+  /* A SOMBRA DA FOTO SAI NO TETO, mesmo com a vista rodando no piso.
+     ---------------------------------------------------------------------------
+     A regra do perfil de qualidade (ver o cabeçalho de `core/quality.ts`) é que
+     a imagem BAIXADA é o produto e não se degrada nunca — um PC fraco pode ter
+     uma vista 3D suave e ainda assim baixar a mesma foto que o PC bom baixa, só
+     demorando mais.
+
+     A resolução de render já obedecia por CONSTRUÇÃO: esta função renderiza em
+     ladrilhos para um `WebGLRenderTarget` próprio, que tem o próprio viewport e
+     não passa por `setPixelRatio` (ver o cabeçalho deste arquivo). O MAPA DE
+     SOMBRA não obedecia, e era a única brecha: ele é global do renderizador, e
+     no nível Baixo a foto sairia com uma sombra 1024² — visível, e justamente
+     no contato do pneu com o chão, que é onde o olho procura.
+
+     Levantar aqui é barato porque a captura já roda fora do laço e sob a
+     cortina: o custo é uma realocação de alvo e um passe de sombra, pagos uma
+     vez por foto, não por quadro. */
+  const shadowCeil = ceilingShadowMapSize();
+  const prevShadowSide = getKeyLight().shadow.mapSize.x;
+  let restoreShadow: (() => void) | null = null;
+
+  /* ---------------- O FLOCO METÁLICO É A OUTRA COISA QUE NÃO ESCALA ----------
+     Mesma família do mapa de sombra logo acima, e descoberta pelo mesmo tipo de
+     relato: *"no render (foto tirada) quando em qualidade máxima, os flakes
+     metálicos ficam muito grandes"*.
+
+     O shader da tinta escolhe a oitava do floco — e quanto dele é desenhado
+     DISCRETO em vez de dissolvido em rugosidade — a partir de `fwidth()`, que
+     mede o pixel DO BUFFER em curso. Aqui o buffer tem 7680 px de aresta contra
+     os ~1920 da tela, então o mesmo floco de 3,3 mm passa de sub-pixel
+     (invisível, virou brilho) a ~4 px (visível, e grande). Ver o bloco `uPxScale`
+     em vehicle/paint.ts, onde os números estão.
+
+     A razão é de ALTURA e sai do canvas real, não do preset: `fullH` já foi
+     arredondado para a grade de ladrilhos, e `domElement.height` já inclui o
+     `setPixelRatio` — que é justamente o que faz a mesma foto ser tirada de duas
+     telas diferentes. Piso em 1: uma captura MENOR que a tela (o preset Baixa
+     numa tela 4K) não pode ENGROSSAR o floco. */
+  const prevPxScale = paintPixelScale();
+  setPaintPixelScale(fullH / Math.max(1, renderer.domElement.height));
 
   try {
+    if (shadowCeil > prevShadowSide) {
+      const key = getKeyLight();
+      key.shadow.mapSize.set(shadowCeil, shadowCeil);
+      key.shadow.map?.dispose();
+      key.shadow.map = null;
+      renderer.shadowMap.needsUpdate = true;
+      restoreShadow = () => {
+        key.shadow.mapSize.set(prevShadowSide, prevShadowSide);
+        key.shadow.map?.dispose();
+        key.shadow.map = null;
+        renderer.shadowMap.needsUpdate = true;
+      };
+    }
     if (transparent) {
       restoreIsolation = isolateVehicle();
       scene.background = null;
@@ -655,6 +710,15 @@ async function renderMosaic(
     restoreIsolation?.();
     scene.background = prevBackground;
     renderer.setClearAlpha(prevClearAlpha);
+    /* NO `finally` como os outros três: uma exceção no meio do mosaico não pode
+       deixar a vista do usuário com um mapa de sombra de 3072² que o perfil dele
+       não pediu — seria a captura piorando permanentemente o desempenho da
+       máquina que menos pode pagá-lo. */
+    restoreShadow?.();
+    /* E o floco volta ao pixel da TELA. Deixado para trás, ele faria a vista 3D
+       escolher a oitava com o pixel de uma foto de 7680 — o mesmo defeito ao
+       contrário, e permanente até o próximo recarregamento. */
+    setPaintPixelScale(prevPxScale);
   }
 }
 

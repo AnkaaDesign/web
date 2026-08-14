@@ -274,6 +274,16 @@ export function defaultLayers(panel: PanelSpec): LiveryLayer[] {
     { id: 'base', kind: 'base', source: { kind: 'solid', color: '#ffffff' } },
   ];
 
+  /* ---- O TETO SÓ TEM CHAPA ----
+     Ele entrou como face de livery em 2026-08-13 e é a face mais simples das
+     cinco: não tem fita refletiva (ela é lateral), não tem cantoneira (ela é a
+     junção teto-lateral, e é vista de LADO), não tem para-choque, não tem vão
+     de porta e não tem marco. Tudo que este arquivo sabe desenhar é peça que o
+     teto não tem — então ele sai aqui, com a chapa e nada mais.
+     `structuralLayers()` ainda descarta a `base`, e a pilha do teto fica vazia:
+     o que se vê no palco é a arte sobre a cor da chapa, que é o certo. */
+  if ((face as string) === 'roof') return layers;
+
   /* A ponta presa, em coordenada de PAINEL. O 3D prende a dianteira; x=0 é a
      traseira na SIDE_L e a dianteira na SIDE_R (ver `anchor` em LiveryLayer). */
   const anchor: 'start' | 'end' = face === 'left' ? 'end' : 'start';

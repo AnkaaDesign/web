@@ -29,6 +29,7 @@
    antigos. Sem isso, cada set carregaria a sua própria cópia do mesmo asfalto
    4k: o `distrito-industrial` fecha em 7,8 MB porque o chão dele pesa zero. */
 import * as THREE from 'three';
+import { getProfile } from '../core/quality';
 import { scene, renderer, registerGroundMaterials, setCameraObstacles } from './scene';
 import type { GroundMatEntry, GroundSurface } from './scene';
 import { loadGLB } from '../vehicle/models';
@@ -216,8 +217,13 @@ function loadTex(url: string, srgb: boolean, repeat: number,
            (getTextureCacheKey lista anisotropy): clone e base têm de concordar,
            senão o clone abriria um segundo objeto de textura e a economia acima
            não existiria. */
-        t.anisotropy = srgb ? renderer.capabilities.getMaxAnisotropy()
-          : Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        /* O TETO VEM DO PERFIL (2026-08-13) e no nível Alto continua sendo o
+           máximo do dispositivo para o albedo — ou seja, esta linha faz o que
+           sempre fez para quem aguenta. O `min` com a capacidade do adaptador
+           fica: o perfil declara a INTENÇÃO, o device impõe o fato. */
+        const cap = getProfile().anisotropyGround;
+        t.anisotropy = srgb ? Math.min(cap, renderer.capabilities.getMaxAnisotropy())
+          : Math.min(cap, 8, renderer.capabilities.getMaxAnisotropy());
         if (srgb) t.colorSpace = THREE.SRGBColorSpace;
         texCache.set(key, t);
         if (onProgress) onProgress(1);

@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { scene, onRig, invalidate } from '../scene/scene';
+import { scene, onRig, invalidate, frameAll, setVehicleFocus } from '../scene/scene';
 import {
   makePaintMaterial, forgetPaintMaterial, setPaint, isPaintMaterial,
 } from './paint';
 import {
   setupCommon, setShadowCasters, isPaintableMaterial, materialNamesOf, maskOnly,
-  TEXTURE_ANISOTROPY,
+  textureAnisotropy,
 } from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
@@ -19,7 +19,7 @@ import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
 import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './trailer-rig';
-import { RIB_FLAT_CENTER } from './trailer-geometry';
+import { RIB_FLAT_CENTER, TRAILER_ROOF_MESH } from './trailer-geometry';
 import { TRIM_WIDTH } from './trailer-door';
 import { swapTrailerWheels } from './wheels';
 import {
@@ -670,8 +670,12 @@ function auditTransparency(root: THREE.Object3D, label: string) {
    So the body is identified by what BOTH bakes agree on: the three named panels
    when they exist, otherwise the white-body material the panels were cut from.
    Falling back to the whole object is never right here, and this predicate
-   removes that possibility. */
-const WHITE_BODY_RE = /cor_padrao_branco/i;
+   removes that possibility.
+
+   O NOME DO MATERIAL BRANCO ESTÁ EM `WHITE_BODY_SUB`, mais abaixo, e existe
+   UMA vez: havia aqui um `WHITE_BODY_RE` com a mesma string, e duas cópias da
+   mesma pergunta são duas chances de responder diferente. Quem pergunta "isto é
+   carroceria?" chama `isBodyMesh()`, que já cuida da pintura. */
 
 function bodyPanelPred(_root: THREE.Object3D): MeshMatcher {
   /* THE MATERIAL, NOT THE PANEL NAMES — in either bake.
@@ -692,11 +696,11 @@ function bodyPanelPred(_root: THREE.Object3D): MeshMatcher {
      caixa do baú voltaria sempre nas medidas DE FÁBRICA por mais que o usuário
      redimensionasse, e `trailerBase.frontZ` (o engate) e a montagem do Thermo
      King viriam junto. Um corpo escondido não é carroceria. */
-  return (o: THREE.Mesh) => {
-    if (!o.visible) return false;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    return mats.some((m) => !!m && WHITE_BODY_RE.test(m.name || ''));
-  };
+  /* E O MATERIAL É O DE FÁBRICA, não o que está na malha agora — ver
+     `factoryMaterials()`. Sem isso a caixa do baú volta VAZIA sempre que
+     "pintar o implemento" está ligado, e com ela erram o engate, a altura em
+     que o Thermo King pendura e o recorte das chapas de livery. */
+  return (o: THREE.Mesh) => o.visible && isBodyMesh(o);
 }
 
 /* THE TYRES THAT CARRY THE TRAILER — not every mesh with "pneu" in its name.
@@ -975,6 +979,59 @@ function isWhiteBodyMat(m: THREE.Material | null | undefined) {
   return !!m && (m.name || '').toLowerCase().includes(WHITE_BODY_SUB);
 }
 
+/* ---------------- O MATERIAL DE FÁBRICA DE UMA MALHA ----------------
+   ⚠️ ESTA FUNÇÃO É A CORREÇÃO DE UM DEFEITO QUE COMIA O EDITOR INTEIRO, e o
+   raciocínio dela vale para qualquer código futuro que queira reconhecer uma
+   peça do baú pelo nome do material.
+
+   O DEFEITO, medido em `tools/studio-bench/checks-porta2-diag-0813.mjs`:
+
+     102ms  retrato#1 / 0 vãos / 1 malha SIDE_L / ocioso
+     555ms  retrato#2 / 0 vãos / 1 malha SIDE_L / ocioso
+     — clique "+ Adicionar porta" —
+     3142ms retrato#2 / 1 vão  / 0 malhas SIDE_L / ocioso     ← as chapas SUMIRAM
+     + "[livery] nenhuma malha do corpo branco — o editor de arte não terá onde
+        pintar." e "[paint] front wall triangles not found"
+
+   Ou seja: com "Pintar o implemento com a cor do cavalo" LIGADO, todo recorte
+   de geometria (um vão de porta, uma altura, um comprimento) destruía as chapas
+   de livery e não recriava nenhuma. O sintoma relatado foi *"adicionei uma
+   segunda porta, ela foi adicionada no modelo 3d, mas não atualizou no
+   livery"*, mas o estrago é maior: sem chapa não há arte no baú, não há retrato
+   para o editor (o palco congela na última foto), não há parede dianteira
+   pintável — e `bboxOfMatching(bodyPanelPred)` devolve uma caixa VAZIA, que é o
+   que o engate e a montagem do Thermo King leem.
+
+   A CAUSA é circular e por isso invisível na leitura: `trailerPanelMeshes()`
+   casa a carroceria pelo material branco, e `setPaintTarget('both')` troca esse
+   material por `carpaint` em todas elas. A partir daí NADA no arquivo consegue
+   mais reconhecer a carroceria — inclusive as três funções que precisam
+   reconhecê-la para RECRIAR as chapas. A pintura apagava a própria definição de
+   "o que é carroceria".
+
+   A RESPOSTA CERTA NÃO É casar também por `carpaint`: aquele material está
+   igualmente no teto e na carcaça do Thermo King (ver `trailerPanelMeshes()`),
+   e incluí-los na carroceria devolveria a caixa grande demais — exatamente o
+   defeito que o cabeçalho de `bodyPanelPred()` documenta ter custado 0,83 m no
+   engate. O que identifica a carroceria é o que ela ERA, e isso está guardado:
+   `setPaintTarget()` escreve `userData.origMat` antes de trocar, e
+   `vehicle/trim.ts` escreve `trimOrigMat` pelo mesmo motivo.
+
+   A ORDEM DOS TRÊS IMPORTA. `origMat` primeiro porque é o de fábrica de
+   verdade; `trimOrigMat` depois porque `applyTrim()` roda DEPOIS de
+   `setPaintTarget()` e, numa peça que segue o corpo, o que ele guardou já é a
+   tinta do baú; o material corrente por último, que é o caso normal de quem
+   nunca foi pintado. */
+function factoryMaterials(o: THREE.Mesh): (THREE.Material | null)[] {
+  const raw = (o.userData.origMat ?? o.userData.trimOrigMat ?? o.material) as
+    THREE.Material | THREE.Material[] | null | undefined;
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
+/** A malha É chapa de carroceria — pintada ou não. Ver `factoryMaterials()`. */
+const isBodyMesh = (o: THREE.Mesh) => factoryMaterials(o).some(isWhiteBodyMat);
+
 /* Paint set: the named livery panels only. The rest of the white body is ONE
    joined mesh (opt_Cor_padrao_branco…: front wall + roof + trim + frames all
    in a single geometry — verified by bbox enumeration), so the FRONT WALL is
@@ -1002,7 +1059,7 @@ function trailerPanelMeshes() {
          e os REBITES das emendas junto: no baú real eles são pintados com a
          chapa (pedido de 2026-08-11). Soleira e arremate ficam de fora, como
          o trilho galvanizado que eles arrematam. */
-      if (/^(SIDE_L|SIDE_R|REAR|SIDE_[LR]_RIVETS)$/.test(o.name)) { out.push(o); return; }
+      if (/^(SIDE_L|SIDE_R|REAR|FRONT|SIDE_[LR]_RIVETS)$/.test(o.name)) { out.push(o); return; }
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       if (mats.some((m) => m && (m.name || '').toLowerCase().includes(TK_PAINT_SUB))) {
         out.push(o); return;
@@ -1021,7 +1078,14 @@ function trailerPanelMeshes() {
          geometria estar unida, recortada ou nomeada de um jeito específico —
          só de o bake continuar chamando o branco de fábrica pelo mesmo nome. */
       if (BODY_INTERIOR_RE.test(o.name)) return;
-      if (mats.some((m) => m && (m.name || '').toLowerCase().includes(BODY_WHITE_MAT))) {
+      /* PELO MATERIAL DE FÁBRICA, e não pelo corrente. A malha do corpo
+         paramétrico já está com `carpaint` quando este laço roda pela SEGUNDA
+         vez (todo `setTrailerDims()` reaplica o alvo da tinta), e casar pelo
+         corrente a deixava de fora do conjunto: ela continuava pintada por
+         inércia, mas qualquer troca de cor a partir dali só alcançava as
+         chapas recortadas. Ver `factoryMaterials()`. */
+      if (factoryMaterials(o).some(
+        (m) => m && (m.name || '').toLowerCase().includes(BODY_WHITE_MAT))) {
         out.push(o);
       }
     });
@@ -1053,18 +1117,40 @@ const FRONT_WALL_SKIN = 0.05;
 function buildFrontWallOverlay() {
   if (state.frontWalls !== undefined || !state.trailer) return;
   state.frontWalls = [];
+  /* A CHAPA `FRONT` APOSENTA ESTE CAMINHO — quando ela existe.
+     ---------------------------------------------------------------------
+     Este overlay foi escrito para um bake em que a testeira era um punhado de
+     triângulos dentro da malha branca unida: ele os copiava para uma cópia por
+     cima, com bias de profundidade, só para poder pintá-la. Desde
+     2026-08-13 `buildLiveryPanels()` RECORTA a testeira numa malha própria —
+     os triângulos saem da origem, e a malha nova é pintada e plotada como
+     qualquer outra chapa.
+
+     Se ele continuasse rodando, encontraria a parede JÁ VAZIA (os triângulos
+     migraram) e no melhor caso desenharia nada; no pior, uma segunda superfície
+     coplanar com a chapa nova, que é o "marrom lamacento" que
+     `buildLiveryPanels()` documenta. Sair cedo é a resposta certa, e o
+     caminho fica inteiro para o bake sem corpo branco recortável. */
+  let hasFrontPanel = false;
+  state.trailer.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (o.isMesh && o.name === 'FRONT') hasFrontPanel = true;
+  });
+  if (hasFrontPanel) return;
   const sideBox = bboxOfMatching(state.trailer, bodyPanelPred(state.trailer));
   const zLim = sideBox.max.z - 0.5;                  // generous front slab
   const sources: THREE.Mesh[] = [];
   state.trailer.traverse((node) => {
     const o = node as THREE.Mesh;
-    if (!o.isMesh || /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) return;
+    if (!o.isMesh || panelNameRe().test(o.name)) return;
     /* Mesmo motivo de buildLiveryPanels(): as chapas brancas originais seguem
        na cena, só escondidas por `TrailerBody`. Extrair a parede dianteira de
        uma delas desenharia a tinta na altura de fábrica. */
     if (!o.visible) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (mats.some(isWhiteBodyMat)) sources.push(o);
+    /* Idem `buildLiveryPanels()`: o material de FÁBRICA. Com a tinta ligada,
+       casar pelo corrente devolvia "[paint] front wall triangles not found" e a
+       testeira deixava de ser pintável no bake que não a recorta. */
+    if (isBodyMesh(o)) sources.push(o);
   });
   const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
   const wa = new THREE.Vector3(), wb = new THREE.Vector3(), wc = new THREE.Vector3();
@@ -1122,6 +1208,7 @@ function buildFrontWallOverlay() {
     if (!state.frontWallMat) {
       state.frontWallMat = makePaintMaterial();
       state.frontWallMat.name = 'carpaint';
+      adoptProbeMaterial(state.frontWallMat);      // idem — ver adoptProbeMaterial()
       /* CONSTANT bias, no slope term. This overlay really is coincident with the
          wall it is cut from — unlike the livery panels, whose triangles are moved
          out — so it needs a bias to win the depth test. But `polygonOffsetFactor`
@@ -1182,6 +1269,10 @@ export function setPaintTarget(mode: 'cab' | 'both') {
     if (!state.trailerPaintMat) {
       state.trailerPaintMat = makePaintMaterial();
       state.trailerPaintMat.name = 'carpaint';
+      /* NASCEU DEPOIS DA SONDA — ver `adoptProbeMaterial()`. Sem esta linha o
+         implemento pintado reflete o HDRI cru enquanto a cabine reflete a
+         vizinhança, e uma tinta preta sai cinza no baú e preta no cavalo. */
+      adoptProbeMaterial(state.trailerPaintMat);
       /* NO polygonOffset here. It was added when buildLiveryPanels() duplicated
          the skin — painting swapped the bias away and the flank flickered between
          white and the chosen colour. The panels are now CUT OUT of the body
@@ -1190,7 +1281,15 @@ export function setPaintTarget(mode: 'cab' | 'both') {
          wall still needs one; see frontWallMat. */
     }
     for (const mesh of meshes) {
-      if (!mesh.userData.origMat) mesh.userData.origMat = mesh.material;
+      /* O ORIGINAL É O DE FÁBRICA, e `mesh.material` pode não ser ele.
+         `vehicle/trim.ts` pinta teto e Thermo King com uma tinta PRÓPRIA e
+         guarda o de fábrica em `trimOrigMat`. Ligar "pintar o implemento" com o
+         teto já colorido gravava a TINTA DO TETO como "original" — e a partir
+         dali não havia mais como voltar ao branco: desligar a caixa restaurava
+         a cor do teto achando que restaurava a chapa. */
+      if (!mesh.userData.origMat) {
+        mesh.userData.origMat = mesh.userData.trimOrigMat ?? mesh.material;
+      }
       mesh.material = state.trailerPaintMat;
     }
     for (const w of state.frontWalls || []) w.visible = true;
@@ -1217,6 +1316,97 @@ export function setPaintTarget(mode: 'cab' | 'both') {
      Chamado no fim porque o overlay da parede dianteira também é refeito
      acima, e um invalidate() antes dele perderia esse desenho. */
   invalidate();
+}
+
+/* ============================================================
+   O QUE FICA EM CENA: o conjunto, só o cavalo, ou só o implemento
+   ============================================================
+   Pedido de 2026-08-13: *"deve ter uma opção para esconder o cavalo e mostrar
+   somente o implemento, e vice-versa"*.
+
+   Isto JÁ EXISTIU, como dois checkboxes na topbar, e foi removido com ela — a
+   nota em `core/template.ts` registra o porquê e ela continua certa: eram um
+   atalho de depuração ("some com a cabine"), duas caixas independentes que
+   podiam apagar as duas metades ao mesmo tempo e deixar a tela vazia sem nada
+   dizendo por quê.
+
+   O que volta é outra coisa: UM estado com TRÊS valores, que por construção
+   nunca esconde tudo, e que mora no card de configurações junto das outras
+   decisões sobre o produto. Um implemento é vendido sozinho — a foto do baú sem
+   cavalo é material de catálogo, não um modo de depuração.
+
+   POR QUE NOS GRUPOS e não nos modelos: `state.cab` e `state.trailer` são
+   trocados a cada carga, e uma escolha escrita neles se perderia na próxima
+   troca de caminhão. Os grupos são permanentes (criados na avaliação deste
+   módulo), então a escolha sobrevive — e `applyVehicleView()` é chamada de novo
+   depois de cada carga só para o caso de alguém ter mexido no `visible` de um
+   grupo por outro caminho.
+
+   NÃO É PERSISTIDA na escolha do catálogo, e é deliberado: é um estado de
+   OLHAR, não de produto. Um `Choice` gravado com "só o implemento" abriria o
+   estúdio, na sessão seguinte, sem o caminhão — e o usuário procuraria o
+   caminhão, não a opção. */
+export type VehicleView = 'both' | 'cab' | 'trailer';
+
+let vehicleView: VehicleView = 'both';
+
+export const getVehicleView = (): VehicleView => vehicleView;
+
+/** Escreve a escolha corrente nos dois grupos. Idempotente. */
+export function applyVehicleView() {
+  state.cabGroup.visible = vehicleView !== 'trailer';
+  state.trailerGroup.visible = vehicleView !== 'cab';
+  invalidate();
+}
+
+/**
+ * A CÂMERA PASSA A ORBITAR A METADE QUE FICOU, e não o conjunto.
+ *
+ * `frameAll()` já ignora grupo invisível ao medir a caixa, então o
+ * enquadramento sozinho já vinha certo. O que NÃO vinha era a ÓRBITA: quem
+ * define o centro do giro, o alcance de zoom, a coleira do pan e a caixa da
+ * qual a câmera é expulsa é `setVehicleFocus()`, e ela continuava recebendo a
+ * caixa do conjunto inteiro (`focusOnRig()` em studio.ts, chamada no fim de cada
+ * carga). Com "só o implemento", o centro do giro ficava no ENGATE — a uns 9 m
+ * do baú — e girar a cena fazia o implemento varrer a tela em torno de um ponto
+ * vazio, com o zoom limitado pelo raio de um conjunto que não está mais lá.
+ *
+ * Aqui a caixa é a do que está VISÍVEL, e as duas coisas andam juntas por
+ * construção. Vive em models.ts, e não em studio.ts como `focusOnRig()`, porque
+ * quem muda a vista é este módulo — uma segunda cópia da regra em studio.ts
+ * discordaria desta na primeira mudança.
+ */
+function frameVisible() {
+  const box = new THREE.Box3();
+  for (const g of [state.cabGroup, state.trailerGroup]) {
+    if (g.visible) box.expandByObject(g);
+  }
+  if (box.isEmpty()) return;
+  frameAll([state.cabGroup, state.trailerGroup]);
+  setVehicleFocus(box);
+}
+
+/**
+ * Mostra o conjunto, só o cavalo ou só o implemento.
+ *
+ * Devolve o modo EFETIVO, que pode não ser o pedido: esconder o cavalo num
+ * estúdio que não tem implemento carregado deixaria a tela vazia, e uma tela
+ * vazia não é uma resposta — é a aparência de um app quebrado. Quem chama usa o
+ * retorno para redesenhar o controle, e assim o botão volta sozinho para onde
+ * ele realmente está em vez de mentir.
+ */
+export function setVehicleView(mode: VehicleView): VehicleView {
+  const want: VehicleView = mode === 'cab' || mode === 'trailer' ? mode : 'both';
+  const ok = want === 'both'
+    || (want === 'cab' ? !!state.cab : !!state.trailer);
+  vehicleView = ok ? want : 'both';
+  applyVehicleView();
+  /* SÓ AQUI, e não em `applyVehicleView()`: aquela também roda depois de cada
+     carga de veículo, onde `runApply()` já enquadra e já chama `focusOnRig()` —
+     um segundo enquadramento no meio da cortina brigaria com o dele. Este é o
+     caminho da ESCOLHA do usuário, e a escolha é que pede a câmera nova. */
+  frameVisible();
+  return vehicleView;
 }
 
 /* ---------------- Scania: original FBX + old-viewer material treatment ----- */
@@ -1306,7 +1496,7 @@ function convertScaniaMaterials(root: THREE.Object3D) {
         }
       }
       const om = (out as THREE.MeshStandardMaterial).map;
-      if (om) { om.colorSpace = THREE.SRGBColorSpace; om.anisotropy = TEXTURE_ANISOTROPY; }
+      if (om) { om.colorSpace = THREE.SRGBColorSpace; om.anisotropy = textureAnisotropy(); }
     }
     (out as THREE.MeshStandardMaterial).envMapIntensity = 1.3;
     cache.set(src.uuid, out);
@@ -2187,6 +2377,58 @@ function applyTrailerFinish(root: THREE.Object3D) {
 let probeBase = new Map<THREE.MeshStandardMaterial, number>();
 /** `scene.environmentIntensity` at the instant the live cubemap was captured. */
 let probeEnvIntensity = 1;
+/**
+ * O cubemap da última captura, guardado — e este é o conserto de um defeito que
+ * só aparecia com tinta ESCURA.
+ *
+ * `refreshVehicleReflection()` percorre `state.cab` e `state.trailer` e liga a
+ * sonda a todo material que encontrar NAQUELE INSTANTE. Mas nem todo material de
+ * tinta existe naquele instante: `state.trailerPaintMat`, `state.frontWallMat` e
+ * os `carpaint-<peça>` de `vehicle/trim.ts` nascem PREGUIÇOSOS, no primeiro
+ * clique que os pede — sempre depois da captura. Eles ficavam então sem `envMap`
+ * próprio e caíam em `scene.environment`, que é o HDRI CRU do céu, multiplicado
+ * pelo `envMapIntensity` de 1,3 da tinta.
+ *
+ * A sonda é um render da vizinhança REAL (asfalto, galpões, sombra); o HDRI é o
+ * céu inteiro. Com uma tinta clara a diferença passa; com uma tinta PRETA
+ * metálica, em que a difusa é zerada e o que se vê é só reflexo, ela é a
+ * diferença entre preto e cinza — que foi exatamente o relato: *"apliquei a cor
+ * do cavalo, que é preto, ela ficou meio que cinza"*, com a cabine preta ao lado
+ * do implemento cinza na mesma foto. As duas metades tinham a mesma receita e
+ * ambientes diferentes.
+ */
+let probeTex: THREE.Texture | null = null;
+
+/**
+ * A intensidade AUTORADA de cada material adotado, guardada para sempre.
+ *
+ * `probeBase` é RECONSTRUÍDO a cada captura, e um material que não estivesse
+ * pendurado em malha nenhuma naquele instante cai fora dele — é o caso exato de
+ * `trailerPaintMat` com "pintar o implemento" desligado. Sem esta segunda
+ * tabela, a próxima adoção leria `envMapIntensity` já multiplicado pelo ganho da
+ * noite anterior e o assaria dentro da base, compondo um pouco mais a cada ida e
+ * volta da caixa. WeakMap porque a chave é o material: quando ele morre, a
+ * entrada vai junto.
+ */
+const authoredEnvIntensity = new WeakMap<THREE.Material, number>();
+
+/**
+ * Adota um material RECÉM-CRIADO na sonda corrente.
+ *
+ * Chamado por quem cria material de tinta fora do ciclo de carga — ver o bloco
+ * de `probeTex`. Idempotente: a base sai de `authoredEnvIntensity`, então
+ * chamá-la dez vezes dá o mesmo resultado que chamá-la uma.
+ */
+export function adoptProbeMaterial(m: THREE.Material | null | undefined) {
+  if (!probeTex || !m) return;
+  const mat = m as THREE.MeshStandardMaterial;
+  if (mat.envMapIntensity === undefined) return;
+  const base = authoredEnvIntensity.get(mat) ?? mat.envMapIntensity;
+  authoredEnvIntensity.set(mat, base);
+  probeBase.set(mat, base);
+  if (mat.envMap !== probeTex) { mat.envMap = probeTex; mat.needsUpdate = true; }
+  mat.envMapIntensity = base * (scene.environmentIntensity / (probeEnvIntensity || 1));
+}
 
 /* THE IMPLEMENT MUST NOT LAG THE WORLD. The first version of this fix
    re-captured the probe a quarter-second after the slider settled, which is
@@ -2279,6 +2521,7 @@ export function refreshVehicleReflection() {
     hide: [state.cabGroup, state.trailerGroup],
   });
   if (!tex) return;
+  probeTex = tex;
 
   const seen = new Set<string>();
   /* Reconstruído em vez de mutado: uma troca de cabine ou de implemento descarta
@@ -2355,6 +2598,24 @@ export function refreshVehicleReflection() {
    shared by several meshes is cloned first so the others keep theirs. */
 const LIVERY_SKIN_SIDE = 0.04;
 const LIVERY_SKIN_REAR = 0.10;
+/**
+ * A fatia da TESTEIRA que vira chapa de arte. **50 mm.**
+ *
+ * A quarta face nasceu em 2026-08-13, a pedido: *"precisa adicionar um livery da
+ * frontal, ao lado do livery da traseira"*. Ela já era pintável — a frente
+ * entrava em `trailerPanelMeshes()` pelo material branco, e antes disso por
+ * `buildFrontWallOverlay()` — mas não tinha onde receber DESENHO, que é outra
+ * coisa: pintar é trocar o material da malha, plotar exige `uv1` e uma malha
+ * própria para a sobreposição de arte pendurar.
+ *
+ * O número é o `FRONT_WALL_SKIN` do overlay, e a igualdade não é coincidência:
+ * é a mesma pele, medida da mesma forma, e lá ela foi verificada em 1 630
+ * triângulos cobrindo 100 % da parede (0,02 perde uma segunda folha 9 mm atrás;
+ * ≥0,12 começa a puxar a parede INTERNA de volta). Aqui ela vale como fatia a
+ * partir de `box.max.z` em vez de a partir do z mais avançado por malha, o que é
+ * a mesma coisa: a parede dianteira É a face de maior z do corpo branco.
+ */
+const LIVERY_SKIN_FRONT = 0.05;
 
 /* ---------------- as CHAPAS da lateral: remonte e rebites ----------------
    A lateral não é uma chapa única de 14,7 m: é uma sequência de chapas
@@ -2854,7 +3115,21 @@ export const getPlateGrid = (): PlateGrid | null => plateGrid;
  *  v runs DOWNWARDS because the CanvasTexture is built with flipY = false; u runs
  *  the way each panel reads from outside, which is mirrored between the flanks.
  *  Get either backwards and the artwork is a legible mirror image. */
-function addLiveryUV(geo: THREE.BufferGeometry, key: 'SIDE_L' | 'SIDE_R' | 'REAR') {
+/** As chapas de arte, pelos nomes de malha que o resto do engine casa.
+ *
+ *  `ROOF` NÃO É RECORTADO — e é a única da lista que não é. O teto já tem malha
+ *  própria desde que `TrailerBody.rebuild()` passou a escrevê-lo num buffer
+ *  separado (`TRAILER_ROOF`, ver vehicle/trim.ts), justamente para poder trocar
+ *  de material sozinho. Recortá-lo do corpo de novo não acharia nada: os
+ *  triângulos já saíram de lá. O que ele precisa para virar livery é só `uv1`, e
+ *  é o que `tagRoofLiveryUV()` faz. */
+export type LiveryPanelName = 'SIDE_L' | 'SIDE_R' | 'REAR' | 'FRONT' | 'ROOF';
+const LIVERY_PANEL_NAMES: LiveryPanelName[] = ['SIDE_L', 'SIDE_R', 'REAR', 'FRONT'];
+/** `^(SIDE_L|SIDE_R|REAR|FRONT)$` — uma fonte só para os cinco lugares que o
+ *  testam. Nova a cada uso porque um literal com `g` guardaria `lastIndex`. */
+const panelNameRe = () => /^(SIDE_L|SIDE_R|REAR|FRONT)$/;
+
+function addLiveryUV(geo: THREE.BufferGeometry, key: LiveryPanelName) {
   geo.computeBoundingBox();
   const b = geo.boundingBox as THREE.Box3;
   const pos = geo.attributes.position;
@@ -2864,19 +3139,66 @@ function addLiveryUV(geo: THREE.BufferGeometry, key: 'SIDE_L' | 'SIDE_R' | 'REAR
   const spanZ = Math.max(1e-6, b.max.z - b.min.z);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    /* A TESTEIRA CORRE AO CONTRÁRIO DA TRASEIRA, e é o mesmo motivo que faz as
+       duas laterais correrem em sentidos opostos: `u` cresce no sentido em que
+       a face é LIDA DE FORA. Quem olha a traseira está atrás do baú e vê o +X à
+       esquerda dele; quem olha a testeira está na frente e vê o +X à direita.
+       Igualar as duas sairia com o desenho da frente espelhado no baú, e o
+       espelho de um texto é o defeito que ninguém percebe no editor. */
+    /* O TETO É A ÚNICA FACE HORIZONTAL, e as duas coordenadas dele saem do
+       plano XZ — `y` não entra em nada.
+       ---------------------------------------------------------------------
+       O quadro é o de quem olha o baú DE CIMA, com a traseira à esquerda e a
+       dianteira à direita, que é o mesmo sentido da lateral do MOTORISTA
+       (SIDE_L). Fixada a leitura, `v` está determinado e não é escolha: com a
+       lente apontando para −Y e o +Z indo para a direita da tela, o para-cima
+       da tela é o +X (regra da mão direita). Como `v` cresce para BAIXO — a
+       CanvasTexture é construída com flipY = false —, ele tem de correr de
+       `max.x` para `min.x`. Trocar o sinal aqui espelha o desenho no teto, e o
+       espelho de um texto visto de cima é o defeito que só aparece na foto
+       aérea, depois de a película estar aplicada. */
+    if (key === 'ROOF') {
+      uv[i * 2] = (z - b.min.z) / spanZ;
+      uv[i * 2 + 1] = (b.max.x - x) / spanX;
+      continue;
+    }
     uv[i * 2] = key === 'SIDE_L' ? (z - b.min.z) / spanZ
       : key === 'SIDE_R' ? (b.max.z - z) / spanZ
-        : (b.max.x - x) / spanX;
+        : key === 'FRONT' ? (x - b.min.x) / spanX
+          : (b.max.x - x) / spanX;
     uv[i * 2 + 1] = (b.max.y - y) / spanY;
   }
   geo.setAttribute('uv1', new THREE.BufferAttribute(uv, 2));
+}
+
+/**
+ * Dá `uv1` ao TETO, para ele poder receber arte como as outras quatro faces.
+ *
+ * Ele não passa por `buildLiveryPanels()` — não há o que recortar, a malha já
+ * existe (ver `LiveryPanelName`). O que ele precisa é da mesma normalização de
+ * 0 a 1 sobre a caixa dele, e de que ela seja REFEITA a cada reconstrução: o
+ * corpo paramétrico reescreve a geometria do teto a cada mudança de medida, e
+ * um `uv1` da medida anterior mapearia a arte sobre um retângulo que não existe
+ * mais — o logotipo escorregaria para fora do baú a cada centímetro digitado.
+ *
+ * Idempotente e barato: um `Float32Array` do tamanho do teto, uma vez por
+ * recorte, no mesmo passo em que as outras quatro chapas são recortadas.
+ */
+export function tagRoofLiveryUV(trailer: THREE.Object3D) {
+  trailer.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || o.name !== TRAILER_ROOF_MESH) return;
+    const g = o.geometry as THREE.BufferGeometry;
+    if (!g?.attributes?.position?.count) return;
+    addLiveryUV(g, 'ROOF');
+  });
 }
 
 function buildLiveryPanels(trailer: THREE.Object3D) {
   let already = false;
   trailer.traverse((node) => {
     const o = node as THREE.Mesh;
-    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) already = true;
+    if (o.isMesh && panelNameRe().test(o.name)) already = true;
   });
   /* Bake fundido traz as chapas prontas — e SEM grade de emendas, então quem
      leu a grade do implemento anterior não pode continuar acreditando nela. */
@@ -2893,8 +3215,11 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
        sobe), os limiares de 40 mm cairiam no lugar errado e os painéis sairiam
        recortados de uma geometria que ninguém vê. */
     if (!o.visible) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (mats.some((m) => !!m && WHITE_BODY_RE.test(m.name || ''))) sources.push(o);
+    /* PELO MATERIAL DE FÁBRICA. Com "pintar o implemento" ligado o corpo está
+       com `carpaint`, e casar pelo material CORRENTE não achava nada: cada
+       recorte destruía as chapas e não recriava nenhuma. Ver
+       `factoryMaterials()`, que é onde a medição do defeito está. */
+    if (isBodyMesh(o)) sources.push(o);
   });
   if (!sources.length) {
     console.warn('[livery] nenhuma malha do corpo branco — o editor de arte não terá onde pintar.');
@@ -2918,8 +3243,13 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     for (let i = 0; i < pos.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(p.mat));
   }
 
-  const keep: Record<'SIDE_L' | 'SIDE_R' | 'REAR', { p: number[]; n: number[]; u: number[] }> = {
-    SIDE_L: { p: [], n: [], u: [] }, SIDE_R: { p: [], n: [], u: [] }, REAR: { p: [], n: [], u: [] },
+  const keep: Record<LiveryPanelName, { p: number[]; n: number[]; u: number[] }> = {
+    SIDE_L: { p: [], n: [], u: [] }, SIDE_R: { p: [], n: [], u: [] },
+    REAR: { p: [], n: [], u: [] }, FRONT: { p: [], n: [], u: [] },
+    /* Declarado e NUNCA preenchido: o laço abaixo só escreve nas quatro chaves
+       que ele classifica, e `LIVERY_PANEL_NAMES` (que é quem cria as malhas)
+       não tem ROOF. O teto não é recortado — ver `tagRoofLiveryUV()`. */
+    ROOF: { p: [], n: [], u: [] },
   };
   const a = new THREE.Vector3(), b2 = new THREE.Vector3(), c = new THREE.Vector3();
   const na = new THREE.Vector3(), nb = new THREE.Vector3(), nc = new THREE.Vector3();
@@ -2954,7 +3284,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
       a.fromBufferAttribute(pos, i0).applyMatrix4(p.mat);
       b2.fromBufferAttribute(pos, i1).applyMatrix4(p.mat);
       c.fromBufferAttribute(pos, i2).applyMatrix4(p.mat);
-      let where: 'SIDE_L' | 'SIDE_R' | 'REAR' | null = null;
+      let where: LiveryPanelName | null = null;
       const minX = Math.min(a.x, b2.x, c.x);
       const maxX = Math.max(a.x, b2.x, c.x);
       /* SÓ O SLAB, e a hipótese descartada fica registrada: suspeitou-se que
@@ -2975,6 +3305,18 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
         /* abs(): ~0.2 % of these ripped triangles are wound backwards, so the
            sign of the face normal proves nothing about which way it faces. */
         if (Math.abs(fn.z) >= 0.7) where = 'REAR';
+      }
+      /* A TESTEIRA, pela mesma regra da traseira invertida: fatia rente à face
+         de MAIOR z e o mesmo teste de normal. O teste de normal não é opcional
+         aqui — a testeira leva os montantes de canto e o retorno das laterais
+         dentro da fatia, e eles olham para o lado. Sem ele a chapa da frente
+         sairia com as duas quinas dobradas para dentro dela.
+         O TETO passa longe deste teste: ele atravessa o baú inteiro em z, então
+         o `minZ` dele nunca alcança a fatia; e a normal dele é +Y. */
+      if (!where && Math.min(a.z, b2.z, c.z) >= box.max.z - LIVERY_SKIN_FRONT) {
+        e1.subVectors(b2, a); e2.subVectors(c, a);
+        fn.crossVectors(e1, e2).normalize();
+        if (Math.abs(fn.z) >= 0.7) where = 'FRONT';
       }
       if (!where) continue;
       na.fromBufferAttribute(nor, i0).applyMatrix3(p.nrm).normalize();
@@ -3055,7 +3397,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
   const srcMat = (Array.isArray(sources[0].material) ? sources[0].material[0] : sources[0].material) as THREE.MeshStandardMaterial;
   const report: string[] = [];
   plateGrid = null;
-  for (const key of ['SIDE_L', 'SIDE_R', 'REAR'] as const) {
+  for (const key of LIVERY_PANEL_NAMES) {
     const k = keep[key];
     if (!k.p.length) { report.push(`${key}: VAZIO`); continue; }
     const geo = new THREE.BufferGeometry();
@@ -3075,8 +3417,9 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     mesh.receiveShadow = true;
     trailer.add(mesh);
     /* Os rebites da emenda, um por rebaixo — e a grade publicada para o editor
-       2D desenhar as MESMAS emendas nas MESMAS alturas. */
-    if (key !== 'REAR') {
+       2D desenhar as MESMAS emendas nas MESMAS alturas. Só as LATERAIS têm
+       emenda de curso: traseira e testeira são chapa inteira. */
+    if (key === 'SIDE_L' || key === 'SIDE_R') {
       const seams = seamsOf[key] ?? [];
       const sgn = key === 'SIDE_R' ? 1 : -1;
       const rows = addPlateRivets(trailer, mesh,
@@ -3170,7 +3513,7 @@ function disposeLiveryPanels(trailer: THREE.Object3D) {
   const doomed: THREE.Mesh[] = [];
   trailer.traverse((node) => {
     const o = node as THREE.Mesh;
-    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR|LIVERY_SILL_[LR]|LIVERY_HEM_[LR])$/.test(o.name)) doomed.push(o);
+    if (o.isMesh && /^(SIDE_L|SIDE_R|REAR|FRONT|LIVERY_SILL_[LR]|LIVERY_HEM_[LR])$/.test(o.name)) doomed.push(o);
   });
   for (const panel of doomed) {
     panel.traverse((node) => {
@@ -3282,9 +3625,11 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
         anterior e aponta para uma contagem de vértices que está prestes a
         mudar. Depois do rebuild já seria tarde: a malha passaria um quadro
         indexando lixo. */
-  const bodyGeo = rig.body.mesh.geometry as THREE.BufferGeometry;
-  bodyGeo.setIndex(null);
-  bodyGeo.clearGroups();
+  for (const m of [rig.body.mesh, rig.body.roof]) {
+    const g = m.geometry as THREE.BufferGeometry;
+    g.setIndex(null);
+    g.clearGroups();
+  }
 
   const dims = rig.set(patch);
 
@@ -3296,6 +3641,9 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
   disposeLiveryPanels(t);
   disposeFrontWallOverlays();
   buildLiveryPanels(t);
+  /* E o TETO ganha o `uv1` dele no mesmo passo — a geometria dele acabou de ser
+     reescrita por `rig.set()`. Ver `tagRoofLiveryUV()`. */
+  tagRoofLiveryUV(t);
 
   /* 4. O Thermo King pendura na parede dianteira a uma folga fixa abaixo do
         teto, e a parede acabou de mudar de altura. Ele não faz parte do
@@ -3454,6 +3802,7 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
   applyTrailerFinish(trailer);               // AFTER setupCommon: it overrides env 1.35
   /* After grounding, before studio.ts calls livery.attachOverlays(). */
   buildLiveryPanels(trailer);
+  tagRoofLiveryUV(trailer);
   state.trailer = trailer;
   /* Remedida DEPOIS do baú paramétrico: `box` veio de groundAndCenter(), que
      rodou sobre as chapas originais — as mesmas que `TrailerBody` acabou de

@@ -1787,7 +1787,23 @@ def add_slab(name, x0, x1, y0, y1, material, cell=4.5, uv_scale=8.0, z_fn=None,
         spans.append((x0, min(x1, cw0)))
     if x1 > cw1:
         spans.append((max(x0, cw1), x1))
-    if y0 < road_lo:
+    # O RABO E DO CORREDOR, ENTAO SO SAI DE QUEM ENCOSTA NELE.
+    #
+    # A condicao era so `y0 < road_lo`, sem olhar o x — e as bandas leste e
+    # oeste da turfa (x 109…150 e -150…-108,75) passavam por ela sem nunca
+    # tocarem o corredor. Saiam DUAS lajes de grama IDENTICAS, coincidentes,
+    # em x -28,6…10,4 · z 105…133 (`turf_e_tail` e `turf_w_tail`), 680 vertices
+    # cada uma, as duas por baixo do `yard_tail` de betao — geometria que nunca
+    # aparece.
+    #
+    # Nunca apareceu, mas foi vista: `scenery.ts` plantava dentro da CAIXA
+    # ENVOLVENTE de cada faixa de grama, e a caixa destas duas engole a metade
+    # sul do balao. Vinte e nove plantas em pavimento, 21 delas dentro do disco
+    # de 19 m — o *"as arvores estao no meio da rotatoria"*. A outra metade da
+    # correcao esta la, e nao depende desta: o plantio passou a medir a MALHA em
+    # vez da caixa dela. Esta aqui e para que uma reconstrucao do set nao volte a
+    # oferecer a mentira.
+    if y0 < road_lo and x0 < cw1 and x1 > cw0:
         out += _corridor_tail(name, cw0, cw1, y0, material, uv_scale, z_fn, seed)
     for i, (a, b) in enumerate(spans):
         w, d = b - a, y1 - y0

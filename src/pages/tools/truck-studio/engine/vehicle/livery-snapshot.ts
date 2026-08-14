@@ -50,7 +50,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-export type SnapshotKey = 'left' | 'right' | 'rear';
+export type SnapshotKey = 'left' | 'right' | 'rear' | 'front';
 
 /**
  * A área LIVRE da chapa — do frame metálico para dentro — em frações da
@@ -109,7 +109,10 @@ export interface FaceSnapshot {
    laterais. Na TRASEIRA os montantes já entram 92 mm de cada lado e 3 cm
    fecham a peça; mais do que isso começaria a mostrar a parede lateral do baú,
    que é outra face. */
-const M_SIDE: Record<SnapshotKey, number> = { left: 0.15, right: 0.15, rear: 0.03 };
+/* A TESTEIRA usa a margem da traseira, e pela mesma razão: os montantes de
+   canto já entram na caixa da chapa dos dois lados, e 3 cm fecham a peça sem
+   começar a mostrar a parede lateral, que é outra face. */
+const M_SIDE: Record<SnapshotKey, number> = { left: 0.15, right: 0.15, rear: 0.03, front: 0.03 };
 const M_TOP = 0.01;
 /**
  * A folga de baixo é POR FACE, e a das laterais não é sangria: é o trilho.
@@ -154,13 +157,44 @@ const M_TOP = 0.01;
  * para-choque de proteção, as lanternas e a placa continuam fora — que é o
  * outro lado do mesmo pedido ("nada do chassi").
  */
-const M_BOTTOM: Record<SnapshotKey, number> = { left: 0.09, right: 0.09, rear: 0.31 };
+/* A TESTEIRA fica no MEIO entre as laterais e a traseira, e as duas pontas do
+   raciocínio são medidas diferentes.
+   Ela não tem o degrau da traseira: os 31 cm de lá existem para vencer os
+   ~213 mm em que a chapa traseira termina acima do piso (as folhas das portas
+   descem além dela) e alcançar a faixa refletiva da travessa; a chapa da frente
+   vai do piso ao teto (`PANEL_MM.front` mede a altura cheia), então 31 cm ali
+   só mostrariam chassi.
+   Mas 9 cm, como as laterais, também não serve — e foi o primeiro valor, com o
+   relato "está faltando o frame metálico inferior, está cortando antes do final
+   dele". O frame da testeira não é o trilho da saia lateral: é a travessa
+   dianteira, mais alta, e ela desce abaixo da linha em que a lateral já acabou.
+   22 cm fecham a travessa inteira e param antes do conjunto do pino-rei e das
+   patolas, que é o "nada do chassi" do mesmo pedido. */
+const M_BOTTOM: Record<SnapshotKey, number> = { left: 0.09, right: 0.09, rear: 0.31, front: 0.22 };
 
-/** Fatia de profundidade fotografada, a partir da pele: para FORA e para
- *  DENTRO. Fora cobre a ferragem mais saliente (SKIN_OUT do medidor de área é
- *  0,20) sem alcançar o rodado; dentro, o suficiente para a saia e o trilho — e
- *  pouco o bastante para o interior do baú nunca entrar no quadro. */
-const D_OUT = 0.30;
+/* Fatia de profundidade fotografada, a partir da pele: para FORA e para DENTRO.
+   Dentro, o suficiente para a saia e o trilho — e pouco o bastante para o
+   interior do baú nunca entrar no quadro. */
+/**
+ * A fatia PARA FORA é por face, e a TESTEIRA precisa de muito mais.
+ *
+ * Trinta centímetros cobrem a ferragem mais saliente de uma lateral (o medidor
+ * de área usa `SKIN_OUT = 0,20`) sem alcançar o rodado. Na frente há uma peça
+ * que não é ferragem: o THERMO KING, montado na testeira, com **451 mm de
+ * profundidade** (`thermoking_meta.json`, `dims.d`). Com 30 cm o plano PRÓXIMO
+ * da ortográfica caía 151 mm dentro dele — a carcaça aparecia com o miolo
+ * decepado, que é o "a parte central do Thermo King está sendo cortada".
+ *
+ * 0,75 m dá os 451 mm mais folga para o suporte e as mangueiras. Podia ser
+ * arriscado: o CAVALO fica logo à frente, e o engate é justamente clampeado
+ * contra `tkDepth` — ou seja a traseira da cabine está a poucos centímetros do
+ * fim do Thermo King. Não é, porque o cavalo sai de cena durante o disparo (ver
+ * `hide` em `takeFaceSnapshots`), que é a resposta certa de qualquer forma: o
+ * retrato é do IMPLEMENTO.
+ */
+const D_OUT: Record<SnapshotKey, number> = {
+  left: 0.30, right: 0.30, rear: 0.30, front: 0.75,
+};
 /**
  * E a fatia PARA DENTRO é por face, porque a traseira tem uma peça funda.
  *
@@ -176,7 +210,7 @@ const D_OUT = 0.30;
  * oclui todo o interior do baú acima da travessa, então aumentar a fatia só
  * revela o que está ABAIXO das folhas — que é justamente a travessa.
  */
-const D_IN: Record<SnapshotKey, number> = { left: 0.30, right: 0.30, rear: 0.60 };
+const D_IN: Record<SnapshotKey, number> = { left: 0.30, right: 0.30, rear: 0.60, front: 0.30 };
 
 /** Densidades: lateral tem 15 m — o teto de textura manda; a traseira é
  *  pequena e merece mais pixel por metro. */
@@ -229,7 +263,7 @@ const invisible = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.D
       o que impede a fita refletiva e o inox de virarem manchas brancas sem
       forma —, e cravada porque o preset da cena mexe na exposição do
       renderizador principal e o painel não pode seguir junto. Uma só porque as
-      três faces são o mesmo documento; ver `EXPOSURE`. */
+      quatro faces são o mesmo documento; ver `EXPOSURE`. */
 /* Os quatro números da luz, e como eles foram escolhidos: MEDINDO a foto.
    `checks-livery-registro.mjs` lê a luminância média do miolo da chapa, a
    fração de pixels estourados (≥ 254 nos três canais) e a fração escura
@@ -273,52 +307,76 @@ const FILL_INTENSITY = 1.9;
  */
 const ENV_GAIN = 1.0;
 /**
- * A exposição base, e um APARO por face.
+ * A EXPOSIÇÃO É UMA SÓ PARA AS QUATRO FACES — e chegar a isso levou três voltas.
  *
- * O pedido é *"os 3 devem ter um mesmo nível de exposição"*, e o que ele quer
- * dizer é o RESULTADO: as três faces têm de ler como o mesmo documento. Houve
- * uma versão aqui que compensava a traseira com quase o dobro de exposição, e
+ * O pedido sempre foi *"os 3 devem ter um mesmo nível de exposição"*, e o que
+ * ele quer dizer é o RESULTADO: as faces têm de ler como o mesmo documento.
+ * Houve uma versão que compensava a traseira com quase o dobro de exposição, e
  * ela estava errada — não pelo mecanismo, mas porque mascarava dois DEFEITOS,
- * que foram corrigidos onde nasciam:
+ * corrigidos onde nasciam:
  *
  *   1. o `envMap` da sonda chegava vazio neste renderizador e todo metal
  *      renderizava preto (ver a troca de `envMap` em `snapFace`);
  *   2. o ambiente é uma CAIXA, e cada face a via de um ângulo diferente (ver
  *      `envRot`, também em `snapFace`).
  *
- * Com os dois resolvidos sobrou uma diferença pequena e REAL: medido, as
- * laterais ficam em 234–238 de mediana e a traseira em 247. Não é defeito de
- * luz — é a folha da porta, que tem albedo mais alto que a chapa do corpo. A
- * 247 ela lê a dois passos do branco puro, que foi o relato: *"está muito
- * esbranquiçada"*.
+ * Depois deles sobrou um `EXPOSURE_TRIM` por face — 1,00 nas laterais contra
+ * 0,52 nas pontas —, calibrado a olho sobre o baú BRANCO. Ele foi o último a
+ * cair, e caiu com número: `logExposure()` (leia o bloco dele) mediu as quatro
+ * faces nos dois estados que importam.
  *
- * O APARO É GRANDE PORQUE A CURVA É QUASE HORIZONTAL ALI, e isso surpreende:
- * a 246 a chapa da traseira está no OMBRO do ACES, onde a curva quase não
- * anda. Medido: cortar 14 % da exposição moveu a mediana de 247 para 246 — um
- * nível. Para trazê-la à faixa das laterais é preciso cortar cerca de metade,
- * e o número parece agressivo só porque se está lendo a saída; na entrada é a
- * diferença normal entre duas superfícies brancas com albedos diferentes.
+ *                    BRANCO DE FÁBRICA          PINTADO DE PRETO
+ *     lateral        232   (exposição 1,145)     47   (exposição 1,145)
+ *     traseira       238   (exposição 0,754)     22   (exposição 0,754)
+ *     testeira       227   (exposição 0,754)     22   (exposição 0,754)
  *
- * Este é o único aparo empírico do arquivo, e ele é a última linha de defesa,
- * não a primeira: se as três voltarem a divergir muito, a causa está em outro
- * lugar — como esteve nas duas vezes anteriores.
+ * Ceifado (250+ nos três canais): 0,0 % nas laterais e na frente, 0,3 % na
+ * traseira. Ou seja o estouro que motivou a rodada anterior já não existia — e
+ * mesmo assim a lateral estava errada, de um jeito que só o baú PINTADO
+ * mostrava: com tinta preta ela lia **mais que o dobro** das duas pontas.
+ *
+ * A LEITURA DOS NÚMEROS, e ela é o argumento inteiro. Compare lateral e
+ * testeira, que são a MESMA chapa de corpo, sob 52 % mais exposição na lateral:
+ *
+ *   · no branco, 52 % de exposição a mais valem **cinco níveis** (227 → 232).
+ *     A chapa branca está no OMBRO do ACES, onde a curva é quase horizontal;
+ *   · no preto, os mesmos 52 % valem **mais que o dobro** (22 → 47). A tinta
+ *     escura está no PÉ da curva, onde a resposta é quase linear.
+ *
+ * Isto é o que a calibração a olho não tinha como ver: um aparo escolhido sobre
+ * a chapa branca é praticamente GRATUITO na chapa branca e CARÍSSIMO na
+ * pintada. Igualar a exposição custa ~5 níveis num caso e conserta um fator de
+ * dois no outro — não é um meio-termo, é ganho dos dois lados.
+ *
+ * Sobra uma diferença real entre a lateral e as pontas, e ela FICA: dos 2,14×
+ * medidos no preto, ~1,52× era exposição e ~1,4× é a lateral ser FRISADA. Cada
+ * friso é um meio-cilindro e, num render ortográfico de frente, todos devolvem
+ * a mesma banda especular ao mesmo tempo. Uma lateral frisada preta é mais
+ * clara que uma porta traseira plana preta — no baú de verdade também é, e um
+ * retrato que apagasse isso mentiria.
+ *
+ * Se uma face voltar a divergir, `logExposure()` diz qual e quanto ANTES de
+ * alguém inventar um número. Um aparo por face é fácil de reintroduzir; o que
+ * não se recupera é a medição que justifica o valor dele.
  */
-const EXPOSURE = 1.45;
-const EXPOSURE_TRIM: Record<SnapshotKey, number> = { left: 1, right: 1, rear: 0.52 };
+const EXPOSURE = 0.754;
+
 
 let renderer: THREE.WebGLRenderer | null = null;
 let benchEnv: THREE.Texture | null = null;
 
-function rendererFor(w: number, h: number, key: SnapshotKey) {
+function rendererFor(w: number, h: number) {
   if (!renderer) {
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
   }
-  /* FORA do `if`: o aparo é por face e o renderizador é um só, reusado nas
-     três. Deixá-lo na criação daria o aparo da PRIMEIRA face às outras duas. */
-  renderer.toneMappingExposure = EXPOSURE * EXPOSURE_TRIM[key];
+  /* FORA do `if`, mesmo com a exposição sendo uma só: um renderizador reusado
+     entre quatro faces não pode depender de ninguém ter escrito isto na
+     criação — foi assim que o aparo por face, quando existia, vazava da
+     primeira face para as outras. */
+  renderer.toneMappingExposure = EXPOSURE;
   renderer.setSize(w, h, false);
   return renderer;
 }
@@ -372,11 +430,19 @@ function attrBox(mesh: THREE.Mesh): THREE.Box3 {
 
 /** Os eixos LOCAIS do desenho de cada face — os mesmos de `addLiveryUV()`:
  *  u corre o comprimento no sentido em que o painel é lido de fora, v desce. */
-const AXES: Record<SnapshotKey, { u: THREE.Vector3; skin: 'minX' | 'maxX' | 'minZ' }> = {
+const AXES: Record<SnapshotKey, { u: THREE.Vector3; skin: 'minX' | 'maxX' | 'minZ' | 'maxZ' }> = {
   left: { u: new THREE.Vector3(0, 0, 1), skin: 'minX' },
   right: { u: new THREE.Vector3(0, 0, -1), skin: 'maxX' },
   rear: { u: new THREE.Vector3(-1, 0, 0), skin: 'minZ' },
+  /* A testeira corre ao CONTRÁRIO da traseira — quem a olha está na frente do
+     baú e vê o +X à direita. É o mesmo espelho que `addLiveryUV()` aplica, e as
+     duas tabelas têm de concordar ou o retrato sai invertido em relação à arte
+     que ele emoldura. */
+  front: { u: new THREE.Vector3(1, 0, 0), skin: 'maxZ' },
 };
+
+/** As faces de PONTA: o painel delas corre no X e a pele é um plano de z. */
+const isEndSkin = (skin: string) => skin === 'minZ' || skin === 'maxZ';
 
 /* ---------------- A ÁREA PINTÁVEL, MEDIDA NA FERRAGEM ----------------
    O passe da FRENTE já é, por construção, a resposta: ele contém exatamente o
@@ -440,10 +506,13 @@ function measurePaintRect(crop: HTMLCanvasElement): PaintRect {
 
 interface RawShot { bgCanvas: HTMLCanvasElement; snap: FaceSnapshot }
 
-function snapFace(scene: THREE.Scene, panel: THREE.Mesh): RawShot | null {
+function snapFace(
+  scene: THREE.Scene, panel: THREE.Mesh, alsoHide: THREE.Object3D[],
+): RawShot | null {
   const lb = attrBox(panel);
   const key: SnapshotKey = panel.name === 'SIDE_L' ? 'left'
-    : panel.name === 'SIDE_R' ? 'right' : 'rear';
+    : panel.name === 'SIDE_R' ? 'right'
+      : panel.name === 'FRONT' ? 'front' : 'rear';
   const axes = AXES[key];
   const mBottom = M_BOTTOM[key];
   const mSide = M_SIDE[key];
@@ -452,12 +521,14 @@ function snapFace(scene: THREE.Scene, panel: THREE.Mesh): RawShot | null {
   const chapaH = lb.max.y - lb.min.y;
   if (!(chapaW > 0.5 && chapaH > 0.5)) return null;
 
-  const skinAt = axes.skin === 'minX' ? lb.min.x : axes.skin === 'maxX' ? lb.max.x : lb.min.z;
+  const skinAt = axes.skin === 'minX' ? lb.min.x
+    : axes.skin === 'maxX' ? lb.max.x
+      : axes.skin === 'maxZ' ? lb.max.z : lb.min.z;
 
   /* Centro do QUADRO em coordenadas locais: o centro da chapa deslocado por
      meia diferença de margens (as laterais são iguais; a vertical não). */
   const c = lb.getCenter(new THREE.Vector3());
-  if (axes.skin === 'minZ') c.z = skinAt; else c.x = skinAt;
+  if (isEndSkin(axes.skin)) c.z = skinAt; else c.x = skinAt;
   c.y += (M_TOP - mBottom) / 2;
 
   const frameW = chapaW + 2 * mSide;
@@ -471,13 +542,13 @@ function snapFace(scene: THREE.Scene, panel: THREE.Mesh): RawShot | null {
   const outW = new THREE.Vector3().crossVectors(uW, upW).normalize();
   const centerW = c.clone().applyMatrix4(m);
 
-  const ppm = axes.skin === 'minZ' ? REAR_PPM : Math.min(190, SIDE_MAX_W / frameW);
+  const ppm = isEndSkin(axes.skin) ? REAR_PPM : Math.min(190, SIDE_MAX_W / frameW);
   const wPx = Math.max(64, Math.round(frameW * ppm));
   const hPx = Math.max(64, Math.round(frameH * ppm));
 
-  const rr = rendererFor(wPx, hPx, key);
+  const rr = rendererFor(wPx, hPx);
   const cam = new THREE.OrthographicCamera(-frameW / 2, frameW / 2, frameH / 2, -frameH / 2,
-    3 - D_OUT, 3 + D_IN[key]);
+    3 - D_OUT[key], 3 + D_IN[key]);
   const rot = new THREE.Matrix4().makeBasis(uW, upW, outW);
   cam.quaternion.setFromRotationMatrix(rot);
   cam.position.copy(centerW).addScaledVector(outW, 3);
@@ -625,6 +696,16 @@ function snapFace(scene: THREE.Scene, panel: THREE.Mesh): RawShot | null {
      A geometria PRÓPRIA dos rebites fica — ela é relevo do painel e tem de
      aparecer na foto. Some só a camada de arte que veste esse relevo. */
   const hidden: THREE.Object3D[] = [];
+  /* O CAVALO SAI DE CENA, e não é um caso especial da testeira: o retrato é do
+     IMPLEMENTO, e a cabine nunca fez parte de nenhuma das quatro faces. Nas
+     laterais e na traseira ela já ficava fora por acidente — a fatia de 30 cm
+     do plano próximo não a alcançava —, e esse acidente deixa de valer na
+     FRENTE, onde a cabine está encostada e a fatia teve de crescer para caber o
+     Thermo King (ver `D_OUT`). Escondê-la é o que torna aquela fatia segura.
+     Restaurado no mesmo `finally` que devolve as luzes e a arte. */
+  for (const o of alsoHide) {
+    if (o.visible) { o.visible = false; hidden.push(o); }
+  }
   const root = panel.parent ?? panel;
   root.traverse((node) => {
     const o = node as THREE.Mesh;
@@ -727,6 +808,58 @@ function snapFace(scene: THREE.Scene, panel: THREE.Mesh): RawShot | null {
   };
 }
 
+/**
+ * O DIAGNÓSTICO DA EXPOSIÇÃO — mediana e fração ceifada, por face.
+ *
+ * A exposição é o único número empírico deste arquivo, e até aqui cada ajuste
+ * dela foi feito com os olhos e defendido com medições que moravam num script de
+ * bancada (`checks-livery-registro.mjs`) que ninguém roda junto com o app. O
+ * resultado previsível: as duas notas de calibração antigas se CONTRADIZIAM
+ * sobre qual face era a mais clara, porque foram escritas em momentos diferentes
+ * e nenhuma foi refeita quando a outra mudou. Foi este diagnóstico que aposentou
+ * o `EXPOSURE_TRIM` por face — ver o bloco de `EXPOSURE`.
+ *
+ * Isto põe o número no console a cada retrato, ao lado da face que ele descreve.
+ * Não corrige nada sozinho — mas transforma a próxima rodada de "acho que a
+ * lateral está estourando" em "lateral 241, 8,3 % ceifado", que é uma frase que
+ * se pode agir.
+ *
+ * SUBAMOSTRADO a cada 8 pixels nos dois eixos (1/64 dos pontos): a lateral tem
+ * 1,5 M de pixels e a mediana de uma amostra de 24 k é indistinguível da mediana
+ * exata para esta finalidade. O custo é ~1 ms por face.
+ *
+ * `CEIFADO` conta o pixel com os três canais em 250+, que é onde o ACES já não
+ * separa mais nada — é a medida que a MEDIANA não dá, e é justamente a que
+ * descreve o defeito da lateral frisada.
+ */
+function logExposure(key: SnapshotKey, cnv: HTMLCanvasElement) {
+  const ctx = cnv.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+  let data: Uint8ClampedArray;
+  try { data = ctx.getImageData(0, 0, cnv.width, cnv.height).data; } catch { return; }
+  const hist = new Uint32Array(256);
+  let n = 0, clipped = 0;
+  for (let y = 0; y < cnv.height; y += 8) {
+    for (let x = 0; x < cnv.width; x += 8) {
+      const i = (y * cnv.width + x) * 4;
+      /* Só o que É a foto: o quadro tem alfa 0 em volta da chapa, e contar o
+         vazio como preto puxaria a mediana para baixo de forma diferente em cada
+         face (a lateral tem margem lateral de 15 cm, a traseira de 3). */
+      if (data[i + 3] < 24) continue;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      hist[Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)]++;
+      if (r >= 250 && g >= 250 && b >= 250) clipped++;
+      n++;
+    }
+  }
+  if (!n) return;
+  let acc = 0, median = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n / 2) { median = v; break; } }
+  console.info(`[livery] retrato ${key} · mediana ${median}`
+    + ` · ceifado ${(100 * clipped / n).toFixed(1)} %`
+    + ` · exposição ${EXPOSURE.toFixed(3)}`);
+}
+
 /** WebP quando o navegador dá (~6× menor); PNG na degradação do próprio
  *  `toBlob`. ASSÍNCRONO de propósito: a codificação sai da thread principal, e
  *  era ela — não os renders — que respondia pelo grosso dos 723 ms medidos. */
@@ -759,8 +892,12 @@ const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()
 export async function takeFaceSnapshots(
   scene: THREE.Scene, trailerRoot: THREE.Object3D,
   onFace: (key: SnapshotKey, snap: FaceSnapshot) => void,
+  /** O que mais tem de sair de cena durante o disparo — hoje, o cavalo. */
+  alsoHide: THREE.Object3D[] = [],
 ): Promise<void> {
-  const names: Record<string, SnapshotKey> = { SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear' };
+  const names: Record<string, SnapshotKey> = {
+    SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear', FRONT: 'front',
+  };
   const panels: [SnapshotKey, THREE.Mesh][] = [];
   trailerRoot.traverse((node) => {
     const o = node as THREE.Mesh;
@@ -780,8 +917,9 @@ export async function takeFaceSnapshots(
        entre as duas e nenhuma face divide tarefa com nada. */
     await nextFrame();
     try {
-      const shot = snapFace(scene, mesh);
+      const shot = snapFace(scene, mesh, alsoHide);
       if (!shot) continue;
+      logExposure(key, shot.bgCanvas);
       shot.snap.bg = await encodeBg(shot.bgCanvas);
       onFace(key, shot.snap);
     } catch (e: unknown) {
