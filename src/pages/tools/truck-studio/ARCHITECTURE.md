@@ -1362,3 +1362,51 @@ ser arrastada `FOCUS_PAN_F · r`; quem segura a lente longe da LATARIA é
 `FOCUS_SKIN`, a expulsão da caixa, que estava em 0,45 m. Os dois subiram
 (1,00 · r e 1,50 m) e a bancada `checks-zoom-0813.mjs` mede o que importa —
 folga mínima medida em oito azimutes, com a mira no pior lugar possível.
+
+## 15. 2026-08-14 — o teto sem chapa no card, e a assimetria que o produziu
+
+*"o teto do implemento no card do livery está transparente, mas quando abro o
+modal do livery ele fica branco como deveria"*.
+
+A chapa que aparece atrás da arte é a MESMA variável nos dois lugares
+(`--ts-implement`), mas o CSS a entrega por caminhos diferentes:
+
+```
+  palco   .stage-panel .canvas-container            → sempre
+  card    .ts-panel.ts-pw-ready .ts-panel__media canvas → só com a classe
+```
+
+Quem liga `.ts-pw-ready` é `publishWindow()` (vehicle/livery.ts), e ela só roda
+quando a face TEM uma janela. As outras quatro ganham a delas por um de dois
+caminhos — a foto de degradação medida ou o retrato ortográfico. **O teto não
+tem nenhum dos dois, e por construção**: não tem foto (a prancha do cliente
+nunca desenhou o teto) e não é `SnapshotKey` — `livery-snapshot.ts` fotografa as
+quatro CHAPAS RECORTADAS, e o teto é malha do corpo paramétrico
+(`tagRoofLiveryUV`). Ou seja, a face que §14.6 acabou de criar caiu no único
+buraco que a arquitetura do painel tinha, e o palco não denunciou porque a regra
+dele não depende da classe.
+
+A correção é uma **janela sintética** — a chapa inteira, sem moldura vazada a
+encaixar —, recalculada a cada rebuild a partir de `PANEL_MM.roof`, porque a
+razão do teto muda com o comprimento do baú. De quebra ela conserta um segundo
+sintoma que ninguém tinha relatado ainda: `sizePreviewCanvas()` também se
+guardava em `windows[key]`, então o buffer da miniatura do teto ficava no
+600 × 106 literal do template enquanto a tela do fabric seguia a chapa medida —
+a arte saía esticada na razão entre as duas.
+
+E `PANEL_IMAGE.roof` virou `null` em vez de um caminho para um arquivo que nunca
+existiu: as outras quatro apontam para fotos que EXISTIRAM e podem voltar (o 404
+delas é estado de pacote), o teto não tem para onde voltar, e um `url()`
+garantidamente perdido a cada publicação não é degradação — é request jogado
+fora.
+
+Trava: `checks-teto-card-0814.mjs`, que compara os DOIS lados na mesma sessão —
+"o card está branco" isolado passaria com o palco quebrado do mesmo jeito.
+
+**A bancada também mudou**, e vale para qualquer investigação futura: ela forçava
+`DISPLAY=:1` no navegador. Fora da estação que tem um X naquele número o ANGLE
+responde `Could not create a WebGL context … BindToCurrentSequence failed`, com o
+VENDOR da placa no meio — um erro que manda procurar defeito no hardware quando
+o que falta é a tela, e que aparecia ATÉ no caminho SwiftShader, onde nenhum dos
+dois é necessário. Agora o `:1` só é chutado com `--gpu`, e o console da página
+é impresso quando o boot falha (a mensagem mandava olhá-lo e não havia por onde).

@@ -210,6 +210,24 @@ const GPU_ARGS = ['--use-gl=angle', '--use-angle=gl', '--enable-gpu', '--ignore-
 const SOFT_ARGS = ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader',
   '--enable-unsafe-swiftshader'];
 
+/* DISPLAY SÓ QUANDO ELE EXISTE, e só no caminho da placa.
+   `DISPLAY: process.env.DISPLAY || ':1'` era o atalho da estação que tem um X
+   naquele número. Fora dela — sessão por SSH, CI, este contêiner — o `:1` é um
+   socket que não existe, e o ANGLE responde com
+
+     Could not create a WebGL context, VENDOR = 0x1002, DEVICE = 0x15d8 …
+     ErrorMessage = BindToCurrentSequence failed
+
+   ou seja: um erro que nomeia a PLACA quando o que falta é a tela, e que
+   aparece ATÉ no caminho de software, onde nenhuma das duas é necessária. O
+   SwiftShader não abre display nenhum; quem precisa de um é `--gpu`, e para
+   esse o `:1` continua sendo o palpite útil. */
+function browserEnv() {
+  const env = { ...process.env };
+  if (flag('gpu') && !env.DISPLAY) env.DISPLAY = ':1';
+  return env;
+}
+
 async function launch() {
   const proc = spawn(SHELL, [
     '--headless', '--no-sandbox', '--hide-scrollbars',
@@ -218,7 +236,7 @@ async function launch() {
        `new WebGLRenderer()`, que roda no tempo de import. */
     ...(flag('gpu') ? GPU_ARGS : SOFT_ARGS),
     'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, DISPLAY: process.env.DISPLAY || ':1' } });
+  ], { stdio: ['ignore', 'ignore', 'pipe'], env: browserEnv() });
 
   const wsUrl = await new Promise((ok, fail) => {
     let buf = '';
@@ -299,7 +317,20 @@ async function main() {
   const checks = await readFile(join(HERE, opt('checks', 'checks.mjs')), 'utf8');
   const ready = await evalIn(send, sessionId,
     'return await new Promise(r => { const t=setInterval(()=>{ if(window.__bench){clearInterval(t);r(true);} },100); setTimeout(()=>{clearInterval(t);r(false);},30000); });');
-  if (!ready) throw new Error('__bench não apareceu — o boot falhou (veja o console da página)');
+  if (!ready) {
+    /* O console da página SAI JUNTO. A mensagem manda olhá-lo, e até aqui não
+       havia por onde: os `console.error` da página estão coletados em `logs`,
+       que só era impresso depois do relatório — ou seja, nunca no caminho em
+       que o boot falha, que é justamente quando eles são a única pista. */
+    if (logs.length) {
+      console.error('console da página:');
+      for (const l of logs.slice(-40)) console.error('   ', l);
+    } else {
+      console.error('(o console da página não registrou erro nenhum —'
+        + ' tente --verbose para ver todas as linhas)');
+    }
+    throw new Error('__bench não apareceu — o boot falhou (veja o console da página)');
+  }
 
   const report = await evalIn(send, sessionId, checks);
 
