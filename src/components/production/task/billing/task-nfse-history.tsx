@@ -162,6 +162,7 @@ export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
           previousRejectionMessage={
             cancelTarget.status === "CANCEL_REJECTED" ? cancelTarget.cancelRejectionMessage : null
           }
+          supersededByNfseNumber={cancelTarget.supersededByNfseNumber}
           onCancelled={() => setCancelTarget(null)}
         />
       )}

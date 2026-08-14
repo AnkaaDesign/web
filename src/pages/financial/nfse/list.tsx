@@ -5,7 +5,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useNfseList } from "@/hooks/financial/use-nfse";
-import { useCancelNfse } from "@/hooks/production/use-invoice";
+import { useCancelNfse, useCancelNfseByDocument } from "@/hooks/production/use-invoice";
 import type { ElotechNfseListItem } from "@/types/invoice";
 import { formatCurrency, formatDate } from "@/utils";
 import { Badge } from "@/components/ui/badge";
@@ -403,6 +403,7 @@ export function NfseListContent() {
   const [cancelReasonCode, setCancelReasonCode] = useState("1");
   const [cancelSubstituteNumber, setCancelSubstituteNumber] = useState("");
   const cancelNfse = useCancelNfse();
+  const cancelNfseByDocument = useCancelNfseByDocument();
 
   // Close context menu on outside click
   useEffect(() => {
@@ -516,8 +517,13 @@ export function NfseListContent() {
     }
   }, [contextMenu]);
 
-  // Substitute NF number is required by the prefeitura when the reason is Duplicidade (code 4)
-  const substituteRequired = cancelReasonCode === "4";
+  // A substituta é exigida em Duplicidade (código 4) e também quando a prefeitura já recusou
+  // este cancelamento — o fiscal de Ibiporã pede o número da nota substituta em qualquer
+  // motivo, e reenviar sem ela só queima outra recusa.
+  const previouslyRejected =
+    cancelTarget?.cancelRequestStatus === "REJEITADO" ||
+    cancelTarget?.localStatus === "CANCEL_REJECTED";
+  const substituteRequired = cancelReasonCode === "4" || !!previouslyRejected;
 
   // Submit cancel
   const handleConfirmCancel = useCallback(() => {
@@ -528,28 +534,40 @@ export function NfseListContent() {
       );
       return;
     }
-    if (cancelReasonCode === "4" && !cancelSubstituteNumber.trim()) {
+    if (substituteRequired && !cancelSubstituteNumber.trim()) {
       toast.error(
-        "Informe o número da nota fiscal substituta para cancelamento por duplicidade.",
+        cancelReasonCode === "4"
+          ? "Informe o número da nota fiscal substituta para cancelamento por duplicidade."
+          : "A prefeitura já recusou este cancelamento pedindo o número da nota substituta. Informe-o antes de reenviar.",
       );
       return;
     }
-    if (!cancelTarget.invoiceId || !cancelTarget.nfseDocumentId) return;
+    if (!cancelTarget.nfseDocumentId) return;
 
-    cancelNfse.mutate(
+    const data = {
+      reason: cancelReason,
+      reasonCode: Number(cancelReasonCode),
+      substituteNfseNumber: cancelSubstituteNumber.trim()
+        ? Number(cancelSubstituteNumber)
+        : undefined,
+    };
+
+    // Sem invoiceId (nota órfã de uma reversão) usa o endpoint por documento, que atende
+    // qualquer nota. Antes, essas notas simplesmente não tinham como ser canceladas.
+    const mutation = cancelTarget.invoiceId
+      ? cancelNfse.mutate.bind(null, {
+          invoiceId: cancelTarget.invoiceId,
+          nfseDocumentId: cancelTarget.nfseDocumentId,
+          data,
+        })
+      : cancelNfseByDocument.mutate.bind(null, {
+          nfseDocumentId: cancelTarget.nfseDocumentId,
+          data,
+        });
+
+    mutation(
       {
-        invoiceId: cancelTarget.invoiceId,
-        nfseDocumentId: cancelTarget.nfseDocumentId,
-        data: {
-          reason: cancelReason,
-          reasonCode: Number(cancelReasonCode),
-          substituteNfseNumber: cancelSubstituteNumber.trim()
-            ? Number(cancelSubstituteNumber)
-            : undefined,
-        },
-      },
-      {
-        onSuccess: (result) => {
+        onSuccess: (result: any) => {
           // The backend message already states pending/rejected/cancelled appropriately.
           if (result?.message) {
             if (result.rejected) {
@@ -566,12 +584,24 @@ export function NfseListContent() {
         },
       },
     );
-  }, [cancelTarget, cancelReason, cancelReasonCode, cancelSubstituteNumber, cancelNfse, refetch]);
+  }, [
+    cancelTarget,
+    cancelReason,
+    cancelReasonCode,
+    cancelSubstituteNumber,
+    substituteRequired,
+    cancelNfse,
+    cancelNfseByDocument,
+    refetch,
+  ]);
 
   // Can cancel/re-request: emitida (still active at Elotech — includes rejected requests),
-  // not yet cancelled, and linked to a local invoice + NFS-e document.
+  // not yet cancelled, and linked to a local NFS-e document.
+  // Não exige invoiceId: a fatura some quando o faturamento é revertido, e é justamente essa
+  // nota órfã — viva na prefeitura — que precisa do reenvio. O dialog já usa o endpoint
+  // por documento nesse caso.
   const canCancelItem = (item: ElotechNfseListItem) =>
-    item.emitida && !item.cancelada && !!item.invoiceId && !!item.nfseDocumentId;
+    item.emitida && !item.cancelada && !!item.nfseDocumentId;
 
   return (
     <>

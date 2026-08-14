@@ -82,7 +82,17 @@ async function bundle() {
        buscar. Sem isto o esbuild tenta achá-las no disco e falha. O servidor
        abaixo serve `/fonts/` de `web/public`, então elas carregam de verdade. */
     external: ['/fonts/*', '/vendor/*'],
-    define: { 'import.meta.env.VITE_STUDIO_ASSETS_BASE': '"/studio-assets/v1"' },
+    /* `DEV` FALSO, e a escolha é deliberada: a bancada valida a FORMA QUE
+       SOBE, e o que sobe é o build de produção. Com `DEV` verdadeiro ela
+       exercitaria o bloco de diagnóstico do painel de qualidade — que em
+       produção o Rollup remove da árvore — e passaria a garantir um caminho que
+       nenhum usuário executa.
+       Vale acrescentar `import.meta.env.DEV: 'true'` à mão para depurar o outro
+       ramo. Ver a nota de `buildQualitySection()` em ui/hud.ts. */
+    define: {
+      'import.meta.env.VITE_STUDIO_ASSETS_BASE': '"/studio-assets/v1"',
+      'import.meta.env.DEV': 'false',
+    },
   });
   const js = out.outputFiles.find((f) => f.path.endsWith('.js'));
   const css = out.outputFiles.find((f) => f.path.endsWith('.css'));
@@ -206,9 +216,58 @@ const SHELL = findShell();
    `--use-angle=gl` e não `vulkan`: os dois funcionam aqui, mas o caminho GL é o
    que o Chromium usa em desktop Linux quando a placa é aceita, ou seja é o mais
    próximo do que o usuário final vê. */
-const GPU_ARGS = ['--use-gl=angle', '--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'];
+/* ---------------- E O CAMINHO SEM TELA NENHUMA (2026-08-14) ----------------
+   O parágrafo acima está certo para uma estação com X. Numa máquina headless
+   com Mesa — este servidor, um CI com placa, um contêiner — `--use-angle=gl`
+   devolve **WebGL2 indisponível**, e o Chromium cai calado no llvmpipe: a
+   bancada roda, relata `renderer` de software e mede um fps que não responde
+   pergunta nenhuma.
+
+   MEDIDO aqui, nas quatro combinações, com uma sonda de uma página:
+
+     --use-gl=egl                       webgl2: false
+     --ozone-platform=headless --use-gl=egl   webgl2: false
+     --use-angle=vulkan                 ANGLE (AMD, Vulkan … RADV RAVEN)   ✔
+     --use-angle=gles-egl               ANGLE (AMD, radeonsi raven ACO)    ✔
+
+   `gles-egl` é o que se adota quando alguém pede, porque ele expõe também
+   `ASTC` e `KHR_parallel_shader_compile`, que o caminho Vulkan não expôs.
+
+   ⚠️ O PADRÃO NÃO MUDOU, de propósito: quem tem X continua recebendo
+   `--use-angle=gl`, que é o que o Chromium de desktop Linux usa de verdade e
+   portanto o mais próximo do que o usuário final vê. O caminho headless é uma
+   ESCOLHA explícita, por variável de ambiente, porque ele é menos representativo
+   e não deve virar o padrão de ninguém sem querer.
+
+     STUDIO_BENCH_GPU_ARGS='--use-gl=angle --use-angle=gles-egl --enable-gpu --ignore-gpu-blocklist' \
+       node tools/studio-bench/bench.mjs --gpu --geometry
+
+   E o `DISPLAY` abaixo: com a variável definida, `browserEnv()` não inventa o
+   `:1`, então basta exportar `DISPLAY=` vazio — ou usar a variável acima, que é
+   o caminho documentado. */
+const GPU_ARGS = process.env.STUDIO_BENCH_GPU_ARGS
+  ? process.env.STUDIO_BENCH_GPU_ARGS.split(/\s+/).filter(Boolean)
+  : ['--use-gl=angle', '--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'];
 const SOFT_ARGS = ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader',
   '--enable-unsafe-swiftshader'];
+
+/* DISPLAY SÓ QUANDO ELE EXISTE, e só no caminho da placa.
+   `DISPLAY: process.env.DISPLAY || ':1'` era o atalho da estação que tem um X
+   naquele número. Fora dela — sessão por SSH, CI, este contêiner — o `:1` é um
+   socket que não existe, e o ANGLE responde com
+
+     Could not create a WebGL context, VENDOR = 0x1002, DEVICE = 0x15d8 …
+     ErrorMessage = BindToCurrentSequence failed
+
+   ou seja: um erro que nomeia a PLACA quando o que falta é a tela, e que
+   aparece ATÉ no caminho de software, onde nenhuma das duas é necessária. O
+   SwiftShader não abre display nenhum; quem precisa de um é `--gpu`, e para
+   esse o `:1` continua sendo o palpite útil. */
+function browserEnv() {
+  const env = { ...process.env };
+  if (flag('gpu') && !env.DISPLAY) env.DISPLAY = ':1';
+  return env;
+}
 
 async function launch() {
   const proc = spawn(SHELL, [
@@ -218,7 +277,7 @@ async function launch() {
        `new WebGLRenderer()`, que roda no tempo de import. */
     ...(flag('gpu') ? GPU_ARGS : SOFT_ARGS),
     'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, DISPLAY: process.env.DISPLAY || ':1' } });
+  ], { stdio: ['ignore', 'ignore', 'pipe'], env: browserEnv() });
 
   const wsUrl = await new Promise((ok, fail) => {
     let buf = '';
@@ -299,7 +358,20 @@ async function main() {
   const checks = await readFile(join(HERE, opt('checks', 'checks.mjs')), 'utf8');
   const ready = await evalIn(send, sessionId,
     'return await new Promise(r => { const t=setInterval(()=>{ if(window.__bench){clearInterval(t);r(true);} },100); setTimeout(()=>{clearInterval(t);r(false);},30000); });');
-  if (!ready) throw new Error('__bench não apareceu — o boot falhou (veja o console da página)');
+  if (!ready) {
+    /* O console da página SAI JUNTO. A mensagem manda olhá-lo, e até aqui não
+       havia por onde: os `console.error` da página estão coletados em `logs`,
+       que só era impresso depois do relatório — ou seja, nunca no caminho em
+       que o boot falha, que é justamente quando eles são a única pista. */
+    if (logs.length) {
+      console.error('console da página:');
+      for (const l of logs.slice(-40)) console.error('   ', l);
+    } else {
+      console.error('(o console da página não registrou erro nenhum —'
+        + ' tente --verbose para ver todas as linhas)');
+    }
+    throw new Error('__bench não apareceu — o boot falhou (veja o console da página)');
+  }
 
   const report = await evalIn(send, sessionId, checks);
 

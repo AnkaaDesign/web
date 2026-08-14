@@ -177,7 +177,74 @@ interface Capa {
   uMin: { value: THREE.Vector3 };
   uMax: { value: THREE.Vector3 };
   uNivel: { value: number };
+  /**
+   * Esta capa foi REABERTA por nós (estava em `forcadasOpacas`), ou ela já era
+   * translúcida no bake?
+   *
+   * A distinção é o que autoriza o fecha-e-abre por nível descrito no bloco
+   * O EARLY-Z QUE A CAPA COBRAVA 24 H POR DIA. Uma capa que o bake autorou
+   * translúcida (o `cabin_mat_0006_glass_ex` do FH, opacidade 0,8 —
+   * para-brisa + janela lateral + capa NA MESMA PRIMITIVA) **nunca** pode ser
+   * fechada: fechá-la deixaria o para-brisa opaco. Só quem já tinha sido
+   * declarado opaco por `auditTransparency()` volta a sê-lo.
+   */
+  reaberta: boolean;
 }
+
+/* ---------------- O EARLY-Z QUE A CAPA COBRAVA 24 H POR DIA (2026-08-14) ------
+   O bloco A CAPA QUE JÁ TINHA SIDO FECHADA, acima, reabre `transparent` nos ~8
+   chassis Scania para que o fragmento possa abrir a janela de 24 cm do farol. O
+   que ele não dizia é o preço: `transparent === true` tira a malha do passe
+   OPACO para sempre — de dia inclusive, quando `tsCapaNivel` é 0 e o `mix()` do
+   `MAIN_FRAG` é comprovadamente um no-op (`mix(1.0, 0.18, x * 0.0) == 1.0`).
+   Ou seja: um efeito exclusivamente NOTURNO cobrando o passe opaco o dia todo.
+
+   A CONSEQUÊNCIA, medida na fonte do three r0.179:
+     · `WebGLRenderLists.push()` decide o balde por `material.transparent`; o
+       balde transparente é desenhado DEPOIS de todo o opaco e ordenado de trás
+       para a frente;
+     · `WebGLState.setMaterial()` liga o blending quando `transparent` é true e
+       o desliga (`NoBlending`) quando é false.
+   Devolver a malha ao balde opaco devolve as duas coisas. O ganho de early-Z em
+   si — a chapa dianteira do Scania rejeitando o que está atrás dela — é
+   ESTIMADO, não medido em hardware.
+
+   ⚠️ **E A RECOMPILAÇÃO? NÃO ACONTECE — e isto foi conferido linha a linha, não
+   suposto.** `transparent` É chave de cache de programa: `WebGLPrograms` deriva
+   `opaque: material.transparent === false && blending === NormalBlending &&
+   alphaToCoverage === false` e a alista como booleano do cache (camada 17).
+   MAS `WebGLRenderer.setProgram()` só reavalia os parâmetros quando
+   `material.version !== materialProperties.__version` — e a lista de exceções
+   que forçam `needsProgramChange` com a versão IGUAL (luzes, colorSpace,
+   instancing, skinning, envMap, fog, planos de corte, vertexAlphas,
+   vertexTangents, morphs, toneMapping…) **não inclui `transparent`**.
+
+   Logo, escrever `mat.transparent` SEM tocar `needsUpdate` muda o balde e o
+   blending e **não recompila nada**. É a diferença entre um botão quente e um
+   engasgo de dois segundos, e é a razão pela qual esta alternância é aceitável
+   num valor que muda continuamente durante o arrasto do relógio.
+
+   ⚠️ **O PREÇO DISSO É UM `#define` QUE FICA PARA TRÁS, E ELE TEM DE SER MORTO.**
+   Sem recompilar, o programa guarda o `OPAQUE` com que foi compilado da PRIMEIRA
+   vez. E `<opaque_fragment>` é `#ifdef OPAQUE diffuseColor.a = 1.0; #endif`. Ou
+   seja: um caminhão carregado de DIA compilaria a capa com `OPAQUE` e, à noite,
+   com `transparent` de volta em true e sem recompilação, o alfa continuaria
+   forçado em 1 — **a capa nunca clarearia, e em silêncio**. O conserto é um
+   `#undef OPAQUE` no topo do nosso fragmento (o prefixo do three, que carrega o
+   `#define`, é montado ANTES do que `onBeforeCompile` devolve), e ele entra
+   **só nas capas REABERTAS**: numa capa permanentemente opaca que casou só pelo
+   nome, tirar o `OPAQUE` faria o alfa de 0,18 ser escrito no framebuffer sem
+   blending — um buraco no canal alfa em vez de um clareamento.
+
+   ⚠️ HISTERESE: não há, e não é esquecimento. `rig.vehLights` é
+   `max(smoothstep(hora,…), escuro)` (scene.ts:1382), e `smoothstep` devolve
+   EXATAMENTE 0 no platô diurno — não há tremor em torno do limiar para filtrar.
+   E, como a alternância não recompila, mesmo um vaivém patológico custaria uma
+   escrita de booleano por quadro. */
+const EPS_NOITE = 0.001;
+/** O último nível escrito. Serve para uma capa registrada no meio da sessão
+ *  nascer no balde certo — ver `registerHeadlightCover()`. */
+let nivelAtual = 0;
 
 const porRaiz = new Map<THREE.Object3D, Capa[]>();
 const injetadas = new WeakSet<THREE.Material>();
@@ -197,9 +264,14 @@ function injetar(c: Capa) {
     shader.uniforms.tsCapaNivel = c.uNivel;
     shader.vertexShader = PARS_VERT + shader.vertexShader
       .replace('#include <project_vertex>', MAIN_VERT);
-    shader.fragmentShader = PARS_FRAG + shader.fragmentShader
-      .replace('#include <alphatest_fragment>', MAIN_FRAG)
-      .replace(/TS_CAPA_CLAREIA/g, CAPA_CLAREIA.toFixed(4));
+    /* ⚠️ O `#undef` VEM PRIMEIRO E SÓ NAS REABERTAS — ver o bloco O EARLY-Z QUE A
+       CAPA COBRAVA 24 H POR DIA. `#undef` de macro não definida é legal no
+       pré-processador do GLSL ES, então a linha é inofensiva na noite em que o
+       programa já foi compilado como transparente. */
+    shader.fragmentShader = (c.reaberta ? '#undef OPAQUE\n' : '') + PARS_FRAG
+      + shader.fragmentShader
+        .replace('#include <alphatest_fragment>', MAIN_FRAG)
+        .replace(/TS_CAPA_CLAREIA/g, CAPA_CLAREIA.toFixed(4));
   };
   c.mat.customProgramCacheKey = function () {
     return 'ts-capa-v1|' + (antesChave ? antesChave.call(this) : '');
@@ -261,8 +333,14 @@ export function registerHeadlightCover(
       if (forcadasOpacas.has(mat)) {
         /* REABRE — ver o bloco A CAPA QUE JÁ TINHA SIDO FECHADA. Opacidade fica
            em 1 e `depthWrite` fica ligado de propósito: fora da caixa do farol
-           isto desenha idêntico a um opaco, e é o fragmento que abre a janela. */
-        mat.transparent = true;
+           isto desenha idêntico a um opaco, e é o fragmento que abre a janela.
+           ⚠️ E NASCE NO BALDE DO NÍVEL VIGENTE, não sempre em `true`: um caminhão
+           carregado às 14:00 tem de entrar no passe OPACO (ver o bloco O EARLY-Z
+           QUE A CAPA COBRAVA 24 H POR DIA), e um carregado às 21:00 no
+           transparente. Escrever `true` aqui deixaria a capa fora do passe opaco
+           até a próxima travessia do limiar, que num caminhão carregado de dia
+           pode ser NUNCA. */
+        mat.transparent = nivelAtual > EPS_NOITE;
         mat.opacity = 1;
         mat.depthWrite = true;
         mat.needsUpdate = true;
@@ -284,6 +362,9 @@ export function registerHeadlightCover(
       uMin: { value: new THREE.Vector3(1, 1, 1) },
       uMax: { value: new THREE.Vector3(-1, -1, -1) },
       uNivel: { value: 0 },
+      /* A MESMA pergunta que o laço acima já respondeu, guardada: só quem a
+         auditoria tinha fechado pode voltar a fechar. */
+      reaberta: forcadasOpacas.has(m),
     };
     injetar(c);
     lista.push(c);
@@ -316,15 +397,29 @@ export function setHeadlightCoverBox(root: THREE.Object3D, caixa: THREE.Box3 | n
 /** O nível, 0..1 — o mesmo `rig.vehLights` que acende a lâmpada. */
 export function setHeadlightCoverLevel(n: number) {
   const v = THREE.MathUtils.clamp(n, 0, 1);
+  nivelAtual = v;
+  /* De dia a capa REABERTA volta para o passe opaco, que é exatamente o estado
+     que `auditTransparency()` escolheu para ela — ver o bloco O EARLY-Z QUE A
+     CAPA COBRAVA 24 H POR DIA, inclusive para por que isto NÃO recompila. */
+  const querTransp = v > EPS_NOITE;
   for (const [raiz, lista] of porRaiz) {
     if (!raiz.parent) { porRaiz.delete(raiz); continue; }
-    for (const c of lista) c.uNivel.value = v;
+    for (const c of lista) {
+      c.uNivel.value = v;
+      /* ⚠️ SEM `needsUpdate`. A escrita muda o balde do render list e o blending;
+         marcar a versão do material é o que dispararia a recompilação que este
+         bloco existe para não ter. */
+      if (c.reaberta && c.mat.transparent !== querTransp) c.mat.transparent = querTransp;
+    }
   }
 }
 
 /** Para o console e para a bancada. */
 export function getHeadlightCover() {
-  const out: { raiz: string; mat: string; nivel: number; caixa: number[] }[] = [];
+  const out: {
+    raiz: string; mat: string; nivel: number; caixa: number[];
+    reaberta: boolean; transparente: boolean;
+  }[] = [];
   for (const [raiz, lista] of porRaiz) {
     if (!raiz.parent) continue;
     for (const c of lista) {
@@ -332,6 +427,10 @@ export function getHeadlightCover() {
         raiz: raiz.name || '(sem nome)',
         mat: c.mat.name || '(sem nome)',
         nivel: Math.round(c.uNivel.value * 100) / 100,
+        reaberta: c.reaberta,
+        /* A prova, do console, de que a capa reaberta está no passe OPACO de dia:
+           `reaberta: true, transparente: false` ao meio-dia é o estado certo. */
+        transparente: c.mat.transparent,
         caixa: [c.uMin.value.x, c.uMin.value.y, c.uMin.value.z,
           c.uMax.value.x, c.uMax.value.y, c.uMax.value.z]
           .map((v) => Math.round(v * 100) / 100),

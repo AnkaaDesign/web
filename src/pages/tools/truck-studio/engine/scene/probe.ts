@@ -33,9 +33,22 @@
    photograph of a field, and no viewer is going to check the parallax. */
 import * as THREE from 'three';
 import { renderer, scene } from './scene';
+import { getProfile } from '../core/quality';
 
-/** Cube face resolution. 256 is plenty once PMREM has blurred it by roughness. */
-const PROBE_SIZE = 256;
+/** Cube face resolution. 256 is plenty once PMREM has blurred it by roughness.
+ *
+ *  DO PERFIL, e FUNÇÃO em vez de constante porque o nível pode mudar no meio da
+ *  sessão — um valor congelado no tempo de import entregaria para sempre o
+ *  tamanho do nível em que a página abriu.
+ *
+ *  Por que ele vale um botão: esta sonda faz SEIS renderizações completas da
+ *  cena mais um PMREM a cada troca de cenário ou de cavalo — da ordem de 14 000
+ *  chamadas de desenho num único quadro. Nunca no laço, mas numa GPU integrada
+ *  é um engasgo visível bem no momento em que o usuário está olhando. Cair para
+ *  128 corta 75 % do preenchimento dessas seis passadas (a geometria continua a
+ *  mesma), e o resultado passa por PMREM logo em seguida, que borra por
+ *  rugosidade — é amostragem, não decisão visual. */
+const probeSize = () => getProfile().probeSize;
 /** Past the bodywork the camera sits inside, so the truck cannot clip in. */
 const PROBE_NEAR = 2.5;
 const PROBE_FAR = 400;
@@ -60,8 +73,16 @@ export interface ProbeOptions {
  */
 export function captureReflectionProbe(opts: ProbeOptions): THREE.Texture | null {
   try {
+    /* O ALVO É CACHEADO E O TAMANHO É DO PERFIL, então o cache tem de conferir
+       o tamanho — não só a existência. Sem a segunda condição, uma sessão que
+       abrisse em Alta e caísse para Baixo continuaria sondando a 256² para
+       sempre, e o botão pareceria não fazer nada (que é exatamente a classe de
+       defeito que esta passagem existe para corrigir). Trocar de tamanho é raro:
+       acontece na mudança de nível, não a cada sonda. */
+    const side = probeSize();
+    if (rt && rt.width !== side) { rt.dispose(); rt = null; }
     if (!rt) {
-      rt = new THREE.WebGLCubeRenderTarget(PROBE_SIZE, { type: THREE.HalfFloatType });
+      rt = new THREE.WebGLCubeRenderTarget(side, { type: THREE.HalfFloatType });
     }
     if (!pmrem) {
       pmrem = new THREE.PMREMGenerator(renderer);

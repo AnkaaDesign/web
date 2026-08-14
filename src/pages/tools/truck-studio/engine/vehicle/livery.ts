@@ -730,8 +730,14 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
      é refeita aqui — no boot a foto ainda pode não ter chegado, e aí
      `measurePanelWindows()` publica quando chegar. */
   for (const k of SURFACE_KEYS) {
-    const win = windows[k];
+    /* `windowFor()` e não `windows[k]`: o teto nunca entra naquele mapa por
+       medição nenhuma, e é aqui — com `PANEL_MM` recém-remedido — que a janela
+       sintética dele nasce com a razão do baú corrente. */
+    const win = windowFor(k);
     if (win) publishWindow(k, win);
+    /* DEPOIS de publicar: o buffer da miniatura segue a tela do fabric, e a
+       guarda de `sizePreviewCanvas()` é a janela publicada. */
+    sizePreviewCanvas(k);
     installGuide(k);
     drawPreview(k);
   }
@@ -1178,7 +1184,7 @@ interface PanelWindow {
    coisas que consomem isto (o `url()` da variável CSS e o `new Image()` da
    medição) degradam em silêncio.
    `assetUrl()` é idempotente por contrato, então resolver AQUI, uma vez, basta. */
-const PANEL_IMAGE: Record<SurfaceKey, string> = {
+const PANEL_IMAGE: Record<SurfaceKey, string | null> = {
   left: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
   right: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
   rear: assetUrl(VEHICLES_DIR + 'panels/traseira.png'),
@@ -1190,17 +1196,50 @@ const PANEL_IMAGE: Record<SurfaceKey, string> = {
      na degradação e mostraria as portas de trás no card da frente. */
   front: assetUrl(VEHICLES_DIR + 'panels/frente.png'),
   /* O TETO NUNCA TEVE FOTO e nunca vai ter: as fotos de degradação eram
-     recortes da prancha do cliente, e a prancha não desenha o teto. Apontar
-     para um arquivo que não existe é o mesmo estado das quatro acima — 404 em
-     silêncio, `windows.roof` fica indefinido, e o palco cai no caminho sem
-     foto. Ver `measurePanelWindows()`. */
-  roof: assetUrl(VEHICLES_DIR + 'panels/teto.png'),
+     recortes da prancha do cliente, e a prancha não desenha o teto.
+     `null` e não um caminho que dá 404: as quatro acima apontam para arquivos
+     que EXISTIRAM e podem voltar (elas são a degradação de um bake sem chapa
+     branca), e o 404 delas é um estado transitório de pacote. O teto não tem
+     arquivo para voltar, então pedir um é um request garantidamente perdido a
+     cada publicação de janela — e `url("…404")` no CSS é indistinguível de
+     `none` na tela. Ver `roofWindow()` logo abaixo. */
+  roof: null,
 };
 
 /* Sem medida ainda (ou foto sem janela): a tela ocupa a caixa inteira e a foto
    volta a ficar ATRÁS dela — ver .ts-pw-ready em core/studio.css. Um fallback
    que deixasse a foto opaca por cima esconderia o desenho inteiro. */
 const windows: Partial<Record<SurfaceKey, PanelWindow>> = {};
+
+/* O TETO PRECISA DE UMA JANELA SINTÉTICA — e a falta dela é o defeito
+   "o teto do card está transparente e no editor está branco".
+   ---------------------------------------------------------------------------
+   As outras quatro faces ganham janela por um de dois caminhos: a foto de
+   degradação medida (`measurePanelWindows`) ou o retrato ortográfico
+   (`refreshSnapshots`). O teto não tem NENHUM dos dois, e por construção: não
+   tem foto (acima) e não é `SnapshotKey` — `livery-snapshot.ts` fotografa as
+   quatro CHAPAS RECORTADAS, e o teto é malha do corpo paramétrico.
+   Sem janela, `publishWindow()` nunca roda para ele, e é ela que liga
+   `.ts-pw-ready` no card. Só sob essa classe é que `core/studio.css` dá à tela
+   do fabric o fundo `--ts-implement`, que é a CHAPA. O palco não depende dela
+   (`.stage-panel .canvas-container` pinta o fundo incondicionalmente) — daí o
+   relato exato: a mesma face saía branca no editor e transparente na
+   miniatura. E, de quebra, `sizePreviewCanvas()` também se guarda em
+   `windows[key]`, então o buffer do card ficava no tamanho literal do template
+   enquanto a tela do fabric seguia a chapa medida.
+
+   A janela é a CHAPA INTEIRA (não há moldura vazada a encaixar) e a razão sai
+   de `PANEL_MM.roof`, remedido a cada rebuild: o teto muda de proporção com o
+   comprimento do baú. Por isso ela é recalculada, e não memorizada em
+   `windows`. */
+function roofWindow(): PanelWindow {
+  const p = PANEL_MM.roof;
+  return { photoAr: p.h > 0 ? p.w / p.h : 4, x: 0, y: 0, w: 1, h: 1 };
+}
+
+/** A janela de uma face: a medida na foto, ou a sintética do teto. */
+const windowFor = (key: SurfaceKey): PanelWindow | undefined =>
+  key === 'roof' ? roofWindow() : windows[key];
 
 /** alpha até aqui conta como vazado — margem para o antialias da borda */
 const CLEAR_A = 8;
@@ -1403,8 +1442,9 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
   const snap = snapshots[key];
   const box = snap ? snap.box : usingArt ? { x: 0, y: 0, w: 1, h: 1 } : r;
   const ar = snap ? snap.ar : usingArt && p.h > 0 ? p.w / p.h : win.photoAr;
+  const photo = PANEL_IMAGE[key];
   const img = snap ? 'url("' + snap.bg + '")'
-    : usingArt ? 'none' : 'url("' + PANEL_IMAGE[key] + '")';
+    : usingArt || !photo ? 'none' : 'url("' + photo + '")';
   /* A CAIXA COMUM DO PAR DE PONTA — ver o bloco acima.
      `k` é a fração da altura da caixa que o retrato desta face ocupa, e `off` a
      tarja de cima. Numa face que não é de ponta, ou antes de o segundo retrato
@@ -1517,6 +1557,9 @@ async function measurePanelWindows() {
   const byUrl = new Map<string, Promise<PanelWindow | null | 'ausente'>>();
   await Promise.all(SURFACE_KEYS.map(async (key) => {
     const url = PANEL_IMAGE[key];
+    /* Face SEM foto declarada é o teto, e ele não passa por aqui: a janela dele
+       é sintética e sai de `roofWindow()`, publicada em `attachOverlays()`. */
+    if (!url) return;
     let job = byUrl.get(url);
     if (!job) {
       job = loadImage(url).then((img) => (img ? findWindow(img) : 'ausente' as const));
@@ -1821,7 +1864,7 @@ export function initLivery() {
      Ver a nota em `publishWindow`. */
   onLiveryArtReady(() => {
     for (const k of SURFACE_KEYS) {
-      const win = windows[k];
+      const win = windowFor(k);
       if (win) publishWindow(k, win);
       schedulePreview(k);
     }
@@ -1830,9 +1873,18 @@ export function initLivery() {
      chegar os cards já estão desenhados com a foto atrás (o fallback). */
   void measurePanelWindows();
 
+  /* O TETO JÁ NASCE COM CHAPA. As outras quatro esperam a foto ou o retrato
+     para ganhar `.ts-pw-ready` — e é essa classe que pinta a chapa por trás da
+     arte no card (`--ts-implement`). Para elas a espera é curta e o card mostra
+     a moldura de vidro nesse meio-tempo; para o teto ela nunca terminaria, e é
+     por isso que a janela sintética entra já aqui, com a semente de `PANEL_MM`.
+     `attachOverlays()` republica com a chapa medida assim que houver baú. */
+  publishWindow('roof', roofWindow());
+
   for (const k of SURFACE_KEYS) {
     installGuide(k);
     surfaces[k].requestRenderAll();
+    sizePreviewCanvas(k);
     drawPreview(k);
   }
 

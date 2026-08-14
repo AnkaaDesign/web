@@ -115,6 +115,7 @@
    argumento não sobreviveu ao produto rodando. */
 import * as THREE from 'three';
 import { grupoDePrimitivas } from './scenery';
+import { getProfile } from '../core/quality';
 
 /* ---------------- os números ---------------- */
 
@@ -168,8 +169,19 @@ const TAU_SAI = 0.26;
 /** Abaixo disto o vértice está no plano da câmera e a divisão por w explode. */
 const W_MIN = 1e-3;
 
-/** Amostras ao longo do corredor lente→veículo no pré-teste barato. */
-const AMOSTRAS = 8;
+/** Amostras ao longo do corredor lente→veículo no pré-teste barato.
+ *
+ *  DO PERFIL, porque este é o maior custo fixo de CPU do laço: `updateSeeThrough`
+ *  roda 60×/s sobre ~650 objetos (60 sólidos + as plantas instanciadas)
+ *  INCLUSIVE em quadro pulado, e cada sólido paga até `AMOSTRAS + 1` chamadas de
+ *  `Box3.distanceToPoint`. Numa máquina limitada por CPU — que é o caso do alvo
+ *  desta passagem — cortar isso pela metade vale mais que qualquer botão de
+ *  preenchimento.
+ *
+ *  É amostragem pura pela régua do perfil: metade das amostras ao longo do MESMO
+ *  corredor só torna o pré-teste um pouco mais grosseiro, e quem decide de fato
+ *  é o teste de retângulo em NDC que vem depois. */
+const amostras = () => getProfile().seeThroughSamples;
 
 /* ---------------- o shader ----------------
    O uniforme `uSeeHide` é declarado sempre e o atributo só sob instanciamento,
@@ -741,8 +753,11 @@ const _wOut = [0];
  * não quer dizer nada.
  */
 function noCorredor(bx: THREE.Box3) {
-  for (let k = 0; k <= AMOSTRAS; k++) {
-    const t = k / AMOSTRAS;
+  /* Lido UMA vez por chamada e não por iteração: são ~650 chamadas por quadro e
+     `getProfile()` monta um objeto novo a cada leitura. */
+  const n = amostras();
+  for (let k = 0; k <= n; k++) {
+    const t = k / n;
     _p.copy(_cam).lerp(_tgt, t);
     /* O 1,2 m de folga fixa (era 0,6) cobre a HISTERESE: um objeto que só
        continua escondido por causa dela não pode ser rejeitado aqui antes de o

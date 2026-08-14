@@ -16,6 +16,7 @@
 */
 import * as THREE from 'three';
 import { scene, camera, onFrame, onRig } from './scene';
+import { getProfile, onQualityChange } from '../core/quality';
 import type { Rig } from './presets';
 
 const RAIN_COUNT = 2600;                 // ≈0.21 drops/m³ in a 26 m box
@@ -388,6 +389,9 @@ function makeRipples() {
 }
 
 /* ---------------- wiring ---------------- */
+/** O que o RIG pede — a intensidade autorada do preset, 0..1. É ela que manda na
+ *  opacidade, na cor e na largura do risco; o perfil de qualidade só mexe em
+ *  QUANTAS gotas existem. Ver `aplicarPerfil()`. */
 let amount = 0;
 const _rippleTint = new THREE.Color();
 const WHITE = new THREE.Color(0xffffff);
@@ -399,9 +403,56 @@ export function initWeather() {
   const ripples = makeRipples();
   scene.add(rain, ripples);
 
+  /* ---------------- O PERFIL DE QUALIDADE ENTRA AQUI, e só aqui ----------------
+     DUAS COISAS, e nenhuma delas é "chuva mais fraca":
+
+     · `rainAmount` (1 / 0,7 / 0,45) multiplica SÓ o `uAmount`, que é o gate de
+       densidade `aRand > uAmount` do topo dos dois vertex shaders (o da chuva e
+       o das ondulações). Instância acima do limiar sai em `gl_Position` fora do
+       clip e não gera fragmento nenhum. Ou seja: no nível Baixo passam ~1 170
+       das 2 600 gotas e ~630 dos 1 400 aros, com a MESMA opacidade, a MESMA cor
+       e o MESMO calibre — o que se perde é densidade de campo, que é
+       amostragem; o que NÃO muda é a leitura autorada da chuva, que é a regra do
+       cabeçalho de `core/quality.ts`.
+       ⚠️ Por isso a opacidade, o tint e `uWidth` continuam saindo de `amount`
+       (o rig) e não do produto: multiplicá-los também seria pagar o desconto
+       duas vezes e escurecer/afinar a chuva, que é decisão visual.
+     · `rainRipples` esconde o campo de ondulações inteiro no nível Baixo. São
+       quads DEITADOS com `NormalBlending` e `depthWrite:false` — overdraw
+       transparente sem early-Z, a categoria mais cara numa integrada — e o custo
+       de VÉRTICE deles é o que a auditoria achou de pior: os `~3× hash22`
+       (~50 ALU) das linhas 294-296 são pagos ANTES do early-out de fase
+       (`phase > lifeT`), e ~58 % das instâncias são descartadas DEPOIS de
+       pagá-los. Reordenar isso não dá: o `lifeT` que decide o descarte sai
+       justamente do segundo hash.
+       O que se perde: o chão molhado volta a ler como "choveu há uma hora" —
+       as gotas visivelmente nunca chegam (ver o cabeçalho da seção). É uma
+       perda REAL, e é por isso que ela só acontece no nível Baixo.
+
+     ⚠️ O QUE ISTO **NÃO** DEVOLVE, e é a maior parte do custo da chuva: o laço.
+     `wantsFrame()` (scene/scene.ts) devolve `true` enquanto `rig.rain > 0.02`,
+     então com chuva a cena inteira desenha em 60 fps — as duas chamadas de
+     desenho daqui são troco perto de redesenhar o set, o veículo e o reflexo
+     todo quadro. Tirar `rain` de `wantsFrame()` seria trocar o custo por uma
+     chuva CONGELADA (o `uTime` dela avança no gancho de quadro), o que é um
+     defeito visual e não uma otimização. Logo: o perfil corta o preenchimento e
+     o vértice da chuva, e o pino de 60 fps continua — de propósito.
+
+     É FUNÇÃO, e não uma leitura feita uma vez na montagem: o nível muda no meio
+     da sessão (medidor ou escolha do usuário), e um `const` de módulo
+     congelaria a densidade no nível em que a página abriu. É a mesma armadilha
+     que `textureAnisotropy()` teve de virar função para não ter. */
+  const aplicarPerfil = () => {
+    const p = getProfile();
+    rainU.uAmount.value = amount * p.rainAmount;
+    rippleU.uAmount.value = amount * 0.9 * p.rainAmount;
+    const on = amount > 0.02;
+    rain.visible = on;
+    ripples.visible = on && p.rainRipples;
+  };
+
   onRig((rig: Rig) => {
     amount = THREE.MathUtils.clamp(rig.rain, 0, 1);
-    rainU.uAmount.value = amount;
     /* 0.34 -> 0.46 PARA COMPENSAR AS CORTINAS, não para deixar a chuva mais
        forte. O `curtain` do vertex shader multiplica a opacidade por algo entre
        0,24 e 1,0 (média 0,62), então manter 0,34 aqui entregaria uma chuva ~40%
@@ -412,14 +463,19 @@ export function initWeather() {
     rainU.uTint.value.copy(rig.rainColor);
     rainU.uWidth.value = 0.010 + 0.006 * amount;
 
-    rippleU.uAmount.value = amount * 0.9;
     rippleU.uOpacity.value = 0.30 * amount;
     rippleU.uTint.value.copy(_rippleTint.copy(rig.rainColor).lerp(WHITE, 0.35));
 
-    const on = amount > 0.02;
-    rain.visible = on;
-    ripples.visible = on;
+    /* Densidade e visibilidade num lugar só, para o rig e a troca de nível não
+       terem duas cópias da mesma regra. */
+    aplicarPerfil();
   });
+
+  /* SEM `invalidate()` aqui, e é dedução e não esquecimento: enquanto há chuva
+     na tela o laço já está preso em 60 fps por `wantsFrame()`, então o quadro
+     seguinte vem sozinho; e quando não há chuva (`amount <= 0.02`) as duas
+     malhas estão invisíveis e nada do que esta função escreve muda um pixel. */
+  onQualityChange(aplicarPerfil);
 
   onFrame((dt: number) => {
     if (amount <= 0.02) return;

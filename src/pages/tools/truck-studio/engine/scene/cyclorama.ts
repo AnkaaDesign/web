@@ -1015,12 +1015,21 @@ onFrame(syncCenter);
 onDrawFrame(() => {
   if (!group.visible || !gloss || !gloss.visible) return;
   /* O NÍVEL BAIXO NÃO PAGA A SEGUNDA PASSADA. É o item mais caro do cenário
-     mais caro (14,1 fps medidos), e a nota de `QualityProfile.floorReflection`
-     explica por que ele é liga/desliga em vez de escala: reduzi-lo devolve meio
-     fps e cobra uma silhueta que cintila no giro. Lido por quadro em vez de
-     empurrado por `onQualityChange` porque é uma leitura de booleano — e um
-     termo que LÊ não tem como ficar dessincronizado de quem escreve. */
-  if (!getProfile().floorReflection) return;
+     mais caro — 14,1 fps medidos, mais 96,7 MB de VRAM no alvo (dos quais ~79
+     são o buffer `samples: 4`), o que faz dela o segundo maior item de memória
+     da cena inteira, atrás só dos conjuntos de chão.
+
+     Lido por quadro em vez de empurrado por `onQualityChange` porque um termo
+     que LÊ não tem como ficar dessincronizado de quem escreve.
+
+     ⚠️ A COMPARAÇÃO É CONTRA `'off'`, E TEM DE SER EXPLÍCITA. O campo era
+     `boolean` e virou `'full' | 'lod' | 'off'` quando o degrau intermediário
+     entrou. Um `if (!getProfile().floorReflection)` continua COMPILANDO com o
+     tipo novo e passa a estar sempre errado, porque `'off'` é uma string não
+     vazia e portanto truthy — o nível Baixo pagaria a passada inteira
+     silenciosamente, e nenhum verificador de tipos acusaria. Se este campo
+     ganhar um quarto estado, é esta linha que se lê primeiro. */
+  if (getProfile().floorReflection === 'off') return;
   renderFloorReflection(camera, group.position.y, gloss);
 });
 

@@ -57,6 +57,49 @@
 import * as THREE from 'three';
 import { setLampSites } from './lamps';
 import type { LampSite, LampSiteGeo } from './lamps';
+import { getProfile, onQualityChange } from '../core/quality';
+
+/* ---------------- DENSIDADE POR NÍVEL ----------------
+   Ver o bloco longo em `plantar()` para o motivo de a ordem do buffer ser
+   permutada antes. Aqui só mora a aritmética e o gancho. */
+
+/** Quantas das `n` plantadas ficam visíveis no nível vigente. Nunca zero quando
+ *  havia alguma: um canteiro vazio lê como cenário quebrado, não como qualidade
+ *  baixa. */
+const plantCount = (n: number) =>
+  n > 0 ? Math.max(1, Math.round(n * getProfile().vegetation)) : 0;
+
+/** Todas as malhas instanciadas plantadas, para a repoda sem replantio. */
+const plantadas = new Set<THREE.InstancedMesh>();
+
+/**
+ * Repoda com a densidade do nível vigente, SEM replantar.
+ *
+ * É só uma escrita em `count` por malha — as matrizes já estão no buffer e a
+ * ordem já é a permutada, então as plantas que sobrevivem são exatamente as
+ * mesmas de antes e nenhuma se move. É o que torna a troca de nível legível:
+ * "algumas sumiram", e não "o bosque se reorganizou".
+ *
+ * ⚠️ NÃO recomputa as caixas envolventes de propósito. Elas foram medidas sobre
+ * o plantio INTEIRO, e encolhê-las para o subconjunto faria o three descartar do
+ * frustum — e do passe de sombra — plantas que ainda estão em cena. Uma caixa
+ * grande demais custa um teste de frustum a mais; uma pequena demais some com a
+ * copa, que é o defeito que os dois `compute*` de `plantar()` existem para
+ * evitar.
+ */
+export function applyVegetationDensity() {
+  for (const im of plantadas) {
+    const n = (im.userData.tsPlanted as number | undefined) ?? im.count;
+    im.count = plantCount(n);
+  }
+}
+/* SEM `invalidate()` AQUI, e a ausência é deliberada — não esquecimento.
+   `scene.ts` registra `applyQualityProfile` no MESMO canal e ele termina em
+   `invalidate()`, que marca três quadros sujos. Como os dois ouvintes disparam
+   na mesma mudança, o quadro já está pedido qualquer que seja a ordem de
+   inscrição. Importar `invalidate` daqui abriria uma aresta nova
+   `scenery → scene` só para pedir um quadro que já foi pedido. */
+onQualityChange(applyVegetationDensity);
 
 /** Semente fixa: ver o cabeçalho. Trocar isto replanta o distrito inteiro. */
 const SEED = 0x5eed1e;
@@ -665,6 +708,11 @@ const PASSO_CANTEIRO = 14;
 const JITTER_CANTEIRO = 1.6;
 
 function plantar(protos: Proto[], faixas: Faixa[], grelha: Grelha) {
+  /* O registro de poda é do PLANTIO CORRENTE. Sem esta linha ele acumularia as
+     malhas de todo cenário já visitado — e uma troca de nível depois de duas
+     trocas de cenário escreveria `count` em `InstancedMesh` já descartadas,
+     segurando-as vivas de graça. */
+  plantadas.clear();
   const canteiros = faixas.filter((f) => f.canteiro);
   const gramas = faixas.filter((f) => !f.canteiro);
   const rand = rng(SEED);
@@ -769,9 +817,57 @@ function plantar(protos: Proto[], faixas: Faixa[], grelha: Grelha) {
       }
     }
 
+    /* ---------------- A PODA POR NÍVEL, E POR QUE ELA PERMUTA ANTES ----------
+       Folhagem é o pior caso que existe numa GPU integrada: `PLANT_LEAF` e
+       `PLANT_BARK` vêm do próprio GLB com `alphaMode: MASK` (corte 0,38), ou
+       seja `discard` no fragmento, ou seja **sem early-Z**. E o custo é pago
+       DUAS vezes, porque o material de profundidade copia o `alphaTest` — então
+       o passe de sombra também roda amostragem de textura na copa em vez de ser
+       um passe de profundidade puro.
+
+       Reduzir `count` é o degrau mais barato do engine inteiro: não toca em
+       buffer, não realoca, não recompila. Mas ele **não pode ser um simples
+       corte no fim do vetor**, e é isso que a permutação abaixo resolve.
+
+       `usados` está ordenado ESPACIALMENTE — a alameda é preenchida estação a
+       estação ao longo do eixo longo da faixa. Ficar com o prefixo apagaria a
+       ponta final da fileira inteira, e uma alameda que termina no nada lê como
+       DEFEITO DE CENÁRIO ("as árvores sumiram daquele lado"), não como
+       qualidade reduzida. Já uma alameda com metade das árvores, espaçadas,
+       lê como um plantio mais ralo — que é a leitura honesta.
+
+       A permutação é um passo de RAZÃO ÁUREA sobre o índice: `i·φ mod n` visita
+       o vetor inteiro em ordem máximamente espalhada, então QUALQUER prefixo é
+       uma subamostra espacialmente uniforme. É determinística (mesma cena, mesmo
+       resultado) e custa uma multiplicação por planta.
+
+       ⚠️ A permutação é aplicada SEMPRE, inclusive no nível Alta com fator 1 —
+       de propósito. Assim a ordem do buffer é a mesma em todos os níveis, e
+       mudar de nível só mexe em `count`: as plantas que ficam não se movem, e a
+       transição é "algumas somem", não "o bosque inteiro se reorganiza". */
+    const PHI = 0.61803398875;
+    const n = usados.length;
+    if (n > 2) {
+      const espalhado: THREE.Matrix4[] = new Array(n);
+      const visto = new Uint8Array(n);
+      let escrita = 0;
+      for (let i = 0; i < n; i++) {
+        let j = Math.floor(((i * PHI) % 1) * n);
+        /* Colisão é possível porque o piso quantiza; anda para a frente até
+           achar vaga. O laço termina sempre: há exatamente `n` vagas. */
+        while (visto[j]) j = (j + 1) % n;
+        visto[j] = 1;
+        espalhado[escrita++] = usados[j];
+      }
+      for (let i = 0; i < n; i++) usados[i] = espalhado[i];
+    }
+
     for (const im of p.malhas) {
       for (let i = 0; i < usados.length; i++) im.setMatrixAt(i, usados[i]);
-      im.count = usados.length;
+      /* Guardado para `applyVegetationDensity()` poder repodar sem replantar. */
+      im.userData.tsPlanted = usados.length;
+      plantadas.add(im);
+      im.count = plantCount(usados.length);
       im.instanceMatrix.needsUpdate = true;
       /* As caixas envolventes são as do plantio ANTIGO até isto rodar, e é por
          elas que o three descarta a malha inteira do frustum — e do passe de

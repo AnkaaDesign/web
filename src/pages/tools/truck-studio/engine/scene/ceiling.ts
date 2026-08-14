@@ -54,6 +54,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { scene, camera, invalidate, onFrame, onRig, getRig } from './scene';
+import { getProfile, onQualityChange } from '../core/quality';
 
 /* ---------------- as medidas do modelo, em metros ----------------
    Cruas, como saíram da varredura. Tudo abaixo deriva daqui — deixá-las
@@ -125,6 +126,9 @@ scene.add(group);
 
 const materials: THREE.Material[] = [];
 let built = false;
+/** O grupo dos 28×3 spots decorativos, guardado para o perfil de qualidade poder
+ *  escondê-lo sem mexer no resto do teto. Ver `aplicarSpots()`. */
+let spotsGroup: THREE.Group | null = null;
 let deckMat: THREE.MeshStandardMaterial | null = null;
 let steelMat: THREE.MeshStandardMaterial | null = null;
 let bankMat: THREE.MeshStandardMaterial | null = null;
@@ -362,9 +366,49 @@ function build() {
     group.add(o);
   }
   group.add(spots);
+  spotsGroup = spots;
+  aplicarSpots();
   group.position.y = H;
   built = true;
 }
+
+/* ---------------- OS SPOTS SÃO O PRIMEIRO A SAIR ----------------
+   `ceilingSpots` (Alta/Média sim, Baixa não) esconde o grupo dos spots.
+
+   POR QUE JUSTO ELES, e por que isto não fere a regra de "só amostragem". O
+   próprio bloco das luminárias acima os declara DECORATIVOS: *"Eles não iluminam
+   nada; existem para dar ESCALA e ritmo ao teto"*. Nenhuma luz do three nasce
+   aqui, nada aqui projeta sombra, e os PAINÉIS — que são a fonte que aparece no
+   quadro, no reflexo do piso e na sonda — CONTINUAM ligados. Ou seja: a foto
+   sai com a mesma luz, o mesmo enquadramento e a mesma softbox; o teto perde os
+   corpos pretos pendurados, e com eles a referência de escala que diz se a laje
+   está a 14 m ou a 40 m. É uma perda de LEITURA, não de iluminação.
+
+   O QUE SE GANHA: 3 `InstancedMesh` de 28 instâncias cada — corpo (cilindro
+   aberto de 14 lados), tampa e haste — somem do passe opaco E da segunda
+   varredura de geometria do reflexo do piso, que é o gargalo medido em
+   `floor-reflection.ts` (14,1 fps a meio lado contra 14,7 a um quarto: o custo
+   é GEOMETRIA, não preenchimento). Contagem exata de triângulos NÃO VERIFICADA.
+
+   ⚠️ É FUNÇÃO e não constante, pela razão de sempre neste engine: o nível muda
+   no meio da sessão e uma leitura congelada na montagem deixaria os spots no
+   estado do nível em que a página abriu.
+
+   ⚠️ E ELA TEM DE VIR DEPOIS DE `applyFade()`, que escreve `visible` em TODO
+   filho do grupo — daí `applyFade` chamá-la no fim em vez de o contrário. */
+function aplicarSpots() {
+  if (!spotsGroup) return;
+  /* `faded < 0` = a esmaecida ainda não foi medida nesta acendida (ver `faded`),
+     e aí quem decide é só o perfil. */
+  const fadeOn = faded < 0 || faded > 0.004;
+  spotsGroup.visible = getProfile().ceilingSpots && fadeOn;
+}
+
+onQualityChange(() => {
+  if (!group.visible || !built) return;
+  aplicarSpots();
+  invalidate();
+});
 
 /** Refaz a geometria com as medidas correntes. Uma vez por mudança de sala. */
 function rebuild() {
@@ -412,7 +456,33 @@ export function sizeStudioCeiling(m: {
    `transparent` só é LIGADO durante a faixa. Um material transparente sai do
    passo opaco e entra no ordenado por profundidade, e deixar a laje inteira
    nesse passo o tempo todo pagaria ordenação e perda de descarte de
-   profundidade em 100 % dos quadros por um efeito que roda em quase nenhum. */
+   profundidade em 100 % dos quadros por um efeito que roda em quase nenhum.
+
+   ⚠️⚠️ ACHADO DA AUDITORIA DE 2026-08-14, NÃO CONSERTADO AQUI (é fora do escopo
+   da ligação do perfil de qualidade, e conserta-se mexendo no laço, que é de
+   outro dono). Deixado escrito para quem vier depois:
+
+     · `applyFade` roda em `onFrame`, ou seja **inclusive em quadro PULADO** —
+       o gancho de quadro corre mesmo quando o laço sob demanda decide não
+       desenhar. O `smoothstep` e o memo de 0,01 são baratos, mas o gancho em si
+       é custo fixo de CPU por quadro, que é o recurso escasso num i5 (a mesma
+       razão pela qual `seeThroughSamples` existe no perfil).
+     · O caro é a TRAVESSIA DA FAIXA. Entre 10,6 e 13,2 m de altura de câmera,
+       `m.transparent` muda de valor e leva `m.needsUpdate = true` junto — e
+       `transparent` é CHAVE DE PROGRAMA no three. São 5 materiais
+       (laje, estrutura, spot, painel, lente), logo **5 recompilações de
+       programa** em cada cruzamento da faixa, no meio de um arrasto de órbita.
+       O sintoma é um engasgo ao levar a câmera para cima do teto, e a causa não
+       se parece nada com ele.
+     · O conserto honesto NÃO é deixar `transparent: true` sempre (o comentário
+       acima explica por que isso custa em 100 % dos quadros): é pré-compilar as
+       duas configurações no aquecimento, do mesmo jeito que
+       `warmLightPrograms()` faz para o pool de spotlights.
+
+   Enquanto isso não existir, a esmaecida é um engasgo CONHECIDO — e é o motivo
+   de o perfil de qualidade não ter nenhum botão que ligue/desligue este
+   caminho: um botão que recompilasse 5 programas sozinho seria exatamente o
+   defeito que a adaptação automática existe para evitar. */
 let faded = -1;
 
 function applyFade() {
@@ -430,6 +500,9 @@ function applyFade() {
     m.depthWrite = !t;
   }
   for (const child of group.children) child.visible = on;
+  /* DEPOIS do laço, que acabou de escrever `visible` em todo filho: os spots têm
+     um segundo dono (o perfil de qualidade) e precisam da última palavra. */
+  aplicarSpots();
   invalidate();
 }
 
@@ -531,6 +604,10 @@ export function disposeStudioCeiling() {
   for (const m of materials) m.dispose();
   materials.length = 0;
   deckMat = steelMat = bankMat = lensMat = housingMat = null;
+  /* O grupo dos spots acabou de sair de `group.children` e teve a geometria
+     descartada no laço acima; segurar a referência faria `aplicarSpots()`
+     escrever num objeto morto. */
+  spotsGroup = null;
   built = false;
   group.visible = false;
   invalidate();

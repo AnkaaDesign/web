@@ -1,5 +1,63 @@
 # Truck Studio — passagem de otimização (2026-08-13)
 
+> ## 🔴 A §2 E A §3-A DESTE DOCUMENTO DESCREVEM UM ESTADO QUE NÃO EXISTE
+>
+> **Verificado em 2026-08-14, medindo o disco.** A §2 relata a passagem de
+> textura como CONCLUÍDA — `trailer.glb` de 263 → 166 MB de VRAM e 31,3 →
+> 22,5 MB de disco, `iveco_metallica_4x2.glb` 344 → 238 MB, e backups
+> `*.glb.bak-texopt-2026-08-13` "ao lado de cada arquivo". Medido hoje, em
+> `/srv/files/Estudio3D/v1` **e** em `web/public/`:
+>
+> | | o doc diz | o disco tem |
+> |---|---:|---:|
+> | `trailer.glb` — VRAM | 166 MB | **251,0 MB** |
+> | `trailer.glb` — disco | 22,5 MB | **29,87 MB** (31.319.392 B) |
+> | `iveco_metallica_4x2.glb` | 238 MB | **327,9 MB** |
+> | `distrito/set.glb` | 133 MB | **144,0 MB** |
+> | backups `*.bak-texopt-*` | 62 arquivos | **nenhum, em lugar nenhum do sistema** |
+>
+> O `md5sum` do `trailer.glb` é **idêntico nas duas árvores**
+> (`97aba3fc83ac8416ce5100858f6f678f`) e é o do arquivo original. A máscara
+> 4096² de 85,3 MB descrita na §2 continua lá, intacta. **A ferramenta
+> (`tools/glb-texopt/texopt.py`) sobreviveu; o resultado dela não.**
+>
+> Idem para a §2 quando ela diz que os ranges Draco duplicados "passaram a ser
+> compartilhados no arquivo": medido, as 1.302 cargas idênticas moram em
+> **2.157 `byteOffset` distintos**, e a chave de cache do `GLTFLoader` é o
+> ÍNDICE do `bufferView` — então o three continua decodificando 2.157 payloads e
+> alocando 2.157 `BufferGeometry`. Os 8,8 MB de download não foram economizados.
+>
+> **Consequência prática: os −290 MB de VRAM da §2 continuam inteiramente
+> disponíveis**, e são o item mais barato de qualquer plano de otimização — a
+> medição já foi feita e o portão perceptual já aprovou.
+>
+> ⚠️ Um detalhe que a §2 não registra e que quem for reexecutar precisa saber:
+> **o portão automático REJEITA o maior ganho do acervo.** A máscara 4096² do
+> implemento é 99,68 % preto ou branco puro, com 11 valores distintos, e o erro
+> de reconstrução a 2048² dá p99,9 = 63 contra o limite de 16. O portão não sabe
+> distinguir "borda de máscara binária" de "desenho". Ela precisa de um
+> `--image 19=2048` manual.
+>
+> ---
+>
+> ## ⚠️ E a §3-A (o perfil de qualidade) foi SUBSTITUÍDA
+>
+> O perfil que ela descreve funcionava como projetado e **não fazia diferença**,
+> pelo motivo que ela mesma não podia ver: todos os cinco botões eram de
+> AMOSTRAGEM DE PIXEL, e esta cena nunca foi limitada por preenchimento. O
+> relato do dono em 14/08 foi *"colocando no modo de qualidade baixa não vejo
+> diferença nenhuma, nem visual, nem de performance"*, e ele estava certo — num
+> monitor a `devicePixelRatio` 1, fora do cenário Estúdio, a diferença efetiva
+> entre Alta e Baixa era **um uniforme de shader**.
+>
+> Leia `OTIMIZACAO-2026-08-14.md` para o que substituiu. As duas afirmações
+> desta §3-A que ficaram FALSAS:
+> * *"teto do `devicePixelRatio` 2 / 1,5 / 1"* — um TETO não faz nada num monitor
+>   a dpr 1. O botão dominante nunca foi implementado.
+> * *"mapa de sombra 3072² / 2048² / 1024²"* — baixá-lo perde nitidez de contato
+>   e não devolve um quadro (`shadowMap.autoUpdate = false`), **e o bias não era
+>   escalado junto**, o que provavelmente introduzia peter-panning no nível Baixo.
+
 **ISTO É UM REGISTRO DO QUE FOI FEITO**, ao contrário do
 `ANALISE-PERF-UX-2026-08-12.md` ao lado, que é o levantamento que a originou.
 Onde os dois discordarem, este vale: três recomendações daquele documento foram

@@ -144,8 +144,9 @@ import {
 } from './scene';
 import { renderCycloramaReflection } from './cyclorama';
 import { root } from '../core/dom';
-import { ceilingShadowMapSize } from '../core/quality';
+import { ceilingProfile, ceilingShadowMapSize, renderScale } from '../core/quality';
 import { setPaintPixelScale, paintPixelScale } from '../vehicle/paint';
+import { applyLod, releaseLod } from '../vehicle/lod';
 
 /** Os três presets, pelo id que a interface e o localStorage usam. */
 export type CaptureQuality = 'low' | 'medium' | 'high';
@@ -629,8 +630,23 @@ async function renderMosaic(
      `setPixelRatio` — que é justamente o que faz a mesma foto ser tirada de duas
      telas diferentes. Piso em 1: uma captura MENOR que a tela (o preset Baixa
      numa tela 4K) não pode ENGROSSAR o floco. */
+  /* ⚠️ A REFERÊNCIA É A TELA NO TETO, NÃO O BUFFER DE AGORA. `domElement.height`
+     passou a carregar a ESCALA DE RENDER do perfil de qualidade (ver
+     `effectivePixelRatio()` em scene.ts), e ela não pertence a esta conta: a
+     razão aqui existe para ancorar o floco da FOTO ao pixel da TELA, e a tela de
+     referência é sempre a do nível Alta.
+
+     Sem desfazer a escala, uma máquina rodando a 0,65 dividiria por um número
+     1,54× menor, pediria uma oitava mais grossa e baixaria uma foto com o floco
+     diferente do de uma máquina em Alta — que é precisamente a violação da regra
+     "a imagem baixada é o produto e não se degrada nunca". */
   const prevPxScale = paintPixelScale();
-  setPaintPixelScale(fullH / Math.max(1, renderer.domElement.height));
+  const telaNoTeto = Math.max(1, renderer.domElement.height / Math.max(0.25, renderScale()));
+  /* O piso de 1 mora AQUI agora, e não dentro de `setPaintPixelScale()`: ele é
+     regra da captura — uma foto MENOR que a tela não pode engrossar o floco —, e
+     deixá-lo na função genérica impedia a tela de usar valores abaixo de 1, que
+     é o que a escala de render precisa. */
+  setPaintPixelScale(Math.max(1, fullH / telaNoTeto));
 
   try {
     if (shadowCeil > prevShadowSide) {
@@ -651,6 +667,37 @@ async function renderMosaic(
       scene.background = null;
       renderer.setClearAlpha(0);
     }
+    /* ---------------- O LOD, UMA VEZ, PARA O MOSAICO INTEIRO ----------------
+       ⚠️ **A ALTURA É `fullH`, NUNCA A DO LADRILHO E NUNCA A DO VIEWPORT.** O
+       mosaico recorta o MESMO frustum com `camera.setViewOffset(fullW, fullH,…)`
+       (ver o item 2 dos INVARIANTES), então a densidade angular do ladrilho é a
+       da imagem COMPLETA: no preset Alta são 7680x4320 em 4x4 ladrilhos de
+       1920x1080, e uma peça mede ~4x mais pixels na foto que na tela de 1080p.
+       Passar `tileH` faria o LOD julgar a foto pela régua da tela e apagar da
+       IMAGEM BAIXADA peças que ela tem resolução de sobra para mostrar.
+
+       ⚠️ **UMA VEZ, ANTES DO LAÇO.** A câmera foi congelada no clique (ver o
+       bloco UMA CÓPIA DA CÂMERA), então a distância de cada peça ao olho é a
+       mesma nos dezesseis ladrilhos e a decisão também é. Por ladrilho seria
+       dezesseis varreduras de ~1 200 entradas para escrever o mesmo resultado —
+       e, pior, dezesseis `shadowMap.needsUpdate` em quadros que não têm por que
+       refazer o mapa.
+
+       ⚠️ **O LIMIAR É O DO TETO, NÃO O DO PERFIL VIGENTE**, e hoje isso quer
+       dizer ZERO: `ceilingProfile().lodMinPx` é 0 (a tabela do nível Alta em
+       `core/quality.ts`). A regra fundadora é "a imagem baixada é o produto e não
+       se degrada nunca" — a mesma que levanta o mapa de sombra logo acima —, e
+       para um LOD que a auditoria mede como PERDA DE QUALIDADE (ver o cabeçalho
+       de `vehicle/lod.ts`) ela significa: desligado na foto, sempre.
+
+       E É POR ISSO QUE A CHAMADA EXISTE MESMO VALENDO ZERO — ela não é
+       decorativa, ela é o CONSERTO. `applyLod(cam, fullH, 0)` não é um `return`
+       precoce: é `releaseLod()`. Sem ela, uma foto tirada com o estúdio no nível
+       Baixa sairia com os ~600 parafusos que o laço vivo tinha acabado de
+       esconder — e sairia em silêncio, porque `stopLoop()` já parou o gancho de
+       quadro que os devolveria. No dia em que o teto ganhar um limiar próprio, a
+       linha passa a fazer as duas coisas sem mudar de forma. */
+    applyLod(cam, fullH, ceilingProfile().lodMinPx);
     /* O REFLEXO DO PISO, UMA VEZ, PARA O MOSAICO INTEIRO.
        Ele é desenhado por um gancho de quadro, e durante a captura o laço está
        PARADO — sem esta linha o piso do estúdio refletiria o último
@@ -707,6 +754,17 @@ async function renderMosaic(
   } finally {
     renderer.setRenderTarget(prevTarget);
     rt?.dispose();
+    /* ⚠️ **ANTES de `restoreIsolation()`, e a ordem não é estilo.** Os dois mexem
+       em `.visible` e os dois restauram por LISTA PRÓPRIA — `isolateVehicle()`
+       guarda os filhos diretos da cena que ELE escondeu, `lod.ts` guarda as
+       malhas que ELE escondeu (ver POSSE POSITIVA no cabeçalho de lá). Hoje os
+       conjuntos são disjuntos (um mexe acima do `RIG`, o outro dentro dele), mas
+       soltar o mais interno primeiro é o que mantém a propriedade caso alguém
+       amplie o alcance de qualquer um dos dois: o de fora nunca pode restaurar em
+       cima de uma decisão do de dentro.
+       Rodar isto aqui é barato mesmo quando não há nada a soltar: `releaseLod()`
+       sai na primeira linha quando o contador de ocultas é zero. */
+    releaseLod();
     restoreIsolation?.();
     scene.background = prevBackground;
     renderer.setClearAlpha(prevClearAlpha);

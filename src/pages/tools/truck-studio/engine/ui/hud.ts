@@ -31,19 +31,26 @@
    --ts-hud-fill custom property (the filled portion of a range track, which CSS
    cannot compute on its own) and the dial's `touch-action: none`, without which
    a touch drag scrolls the page instead of turning the light. */
-import { root, $opt, el, num } from '../core/dom';
+import { root, $opt, el, num, isMounted } from '../core/dom';
 import {
   sceneState, LIGHT_PRESETS, applyPreset, setLightParams,
   setHourOfDay, getHourOfDay, HOUR_MIN, HOUR_MAX, beginLightScrub,
   warmLightPrograms,
   BACKDROPS, STUDIO_RANGE, isStudioPreset, setStudioParams, getStudioParams,
   TEMP_NEUTRAL, onRig,
+  /* Contadores do `renderer.info`, que o three mantém quer alguém leia ou não —
+     ver o cabeçalho de `getRenderStats()`. É a matéria-prima do bloco de
+     diagnóstico, e ela é GRATUITA: nada é ligado para produzi-la. */
+  getRenderStats,
 } from '../scene/scene';
 import { claimPill, paintFrame } from './loader';
 /* O perfil de qualidade. Módulo FOLHA — ver o cabeçalho de `core/quality.ts`. */
 import {
-  qualityMode, qualityLevel, setQualityMode, onQualityChange,
-  LEVEL_LABEL, type QualityMode,
+  qualityMode, qualityLevel, setQualityMode, onQualityChange, onScaleChange,
+  renderScale, setRenderScale, scaleBand, getProfile,
+  coldProfile, appliedColdProfile, coldPending,
+  frameTimeEma, submitTimeEma, probeHardware, suggestLevel,
+  LEVEL_LABEL, type QualityMode, type ColdProfile,
 } from '../core/quality';
 
 /* ---------------- trocar de preset SEM engasgo ----------------
@@ -152,6 +159,32 @@ const ICON_BODY: Record<string, string> = {
   bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4.9 1.1.9 1.8v.3h5.2v-.3c0-.7.3-1.4.9-1.8'
     + 'A6 6 0 0 0 12 3Z"/><path d="M9.6 19h4.8M10.4 21.6h3.2"/>',
 
+  /* --- configurações ---
+     A ENGRENAGEM, e não um trio de faders. O painel de configurações é feito de
+     controles deslizantes e pastilhas — as mesmas formas da face de iluminação —,
+     então um glifo de "faders" descreveria o CONTEÚDO dos dois cabeçalhos
+     igualmente e não distinguiria um do outro. A engrenagem é o único desenho que
+     diz "ajuste de máquina" em oposição à lâmpada, que diz "decisão de foto". Essa
+     oposição é justamente a razão de as duas faces terem se separado. */
+  gear: '<circle cx="12" cy="12" r="3"/>'
+    + '<path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3'
+    + ' 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1'
+    + 'a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H2a2 2 0 1 1 0-4h.1'
+    + 'a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3'
+    + 'H8a1.6 1.6 0 0 0 1-1.5V2a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1'
+    + 'a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V8a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1'
+    + 'a1.6 1.6 0 0 0-1.5 1Z"/>',
+  /* Pontas da régua de ESCALA DE RENDER: quatro células grandes contra uma malha
+     fina. Não é "escuro→claro" nem "pequeno→grande": o que a escala move é a
+     DENSIDADE DE AMOSTRAGEM, e uma grade é a única figura honesta disso — é a
+     mesma coisa que `renderScale` faz com os fragmentos. */
+  pixelLow: '<rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.2"/>'
+    + '<rect x="13" y="3.5" width="7.5" height="7.5" rx="1.2"/>'
+    + '<rect x="3.5" y="13" width="7.5" height="7.5" rx="1.2"/>'
+    + '<rect x="13" y="13" width="7.5" height="7.5" rx="1.2"/>',
+  pixelHigh: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/>'
+    + '<path d="M8 3.5v17M13 3.5v17M18 3.5v17M3.5 8h17M3.5 13h17M3.5 18h17"/>',
+
   /* --- weather --- */
   cloud: '<path d="' + CLOUD + '"/>',
   rain: '<path d="' + CLOUD + '"/><path d="M8.6 19.8 7.6 22M12.5 19.8l-1 2.2M16.4 19.8l-1 2.2"/>',
@@ -246,13 +279,33 @@ let dialRay!: SVGLineElement;
 let dialHandle!: SVGCircleElement;
 let tilesEl!: HTMLElement;
 let weatherVal!: HTMLElement;
-/* ---- qualidade ----
-   Sem `!` porque `paintQuality()` é chamado por `onQualityChange`, que o
-   adaptador automático pode disparar ANTES de o painel existir (o medidor roda
-   no laço, o HUD é construído sob demanda). A guarda de nulo em `paintQuality()`
-   é o que cobre essa janela — um `!` aqui seria mentira de tipo. */
+/* ---- a face de CONFIGURAÇÕES ----
+   Sem `!` em NENHUM destes, e a razão é a mesma que já valia para a fileira de
+   qualidade: `paintQuality()` é chamado por `onQualityChange`, e `paintScale()`
+   por `onScaleChange` — dois ganchos registrados no escopo do módulo que o
+   adaptador automático pode disparar ANTES de o painel existir (o medidor roda no
+   laço, o HUD é construído sob demanda). A guarda de nulo em cada pintor é o que
+   cobre essa janela; um `!` aqui seria mentira de tipo. */
+let cfgHint: HTMLElement | null = null;
+
 let qualityVal: HTMLElement | null = null;
 let qualityTiles: HTMLElement | null = null;
+
+let coldRow: HTMLElement | null = null;
+let coldNote: HTMLElement | null = null;
+let coldBtn: HTMLButtonElement | null = null;
+
+let scaleInput: HTMLInputElement | null = null;
+let scaleVal: HTMLElement | null = null;
+let scaleNote: HTMLElement | null = null;
+let scalePx: HTMLElement | null = null;
+
+let floorVal: HTMLElement | null = null;
+
+let diagStats: HTMLElement | null = null;
+let diagNote: HTMLElement | null = null;
+
+let hwStats: HTMLElement | null = null;
 
 /* ---- face de estúdio ----
    As LINHAS inteiras, e não só os controles: a troca de face é feita
@@ -277,6 +330,12 @@ let tempInput!: HTMLInputElement;
 let tempVal!: HTMLElement;
 
 let collapsed = false;
+/* CONFIGURAÇÕES ABRE FECHADA, e isso não é timidez de interface: é a mesma
+   distinção que separou as duas faces. Iluminação é decisão AUTORAL e se mexe o
+   tempo todo; qualidade é decisão de MÁQUINA e se consulta quando alguma coisa
+   está errada. Um bloco de diagnóstico permanentemente aberto num painel de
+   200 px empurraria os controles de luz para dentro de uma barra de rolagem em
+   troca de números que ninguém está lendo. */
 let dragPointer: number | null = null;   // pointerId while the dial is turning
 
 /* ---------------- persistence ---------------- */
@@ -284,15 +343,20 @@ let dragPointer: number | null = null;   // pointerId while the dial is turning
 function loadCollapsed() {
   try {
     const raw = localStorage.getItem(HUD_KEY);
-    if (!raw) return false;
+    if (!raw) return;
     const data = JSON.parse(raw);
-    return !!(data && data.collapsed);
-  } catch { return false; }
+    if (!data) return;
+    collapsed = !!data.collapsed;
+    /* `v: 1` no disco não tem o campo, e a AUSÊNCIA tem de resolver para
+       "fechada" — que é o padrão acima. `!!undefined` já faria isso; o teste
+       explícito existe para que um `false` gravado seja respeitado em vez de
+       cair no padrão junto com o ausente. */
+  } catch { /* storage bloqueado: os padrões valem */ }
 }
 
 function saveCollapsed() {
   try {
-    localStorage.setItem(HUD_KEY, JSON.stringify({ v: 1, collapsed }));
+    localStorage.setItem(HUD_KEY, JSON.stringify({ v: 2, collapsed }));
   } catch { /* private mode / quota — the panel still works, just forgets */ }
 }
 
@@ -531,79 +595,6 @@ function buildBackdropRow() {
   return row;
 }
 
-/* ---------------- QUALIDADE ----------------
-   QUATRO POSIÇÕES: Automático · Alta · Média · Baixa.
-
-   POR QUE ISTO EXISTE NA INTERFACE, E NÃO SÓ NO CONSOLE. Adaptação silenciosa é
-   um defeito, e este arquivo já rejeitou essa forma uma vez: a nota de
-   `warnIfUnpaintable()` diz que *"um usuário informado é um bug relatado, um
-   usuário calado é um bug perdido"*. Vale igual aqui — alguém cuja imagem
-   piorou sozinha e que não sabe por quê vai relatar "o estúdio está borrado",
-   que é um defeito impossível de diagnosticar. Com o controle visível, a mesma
-   pessoa relata "ele caiu para Baixo sozinho", que é uma frase acionável.
-
-   EM AUTOMÁTICO O RÓTULO MOSTRA ONDE ELE ESTÁ (`Automático · média`), porque
-   "automático" sozinho não responde a pergunta que a pessoa tem.
-
-   ESCOLHER UM NOME CONGELA O ADAPTADOR, e isso é um direito: quem escolheu Alta
-   num PC fraco escolheu ver 20 quadros por segundo. O medidor nem é consultado
-   depois — ver `setQualityMode()`. */
-function buildQualityRow() {
-  const row = el('div', 'ts-hud-row ts-hud-row--quality');
-  const top = el('div', 'ts-hud-row__top');
-  top.appendChild(el('span', 'ts-hud-row__label', 'Qualidade'));
-  qualityVal = el('span', 'ts-hud-row__val');
-  top.appendChild(qualityVal);
-  row.appendChild(top);
-
-  qualityTiles = el('div', 'ts-hud-tiles');
-  qualityTiles.setAttribute('role', 'radiogroup');
-  qualityTiles.setAttribute('aria-label', 'Qualidade da imagem');
-  const OPTS: { id: QualityMode; name: string; title: string }[] = [
-    { id: 'auto', name: 'Auto', title: 'Ajusta sozinho pelo desempenho medido' },
-    { id: 'alta', name: 'Alta', title: 'Resolução cheia, sombra 3072², reflexo do piso' },
-    { id: 'media', name: 'Média', title: 'Resolução 1,5×, sombra 2048²' },
-    { id: 'baixa', name: 'Baixa', title: 'Resolução 1×, sombra 1024², sem reflexo nem casca de laranja' },
-  ];
-  for (const o of OPTS) {
-    const tile = el('button', 'ts-hud-tile ts-hud-tile--text');
-    tile.type = 'button';
-    tile.dataset.quality = o.id;
-    tile.setAttribute('role', 'radio');
-    tile.setAttribute('aria-checked', 'false');
-    tile.title = o.title;
-    tile.setAttribute('aria-label', o.name + ' — ' + o.title);
-    tile.appendChild(el('span', 'ts-hud-tile__name', o.name));
-    tile.addEventListener('click', () => { setQualityMode(o.id); paintQuality(); });
-    qualityTiles.appendChild(tile);
-  }
-  row.appendChild(qualityTiles);
-  return row;
-}
-
-/* O ADAPTADOR MUDA O NÍVEL SOZINHO, e o rótulo tem de ir junto — senão o painel
-   diria "Automático · alta" com a cena rodando em Baixo, que é pior do que não
-   ter o controle. Registrado no escopo do módulo, uma vez: o gancho sobrevive ao
-   painel ser construído depois, porque `paintQuality()` sai cedo enquanto ele
-   não existe. */
-onQualityChange(() => paintQuality());
-
-function paintQuality() {
-  if (!qualityVal || !qualityTiles) return;
-  const mode = qualityMode();
-  const level = qualityLevel();
-  /* Em automático o nível EFETIVO vai junto; num nível fixo ele seria a mesma
-     palavra duas vezes. */
-  qualityVal.textContent = mode === 'auto'
-    ? 'Automático · ' + LEVEL_LABEL[level].toLowerCase()
-    : LEVEL_LABEL[level];
-  for (const tile of qualityTiles.querySelectorAll<HTMLElement>('.ts-hud-tile')) {
-    const on = tile.dataset.quality === mode;
-    tile.classList.toggle('is-on', on);
-    tile.setAttribute('aria-checked', on ? 'true' : 'false');
-  }
-}
-
 /* Os três multiplicadores. Um só construtor porque são a MESMA coisa três
    vezes: um deslizante 0..N cujo 1 é o que o preset autorou. O `centro` do
    controle é o valor calibrado — mexer é sempre um desvio consciente dele. */
@@ -657,10 +648,803 @@ function buildWeatherRow() {
   return row;
 }
 
+/* ===========================================================================
+   A FACE DE CONFIGURAÇÕES — e por que ela é uma SEÇÃO IRMÃ, não um segundo painel
+   ===========================================================================
+   O PEDIDO, literal: *"essas configurações devem estar em configurações, não
+   junto com iluminação, não faz sentido"*. Ele está certo, e a razão é mais forte
+   que arrumação — está escrita em `core/quality.ts`, na regra que governa aquele
+   arquivo inteiro:
+
+       O perfil só mexe em AMOSTRAGEM. Nunca em decisão visual autorada.
+
+   Iluminação é decisão AUTORAL: hora, clima, fundo, preenchimento, recorte e
+   temperatura MUDAM A FOTO, e a foto é o produto. Qualidade é decisão de MÁQUINA:
+   por construção ela não pode mudar a foto — *"uma captura tirada no Baixo sai com
+   o mesmo enquadramento e a mesma luz da tirada no Alto, só mais serrilhada"*.
+   Deixar as duas na mesma superfície CONTRADIZ a regra na interface: quem vê a
+   fileira de qualidade entre o recorte e o clima conclui, corretamente para o que
+   está olhando, que ela é mais um botão de foto.
+
+   POR QUE NÃO UM PAINEL FLUTUANTE SEPARADO. Medido nos arquivos que definem os
+   cantos: a coluna esquerda de `#canvas-holder` já é `.ts-mapbadge` (topo),
+   `#ts-hud` (meio) e `.ts-corner` (base) — é exatamente para isso que existem
+   `--ts-hud-top` e `--ts-hud-reserve` —, e a direita é `#view-controls` (topo) e
+   `#ts-panels` (base). Não sobra canto. Um quinto painel teria de se sobrepor a
+   um dos quatro, e os quatro moram em arquivos que este trabalho não pode tocar.
+
+   Então a separação é feita onde ela custa zero pixel: DUAS SEÇÕES no mesmo
+   vidro, cada uma com seu cabeçalho, seu ícone, seu estado de recolhimento e seu
+   `role=group` rotulado. A lâmpada continua dizendo "foto"; a engrenagem diz
+   "máquina". E `Configurações` abre FECHADA, então o painel de luz não perde uma
+   linha de altura por causa dela.
+
+   ⚠️ O RECOLHIMENTO PASSOU A SER DIRIGIDO POR `aria-expanded`, e não mais pela
+   classe `is-collapsed` na raiz. Com dois cabeçalhos, uma classe na raiz giraria
+   as DUAS setas e mostraria os DOIS resumos. `aria-expanded` já era escrito por
+   `applyCollapsed()`, é por seção por definição, e usá-lo como gancho de CSS
+   torna impossível a seta dessincronizar do estado acessível — é o mesmo
+   argumento que fez `aria-checked` entrar ao lado de `.is-on` nas pastilhas. */
+
+/* ---------------- QUALIDADE ----------------
+   QUATRO POSIÇÕES: Automático · Alta · Média · Baixa.
+
+   POR QUE ISTO EXISTE NA INTERFACE, E NÃO SÓ NO CONSOLE. Adaptação silenciosa é
+   um defeito, e este arquivo já rejeitou essa forma uma vez: a nota de
+   `warnIfUnpaintable()` diz que *"um usuário informado é um bug relatado, um
+   usuário calado é um bug perdido"*. Vale igual aqui — alguém cuja imagem
+   piorou sozinha e que não sabe por quê vai relatar "o estúdio está borrado",
+   que é um defeito impossível de diagnosticar. Com o controle visível, a mesma
+   pessoa relata "ele caiu para Baixo sozinho", que é uma frase acionável.
+
+   EM AUTOMÁTICO O RÓTULO MOSTRA ONDE ELE ESTÁ (`Automático · média`), porque
+   "automático" sozinho não responde a pergunta que a pessoa tem.
+
+   ESCOLHER UM NOME CONGELA O ADAPTADOR, e isso é um direito: quem escolheu Alta
+   num PC fraco escolheu ver 20 quadros por segundo. O medidor nem é consultado
+   depois — ver `setQualityMode()`. */
+
+/* ⚠️ OS `title` DESTAS PASTILHAS ERAM MENTIRA, E A MENTIRA CUSTOU UMA AUDITORIA.
+   ---------------------------------------------------------------------------
+   O texto anterior de Baixa era *"Resolução 1×, sombra 1024², sem reflexo nem
+   casca de laranja"*, e ele errava em duas frentes ao mesmo tempo:
+
+     · "Resolução 1×" descrevia `pixelRatioCap`, que é um TETO — `min(dpr, 1)`.
+       Num monitor a `devicePixelRatio` 1, que é o caso da esmagadora maioria dos
+       desktops, `min(1,2)` e `min(1,1)` são o mesmo número. A pastilha prometia
+       um corte de resolução que não acontecia.
+     · "sombra 1024²" deixou de ser verdade nesta revisão: o Baixo fica em 2048²
+       DE PROPÓSITO (o passe de sombra é limitado por geometria, não por
+       resolução, e a leitura já cai de 17 taps para 1 pelo filtro `basic`).
+
+   Foi essa distância entre o rótulo e a tabela que produziu o relato *"no modo de
+   qualidade baixa não vejo diferença nenhuma"*. Os textos abaixo são lidos, valor
+   por valor, de `PROFILES` e `COLD` em `core/quality.ts`. Se um dia divergirem,
+   é ESTE arquivo que está errado. */
+const QUALITY_OPTS: { id: QualityMode; name: string; title: string }[] = [
+  {
+    id: 'auto', name: 'Auto',
+    title: 'Ajusta sozinho pelo tempo de quadro medido. Mexe primeiro na escala de'
+      + ' render, que é barata e reversível, e só troca de nível quando a escala'
+      + ' satura no fim da faixa.',
+  },
+  {
+    id: 'alta', name: 'Alta',
+    title: 'Escala de render 100 %. Sombra 3072² com filtro PCF de 17 amostras.'
+      + ' Anisotropia 8 (veículo) e 16 (chão). Reflexo do piso completo. Casca de'
+      + ' laranja e 2 oitavas de floco na tinta. Sem corte de LOD. 14 refletores à'
+      + ' noite. É o que o estúdio sempre fez — nenhum degrau ligado.',
+  },
+  {
+    id: 'media', name: 'Média',
+    title: 'Escala de render 80 %, ou seja 64 % dos fragmentos. Sombra 2048², ainda'
+      + ' PCF. Anisotropia 4 e 8. Reflexo do piso só com as silhuetas que sobrevivem'
+      + ' a mip 4 (sai parafusaria, ferragem e pneu). Sem casca de laranja — o maior'
+      + ' ganho barato do shader de tinta. LOD abaixo de 1,5 px. 6 refletores à'
+      + ' noite: saem os 8 postes, o vidro aceso deles continua.',
+  },
+  {
+    id: 'baixa', name: 'Baixa',
+    title: 'Escala de render 65 %, ou seja 42 % dos fragmentos. Sombra 2048² com'
+      + ' filtro de 1 amostra (a borda vira escada de um texel e a penumbra larga do'
+      + ' preset chuvoso deixa de existir). Anisotropia 2. Sem reflexo do piso, sem'
+      + ' casca de laranja, 1 oitava de floco. LOD abaixo de 3 px. Nenhum refletor'
+      + ' de rua à noite. Persegue 45 fps, não 60.',
+  },
+];
+
+function buildQualityRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--quality');
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Qualidade'));
+  qualityVal = el('span', 'ts-hud-row__val');
+  top.appendChild(qualityVal);
+  row.appendChild(top);
+
+  /* CONSTRUÍDO NUM LOCAL E SÓ DEPOIS PUBLICADO NA VARIÁVEL DE MÓDULO — é o padrão
+     em todos os construtores desta seção. Uma `let` de módulo que qualquer função
+     pode reatribuir nunca é estreitada pelo TypeScript, então usá-la direto aqui
+     exigiria um `!` por linha; e este arquivo já registrou que `!` num valor que
+     PODE ser nulo é mentira de tipo. O local é não-nulo por construção. */
+  const tiles = el('div', 'ts-hud-tiles');
+  tiles.setAttribute('role', 'radiogroup');
+  tiles.setAttribute('aria-label', 'Qualidade da imagem');
+  for (const o of QUALITY_OPTS) {
+    const tile = el('button', 'ts-hud-tile ts-hud-tile--text');
+    tile.type = 'button';
+    tile.dataset.quality = o.id;
+    tile.setAttribute('role', 'radio');
+    tile.setAttribute('aria-checked', 'false');
+    tile.title = o.title;
+    tile.setAttribute('aria-label', o.name + ' — ' + o.title);
+    tile.appendChild(el('span', 'ts-hud-tile__name', o.name));
+    /* Trocar de nível mexe na faixa da escala, na assinatura fria e no reflexo do
+       piso de uma vez — repinta a seção inteira, não só esta fileira. */
+    tile.addEventListener('click', () => { setQualityMode(o.id); paintCfg(); });
+    tiles.appendChild(tile);
+  }
+  row.appendChild(tiles);
+  qualityTiles = tiles;
+  return row;
+}
+
+/* O ADAPTADOR MUDA O NÍVEL SOZINHO, e o rótulo tem de ir junto — senão o painel
+   diria "Automático · alta" com a cena rodando em Baixo, que é pior do que não
+   ter o controle. Registrado no escopo do módulo, uma vez: o gancho sobrevive ao
+   painel ser construído depois, porque todo pintor sai cedo enquanto ele não
+   existe. */
+onQualityChange(() => paintCfg());
+
+function paintQuality() {
+  if (!qualityVal || !qualityTiles) return;
+  const mode = qualityMode();
+  const level = qualityLevel();
+  /* Em automático o nível EFETIVO vai junto; num nível fixo ele seria a mesma
+     palavra duas vezes. */
+  qualityVal.textContent = mode === 'auto'
+    ? 'Automático · ' + LEVEL_LABEL[level].toLowerCase()
+    : LEVEL_LABEL[level];
+  for (const tile of qualityTiles.querySelectorAll<HTMLElement>('.ts-hud-tile')) {
+    const on = tile.dataset.quality === mode;
+    tile.classList.toggle('is-on', on);
+    tile.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+}
+
+/* ---------------- MUDANÇA FRIA PENDENTE ----------------
+   `core/quality.ts` separa botões QUENTES de FRIOS, e a separação é o que torna a
+   adaptação automática segura por construção: *"o medidor NUNCA toca aqui"*. Um
+   botão frio muda um `#define`, uma chave de cache de programa ou um parâmetro de
+   construtor — trocá-lo exige cortina, e um engasgo de recompilação disparado
+   sozinho no meio de um arrasto é exatamente o defeito que a adaptação existe
+   para evitar.
+
+   Consequência para a interface: escolher "Baixa" pode NÃO entregar tudo que a
+   pastilha promete até a cena ser reconstruída. Sem esta fileira, o usuário leria
+   o rótulo, não veria o ganho e concluiria de novo que o controle não faz nada —
+   o mesmo relato que originou toda esta revisão. Ela existe para que a distância
+   entre o PEDIDO e o APLICADO seja visível em vez de ser um mistério.
+
+   ⚠️ POR QUE O CAMINHO DE APLICAÇÃO É PROCURADO, E NÃO IMPORTADO.
+   Quem sabe subir a cortina é `studio.ts` — ele já tem `releasedChoice` +
+   `RELEASE_MS`, é o dono do laço e do ciclo de carga. Mas `ui/hud.ts` é importado
+   POR `studio.ts` (`initHud()` roda no boot dele), então um `import` daqui para lá
+   fecharia um ciclo de módulos. Sobram duas portas, e as duas estão abertas:
+
+     1. `setColdApplyHandler(fn)`, exportado abaixo. É a porta PREFERIDA — é
+        explícita, é tipada e não depende de um objeto global existir. `studio.ts`
+        chama uma vez, logo depois de `initHud()`.
+     2. `window.__studio`, que `studio.ts` já publica e já contém `quality`. É a
+        rede de segurança para o caso de a integração ainda não ter ligado (1),
+        e é acessada com `typeof === 'function'` em vez de `any`.
+
+   CONFERIDO NO CÓDIGO VIVO: `studio.ts` exporta `applyColdQuality()` e o publica
+   como `window.__studio.quality.applyCold` — ou seja, a porta (2) já responde e o
+   botão funciona sem integração nenhuma. A porta (1) continua sendo a preferida
+   por uma razão de TEMPO: o handle só é instalado no FIM do `boot()`, depois do
+   primeiro `applyChoice`, enquanto `initHud()` roda bem antes. Entre os dois
+   momentos o botão se declara indisponível — e se declara com honestidade, mas um
+   `setColdApplyHandler()` logo após `initHud()` fecharia essa janela. Como o
+   painel repinta a cada tique de diagnóstico e a cada mudança de nível, ele se
+   conserta sozinho assim que o handle aparece.
+
+   Se nenhuma das duas responder, o botão fica DESABILITADO com texto honesto —
+   e o texto é honesto porque a mudança realmente vai acontecer sozinha: o próprio
+   `coldPending()` documenta que ela *"é aplicada na próxima borda natural de carga
+   (troca de cenário/veículo)"*. Prometer um botão que não recarrega nada seria
+   pior do que não ter botão. */
+
+type ColdApply = () => void | Promise<void>;
+let coldApplyHook: ColdApply | null = null;
+
+/**
+ * Registra quem sabe reconstruir a cena para aplicar a assinatura fria.
+ *
+ * Chamado por `studio.ts` depois de `initHud()`. Idempotente e reversível
+ * (`null` desregistra), porque o engine sobrevive à rota do React e um handle
+ * pendurado num escopo morto seria pior que nenhum.
+ */
+export function setColdApplyHandler(fn: ColdApply | null) {
+  coldApplyHook = fn;
+  paintCold();
+}
+
+function coldApply(): ColdApply | null {
+  if (coldApplyHook) return coldApplyHook;
+  /* Cast local em vez de confiar no `declare global` de `studio.ts`: ele existe,
+     mas depender dele daqui amarraria este módulo à ordem de compilação de um
+     arquivo que não importamos. */
+  const handle = (window as Window & { __studio?: Record<string, unknown> }).__studio;
+  if (!handle) return null;
+  const direct = handle.applyColdQuality;
+  /* `.call(dono)` e nunca a referência solta: um método publicado num objeto
+     literal pode legitimamente usar `this`, e desmontá-lo aqui seria um
+     `undefined` no meio de uma cortina de carregamento. */
+  if (typeof direct === 'function') return () => (direct as ColdApply).call(handle);
+  const q = handle.quality as Record<string, unknown> | undefined;
+  if (q) {
+    const nested = q.applyCold ?? q.applyColdQuality;
+    if (typeof nested === 'function') return () => (nested as ColdApply).call(q);
+  }
+  return null;
+}
+
+const SHADOW_LABEL: Record<ColdProfile['shadowType'], string> = {
+  pcf: 'PCF (17 amostras)', basic: '1 amostra',
+};
+/* `''` é "os arquivos de sempre" — ver `groundVariant`/`hdrVariant`. O rótulo diz
+   o que o arquivo É, não o sufixo, porque o sufixo não quer dizer nada para quem
+   está lendo o painel. */
+const VARIANT_LABEL: Record<string, string> = {
+  '': 'originais', '@1k': '1024²', '@ktx2': 'KTX2/BC7',
+};
+
+function buildColdRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--cold hidden');
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Mudança pendente'));
+  row.appendChild(top);
+
+  const note = el('span', 'ts-hud-note ts-hud-note--warn');
+  /* `polite`, nunca `assertive`: isto aparece como CONSEQUÊNCIA de um clique que
+     o usuário acabou de dar, então interromper a leitura dele para anunciar o
+     efeito do próprio clique seria ruído. */
+  note.setAttribute('role', 'status');
+  note.setAttribute('aria-live', 'polite');
+  row.appendChild(note);
+
+  const btn = el('button', 'ts-hud-btn');
+  btn.type = 'button';
+  btn.addEventListener('click', () => {
+    const fn = coldApply();
+    if (fn) void fn();
+  });
+  row.appendChild(btn);
+
+  coldRow = row;
+  coldNote = note;
+  coldBtn = btn;
+  return row;
+}
+
+function paintCold() {
+  if (!coldRow || !coldNote || !coldBtn) return;
+  const pending = coldPending();
+  coldRow.classList.toggle('hidden', !pending);
+  if (!pending) return;
+
+  const want = coldProfile();
+  const got = appliedColdProfile();
+  const diffs: string[] = [];
+  if (want.spotPool !== got.spotPool) {
+    diffs.push('refletores à noite ' + got.spotPool + ' → ' + want.spotPool);
+  }
+  if (want.shadowType !== got.shadowType) {
+    diffs.push('filtro de sombra ' + SHADOW_LABEL[got.shadowType]
+      + ' → ' + SHADOW_LABEL[want.shadowType]);
+  }
+  if (want.antialias !== got.antialias) {
+    diffs.push('MSAA ' + (got.antialias ? 'ligado' : 'desligado')
+      + ' → ' + (want.antialias ? 'ligado' : 'desligado'));
+  }
+  if (want.groundVariant !== got.groundVariant) {
+    diffs.push('texturas de chão ' + (VARIANT_LABEL[got.groundVariant] || got.groundVariant)
+      + ' → ' + (VARIANT_LABEL[want.groundVariant] || want.groundVariant));
+  }
+  if (want.hdrVariant !== got.hdrVariant) {
+    diffs.push('HDR de ambiente ' + (VARIANT_LABEL[got.hdrVariant] || got.hdrVariant)
+      + ' → ' + (VARIANT_LABEL[want.hdrVariant] || want.hdrVariant));
+  }
+
+  const fn = coldApply();
+  coldNote.textContent = diffs.join(' · ')
+    + (fn
+      ? '. Recompila os shaders da cena — leva uma cortina de alguns segundos.'
+      : '. Aplica sozinho na próxima troca de cenário ou de veículo.');
+  coldBtn.disabled = !fn;
+  coldBtn.textContent = fn ? 'Aplicar agora' : 'Aplica na próxima carga';
+  coldBtn.title = fn
+    ? 'Solta a cena e a reconstrói com a assinatura fria do nível escolhido.'
+    : 'Nenhum caminho de recarga registrado nesta compilação. A mudança entra na'
+      + ' próxima borda natural de carga, ou ao recarregar a página — o nível'
+      + ' escolhido fica salvo.';
+}
+
+/* ---------------- ESCALA DE RENDER ----------------
+   O BOTÃO DOMINANTE, e o que faltava. `core/quality.ts` é explícito: o custo de
+   preenchimento escala com o QUADRADO disto, e — ao contrário do teto de
+   `devicePixelRatio` — ele funciona em qualquer monitor.
+
+   ⚠️ A LEITURA É EM PIXELS, e não só em fator. `0,78` não é acionável; `1920×1080
+   · 78 % → 1498×842` é: dá para comparar com a resolução do monitor, dá para
+   colar num relato de bug e dá para ver que o número mudou. E os dois pares saem
+   do CANVAS — `clientWidth/clientHeight` é o tamanho lógico, `width/height` é o
+   drawing buffer que o three alocou. Nenhum dos quatro é calculado aqui.
+
+   Isso é deliberado e é a parte que torna o controle AUDITÁVEL: se um dia a
+   escala parar de ser aplicada no `setSize()`, o segundo par não vai acompanhar o
+   primeiro e a divergência aparece na tela em vez de virar mais um "não vejo
+   diferença nenhuma".
+
+   ⚠️ EM AUTOMÁTICO O CONTROLE FICA DESABILITADO, e isso não é uma amputação: em
+   `auto` o controlador anda dentro da faixa a cada 900 ms para segurar o alvo de
+   tempo de quadro, então um arrasto do usuário duraria menos de um segundo. Este
+   arquivo já decidiu esse caso uma vez, sobre a hora do dia no ciclorama: *"um
+   controle deslizante que anda e não muda nada é pior do que a ausência dele"*.
+   Aqui ele fica visível e vivo (o valor se move sozinho, é o que se quer ver),
+   mas não aceita a mão — e a nota diz como pegar o volante. */
+
+function buildScaleRow() {
+  const built = buildRangeRow('scale', 'Escala de render', 'pixelLow', 'pixelHigh',
+    50, 100, 1, 'low', 'high');
+  scaleInput = built.input;
+  scaleVal = built.val;
+  built.input.setAttribute('aria-label', 'Escala de render');
+  built.input.addEventListener('input', () => {
+    setRenderScale(num(built.input.value, 100) / 100);
+    /* `setRenderScale` emite `onScaleChange`, que já repinta — mas só quando o
+       valor MUDA de verdade (há uma banda morta de 1e-4 lá dentro). Repintar aqui
+       também é o que garante que a leitura acompanhe o polegar mesmo num degrau
+       que o módulo considerou nulo. */
+    paintScale();
+  });
+
+  scalePx = el('span', 'ts-hud-note ts-hud-note--px');
+  built.row.appendChild(scalePx);
+  scaleNote = el('span', 'ts-hud-note');
+  built.row.appendChild(scaleNote);
+  return built.row;
+}
+
+/* O gancho de escala é registrado no módulo pela mesma razão do de qualidade: o
+   controlador dinâmico pode mexer na escala antes de o painel existir. */
+onScaleChange(() => { paintScale(); paintCfgHint(); });
+
+/** Os dois pares de dimensões do canvas vivo, ou `null` antes de ele existir. */
+function canvasPixels() {
+  const c = $opt('canvas-holder')?.querySelector('canvas');
+  if (!c) return null;
+  return {
+    cssW: Math.round(c.clientWidth), cssH: Math.round(c.clientHeight),
+    bufW: c.width, bufH: c.height,
+  };
+}
+
+function paintScale() {
+  if (!scaleInput || !scaleVal || !scaleNote || !scalePx) return;
+  const auto = qualityMode() === 'auto';
+  const band = scaleBand();
+  const lo = Math.round(band.min * 100);
+  const hi = Math.round(band.max * 100);
+  /* A FAIXA MUDA COM O NÍVEL (0,85–1 no Alto, 0,50–0,85 no Baixo), então os
+     limites do input são reescritos a cada pintura em vez de fixados na
+     construção. Escritos só quando mudam: atribuir `min`/`max` reavalia o valor
+     do input, e fazer isso a cada quadro de arrasto brigaria com o polegar. */
+  if (scaleInput.min !== String(lo)) scaleInput.min = String(lo);
+  if (scaleInput.max !== String(hi)) scaleInput.max = String(hi);
+
+  const pct = Math.round(renderScale() * 100);
+  scaleInput.value = String(clamp(pct, lo, hi));
+  /* A LEITURA MOSTRA O VALOR REAL, não o preso à faixa: `setRenderScale()` aceita
+     0,35 a 2,0 por escolha explícita (o console e a bancada usam), e um número
+     fora da faixa é justamente o que se precisa enxergar. */
+  scaleVal.textContent = pctText(pct);
+  setFill(scaleInput, clamp(pct, lo, hi), lo, hi);
+  scaleInput.disabled = auto;
+
+  const px = canvasPixels();
+  scalePx.textContent = px
+    ? px.cssW + '×' + px.cssH + ' → ' + px.bufW + '×' + px.bufH + ' desenhados'
+    : 'canvas ainda não medido';
+
+  const alvo = String(Math.round(band.targetMs * 10) / 10).replace('.', ',');
+  scaleNote.textContent = auto
+    ? 'O controlador move a escala sozinho entre ' + lo + ' e ' + hi
+      + ' % para segurar ' + alvo + ' ms por quadro. Congele um nível para travá-la.'
+    : 'Faixa do nível ' + LEVEL_LABEL[qualityLevel()] + ': ' + lo + '–' + hi
+      + ' %. O custo de preenchimento cai com o quadrado.';
+}
+
+/* ---------------- REFLEXO DO PISO ----------------
+   MOSTRADOR, NÃO CONTROLE — e a escolha é deliberada.
+
+   Ele é o item mais caro do cenário Estúdio por duas contas independentes: 14,1
+   fps medidos por `scene/floor-reflection.ts` e **96,7 MB de VRAM** (alvo
+   1600×1080 `HalfFloatType` com mipmaps e `samples: 4`, dos quais ~79 MB são só o
+   buffer multiamostrado). Isso o torna o segundo maior item isolado do orçamento
+   de memória da cena, atrás apenas dos 341 MB de chão. Merece aparecer.
+
+   ⚠️ MAS A ÚNICA PORTA DE ESCRITA QUE EXISTE HOJE É BINÁRIA. `cyclorama.ts`
+   reexporta `setFloorReflection(on: boolean)`, e o perfil passou a ter TRÊS
+   estados (`full` / `lod` / `off`). Um controle de três posições ligado a uma
+   porta de duas ou perderia o estado do meio ou mentiria sobre ele; e a porta de
+   três estados mora em arquivos de cena que este trabalho não pode editar.
+
+   Entre um controle que não controla e um mostrador honesto, o mostrador. Ele diz
+   o valor E diz quem decide, que é a informação de que alguém precisa para
+   entender por que o piso do estúdio perdeu o brilho ao cair para Média. */
+const FLOOR_LABEL: Record<string, string> = {
+  full: 'Completo', lod: 'Só silhuetas', off: 'Desligado',
+};
+
+function buildFloorRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--floor');
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Reflexo do piso'));
+  floorVal = el('span', 'ts-hud-row__val');
+  top.appendChild(floorVal);
+  row.appendChild(top);
+
+  const note = el('span', 'ts-hud-note',
+    'Decidido pelo nível de qualidade, não por aqui. Só existe no cenário Estúdio.'
+    + ' Custo medido: 14,1 fps e 96,7 MB de VRAM — o segundo maior item de memória'
+    + ' da cena.');
+  row.appendChild(note);
+  return row;
+}
+
+function paintFloor() {
+  if (!floorVal) return;
+  const v = getProfile().floorReflection;
+  floorVal.textContent = FLOOR_LABEL[v] || v;
+}
+
+/* ---------------- DIAGNÓSTICO ----------------
+   ESTE BLOCO É A RAZÃO DE A SEÇÃO EXISTIR.
+
+   O relato que originou a reescrita de `core/quality.ts` foi *"colocando no modo
+   de qualidade baixa não vejo diferença nenhuma, nem visual, nem de performance"*
+   — e ele estava certo. Custou uma auditoria botão por botão para provar. Com
+   estes números na tela, a mesma descoberta leva dez segundos: escolhe Baixa,
+   olha ms/quadro e chamadas de desenho, vê que não mexeram.
+
+   O adaptador tem de ser AUDITÁVEL pela mesma razão que ele tem de ser visível.
+
+   ⚠️ A COMPARAÇÃO PAREDE × SUBMISSÃO É O DIAGNÓSTICO, e não um segundo número
+   decorativo. `core/quality.ts` explica por quê: `performance.now()` em volta do
+   `render()` mede SUBMISSÃO, não execução — com `setAnimationLoop` preso ao
+   vsync, uma GPU saturada deixa o bloqueio no swap, FORA do `render()`. Então:
+
+     · os dois próximos  → o gargalo é GPU/submissão. Mexer na ESCALA devolve
+       quadros.
+     · parede muito maior → é CPU fora do `render()` (o teste de corredor de
+       `seethrough.ts` roda 60×/s sobre ~650 objetos, inclusive em quadro pulado)
+       ou espera de vsync. Baixar resolução não devolve nada.
+
+   ⚠️ ARMADILHA DE LEITURA, e ela é real: `reportFrameTime()` sai na primeira linha
+   quando o modo NÃO é `auto`. Ou seja, ao congelar um nível o medidor PARA, e
+   `frameTimeEma()` continua devolvendo a última leitura feita em automático.
+   Mostrar esse número sem marcação seria exatamente o tipo de mentira de painel
+   que esta seção existe para acabar. Daí a nota.
+
+   ⚠️ POR ISSO O `fps desenhado` VEM DO CONTADOR DE QUADROS, e não do EMA: ele é
+   derivado de `renderStats.frame`, que o three incrementa sempre, então ele
+   continua vivo com o nível congelado. Em compensação ele é 0 numa cena parada —
+   o laço é SOB DEMANDA, e um 0 ali significa "nada mudou", não "travou". É a
+   mesma leitura que o cabeçalho de `getRenderStats()` descreve. */
+
+const DIAG_MS = 500;
+/* Uma vez por meio segundo, e nunca por quadro. `getRenderStats()` é grátis, mas
+   escrever nove nós de texto a 60 Hz não é — e um número que pisca 60×/s é
+   ilegível de qualquer forma. Meio segundo é rápido o bastante para acompanhar um
+   arrasto e lento o bastante para se conseguir ler. */
+let diagTimer = 0;
+let lastFrame = -1;
+let lastFrameAt = 0;
+
+/* Os pares do <dl>, na ordem em que são pintados. Guardados como nós para não
+   reconstruir a lista a cada tique — `textContent` num <dd> existente é o barato;
+   recriar nove elementos duas vezes por segundo é lixo para o coletor. */
+const diagCells: Record<string, HTMLElement> = {};
+
+function statLine(list: HTMLElement, key: string, label: string, title?: string) {
+  const dt = el('dt', 'ts-hud-stat__k', label);
+  if (title) dt.title = title;
+  const dd = el('dd', 'ts-hud-stat__v', '—');
+  list.appendChild(dt);
+  list.appendChild(dd);
+  return (diagCells[key] = dd);
+}
+
+function buildDiagRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--diag');
+  const top = el('div', 'ts-hud-row__top');
+  const label = el('span', 'ts-hud-row__label', 'Diagnóstico');
+  label.title = 'Compare PAREDE com SUBMISSÃO: próximos, o gargalo é GPU e a escala'
+    + ' de render devolve quadros; parede muito maior, é CPU fora do render() ou'
+    + ' espera de vsync, e baixar resolução não devolve nada.';
+  top.appendChild(label);
+  row.appendChild(top);
+
+  const list = el('dl', 'ts-hud-stats');
+  statLine(list, 'wall', 'parede', 'Tempo de PAREDE entre dois quadros'
+    + ' desenhados — inclui CPU, GPU, compositor e swap. É o que o usuário sente.');
+  statLine(list, 'submit', 'submissão', 'Tempo dentro de renderer.render().'
+    + ' Mede SUBMISSÃO, não execução.');
+  statLine(list, 'fps', 'quadros/s', 'Derivado do contador do renderer, não do'
+    + ' medidor — continua vivo com o nível congelado. O laço é sob demanda: 0'
+    + ' significa cena parada, não travada.');
+  statLine(list, 'calls', 'chamadas');
+  statLine(list, 'tris', 'triângulos');
+  statLine(list, 'programs', 'programas', 'Shaders compilados. Um salto aqui é'
+    + ' um engasgo de compilação — a razão de os botões frios exigirem cortina.');
+  statLine(list, 'tex', 'texturas');
+  statLine(list, 'geo', 'geometrias');
+  statLine(list, 'env', 'cache de ambiente');
+  row.appendChild(list);
+
+  const note = el('span', 'ts-hud-note');
+  row.appendChild(note);
+  diagStats = list;
+  diagNote = note;
+  return row;
+}
+
+/* "12,4 ms" com vírgula: o painel inteiro é pt-BR, e um ponto decimal no meio de
+   uma coluna de números lidos em português lê como separador de milhar. */
+const msText = (v: number) => (v > 0 ? v.toFixed(1).replace('.', ',') + ' ms' : '—');
+const intText = (v: number) => Math.round(v).toLocaleString('pt-BR');
+
+function paintDiag() {
+  if (!diagStats || !diagNote) return;
+  /* A árvore do engine SOBREVIVE à rota do React (ver o cabeçalho de
+     `core/dom.ts`), então este intervalo pode ficar de pé com o estúdio fora da
+     página. Sair aqui é o que impede duas escritas de DOM por segundo em nós que
+     ninguém está vendo — o próprio tique fica, porque religá-lo exigiria um
+     gancho de montagem que este módulo não tem. */
+  /* ⚠️ E ZERA A ÂNCORA AO SAIR, senão o primeiro tique depois de voltar à página
+     dividiria os quadros de uma sessão inteira pelo intervalo de meio segundo e
+     imprimiria um fps absurdo. `-1` faz esse tique mostrar "—" e o seguinte já
+     sair certo. */
+  if (!isMounted()) { lastFrame = -1; lastFrameAt = 0; return; }
+
+  const st = getRenderStats();
+  const now = performance.now();
+  let drawn = -1;
+  if (lastFrame >= 0 && now > lastFrameAt) {
+    drawn = (st.frame - lastFrame) * 1000 / (now - lastFrameAt);
+  }
+  lastFrame = st.frame;
+  lastFrameAt = now;
+
+  const wall = frameTimeEma();
+  const submit = submitTimeEma();
+  diagCells.wall.textContent = msText(wall);
+  diagCells.submit.textContent = msText(submit);
+  diagCells.fps.textContent = drawn >= 0 ? intText(drawn) : '—';
+  diagCells.calls.textContent = intText(st.calls);
+  diagCells.tris.textContent = intText(st.triangles);
+  diagCells.programs.textContent = intText(st.programs);
+  diagCells.tex.textContent = intText(st.textures);
+  diagCells.geo.textContent = intText(st.geometries);
+  diagCells.env.textContent = intText(st.envCacheSize);
+
+  const notes: string[] = [];
+  if (qualityMode() !== 'auto') {
+    /* Ver a armadilha documentada acima: com o nível congelado o medidor nem é
+       consultado, e os dois primeiros números param no tempo. */
+    notes.push('Medidor pausado com o nível congelado — parede e submissão são a'
+      + ' última leitura feita em automático.');
+  }
+  if (wall > 0 && submit > 0) {
+    /* ⚠️ OS DOIS LIMIARES SÃO AUXÍLIO DE LEITURA, NÃO MEDIÇÃO. Eles apenas
+       nomeiam as duas pontas que `core/quality.ts` descreve em palavras
+       ("próximos" e "muito maior"); a fronteira exata entre elas não foi medida e
+       não pretende ser. Por isso existe a faixa do meio, e por isso ela se
+       declara indefinida em vez de chutar um culpado. */
+    const r = submit / wall;
+    if (r >= 0.7) notes.push('Submissão perto da parede: o gargalo é GPU — a escala de render é o botão.');
+    else if (r <= 0.4) notes.push('Parede bem acima da submissão: CPU fora do render() ou espera de vsync.');
+    else notes.push('Parede e submissão em faixa intermediária: sem veredito.');
+  }
+  diagNote.textContent = notes.join(' ');
+}
+
+function startDiag() {
+  if (diagTimer) return;
+  lastFrame = -1;
+  lastFrameAt = 0;
+  paintDiag();
+  diagTimer = window.setInterval(() => { paintDiag(); paintCold(); }, DIAG_MS);
+}
+
+function stopDiag() {
+  if (!diagTimer) return;
+  clearInterval(diagTimer);
+  diagTimer = 0;
+}
+
+/* ---------------- HARDWARE DETECTADO ----------------
+   Uma linha discreta, e ela tem uma justificativa registrada: *"um usuário
+   informado é um bug relatado, um usuário calado é um bug perdido"*. Um relato
+   que traz a string do adaptador é um relato que se reproduz; um que diz "meu PC"
+   não é.
+
+   ⚠️ E ELA MOSTRA O `null` COMO `null`. O Firefox mascara
+   `UNMASKED_RENDERER_WEBGL` por privacidade, e a política de `core/quality.ts` é
+   literal: *"ausência de informação nunca significa fraco"* — um adaptador não
+   identificado abre no nível Alto. Escrever "desconhecido" aqui, em vez de
+   esconder a linha, é o que explica por que uma máquina modesta no Firefox pode
+   abrir pesada. */
+function buildHardwareRow() {
+  const row = el('div', 'ts-hud-row ts-hud-row--hw');
+  const top = el('div', 'ts-hud-row__top');
+  top.appendChild(el('span', 'ts-hud-row__label', 'Hardware'));
+  row.appendChild(top);
+
+  hwStats = el('dl', 'ts-hud-stats ts-hud-stats--hw');
+  row.appendChild(hwStats);
+  return row;
+}
+
+function paintHardware() {
+  if (!hwStats) return;
+  /* UMA VEZ SÓ. `probeHardware()` é memoizada e o hardware não muda no meio da
+     sessão, mas `paintCfg()` roda em toda troca de cenário (via `syncHud()`) —
+     reconstruir catorze nós a cada uma seria lixo puro para o coletor. */
+  if (hwStats.childElementCount) return;
+  const hw = probeHardware();
+  /* Capturado numa const em vez de `hwStats!` dentro do fecho: a estreitagem de
+     tipo não atravessa a fronteira da função, e um `!` aqui seria afirmar de novo
+     o que a guarda acima já provou — o mesmo motivo pelo qual os pintores desta
+     seção não usam `!` nas suas variáveis de módulo. */
+  const list = hwStats;
+  const add = (k: string, v: string, title?: string) => {
+    const dt = el('dt', 'ts-hud-stat__k', k);
+    const dd = el('dd', 'ts-hud-stat__v', v);
+    /* O `title` vai nos DOIS nós: a string do adaptador é longa e trunca no <dd>,
+       e o rótulo é onde o ponteiro cai primeiro. */
+    if (title) { dt.title = title; dd.title = title; }
+    list.appendChild(dt);
+    list.appendChild(dd);
+  };
+  add('adaptador', hw.renderer || 'não informado',
+    hw.renderer || 'O navegador mascara a string do adaptador (o Firefox faz isso'
+      + ' por privacidade). Sem ela o veredito é DESCONHECIDO, e desconhecido abre'
+      + ' no nível Alto por política: só o medidor pode rebaixar quem não se'
+      + ' identificou.');
+  add('núcleos', hw.cores ? String(hw.cores) : '—');
+  add('memória', hw.memoryGB ? hw.memoryGB + ' GB' : 'não informada',
+    'Só o Chromium expõe navigator.deviceMemory.');
+  add('pixels da tela', hw.pixels ? intText(hw.pixels) : '—',
+    'Quantos pixels a tela pede, já com o DPR. Numa placa integrada isto pesa mais'
+    + ' que o modelo da placa.');
+  add('textura máx.', hw.maxTextureSize ? hw.maxTextureSize + '²' : '—');
+  add('anisotropia máx.', hw.maxAnisotropy ? hw.maxAnisotropy + '×' : '—');
+  add('sonda sugere', LEVEL_LABEL[suggestLevel(hw)],
+    'O que a sonda ESTÁTICA sugeriria antes do primeiro quadro. Ela acerta o caso'
+    + ' extremo e chuta o meio — quem manda depois é o medidor, e acima dos dois'
+    + ' manda a escolha do usuário.');
+}
+
+/* ---------------- a seção inteira ---------------- */
+
+/**
+ * As fileiras de qualidade, prontas para montar — SEM cabeçalho e SEM painel.
+ *
+ * Quem monta é `ui/trim-panel.ts`, dentro do card que já carrega "Cores" e
+ * "Em cena". Elas continuam definidas aqui porque é aqui que moram os
+ * componentes (`ts-hud-row`, `ts-hud-tile`) e o estado que `onQualityChange` e
+ * `onScaleChange` repintam; mover o código junto com o lugar teria duplicado
+ * tudo isso por uma questão de endereço.
+ *
+ * ⚠️ **O DIAGNÓSTICO SÓ EXISTE EM DESENVOLVIMENTO**, e isso é um pedido
+ * explícito: *"não deveria ter tudo isso de diagnóstico na produção, deve ficar
+ * apenas em desenvolvimento"*. Ele está certo — ms por quadro, chamadas de
+ * desenho, contagem de programas e a string do adaptador são ferramenta de
+ * quem desenvolve, não informação de quem compõe uma foto de caminhão. Em
+ * produção o painel fica com o que o usuário pode DECIDIR: o nível, a escala e
+ * o aviso de recarga.
+ *
+ * `DEV` sai de `import.meta.env.DEV`, que o Vite substitui por um literal no
+ * build — então o Rollup remove as duas fileiras da árvore em produção. Não é
+ * esconder com CSS: elas não existem no bundle.
+ *
+ * ⚠️ O ACESSO É OPCIONAL (`?.`) E ISSO NÃO É ZELO — é o conserto de um crash
+ * que a bancada pegou. O engine é um port autocontido, e `tools/studio-bench`
+ * o empacota com esbuild, que só substitui os `define` que recebe: ele recebe
+ * `VITE_STUDIO_ASSETS_BASE` e mais nada, então `import.meta.env` chega
+ * **undefined** e um acesso direto lança `Cannot read properties of undefined`
+ * no meio do boot. O `tsc` não vê isso — o tipo de `import.meta.env` diz que
+ * ele existe. Só rodar viu.
+ */
+const DEV = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
+
+export function buildQualitySection(): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  frag.appendChild(buildQualityRow());
+  frag.appendChild(buildColdRow());
+  frag.appendChild(buildScaleRow());
+  frag.appendChild(buildFloorRow());
+  if (DEV) {
+    frag.appendChild(buildDiagRow());
+    frag.appendChild(buildHardwareRow());
+    /* O TIQUE COMEÇA COM A SEÇÃO, e o dono dele é esta função porque é ela que
+       constrói as fileiras que ele pinta. `startDiag()` é idempotente (sai cedo
+       se já há temporizador), o que importa porque `trim-panel.ts` reconstrói o
+       card inteiro a cada `paint()` — uma troca de veículo, por exemplo.
+
+       O tique se encerra sozinho: `paintDiag()` sai cedo quando os nós saíram do
+       documento, e em produção nada disto existe no bundle. */
+    startDiag();
+  } else {
+    /* Sem diagnóstico não há o que pintar em intervalo. Chamado por segurança:
+       um build que trocasse de modo em tempo de execução (não existe hoje) não
+       pode deixar um temporizador de dev vivo. */
+    stopDiag();
+  }
+  return frag;
+}
+
+/* O resumo do cabeçalho recolhido — as duas coisas que respondem "em que a
+   máquina está": o modo/nível e a escala corrente. Mais o aviso de pendência,
+   que é o único estado desta seção que alguém precisaria descobrir sem ter aberto
+   nada. */
+function paintCfgHint() {
+  /* O cabeçalho que este resumo alimentava era o da seção de Configurações
+     dentro do painel de luz, e ele não existe mais. A função fica porque
+     `paintCfg()` a chama e porque o card de `trim-panel.ts` pode querer o mesmo
+     resumo um dia; enquanto `cfgHint` for nulo ela é uma comparação. */
+  if (!cfgHint) return;
+  const mode = qualityMode();
+  const parts = [
+    mode === 'auto'
+      ? 'Auto · ' + LEVEL_LABEL[qualityLevel()].toLowerCase()
+      : LEVEL_LABEL[qualityLevel()],
+    pctText(Math.round(renderScale() * 100)),
+  ];
+  if (coldPending()) parts.push('pendente');
+  cfgHint.textContent = parts.join(' · ');
+}
+
+/** Repinta a seção inteira. Barato: nenhum pintor aqui toca a cena. */
+function paintCfg() {
+  paintQuality();
+  paintCold();
+  paintScale();
+  paintFloor();
+  paintHardware();
+  paintCfgHint();
+}
+
+/* ⚠️ O RECOLHIMENTO DA SEÇÃO SAIU DAQUI, e com ele `cfgHead`/`cfgBody`.
+   As fileiras de qualidade moram agora em `ui/trim-panel.ts`, dentro de um card
+   que tem o próprio recolhimento — manter um segundo mecanismo aqui era guardar
+   estado para uma superfície que este arquivo não desenha mais.
+
+   O que ficou: `paintCfg()`, chamado por `syncHud()` e pelos ganchos de
+   qualidade, porque os PINTORES continuam sendo daqui (é aqui que mora o estado
+   que `onQualityChange`/`onScaleChange` repintam). E `startDiag()`/`stopDiag()`,
+   que o `trim-panel` aciona ao abrir e fechar o card. */
+
 function build() {
   hudRoot = el('aside', 'ts-hud');
   hudRoot.id = 'ts-hud';
-  hudRoot.setAttribute('aria-label', 'Iluminação');
+  /* NÃO mais "Iluminação": o painel passou a hospedar duas seções, e cada uma
+     carrega o próprio rótulo no seu `role=group`. Um `aria-label` de "Iluminação"
+     na raiz anunciaria o bloco de diagnóstico como parte da luz — que é
+     precisamente a confusão que esta separação existe para desfazer. */
+  hudRoot.setAttribute('aria-label', 'Controles do estúdio');
 
   /* #canvas-holder holds the WebGL canvas and the badges as SIBLINGS, and
      scene/scene.ts binds OrbitControls to `renderer.domElement` — the canvas itself,
@@ -681,7 +1465,9 @@ function build() {
   });
 
   /* ---- header (collapse toggle) ---- */
-  headBtn = el('button', 'ts-hud__head');
+  /* O modificador `--light` existe para o CSS poder falar de UM cabeçalho: desde
+     que há dois, um seletor sem ele alcança os dois. */
+  headBtn = el('button', 'ts-hud__head ts-hud__head--light');
   headBtn.type = 'button';
   headBtn.appendChild(iconSpan('bulb', 'ts-hud__head-ico'));
   headBtn.appendChild(el('span', 'ts-hud__title', 'Iluminação'));
@@ -693,6 +1479,8 @@ function build() {
 
   /* ---- body ---- */
   bodyEl = el('div', 'ts-hud__body');
+  bodyEl.setAttribute('role', 'group');
+  bodyEl.setAttribute('aria-label', 'Iluminação');
 
   const hour = buildRangeRow(
     'hour', 'Hora do dia', 'sun', 'moon',
@@ -811,11 +1599,28 @@ function build() {
   bodyEl.appendChild(weatherRow);
   backdropRow = buildBackdropRow();
   bodyEl.appendChild(backdropRow);
-  bodyEl.appendChild(buildQualityRow());
 
   hudRoot.appendChild(bodyEl);
 
-  collapsed = loadCollapsed();
+  /* A QUALIDADE SAIU DAQUI. Ela era a última fileira deste corpo, entre o clima e
+     o fim do painel; agora é a primeira da seção de Configurações, logo abaixo.
+     Nada mais do painel de luz mudou de lugar — fundo, preenchimento, recorte,
+     hora, clima e temperatura são decisão autoral e ficam onde estavam. */
+  /* ⚠️ A SEÇÃO DE CONFIGURAÇÕES SAIU DAQUI (2026-08-14), por pedido do dono do
+     produto: *"a seleção de qualidade deveria estar onde já tem configurações,
+     onde está a seleção de somente implemento, somente cavalo"*.
+
+     Ele está certo, e a razão é a mesma que motivou tirá-la do painel de luz em
+     primeiro lugar — só levada um passo adiante. Iluminação é decisão AUTORAL;
+     qualidade é decisão de MÁQUINA. Mas "Em cena" (cavalo/implemento/conjunto) e
+     as cores do card também não são luz: `ui/trim-panel.ts` JÁ É o painel de
+     configurações do estúdio, e criar um segundo dentro do vidro da luz era
+     inventar uma terceira casa para o que já tinha uma.
+
+     `buildQualitySection()` continua morando aqui — o código é o mesmo, testado
+     e tipado — e `trim-panel.ts` o monta. Ver a nota daquele export. */
+
+  loadCollapsed();
   applyCollapsed();
 }
 
@@ -1052,6 +1857,11 @@ function applyFace() {
 
 /* ---------------- collapse ---------------- */
 
+/* ⚠️ `is-collapsed` NA RAIZ passou a significar só "o corpo de ILUMINAÇÃO está
+   fechado", e sobrou para uma coisa só: combinada com `is-cfg-collapsed`, ela é
+   como o CSS sabe que o painel INTEIRO encolheu e pode soltar o `max-height`. A
+   seta e o resumo deixaram de depender dela — ver o cabeçalho da seção de
+   Configurações. */
 function applyCollapsed() {
   hudRoot.classList.toggle('is-collapsed', collapsed);
   /* The global `.hidden` rule does the hiding, so the panel still collapses
@@ -1129,5 +1939,10 @@ export function syncHud() {
      resumo do cabeçalho, que depende das duas coisas. */
   applyFace();
   paintStudio();
-  paintQuality();
+  /* A seção de Configurações não lê nada da cena, mas `syncHud()` é o único ponto
+     que o orquestrador promete chamar depois de uma troca de cenário — e uma
+     troca de cenário realoca o buffer de reflexo e mexe nos contadores do
+     renderer. Repintar aqui é o que mantém o mostrador do piso e a leitura em
+     pixels honestos sem precisar de um segundo gancho. */
+  paintCfg();
 }

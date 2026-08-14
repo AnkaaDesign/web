@@ -69,6 +69,7 @@ import {
 import type { TrimKey } from '../vehicle/trim';
 import { state, getVehicleView, setVehicleView, type VehicleView } from '../vehicle/models';
 import { setStatus } from './chrome';
+import { buildQualitySection } from './hud';
 
 /* ---------------- AS PEÇAS QUE AINDA MORAM AQUI ----------------
    Pedido de 2026-08-13, literal: *"em vez de ter a configuração de teto e
@@ -295,6 +296,26 @@ function paint() {
   body.appendChild(section('Cores', colors));
 
   body.appendChild(section('Em cena', viewControl()));
+
+  /* ---------------- QUALIDADE ----------------
+     AQUI E NÃO NO PAINEL DE LUZ, por pedido do dono do produto: *"a seleção de
+     qualidade deveria estar onde já tem configurações, onde está a seleção de
+     somente implemento, somente cavalo"*.
+
+     A razão de fundo é a mesma que já tirou a fileira do painel de iluminação —
+     luz é decisão AUTORAL, qualidade é decisão de MÁQUINA —, mas levada até o
+     fim: este card já É o painel de configurações do estúdio. "Em cena" e as
+     cores dos cards também não são luz. Criar uma segunda casa de configurações
+     dentro do vidro da luz era inventar um terceiro endereço para o que já
+     tinha um.
+
+     As fileiras vêm de `ui/hud.ts` porque é lá que moram os componentes e o
+     estado que `onQualityChange`/`onScaleChange` repintam — mudar de endereço
+     não é motivo para duplicar isso. E o bloco de diagnóstico só existe em
+     desenvolvimento; ver a nota de `buildQualitySection()`. */
+  const q = el('div', 'ts-cfg__quality');
+  q.appendChild(buildQualitySection());
+  body.appendChild(section('Qualidade', q));
 
   if (focused) $opt(focused)?.focus();
 }

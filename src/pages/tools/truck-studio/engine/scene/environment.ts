@@ -89,6 +89,9 @@ import { loadGLB } from '../vehicle/models';
 import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { EnvironmentDef, RawBlock } from '../catalog/catalog';
+import {
+  getProfile, onQualityChange, hdrVariant,
+} from '../core/quality';
 
 /* ---------------- tipos ----------------
    O manifesto chega tipado de catalog.ts, mas os blocos que ele repassa crus
@@ -100,12 +103,22 @@ import type { EnvironmentDef, RawBlock } from '../catalog/catalog';
 
 const rgbeLoader = new RGBELoader();
 
-/* O manifesto tem 2 cenários, então na prática nada é despejado — a LRU existe
-   para que um manifesto editado à mão com 20 cenas não coma um gigabyte de VRAM
-   pelo resto da sessão. O teto continua em 3 (e não em 2) de propósito: é uma
+/* O manifesto tem 3 cenários (dois com HDRI e o estúdio, que não tem nenhum),
+   então na prática quase nada é despejado — a LRU existe para que um manifesto
+   editado à mão com 20 cenas não coma um gigabyte de VRAM pelo resto da sessão.
+   O teto continua em 3 (e não em 2) nos níveis Alto e Médio de propósito: é uma
    folga, não uma contagem, e baixá-lo para o tamanho exato do catálogo faria a
-   próxima cena adicionada despejar em toda troca. */
-const MAX_CACHE = 3;
+   próxima cena adicionada despejar em toda troca.
+
+   VEM DO PERFIL DESDE 2026-08-14 (`envCacheMax`: 3 / 3 / 2). Cada entrada com
+   par de céus são dois equirects crus 2k meio-float — ~16,8 MB cada — e cada
+   entrada de plate único é um PMREM de ~25 MB. Numa integrada de memória
+   compartilhada um slot a menos é um item inteiro do orçamento; o que se perde é
+   VELOCIDADE DE VOLTA a um cenário visitado antes (o download volta a acontecer,
+   ou pelo menos a decodificação RGBE), nunca imagem.
+
+   ⚠️ FUNÇÃO, não `const`: o nível muda no meio da sessão. Ver `podar()`. */
+const maxCache = () => Math.max(1, getProfile().envCacheMax);
 
 /* SÓ o PMREM. Os outros cinco campos (`sky`, `bg`, `ground`, `near`, `macro`)
    saíram em 2026-08-03 com o domo projetado e a faixa próxima: o equirect cru
@@ -127,14 +140,145 @@ interface CacheEntry {
   dia?: THREE.DataTexture | null;
   noite?: THREE.DataTexture | null;
 }
+/* A CHAVE É A URL DO PAR DE HDRs, e ISSO É A CORREÇÃO DE UM DESPERDÍCIO REAL.
+   ---------------------------------------------------------------------------
+   Era `envDef.id`. E o manifesto de hoje tem DOIS cenários — `distrito-industrial`
+   e `serra` — que apontam para os MESMOS dois arquivos:
+
+     environments/distrito-industrial/sky.hdr
+     environments/distrito-industrial/sky-night.hdr
+
+   (o que difere entre eles é o `set.glb`, que é de set.ts e tem cache próprio).
+   Com a chave no id, visitar os dois DECODIFICAVA o par duas vezes e retinha
+   duas cópias idênticas: 4 × 16,8 MB ≈ **33,6 MB de VRAM desperdiçada**, mais um
+   segundo parse RGBE de ~5,8 MB comprimidos. Chaveando pela URL as duas entradas
+   viram uma, e a segunda visita nem chega a pedir bytes.
+
+   A CHAVE INCLUI A VARIANTE, porque ela está dentro da própria URL
+   (`sky@1k.hdr`): um par assado em 1024×512 não pode ser servido para quem
+   pediu o de 2048, e vice-versa. Cai de graça — nada a fazer.
+
+   POR QUE NÃO MEMOIZAR `loadHdr` POR URL, que era a outra saída possível: a
+   `CacheEntry` é DONA das texturas (`disposeEntry` as descarta), e uma promessa
+   memoizada por fora criaria um segundo dono para o mesmo objeto — descartar
+   uma entrada mataria a textura que a outra ainda usa. Chavear o cache que já
+   existe resolve o mesmo problema com UM dono.
+   ⚠️ E é o defeito que `lampModels` (logo abaixo) tem e que não se repete aqui:
+   aquele Map memoiza INCLUSIVE as falhas, nunca despeja e nunca descarta — é a
+   única superfície de crescimento monótono deste módulo. Aqui a política de não
+   cachear um HDRI que falhou continua valendo (ver `cacheable`). */
+function hdriKey(envDef: EnvironmentDef): string | null {
+  const d = path(envDef.hdri);
+  if (!d) return null;      // sem HDRI não há nada que valha um slot de cache
+  const n = path(envDef.hdriNight);
+  return assetUrl(hdrPath(d)) + '|' + (n ? assetUrl(hdrPath(n)) : '');
+}
+
 /** @type {Map<string, CacheEntry>} */
 const cache = new Map<string, CacheEntry>();
 
 let current: EnvironmentDef | null = null;        // the applied envDef
+/** A CHAVE da entrada que está na tela. Guardada em vez de recalculada de
+ *  `current`: `hdriKey()` lê `hdrVariant()`, que muda com o nível, e uma chave
+ *  recalculada depois de uma troca de nível não casaria com aquela sob a qual a
+ *  entrada VIVA foi guardada — o despejo poderia então descartar as texturas que
+ *  a cena está amostrando neste instante. */
+let currentKey: string | null = null;
 let seq = 0;               // guards against an out-of-order double apply
 
 const num = (v: unknown, d: number) => (Number.isFinite(+(v as number)) ? +(v as number) : d);
 const path = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/* ---------------- A VARIANTE DO HDR ----------------
+   `sky.hdr` → `sky@1k.hdr`, e só quando o perfil pede E o manifesto declara que
+   o arquivo existe (`hdrVariant()` já devolve '' nos dois casos contrários — ver
+   `coldProfile()` em core/quality.ts).
+
+   O QUE SE GANHA, medido: o par de HDRs do distrito + o alvo de mistura + o
+   PMREM somam **75,5 MB** a 2048×1024 e **18,9 MB** a 1024×512, e o download cai
+   de 9,53 MB para ~2,4 MB. Mais importante que os dois: a assadura do PMREM fica
+   **~4× mais barata**, porque o custo escala com a ÁREA — os picos de 10-40 ms
+   de `scene/skyblend.ts` viram 3-10 ms, e é justamente esse pico que engasga o
+   arrasto do relógio.
+
+   O QUE SE PERDE: o FUNDO, e só ele. O PMREM já borra o irradiance, então a
+   ILUMINAÇÃO não muda de forma perceptível; quem perde nitidez é a mesma
+   textura posta em `scene.background`, ou seja o céu que se vê. Defensável no
+   Médio, certo no Baixo, **nunca na Alta** — e a tabela do perfil é assim.
+
+   ⚠️ NÃO ENTRA EM `assetUrl()`. Aquela função é a junção de TODA URL do engine
+   (glb, hdr, json, cards, miniaturas), e reescrever lá renomearia também os
+   `.glb` e as `.webp` — arquivos que não têm variante nenhuma publicada. O mesmo
+   raciocínio vale para `groundTexUrl()` em scene/set.ts.
+
+   ⚠️ É FUNÇÃO e é lida NO MOMENTO DA CARGA: `hdrVariant()` é um botão FRIO, e a
+   troca dele só chega ao ar na próxima borda de carga (a cortina de `studio.ts`,
+   ou uma troca de cenário). Guardar o resultado num const de módulo congelaria a
+   variante no nível em que a página abriu. */
+function comVariante(p: string, sufixo: string): string {
+  if (!sufixo || !p) return p;
+  /* URL com esquema, âncora ou query fica INTOCADA: o sufixo é uma convenção da
+     árvore de assets própria, e reescrever um `data:` ou um CDN de terceiro
+     produziria um 404 mudo — o modo de falha que core/paths.ts documenta. */
+  if (/^[a-z][a-z0-9+.-]*:/i.test(p) || p.includes('?') || p.includes('#')) return p;
+  const ponto = p.lastIndexOf('.');
+  const barra = p.lastIndexOf('/');
+  if (ponto <= barra + 1) return p;          // o último segmento não tem extensão
+  return p.slice(0, ponto) + sufixo + p.slice(ponto);
+}
+
+function hdrPath(p: string): string { return comVariante(p, hdrVariant()); }
+
+/* ---------------- AS VARIANTES QUE O SERVIDOR DECLARA TER ----------------
+   `core/quality.ts` só emite um sufixo de variante quando o MANIFESTO declara
+   que os arquivos existem — a nota "VARIANTES DE ASSET" de lá explica por quê:
+   pedir um asset inexistente é um 404 que este engine degrada em silêncio, e um
+   retry no `onError` custaria 16 requisições perdidas por boot enquanto o deploy
+   não chega, além de esconder um deploy pela metade.
+
+   ⚠️ ONDE ISTO DEVERIA MORAR, E NÃO MORA. O lugar certo é `catalog/catalog.ts`,
+   lendo uma chave de RAIZ de `environments.json` — `"textureVariants": ["@1k"]`
+   — uma vez, no `doLoadCatalog()`, porque o que se declara é um fato do
+   SERVIDOR (quais arquivos foram publicados) e não uma propriedade de um
+   cenário. O próprio `core/quality.ts` diz isso: *"Quem alimenta isto é
+   catalog.ts ao ler environments.json"*.
+
+   Só que `normalizeEnvironment()` é uma LISTA BRANCA e o normalizador do
+   catálogo não repassa a raiz do JSON para lugar nenhum — uma chave de raiz nova
+   evapora no caminho, que é o mesmo modo de falha que `warnDroppedKeys()`
+   documenta. O bloco `set`, ao contrário, chega aqui CRU (`RawBlock`), e este
+   módulo é o único validador dele no engine. Então, por ora, a declaração é lida
+   de `set.textureVariants`.
+
+   ⚠️ CONSEQUÊNCIA A NÃO ESQUECER, e é por isso que a ausência NÃO limpa a lista:
+   as texturas de chão são COMPARTILHADAS entre cenários (é o motivo de o
+   `distrito-industrial` fechar em 7,8 MB), então "existe a variante @1k" é
+   verdade para a árvore inteira ou para nenhuma. Um cenário que não declara nada
+   não está dizendo "não existe" — está calado, e limpar a lista aí faria a
+   variante piscar a cada troca de cenário. Declarar `[]` explicitamente, sim,
+   desliga.
+
+   ---------------------------------------------------------------------------
+   ⚠️ ESTA FUNÇÃO FOI APAGADA NA INTEGRAÇÃO (2026-08-14), e o raciocínio acima é
+   exatamente o motivo — ele conclui, corretamente, que a variante é um fato da
+   ÁRVORE INTEIRA e não de um cenário, e que o certo seria "ler a raiz, chamar
+   `setAvailableVariants()` uma vez, e apagar esta função".
+
+   É o que passou a existir: `studio.ts` → `loadTextureVariants()`, lido da chave
+   de RAIZ de `environments.json` e chamado **uma vez, no boot, antes do primeiro
+   `applyChoice`** — que é antes de qualquer URL de textura ou de HDR ser montada.
+
+   Deixar as duas em pé seria pior que qualquer uma sozinha: dois escritores de
+   um estado GLOBAL lendo FONTES DIFERENTES (a raiz do JSON e o bloco `set` de um
+   cenário), em que o último a rodar vence. Um cenário que declarasse `[]` apagaria
+   a declaração da raiz, e a variante passaria a piscar conforme a ordem de visita
+   — o defeito que o parágrafo acima previu, chegando pela outra porta.
+
+   O que continua verdadeiro e ainda não foi feito: o lugar certo é `catalog.ts`,
+   porque `normalizeEnvironment()` é uma lista branca e a raiz do JSON evapora
+   nela. `loadTextureVariants()` contorna isso com um `fetch` próprio
+   (`cache: 'force-cache'`, então sai do cache que `fetchJSON` acabou de encher).
+   Quem for mexer em `catalog.ts` deve repassar a raiz e apagar aquele contorno. */
 
 /* ---------------- progress ----------------
    Weighted, because the assets differ by an order of magnitude in size and an
@@ -282,18 +426,54 @@ function disposeEntry(entry: CacheEntry | null | undefined) {
   if (entry.noite) entry.noite.dispose();
 }
 
-function touch(id: string, entry: CacheEntry) {
-  cache.delete(id);
-  cache.set(id, entry);                       // Map keeps insertion order = LRU
-  while (cache.size > MAX_CACHE) {
-    /* `!`: o laço só roda com size > MAX_CACHE ≥ 1, então há sempre uma chave. */
-    const oldest = cache.keys().next().value!;
-    /* never evict what is on screen */
-    if (oldest === id || (current && oldest === current.id)) break;
-    disposeEntry(cache.get(oldest));
-    cache.delete(oldest);
+function touch(key: string, entry: CacheEntry) {
+  cache.delete(key);
+  cache.set(key, entry);                      // Map keeps insertion order = LRU
+  podar(key);
+}
+
+/**
+ * Despeja até caber em `maxCache()`, pulando o que não pode ser despejado.
+ *
+ * ⚠️ ERA `break` E VIROU "PULAR", E A TROCA É DELIBERADA — a auditoria de
+ * 2026-08-14 achou aqui um teto real de `MAX_CACHE + 1`. O laço antigo parava
+ * de despejar assim que a MAIS ANTIGA fosse a entrada protegida (a que está na
+ * tela ou a que acabou de entrar), em vez de olhar a seguinte: com a protegida
+ * no fundo da ordem de inserção, nada jamais era despejado.
+ *
+ * Não foi consertado em silêncio porque o número muda: com `envCacheMax` em 2
+ * (nível Baixo), um teto efetivo de 3 é **50 % mais VRAM do que o orçado** — e
+ * o nível Baixo existe justamente para caber num orçamento. Com 3 no Alto o
+ * erro era invisível (o catálogo tem 2 cenários com HDRI e nada chegava a
+ * despejar), que é por que ele sobreviveu.
+ *
+ * O QUE CONTINUA VALENDO: **nunca despejar o que está na tela.** Descartar o
+ * render target ou os equirects crus que `scene.environment` e o passe de
+ * mistura estão amostrando renderiza lixo. Então o teto ainda pode ser furado —
+ * por no máximo DUAS entradas, a de `protegido` e a de `currentKey`, e só
+ * enquanto elas forem exatamente as duas mais antigas. Isso é um limite honesto
+ * e nomeado, e não um `break` que parecia um teto e não era.
+ */
+function podar(protegido?: string) {
+  const max = maxCache();
+  while (cache.size > max) {
+    let vitima: string | null = null;
+    for (const k of cache.keys()) {                 // ordem de inserção = LRU
+      if (k === protegido || k === currentKey) continue;
+      vitima = k;
+      break;
+    }
+    if (!vitima) break;                             // só restaram as protegidas
+    disposeEntry(cache.get(vitima));
+    cache.delete(vitima);
   }
 }
+
+/* O teto pode ENCOLHER no meio da sessão (Média → Baixa leva `envCacheMax` de 3
+   para 2), e sem isto a memória a mais ficaria retida até a próxima troca de
+   cenário — que num uso normal pode não vir nunca. Descartar um PMREM que não
+   está em cena é invisível: o que ele custa é uma recarga na próxima visita. */
+onQualityChange(() => { podar(); });
 
 /** Release every cached PMREM and every texture the set holds, and return the
  *  scene to procedural. */
@@ -328,6 +508,7 @@ export function disposeEnvironments() {
      set já vazio, que é exatamente um cache frio. */
   disposeSetTextures();
   current = null;
+  currentKey = null;
 }
 
 /* ---------------- apply ---------------- */
@@ -608,14 +789,22 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
  */
 export function prefetchEnvironment(envDef: EnvironmentDef | null | undefined): void {
   if (!envDef || typeof envDef !== 'object') return;
+  /* A autorização do sufixo de variante já foi dada no boot, por
+     `studio.ts` → `loadTextureVariants()`, a partir da chave de RAIZ do
+     manifesto. Ver o bloco de `hdrVariant()` acima. */
   const set = resolveSet(envDef);
+  const d = path(envDef.hdri);
+  const n = path(envDef.hdriNight);
   prefetch([
     set ? set.url : null,
-    envDef.hdri,
+    /* COM A VARIANTE, obrigatoriamente. Aquecer `sky.hdr` para depois pedir
+       `sky@1k.hdr` seria baixar 5,8 MB que ninguém vai ler — o prefetch deixaria
+       de ser uma otimização e viraria o dobro do tráfego. */
+    d ? hdrPath(d) : null,
     /* DEPOIS do de dia, e essa ordem é a que importa: com MAX_IN_FLIGHT em 2,
        quem entra primeiro termina primeiro, e o céu que abre a cena é o de dia
        (o estúdio abre às 17:45). */
-    envDef.hdriNight,
+    n ? hdrPath(n) : null,
     envDef.lamps ? path((envDef.lamps as RawBlock).model) : null,
   ], 'env');
 }
@@ -645,11 +834,21 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
   const report = typeof onProgress === 'function' ? onProgress : () => { };
   report(0);
 
-  const id = String(envDef.id || 'env');
+  /* `hdriKey()`, `hdrPath()` e as URLs logo abaixo dependem de `hdrVariant()`,
+     que só emite o sufixo depois de o manifesto declarar que o arquivo existe —
+     e essa declaração acontece UMA vez, no boot, antes do primeiro
+     `applyChoice`. Ver o bloco de `hdrVariant()` acima. */
+
   const hdriPath = path(envDef.hdri);
   const nightPath = hdriPath ? path(envDef.hdriNight) : null;
+  /* As URLs FINAIS, já com a variante — e a chave de cache é feita das mesmas
+     strings, para não haver como pedir um arquivo e guardar sob o nome de
+     outro. */
+  const hdriHref = hdriPath ? assetUrl(hdrPath(hdriPath)) : null;
+  const nightHref = nightPath ? assetUrl(hdrPath(nightPath)) : null;
+  const key = hdriKey(envDef);
 
-  let entry = cache.get(id) || null;
+  let entry = key ? cache.get(key) || null : null;
   let cacheable = true;               // false only for a freshly FAILED HDRI
 
   /* FORA do bloco `!entry`: o modelo do poste tem cache próprio, por URL, então
@@ -699,8 +898,8 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
   /* HDRI e modelo do poste em PARALELO — são independentes, e o pequeno pega
      carona de graça. */
   const [hdr, lampObj, hdrNight] = await Promise.all([
-    (!entry && hdriPath)
-      ? loadHdr(assetUrl(hdriPath), e => track.set(HDRI_SLOT, fraction(e)))
+    (!entry && hdriHref)
+      ? loadHdr(hdriHref, e => track.set(HDRI_SLOT, fraction(e)))
         .then(t => { track.set(HDRI_SLOT, 1); return t; })
       : Promise.resolve(null),
     /* loadGLB() reporta uma FRAÇÃO, não um ProgressEvent — sem fraction() aqui. */
@@ -708,8 +907,8 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
       ? loadLampModel(lampHref, f => track.set(LAMP_SLOT, f))
         .then(o => { track.set(LAMP_SLOT, 1); return o; })
       : Promise.resolve(null),
-    (!entry && nightPath)
-      ? loadHdr(assetUrl(nightPath), e => track.set(NIGHT_SLOT, fraction(e)))
+    (!entry && nightHref)
+      ? loadHdr(nightHref, e => track.set(NIGHT_SLOT, fraction(e)))
         .then(t => { track.set(NIGHT_SLOT, 1); return t; })
       : Promise.resolve(null),
   ]);
@@ -730,11 +929,23 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
 
     /* Do NOT cache a FAILED HDRI: caching it would make one dropped packet
        permanent for the whole session (the engine outlives the React page), and
-       the user's only recourse would be a full reload. A successful load, or an
-       environment that never wanted an HDRI, is cached even if a newer apply
-       has already overtaken us — the bytes are decoded either way. */
-    cacheable = !hdriPath || !!entry.rt || !!entry.dia;
-    if (cacheable) touch(id, entry);
+       the user's only recourse would be a full reload. A successful load is
+       cached even if a newer apply has already overtaken us — the bytes are
+       decoded either way.
+       UM CENÁRIO SEM HDRI DEIXOU DE OCUPAR SLOT (2026-08-14). Antes ele entrava
+       no cache com `{ rt: null }` — uma entrada que não guarda um único byte e
+       ainda assim empurrava um PMREM de verdade para fora quando o teto é 2. Com
+       a chave na URL ele nem tem chave: `hdriKey()` devolve null, não há o que
+       reencontrar, e a próxima visita reconstrói o mesmo objeto vazio de graça. */
+    cacheable = !!key && (!!entry.rt || !!entry.dia);
+    if (cacheable) touch(key!, entry);
+  } else if (key) {
+    /* ACERTO DE CACHE: refresca a ordem de uso. Faltava, e o efeito é uma LRU
+       que na verdade despejava por ordem de CARGA — voltar a um cenário não o
+       tornava "recente", então o mais antigo a ser carregado saía primeiro
+       mesmo sendo o mais usado. Invisível com 2 cenários e um teto de 3; deixa
+       de ser quando o teto é 2. */
+    touch(key, entry);
   }
 
   /* A second applyEnvironment() started while we were awaiting — it owns the
@@ -745,6 +956,13 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
     if (!cacheable) disposeEntry(entry);
     return current;
   }
+
+  /* A ENTRADA QUE PASSA A ESTAR NA TELA — antes de qualquer outra poda poder
+     acontecer. `podar()` nunca despeja `currentKey`, e é esta linha que diz qual
+     é ele. Escrita aqui e não em `applyToScene()` porque a CHAVE (com a variante
+     que foi de fato pedida) só existe neste escopo — ver o comentário de
+     `currentKey`. */
+  currentKey = key;
 
   /* AGUARDADO, para applyEnvironment() continuar significando "a cena está
      visualmente pronta" — e agora ela realmente está: applySet() só resolve com
