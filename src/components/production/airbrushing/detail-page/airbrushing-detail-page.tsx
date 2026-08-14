@@ -293,7 +293,9 @@ export function AirbrushingDetailPage() {
 
   const { data: response, isLoading, error } = useAirbrushing(id!, {
     include: {
-      task: { include: { customer: { include: { logo: true } }, sector: true } },
+      // truck entra por causa do Identificador: sem número de série, a tarefa é
+      // identificada pela placa.
+      task: { include: { customer: { include: { logo: true } }, sector: true, truck: true } },
       painter: true,
       // Layouts are Layout wrappers; the backing File (id/path) lives on the nested
       // `file` relation. Without this include the grid would fall back to the Layout's
@@ -712,11 +714,19 @@ export function AirbrushingDetailPage() {
         fields: [
           { id: "taskName", label: "Nome da Tarefa", icon: IconClipboardList, accessor: (a) => a.task?.name ?? null },
           {
-            id: "serialNumber",
-            label: "Número de Série",
+            // "Identificador", não "Número de Série": a tarefa é identificada pelo
+            // número de série OU, quando não tem, pela placa do caminhão — é assim
+            // que a agenda, o histórico e a exportação de tarefas já a rotulam.
+            // Mostrar só o serialNumber deixava carreta identificada por placa
+            // aparecendo como se não tivesse identificação nenhuma.
+            id: "identifier",
+            label: "Identificador",
             icon: IconHash,
-            accessor: (a) => a.task?.serialNumber ?? null,
-            render: (a) => (a.task?.serialNumber ? <span className="font-mono">{a.task.serialNumber}</span> : muted),
+            accessor: (a) => a.task?.serialNumber ?? a.task?.truck?.plate ?? null,
+            render: (a) => {
+              const identifier = a.task?.serialNumber ?? a.task?.truck?.plate ?? null;
+              return identifier ? <span className="font-mono">{identifier}</span> : muted;
+            },
           },
           { id: "sector", label: "Setor", icon: IconBuildingFactory, accessor: (a) => a.task?.sector?.name ?? null },
           {
