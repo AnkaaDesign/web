@@ -38,6 +38,7 @@ import {
   IconGift,
   IconUsers,
   IconCreditCard,
+  IconReceiptTax,
 } from "@tabler/icons-react";
 
 import { DetailPage } from "@/components/ui/detailpage";
@@ -50,11 +51,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 
 import { useUser, useUserMutations } from "@/hooks";
+import { useFiscalEmitter } from "@/hooks/administration/use-fiscal-emitter";
 import { getPositions } from "@/api-client/position";
 import { getSectors } from "@/api-client/sector";
 import { useAuth } from "@/contexts/auth-context";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { usePrivileges } from "@/hooks/common/use-privileges";
 import { canEditUsers, canDeleteUsers } from "@/utils/permissions/entity-permissions";
 import {
   formatBrazilianPhone,
@@ -87,6 +90,8 @@ import { UserBenefitsCard } from "@/components/personnel-department/user-benefit
 import { DependentsCard } from "@/components/personnel-department/dependent/dependents-card";
 import { CollaboratorLoansCard } from "@/components/personnel-department/collaborator-loans-card";
 import { CollaboratorThirteenthCard } from "@/components/personnel-department/collaborator-thirteenth-card";
+import { FiscalEmitterCard } from "@/components/administration/user/fiscal/fiscal-emitter-card";
+import { A1CertificateCard } from "@/components/administration/user/fiscal/a1-certificate-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 
 // Audience for the page — mirrors the legacy collaborator-detail PrivilegeRoute.
@@ -101,6 +106,11 @@ const PAGE_PRIVILEGES = [
 // (HR / Contabilidade) + ADMIN — Production Manager can see the page but not these. Matches
 // `canEditUsers` (HR/ACCOUNTING/ADMIN), so it doubles as the inline-edit gate.
 const HR_ACC_ADMIN = [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN];
+
+// Dados fiscais do colaborador-prestador (CNPJ do MEI, certificado A1). Audiência
+// própria — quem lida com nota fiscal: ADMIN / Contabilidade / Financeiro. NÃO é o mesmo
+// conjunto de `HR_ACC_ADMIN`: RH não emite nota, e o Financeiro (que não vê folha) precisa.
+const FISCAL_PRIVILEGES = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL];
 
 /** WhatsApp deep-link for a raw BR phone number (prefixes 55 when missing). */
 function whatsappHref(phone: string): string {
@@ -169,6 +179,15 @@ function UserDetailContent() {
 
   const user = response?.data;
   const mutations = useUserMutations();
+
+  // Emissor fiscal: só interessa a quem pode vê-lo, e só aparece para quem é aerografista
+  // (setor com o privilégio AIRBRUSHING) OU já tem perfil fiscal cadastrado — um pintor
+  // desligado do setor não pode perder o acesso à própria identidade fiscal.
+  const { hasAnyPrivilegeAccess } = usePrivileges();
+  const canSeeFiscal = hasAnyPrivilegeAccess(FISCAL_PRIVILEGES);
+  const { data: fiscalResponse } = useFiscalEmitter(id || "", { enabled: !!id && canSeeFiscal });
+  const isAirbrushingPainter = user?.sector?.privileges === SECTOR_PRIVILEGES.AIRBRUSHING;
+  const showFiscalSections = canSeeFiscal && (isAirbrushingPainter || !!fiscalResponse?.data?.profile);
 
   // Hide-empty for self-hiding embedded sections. The base auto-hides a section
   // only when its `render` returns null, but the embedded cards return a truthy
@@ -547,6 +566,32 @@ function UserDetailContent() {
         render: (u) => <UserDocumentationCard userId={u.id} embedded onCount={(n) => reportCount("documentation", n)} />,
       },
 
+      // ---- Emissor Fiscal (NFS-e do aerografista) ----------------------------
+      // O pintor MEI é o PRESTADOR da nota; a empresa é a tomadora. Só renderiza para
+      // aerografistas (ou quem já tem perfil) e apenas para a audiência fiscal.
+      ...(showFiscalSections
+        ? [
+            {
+              id: "fiscal-emitter",
+              label: "Identidade Fiscal (NFS-e)",
+              icon: IconReceiptTax,
+              span: 2 as const,
+              requiredPrivilege: FISCAL_PRIVILEGES,
+              editablePrivilege: FISCAL_PRIVILEGES,
+              render: (u: User) => <FiscalEmitterCard userId={u.id} embedded />,
+            },
+            {
+              id: "fiscal-certificate",
+              label: "Certificado Digital A1",
+              icon: IconCertificate,
+              span: 2 as const,
+              requiredPrivilege: FISCAL_PRIVILEGES,
+              editablePrivilege: FISCAL_PRIVILEGES,
+              render: (u: User) => <A1CertificateCard userId={u.id} embedded />,
+            },
+          ]
+        : []),
+
       // ---- Tamanhos de EPI ---------------------------------------------------
       {
         id: "ppe-sizes",
@@ -657,7 +702,7 @@ function UserDetailContent() {
       // No separate "Informações de Contato" section — the phone already lives in Informações Básicas.
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isCltCollaborator, user?.position, user?.sector]);
+  }, [id, isCltCollaborator, showFiscalSections, user?.position, user?.sector]);
 
   // Drop a section once its embedded card has reported exactly 0 records. While
   // the count is undefined (not yet reported) or null (loading), the section

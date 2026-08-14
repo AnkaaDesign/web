@@ -171,6 +171,17 @@ export interface DetailSectionDef<TData = any> {
   icon?: ComponentType<{ className?: string }>;
   /** Key→value fields. */
   fields?: DetailFieldDef<TData>[];
+  /**
+   * Como os `fields` ocupam o corpo da seção:
+   * - `"stack"` (padrão) — uma linha rótulo/valor por campo, empilhadas. É o comportamento
+   *   histórico e continua valendo para toda seção que não pedir outra coisa.
+   * - `"row"` — os campos dividem UMA linha, lado a lado, quebrando para a linha de baixo
+   *   quando não couberem (cada campo tem uma largura mínima). Serve para seções de valores
+   *   curtos (dinheiro, status, datas) que ficam mais legíveis juntas do que empilhadas.
+   *   Use com `block: true` nos campos (rótulo em cima, valor embaixo) e, na prática,
+   *   com `span: 2` — em meia largura não há espaço para uma linha só.
+   */
+  fieldsLayout?: "stack" | "row";
   /** Arbitrary content (embedded tables, galleries) rendered after the fields. */
   render?: (row: TData) => ReactNode;
   /** Make the section TITLE clickable (e.g. open the quote). Renders the title as a hover-underlined button. */

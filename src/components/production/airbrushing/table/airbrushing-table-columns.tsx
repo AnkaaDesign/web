@@ -4,12 +4,15 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   AIRBRUSHING_PAYMENT_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
+  NFSE_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
+import type { NFSE_STATUS } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { AIRBRUSHING_FINANCE_PRIVILEGES } from "@/utils/permissions/entity-permissions";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
+import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
 
@@ -194,6 +197,24 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
         exportValue: (row) => (row.paymentMethod ? PAYMENT_METHOD_LABELS[row.paymentMethod] : ""),
       },
       cell: ({ row }) => (row.original.paymentMethod ? <span className="text-sm">{PAYMENT_METHOD_LABELS[row.original.paymentMethod]}</span> : muted("—")),
+    },
+    {
+      // Status da NFS-e emitida para o PINTOR (prestador MEI). Dado fiscal → mesmo gate de
+      // dinheiro das colunas de preço/pagamento. Oculta por padrão: só interessa a quem
+      // acompanha a emissão. Não é ordenável (a nota vive numa relação sem sort no servidor).
+      id: "nfseStatus",
+      header: "NFS-e",
+      accessorFn: (row) => row.nfse?.status ?? "",
+      enableSorting: false,
+      size: 150,
+      minSize: 120,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Status da NFS-e",
+        requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
+        exportValue: (row) => (row.nfse?.status ? NFSE_STATUS_LABELS[row.nfse.status as NFSE_STATUS] || row.nfse.status : ""),
+      },
+      cell: ({ row }) => (row.original.nfse?.status ? <NfseStatusBadge status={row.original.nfse.status} /> : muted("—")),
     },
     {
       id: "dueDate",

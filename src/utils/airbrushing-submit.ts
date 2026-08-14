@@ -1,20 +1,84 @@
 import { airbrushingService } from "../api-client/airbrushing";
 import { createAirbrushingFormData } from "./form-data-helper";
+import { AIRBRUSHING_DUE_DATE_RULE, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_STATUS } from "../constants";
 
 // Shared "create the airbrushings for a freshly-created task" routine, used by the task
 // CREATE form and the BUDGET form. Mirrors the create branch of the task-edit form's
 // airbrushing reconciliation: already-uploaded files ride as *Ids, brand-new File objects
-// ride as multipart (receipts/invoices/layouts). Airbrushing layouts carry no status.
+// ride as multipart (receipts/invoices/layouts).
 
 const uploadedIds = (files: any[]): string[] =>
   (files || []).filter((f) => f?.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean);
 const newFilesOf = (files: any[]): File[] =>
   (files || []).filter((f) => f instanceof File && !(f as any).uploaded) as File[];
 
+/**
+ * ÚNICA definição do payload escalar de uma aerografia.
+ *
+ * Todo caminho de submissão (assistente de aerografia, formulário de tarefa, orçamento e a
+ * reconciliação da edição de tarefa) passa por aqui — antes eram QUATRO listas escritas à
+ * mão e um campo novo precisava ser lembrado nas quatro, o que fez a configuração de
+ * pagamento inteira ser descartada em silêncio no cadastro.
+ *
+ * Aceita tanto uma linha do `MultiAirbrushingSelector` quanto os valores do react-hook-form:
+ * os nomes dos campos são os mesmos nos dois.
+ */
+export const buildAirbrushingPayload = (a: any): Record<string, any> => ({
+  status: a.status,
+  paymentStatus: a.paymentStatus,
+  paymentMethod: a.paymentMethod ?? null,
+  // `undefined` (e não null): o campo é NOT NULL no banco com default próprio, então omiti-lo
+  // deixa o servidor decidir em vez de tentar gravar null.
+  dueDateRule: a.dueDateRule ?? undefined,
+  paymentTermDays: a.paymentTermDays ?? null,
+  dueDayOfMonth: a.dueDayOfMonth ?? null,
+  dueDate: a.dueDate ?? null,
+  price: a.price ?? null,
+  // `|| null` (não `??`): colapsa "" em null para que um campo em branco limpe o valor em vez
+  // de mandar string vazia pelo helper de FormData.
+  description: typeof a.description === "string" ? a.description.trim() || null : (a.description ?? null),
+  startDate: a.startDate ?? null,
+  finishDate: a.finishDate ?? null,
+  startedAt: a.startedAt ?? null,
+  finishedAt: a.finishedAt ?? null,
+  painterId: a.painterId ?? null,
+});
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Mapa `fileId → status` de layout, já filtrado para chaves que são File IDs reais — o schema
+ * exige UUID, e um id temporário de arquivo ainda não enviado derrubaria a requisição inteira.
+ * Devolve `undefined` quando não há nada a enviar.
+ */
+export const airbrushingLayoutStatuses = (a: any): Record<string, string> | undefined => {
+  const raw = a?.layoutStatuses;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>).filter(([fileId, status]) => UUID_RE.test(fileId) && typeof status === "string" && !!status);
+  return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, string>) : undefined;
+};
+
+/**
+ * A linha carrega alguma configuração que FOGE dos padrões (pagamento ou status)?
+ *
+ * Sem isto, uma linha preenchida SÓ com forma de pagamento/vencimento era considerada vazia e
+ * descartada inteira. Os padrões (Preparação / Pendente / "dias após o término" sem prazo) não
+ * contam — senão a linha vazia que o seletor semeia viraria uma aerografia fantasma.
+ */
+export const hasNonDefaultAirbrushingConfig = (a: any): boolean =>
+  !!a?.paymentMethod ||
+  a?.paymentTermDays != null ||
+  a?.dueDayOfMonth != null ||
+  !!a?.dueDate ||
+  (!!a?.dueDateRule && a.dueDateRule !== AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) ||
+  (!!a?.status && a.status !== AIRBRUSHING_STATUS.PREPARATION) ||
+  (!!a?.paymentStatus && a.paymentStatus !== AIRBRUSHING_PAYMENT_STATUS.PENDING);
+
 // Skip the empty default row the selector may seed — only create rows carrying real data.
 const isMeaningful = (a: any): boolean =>
   a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
   !!a.description?.trim() ||
+  hasNonDefaultAirbrushingConfig(a) ||
   uploadedIds(a.layouts).length > 0 || newFilesOf(a.layouts).length > 0 ||
   uploadedIds(a.receiptFiles).length > 0 || newFilesOf(a.receiptFiles).length > 0 ||
   uploadedIds(a.invoiceFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0;
@@ -87,27 +151,12 @@ export async function createAirbrushingForTasks(
   const newInvoices = config.newInvoices ?? [];
   const newLayouts = config.newLayouts ?? [];
   const hasNewFiles = newReceipts.length > 0 || newInvoices.length > 0 || newLayouts.length > 0;
-  const hasLayoutStatuses = !!config.layoutStatuses && Object.keys(config.layoutStatuses).length > 0;
+  const layoutStatuses = airbrushingLayoutStatuses(config);
 
   const results: any[] = [];
   for (const task of tasks) {
     const base: Record<string, any> = {
-      status: config.status,
-      paymentStatus: config.paymentStatus,
-      paymentMethod: config.paymentMethod ?? null,
-      dueDateRule: config.dueDateRule ?? undefined,
-      paymentTermDays: config.paymentTermDays ?? null,
-      dueDayOfMonth: config.dueDayOfMonth ?? null,
-      dueDate: config.dueDate ?? null,
-      price: config.price ?? null,
-      // `|| null` (not `??`): collapses "" to null so a blank textarea clears the field rather than
-      // sending an empty string through the FormData helper.
-      description: config.description?.trim() || null,
-      startDate: config.startDate ?? null,
-      finishDate: config.finishDate ?? null,
-      startedAt: config.startedAt ?? null,
-      finishedAt: config.finishedAt ?? null,
-      painterId: config.painterId ?? null,
+      ...buildAirbrushingPayload(config),
       receiptIds: config.receiptIds ?? [],
       invoiceIds: config.invoiceIds ?? [],
       layoutIds: config.layoutIds ?? [],
@@ -118,7 +167,7 @@ export async function createAirbrushingForTasks(
       const data = {
         ...base,
         // Wrap in an array for multipart serialization (backend preprocess unwraps).
-        layoutStatuses: hasLayoutStatuses ? [config.layoutStatuses] : undefined,
+        layoutStatuses: layoutStatuses ? [layoutStatuses] : undefined,
       };
       const formData = createAirbrushingFormData(
         data,
@@ -131,12 +180,26 @@ export async function createAirbrushingForTasks(
       );
       results.push(await createFn(formData));
     } else {
-      const data = { ...base, layoutStatuses: hasLayoutStatuses ? config.layoutStatuses : undefined };
+      const data = { ...base, layoutStatuses };
       results.push(await createFn(data));
     }
   }
   return results;
 }
+
+/** Payload completo de UMA linha do seletor para UMA tarefa (escalares + ids de arquivo + status de layout). */
+const buildRowPayload = (a: any, taskId: string, multipart: boolean): Record<string, any> => {
+  const layoutStatuses = airbrushingLayoutStatuses(a);
+  return {
+    ...buildAirbrushingPayload(a),
+    receiptIds: uploadedIds(a.receiptFiles),
+    invoiceIds: uploadedIds(a.invoiceFiles),
+    layoutIds: uploadedIds(a.layouts),
+    // Multipart exige o mapa embrulhado num array (o preprocess do backend desembrulha).
+    layoutStatuses: layoutStatuses ? (multipart ? [layoutStatuses] : layoutStatuses) : undefined,
+    taskId,
+  };
+};
 
 /**
  * Fan a `MultiAirbrushingSelector` config array out over EACH selected task — the standalone
@@ -154,27 +217,13 @@ export async function createAirbrushingsForTasks(
   const results: any[] = [];
   for (const task of tasks) {
     for (const a of meaningful) {
-      const data: Record<string, any> = {
-        status: a.status,
-        paymentStatus: a.paymentStatus,
-        price: a.price ?? null,
-        description: a.description?.trim() || null,
-        startDate: a.startDate ?? null,
-        finishDate: a.finishDate ?? null,
-        startedAt: a.startedAt ?? null,
-        finishedAt: a.finishedAt ?? null,
-        painterId: a.painterId ?? null,
-        receiptIds: uploadedIds(a.receiptFiles),
-        invoiceIds: uploadedIds(a.invoiceFiles),
-        layoutIds: uploadedIds(a.layouts),
-        taskId: task.id,
-      };
       const files = {
         receipts: newFilesOf(a.receiptFiles),
         invoices: newFilesOf(a.invoiceFiles),
         layouts: newFilesOf(a.layouts),
       };
       const hasFiles = files.receipts.length > 0 || files.invoices.length > 0 || files.layouts.length > 0;
+      const data = buildRowPayload(a, task.id, hasFiles);
       if (hasFiles) {
         const formData = createAirbrushingFormData(data, files, task.customer);
         results.push(await airbrushingService.createAirbrushing(formData as any, undefined, { suppressToast: true }));
@@ -197,27 +246,13 @@ export async function createAirbrushingsForTask(
 ): Promise<void> {
   for (const a of airbrushings || []) {
     if (!isMeaningful(a)) continue;
-    const data: Record<string, any> = {
-      status: a.status,
-      paymentStatus: a.paymentStatus,
-      price: a.price ?? null,
-      description: a.description?.trim() || null,
-      startDate: a.startDate ?? null,
-      finishDate: a.finishDate ?? null,
-      startedAt: a.startedAt ?? null,
-      finishedAt: a.finishedAt ?? null,
-      painterId: a.painterId ?? null,
-      receiptIds: uploadedIds(a.receiptFiles),
-      invoiceIds: uploadedIds(a.invoiceFiles),
-      layoutIds: uploadedIds(a.layouts),
-      taskId,
-    };
     const files = {
       receipts: newFilesOf(a.receiptFiles),
       invoices: newFilesOf(a.invoiceFiles),
       layouts: newFilesOf(a.layouts),
     };
     const hasFiles = files.receipts.length > 0 || files.invoices.length > 0 || files.layouts.length > 0;
+    const data = buildRowPayload(a, taskId, hasFiles);
     if (hasFiles) {
       const formData = createAirbrushingFormData(data, files, customerInfo);
       await airbrushingService.createAirbrushing(formData as any);

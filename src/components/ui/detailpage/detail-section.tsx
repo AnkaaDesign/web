@@ -75,10 +75,20 @@ function DetailSectionInner<TData>({ section, row, hideEmptyFields, editLocked, 
       : <div className={cn(fields.length ? "mt-3" : "")}>{rendered}</div>
     : null;
 
+  // `fieldsLayout: "row"` põe os campos LADO A LADO numa única linha, com quebra quando não
+  // couberem: cada campo é um item flex com largura mínima (`basis-40`) que cresce para
+  // preencher a linha. O `[&>*]` alcança tanto o campo direto quanto o invólucro que o
+  // InlineEditField cria quando a linha tem tooltip — sem isso, campos com e sem tooltip
+  // teriam larguras/alturas diferentes na mesma linha.
+  const fieldsCls =
+    def.fieldsLayout === "row"
+      ? "flex flex-wrap items-stretch gap-2 [&>*]:flex [&>*]:min-w-0 [&>*]:grow [&>*]:basis-40 [&>*>*]:w-full"
+      : "space-y-2";
+
   const body = (
     <>
       {fields.length ? (
-        <div className="space-y-2">
+        <div className={fieldsCls}>
           {fields.map((f) => (
             <InlineEditField key={f.id} field={f} row={row} editable={sectionEditable && canEdit(f)} lockedReason={editLocked ? editLockedReason : undefined} />
           ))}

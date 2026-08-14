@@ -9,6 +9,7 @@ export * from "./use-implement-measure";
 export * from "./use-implement-measure-list";
 export * from "./use-implement-measure-section";
 export * from "./use-changelog";
+export * from "./use-fiscal-emitter";
 export * from "./use-responsible";
 export * from "./use-notification";
 export {

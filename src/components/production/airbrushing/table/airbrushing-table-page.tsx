@@ -26,6 +26,8 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_PAYMENT_STATUS_LABELS,
+  NFSE_STATUS,
+  NFSE_STATUS_LABELS,
 } from "../../../../constants";
 import { canCreateAirbrushings } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/contexts/auth-context";
@@ -49,7 +51,15 @@ const LIST_INCLUDE = {
     },
   },
   painter: true,
+  // A NFS-e do aerografista alimenta a coluna "NFS-e" (oculta por padrão). É uma linha 1:1
+  // barata — nada a ver com os arquivos de nota ANEXADOS, que continuam fora do include.
+  nfse: true,
 } as const;
+
+// Valor SINTÉTICO do filtro de NFS-e: "aerografia sem nenhuma nota". Não pertence a
+// NFSE_STATUS — é um literal que só o filtro `nfseStatuses` da API entende, onde vira
+// `nfse: { is: null }`. Convive com os status reais no mesmo array.
+const NFSE_STATUS_FILTER_NONE = "NONE";
 
 // Sectors allowed to create/edit/delete/change-status of an airbrushing — mirrors
 // canEdit/canDelete/canCreateAirbrushings (ADMIN, COMMERCIAL, FINANCIAL). ADMIN always passes the gate.
@@ -113,6 +123,10 @@ function buildAirbrushingQuery(filters: DataTableFilterValues, search: string): 
   if (Array.isArray(status) && status.length > 0) q.status = status;
   const pay = filters.paymentStatus;
   if (Array.isArray(pay) && pay.length > 0) q.paymentStatuses = pay;
+  // Array PLANO de strings (NFSE_STATUS + o literal sintético "NONE"). Nunca um `where`
+  // aninhado: o paramsSerializer o transformaria em JSON string e o pipe da API 400aria.
+  const nfse = filters.nfseStatus;
+  if (Array.isArray(nfse) && nfse.length > 0) q.nfseStatuses = nfse;
   const customers = filters.customerIds;
   if (Array.isArray(customers) && customers.length > 0) q.customerIds = customers;
   const painters = filters.painterIds;
@@ -372,6 +386,20 @@ export function AirbrushingTablePage() {
         type: "multiselect",
         requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
         options: Object.values(AIRBRUSHING_PAYMENT_STATUS).map((s) => ({ value: s, label: AIRBRUSHING_PAYMENT_STATUS_LABELS[s] })),
+      },
+      {
+        // Status da NFS-e do pintor — dado fiscal, mesmo gate das demais colunas de dinheiro.
+        // "Sem nota" (NONE) é o caso que mais importa: aerografia concluída que não gerou
+        // nota. É sintético (não existe em NFSE_STATUS) e o servidor o traduz para
+        // `nfse: { is: null }`, combinável com os demais valores no mesmo array.
+        key: "nfseStatus",
+        label: "Status da NFS-e",
+        type: "multiselect",
+        requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
+        options: [
+          ...Object.values(NFSE_STATUS).map((s) => ({ value: s as string, label: NFSE_STATUS_LABELS[s] })),
+          { value: NFSE_STATUS_FILTER_NONE, label: "Sem nota" },
+        ],
       },
       { key: "customerIds", label: "Cliente", type: "multiselect", options: customerOptions },
       { key: "painterIds", label: "Pintor", type: "multiselect", options: painterOptions },

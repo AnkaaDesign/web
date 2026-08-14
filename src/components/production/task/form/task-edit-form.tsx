@@ -34,10 +34,11 @@ import { useTaskMutations, useCutsByTask, useAirbrushingsByTask } from "../../..
 import { cutKeys, airbrushingKeys } from "../../../../hooks/common/query-keys";
 import { cutService } from "../../../../api-client/cut";
 import { airbrushingService } from "../../../../api-client/airbrushing";
+import { buildAirbrushingPayload, hasNonDefaultAirbrushingConfig } from "@/utils/airbrushing-submit";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole, getResponsibleRoles } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE } from "../../../../constants";
 import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
 import { useAuth } from "../../../../contexts/auth-context";
@@ -189,6 +190,8 @@ function planAirbrushingReconciliation(
   const isMeaningful = (a: any): boolean =>
     a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
     !!a.description?.trim() ||
+    // Uma linha preenchida só com forma de pagamento/vencimento também é uma aerografia real.
+    hasNonDefaultAirbrushingConfig(a) ||
     uploadedIds(rowReceipts(a)).length > 0 || uploadedIds(rowInvoices(a)).length > 0 || uploadedIds(rowLayouts(a)).length > 0 ||
     newFilesOf(rowReceipts(a)).length > 0 || newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0;
 
@@ -199,6 +202,13 @@ function planAirbrushingReconciliation(
     if (a.status !== orig.status) return true;
     if ((a.paymentStatus ?? null) !== (orig.paymentStatus ?? null)) return true;
     if ((a.painterId ?? null) !== (orig.painterId ?? null)) return true;
+    // Configuração de pagamento — sem estas comparações, mexer SÓ na forma de pagamento ou
+    // no vencimento não gerava requisição nenhuma (a alteração sumia ao recarregar).
+    if ((a.paymentMethod ?? null) !== (orig.paymentMethod ?? null)) return true;
+    if ((a.dueDateRule ?? null) !== (orig.dueDateRule ?? null)) return true;
+    if ((a.paymentTermDays ?? null) !== (orig.paymentTermDays ?? null)) return true;
+    if ((a.dueDayOfMonth ?? null) !== (orig.dueDayOfMonth ?? null)) return true;
+    if (time(a.dueDate) !== time(orig.dueDate)) return true;
     if (time(a.startDate) !== time(orig.startDate)) return true;
     if (time(a.finishDate) !== time(orig.finishDate)) return true;
     if (time(a.startedAt) !== time(orig.startedAt)) return true;
@@ -214,17 +224,9 @@ function planAirbrushingReconciliation(
   // batch endpoint cannot carry an upload, so including them there can only ever remove
   // files — and the API now ignores them outright. Anything that touches attachments is
   // routed to the single multipart endpoint via `buildFileData` below.
-  const buildData = (a: any): Record<string, any> => ({
-    status: a.status,
-    paymentStatus: a.paymentStatus,
-    price: a.price ?? null,
-    description: a.description?.trim() || null,
-    startDate: a.startDate ?? null,
-    finishDate: a.finishDate ?? null,
-    startedAt: a.startedAt ?? null,
-    finishedAt: a.finishedAt ?? null,
-    painterId: a.painterId ?? null,
-  });
+  // Uma única definição, compartilhada com o assistente de aerografia e com o cadastro de
+  // tarefa (`buildAirbrushingPayload`): campo novo entra lá e vale para todos os caminhos.
+  const buildData = (a: any): Record<string, any> => buildAirbrushingPayload(a);
 
   const buildFileData = (a: any): Record<string, any> => ({
     receiptIds: uploadedIds(rowReceipts(a)),
@@ -1103,6 +1105,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             description: a.description ?? null,
             status: a.status,
             paymentStatus: a.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
+            // Configuração de pagamento — precisa ser semeada aqui: sem ela a linha nasce
+            // vazia, o seletor a "corrige" para os padrões e o save gravaria por cima do
+            // que já estava no banco.
+            paymentMethod: (a as any).paymentMethod ?? null,
+            dueDateRule: (a as any).dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+            paymentTermDays: (a as any).paymentTermDays ?? null,
+            dueDayOfMonth: (a as any).dueDayOfMonth ?? null,
+            dueDate: (a as any).dueDate ? new Date((a as any).dueDate) : null,
             painterId: a.painterId || null,
             painter: a.painter || null,
             receiptIds: a.receipts?.map((r: any) => r.id) || [],
@@ -1120,6 +1130,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             id: `airbrushing-initial`,
             status: AIRBRUSHING_STATUS.PREPARATION,
             paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+            paymentMethod: null,
+            dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+            paymentTermDays: null,
+            dueDayOfMonth: null,
+            dueDate: null,
             price: null,
             description: null,
             startDate: null,

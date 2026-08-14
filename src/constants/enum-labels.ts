@@ -146,6 +146,9 @@ import {
   INSTALLMENT_STATUS,
   BANK_SLIP_STATUS,
   NFSE_STATUS,
+  OP_SIMP_NAC,
+  NFSE_ENVIRONMENT,
+  NFSE_CANCEL_REASON,
   SALARY_ADJUSTMENT_TYPE,
   POSITION_CHANGE_REASON,
   BENEFIT_KIND,
@@ -397,8 +400,10 @@ export const AIRBRUSHING_PAYMENT_STATUS_LABELS: Record<AIRBRUSHING_PAYMENT_STATU
 
 export const AIRBRUSHING_DUE_DATE_RULE_LABELS: Record<AIRBRUSHING_DUE_DATE_RULE, string> = {
   [AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH]: "Dias após o término",
-  [AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH]: "Dia fixo do mês",
-  [AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE]: "Data específica",
+  // Recorrente: a data é RECALCULADA a partir do término (próxima ocorrência do dia escolhido).
+  [AIRBRUSHING_DUE_DATE_RULE.DAY_OF_MONTH]: "Dia fixo do mês (recorrente)",
+  // Data cravada: nunca é recalculada, nem se o término mudar. É o que a distingue da regra acima.
+  [AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE]: "Data fixa (não recalcula)",
 };
 
 export const LAYOUT_STATUS_LABELS: Record<LAYOUT_STATUS, string> = {
@@ -2549,6 +2554,23 @@ export const NFSE_STATUS_LABELS: Record<NFSE_STATUS, string> = {
   [NFSE_STATUS.CANCEL_REJECTED]: "Cancelamento Rejeitado",
   [NFSE_STATUS.CANCELLED]: "Cancelada",
   [NFSE_STATUS.ERROR]: "Erro",
+};
+
+export const OP_SIMP_NAC_LABELS: Record<OP_SIMP_NAC, string> = {
+  [OP_SIMP_NAC.NAO_OPTANTE]: "Não optante pelo Simples Nacional",
+  [OP_SIMP_NAC.OPTANTE_MEI]: "Optante pelo Simples Nacional — MEI",
+  [OP_SIMP_NAC.OPTANTE_ME_EPP]: "Optante pelo Simples Nacional — ME/EPP",
+};
+
+export const NFSE_ENVIRONMENT_LABELS: Record<NFSE_ENVIRONMENT, string> = {
+  [NFSE_ENVIRONMENT.PRODUCTION]: "Produção",
+  [NFSE_ENVIRONMENT.RESTRICTED_PRODUCTION]: "Produção Restrita",
+};
+
+export const NFSE_CANCEL_REASON_LABELS: Record<NFSE_CANCEL_REASON, string> = {
+  [NFSE_CANCEL_REASON.EMISSION_ERROR]: "Erro na emissão",
+  [NFSE_CANCEL_REASON.SERVICE_NOT_PROVIDED]: "Serviço não prestado",
+  [NFSE_CANCEL_REASON.OTHER]: "Outros",
 };
 
 // =====================

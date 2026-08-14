@@ -23,13 +23,16 @@ import {
   IconList,
   IconLayoutGrid,
   IconFileDescription,
+  IconReceiptTax,
+  IconDownload,
+  IconEye,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
 import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { FileViewMode } from "@/components/common/file";
+import { useFileViewer, type FileViewMode } from "@/components/common/file";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
@@ -52,6 +55,7 @@ import {
 } from "@/utils/permissions/entity-permissions";
 import { getUsers } from "@/api-client";
 import { useAirbrushing, useAirbrushingMutations } from "../../../../hooks";
+import { useAirbrushingNfse } from "../../../../hooks/production/use-airbrushing-nfse";
 import {
   routes,
   SECTOR_PRIVILEGES,
@@ -68,8 +72,11 @@ import {
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
 import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS } from "@/utils/airbrushing";
-import type { Airbrushing } from "../../../../types";
+import { formatDate } from "@/utils";
+import { formatFileSize, getFileDownloadUrl } from "@/utils/file";
+import type { Airbrushing, File as AnkaaFile } from "../../../../types";
 import { AirbrushingFilesSection } from "./airbrushing-files-section";
+import { AirbrushingNfseSection, AirbrushingNfseHeaderBadges, DocumentRow, SubBlock } from "./airbrushing-nfse-section";
 // Resolve each Layout wrapper to its backing File (id/filename/path) — shared with the
 // task-detail airbrushing section so both download the real File, not the Layout id.
 import { getAirbrushingLayouts } from "@/components/production/task/detail/sections/airbrushings-section";
@@ -91,6 +98,58 @@ const AIRBRUSHING_STATUS_TRANSITIONS: Record<string, AIRBRUSHING_STATUS[]> = {
 
 const muted = <span className="text-muted-foreground">—</span>;
 
+/**
+ * Recibos do pagamento, DENTRO da seção "Preço & Pagamento" — o recibo é o comprovante do
+ * pagamento, então mora ao lado do valor e do status, não numa seção própria lá embaixo.
+ *
+ * Reaproveita `SubBlock` + `DocumentRow` da seção fiscal de propósito: documento de
+ * aerografia tem UM visual só (ícone à esquerda, nome e tamanho no meio, ações dentro do
+ * card, à direita), seja ele DANFSe, XML ou recibo.
+ */
+function AirbrushingReceiptsBlock({ files }: { files: AnkaaFile[] }) {
+  const { actions } = useFileViewer();
+
+  return (
+    <SubBlock title="Recibos do pagamento">
+      {files.length === 0 ? (
+        // Quem anexa o recibo é o Contas a Pagar, ao registrar o pagamento
+        // (`attachAirbrushingReceipts`) — o formulário da aerografia não tem seletor de
+        // recibo. Dizer isso evita a caçada por um botão de anexar que não existe aqui.
+        <p className="py-1 text-sm text-muted-foreground">
+          Nenhum recibo anexado. O recibo é anexado pelo Contas a Pagar ao registrar o pagamento.
+        </p>
+      ) : (
+        <div className="space-y-2 py-1">
+          {files.map((file, index) => (
+            <DocumentRow
+              key={file.id}
+              icon={IconReceipt}
+              title={file.filename}
+              subtitle={formatFileSize(file.size ?? 0)}
+              actions={
+                <>
+                  <Button variant="outline" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={() => actions.viewFiles(files, index)} title="Visualizar recibo">
+                    <IconEye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 shrink-0 p-0"
+                    onClick={() => window.open(getFileDownloadUrl(file), "_blank", "noopener,noreferrer")}
+                    title="Baixar recibo"
+                  >
+                    <IconDownload className="h-4 w-4" />
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+    </SubBlock>
+  );
+}
+
 export function AirbrushingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -110,6 +169,10 @@ export function AirbrushingDetailPage() {
   // servidor, que ignora em SILÊNCIO (200, sem mudança) quem não pode. Esconder o
   // controle aqui é o que evita o clique que parece funcionar e não faz nada.
   const canApproveLayouts = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]);
+  // VER a nota segue o gate de dinheiro (MONEY_GATE, que inclui COMMERCIAL), mas EMITIR /
+  // CANCELAR é mais estreito no servidor — ADMIN/Contabilidade/Financeiro. Sem esse recorte
+  // o comercial veria botões que só devolvem 403.
+  const canManageNfse = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL]);
 
   /**
    * fileId → LayoutStatus. A seção de layouts trabalha com os Files (é o File que baixa e
@@ -176,6 +239,19 @@ export function AirbrushingDetailPage() {
   });
 
   const airbrushing = response?.data as Airbrushing | undefined;
+
+  /**
+   * A nota também é lida AQUI — não só dentro da seção — porque a página precisa de
+   * `pdfFileId` para tirar o DANFSe da galeria de notas ANEXADAS e dos badges de
+   * status/ambiente no cabeçalho da seção. É a mesma query key da seção: o react-query
+   * deduplica, então não há requisição extra.
+   *
+   * O `enabled` repete o gate de dinheiro da seção de propósito: sem ele, um usuário de
+   * PRODUÇÃO (que nunca vê a seção) passaria a bater num endpoint que só responde 403.
+   */
+  const canSeeMoney = hasAnyPrivilegeAccess(MONEY_GATE);
+  const { data: nfseResponse } = useAirbrushingNfse(id ?? "", { enabled: !!id && canSeeMoney });
+  const nfse = nfseResponse?.data ?? null;
 
   const handleDelete = async () => {
     if (!airbrushing) return;
@@ -323,11 +399,17 @@ export function AirbrushingDetailPage() {
     });
 
     // --- Preço & Pagamento (financial-only) ---
+    // São todos valores CURTOS (dinheiro, status, forma, regra, datas): empilhados em meia
+    // largura viravam uma coluna alta de linhas quase vazias. Aqui a seção ocupa a largura
+    // toda (`span: 2`) e os campos dividem UMA linha (`fieldsLayout: "row"`), cada um com
+    // rótulo em cima e valor embaixo (`block: true`) — em telas estreitas a linha quebra
+    // sozinha. O gate de dinheiro (MONEY_GATE) segue campo a campo, como antes.
     list.push({
       id: "payment",
       label: "Preço & Pagamento",
       icon: IconCurrencyReal,
-      span: 1,
+      span: 2,
+      fieldsLayout: "row",
       requiredPrivilege: MONEY_GATE,
       fields: [
         {
@@ -335,6 +417,7 @@ export function AirbrushingDetailPage() {
           label: "Preço",
           icon: IconCurrencyReal,
           dataType: "money",
+          block: true,
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.price ?? null,
@@ -356,11 +439,12 @@ export function AirbrushingDetailPage() {
           label: "Status do Pagamento",
           icon: IconCreditCard,
           dataType: "enum",
+          block: true,
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.paymentStatus ?? null,
           render: (a) => (
-            <div className="flex items-center justify-end">
+            <div className="flex items-center">
               <Badge variant={(ENTITY_BADGE_CONFIG.AIRBRUSHING_PAYMENT[a.paymentStatus] || "default") as any}>
                 {AIRBRUSHING_PAYMENT_STATUS_LABELS[a.paymentStatus] || a.paymentStatus}
               </Badge>
@@ -391,10 +475,11 @@ export function AirbrushingDetailPage() {
           label: "Forma de Pagamento",
           icon: IconCreditCard,
           dataType: "enum",
+          block: true,
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.paymentMethod ?? null,
-          render: (a) => <div className="flex items-center justify-end">{a.paymentMethod ? PAYMENT_METHOD_LABELS[a.paymentMethod] : "-"}</div>,
+          render: (a) => <div className="flex items-center">{a.paymentMethod ? PAYMENT_METHOD_LABELS[a.paymentMethod] : "-"}</div>,
           edit: canEdit
             ? {
                 get: (a) => a.paymentMethod ?? null,
@@ -410,6 +495,7 @@ export function AirbrushingDetailPage() {
           label: "Regra de Vencimento",
           icon: IconCalendar,
           dataType: "enum",
+          block: true,
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
@@ -424,7 +510,7 @@ export function AirbrushingDetailPage() {
                     ? `Todo dia ${a.dueDayOfMonth}`
                     : AIRBRUSHING_DUE_DATE_RULE_LABELS[rule]
                   : AIRBRUSHING_DUE_DATE_RULE_LABELS[rule];
-            return <div className="flex items-center justify-end">{detail}</div>;
+            return <div className="flex items-center">{detail}</div>;
           },
           edit: canEdit
             ? {
@@ -451,9 +537,37 @@ export function AirbrushingDetailPage() {
           label: "Vencimento",
           icon: IconCalendar,
           dataType: "date",
+          block: true,
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.dueDate ?? null,
+          // Enquanto a aerografia não é CONCLUÍDA de fato (`finishedAt` nulo), as regras
+          // derivadas do término são calculadas sobre o término PREVISTO — o servidor
+          // recalcula tudo na conclusão. Sem esse rótulo a data parece firme e alguém
+          // programa pagamento por um vencimento que ainda vai mudar. Nada é calculado
+          // aqui: só rotulamos o valor que já veio do servidor.
+          render: (a) => {
+            if (!a.dueDate) return muted;
+            const rule = a.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
+            const isForecast = !a.finishedAt && rule !== AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE;
+            const shown = formatDate(new Date(a.dueDate));
+            if (!isForecast) return <div className="flex items-center">{shown}</div>;
+            // Numa linha só não cabe o parágrafo que explicava a previsão: a frase inteira
+            // vira o `title` da célula e fica no lugar dela a marcação "Previsto" + o
+            // lembrete curto de que a data ainda vai mudar.
+            return (
+              <div
+                className="flex flex-col items-start gap-1"
+                title="Calculado sobre o término previsto — será recalculado quando a aerografia for concluída."
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span>{shown}</span>
+                  <Badge variant="secondary">Previsto</Badge>
+                </span>
+                <span className="text-xs font-normal text-muted-foreground">Recalculado na conclusão.</span>
+              </div>
+            );
+          },
           edit:
             canEdit && (airbrushing?.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) === AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE
               ? {
@@ -465,8 +579,30 @@ export function AirbrushingDetailPage() {
               : undefined,
         },
         // paidAt is server-stamped when paymentStatus becomes PAID — read-only.
-        { id: "paidAt", label: "Pago em", icon: IconCalendar, dataType: "datetime", requiredPrivilege: MONEY_GATE, accessor: (a) => a.paidAt ?? null },
+        { id: "paidAt", label: "Pago em", icon: IconCalendar, dataType: "datetime", block: true, requiredPrivilege: MONEY_GATE, accessor: (a) => a.paidAt ?? null },
       ],
+      // Os recibos entram ABAIXO da linha de campos: comprovante e pagamento na mesma
+      // seção. O gate continua sendo o da seção (MONEY_GATE) — mudou o lugar, não quem vê.
+      render: (a) => <AirbrushingReceiptsBlock files={a.receipts ?? []} />,
+    });
+
+    // --- NFS-e do Aerografista (financial-only) ---
+    // O id é "nfse" e NÃO "invoices": este último já pertence à galeria de notas fiscais
+    // ANEXADAS (arquivos), que é outra coisa — colidir apagaria uma das duas seções.
+    //
+    // Esta é a seção ÚNICA do documento fiscal: DANFSe (PDF) e XML autorizado ficam juntos
+    // no bloco "Documentos da nota". `invoices` entra porque é lá que o servidor conecta o
+    // File do DANFSe — é de onde sai nome/tamanho/miniatura sem uma segunda busca.
+    // `span: 2` porque o corpo agora tem três blocos + documentos e ficava espremido em
+    // meia largura (quem já personalizou a largura desta seção mantém a escolha dele).
+    list.push({
+      id: "nfse",
+      label: "NFS-e do Aerografista",
+      icon: IconReceiptTax,
+      span: 2,
+      requiredPrivilege: MONEY_GATE,
+      headerActions: () => <AirbrushingNfseHeaderBadges nfse={nfse} />,
+      render: (a) => <AirbrushingNfseSection airbrushingId={a.id} canManage={canManageNfse} invoices={a.invoices ?? []} />,
     });
 
     // --- Tarefa Relacionada (read-only; belongs to the Task) ---
@@ -560,18 +696,27 @@ export function AirbrushingDetailPage() {
       });
     }
 
-    // --- Notas Fiscais (financial-only) ---
-    if ((airbrushing?.invoices?.length || 0) > 0) {
+    // --- Notas Fiscais Anexadas (financial-only) ---
+    // O DANFSe gerado pelo sistema é conectado pelo servidor na MESMA relação
+    // (AIRBRUSHING_INVOICES) em que caem os anexos manuais. Aqui ele sai da lista: seu lugar
+    // é a seção "NFS-e do Aerografista", junto do XML. O filtro é por `pdfFileId` e nada
+    // mais — em notas antigas (pdfFileId nulo) o PDF simplesmente continua entre os anexos,
+    // que é melhor do que adivinhar por nome de arquivo e esconder o anexo errado.
+    //
+    // A seção continua existindo mesmo com a subtração: há arquivos que usuários anexaram à
+    // mão e sumir com eles seria perda de dado visível.
+    const attachedInvoices = (airbrushing?.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId);
+    if (attachedInvoices.length > 0) {
       list.push({
         id: "invoices",
-        label: "Notas Fiscais",
+        label: "Notas Fiscais Anexadas",
         icon: IconFileInvoice,
         span: 1,
         requiredPrivilege: MONEY_GATE,
-        headerActions: (a) => <Badge variant="secondary">{a.invoices?.length ?? 0}</Badge>,
+        headerActions: (a) => <Badge variant="secondary">{(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId).length}</Badge>,
         render: (a) => (
           <AirbrushingFilesSection
-            files={a.invoices ?? []}
+            files={(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId)}
             emptyIcon={IconFileInvoice}
             emptyTitle="Nenhuma nota fiscal cadastrada"
             emptyDescription="Esta aerografia não possui notas fiscais anexadas."
@@ -580,25 +725,9 @@ export function AirbrushingDetailPage() {
       });
     }
 
-    // --- Recibos (financial-only) ---
-    if ((airbrushing?.receipts?.length || 0) > 0) {
-      list.push({
-        id: "receipts",
-        label: "Recibos",
-        icon: IconReceipt,
-        span: 1,
-        requiredPrivilege: MONEY_GATE,
-        headerActions: (a) => <Badge variant="secondary">{a.receipts?.length ?? 0}</Badge>,
-        render: (a) => (
-          <AirbrushingFilesSection
-            files={a.receipts ?? []}
-            emptyIcon={IconReceipt}
-            emptyTitle="Nenhum recibo cadastrado"
-            emptyDescription="Esta aerografia não possui recibos anexados."
-          />
-        ),
-      });
-    }
+    // --- Recibos: NÃO há seção própria ---
+    // Os recibos são exibidos dentro de "Preço & Pagamento" (o comprovante pertence ao
+    // pagamento). Nada foi escondido: é mudança de lugar, não de visibilidade.
 
     // --- Histórico ---
     list.push({
@@ -624,9 +753,13 @@ export function AirbrushingDetailPage() {
   }, [
     airbrushing?.task,
     airbrushing?.layouts?.length,
-    airbrushing?.invoices?.length,
+    airbrushing?.invoices,
     airbrushing?.receipts?.length,
+    // A nota entra nas deps porque o `pdfFileId` decide o que sobra na galeria de anexos
+    // (e alimenta os badges do cabeçalho da seção fiscal).
+    nfse,
     canEdit,
+    canManageNfse,
     updateAsync,
     confirmPaymentChange,
     loadPainters,

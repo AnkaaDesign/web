@@ -3,6 +3,7 @@
 export * from "./activity";
 export * from "./consumption-analytics";
 export * from "./airbrushing";
+export * from "./airbrushing-nfse";
 export * from "./auth";
 export {
   apiClient,
@@ -33,6 +34,7 @@ export * from "./cut";
 export * from "./ppe";
 export * from "./externalOperation";
 export * from "./file";
+export * from "./fiscal-emitter";
 export * from "./goal";
 export * from "./holiday";
 export * from "./item";

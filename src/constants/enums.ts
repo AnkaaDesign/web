@@ -2898,6 +2898,33 @@ export enum NFSE_STATUS {
 }
 
 // =====================
+// NFS-e Nacional (SEFIN) — emissor fiscal do prestador
+// =====================
+
+/**
+ * `opSimpNac` do DPS: regime do PRESTADOR perante o Simples Nacional. Numérico porque
+ * é assim que trafega no XML/JSON da SEFIN nacional.
+ */
+export enum OP_SIMP_NAC {
+  NAO_OPTANTE = 1,
+  OPTANTE_MEI = 2,
+  OPTANTE_ME_EPP = 3,
+}
+
+/** Ambiente de emissão da NFS-e nacional. 2 (Produção Restrita) NÃO gera nota válida. */
+export enum NFSE_ENVIRONMENT {
+  PRODUCTION = 1,
+  RESTRICTED_PRODUCTION = 2,
+}
+
+/** Códigos de motivo aceitos pelo cancelamento da NFS-e nacional. */
+export enum NFSE_CANCEL_REASON {
+  EMISSION_ERROR = 1,
+  SERVICE_NOT_PROVIDED = 2,
+  OTHER = 9,
+}
+
+// =====================
 // Deployment Enums
 // =====================
 

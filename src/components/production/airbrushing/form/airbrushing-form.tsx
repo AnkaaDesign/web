@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -10,16 +10,16 @@ import {
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_DUE_DATE_RULE,
-  AIRBRUSHING_STATUS_LABELS,
-  AIRBRUSHING_PAYMENT_STATUS_LABELS,
   FAVORITE_PAGES,
 } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { AirbrushingFormFields } from "./airbrushing-form-fields";
+import type { AirbrushingFieldValues } from "./airbrushing-fields";
+import { buildAirbrushingReviewSections, AirbrushingReviewRows, AirbrushingLayoutPreviews } from "./airbrushing-review-rows";
 import { TaskSelector } from "./task-selector";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { SelectedTasksSummary, TaskReviewRows } from "@/components/production/task/form/selected-tasks-summary";
@@ -27,39 +27,25 @@ import {
   IconSpray,
   IconBrush,
   IconClipboardList,
-  IconPaperclip,
-  IconFileInvoice,
-  IconPhoto,
-  IconUser,
-  IconBuildingFactory,
-  IconHash,
+  IconCreditCard,
   IconArrowLeft,
   IconArrowRight,
   IconCheck,
   IconLoader2,
-  IconCalendar,
-  IconCurrencyReal,
-  IconCreditCard,
   IconStack2,
-  IconFileTypePdf,
-  IconFileDescription,
 } from "@tabler/icons-react";
-import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
-import { FileCardUploadField, FileThumbnail, type FileWithPreview } from "@/components/common/file";
-import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
-// ONE uploader drives the whole "Arquivos" card so the three columns are identical by
-// construction — same dropzone size, same "anexados" list. Recibos and notas fiscais use
-// the shared FileCardUploadField; layouts use LayoutFileUploadField, which is that same
-// component plus the per-file status selector.
+import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
+// Só LAYOUTS têm seletor de arquivo neste formulário: o recibo é anexado a partir de Contas a
+// Pagar e a nota fiscal entra automaticamente na geração da NFS-e. `LayoutFileUploadField` é o
+// mesmo uploader do layout de tarefa mais o seletor de status por arquivo.
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
 import { createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
 import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import { useAuth } from "@/contexts/auth-context";
 import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
-import { formatCurrency, formatDate } from "../../../../utils";
 
 interface AirbrushingFormProps {
   airbrushingId?: string;
@@ -80,6 +66,13 @@ const makeEmptyAirbrushing = () => ({
   id: `airbrushing-${crypto.randomUUID()}`,
   status: AIRBRUSHING_STATUS.PREPARATION,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+  // Mesmos padrões da linha que o `MultiAirbrushingSelector` cria — assim a linha semeada e
+  // a adicionada pelo botão nascem idênticas.
+  paymentMethod: null,
+  dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+  paymentTermDays: null,
+  dueDayOfMonth: null,
+  dueDate: null,
   price: null,
   description: null,
   startDate: null,
@@ -88,105 +81,41 @@ const makeEmptyAirbrushing = () => ({
   finishedAt: null,
   painterId: null,
   painter: null,
+  // O formulário não anexa recibos nem notas fiscais (recibo vem de Contas a Pagar, NF sai da
+  // geração da NFS-e). As chaves continuam aqui apenas porque o modelo do
+  // `MultiAirbrushingSelector` — compartilhado com tarefa e orçamento — as exige; ficam vazias.
   receiptFiles: [],
   invoiceFiles: [],
   layouts: [],
   receiptIds: [],
   invoiceIds: [],
   layoutIds: [],
+  layoutStatuses: {},
 });
 
-// Recibos / notas fiscais are paperwork, not artwork: they accept the office-document set
-// on top of images (the layouts column keeps the uploader's image/PDF/vector default).
-const DOCUMENT_FILE_TYPES: Record<string, string[]> = {
-  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
-  "application/pdf": [".pdf"],
-  "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-  "text/plain": [".txt"],
-  "text/csv": [".csv"],
-};
-
-/** 50 MB — the ceiling the recibo/NF pickers have always enforced. */
-const DOCUMENT_MAX_SIZE = 50 * 1024 * 1024;
-
-// Review-step layout preview. Uploaded (server) files reuse FileThumbnail (server thumbnail
-// endpoints). A JUST-SELECTED local File has no server id/thumbnail, so we render it client-side:
-// images via an object URL, PDFs via pdfjs (generatePDFThumbnailFromBlob) — same as the file picker's
-// selected card. EPS/AI and loading states fall back to a typed icon.
-const LayoutThumbnail = ({ file }: { file: any }) => {
-  const name: string = file?.name || file?.filename || "layout";
-  const mimetype: string = file?.type || file?.mimetype || "";
-  // Read the flag BEFORE the instanceof: that check narrows a plain `any` down to the DOM `File`,
-  // which carries no `uploaded`, so `file.uploaded` after it is an error even though the value is
-  // there at runtime. Hoisted alongside name/mimetype, which normalise the same two shapes
-  // (FileWithPreview vs. the server's File entity).
-  const uploaded: boolean = Boolean(file?.uploaded);
-  const isLocal = file instanceof File && !uploaded;
-  const isImage = mimetype.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
-  const isPdf = mimetype === "application/pdf" || /\.pdf$/i.test(name);
-  const [thumb, setThumb] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLocal) return;
-    let cancelled = false;
-    let objUrl: string | null = null;
-    if (isImage) {
-      objUrl = URL.createObjectURL(file);
-      setThumb(objUrl);
-    } else if (isPdf) {
-      generatePDFThumbnailFromBlob(file as Blob).then((url) => {
-        if (!cancelled) setThumb(url);
-      });
-    }
-    return () => {
-      cancelled = true;
-      if (objUrl) URL.revokeObjectURL(objUrl);
-    };
-  }, [file, isLocal, isImage, isPdf]);
-
-  if (isLocal && (isImage || isPdf)) {
-    return (
-      <div className="w-16">
-        <div className="w-16 h-16 rounded-lg border border-border/20 overflow-hidden bg-white flex items-center justify-center">
-          {thumb ? (
-            <img src={thumb} alt={name} className="w-full h-full object-contain" />
-          ) : isPdf ? (
-            <IconFileTypePdf className="h-6 w-6 text-red-500" />
-          ) : (
-            <IconPhoto className="h-6 w-6 text-blue-500" />
-          )}
-        </div>
-        <p className="mt-1 text-xs text-foreground leading-tight line-clamp-1" title={name}>
-          {name.length > 12 ? `${name.slice(0, 12)}...` : name}
-        </p>
-      </div>
-    );
-  }
-
-  // Uploaded (server) file, or local non-previewable (EPS/AI) → FileThumbnail (server thumb or icon).
-  return (
-    <FileThumbnail
-      file={
-        {
-          id: file?.uploadedFileId || file?.id || name,
-          filename: name,
-          mimetype,
-          size: file?.size || 0,
-          thumbnailUrl: file?.thumbnailUrl,
-        } as any
-      }
-      size="md"
-      showName
-    />
-  );
-};
+// Campos escalares que o modo edição valida antes de avançar de passo. É a MESMA lista que
+// `AirbrushingFields` desenha — inclusive a configuração de pagamento, que antes nunca era
+// validada porque não constava de nenhum `form.trigger`.
+const VALIDATED_FIELDS = [
+  "painterId",
+  "description",
+  "status",
+  "paymentStatus",
+  "startDate",
+  "finishDate",
+  "startedAt",
+  "finishedAt",
+  "price",
+  "paymentMethod",
+  "dueDateRule",
+  "paymentTermDays",
+  "dueDayOfMonth",
+  "dueDate",
+] as const;
 
 // Three-step wizard definition (mirrors the Order create/edit wizard).
 const STEPS = [
-  { id: 1, name: "Detalhes", description: "Dados da aerografia e arquivos" },
+  { id: 1, name: "Detalhes", description: "Dados da aerografia e layouts" },
   { id: 2, name: "Tarefas", description: "Selecione uma ou mais tarefas" },
   { id: 3, name: "Revisão", description: "Confirme os dados da aerografia" },
 ];
@@ -223,8 +152,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const [selectedTaskRows, setSelectedTaskRows] = useState<ClusteredTask[]>([]);
 
   // File-upload state (kept outside RHF; uploaded IDs are mirrored into RHF fields).
-  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
+  // Só LAYOUTS: recibos e notas fiscais não são anexados por aqui.
   const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
   const [layoutStatuses, setLayoutStatuses] = useState<Record<string, LayoutStatus>>({});
 
@@ -288,8 +216,8 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       description: null,
       taskId: initialTaskId || "",
       painterId: null,
-      receiptIds: [],
-      invoiceIds: [],
+      // Sem receiptIds/invoiceIds: o formulário não gerencia recibos nem notas fiscais, e mandar
+      // um array vazio faria o backend DESANEXAR os que já existem.
       layoutIds: [],
       status: AIRBRUSHING_STATUS.PREPARATION,
       paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
@@ -325,30 +253,12 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       dueDate: airbrushing.dueDate ?? null,
       taskId: airbrushing.taskId,
       painterId: airbrushing.painterId ?? null,
-      receiptIds: airbrushing.receipts?.map((f) => f.id) || [],
-      invoiceIds: airbrushing.invoices?.map((f) => f.id) || [],
+      // receiptIds/invoiceIds NÃO são hidratados nem enviados — ver defaultValues.
       // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
       layoutIds: airbrushing.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
     });
 
     setSelectedTasks(new Set([airbrushing.taskId]));
-
-    const mapFile = (file: any): FileWithPreview =>
-      Object.assign(
-        new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
-          type: file.mimetype || "application/octet-stream",
-          lastModified: new Date(file.createdAt || Date.now()).getTime(),
-        }),
-        {
-          id: file.id,
-          uploaded: true,
-          uploadedFileId: file.id,
-          thumbnailUrl: file.thumbnailUrl,
-        },
-      ) as FileWithPreview;
-
-    const receipts: FileWithPreview[] = airbrushing.receipts?.map(mapFile) || [];
-    const invoices: FileWithPreview[] = airbrushing.invoices?.map(mapFile) || [];
 
     // layouts are Layout entities with fileId, status, and nested file data
     const layouts: FileWithPreview[] =
@@ -379,8 +289,6 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     });
     setLayoutStatuses(initialStatuses);
 
-    setReceiptFiles(receipts);
-    setInvoiceFiles(invoices);
     setLayouts(layouts);
   }, [isEdit, airbrushing, form]);
 
@@ -453,22 +361,6 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   // File change handlers — mirror uploaded (existing) IDs into RHF; new files ride along as FormData.
   const extractUploadedIds = (files: FileWithPreview[]) => files.filter((f) => f.uploaded && f.uploadedFileId).map((f) => f.uploadedFileId!).filter(Boolean);
 
-  const handleReceiptFilesChange = useCallback(
-    (files: FileWithPreview[]) => {
-      setReceiptFiles(files);
-      form.setValue("receiptIds", extractUploadedIds(files));
-    },
-    [form],
-  );
-
-  const handleInvoiceFilesChange = useCallback(
-    (files: FileWithPreview[]) => {
-      setInvoiceFiles(files);
-      form.setValue("invoiceIds", extractUploadedIds(files));
-    },
-    [form],
-  );
-
   const handleLayoutsChange = useCallback(
     (files: FileWithPreview[]) => {
       setLayouts(files);
@@ -508,10 +400,12 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           return true;
         }
         // Edit — all fields optional; only fail on malformed values.
-        const ok = await form.trigger(["price", "description", "startDate", "finishDate", "status", "paymentStatus", "painterId"] as any);
+        const ok = await form.trigger(VALIDATED_FIELDS as any);
         if (!ok) {
           const errors = form.formState.errors as any;
-          const firstMsg = errors.price?.message || errors.painterId?.message || errors.startDate?.message || errors.finishDate?.message || "Verifique os dados da aerografia";
+          // Primeira mensagem na ORDEM DOS CAMPOS — nada de uma lista à parte que esquece
+          // justamente o campo que falhou.
+          const firstMsg = VALIDATED_FIELDS.map((name) => errors[name]?.message).find((msg) => typeof msg === "string") || "Verifique os dados da aerografia";
           toast.error(firstMsg);
           return false;
         }
@@ -534,7 +428,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           toast.error("Uma tarefa deve ser selecionada");
           return false;
         }
-        const ok = await form.trigger(["startDate", "finishDate", "price", "description", "taskId", "status", "paymentStatus", "painterId"] as any);
+        const ok = await form.trigger([...VALIDATED_FIELDS, "taskId"] as any);
         if (!ok) {
           toast.error("Por favor, corrija os erros no formulário");
           return false;
@@ -599,17 +493,15 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     try {
       if (!(await validateCurrentStep())) return;
 
-      const data = form.getValues();
+      // `receiptIds`/`invoiceIds` NUNCA saem daqui: o backend traduz um array vazio em
+      // `receipts: { set: [] }`, ou seja, desanexa tudo. Como este formulário não gerencia
+      // recibos nem notas fiscais, omitir os campos é o que preserva os anexos existentes.
+      const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...data } = form.getValues() as Record<string, any>;
 
-      const newReceiptFiles = receiptFiles.filter((f) => !f.uploaded);
-      const newInvoiceFiles = invoiceFiles.filter((f) => !f.uploaded);
       const newLayouts = layouts.filter((f) => !f.uploaded);
-
-      const existingReceiptIds = receiptFiles.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
-      const existingInvoiceIds = invoiceFiles.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
       const existingLayoutIds = layouts.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
-      const hasNewFiles = newReceiptFiles.length > 0 || newInvoiceFiles.length > 0 || newLayouts.length > 0;
+      const hasNewFiles = newLayouts.length > 0;
 
       // Build layoutStatuses map for existing files.
       const existingLayoutStatusesMap: Record<string, LayoutStatus> = {};
@@ -653,8 +545,6 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
         // Reset the wizard.
         form.reset();
-        setReceiptFiles([]);
-        setInvoiceFiles([]);
         setLayouts([]);
         setLayoutStatuses({});
         setSelectedTasks(new Set());
@@ -679,8 +569,6 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
         const submitData = {
           ...data,
-          receiptIds: existingReceiptIds,
-          invoiceIds: existingInvoiceIds,
           layoutIds: existingLayoutIds,
           // Wrap in array for FormData serialization (backend preprocess unwraps).
           layoutStatuses: layoutStatusesMap ? [layoutStatusesMap] : undefined,
@@ -688,11 +576,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
         const formData = createAirbrushingFormData(
           submitData,
-          {
-            receipts: newReceiptFiles.length > 0 ? (newReceiptFiles as File[]) : undefined,
-            invoices: newInvoiceFiles.length > 0 ? (newInvoiceFiles as File[]) : undefined,
-            layouts: newLayouts.length > 0 ? (newLayouts as File[]) : undefined,
-          },
+          { layouts: newLayouts.length > 0 ? (newLayouts as File[]) : undefined },
           customerInfo,
         );
 
@@ -700,8 +584,6 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       } else {
         const submitData = {
           ...data,
-          receiptIds: existingReceiptIds,
-          invoiceIds: existingInvoiceIds,
           layoutIds: existingLayoutIds,
           layoutStatuses: layoutStatusesMap,
         };
@@ -725,7 +607,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       submitInFlight.current = false;
       setIsSubmittingLocal(false);
     }
-  }, [validateCurrentStep, form, mode, update, refresh, airbrushingId, onSuccess, navigate, setSearchParams, receiptFiles, invoiceFiles, layouts, layoutStatuses, airbrushing, selectedTaskResponse, selectedTasks, selectedTaskRows, selectedTaskId]);
+  }, [validateCurrentStep, form, mode, update, refresh, airbrushingId, onSuccess, navigate, setSearchParams, layouts, layoutStatuses, airbrushing, selectedTaskResponse, selectedTasks, selectedTaskRows, selectedTaskId]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === STEPS.length;
@@ -747,6 +629,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   );
   const reviewPainterName = airbrushing?.painter?.id === reviewPainterId ? airbrushing?.painter?.name : painterResponse?.data?.[0]?.name;
 
+  // Revisão do modo edição: os valores atuais do formulário passados pela MESMA definição de
+  // seções que o cadastro usa — nenhuma das duas telas tem lista literal de campos.
+  const editReviewValues = form.watch() as AirbrushingFieldValues;
+
   // Create-mode: resolve every config's painterId → name for the review (the selector stores only ids).
   const reviewPainterIds = useMemo(
     () => Array.from(new Set(reviewConfigs.map((c) => c.painterId).filter(Boolean))) as string[],
@@ -764,6 +650,48 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
   // Unified task summary source (edit → loaded airbrushing.task; create → selected task).
   const reviewTask = useMemo(() => airbrushing?.task ?? selectedTaskResponse?.data, [airbrushing, selectedTaskResponse]);
+
+  // Cliente da tarefa — contexto de organização dos arquivos e escopo das sugestões de layout.
+  const layoutCustomerId = (isEdit ? airbrushing?.task?.customer?.id : selectedTaskResponse?.data?.customer?.id) || undefined;
+
+  // ------- Revisão: UMA lista de itens, e o MESMO JSX nos dois modos -------
+  // Edição = um item (a aerografia carregada); cadastro = um item por configuração preenchida.
+  // É o que garante que a revisão seja idêntica: só o tamanho da lista muda.
+  const reviewItems = (
+    isEdit
+      ? [
+          {
+            key: airbrushingId || "airbrushing",
+            label: "Aerografia",
+            values: editReviewValues,
+            layouts: layouts as any[],
+            painterName: reviewPainterName ?? null,
+            receiptCount: airbrushing?.receipts?.length ?? 0,
+            invoiceCount: airbrushing?.invoices?.length ?? 0,
+          },
+        ]
+      : reviewConfigs.map((c, index) => ({
+          key: (c.id ?? index) as string,
+          label: `Aerografia ${index + 1}`,
+          values: c as AirbrushingFieldValues,
+          layouts: (c.layouts ?? []) as any[],
+          painterName: (c.painterId && painterNameById.get(c.painterId)) || null,
+          receiptCount: 0,
+          invoiceCount: 0,
+        }))
+  ).map((item) => ({
+    ...item,
+    sections: buildAirbrushingReviewSections(item.values, {
+      canViewFinancials,
+      painterName: item.painterName,
+      receiptCount: item.receiptCount,
+      invoiceCount: item.invoiceCount,
+    }),
+  }));
+
+  // Só o cadastro pode ter mais de uma configuração — com N itens cada bloco ganha um rótulo.
+  const hasMultipleReviewItems = reviewItems.length > 1;
+  const showPaymentSection = canViewFinancials && reviewItems.some((item) => item.sections.pagamento.length > 0);
 
   // ------- Header chrome -------
   const title = isEdit
@@ -843,128 +771,78 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
                 {/* Step content — step 2 (task table) takes full height. */}
                 <div className={cn("flex-1 min-h-0", currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
-                  {/* ---------- Step 1 (create): multi-config aerografias ---------- */}
-                  {currentStep === 1 && !isEdit && (
+                  {/* ---------- Passo 1: dados da aerografia + layouts ----------
+                      MESMO contorno nos dois modos (card, título, espaçamento). A única
+                      diferença é o miolo: o cadastro repete o bloco N vezes (uma configuração
+                      por linha), a edição tem uma só, ligada ao react-hook-form. Os CAMPOS, a
+                      ordem e o seletor de layouts vêm de `AirbrushingFields` nos dois casos. */}
+                  {currentStep === 1 && (
                     <div className="space-y-4">
                       <Card className="w-full">
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2">
                             <IconSpray className="h-5 w-5" />
-                            Aerografias
+                            {isEdit ? "Aerografia" : "Aerografias"}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <MultiAirbrushingSelector
-                            control={form.control}
-                            disabled={isSubmitting}
-                            customerId={selectedTaskResponse?.data?.customer?.id || undefined}
-                            canViewFinancials={canViewFinancials}
-                          />
-                        </CardContent>
-                      </Card>
-                      <p className="text-xs text-muted-foreground px-1">Cada aerografia será criada para cada tarefa selecionada.</p>
-                    </div>
-                  )}
-
-                  {/* ---------- Step 1 (edit): single airbrushing details + files ---------- */}
-                  {currentStep === 1 && isEdit && (
-                    <div className="space-y-6">
-                      <Card className="w-full">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <IconSpray className="h-5 w-5" />
-                            Informações da Aerografia
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <AirbrushingFormFields
-                            control={form.control}
-                            disabled={isSubmitting}
-                            initialPainter={airbrushing?.painter ?? undefined}
-                            canViewFinancials={canViewFinancials}
-                          />
-                        </CardContent>
-                      </Card>
-
-                      <Card className="w-full">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <IconPaperclip className="h-5 w-5" />
-                            Arquivos
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {/* items-start: the layouts column grows with its attached-files
-                              list — without it the other two dropzones stretch to match the
-                              tallest column and the row stops looking like one set. */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                            {/* Recibos */}
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="flex items-center gap-2">
-                                <IconPaperclip className="h-4 w-4" />
-                                Recibos
-                              </FormLabel>
-                              <FormControl>
-                                <FileCardUploadField
-                                  onFilesChange={handleReceiptFilesChange}
-                                  existingFiles={receiptFiles}
-                                  acceptedFileTypes={DOCUMENT_FILE_TYPES}
-                                  maxFiles={10}
-                                  maxSize={DOCUMENT_MAX_SIZE}
-                                  showPreview={true}
-                                  variant="list"
-                                  placeholder="Adicione recibos do serviço"
-                                  label="Recibos anexados"
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-
-                            {/* Notas Fiscais */}
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="flex items-center gap-2">
-                                <IconFileInvoice className="h-4 w-4" />
-                                Notas Fiscais
-                              </FormLabel>
-                              <FormControl>
-                                <FileCardUploadField
-                                  onFilesChange={handleInvoiceFilesChange}
-                                  existingFiles={invoiceFiles}
-                                  acceptedFileTypes={DOCUMENT_FILE_TYPES}
-                                  maxFiles={10}
-                                  maxSize={DOCUMENT_MAX_SIZE}
-                                  showPreview={true}
-                                  variant="list"
-                                  placeholder="Adicione notas fiscais"
-                                  label="NFes anexadas"
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-
-                            {/* Layouts (layouts) with per-file status */}
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="flex items-center gap-2">
-                                <IconPhoto className="h-4 w-4" />
-                                Layouts da Aerografia
-                              </FormLabel>
-                              <FormControl>
+                          {isEdit ? (
+                            <AirbrushingFormFields
+                              control={form.control}
+                              disabled={isSubmitting}
+                              initialPainter={airbrushing?.painter ?? undefined}
+                              canViewFinancials={canViewFinancials}
+                              layoutsSlot={
                                 <LayoutFileUploadField
                                   onFilesChange={handleLayoutsChange}
                                   onStatusChange={handleLayoutStatusChange}
+                                  showStatus
                                   existingFiles={layouts}
                                   maxFiles={20}
                                   showPreview={true}
-                                  placeholder="Adicione os layouts da aerografia"
-                                  label="Layouts anexados"
-                                  variant="list"
+                                  placeholder="Adicione layouts da aerografia"
+                                  variant="card"
                                   disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          </div>
+                                >
+                                  {layoutCustomerId && (
+                                    <FileSuggestions
+                                      customerId={layoutCustomerId}
+                                      fileContext="airbrushingLayouts"
+                                      excludeFileIds={layouts.map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[]}
+                                      onSelect={(newFile) => {
+                                        const fileWithPreview = {
+                                          id: newFile.id,
+                                          name: newFile.filename || newFile.originalName || "layout",
+                                          size: newFile.size || 0,
+                                          type: newFile.mimetype || "application/octet-stream",
+                                          lastModified: Date.now(),
+                                          uploaded: true,
+                                          uploadProgress: 100,
+                                          uploadedFileId: newFile.id,
+                                          thumbnailUrl: newFile.thumbnailUrl || undefined,
+                                        } as unknown as FileWithPreview;
+                                        handleLayoutsChange([...layouts, fileWithPreview]);
+                                      }}
+                                      disabled={isSubmitting}
+                                    />
+                                  )}
+                                </LayoutFileUploadField>
+                              }
+                            />
+                          ) : (
+                            /* `showStatus` liga Status/Status do Pagamento para que cadastrar e
+                               editar ofereçam exatamente os mesmos campos. */
+                            <MultiAirbrushingSelector
+                              control={form.control}
+                              disabled={isSubmitting}
+                              customerId={layoutCustomerId}
+                              canViewFinancials={canViewFinancials}
+                              showStatus
+                            />
+                          )}
                         </CardContent>
                       </Card>
+                      {!isEdit && <p className="text-xs text-muted-foreground px-1">Cada aerografia será criada para cada tarefa selecionada.</p>}
                     </div>
                   )}
 
@@ -980,54 +858,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="pt-0 space-y-3">
-                            {reviewTask ? (
-                              <>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconClipboardList className="h-4 w-4" />
-                                    Tarefa
-                                  </span>
-                                  <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask.name || "-"}</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconUser className="h-4 w-4" />
-                                    Cliente
-                                  </span>
-                                  {reviewTask.customer ? (
-                                    <div className="flex items-center gap-2 ml-4 min-w-0">
-                                      <CustomerLogoDisplay
-                                        logo={reviewTask.customer.logo}
-                                        customerName={reviewTask.customer.fantasyName || "Cliente"}
-                                        size="sm"
-                                        shape="rounded"
-                                        className="flex-shrink-0"
-                                      />
-                                      <span className="text-sm font-semibold text-foreground truncate text-right">{reviewTask.customer.fantasyName}</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm font-semibold text-foreground ml-4 text-right">-</span>
-                                  )}
-                                </div>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconBuildingFactory className="h-4 w-4" />
-                                    Setor
-                                  </span>
-                                  <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask.sector?.name || "-"}</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconHash className="h-4 w-4" />
-                                    Número de Série
-                                  </span>
-                                  <span className="text-sm font-semibold text-foreground truncate ml-4 text-right font-mono">{reviewTask.serialNumber || "-"}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground pt-1">A tarefa vinculada não pode ser alterada após a criação.</p>
-                              </>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">Tarefa não encontrada.</p>
-                            )}
+                            {/* MESMAS linhas que a revisão usa — a tarefa vinculada tem a mesma
+                                aparência aqui e no passo 3. */}
+                            <TaskReviewRows task={reviewTask as any} />
+                            {reviewTask && <p className="text-xs text-muted-foreground pt-1">A tarefa vinculada não pode ser alterada após a criação.</p>}
                           </CardContent>
                         </Card>
                       ) : (
@@ -1045,85 +879,56 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                     </>
                   )}
 
-                  {/* ---------- Step 3 (create): multi-config review (mirrors the cut wizard) ---------- */}
-                  {currentStep === 3 && !isEdit && (
-                    <div className="space-y-6">
+                  {/* ---------- Passo 3: revisão em TRÊS seções ----------
+                      1. Tarefa · 2. Aerografia (com os layouts em si) · 3. Pagamento.
+                      MESMO JSX nos dois modos: só a lista `reviewItems` muda de tamanho
+                      (edição = 1 aerografia; cadastro = 1 por configuração preenchida). */}
+                  {currentStep === 3 && (
+                    <div className="space-y-4">
                       <div>
-                        <h2 className="text-xl font-semibold text-foreground">Revisão das Aerografias</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de cadastrar.</p>
+                        <h2 className="text-xl font-semibold text-foreground">{isEdit ? "Revisão da Aerografia" : "Revisão das Aerografias"}</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de {isEdit ? "salvar" : "cadastrar"}.</p>
                       </div>
 
-                      {/* Total callout */}
-                      <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                        <IconStack2 className="h-6 w-6 text-primary shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">
-                            {totalAirbrushings} {totalAirbrushings === 1 ? "aerografia será criada" : "aerografias serão criadas"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {perTaskAirbrushings} {perTaskAirbrushings === 1 ? "aerografia" : "aerografias"} por tarefa × {selectedTasks.size}{" "}
-                            {selectedTasks.size === 1 ? "tarefa" : "tarefas"}
-                          </p>
+                      {/* Quantas serão criadas — só faz sentido no cadastro (N configurações × N tarefas). */}
+                      {!isEdit && (
+                        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                          <IconStack2 className="h-6 w-6 text-primary shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">
+                              {totalAirbrushings} {totalAirbrushings === 1 ? "aerografia será criada" : "aerografias serão criadas"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {perTaskAirbrushings} {perTaskAirbrushings === 1 ? "aerografia" : "aerografias"} por tarefa × {selectedTasks.size}{" "}
+                              {selectedTasks.size === 1 ? "tarefa" : "tarefas"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Airbrushing configs card */}
-                        <Card className="h-full">
+                      {/* Aerografia à ESQUERDA (é a coluna mais alta, por causa dos previews de
+                          layout); Tarefa e Pagamento empilhados à DIREITA. Em telas estreitas o
+                          grid vira uma coluna e a ordem do DOM manda: Aerografia → Tarefa → Pagamento. */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        {/* ----- Aerografia: pintor, descrição, status, datas previstas E reais + LAYOUTS ----- */}
+                        <Card className="w-full">
                           <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
                               <IconSpray className="h-5 w-5" />
-                              Aerografias ({perTaskAirbrushings})
+                              {isEdit ? "Aerografia" : `Aerografias (${perTaskAirbrushings})`}
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="pt-0">
-                            {reviewConfigs.length > 0 ? (
-                              <div className="space-y-3">
-                                {reviewConfigs.map((c, i) => {
-                                  const layouts = (c.layouts ?? []) as any[];
-                                  const rows: Array<{ icon: ReactNode; label: string; value: string }> = [
-                                    { icon: <IconBrush className="h-4 w-4" />, label: "Pintor", value: (c.painterId && painterNameById.get(c.painterId)) || "-" },
-                                    ...(canViewFinancials
-                                      ? [{ icon: <IconCurrencyReal className="h-4 w-4" />, label: "Preço", value: c.price != null ? formatCurrency(Number(c.price)) : "-" }]
-                                      : []),
-                                    { icon: <IconCalendar className="h-4 w-4" />, label: "Início Previsto", value: c.startDate ? formatDate(c.startDate as Date) : "-" },
-                                    { icon: <IconCalendar className="h-4 w-4" />, label: "Término Previsto", value: c.finishDate ? formatDate(c.finishDate as Date) : "-" },
-                                    ...(c.description?.trim()
-                                      ? [{ icon: <IconFileDescription className="h-4 w-4" />, label: "Descrição", value: c.description.trim() }]
-                                      : []),
-                                  ];
-                                  return (
-                                    <div key={c.id ?? i} className={reviewConfigs.length > 1 ? "rounded-lg border border-border p-3 space-y-2" : "space-y-2"}>
-                                      {reviewConfigs.length > 1 && <p className="text-xs font-semibold text-muted-foreground px-1">Aerografia {i + 1}</p>}
-                                      {rows.map((r) => (
-                                        <div key={r.label} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 h-11 gap-3">
-                                          <span className="text-sm text-muted-foreground flex items-center gap-2 flex-shrink-0">
-                                            {r.icon}
-                                            {r.label}
-                                          </span>
-                                          <span className="text-sm font-semibold text-foreground truncate text-right min-w-0">{r.value}</span>
-                                        </div>
-                                      ))}
-
-                                      {/* Layouts — actual previews, not just a count */}
-                                      <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
-                                        <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                          <IconPhoto className="h-4 w-4" />
-                                          Layouts ({layouts.length})
-                                        </span>
-                                        {layouts.length > 0 ? (
-                                          <div className="flex flex-wrap gap-2">
-                                            {layouts.map((f, li) => (
-                                              <LayoutThumbnail key={(f.uploadedFileId || f.id || f.name || li) as string} file={f} />
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <p className="text-xs text-muted-foreground">Nenhum layout</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                            {reviewItems.length > 0 ? (
+                              <div className="space-y-4">
+                                {reviewItems.map((item) => (
+                                  <div key={item.key} className={hasMultipleReviewItems ? "rounded-lg border border-border p-3 space-y-2" : "space-y-2"}>
+                                    {hasMultipleReviewItems && <p className="text-xs font-semibold text-muted-foreground px-1">{item.label}</p>}
+                                    <AirbrushingReviewRows rows={item.sections.aerografia} />
+                                    {/* Os layouts em si (imagem/PDF), não a contagem nem o nome. */}
+                                    <AirbrushingLayoutPreviews files={item.layouts} />
+                                  </div>
+                                ))}
                               </div>
                             ) : (
                               <p className="text-sm text-muted-foreground">Nenhuma aerografia preenchida.</p>
@@ -1131,150 +936,43 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                           </CardContent>
                         </Card>
 
-                        {/* Tasks card — shared summary component */}
-                        <Card className="h-full">
-                          <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center gap-2">
-                              <IconClipboardList className="h-5 w-5" />
-                              Tarefas ({selectedTasks.size})
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <SelectedTasksSummary tasks={selectedTaskRows} />
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </div>
-                  )}
+                        <div className="space-y-4">
+                          {/* ----- Tarefa ----- */}
+                          <Card className="w-full">
+                            <CardHeader className="pb-4">
+                              <CardTitle className="flex items-center gap-2">
+                                <IconClipboardList className="h-5 w-5" />
+                                {isEdit ? "Tarefa" : `Tarefas (${selectedTasks.size})`}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              {isEdit ? <TaskReviewRows task={reviewTask as any} /> : <SelectedTasksSummary tasks={selectedTaskRows} />}
+                            </CardContent>
+                          </Card>
 
-                  {/* ---------- Step 3 (edit): single airbrushing review ---------- */}
-                  {currentStep === 3 && isEdit && (
-                    <div className="space-y-6">
-                      <div>
-                        <h2 className="text-xl font-semibold text-foreground">Revisão da Aerografia</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de salvar</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Task card — the single linked task (shared review rows). */}
-                        <Card className="h-full">
-                          <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center gap-2">
-                              <IconClipboardList className="h-5 w-5" />
-                              Tarefa
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <TaskReviewRows task={reviewTask as any} />
-                          </CardContent>
-                        </Card>
-
-                        {/* Airbrushing card */}
-                        <Card className="h-full">
-                          <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center gap-2">
-                              <IconSpray className="h-5 w-5" />
-                              Aerografia
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0 space-y-3">
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Pintor</span>
-                              <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewPainterName || "-"}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Status</span>
-                              <span className="text-sm font-semibold text-foreground">
-                                {AIRBRUSHING_STATUS_LABELS[(form.watch("status") as AIRBRUSHING_STATUS) ?? AIRBRUSHING_STATUS.PREPARATION] || "-"}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <IconCalendar className="h-4 w-4" />
-                                Início Previsto
-                              </span>
-                              <span className="text-sm font-semibold text-foreground">{form.watch("startDate") ? formatDate(form.watch("startDate") as Date) : "-"}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <IconCalendar className="h-4 w-4" />
-                                Término Previsto
-                              </span>
-                              <span className="text-sm font-semibold text-foreground">{form.watch("finishDate") ? formatDate(form.watch("finishDate") as Date) : "-"}</span>
-                            </div>
-                            {/* Stacked, not justify-between: free-form multi-line text. */}
-                            {form.watch("description") && (
-                              <div className="flex flex-col gap-1 bg-muted/50 rounded-lg px-4 py-3">
-                                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                  <IconFileDescription className="h-4 w-4" />
-                                  Descrição
-                                </span>
-                                <span className="text-sm font-semibold text-foreground whitespace-pre-wrap break-words">
-                                  {form.watch("description") as string}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Money rows — gated behind canViewAirbrushingFinancials */}
-                            {canViewFinancials && (
-                              <>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconCurrencyReal className="h-4 w-4" />
-                                    Preço do Serviço
-                                  </span>
-                                  <span className="text-sm font-semibold text-primary">{form.watch("price") != null ? formatCurrency(Number(form.watch("price"))) : "-"}</span>
+                          {/* ----- Pagamento: valor, status, forma, regra e vencimento ----- */}
+                          {showPaymentSection && (
+                            <Card className="w-full">
+                              <CardHeader className="pb-4">
+                                <CardTitle className="flex items-center gap-2">
+                                  <IconCreditCard className="h-5 w-5" />
+                                  Pagamento
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <div className="space-y-4">
+                                  {reviewItems.map((item) => (
+                                    <div key={item.key} className={hasMultipleReviewItems ? "rounded-lg border border-border p-3 space-y-2" : "space-y-2"}>
+                                      {hasMultipleReviewItems && <p className="text-xs font-semibold text-muted-foreground px-1">{item.label}</p>}
+                                      <AirbrushingReviewRows rows={item.sections.pagamento} />
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <IconCreditCard className="h-4 w-4" />
-                                    Status do Pagamento
-                                  </span>
-                                  <span className="text-sm font-semibold text-foreground">
-                                    {AIRBRUSHING_PAYMENT_STATUS_LABELS[(form.watch("paymentStatus") as AIRBRUSHING_PAYMENT_STATUS) ?? AIRBRUSHING_PAYMENT_STATUS.PENDING] || "-"}
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                          </CardContent>
-                        </Card>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
                       </div>
-
-                      {/* File summary */}
-                      <Card className="w-full">
-                        <CardHeader className="pb-4">
-                          <CardTitle className="flex items-center gap-2">
-                            <IconPaperclip className="h-5 w-5" />
-                            Arquivos
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <IconPaperclip className="h-4 w-4" />
-                                Recibos
-                              </span>
-                              <span className="text-sm font-semibold text-foreground">{receiptFiles.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <IconFileInvoice className="h-4 w-4" />
-                                Notas Fiscais
-                              </span>
-                              <span className="text-sm font-semibold text-foreground">{invoiceFiles.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <IconPhoto className="h-4 w-4" />
-                                Layouts
-                              </span>
-                              <span className="text-sm font-semibold text-foreground">{layouts.length}</span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
                     </div>
                   )}
                 </div>

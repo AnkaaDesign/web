@@ -1,7 +1,7 @@
 // packages/interfaces/src/user.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { ORDER_BY_DIRECTION, CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE } from '@constants';
+import type { ORDER_BY_DIRECTION, CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, OP_SIMP_NAC, NFSE_ENVIRONMENT } from '@constants';
 import type { PpeSize, PpeDelivery, PpeDeliverySchedule, PpeSizeIncludes, PpeDeliveryIncludes, PpeDeliveryScheduleIncludes } from "./ppe";
 import type { SeenNotification, Notification, SeenNotificationIncludes, NotificationIncludes } from "./notification";
 import type { Position, PositionIncludes, PositionOrderBy } from "./position";
@@ -111,6 +111,66 @@ export interface User extends BaseEntity {
     seenNotification?: number;
   };
 }
+
+// =====================
+// Emissor Fiscal (NFS-e Nacional)
+// =====================
+
+/**
+ * Identidade fiscal do colaborador que emite NFS-e como PRESTADOR (o aerografista MEI).
+ * A empresa é sempre o TOMADOR — a nota sai no CNPJ do próprio pintor, assinada com o
+ * certificado A1 dele.
+ */
+export interface FiscalEmitterProfile extends BaseEntity {
+  userId: string;
+  cnpj: string;
+  corporateName: string;
+  tradeName: string | null;
+  /** Inscrição municipal — OPCIONAL para MEI (a maioria não possui). */
+  municipalRegistration: string | null;
+  /** Código IBGE do município do prestador (7 dígitos). */
+  municipalityIbgeCode: string;
+  opSimpNac: OP_SIMP_NAC;
+  regEspTrib: number | null;
+  /** Código de tributação nacional (6 dígitos); padrão "140501". */
+  cTribNac: string | null;
+  /** Código de tributação municipal, quando o município exigir. */
+  cTribMun: string | null;
+  serviceDescription: string | null;
+  serie: string | null;
+  environment: NFSE_ENVIRONMENT;
+  emissionEnabled: boolean;
+}
+
+/** Resumo público de um certificado A1 — NUNCA carrega a senha nem o binário. */
+export interface FiscalCertificateSummary {
+  id: string;
+  profileId: string;
+  holderDocument: string | null;
+  subjectCommonName: string | null;
+  issuer: string | null;
+  serialNumber: string | null;
+  notBefore: Date | null;
+  notAfter: Date | null;
+  isActive: boolean;
+  revokedAt: Date | null;
+  daysUntilExpiry: number | null;
+  isExpired: boolean;
+  createdAt: Date;
+}
+
+/** Payload do GET /fiscal-emitters/:userId. */
+export interface FiscalEmitterState {
+  profile: FiscalEmitterProfile | null;
+  certificate: FiscalCertificateSummary | null;
+  /** Prefill (CNPJ / razão social do vínculo) quando ainda não existe perfil. */
+  suggestion: { cnpj?: string | null; corporateName?: string | null } | null;
+}
+
+export interface FiscalEmitterGetResponse extends BaseGetUniqueResponse<FiscalEmitterState> {}
+export interface FiscalEmitterProfileResponse extends BaseUpdateResponse<FiscalEmitterProfile> {}
+export interface FiscalCertificateResponse extends BaseUpdateResponse<FiscalCertificateSummary> {}
+export interface FiscalCertificateGetManyResponse extends BaseGetManyResponse<FiscalCertificateSummary> {}
 
 // =====================
 // Include Types

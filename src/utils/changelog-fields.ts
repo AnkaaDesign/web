@@ -241,6 +241,28 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     ledSector: "Setor Liderado",
     performanceLevel: "Nível de Desempenho",
 
+    // Emissor fiscal (NFS-e) — identidade do colaborador PRESTADOR (MEI) e o certificado A1
+    cnpj: "CNPJ",
+    corporateName: "Razão Social",
+    tradeName: "Nome Fantasia",
+    municipalRegistration: "Inscrição Municipal",
+    municipalityIbgeCode: "Código IBGE do Município",
+    opSimpNac: "Regime Tributário",
+    regEspTrib: "Regime Especial de Tributação",
+    cTribNac: "Código de Tributação Nacional",
+    cTribMun: "Código de Tributação Municipal",
+    serviceDescription: "Descrição Padrão do Serviço",
+    serie: "Série",
+    environment: "Ambiente",
+    emissionEnabled: "Emissão Automática",
+    holderDocument: "Documento do Titular",
+    subjectCommonName: "Titular do Certificado",
+    issuer: "Emissor do Certificado",
+    serialNumber: "Número de Série do Certificado",
+    notBefore: "Certificado Válido a Partir de",
+    notAfter: "Certificado Válido Até",
+    revokedAt: "Certificado Revogado em",
+
     // Contract kind and employment
     contractKind: "Tipo de Contrato", // legacy field name kept for historical changelog rows
     contractKindOrder: "Ordem do Tipo de Contrato",
@@ -1110,6 +1132,18 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     startedAt: "Iniciado em",
     finishedAt: "Finalizado em",
     taskId: "Tarefa",
+    // NFS-e do aerografista (prestador MEI) — a nota emitida para esta aerografia.
+    "nfse.status": "Status da NFS-e",
+    "nfse.accessKey": "Chave de Acesso da NFS-e",
+    "nfse.nfseNumber": "Número da NFS-e",
+    "nfse.serie": "Série da NFS-e",
+    "nfse.environment": "Ambiente da NFS-e",
+    "nfse.issuedAt": "NFS-e Emitida em",
+    "nfse.competence": "Competência da NFS-e",
+    "nfse.serviceAmount": "Valor do Serviço (NFS-e)",
+    "nfse.errorMessage": "Erro da NFS-e",
+    "nfse.cancelledAt": "NFS-e Cancelada em",
+    "nfse.cancelReason": "Motivo do Cancelamento da NFS-e",
   },
   [CHANGE_LOG_ENTITY_TYPE.NOTE]: {
     title: "Título",
