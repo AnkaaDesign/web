@@ -39,6 +39,12 @@ interface NfseCancelDialogProps {
   nfseNumber?: number | string | null;
   /** Rejection message from a previous request (surfaced so the user can correct & resubmit) */
   previousRejectionMessage?: string | null;
+  /**
+   * Número da nota que já substituiu esta (NfseDocument.supersededByNfseNumber). Quando o
+   * refaturamento emitiu a nota nova, o sistema já sabe qual é a substituta — então o campo
+   * vem preenchido e o operador não precisa ir procurar o número em outra tela.
+   */
+  supersededByNfseNumber?: number | null;
   onCancelled?: () => void;
 }
 
@@ -46,7 +52,11 @@ interface NfseCancelDialogProps {
  * Shared NFS-e cancellation dialog. Cancellation at the prefeitura is asynchronous:
  * submitting only registers a request (AGUARDANDO_FISCAL) that is later authorized or
  * rejected. The backend message already states the outcome — we surface it via toast.
- * When the reason is Duplicidade (code 4), the substitute NF number is required.
+ *
+ * Sobre a nota substituta: a regra antiga só a exigia em Duplicidade (código 4). Na prática o
+ * fiscal de Ibiporã a exige em QUALQUER cancelamento de nota que não seja do dia — a NF 3199
+ * foi recusada com motivo 1 pedindo "o MOTIVO do cancelamento e o NÚMERO da nota fiscal
+ * substituta". Então ela passa a ser exigida também sempre que já houve uma recusa anterior.
  */
 export function NfseCancelDialog({
   open,
@@ -55,6 +65,7 @@ export function NfseCancelDialog({
   nfseDocumentId,
   nfseNumber,
   previousRejectionMessage,
+  supersededByNfseNumber,
   onCancelled,
 }: NfseCancelDialogProps) {
   const [reason, setReason] = useState("");
@@ -70,11 +81,14 @@ export function NfseCancelDialog({
     if (open) {
       setReason("");
       setReasonCode("1");
-      setSubstituteNumber("");
+      // Pré-preenche com a substituta que o refaturamento já emitiu, quando existe.
+      setSubstituteNumber(supersededByNfseNumber ? String(supersededByNfseNumber) : "");
     }
-  }, [open]);
+  }, [open, supersededByNfseNumber]);
 
-  const substituteRequired = reasonCode === "4";
+  // Duplicidade sempre exige. Uma recusa anterior também: o fiscal já disse, por escrito,
+  // que sem o número da substituta ele não cancela — reenviar sem ela só queima outra recusa.
+  const substituteRequired = reasonCode === "4" || !!previousRejectionMessage;
 
   const handleConfirm = () => {
     if (!reason.trim() || reason.trim().length < 15) {
@@ -82,7 +96,11 @@ export function NfseCancelDialog({
       return;
     }
     if (substituteRequired && !substituteNumber.trim()) {
-      toast.error("Informe o número da nota fiscal substituta para cancelamento por duplicidade.");
+      toast.error(
+        reasonCode === "4"
+          ? "Informe o número da nota fiscal substituta para cancelamento por duplicidade."
+          : "A prefeitura já recusou este cancelamento pedindo o número da nota substituta. Informe-o antes de reenviar.",
+      );
       return;
     }
 
@@ -162,7 +180,15 @@ export function NfseCancelDialog({
             />
             {substituteRequired && (
               <p className="text-xs text-destructive mt-1">
-                Obrigatório para cancelamento por duplicidade.
+                {reasonCode === "4"
+                  ? "Obrigatório para cancelamento por duplicidade."
+                  : "Obrigatório: a prefeitura já recusou este cancelamento pedindo o número da nota substituta."}
+              </p>
+            )}
+            {!!supersededByNfseNumber && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Preenchido automaticamente com a NFS-e nº {supersededByNfseNumber}, emitida no
+                refaturamento desta tarefa.
               </p>
             )}
           </div>

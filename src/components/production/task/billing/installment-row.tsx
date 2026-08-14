@@ -41,7 +41,19 @@ export function InstallmentRow({ installment }: InstallmentRowProps) {
       </TableCell>
       <TableCell>
         {installment.bankSlip && (
-          <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
+          <div className="space-y-1">
+            <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
+            {/* `bankSlip.errorMessage` não era renderizado em nenhum lugar do sistema: o
+                operador via o badge "Erro" e nada que dissesse o porquê. */}
+            {installment.bankSlip.errorMessage && (
+              <p className="text-xs text-destructive">{installment.bankSlip.errorMessage}</p>
+            )}
+            {/* `TMP-` = nunca foi registrado no Sicredi. Sem isso, "Gerando" parecia um
+                estado transitório normal, mesmo quando estava parado havia dias. */}
+            {installment.bankSlip.nossoNumero?.startsWith('TMP-') && (
+              <p className="text-xs text-amber-600">Ainda não registrado no Sicredi</p>
+            )}
+          </div>
         )}
       </TableCell>
       <TableCell>

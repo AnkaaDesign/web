@@ -12,6 +12,8 @@ import { generatePaymentText } from "@/utils/quote-text-generators";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
+import { TaskNfseHistoryCard } from "@/components/production/task/billing/task-nfse-history";
+import { useTaskNfseHistory } from "@/hooks/production/use-invoice";
 import { useNfseDetail } from "@/hooks/financial/use-nfse";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
@@ -124,6 +126,25 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // is hidden at that moment — so without this the alert would be pointing at something the user
   // cannot see. `attentionOrderNumberFor` narrows the quote-wide signal to the one config it is
   // actually about, and returns "" for every other config so nothing else changes here.
+  // Histórico de NFS-e da TAREFA, não da fatura. A tabela abaixo lê
+  // `configInvoice.nfseDocuments`, que só enxerga as notas da fatura viva — e uma nota de
+  // ciclo anterior fica com `invoiceId = null` quando o faturamento é revertido. Sem isto,
+  // uma NF que existe de verdade na prefeitura (a NF 3199 da "Tati Minas 8,50", substituída
+  // pela 3215) simplesmente não aparecia em lugar nenhum da tabela.
+  const { data: nfseHistoryResponse } = useTaskNfseHistory(task?.id ?? "");
+  const taskNfseHistory: any[] = (nfseHistoryResponse as any)?.data?.nfses ?? [];
+
+  // Notas que NÃO pertencem a nenhuma fatura atual desta tela — os ciclos anteriores.
+  const previousCycleNfses = useMemo(() => {
+    const currentIds = new Set<string>();
+    for (const inv of invoices as any[]) {
+      for (const doc of (inv as any).nfseDocuments ?? []) currentIds.add(doc.id);
+    }
+    return taskNfseHistory
+      .filter((doc) => !currentIds.has(doc.id))
+      .sort((a, b) => (b.nfseNumber ?? -1) - (a.nfseNumber ?? -1));
+  }, [taskNfseHistory, invoices]);
+
   const orderNumberAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "orderNumber");
   const attentionOrderNumberFor = (config: any): string =>
     orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
@@ -239,20 +260,28 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // Revert billing approval state
   const [revertBillingDialogOpen, setRevertBillingDialogOpen] = useState(false);
   const [revertBillingLoading, setRevertBillingLoading] = useState(false);
+  // Mensagem completa dos bloqueios devolvidos pelo backend quando a reversão é recusada.
+  const [revertBlockers, setRevertBlockers] = useState<string | null>(null);
 
   const revertableStatuses = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL"];
   const canRevertBilling = canChangeStatus && revertableStatuses.includes(currentStatus);
 
   // Whether the revert-billing option should be offered. Mirrors the backend precondition
-  // (revertBillingApproval): the revert flow itself baixa's active boletos and cancels AUTHORIZED
-  // NFS-e, so they need NOT be pre-cancelled. It is only blocked when an installment is already
-  // PAID, or an NFS-e is still PROCESSING/PENDING (might become AUTHORIZED).
+  // (revertBillingApproval): the revert flow itself baixa's active boletos and leaves live
+  // NFS-e standing (they get superseded on the next approval), so neither needs pre-cancelling.
+  // It is blocked when an installment is already PAID, when an NFS-e is still PROCESSING/PENDING
+  // (might become AUTHORIZED), or when a boleto is being registered at Sicredi right now —
+  // that last one was missing, so the option was offered, the click 400'd, and the reason
+  // vanished into a truncated toast.
   const canRevertForBilling = useMemo(() => {
     if (!canRevertBilling) return false;
     for (const inv of filteredInvoices) {
       const insts = (inv as any).installments || [];
       for (const inst of insts) {
         if (inst.status === 'PAID') return false;
+        // Só REGISTERING bloqueia: uma chamada pode estar em voo agora. CREATING com
+        // nossoNumero `TMP-` nunca chegou ao banco e o backend já libera a reversão.
+        if (inst.bankSlip?.status === 'REGISTERING') return false;
       }
       const nfses = (inv as any).nfseDocuments || [];
       for (const n of nfses) {
@@ -268,8 +297,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     try {
       await taskQuoteService.revertBilling(task.quoteId);
       window.location.reload();
-    } catch {
-      // Error toast is emitted by the axios error interceptor.
+    } catch (err: any) {
+      // O backend concatena TODOS os bloqueios numa mensagem só, que passa fácil de 400
+      // caracteres. O toast do interceptor tem 280px de largura, line-clamp-4 e some em 8s,
+      // então o operador lia no máximo o primeiro bloqueio — e, na prática, motivo nenhum,
+      // porque este catch estava vazio. Guardamos a mensagem e mostramos num dialog que fica.
+      setRevertBlockers(
+        err?.response?.data?.message ??
+          err?.message ??
+          'Não foi possível reverter o faturamento.',
+      );
     } finally {
       setRevertBillingLoading(false);
       setRevertBillingDialogOpen(false);
@@ -764,8 +801,17 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       ? [...configInvoice.installments].sort((a: any, b: any) => a.number - b.number)
                       : [];
                     const nfseDocuments = (configInvoice as any).nfseDocuments ?? [];
-                    // Current NFSe: AUTHORIZED > PROCESSING > PENDING > ERROR (priority order)
+                    // Nota vigente, por prioridade. CANCEL_REJECTED e CANCEL_REQUESTED entram
+                    // logo depois de AUTHORIZED porque são notas VIVAS na prefeitura: a
+                    // primeira teve o cancelamento RECUSADO pelo fiscal, a segunda tem um
+                    // pedido em análise. Faltavam nas duas listas, então uma nota nesses
+                    // estados não era nem "ativa" nem "cancelada" — sumia da tabela e a tela
+                    // exibia "Não emitida" sobre uma NF que existe de verdade. Foi o que o
+                    // operador viu na NF 3199 da tarefa "Tati Minas 8,50".
+                    // (invoice-list-card.tsx e invoice-detail-dialog.tsx já faziam assim.)
                     const activeNfse = nfseDocuments.find((d: any) => d.status === "AUTHORIZED")
+                      ?? nfseDocuments.find((d: any) => d.status === "CANCEL_REJECTED")
+                      ?? nfseDocuments.find((d: any) => d.status === "CANCEL_REQUESTED")
                       ?? nfseDocuments.find((d: any) => d.status === "PROCESSING")
                       ?? nfseDocuments.find((d: any) => d.status === "PENDING")
                       ?? nfseDocuments.find((d: any) => d.status === "ERROR")
@@ -879,7 +925,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               </thead>
                               <tbody className="divide-y divide-border/50">
                                 {/* No NFS-e at all — single row with emit button */}
-                                {!activeNfse && canceledNfses.length === 0 && (
+                                {!activeNfse && canceledNfses.length === 0 && previousCycleNfses.length === 0 && (
                                   <tr>
                                     <td colSpan={7} className="px-3 py-2 text-muted-foreground">Não emitida</td>
                                     <td className="px-3 py-2">
@@ -908,6 +954,22 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                     invoiceId={configInvoice.id}
                                     nfseDocuments={nfseDocuments}
                                     canManage={!disabled}
+                                  />
+                                ))}
+                                {/* Notas de ciclos ANTERIORES da tarefa — órfãs de fatura porque o
+                                    faturamento foi revertido, mas reais na prefeitura. Sem ações
+                                    inline: elas não pertencem a esta fatura, e o card "Histórico de
+                                    NFS-e" abaixo expõe o "Corrigir e reenviar" por nota, pelo
+                                    endpoint por documento, que é o caminho correto para órfãs. */}
+                                {previousCycleNfses.map((doc: any) => (
+                                  <NfseTableRow
+                                    key={doc.id}
+                                    doc={doc}
+                                    showActions={false}
+                                    invoiceId={configInvoice.id}
+                                    nfseDocuments={nfseDocuments}
+                                    canManage={false}
+                                    supersededNote
                                   />
                                 ))}
                               </tbody>
@@ -1160,9 +1222,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           <AlertDialogHeader>
             <AlertDialogTitle>Reverter aprovação de faturamento?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá baixar os boletos ativos no Sicredi, cancelar as NFS-e autorizadas, remover as
-              faturas e parcelas, e reverter o orçamento para <strong>Aprovado</strong>.
-              O orçamento poderá ser editado e aprovado novamente.
+              Esta ação irá baixar os boletos ativos no Sicredi, remover as faturas e parcelas, e
+              reverter o orçamento para <strong>Aprovado</strong>. O orçamento poderá ser editado
+              e aprovado novamente.
+              <br />
+              <br />
+              <strong>A NFS-e não é cancelada agora</strong> e continua válida na prefeitura,
+              vinculada à tarefa. Ela só pode ser cancelada depois que existir uma nota
+              substituta — o que acontece quando você aprovar o faturamento novamente: a nota
+              nova é emitida e o cancelamento da anterior é solicitado citando-a como
+              substituta.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1178,6 +1247,31 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Bloqueios devolvidos pelo backend — persistente, porque a lista é longa demais
+          para o toast (280px, line-clamp-4, 8s) e o operador precisa agir sobre cada item. */}
+      <AlertDialog open={!!revertBlockers} onOpenChange={(o) => !o && setRevertBlockers(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Não foi possível reverter o faturamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Resolva os itens abaixo e tente novamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 max-h-64 overflow-y-auto">
+            <p className="text-sm text-destructive/90 whitespace-pre-wrap">{revertBlockers}</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fechar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Histórico completo de NFS-e da tarefa. As tabelas acima só enxergam as notas da
+          fatura viva; este card alcança também as notas de ciclos revertidos (que ficam
+          órfãs de fatura, mas VÁLIDAS na prefeitura) e expõe o "Corrigir e reenviar" por
+          nota. Ele já existia, mas só na página de detalhe da tarefa — não aqui, que é
+          justamente onde o financeiro trabalha. */}
+      {task?.id && <TaskNfseHistoryCard taskId={task.id} />}
     </div>
   );
 }
@@ -1422,12 +1516,15 @@ function NfseTableRow({
   invoiceId,
   nfseDocuments,
   canManage,
+  supersededNote = false,
 }: {
   doc: any;
   showActions: boolean;
   invoiceId: string;
   nfseDocuments: any[];
   canManage: boolean;
+  /** Nota de um ciclo de faturamento anterior — exibida em tom apagado, como histórico. */
+  supersededNote?: boolean;
 }) {
   const navigate = useNavigate();
   // enabled:!!elotechNfseId inside the hook — passing 0 is a no-op (docs not yet emitted).
@@ -1448,15 +1545,17 @@ function NfseTableRow({
   const clickable = !!doc.elotechNfseId;
 
   return (
+    <>
     <tr
-      className={cn("hover:bg-muted/40 transition-colors", clickable && "cursor-pointer")}
+      className={cn(
+        "hover:bg-muted/40 transition-colors",
+        clickable && "cursor-pointer",
+        supersededNote && "opacity-70",
+      )}
       onClick={clickable ? () => navigate(routes.financial.nfse.detail(doc.elotechNfseId)) : undefined}
     >
       <td className="px-3 py-2 tabular-nums font-medium whitespace-nowrap">{numero ?? "-"}</td>
-      <td
-        className="px-3 py-2"
-        title={doc.status === "ERROR" && doc.errorMessage ? doc.errorMessage : undefined}
-      >
+      <td className="px-3 py-2">
         <NfseStatusBadge status={doc.status} size="sm" />
       </td>
       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
@@ -1484,5 +1583,39 @@ function NfseTableRow({
         </div>
       </td>
     </tr>
+    {/* O motivo vivia só num `title=` — invisível no toque e sem nenhuma pista de que
+        existia. A recusa do fiscal é estado persistente e acionável (ela diz o que corrigir
+        no reenvio), então fica visível na linha. */}
+    {(supersededNote || doc.errorMessage || doc.cancelRejectionMessage) && (
+      <tr className={cn(supersededNote && "opacity-70")}>
+        <td colSpan={8} className="px-3 pb-2 pt-0">
+          {supersededNote && (
+            <p className="text-xs text-muted-foreground">
+              Faturamento anterior desta tarefa
+              {doc.supersededByNfseNumber
+                ? ` — substituída pela NFS-e nº ${doc.supersededByNfseNumber}`
+                : ""}
+              {doc.status === "CANCEL_REQUESTED"
+                ? ". Cancelamento solicitado, aguardando o fiscal da prefeitura."
+                : doc.status === "CANCELLED"
+                  ? ". Cancelada na prefeitura."
+                  : ""}
+            </p>
+          )}
+          {doc.errorMessage && (
+            <p className="text-xs text-destructive">{doc.errorMessage}</p>
+          )}
+          {doc.cancelRejectionMessage && doc.status !== "CANCELLED" && (
+            <p className="text-xs text-destructive">
+              Cancelamento rejeitado pela prefeitura: {doc.cancelRejectionMessage}
+              {doc.supersededByNfseNumber
+                ? ` (nota substituta: nº ${doc.supersededByNfseNumber})`
+                : ""}
+            </p>
+          )}
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

@@ -56,8 +56,16 @@ export function NfseActions({
   // Substitute NF number is required by the prefeitura for Duplicidade (code 4)
   const substituteRequired = cancelReasonCode === '4';
 
-  // Find the latest authorized NFSe (for cancel action)
-  const authorizedNfse = nfseDocuments?.find((d) => d.status === 'AUTHORIZED') ?? null;
+  // Nota VIVA na prefeitura — a que pode receber um pedido de cancelamento.
+  // CANCEL_REJECTED conta: o fiscal recusou o cancelamento, então a nota continua valendo e
+  // é justamente a que precisa de um reenvio corrigido (o backend aceita esse reenvio —
+  // invoice.controller.ts admite AUTHORIZED, CANCEL_REJECTED e CANCEL_REQUESTED). Enquanto
+  // isso procurava só por AUTHORIZED, uma nota rejeitada não tinha Cancelar, nem Emitir, nem
+  // Reconciliar: o componente inteiro caía no `return null` e a tela ficava sem ação alguma.
+  const authorizedNfse =
+    nfseDocuments?.find((d) => d.status === 'AUTHORIZED') ??
+    nfseDocuments?.find((d) => d.status === 'CANCEL_REJECTED') ??
+    null;
 
   // Find if there's an NFSe in error or pending state (for re-emit action)
   const errorOrPendingNfse = nfseDocuments?.find(

@@ -97,6 +97,11 @@ export interface NfseDocument {
   cancelSubstituteNfseNumber?: number | null;
   cancelRequestedAt?: Date | null;
   cancelResolvedAt?: Date | null;
+  // Substituição: preenchidos quando o refaturamento emitiu a nota que substitui esta.
+  // `supersededByNfseNumber` é o número que o fiscal exige no pedido de cancelamento.
+  supersededByNfseDocumentId?: string | null;
+  supersededByNfseNumber?: number | null;
+  supersededAt?: Date | null;
 }
 
 export interface ElotechNfseListItem {

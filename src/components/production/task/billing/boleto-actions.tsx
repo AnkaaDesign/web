@@ -381,7 +381,19 @@ export function BoletoActions({
   // Mutating actions are gated by `canManage`; read-only ones (view/download
   // PDF, copy digitable line) stay available to read-only viewers.
   const canGenerate = canManage && !bankSlip && !isPaid && installmentStatus !== 'CANCELLED';
-  const canRegenerate = canManage && bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
+  // Um boleto que nunca chegou ao Sicredi ainda carrega o nossoNumero provisório `TMP-`.
+  // Isso é prova, não suspeita: todo ponto que grava CREATING grava o `TMP-` na mesma
+  // instrução, e a única porta para o banco é o CAS atômico CREATING → REGISTERING.
+  // Logo não existe título no banco — regenerar é seguro e não duplica nada.
+  const neverRegistered =
+    !!bankSlip && (!bankSlip.nossoNumero || bankSlip.nossoNumero.startsWith('TMP-'));
+  // CREATING/REGISTERING entram na lista porque a API sempre os aceitou
+  // (invoice.controller.ts). Só o web os excluía, e o resultado era uma parcela parada em
+  // "Gerando" para sempre, sem um único botão que a movesse — o beco da "Tati Minas 8,50".
+  const canRegenerate =
+    canManage &&
+    bankSlip &&
+    ['ERROR', 'REJECTED', 'CANCELLED', 'CREATING', 'REGISTERING'].includes(bankSlip.status);
   const canCancel = canManage && bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canCopyDigitableLine =
@@ -563,8 +575,12 @@ export function BoletoActions({
             size="sm"
             onClick={openRegenerateDialog}
             disabled={regenerateBoleto.isPending}
-            title="Regenerar Boleto"
-            className="h-7 w-7 p-0"
+            title={
+              neverRegistered
+                ? 'Registrar boleto no Sicredi — este boleto nunca chegou a ser registrado'
+                : 'Regenerar Boleto'
+            }
+            className={`h-7 w-7 p-0 ${neverRegistered ? 'text-amber-600 hover:text-amber-700' : ''}`}
           >
             {regenerateBoleto.isPending ? (
               <IconLoader2 className="h-4 w-4 animate-spin" />

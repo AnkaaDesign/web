@@ -65,8 +65,10 @@ export function NfseCancellationCard({
   const isPending = request?.ultimoStatus === "AGUARDANDO_FISCAL";
   // A re-request makes sense while the note is still active (not cancelled) and there is
   // no request awaiting fiscal — i.e. no request yet, or the last one was rejected.
-  const canResubmit =
-    !data.cancelada && !isPending && !!invoiceId && !!nfseDocumentId;
+  // Sem exigir invoiceId: uma nota órfã (fatura apagada por uma reversão) é exatamente a que
+  // mais precisa deste botão, e o NfseCancelDialog já roteia para o endpoint por documento
+  // quando o invoiceId não vem. Exigi-lo bloqueava justamente o caso que o dialog sabe tratar.
+  const canResubmit = !data.cancelada && !isPending && !!nfseDocumentId;
 
   // The rejection message lives in the latest REJEITADO historico's motivo.
   const rejectionMessage = isRejected
