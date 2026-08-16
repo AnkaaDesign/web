@@ -326,7 +326,15 @@ export const STUDIO_HTML = /* html */ `
              é por isso que ela também NÃO some com .ts-bare — ao contrário dos
              cards, esconder a interface durante uma gravação não pode esconder a
              única coisa que diz que existe uma gravação. -->
-        <div id="ts-rec" class="hidden" role="status" aria-live="polite">
+        <!-- ⚠️ NADA DE CRASE NESTE ARQUIVO: ele é um template literal, e uma
+             crase de citação FECHA a string. É armadilha registrada aqui.
+             role=group e NÃO role=status: desde que a gravação virou render
+             offline (2026-08-15) esta caixa muda ~10 vezes por segundo durante
+             MINUTOS e tem um BOTÃO dentro (Cancelar). Uma região viva que se
+             reescreve nesse ritmo sequestra o leitor de tela, e um aria-live em
+             volta de um controle interativo atrapalha alcançá-lo. Quem anuncia o
+             progresso é a região #status, em marcos de 25 por cento. -->
+        <div id="ts-rec" class="hidden" role="group" aria-label="Gravação de vídeo">
           <span class="ts-recdot" aria-hidden="true"></span>
           <span id="ts-rec-text">Gravando…</span>
           <button id="ts-rec-stop" class="ts-recstop" type="button"
@@ -576,7 +584,12 @@ export const STUDIO_HTML = /* html */ `
                 <input type="checkbox" id="paint-trailer" class="bg-check" />
                 <span class="bg-chip"><span class="bg-sw bg-sw--cab"></span></span>
                 <span class="bg-name">Cor do cavalo</span>
-                <span class="bg-val">todo o baú</span>
+                <!-- O ESTADO DESTA LINHA DEPENDE DA FACE, e por isso ele tem id.
+                     A caixa vale para o baú INTEIRO, mas numa face com cor
+                     própria ela é SOBREPOSTA — e escrever "todo o baú" ali,
+                     fixo, era metade do relato de 2026-08-16 (as duas linhas
+                     acesas ao mesmo tempo). syncBackground() reescreve. -->
+                <span class="bg-val" id="bg-cab-val">todo o baú</span>
               </label>
               <div class="bg-row" id="bg-row-face">
                 <!-- A PASTILHA É O SELETOR — mesma construção da linha de cor do
@@ -610,22 +623,44 @@ export const STUDIO_HTML = /* html */ `
                respondem "de que cor é isto?". -->
           <section class="panel insp hidden" data-for="tk">
             <h3 class="panel-title"><span>Thermo King</span><b class="panel-hint" id="tk-state"></b></h3>
+            <!-- A MESMA PILHA DE DUAS LINHAS DO FUNDO, e pela mesma razão.
+                 Faltava a de cima, e o relato de 2026-08-16 foi literal: "o
+                 Thermo King está faltando essa opção pintar da cor do cavalo".
+                 Ela não é um controle novo — é O MESMO estado da linha do Fundo
+                 (a tinta vale para o implemento INTEIRO, e a carcaça o segue por
+                 followsBody em vehicle/trim.ts). O clique aqui aciona o
+                 #paint-trailer, para que exista UM caminho e não dois.
+                 O <label> em volta é o mesmo contrato: setSpecialEdition()
+                 esconde a linha por closest('label'). -->
             <div class="bg-list">
+              <label class="bg-row" id="tk-row-cab"
+                     title="Estende a pintura do cavalo ao implemento inteiro, e a carcaça acompanha.">
+                <input type="checkbox" id="tk-paint-cab" class="bg-check" />
+                <span class="bg-chip"><span class="bg-sw bg-sw--cab"></span></span>
+                <span class="bg-name">Cor do cavalo</span>
+                <span class="bg-val" id="tk-cab-val">todo o baú</span>
+              </label>
               <div class="bg-row" id="tk-row">
                 <span class="bg-chip">
                   <span class="bg-sw is-empty" id="tk-sw"></span>
                   <input type="color" id="tk-color" class="bg-picker" value="#ffffff"
                          aria-label="Cor da carcaça do Thermo King" />
                 </span>
-                <span class="bg-name">Cor da carcaça</span>
+                <span class="bg-name">Só a carcaça</span>
                 <span class="bg-val" id="tk-val">—</span>
                 <button class="bg-reset" id="tk-clear" type="button"
                         title="Voltar para a cor do baú" aria-label="Voltar para a cor do baú">×</button>
               </div>
             </div>
-            <p class="insp-hint">Sem cor própria a carcaça acompanha o baú. A
-              pintura dela é sempre SÓLIDA — é o que sai de uma cabine de pintura,
-              e não a metálica da montadora.</p>
+            <!-- A DICA É ESCRITA POR JS, e o texto fixo que estava aqui era
+                 "sem cor própria a carcaça acompanha o baú" — meia verdade que
+                 confunde exatamente onde importa. A carcaça acompanha a TINTA
+                 do implemento (a do cavalo, quando "Cor do cavalo" está ligada;
+                 o branco de fábrica quando não). O Fundo desta face é PLOTAGEM
+                 sobre a chapa e não alcança a máquina: quem pinta a testeira de
+                 preto e vê a carcaça continuar branca precisa ler o porquê aqui.
+                 syncThermoKing() escreve. -->
+            <p class="insp-hint" id="tk-hint"></p>
           </section>
 
           <!-- O TETO. Ele é uma FACE de livery desde 2026-08-13 (aba Teto), e a

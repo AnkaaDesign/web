@@ -30,16 +30,17 @@
    4k: o `distrito-industrial` fecha em 7,8 MB porque o chão dele pesa zero. */
 import * as THREE from 'three';
 import { getProfile, groundVariant } from '../core/quality';
+import { ktx2Loader, ehKtx2 } from '../core/ktx2';
 import { scene, renderer, registerGroundMaterials, setCameraObstacles } from './scene';
 import type { GroundMatEntry, GroundSurface } from './scene';
 import { loadGLB } from '../vehicle/models';
 import { assetUrl } from '../catalog/catalog';
 import { canvasTex, makeMacroCanvas } from './textures';
-import { arranjarCenario } from './scenery';
+import { arranjarCenario, applyVegetationDensity } from './scenery';
 import {
   installSeeThroughOnSet, measureSeeThrough, clearSeeThrough, bindSeeThroughSatellite,
 } from './seethrough';
-import { getLampLensPairs } from './lamps';
+import { getLampLensPairs, setLampSites } from './lamps';
 
 /** Um conjunto PBR ligado a um material nomeado do .glb. */
 export interface SetMaterialDef {
@@ -220,19 +221,9 @@ function cloneFor(base: THREE.Texture, repeat: number): THREE.Texture {
    o congelaria no nível em que a página abriu — a mesma armadilha que
    `textureAnisotropy()` teve de virar função para não ter, e a razão pela qual
    `groundVariant()` também é função em core/quality.ts. */
-let avisouKtx2 = false;
-
 function groundTexUrl(p: string): string {
   const v = groundVariant();
   if (!v) return assetUrl(p);
-  if (v === '@ktx2') {
-    if (!avisouKtx2) {
-      avisouKtx2 = true;
-      console.warn('[set] variante @ktx2 declarada, mas não há KTX2Loader neste '
-        + 'módulo — usando as texturas de sempre. Ver groundTexUrl().');
-    }
-    return assetUrl(p);
-  }
   /* Sufixo ANTES da extensão, e só quando o último segmento tem uma. Um caminho
      absoluto de terceiro (`https://…`) ou um `data:` fica intocado: o sufixo é
      convenção da nossa árvore de assets, e reescrever fora dela é um 404 mudo. */
@@ -240,6 +231,20 @@ function groundTexUrl(p: string): string {
   const ponto = p.lastIndexOf('.');
   const barra = p.lastIndexOf('/');
   if (ponto <= barra + 1) return assetUrl(p);
+  /* ---- AS VARIANTES KTX2 COMPÕEM DUAS REGRAS, e não uma (2026-08-15) ----
+     O sufixo antes da extensão, como o `@1k` do HDR já fazia, E a troca da
+     própria extensão, porque o arquivo deixa de ser WebP/JPG:
+
+         textures/asphalt_diff.webp → textures/asphalt_diff@ktx2.ktx2
+         textures/asphalt_diff.webp → textures/asphalt_diff@ktx2-1k.ktx2
+
+     São os nomes que `tools/studio-assets/ktx2.mjs` gera. Os dois degraus
+     existem porque medem coisas diferentes, e a tabela está em core/quality.ts:
+     `@ktx2` (2048²) troca 341,3 → 85,3 MB de VRAM mas SOBE o download para
+     69 MB; `@ktx2-1k` (1024²) fecha em 21,3 MB de VRAM com 17,96 MB de fio —
+     MENOS que os 22,2 MB de hoje. Ou seja, o degrau de 1k é melhor que o estado
+     atual nos DOIS eixos, e é ele que decide se uma integrada roda. */
+  if (v.startsWith('@ktx2')) return assetUrl(p.slice(0, ponto) + v + '.ktx2');
   return assetUrl(p.slice(0, ponto) + v + p.slice(ponto));
 }
 
@@ -269,7 +274,12 @@ function loadTex(url: string, srgb: boolean, repeat: number,
   const hit = texCache.get(key);
   if (hit) { if (onProgress) onProgress(1); return Promise.resolve(cloneFor(hit, repeat)); }
   return new Promise((resolve) => {
-    texLoader.load(url,
+    /* O CARREGADOR É ESCOLHIDO POR URL, não por módulo, e isso não é preciosismo:
+       `groundVariant()` é FUNÇÃO justamente para não congelar no nível em que a
+       página abriu, então o formato pode mudar de uma carga para a outra dentro
+       da mesma sessão. Um `const loader` no topo do arquivo escolheria uma vez
+       só e erraria na segunda troca de nível. */
+    (ehKtx2(url) ? ktx2Loader(renderer) : texLoader).load(url,
       (t) => {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         /* Anisotropia no máximo do device APENAS no albedo: um pátio de asfalto
@@ -1127,6 +1137,31 @@ export function disposeSet() {
   /* Idem para o que atravessa: as listas guardam malha e caixa em mundo, e uma
      malha descartada continuaria sendo julgada a cada quadro. */
   clearSeeThrough();
+  /* ⚠️ E OS VIDROS DAS LUMINÁRIAS DO CENÁRIO, PELA MESMA RAZÃO — 2026-08-16.
+     -----------------------------------------------------------------------
+     Este era o **"tem alguns itens flutuando abaixo das lâmpadas"** do
+     relatório, e ele tinha um caminho de escape que ninguém tinha fechado.
+
+     Os vidros que `lamps.ts` acende sob as torres de um set moram em
+     `ts-lamp-site-lenses`, em coordenadas de MUNDO, e são malhas NOSSAS —
+     `disposeTree()` acima não as alcança porque elas nunca estiveram na árvore
+     do set. Quem as limpava era `realinharPostes()` (scenery.ts), pelo ramo
+     "SEM TORRE, ESQUECE AS ANTERIORES" — mas ele só roda dentro de
+     `arranjarCenario()`, ou seja **dentro de `applySet()`**.
+
+     Um cenário SEM BLOCO `set` nunca chega lá: `applyEnvironment()` desvia para
+     `disposeSet()` puro (environment.ts), e o Estúdio é exatamente esse caso.
+     Medido na bancada, saindo do `distrito-industrial` para o `estudio`: onze
+     caixas de 0,77 × 0,13 × 0,37 m penduradas a y = 9,82 m, espalhadas de
+     z = −204 a z = +68 — sem mastro nenhum embaixo, dentro do ciclorama, logo
+     abaixo das luminárias do teto. É a foto que o usuário mandou.
+
+     A correção fica AQUI e não no ramo do `applyEnvironment()` porque este é o
+     único ponto por onde TODOS os caminhos de saída de um set passam: a troca
+     para um cenário sem set, o descarte de `disposeEnvironments()` e as duas
+     saídas de falha de `applySet()`. Chamá-la no começo de uma troca de set é
+     inócuo — `arranjarCenario()` recria os sites logo em seguida. */
+  setLampSites(null, null);
   stats = { meshes: 0, triangles: 0, materials: 0, bound: 0 };
 }
 
@@ -1268,6 +1303,25 @@ export async function applySet(def: SetDef | null | undefined,
      MUNDO, e o recuo é a última coisa que muda essa caixa. Ver setupShadows(). */
   setupShadows(root);
   setCameraObstacles(collectSolids(root, def!));
+  /* ---- E A PODA POR NÍVEL É A ÚLTIMA COISA, DEPOIS DE TUDO QUE MEDE ----
+     ⚠️ A ORDEM É A CORREÇÃO (2026-08-16), e ela vale para os dois cenários com
+     vegetação. `arranjarCenario()` deixa `InstancedMesh.count` CHEIO de
+     propósito, porque três leitores acima dependem de ver o plantio inteiro:
+     os `computeBoundingBox/Sphere()` de `plantar()` (que iteram `i < count`, e
+     uma caixa medida sobre o subconjunto faz o three descartar do frustum e do
+     passe de sombra a copa devolvida por uma subida de nível),
+     `measureSeeThrough()` (que monta as caixas por instância do atravessar com
+     `n = min(count)` do grupo — planta não medida nunca dissolve) e
+     `collectSolids()`.
+
+     Aplicada aqui, a densidade do perfil é REVERSÍVEL: subir de nível devolve
+     instâncias que já estão medidas. Aplicada lá, ela congelava a medição no
+     nível em que o cenário foi carregado.
+
+     ⚠️ E ela é obrigatória, não opcional: sem esta linha o cenário nasceria
+     sempre na densidade cheia, e `getProfile().vegetation` só passaria a valer
+     na primeira MUDANÇA de nível (que é quando `onQualityChange` dispara). */
+  applyVegetationDensity();
   stats = { meshes, triangles, materials: mats.size, bound };
   return true;
 }

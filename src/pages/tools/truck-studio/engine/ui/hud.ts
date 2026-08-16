@@ -42,7 +42,29 @@ import {
      ver o cabeçalho de `getRenderStats()`. É a matéria-prima do bloco de
      diagnóstico, e ela é GRATUITA: nada é ligado para produzi-la. */
   getRenderStats,
+  /* ⚠️ O RENDERIZADOR EM PESSOA, e só para o censo de programas logo abaixo.
+     `getRenderStats()` publica a CONTAGEM de programas; o censo precisa da
+     LISTA, que só existe em `renderer.info.programs`. Não é uma aresta nova:
+     este módulo já importa meia dúzia de coisas de `scene/scene.ts`. */
+  renderer,
 } from '../scene/scene';
+/* ⚠️ DE `cyclorama.ts` E NÃO DE `scene.ts`, E ISSO É UMA EXCEÇÃO CONSCIENTE À
+   REGRA DESTE ARQUIVO.
+   ---------------------------------------------------------------------------
+   O cabeçalho da importação de `presets` acima registra a doutrina: a UI busca
+   tudo que é de cena em `scene/scene.ts`, porque fazê-la buscar metade aqui e
+   metade ali seria pedir que ela conhecesse o corte interno do módulo de cena.
+
+   `floorReflectionCost()` é a exceção por duas razões somadas. A primeira é que
+   `scene/cyclorama.ts` se declara EXPLICITAMENTE a porta pública desta família
+   ("sai por aqui — não por floor-reflection.ts — porque é este módulo que o
+   console e a bancada já alcançam"), ou seja importar daqui é usar a porta que o
+   autor abriu, não furar a parede. A segunda é que `scene/scene.ts` não a
+   reexporta e não é editável nesta rodada.
+
+   Não há ciclo: `hud → cyclorama → floor-reflection → scene`, e `scene` não
+   importa a UI. */
+import { floorReflectionCost } from '../scene/cyclorama';
 import { claimPill, paintFrame } from './loader';
 /* O perfil de qualidade. Módulo FOLHA — ver o cabeçalho de `core/quality.ts`. */
 import {
@@ -293,7 +315,6 @@ let qualityTiles: HTMLElement | null = null;
 
 let coldRow: HTMLElement | null = null;
 let coldNote: HTMLElement | null = null;
-let coldBtn: HTMLButtonElement | null = null;
 
 let scaleInput: HTMLInputElement | null = null;
 let scaleVal: HTMLElement | null = null;
@@ -811,7 +832,7 @@ function paintQuality() {
   }
 }
 
-/* ---------------- MUDANÇA FRIA PENDENTE ----------------
+/* ---------------- MUDANÇA FRIA A CAMINHO ----------------
    `core/quality.ts` separa botões QUENTES de FRIOS, e a separação é o que torna a
    adaptação automática segura por construção: *"o medidor NUNCA toca aqui"*. Um
    botão frio muda um `#define`, uma chave de cache de programa ou um parâmetro de
@@ -819,90 +840,49 @@ function paintQuality() {
    sozinho no meio de um arrasto é exatamente o defeito que a adaptação existe
    para evitar.
 
-   Consequência para a interface: escolher "Baixa" pode NÃO entregar tudo que a
-   pastilha promete até a cena ser reconstruída. Sem esta fileira, o usuário leria
-   o rótulo, não veria o ganho e concluiria de novo que o controle não faz nada —
-   o mesmo relato que originou toda esta revisão. Ela existe para que a distância
-   entre o PEDIDO e o APLICADO seja visível em vez de ser um mistério.
+   ⚠️ ESTA FILEIRA JÁ TEVE UM BOTÃO "APLICAR AGORA", E ELE FOI REMOVIDO EM
+   2026-08-15. O botão fazia sentido enquanto escolher um nível deixava a parte
+   fria PENDENTE; desde que `setQualityMode()` passou a chamar `agendarFrio()`,
+   a escolha do usuário se aplica sozinha depois de 700 ms — e o botão virou um
+   segundo caminho pedindo para refazer o que o primeiro acabara de fazer.
 
-   ⚠️ POR QUE O CAMINHO DE APLICAÇÃO É PROCURADO, E NÃO IMPORTADO.
-   Quem sabe subir a cortina é `studio.ts` — ele já tem `releasedChoice` +
-   `RELEASE_MS`, é o dono do laço e do ciclo de carga. Mas `ui/hud.ts` é importado
-   POR `studio.ts` (`initHud()` roda no boot dele), então um `import` daqui para lá
-   fecharia um ciclo de módulos. Sobram duas portas, e as duas estão abertas:
+   O que sobra é relato, e sobra por um caso estreito: quando é o MEDIDOR que
+   troca o nível (modo `auto`), a parte fria fica pendente DE PROPÓSITO e não é
+   agendada. Ela entra na próxima borda natural de carga — troca de cenário ou
+   de veículo —, e esta fileira serve para que a distância entre o PEDIDO e o
+   APLICADO seja visível em vez de ser um mistério. Sem ela, o usuário leria o
+   rótulo, não veria o ganho e concluiria de novo que o controle não faz nada —
+   o mesmo relato que originou toda esta revisão. */
 
-     1. `setColdApplyHandler(fn)`, exportado abaixo. É a porta PREFERIDA — é
-        explícita, é tipada e não depende de um objeto global existir. `studio.ts`
-        chama uma vez, logo depois de `initHud()`.
-     2. `window.__studio`, que `studio.ts` já publica e já contém `quality`. É a
-        rede de segurança para o caso de a integração ainda não ter ligado (1),
-        e é acessada com `typeof === 'function'` em vez de `any`.
+/* ⚠️ O CAMINHO DE APLICAÇÃO SAIU DAQUI (2026-08-15).
+   Este bloco existia para o botão "Aplicar agora": um tipo `ColdApply`, um
+   gancho registrado por `studio.ts` e um resolvedor que caía para
+   `window.__studio.applyColdQuality` quando o gancho não tinha chegado a tempo.
+   Com o botão removido, o HUD não aplica mais nada — ele só RELATA.
 
-   CONFERIDO NO CÓDIGO VIVO: `studio.ts` exporta `applyColdQuality()` e o publica
-   como `window.__studio.quality.applyCold` — ou seja, a porta (2) já responde e o
-   botão funciona sem integração nenhuma. A porta (1) continua sendo a preferida
-   por uma razão de TEMPO: o handle só é instalado no FIM do `boot()`, depois do
-   primeiro `applyChoice`, enquanto `initHud()` roda bem antes. Entre os dois
-   momentos o botão se declara indisponível — e se declara com honestidade, mas um
-   `setColdApplyHandler()` logo após `initHud()` fecharia essa janela. Como o
-   painel repinta a cada tique de diagnóstico e a cada mudança de nível, ele se
-   conserta sozinho assim que o handle aparece.
-
-   Se nenhuma das duas responder, o botão fica DESABILITADO com texto honesto —
-   e o texto é honesto porque a mudança realmente vai acontecer sozinha: o próprio
-   `coldPending()` documenta que ela *"é aplicada na próxima borda natural de carga
-   (troca de cenário/veículo)"*. Prometer um botão que não recarrega nada seria
-   pior do que não ter botão. */
-
-type ColdApply = () => void | Promise<void>;
-let coldApplyHook: ColdApply | null = null;
-
-/**
- * Registra quem sabe reconstruir a cena para aplicar a assinatura fria.
- *
- * Chamado por `studio.ts` depois de `initHud()`. Idempotente e reversível
- * (`null` desregistra), porque o engine sobrevive à rota do React e um handle
- * pendurado num escopo morto seria pior que nenhum.
- */
-export function setColdApplyHandler(fn: ColdApply | null) {
-  coldApplyHook = fn;
-  paintCold();
-}
-
-function coldApply(): ColdApply | null {
-  if (coldApplyHook) return coldApplyHook;
-  /* Cast local em vez de confiar no `declare global` de `studio.ts`: ele existe,
-     mas depender dele daqui amarraria este módulo à ordem de compilação de um
-     arquivo que não importamos. */
-  const handle = (window as Window & { __studio?: Record<string, unknown> }).__studio;
-  if (!handle) return null;
-  const direct = handle.applyColdQuality;
-  /* `.call(dono)` e nunca a referência solta: um método publicado num objeto
-     literal pode legitimamente usar `this`, e desmontá-lo aqui seria um
-     `undefined` no meio de uma cortina de carregamento. */
-  if (typeof direct === 'function') return () => (direct as ColdApply).call(handle);
-  const q = handle.quality as Record<string, unknown> | undefined;
-  if (q) {
-    const nested = q.applyCold ?? q.applyColdQuality;
-    if (typeof nested === 'function') return () => (nested as ColdApply).call(q);
-  }
-  return null;
-}
+   A porta programática continua existindo e continua sendo a boa: `studio.ts`
+   publica `applyColdQuality()` em `window.__studio`, que é por onde o console e
+   `tools/studio-bench/checks-qualidade.mjs` a alcançam. O que morreu foi o
+   segundo caminho, não o primeiro. */
 
 const SHADOW_LABEL: Record<ColdProfile['shadowType'], string> = {
   pcf: 'PCF (17 amostras)', basic: '1 amostra',
 };
 /* `''` é "os arquivos de sempre" — ver `groundVariant`/`hdrVariant`. O rótulo diz
    o que o arquivo É, não o sufixo, porque o sufixo não quer dizer nada para quem
-   está lendo o painel. */
+   está lendo o painel.
+   ⚠️ Os dois degraus KTX2 são coisas DIFERENTES e o rótulo tem de distingui-los:
+   `@ktx2` é 2048² comprimido (85,3 MB de VRAM) e `@ktx2-1k` é 1024² comprimido
+   (21,3 MB). Mostrar "KTX2" nos dois esconderia justamente o degrau que decide
+   se uma placa integrada roda. */
 const VARIANT_LABEL: Record<string, string> = {
-  '': 'originais', '@1k': '1024²', '@ktx2': 'KTX2/BC7',
+  '': 'originais', '@1k': '1024²', '@ktx2': 'KTX2/BC7 2048²', '@ktx2-1k': 'KTX2/BC7 1024²',
 };
 
 function buildColdRow() {
   const row = el('div', 'ts-hud-row ts-hud-row--cold hidden');
   const top = el('div', 'ts-hud-row__top');
-  top.appendChild(el('span', 'ts-hud-row__label', 'Mudança pendente'));
+  top.appendChild(el('span', 'ts-hud-row__label', 'Mudança a caminho'));
   row.appendChild(top);
 
   const note = el('span', 'ts-hud-note ts-hud-note--warn');
@@ -913,22 +893,13 @@ function buildColdRow() {
   note.setAttribute('aria-live', 'polite');
   row.appendChild(note);
 
-  const btn = el('button', 'ts-hud-btn');
-  btn.type = 'button';
-  btn.addEventListener('click', () => {
-    const fn = coldApply();
-    if (fn) void fn();
-  });
-  row.appendChild(btn);
-
   coldRow = row;
   coldNote = note;
-  coldBtn = btn;
   return row;
 }
 
 function paintCold() {
-  if (!coldRow || !coldNote || !coldBtn) return;
+  if (!coldRow || !coldNote) return;
   const pending = coldPending();
   coldRow.classList.toggle('hidden', !pending);
   if (!pending) return;
@@ -956,18 +927,12 @@ function paintCold() {
       + ' → ' + (VARIANT_LABEL[want.hdrVariant] || want.hdrVariant));
   }
 
-  const fn = coldApply();
+  /* Só o medidor automático chega aqui — a escolha do usuário já se aplicou
+     sozinha (ver o bloco de `buildColdRow`). Então a frase é sempre a mesma: a
+     mudança está a caminho e ninguém precisa fazer nada. */
   coldNote.textContent = diffs.join(' · ')
-    + (fn
-      ? '. Recompila os shaders da cena — leva uma cortina de alguns segundos.'
-      : '. Aplica sozinho na próxima troca de cenário ou de veículo.');
-  coldBtn.disabled = !fn;
-  coldBtn.textContent = fn ? 'Aplicar agora' : 'Aplica na próxima carga';
-  coldBtn.title = fn
-    ? 'Solta a cena e a reconstrói com a assinatura fria do nível escolhido.'
-    : 'Nenhum caminho de recarga registrado nesta compilação. A mudança entra na'
-      + ' próxima borda natural de carga, ou ao recarregar a página — o nível'
-      + ' escolhido fica salvo.';
+    + '. Entra sozinha na próxima troca de cenário ou de veículo — o nível'
+    + ' escolhido já está salvo.';
 }
 
 /* ---------------- ESCALA DE RENDER ----------------
@@ -1141,7 +1106,40 @@ function paintFloor() {
    derivado de `renderStats.frame`, que o three incrementa sempre, então ele
    continua vivo com o nível congelado. Em compensação ele é 0 numa cena parada —
    o laço é SOB DEMANDA, e um 0 ali significa "nada mudou", não "travou". É a
-   mesma leitura que o cabeçalho de `getRenderStats()` descreve. */
+   mesma leitura que o cabeçalho de `getRenderStats()` descreve.
+
+   ---------------------------------------------------------------------------
+   ⚠️⚠️ **O NÚMERO DE CHAMADAS QUE ESTE PAINEL MOSTROU ATÉ 2026-08-15 ESTAVA 40 A
+   70 % ABAIXO DO REAL, E ELE VIROU FOLCLORE.**
+
+   `WebGLRenderer.render()` do three 0.179.1, nesta ordem exata:
+
+       16471:  shadowMap.render( shadowsArray, scene, camera );
+       16477:  if ( this.info.autoReset === true ) this.info.reset();
+
+   **O contador é zerado DEPOIS do passe de sombra.** Logo
+   `renderer.info.render.calls` NUNCA incluiu as chamadas da sombra — e é esse o
+   número que `getRenderStats()` publicava, que esta seção mostrava, e que
+   `scene/scene.ts` cita de observação como *"~2200-2900 draw calls"*.
+
+   O número verdadeiro de um quadro de arrasto, medido com `info.autoReset =
+   false` e um `reset()` manual ANTES do render:
+
+       Alta   2 230 principal  +1 574 sombra  =  **3 804**
+       Média  1 642 principal  +1 574 sombra  =  **3 216**
+       Baixa  1 158 principal  +1 138 sombra  =  **2 296**
+
+   Todo orçamento de desempenho já escrito neste projeto está errado por esse
+   fator, e o "2 400" continuará sendo citado por quem não souber que mudou.
+   **Daí este bloco não se limitar a corrigir o número: ele NOMEIA a correção na
+   própria interface** — o rótulo diz "com sombra", há uma linha só para a fração
+   de sombra, e quando o total verdadeiro ainda não estiver disponível o painel
+   diz isso em vez de mostrar o número velho como se fosse o certo.
+
+   ⚠️ **LIDO DE FORMA DEFENSIVA, e de propósito.** `getRenderStats()` mora em
+   `scene/scene.ts`, que não pertence a esta passagem: os campos `shadowCalls` e
+   `shadowRefreshHz` podem não existir ainda quando este código rodar. Um painel
+   que quebrasse esperando um campo futuro seria pior que o painel que mentia. */
 
 const DIAG_MS = 500;
 /* Uma vez por meio segundo, e nunca por quadro. `getRenderStats()` é grátis, mas
@@ -1180,14 +1178,63 @@ function buildDiagRow() {
   statLine(list, 'wall', 'parede', 'Tempo de PAREDE entre dois quadros'
     + ' desenhados — inclui CPU, GPU, compositor e swap. É o que o usuário sente.');
   statLine(list, 'submit', 'submissão', 'Tempo dentro de renderer.render().'
-    + ' Mede SUBMISSÃO, não execução.');
+    + ' Mede SUBMISSÃO, não execução. Desde 2026-08-16 ele soma os ganchos de'
+    + ' desenho — antes o reflexo do piso, que é uma cena INTEIRA a mais, ficava'
+    + ' de fora dele.');
+  /* ---- A REPARTIÇÃO DA PAREDE, do AGENTE 1 ----
+     `getRenderStats().frameSplit` publica `fora + laco + ganchos + submissao ===
+     parede`, por construção. As três linhas abaixo são os canais que a parede
+     NÃO mostrava, e elas existem porque a soma sem os termos é indistinguível de
+     um número inventado: um quadro de 16,7 ms pode ser 14,5 de espera de vsync
+     com a máquina folgada, ou 14,5 de CPU com a máquina afogada, e o painel
+     dizia a mesma coisa nos dois casos. */
+  statLine(list, 'fora', '· espera (vsync)',
+    'Do fim do render() anterior até o rAF deste quadro. ⚠️ NÃO é desperdício:'
+    + ' numa máquina folgada ele É o quadro — o laço termina em 2 ms e espera 14'
+    + ' pelo vsync. O que denuncia é este número grande COM a taxa baixa: aí a'
+    + ' espera não é vsync, é a placa. E é ele que faz o piso de 16,7 ms que a'
+    + ' régua da escala de render precisa conhecer (ver pisoDaTelaMs).');
+  statLine(list, 'laco', '· CPU do laço',
+    'Controles, guardas, luz, frameHooks, desvio, caixa de sombra e o pré-teste'
+    + ' do atravessar. Medido em 2026-08-16: os quatro suspeitos somam ~0,30 ms,'
+    + ' dos quais updateSeeThrough é 0,011 ms — a frase "o maior custo fixo de'
+    + ' CPU do laço", repetida em três arquivos, estava errada por três ordens'
+    + ' de grandeza.');
+  statLine(list, 'ganchos', '· ganchos de desenho',
+    'O que roda ANTES do render() principal e submete geometria. Hoje é o'
+    + ' reflexo do piso, e só ele.');
+  statLine(list, 'refl', '·· dele, o reflexo',
+    '⚠️ SÓ EXISTE NO CENÁRIO ESTÚDIO — 1 dos 3 do acervo. Nos outros dois a'
+    + ' passada não é chamada e este número é zero POR DESENHO, não por falha.'
+    + ' Ele é uma renderização completa da cena a partir do espelho do piso, e'
+    + ' até 2026-08-16 não entrava em régua nenhuma: submitTimeEma cronometrava'
+    + ' só a linha final do render() e os ganchos rodam antes do relógio abrir.'
+    + ' Corolário: um veredito de "limitado por GPU" tirado no Estúdio podia ser'
+    + ' só isto.');
   statLine(list, 'fps', 'quadros/s', 'Derivado do contador do renderer, não do'
     + ' medidor — continua vivo com o nível congelado. O laço é sob demanda: 0'
     + ' significa cena parada, não travada.');
-  statLine(list, 'calls', 'chamadas');
+  statLine(list, 'calls', 'chamadas (c/ sombra)',
+    'O TOTAL que a máquina submete num quadro: passe principal MAIS passe de'
+    + ' sombra. Até 2026-08-15 este painel mostrava só o passe principal, porque'
+    + ' o three zera renderer.info DEPOIS de shadowMap.render() — o número antigo'
+    + ' estava 40 a 70 % abaixo do real. Um quadro de arrasto no nível Alto são'
+    + ' 3 804 chamadas, não 2 400.');
+  statLine(list, 'shadowCalls', '· das quais sombra',
+    'O passe de sombra são ~1 574 chamadas, cerca de 40 % do quadro — e ele roda'
+    + ' em quase todo quadro de arrasto porque a dissolvência do seethrough suja'
+    + ' o mapa a 60 Hz. É a métrica que o shadowRefreshHz do perfil ataca.');
+  statLine(list, 'shadowHz', '· reassaduras/s',
+    'Quantas vezes por segundo o mapa de sombra foi REFEITO. Medido: cada'
+    + ' reassadura custa de +4,0 a +6,1 ms. O teto do perfil é 20/12/8 Hz;'
+    + ' um número colado em 60 significa que o estrangulamento não está de pé.');
   statLine(list, 'tris', 'triângulos');
   statLine(list, 'programs', 'programas', 'Shaders compilados. Um salto aqui é'
-    + ' um engasgo de compilação — a razão de os botões frios exigirem cortina.');
+    + ' um engasgo de compilação — a razão de os botões frios exigirem cortina.'
+    + ' ⚠️ É o HISTÓRICO da sessão, não a cena: o three guarda os programas por'
+    + ' material num Map que só esvazia no descarte, então tudo que a sessão já'
+    + ' desenhou (a noite, o reflexo, a sonda) continua contado. O censo de'
+    + ' __tsProgramas() diz quais são recompilação da mesma forma, e por quê.');
   statLine(list, 'tex', 'texturas');
   statLine(list, 'geo', 'geometrias');
   statLine(list, 'env', 'cache de ambiente');
@@ -1205,6 +1252,24 @@ function buildDiagRow() {
 const msText = (v: number) => (v > 0 ? v.toFixed(1).replace('.', ',') + ' ms' : '—');
 const intText = (v: number) => Math.round(v).toLocaleString('pt-BR');
 
+/**
+ * O QUE `getRenderStats()` DEVOLVE, mais o que ele VAI devolver.
+ *
+ * `scene/scene.ts` não pertence a esta passagem, e os dois campos novos entram
+ * por lá. A interseção com opcionais é o que deixa este arquivo compilar nos
+ * dois mundos: se o campo já existir como obrigatório, `number & (number |
+ * undefined)` colapsa de volta para `number` e nada muda; se ainda não existir,
+ * ele chega `undefined` e os pintores abaixo dizem isso em vez de inventar.
+ */
+type StatsDeRender = ReturnType<typeof getRenderStats> & {
+  /** Quantas das `calls` são do passe de sombra, por diferença de amostras. */
+  shadowCalls?: number;
+  /** `true` enquanto faltar uma das duas amostras — o split ainda não existe. */
+  shadowCallsEstimated?: boolean;
+  /** Reassaduras do mapa de sombra por segundo, OBSERVADAS (não o teto). */
+  shadowRefreshHz?: number;
+};
+
 function paintDiag() {
   if (!diagStats || !diagNote) return;
   /* A árvore do engine SOBREVIVE à rota do React (ver o cabeçalho de
@@ -1218,7 +1283,7 @@ function paintDiag() {
      sair certo. */
   if (!isMounted()) { lastFrame = -1; lastFrameAt = 0; return; }
 
-  const st = getRenderStats();
+  const st = getRenderStats() as StatsDeRender;
   const now = performance.now();
   let drawn = -1;
   if (lastFrame >= 0 && now > lastFrameAt) {
@@ -1231,20 +1296,107 @@ function paintDiag() {
   const submit = submitTimeEma();
   diagCells.wall.textContent = msText(wall);
   diagCells.submit.textContent = msText(submit);
+
+  /* ---- A REPARTIÇÃO, E O REFLEXO DENTRO DELA ----
+     ⚠️ LIDA COM `Number.isFinite` E COM A PORCENTAGEM CONDICIONADA À PAREDE.
+     `frameSplit` zera inteiro enquanto não houver dois quadros desenhados
+     consecutivos fora de uma janela ocupada — que é o estado NORMAL de uma cena
+     parada sob o laço sob demanda. Dividir por uma parede zero imprimiria
+     "Infinity %", e um painel que imprime Infinity é o painel que ninguém mais
+     lê. */
+  const split = st.frameSplit;
+  const parede = Number.isFinite(split?.parede) ? split.parede : 0;
+  const pct = (v: number) => (parede > 0 ? ` (${Math.round(v / parede * 100)} %)` : '');
+  const canal = (v: number | undefined) =>
+    (Number.isFinite(v) && (v as number) > 0 ? msText(v as number) + pct(v as number) : '—');
+  diagCells.fora.textContent = canal(split?.fora);
+  diagCells.laco.textContent = canal(split?.laco);
+  diagCells.ganchos.textContent = canal(split?.ganchos);
+  /* ⚠️ "só no Estúdio" E NÃO UM TRAÇO SOLITÁRIO. A distinção é a mesma que o
+     bloco de `shadowCalls` já defende um pouco acima: um traço lê como "não
+     medi", e aqui o significado é "esta passada não existe neste cenário". São
+     dois estados diferentes e o painel tem de saber dizer qual é qual — senão
+     quem estiver no distrito passa a tarde procurando um número que, para ele,
+     está certo em ser zero.
+
+     `passes` é o discriminante e não o `ms`: uma passada que já rodou e custou
+     pouco é um zero HONESTO; uma que nunca rodou é um zero VAZIO. */
+  const refl = floorReflectionCost();
+  diagCells.refl.textContent = refl.passes > 0
+    ? msText(refl.ms) + pct(refl.ms)
+    : 'só no Estúdio';
   diagCells.fps.textContent = drawn >= 0 ? intText(drawn) : '—';
+  /* ---- AS CHAMADAS, E A VERDADE SOBRE ELAS ----
+     Ver o bloco ⚠️⚠️ do cabeçalho desta seção. `calls` já é o TOTAL do quadro
+     (passe principal + sombra + a passada do reflexo do piso, que roda dentro de
+     um `drawHook`). O que pode faltar é o SPLIT: `shadowCalls` sai da diferença
+     entre a última amostra COM sombra e a última SEM, e enquanto uma das duas
+     não tiver acontecido ele não vale nada — `shadowCallsEstimated` diz isso, e
+     ele é respeitado à risca. Mostrar um split que ainda não existe seria
+     repetir, com outro número, o erro que este bloco veio consertar. */
+  const sombra = st.shadowCalls;
+  const temSplit = typeof sombra === 'number' && Number.isFinite(sombra)
+    && st.shadowCallsEstimated === false;
   diagCells.calls.textContent = intText(st.calls);
+  diagCells.shadowCalls.textContent = temSplit
+    ? intText(sombra!) + (st.calls > 0 ? ` (${Math.round(sombra! / st.calls * 100)} %)` : '')
+    /* "medindo" e não "—": a diferença importa. Um traço lê como "não tem"; isto
+       é um número que chega assim que o laço vir um quadro de cada tipo. */
+    : (typeof st.shadowCalls === 'number' ? 'medindo…' : '—');
+  /* ---- OBSERVADO AO LADO DO TETO ----
+     É este PAR que prova o conserto, e é ele que vai ser citado. Um número
+     sozinho não distingue "8/s porque o estrangulamento funciona" de "8/s porque
+     ninguém mexeu na cena"; ao lado do teto do nível, ele responde. */
+  const hz = st.shadowRefreshHz;
+  const teto = getProfile().shadowRefreshHz;
+  diagCells.shadowHz.textContent = typeof hz === 'number' && Number.isFinite(hz)
+    ? intText(hz) + '/s' + (teto > 0 ? ` (teto ${intText(teto)})` : '')
+    : '—';
   diagCells.tris.textContent = intText(st.triangles);
   diagCells.programs.textContent = intText(st.programs);
+  /* Ver O CENSO DE PROGRAMAS. Aqui e não noutro lugar porque este é o único
+     tique que já lê a contagem — o censo precisa de DOIS tiques iguais para
+     saber que a compilação assentou, e este é quem os tem. */
+  talvezRelatarCenso(st.programs);
   diagCells.tex.textContent = intText(st.textures);
   diagCells.geo.textContent = intText(st.geometries);
   diagCells.env.textContent = intText(st.envCacheSize);
 
   const notes: string[] = [];
+  if (typeof st.shadowCalls !== 'number') {
+    /* A NOTA É OBRIGATÓRIA, não decorativa. O "~2 400 chamadas" deste projeto
+       nasceu de um painel que mostrava só o passe principal e não avisava. Se
+       este painel voltar a mostrar um número parcial, ele avisa. */
+    notes.push('Chamadas SEM o passe de sombra: getRenderStats() ainda não devolve'
+      + ' o total (o three zera info.reset() DEPOIS de shadowMap.render()).'
+      + ' O real é ~40 a 70 % maior que este número.');
+  } else if (temSplit && sombra! > 0 && st.calls > 0 && sombra! / st.calls > 0.3) {
+    notes.push('O passe de sombra é ' + Math.round(sombra! / st.calls * 100)
+      + ' % das chamadas: é ele, e não a resolução, que decide este quadro.');
+  }
+  if (typeof hz === 'number' && teto > 0 && hz > teto * 1.5) {
+    /* O ESTRANGULAMENTO CAIU. Vale nomear porque o sintoma (quadro ~50 % mais
+       lento no arrasto) é indistinguível de "a máquina piorou". */
+    notes.push('Sombra reassada acima do teto do nível: o estrangulamento não'
+      + ' está de pé, e cada reassadura custa de +4,0 a +6,1 ms.');
+  }
   if (qualityMode() !== 'auto') {
     /* Ver a armadilha documentada acima: com o nível congelado o medidor nem é
        consultado, e os dois primeiros números param no tempo. */
     notes.push('Medidor pausado com o nível congelado — parede e submissão são a'
       + ' última leitura feita em automático.');
+  }
+  if (refl.passes > 0 && parede > 0 && refl.ms / parede > 0.2) {
+    /* ⚠️ NOMEAR ESTA FRAÇÃO É O PONTO DA LINHA NOVA. O reflexo do piso é a
+       ÚNICA segunda renderização completa de cena do engine, e ela ficou fora de
+       toda régua até 2026-08-16 — inclusive da bancada, cujo 4,18 ms mede um
+       render() chamado à mão, sem gancho nenhum. Um quinto do quadro gasto num
+       efeito de PISO é uma informação de produto, não de depuração: existe um
+       botão para ele em Configurações, e o dono tem o direito de saber o preço
+       antes de decidir. */
+    notes.push('O reflexo do piso é ' + Math.round(refl.ms / parede * 100)
+      + ' % do quadro: é uma cena inteira desenhada duas vezes, e ela só existe'
+      + ' no Estúdio.');
   }
   if (wall > 0 && submit > 0) {
     /* ⚠️ OS DOIS LIMIARES SÃO AUXÍLIO DE LEITURA, NÃO MEDIÇÃO. Eles apenas
@@ -1258,6 +1410,173 @@ function paintDiag() {
     else notes.push('Parede e submissão em faixa intermediária: sem veredito.');
   }
   diagNote.textContent = notes.join(' ');
+}
+
+/* ===========================================================================
+   O CENSO DE PROGRAMAS — por que a cena compila ~370 shaders para 552 chamadas
+   ===========================================================================
+   O painel acima mostra o NÚMERO de programas e a dica dele diz que um salto é
+   um engasgo de compilação. O número sozinho, porém, não responde a única
+   pergunta que importa quando ele é grande: **quais desses programas são o mesmo
+   shader compilado duas vezes, e por qual campo eles se separaram?**
+
+   ---------------------------------------------------------------------------
+   O QUE O THREE GUARDA, E POR QUE A CONTA NUNCA CAI SOZINHA
+
+   `WebGLRenderer.getProgram()` (three.module.js:16913) mantém
+   `materialProperties.programs` como um **Map por MATERIAL, chaveado pelo
+   cacheKey**, e nada esvazia esse Map — o único caminho de despejo é
+   `onMaterialDispose`, que só roda quando o material é descartado. Logo:
+
+       o contador de programas não é uma propriedade da CENA.
+       Ele é o HISTÓRICO da sessão.
+
+   Toda configuração de renderização que a sessão já visitou fica compilada e
+   contada para sempre: a noite depois de o usuário ter mexido no relógio, a
+   passada do reflexo do piso depois de ele ter entrado no Estúdio, a sonda de
+   ambiente da última troca de cavalo. Ver `acquireProgram` (:7370), que é quem
+   decide reusar por comparação de string de cacheKey.
+
+   ---------------------------------------------------------------------------
+   OS EIXOS QUE MULTIPLICAM, todos lidos em `getParameters()` (:6866)
+
+   · **passe de ALVO contra passe de CANVAS.** `toneMapping` só é o do
+     renderizador quando `getRenderTarget() === null`; fora disso é
+     `NoToneMapping`. E `outputColorSpace` é `LinearSRGBColorSpace` em qualquer
+     alvo. Os dois estão na chave (:7197 e :7240) ⇒ **todo material desenhado
+     dentro do reflexo do piso, da sonda de ambiente, da mistura de céus ou da
+     captura tem DOIS programas, e não um.** É o maior multiplicador do censo, e
+     é legítimo — o que não é legítimo é pagá-lo no primeiro quadro em que o
+     usuário está olhando (ver a nota sobre `renderer.compile()` no relatório de
+     2026-08-16);
+   · **dia contra noite.** `numSpotLights` 0 ou 14 está na chave (:7230). Este
+     eixo JÁ é pré-pago: `warmLightPrograms()` compila as duas configurações
+     atrás da cortina, de propósito;
+   · **altura do PMREM.** `envMapCubeUVHeight` está na chave (:7199) e vale
+     `4 x cubeSize` — 1024 para uma sonda de 256, 512 para uma de 128, 2048 para
+     um HDR equirect de 2048 px. Ver o bloco de `probeSize` em `core/quality.ts`;
+   · **`transparent`.** Entra pelo apelido `opaque` (:7335);
+   · **`shadowMapType`** (:7239), que é o botão frio `shadowType`;
+   · **`instancing`** (bit 1 da primeira máscara): o MESMO material usado numa
+     malha comum e numa `InstancedMesh` são dois programas.
+
+   ⚠️ **CLONE DE MATERIAL NÃO CRIA PROGRAMA.** É a suspeita óbvia e ela é falsa:
+   `scene/seethrough.ts` clona por MALHA e `vehicle/trim.ts` colore por peça, mas
+   a chave de cache não conhece uniformes nem cor — dois clones com os mesmos
+   mapas e os mesmos `defines` reusam o mesmo `WebGLProgram`. O que separa é
+   `defines`, `customProgramCacheKey` e a lista de parâmetros; e os
+   `customProgramCacheKey` deste motor são todos literais fixos
+   (`truckstudio-paint-v6`, `ts-see-v2`, `ts-lamp-v4`, `ts-retro-v1`,
+   `ts-capa-v1`, `ts-set-macro-v6` com um sufixo 0/1). Nenhum deles diverge por
+   instância.
+
+   ---------------------------------------------------------------------------
+   COMO O CENSO AGRUPA, e por que não por índice de campo
+
+   O cacheKey é um `array.join()` (:7190), e o comprimento do array VARIA: os
+   `defines` do material entram como pares nome/valor logo no começo. Indexar
+   posição por posição, portanto, compararia campos diferentes entre materiais
+   diferentes. O agrupamento é por **forma**: primeiro token (o `shaderID`),
+   último token (o `customProgramCacheKey`) e o COMPRIMENTO. Dentro de uma forma
+   as posições são comparáveis, e o que o censo reporta é exatamente as posições
+   que DIVERGEM e os valores que elas assumem — que é a resposta à pergunta
+   "quais desses são o mesmo shader duas vezes, e por quê". */
+
+/** Um programa como `renderer.info.programs` o entrega. Tipado à mão porque o
+ *  `WebGLProgram` do three não é exportado pelo pacote de tipos com estes
+ *  campos, e o censo só lê dois deles. */
+interface ProgramaCompilado { cacheKey?: string; usedTimes?: number }
+
+export interface CensoDeProgramas {
+  total: number;
+  /** Quantas FORMAS distintas — o piso teórico de programas se nenhum eixo de
+   *  passe existisse. */
+  formas: number;
+  /** `total - formas`: quantos programas são uma segunda compilação de uma forma
+   *  que já existe. É o número que a investigação persegue. */
+  duplicados: number;
+  /** As formas com mais de um membro, da mais duplicada para a menos. */
+  familias: {
+    forma: string;
+    membros: number;
+    /** `#posição={valorA|valorB}` para cada campo que diverge dentro da forma. */
+    variam: string[];
+  }[];
+}
+
+/**
+ * O censo dos programas compilados nesta sessão. Gratuito: só lê strings que o
+ * three já mantém.
+ *
+ * Alcançável do console por `window.__tsProgramas()`. ⚠️ Registrado num global
+ * PRÓPRIO e não em `window.__studio`: `studio.ts` atribui aquele objeto por
+ * inteiro (`window.__studio = { ... }`), então qualquer coisa pendurada antes
+ * dele seria apagada sem aviso. Quem for mexer em `studio.ts` pode dobrar isto
+ * para dentro de `__studio.quality` — a função é exportada para isso.
+ */
+export function programCensus(): CensoDeProgramas {
+  const lista = (renderer.info.programs ?? []) as ReadonlyArray<ProgramaCompilado>;
+  const formas = new Map<string, string[][]>();
+  for (const p of lista) {
+    const chave = typeof p.cacheKey === 'string' ? p.cacheKey : '';
+    if (!chave) continue;
+    const t = chave.split(',');
+    /* Ver COMO O CENSO AGRUPA: shaderID, customProgramCacheKey e comprimento. */
+    const forma = `${t[0]}|${t[t.length - 1] || '(sem chave própria)'}|${t.length}`;
+    const alvo = formas.get(forma);
+    if (alvo) alvo.push(t); else formas.set(forma, [t]);
+  }
+  const familias: CensoDeProgramas['familias'] = [];
+  for (const [forma, membros] of formas) {
+    if (membros.length < 2) continue;
+    const variam: string[] = [];
+    for (let i = 0; i < membros[0].length; i++) {
+      const vals = new Set<string>();
+      for (const m of membros) vals.add(m[i] ?? '');
+      if (vals.size > 1) variam.push(`#${i}={${[...vals].join('|')}}`);
+    }
+    familias.push({ forma, membros: membros.length, variam });
+  }
+  familias.sort((a, b) => b.membros - a.membros);
+  return {
+    total: lista.length,
+    formas: formas.size,
+    duplicados: lista.length - formas.size,
+    familias,
+  };
+}
+
+/* ⚠️ REGISTRO NO ESCOPO DE MÓDULO, e o `typeof` existe porque este arquivo é
+   importado pelo pipeline de testes, que roda sem `window`. */
+if (typeof window !== 'undefined') {
+  (window as unknown as { __tsProgramas?: () => CensoDeProgramas }).__tsProgramas
+    = programCensus;
+}
+
+/* ---- O RELATO AUTOMÁTICO, UMA VEZ POR CARGA DE PÁGINA ----
+   O censo só serve se alguém o chamar, e ninguém chama o que não sabe que
+   existe. Então ele se anuncia sozinho — **uma vez**, e só quando a contagem
+   PAROU de crescer, que é o instante em que ela significa alguma coisa (durante
+   a carga ela sobe a cada material novo e um relato ali seria sobre uma cena
+   pela metade).
+
+   Três linhas no máximo, e nenhuma se a cena não tiver duplicados. É a mesma
+   dose de console que `setShadowCasters()` já gasta com o censo de emissores. */
+let censoRelatado = false;
+let programasNoTiqueAnterior = -1;
+
+function talvezRelatarCenso(programas: number) {
+  if (censoRelatado || programas <= 0) return;
+  if (programas !== programasNoTiqueAnterior) { programasNoTiqueAnterior = programas; return; }
+  censoRelatado = true;
+  const c = programCensus();
+  if (!c.duplicados) return;
+  console.info(`[programas] ${c.total} compilados · ${c.formas} formas distintas`
+    + ` · ${c.duplicados} são recompilação de uma forma que já existia.`
+    + ' Ver O CENSO DE PROGRAMAS em ui/hud.ts; detalhe em __tsProgramas().');
+  for (const f of c.familias.slice(0, 3)) {
+    console.info(`[programas]   ${f.membros}x ${f.forma} · diverge em ${f.variam.join(' ') || '(nada — chaves iguais?)'}`);
+  }
 }
 
 function startDiag() {
@@ -1331,6 +1650,21 @@ function paintHardware() {
     + ' que o modelo da placa.');
   add('textura máx.', hw.maxTextureSize ? hw.maxTextureSize + '²' : '—');
   add('anisotropia máx.', hw.maxAnisotropy ? hw.maxAnisotropy + '×' : '—');
+  /* ---- A CLASSE, E POR QUE ELA MERECE UMA LINHA ----
+     Quando o adaptador vem mascarado (Firefox, Safari, modo anti-impressão-
+     digital), esta é a ÚNICA coisa que a sonda sabe sobre a arquitetura — e é o
+     que explica um nível que abriu mais baixo do que a pessoa esperava. Sem ela,
+     "sonda sugere: Baixa" numa máquina sem string é um veredito sem argumento, e
+     um veredito sem argumento vira um relato de bug. */
+  add('classe', hw.integrated ? 'integrada (reconhecida pela string)'
+    : hw.software ? 'rasterizador de SOFTWARE'
+      : hw.gpuClass === 'tile' ? 'rasterização por ladrilho (ASTC/ETC2)'
+        : hw.gpuClass === 'desktop' ? 'rasterização imediata (S3TC/BPTC)'
+          : 'sem veredito',
+  'Deduzida dos formatos comprimidos que o adaptador aceita — o sinal que o'
+  + ' navegador NÃO mascara. Ladrilho (Adreno, Mali, PowerVR, Apple) paga'
+  + ' desproporcionalmente pelo discard da folhagem e pelo overdraw da chuva.'
+  + ' Sem veredito nada é rebaixado.');
   add('sonda sugere', LEVEL_LABEL[suggestLevel(hw)],
     'O que a sonda ESTÁTICA sugeriria antes do primeiro quadro. Ela acerta o caso'
     + ' extremo e chuta o meio — quem manda depois é o medidor, e acima dos dois'

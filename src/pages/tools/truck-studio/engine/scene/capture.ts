@@ -937,3 +937,82 @@ export function previewTiles(quality: CaptureQuality): number {
   const t = tiling(outW, outH, preset.tiles, edgeLimit());
   return t.nx * t.ny;
 }
+
+/* ---------------- a MINIATURA de uma pose ----------------
+   Quem consome: o criador de vídeo (`scene/timeline.ts` + `ui/timeline.ts`).
+   Cada ponto da linha do tempo mostra O QUE A CÂMERA VIA ali — sem isso a tira
+   é uma fileira de retângulos numerados, e escolher qual ponto ajustar vira
+   tentativa e erro. É a diferença entre uma lista e um storyboard.
+
+   ⚠️ ELA MORA AQUI, E NÃO NO CRIADOR, POR CAUSA DE TRÊS LINHAS. `makeTarget()`
+   carrega o trio `colorSpace = SRGB` + `internalFormat = RGBA8` +
+   `isXRRenderTarget` que este arquivo documenta ter descoberto MEDINDO — sem
+   ele o resolve do multiamostrado falha com GL_INVALID_OPERATION e a leitura
+   devolve zeros, ou seja **uma imagem toda preta, em silêncio**. Uma segunda
+   implementação de "renderizar para fora da tela" nasceria com esse defeito e
+   ninguém ligaria os pontos.
+
+   ⚠️ E ELA NÃO TOCA A CÂMERA. A pose que ela retrata é a que a câmera JÁ TEM —
+   é chamada no instante em que o usuário marca o ponto, então o enquadramento
+   é exatamente o que ele está vendo. Daí também o tamanho: a altura sai da
+   proporção VIVA da câmera, senão a miniatura sairia esticada em relação ao
+   viewport que a produziu.
+
+   O que ela deliberadamente NÃO faz, ao contrário de `captureViewport()`:
+   não para o laço, não levanta o mapa de sombra, não reancora o floco metálico
+   e não mexe no LOD. São ~200 px de aresta — as quatro coisas custariam duas
+   realocações de alvo e um passe de sombra para um retrato do tamanho de uma
+   unha, e as quatro voltariam a valer no quadro seguinte de qualquer forma. */
+
+/** Aresta longa da miniatura, em pixels de buffer. */
+const THUMB_EDGE = 224;
+
+/**
+ * Um retrato do que a câmera vê AGORA, como data URL.
+ *
+ * Síncrona (é um render e uma leitura de ~100 KB) e TOLERANTE: qualquer falha
+ * — contexto perdido, alocação recusada, canvas 2D indisponível — devolve
+ * `null`, e quem chamou segue sem miniatura. Um ponto sem retrato continua
+ * sendo um ponto; uma exceção aqui derrubaria a marcação.
+ */
+export function poseThumbnail(edge = THUMB_EDGE): string | null {
+  const aspect = camera.aspect > 0 && Number.isFinite(camera.aspect) ? camera.aspect : 16 / 9;
+  /* PARES nos dois lados: nada aqui exige, mas um alvo ímpar já custou um
+     defeito no gravador e o arredondamento é de graça. */
+  const w = Math.max(2, Math.round(edge / 2) * 2);
+  const h = Math.max(2, Math.round(w / aspect / 2) * 2);
+
+  const prevTarget = renderer.getRenderTarget();
+  let rt: THREE.WebGLRenderTarget | null = null;
+  try {
+    rt = makeTarget(w, h);
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, camera);
+    /* Desligar o alvo é o que RESOLVE o multiamostrado para a textura de uma
+       amostra — a mesma armadilha do mosaico, algumas centenas de linhas acima. */
+    renderer.setRenderTarget(null);
+    const src = new Uint8Array(w * h * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, w, h, src);
+    const dst = new Uint8ClampedArray(w * h * 4);
+    flipInto(src, dst, w, h, true);
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d', { alpha: false });
+    if (!ctx) return null;
+    ctx.putImageData(new ImageData(dst, w, h), 0, 0);
+    /* WebP com perdas: são ~8 KB por ponto contra ~40 KB de PNG, e vinte e
+       quatro deles ficam vivos em memória enquanto o percurso existir. O
+       fallback não é decoração — um motor sem codificador WebP devolve um PNG
+       com o mimetype trocado, e `toDataURL` não avisa: o teste do prefixo é a
+       única forma de saber o que saiu. */
+    const webp = out.toDataURL('image/webp', 0.72);
+    return webp.startsWith('data:image/webp') ? webp : out.toDataURL('image/jpeg', 0.78);
+  } catch (err: unknown) {
+    console.warn('[truck-studio] a miniatura do ponto falhou', err);
+    return null;
+  } finally {
+    renderer.setRenderTarget(prevTarget);
+    rt?.dispose();
+  }
+}

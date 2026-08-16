@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { scene, onRig, invalidate, frameAll, setVehicleFocus } from '../scene/scene';
+import { scene, renderer, onRig, invalidate, frameAll, setVehicleFocus } from '../scene/scene';
 import {
   makePaintMaterial, forgetPaintMaterial, setPaint, isPaintMaterial,
 } from './paint';
@@ -15,6 +15,8 @@ import {
 } from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
+import { ktx2Loader, preloadKtx2 } from '../core/ktx2';
+import { markShared } from './geometry-share';
 import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
@@ -22,6 +24,10 @@ import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './traile
 import { RIB_FLAT_CENTER, TRAILER_ROOF_MESH } from './trailer-geometry';
 import { TRIM_WIDTH } from './trailer-door';
 import { swapTrailerWheels } from './wheels';
+import { buildLandingGear, setLandingGearDown } from './landing-gear';
+import {
+  loadPlateManifest, attachCabPlate, detachCabPlate, attachTrailerPlate, placeTrailerPlate,
+} from './license-plate';
 import {
   solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
   type TractorHitch, type HitchManifest, type CouplingSolution,
@@ -370,7 +376,27 @@ const draco = new DRACOLoader().setDecoderPath(DRACO_DECODER_DIR);
    is unreachable the failure simply resurfaces on the first real Draco load,
    which is where it can be reported. */
 draco.preload();
-const loader = new GLTFLoader().setDRACOLoader(draco);
+
+/* ---------------- KTX2, e a ORDEM DE DEPLOY INVERTIDA ----------------
+   Este registro tem de estar NO AR **antes** de o primeiro `.glb` com
+   `KHR_texture_basisu` ser publicado, e é o inverso da ordem de todo o resto
+   do acervo.
+
+   O motivo: para KTX2 dentro de um `.glb` a extensão entra em
+   `extensionsRequired` — não há fonte de reserva declarada —, e o `GLTFLoader`
+   **LANÇA** quando encontra uma extensão obrigatória sem carregador registrado.
+   Um asset publicado antes do código não degrada em textura feia: quebra o
+   carregamento inteiro, e com ele o estúdio.
+
+   Hoje nenhum arquivo da árvore usa KTX2, então isto é inerte — e é exatamente
+   por isso que ele entra AGORA, barato, em vez de junto com o primeiro asset.
+   O `preload` é o irmão do `draco.preload()` acima, pelo mesmo motivo: sem ele
+   os 527 kB do transcodificador seriam buscados no meio da primeira carga, onde
+   a ida e volta não tem nada com que se sobrepor. Ver `core/ktx2.ts`. */
+preloadKtx2(renderer);
+const loader = new GLTFLoader()
+  .setDRACOLoader(draco)
+  .setKTX2Loader(ktx2Loader(renderer));
 const fbxLoader = new FBXLoader();
 
 /* ---------------- stall guard ----------------
@@ -503,6 +529,18 @@ export async function loadManifests() {
       console.warn('[manifest] trailer_meta.json indisponível — engate legado + painéis retangulares.', errText(e));
       return null;
     });
+  /* O TERCEIRO MANIFESTO — `plates.json`, onde a placa de licenciamento mora em
+     cada cavalo. Disparado AQUI, junto com os outros dois, e AGUARDADO no fim
+     desta função (não neste ponto).
+
+     ⚠️ Por que aguardado, se ele não bloqueia nada: `attachCabPlate()` lê o
+     manifesto de forma SÍNCRONA, no fim de `loadCab()`. Na prática os 16 kB de
+     JSON chegam muito antes dos ~28 MB de geometria — mas "na prática" não é
+     uma garantia, e o modo de falhar é o pior possível: um cavalo sem placa, sem
+     erro nenhum, dependendo da rede. Como a requisição já está em voo desde esta
+     linha, o `await` do fim custa zero no caso comum e transforma a ordem numa
+     propriedade do código. `loadPlateManifest()` já traz o próprio `catch`. */
+  const placasReq = loadPlateManifest();
 
   /* Já em voo desde o topo da função — este await normalmente não espera nada. */
   state.trailerMeta = await metaReq;
@@ -526,6 +564,8 @@ export async function loadManifests() {
     state.hitch = null;
     state.hitchDefaults = FALLBACK_DEFAULTS;
   }
+  /* Em voo desde o topo da função — este await normalmente não espera nada. */
+  await placasReq;
   return state;
 }
 
@@ -1240,6 +1280,50 @@ export function syncTrailerPaintFromCab() {
   setPaint({});
 }
 
+/* ---------------------------------------------------------------------------
+   O QUE A FUSÃO POR MATERIAL NÃO PODE ENCOSTAR — a metade deste arquivo
+
+   `vehicle/merge.ts` assa mil malhas numa por material e guarda a REFERÊNCIA do
+   material no instante da fusão. Isso é gratuito para quem lê o material (o
+   livery escreve `CanvasTexture` nele, `vehicle/lights.ts` decide por fragmento
+   pela posição de mundo — os dois sobrevivem sem uma linha de mudança) e é fatal
+   para quem TROCA `mesh.material` depois. É exatamente o que `setPaintTarget()`
+   faz em toda malha de `trailerPanelMeshes()` ao ligar "pintar o implemento".
+
+   Então tudo que pode virar tinta fica de fora dos baldes:
+
+     · o BRANCO DE CARROCERIA (`cor_padrao_branco`) — as duas laterais, a
+       traseira, a testeira e o teto;
+     · `tk-housing-white`, a chapa do Thermo King, que entra no mesmo conjunto;
+     · `carpaint*`, que é o material que a tinta PÕE no lugar — uma malha que já
+       esteja pintada quando a fusão rodar tem de ficar igualmente de fora, ou
+       desligar a tinta a deixaria colorida para sempre dentro do balde;
+     · as chapas RECORTADAS por nome (`SIDE_L`, `SIDE_R`, `REAR`, `FRONT` e os
+       rebites das emendas) e a malha do teto paramétrico. Elas são recriadas do
+       zero a cada `setTrailerDims()`, e além disso `livery-snapshot.ts` fotografa
+       cada uma isoladamente — as duas coisas exigem que continuem sendo malhas
+       de verdade, com nome.
+
+   A lista sai DAQUI e não de `merge.ts` pelo mesmo motivo que a de `trim.ts` sai
+   de lá: é aqui que estes nomes são verdade. Quem junta as duas é `studio.ts`, a
+   raiz de composição. Uma segunda cópia divergiria no primeiro re-bake — e o
+   sintoma seria a chapa do baú parando de aceitar cor, que é o defeito que
+   `factoryMaterials()` acima documenta ter custado o editor inteiro. */
+export const PAINT_MERGE_EXCLUSIONS: {
+  materials: { re: RegExp; label: string }[];
+  meshes: { re: RegExp; label: string }[];
+} = {
+  materials: [
+    { re: new RegExp(WHITE_BODY_SUB, 'i'), label: 'pintura: chapa de carroceria' },
+    { re: new RegExp(TK_PAINT_SUB, 'i'), label: 'pintura: chapa de carroceria' },
+    { re: /carpaint/i, label: 'pintura: chapa de carroceria' },
+  ],
+  meshes: [
+    { re: /^(SIDE_L|SIDE_R|REAR|FRONT|SIDE_[LR]_RIVETS)$/, label: 'pintura: chapa de carroceria' },
+    { re: new RegExp(`^${TRAILER_ROOF_MESH}$`), label: 'pintura: chapa de carroceria' },
+  ],
+};
+
 /* Quem quiser corrigir o material de alguma peça DEPOIS de setPaintTarget().
    Mesmo desenho — e mesmo motivo — de `onTrailerPanelsRebuilt()`: quem reage é
    `vehicle/trim.ts`, que já importa ESTE módulo, e uma importação de volta
@@ -1356,6 +1440,16 @@ export const getVehicleView = (): VehicleView => vehicleView;
 export function applyVehicleView() {
   state.cabGroup.visible = vehicleView !== 'trailer';
   state.trailerGroup.visible = vehicleView !== 'cab';
+  /* E A PATOLA ACOMPANHA, porque ela é a mesma decisão vista de outro ângulo:
+     "só o implemento" é um semirreboque DESENGATADO, e um semirreboque
+     desengatado está apoiado no pé, não pendurado no ar. Ver
+     `vehicle/landing-gear.ts` — o baú NÃO se mexe; a perna telescópica é que
+     desce os 301 mm que faltam do chão.
+
+     AQUI e não em `setVehicleView()`: esta função também roda depois de cada
+     carga de veículo (`runApply()` em studio.ts), e é lá que a patola do
+     implemento recém-montado precisa nascer na pose certa. */
+  setLandingGearDown(vehicleView === 'trailer');
   invalidate();
 }
 
@@ -1709,6 +1803,15 @@ export async function loadCab(
 
   setRigPlacement(false);       // assentamento e ancoragem em z medem o mundo; ver rigGroup
   if (state.cab) {
+    /* ⚠️ A PLACA SAI ANTES DA CABINE MORRER. `disposeTree()` varre a raiz
+       inteira e libera material E TEXTURA de tudo que encontra — e os dois
+       materiais da placa são COMPARTILHADOS entre a placa do cavalo e a do
+       implemento, criados uma vez na primeira cabine. Deixá-la pendurada aqui
+       fazia a primeira troca de caminhão descartar a arte de 178 kB que a placa
+       do BAÚ ainda está usando, e a segunda placa nasceria de um material
+       morto. Não é hipótese: é a mesma armadilha que `tsSharedSource` existe
+       para desviar no clone do FBX, três linhas acima. */
+    detachCabPlate();
     state.cabGroup.remove(state.cab);
     disposeTree(state.cab);
   }
@@ -1823,6 +1926,21 @@ export async function loadCab(
         + ' Materiais que este arquivo declara:', materialNamesOf(cab).join(', '));
     }
   }
+  /* A PLACA DIANTEIRA, no sítio que `plates.json` declara para ESTE arquivo.
+     ------------------------------------------------------------------------
+     Depois da tinta e ANTES de `reapplyVehicleWetness()`: o material da placa é
+     criado aqui, na primeira cabine, e a molhagem vale sobre MATERIAIS — montar
+     depois dela deixaria a placa seca num pátio molhado até a próxima troca.
+     E antes de `freezeMatrices()`, que é a regra de toda peça que muda de pai
+     (ver o ⚠️ do cabeçalho de `landing-gear.ts`).
+
+     O manifesto pode não ter chegado ainda: `loadPlateManifest()` sai junto com
+     os outros dois em `loadManifests()`, que é sempre muito antes da geometria
+     de um cavalo, mas quem chega primeiro não é garantido por construção. Sem
+     manifesto a cabine fica sem placa e o console diz por quê — ausência de
+     placa é degradação, não erro. */
+  attachCabPlate(cab, def.file);
+
   /* Newly created paint materials register themselves with vehicle/paint.ts, so a
      re-apply pushes the CURRENT parameters onto them — the imported colour is
      never used, and a cab swap keeps whatever the user had configured. */
@@ -3489,6 +3607,38 @@ export function onTrailerPanelsRebuilt(cb: PanelListener) {
   return () => { const i = panelListeners.indexOf(cb); if (i >= 0) panelListeners.splice(i, 1); };
 }
 
+/* ---------------- O GUARDA DA GEOMETRIA ----------------
+   Quem tiver derivado alguma coisa da MALHARIA do implemento — e hoje há um
+   único cliente, `vehicle/merge.ts`, que assa os triângulos de mil peças em
+   baldes por material — precisa soltar essa derivação ANTES de `setTrailerDims()`
+   e refazê-la DEPOIS.
+
+   POR QUE "ANTES", e não um simples aviso no fim: `TrailerBody.rebuild()`
+   REGENERA o corpo branco e `TrailerAssembly.set()` TRANSFORMA a ferragem da
+   região do baú, peça por peça, lendo `.visible` e caixas de mundo pelo caminho.
+   Um derivado que ainda estivesse de pé nesse instante seria (a) medido como se
+   fosse geometria de origem e (b) deixado com os triângulos da medida anterior —
+   um baú do tamanho novo com a ferragem do tamanho velho assada por dentro.
+
+   POR QUE UM GUARDA E NÃO UMA CHAMADA DIRETA: `vehicle/merge.ts` é importado por
+   este módulo? Não — é o contrário do que parece. Ele é FOLHA de política (ver o
+   bloco `MergePolicy` lá): quem sabe onde ficam a caixa de cozinha, o Thermo
+   King e o branco de carroceria é `studio.ts`, a raiz de composição. Uma chamada
+   daqui para lá teria de duplicar essa política; um guarda deixa quem a possui
+   registrar o par suspende/retoma e não cria dependência nenhuma.
+
+   O contrato é de UM guarda, não de uma lista: ele devolve a função de retomar,
+   e é isso que torna impossível esquecer de refazer — o `finally` abaixo a
+   chama. Registrar um segundo substitui o primeiro, de propósito: dois donos de
+   "solte tudo antes do rebuild" seria uma ordem de execução implícita entre
+   eles, que é a classe de defeito que este arquivo já paga caro em outros
+   lugares. */
+export type GeometryGuard = () => (() => void);
+let geometryGuard: GeometryGuard | null = null;
+
+/** Registra (ou remove, com `null`) o guarda. Ver o bloco acima. */
+export function setGeometryGuard(g: GeometryGuard | null) { geometryGuard = g; }
+
 /** Materiais que pertencem à CENA e não a uma chapa: sobrevivem ao descarte. */
 const isSharedMat = (m: THREE.Material | null | undefined) =>
   !!m && (m === (state.trailerPaintMat as THREE.Material | null)
@@ -3571,6 +3721,21 @@ function disposeFrontWallOverlays() {
  */
 function buildTrailerRig(trailer: THREE.Object3D) {
   try {
+    /* QUAIS GEOMETRIAS SÃO MOLDE — e tem de ser AQUI, antes de `new TrailerRig`.
+       O construtor do rig chama `applyBakeFixes()`, que é o PRIMEIRO a escrever
+       dentro da malharia carregada; `TrailerAssembly` vem logo depois e congela
+       `piece.base`. Marcar depois de qualquer um dos dois transformaria uma
+       geometria JÁ MODIFICADA em molde, e a modificação vazaria para as irmãs
+       na primeira vez que uma delas clonasse.
+
+       Com o `trailer.glb` de hoje isto não encontra quase nada (a maior família
+       tem 6 malhas, e são as rodas). Ele existe para o acervo DEDUPLICADO, em
+       que até 104 malhas dividem uma geometria — ver `vehicle/geometry-share.ts`
+       e `tools/studio-assets/dedup-cargas.mjs`. Custa uma varredura de nós. */
+    const compartilhadas = markShared(trailer);
+    if (compartilhadas) console.info('[baú] geometria compartilhada —', compartilhadas,
+      'malhas dividem um molde; a escrita clona (ver geometry-share.ts)');
+
     const rig = new TrailerRig(trailer);
     state.trailerRig = rig;
     const p = rig.profile;
@@ -3602,6 +3767,17 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
   const t = state.trailer;
   const base = state.trailerBase;
   if (!rig || !t || !base) return null;
+
+  /* 0. QUEM DERIVOU DA MALHARIA SOLTA AGORA — ver O GUARDA DA GEOMETRIA. Tem de
+        ser a PRIMEIRA linha do corpo: os passos 1 a 3 leem `.visible` e caixas
+        de mundo de todo o implemento, e um derivado de pé seria medido junto.
+
+        SEM `try/finally`, e é decisão: se algum passo abaixo lançar, o derivado
+        fica SOLTO. Esse é o estado degradado certo — a imagem continua completa
+        (as malhas de origem estão todas visíveis) e o que se perde é velocidade.
+        O contrário — refazer a fusão sobre uma geometria que acabou de falhar no
+        meio do rebuild — assaria o estado rasgado dentro dos baldes. */
+  const retomarGeometria = geometryGuard ? geometryGuard() : null;
 
   /* 1. DE VOLTA À POSE DE CARGA, e o `rigGroup` à identidade.
      `TrailerAssembly.set()` decide em ESPAÇO DE MUNDO ("esta peça encosta no
@@ -3661,6 +3837,12 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
         entra na conta: é produto físico e não cresce com a caixa. */
   placeThermoKing();
 
+  /* 4b. A PLACA TRASEIRA acompanha a porta. O comprimento cresce PARA TRÁS
+        (`mapZ()` comportamento `front`), então o para-choque — e com ele a
+        placa — anda o resize inteiro. Mesma doutrina do passo 4: REMEDIR o
+        para-choque, nunca somar um delta. Ver `placeTrailerPlate()`. */
+  placeTrailerPlate(t);
+
   /* 5. A caixa do baú, rederivada da geometria nova — é o que o engate lê. */
   const box = bboxOfMatching(t, bodyPanelPred(t));
   if (state.trailerPivotFromFront !== undefined) {
@@ -3687,6 +3869,12 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
 
   /* 8. E a arte volta para cima delas — ver onTrailerPanelsRebuilt(). */
   for (const cb of panelListeners) cb(t);
+
+  /* 9. E O DERIVADO VOLTA — depois de TUDO, inclusive do `setPaintTarget()` do
+        passo 7 e dos ouvintes do passo 8: quem funde por material guarda a
+        referência do material no instante da fusão, e refazê-la antes da tinta
+        assar a chapa branca dentro do balde. Ver O GUARDA DA GEOMETRIA. */
+  retomarGeometria?.();
 
   invalidate();
   console.info('[baú] redimensionado —',
@@ -3825,11 +4013,26 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
   await attachFh16Wheels(trailer);   // optional — a roda original fica se faltar
   await attachThermoKing();   // optional — skips gracefully if the GLB is absent
   reapplyVehicleWetness();
+  /* A PATOLA GANHA UM GRUPO — depois das rodas (o plano de contato sai do ponto
+     mais baixo do implemento, e `attachFh16Wheels()` acabou de trocar a rodagem
+     inteira) e ANTES do congelamento, porque mudar um nó de pai depois dele é
+     justamente a armadilha que o bloco de `freezeMatrices()` documenta.
+     Ver `vehicle/landing-gear.ts`. */
+  buildLandingGear(trailer);
+  /* A PLACA TRASEIRA — no para-choque, MEDIDO. Depois da patola (as duas
+     disputam a mesma janela de "antes do congelamento") e depois do Thermo King,
+     pela mesma razão dele: o que entra na árvore depois de `freezeMatrices()`
+     nasce fora da varredura e recompõe matriz a cada quadro.
+     Ver `vehicle/license-plate.ts`. */
+  attachTrailerPlate(trailer);
   /* DEPOIS do Thermo King: ele entra como filho do implemento, então congelar
      antes deixaria a unidade recompondo a matriz dela a cada quadro e — pior —
      fora da varredura, o que faria a intenção do congelamento mentir sobre o
      que está congelado. */
   freezeMatrices(trailer);
+  /* E a pose corrente é reescrita no grupo recém-criado: quem estava olhando só
+     o implemento troca de caminhão e o novo tem de nascer com o pé no chão. */
+  setLandingGearDown(vehicleView === 'trailer');
   return trailer;
 }
 
@@ -4293,6 +4496,15 @@ export function placeTrailer() {
   t.updateMatrix();
   t.updateWorldMatrix(true, true);
   setRigPlacement(true);
+  /* A PATOLA REAGE À POSE, e é aqui que a pose acaba de mudar.
+     A queda dela é resolvida em espaço de MUNDO (ver A QUEDA É MEDIDA NO MUNDO
+     em `vehicle/landing-gear.ts`) porque a INCLINAÇÃO de engate escrita logo
+     acima vale 54 mm de altura sob a patola — e essa inclinação muda com a
+     cabine (a altura da quinta roda é por bake) e com todo `setTrailerDims()`.
+     Sem esta linha, a chapa ficaria correta até a primeira troca de caminhão e
+     depois nasceria enterrada, sem nada avisar. Não faz nada antes de
+     `buildLandingGear()` ter rodado. */
+  setLandingGearDown(vehicleView === 'trailer');
 }
 
 let legacyWarnedFor: string | null = null;

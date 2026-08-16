@@ -1410,3 +1410,959 @@ VENDOR da placa no meio — um erro que manda procurar defeito no hardware quand
 o que falta é a tela, e que aparecia ATÉ no caminho SwiftShader, onde nenhum dos
 dois é necessário. Agora o `:1` só é chutado com `--gpu`, e o console da página
 é impresso quando o boot falha (a mensagem mandava olhá-lo e não havia por onde).
+
+## 16. A rodada de 2026-08-16 — a patola, e quatro defeitos do editor de plotagem
+
+Sete pedidos numa captura só. Todos medidos na bancada antes de virarem código,
+e todos com trava: `checks-patola-0816.mjs`, `checks-livery-0816.mjs`,
+`checks-tk-adesivo-0816.mjs`.
+
+### 16.1 A patola desce quando o implemento está sozinho
+
+*"quando estiver apenas o implemento sendo mostrado, o suporte do implemento
+fique tocando no chão — mas não a frente da caixa, e sim o suporte mecânico
+abaixado"*.
+
+As duas metades importam, e a segunda decide o desenho: **o baú não se mexe**.
+Baixar o nariz do conjunto até o pé encostar seria outra pose do produto inteiro
+— outra altura de carga, outro ângulo de teto, outro enquadramento. O que ele
+pediu é a manivela sendo girada.
+
+`trailer-rig.ts` declara `landingGear: null` com a nota "não existe nó de patola
+neste GLB", e está certo quanto ao NOME: o bake é um `stitch_result_stitch_all`
+de 5 852 nós anônimos. Mas a geometria existe e é **telescópica de verdade** —
+duas malhas por perna, medidas no referencial da raiz:
+
+```
+  tubo EXTERNO  esq. y 0,303 … 1,110  (leva a caixa da manivela)   fica
+  tubo EXTERNO  dir. y 0,300 … 1,072                               fica
+  tubo INTERNO  esq. y 0,282 … 0,878                               DESCE
+  tubo INTERNO  dir. y 0,2815… 0,915                               DESCE
+```
+
+Os internos estão inteiros DENTRO dos externos: fotografados sozinhos são um tubo
+de 63 cm com sapata no pé; montados, só a sapata aparece. Com a rodagem do FH16
+o plano de contato fica em y = −0,045, ou seja **326 mm de curso** — e descer os
+dois internos por 326 mm deixa 252 mm de tubo ainda encaixado no externo, que é a
+pose de um conjunto estacionado.
+
+**As pernas são achadas por FÍSICA, não por nome de nó** (`vehicle/landing-gear.ts`):
+a patola sustenta a DIANTEIRA, logo vive à frente da rodagem; dela, a malha mais
+baixa DE CADA LADO que não toque o chão e seja alta o bastante para ser perna; e
+as duas têm de formar par (espelhadas, mesmo z, mesmo pé).
+
+⚠️ **Duas cláusulas foram aprendidas falhando na bancada, e as duas ficam:**
+
+* **"à frente da rodagem"** — sem ela, as duas malhas mais baixas do implemento
+  depois dos pneus são os **lameiros do bogie** (`x 0,758 / −1,114 · z −3,526`),
+  que também vêm aos pares e também descem meio metro. E "o fim da rodagem" se
+  acha sozinho, sem regexp: **o que toca o chão é pneu**, por construção —
+  `groundAndCenter()` assentou o implemento por eles.
+* **"uma por lado", e não "as duas mais baixas"** — a diferença é de 18 mm. O
+  tubo interno da direita começa em 0,2815 e o externo em 0,300; um re-bake que
+  invertesse essa ordem por um milímetro escolheria os dois tubos EXTERNOS, que
+  passam no teste de espelho e desceriam a perna inteira para fora do mancal.
+
+⚠️ **E a peça fica FORA DA FUSÃO POR MATERIAL.** As duas pernas são
+`metal-preto`, o mesmo material de 577 outras primitivas; fundidas, os vértices
+ficam assados na pose do instante da fusão dentro de um balde que atravessa o
+implemento, e mover um pedaço de balde é impossível. A exclusão
+(`LANDING_GEAR_MERGE_EXCLUSIONS`, casada pelo grupo `PATOLA`) custa **duas
+chamadas** — 1 994 → 1 992 poupadas, medido —, porque o balde continua existindo
+com dois membros a menos.
+
+A trava mede as duas metades do pedido: o pé encosta **e** a caixa envolvente
+das quatro chapas não se move (0 mm). E repete o ciclo com a fusão montada,
+porque é nesse estado que o app roda.
+
+#### 16.1.1 A sapata, e o teste que media no espaço errado
+
+Segundo pedido, depois de ver a patola descida: *"na peça que segura o
+implemento que vai no chão, deve ter uma superfície de uns 2 cm, mais larga que
+o suporte em si, na parte que toca o chão"*. Medido antes de mexer:
+
+```
+  tubo, a 400–600 mm do pé      102 × 100 mm
+  FLANGE de fábrica             existe — 7,7 mm de espessura,
+                                avançando 69 mm além do tubo (⇒ 240 mm)
+```
+
+Ou seja a sapata de fábrica EXISTE e já é bem mais larga que o tubo. O que não
+existe é uma sapata que se VEJA: 7,7 mm assentados no plano de contato somem
+contra qualquer piso. A chapa gerada pende dela — 20 mm além em cada lado
+(280 mm) e 14 mm de espessura —, reusa o material da perna (para herdar o
+acabamento e a sonda de reflexo já aplicados ao `metal-preto`) e as duas viram
+UMA malha. A largura sai da FLANGE e não do tubo, e é a única leitura do pedido
+que produz algo visível: 2 cm a mais que os 100 mm do tubo dariam 140 mm, que
+nasce escondido debaixo dos 240 da flange.
+
+⚠️⚠️ **E AQUI O TESTE MENTIU, que é a lição mais cara desta rodada.** A primeira
+versão calculava a queda em espaço LOCAL DA RAIZ — *pé local menos chão local* —
+e a bancada, medindo no MESMO espaço, declarou `erro contra o chão: 0 mm`. O
+relato pegou o que ela não pegou: *"a sapata só aparece quando NÃO está somente
+o implemento"*. Medido de novo, agora em MUNDO, com só o implemento em cena:
+
+```
+  face de baixo da sapata   y de mundo  −0,0483
+  pneus tocam               y de mundo  +0,0062
+  ⇒ a chapa nascia 54,5 mm ENTERRADA no piso
+```
+
+A causa é a INCLINAÇÃO DE ENGATE: `placeTrailer()` gira o implemento sobre o
+contato dos pneus para o pino descer sobre a quinta roda (~0,36°), e a patola
+fica ~8,6 m à frente do bogie — 8,6 · tg 0,36° = 54 mm. **No referencial da raiz
+essa inclinação não existe**, então lá o pé encostava perfeitamente num chão que
+não é o chão. Um teste no referencial errado não é um teste fraco; é um carimbo.
+
+A queda passou a ser resolvida em mundo e **recalculada a cada aplicação** (a
+inclinação muda com a cabine e com todo `setTrailerDims()`, então um número
+gravado na construção estaria certo até a primeira troca de caminhão), e
+`placeTrailer()` — que é quem escreve a pose — reaplica no fim. A conversão de
+volta para local divide por `matrixWorld.elements[5]`, a componente y do eixo Y
+local, que carrega junto a escala da raiz. ⚠️ Nada de `transformDirection()`
+aqui: ela NORMALIZA, e queda é distância — foi assim que a primeira medição na
+bancada devolveu 10 mm em vez de 301.
+
+### 16.2 A cor do Thermo King não recarregava o livery
+
+*"quando aplico uma cor no Thermo King, não recarrega o livery — a cor é aplicada
+ao modelo 3D mas não reflete no livery"*.
+
+Exato, e a causa é a mesma de `scheduleRepaintSnapshot()` (§13) por outra porta:
+desde que o painel do editor virou uma FOTOGRAFIA do baú, toda peça que aparece
+na foto é conteúdo do editor — e a unidade aparece inteira na testeira.
+`vehicle/trim.ts` já avisava (`onTrimChanged`); faltava ligar.
+
+Duas decisões: **só a testeira** (as outras três peças não entram em retrato
+nenhum — o teto não é fotografado e para-lama e caixa ficam abaixo da margem
+inferior do quadro), e **debounced em 200 ms**. Para isso `takeFaceSnapshots()`
+ganhou um filtro `only` e `onTrimChanged` passou a informar QUAL peça mudou.
+
+⚠️ **E o token de refotografia virou um POR FACE.** Um contador só bastava
+enquanto toda refotografia pedia as quatro; com uma que pede só a testeira, um
+arrasto de medida em voo seria descartado pela troca de cor que chegasse 200 ms
+depois — três faces perdidas, e o palco com o retrato de uma medida que não
+existe mais.
+
+### 16.3 As duas linhas do Fundo acendiam juntas
+
+*"a opção de cor customizada e pintar igual ao cavalo selecionadas juntas, e não
+deveria — isso acontece até nas laterais"*.
+
+O CSS já dizia a regra certa desde §14 ("o anel verde marca qual das duas está
+mandando NESTA face — nunca as duas ao mesmo tempo") e o seletor a contradizia:
+`#bg-row-cab:has(.bg-check:checked)` acende sempre que a caixa está marcada, e a
+caixa é uma decisão sobre o BAÚ INTEIRO — ela fica marcada inclusive nas faces
+que têm cor própria e portanto IGNORAM a tinta do cavalo.
+
+A pilha continua sendo pilha (a de baixo sobrepõe a de cima; §14.5 registra o
+pedido que a criou). O que mudou é o que a forma diz: `syncBackground()` decide
+quem manda, o anel marca o vencedor, e o perdedor recebe `.is-muted` com o
+estado trocado para "sobreposta aqui".
+
+⚠️ **O checkbox NÃO é desmarcado.** Desmarcá-lo "para ficar coerente" desligaria
+a tinta das outras três faces por causa desta — que é exatamente o defeito de
+`setBackgroundsForPaint()`, apagado em §14.5.
+
+De quebra, a dica do Thermo King deixou de prometer o que não cumpria. "Sem cor
+própria a carcaça acompanha o baú" é meia verdade: ela acompanha a **tinta** do
+implemento, e o Fundo da face é PLOTAGEM sobre a chapa — não alcança a máquina.
+Quem pinta a testeira de preto e vê a carcaça continuar branca agora lê por quê.
+
+### 16.4 Clicar no Thermo King não selecionava a camada dele
+
+Ele já ERA uma linha fixa da lista de camadas (§14.7), mas o palco não sabia: a
+unidade não é objeto do fabric, é um pedaço da FOTOGRAFIA, e todo clique na foto
+caía na regra "clicar no caminhão seleciona o Fundo".
+
+`FaceSnapshot` ganhou `tk` — o retângulo da unidade **projetado pela mesma câmera
+ortográfica que fez a imagem**, nas mesmas frações de `box`. Em registro por
+construção; qualquer segunda conta divergiria na primeira medida digitada. É a
+única medida deste arquivo que usa `Box3.setFromObject()` de propósito: ela é
+alvo de CLIQUE, e os ~17 mm que a inclinação de engate acrescenta são folga do
+lado certo.
+
+### 16.5 Selecionar uma camada exigia mira
+
+*"por conta de poder trocar o nome da camada, tenho que clicar numa área muito
+pequena para poder selecionar"*.
+
+O nome é um `<input readonly>` com `flex: 1` — quase a largura inteira da linha —
+e o clique nele era descartado (`if (ev.target === name) return`). Sobravam o
+punho, o ícone e a folga entre os botões.
+
+`preventDefault()` no `mousedown` **enquanto** `readonly` tira o foco e o cursor
+de texto sem tirar o `click` nem o `dblclick`: a linha recebe o clique, e o duplo
+clique continua abrindo a edição (e agora pede o foco explicitamente, porque o
+`mousedown` o recusou). O CSS acompanha — `cursor: inherit` com `readonly`,
+`cursor: text` sem.
+
+Junto: `#bg-row-cab`, `#bg-row-face` e `#tk-row` ganharam `cursor: pointer` e
+`user-select: none`. As três são controles inteiros desde §14.5 — clicar em
+qualquer ponto da linha abre o seletor —, e continuavam desenhando um cursor de
+texto porque são `<div>` com `<span>`.
+
+⚠️ **E o conserto do nome nasceu com um defeito próprio, que só a MEDIÇÃO pegou.**
+As duas regras novas eram `.lyr-name[readonly]` e `.lyr-name:not([readonly])` —
+sem o `input.` na frente. As camadas FIXAS (Fundo e Thermo King) usam
+`.lyr-name .lyr-name--fixed` num `<span>`, que nunca tem `readonly`: o
+`:not([readonly])` casava justamente elas e lhes dava `cursor: text`. O relato
+seguinte foi o mesmo do primeiro (*"passo o mouse por cima do texto da camada e
+continua cursor text"*), e `checks-cursor-camada-0816.mjs` — que lê o `cursor`
+COMPUTADO de cada peça da linha — mostrou em uma linha qual das três mentia.
+
+#### 16.5.1 A linha sobreposta ainda lia como ligada
+
+*"cor do cavalo continuar selecionada, mesmo quando eu pinto de uma cor
+diferente"*. Apagar a linha não bastou: o que continuava dizendo "ligado AQUI"
+era o TIQUE verde ao lado de uma linha apagada — sinal contraditório. Agora o
+tique perde o acento (fica cinza: ligado, sem mandar) e o nome é RISCADO, que é
+a convenção de quem já resolveu este problema — as ferramentas de desenvolvedor
+do navegador riscam a declaração de CSS que outra sobrepôs. A linha continua
+clicável: desligar a tinta do cavalo com uma face pintada por cima é uma decisão
+legítima, e desabilitá-la a esconderia.
+
+#### 16.5.2 O Thermo King não tinha a linha "Cor do cavalo"
+
+*"o Thermo King está faltando essa opção pintar da cor do cavalo"*. A seção dele
+tinha uma linha só, enquanto o Fundo tinha a pilha de duas — e a carcaça SEGUE a
+tinta do implemento (`followsBody` em `vehicle/trim.ts`), então a linha de cima
+descreve um estado que existe. Ela não implementa nada: escreve no
+`#paint-trailer` e despacha o `change` dele, para que o caminho continue sendo UM
+(`bindTrailerPaint()`, que troca o material, refotografa e escreve o status) e os
+dois controles não possam discordar. `setSpecialEdition()` esconde as duas.
+
+### 16.6 O halo branco dos adesivos do Thermo King
+
+*"as bordas ficam brancas, fica estranho"*. Medido em `thermoking.glb`, imagem 3
+(`tk_logo`, 1024², RGBA):
+
+```
+  alfa == 0    67,4% dos texels   RGB médio ali = (254,4  254,5  254,4)
+  alfa == 255  29,2%              RGB médio ali = ( 26,4   62,8   69,4)
+```
+
+Dois terços da imagem são BRANCOS e invisíveis. Isso é legal no arquivo e fatal
+na GPU: **a filtragem e o mipmap fazem a média de RGB e de ALFA separadamente**.
+A média entre o preto do glifo (a=255) e o branco do vazio (a=0) devolve RGB
+claro com alfa intermediário, e o `alphaTest = 0.5` que `auditTransparency()`
+aplica ao decalque deixa passar justamente a orla onde o alfa ainda é > 0,5.
+Nenhum ajuste de filtro, anisotropia ou `alphaTest` conserta: o dado está errado
+antes de chegar ao amostrador.
+
+O conserto é de ASSET — `tools/glb-texopt/sangra_alfa.py`, mesma doutrina de
+contêiner de `texopt.py` (o BIN só cresce no fim, nenhum offset muda, e o que não
+foi tocado é conferido byte a byte). O **canal alfa não é tocado**; o que muda é
+o RGB dos texels invisíveis, que passa a ser o do texel visível mais próximo.
+
+⚠️ **Duas escolhas não óbvias, as duas medidas:**
+
+* **a semente é `alfa ≥ 250`, não `alfa > 0`.** O texel de meia cobertura deste
+  bake não carrega o ciano com meio alfa — ele carrega uma cor JÁ MISTURADA com o
+  branco (medido na linha 512: `(205,236,249,128)` entre um vazio `(255,251,255,7)`
+  e o ciano `(33,162,222,252)`). Semeando a partir dele, a média do vazio caía só
+  de 254 para 211 e o halo continuava. Com semente opaca ela cai para 69,5.
+* **vizinho mais próximo, não média dos vizinhos.** As duas dão a mesma média de
+  cor; a média escreve um DEGRADÊ por todo o vazio e degradê é o que o PNG
+  comprime pior — `tk_logo` 74 → **184 KB** contra 74 → **83 KB**. O mosaico
+  comprime como o branco chapado que substituiu, e o arquivo inteiro sai MENOR
+  do que entrou.
+
+Medido na placa, com a carcaça pintada de escuro (no branco de fábrica o halo é
+invisível por construção — ele É branco): **269 → 0 pixels claros-e-neutros** na
+janela do emblema, com o ciano do logo intacto. Backup em
+`thermoking.glb.bak-sangra-2026-08-16`.
+
+---
+
+## 17. A rodada de 2026-08-16 (tarde) — o modo livre virou um CRIADOR DE VÍDEO
+
+O pedido, por inteiro:
+
+> *"em vez de ter modo livre, o modo livre deve ser um criador de vídeo […] irei
+> posicionar a câmera onde quero que comece, selecionarei o tempo, por exemplo
+> 2s, então posicionarei a câmera no segundo ponto e direi que aquele será o
+> segundo ponto, colocarei um timer novamente, e assim por diante […] **porque
+> assim a câmera será suave, não rígida já que manualmente não conseguimos
+> deixar ela suave**"*
+
+E, na mesma rodada, mais quatro: o seletor de tempo virou um `<select>` de 1 a
+8 s, o cartão perdeu a fileira de botões (o ✕ subiu para o canto), a prévia
+parou de piscar, o vídeo parou de sair com artefato — e o **modo cinemático foi
+removido**, *"já que esse substitui"*.
+
+### 17.1 O diagnóstico do dono estava certo, e é ele que decide o desenho
+
+O modo `livre` amostrava a órbita à mão (`capturePath()`) e reamostrava o
+caminho para 60 fps por interpolação (`poseAt()`). Ou seja: ele reproduzia com
+fidelidade **até o tremor da mão**. Não há filtro que conserte isso, porque o
+tremor não é ruído sobre o sinal — ele *é* o sinal que foi colhido.
+
+A troca é de natureza: em vez de suavizar um caminho amostrado, o percurso é
+**resolvido** a partir de poucos pontos autorados. O usuário dá os PONTOS; a
+máquina dá o CAMINHO.
+
+### 17.2 Três arquivos novos, e a divisão entre eles é o que os torna testáveis
+
+| arquivo | o que é | por que separado |
+|---|---|---|
+| `scene/timeline-curve.ts` | PCHIP, base de Hermite, desembrulho de ângulo | **não importa nada.** `scene/scene.ts` constrói um `WebGLRenderer` no tempo de import, então tudo que o alcança é impossível de carregar sob vitest. Aqui moram as funções puras, e `timeline-curve.test.ts` prova as duas propriedades que produzem vídeo errado **em silêncio** |
+| `scene/timeline.ts` | o modelo (chaves), o percurso e o reprodutor | precisa da câmera; não tem uma linha de DOM |
+| `ui/timeline.ts` + `.css` | o dock de três faixas | só DOM; fala com `chrome.ts` por *callback*, nunca por import (o ciclo mataria o boot) |
+
+Os três — prévia, régua e gravação — consomem a **mesma** `place(t)`. É isso que
+faz a prévia ser uma promessa em vez de uma aproximação.
+
+### 17.3 A curva é PCHIP, e as duas candidatas descartadas explicam por quê
+
+* **`smootherstep` por trecho** (o que o modo cinemático fazia): C¹ de graça, mas
+  a câmera **para em todo ponto marcado**. Quem marca seis pontos para descrever
+  *um* movimento recebe seis movimentos com cinco paradinhas.
+* **Catmull-Rom**: a resposta clássica, e ela **ultrapassa** — a tangente
+  automática num ponto de inflexão joga o valor para fora do intervalo dos
+  vizinhos. Numa câmera isso é passar do outro lado do ponto e voltar; no eixo do
+  RAIO, é entrar na zona de expulsão da carroceria.
+* **PCHIP (Fritsch–Carlson)**, que ficou: tangente por média harmônica ponderada,
+  zerada em todo extremo local. A propriedade que ela compra vale por uma dúzia
+  de guardas:
+
+      TODO VALOR INTERMEDIÁRIO FICA ENTRE OS DOIS VIZINHOS.
+
+  Como toda chave nasce de uma pose que o laço vivo já validou (`minDistance`,
+  `maxPolarAngle`, a coleira da mira), **um caminho que não sai do intervalo das
+  chaves não viola nenhuma daquelas guardas** — e não é preciso aparar no meio,
+  que é o que produz a "dobra" que um percurso keyframado não pode ter.
+
+  Medido na bancada com o ponto do meio colado no `minDistance`: guarda 9,61 m ·
+  menor raio do percurso **9,80 m** · folga até a lataria **4,49 m**.
+
+As pontas ganham tangente **zero à força** — é o que dá partida e chegada macias
+sem nenhum controle na interface. E a **pausa** não é um campo: marcar o mesmo
+ponto duas vezes dá um trecho chato, e a mesma regra de Fritsch–Carlson que
+impede a ultrapassagem para a câmera nele, de graça.
+
+### 17.4 O azimute é desembrulhado, e isso não é detalhe
+
+`atan2` devolve (−π, π]. Duas chaves a 170° e a −170° estão a 20° uma da outra, e
+interpolar os números crus varreria **340° pelo lado errado** — uma volta inteira
+ao contrário, num vídeo que só se descobre errado depois de esperar o render.
+`unwrapAngles()` garante o arco menor entre pontos consecutivos.
+
+### 17.5 A interface: três faixas, e a câmera é a fonte da verdade
+
+1. **a barra** — o que o percurso é, a lente, prévia e gravar;
+2. **a régua** — proporcional no tempo, e ela *é* o cabeçote: arrastar move a
+   câmera quadro a quadro;
+3. **a tira** — um storyboard com miniatura de verdade (`poseThumbnail()`, em
+   `scene/capture.ts`, que reusa o trio sRGB/RGBA8/`isXRRenderTarget` que aquele
+   arquivo descobriu medindo — sem ele o resolve falha e o retrato sai **preto em
+   silêncio**).
+
+Não existe editor de pose: enquadre com o mouse → ＋ marca; clique na miniatura →
+a câmera volta lá; ✕ → o ponto sai. O `.ts-tlmode` no root recolhe HUD, cards e
+badges pela **mesma lista** do modo limpo em `core/studio.css` — mas por uma
+classe PRÓPRIA, senão fechar o criador desfaria um modo limpo que o usuário tinha
+ligado à mão.
+
+### 17.6 A prévia engasgava — e a primeira tentativa de conserto errou
+
+Relato: *"o preview está muito travado, muito mesmo, fica tipo flicando"*. A
+prévia não é cara de calcular (sete cúbicas e dois vetores), e o que se cortou na
+primeira passagem foi desperdício real: ela **escrevia no DOM cinco vezes por
+quadro** dentro de um dock com `backdrop-filter`. Isso ficou (nada é escrito sem
+mudar; ARIA e relógio a 10 Hz; o vidro sai de cena enquanto a prévia toca).
+
+⚠️ **Mas o diagnóstico estava errado, e a correção piorou o caso.** Ver §21 — o
+relato voltou, e a causa é outra.
+
+### 17.7 O artefato do vídeo tinha nome, e era o gancho de quadro
+
+Relato: *"às vezes o vídeo sai com um artefato"*. O "às vezes" era a pista.
+
+A prévia escreve a pose de dentro de um `onFrame` — e **`renderOfflineFrame()`
+também roda os `onFrame`**, porque é o mesmo laço avaliado fora do tempo real.
+Um motorista vivo ali dentro reescreveria a pose que `record.ts` acabou de
+escrever, DEPOIS de `place()` e ANTES do `render()`. E o motorista mais fácil de
+deixar vivo não é a prévia: é o **voo de 0,45 s** que um clique na miniatura
+dispara — o gesto natural é "deixa eu ver este ponto… pronto, gravar".
+
+Conserto: `suspendTimelineDrivers(true)` no começo de **toda** gravação, solto no
+`finally`. `checks-percurso-video-0816.mjs` reproduz a janela de propósito
+(dispara o voo e grava no quadro seguinte) e julga o `.mp4` **fora do
+navegador**, com ffprobe/ffmpeg — o `chrome-headless-shell` não decodifica H.264
+para canvas e relata "preto" para arquivos perfeitos, armadilha em que o
+`checks-gravacao.mjs` cai desde sempre.
+
+### 17.8 O modo cinemático saiu, e ~520 linhas com ele
+
+> *"remova o modo cinemático, não será necessário, já que esse substitui"*
+
+Ele era um percurso autorado — pontos de câmera, tempo entre eles, aceleração nas
+pontas, zoom de lente. É exatamente o que o criador faz, com uma diferença que
+decide: **a decupagem estava cravada no código**. Manter os dois seria manter
+duas implementações do mesmo conceito, e a que ninguém pode ajustar é a que
+envelhece. O que ele sabia — interpolação esférica e nunca cartesiana, zoom por
+LENTE porque as guardas tornam o close-up mecanicamente impossível, o
+assentamento de dois estágios antes do primeiro quadro — está herdado e
+documentado em `timeline.ts` e no ramo do percurso em `record.ts`.
+
+`RecordMode` passou de três membros para dois; `RecordProgress.shot` e a fase
+`gravando` do caminho offline saíram junto.
+
+### 17.9 O que ficou provado
+
+* `engine/scene/timeline-curve.test.ts` — 21 portões, sem navegador: não
+  ultrapassa, arco menor, a pausa para de verdade, passa pelos pontos, C¹ nas
+  emendas, o cursor retrocede.
+* `tools/studio-bench/checks-percurso-0816.mjs` — o caminho do painel até o dock,
+  a interface sumindo, as miniaturas não-pretas, o select de 1 a 8 s, o ✕ no
+  canto, as guardas da cena em 600 amostras do percurso, a prévia movendo a
+  câmera, e o fechamento devolvendo a lente de fábrica.
+* `tools/studio-bench/checks-percurso-video-0816.mjs` — o `.mp4` de verdade:
+  120 quadros, 60/1, 2,000 s, luminância média 84/255 e a câmera andando entre os
+  instantes, com um voo em curso na largada.
+
+---
+
+## 18. A rodada de 2026-08-16 (noite) — quatro defeitos do card de Configurações
+
+> *"quando configurações está aberto a parte lateral de todos os cards ficam
+> cortados, além disso parece ter um background em todos juntos, não deveria, e
+> todos os cards têm um border green no hover, exceto a iluminação, e o paralamas
+> está faltando ter a opção de pintar da cor do cavalo também, como todos os
+> outros itens"*
+
+Quatro queixas, **três** causas — as duas primeiras são o mesmo defeito visto de
+dois ângulos.
+
+### 18.1 Os cards cortados e a "laje" são a mesma linha de CSS
+
+`#ts-panels` tem `overflow-y: auto` para que a pilha role em vez de vazar por
+cima dos view controls. E aí entra a regra que ninguém lembra:
+
+> **um eixo que deixa de ser `visible` tira o `visible` do outro.**
+
+Ou seja, `overflow-x` passa a `auto` e clipa no eixo horizontal. O que é cortado
+ali não é conteúdo — os cards têm exatamente a largura da caixa — é a **SOMBRA**.
+`--ts-glass-shadow` alcança ~6 px para os lados e ~18 px para baixo, e é ela que
+faz cada card ler como uma lâmina flutuando sobre o render.
+
+Cortada, ela vira o contrário: as bordas viram um corte reto de cima a baixo, as
+sombras dos cinco cards se emendam nos vãos de 10 px e a coluna passa a ler como
+**uma laje escura** com os cards recortados dentro. Daí as duas frases do relato.
+
+⚠️ **Sempre esteve assim** — `overflow: auto` clipa mesmo sem ter o que rolar. O
+que mudou com o card aberto foi o TAMANHO: 587 → **826 px** medidos na bancada,
+quase a tela inteira.
+
+Conserto: acolchoar por dentro e recuar o deslocamento pelo mesmo tanto, para o
+card não sair do lugar um pixel.
+
+    right  6 + padding-right   8 = 14 px da borda   (era right: 14)
+    bottom 0 + padding-bottom 14 = 14 px do rodapé  (era bottom: 14)
+
+### 18.2 O HUD era o único a acender em branco
+
+`.ts-panel:hover` e `.ts-cfg:hover` acendem em `--accent`; `#ts-hud:hover` acendia
+em branco a 20 %. Duas gramáticas para o mesmo gesto, em duas colunas visíveis ao
+mesmo tempo. Agora os três acendem igual — e o par de NOITE continua sendo uma
+linha própria, porque é ela que impede a regra de noite (1,1,0) de vencer a de
+hover (1,1,0) pela ordem de fonte.
+
+### 18.3 O para-lama passou a seguir a tinta do cavalo — e isso destapou dois buracos
+
+`SPECS.fenders.followsBody` era `false`. A razão histórica era boa ("sem cor
+escolhida, nada muda", e o para-lama nunca fora pintado junto com o baú) mas era
+descrição do bake, não decisão de produto: na oficina ele é pintado com a cor da
+frota como qualquer outra chapa. Virou `true`, e o card de Configurações ganhou a
+linha **"Cor do cavalo"** — que não implementa nada, escreve no `#paint-trailer` e
+despacha o `change` dele, exatamente como a linha do Thermo King faz. Um caminho,
+três superfícies.
+
+Ligar o `followsBody` destapou dois defeitos do motor:
+
+* **ninguém guardava o material de fábrica dele.** Teto e Thermo King estão em
+  `trailerPanelMeshes()`, então `setPaintTarget('both')` os pinta *e* grava
+  `origMat` de graça. O para-lama não é tocado por aquele laço — quem o veste é o
+  `applyTrim()`. Sem um terceiro slot (`trimFactoryMat`, capturado **antes** de
+  qualquer escrita) a tinta entrava e não saía.
+* **⚠️ vestir a tinta APAGAVA A IDENTIDADE DA PEÇA.** `fenders` e `thermoking`
+  casam por MATERIAL, e a primeira coisa que este módulo faz com uma malha casada
+  é trocar o material dela. A partir daí `spec.match()` devolve false e a peça
+  deixa de existir para `meshesOf()`: **o laço que tiraria a cor não encontra mais
+  nada para tirar.** Era um defeito ANTERIOR — tirar a cor própria do para-lama
+  nunca o despintou — e só não gritava porque `followsBody: false` o mantinha
+  fora do caminho da tinta do baú. Fechado por `userData.trimKey`, escrito no
+  primeiro encontro: identidade, não cache. Um re-bake cria malhas novas, sem
+  carimbo, que voltam a ser casadas pelo material.
+
+### 18.4 O que ficou provado
+
+`tools/studio-bench/checks-configuracoes-0816.mjs`: a folga de 8 px dos dois lados
+do scroller (com o card ainda a 14 px da borda do render), o hover do HUD em
+`--accent`, a linha "Cor do cavalo" nascendo espelhada e acionando a decisão
+única, e as quatro transições do para-lama — veste a tinta do baú, volta ao de
+fábrica, a cor própria ganha dela, e tirar a cor própria devolve a peça.
+
+⚠️ O conjunto da bancada **não tem material `paralamas`** (52 materiais no
+implemento, nenhum casa), então o portão 4 exercita o mecanismo num para-lama
+sintético. Vale registrar como pergunta em aberto: nesta cópia dos assets a linha
+"Paralamas" do card não tem o que pintar.
+
+---
+
+## 19. A rodada de 2026-08-16 (noite) — a PLACA DE LICENCIAMENTO nos 50
+
+O pedido: *"crie uma placa 3D com essa imagem, e adicione em todos os modelos 3D
+do meu truck studio, todos os cavalos e o implemento, garanta que ira cobrir
+todos os modelos, achar todos os locais que sao necessarios para estarem
+corretamente posicionados"*.
+
+⚠️ **"PLACA" JÁ ERA DUAS OUTRAS COISAS AQUI**, e confundi-las custa caro. A
+**chapa** da carroceria do implemento (`PLATE_PITCH`, `plateSeams()`,
+`PlateGrid`, §9.7) e o **prato** da quinta roda (`fifthWheel.plateTopY` em
+`hitch.json`). Esta seção é sobre a placa do DETRAN, padrão Mercosul,
+400 × 130 mm. O módulo se chama `vehicle/license-plate.ts` por isso.
+
+| arquivo | papel |
+|---|---|
+| `tools/placa/build.py` | prepara a arte: recorte, cantos e o normal map do relevo |
+| `tools/placa/probe.mjs` | mede o sítio nos 49 cavalos → `models/vehicles/plates.json` |
+| `tools/placa/contato.py` | monta a folha de contato das 49 fotos |
+| `engine/vehicle/license-plate.ts` | a geometria, o material e as duas montagens |
+| `tools/studio-bench/checks-placa-0816.mjs` | o portão |
+| `tools/studio-bench/checks-placa-frota-0816.mjs` | a cobertura, chassi a chassi |
+
+### 19.1 As duas metades são diferentes, e por quê
+
+|  | onde a posição sai | por quê |
+|---|---|---|
+| 49 cavalos | `models/vehicles/plates.json` | o `.glb` não muda em runtime |
+| implemento | MEDIDA a cada rebuild | ele é PARAMÉTRICO |
+
+É a mesma divisão que `hitch.json` já faz — o lado do cavalo congelado com o
+`sha256` dos bytes, `implements: {}` porque o baú anda a cada medida digitada.
+Uma posição de traseira congelada estaria errada no primeiro redimensionamento e
+errada **em silêncio**.
+
+### 19.2 A sonda: z-buffer e ajuste de plano
+
+Cinco decisões, e as cinco vieram de uma tentativa que falhou antes:
+
+1. **A orientação sai das RODAS, não de `hitch.json`.** Dois dos 49 arquivos
+   (`scania_r_2016_6x2t`, `vw_titan_6x2_tl`) não têm entrada lá. O eixo
+   direcional é a frente por definição, e os bakes nomeiam `wheel_f_*` /
+   `wheel_r_*`. Conferido contra os 47 que têm entrada: bate em 47 de 47.
+2. **A superfície sai de um Z-BUFFER, não de vértices.** Amostrar vértice não
+   responde "o que uma placa encostada aqui tocaria": um painel plano de meio
+   metro quadrado tem QUATRO vértices. A primeira versão da sonda reprovou os 49
+   por "cobertura < 50 %". Rasterizar cada triângulo dianteiro numa grade de
+   5 mm transforma a pergunta numa leitura.
+3. **O sítio sai de um AJUSTE DE PLANO.** Para-choque de caminhão não é
+   vertical: medido, ele cai de 1° (Scania S 2024e) a 27° (DAF XG) dentro da
+   própria pegada. Mínimos quadrados devolvem posição e inclinação de uma vez, e
+   o resíduo separa o painel da grade.
+4. **O critério é `rms`, não o resíduo máximo.** Um rebite estoura o máximo e não
+   atrapalha placa nenhuma. Com `rms ≤ 8 mm` o passe estrito acha sítio em
+   **46 de 49** (as três variantes do XF 105 caem em `AUTORADOS`); com
+   `res ≤ 15 mm` sozinho ele perdia sete.
+5. **A altura preferida é 0,45 m dentro da BANDA MAIS BAIXA**, e não "a mais
+   baixa que passa" (no FH 2021 isso punha a borda de baixo rente ao fundo do
+   para-choque) nem "a de menor resíduo" (essa sobe para o radiador em metade da
+   frota).
+
+**Validação independente que não foi encomendada:** o `vw_titan_6x2_tl` é o único
+bake do acervo que já traz um nó `placa_p0` — e a sonda, que não lê nome nenhum,
+parou exatamente em cima dele (`y = 0,750`, `rms 1,9 mm`).
+
+### 19.3 O `vão`, e por que a placa tem um BERÇO
+
+Nenhum para-choque é um plano de 400 × 130 mm. Medido nos 49, o afastamento
+entre a chapa e a superfície **no contorno** da placa tem mediana de 10 mm, mas
+sete modelos passam de 29 mm — e o DAF XF 105 não tem 130 mm planos em ponto
+nenhum da dianteira (a face externa do para-choque mede 70 mm e logo acima
+começa a grade de palhetas com passo de 10,5 cm; é o único MODELO em
+`AUTORADOS`, e entra com as três variantes de eixo).
+
+Encostar a placa no ponto mais saliente e deixar o resto no ar dá uma placa
+FLUTUANDO. Então ela ganha o que um caminhão de verdade tem: uma bandeja rasa e
+escura atrás dela, com a profundidade que aquele modelo pediu. Onde o vão é de
+3 mm o berço é um aro; onde é de 45 mm ele é o suporte que aquele para-choque
+exigiria de fato.
+
+⚠️ **O vão é medido na BORDA, não na pegada inteira** — a diferença chega a 30 mm.
+Um furo de parafuso no meio do para-choque fica ATRÁS da placa e ninguém o vê;
+deixá-lo mandar transformava o aro de 7 mm do FH 2021 numa caixa de 41 mm.
+
+### 19.4 Ela reflete, e isso não é efeito
+
+Placa Mercosul brasileira é película retrorrefletiva com caracteres estampados
+por cima. `vehicle/retroreflect.ts` (§12.5) já implementa esse lóbulo, e a última
+linha do shader de lá multiplica o retorno pelo **albedo do fragmento**. Numa
+placa isso é fisicamente certo de graça: o fundo branco devolve, os caracteres
+pretos não. Por isso o material se chama `placa-retrorrefletiva` — o nome CASA
+`FITA_RE` de lá, e a injeção acontece sem uma linha nova de GLSL.
+
+⚠️ **O nome do material é FUNCIONAL.** Renomeá-lo para algo que não case
+`/retro.?reflet/i` apaga a retrorreflexão sem erro nenhum, e o sintoma é uma
+placa que some à noite.
+
+### 19.5 No implemento ela vai no PORTA-PLACA, não no para-choque
+
+A primeira versão pôs a placa no para-choque traseiro, centrada. O Kennedy
+corrigiu com uma captura: *"no implemento a placa vai essa placa a direita da
+imagem, em baixo da lanterna traseira, nao no parachoque"*. E o bake dá razão a
+ele — o porta-placa EXISTE:
+
+```
+painel    x −1,167…−0,705   y 0,913…1,098   z −7,273…−7,213     462 × 185 mm
+lanterna  x −1,206…−0,648   y 1,089…1,254   z −7,328…−7,266
+```
+
+Um painel raso encostado por baixo na lanterna, alinhado com ela em x, em que uma
+placa de 400 × 130 mm cabe com 23 mm de folga de cada lado. É a única peça da
+traseira cujas medidas só fazem sentido como porta-placa.
+
+⚠️ **Achado por GEOMETRIA, não por nome.** O nó se chama
+`stitch_result_stitch_all_plastico-preto_0_7`, e o `_7` é o índice de um export
+que o próximo re-bake renumera em silêncio — a mesma armadilha do cabeçalho de
+`landing-gear.ts`. A regra é a definição da peça: *é o painel raso que fica
+abaixo da lanterna traseira, alinhado com ela em x, e grande o bastante para uma
+placa*.
+
+⚠️ **E o lado é o da DIREITA DO VEÍCULO** — que é o lado direito de quem olha a
+traseira, porque olhar a traseira é encarar a mesma direção para a qual o veículo
+aponta. Com a frente em `+z` e o topo em `+y`, a direita é `frente × topo = −x`.
+O bake nomeia lados de forma inconsistente (`PARABARRO-E` está em `x < 0` e
+`registro-MangueidaTraseira-E` em `x > 0`), então nome de nó não decide isto.
+
+### 19.6 O defeito que o porta-placa revelou — `HEAVY_VERTS` e `REAR_TAIL`
+
+Montada a placa, o portão da bancada reprovou o redimensionamento: **o
+porta-placa não acompanhava a traseira.** Num baú alongado em 2 m, a lanterna ia
+para `z −9,328` e o painel — com a placa nele — ficava em `−7,273`, ou seja 2 m
+dentro do veículo. É defeito ANTERIOR a esta rodada, e ele tinha **duas** causas
+independentes, as duas em `trailer-assembly.ts`:
+
+| constante | era | é | o que ficava para trás |
+|---|---|---|---|
+| `REAR_TAIL` | 0,25 | **0,28** | o painel erra a faixa por **17 mm** |
+| `HEAVY_VERTS` | 50 000 | **56 000** | a chapa furada tem 53 533 vértices |
+
+O `REAR_TAIL` antigo foi calibrado na peça mais dianteira que alguém tinha
+olhado, a tampa da lanterna (`z0 + 215 mm`). Abaixo da lanterna há mais conjunto,
+e ele passava despercebido porque também mora sob o piso. As oito malhas na
+janela entre 250 e 275 mm são todas traseira sem dúvida: os quatro painéis
+porta-placa, as duas mãos-francesas do quadro e os dois parafusos delas. 0,28 cai
+no meio do vazio — a próxima malha para cima é a prateleira do quadro em
+`z0 + 304 mm`, ou seja há 24 mm de folga.
+
+O `HEAVY_VERTS` partia o painel em dois: ele vem em DUAS malhas coincidentes — a
+chapa furada (53 533 vértices, e é a furação que a engorda) e o fundo (16 069).
+Com o corte em 50 000 só o fundo recuava. O acervo sob o piso não tem nada entre
+58 763 e os monstros que o filtro existe para pular: para-lama 58 763 ·
+**porta-placa 53 533** · pneus 44 593.
+
+⚠️ **O que ainda NÃO está consertado**, e fica registrado: a prateleira
+`Metal-preto_0_20/_0_21` (13 mm de espessura, `z máx −7,176`) continua parada,
+porque erra `REAR_GRIP` por 4 mm no outro extremo. É uma chapa fina escondida sob
+o quadro; consertá-la pede rever a regra, não esticar mais a faixa — esticar até
+0,31 varreria junto as lanternas laterais, que são da SAIA e têm de ficar.
+
+### 19.7 Custo, e o que ficou provado
+
+**Duas chamadas de desenho por placa** — a arte e o casco escuro são dois
+materiais na mesma geometria —, quatro no conjunto engatado, de 552. A peça sai
+da fusão pelo mesmo motivo da patola (§16.1): um balde assa os vértices na pose
+do instante, e a placa do implemento anda o resize inteiro.
+
+⚠️ Mas a exclusão que DISPARA não é a de nome. `merge.ts` testa as estruturais
+antes das de dono, e a primeira é `Array.isArray(o.material)` — medido,
+`mergeInfo().excluidas` traz `"material em array": 1`, que é a placa. A regra
+`^PLACA$` fica como REDE: no dia em que alguém unificar os dois materiais num
+atlas, a proteção estrutural evapora sem erro nenhum e é ela que segura a peça.
+
+`checks-placa-0816.mjs` prova sete propriedades: o manifesto com 49, a posição
+local igual ao manifesto, o porta-placa achado fora do eixo e na altura certa, a
+arte decodificada (uma textura 404 dá uma chapa branca que passa despercebida em
+toda verificação geométrica), o resize acompanhando a lanterna **peça a peça**, a
+sobrevivência à fusão, e a troca de cavalo repondo a placa nos seis fabricantes.
+`checks-placa-frota-0816.mjs` carrega os 47 que têm card e fotografa cada um.
+
+⚠️ **ELE NÃO CABE NUMA CORRIDA SÓ**, e isso custou duas tentativas mortas pelo
+prazo sem uma linha de relatório (a bancada só imprime no fim). São ~50 s por
+cabine; rode com `--marca`, um fabricante por vez — o filtro chega pela linha de
+comando via `window.__benchArgv`, que é um gancho novo de `bench.mjs`. E dois
+chassis são "Em breve": o card deles nasce `disabled`, `applyChoice()` não entra,
+e mandá-los para o laço custava 300 s de espera CADA. Eles continuam no
+manifesto, e o portão verifica isso estaticamente.
+
+**O resultado:** 47 de 47 carregaram com a placa no sítio do manifesto, zero
+falhas. `tools/placa/contato.py` monta a folha de contato; nela 40 dos 47
+quadros mostram a placa e 7 a perderam pela borda — o estúdio recusa câmera
+colada (`minDistance` é uma esfera de ~1 raio do rig em volta da mira, mais a
+expulsão de corpo), então o enquadramento apertado nem sempre fecha. Todos os
+sete são cobertos por um irmão do mesmo modelo ou pelo portão 8.
+
+⚠️ **Um portão desta rodada PASSOU EM FALSO na primeira escrita**, e vale o
+registro: ele comparava a placa com a lanterna lendo `getWorldPosition()` dos
+nós — que devolve a ORIGEM do nó, não a geometria — e concluía "andaram o mesmo:
+0 mm" quando nenhuma das duas tinha andado. Quem responde é a caixa por VÉRTICE.
+
+---
+
+## 20. 2026-08-16 — a marca d'água do vídeo (substituída no mesmo dia — ver §22)
+
+> *"adicione uma marca d'água com a logo ankaa no vídeo gerado, no canto inferior
+> direito"*
+
+### 19.1 As duas respostas óbvias não servem, e a razão é a mesma dos outros blocos
+
+**Um `<img>` posicionado por CSS** não funciona: *overlay de DOM nunca é composto
+no canvas*. É a mesma propriedade que `ui/chrome.ts` registra como **vantagem** da
+pílula de gravação ("ela pode dizer o que quiser sem sujar o arquivo") — aqui ela
+é o obstáculo. O gravador constrói cada `VideoFrame` a partir do canvas do
+renderizador e de mais nada.
+
+**Compor num canvas 2D intermediário** é o caminho que o cabeçalho de
+`scene/record.ts` já recusa por escrito para o caso geral: uma cópia de quadro
+inteiro por quadro, mais um segundo canvas, a 1080p60 — para carimbar um
+retângulo de 137 px.
+
+Sobra a certa: **um quadrilátero ortográfico desenhado no MESMO buffer, depois da
+cena**. Duas triângulos por quadro.
+
+### 19.2 `onOverlay` — a terceira lista de ganchos
+
+As duas que existiam correm **antes** do `renderer.render()`, que é exatamente o
+que um carimbo não pode fazer:
+
+| gancho | o que é | quando roda |
+|---|---|---|
+| `onFrame` | corrige ESTADO (grampos, expulsão, bruma) | sempre, até em quadro pulado |
+| `onDrawFrame` | DESENHA para alvo próprio (reflexo do piso) | antes da cena, para o piso o ler no mesmo quadro |
+| `onOverlay` | compõe POR CIMA do quadro pronto | depois do `render()` |
+
+Chamado nos **dois** sítios de desenho (o laço vivo e `renderOfflineFrame`),
+porque as duas gravações possíveis passam cada uma por um: o caminho offline
+desenha à mão, e a reserva em tempo real lê o canvas que o laço compôs. Uma marca
+que só existisse num dos dois faria alguns vídeos saírem sem ela — e o usuário não
+teria como saber qual caminho a máquina dele pegou, porque isso é uma descoberta
+de runtime.
+
+⚠️ **Quem entra ali é responsável pelo `autoClear`.** Um segundo `render()` com a
+bandeira ligada — que é o padrão — **limpa o buffer e joga fora a cena que acabou
+de ser desenhada**, sem erro nenhum. O assinante guarda e devolve.
+
+### 19.3 As decisões do carimbo
+
+* **`toneMapped: false`.** O renderizador sai em ACESFilmic, que escurece e
+  dessatura tudo que passa por ele. Um logo tone-mapeado sairia com o verde da
+  marca lavado **e diferente em cada cenário**, porque a exposição muda com a hora
+  do dia.
+* **O tamanho sai da ALTURA do quadro** (5,5 %), nunca da largura, e a folga
+  também (3 %). Ancorar na largura pareceria natural e erraria em 21:9: o mesmo
+  vídeo ganharia um logo 40 % maior só por ser mais largo.
+* **Mipmap + anisotropia.** O PNG tem 875 px e é desenhado com ~137: sem mipmap a
+  minificação amostra um texel a cada seis e o contorno vira serrilha
+  **piscante**, que num vídeo é o pior tipo de artefato.
+* **Opacidade 0,85.** Uma marca d'água é assinatura, não selo.
+* **Falhar não cancela nada.** Quatro minutos de render perdidos por um PNG de
+  40 KB que não respondeu seria a pior troca possível: o vídeo sai sem a marca e a
+  ressalva de `degraded` diz.
+
+### 19.4 Onde ela NÃO aparece, e é decisão
+
+O viewport vivo (ninguém trabalha com um logo grudado no canto), a **foto**
+(`capture.ts` renderiza para alvo próprio e nunca chama o gancho — e um carimbo
+num recorte transparente destruiria o que aquele modo entrega) e a **prévia** do
+criador (ela existe para decidir o movimento da câmera).
+
+⚠️ E o `/branding/logo.png` é servido pelo **WEB**, como o decodificador Draco e
+as fontes — não pela árvore do studio. `BRAND_LOGO` é absoluto e **não passa por
+`assetUrl()`**; prefixá-lo com `STUDIO_BASE` daria um 404 mudo. A bancada precisou
+ganhar `/branding/` na lista de diretórios servidos, senão toda gravação saía com
+a ressalva e o caminho de degradação passava por certo.
+
+### 19.5 O que ficou provado
+
+`checks-percurso-video-0816.mjs` mede o **pixel**: com a marca desligada, o canto
+inferior direito tem **0** pixels do verde da marca; com ela ligada, **706 de
+3 640** (a caixa exata do logotipo). E confere que a bandeira foi solta no fim —
+ligada por engano ela carimbaria o estúdio inteiro, inclusive a próxima foto, até
+alguém recarregar a página.
+
+---
+
+## 21. 2026-08-16 — a prévia, de novo: o "por algum motivo" tinha nome
+
+> *"tinha parado de bugar durante o preview, mas voltou por algum motivo,
+> ultrathink para uma própria análise e garanta que irá fazer funcionar como
+> esperado, suave"*
+
+**"Por algum motivo" é a parte informativa.** Um defeito que vai e volta sem o
+código mudar depende de ESTADO — e o estado, aqui, é a **escala de render no
+instante em que se aperta ▶**.
+
+### 20.1 O que a primeira tentativa (§17.6) errou
+
+1. **Ela culpou o flash de realocação.** A hipótese era que o controlador de
+   qualidade, vendo quadros caros, trocava a escala e o `setSize()` limpava o
+   drawing buffer — um quadro em branco por degrau. **É falso, e o próprio
+   `scene.ts` prova**: aquele defeito existiu, foi relatado ("está dando umas
+   piscadas às vezes") e **já foi consertado** — `flushPendingScale()` aplica a
+   escala no TOPO do quadro, antes do `render()`, justamente para que realocação
+   e desenho caiam no mesmo quadro. Não havia flash a evitar.
+
+2. **E, pior, ela tirou a única válvula que ajudava.** `markBusy()` congela o
+   controlador — e o controlador é exatamente quem abaixa a resolução quando o
+   quadro não cabe no orçamento. A prévia virou **a única interação do estúdio
+   sem adaptação**: com a escala em 1,0 no clique, ficava em 1,0 o percurso
+   inteiro; com a escala já baixa (porque o usuário tinha acabado de orbitar numa
+   cena pesada), ficava lisa. É esse o "por algum motivo".
+
+3. **E o corte do reflexo estava condicionado à medida errada.**
+   `floorReflectionCost()` devolve ms de **submissão**, e o próprio
+   `floor-reflection.ts` avisa por escrito que a conclusão antiga não pode ser
+   copiada para a cena fundida: depois do `merge`, a submissão deixou de dominar
+   e o que sobrou é **preenchimento**, que aquele número não mede. Um limiar
+   sobre a grandeza errada é um botão que às vezes liga.
+
+### 20.2 A resposta: um MODO PROXY, imediato e determinístico
+
+Toda ferramenta de vídeo tem uma prévia mais barata que o render final, e pela
+mesma razão: o que se decide olhando uma prévia de câmera é o **movimento**.
+Resolução e reflexo não mudam essa decisão; a fluidez muda.
+
+Enquanto a prévia toca — e voltando exatamente como estava ao pausar:
+
+* **o reflexo do piso sai, sem limiar nenhum.** É uma segunda renderização
+  completa da cena, e o diagnóstico do próprio estúdio na máquina do dono o mede
+  em **4,6 ms de um quadro de 16,2 ms — 29 %**;
+* **a escala de render cai para 0,70 no primeiro quadro.** Não adianta esperar o
+  controlador: `SCALE_COOLDOWN_DOWN` é 900 ms **por degrau**, então ele levaria
+  ~2 s para chegar onde este corte chega imediatamente — e uma prévia de 4 s
+  teria metade dela travada antes de o socorro chegar. O preenchimento segue a
+  escala **ao quadrado**.
+
+⚠️ E o controlador **continua congelado**, agora pelo motivo certo — que não é o
+flash: no nível Alta o piso da faixa dele é `0,80`, ou seja **acima** do que o
+proxy já aplicou (ele não tem nada melhor a oferecer sem descer de NÍVEL); e
+descer de nível no meio de um movimento **liga o LOD** (`lodMinPx` é 0 no Alta e
+positivo abaixo), fazendo centenas de peças pequenas aparecerem e sumirem — *isto*
+sim seria visto como "flicando".
+
+A escala não é persistida (`setScale` só avisa ouvintes), então mexer nela não
+deixa rastro na sessão; a restauração é **guardada, não recalculada**, e só
+devolve se o valor ainda for o nosso — alguém pode tê-la fixado pelo console no
+meio.
+
+### 20.3 A resposta de produto: dizer o número
+
+Enquanto a prévia toca, o relógio mostra **`1,2 s / 4 s · 60 fps`** e a nota do pé
+troca de assunto abaixo de 50 fps:
+
+> *"A prévia está a 24 fps nesta máquina — o VÍDEO sai a 60, liso: ele é desenhado
+> quadro a quadro, fora do tempo real."*
+
+⚠️ **É a resposta à pergunta que o usuário tem e não faz.** "A prévia está
+travada" quase sempre quer dizer *"o vídeo vai sair assim?"* — e a resposta é
+**não**, categoricamente. Sem essa linha, a pessoa desiste de um percurso que
+estava certo.
+
+### 20.4 O que a bancada prova, e o que ela não pode provar
+
+`checks-previa-proxy-0816.mjs` mede **no cenário do relato** (Estúdio, com o piso
+polido — a primeira medição rodou no distrito e por isso deu 60 fps cravados e não
+disse nada). Ela prova o MECANISMO, **dentro** da reprodução: o proxy ligado, o
+reflexo fora, a escala em 0,70, a taxa sendo medida, e tudo devolvido ao pausar.
+
+⚠️ O que ela **não** pode provar: aqui o laço fica travado em vsync (16,6 ms) com
+folga em qualquer configuração, então nenhum tempo daqui refuta ou confirma o
+engasgo do dono. E `frameSplit` **não vale durante a prévia** — `markBusy()` põe o
+laço numa janela ocupada e a repartição só é atualizada fora dela.
+
+---
+
+## 22. 2026-08-16 — a marca d'água saiu, entrou uma VINHETA de encerramento
+
+> *"remova a marca d'água durante o vídeo, e coloque ao final esse vídeo, de
+> forma sutil, suave a transição, mas a animação está demorando muito iniciar,
+> então corte o início do vídeo"*
+
+A troca é boa e vale dizer por quê: **um carimbo no canto pesa em todo quadro e
+nunca é o assunto; uma vinheta no fim pesa em nenhum e é o assunto por sete
+segundos.** `scene/watermark.ts` foi apagado inteiro (era o §20); nasceu `scene/outro.ts`.
+
+### 21.1 O asset: cortado, sem áudio, e em DOIS contêineres
+
+O original tinha 10 s e **os 2,2 s iniciais eram fundo vazio** (medido: o
+primeiro pixel verde aparece em 2,375 s). O arquivo shipado começa em 2,2 s —
+sobram ~0,2 s de fundo limpo, que é exatamente onde a dissolvência pousa. Áudio
+removido: o gravador não tem trilha.
+
+⚠️ **São dois arquivos, e o WebM vem primeiro.** Não é redundância: um `<video>`
+com **H.264 derruba o processo de GPU** no `chrome-headless-shell` — medido, com
+`isContextLost() === true` logo depois do `load()`. VP9 não. O mesmo par existe
+do outro lado do estúdio (o gravador), pela mesma doutrina. E o VP9 pesa 295 KB
+contra 1,5 MB.
+
+### 21.2 O quadro tem de nascer NO CANVAS DO RENDERIZADOR
+
+`openOfflineEncoder()` amarra um `mb.CanvasSource` a `renderer.domElement`: toda
+a pipeline pende daquele canvas. Então a vinheta é desenhada **como cena** — um
+quadrilátero ortográfico de tela cheia com a textura do `<video>`, pelo gancho
+`onOverlay` que a marca d'água havia introduzido.
+
+**Dois relógios, porque são duas naturezas:**
+
+| caminho | quem avança a vinheta | por quê |
+|---|---|---|
+| offline | `currentTime` (busca) | o vídeo é montado FORA do tempo real; um `play()` sairia acelerado ou arrastado conforme a máquina |
+| reserva | `play()` | o `MediaRecorder` carimba pelo relógio de parede — tocar é a única forma de sair na velocidade certa |
+
+E a ordem no laço offline é contrato: **buscar (assíncrono) → desenhar → `add()`**.
+Um `await` entre o desenho e a captura dá vídeo preto.
+
+### 21.3 Três defeitos encontrados medindo, e nenhum deles lançava
+
+Esta rodada foi um estudo de caso de falha silenciosa. Os três produziam um MP4
+que **abre, tem a duração certa e está errado**:
+
+1. **Contexto WebGL perdido → 240 quadros pretos em 44 KB.** Causado pelo
+   `<video>` H.264 no headless, mas a causa é secundária: quando o contexto cai,
+   `renderer.render()` **sai na primeira linha sem erro**, o laço continua e o
+   arquivo é entregue como sucesso. O gravador não tinha guarda nenhuma.
+   Agora tem: `contextLost()` antes de abrir o codificador e a cada 30 quadros,
+   com uma mensagem que diz o que houve e o que fazer.
+2. **A carga da vinheta estava DENTRO da preparação**, depois de
+   `pinCeilingProfile()`, dos 1080p forçados e do `stopLoop()` — uma espera de
+   REDE com o estúdio preparado e parado. Foi para junto da sondagem de codec,
+   que é o bloco documentado como "antes de qualquer mutação".
+3. **`VideoTexture` congelada.** Ela delega a atualização ao
+   `requestVideoFrameCallback`, que só dispara quando o vídeo **apresenta** um
+   quadro — e o laço offline nunca apresenta. A vinheta saía como sete segundos
+   de fundo parado. ⚠️ E a resposta óbvia (trocar por uma `Texture` comum e
+   marcar `needsUpdate` na mão) sai **pior**: o `WebGLTextures` só passa o
+   elemento direto ao `texImage2D` quando `isVideoTexture` é verdadeiro; no
+   caminho comum ele lê `image.width`, que num `<video>` é 0, e sobe uma textura
+   vazia — a vinheta saiu PRETA. A combinação certa é a classe `VideoTexture`
+   (pelo upload) com `needsUpdate` marcado à mão (pelo gatilho).
+
+### 21.4 E um quarto, na bancada — que também era invisível
+
+Com o servidor da bancada sem `Accept-Ranges`, o `<video>` reportava
+`readyState 4`, a duração certa e **`seekable` VAZIO**: todo `currentTime = t`
+era aparado para 0 em silêncio e o fecho saía congelado. Um navegador só habilita
+busca em mídia quando o servidor anuncia range — ter o arquivo inteiro em memória
+não basta. `bench.mjs` ganhou requisições parciais (206) e o tipo MIME de `.mp4`
+e `.webm`; um tipo errado é pior que um arquivo ausente, porque passa por
+meio-certo.
+
+### 21.5 O que ficou provado
+
+`checks-percurso-video-0816.mjs`: o arquivo mede **percurso + vinheta** (2 +
+7,792 = 9,8 s, 588 quadros), e a vinheta é **buscável** — o portão que faltava
+quando ela saiu congelada. O conteúdo é julgado fora, com ffmpeg: quadro 110 é a
+cena, 135 é a dissolvência (o caminhão sumindo enquanto a estrela entra), 165 em
+diante é a animação correndo até o logotipo montado.

@@ -187,6 +187,11 @@ if (cyc?.setFloorReflection) {
   await fps('fps na pose lateral · reflexo a 1/4 de lado');
   cyc.setFloorReflectionScale(0.5);
 }
+/* Números do ÚLTIMO quadro desenhado pelo laço — `scene/scene.ts` é quem zera
+   o contador (à mão, desde 2026-08-15). ⚠️ `calls` mudou de significado nessa
+   data: agora inclui o passe de SOMBRA e a passada do reflexo do piso, ou seja
+   tudo que o quadro submete. Um salto de ~2 200 para ~3 800 aqui não é
+   regressão — é o número que sempre foi verdade e que ninguém via. */
 out.push(['desenho', {
   tris: renderer.info.render.triangles,
   calls: renderer.info.render.calls,

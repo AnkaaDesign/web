@@ -14,7 +14,7 @@ import { $, $$, evTarget, isMounted, root } from '../core/dom';
 import {
   surfaces, SURFACE_KEYS, active, activeKey, setActiveKey, otherSide,
   CAPTIONS, SIDE_LABEL, DEFAULT_BG, markDirty, sizeModalCanvas, stagePanels, setStageResizer,
-  pxToCm, cmToPx, panelMM, mmPerPx, cabPaintColor, isImplementPainted,
+  pxToCm, cmToPx, panelMM, mmPerPx, cabPaintColor, isImplementPainted, getSnapshot,
 } from '../vehicle/livery';
 import type { SurfaceKey } from '../vehicle/livery';
 import {
@@ -201,6 +201,32 @@ let panX = 0, panY = 0;
 let panPicked = false;      // o gesto começou no VAZIO do painel?
 let spaceHeld = false;
 
+/**
+ * O clique caiu sobre o Thermo King do RETRATO desta face?
+ *
+ * `false` sempre que a resposta não for certa: fora da testeira, sem retrato,
+ * sem unidade em cena (ela pode ter sido removida do produto no card de
+ * Configurações) ou com o palco ainda sem layout. Errar para "é o Fundo"
+ * preserva o comportamento de antes, que é o certo para um alvo de clique.
+ *
+ * O PALCO É A FOTO INTEIRA — `sizeModalCanvas()` dá ao `.stage-panel` a largura
+ * e a altura do retrato e estica a imagem em `100% 100%` sobre ele —, então a
+ * fração medida no elemento é a MESMA fração em que `snap.tk` foi publicado.
+ * É por isso que não há conversão nenhuma aqui: uma segunda conta divergiria da
+ * primeira na primeira medida digitada.
+ */
+function hitsThermoKing(e: PointerEvent): boolean {
+  if (!tkPresent()) return false;
+  const rect = getSnapshot(activeKey())?.tk;
+  if (!rect) return false;
+  const el = stagePanels[activeKey()];
+  const r = el?.getBoundingClientRect();
+  if (!r || r.width <= 0 || r.height <= 0) return false;
+  const nx = (e.clientX - r.left) / r.width;
+  const ny = (e.clientY - r.top) / r.height;
+  return nx >= rect.x && nx <= rect.x + rect.w && ny >= rect.y && ny <= rect.y + rect.h;
+}
+
 function bindStagePan() {
   const stage = $('modal-stage');
 
@@ -281,7 +307,18 @@ function bindStagePan() {
     const c = active();
     c.discardActiveObject();
     c.requestRenderAll();
-    selectBackground();
+    /* ---- E NA TESTEIRA, O THERMO KING É UMA CAMADA COMO O FUNDO ----
+       Relato de 2026-08-16: *"o Thermo King, quando clico nele no livery, não
+       seleciona sua camada"*. Ele já É uma linha fixa da lista de camadas (ver
+       `thermoKingRow()`), mas o palco não sabia disso: a unidade não é um objeto
+       do fabric, é um pedaço da FOTOGRAFIA do baú, e todo clique na foto caía na
+       regra "clicar no caminhão seleciona o Fundo".
+
+       O retângulo dele vem do PRÓPRIO retrato (`snap.tk`, projetado pela mesma
+       câmera ortográfica que fez a imagem — ver livery-snapshot.ts), então ele
+       está em registro com o que o olho vê sem nenhuma segunda conta. */
+    if (hitsThermoKing(e)) selectThermoKing();
+    else selectBackground();
   };
   stage.addEventListener('pointerup', end, { capture: true });
   stage.addEventListener('pointercancel', end, { capture: true });
@@ -662,8 +699,32 @@ function syncBackground() {
   sw.classList.toggle('is-empty', !bg);
   sw.style.background = bg || '';
   $('bg-val').textContent = bg ? 'Personalizada' : 'Sem cor';
-  $('bg-row-face').classList.toggle('is-on', !!bg);
   ($('bg-clear') as HTMLButtonElement).disabled = !bg;
+
+  /* ---- QUEM MANDA NESTA FACE, e é UMA das duas ----
+     A pilha não mudou: a cor da face SOBREPÕE a do cavalo onde existir. O que
+     mudou é o que a forma diz sobre ela. A caixa "Cor do cavalo" é uma decisão
+     sobre o produto inteiro, então ela fica marcada em todas as faces — e até
+     2026-08-16 ela também ACENDIA em todas, inclusive nas que a ignoram. As
+     duas linhas verdes lado a lado leem como duas opções exclusivas ligadas ao
+     mesmo tempo, que foi o relato ("e não deveria... isso acontece até nas
+     laterais"). O anel agora marca o vencedor; o perdedor fica apagado, e o
+     estado dele diz por quê.
+
+     O CHECKBOX NÃO É TOCADO. Desmarcá-lo "para ficar coerente" desligaria a
+     tinta do baú inteiro por causa de uma face — que é justamente o defeito que
+     `setBackgroundsForPaint()` tinha e foi apagado por isso. */
+  const cavaloManda = painted && !bg;
+  const cavaloSobreposto = painted && !!bg;
+  $('bg-row-cab').classList.toggle('is-on', cavaloManda);
+  $('bg-row-cab').classList.toggle('is-muted', cavaloSobreposto);
+  $('bg-cab-val').textContent = cavaloSobreposto ? 'sobreposta aqui' : 'todo o baú';
+  $('bg-row-cab').title = cavaloSobreposto
+    ? 'A tinta do cavalo continua valendo para o baú — esta face tem cor própria'
+      + ' e fica por cima dela.'
+    : 'Estende a pintura do cavalo ao implemento inteiro. As faces com cor própria'
+      + ' continuam com ela.';
+  $('bg-row-face').classList.toggle('is-on', !!bg);
 
   $('bg-state').textContent = bg ? 'cor própria' : painted ? 'cor do cavalo' : 'chapa branca';
   $('bg-hint').textContent = bg
@@ -685,6 +746,10 @@ function setBackground(value: string, commit: boolean) {
   markDirty(key);
   c.requestRenderAll();
   syncBackground();
+  /* E a seção do Thermo King também, porque a dica dela FALA desta cor: sem
+     isto, escolher um preto na testeira deixaria a explicação de "por que a
+     carcaça não ficou preta" esperando o próximo clique em outra coisa. */
+  syncThermoKing();
   /* A LISTA DE CAMADAS SÓ NO COMMIT. `input` chega a cada pixel percorrido
      dentro do seletor nativo, e remontar a lista inteira a cada um deles é
      reconstruir DOM sessenta vezes por segundo para mudar um quadradinho de
@@ -771,10 +836,42 @@ function syncThermoKing() {
   const sw = $('tk-sw');
   sw.classList.toggle('is-empty', !hex);
   sw.style.background = hex || '';
-  $('tk-val').textContent = hex ? 'Personalizada' : 'Como o baú';
+  $('tk-val').textContent = hex ? 'Personalizada' : 'Sem cor';
   $('tk-row').classList.toggle('is-on', !!hex);
   ($('tk-clear') as HTMLButtonElement).disabled = !hex;
-  $('tk-state').textContent = hex ? 'cor própria' : 'como o baú';
+  $('tk-state').textContent = hex ? 'cor própria' : painted ? 'como o baú' : 'branca de fábrica';
+
+  /* A LINHA DE CIMA — a mesma pilha do Fundo, e o mesmo estado.
+     Ela não guarda nada: espelha `#paint-trailer`, que é o dono da decisão.
+     Duas cópias do booleano divergiriam na primeira troca de caminhão. */
+  ($('tk-paint-cab') as HTMLInputElement).checked = painted;
+  const cavaloManda = painted && !hex;
+  $('tk-row-cab').classList.toggle('is-on', cavaloManda);
+  $('tk-row-cab').classList.toggle('is-muted', painted && !!hex);
+  $('tk-cab-val').textContent = painted && hex ? 'sobreposta aqui' : 'todo o baú';
+  /* ---- A DICA DIZ O QUE A CARCAÇA SEGUE, e é aqui que a pilha desta face
+     deixa de valer.
+     O Fundo do painel é PLOTAGEM: ele vira textura da chapa e não alcança a
+     máquina. A carcaça segue a TINTA do implemento, que é outra coisa — a do
+     cavalo quando "Cor do cavalo" está ligada, o branco de fábrica quando não.
+     Sem isto escrito, quem pinta a testeira de preto e vê a carcaça continuar
+     branca lê como defeito. Ver `followsBody` em `vehicle/trim.ts`. */
+  const faceComCor = !!active().backgroundColor;
+  $('tk-hint').textContent = (hex
+    ? (painted
+      ? 'A carcaça tem cor própria e ignora a cor do cavalo. O resto do baú'
+        + ' continua seguindo o cavalo.'
+      : 'A carcaça tem cor própria.')
+      + ' A pintura dela é sempre SÓLIDA — é o que sai de uma cabine de pintura,'
+      + ' e não a metálica da montadora.'
+    : (painted
+      ? 'Sem cor própria, a carcaça segue a tinta do implemento — hoje, a cor do'
+        + ' cavalo.'
+      : 'Sem cor própria, a carcaça fica branca de fábrica.'))
+    + (faceComCor
+      ? ' A cor do Fundo desta face é plotagem sobre a chapa e não alcança a'
+        + ' unidade: para pintá-la, escolha a cor aqui.'
+      : '');
 }
 
 /**
@@ -828,7 +925,23 @@ function renderLayers() {
     const name = document.createElement('input');
     name.className = 'lyr-name'; name.readOnly = true;
     name.value = a.name || defaultName(o);
-    name.addEventListener('dblclick', () => { name.readOnly = false; name.select(); });
+    name.title = 'Clique para selecionar · duplo clique para renomear';
+    /* ⚠️ O CLIQUE SIMPLES NÃO PODE PÔR O CURSOR AQUI, e é isto que devolve a
+       linha inteira à seleção.
+       O campo tem `flex: 1`, ou seja é quase toda a largura da linha. Enquanto
+       ele aceitava foco no primeiro clique, clicar no nome — o gesto óbvio para
+       "selecionar esta camada" — punha um cursor de texto num campo somente
+       leitura e não selecionava nada; sobravam o punho, o ícone e a folga entre
+       os botões, que foi o "tenho que clicar numa área muito pequena".
+       `preventDefault()` no `mousedown` tira o FOCO e a seleção de texto sem
+       tirar o `click` nem o `dblclick`, que continuam sendo despachados — então
+       a linha recebe o clique e o duplo clique continua abrindo a edição. */
+    name.addEventListener('mousedown', (ev) => { if (name.readOnly) ev.preventDefault(); });
+    name.addEventListener('dblclick', () => {
+      name.readOnly = false;
+      name.focus();                            // o mousedown recusou o foco; aqui ele é pedido
+      name.select();
+    });
     name.addEventListener('blur', () => {
       name.readOnly = true;
       const v = name.value.trim();
@@ -865,7 +978,10 @@ function renderLayers() {
     row.append(grip, icon, name, eye, lock);
 
     row.addEventListener('click', (ev) => {
-      if (ev.target === name) return;
+      /* SÓ SAI CEDO ENQUANTO SE ESTÁ RENOMEANDO. Era `ev.target === name`, sem
+         a segunda metade, e com o campo ocupando a linha inteira isso queria
+         dizer "clicar no nome não seleciona" — ver o bloco do `mousedown`. */
+      if (ev.target === name && !name.readOnly) return;
       /* Um objeto travado não recebe clique NA TELA — selecioná-lo pela lista é
          a saída que faz o cadeado deixar de dar medo. */
       c.discardActiveObject();
@@ -1164,13 +1280,37 @@ function bindToolbar() {
     $<HTMLInputElement>('tk-color').click();
   });
 
+  /* A LINHA "COR DO CAVALO" DA SEÇÃO DO THERMO KING ACIONA A DO FUNDO.
+     ---------------------------------------------------------------------
+     Ela é a MESMA decisão vista de outro lugar (a tinta vale para o implemento
+     inteiro e a carcaça a segue por `followsBody`), então ela não implementa
+     nada: escreve no `#paint-trailer` e despacha o `change` dele. Assim o
+     caminho continua sendo UM — o de `bindTrailerPaint()` em vehicle/livery.ts,
+     que troca o material do 3D, refotografa e escreve o status — e os dois
+     controles não podem discordar.
+
+     `change` e não `click`: o `<label>` já alterna o checkbox interno antes de o
+     evento chegar aqui, e reagir ao clique alternaria duas vezes. */
+  $('tk-paint-cab').addEventListener('change', (e) => {
+    const alvo = $<HTMLInputElement>('paint-trailer');
+    alvo.checked = evTarget<HTMLInputElement>(e).checked;
+    alvo.dispatchEvent(new Event('change'));
+  });
+
   /* "Pintar o implemento" é de vehicle/livery.ts (ele mexe no material do 3D e
      no fundo das QUATRO telas de uma vez), mas agora mora nesta seção — então o
      inspetor tem de se redesenhar quando ele muda, ou a camada Fundo continuaria
      anunciando a cor que `setBackgroundsForPaint()` acabou de tirar. Segundo
      ouvinte no mesmo elemento, registrado DEPOIS do de lá (initLivery() roda
      antes de initLiveryEditor()), então lê o estado já aplicado. */
-  $('paint-trailer').addEventListener('change', () => { syncBackground(); renderLayers(); });
+  $('paint-trailer').addEventListener('change', () => {
+    syncBackground();
+    /* A carcaça do Thermo King SEGUE a tinta do implemento quando não tem cor
+       própria, então ligar e desligar esta caixa muda o que a seção dela diz —
+       "Como o baú" contra "De fábrica" — e a pastilha dela na lista de camadas. */
+    syncThermoKing();
+    renderLayers();
+  });
 
   $('stage-zoom').addEventListener('change', (e) => {
     const v = evTarget<HTMLSelectElement>(e).value;

@@ -1,0 +1,673 @@
+/* O CRIADOR DE VÍDEO — a folha.
+   ===========================================================================
+   O componente está em ui/timeline.ts, que abre explicando as três faixas e por
+   que a câmera é a fonte da verdade. Aqui só o desenho.
+
+   MATERIAL: o MESMO vidro fumê de tudo que flutua sobre o render, com o fundo
+   mais fechado — a mesma exceção que `.ts-shotmenu` faz em core/studio.css e
+   pelo mesmo motivo: um painel de TEXTO sobre céu claro pede mais opacidade que
+   um botão de ícone. Os tokens (`--ts-glass-*`) moram em core/studio.css; aqui
+   eles são só lidos, para que retocar o vidro do estúdio retoque este junto.
+
+   ⚠️ ESCURO NOS DOIS MODOS DO HOST, e por isso `--muted`/`--text` e NUNCA os
+   tokens `--ts-screen-*`. Aqueles viram cinza-escuro no Ankaa claro (o estúdio
+   os usa só na tela de carga e na cortina, que de fato acompanham o tema), e um
+   texto `#6b6b6b` sobre este fundo mede ~2,3:1 — some. É a mesma armadilha
+   registrada em `.ts-recnote`.
+
+   ⚠️ E ELE NUNCA OCUPA LAYOUT. `position: absolute` dentro de #canvas-holder:
+   mudar a CAIXA do holder dispara o ResizeObserver de mountStudio(), e um
+   resize() reescreve o buffer, a proporção da câmera e a âncora do floco
+   metálico. Sobrepor é seguro; ocupar não é. */
+
+.truck-studio-root .ts-tl {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9;                        /* acima dos badges (8), sob as pílulas (10) */
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 14px;
+  background-color: rgba(13, 13, 13, 0.9);
+  backdrop-filter: var(--ts-glass-filter-hover);
+  -webkit-backdrop-filter: var(--ts-glass-filter-hover);
+  box-shadow: var(--ts-glass-shadow-ctl);
+  color: var(--text);
+  font-size: 12px;
+  /* Tabular em toda a caixa: são seis lugares mostrando segundos e um deles
+     anda dez vezes por segundo. Sem isto a linha inteira dança porque o "1" é
+     mais estreito que os outros dígitos. */
+  font-variant-numeric: tabular-nums;
+  animation: ts-tl-in 180ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
+  transition: opacity 180ms ease;
+  /* Uma escrita no cabeçote não pode obrigar o navegador a recalcular o layout
+     da PÁGINA inteira do Ankaa por trás do estúdio. `layout style` e não
+     `paint`: conter a pintura criaria um bloco de contenção que muda o que
+     `position: absolute` dos filhos significa. */
+  contain: layout style;
+}
+@keyframes ts-tl-in {
+  from { opacity: 0; translate: 0 14px; }
+  to   { opacity: 1; translate: none; }
+}
+
+/* ---------- O VIDRO SAI DE CENA ENQUANTO A PRÉVIA TOCA ----------
+   `backdrop-filter` obriga o compositor a DESFOCAR o que está atrás do
+   elemento. Com o canvas parado esse desfoque é calculado uma vez e reusado — é
+   por isso que o vidro do estúdio é de graça no uso normal. Durante a prévia o
+   canvas repinta a cada quadro, e uma faixa de ~1400 × 200 px passa a ser
+   desfocada sessenta vezes por segundo EM CIMA do render que já está ocupando a
+   placa.
+
+   ⚠️ E ISTO É UMA ECONOMIA BARATA, NÃO O DIAGNÓSTICO DO ENGASGO. A primeira
+   versão deste bloco afirmava que o desfoque era "metade do conserto" de *"o
+   preview está muito travado, fica tipo flicando"* — e essa afirmação nunca foi
+   MEDIDA. A bancada roda travada em 60 fps (vsync) com e sem o vidro, e a causa
+   que a segunda passagem encontrou é outra e está documentada no § O MODO PROXY
+   de `scene/timeline.ts`: a escala de render, que a prévia congelava.
+   A regra fica porque continua sendo verdade que o desfoque custa e que durante
+   a prévia o assunto da tela é o RENDER — só não é ela que explicava o relato.
+   Ao pausar, o vidro volta. */
+.truck-studio-root .ts-tl.is-playing {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(10, 10, 10, 0.94);
+}
+
+/* ---------- some enquanto a mão compõe ----------
+   O gesto de arrastar a CENA devolve a tela inteira sem ninguém pedir; soltar
+   traz o dock de volta. `pointer-events: none` junto com a opacidade: um painel
+   a 12 % que ainda engole cliques é pior que um painel opaco. */
+.truck-studio-root .ts-tl.is-ghost {
+  opacity: 0.12;
+  pointer-events: none;
+}
+/* Recolhido: só a barra. Para quem quer enquadrar com calma sem fechar nada. */
+.truck-studio-root .ts-tl.is-min .ts-tl__bar,
+.truck-studio-root .ts-tl.is-min .ts-tl__strip,
+.truck-studio-root .ts-tl.is-min .ts-tl__hint { display: none; }
+.truck-studio-root .ts-tl.is-min { padding-bottom: 10px; }
+.truck-studio-root .ts-tl__min svg { transition: rotate 200ms ease; }
+.truck-studio-root .ts-tl__min.on svg { rotate: 180deg; }
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-tl { animation: none; }
+  .truck-studio-root .ts-tl__min svg { transition: none; }
+}
+
+/* ---------- faixa 1: a barra ---------- */
+.truck-studio-root .ts-tl__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.truck-studio-root .ts-tl__badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.truck-studio-root .ts-tl__meta {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Empurra o grupo da direita: as duas metades respondem perguntas diferentes
+     (o que este percurso É · o que fazer com ele), e um vão é mais legível que
+     um filete. Mesma escolha da `.tb-gap` da barra do editor de plotagem. */
+  margin-right: auto;
+}
+
+/* ---------- a lente ---------- */
+.truck-studio-root .ts-tl__lens {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px 3px 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.truck-studio-root .ts-tl__lenslabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.truck-studio-root .ts-tl__lensval {
+  min-width: 30px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
+.truck-studio-root .ts-tl__lensrange {
+  width: 96px;
+  height: 14px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+/* Os dois motores pedem os seletores separados: um `::-webkit-…, ::-moz-…`
+   junto INVALIDA a regra inteira nos dois. */
+.truck-studio-root .ts-tl__lensrange::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.2);
+}
+.truck-studio-root .ts-tl__lensrange::-moz-range-track {
+  height: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.2);
+}
+.truck-studio-root .ts-tl__lensrange::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 12px; height: 12px; margin-top: -4.5px;
+  border: 0; border-radius: 50%; background: var(--accent);
+}
+.truck-studio-root .ts-tl__lensrange::-moz-range-thumb {
+  width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--accent);
+}
+.truck-studio-root .ts-tl__lensrange:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+/* ---------- os botões da barra ---------- */
+.truck-studio-root .ts-tl__ghost {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--stroke-2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.truck-studio-root .ts-tl__ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--stroke-2);
+}
+.truck-studio-root .ts-tl__ghost:focus-visible,
+.truck-studio-root .ts-tl__go:focus-visible,
+.truck-studio-root .ts-tl__play:focus-visible,
+.truck-studio-root .ts-tl__add:focus-visible,
+.truck-studio-root .ts-tl__thumb:focus-visible,
+.truck-studio-root .ts-tl__kill:focus-visible,
+.truck-studio-root .ts-tl__ruler:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* "Gravar vídeo" — o único controle desta tela que produz um ARQUIVO, e por
+   isso o único em accent sólido. Mesma regra do `.ts-shotgo` do painel da
+   câmera, na escala desta barra. */
+.truck-studio-root .ts-tl__go {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #071108;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.truck-studio-root .ts-tl__go:hover:not(:disabled) {
+  background: #34d36c;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.28);
+}
+.truck-studio-root .ts-tl__go:active:not(:disabled) { background: var(--accent-solid); }
+/* Desabilitado e NÃO escondido: um botão que some leva o cursor junto e
+   reorganiza a barra debaixo da mão. O `title` explica o que falta. */
+.truck-studio-root .ts-tl__go:disabled,
+.truck-studio-root .ts-tl__play:disabled,
+.truck-studio-root .ts-tl__add:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ---------- faixa 2: transporte + régua ---------- */
+.truck-studio-root .ts-tl__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.truck-studio-root .ts-tl__play {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--stroke-2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.truck-studio-root .ts-tl__play:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: var(--accent);
+  color: #eafff1;
+}
+.truck-studio-root .ts-tl__play.on {
+  background: var(--accent-solid);
+  border-color: var(--accent);
+  color: #071108;
+}
+.truck-studio-root .ts-tl__clock {
+  flex: none;
+  min-width: 104px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* A RÉGUA. `position: relative` porque o cabeçote e os marcadores se ancoram
+   nela; a altura de toque é maior que a do trilho (o `padding` vertical), senão
+   arrastar um trilho de 4 px vira mira de precisão. */
+.truck-studio-root .ts-tl__ruler {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 9px 0;
+  cursor: pointer;
+  touch-action: none;                /* o arrasto é nosso, não da rolagem */
+}
+.truck-studio-root .ts-tl__ruler.is-off { cursor: default; opacity: 0.45; }
+.truck-studio-root .ts-tl__rulerfill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+/* O marcador de um ponto. Com PARADA ele ganha largura e vira uma faixa — é o
+   único jeito de ver, sem ler número nenhum, que o percurso descansa ali. */
+.truck-studio-root .ts-tl__mark {
+  position: absolute;
+  top: 6px;
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateX(-1.5px);
+  pointer-events: none;
+}
+/* O CABEÇOTE OCUPA A RÉGUA INTEIRA e o risco mora na borda esquerda dele — é o
+   que faz `translateX(u × 100%)` cair no pixel certo sem medir nada. Ver a nota
+   em `syncPlayhead()`. */
+.truck-studio-root .ts-tl__playhead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  pointer-events: none;
+  will-change: transform;
+}
+.truck-studio-root .ts-tl__playhead::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.7);
+}
+.truck-studio-root .ts-tl__playhead::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- faixa 3: a tira ---------- */
+.truck-studio-root .ts-tl__strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.truck-studio-root .ts-tl__strip::-webkit-scrollbar { height: 7px; }
+.truck-studio-root .ts-tl__strip::-webkit-scrollbar-thumb {
+  border-radius: 999px; background: rgba(255, 255, 255, 0.22);
+}
+
+.truck-studio-root .ts-tl__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  max-width: 460px;
+  padding: 6px 14px 6px 2px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.truck-studio-root .ts-tl__empty strong { color: var(--text); font-weight: 650; }
+
+/* ---- o cartão de um ponto: A FOTO, E MAIS NADA ----
+   A fileira de quatro botões que morava embaixo saiu a pedido (2026-08-16) —
+   ver o bloco em `keyCard()`. O cartão perdeu ~30 px de altura, e essa altura
+   voltou para a cena. `position: relative` porque o ✕ se ancora nele. */
+.truck-studio-root .ts-tl__key {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 152px;
+  padding: 5px;
+  border: 1px solid var(--stroke);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.truck-studio-root .ts-tl__key.is-on {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* A MINIATURA É O BOTÃO. Alvo grande para a ação mais frequente da tela — ver a
+   nota em `keyCard()`. */
+.truck-studio-root .ts-tl__thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0a0a0a;
+  cursor: pointer;
+}
+.truck-studio-root .ts-tl__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: scale 220ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+.truck-studio-root .ts-tl__thumb:hover img { scale: 1.05; }
+/* Sem retrato: a placa numerada, no mesmo tramado diagonal que o estúdio já usa
+   quando falta a foto de um caminhão (ver --ts-plate-* em core/studio.css). */
+.truck-studio-root .ts-tl__ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 22px;
+  font-weight: 700;
+  background-image: repeating-linear-gradient(
+    -45deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 8px);
+}
+/* O selo de "clique para ir" — ver a nota em `keyCard()`. Centrado sobre a
+   miniatura, com um véu por baixo para o ícone sobreviver a um enquadramento
+   claro (céu de meio-dia atrás de um contorno branco some). */
+.truck-studio-root .ts-tl__seal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+.truck-studio-root .ts-tl__thumb:hover .ts-tl__seal,
+.truck-studio-root .ts-tl__thumb:focus-visible .ts-tl__seal { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-tl__seal,
+  .truck-studio-root .ts-tl__thumb img { transition: none; }
+}
+
+/* O número desceu para o canto INFERIOR esquerdo quando o ✕ ocupou o superior
+   direito: um selo no topo à esquerda ao lado de um botão no topo à direita lê
+   como um PAR de botões, e um deles não faz nada. Embaixo ele fica na mesma
+   linha do instante, que é a outra coisa que identifica o ponto. */
+.truck-studio-root .ts-tl__num {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  min-width: 17px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.truck-studio-root .ts-tl__at {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+/* O ✕ DO CANTO. Sempre visível e discreto: ele é o único jeito de tirar um
+   ponto, e um alvo que só aparece no hover não existe para quem usa toque. O
+   véu escuro por baixo é o que o mantém legível sobre um enquadramento claro. */
+.truck-studio-root .ts-tl__kill {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.truck-studio-root .ts-tl__kill:hover {
+  background: rgba(232, 62, 62, 0.92);
+  color: #fff;
+}
+
+/* ---- O SELECT DE SEGUNDOS ----
+   Um `<select>` nativo, repintado: o menu que ele abre é do SISTEMA e não pode
+   ser estilizado de forma confiável em nenhum navegador — o que se pinta é o
+   gatilho. Vale a troca: um menu nativo é acessível de graça, funciona no toque
+   e não precisa de um segundo componente de popover flutuando sobre o render.
+   `appearance: none` para o triângulo padrão sair; o nosso vem no `::after` do
+   invólucro, que é quem tem `position: relative`. */
+.truck-studio-root .ts-tl__sel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--stroke-2);
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.96);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.truck-studio-root .ts-tl__sel:hover { border-color: var(--accent); }
+.truck-studio-root .ts-tl__sel:focus-within {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.truck-studio-root .ts-tl__sel::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -3px;
+  border-right: 1.3px solid var(--muted);
+  border-bottom: 1.3px solid var(--muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.truck-studio-root .ts-tl__selin {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 18px 4px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.truck-studio-root .ts-tl__selin:focus { outline: none; }
+/* O menu nativo abre com o fundo do SISTEMA; as opções precisam de cor própria
+   para não saírem texto claro sobre fundo claro num host de tema escuro. */
+.truck-studio-root .ts-tl__selin option {
+  background: #1c1c1c;
+  color: #d9d9d9;
+}
+.truck-studio-root .ts-tl__selin option:disabled { color: #6b6b6b; }
+
+/* ---- o conector: a linha e o tempo de viagem ---- */
+.truck-studio-root .ts-tl__conn {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  /* Alinhado com o MEIO DA MINIATURA e não com o meio do cartão: o cartão tem
+     uma linha de controles embaixo, e centrar na caixa inteira desceria a seta
+     para a altura dos botões. */
+  align-self: stretch;
+}
+.truck-studio-root .ts-tl__connline {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(
+    90deg, transparent, var(--stroke-2) 18%, var(--stroke-2) 82%, transparent);
+}
+/* A ponta da seta, à direita: ela diz o SENTIDO do percurso, que é a única
+   coisa que uma linha sozinha não diz. */
+.truck-studio-root .ts-tl__conn::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-top: 1px solid var(--stroke-2);
+  border-right: 1px solid var(--stroke-2);
+  transform: translateY(-50%) rotate(45deg);
+}
+.truck-studio-root .ts-tl__conn .ts-tl__sel {
+  position: relative;                /* acima da linha */
+}
+
+/* ---- marcar ponto ---- */
+.truck-studio-root .ts-tl__add {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 132px;
+  margin-left: 10px;
+  padding: 10px;
+  border: 1px dashed rgba(34, 197, 94, 0.5);
+  border-radius: 11px;
+  background: rgba(34, 197, 94, 0.07);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-align: center;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.truck-studio-root .ts-tl__add:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.17);
+  border-color: var(--accent);
+}
+
+.truck-studio-root .ts-tl__hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* ---------- ESCONDER O RESTO DA INTERFACE ----------
+   A lista está em core/studio.css, junto com a do modo limpo: uma lista só, num
+   lugar só. O que mora AQUI é o oposto — o que NÃO some. */
+
+/* Uma gravação em curso desabilita a tira inteira: a cortina cobre tudo, mas os
+   milissegundos entre ela cair e a repintura chegar são clicáveis. */
+.truck-studio-root .ts-tl.is-busy .ts-tl__strip,
+.truck-studio-root .ts-tl.is-busy .ts-tl__ruler,
+.truck-studio-root .ts-tl.is-busy .ts-tl__lens {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---------- telas estreitas ----------
+   Abaixo de 720 px o dock encosta nas bordas e os cartões encolhem: a régua e a
+   barra continuam inteiras, que são as duas coisas sem as quais a ferramenta não
+   funciona. A tira rola — ela já rolava. */
+@media (max-width: 720px) {
+  .truck-studio-root .ts-tl { left: 8px; right: 8px; bottom: 8px; padding: 8px; }
+  .truck-studio-root .ts-tl__lens { display: none; }
+  .truck-studio-root .ts-tl__clock { min-width: 76px; font-size: 10px; }
+  .truck-studio-root .ts-tl__key { width: 124px; }
+  .truck-studio-root .ts-tl__conn { width: 54px; }
+  .truck-studio-root .ts-tl__add { width: 108px; }
+  .truck-studio-root .ts-tl__go span { display: none; }
+  .truck-studio-root .ts-tl__go { padding: 7px 10px; }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  /* Sem blur o vidro é só um filme escuro sobre um render claro, e a tira de
+     miniaturas sumiria dentro dele. Mesma resposta do resto do estúdio: troca a
+     translucidez por uma superfície quase sólida. */
+  .truck-studio-root .ts-tl { background-color: rgba(11, 11, 11, 0.97); }
+}

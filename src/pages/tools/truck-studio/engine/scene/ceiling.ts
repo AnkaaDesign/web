@@ -53,7 +53,7 @@
    parece nada com a causa. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { scene, camera, invalidate, onFrame, onRig, getRig } from './scene';
+import { renderer, scene, camera, invalidate, onFrame, onRig, getRig } from './scene';
 import { getProfile, onQualityChange } from '../core/quality';
 
 /* ---------------- as medidas do modelo, em metros ----------------
@@ -148,10 +148,19 @@ let housingMat: THREE.MeshStandardMaterial | null = null;
 function corrugatedDeck(halfX: number, halfZ: number, pitch: number, rib: number) {
   const pos: number[] = [];
   const nor: number[] = [];
+  /* ⚠️ UV EM X, e ela existe por UM motivo só: carregar a MANCHA DAS BARRAS
+     (`buildSpillTexture`). `u = 0` é `x = −halfX` e `u = 1` é `x = +halfX`, que é
+     a mesma régua em que as calhas dos painéis são calculadas — ver
+     `bankLanes()`. `v` acompanha z e hoje ninguém a lê; ela vai junto porque uma
+     UV pela metade é a armadilha que a próxima textura aqui encontraria.
+     Dois vértices por quad em x bastam: a UV é INTERPOLADA por fragmento, então
+     a mancha tem a resolução da textura e não a da malha. */
+  const uv: number[] = [];
   /* Proporções do perfil medido: vale largo, crista curta, rampas curtas. */
   const wValley = pitch * 0.42, wRamp = pitch * 0.14, wCrest = pitch * 0.30;
   const n = Math.ceil((halfZ * 2) / pitch);
   const z0 = -n * pitch * 0.5;
+  const zSpan = n * pitch;
 
   const quad = (za: number, ya: number, zb: number, yb: number) => {
     /* Normal do segmento no plano (z,y), apontando para BAIXO. */
@@ -162,7 +171,10 @@ function corrugatedDeck(halfX: number, halfZ: number, pitch: number, rib: number
       [-halfX, ya, za], [halfX, ya, za], [halfX, yb, zb],
       [-halfX, ya, za], [halfX, yb, zb], [-halfX, yb, zb],
     ];
-    for (const p of v) { pos.push(p[0], p[1], p[2]); nor.push(nx, ny, nz); }
+    for (const p of v) {
+      pos.push(p[0], p[1], p[2]); nor.push(nx, ny, nz);
+      uv.push((p[0] + halfX) / (2 * halfX), (p[2] - z0) / zSpan);
+    }
   };
 
   for (let i = 0; i < n; i++) {
@@ -176,12 +188,120 @@ function corrugatedDeck(halfX: number, halfZ: number, pitch: number, rib: number
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 
 /** Uma caixa posicionada por centro e tamanho, já no referencial do grupo. */
 function bar(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number) {
   return new THREE.BoxGeometry(sx, sy, sz).translate(cx, cy, cz);
+}
+
+/**
+ * Onde cada painel corre, em x. UM painel no MEIO de cada vão entre vigas —
+ * nunca coincidente com a viga (onde ele ficaria escondido) e sempre no ritmo da
+ * estrutura.
+ *
+ * Virou função porque agora tem DOIS leitores: `buildLights()`, que põe o
+ * fixture, e `buildSpillTexture()`, que pinta a mancha dele na laje. Duas cópias
+ * da mesma conta acabariam desalinhando a mancha do painel no dia em que alguém
+ * mexesse no passo — e o sintoma seria uma sombra de luz ao lado da luz.
+ */
+function bankLanes(): number[] {
+  const pitch = SRC.beamPitch * K;
+  const lanes: number[] = [];
+  for (let i = -Math.ceil(HALF / pitch); i <= Math.ceil(HALF / pitch); i++) {
+    const x = (i + 0.5) * pitch;
+    if (Math.abs(x) < HALF) lanes.push(x);
+  }
+  return lanes;
+}
+
+/* ---------------- A MANCHA DAS BARRAS NA LAJE ----------------
+   ⚠️ NOVO EM 2026-08-16, e é a segunda metade de *"às vezes o branco das
+   lâmpadas some"*. O bloco do difusor explica a primeira (o painel vira de
+   perfil); esta é a outra: quando o painel encolhe, o que fica no alto do quadro
+   é a LAJE, e ela estava em **4/255 — preto absoluto**. Um teto de estúdio que
+   some e deixa um bloco preto no lugar não lê como "a luz sumiu de ângulo", lê
+   como defeito.
+
+   POR QUE ELA ESTAVA PRETA, e por que não se conserta com albedo: a laje é uma
+   superfície que olha PARA BAIXO. A chave está a 46° ACIMA dela, então
+   `N·L = 0` — ela não recebe direta nenhuma, e nenhum multiplicador de `color`
+   muda isso, porque `0 · qualquer coisa` é 0. O que ela tem é hemi de baixo,
+   ambiente e 14 % de ambiente por `envMapIntensity`. Daí os 4/255.
+
+   O QUE ESTÁ FALTANDO É FÍSICO, e é a razão de ele entrar como EMISSIVO e não
+   como luz: um banco de luz pendurado 34 cm abaixo da laje ILUMINA a laje. Numa
+   foto de estúdio de verdade a telha ao redor de cada barra é a parte mais clara
+   do teto; o resto continua escuro. Como `ceiling.ts` não cria luz nenhuma — ver
+   o cabeçalho, e a razão continua valendo —, a mancha é PINTADA: um
+   `emissiveMap` de uma linha só, alinhado às calhas por `bankLanes()`.
+
+   ⚠️ É UMA TEXTURA DE 1 PIXEL DE ALTURA. A mancha só varia em x (as barras
+   correm em z), então uma linha de 512 amostras descreve o teto inteiro; pedir
+   um mapa 2D aqui seria 512x mais memória para guardar a mesma coluna repetida.
+
+   ⚠️ O PERFIL NÃO É UM PICO NA CALHA, é um PLATÔ AO REDOR DELA. Bem embaixo da
+   barra a laje está escondida PELA PRÓPRIA BARRA — pintar o máximo ali é pintar
+   o que não se vê. O que aparece é a faixa logo ao lado, e é ela que recebe o
+   máximo. */
+const SPILL_RES = 512;
+/** Meia-largura da mancha, em metros a partir do eixo da calha. */
+const SPILL_REACH = 6.0;
+/** Quanto da mancha some no vão coberto pela própria barra. */
+const SPILL_CORE = 0.45;
+/**
+ * Ganho do emissivo da laje.
+ *
+ * MEDIDO, não escolhido. Com 0,055 a telha ao lado da barra saía em 51 de
+ * luminância; 0,11 a põe em ~78, que é o alvo, e o alvo tem duas âncoras:
+ *
+ *   · ela tem de ficar ABAIXO DA PAREDE (85 a 120 conforme o fundo), senão a
+ *     laje deixa de ser o contraponto escuro que faz o ciclorama ler como claro
+ *     — ver o bloco dos cinzas;
+ *   · e MUITO abaixo do painel (218), senão a barra deixa de ser a fonte.
+ *
+ * O vão entre duas barras continua em 3–8, que é o preto de antes: a mancha é
+ * uma faixa, não uma clareada geral. É essa razão de 10x entre a telha ao lado
+ * da barra e a telha do meio do vão que faz o teto ter DESENHO quando ele é
+ * visto de perfil, que era o defeito.
+ */
+const DECK_SPILL = 0.11;
+
+function buildSpillTexture(): THREE.DataTexture {
+  const data = new Uint8Array(SPILL_RES * 4);
+  const lanes = bankLanes();
+  const bankW = SRC.boxSize * K * 0.62;
+  for (let i = 0; i < SPILL_RES; i++) {
+    /* Centro do texel de volta para x de mundo — a mesma régua da UV da telha. */
+    const x = ((i + 0.5) / SPILL_RES) * 2 * HALF - HALF;
+    let v = 0;
+    for (const lane of lanes) {
+      const d = Math.abs(x - lane);
+      if (d >= SPILL_REACH) continue;
+      /* Cosseno levantado: 1 na borda da barra, 0 no alcance. */
+      const t = Math.min(1, Math.max(0, (d - bankW * 0.5) / (SPILL_REACH - bankW * 0.5)));
+      const fora = 0.5 + 0.5 * Math.cos(Math.PI * t);
+      /* E o furo do meio, onde a própria barra tapa a laje. */
+      const dentro = d < bankW * 0.5 ? SPILL_CORE : 1;
+      v = Math.max(v, fora * dentro);
+    }
+    const b = Math.round(255 * v);
+    data[i * 4] = b; data[i * 4 + 1] = b; data[i * 4 + 2] = b; data[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, SPILL_RES, 1, THREE.RGBAFormat);
+  /* `ClampToEdge` porque a UV cobre exatamente [−HALF, +HALF] e não repete; sem
+     isto a borda da telha amostraria a calha do outro lado da sala. */
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  /* ⚠️ `SRGBColorSpace`: um `emissiveMap` é COR e o three o converte para linear
+     no shader. Deixá-lo em `NoColorSpace` faria a mancha nascer com o dobro do
+     contraste que a curva do canvas descreve. */
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 /* ---------------- a grelha ----------------
@@ -254,18 +374,68 @@ function buildLights(): { banks: THREE.Mesh; frames: THREE.Mesh; spots: THREE.Gr
      a ser uma barra contínua, que é o que a referência mostra. */
   const bankY = purlinBottom() - 0.34;
 
-  /* Um painel no MEIO de cada vão entre vigas: nunca coincidente com a viga
-     (onde ele ficaria escondido) e sempre no ritmo da estrutura. */
-  const lanes: number[] = [];
-  for (let i = -Math.ceil(HALF / pitch); i <= Math.ceil(HALF / pitch); i++) {
-    const x = (i + 0.5) * pitch;
-    if (Math.abs(x) < HALF) lanes.push(x);
-  }
+  const lanes = bankLanes();
 
+  /* ---------------- O DIFUSOR PENDE DA MOLDURA ----------------
+     ⚠️ ELE ERA UMA LÂMINA DE 6 cm CENTRADA NA FACE DE BAIXO DA MOLDURA, e essa
+     era a causa do relato **"algumas vezes quando mexo a câmera as iluminações
+     não saem das lâmpadas/painéis, meio que apenas existem"**. Reproduzido na
+     bancada e nas duas capturas que vieram com o pedido, e a explicação é
+     puramente geométrica:
+
+       · a moldura vai de `bankY` a `bankY + 0,40` e é 34 cm MAIS LARGA que o
+         difusor, então ela o esconde por cima e pelos lados;
+       · o difusor ia de `bankY − 0,03` a `bankY + 0,03`, ou seja sobrava
+         **3 cm** dela para baixo.
+
+     Com a câmera baixa — a pose de foto de veículo, e as duas do relato — o
+     teto é visto RASANTE: o que entra no quadro é o flanco do painel, e 3 cm de
+     flanco a 30 m subtendem 0,06°. O emissivo simplesmente não tinha área. Daí
+     o painel ACENDER quando a câmera sobe (aí se vê a face de baixo) e APAGAR
+     quando ela desce, sem que luz nenhuma tenha mudado — que é exatamente o
+     "às vezes, quando mexo a câmera".
+
+     A correção é a forma que uma softbox de verdade tem: o difusor é um bloco
+     que PENDE da moldura. Ele passa a ter flanco emissivo em toda a volta, então
+     lê como aceso de qualquer ângulo de onde a moldura não o tampe — e de cima
+     do teto quem manda continua sendo a esmaecida, que apaga o grupo inteiro.
+
+     Ele continua sendo NARROWER que a moldura (bankW contra bankW + 0,34), que
+     é o que mantém a borda escura do bloco original.
+
+     ⚠️ **26 cm → 50 cm EM 2026-08-16**, e a segunda rodada tem número.
+     -----------------------------------------------------------------------
+     O relato voltou: *"às vezes ainda acontece do branco das lâmpadas
+     sumirem"*, com o fundo em Branco e a câmera alta. Reproduzido na bancada
+     (`checks-teto-altura-0816.mjs`) e medido no pixel da captura: a faixa branca
+     tinha **5 px** de espessura, contra os ~60 px que ela tem de câmera baixa.
+
+     A conta que fecha isso, e ela é de projeção e não de material. Um painel é
+     um bloco horizontal visto de baixo a uma elevação θ; o que ele entrega ao
+     quadro é
+
+         face de baixo · sen θ   +   flanco · cos θ
+
+     A face de baixo tem 3,35 m e o flanco tinha 0,26 m, então elas se EMPATAM em
+     `tan θ = 0,26 / 3,35`, ou seja **θ = 4,4°**. Abaixo disso quem sustenta o
+     painel é só o flanco. E θ desaba quando a câmera sobe: com a câmera a 10,7 m
+     o painel está 1,6 m acima dela, e a 30 m de distância isso é θ = 3°. Não há
+     nada de errado com o emissivo — o painel virou de perfil.
+
+     ⚠️ NÃO EXISTE CONSERTO QUE FAÇA UMA FACE HORIZONTAL SOBREVIVER A θ → 0. O
+     que existe é dar ao fixture ALTURA, que é o termo que sobra: 0,50 m de
+     flanco entregam 1,9x o que 0,26 entregavam, e a mesma face de baixo. Um
+     difusor de meio metro pendurado sob uma moldura de 40 cm é a proporção de um
+     banco de luz de estúdio de verdade a 14 m de pé-direito — não é um aumento
+     "para caber no teste".
+
+     A OUTRA METADE do mesmo relato é a LAJE, que a θ → 0 fica preta (medido:
+     4/255, com o painel em 200). Ela é tratada em `buildSpillTexture()`. */
+  const bankT = 0.50;
   const faces: THREE.BufferGeometry[] = [];
   const frames: THREE.BufferGeometry[] = [];
   for (const x of lanes) {
-    faces.push(bar(x, bankY, 0, bankW, 0.06, bankLen));
+    faces.push(bar(x, bankY - bankT / 2 + 0.03, 0, bankW, bankT, bankLen));
     /* A moldura é o que impede o painel de ler como retângulo branco colado no
        teto: ela lhe dá espessura e uma borda escura. */
     frames.push(bar(x, bankY + 0.20, 0, bankW + 0.34, 0.40, bankLen + 0.34));
@@ -289,7 +459,21 @@ function buildLights(): { banks: THREE.Mesh; frames: THREE.Mesh; spots: THREE.Gr
     }
   }
   const bodyGeo = new THREE.CylinderGeometry(0.30, 0.44, 0.72, 14, 1, true);
-  const capGeo = new THREE.CylinderGeometry(0.30, 0.30, 0.06, 14);
+  /* ---------------- A LENTE SAI DA BOCA DA CÚPULA ----------------
+     ⚠️ MESMO DEFEITO DO DIFUSOR, e a mesma causa. Ela era um disco de raio 0,30
+     e 6 cm de altura assentado no PLANO da boca (`p.y − 0,36`) — e a boca da
+     cúpula tem raio 0,44. Ou seja o vidro ficava 14 cm RECUADO para dentro do
+     abajur, e horizontal: de qualquer câmera que não estivesse quase embaixo
+     dele, a aba da cúpula o tampava e a luminária lia como um cone preto morto.
+     Nas capturas do relato são 28 cones pretos pendurados sem nenhum sinal de
+     estarem acesos — o **"as lâmpadas meio que apenas existem"**.
+
+     Agora ela é uma lente TRONCADA que sai 16 cm por baixo da boca: 0,42 de
+     raio encostando na aba (que tem 0,44 — 2 cm de folga para não haver
+     z-fighting com a parede da cúpula) e 0,30 na ponta. Ela tem flanco, então
+     acende em silhueta; e como ela sobra da aba, nenhuma câmera abaixo do plano
+     da boca a perde. Continua sem luz nenhuma do three — ver o cabeçalho. */
+  const capGeo = new THREE.CylinderGeometry(0.42, 0.30, 0.17, 14);
   const rodGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.3, 6);
   const body = new THREE.InstancedMesh(bodyGeo, housingMat!, rows.length);
   const cap = new THREE.InstancedMesh(capGeo, lensMat!, rows.length);
@@ -297,7 +481,9 @@ function buildLights(): { banks: THREE.Mesh; frames: THREE.Mesh; spots: THREE.Gr
   const m = new THREE.Matrix4();
   rows.forEach((p, i) => {
     body.setMatrixAt(i, m.makeTranslation(p.x, p.y, p.z));
-    cap.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.36, p.z));
+    /* O topo da lente (meia-altura acima do centro) fica em `p.y − 0,355`, ou
+       seja 5 mm dentro da boca da cúpula, que está em `p.y − 0,36`. */
+    cap.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.44, p.z));
     rod.setMatrixAt(i, m.makeTranslation(p.x, p.y + 1.01, p.z));
   });
   for (const im of [body, cap, rod]) {
@@ -313,6 +499,10 @@ function makeMaterials() {
   if (deckMat) return;
   deckMat = new THREE.MeshStandardMaterial({
     color: C_DECK, roughness: 0.88, metalness: 0.15, side: THREE.DoubleSide,
+    /* A MANCHA DAS BARRAS — ver `buildSpillTexture()`. `emissive` branco aqui
+       porque `applyCeilingRig()` o troca pelo matiz da chave logo em seguida; o
+       mapa é ligado em `build()`, que é quem conhece as medidas da sala. */
+    emissive: 0xffffff, emissiveIntensity: DECK_SPILL,
     /* Baixo pelo mesmo motivo da casca do ciclorama: este é um objeto grande, e
        devolver o ambiente inteiro nele transformaria a laje escura num verniz
        cinza — que é o oposto do que ela está aqui para fazer. */
@@ -352,6 +542,18 @@ function build() {
   if (built) return;
   makeMaterials();
 
+  /* A MANCHA DAS BARRAS. Ela depende de `HALF` e de `K`, então nasce aqui e não
+     em `makeMaterials()` — e é REFEITA a cada `rebuild()`, porque uma troca de
+     medidas move as calhas.
+     ⚠️ A textura ANTIGA é descartada antes: `rebuild()` mantém os materiais
+     vivos, e sem isto cada mudança de sala vazaria uma textura na GPU. */
+  deckMat!.emissiveMap?.dispose();
+  deckMat!.emissiveMap = buildSpillTexture();
+  /* A primeira atribuição é `null` → textura, e isso É uma troca de programa —
+     por isso ela acontece antes de `aquecerEsmaecida()`, que compila as duas
+     configurações de `transparent` já com o mapa no lugar. */
+  deckMat!.needsUpdate = true;
+
   const deck = new THREE.Mesh(
     corrugatedDeck(HALF, HALF, SRC.deckPitch * K, SRC.deckRib * K), deckMat!,
   );
@@ -370,6 +572,78 @@ function build() {
   aplicarSpots();
   group.position.y = H;
   built = true;
+  aquecerEsmaecida();
+}
+
+/* ===========================================================================
+   AS DUAS CONFIGURAÇÕES DE `transparent`, PRÉ-COMPILADAS NA MONTAGEM
+   ===========================================================================
+   ⚠️ ESTE É O CONSERTO DO ENGASGO QUE O BLOCO DE `applyFade()` DESCREVIA E NÃO
+   CONSERTAVA. Reproduzido dali, porque é a causa e ela não se parece com o
+   sintoma: entre 10,6 e 13,2 m de altura de câmera, `m.transparent` muda de
+   valor e leva `m.needsUpdate = true` junto. **`transparent` é chave de programa
+   no three** — ele entra em `parameters.opaque` e acende o bit 17 de
+   `getProgramCacheKeyBooleans()`, o que muda o `#define OPAQUE` e portanto o
+   binário. São 5 materiais (laje, estrutura, spot, painel, lente), logo **5
+   compilações de programa no meio de um arrasto de órbita**. O sintoma é a
+   câmera travar meio segundo ao subir acima do teto; a causa é uma faixa de
+   esmaecida.
+
+   POR QUE PRÉ-COMPILAR E NÃO DEIXAR `transparent: true` SEMPRE. O bloco de
+   `applyFade()` já responde e continua valendo: um material transparente sai do
+   passe opaco e entra no ordenado por profundidade, e deixar a laje inteira
+   nesse passe pagaria ordenação e perda de descarte de profundidade em 100 % dos
+   quadros por um efeito que roda em quase nenhum. A troca certa é pagar o
+   compilador UMA vez, na montagem, debaixo da cortina que a troca de cenário já
+   tem.
+
+   ⚠️ E É UMA VEZ SÓ POR SESSÃO DE MATERIAL, NÃO UMA VEZ POR CRUZAMENTO — o que
+   também explica por que o defeito era difícil de flagrar. `materialProperties
+   .programs` é um `Map` por MATERIAL chaveado pelo cache key (three r179,
+   WebGLRenderer:2067), e ele só é esvaziado no `dispose` do material. Ou seja o
+   segundo cruzamento da faixa já acertava o cache e não compilava nada. O
+   engasgo era real, era visível, e acontecia exatamente uma vez: na PRIMEIRA vez
+   que o usuário levanta a câmera — que é também a primeira vez que ele julga se
+   a movimentação é fluida.
+
+   ⚠️ SÍNCRONO, E ISSO É REQUISITO E NÃO PREGUIÇA. `renderer.compile()` não
+   cede o controle, então a inversão e a restauração dos 5 materiais vivem na
+   MESMA tarefa e nenhum quadro pode ser apresentado entre elas — é a garantia
+   que `warmLightPrograms()` (scene.ts) cita para explicar por que ela, sendo
+   `compileAsync`, precisa de `drawSuspended`. Aqui não precisa.
+
+   ⚠️ `compile(group, camera, scene)` E NÃO `compile(scene, camera)`. A assinatura
+   é `compile(scene, camera, targetScene)`: o PRIMEIRO argumento é o que se
+   percorre para inicializar material (e é `traverse`, não `traverseVisible` —
+   funciona com o grupo ainda apagado, que é o estado dele aqui, porque
+   `setStudioCeiling()` só acende depois de `build()` voltar); o TERCEIRO é de
+   onde vêm as luzes e o estado de cena. Passar a cena inteira compilaria o
+   veículo e o cenário de novo por nada. */
+let aquecida = false;
+
+function aquecerEsmaecida() {
+  if (aquecida || !materials.length) return;
+  aquecida = true;
+  const antes = materials.map((m) => m.transparent);
+  try {
+    for (const m of materials) { m.transparent = !m.transparent; m.needsUpdate = true; }
+    renderer.compile(group, camera, scene);
+  } catch (err) {
+    /* Aquecer é otimização; nunca pode ser o motivo de o teto não subir. */
+    console.warn('[truck-studio] pré-compilação da esmaecida do teto falhou'
+      + ' — a primeira subida da câmera acima de 10,6 m pode engasgar.', err);
+  } finally {
+    /* Restaurado no `finally` pelo mesmo motivo do `try/finally` da passada de
+       reflexo: uma exceção no meio deixaria os 5 materiais no estado INVERTIDO,
+       e o sintoma seria uma laje translúcida permanente. */
+    materials.forEach((m, i) => {
+      if (m.transparent !== antes[i]) { m.transparent = antes[i]; m.needsUpdate = true; }
+    });
+  }
+  /* E a configuração que de fato vai ser desenhada agora, para o primeiro quadro
+     depois da cortina também não ser uma compilação. Mesma sequência, e mesma
+     ordem, de `warmLightPrograms()`. */
+  try { renderer.compile(group, camera, scene); } catch { /* ver acima */ }
 }
 
 /* ---------------- OS SPOTS SÃO O PRIMEIRO A SAIR ----------------
@@ -458,31 +732,24 @@ export function sizeStudioCeiling(m: {
    nesse passo o tempo todo pagaria ordenação e perda de descarte de
    profundidade em 100 % dos quadros por um efeito que roda em quase nenhum.
 
-   ⚠️⚠️ ACHADO DA AUDITORIA DE 2026-08-14, NÃO CONSERTADO AQUI (é fora do escopo
-   da ligação do perfil de qualidade, e conserta-se mexendo no laço, que é de
-   outro dono). Deixado escrito para quem vier depois:
+   ⚠️ O ENGASGO DA TRAVESSIA DA FAIXA — as 5 recompilações de programa ao cruzar
+   10,6–13,2 m — FOI CONSERTADO EM 2026-08-16, e o conserto é o que a auditoria
+   de 2026-08-14 tinha mandado fazer: pré-compilar as duas configurações no
+   aquecimento, do mesmo jeito que `warmLightPrograms()` faz para o pool de
+   refletores. Ver `aquecerEsmaecida()`, logo acima, que também explica por que
+   NÃO se resolve deixando `transparent: true` sempre.
 
-     · `applyFade` roda em `onFrame`, ou seja **inclusive em quadro PULADO** —
-       o gancho de quadro corre mesmo quando o laço sob demanda decide não
-       desenhar. O `smoothstep` e o memo de 0,01 são baratos, mas o gancho em si
-       é custo fixo de CPU por quadro, que é o recurso escasso num i5 (a mesma
-       razão pela qual `seeThroughSamples` existe no perfil).
-     · O caro é a TRAVESSIA DA FAIXA. Entre 10,6 e 13,2 m de altura de câmera,
-       `m.transparent` muda de valor e leva `m.needsUpdate = true` junto — e
-       `transparent` é CHAVE DE PROGRAMA no three. São 5 materiais
-       (laje, estrutura, spot, painel, lente), logo **5 recompilações de
-       programa** em cada cruzamento da faixa, no meio de um arrasto de órbita.
-       O sintoma é um engasgo ao levar a câmera para cima do teto, e a causa não
-       se parece nada com ele.
-     · O conserto honesto NÃO é deixar `transparent: true` sempre (o comentário
-       acima explica por que isso custa em 100 % dos quadros): é pré-compilar as
-       duas configurações no aquecimento, do mesmo jeito que
-       `warmLightPrograms()` faz para o pool de spotlights.
+   ⚠️ O QUE CONTINUA VALENDO da mesma auditoria, e é de outro dono: `applyFade`
+   roda em `onFrame`, ou seja **inclusive em quadro PULADO** — o gancho corre
+   mesmo quando o laço sob demanda decide não desenhar. Nos dois cenários sem
+   ciclorama ele sai na primeira linha (`!group.visible`), que é o caso em 2 dos
+   3 cenários do acervo; no Estúdio ele custa um `smoothstep` e uma comparação.
+   É barato e fica.
 
-   Enquanto isso não existir, a esmaecida é um engasgo CONHECIDO — e é o motivo
-   de o perfil de qualidade não ter nenhum botão que ligue/desligue este
-   caminho: um botão que recompilasse 5 programas sozinho seria exatamente o
-   defeito que a adaptação automática existe para evitar. */
+   E é por causa do custo de programa que o perfil de qualidade não tem nenhum
+   botão que ligue/desligue este caminho: um botão que recompilasse 5 programas
+   sozinho, no meio de um arrasto, seria exatamente o defeito que a adaptação
+   automática existe para evitar. */
 let faded = -1;
 
 function applyFade() {
@@ -554,7 +821,15 @@ function applyCeilingRig(rig: { keyColor: THREE.Color; cycloramaAlbedo: number }
   if (lensMat) lensMat.emissive.copy(tint);
   /* As superfícies passivas ganham o matiz no ALBEDO — elas são pintadas de
      cinza e o que as tinge é a luz que as banha, que é a mesma dos painéis. */
-  if (deckMat) deckMat.color.setHex(C_DECK).multiply(tint).multiplyScalar(lift);
+  if (deckMat) {
+    deckMat.color.setHex(C_DECK).multiply(tint).multiplyScalar(lift);
+    /* E a MANCHA das barras acompanha a cor da própria barra, não o albedo da
+       laje: ela é a luz do painel batendo na telha, então ela é do painel.
+       Sem esta linha um estúdio a 2800 K teria as barras âmbar e a mancha delas
+       branca — o mesmo defeito que este gancho existe para consertar, uma camada
+       abaixo. Ela NÃO leva o `lift`: quem clareia com o fundo é a telha. */
+    deckMat.emissive.copy(tint);
+  }
   if (steelMat) steelMat.color.setHex(C_STEEL).multiply(tint).multiplyScalar(lift);
   if (housingMat) housingMat.color.setHex(C_HOUSING).multiply(tint);
   invalidate();
@@ -601,8 +876,17 @@ export function disposeStudioCeiling() {
       if (mesh.isMesh) mesh.geometry.dispose();
     });
   }
+  /* A MANCHA DAS BARRAS é textura NOSSA e `Material.dispose()` não solta mapa —
+     ele só emite o evento que libera o programa. Sem esta linha, sair e voltar
+     ao Estúdio deixaria uma `DataTexture` por visita na GPU. */
+  deckMat?.emissiveMap?.dispose();
   for (const m of materials) m.dispose();
   materials.length = 0;
+  /* ⚠️ Os programas pré-compilados morrem COM os materiais: `onMaterialDispose`
+     chama `releaseMaterialProgramReferences()`, que zera o `Map` por material.
+     Deixar a bandeira em `true` faria a próxima visita ao Estúdio voltar a ter o
+     engasgo, agora sem ninguém para pré-compilar. */
+  aquecida = false;
   deckMat = steelMat = bankMat = lensMat = housingMat = null;
   /* O grupo dos spots acabou de sair de `group.children` e teve a geometria
      descartada no laço acima; segurar a referência faria `aplicarSpots()`

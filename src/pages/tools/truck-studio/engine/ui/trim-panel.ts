@@ -67,7 +67,9 @@ import {
   trimLabel, trimFollowsBody,
 } from '../vehicle/trim';
 import type { TrimKey } from '../vehicle/trim';
-import { state, getVehicleView, setVehicleView, type VehicleView } from '../vehicle/models';
+import {
+  state, getVehicleView, setVehicleView, onPaintTargetApplied, type VehicleView,
+} from '../vehicle/models';
 import { setStatus } from './chrome';
 import { buildQualitySection } from './hud';
 
@@ -136,6 +138,84 @@ function paintDots() {
   const trim = getTrim();
   for (const key of CARD_PAINT_KEYS) {
     dots.appendChild(swatch(trim[key].color, 'ts-cfg__sw--dot'));
+  }
+}
+
+/* ---------------- A LINHA "COR DO CAVALO" ----------------
+   Pedido de 2026-08-16: *"o paralamas está faltando ter a opção de pintar da cor
+   do cavalo também, como todos os outros itens"*. E a metade do motor já foi
+   feita — `SPECS.fenders.followsBody` virou `true` em `vehicle/trim.ts`. O que
+   falta é a PERGUNTA, e ela tem de estar aqui porque é aqui que o para-lama
+   mora: as outras duas peças que seguem o corpo (o Fundo da chapa e o Thermo
+   King) fazem a mesma pergunta no inspetor do editor de plotagem, cada uma ao
+   lado da face em que aparece.
+
+   ⚠️⚠️ ELA NÃO IMPLEMENTA NADA, E NÃO PODE IMPLEMENTAR. A decisão é UMA só — a
+   tinta do cavalo vale para o implemento INTEIRO — e ela já tem dono:
+   `bindTrailerPaint()` em `vehicle/livery.ts`, que troca o material do 3D,
+   repinta a chapa das quatro telas e escreve a linha de estado. Esta linha
+   escreve no `#paint-trailer` e despacha o `change` dele, exatamente como a
+   linha do Thermo King faz — é a mesma técnica, pelo mesmo motivo, e é o que
+   torna impossível dois controles discordarem.
+
+   ⚠️ E ELA SOME NUMA EDIÇÃO ESPECIAL. `setSpecialEdition()` (vehicle/livery.ts)
+   esconde as outras duas por id; esta entra na mesma lista com o id
+   `ts-cfg-row-cab`. Deixá-la de pé ofereceria a tinta de um caminhão que não tem
+   tinta.
+
+   O ESTADO DELA É LIDO DO CHECKBOX DE LÁ, nunca de uma cópia: `paint()` roda
+   também no `onPaintTargetApplied()`, então ligar a caixa no editor de plotagem
+   marca esta, e vice-versa. */
+function cabPaintRow(): HTMLElement | null {
+  const master = $opt<HTMLInputElement>('paint-trailer');
+  if (!master) return null;
+
+  const row = el('label', 'ts-cfg__row ts-cfg__row--check');
+  row.id = 'ts-cfg-row-cab';
+  row.title = 'Estende a pintura do cavalo ao implemento inteiro — inclusive aos'
+    + ' para-lamas. As peças com cor própria continuam com ela.';
+  /* A edição especial esconde a linha ORIGEM; esta acompanha o estado dela em
+     vez de consultar o catálogo por conta própria. */
+  const masterRow = master.closest('label');
+  if (masterRow?.classList.contains('hidden')) row.classList.add('hidden');
+
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.className = 'ts-cfg__check';
+  box.id = 'ts-cfg-paint-cab';
+  box.checked = master.checked;
+  row.appendChild(box);
+
+  /* A pastilha lê `--ts-cabpaint`, a mesma custom property que a linha do editor
+     usa — escrita por `livery.ts` a cada tinta nova. Uma segunda leitura do
+     catálogo daqui seria uma segunda fonte para a mesma cor. */
+  const chip = el('span', 'ts-cfg__chip ts-cfg__chip--flat');
+  chip.appendChild(el('span', 'ts-cfg__sw ts-cfg__sw--cab'));
+  row.appendChild(chip);
+
+  row.appendChild(el('span', 'ts-cfg__name', 'Cor do cavalo'));
+  row.appendChild(el('span', 'ts-cfg__val', 'todo o implemento'));
+
+  /* `change` e não `click`: o `<label>` já alterna a caixa antes de o evento
+     chegar, e reagir ao clique alternaria duas vezes. */
+  box.addEventListener('change', () => {
+    master.checked = box.checked;
+    master.dispatchEvent(new Event('change'));
+  });
+  return row;
+}
+
+/** Espelha o estado da linha ORIGEM sem trocar nó nenhum — ver a nota do
+ *  `onPaintTargetApplied()` em `initTrimPanel()`. */
+function syncCabRow() {
+  const master = $opt<HTMLInputElement>('paint-trailer');
+  const box = $opt<HTMLInputElement>('ts-cfg-paint-cab');
+  if (!master || !box) return;
+  if (box.checked !== master.checked) box.checked = master.checked;
+  const row = $opt('ts-cfg-row-cab');
+  const masterRow = master.closest('label');
+  if (row && masterRow) {
+    row.classList.toggle('hidden', masterRow.classList.contains('hidden'));
   }
 }
 
@@ -292,6 +372,12 @@ function paint() {
   body.textContent = '';
 
   const colors = el('div', 'ts-cfg__list');
+  /* A "Cor do cavalo" VEM PRIMEIRO porque ela qualifica a linha de baixo: um
+     controle que muda o significado do que vem depois tem de vir antes. É a
+     mesma ordem do stack do Fundo no editor de plotagem, e a mesma regra que o
+     "Fundo" usa no menu da câmera. */
+  const cab = cabPaintRow();
+  if (cab) colors.appendChild(cab);
   for (const key of CARD_PAINT_KEYS) colors.appendChild(colorRow(key));
   body.appendChild(section('Cores', colors));
 
@@ -334,6 +420,18 @@ export function initTrimPanel() {
   card.addEventListener('pointerdown', swallow);
   card.addEventListener('pointerup', swallow);
   card.addEventListener('wheel', swallow, { passive: true });
+
+  /* ⚠️ SINCRONIZA, NÃO REPINTA — e a diferença é um defeito evitado, não uma
+     economia. `setTrim()` passa por `setPaintTarget()` (ver a nota lá), que
+     dispara este gancho; e `setTrim()` é chamado no PRIMEIRO `input` do seletor
+     de cor, ou seja NO MEIO DO ARRASTO. Um `paint()` aqui destruiria o
+     `<input type="color">` que está com o diálogo nativo aberto debaixo do dedo.
+     `syncCabRow()` só reescreve o que mudou e não troca nó nenhum.
+
+     O gancho é o do MOTOR e não um segundo `change` no `#paint-trailer`: dois
+     ouvintes no mesmo elemento dependeriam da ordem de registro para ler o
+     estado JÁ aplicado, e essa ordem é a do boot. */
+  onPaintTargetApplied(syncCabRow);
 
   toggle.addEventListener('click', () => {
     const closed = body.classList.toggle('hidden');

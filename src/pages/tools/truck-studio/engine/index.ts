@@ -38,6 +38,15 @@
                  because that is all `captureStream()` sees. See record.ts's
                  header — that one constraint explains every difference between
                  them.
+                 `timeline` + `timeline-curve` are the CAMERA PATH the user
+                 authors: points with a time between them, resolved into a
+                 monotone (PCHIP) curve in spherical coordinates. They replaced
+                 both the `livre` mode (which resampled a hand-held orbit, tremor
+                 included) and the `cinematica` one (an authored path with the
+                 shot list hard-coded). `timeline-curve` imports NOTHING on
+                 purpose: scene.ts builds a WebGLRenderer at import time, so
+                 anything that reaches it cannot be loaded under vitest — and the
+                 curve is the part of this feature whose bugs are silent.
                  `plate` and `scatter` are gone: they belonged to the photo-backed
                  scenarios deleted on 2026-08-03 — see ARCHITECTURE.md.
      ui/         the DOM chrome: the topbar/view controls (chrome), the card

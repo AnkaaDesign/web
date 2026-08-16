@@ -1,0 +1,1010 @@
+{
+ "schema": "truck-studio/plates@1",
+ "unidades": "metros, ESPAÇO CRU DO ARQUIVO .glb (o mesmo de hitch.json/fifthWheel)",
+ "gerado": "2026-08-16",
+ "_comment": [
+  "Onde a PLACA DE LICENCIAMENTO (Mercosul, 400 x 130 mm) mora em cada cavalo.",
+  "Gerado por tools/placa/probe.mjs — NÃO editar à mão: escreva a exceção em",
+  "AUTORADOS naquele arquivo e rode a sonda de novo, senão a próxima corrida",
+  "apaga a correção em silêncio.",
+  "",
+  "`pos`    centro da placa, no espaço cru do .glb.",
+  "`normal` para onde ela olha, no mesmo espaço.",
+  "`vao`    afastamento entre a chapa e a superfície NO CONTORNO da placa —",
+  "         é a profundidade do berço, para ela ficar montada e não flutuando.",
+  "`alturaSolo` é diagnóstico: a altura do centro sobre o plano dos pneus.",
+  "",
+  "O IMPLEMENTO NÃO ESTÁ AQUI de propósito: ele é paramétrico e a traseira",
+  "anda a cada redimensionamento. O lado dele é medido em runtime, no",
+  "PORTA-PLACA sob a lanterna traseira — ver engine/vehicle/license-plate.ts."
+ ],
+ "placa": {
+  "larguraM": 0.4,
+  "alturaM": 0.13
+ },
+ "tractors": {
+  "models/trucks/daf_xd_4x2_sl.glb": {
+   "pos": [
+    -0.00009,
+    0.48875,
+    -3.29706
+   ],
+   "normal": [
+    -0.00002,
+    0.23388,
+    -0.97226
+   ],
+   "vao": 0.0339,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.43,
+    "res": 20.07,
+    "inclinacaoGraus": 13.53
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xd_6x2s_sl.glb": {
+   "pos": [
+    -0.00009,
+    0.48875,
+    -3.29706
+   ],
+   "normal": [
+    -0.00002,
+    0.23415,
+    -0.9722
+   ],
+   "vao": 0.0338,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.38,
+    "res": 19.93,
+    "inclinacaoGraus": 13.54
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xd_6x4t_sl.glb": {
+   "pos": [
+    -0.00009,
+    0.48875,
+    -3.29706
+   ],
+   "normal": [
+    -0.00002,
+    0.23416,
+    -0.9722
+   ],
+   "vao": 0.0338,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.38,
+    "res": 19.93,
+    "inclinacaoGraus": 13.54
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xf_105_4x2.glb": {
+   "pos": [
+    0,
+    0.41475,
+    -3.03849
+   ],
+   "normal": [
+    0,
+    0.20511,
+    -0.97874
+   ],
+   "vao": 0.045,
+   "alturaSolo": 0.415,
+   "ajuste": {
+    "rms": 14.41,
+    "res": 28.26,
+    "inclinacaoGraus": 11.84
+   },
+   "fonte": "altura autorada",
+   "motivo": "sem trecho plano de 130 mm; montada no pad do para-choque"
+  },
+  "models/trucks/daf_xf_105_6x2a_tl.glb": {
+   "pos": [
+    0,
+    0.41475,
+    -3.03851
+   ],
+   "normal": [
+    0,
+    0.20569,
+    -0.97862
+   ],
+   "vao": 0.045,
+   "alturaSolo": 0.415,
+   "ajuste": {
+    "rms": 14.44,
+    "res": 28.44,
+    "inclinacaoGraus": 11.87
+   },
+   "fonte": "altura autorada",
+   "motivo": "idem daf_xf_105_4x2"
+  },
+  "models/trucks/daf_xf_105_6x4.glb": {
+   "pos": [
+    0,
+    0.41475,
+    -3.03851
+   ],
+   "normal": [
+    0,
+    0.20569,
+    -0.97862
+   ],
+   "vao": 0.045,
+   "alturaSolo": 0.415,
+   "ajuste": {
+    "rms": 14.44,
+    "res": 28.44,
+    "inclinacaoGraus": 11.87
+   },
+   "fonte": "altura autorada",
+   "motivo": "idem daf_xf_105_4x2"
+  },
+  "models/trucks/daf_xf_euro6_4x2.glb": {
+   "pos": [
+    -0.00009,
+    0.44375,
+    -2.94807
+   ],
+   "normal": [
+    0.00003,
+    -0.00085,
+    -1
+   ],
+   "vao": 0.0091,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.34,
+    "res": 4.62,
+    "inclinacaoGraus": -0.05
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xf_euro6_6x2_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.44375,
+    -2.94811
+   ],
+   "normal": [
+    0.00003,
+    -0.00099,
+    -1
+   ],
+   "vao": 0.0091,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.33,
+    "res": 4.63,
+    "inclinacaoGraus": -0.06
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xg_2021_4x2.glb": {
+   "pos": [
+    -0.00064,
+    0.48875,
+    -3.29705
+   ],
+   "normal": [
+    -0.00009,
+    0.23324,
+    -0.97242
+   ],
+   "vao": 0.0338,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.38,
+    "res": 20,
+    "inclinacaoGraus": 13.49
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xg_2021_6x2s.glb": {
+   "pos": [
+    -0.00064,
+    0.48875,
+    -3.29705
+   ],
+   "normal": [
+    -0.00009,
+    0.23436,
+    -0.97215
+   ],
+   "vao": 0.0338,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.38,
+    "res": 19.94,
+    "inclinacaoGraus": 13.55
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/daf_xg_2021_6x4t.glb": {
+   "pos": [
+    -0.00064,
+    0.48875,
+    -3.29705
+   ],
+   "normal": [
+    -0.00009,
+    0.23436,
+    -0.97215
+   ],
+   "vao": 0.0338,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 7.38,
+    "res": 19.94,
+    "inclinacaoGraus": 13.55
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/iveco_hiway_4x2.glb": {
+   "pos": [
+    -0.00009,
+    0.35475,
+    -2.99889
+   ],
+   "normal": [
+    -0.00001,
+    0.19029,
+    -0.98173
+   ],
+   "vao": 0.0403,
+   "alturaSolo": 0.355,
+   "ajuste": {
+    "rms": 7.85,
+    "res": 25.26,
+    "inclinacaoGraus": 10.97
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/iveco_hiway_6x2a_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.35475,
+    -2.99898
+   ],
+   "normal": [
+    0,
+    0.19331,
+    -0.98114
+   ],
+   "vao": 0.0405,
+   "alturaSolo": 0.355,
+   "ajuste": {
+    "rms": 7.88,
+    "res": 25.44,
+    "inclinacaoGraus": 11.15
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/iveco_metallica_4x2.glb": {
+   "pos": [
+    -0.00021,
+    0.42375,
+    -2.95305
+   ],
+   "normal": [
+    0,
+    0.07068,
+    -0.9975
+   ],
+   "vao": 0.0131,
+   "alturaSolo": 0.43,
+   "ajuste": {
+    "rms": 2.58,
+    "res": 7.54,
+    "inclinacaoGraus": 4.05
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/iveco_stralis_4x2.glb": {
+   "pos": [
+    -0.00437,
+    0.46475,
+    -2.93695
+   ],
+   "normal": [
+    0,
+    -0.14344,
+    -0.98966
+   ],
+   "vao": 0.0293,
+   "alturaSolo": 0.465,
+   "ajuste": {
+    "rms": 7.17,
+    "res": 18.39,
+    "inclinacaoGraus": -8.25
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/iveco_stralis_6x2_tl.glb": {
+   "pos": [
+    -0.00437,
+    0.46475,
+    -2.93698
+   ],
+   "normal": [
+    -0.00001,
+    -0.14269,
+    -0.98977
+   ],
+   "vao": 0.0291,
+   "alturaSolo": 0.465,
+   "ajuste": {
+    "rms": 7.12,
+    "res": 18.29,
+    "inclinacaoGraus": -8.2
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/man_tgx_4x2.glb": {
+   "pos": [
+    0,
+    0.43058,
+    -3.07864
+   ],
+   "normal": [
+    0.00019,
+    -0.16998,
+    -0.98545
+   ],
+   "vao": 0.0078,
+   "alturaSolo": 0.435,
+   "ajuste": {
+    "rms": 1.14,
+    "res": 4.69,
+    "inclinacaoGraus": -9.79
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/man_tgx_6x2_tl.glb": {
+   "pos": [
+    0,
+    0.43058,
+    -3.0789
+   ],
+   "normal": [
+    0.0002,
+    -0.16711,
+    -0.98594
+   ],
+   "vao": 0.0098,
+   "alturaSolo": 0.435,
+   "ajuste": {
+    "rms": 1.49,
+    "res": 6.35,
+    "inclinacaoGraus": -9.62
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/man_tgx_6x4.glb": {
+   "pos": [
+    0,
+    0.43058,
+    -3.0789
+   ],
+   "normal": [
+    0.0002,
+    -0.16711,
+    -0.98594
+   ],
+   "vao": 0.0098,
+   "alturaSolo": 0.435,
+   "ajuste": {
+    "rms": 1.49,
+    "res": 6.35,
+    "inclinacaoGraus": -9.62
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/mercedes_actros2014_4x2.glb": {
+   "pos": [
+    -0.00009,
+    0.45558,
+    -3.20178
+   ],
+   "normal": [
+    0,
+    -0.13748,
+    -0.9905
+   ],
+   "vao": 0.0066,
+   "alturaSolo": 0.46,
+   "ajuste": {
+    "rms": 1.29,
+    "res": 2.34,
+    "inclinacaoGraus": -7.9
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/mercedes_actros2014_6x2_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.45558,
+    -3.20205
+   ],
+   "normal": [
+    -0.00001,
+    -0.13673,
+    -0.99061
+   ],
+   "vao": 0.0068,
+   "alturaSolo": 0.46,
+   "ajuste": {
+    "rms": 1.32,
+    "res": 2.49,
+    "inclinacaoGraus": -7.86
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/mercedes_actros2014_6x4.glb": {
+   "pos": [
+    -0.00009,
+    0.45558,
+    -3.20205
+   ],
+   "normal": [
+    -0.00001,
+    -0.13673,
+    -0.99061
+   ],
+   "vao": 0.0068,
+   "alturaSolo": 0.46,
+   "ajuste": {
+    "rms": 1.32,
+    "res": 2.49,
+    "inclinacaoGraus": -7.86
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/mercedes_actros_mp3_4x2a.glb": {
+   "pos": [
+    -0.00009,
+    0.41166,
+    -3.09642
+   ],
+   "normal": [
+    0,
+    0.14169,
+    -0.98991
+   ],
+   "vao": 0.0364,
+   "alturaSolo": 0.415,
+   "ajuste": {
+    "rms": 7.92,
+    "res": 18.81,
+    "inclinacaoGraus": 8.15
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/mercedes_actros_mp3_6x2a_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.41166,
+    -3.09642
+   ],
+   "normal": [
+    0,
+    0.14169,
+    -0.98991
+   ],
+   "vao": 0.0364,
+   "alturaSolo": 0.415,
+   "ajuste": {
+    "rms": 7.92,
+    "res": 18.81,
+    "inclinacaoGraus": 8.15
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2009_4x2.glb": {
+   "pos": [
+    0.00007,
+    0.49475,
+    -3.38704
+   ],
+   "normal": [
+    0.00001,
+    -0.34261,
+    -0.93948
+   ],
+   "vao": 0.0297,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 5.61,
+    "res": 17.5,
+    "inclinacaoGraus": -20.04
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2009_6x2.glb": {
+   "pos": [
+    -0.00009,
+    0.49475,
+    -3.38709
+   ],
+   "normal": [
+    -0.00002,
+    -0.34196,
+    -0.93971
+   ],
+   "vao": 0.0296,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 5.62,
+    "res": 17.48,
+    "inclinacaoGraus": -20
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2009_6x2a_tl.glb": {
+   "pos": [
+    0.00007,
+    0.49475,
+    -3.38708
+   ],
+   "normal": [
+    0.00002,
+    -0.34196,
+    -0.93971
+   ],
+   "vao": 0.0296,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 5.62,
+    "res": 17.48,
+    "inclinacaoGraus": -20
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2016_4x2.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.05675
+   ],
+   "normal": [
+    0,
+    0.05087,
+    -0.99871
+   ],
+   "vao": 0.0102,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.67,
+    "res": 6.23,
+    "inclinacaoGraus": 2.92
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2016_6x2.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.0568
+   ],
+   "normal": [
+    0,
+    0.05183,
+    -0.99866
+   ],
+   "vao": 0.0103,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.33,
+    "inclinacaoGraus": 2.97
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2016_6x2_4.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.0568
+   ],
+   "normal": [
+    0,
+    0.05183,
+    -0.99866
+   ],
+   "vao": 0.0103,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.33,
+    "inclinacaoGraus": 2.97
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_r_2016_6x2t.glb": {
+   "pos": [
+    -0.00009,
+    0.44374,
+    -3.05689
+   ],
+   "normal": [
+    0,
+    0.05047,
+    -0.99873
+   ],
+   "vao": 0.0103,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.66,
+    "res": 6.27,
+    "inclinacaoGraus": 2.89
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_s_2016_4x2.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.05675
+   ],
+   "normal": [
+    0,
+    0.05087,
+    -0.99871
+   ],
+   "vao": 0.0102,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.67,
+    "res": 6.23,
+    "inclinacaoGraus": 2.92
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_s_2016_6x2.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.0568
+   ],
+   "normal": [
+    0,
+    0.05183,
+    -0.99866
+   ],
+   "vao": 0.0103,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.33,
+    "inclinacaoGraus": 2.97
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_s_2016_6x2_4.glb": {
+   "pos": [
+    0,
+    0.44375,
+    -3.0568
+   ],
+   "normal": [
+    0,
+    0.05183,
+    -0.99866
+   ],
+   "vao": 0.0103,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.33,
+    "inclinacaoGraus": 2.97
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_s_2024e_4x2.glb": {
+   "pos": [
+    0,
+    0.39375,
+    -3.10609
+   ],
+   "normal": [
+    0,
+    0.00111,
+    -1
+   ],
+   "vao": 0.009,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.13,
+    "res": 5.92,
+    "inclinacaoGraus": 0.06
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_streamline_4x2.glb": {
+   "pos": [
+    0.00007,
+    0.49475,
+    -3.38701
+   ],
+   "normal": [
+    0.00002,
+    -0.34265,
+    -0.93946
+   ],
+   "vao": 0.0295,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 5.6,
+    "res": 17.4,
+    "inclinacaoGraus": -20.04
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/scania_streamline_6x2a_tl.glb": {
+   "pos": [
+    0.00007,
+    0.49475,
+    -3.38701
+   ],
+   "normal": [
+    0.00002,
+    -0.34396,
+    -0.93898
+   ],
+   "vao": 0.0296,
+   "alturaSolo": 0.495,
+   "ajuste": {
+    "rms": 5.57,
+    "res": 17.45,
+    "inclinacaoGraus": -20.12
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh16_2009_4x2.glb": {
+   "pos": [
+    -0.00009,
+    0.44475,
+    -3.22411
+   ],
+   "normal": [
+    0,
+    -0.03697,
+    -0.99932
+   ],
+   "vao": 0.0032,
+   "alturaSolo": 0.445,
+   "ajuste": {
+    "rms": 0.3,
+    "res": 0.62,
+    "inclinacaoGraus": -2.12
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh16_2009_6x2_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.44475,
+    -3.22406
+   ],
+   "normal": [
+    0.00001,
+    -0.0377,
+    -0.99929
+   ],
+   "vao": 0.0031,
+   "alturaSolo": 0.445,
+   "ajuste": {
+    "rms": 0.28,
+    "res": 0.6,
+    "inclinacaoGraus": -2.16
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh16_2012_4x2.glb": {
+   "pos": [
+    0.00029,
+    0.39558,
+    -3.1411
+   ],
+   "normal": [
+    0.00001,
+    -0.00899,
+    -0.99996
+   ],
+   "vao": 0.0097,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.76,
+    "res": 6.34,
+    "inclinacaoGraus": -0.52
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh16_2012_6x2_tl.glb": {
+   "pos": [
+    0.00029,
+    0.39558,
+    -3.14109
+   ],
+   "normal": [
+    0.00002,
+    -0.00905,
+    -0.99996
+   ],
+   "vao": 0.0094,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.71,
+    "res": 6.11,
+    "inclinacaoGraus": -0.52
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh16_2012_6x4a.glb": {
+   "pos": [
+    0.00029,
+    0.39558,
+    -3.14109
+   ],
+   "normal": [
+    0.00002,
+    -0.00905,
+    -0.99996
+   ],
+   "vao": 0.0094,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.71,
+    "res": 6.11,
+    "inclinacaoGraus": -0.52
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2021_4x2.glb": {
+   "pos": [
+    0,
+    0.39558,
+    -3.14117
+   ],
+   "normal": [
+    0,
+    -0.0094,
+    -0.99996
+   ],
+   "vao": 0.0094,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.7,
+    "res": 6.03,
+    "inclinacaoGraus": -0.54
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2021_6x2_t.glb": {
+   "pos": [
+    0,
+    0.39558,
+    -3.14109
+   ],
+   "normal": [
+    0,
+    -0.00915,
+    -0.99996
+   ],
+   "vao": 0.0095,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.11,
+    "inclinacaoGraus": -0.52
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2021_6x4.glb": {
+   "pos": [
+    0,
+    0.39558,
+    -3.14109
+   ],
+   "normal": [
+    0,
+    -0.00915,
+    -0.99996
+   ],
+   "vao": 0.0095,
+   "alturaSolo": 0.4,
+   "ajuste": {
+    "rms": 1.69,
+    "res": 6.11,
+    "inclinacaoGraus": -0.52
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2024_4x2.glb": {
+   "pos": [
+    0,
+    0.44558,
+    -3.37663
+   ],
+   "normal": [
+    0,
+    0.00004,
+    -1
+   ],
+   "vao": 0.0039,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 0.53,
+    "res": 1.31,
+    "inclinacaoGraus": 0
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2024_6x2_t.glb": {
+   "pos": [
+    0,
+    0.44558,
+    -3.37677
+   ],
+   "normal": [
+    0,
+    -0.00001,
+    -1
+   ],
+   "vao": 0.0041,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 0.6,
+    "res": 1.37,
+    "inclinacaoGraus": 0
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/volvo_fh_2024_6x4.glb": {
+   "pos": [
+    0,
+    0.44558,
+    -3.37677
+   ],
+   "normal": [
+    0,
+    -0.00001,
+    -1
+   ],
+   "vao": 0.0041,
+   "alturaSolo": 0.45,
+   "ajuste": {
+    "rms": 0.6,
+    "res": 1.37,
+    "inclinacaoGraus": 0
+   },
+   "fonte": "medido"
+  },
+  "models/trucks/vw_titan_6x2_tl.glb": {
+   "pos": [
+    -0.00009,
+    0.74639,
+    -3.10998
+   ],
+   "normal": [
+    -0.00487,
+    -0.01102,
+    -0.99993
+   ],
+   "vao": 0.0097,
+   "alturaSolo": 0.75,
+   "ajuste": {
+    "rms": 1.85,
+    "res": 28.93,
+    "inclinacaoGraus": -0.63
+   },
+   "fonte": "medido"
+  }
+ }
+}

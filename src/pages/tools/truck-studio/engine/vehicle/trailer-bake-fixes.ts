@@ -24,6 +24,7 @@
    (ou mutilado) em silêncio. */
 import * as THREE from 'three';
 import { RIB_FLAT_CENTER } from './trailer-geometry';
+import { claimGeometry } from './geometry-share';
 
 /** Galvanizado do frame — o mesmo material do trilho da saia, então a peça é
  *  escolhida pela REGIÃO (testeira, no alto), nunca só pelo material. */
@@ -95,8 +96,8 @@ function editVerts(
   mesh: THREE.Mesh, toLocal: THREE.Matrix4,
   fn: (v: THREE.Vector3, i: number) => boolean,
 ): number {
-  const geo = mesh.geometry as THREE.BufferGeometry;
-  const pos = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
+  const leitura = mesh.geometry as THREE.BufferGeometry;
+  const pos = leitura.getAttribute('position') as THREE.BufferAttribute | undefined;
   if (!pos) return 0;
   const m4 = new THREE.Matrix4().multiplyMatrices(toLocal, mesh.matrixWorld);
   const inv = m4.clone().invert();
@@ -111,8 +112,26 @@ function editVerts(
     moved.push({ i, x: v.x, y: v.y, z: v.z });
   }
   if (!moved.length) return 0;
-  for (const m of moved) pos.setXYZ(m.i, m.x, m.y, m.z);
-  pos.needsUpdate = true;
+
+  /* ⚠️ CLONE-NA-ESCRITA, E SÓ AGORA — depois de a varredura ter decidido que há
+     algo a mover. Com o acervo deduplicado esta geometria pode ser a MESMA de
+     dezenas de outras malhas, e uma correção de bake é, por definição,
+     específica de UMA peça: sem a posse, corrigir a testeira moveria os
+     vértices correspondentes de todas as irmãs que dividem a forma.
+
+     A posição da chamada é o ponto. Reivindicar no TOPO da função clonaria
+     também para as malhas em que `fn` não casa com vértice nenhum — e a
+     esmagadora maioria das chamadas é assim, porque estas correções varrem o
+     implemento inteiro procurando meia dúzia de peças. O `if` acima é a mesma
+     porta que já garantia "uma correção que desiste no meio não deixa meia
+     malha movida"; ela agora também garante "não clona à toa".
+
+     Ver `vehicle/geometry-share.ts`. */
+  const geo = claimGeometry(mesh);
+  const escrita = geo === leitura ? pos
+    : geo.getAttribute('position') as THREE.BufferAttribute;
+  for (const m of moved) escrita.setXYZ(m.i, m.x, m.y, m.z);
+  escrita.needsUpdate = true;
   geo.computeBoundingBox();
   geo.computeBoundingSphere();
   return moved.length;

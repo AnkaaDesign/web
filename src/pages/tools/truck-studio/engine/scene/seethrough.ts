@@ -112,10 +112,44 @@
 
    E A SOMBRA DISSOLVE JUNTO — ver o bloco A SOMBRA SAI COM O OBJETO. Esta versão
    do arquivo dizia o contrário ("a sombra continua inteira, de propósito"), e o
-   argumento não sobreviveu ao produto rodando. */
+   argumento não sobreviveu ao produto rodando.
+
+   ===========================================================================
+   ⚠️ ESTE MÓDULO ERA O MAIOR CUSTO ISOLADO DO QUADRO, E POR UMA LINHA
+   (2026-08-15). O diagnóstico está em `GARGALO-2026-08-15.md` §1.2, e ele é
+   MEDIDO, não estimado. `escrever()` marcava o mapa de sombra como sujo a cada
+   passo de dissolvência de cada sólido, incondicionalmente. No
+   `distrito-industrial` há prédio entrando e saindo do corredor o tempo todo
+   enquanto a câmera orbita, então o resultado era:
+
+     nível Alta   sombra reassada em 90 de 90 quadros de arrasto (100 %)
+     nível Média  70 de 90 (78 %)
+
+   ou seja uma SEGUNDA varredura completa da geometria, 60 vezes por segundo.
+   Medido numa RX 570: +6,06 ms no Alta, +5,31 ms no Média, +4,02 ms no Baixa —
+   perto de metade do quadro, gasto para redesenhar uma sombra que mudou alguns
+   por cento.
+
+   Três travas, todas aqui em baixo e todas baratas:
+
+     1. SÓ SUJA QUEM PROJETA. `escrever()` marcava até para satélite e para malha
+        com `castShadow` false — nesses casos o passe de sombra nem enxerga o
+        objeto, então a reassadura redesenha exatamente a mesma imagem.
+     2. SÓ SUJA EM DEGRAU. Um passo de dissolvência de meio por cento não muda um
+        texel do mapa. Ver `PASSO_SOMBRA`.
+     3. QUEM ESTRANGULA A FREQUÊNCIA É scene.ts, e de propósito — ver
+        `takeSeeThroughShadowDirty()`. Este módulo diz "mudou"; quem tem o
+        `renderer` decide quando pagar, com a MESMA máquina de dívida que já
+        existe para o arrasto do relógio de luz (`shadowStale`/`scrubUntil`).
+
+   ⚠️ E A DÍVIDA TEM DE SER PAGA. Se a dissolvência termina dentro da janela
+   estrangulada e ninguém pede a reassadura depois, o prédio fica com a sombra do
+   estado anterior — que é exatamente o defeito que a marcação existe para não
+   ter. Por isso a marcação é INCONDICIONAL no passo que ASSENTA (`hide ===
+   want`), e por isso scene.ts mantém o laço vivo enquanto houver dívida. */
 import * as THREE from 'three';
 import { grupoDePrimitivas } from './scenery';
-import { getProfile } from '../core/quality';
+import { getProfile, onQualityChange } from '../core/quality';
 
 /* ---------------- os números ---------------- */
 
@@ -169,19 +203,127 @@ const TAU_SAI = 0.26;
 /** Abaixo disto o vértice está no plano da câmera e a divisão por w explode. */
 const W_MIN = 1e-3;
 
+/* ⚠️⚠️ ESTE MÓDULO NÃO É O GARGALO, E ESTA NOTA CORRIGE UM NÚMERO QUE ESTE
+   PROJETO VINHA REPETINDO SEM NUNCA TER MEDIDO (2026-08-16).
+   ===========================================================================
+   Três arquivos afirmavam, com estas palavras ou parecidas, que
+   `updateSeeThrough()` é *"o maior custo fixo de CPU do laço"* — este bloco,
+   `core/quality.ts` e o cabeçalho de `reportFrameTime()`. A frase nasceu de uma
+   CONTAGEM ("~650 objetos, 60 vezes por segundo, inclusive em quadro pulado"),
+   e contagem prova que uma coisa é GRANDE, nunca que ela é o GARGALO — é
+   exatamente o erro de método que a §0 do `GARGALO-2026-08-15.md` documenta.
+
+   MEDIDO agora, com o laço quente copiado verbatim para fora do navegador
+   (aritmética de ponto flutuante, sem GPU e sem compositor: é literalmente "o
+   laço em JavaScript"), sobre a população que este cenário declara — 60 sólidos,
+   12 grupos, 593 plantas —, numa órbita de 24 m a 1440×900, Ryzen 7 5700X:
+
+       LOTES = 3 (o que está no ar)   mediana 0,011 ms · p95 0,020 ms
+       LOTES = 1 (antes da amortização) mediana 0,017 ms
+       um cenário 4× maior (240 + 2 372) mediana 0,043 ms
+
+   **Onze microssegundos.** Contra uma parede de 36,86 ms, é 0,03 % do quadro. A
+   amortização em três lotes, que custou um bloco inteiro de raciocínio sobre
+   latência de veredito, comprou 6 microssegundos.
+
+   O que isso muda na prática, e é o que interessa a quem chegar aqui procurando
+   desempenho:
+
+     · `seeThroughSamples` no perfil de qualidade é um botão que não devolve
+       quadro nenhum. Ele continua aqui porque não custa nada e porque um cenário
+       muito maior um dia pode precisar dele — mas quem estiver caçando
+       milissegundos NÃO os encontra neste arquivo;
+     · o custo REAL deste módulo nunca foi o laço de CPU: foi a TEMPESTADE DE
+       SOMBRA de `escrever()` (+6,06 ms medidos, ver o bloco ⚠️ acima), que é uma
+       chamada de desenho e não uma conta. A lição se repete: o triângulo é de
+       graça, a conta é de graça, a CHAMADA é o que se paga;
+     · o que sobrou de custo por quadro aqui era UMA alocação — a leitura do
+       perfil —, e ela saiu (ver `lerPerfil()`).
+
+   Quem for repetir a frase antiga em algum documento novo: ela está errada, e o
+   número acima é reprodutível em qualquer máquina sem abrir um navegador. */
+
 /** Amostras ao longo do corredor lente→veículo no pré-teste barato.
  *
- *  DO PERFIL, porque este é o maior custo fixo de CPU do laço: `updateSeeThrough`
- *  roda 60×/s sobre ~650 objetos (60 sólidos + as plantas instanciadas)
- *  INCLUSIVE em quadro pulado, e cada sólido paga até `AMOSTRAS + 1` chamadas de
- *  `Box3.distanceToPoint`. Numa máquina limitada por CPU — que é o caso do alvo
- *  desta passagem — cortar isso pela metade vale mais que qualquer botão de
- *  preenchimento.
+ *  DO PERFIL porque o campo existe e é barato de honrar, NÃO porque isto pese —
+ *  ver o bloco acima, que mede o laço inteiro em 0,011 ms.
  *
  *  É amostragem pura pela régua do perfil: metade das amostras ao longo do MESMO
  *  corredor só torna o pré-teste um pouco mais grosseiro, e quem decide de fato
- *  é o teste de retângulo em NDC que vem depois. */
-const amostras = () => getProfile().seeThroughSamples;
+ *  é o teste de retângulo em NDC que vem depois.
+ *
+ *  ⚠️ LIDO NUMA VARIÁVEL, E NÃO POR ITERAÇÃO. `getProfile()` MONTA UM OBJETO
+ *  NOVO a cada chamada (ele espalha a tabela e apara anisotropia e lado do mapa
+ *  contra o hardware). A versão original era
+ *  `const amostras = () => getProfile().seeThroughSamples`, chamada de dentro de
+ *  `noCorredor()`, ou seja até ~650 objetos por quadro jogados fora, 60×/s. */
+let nAmostras = 8;
+
+/* ---------------- O PERFIL, LIDO POR EVENTO E NÃO POR QUADRO ----------------
+   O degrau que faltava. Ler uma vez por quadro em vez de ~650 tirou o grosso,
+   mas continuava sendo UM objeto novo por quadro para ler um inteiro que muda
+   umas poucas vezes por sessão — 60 objetos por segundo de lixo por nada, e o
+   laço sob demanda não ajuda porque `updateSeeThrough()` roda também em quadro
+   PULADO.
+
+   O padrão é o da casa e está escrito por extenso em `vehicle/lod.ts`
+   (`minPxCache`): cache invalidado pelo EVENTO EXATO, nunca um `const` de tempo
+   de import. A diferença entre os dois é a armadilha que `textureAnisotropy()` e
+   `groundVariant()` já registram — o nível muda no meio da sessão (o medidor
+   rebaixa, o usuário escolhe), e um valor congelado na carga entregaria para
+   sempre a amostragem do nível em que a página abriu.
+
+   `onQualityChange` não fecha ciclo: `core/quality.ts` é folha por construção —
+   ele não importa nada do engine, justamente para poder ser importado de
+   qualquer lugar (ver o bloco de importação em `scene/scene.ts`). */
+let amostrasCache = -1;
+function lerPerfil() {
+  if (amostrasCache < 0) amostrasCache = Math.max(1, getProfile().seeThroughSamples | 0);
+  nAmostras = amostrasCache;
+}
+onQualityChange(() => { amostrasCache = -1; });
+
+/**
+ * Degrau de dissolvência que vale uma reassadura do mapa de sombra.
+ *
+ * ⚠️ NÃO É TOLERÂNCIA NUMÉRICA, É ORÇAMENTO. Um passo de `passo()` a 60 Hz com
+ * `TAU_ENTRA` de 0,10 s move `hide` em ~15 % no primeiro quadro e em frações de
+ * por cento perto do fim — e a rampa inteira leva ~33 quadros a entrar e ~86 a
+ * sair. Sem degrau, cada um desses quadros pedia uma varredura completa da
+ * geometria no mapa de profundidade.
+ *
+ * 1/8 dá no máximo 8 reassaduras por dissolvência em vez de 33 a 86, e a
+ * diferença de imagem é uma sombra que engrossa em oito passos em vez de
+ * oitenta e seis, ao longo de um décimo de segundo. Invisível pelo mesmo
+ * argumento que autoriza reassar a 12–15 Hz.
+ *
+ * O passo que ASSENTA (`hide === want`) ignora este degrau de propósito: é ele
+ * que paga a dívida e deixa o mapa coerente com o estado final.
+ */
+const PASSO_SOMBRA = 1 / 8;
+
+/**
+ * Em quantos quadros o VEREDITO (não a dissolvência) dá uma volta completa.
+ *
+ * ⚠️ O QUE É AMORTIZADO É SÓ A DECISÃO. `hide` continua andando TODO quadro,
+ * para todo objeto, com o `dt` do relógio — se a rampa fosse amortizada junto, a
+ * dissolvência passaria a andar em degraus de 3 quadros e a trama de Bayer
+ * viraria pisca, que é o defeito que este módulo inteiro existe para não ter.
+ *
+ * O que se paga é LATÊNCIA DE VEREDITO: um prédio que entra no corredor pode
+ * levar até 2 quadros (33 ms a 60 Hz) para COMEÇAR a dissolver. Contra
+ * `TAU_ENTRA` de 100 ms e uma rampa completa de ~550 ms, são 6 % do tempo de
+ * entrada — abaixo do que o olho separa, e muito abaixo do que a v1 mostrava.
+ *
+ * ⚠️ E A HISTERESE NÃO SE MEXE. Ela é de ESTADO (`s.want === 1` alimenta a folga
+ * extra em `tapa()`), não de cadência: avaliar de 3 em 3 quadros só pode
+ * DIMINUIR a taxa de troca de lado, nunca aumentá-la. A amortização não
+ * reintroduz o pisca que `HISTERESE_NDC` documenta; ela o torna ainda mais
+ * difícil. O que ela NÃO poderia fazer — e não faz — é amortizar o cálculo do
+ * retângulo do ALVO, que é compartilhado por todos e é refeito a cada quadro.
+ */
+const LOTES = 3;
+let loteAtual = 0;
 
 /* ---------------- o shader ----------------
    O uniforme `uSeeHide` é declarado sempre e o atributo só sob instanciamento,
@@ -517,6 +659,14 @@ interface Solido {
   cx: number; cy: number; cz: number; r: number;
   hide: number;
   want: number;
+  /**
+   * O valor de `hide` que estava no ar na última vez que este sólido pediu uma
+   * reassadura de sombra. É contra ele que `PASSO_SOMBRA` é medido.
+   *
+   * Nasce em 0 junto com `hide`, que é o estado de repouso — assim o primeiro
+   * degrau real é medido a partir da verdade e não de um marco inventado.
+   */
+  hideSombra: number;
 }
 
 interface Grupo {
@@ -530,6 +680,8 @@ interface Grupo {
   esferas: Float32Array;
   hide: Float32Array;
   want: Uint8Array;
+  /** O par de `Solido.hideSombra`, por instância. Ver `PASSO_SOMBRA`. */
+  hideSombra: Float32Array;
   sujo: boolean;
 }
 
@@ -553,6 +705,11 @@ let alvoR = 0;
 export function measureSeeThrough(root: THREE.Object3D) {
   solidos = [];
   grupos = [];
+  /* O rodízio recomeça com o cenário: um lote herdado de um set que não existe
+     mais não quebra nada (o índice é módulo), mas zerar torna a bancada
+     reproduzível — dois carregamentos iguais avaliam os mesmos objetos nos
+     mesmos quadros. */
+  loteAtual = 0;
   root.updateMatrixWorld(true);
 
   const cx = new THREE.Box3();
@@ -586,7 +743,7 @@ export function measureSeeThrough(root: THREE.Object3D) {
       mesh, us, sats: [], box: cx.clone(),
       cx: c.x, cy: c.y, cz: c.z,
       r: cx.getSize(new THREE.Vector3()).length() / 2,
-      hide: 0, want: 0,
+      hide: 0, want: 0, hideSombra: 0,
     });
   });
 
@@ -634,7 +791,8 @@ export function measureSeeThrough(root: THREE.Object3D) {
     }
     grupos.push({
       malhas, attrs, n, boxes, esferas,
-      hide: new Float32Array(n), want: new Uint8Array(n), sujo: false,
+      hide: new Float32Array(n), want: new Uint8Array(n),
+      hideSombra: new Float32Array(n), sujo: false,
     });
   }
 
@@ -753,9 +911,11 @@ const _wOut = [0];
  * não quer dizer nada.
  */
 function noCorredor(bx: THREE.Box3) {
-  /* Lido UMA vez por chamada e não por iteração: são ~650 chamadas por quadro e
-     `getProfile()` monta um objeto novo a cada leitura. */
-  const n = amostras();
+  /* `nAmostras` e não `getProfile().seeThroughSamples`: são ~650 chamadas por
+     quadro e cada leitura do perfil MONTA UM OBJETO. Ver O PERFIL, LIDO POR
+     EVENTO E NÃO POR QUADRO — hoje a variável é escrita só quando o nível muda,
+     e `updateSeeThrough()` a refresca chamando `lerPerfil()`. */
+  const n = nAmostras;
   for (let k = 0; k <= n; k++) {
     const t = k / n;
     _p.copy(_cam).lerp(_tgt, t);
@@ -811,16 +971,72 @@ function encosta(a: number[], b: number[], mais: number) {
 /** Alguma sombra mudou neste quadro? Ver `escrever()`. */
 let sombraSuja = false;
 
+/**
+ * O satélite deste `host` chega a aparecer no passe de sombra?
+ *
+ * ⚠️ LAZY E EM CACHE, E A PREGUIÇA É O PONTO. `setupShadows()` de set.ts é quem
+ * escreve `castShadow` na árvore do cenário, e ele roda DEPOIS de
+ * `measureSeeThrough()` e DEPOIS de `bindSeeThroughSatellite()` — ver a
+ * sequência no fim de `applySet()`. Ler a bandeira na hora do registro devolveria
+ * o padrão do `GLTFLoader` (false para tudo) e esta trava passaria a mentir para
+ * a cena inteira. Na primeira TROCA de visibilidade a carga já terminou, e aí a
+ * bandeira é a verdade.
+ *
+ * Percorre a subárvore porque um satélite pode ser um `Group` — hoje o único é
+ * o vidro de luminária de `lamps.ts` (que nasce `castShadow = false`, ou seja
+ * esta função devolve false e o vínculo do vidro nunca custa uma reassadura),
+ * mas o registro é público e o próximo satélite pode ser qualquer coisa.
+ */
+const satProjetaCache = new WeakMap<THREE.Object3D, boolean>();
+function satProjeta(o: THREE.Object3D) {
+  const v = satProjetaCache.get(o);
+  if (v !== undefined) return v;
+  let sim = false;
+  o.traverse((x) => { if (x.castShadow) sim = true; });
+  satProjetaCache.set(o, sim);
+  return sim;
+}
+
 function escrever(s: Solido) {
   for (const u of s.us) u.value = s.hide;
   /* Meio caminho conta como escondido: o satélite é pequeno e aceso, e deixá-lo
      ligado durante a dissolvência é justamente o "vidro sem poste". */
   const mostrar = s.hide < 0.5;
-  for (const o of s.sats) if (o.visible !== mostrar) o.visible = mostrar;
-  /* O mapa de sombra deste engine não se redesenha sozinho
+  for (const o of s.sats) {
+    if (o.visible === mostrar) continue;
+    o.visible = mostrar;
+    /* Aparecer e sumir É uma mudança de sombra, e ao contrário da dissolvência
+       ela é uma BORDA (uma vez por travessia), não uma rampa — então não passa
+       pelo degrau de `PASSO_SOMBRA`. */
+    if (satProjeta(o)) sombraSuja = true;
+  }
+
+  /* ---- ⚠️ AS DUAS TRAVAS DA TEMPESTADE DE SOMBRA ----
+     O mapa de sombra deste engine não se redesenha sozinho
      (`shadowMap.autoUpdate = false`), então mexer no valor não basta: o quadro
-     tem de PEDIR o redesenho. */
-  sombraSuja = true;
+     tem de PEDIR o redesenho. O que mudou em 2026-08-15 é QUANDO se pede.
+
+     TRAVA 1 — quem não projeta não muda o mapa. `WebGLShadowMap` nem chega a
+     visitar um objeto com `castShadow` false, então reassar por causa dele
+     redesenha exatamente a mesma imagem. Os candidatos a atravessar e os
+     projetores de sombra do cenário se sobrepõem quase inteiramente (os dois
+     usam o mesmo limiar de 0,35 m — ver ALTURA_MIN e SHADOW_CAST_MIN_H), mas
+     não são o mesmo conjunto: um painel de telhado é uma malha de espessura
+     zero a 8 m do chão, entra aqui pelo ramo da ALTITUDE e não projeta.
+
+     ⚠️ A BANDEIRA É LIDA A CADA QUADRO, DE PROPÓSITO. `setupShadows()` roda
+     DEPOIS de `measureSeeThrough()`, então guardar `castShadow` no `Solido` na
+     hora da medição guardaria `false` para o cenário inteiro. É uma leitura de
+     propriedade; não vale um campo em cache que envelhece.
+
+     TRAVA 2 — só em degrau. Ver `PASSO_SOMBRA`. O passo que ASSENTA passa
+     sempre, e é ele que garante que o mapa termine coerente com o estado final:
+     é a dívida a que o cabeçalho deste arquivo se refere. */
+  if (!s.mesh.castShadow) return;
+  if (s.hide === s.want || Math.abs(s.hide - s.hideSombra) >= PASSO_SOMBRA) {
+    s.hideSombra = s.hide;
+    sombraSuja = true;
+  }
 }
 
 /**
@@ -829,6 +1045,18 @@ function escrever(s: Solido) {
  * Existe para não importar `renderer` aqui: scene.ts é quem tem o
  * `shadowMap.needsUpdate`, e uma seta de volta para lá só por um booleano seria
  * um ciclo de módulo.
+ *
+ * ⚠️ QUEM ESTRANGULA A FREQUÊNCIA É QUEM CHAMA, e a divisão de trabalho é
+ * deliberada: aqui se sabe O QUE mudou, lá se sabe se o passe já rodou neste
+ * quadro, quanto tempo passou desde a última reassadura e como manter o laço
+ * vivo até a dívida ser paga. scene.ts já tem essa máquina inteira montada para
+ * o arrasto do relógio de luz (`shadowStale` + `scrubUntil`); duplicá-la aqui
+ * daria dois donos para o mesmo orçamento.
+ *
+ * Consequência para quem for mexer: um `true` daqui é um PEDIDO, não uma
+ * garantia de que o mapa será reassado neste quadro. O que é garantido é que o
+ * pedido não se perde — o passo que assenta sempre pede, e scene.ts guarda a
+ * dívida até pagá-la.
  */
 export function takeSeeThroughShadowDirty() {
   const v = sombraSuja;
@@ -876,6 +1104,10 @@ function passo(hide: number, want: number, dt: number) {
 export function updateSeeThrough(camera: THREE.Camera, dt: number) {
   if (!solidos.length && !grupos.length) return false;
 
+  /* NENHUMA leitura do perfil por quadro — só na primeira depois de o nível
+     mudar. Ver O PERFIL, LIDO POR EVENTO E NÃO POR QUADRO. */
+  lerPerfil();
+
   /* SEM ALVO, TUDO VOLTA. Acontece de verdade: entre a troca de cavalo e o
      engate `vehicleFocus` é null por alguns quadros, e congelar o cenário
      escondido nessa janela deixaria um buraco no distrito sem nada dentro. */
@@ -913,35 +1145,74 @@ export function updateSeeThrough(camera: THREE.Camera, dt: number) {
      candidato que o cone aceitaria. */
   const folgaR = alvoR * 1.4 + 1.2;
 
-  for (const s of solidos) {
-    /* Rejeição em três degraus, do mais barato ao mais caro: esfera contra o
-       eixo, caixa contra o cone, e só então a silhueta em tela. */
-    const want = temAlvo
-      && distEixo(s.cx, s.cy, s.cz) <= s.r + folgaR
-      && noCorredor(s.box)
-      && tapa(s.box, s.want === 1) ? 1 : 0;
-    s.want = want;
-    if (s.hide !== want) {
-      s.hide = passo(s.hide, want, dt);
+  /* O RODÍZIO DO VEREDITO. Ver o bloco de `LOTES`.
+     SEM ALVO NÃO HÁ RODÍZIO, e não é exceção: com `temAlvo` false o veredito é 0
+     para todo mundo sem um único teste caro (nem corredor, nem silhueta), então
+     amortizar não economiza nada e só atrasaria em 2 quadros a devolução do
+     cenário na janela em que `vehicleFocus` é null. */
+  const lote = loteAtual;
+  loteAtual = (loteAtual + 1) % LOTES;
+  const cheia = !temAlvo;
+
+  for (let i = 0; i < solidos.length; i++) {
+    const s = solidos[i];
+    if (cheia || i % LOTES === lote) {
+      /* Rejeição em três degraus, do mais barato ao mais caro: esfera contra o
+         eixo, caixa contra o cone, e só então a silhueta em tela.
+         `s.want === 1` é o estado ANTERIOR — é ele que alimenta a histerese, e
+         o JS avalia a direita inteira antes de atribuir. */
+      s.want = temAlvo
+        && distEixo(s.cx, s.cy, s.cz) <= s.r + folgaR
+        && noCorredor(s.box)
+        && tapa(s.box, s.want === 1) ? 1 : 0;
+    }
+    /* A RAMPA ANDA TODO QUADRO, esteja o sólido no lote ou não. Ver `LOTES`. */
+    if (s.hide !== s.want) {
+      s.hide = passo(s.hide, s.want, dt);
       escrever(s);
-      if (s.hide !== want) andando = true;
+      if (s.hide !== s.want) andando = true;
     }
   }
 
   for (const g of grupos) {
+    /* A MESMA TRAVA 1 DE `escrever()`, um nível acima: se nenhuma das malhas do
+       grupo projeta, nenhuma dissolvência de vegetação pode mudar um texel do
+       mapa. Lido por quadro pela mesma razão de ordem (`setupShadows()` roda
+       depois de `measureSeeThrough()`), e são 2 leituras por grupo. */
+    let projeta = false;
+    for (const im of g.malhas) if (im.castShadow) { projeta = true; break; }
+
     for (let i = 0; i < g.n; i++) {
-      let want = 0;
-      if (temAlvo
-        && distEixo(g.esferas[i * 4], g.esferas[i * 4 + 1], g.esferas[i * 4 + 2])
-          <= g.esferas[i * 4 + 3] + folgaR) {
-        _bx.min.set(g.boxes[i * 6], g.boxes[i * 6 + 1], g.boxes[i * 6 + 2]);
-        _bx.max.set(g.boxes[i * 6 + 3], g.boxes[i * 6 + 4], g.boxes[i * 6 + 5]);
-        if (noCorredor(_bx) && tapa(_bx, g.want[i] === 1)) want = 1;
+      if (cheia || i % LOTES === lote) {
+        let want = 0;
+        if (temAlvo
+          && distEixo(g.esferas[i * 4], g.esferas[i * 4 + 1], g.esferas[i * 4 + 2])
+            <= g.esferas[i * 4 + 3] + folgaR) {
+          _bx.min.set(g.boxes[i * 6], g.boxes[i * 6 + 1], g.boxes[i * 6 + 2]);
+          _bx.max.set(g.boxes[i * 6 + 3], g.boxes[i * 6 + 4], g.boxes[i * 6 + 5]);
+          if (noCorredor(_bx) && tapa(_bx, g.want[i] === 1)) want = 1;
+        }
+        g.want[i] = want;
       }
-      g.want[i] = want;
+      const want = g.want[i];
       if (g.hide[i] !== want) {
         g.hide[i] = passo(g.hide[i], want, dt);
         g.sujo = true;
+        /* ⚠️ A VEGETAÇÃO NUNCA PEDIA REASSADURA, E ISSO ERA UM DEFEITO LATENTE
+           que só não aparecia porque `escrever()` sujava o mapa em todo quadro:
+           a sombra de uma árvore vinha de carona no pedido de um PRÉDIO. Com o
+           pedido dos prédios estrangulado, a carona deixa de ser garantida — uma
+           órbita que só cruze o bosque não moveria um sólido — e a copa ficaria
+           projetando uma rendilha que não está mais lá, que é exatamente o
+           relato que criou o bloco A SOMBRA SAI COM O OBJETO. Mesmo degrau,
+           mesma dívida no passo que assenta. */
+        if (projeta) {
+          const h = g.hide[i];
+          if (h === want || Math.abs(h - g.hideSombra[i]) >= PASSO_SOMBRA) {
+            g.hideSombra[i] = h;
+            sombraSuja = true;
+          }
+        }
         if (g.hide[i] !== want) andando = true;
       }
     }

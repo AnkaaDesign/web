@@ -54,8 +54,38 @@ const PROBE_NEAR = 2.5;
 const PROBE_FAR = 400;
 
 let rt: THREE.WebGLCubeRenderTarget | null = null;
+let cubeCam: THREE.CubeCamera | null = null;
+/** O alvo do PMREM, REUSADO entre capturas. Ver o bloco de `assarPmrem()`. */
+let pmremRT: THREE.WebGLRenderTarget | null = null;
 let pmrem: THREE.PMREMGenerator | null = null;
 let baked: THREE.Texture | null = null;
+
+/* ===========================================================================
+   ⚠️⚠️ POR QUE ESTE MÓDULO TEM UM `PMREMGenerator` PRÓPRIO, e NÃO usa o
+   `pmrem` compartilhado que `scene.ts` exporta — apesar de a própria
+   documentação do three dizer "you should not need more than one".
+   ===========================================================================
+   Porque as duas coisas juntas — alvo reusado E gerador compartilhado — formam
+   uma armadilha silenciosa, e ela está no código do three:
+
+     `_fromTexture(texture, renderTarget)` chama `_setSize()` SEMPRE (o
+     `_cubeSize` acompanha a fonte), mas só chama `_allocateTargets()` quando
+     `renderTarget` é nulo. E é dentro de `_allocateTargets()` que moram o
+     `_pingPongRenderTarget`, os `_lodPlanes` e o `_blurMaterial` — todo o
+     rascunho do borrão, dimensionado pelo `_cubeSize` DAQUELA chamada.
+
+   Ou seja: dois consumidores de tamanhos diferentes, cada um passando o próprio
+   alvo em cache, param de realocar o rascunho — e o segundo passa a borrar com
+   um ping-pong dimensionado para o primeiro. `scene/skyblend.ts` assa equirect
+   de 2048x1024 (`_cubeSize` 512); esta sonda assa cubo de 256 ou 128. Não são o
+   mesmo número, e a divergência não dá erro: dá reflexo errado.
+
+   Um gerador por tamanho de fonte é a forma de não ter esse acoplamento. O custo
+   é um `_blurMaterial` e uma pirâmide de planos a mais em VRAM, que é troco
+   perto do que a confusão custaria para achar.
+
+   ⚠️ E POR ISSO `disposeReflectionProbe()` PODE descartar este gerador: ele é
+   nosso. Descartar o de `scene.ts` daqui apagaria o borrão do céu misturado. */
 
 export interface ProbeOptions {
   /** World point to capture from — normally the middle of the rig. */
@@ -80,7 +110,18 @@ export function captureReflectionProbe(opts: ProbeOptions): THREE.Texture | null
        defeito que esta passagem existe para corrigir). Trocar de tamanho é raro:
        acontece na mudança de nível, não a cada sonda. */
     const side = probeSize();
-    if (rt && rt.width !== side) { rt.dispose(); rt = null; }
+    if (rt && rt.width !== side) {
+      rt.dispose(); rt = null;
+      /* ⚠️ O ALVO DO PMREM CAI JUNTO, E ISSO É OBRIGATÓRIO — não é limpeza
+         defensiva. Enquanto `pmremRT` for passado de volta, o three PULA
+         `_allocateTargets()`, e é lá dentro que o `_pingPongRenderTarget` e os
+         `_lodPlanes` são redimensionados pelo `_cubeSize` novo. Guardar o alvo
+         de 256 e assar uma fonte de 128 nele borraria com a pirâmide errada.
+         Soltando os dois, a próxima assadura realoca tudo em conjunto. */
+      pmremRT?.dispose(); pmremRT = null;
+      /* A câmera segura a referência ao alvo; um alvo novo pede uma câmera nova. */
+      cubeCam = null;
+    }
     if (!rt) {
       rt = new THREE.WebGLCubeRenderTarget(side, { type: THREE.HalfFloatType });
     }
@@ -88,7 +129,14 @@ export function captureReflectionProbe(opts: ProbeOptions): THREE.Texture | null
       pmrem = new THREE.PMREMGenerator(renderer);
       pmrem.compileCubemapShader();
     }
-    const cam = new THREE.CubeCamera(PROBE_NEAR, PROBE_FAR, rt);
+    /* ⚠️ A CÂMERA É REUSADA, e não construída por captura. `new CubeCamera()`
+       monta SEIS `PerspectiveCamera` e um `Group`, e a sonda dispara em cadeia
+       na carga (cenário novo, cabine nova, implemento movido, troca de fundo do
+       ciclorama). Não é o custo dominante desta função — as seis renderizações
+       são —, mas é lixo que nasce exatamente no instante de engasgo, que é o
+       pior instante possível para dar trabalho ao coletor. */
+    if (!cubeCam) cubeCam = new THREE.CubeCamera(PROBE_NEAR, PROBE_FAR, rt);
+    const cam = cubeCam;
     cam.position.copy(opts.at);
     cam.updateMatrixWorld(true);
 
@@ -106,12 +154,25 @@ export function captureReflectionProbe(opts: ProbeOptions): THREE.Texture | null
       opts.hide.forEach((o, i) => { o.visible = wasVisible[i]; });
     }
 
-    const next = pmrem.fromCubemap(rt.texture).texture;
-    /* Dispose AFTER the new bake exists: fromCubemap can throw on a lost context,
-       and dropping the old one first would leave the vehicle with no environment
-       at all rather than a stale but correct one. */
-    if (baked && baked !== next) baked.dispose();
-    baked = next;
+    /* ---- O ALVO DO PMREM É REUSADO, e é a mesma receita de `skyblend.ts` ----
+       `fromCubemap(cubemap, renderTarget)` aceita o alvo de volta e escreve
+       NELE. Antes, cada captura alocava um alvo novo (256² viram uma folha
+       cubeUV de 768 × 1024 em `HalfFloat`) e descartava o anterior — alocar e
+       liberar VRAM é justamente o que faz um driver de memória compartilhada
+       parar para respirar, e a sonda dispara em cadeia na carga.
+
+       ⚠️ E O EFEITO COLATERAL BOM É A IDENTIDADE ESTÁVEL: `baked` passa a ser
+       sempre a MESMA `Texture`. Quem consome (`refreshVehicleReflection()` em
+       vehicle/models.ts) escreve `m.envMap = tex; m.needsUpdate = true` em todo
+       material do veículo; com a textura mudando de identidade, o three tinha de
+       subir uma textura nova e soltar a velha a cada sonda. Com ela estável, a
+       reatribuição é um no-op de GPU. */
+    const alvo = pmrem.fromCubemap(rt.texture, pmremRT || undefined);
+    /* Só depois de a assadura VOLTAR: `fromCubemap` pode lançar num contexto
+       perdido, e adotar o alvo antes disso deixaria o veículo apontando para um
+       alvo meio escrito em vez de manter o anterior, velho mas correto. */
+    pmremRT = alvo;
+    baked = alvo.texture;
     return baked;
   } catch (e: unknown) {
     console.warn('[probe] captura falhou — os metais seguem no HDRI.',
@@ -122,10 +183,17 @@ export function captureReflectionProbe(opts: ProbeOptions): THREE.Texture | null
 
 /** Free everything. Called when the studio unmounts. */
 export function disposeReflectionProbe() {
-  baked?.dispose();
+  /* `baked` É A TEXTURA DE `pmremRT`, não um objeto independente — soltar o alvo
+     já solta a textura dele. Um `baked.dispose()` a mais aqui era inofensivo
+     antes (a textura era descartável), e passa a ser ruído agora que a
+     identidade é a do alvo: descartar os dois emitiria dois eventos de dispose
+     para o mesmo recurso. */
   baked = null;
+  pmremRT?.dispose();
+  pmremRT = null;
   rt?.dispose();
   rt = null;
+  cubeCam = null;
   pmrem?.dispose();
   pmrem = null;
 }

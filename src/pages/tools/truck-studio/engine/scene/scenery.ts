@@ -69,7 +69,16 @@ import { getProfile, onQualityChange } from '../core/quality';
 const plantCount = (n: number) =>
   n > 0 ? Math.max(1, Math.round(n * getProfile().vegetation)) : 0;
 
-/** Todas as malhas instanciadas plantadas, para a repoda sem replantio. */
+/** Todas as malhas instanciadas sob poda, para a repoda sem replantio.
+ *
+ *  DUAS FONTES a alimentam, e é preciso saber disso para não procurar a segunda
+ *  dentro da primeira:
+ *    · `plantar()` — o plantio autorado deste módulo, que só roda em cenário com
+ *      faixas (`median_*`/`turf_*`) e protótipos `PLANT_*`: hoje, o
+ *      `distrito-industrial` e mais ninguém;
+ *    · `repodarAcervo()` — a folhagem instanciada que veio POSICIONADA do
+ *      `.glb`, reconhecida por `alphaTest > 0`. É o que faz o botão existir na
+ *      `serra`, onde ele não existia. Ver o bloco longo lá embaixo. */
 const plantadas = new Set<THREE.InstancedMesh>();
 
 /**
@@ -708,11 +717,6 @@ const PASSO_CANTEIRO = 14;
 const JITTER_CANTEIRO = 1.6;
 
 function plantar(protos: Proto[], faixas: Faixa[], grelha: Grelha) {
-  /* O registro de poda é do PLANTIO CORRENTE. Sem esta linha ele acumularia as
-     malhas de todo cenário já visitado — e uma troca de nível depois de duas
-     trocas de cenário escreveria `count` em `InstancedMesh` já descartadas,
-     segurando-as vivas de graça. */
-  plantadas.clear();
   const canteiros = faixas.filter((f) => f.canteiro);
   const gramas = faixas.filter((f) => !f.canteiro);
   const rand = rng(SEED);
@@ -867,15 +871,218 @@ function plantar(protos: Proto[], faixas: Faixa[], grelha: Grelha) {
       /* Guardado para `applyVegetationDensity()` poder repodar sem replantar. */
       im.userData.tsPlanted = usados.length;
       plantadas.add(im);
-      im.count = plantCount(usados.length);
+      /* ⚠️⚠️ **O `count` FICA CHEIO AQUI, E ISSO É UMA CORREÇÃO DE 2026-08-16.**
+         Ele valia `plantCount(usados.length)` nesta linha, e a poda por nível
+         acontecia ANTES de duas medições que leem `count`:
+
+           · os dois `compute*` logo abaixo — `InstancedMesh.computeBoundingBox()`
+             itera `i < this.count`, logo a caixa saía medida sobre o
+             SUBCONJUNTO. Subir de nível depois disso devolvia as instâncias sem
+             devolver a caixa, e o three descarta do frustum (e do passe de
+             sombra) pela caixa: a copa sumia em parte das órbitas. O comentário
+             de `applyVegetationDensity()` já afirmava que as caixas são "medidas
+             sobre o plantio INTEIRO" — a afirmação estava certa e o código não.
+           · `measureSeeThrough()` (scene/set.ts, logo depois de
+             `arranjarCenario()`) usa `n = min(im.count)` do grupo para montar as
+             caixas por instância do atravessar. Medido sobre o subconjunto, uma
+             planta devolvida por uma subida de nível nunca dissolveria — ela
+             ficaria opaca na frente do caminhão, que é o defeito que o módulo
+             de atravessar existe para não ter.
+
+         A poda passou a ser aplicada por `applyVegetationDensity()`, chamada por
+         `applySet()` DEPOIS de tudo que mede. Nada some de graça: o efeito
+         visível é o mesmo, só que agora ele é reversível. */
       im.instanceMatrix.needsUpdate = true;
       /* As caixas envolventes são as do plantio ANTIGO até isto rodar, e é por
          elas que o three descarta a malha inteira do frustum — e do passe de
          sombra. Sem os dois recomputes a copa some em metade das órbitas. */
+      im.count = usados.length;
       im.computeBoundingBox();
       im.computeBoundingSphere();
     }
   }
+}
+
+/* ===========================================================================
+   A REPODA DO ACERVO — a folhagem que este módulo NÃO plantou
+   ===========================================================================
+   ⚠️⚠️ **ACHADO DE 2026-08-16: `getProfile().vegetation` NÃO FAZIA NADA NO
+   CENÁRIO `serra`, QUE É O MAIS PESADO DOS TRÊS.**
+
+   A cadeia inteira da poda dependia de `plantar()`, e `plantar()` só roda com
+   `faixas.length && grelha && protos.length` — ou seja com o cenário trazendo
+   `median_*`/`rb_island*`/`turf_*` (as faixas) E materiais `PLANT_*` (os
+   protótipos). É a assinatura do `distrito-industrial`, e de mais ninguém.
+
+   Medido nos arquivos em disco (`tools/studio-bench/glbstat.mjs` + leitura do
+   chunk JSON):
+
+     · `serra/set.glb`   — 28 nós instanciados, **2 636 instâncias**, nenhum nó
+       com nome de faixa e nenhum material `PLANT_*`. Os dois testes falhavam,
+       `plantadas` ficava VAZIO e `applyVegetationDensity()` era um laço sobre
+       nada. O nível Baixo desenhava exatamente a mesma mata que o Alto.
+     · `distrito-industrial/set.glb` — 10 nós, 805 instâncias, todos
+       `PLANT_BARK + PLANT_LEAF`. Só ele era podado.
+
+   E o que não estava sendo podado é justamente o pior caso que existe numa
+   integrada: **900 coníferas de 27 m** (`FOREST_FAR`), 680 touceiras de grama,
+   212 samambaias, 156 moitas baixas, 150 mudas, 140 placas de musgo e 86
+   arbustos — folhagem com `alphaMode: MASK`, ou seja `discard` no fragmento, ou
+   seja **sem early-Z**, e paga DUAS vezes porque o material de profundidade
+   copia o `alphaTest` para o passe de sombra.
+
+   ---------------------------------------------------------------------------
+   O CRITÉRIO É `alphaTest > 0`, E ELE NÃO É UM PALPITE SOBRE NOMES
+
+   A tentação era casar nome de material (`/LEAF|FOLHA|GRAMA|BUSH|.../`), e isso
+   é adivinhação que quebra no próximo cenário. O critério certo é a PROPRIEDADE
+   QUE TORNA A COISA CARA: quem tem `alphaTest` é quem descarta fragmento, é quem
+   não tem early-Z e é quem paga o dobro no passe de sombra. Perguntar ao asset,
+   como o resto deste módulo faz.
+
+   E o corte cai onde tem de cair. Conferido no `serra/set.glb`, material por
+   material:
+
+     PODADOS  (MASK)   FOREST_FAR_LEAF · PH_SAMAMBAIA · PH_ARBUSTO ·
+                       PH_ARBUSTO_BAIXO · PH_MUDA_FOLHA · PH_MUSGO ·
+                       PH_GRAMA_TUFO                      → 2 324 instâncias
+     INTACTOS (opacos) PH_AFLORAMENTO (afloramento) · PH_ROCHA_MUSGO (matacões) ·
+                       PH_GALHADA (galhada seca) · PH_RAIZ · PH_TOCO
+                                                          →   312 instâncias
+
+   Pedra, toco, raiz e galhada FICAM — e isso importa mais do que parece: uma
+   pedra que some entre um nível e outro lê como cenário quebrado, enquanto mato
+   mais ralo lê como mato mais ralo. O critério acertou a divisão sozinho.
+
+   ---------------------------------------------------------------------------
+   ⚠️⚠️ A ARMADILHA: O TRONCO É OPACO E A COPA NÃO
+
+   `FOREST_FAR` é UM nó instanciado com DUAS primitivas — `FOREST_FAR_BARK`
+   (opaco) e `FOREST_FAR_LEAF` (MASK) —, e `MUDA` é igual. Podar só a primitiva
+   que tem `alphaTest` deixaria **900 troncos de 27 m com 315 copas**: uma mata de
+   postes. O corte tem de ser POR INDIVÍDUO, nunca por malha.
+
+   Daí a decisão sair do `grupoDePrimitivas()` que já existe e já é exportado
+   exatamente para isto (`seethrough.ts` usa o mesmo agrupamento pela mesma
+   razão: se os dois módulos discordarem, um poda a árvore e o outro dissolve
+   meia). O grupo entra se QUALQUER primitiva dele tiver `alphaTest`, e aí TODAS
+   as primitivas dele descem juntas.
+
+   ⚠️ E TODAS TÊM DE TER O MESMO `count`. Elas têm, porque vêm do mesmo nó e do
+   mesmo acessor de `EXT_mesh_gpu_instancing` — mas se um dia não tiverem, a
+   correspondência instância-a-instância entre casca e copa não existe e o grupo
+   inteiro é PULADO. Errar para o lado de desenhar demais.
+
+   ---------------------------------------------------------------------------
+   E A PERMUTAÇÃO É OBRIGATÓRIA, PELO MESMO MOTIVO QUE EM `plantar()`
+
+   `count` menor é um PREFIXO do buffer, e o buffer do `.glb` está em ordem de
+   construção — `build_serra.py` percorre o eixo da rodovia. Ficar com o prefixo
+   DESMATA uma ponta da estrada e deixa a outra fechada, que lê como defeito de
+   cenário e não como qualidade reduzida. O passo de razão áurea (`i·φ mod n`)
+   visita o vetor inteiro em ordem máximamente espalhada, então qualquer prefixo
+   é uma subamostra espacialmente uniforme.
+
+   ⚠️ A PERMUTAÇÃO É A MESMA PARA TODAS AS MALHAS DO GRUPO, e sai de graça: ela é
+   função pura de (índice, n), e `n` é igual em todas por causa da trava acima.
+   Casca e copa continuam casadas sem precisar compartilhar estado.
+
+   ⚠️ E ELA É APLICADA SEMPRE, inclusive no nível Alta com fator 1 — de propósito,
+   e é a mesma regra de `plantar()`: assim a ordem do buffer é a mesma nos três
+   níveis, e mudar de nível só mexe em `count`. As plantas que ficam não se
+   movem; a transição é "algumas somem", não "a mata inteira se reorganiza".
+
+   ⚠️ AS CAIXAS ENVOLVENTES NÃO SÃO RECOMPUTADAS, e também é a regra de
+   `applyVegetationDensity()`: permutar não muda a união, e encolher a caixa para
+   o subconjunto faria o three descartar do frustum — e do passe de sombra —
+   plantas que ainda estão em cena. */
+const PHI_PASSO = 0.61803398875;
+
+/** A permutação de razão áurea de `n` posições: `ordem[i]` é de onde vem o
+ *  elemento que passa a ocupar a posição `i`. Determinística. */
+function ordemEspalhada(n: number): Uint32Array {
+  const ordem = new Uint32Array(n);
+  const visto = new Uint8Array(n);
+  let escrita = 0;
+  for (let i = 0; i < n; i++) {
+    let j = Math.floor(((i * PHI_PASSO) % 1) * n);
+    /* Colisão é possível porque o piso quantiza; anda para a frente até achar
+       vaga. O laço termina sempre: há exatamente `n` vagas. */
+    while (visto[j]) j = (j + 1) % n;
+    visto[j] = 1;
+    ordem[escrita++] = j;
+  }
+  return ordem;
+}
+
+/** Reordena um buffer de instâncias em `stride` floats por instância. */
+function permutarBuffer(arr: Float32Array, n: number, stride: number, ordem: Uint32Array) {
+  const copia = arr.slice(0, n * stride);
+  for (let i = 0; i < n; i++) {
+    const de = ordem[i] * stride;
+    const para = i * stride;
+    for (let k = 0; k < stride; k++) arr[para + k] = copia[de + k];
+  }
+}
+
+/**
+ * Registra para a poda por nível a folhagem instanciada que `plantar()` não
+ * plantou — ver o bloco longo acima.
+ *
+ * @returns quantas instâncias passaram a obedecer ao perfil.
+ */
+function repodarAcervo(root: THREE.Object3D): number {
+  const porGrupo = new Map<THREE.Object3D, THREE.InstancedMesh[]>();
+  root.traverse((o) => {
+    const im = o as THREE.InstancedMesh;
+    if (!im.isInstancedMesh || !im.geometry) return;
+    /* Quem `plantar()` já registrou tem dono, e o dono dele sabe coisas que este
+       caminho não sabe (o veto do canteiro, a repartição por porte). */
+    if (plantadas.has(im)) return;
+    const chave = grupoDePrimitivas(im);
+    const lista = porGrupo.get(chave);
+    if (lista) lista.push(im); else porGrupo.set(chave, [im]);
+  });
+
+  let total = 0;
+  for (const malhas of porGrupo.values()) {
+    const n = malhas[0].count;
+    if (n < 1) continue;
+    let recorta = false;
+    let coerente = true;
+    for (const im of malhas) {
+      if (im.count !== n) { coerente = false; break; }
+      const mats = Array.isArray(im.material) ? im.material : [im.material];
+      for (const m of mats) if (m && (m as THREE.Material).alphaTest > 0) recorta = true;
+    }
+    if (!coerente || !recorta) continue;
+
+    const ordem = n > 2 ? ordemEspalhada(n) : null;
+    for (const im of malhas) {
+      if (ordem) {
+        permutarBuffer(im.instanceMatrix.array as Float32Array, n, 16, ordem);
+        im.instanceMatrix.needsUpdate = true;
+        /* A cor por instância, quando o acervo a traz, viaja com a matriz — ela
+           descreve A MESMA instância. Permutar uma sem a outra trocaria a cor
+           das plantas de lugar. */
+        const cor = im.instanceColor;
+        if (cor && cor.count >= n) {
+          permutarBuffer(cor.array as Float32Array, n, cor.itemSize, ordem);
+          cor.needsUpdate = true;
+        }
+      }
+      im.userData.tsPlanted = n;
+      plantadas.add(im);
+      /* ⚠️ O `count` NÃO é reduzido aqui — ver o bloco do `count` cheio em
+         `plantar()`. Quem reduz é `applyVegetationDensity()`, chamada por
+         `applySet()` depois de `measureSeeThrough()`. Reduzir agora mediria o
+         atravessar sobre o subconjunto, e a serra é justamente o cenário em que
+         a folhagem PERTO da lente dissolve (o manifesto nomeia `PH_SAMAMBAIA`,
+         `PH_ARBUSTO*` e `PH_MUDA_*` como quem dissolve). */
+    }
+    total += n;
+  }
+  return total;
 }
 
 /** Uma matriz de instância: pé no chão, giro livre em Y, porte variado. */
@@ -1231,12 +1438,24 @@ function realinharPostes(root: THREE.Object3D) {
  */
 export function arranjarCenario(root: THREE.Object3D) {
   const t0 = performance.now();
+  /* ⚠️ O REGISTRO DE PODA É DO CENÁRIO CORRENTE, E O LUGAR DESTA LINHA MUDOU EM
+     2026-08-16 — ela morava dentro de `plantar()`.
+     Lá ela só zerava quando havia o que plantar, então um cenário SEM faixas
+     (a `serra`) herdava as `InstancedMesh` do cenário anterior: uma troca de
+     nível depois de `distrito → serra` escrevia `count` em malhas já
+     descartadas e as segurava vivas de graça. Aqui ela zera em toda troca de
+     cenário, que é o que o comentário original dizia querer. */
+  plantadas.clear();
   const { faixas, grelha } = coletarFaixas(root);
   const protos = coletarProtos(root);
   /* ANTES de plantar: é o veto do canteiro que decide o destino, e ele lê o
      albedo. Depois seria tarde. */
   medirAlbedos(protos);
   if (faixas.length && grelha && protos.length) plantar(protos, faixas, grelha);
+  /* DEPOIS de `plantar()`, e a ordem é a correção: ela pula o que já tem dono.
+     Ver o bloco longo de `repodarAcervo()` — é o que faz o botão `vegetation`
+     existir na `serra`, onde ele não existia. */
+  const acervoPodado = repodarAcervo(root);
   const postes = realinharPostes(root);
   root.updateMatrixWorld(true);
   /* Quem foi barrado do canteiro e por quê — sai no log de carga porque é a
@@ -1257,6 +1476,11 @@ export function arranjarCenario(root: THREE.Object3D) {
     ms: Math.round(performance.now() - t0),
     protos: protos.length,
     plantas: protos.reduce((s, p) => s + (p.malhas[0]?.count || 0), 0),
+    /* Quantas instâncias do ACERVO passaram a obedecer ao nível. No distrito é 0
+       (tudo passa por `plantar()`); na serra é o número que denuncia, no log de
+       carga, se o critério de `alphaTest` parou de casar depois de uma troca de
+       set — que é a única forma de ver isso sem abrir a bancada. */
+    ...(acervoPodado ? { acervoPodado } : {}),
     ...postes,
     ...(vetados.length ? { vetadosNoCanteiro: vetados } : {}),
   };

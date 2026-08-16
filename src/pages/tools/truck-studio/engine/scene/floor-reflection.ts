@@ -29,12 +29,18 @@
       reflexo é uma segunda passada por cima disso. `SCALE` desce a resolução do
       alvo (o custo de preenchimento cai com o quadrado) e `setFloorReflection()`
       permite desligar. MEDIDO na bancada — ver ARCHITECTURE §9.8.
-      E DESDE O PERFIL DE QUALIDADE SÃO TRÊS ESTADOS, não dois:
       `getProfile().floorReflection` vale `'full' | 'lod' | 'off'`. O `'off'` é
       tratado por `cyclorama.ts` (o gancho de quadro nem chama esta passada) e
-      aqui, soltando o ALVO — 96,7 MB. O `'lod'` é o degrau do meio e mora neste
-      arquivo; ver o bloco O MODO 'lod' lá embaixo, que explica por que ele tira
-      GEOMETRIA e não resolução.
+      aqui, soltando o ALVO. O `'lod'` era o degrau do meio e foi ARRANCADO em
+      2026-08-16 — ver a lápide dele lá embaixo, que explica por que a medição
+      que o justificava continua certa e mesmo assim ele saiu.
+
+   ⚠️⚠️ **ELA SÓ EXISTE NO CENÁRIO ESTÚDIO**, e isso muda quem é afetado por
+      tudo que se escreve aqui. São TRÊS cenários no acervo
+      (`public/environments/environments.json`): `distrito-industrial`, `serra` e
+      `estudio`, e só o último acende o ciclorama. Quem roda no distrito ou na
+      serra não paga um milissegundo desta passada — e, simetricamente, nenhum
+      conserto feito aqui responde a uma queixa de fluidez vinda de lá.
 
    O PLANO DE CORTE OBLÍQUO. Sem ele a câmera espelhada enxerga o que está ABAIXO
    do piso, e há geometria lá: a caixa do rig começa em y = −0,21 m. O resultado
@@ -53,7 +59,14 @@ let SCALE = 0.5;
 const MAX_DIM = 1600;
 
 const reflector = new THREE.PerspectiveCamera();
-const target = { rt: null as THREE.WebGLRenderTarget | null, w: 0, h: 0 };
+/* ⚠️ `s` (as amostras do alvo) ENTRA NA CHAVE DO CACHE junto com `w`/`h`, e essa
+   é a única razão de este objeto ter um campo novo. `samples` é parâmetro de
+   CONSTRUTOR de `WebGLRenderTarget`: escrevê-lo num alvo já criado não realoca o
+   renderbuffer multiamostrado, então um cache que só comparasse dimensões
+   entregaria para sempre o alvo do nível em que a página abriu — que é
+   exatamente a classe de defeito ("o botão não faz nada") que a §0 de
+   `OTIMIZACAO-2026-08-14.md` documenta cinco vezes. */
+const target = { rt: null as THREE.WebGLRenderTarget | null, w: 0, h: 0, s: -1 };
 const textureMatrix = new THREE.Matrix4();
 
 let enabled = true;
@@ -96,184 +109,85 @@ const _plane = new THREE.Plane();
 const _onPlane = new THREE.Vector3();
 const _clip = new THREE.Vector4();
 const _q = new THREE.Vector4();
+const _size = new THREE.Vector2();
 const UP = new THREE.Vector3(0, 1, 0);
 
 /* ===========================================================================
-   O MODO 'lod' — REDUZIR GEOMETRIA, E NÃO RESOLUÇÃO
+   ⚰️ O MODO 'lod' — LÁPIDE. ARRANCADO EM 2026-08-16.
    ===========================================================================
-   A MEDIÇÃO QUE MANDA, e ela já estava neste arquivo, em `setFloorReflectionScale`:
-   **14,1 fps a meio lado contra 14,7 a um quarto.** Um quarto de lado é 1/4 dos
-   fragmentos e devolveu 0,6 fps. Ou seja o gargalo desta passada NÃO é
-   preenchimento — é a segunda varredura de GEOMETRIA (submissão de chamadas +
-   transformação de vértice + passe de profundidade). Logo o degrau intermediário
-   tem de tirar OBJETOS, não pixels.
+   Ele existia para tirar GEOMETRIA da segunda varredura: um plano de corte que
+   escondia, só durante esta passada, toda malha cuja SEGUNDA MAIOR ARESTA em
+   espaço de mundo fosse menor que 8 cm — a largura que o mip lido pelo piso
+   (1,03 a 1,88 dentro da órbita de 8,6–22,4 m) não consegue resolver.
 
-   QUANTO DETALHE O REFLEXO CONSEGUE CARREGAR, pela conta e não pelo gosto:
+   POR QUE A MEDIÇÃO QUE O JUSTIFICAVA CONTINUA CERTA E MESMO ASSIM ELE SAIU.
+   A medição era **14,1 fps a meio lado do alvo contra 14,7 a um quarto**: um
+   quarto de lado é 1/4 dos fragmentos e devolveu 0,6 fps, logo o gargalo desta
+   passada NÃO era preenchimento — era a segunda varredura de GEOMETRIA. Ela foi
+   tirada com **1 968 malhas separadas** submetendo ~1 968 chamadas por passada.
+   Com `mergeVehicle: 'all'` o implemento virou **45 baldes por material**, e a
+   passada de reflexo submete hoje ~45 chamadas. **O chão da medição mudou; a
+   conclusão dela não sobrevive à mudança de chão.**
 
-     · o alvo é `size × pixelRatio × SCALE`, SCALE 0,5 — num 1080p a dpr 1 são
-       960 × 540;
-     · a lente é de 30° (ver `core/quality.ts`), então mip 0 vale
-       30° / 540 = 0,0556° por texel;
-     · a leitura é `textureLod` com `lod = clamp(log2(1 + d·0,12), 0, 4)`;
-     · a órbita é presa entre ~8,6 e ~22,4 m.
+   E o filtro deixou de filtrar junto: `collectThin()` media a segunda aresta da
+   caixa de cada malha, e um balde fundido abraça o trailer inteiro — METROS de
+   segunda aresta. Ele parou de esconder qualquer coisa do veículo e ficou só com
+   o refugo do cenário, que no Estúdio (o único cenário onde esta passada roda,
+   ver `cyclorama.ts`) é o conjunto vazio.
 
-   ⚠️ **E AQUI HÁ UM NÚMERO QUE A DOCUMENTAÇÃO DE `core/quality.ts` ARREDONDA
-   PARA O LADO ERRADO.** Ela diz "lido até 4,0", e 4,0 é o TETO da expressão, não
-   a faixa de trabalho: `lod = 4` exigiria `1 + 0,12·d = 16`, ou seja **d = 125 m**
-   — cinco vezes o alcance da órbita. Dentro da órbita o nível real vai de
-   `log2(1 + 0,12·8,6) = 1,03` a `log2(1 + 0,12·22,4) = 1,88`. Dimensionar o corte
-   por mip 4 (60 × 34 pixels) tiraria coisa que o reflexo AINDA MOSTRA.
+   O QUE SOBRAVA ERA SÓ CUSTO, e ele tinha três parcelas, todas pagas por quadro
+   ou por meio segundo: `lodPlan()` percorria o grafo de cena INTEIRO a cada
+   500 ms medindo caixas envolventes; `lodHide()`/`lodRestore()` escreviam
+   `.visible` por candidato por quadro; e o ramo carregava um quarto estado de
+   `renderer.shadowMap.needsUpdate` para o mapa de sombra não ser assado a partir
+   da cena podada. **É o candidato nomeado para o Portão 3 ter medido o Médio
+   (3,61 ms) MAIS LENTO que o Alto (3,23 ms)** — o Médio era o único nível em
+   `'lod'`.
 
-   Então a régua honesta é mip ~1,9, ou seja ~3,7 texels de mip 0 por texel lido.
-   Uma feição precisa de mais que ~1 texel lido para existir, e o reflexo ainda é
-   atenuado por Fresnel a no máximo `k = 0,42` (linha do TETO É 0,42) e por
-   `k /= 1 + d·0,018`. Juntando: 3,7 × 0,0556° = 0,206°, que a 22,4 m são **8,0
-   cm**; e o que sobrar disso entra na imagem com menos da metade do contraste
-   que teria na vista direta. **8 cm é o corte, e ele é conservador nas duas
-   pontas** — perto da câmera o mip cai para ~1,0 mas a peça também está mais
-   perto, e as duas variações se cancelam em primeira ordem.
+   ⚠️ O QUE O RESSUSCITARIA: a fusão sair do ar (`mergeVehicle` em `'off'` ou
+   `'floor'`), ou um acervo novo que volte a trazer milhares de primitivas finas
+   separadas. Nesse dia o corte de **8 cm** é o número a reusar, e a conta que o
+   produz é: mip ~1,9 ⇒ ~3,7 texels de mip 0 por texel lido; lente de 30° sobre
+   540 linhas ⇒ 0,0556°/texel; 3,7 × 0,0556° = 0,206°, que a 22,4 m são 8,0 cm. E
+   a medida é a SEGUNDA maior aresta, nunca `userData.tsWorldDiameter`: um friso
+   de flanco de 14,47 m por 2 cm tem diâmetro enorme e some no reflexo — é a
+   largura que o olho lê, e são 27 trilhos assim no implemento.
 
-   ---------------------------------------------------------------------------
-   POR QUE A MEDIDA É A SEGUNDA MAIOR ARESTA, E NÃO O DIÂMETRO
+   ✅ RESOLVIDO em 2026-08-16: `'lod'` SAIU da união de `getProfile().floorReflection`,
+   que hoje é `'full' | 'off'`. O `tsc` passou sem uma queixa na remoção, o que é
+   a prova de que nenhuma comparação viva contra `'lod'` sobrava em lugar nenhum —
+   o valor só existia no tipo, degradando em silêncio.
 
-   A opção óbvia era casar com o `userData.tsWorldDiameter` que o LOD de tela
-   grava (maior extensão da peça). **Ele responde a pergunta errada aqui**, e o
-   contraexemplo mora neste próprio implemento: medido em `models.ts`, são
-   1 131 malhas de ferragem em `inox-ferragem`/`metal-pouco-polido` com z-span
-   < 0,50 m, mais 27 de TRILHO — `2 × capping strip de 14,55 m`, `4 × friso de
-   flanco de 14,47 m`, `11 × proteção de piso de 14,32 m`. Um friso de 14,5 m de
-   comprimento por ~2 cm de largura tem `tsWorldDiameter` ENORME e, no reflexo a
-   mip 1,9, é um risco de 2 cm que texel nenhum resolve. Pelo diâmetro ele
-   sobrevive; pela largura ele some — e é a largura que o olho lê.
+   ⚠️ E o degrau de MEIO, para quem vier procurar "um jeito de custar menos sem
+   sumir com o reflexo", NÃO é ressuscitar isto: é `floorReflectionMsaa` (4 → 0
+   são 71 MB, e a mip que este reflexo de fato lê — 1,03 a 1,88 — já é o
+   passa-baixa que o MSAA daria). O botão certo já existe; este aqui é o errado.
+   =========================================================================== */
 
-   A SEGUNDA MAIOR ARESTA da caixa da peça é exatamente essa largura: numa
-   esfera de 8 cm ela vale 8 cm (fica), num friso de 14,5 × 0,02 × 0,02 vale 2 cm
-   (sai), na placa da traseira de 810 × 230 × 54 mm vale 23 cm (fica — e é a peça
-   com o recorte Ankaa, que TEM de aparecer no chão do estúdio).
+/* ---------------- a conta que esta passada nunca teve ----------------
+   ⚠️⚠️ **ELA NUNCA FOI CONTABILIZADA POR NINGUÉM, E ESSE É O ACHADO.**
 
-   `userData.tsWorldDiameter` continua sendo lido quando existe, mas só como
-   ATALHO seguro: se a MAIOR aresta já é menor que o corte, a segunda também é, e
-   não há caixa a medir. Se o campo não existir — e no momento em que isto foi
-   escrito ele ainda não existia em lugar nenhum da árvore — nada se perde.
+   O `submitTimeEma` do laço cronometra `t1 - t0` em volta de UMA linha —
+   `renderer.render(scene, camera)` — e os `drawHooks` rodam ANTES do `t0`. Esta
+   passada mora num deles (`cyclorama.ts`), logo ela nunca entrou no canal de
+   submissão. A bancada tem o mesmo buraco em outro lugar: o `4,18 ms` da fusão
+   mede um `renderer.render()` chamado À MÃO, sem os `drawHooks`. As duas réguas
+   somem com a mesma passada, e o quadro de parede — que é a única que a contém —
+   não sabe dizer quanto dela é isto.
 
-   ---------------------------------------------------------------------------
-   POR QUE ISTO NÃO VAZA PARA A CAPTURA
+   O corolário DOI: no cenário Estúdio a razão parede ÷ submissão, que é o que
+   `reportFrameTime()` usa para separar "limitado por GPU" de "limitado por CPU",
+   está sistematicamente inflada por uma renderização inteira de cena. Um
+   diagnóstico de "GPU-bound" tirado lá pode ser só isto.
 
-   `renderFloorReflection()` tem DOIS chamadores: o gancho de quadro de
-   `cyclorama.ts`, que passa a câmera VIVA, e `renderCycloramaReflection()`, que
-   passa a câmera da CAPTURA — e aquele caminho não consulta o perfil de
-   propósito ("um PC fraco pode ter uma vista sem reflexo e ainda assim baixar a
-   mesma foto"). Como `cyclorama.ts` não é editável nesta rodada, o discriminante
-   é o próprio argumento: a captura constrói `new THREE.PerspectiveCamera()`
-   (scene/capture.ts), que nunca é `=== liveCamera`. Uma identidade de objeto, sem
-   parâmetro novo e sem mudar assinatura nenhuma. */
+   Duas leituras de relógio por quadro (~0,1 µs) fecham o buraco. O EMA é o mesmo
+   coeficiente do resto do engine. */
+let passMs = 0;
+let passes = 0;
 
-/** Abaixo desta largura aparente (metros) a peça não sobrevive ao mip do reflexo. */
-const LOD_THIN_M = 0.08;
-
-/* As três arestas da caixa da GEOMETRIA, ordenadas, em unidades locais. Uma vez
-   por geometria: `computeBoundingBox()` é O(vértices) e o implemento tem 5,3 M
-   deles. Chaveado pela geometria e não pelo objeto porque a rodagem, os rebites
-   e as travas reusam a MESMA malha dezenas de vezes — `wheels.ts` documenta 14
-   nós sobre três geometrias. */
-const lodExtents = new WeakMap<THREE.BufferGeometry, [number, number, number]>();
-
-function localExtents(g: THREE.BufferGeometry): [number, number, number] | null {
-  const hit = lodExtents.get(g);
-  if (hit) return hit;
-  if (!g.boundingBox) {
-    /* Pode lançar em geometria sem `position` — e uma passada de reflexo não é
-       lugar de derrubar o quadro. */
-    try { g.computeBoundingBox(); } catch { return null; }
-  }
-  const b = g.boundingBox;
-  if (!b) return null;
-  const e: [number, number, number] = [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z];
-  if (!Number.isFinite(e[0]) || !Number.isFinite(e[1]) || !Number.isFinite(e[2])) return null;
-  e.sort((a, c) => c - a);                       // maior primeiro
-  lodExtents.set(g, e);
-  return e;
-}
-
-/* O plano de corte: as malhas que a passada de reflexo esconde. Reconstruído
-   raramente — ver `lodPlan()`. */
-let lodList: THREE.Object3D[] = [];
-let lodBuiltAt = 0;
-let lodGeomCount = -1;
-/* Meio segundo. A lista só fica errada entre uma troca de veículo/cenário e o
-   próximo rebuild, e "errada" aqui significa desenhar por alguns quadros uma
-   peça de 2 cm que ia sumir, ou deixar de desenhar uma que já não está na cena —
-   nenhuma das duas é observável. Reconstruir por quadro seria uma terceira
-   varredura completa do grafo por quadro, que é justamente o recurso que este
-   modo existe para poupar num i5. */
-const LOD_REBUILD_MS = 500;
-
-const _lodBasis = new THREE.Vector3();
-
-/** A maior escala que a matriz de mundo aplica. Conservadora de propósito:
- *  superestimar a peça só a mantém desenhada. */
-function worldScale(o: THREE.Object3D): number {
-  const m = o.matrixWorld.elements;
-  const sx = _lodBasis.set(m[0], m[1], m[2]).length();
-  const sy = _lodBasis.set(m[4], m[5], m[6]).length();
-  const sz = _lodBasis.set(m[8], m[9], m[10]).length();
-  return Math.max(sx, sy, sz);
-}
-
-function collectThin(o: THREE.Object3D, out: THREE.Object3D[]) {
-  /* Subárvore já invisível não é nossa: quem a escondeu (o `isolateVehicle()` da
-     captura, o `seethrough`, a escolha de vista "só o implemento", o LOD de
-     tela) continua sendo o dono dela, e descer nela só custaria trabalho. */
-  if (!o.visible) return;
-  const mesh = o as THREE.Mesh;
-  if (mesh.isMesh && mesh.geometry) {
-    /* O ATALHO do LOD de tela, quando ele existir. Ver o bloco acima: a maior
-       aresta menor que o corte implica a segunda também menor. */
-    const d = (o.userData as { tsWorldDiameter?: number }).tsWorldDiameter;
-    if (typeof d === 'number' && d > 0) {
-      if (d < LOD_THIN_M) { out.push(o); return; }
-    }
-    const e = localExtents(mesh.geometry);
-    if (e && e[1] * worldScale(o) < LOD_THIN_M) { out.push(o); return; }
-  }
-  for (const c of o.children) collectThin(c, out);
-}
-
-function lodPlan(): THREE.Object3D[] {
-  const geoms = renderer.info.memory.geometries;
-  const now = performance.now();
-  if (geoms !== lodGeomCount || now - lodBuiltAt > LOD_REBUILD_MS) {
-    lodGeomCount = geoms;
-    lodBuiltAt = now;
-    const next: THREE.Object3D[] = [];
-    collectThin(scene, next);
-    lodList = next;
-  }
-  return lodList;
-}
-
-/* O que ESTA passada escondeu, para devolver exatamente isso e nada mais.
-   ⚠️ Reusado entre quadros (um array novo por quadro é lixo por nada) e SEMPRE
-   esvaziado no `finally` de quem o preenche. */
-const lodHidden: THREE.Object3D[] = [];
-
-/**
- * Esconde o que não sobrevive ao mip do reflexo. Simétrica por construção: só
- * entra na lista de restauração o que estava VISÍVEL no instante em que
- * escondemos, então um objeto que outro dono já havia escondido não volta ligado.
- */
-function lodHide() {
-  for (const o of lodPlan()) {
-    if (!o.visible) continue;
-    o.visible = false;
-    lodHidden.push(o);
-  }
-}
-
-function lodRestore() {
-  for (const o of lodHidden) o.visible = true;
-  lodHidden.length = 0;
-}
+/** Quanto a segunda passada custou, em ms de SUBMISSÃO, e quantas já rodaram.
+ *  `ms` é 0 fora do Estúdio — lá a passada não é chamada. */
+export const floorReflectionCost = () => ({ ms: passMs, passes });
 
 /* ---------------- o alvo no nível Baixo ----------------
    96,7 MB — 1600 × 1080 `HalfFloatType` com mipmaps E `samples: 4`, dos quais
@@ -318,6 +232,10 @@ export function releaseFloorReflectionTarget() {
   target.rt.dispose();
   target.rt = null;
   target.w = target.h = 0;
+  /* −1 e não 0: 0 é um número de amostras VÁLIDO (é o "sem multiamostragem" do
+     nível Médio), então zerá-lo aqui faria a chave do cache casar por acidente
+     com um pedido legítimo. `-1` é o único valor que nenhum perfil pode pedir. */
+  target.s = -1;
   uniforms.tReflect.value = null;
 }
 
@@ -366,8 +284,8 @@ function makeOblique(cam: THREE.PerspectiveCamera, planeY: number, bias: number)
   e[14] = _clip.w;
 }
 
-function ensureTarget(w: number, h: number) {
-  if (target.rt && target.w === w && target.h === h) return target.rt;
+function ensureTarget(w: number, h: number, s: number) {
+  if (target.rt && target.w === w && target.h === h && target.s === s) return target.rt;
   target.rt?.dispose();
   target.rt = new THREE.WebGLRenderTarget(w, h, {
     type: THREE.HalfFloatType,
@@ -389,8 +307,26 @@ function ensureTarget(w: number, h: number) {
        cintila a cada quadro do giro — a outra metade do "tremido". O custo é de
        preenchimento, e esta passada é limitada por GEOMETRIA (medido: baixar a
        resolução do alvo não devolve fps), então o multiamostrado é quase de
-       graça aqui. */
-    samples: 4,
+       graça aqui.
+
+       ⚠️ **EM TEMPO ELE É QUASE DE GRAÇA; EM MEMÓRIA ELE É O ITEM.** A
+       contabilidade completa dos 96,7 MB, a 1600×1080: 13,8 MB de cor RGBA16F,
+       +4,6 de pirâmide de mipmaps, +6,9 de profundidade D24 e **+71,4 MB do
+       resolve multiamostrado 4×**. Três quartos do segundo maior item isolado de
+       VRAM da cena são ESTA LINHA — e numa integrada de memória compartilhada a
+       memória é o que decide se roda, não o tempo.
+
+       Por isso, desde 2026-08-15, ela vem do perfil (`floorReflectionMsaa`: 4 no
+       Alto, 0 nos outros dois). O que segura o tremido no Médio é a própria
+       leitura do piso: um `textureLod` a mip **1,03–1,88** dentro da órbita de
+       8,6–22,4 m já passa o alvo por 2 a 3,7 texels borrados trilinearmente, que
+       é o mesmo passa-baixa que o MSAA entrega. Não é equivalente — perto do
+       ponto de contato do pneu o mip cai para ~1,0 e a aresta pode aparecer —,
+       mas é a maior parte, por 71 MB. Ver o bloco do campo em `core/quality.ts`.
+
+       ⚠️ 0 é "sem multiamostragem" para o three, e `samples` só tem efeito no
+       CONSTRUTOR — daí ele entrar na chave do cache em `target.s`. */
+    samples: Math.max(0, s | 0),
     /* LINEAR, E ISSO NÃO É ESCOLHA. O three só aplica tonemap e conversão de
        espaço de cor quando o destino é o CANVAS; desenhando num alvo, o que fica
        gravado é radiância linear. É o que este módulo quer, porque o reflexo é
@@ -403,7 +339,7 @@ function ensureTarget(w: number, h: number) {
     depthBuffer: true,
     stencilBuffer: false,
   });
-  target.w = w; target.h = h;
+  target.w = w; target.h = h; target.s = s;
   uniforms.tReflect.value = target.rt.texture;
   return target.rt;
 }
@@ -415,11 +351,12 @@ function ensureTarget(w: number, h: number) {
  * antes do mosaico — ali com a câmera da CAPTURA e ANTES do `setViewOffset()`,
  * porque a matriz de textura tem de descrever o quadro inteiro e não o ladrilho.
  *
- * ⚠️ **QUAL DAS DUAS CÂMERAS É QUEM DECIDE O NÍVEL DE DETALHE.** Com
- * `floorReflection: 'lod'` a passada esconde o que não sobrevive ao mip do
- * reflexo — mas SÓ quando `cam` é a câmera viva. A captura passa uma câmera
- * própria e continua desenhando a cena inteira, porque a foto sai sempre no
- * teto. Ver o bloco O MODO 'lod'.
+ * ⚠️ **QUAL DAS DUAS CÂMERAS É O DISCRIMINANTE DO NÍVEL.** A captura constrói
+ * `new THREE.PerspectiveCamera()` (scene/capture.ts), que nunca é
+ * `=== liveCamera` — e é essa identidade de objeto, sem parâmetro novo e sem
+ * mudar assinatura nenhuma, que mantém a FOTO sempre no teto enquanto a viewport
+ * obedece ao perfil. Um PC fraco pode ter uma vista sem multiamostragem no
+ * reflexo e ainda assim baixar a mesma imagem que o PC bom baixa.
  *
  * @param cam      a câmera de quem vai desenhar o piso
  * @param planeY   altura do plano do piso, em metros (normalmente 0)
@@ -443,11 +380,28 @@ export function renderFloorReflection(
      tremido. Um reflexo é uma imagem ESPELHADA da cena; ele não pode atrasar em
      relação ao que a espelha, nem por um quadro. */
 
-  const size = renderer.getSize(new THREE.Vector2());
+  /* ⚠️ `_size` É DE MÓDULO, e não um `new THREE.Vector2()` por chamada.
+     `getSize()` ESCREVE no vetor que recebe, então alocar aqui era um objeto de
+     lixo por quadro desenhado num caminho que já é o mais quente do cenário mais
+     caro. Não vale um milissegundo; vale não somar pressão de coletor a um laço
+     cuja queixa é justamente a VARIÂNCIA do quadro, não a média dele. */
+  const size = renderer.getSize(_size);
   const pr = renderer.getPixelRatio();
   const w = Math.max(2, Math.min(MAX_DIM, Math.round(size.x * pr * SCALE)));
   const h = Math.max(2, Math.min(MAX_DIM, Math.round(size.y * pr * SCALE)));
-  const rt = ensureTarget(w, h);
+  /* ⚠️ A CAPTURA CONTINUA NO TETO. A foto é o produto e sai sempre com a
+     assinatura do nível Alto; uma câmera que não é a viva é, por construção, a
+     de `scene/capture.ts`. Sem esta linha o Médio baixaria a multiamostragem do
+     alvo TAMBÉM na foto, e o reflexo do piso sairia com a silhueta serrilhada
+     numa imagem que ninguém pode degradar.
+
+     ⚠️ E ISSO CUSTA DUAS REALOCAÇÕES POR FOTO no nível Médio: uma para subir ao
+     teto e outra no primeiro quadro vivo depois. É deliberado, e é barato no
+     lugar certo — a captura já roda atrás da própria cortina, é bloqueante e
+     desenha um mosaico inteiro. Pagar 25 MB de realocação lá para não serrilhar
+     o produto é o mesmo negócio que `ceilingProfile()` faz com o mapa de sombra. */
+  const msaa = cam === liveCamera ? Math.max(0, getProfile().floorReflectionMsaa | 0) : 4;
+  const rt = ensureTarget(w, h, msaa);
 
   /* ---- a câmera espelhada ----
      Posição e mira refletidas no plano, e o `up` refletido junto. A reflexão é
@@ -490,44 +444,47 @@ export function renderFloorReflection(
   plane.visible = false;
   const prevTarget = renderer.getRenderTarget();
   const prevShadow = renderer.shadowMap.autoUpdate;
-  /* O DEGRAU 'lod', E SÓ NA CÂMERA VIVA. Ver o bloco do modo 'lod' lá em cima:
-     a captura passa uma câmera própria e continua desenhando a cena inteira,
-     porque a foto sai sempre no teto. */
-  const lod = cam === liveCamera && getProfile().floorReflection === 'lod';
-  /* ⚠️ E O MAPA DE SOMBRA NÃO PODE SER ASSADO COM A CENA PODADA.
-     `WebGLShadowMap.render()` só sai cedo quando `autoUpdate` E `needsUpdate`
-     são AMBOS falsos (three r179). Ou seja, num quadro em que alguém invalidou a
-     sombra, o `renderer.render()` desta passada assa o mapa — e limpa
-     `needsUpdate` —, e o quadro principal reusa esse mapa. Sem LOD isso é uma
-     economia legítima (é a mesma geometria); COM LOD seria um mapa de sombra sem
-     a ferragem, produzido por uma passada que ninguém olha. Devolver a bandeira
-     faz o quadro principal reassá-lo com a cena inteira. Só no ramo `lod`, para
-     o caminho de sempre continuar pagando um assado e não dois — e o custo extra
-     é raro por construção, porque `shadowMap.autoUpdate` é false e a
-     invalidação de sombra é por borda, não por quadro. */
-  const prevShadowNeeds = renderer.shadowMap.needsUpdate;
-  /* ⚠️ `try/finally` E NÃO TRÊS LINHAS SOLTAS, e o `finally` já era necessário
-     ANTES do LOD: `plane.visible = false` e o alvo de render estavam sendo
-     restaurados por atribuição direta depois do `render()`, então uma exceção
-     lá dentro (um material com `onBeforeCompile` quebrado, uma textura solta)
-     deixava o piso do estúdio INVISÍVEL e o renderer apontando para o alvo do
-     reflexo pelo resto da sessão. */
+  /* ⚠️ `try/finally` E NÃO TRÊS LINHAS SOLTAS: `plane.visible = false` e o alvo
+     de render estavam sendo restaurados por atribuição direta depois do
+     `render()`, então uma exceção lá dentro (um material com `onBeforeCompile`
+     quebrado, uma textura solta) deixava o piso do estúdio INVISÍVEL e o
+     renderer apontando para o alvo do reflexo pelo resto da sessão. */
+  const t0 = performance.now();
   try {
-    if (lod) lodHide();
     /* O mapa de sombra é o da cena, já corrente. Refazê-lo para a passada de
        reflexo dobraria o custo por uma diferença que a metade da resolução e o
-       borrão por distância não carregam. */
+       borrão por distância não carregam.
+
+       ⚠️ E ISTO NÃO IMPEDE O ASSADO: `WebGLShadowMap.render()` só sai cedo
+       quando `autoUpdate` E `needsUpdate` são AMBOS falsos (three r179). Num
+       quadro em que alguém invalidou a sombra é ESTA passada que assa o mapa e
+       limpa a bandeira, e o quadro principal reusa — economia legítima, porque é
+       a mesma geometria. `scene.ts` lê `needsUpdate` ANTES dos `drawHooks`
+       justamente por causa disso. */
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(rt);
-    renderer.clear();
+    /* ⚠️ **SEM `renderer.clear()` AQUI, E A AUSÊNCIA É A CORREÇÃO.**
+       `renderer.render()` abre com `if (autoClear || forceClear) this.clear(...)`
+       e `autoClear` é `true` (ninguém neste engine o desliga). O `clear()`
+       explícito que havia nesta linha era, portanto, um SEGUNDO apagamento de
+       tela cheia do mesmo alvo, por quadro desenhado, no cenário mais caro.
+       A conta do que ele tocava à toa, no teto do alvo (1600 × 1080): 13,8 MB de
+       cor RGBA16F + 6,9 MB de profundidade + 71,4 MB do resolve 4× — e num
+       laço a 60 Hz isso é banda de memória de vídeo gasta escrevendo zeros por
+       cima de zeros. Numa integrada de memória COMPARTILHADA, banda é o recurso
+       que decide. */
     renderer.render(scene, reflector);
   } finally {
-    lodRestore();
     renderer.setRenderTarget(prevTarget);
     renderer.shadowMap.autoUpdate = prevShadow;
-    if (lod && prevShadowNeeds) renderer.shadowMap.needsUpdate = true;
     plane.visible = wasVisible;
   }
+  /* Ver o bloco "a conta que esta passada nunca teve", lá em cima. Depois do
+     `finally` de propósito: o que interessa é o custo da passada COMPLETA,
+     restauração de estado incluída. */
+  const dt = performance.now() - t0;
+  passMs = passes ? passMs + (dt - passMs) * 0.1 : dt;
+  passes++;
   uniforms.reflectStrength.value = 1;
 }
 
@@ -776,21 +733,33 @@ export function setFloorContact(cx: number, cz: number, hx: number, hz: number) 
 }
 
 /**
- * Fração da resolução do canvas usada no alvo. Existe para a bancada MEDIR se o
- * custo do reflexo é de geometria ou de preenchimento — MEDIDO: 14,1 fps a meio
- * lado contra 14,7 a um quarto, ou seja o gargalo é a segunda varredura de
- * geometria e resolução não resolve. Fica como instrumento, não como ajuste.
+ * Fração da resolução do canvas usada no alvo. Instrumento de bancada, não
+ * ajuste de perfil.
  *
- * É DESTA MEDIÇÃO que sai a forma do modo `'lod'`: um quarto de lado é 1/4 dos
- * fragmentos e devolveu 0,6 fps, então o degrau intermediário tira OBJETOS.
+ * ⚠️⚠️ **A MEDIÇÃO ANTIGA DELE PRECISA SER REFEITA, E ESTE É O PEDIDO.**
+ * O que está registrado é *14,1 fps a meio lado contra 14,7 a um quarto* — 1/4
+ * dos fragmentos por 0,6 fps —, e a conclusão tirada dali foi "o gargalo é
+ * geometria, resolução não resolve". Ela foi tirada com **1 968 malhas
+ * separadas**, ou seja com a passada limitada por SUBMISSÃO. Com
+ * `mergeVehicle: 'all'` a passada submete ~45 chamadas: a parcela que dominava a
+ * medida saiu do quadro, e o preenchimento — que era invisível debaixo dela —
+ * passa a ser a fração que sobrou. **Não se pode copiar a conclusão; ela tem de
+ * ser remedida no chão novo**, com `floorReflectionCost()` (que agora existe) em
+ * vez de fps de cena inteira, e intercalada A/B como a bancada de ablação faz.
+ *
+ * Se `SCALE` voltar a devolver tempo, ele é o botão certo para o Médio — e é
+ * mais barato que qualquer outro, porque o reflexo já é lido a mip 1,03–1,88 e
+ * atenuado a no máximo 42 % de contraste.
  */
 export function setFloorReflectionScale(s: number) {
   const v = THREE.MathUtils.clamp(s, 0.1, 1);
   if (v === SCALE) return;
   SCALE = v;
-  target.rt?.dispose();
-  target.rt = null;
-  target.w = target.h = 0;
+  /* Delegado em vez de repetido: era a mesma sequência escrita duas vezes, e
+     desde que `target` ganhou `s` uma cópia esquecida deixaria a chave do cache
+     meio-invalidada. Ela também zera `tReflect`, o que aqui é correto — não há
+     alvo para o piso amostrar até a próxima passada. */
+  releaseFloorReflectionTarget();
 }
 
 /** O alvo cru, para diagnóstico. `null` antes da primeira passada. */

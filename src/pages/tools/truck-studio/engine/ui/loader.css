@@ -327,7 +327,11 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  color: var(--muted);
+  /* ⚠️ `--ts-screen-muted` e não `--muted`, que era o que estava aqui: esta
+     cortina fica CLARA quando o Ankaa está claro (ver os tokens --ts-screen-* em
+     core/studio.css), e o cinza do tema escuro mede ~2,4:1 sobre o #f5f5f5 —
+     ou seja a linha de fase sumia justamente para quem usa o modo claro. */
+  color: var(--ts-screen-muted);
   font-size: 11px;
   letter-spacing: 0.04em;
 }
@@ -344,6 +348,81 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
+
+/* ---------- o encaixe de trabalho longo (loader.ts: setLoaderDetail) ----------
+   Duas linhas de detalhe e um botão, sob a barra. Existe porque a gravação de
+   vídeo pode ficar MINUTOS aqui: quem espera tanto quer contadores e quer poder
+   desistir, e a alternativa — uma segunda caixa flutuando por cima da cortina —
+   foi reprovada na tela ("não precisa desse segundo loading"). Ver o bloco no
+   topo de ui/loader.ts.
+
+   ⚠️ AS LINHAS NÃO PODEM IR PARA DENTRO DE `.ts-load-label`: ele é
+   `white-space: nowrap` com reticências, e qualquer coisa mais longa que a
+   largura do medidor sumiria no "…" — que é justamente o fim das frases, onde
+   moram os números. Por isso nós próprios, com quebra permitida. */
+.truck-studio-root .ts-load-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  /* Negativo contra o `gap: 9px` do medidor: o detalhe pertence à linha de
+     estado logo acima dela, não é um terceiro bloco solto. */
+  margin-top: -3px;
+}
+.truck-studio-root .ts-load-detail__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.truck-studio-root .ts-load-detailline {
+  font-size: 11px;
+  line-height: 1.4;
+  /* `--ts-screen-muted` e não `--muted`: a cortina é uma das duas telas que
+     seguem o modo claro do host, e o cinza fixo do escuro mede ~2,4:1 sobre o
+     #f5f5f5 do claro. (A `.ts-load-status` logo acima ainda usa `--muted` por
+     herança da versão original; corrigida junto.) */
+  color: var(--ts-screen-muted);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* O botão é o único alvo clicável de uma tela que, fora ele, só se assiste. Daí
+   o `cursor: pointer` explícito — `.ts-load` inteira é `cursor: progress`, e um
+   botão que continua dizendo "espere" não parece clicável. */
+.truck-studio-root .ts-load-action {
+  flex: none;
+  padding: 5px 14px;
+  border: 1px solid var(--ts-screen-stroke);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ts-screen-text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.truck-studio-root .ts-load-action:hover {
+  background: rgba(232, 62, 62, 0.18);
+  border-color: rgba(232, 62, 62, 0.55);
+}
+.truck-studio-root .ts-load-action:focus-visible {
+  outline: 2px solid var(--ts-screen-accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-load-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.truck-studio-root .ts-load-action:disabled:hover {
+  background: transparent;
+  border-color: var(--ts-screen-stroke);
+}
+/* O medidor cresce quando há detalhe: 260 px comportam "Preparando a cena… 34%",
+   não "quadro 495/1440 · 8,3 s de 24 s prontos" mais um botão ao lado. A classe
+   é posta em #ts-loader por `setLoaderDetail()` — um pai não reage à presença de
+   um filho sem `:has()`, que é suporte recente demais para decidir layout. */
+.truck-studio-root .ts-load.has-detail .ts-load-meter { width: 372px; }
 
 /* ============================================================
    6. Intro cascade

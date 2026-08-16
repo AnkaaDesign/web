@@ -134,6 +134,45 @@ export async function withPill<T>(text: string, job: () => T | Promise<T>): Prom
   }
 }
 
+/* ---------------- O ENCAIXE DE TRABALHO LONGO ----------------
+   ⚠️ ESTE BLOCO EXISTE PORQUE A CORTINA GANHOU UM SEGUNDO CLIENTE, e ele mudou o
+   que ela precisa ser. Ela nasceu para o CARREGAMENTO DE MODELO: segundos de
+   espera, uma frase de fase, e nada para o usuário fazer além de esperar. Depois
+   a GRAVAÇÃO DE VÍDEO passou a subi-la para esconder o laço offline (ver
+   ui/chrome.ts), e ali a espera dura MINUTOS — tempo em que a pessoa quer saber
+   quanto já andou, quanto falta, e quer poder DESISTIR.
+
+   A primeira tentativa foi flutuar uma segunda caixa por cima da cortina com
+   esses detalhes e o botão. O dono reprovou na tela: *"junto do loading, onde
+   mostra a progressbar, mostre quanto tempo se passou e quanto tempo falta lá,
+   não precisa desse segundo loading"*. Ele está certo — duas caixas de progresso
+   ao mesmo tempo leem como duas coisas acontecendo, não como uma.
+
+   O ENCAIXE É GENÉRICO DE PROPÓSITO: linhas de texto e uma ação, sem uma palavra
+   sobre vídeo. Quem sabe o que escrever é quem está esperando — a carga de
+   modelo é a outra cliente e um dia vai querer o mesmo ("cancelar o download",
+   "3 de 4 texturas"). Um `setRecordingDetail()` aqui dentro faria esta cortina
+   conhecer o gravador, que é exatamente a dependência que ela não pode ter.
+
+   ⚠️ E NÃO HÁ TERCEIRO SLOT. Duas coisas bastam para o que existe hoje, e um
+   encaixe com sete campos é um componente novo disfarçado de parâmetro. */
+
+/** Um botão dentro da cortina. Sem ele, o usuário só pode esperar. */
+export interface LoaderAction {
+  label: string;
+  /** Vira `title` e nome acessível — é onde mora o preço do clique. */
+  title?: string;
+  disabled?: boolean;
+  onClick: () => void;
+}
+
+/** Linhas curtas sob a barra, mais a ação. `null` limpa tudo. */
+export interface LoaderDetail {
+  /** Vazias e nulas são puladas; a ordem é a de leitura. */
+  lines?: (string | null | undefined)[];
+  action?: LoaderAction | null;
+}
+
 /** What the curtain shows while it is up. Every field may be null/''. */
 export interface LoaderInfo {
   /** which card this load is about — decides the hero AND the flight target */
@@ -213,6 +252,12 @@ let envEl!: HTMLElement;
 let trackEl!: HTMLElement;
 let labelEl!: HTMLElement;
 let pctEl!: HTMLElement;
+let detailEl!: HTMLElement;          // o encaixe de trabalho longo, todo ele
+let detailLinesEl!: HTMLElement;
+let actionEl!: HTMLButtonElement;
+/* O ouvinte do botão é ligado UMA VEZ, no init, e o que troca é este ponteiro:
+   religar a cada `setLoaderDetail()` acumularia ouvintes a dez por segundo. */
+let actionHandler: (() => void) | null = null;
 
 let raf = 0;
 let lastFrame = 0;
@@ -385,9 +430,41 @@ export function initLoader() {
   const status = make('div', 'ts-load-status');
   labelEl = make('div', 'ts-load-label');
   pctEl = make('div', 'ts-load-pct');
+  /* ⚠️ FORA DO LEITOR DE TELA, e a razão só apareceu quando a gravação passou a
+     usar esta cortina (2026-08-15). `#ts-loader` é `role="status"` +
+     `aria-live="polite"`, e este texto muda a cada ponto percentual. Num
+     carregamento de 5 s isso são ~20 anúncios e passa; num render de vídeo
+     offline, que leva MINUTOS, são centenas — o leitor de tela não fala mais
+     nada além da porcentagem.
+     Nada se perde: a barra logo acima é `role="progressbar"` e carrega o mesmo
+     número em `aria-valuenow`, que é a forma que a tecnologia assistiva já sabe
+     ler sob demanda em vez de por interrupção. */
+  pctEl.setAttribute('aria-hidden', 'true');
   status.appendChild(labelEl);
   status.appendChild(pctEl);
   meter.appendChild(status);
+
+  /* ---- o encaixe de trabalho longo (ver o bloco no topo) ----
+     DENTRO do `meter` e não solto no `inner`: é assim que ele herda o fade da
+     saída (`.is-out .ts-load-meter`) sem uma segunda regra que alguém teria de
+     lembrar de manter em sincronia com aquela. */
+  detailEl = make('div', 'ts-load-detail hidden');
+  detailLinesEl = make('div', 'ts-load-detail__lines');
+  /* ⚠️ FORA DO LEITOR DE TELA, pelo mesmo motivo do `pctEl` logo acima e com
+     mais força: estas linhas carregam contadores que mudam DEZ VEZES POR
+     SEGUNDO. Numa região viva isso não é informação, é ruído contínuo — e
+     afogaria o rótulo de fase, que é a única coisa ali que vale ser falada.
+     O botão FICA de fora desta marcação: ele é interativo, e um controle
+     escondido da árvore de acessibilidade é um controle que não existe. */
+  detailLinesEl.setAttribute('aria-hidden', 'true');
+  detailEl.appendChild(detailLinesEl);
+
+  actionEl = make('button', 'ts-load-action hidden');
+  actionEl.type = 'button';
+  actionEl.addEventListener('click', () => { actionHandler?.(); });
+  detailEl.appendChild(actionEl);
+  meter.appendChild(detailEl);
+
   inner.appendChild(meter);
 
   el.appendChild(inner);
@@ -406,9 +483,59 @@ function showFallbackTile(on: boolean) {
 
 function setText(node: HTMLElement, value: string | null | undefined) {
   const s = value == null ? '' : String(value).trim();
-  node.textContent = s;
+  /* Só escreve quando MUDA. Era uma atribuição direta, e bastava enquanto quem
+     chamava era só `applyInfo()` — uma vez por cortina. `setLoaderDetail()`
+     reescreve as linhas dele dez vezes por segundo durante um render de vídeo, e
+     um `textContent =` invalida o layout do nó mesmo quando o texto é idêntico.
+     `classList.toggle` fica FORA da guarda: ele não muta o DOM quando o
+     resultado não muda, e assim uma linha que voltou a ter texto reaparece
+     mesmo que o texto seja o mesmo de antes de ela sumir. */
+  if (node.textContent !== s) node.textContent = s;
   node.classList.toggle('hidden', !s);
   return !!s;
+}
+
+/**
+ * Escreve (ou limpa) o encaixe de trabalho longo. Ver o bloco no topo.
+ *
+ * Chamável a cada tick de progresso: nada aqui aloca nó depois das primeiras
+ * chamadas, e nada é escrito duas vezes com o mesmo valor.
+ */
+export function setLoaderDetail(detail: LoaderDetail | null) {
+  if (!built) initLoader();
+
+  const lines = (detail?.lines || []).filter((s): s is string => !!s && !!s.trim());
+  /* Os nós de linha são REUTILIZADOS e nunca destruídos: a lista encolhe e
+     cresce entre fases (duas linhas renderizando, nenhuma no preparo), e
+     recriá-las seria trocar de nó — e de foco, e de leitura — a cada transição. */
+  while (detailLinesEl.childElementCount < lines.length) {
+    detailLinesEl.appendChild(make('div', 'ts-load-detailline'));
+  }
+  const nodes = detailLinesEl.children;
+  for (let i = 0; i < nodes.length; i++) {
+    setText(nodes[i] as HTMLElement, lines[i] ?? '');
+  }
+
+  const action = detail?.action || null;
+  actionHandler = action ? action.onClick : null;
+  if (action) {
+    setText(actionEl, action.label);
+    const title = action.title || action.label;
+    if (actionEl.title !== title) {
+      actionEl.title = title;
+      actionEl.setAttribute('aria-label', title);
+    }
+    const off = !!action.disabled;
+    if (actionEl.disabled !== off) actionEl.disabled = off;
+  }
+  actionEl.classList.toggle('hidden', !action);
+
+  const any = lines.length > 0 || !!action;
+  detailEl.classList.toggle('hidden', !any);
+  /* A classe é do #ts-loader e não do medidor porque quem muda de largura é o
+     MEDIDOR, e um elemento não pode reagir à presença de um filho sem `:has()`
+     — que é suporte recente demais para uma decisão de layout. */
+  el.classList.toggle('has-detail', any);
 }
 
 /* CSS url() cannot take a raw string: a quote or a backslash in the path would
@@ -561,6 +688,11 @@ export function showLoader(info?: LoaderInfo) {
   trackEl.setAttribute('aria-valuenow', '0');
   el.style.setProperty('--ts-p', '0');
 
+  /* O encaixe de trabalho longo NÃO é herdado. Uma cortina nova é outro
+     trabalho: as linhas e o botão do anterior apareceriam por um instante
+     descrevendo — e oferecendo cancelar — algo que já acabou. */
+  setLoaderDetail(null);
+
   heroEl.style.cssText = '';    // wipe any transform/transition left by an outro
   el.classList.remove('is-done', 'is-out', 'is-flying');
   el.classList.remove('hidden');
@@ -615,6 +747,9 @@ export function hideLoader() {
   visible = false;
   stopTicker();
   cancelPending();
+  /* Solta o `onClick` junto com a cortina: ele é um fechamento sobre o estado de
+     quem a levantou, e mantê-lo vivo depois disso é segurar aquele estado. */
+  setLoaderDetail(null);
   el.classList.add('hidden');
   el.classList.remove('is-in', 'is-done', 'is-out', 'is-flying');
   heroEl.style.cssText = '';

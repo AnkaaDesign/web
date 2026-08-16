@@ -76,6 +76,28 @@ const dpr = window.devicePixelRatio || 1;
 const key = S.lighting.getKeyLight ? S.lighting.getKeyLight() : null;
 const stats = () => (S.lighting.getRenderStats ? S.lighting.getRenderStats() : null);
 
+/* MILISSEGUNDOS POR QUADRO, em laço fechado — a régua que passou a decidir.
+   Desde que a fusão por material tirou a CPU do caminho (2026-08-15), a
+   contagem de chamadas ficou IGUAL nos três níveis por obrigação do Portão 1, e
+   o que separa um nível do outro é o tempo. Sem esta medida o arquivo só sabia
+   conferir números de configuração — e o cabeçalho dele mesmo avisa que isso
+   não prova nada.
+
+   ⚠️ `render()` em laço fechado e `gl.finish()` nas DUAS pontas, e não
+   `requestAnimationFrame`: sob vsync tudo empata em 16,7 ms, e sem o `finish()`
+   o que se mede é o ENFILEIRAMENTO, não o trabalho. É o método da
+   `checks-gargalo.mjs`. */
+const gl = R.getContext();
+function cronometrar(n = 20) {
+  const cena = S.scene, cam = S.camera;
+  for (let i = 0; i < 3; i++) R.render(cena, cam);
+  gl.finish();
+  const t = performance.now();
+  for (let i = 0; i < n; i++) R.render(cena, cam);
+  gl.finish();
+  return +((performance.now() - t) / n).toFixed(2);
+}
+
 /** Deixa a cena assentar e devolve um retrato do que o RENDERIZADOR está
  *  fazendo — não do que o perfil diz que deveria. */
 async function retrato(n = 8) {
@@ -88,6 +110,7 @@ async function retrato(n = 8) {
   const st = stats();
   S.lighting.setTurntable(false);
   return {
+    ms: cronometrar(),
     bufW: c.width, bufH: c.height, px: c.width * c.height,
     pixelRatio: R.getPixelRatio(),
     sombra: key ? key.shadow.mapSize.x : 0,
@@ -125,7 +148,10 @@ const hw = info0.hardware;
 out.push(['sonda: WebGL2', hw.webgl2]);
 out.push(['sonda: adaptador', hw.renderer || '(mascarado — tratado como DESCONHECIDO)']);
 out.push(['sonda: rasterizador de software', hw.software ? 'SIM' : 'não']);
-out.push(['sonda: INTEGRADA reconhecida', hw.integrated ? 'SIM — teto em Média' : 'não']);
+/* O teto da integrada desceu de Média para BAIXA em 2026-08-15: abrir alto
+   demais numa integrada custa a sessão (engasgo de carga, possível perda de
+   contexto), enquanto abrir baixo demais custa 5 s até o medidor promover. */
+out.push(['sonda: INTEGRADA reconhecida', hw.integrated ? 'SIM — teto em Baixa' : 'não']);
 out.push(['sonda: família modesta', hw.weakHint ? 'SIM — teto em Baixa' : 'não']);
 out.push(['sonda: núcleos / memória', `${hw.cores} / ${hw.memoryGB || '?'} GB`]);
 out.push(['sonda: pixels a preencher', (hw.pixels || 0).toLocaleString('pt-BR')]);
@@ -267,10 +293,30 @@ out.push(['BAIXO · reflexo do piso', baixo.perfil.floorReflection === 'off'
 out.push(['BAIXO · sombra', `${baixo.sombra} (2048 é o alvo — 1024 era perda sem ganho)`]);
 out.push(['BAIXO · chamadas / triângulos',
   `${baixo.calls.toLocaleString('pt-BR')} / ${baixo.tris.toLocaleString('pt-BR')}`]);
-marca('BAIXO · as chamadas de desenho caíram',
-  baixo.calls < alto.calls,
+/* ⚠️ A RÉGUA VIROU DE LADO EM 2026-08-15, E A INVERSÃO É A DOUTRINA NOVA.
+   Esta linha exigia `baixo.calls < alto.calls` — porque o único jeito que o
+   nível Baixo tinha de devolver quadro era APAGAR PEÇA (`lodMinPx: 3`). Era
+   exatamente isso que o dono chamava de "no baixo a qualidade fica horrível".
+
+   Com `mergeVehicle: 'all'` e `lodMinPx: 0` nos três níveis, os três submetem
+   as MESMAS chamadas — e isso é o Portão 1 de `checks-aceitacao.mjs` sendo
+   obedecido, não uma regressão:
+
+       um nível mais baixo desenha a MESMA CENA com MENOS AMOSTRAS;
+       ele não desenha UMA CENA DIFERENTE.
+
+   Então a assertiva de chamadas passa a exigir IGUALDADE, e quem tem de cair é
+   o MILISSEGUNDO — que é o que o nível existe para entregar. */
+marca('BAIXO · nenhuma peça foi apagada (chamadas IGUAIS ao Alto)',
+  baixo.calls === alto.calls,
   `${alto.calls.toLocaleString('pt-BR')} → ${baixo.calls.toLocaleString('pt-BR')}`
-  + ` (${alto.calls ? Math.round((1 - baixo.calls / alto.calls) * 100) : 0} % a menos)`);
+  + (baixo.calls === alto.calls ? '' : ' <<< o Baixo está desenhando outra cena'));
+marca('BAIXO · o quadro ficou mais barato',
+  baixo.ms < alto.ms,
+  `${alto.ms} ms → ${baixo.ms} ms`
+  + ` (${alto.ms ? Math.round((1 - baixo.ms / alto.ms) * 100) : 0} % a menos)`
+  + '  ⚠️ numa máquina limitada por SUBMISSÃO os três empatam, e isso é'
+  + ' aprovação: o que separa os níveis é GPU e memória, não chamada.');
 
 /* ---------------- 3. E VOLTA ---------------- */
 await nivel('alta');

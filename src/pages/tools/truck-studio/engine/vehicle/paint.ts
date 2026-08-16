@@ -247,6 +247,13 @@ function makeUniforms() {
     uFlakeGloss: { value: 0.07 },
     uFlakeColor: { value: new THREE.Color(0xffffff) },
     uFlakePx: { value: 2.4 },
+    /* Oitavas do floco — a porta que `core/quality.ts` (`flakeOctaves`) não
+       tinha. ⚠️ Até 2026-08-15 aquele campo era ÓRFÃO: a tabela de níveis
+       anunciava 2/2/1 e as duas oitavas estavam codificadas no GLSL, sem
+       uniforme nenhum para desligá-las. Um botão que não é lido por ninguém é
+       pior que botão nenhum, porque mente para quem escolheu o nível.
+       Nasce em 2 — o valor do nível Alto, e o comportamento histórico. */
+    uFlakeOct: { value: 2 },
     /* Quantos pixels de SAÍDA vale um pixel deste render. 1 na tela; na captura
        em 7680 é 4, porque o mosaico desenha quatro vezes mais pixels por metro
        de lataria. Ver `setPaintPixelScale()`. */
@@ -367,6 +374,12 @@ class PaintInstance {
     U.uFlakeTilt.value = Math.max(0, p.flakeTilt);
     U.uFlakeGloss.value = clamp01(p.flakeGloss);
     U.uFlakePx.value = Math.max(0.5, p.flakePx);
+    /* DO PERFIL, e não do material: quantas oitavas o floco paga é decisão de
+       QUALIDADE, não de acabamento — a mesma tinta custa 215 ALU a menos por
+       fragmento no nível Baixo. `onQualityChange` reexecuta `set()` sobre
+       `instances` (ver o fim deste arquivo), então a troca de nível chega aqui
+       sozinha e o ramo do GLSL é quente por desenho. */
+    U.uFlakeOct.value = getProfile().flakeOctaves;
     U.uCoatThickness.value = Math.max(0, p.coatThickness);
 
     /* A CASCA DE LARANJA É O TRECHO MAIS CARO DESTE SHADER, e o nível Baixo não
@@ -622,7 +635,7 @@ varying vec3 vPaintWPos;
 uniform float uFlakeAmount; uniform float uFlakeScale; uniform float uFlakeTilt;
 uniform float uFlakeGloss;  uniform vec3  uFlakeColor;
 uniform float uFlakePx;     uniform float uCoatThickness;
-uniform float uPxScale;
+uniform float uPxScale;     uniform float uFlakeOct;
 uniform float uPearlAmount; uniform float uPearlTravel;
 uniform vec3  uPearlMid;    uniform vec3  uPearlFlip;
 uniform float uPeel;        uniform float uPeelScale;  uniform float uPeelDetail;
@@ -766,18 +779,60 @@ if( uFlakeAmount > 0.001 ){
   float aa = 1.0 / ( 1.0 + px*px*1.2 );
 
   vec4  cA = pFlakeCell( fPos, sA );
-  vec4  cB = pFlakeCell( fPos, sB );
   float thr = uFlakeAmount * 0.85;
-  float mA = step( cA.w, thr ) * aa * (1.0 - fr);
-  float mB = step( cB.w, thr ) * aa * fr;
 
-  float jA = 0.45 + 1.1*pHash13( cA.xyz*7.3 + 5.1 );
-  float jB = 0.45 + 1.1*pHash13( cB.xyz*7.3 + 5.1 );
-  vec3  nA = normalize( pSmoothN + cA.xyz * uFlakeTilt * jA );
-  vec3  nB = normalize( pSmoothN + cB.xyz * uFlakeTilt * jB );
+  // ---- A SEGUNDA OITAVA, e por que ela é um botão de qualidade (2026-08-15) ----
+  // ⚠️⚠️ NADA DE CRASE NESTE BLOCO. Ele é GLSL dentro de um template literal do
+  // TypeScript, e uma crase de citação FECHA a string — o arquivo inteiro passa
+  // a não compilar, com erro apontando para o meio do shader. É uma armadilha
+  // já registrada neste projeto e é fácil cair nela duas vezes.
+  //
+  // cB é a oitava seguinte da dissolvência cruzada por DISTÂNCIA: entre dois
+  // tamanhos de célula, fr mistura A e B para o grão não SALTAR quando a câmera
+  // se afasta. Ela custa uma segunda célula de Voronoi, um segundo hash de
+  // inclinação, uma segunda normal e um segundo termo de tom — ~215 ALU por
+  // fragmento pintado, no shader mais caro da cena. Numa integrada, onde a ALU
+  // de fragmento é o recurso escasso, isso é um botão legítimo.
+  //
+  // ⚠️ O RAMO É POR UNIFORME, não por fragmento. uFlakeOct vale o mesmo para a
+  // superfície inteira, então a onda toda toma o mesmo caminho e a economia é
+  // REAL — é o mesmo padrão do if( uPeel > 0.001 ) logo abaixo. Um ramo por
+  // fragmento não economizaria nada: a GPU pagaria os dois lados.
+  //
+  // ⚠️⚠️ E NÃO BASTA ZERAR mB. O (1.0 - fr) de mA é a OUTRA METADE da
+  // dissolvência cruzada; mantê-lo sem o par faria o floco DESAPARECER por
+  // completo na distância em que fr tende a 1, que é um defeito, não um nível
+  // de qualidade. Com uma oitava só, cA leva o peso INTEIRO — o que se perde é
+  // a suavidade da troca de célula (o "pop" de granulação que core/quality.ts
+  // documenta), nunca o floco.
+  float mA, mB, tint;
+  if ( uFlakeOct > 1.5 ) {
+    vec4  cB = pFlakeCell( fPos, sB );
+    mA = step( cA.w, thr ) * aa * (1.0 - fr);
+    mB = step( cB.w, thr ) * aa * fr;
 
-  normal = normalize( mix( normal, nA, mA ) );
-  normal = normalize( mix( normal, nB, mB ) );
+    float jA = 0.45 + 1.1*pHash13( cA.xyz*7.3 + 5.1 );
+    float jB = 0.45 + 1.1*pHash13( cB.xyz*7.3 + 5.1 );
+    vec3  nA = normalize( pSmoothN + cA.xyz * uFlakeTilt * jA );
+    vec3  nB = normalize( pSmoothN + cB.xyz * uFlakeTilt * jB );
+
+    normal = normalize( mix( normal, nA, mA ) );
+    normal = normalize( mix( normal, nB, mB ) );
+
+    // Varia a força do tom por floco. Sem isso, flocos vizinhos de cor idêntica
+    // fundem num borrão só em vez de lerem como grão.
+    tint = mA*(0.40 + 0.60*pHash13( cA.xyz*3.1 + 91.7 ))
+         + mB*(0.40 + 0.60*pHash13( cB.xyz*3.1 + 91.7 ));
+  } else {
+    mA = step( cA.w, thr ) * aa;
+    mB = 0.0;
+
+    float jA = 0.45 + 1.1*pHash13( cA.xyz*7.3 + 5.1 );
+    vec3  nA = normalize( pSmoothN + cA.xyz * uFlakeTilt * jA );
+    normal = normalize( mix( normal, nA, mA ) );
+
+    tint = mA*(0.40 + 0.60*pHash13( cA.xyz*3.1 + 91.7 ));
+  }
 
   float m   = mA + mB;
   float cov = uFlakeAmount * 0.85;
@@ -785,10 +840,6 @@ if( uFlakeAmount > 0.001 ){
   // resolvido: as células são grandes o bastante para amostrar uma por vez
   roughnessFactor  = mix( roughnessFactor, uFlakeGloss, m );
   metalnessFactor  = mix( metalnessFactor, 1.0, m );
-  // Varia a força do tom por floco. Sem isso, flocos vizinhos de cor idêntica
-  // fundem num borrão só em vez de lerem como grão.
-  float tint = mA*(0.40 + 0.60*pHash13( cA.xyz*3.1 + 91.7 ))
-             + mB*(0.40 + 0.60*pHash13( cB.xyz*3.1 + 91.7 ));
   diffuseColor.rgb = mix( diffuseColor.rgb, uFlakeColor, tint*0.85 );
 
   // Não resolvido: quando a célula fica abaixo de um pixel, uma amostra por

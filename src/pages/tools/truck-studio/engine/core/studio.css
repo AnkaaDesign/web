@@ -778,11 +778,31 @@
     visibility 0s;
 }
 
+/* ⚠️ DOIS INTERRUPTORES PARA A MESMA LISTA, E ELES NÃO PODEM SER O MESMO.
+   `.ts-bare` é o botão de esconder a interface (#btn-chrome); `.ts-tlmode` é o
+   criador de vídeo aberto (ui/timeline.ts), que precisa da tela para a linha do
+   tempo — *"quando selecionada deve esconder todos os elementos do hud para que
+   tenha mais [espaço] para mostrar a timeline"*.
+   Reusar `.ts-bare` no criador seria mais curto e ERRADO: fechar o criador
+   removeria a classe e DESFARIA um modo limpo que o usuário tinha ligado à mão
+   antes de abri-lo — o botão da régua ficaria aceso com a interface de volta.
+   Duas classes, uma lista de seletores, nenhum estado roubado.
+
+   ⚠️ E #view-controls FICA NOS DOIS. É a saída de ambos os modos, e um botão que
+   se esconde junto com o resto não teria como ser desfeito a não ser
+   adivinhando onde clicar. O criador tem o próprio ✕ e ainda assim a régua fica:
+   enquadrar (#btn-reset) e tela cheia são justamente o que se usa enquanto se
+   compõe um percurso. */
 .truck-studio-root.ts-bare #ts-hud,
 .truck-studio-root.ts-bare #ts-panels,
 .truck-studio-root.ts-bare .ts-corner,
 .truck-studio-root.ts-bare #ts-mapbadge,
-.truck-studio-root.ts-bare #view-hint {
+.truck-studio-root.ts-bare #view-hint,
+.truck-studio-root.ts-tlmode #ts-hud,
+.truck-studio-root.ts-tlmode #ts-panels,
+.truck-studio-root.ts-tlmode .ts-corner,
+.truck-studio-root.ts-tlmode #ts-mapbadge,
+.truck-studio-root.ts-tlmode #view-hint {
   opacity: 0;
   /* `visibility` e não `display`: é a única das duas que transiciona, e o atraso
      é o que a segura até o fade acabar. Sem ela o card continuaria clicável e
@@ -803,18 +823,24 @@
    Então, ao ESCONDER, a transição é redeclarada inteira: três propriedades,
    três durações, três atrasos, nenhuma posição a adivinhar. O vidro não perde
    nada — as linhas dele valem no estado visível, que é onde existe hover. */
-.truck-studio-root.ts-bare #ts-hud {
+.truck-studio-root.ts-bare #ts-hud,
+.truck-studio-root.ts-tlmode #ts-hud {
   transition-property: opacity, translate, visibility;
   transition-duration: 240ms, 300ms, 0s;
   transition-delay: 0s, 0s, 240ms;
 }
 .truck-studio-root.ts-bare #ts-hud,
 .truck-studio-root.ts-bare .ts-corner,
-.truck-studio-root.ts-bare #ts-mapbadge { translate: -18px 0; }
-.truck-studio-root.ts-bare #ts-panels { translate: 18px 0; }
+.truck-studio-root.ts-bare #ts-mapbadge,
+.truck-studio-root.ts-tlmode #ts-hud,
+.truck-studio-root.ts-tlmode .ts-corner,
+.truck-studio-root.ts-tlmode #ts-mapbadge { translate: -18px 0; }
+.truck-studio-root.ts-bare #ts-panels,
+.truck-studio-root.ts-tlmode #ts-panels { translate: 18px 0; }
 /* A dica já usa `transform: translateX(-50%)` para se centralizar; `translate` é
    uma propriedade separada e compõe com ele em vez de sobrescrevê-lo. */
-.truck-studio-root.ts-bare #view-hint { translate: 0 14px; }
+.truck-studio-root.ts-bare #view-hint,
+.truck-studio-root.ts-tlmode #view-hint { translate: 0 14px; }
 
 @media (prefers-reduced-motion: reduce) {
   .truck-studio-root #ts-panels,
@@ -827,7 +853,12 @@
   .truck-studio-root.ts-bare #ts-panels,
   .truck-studio-root.ts-bare .ts-corner,
   .truck-studio-root.ts-bare #ts-mapbadge,
-  .truck-studio-root.ts-bare #view-hint { translate: none; transition-delay: 0s; }
+  .truck-studio-root.ts-bare #view-hint,
+  .truck-studio-root.ts-tlmode #ts-hud,
+  .truck-studio-root.ts-tlmode #ts-panels,
+  .truck-studio-root.ts-tlmode .ts-corner,
+  .truck-studio-root.ts-tlmode #ts-mapbadge,
+  .truck-studio-root.ts-tlmode #view-hint { translate: none; transition-delay: 0s; }
 }
 
 .truck-studio-root #view-hint {
@@ -919,19 +950,43 @@
      duas pílulas no mesmo topo se sobreporiam exatamente no meio da tela;
    · a borda é vermelha. É o único elemento do estúdio que usa essa cor, e usa
      porque "gravando" tem um vocabulário visual que já existe e que não vale a
-     pena reinventar em cinza. */
+     pena reinventar em cinza.
+
+   ELA DEIXOU DE SER UMA PÍLULA DE UMA LINHA, e a causa é mecânica: o gravador
+   passou a desenhar os quadros um a um (ver o cabeçalho de scene/record.ts e o
+   bloco "A ESPERA, DESENHADA" em ui/chrome.ts), então o que ela mostra agora é
+   uma espera de minutos com fase, contagem de quadros, barra, DOIS relógios e a
+   nota que explica a cena piscando atrás dela. Continua ancorada no mesmo lugar
+   e continua sendo o único lugar onde se pode parar.
+
+   ⚠️ A LARGURA É FIXA, E É DESEMPENHO ANTES DE SER DESENHO. O conteúdo muda dez
+   vezes por segundo; com largura automática, cada texto novo redimensionaria a
+   caixa e — como ela se centra por `translateX(-50%)` — o recentramento a faria
+   TREMER durante a renderização inteira, além de custar um layout por tick
+   justamente na hora em que a CPU está toda comprometida com os quadros. */
 .truck-studio-root #ts-rec {
   position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 10;
-  display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text);
-  background: rgba(17, 17, 17, 0.82); border: 1px solid rgba(232, 62, 62, 0.55);
-  padding: 7px 8px 7px 15px; border-radius: 22px; backdrop-filter: blur(6px);
+  display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--text);
+  background: rgba(17, 17, 17, 0.86); border: 1px solid rgba(232, 62, 62, 0.55);
+  padding: 9px 9px 10px 14px; border-radius: 16px; backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  width: 344px; max-width: calc(100vw - 24px);
   /* Tabular para o cronômetro não dançar a cada segundo — o "1" é mais estreito
      que os outros dígitos em quase toda fonte de interface. */
   font-variant-numeric: tabular-nums;
 }
+/* Houve aqui uma regra levantando a pílula ACIMA da cortina (z-index 401), de
+   quando as duas ficavam na tela ao mesmo tempo — a cortina escondendo o render
+   e a pílula flutuando por cima com os contadores e o cancelar. O dono reprovou
+   o arranjo (*"não precisa desse segundo loading"*) e agora só uma das duas
+   existe por vez, então a regra saiu junto com o problema. Ver o encaixe de
+   trabalho longo em ui/loader.ts. */
 .truck-studio-root .ts-recdot {
   width: 9px; height: 9px; flex: none; border-radius: 50%;
+  /* Alinhado com a PRIMEIRA linha, e não com o centro da caixa: o corpo tem
+     altura variável (uma linha em "Gravando", cinco em "Renderizando") e um
+     ponto centrado subiria e desceria conforme o texto crescesse. */
+  margin-top: 4px;
   background: #e83e3e;
   animation: truck-studio-recpulse 1.4s ease-in-out infinite;
 }
@@ -941,14 +996,81 @@
 @media (prefers-reduced-motion: reduce) {
   .truck-studio-root .ts-recdot { animation: none; }
 }
+/* ---- o corpo: o título e as cinco linhas que ui/chrome.ts injeta ---- */
+.truck-studio-root .ts-recbody {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+}
+.truck-studio-root #ts-rec-text { font-weight: 600; letter-spacing: 0.01em; }
+.truck-studio-root .ts-recsub,
+.truck-studio-root .ts-recwhy {
+  font-size: 11px; line-height: 1.35;
+  /* `--muted` e NUNCA `--ts-screen-muted`: esta caixa é escura nos dois modos
+     (ela flutua sobre o render), e o token de TELA vira #6b6b6b no modo claro —
+     cinza escuro sobre preto, ~2,3:1, ilegível. Ver o bloco dos --ts-screen-*.
+     (A cortina é o caso oposto — ela SEGUE o modo claro —, e por isso as linhas
+     dela, em ui/loader.css, usam justamente o token de tela.) */
+  color: var(--muted);
+}
+/* As duas classes que faltam aqui — `.ts-recclock` e `.ts-recvideo` — foram
+   embora com as linhas que elas vestiam: os dois relógios da renderização agora
+   moram dentro da cortina. */
+.truck-studio-root .ts-recwhy { color: rgba(217, 217, 217, 0.62); }
+/* ---- a barra ----
+   `transform: scaleX()` e não `width`: a largura recalcula o layout a cada
+   passo, a transformação fica com o compositor. Durante a renderização a CPU
+   está toda comprometida desenhando quadros, e esta barra anda dez vezes por
+   segundo por vários minutos. O preenchimento não tem raio próprio — quem
+   arredonda é o `overflow: hidden` da trilha, senão o escalonamento horizontal
+   achataria as pontas redondas em elipses. */
+.truck-studio-root .ts-recbar {
+  width: 100%; height: 5px; margin: 4px 0 2px;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.14); overflow: hidden;
+}
+.truck-studio-root .ts-recbar__fill {
+  display: block; width: 100%; height: 100%; background: #e83e3e;
+  transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform 140ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-recbar__fill { transition: none; }
+}
+/* ---- o aviso que fica DEPOIS que o vídeo termina ----
+   A mesma caixa muda de cor em vez de virar um segundo componente: quem estava
+   olhando a barra continua olhando o mesmo retângulo, agora dizendo como
+   terminou. Verde = saiu como prometido; âmbar = saiu com ressalva (gravado em
+   tempo real, ou o `degraded` do perfil); vermelho = não saiu. */
+.truck-studio-root #ts-rec.is-done { border-color: var(--stroke-2); }
+.truck-studio-root #ts-rec.is-done .ts-recdot {
+  animation: none; background: var(--accent);
+}
+.truck-studio-root #ts-rec.is-warn { border-color: rgba(232, 176, 62, 0.6); }
+.truck-studio-root #ts-rec.is-warn .ts-recdot { background: #e8b03e; }
+.truck-studio-root #ts-rec.is-error { border-color: rgba(232, 62, 62, 0.6); }
+.truck-studio-root #ts-rec.is-error .ts-recdot { background: #e83e3e; }
+/* A ressalva sobe para o texto cheio. Ela é a razão de o aviso existir — o
+   "gravado em tempo real" e o `degraded` são as duas confissões da ferramenta —,
+   e uma confissão em cinza fraco é uma confissão escondida pela metade. */
+.truck-studio-root #ts-rec.is-warn .ts-recsub,
+.truck-studio-root #ts-rec.is-error .ts-recsub { color: var(--text); }
+.truck-studio-root #ts-rec.is-warn .ts-recwhy,
+.truck-studio-root #ts-rec.is-error .ts-recwhy { color: var(--muted); }
 .truck-studio-root .ts-recstop {
-  font: inherit; color: var(--text); cursor: pointer;
+  font: inherit; color: var(--text); cursor: pointer; flex: none;
+  white-space: nowrap; margin-top: 1px;
   background: rgba(255, 255, 255, 0.10); border: 1px solid var(--stroke-2);
   padding: 3px 12px; border-radius: 999px;
   transition: background 140ms ease, border-color 140ms ease;
 }
 .truck-studio-root .ts-recstop:hover { background: rgba(232, 62, 62, 0.24); border-color: rgba(232, 62, 62, 0.6); }
 .truck-studio-root .ts-recstop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Só na montagem do arquivo, que dura um piscar — ver a nota do botão em
+   ui/chrome.ts. Cursor padrão para o ponteiro não prometer um clique. */
+.truck-studio-root .ts-recstop:disabled {
+  opacity: 0.45; cursor: default; background: rgba(255, 255, 255, 0.06);
+}
+.truck-studio-root .ts-recstop:disabled:hover {
+  background: rgba(255, 255, 255, 0.06); border-color: var(--stroke-2);
+}
 
 /* ---------------- o painel do botão de gravar ----------------
    Reusa por completo as classes do painel da câmera (.ts-shotgroup /
@@ -956,17 +1078,34 @@
    perguntas mais um botão que age — e ui/chrome.ts o constrói com a mesma
    função. O que existe aqui é só o que é próprio da gravação.
 
-   `--ts-recmenu-w` é maior que o da câmera porque as pastilhas de modo carregam
-   duas palavras ("Volta completa") e quebrar em duas linhas dentro de um
-   segmento faria as duas pastilhas terem alturas diferentes. */
-.truck-studio-root .ts-recgroup .ts-shotmenu { width: 264px; }
+   A LARGURA MAIOR QUE A DA CÂMERA continua, com outra justificativa: os três
+   modos deixaram de ser pastilhas e viraram LINHAS com descrição (ui/chrome.ts
+   explica por quê), e uma frase por linha pede largura para não virar cinco
+   linhas de três palavras. A altura, com isso, passou a caber justo numa janela
+   baixa — daí o teto e a rolagem, que não existem no painel da câmera. */
+.truck-studio-root .ts-recgroup .ts-shotmenu {
+  width: 272px;
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+}
 /* A nota de duração fica presa ao segmento de modo, não solta no fim do painel:
    ela QUALIFICA o modo escolhido ("uma volta em ~18 s"), e uma frase longe do
-   controle que ela descreve é uma frase que ninguém liga a nada. */
+   controle que ela descreve é uma frase que ninguém liga a nada. (A última do
+   painel é a exceção que confirma: ela fala do painel INTEIRO — os 60 fps e a
+   espera do render quadro a quadro — e por isso fica encostada no botão que
+   age, que é onde aquilo ainda é uma decisão.)
+   ⚠️ `--muted` e não `--ts-screen-muted`, que era o que estava aqui: o painel é
+   vidro fumê nos DOIS modos (`.ts-shotmenu` é rgba(13,13,13,.9)), e o token de
+   tela vira #6b6b6b no modo claro — cinza escuro sobre quase preto, ~2,3:1. A
+   nota simplesmente sumia para quem usa o Ankaa claro. */
 .truck-studio-root .ts-recnote {
   display: block; margin: -2px 2px 10px; font-size: 11px; line-height: 1.35;
-  color: var(--ts-screen-muted);
+  color: var(--muted);
 }
+/* O aviso de que ESTE navegador não faz o render quadro a quadro. Âmbar e não
+   vermelho: não é uma falha, é um caminho pior — o vídeo sai, só pode engasgar.
+   Mede 8,6:1 sobre o fundo do painel. */
+.truck-studio-root .ts-recnote--warn { color: #e8b03e; }
 
 /* Botão pequeno da barra do editor (o "×" que devolve o fundo ao alumínio).
    Sobreviveu à sidebar porque quem o usa é o modal, não ela. */
@@ -996,10 +1135,43 @@
 
    z-index 8: mesma camada dos badges, abaixo da pílula de troca (9), do
    #loading (10) e da cortina (400). */
+/* ⚠️⚠️ O `padding` E OS DESLOCAMENTOS ENCOLHIDOS SÃO UM CONSERTO, NÃO ESPAÇAMENTO
+   — e o defeito que eles fecham foi relatado assim: *"quando configurações está
+   aberto a parte lateral de todos os cards ficam cortados, além disso parece ter
+   um background em todos juntos, não deveria"*. As duas frases são o MESMO
+   defeito visto de dois ângulos, e a causa é uma linha:
+
+       `overflow-y: auto` FORÇA `overflow-x` a `auto`.
+
+   É regra de CSS, não do navegador: quando um eixo deixa de ser `visible`, o
+   outro para de ser `visible` também. E o que passa a ser cortado no eixo
+   horizontal não é conteúdo — os cards têm exatamente a largura da caixa —, é a
+   SOMBRA. `--ts-glass-shadow` alcança ~6 px para os lados e ~18 px para baixo, e
+   é ela que faz cada card ler como uma lâmina flutuando sobre o render.
+
+   Cortada, ela vira o contrário do que é: as bordas viram um corte reto de cima
+   a baixo, as sombras dos cinco cards se emendam nos vãos de 10 px, e a coluna
+   inteira passa a ler como UMA LAJE ESCURA com os cards recortados dentro. Daí
+   as duas queixas.
+
+   ⚠️ E ELE SEMPRE ESTEVE ASSIM — `overflow-y: auto` vale mesmo quando não há o
+   que rolar. O que mudou com o card de Configurações aberto foi o TAMANHO: a
+   coluna passou de 587 px para 826 px (medido na bancada), ou seja quase a tela
+   inteira, e a laje ficou impossível de não ver.
+
+   O conserto é o padrão da casa para scroller com sombra: **acolchoar por
+   dentro e recuar o deslocamento pelo mesmo tanto**, para que a sombra tenha
+   onde cair sem que o card mude de lugar um pixel:
+
+       right  6 + padding-right  8 = 14 px da borda   (era right: 14)
+       bottom 0 + padding-bottom 14 = 14 px do rodapé (era bottom: 14)
+
+   O `max-height` acompanha (`100% − 60px` em vez de `− 74px`) porque o topo da
+   coluna é `bottom + max-height`, e os dois mudaram juntos. */
 .truck-studio-root #ts-panels {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  right: 6px;
+  bottom: 0;
   z-index: 8;
   display: flex;
   flex-direction: column;
@@ -1009,9 +1181,10 @@
      ocupando meia tela. Encostados à direita, que é a borda que os ancora. */
   align-items: flex-end;
   gap: 10px;
+  padding: 8px 8px 14px;
   /* Nunca sobe além do topo do render; o excedente rola DENTRO da pilha em vez
      de vazar por cima dos view controls. */
-  max-height: calc(100% - 74px);
+  max-height: calc(100% - 60px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -1238,7 +1411,9 @@
    Abaixo de 680px a lateral perde a moldura e vira só o rótulo — três cards
    ainda cabem, e o desenho continua a um toque. */
 @media (max-width: 680px) {
-  .truck-studio-root #ts-panels { right: 10px; bottom: 10px; gap: 8px; width: 154px; }
+  /* Mesma conta do bloco principal: o deslocamento recua o que o `padding`
+     acolchoa, senão a sombra volta a ser cortada nesta faixa. */
+  .truck-studio-root #ts-panels { right: 2px; bottom: 0; gap: 8px; width: 170px; }
   .truck-studio-root .ts-panels__pair { width: 154px; gap: 6px; }
   .truck-studio-root .ts-panel__body { padding: 6px 50px 7px 8px; }
   .truck-studio-root .ts-panel__name { font-size: 11.5px; }
@@ -1254,7 +1429,7 @@
    pontas, que é alta). As pontas encolhem antes das laterais — são as que menos
    recebem arte. */
 @media (max-height: 620px) {
-  .truck-studio-root #ts-panels { bottom: 10px; gap: 8px; width: 176px; }
+  .truck-studio-root #ts-panels { bottom: 0; gap: 8px; width: 192px; }
   .truck-studio-root .ts-panels__pair { width: 176px; gap: 6px; }
   .truck-studio-root .ts-panel__media.square canvas { height: 84px; }
 }
@@ -1544,18 +1719,56 @@
   transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 .truck-studio-root .bg-row:hover { background: rgba(255, 255, 255, 0.06); }
-.truck-studio-root #bg-row-cab { cursor: pointer; user-select: none; }
+/* AS TRÊS LINHAS SÃO CONTROLES INTEIROS, e por isso nenhuma delas é texto.
+   O `cursor: text` sobre a pastilha e sobre o nome era o relato de 2026-08-16
+   ("ele mostra um cursor de texto, não pointer"): o `<label>` da linha de cima
+   já dizia "isto é um botão" e as duas de baixo, sendo `<div>` com `<span>`,
+   diziam "isto é um parágrafo" — mesmo depois de o clique na linha inteira
+   passar a abrir o seletor (ver `bg-row-face` em ui/livery-editor.ts). */
+.truck-studio-root #bg-row-cab,
+.truck-studio-root #bg-row-face,
+.truck-studio-root #tk-row { cursor: pointer; user-select: none; }
 .truck-studio-root .bg-check {
   flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); cursor: pointer;
 }
-/* LIGADA = anel verde, nas duas linhas e pelo mesmo desenho. A de cima acende
-   pelo próprio checkbox; a de baixo por `.is-on`, que `syncBackground()` escreve
-   quando a face tem cor própria. */
-.truck-studio-root #bg-row-cab:has(.bg-check:checked),
+/* ⚠️ QUEM ACENDE É QUEM MANDA NESTA FACE — e é `syncBackground()` que decide.
+   ---------------------------------------------------------------------------
+   Isto era `#bg-row-cab:has(.bg-check:checked)`, e o comentário três parágrafos
+   acima ("nunca as duas ao mesmo tempo") descrevia uma regra que o seletor
+   contradizia: a caixa "Cor do cavalo" é uma decisão sobre o PRODUTO INTEIRO,
+   então ela fica marcada em todas as faces — inclusive nas que têm cor própria e
+   portanto IGNORAM a tinta do cavalo. Nessas, as duas linhas acendiam juntas, e
+   o relato foi exatamente esse ("a opção de cor customizada e pintar igual ao
+   cavalo selecionadas juntas, e não deveria — isso acontece até nas laterais").
+
+   A pilha continua sendo uma pilha (a de baixo SOBREPÕE a de cima; ver
+   `bindTrailerPaint()` em vehicle/livery.ts). O que muda é que o anel verde
+   passou a marcar o VENCEDOR e a linha perdedora ganhou `.is-muted`, que diz
+   "isto continua ligado, e não é o que você está vendo aqui". */
 .truck-studio-root .bg-row.is-on {
   border-color: transparent; background: rgba(34, 197, 94, 0.10);
   box-shadow: 0 0 0 1.5px var(--accent);
 }
+/* SOBREPOSTA: continua LIGADA, e não manda nesta face.
+   ---------------------------------------------------------------------------
+   A primeira versão só apagava a linha, e não bastou: *"cor do cavalo continuar
+   selecionada, mesmo quando eu pinto de uma cor diferente"*. O que ainda dizia
+   "ligado AQUI" era o TIQUE — verde, do lado de uma linha apagada, é sinal
+   contraditório. Então o tique perde o acento (fica cinza: ligado, sem mandar) e
+   o nome é RISCADO.
+
+   O riscado é a convenção de quem já resolveu este problema — as ferramentas de
+   desenvolvedor do navegador riscam a declaração de CSS que outra sobrepôs. Ele
+   diz "isto vale, e algo por cima ganhou", que é exatamente o estado. A linha
+   continua clicável de propósito: desligar a tinta do cavalo com uma face
+   pintada por cima é uma decisão legítima, e desabilitá-la a esconderia. */
+.truck-studio-root .bg-row.is-muted { opacity: 0.62; }
+.truck-studio-root .bg-row.is-muted:hover { opacity: 0.9; }
+.truck-studio-root .bg-row.is-muted .bg-check { accent-color: var(--muted); }
+.truck-studio-root .bg-row.is-muted .bg-name {
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+.truck-studio-root .bg-row.is-muted .bg-sw { opacity: 0.6; }
 /* A PASTILHA É O BOTÃO — mesma construção de `.ts-cfg__chip`: o input de cor
    mora dentro, transparente e do tamanho dela. A caixa nativa não aceita
    border-radius de forma consistente entre navegadores. */
@@ -1594,8 +1807,7 @@
   flex: none; max-width: 96px; text-align: right; color: var(--muted);
   font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.truck-studio-root .bg-row.is-on .bg-val,
-.truck-studio-root #bg-row-cab:has(.bg-check:checked) .bg-val { color: var(--accent); }
+.truck-studio-root .bg-row.is-on .bg-val { color: var(--accent); }
 /* Desabilitado FICA, invisível ao toque mas ocupando o lugar: some, e a linha
    de baixo encolheria 22 px e deixaria de estar alinhada com a de cima. Mesma
    regra de `.ts-cfg__reset`. */
@@ -1793,6 +2005,24 @@
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   border: none; background: transparent; color: inherit; font-family: inherit; font-size: 11.5px; padding: 1px 2px;
 }
+/* ⚠️ ENQUANTO NÃO SE ESTÁ RENOMEANDO, O CAMPO NÃO É UM CAMPO. Ele ocupa a linha
+   inteira (`flex: 1`), então um `cursor: text` ali transformava a única faixa
+   larga da linha em "isto é texto" e sobrava uma tira de poucos pixels para
+   selecionar a camada — o relato de 2026-08-16 foi literal ("tenho que clicar
+   numa área muito pequena para poder selecionar"). `readonly` é o estado
+   normal; `ui/livery-editor.ts` derruba o foco no clique simples e só o duplo
+   clique o torna editável. */
+/* ⚠️ `input.` NO SELETOR, E NÃO SÓ `.lyr-name` — a primeira versão destas duas
+   linhas não o tinha e ISSO ERA O DEFEITO: as camadas FIXAS (Fundo e Thermo
+   King) usam `.lyr-name .lyr-name--fixed` num `<span>`, que nunca tem
+   `readonly`, então `:not([readonly])` casava JUSTAMENTE elas e lhes dava
+   `cursor: text`. Medido em `checks-cursor-camada-0816.mjs`: o input das camadas
+   de objeto saía `pointer` e os dois spans saíam `text` — que é o relato
+   *"passo o mouse por cima do texto da camada e continua cursor text"* depois do
+   primeiro conserto. As duas regras falam do CAMPO DE EDIÇÃO; um `<span>` não é
+   um. */
+.truck-studio-root input.lyr-name[readonly] { cursor: inherit; user-select: none; }
+.truck-studio-root input.lyr-name:not([readonly]) { cursor: text; user-select: text; }
 .truck-studio-root .lyr-name:focus { outline: 1px solid var(--accent); border-radius: 4px; background: var(--panel); }
 .truck-studio-root .lyr-btn {
   flex: none; border: none; background: transparent; color: var(--muted);
@@ -2037,6 +2267,30 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 .truck-studio-root .ts-cfg__sw--dot { width: 9px; height: 9px; border-radius: 3px; }
+/* A pastilha do CAVALO, na linha "Cor do cavalo" do card de Configurações. Ela
+   lê a MESMA `--ts-cabpaint` que a linha equivalente do editor de plotagem
+   (`.bg-sw--cab`), escrita por `vehicle/livery.ts` a cada tinta nova — duas
+   leituras do catálogo seriam duas fontes para a mesma cor. */
+.truck-studio-root .ts-cfg__sw--cab { background: var(--ts-cabpaint, #ffffff); }
+
+/* ---------- a linha com CAIXA ----------
+   Mesmo esqueleto da linha de cor (pastilha · nome · estado), com a caixa no
+   lugar do botão de voltar. É um `<label>`, então o alvo do clique é a linha
+   inteira — o mesmo gesto que o stack do Fundo já oferece no editor. */
+.truck-studio-root .ts-cfg__row--check { cursor: pointer; }
+.truck-studio-root .ts-cfg__check {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+/* A pastilha desta linha NÃO é um seletor: ela só mostra. Sem `cursor` próprio e
+   sem o anel de hover que a outra tem, senão ela promete um clique que abre um
+   seletor de cor e não abre nada. */
+.truck-studio-root .ts-cfg__chip--flat { cursor: inherit; }
+.truck-studio-root .ts-cfg__chip--flat:hover { box-shadow: none; }
 /* SEM COR PRÓPRIA é um quadriculado, e não um buraco: um disco transparente
    sobre vidro escuro leria como "preto" — que é uma cor escolhível. */
 .truck-studio-root .ts-cfg__sw.is-empty {

@@ -77,6 +77,24 @@ public/models/vehicles/trailer.glb
 public/models/trucks/
 public/models/vehicles/iveco_sway_metallica.glb
 
+# AS VARIANTES `@ktx2` DO CHÃO FICAM FORA, pela mesma regra e pela mesma rota.
+# `public/textures/*@ktx2*.ktx2` são os 32 arquivos (87 MB) que
+# `tools/studio-assets/ktx2.mjs` assa a partir dos 16 WebP/JPG versionados logo
+# ao lado — UASTC/BC7 a 2048 (`@ktx2`) e a 1024 (`@ktx2-1k`), os dois degraus de
+# memória de `groundVariant()` em `engine/core/quality.ts`.
+#
+# São SAÍDA DE BUILD, não fonte: a fonte é o .webp/.jpg tracked, e quem tem o
+# script reassa em minutos. Versioná-los cravaria 87 MB no histórico PARA SEMPRE
+# para guardar um derivado — exatamente o que a regra da frota acima recusa.
+#
+# A entrega é o rsync de `api/docs/DEPLOYMENT-studio-assets.md`, porque em
+# produção quem serve `textures/` é a API sob STUDIO_ASSETS_ROOT, não o `public/`
+# do web. E o modo de falhar é BENIGNO POR DESENHO: sem os arquivos,
+# `setAvailableVariants()` não acha o sufixo e o estúdio cai no .webp de sempre.
+# O que NÃO pode faltar é a chave `textureVariants` do `environments.json` DA
+# ÁRVORE SERVIDA — sem ela os arquivos ficam no disco sem ninguém pedir.
+public/textures/*@ktx2*.ktx2
+
 # Saída de diagnóstico do tools/env-build: screenshots de conferência de cena,
 # regeráveis a qualquer momento e sem valor em revisão de código.
 tools/env-build/_shots_*/

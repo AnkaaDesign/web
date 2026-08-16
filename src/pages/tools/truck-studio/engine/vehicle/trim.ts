@@ -93,8 +93,12 @@
 
    · teto e Thermo King JÁ eram pintados junto com o baú (os dois estão em
      `trailerPanelMeshes()`), e continuam sendo — `followsBody: true`;
-   · paralamas e caixa NUNCA foram pintados, e continuam como o bake os
-     entregou — `followsBody: false`.
+   · a caixa de cozinha NUNCA foi pintada, e continua como o bake a entregou —
+     `followsBody: false`;
+   · o PARA-LAMA também não era, e passou a ser em 2026-08-16, a pedido. Ele é a
+     única peça que segue o corpo SEM estar em `trailerPanelMeshes()`, e é dessa
+     assimetria que nasce a captura de `trimFactoryMat` em `applyTrim()`. Ver o
+     bloco no `SPECS.fenders`.
 
    A consequência prática é a ordem de aplicação, e ela é a única sutileza deste
    arquivo: `applyTrim()` roda DEPOIS de `setPaintTarget()`, por assinatura em
@@ -214,7 +218,25 @@ const SPECS: Record<TrimKey, TrimSpec> = {
     match: (_o, mats) => anyMat(mats, FENDER_MAT_RE),
     paintable: true,
     hideable: false,
-    followsBody: false,
+    /* ⚠️ ERA `false`, E VIROU `true` EM 2026-08-16 A PEDIDO: *"o paralamas está
+       faltando ter a opção de pintar da cor do cavalo também, como todos os
+       outros itens"*.
+
+       O `false` tinha uma razão histórica boa — "sem cor escolhida, nada muda",
+       e o para-lama NUNCA fora pintado junto com o baú —, mas ela era descrição
+       do bake e não decisão de produto. Na oficina o para-lama do implemento é
+       pintado com a cor da frota como qualquer outra chapa; o que o `false`
+       fazia era oferecer a extensão da tinta a três peças e negá-la à quarta,
+       sem nada na tela explicando por quê.
+
+       ⚠️ E ELE É A ÚNICA PEÇA QUE SEGUE O CORPO SEM ESTAR EM
+       `trailerPanelMeshes()`. Teto e Thermo King estão lá, então
+       `setPaintTarget('both')` os pinta E grava `origMat` neles de graça; o
+       para-lama não é tocado por aquele laço, e quem o veste é o
+       `restoreOf()`/`applyTrim()` daqui. É por isso que a captura de
+       `trimFactoryMat` existe — ver o bloco dela em `applyTrim()`. Sem ela a
+       tinta entrava e não saía. */
+    followsBody: true,
   },
   box: {
     label: 'Caixa de cozinha',
@@ -235,6 +257,82 @@ const SPECS: Record<TrimKey, TrimSpec> = {
     hideable: true,
     followsBody: true,
   },
+};
+
+/* ---------------------------------------------------------------------------
+   O QUE A FUSÃO POR MATERIAL NÃO PODE ENCOSTAR — e por que a lista sai DAQUI
+
+   `vehicle/merge.ts` assa os triângulos de mil peças em uma malha por material.
+   Isso é invisível para quem despacha POR MATERIAL — o material sobrevive à
+   fusão, com nome e referência —, e é fatal para quem despacha POR NÓ ou para
+   quem TROCA o material de uma malha depois. Este arquivo faz as duas coisas:
+
+     · a CAIXA DE COZINHA casa por NÓ e pode ser REMOVIDA do produto. Os seis
+       materiais dentro dela são compartilhados com o implemento inteiro
+       (`inox-ferragem` sozinho tem 1,56 M de triângulos de uma ponta à outra),
+       então nenhum balde jamais coincide com a peça: esconder a caixa exigiria
+       esconder um PEDAÇO de um balde, e um balde não tem pedaço;
+     · o TETO idem, por nó (`teto-externo`) ou pela malha do corpo paramétrico;
+     · o THERMO KING esconde a UNIDADE inteira por `hideRoot`;
+     · e os quatro TROCAM `mesh.material` ao ganhar cor própria, o que um balde
+       construído antes da troca não teria como acompanhar.
+
+   A lista mora aqui e não lá porque é aqui que ela é VERDADE: `merge.ts` recebe
+   a política de quem a possui (ver `MergePolicy` lá), e `studio.ts` — a raiz de
+   composição — é quem junta esta com a de `models.ts`. Uma segunda cópia destes
+   quatro casamentos divergiria da primeira no próximo re-bake, que é exatamente
+   o defeito que o cabeçalho deste arquivo registra sobre a caixa e `models.ts`.
+
+   ⚠️ QUEM ACRESCENTAR UMA PEÇA A `SPECS` TEM DE ACRESCENTÁ-LA AQUI. O sintoma de
+   esquecer é bonito e caro de achar: a peça nova pinta ou some no nível "Alta"
+   (onde a fusão pode estar desligada) e não faz nada nos outros. */
+export const TRIM_MERGE_EXCLUSIONS: {
+  /** Casamentos por NOME DE NÓ (o nó ou qualquer ancestral dele).
+   *
+   *  `scope` é o que separa EXCLUSÃO de ESCOPO, e a pergunta que decide qual dos
+   *  dois é uma só: **a peça é unidade de visibilidade E nunca troca de
+   *  material?** (`hideable && !paintable`). Se for, ela não precisa ficar fora
+   *  da fusão — ela precisa de uma fusão SÓ DELA, cujos baldes coincidam
+   *  exatamente com a peça que o usuário liga e desliga.
+   *
+   *  ⚠️ O nome do grupo TEM de casar a própria `re`, ou `applyTrim()` não o
+   *  encontraria pelo `selfOrAncestor()`. `merge.applyMerge()` verifica e RECUSA
+   *  o escopo com aviso quando não casa — a falha é para o lado seguro: volta a
+   *  ser exclusão, que é o comportamento de antes. */
+  nodes: { re: RegExp; label: string; scope?: string }[];
+  /** Casamentos por NOME DE MATERIAL. */
+  materials: { re: RegExp; label: string }[];
+  /** Casamentos por NOME DE MALHA. */
+  meshes: { re: RegExp; label: string }[];
+} = {
+  nodes: [
+    /* ESCOPO, E NÃO EXCLUSÃO (2026-08-16). A caixa é `hideable: true` e
+       `paintable: false` — o usuário liga e desliga a peça, e ela NUNCA troca de
+       material (perdeu a cor em 2026-08-13). Medido no `.glb`: 80 primitivas em
+       apenas 6 materiais, das quais 72 usam material EXCLUSIVO da caixa
+       (`splitTrailerHardware()` ainda separa o inox dela em runtime). Fundir
+       dentro do próprio escopo dá **80 → 6 chamadas**, com os baldes coincidindo
+       exatamente com a peça.
+       ⚠️ SE `box.paintable` VOLTAR A `true`, ESTE `scope` SAI NO MESMO COMMIT —
+       senão a tinta é aplicada malha a malha e não alcança os baldes. É a
+       invariante que sustenta a coisa toda. */
+    { re: BOX_NODE_RE, label: 'trim: caixa de cozinha', scope: 'FUSAO__caixa-ferrmantas' },
+    /* O teto continua EXCLUSÃO, e por aritmética e não por doutrina: é 1
+       primitiva de 20 triângulos no arquivo (a outra malha é gerada em runtime).
+       Não há o que agrupar. */
+    { re: ROOF_NODE_RE, label: 'trim: teto' },
+  ],
+  materials: [
+    { re: FENDER_MAT_RE, label: 'trim: paralamas' },
+    { re: TK_MAT_RE, label: 'trim: Thermo King' },
+    /* A chapa da caixa também sai por material: os dois nomes são EXCLUSIVOS
+       dela (medido — ver o bloco A CAIXA), então isto é cinto e suspensório
+       sobre o casamento por nó, e custa dois testes de regex por malha. */
+    { re: BOX_PAINTABLE_RE, label: 'trim: caixa de cozinha' },
+  ],
+  meshes: [
+    { re: ROOF_MESH_RE, label: 'trim: teto' },
+  ],
 };
 
 /** O que o usuário escolheu para uma peça. `color: null` = sem cor própria. */
@@ -347,6 +445,29 @@ function warnHidden(key: TrimKey) {
 
 /** As malhas de uma peça, agora. Varre `state.trailer` — o Thermo King é filho
  *  dele (`trailerRoot.add(tk)`), então uma varredura alcança as quatro. */
+/**
+ * As malhas de uma peça.
+ *
+ * ⚠️⚠️ O CARIMBO NÃO É CACHE, É IDENTIDADE — e sem ele duas das quatro peças são
+ * ENCONTRÁVEIS UMA VEZ SÓ.
+ *
+ * `fenders` e `thermoking` casam por MATERIAL (`anyMat`), e a primeira coisa que
+ * este arquivo faz com uma malha casada é TROCAR O MATERIAL DELA — pela demão da
+ * peça, ou pela tinta do baú. A partir daí `spec.match()` devolve false e a peça
+ * deixa de existir para este módulo: a cor entra e nunca mais sai, porque o laço
+ * que a tiraria não encontra mais nada para tirar.
+ *
+ * Era um defeito REAL e anterior a esta nota — tirar a cor do para-lama não o
+ * despintava —, e ele só não aparecia com mais força porque `followsBody: false`
+ * mantinha aquela peça fora do caminho da tinta do baú. Ao ligar o `followsBody`
+ * dela (2026-08-16, a pedido) o mesmo buraco passou a valer para a decisão mais
+ * usada da tela, e a hora de fechá-lo é esta.
+ *
+ * `userData.trimKey` é escrito no primeiro encontro e vale enquanto a MALHA
+ * existir. Um re-bake das chapas cria malhas novas, sem carimbo, que voltam a
+ * ser casadas pelo material — que é o comportamento certo: quem some é o objeto,
+ * não a regra.
+ */
 function meshesOf(key: TrimKey): THREE.Mesh[] {
   const root = state.trailer;
   if (!root) return [];
@@ -355,8 +476,15 @@ function meshesOf(key: TrimKey): THREE.Mesh[] {
   root.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
+    if (o.userData.trimKey === key) { out.push(o); return; }
+    /* Uma malha já carimbada por OUTRA peça não é reavaliada: as quatro são
+       disjuntas por construção, e um material trocado poderia fazer uma casar
+       na regra da vizinha. */
+    if (o.userData.trimKey) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (spec.match(o, mats)) out.push(o);
+    if (!spec.match(o, mats)) return;
+    o.userData.trimKey = key;
+    out.push(o);
   });
   return out;
 }
@@ -389,11 +517,21 @@ function meshesOf(key: TrimKey): THREE.Mesh[] {
  *   'both'  a tinta do baú — `state.trailerPaintMat`, o mesmo material que
  *           `setPaintTarget()` acabou de pôr em todas as chapas;
  *   'cab'   o material de fábrica, que é `origMat` quando ele existe (a peça já
- *           passou por 'both' alguma vez) e `trimOrigMat` quando não.
+ *           passou por 'both' alguma vez), `trimOrigMat` quando não, e
+ *           `trimFactoryMat` como ÚLTIMO recurso.
+ *
+ * ⚠️ O TERCEIRO SLOT NASCEU COM O PARA-LAMA (2026-08-16). Os outros dois
+ * dependem de alguém ter pintado a malha antes: `origMat` é escrito por
+ * `setPaintTarget()` (só nas chapas de `trailerPanelMeshes()`) e `trimOrigMat`
+ * por `applyTrim()` (só quando a peça ganha cor PRÓPRIA). O para-lama segue o
+ * corpo e não está em nenhum dos dois caminhos, então sem um terceiro slot ele
+ * vestia a tinta do baú e ficava com ela para sempre: desligar "Cor do cavalo"
+ * caía num `factory` indefinido, que este arquivo lê como "não mexa".
  */
 function restoreOf(key: TrimKey, mesh: THREE.Mesh): THREE.Material | THREE.Material[] | null {
   const factory = (mesh.userData.trimOrigMat
-    ?? mesh.userData.origMat) as THREE.Material | THREE.Material[] | undefined;
+    ?? mesh.userData.origMat
+    ?? mesh.userData.trimFactoryMat) as THREE.Material | THREE.Material[] | undefined;
   if (SPECS[key].followsBody && state.paintTarget === 'both') {
     return state.trailerPaintMat ?? factory ?? null;
   }
@@ -432,6 +570,21 @@ export function applyTrim() {
     }
 
     for (const mesh of meshes) {
+      /* ---- A DE FÁBRICA, GUARDADA ANTES DE QUALQUER ESCRITA ----
+         ⚠️ A PRIMEIRA COISA DO LAÇO, e a posição é o conserto. Uma peça que
+         SEGUE O CORPO sem estar em `trailerPanelMeshes()` — hoje só o para-lama
+         — recebe a tinta do baú por este mesmo laço, algumas linhas abaixo. Se
+         a de fábrica não for anotada ANTES, ela deixa de existir: `restoreOf()`
+         não tem para onde voltar e a peça fica pintada para sempre, sem
+         controle visível que a desfaça.
+
+         A guarda contra a própria tinta do baú é o que torna isto idempotente:
+         `applyTrim()` roda a cada `setPaintTarget()` e a cada reconstrução das
+         chapas, e a segunda passada em 'both' encontraria a malha já pintada —
+         anotar ALI seria gravar a tinta como se fosse a fábrica. */
+      if (!mesh.userData.trimFactoryMat && mesh.material !== state.trailerPaintMat) {
+        mesh.userData.trimFactoryMat = mesh.material;
+      }
       if (wantPaint) {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         /* O filtro de material é por MALHA, não por peça: dentro da caixa
@@ -482,7 +635,16 @@ export function applyTrim() {
    `vehicle/*`; uma chamada daqui para lá fecharia um ciclo sobre o módulo que
    monta o estúdio inteiro. É o mesmo desenho de `onTrailerPanelsRebuilt()` e
    `onMeasuresChanged()`, e pelo mesmo motivo. */
-type TrimListener = () => void;
+/* A PEÇA VAI NO AVISO, e não só o fato de algo ter mudado.
+   ---------------------------------------------------------------------------
+   O assinante original (`studio.ts`) grava a escolha inteira e não precisa
+   saber qual peça mudou. O segundo (`vehicle/livery.ts`, 2026-08-16) precisa:
+   ele refotografa a TESTEIRA quando a carcaça do Thermo King muda de cor, e um
+   aviso sem a peça o obrigaria a refotografar também quando o para-lama muda —
+   150 ms de render ortográfico para reconfirmar pixels que não podem ter
+   mudado, porque o para-lama fica abaixo da margem inferior do quadro.
+   Opcional na assinatura: quem não olha continua não olhando. */
+type TrimListener = (key?: TrimKey) => void;
 const trimListeners: TrimListener[] = [];
 export function onTrimChanged(cb: TrimListener) {
   trimListeners.push(cb);
@@ -511,7 +673,7 @@ export function setTrim(key: TrimKey, patch: Partial<TrimPiece>): TrimPiece {
      originais, repinta conforme 'cab'/'both') e chama applyTrim() no fim.
      É a mesma razão de `restoreOf()` devolver `null` para essas duas peças. */
   setPaintTarget(state.paintTarget === 'both' ? 'both' : 'cab');
-  for (const cb of trimListeners) cb();
+  for (const cb of trimListeners) cb(key);
   return { ...piece };
 }
 

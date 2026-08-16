@@ -56,7 +56,7 @@ import { setStudioCeiling, sizeStudioCeiling, disposeStudioCeiling } from './cei
 import {
   installFloorReflection, uninstallFloorReflection, renderFloorReflection,
   disposeFloorReflection, setFloorReflectionAmount, setFloorReflectionFade,
-  setFloorContact,
+  setFloorContact, releaseFloorReflectionTarget,
 } from './floor-reflection';
 import { getProfile } from '../core/quality';
 
@@ -126,8 +126,27 @@ const WALL_CLEARANCE = 14;
    parede-tangente, para a concordância não aparecer atrás do baú". A premissa
    estava certa e a conclusão invertida: a concordância aparecer atrás do baú é
    o que dá pé à sala. O que não pode aparecer é a QUINA VIVA — e disso cuida a
-   própria concordância, que continua existindo. */
-const R_FILLET = 3;
+   própria concordância, que continua existindo.
+
+   ---------------------------------------------------------------------------
+   ⚠️ 3 m → 1,2 m EM 2026-08-16, e é o MESMO defeito descendo mais um degrau.
+   O relato: *"não parece ter um canto ali, parece que o chão está flutuando"*.
+
+   A conta que fechou os 3 m continua certa e não é ela que muda: a parede reta
+   passou a começar aos 3 m, abaixo da linha do teto da cabine, e passou a
+   ocupar o quadro. O que ela não previu é quanto da FOTO a curva ainda toma.
+   Medido na captura que veio com o pedido (câmera a ~7 m, parede a 55 m): a
+   concordância de 3 m subtende 3,5° na vertical, ou seja **85 px de 1008** —
+   uma faixa gorda, e uma faixa que a chave acende MAIS que o piso e MAIS que a
+   parede (ver a rampa: 129 na parede, 227 na curva, 190 no piso). Uma barra
+   clara de 85 px entre duas superfícies mais escuras não lê como quina: lê como
+   fresta iluminada, e o que está abaixo dela lê como uma placa solta. Foi
+   literalmente o que o usuário descreveu.
+
+   1,2 m é a medida de um cove de estúdio de verdade (1 a 2 m) e subtende 1,4°,
+   ou ~35 px na mesma captura: ainda um degradê — não há risco preto de um pixel
+   —, mas estreito o bastante para o olho ler ARESTA em vez de rampa. */
+const R_FILLET = 1.2;
 /** Piso mínimo, para um rig pequeno não gerar uma sala apertada. */
 const MIN_WALL_R = 50;
 
@@ -200,11 +219,24 @@ function sizeRoom(): boolean {
 
    Ele não é zero, e também não é capricho: uma quina viva num fundo sem emenda
    vira um risco preto de um pixel em toda foto tirada na diagonal — que é o
-   defeito que o ciclorama existe para não ter. 3 m é o menor raio que ainda
-   sombreia progressivamente em vez de saltar. */
+   defeito que o ciclorama existe para não ter.
+
+   ⚠️ 3 m → 1,2 m EM 2026-08-16, junto com `R_FILLET` e pela mesma medida. O
+   relato tem uma terceira metade: *"mais pra frente tem uma parede que parece
+   curvada"*. Medido na captura, a 55 m de distância: um canto de 3 m subtende
+   3,1° na horizontal, ou seja **~110 px de 1680**, e nesses 110 px a normal
+   varre 90° inteiros — de uma parede a 95 de luminância para a vizinha a 53,
+   passando por 34 no meio. Cento e dez pixels de degradê contínuo entre dois
+   tons chapados é a definição visual de uma superfície CURVA; não há nada ali
+   que o olho possa chamar de quina.
+
+   1,2 m subtende 1,25° (~44 px), que ainda sombreia progressivamente — o risco
+   preto continua não existindo — mas já lê como aresta. Os dois raios andam
+   juntos de propósito: a quina vertical e a horizontal se encontram no canto do
+   piso, e raios diferentes deixariam ali uma transição em cunha. */
 
 /** Raio dos quatro cantos verticais, em planta e em metros. */
-const CORNER_R = 3;
+const CORNER_R = 1.2;
 /** Amostras por lado reto do contorno. */
 const SIDE_SEGS = 22;
 /** Amostras por canto. 12 não mostra faceta nem no reflexo do cromado. */
@@ -347,12 +379,60 @@ function sweepProfile(profile: THREE.Vector2[]): THREE.BufferGeometry {
    ver SEAM_BAND. Duas superfícies que se tocam têm uma fresta que recebe menos
    luz de todas as direções, e é esse fio escuro que diz ao olho que uma encosta
    na outra em vez de estar sobreposta a ela. Ele é escrito nos dois lados: aqui,
-   nos primeiros 45 cm da concordância, e em `paintGloss()`, no último metro do
-   piso. De um lado só ele viraria degrau. */
+   nos primeiros centímetros da concordância, e em `paintGloss()`, no último
+   metro do piso. De um lado só ele viraria degrau.
+
+   ===========================================================================
+   ⚠️ O PICO DA SEGUNDA LINHA ERA 0,132 E ELE ERA A BARRA ACESA — 2026-08-16.
+   ===========================================================================
+   Este é o outro dono do *"parece que o chão está flutuando"*, e ele NÃO se
+   conserta encolhendo a concordância: um raio menor deixa a barra mais fina,
+   não menos brilhante.
+
+   O QUE ESTAVA ERRADO é um erro de raciocínio, não de gosto. A rampa é ALBEDO e
+   é escrita em função de `y`; o que aparece na tela é `albedo · N·L`, e dentro
+   da concordância o `N·L` NÃO é constante — é o termo que mais varia da cena
+   inteira. A normal gira de "para cima" (no pé) para "horizontal" (no topo), e a
+   chave do preset está a 46° de elevação, ou seja a 44° da vertical. Do lado da
+   sala que encara a chave:
+
+     | ponto da curva | inclinação da normal | N·L           | contra o piso |
+     |---|---|---|---|
+     | pé (y = 0)     | 0° (ainda é piso)    | cos 44 = 0,72 | 1,00x         |
+     | y = 0,281 · R  | 44° (encara a chave) | 1,00          | **1,39x**     |
+     | topo (y = R)   | 90° (já é parede)    | cos 46 = 0,69 | 0,97x         |
+
+   Ou seja a GEOMETRIA já entrega um lóbulo de +39 % no meio da curva. A rampa
+   antiga punha o PICO DE ALBEDO (0,132 — o valor do piso) nesse mesmo ponto
+   (0,45 m sobre um raio de 3 m é 0,15·R, dentro do lóbulo), e os dois se
+   multiplicavam. Medido na captura que veio com o pedido, na mesma coluna de
+   pixels: parede 129, **concordância 227**, piso 190. A curva era a coisa mais
+   clara do quadro — mais clara que o piso polido e que a parede —, e uma barra
+   clara entre duas superfícies escuras não lê como quina: lê como fresta
+   iluminada, com uma placa solta na frente.
+
+   O CONSERTO É COMPENSAR. O albedo do pico cai para 0,090 justamente porque ali
+   `N·L` vale 1,0, e o do pé cai para 0,076 porque ali `N·L` é o do piso. O
+   produto fica quase plano ao longo da curva, com uma sobra de ~5 % no meio — o
+   bastante para a concordância existir, pouco para ela virar barra.
+
+   AS LINHAS DA CURVA SÃO DERIVADAS DE `R_FILLET`, e não cravadas: elas descrevem
+   POSIÇÕES NA CURVA (pé, lóbulo, topo), não alturas. Cravá-las faria a próxima
+   mudança de raio devolver o defeito em silêncio — que é exatamente como ele
+   nasceu.
+
+   ⚠️ DA LINHA DE 1,6 m PARA CIMA NADA MUDOU. `[4.0, 0.036]` é a medição de
+   separação figura/fundo da tabela acima e continua intocada. */
+
+/** Onde a normal da concordância encara a chave: `1 − cos(90° − keyEl)`, com a
+ *  chave do preset `ciclorama` a 46°. É o ponto de `N·L` máximo da curva. */
+const COVE_LOBE = 0.281;
+
 const RAMP: Array<[y: number, v: number]> = [
-  [0.0, 0.090],   // A JUNTA: a oclusão de contato, do lado da parede
-  [0.45, 0.132],  // logo acima dela, o pico da luz que ricocheteia do piso
-  [1.6, 0.068],   // a queda dessa luz, dentro da curva
+  [0.0, 0.076],                  // A JUNTA: a oclusão de contato, do lado da parede
+  [R_FILLET * COVE_LOBE, 0.090], // o lóbulo da curva, JÁ compensado por N·L
+  [R_FILLET, 0.075],             // topo da concordância: daqui é parede reta
+  [1.6, 0.068],   // (intocado)
   [4.0, 0.036],   // ALTURA DO VEÍCULO: o fundo tem de ficar abaixo da lataria
   [11.0, 0.029],  // parede baixa — o ponto mais escuro do quadro
   [18.0, 0.035],  // parede alta, subindo de volta rumo ao difusor
@@ -619,8 +699,22 @@ function ensureFloor(): THREE.Mesh {
    ELA ENCOLHEU JUNTO COM O RAIO. Com a concordância de 14 m, 0,6 m de folga
    ficavam a 1,3 cm de altura; com 3 m de raio, os mesmos 0,6 m já estariam a
    6 cm — uma fresta em que se enxerga a beirada do piso por baixo, de câmera
-   rasante. As duas medidas andam juntas por construção. */
-const FLOOR_OVERLAP = 0.35;
+   rasante. As duas medidas andam juntas por construção.
+
+   ⚠️ E AGORA ELAS ANDAM JUNTAS DE VERDADE — 2026-08-16. O número era CRAVADO em
+   0,35 m, o que com os 3 m de raio de então dava 2,0 cm de altura e estava
+   certo; com o raio caindo para 1,2 m (ver `R_FILLET`) os mesmos 0,35 m
+   passariam a 5,2 cm, ou seja o defeito que este bloco descreve voltaria pela
+   porta da frente, e em silêncio. Ele passa a ser DERIVADO da altura que se quer
+   (2 cm), pela geometria do quarto de círculo:
+
+       h = R − √(R² − d²)   ⇒   d = √(R² − (R − h)²)
+
+   Com R = 1,2 dá 0,218 m; com R = 3 dá 0,344 m — praticamente o número antigo, o
+   que é a conferência de que a fórmula é a mesma decisão escrita direito. */
+const FLOOR_SUBMERGE = 0.02;
+const FLOOR_OVERLAP = Math.sqrt(
+  R_FILLET * R_FILLET - (R_FILLET - FLOOR_SUBMERGE) * (R_FILLET - FLOOR_SUBMERGE));
 /** Anéis do centro à borda. Só existem para carregar a clareada nos vértices. */
 const FLOOR_RINGS = 40;
 
@@ -890,29 +984,67 @@ let lastX = NaN, lastZ = NaN;
    a CAIXA do conjunto — que muda quando o implemento é redimensionado sem o nó
    sair do lugar. Por isso vira uma comparação própria.
    Quatro comparações de número por quadro, sobre valores que `setVehicleFocus()`
-   já mantém em cache: nada é medido aqui. */
-let lastFoot = '';
+   já mantém em cache: nada é medido aqui.
+
+   ⚠️ E AGORA SÃO MESMO QUATRO COMPARAÇÕES DE NÚMERO. Até 2026-08-16 o memo era
+   uma ASSINATURA DE TEXTO — quatro `toFixed(2)`, uma concatenação e uma
+   comparação de string — construída a cada quadro do gancho, inclusive nos
+   quadros que o laço decide PULAR (`onFrame` roda sempre; ver a nota dele em
+   `scene.ts`). Cada `toFixed` formata um número em decimal e devolve uma string
+   nova, então eram cinco objetos de vida curtíssima por quadro para responder
+   "mudou?" — e a resposta é "não" em 100 % dos quadros fora de um resize.
+
+   Não vale um milissegundo, e não é por milissegundo que ele saiu: a queixa que
+   originou esta rodada é *"não sinto fluida a movimentação da câmera"*, e
+   fluidez é VARIÂNCIA. Lixo periódico de laço quente é como se compra uma pausa
+   de coletor no meio de um arrasto.
+
+   ⚠️ A TOLERÂNCIA CONTINUA EXISTINDO, e ela era o que o `toFixed(2)` fazia sem
+   dizer: comparar `float` cru faria a pegada disparar `invalidate()` por um
+   ruído de 1e-9 na caixa envolvente, e aí o laço sob demanda **nunca dormiria**.
+   1 mm é a mesma granularidade de antes, escrita como o que é. */
+const FOOT_EPS = 0.001;
+let footOn = false;
+let footCx = NaN, footCz = NaN, footHx = NaN, footHz = NaN;
 
 function syncContact() {
   const f = vehicleFootprint();
   if (!f) {
-    if (lastFoot === '') return;
-    lastFoot = '';
+    if (!footOn) return;
+    footOn = false;
+    footCx = footCz = footHx = footHz = NaN;
     setFloorContact(0, 0, 0, 0);
     invalidate();
     return;
   }
-  const sig = `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.hx.toFixed(2)},${f.hz.toFixed(2)}`;
-  if (sig === lastFoot) return;
-  lastFoot = sig;
+  if (footOn
+    && Math.abs(f.cx - footCx) < FOOT_EPS && Math.abs(f.cz - footCz) < FOOT_EPS
+    && Math.abs(f.hx - footHx) < FOOT_EPS && Math.abs(f.hz - footHz) < FOOT_EPS) return;
+  footOn = true;
+  footCx = f.cx; footCz = f.cz; footHx = f.hx; footHz = f.hz;
   setFloorContact(f.cx, f.cz, f.hx, f.hz);
   invalidate();
 }
 
+/* ---------------- o nó do RIG, achado UMA vez ----------------
+   ⚠️ `scene.getObjectByName()` é uma BUSCA EM PROFUNDIDADE NO GRAFO INTEIRO, e
+   ela estava sendo feita por quadro — de novo, inclusive em quadro pulado. O
+   custo é o pior tipo: ele não aparece quando se mede a cena vazia e cresce com
+   o acervo, porque a busca desce em toda subárvore que vier ANTES do RIG na
+   ordem de inserção (a sala, o teto, a chuva, o pool de refletores).
+
+   O nó é o mesmo enquanto o veículo estiver montado, então guarda-se a
+   referência. A revalidação é `!rig.parent`: quem troca de veículo remove o RIG
+   da cena, e um nó desparentado é exatamente o sinal de que a busca tem de ser
+   refeita. Não serve `rig.parent !== scene` — o RIG pode legitimamente pender de
+   um grupo intermediário. */
+let rigNode: THREE.Object3D | null = null;
+
 function syncCenter() {
   if (!group.visible) return;
   syncContact();
-  const rig = scene.getObjectByName('RIG');
+  if (!rigNode || !rigNode.parent) rigNode = scene.getObjectByName('RIG') ?? null;
+  const rig = rigNode;
   if (!rig) return;
   /* A SALA É REMEDIDA ANTES DO CENTRO, e o teste dela vem primeiro no `||`:
      trocar as medidas do implemento muda `maxDistance` sem mexer na posição do
@@ -981,6 +1113,36 @@ export function setCyclorama(on: boolean) {
     lastX = NaN; lastZ = NaN; syncCenter();
   } else {
     setStudioCeiling(false);
+    /* ⚠️⚠️ **O ALVO DO REFLEXO SÓ ERA SOLTO NO `unmountStudio()`, E ISSO ERA UM
+       VAZAMENTO DE CENÁRIO.**
+       `environment.ts` chama `setCyclorama(isStudio)` em toda troca de cenário.
+       Saindo do Estúdio, `group.visible` ia a false e o gancho de quadro de lá
+       embaixo passava a sair na primeira linha — a passada parava de RODAR. Mas
+       nada soltava o `WebGLRenderTarget` dela, e ninguém mais o soltaria:
+       `disposeFloorReflection()` só é alcançado por `disposeCyclorama()`, que é
+       a desmontagem do estúdio inteiro, não a troca de cenário. Ou seja **quem
+       abrisse o Estúdio uma vez e fosse para o distrito ou para a serra carregava
+       o alvo pelo resto da sessão sem desenhar um pixel nele.**
+
+       Quanto: `size × pixelRatio × 0,5` por lado, teto de 1600 × 1080, e no teto
+       são 96,7 MB (13,8 de cor RGBA16F + 4,6 de pirâmide + 6,9 de profundidade
+       D24 + 71,4 do resolve 4×) — o segundo maior item isolado de VRAM da cena,
+       atrás só dos conjuntos de chão. Num 1080p a dpr 1 são 960 × 540 e ~24 MB,
+       que continua sendo memória parada.
+
+       ⚠️ Numa integrada de memória COMPARTILHADA isto não aparece como "menos
+       fps": aparece como engasgo de meio segundo ao mover a câmera, porque o
+       driver está despejando textura para caber. É a classe de defeito que
+       nenhum ajuste de amostragem conserta — só menos bytes conserta.
+
+       `releaseFloorReflectionTarget()` e não `disposeFloorReflection()`, e a
+       diferença importa: aquele esqueceria também os CLIENTES, e o material do
+       piso continua injetado e continua vivo entre uma visita e a seguinte. Solta
+       só a memória; a injeção fica de pé, com o uniforme apontando para nada — o
+       que é inofensivo porque o piso não está sendo desenhado. Voltando ao
+       Estúdio, `ensureTarget()` realoca no primeiro `onDrawFrame`, que roda ANTES
+       do `render()` do mesmo quadro. Nenhum quadro sai sem reflexo. */
+    releaseFloorReflectionTarget();
   }
   invalidateShadows();
   invalidate();
@@ -1055,6 +1217,16 @@ export const isCycloramaOn = () => group.visible;
 export {
   setFloorReflection, isFloorReflectionOn, setFloorReflectionScale,
   floorReflectionTarget,
+  /* ⚠️ NOVO EM 2026-08-16, e ele existe porque NENHUMA RÉGUA DO PROJETO CONTINHA
+     ESTA PASSADA. O `submitTimeEma` do laço cronometra só a linha final
+     (`renderer.render(scene, camera)`), e os `drawHooks` — onde esta passada
+     mora — rodam ANTES do relógio abrir; a bancada tem o mesmo buraco, porque o
+     `4,18 ms` da fusão mede um `render()` chamado à mão, sem gancho nenhum. Ou
+     seja: a única segunda renderização completa de cena que o engine tem nunca
+     apareceu em número nenhum, nem antes nem depois da fusão.
+     `floorReflectionCost()` devolve o EMA de submissão dela e quantas já
+     rodaram. É o que fecha o A/B honesto de `setFloorReflectionScale()`. */
+  floorReflectionCost,
 } from './floor-reflection';
 
 /**

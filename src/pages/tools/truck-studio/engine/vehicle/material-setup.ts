@@ -194,8 +194,36 @@ export const textureAnisotropy = () => getProfile().anisotropyVehicle;
    5 cm sits below the 7.8 cm kernel with margin, so the cut is invisible by
    construction and not merely by inspection. `receiveShadow` stays TRUE on
    everything: a bolt is far too small to cast a shadow and exactly the right
-   size to be sitting in the truck's. */
+   size to be sitting in the truck's.
+
+   ---------------------------------------------------------------------------
+   PASSOU A SER LIDO DO PERFIL (2026-08-15), e o valor acima continua sendo o do
+   nível ALTO — ou seja, nada mudou para quem aguenta.
+
+   A aritmética inteira acima continua valendo: 5 cm é o corte INVISÍVEL, o que
+   o núcleo do PCF prova estar abaixo do que ele consegue mostrar. Os níveis
+   Média (10 cm) e Baixa (20 cm) cortam ACIMA disso, e aí a honestidade obriga a
+   dizer o que está sendo trocado: a partir de 7,8 cm o corte deixa de ser
+   demonstravelmente invisível e passa a ser uma degradação escolhida — a mesma
+   classe de decisão que `vehicle/lod.ts` documenta para o `lodMinPx`, e pelo
+   mesmo tipo de razão (a máquina não dá conta). A direção do erro continua
+   segura: `tsWorldDiameter` é COTA SUPERIOR (ver o bloco A MEDIDA FICA
+   GUARDADA), então quem corta por ele corta de MENOS, nunca de mais.
+
+   FUNÇÃO e não mais constante porque o nível muda no meio da sessão, e um valor
+   congelado no tempo de import entregaria para sempre o corte do nível em que a
+   página abriu — a mesma lição de `textureAnisotropy()` logo acima.
+
+   ⚠️ `shadowCasterMinM` é declarado por `core/quality.ts`. Enquanto ele não
+   existir, a rede devolve o 0,05 de sempre e este arquivo se comporta como
+   antes desta mudança, linha por linha. */
 const SHADOW_CASTER_MIN_M = 0.05;
+
+interface PerfilDeSombra { shadowCasterMinM?: number }
+const shadowCasterMin = () => {
+  const v = (getProfile() as unknown as PerfilDeSombra).shadowCasterMinM;
+  return typeof v === 'number' && v > 0 ? v : SHADOW_CASTER_MIN_M;
+};
 
 const _casterSphere = new THREE.Sphere();
 
@@ -222,11 +250,36 @@ export function setShadowCasters(root: THREE.Object3D) {
      carregamento, onde ninguém está olhando o contador de quadros. E ele lê o
      atributo de posição, não o índice, então continua correto depois de
      buildLiveryPanels() reescrever índices (os vértices ficam onde estão). */
-  let cast = 0, skip = 0;
+  const minM = shadowCasterMin();
+  let cast = 0, skip = 0, baldes = 0;
   root.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
     o.receiveShadow = true;
+    /* ---------------- O BALDE DECIDE PELA BANDA, NÃO PELO TAMANHO ----------
+       `vehicle/merge.ts` funde as malhas por material E POR FAIXA DE TAMANHO
+       justamente para que este corte continue valendo depois da fusão. Uma
+       malha fundida tem o diâmetro do IMPLEMENTO — medi-la aqui responderia
+       "projeta" para todo mundo e acenderia a sombra dos 483 parafusos que o
+       bloco acima acabou de provar que ninguém vê.
+
+       O que ela carrega é a borda INFERIOR da faixa dos membros, em
+       `userData.tsMergeBand`, e é ela que entra na comparação. Como as bordas
+       das faixas são exatamente os valores que `shadowCasterMinM` pode assumir,
+       trocar de nível liga e desliga baldes inteiros sem refundir nada.
+
+       ⚠️ O CONTRATO É POR `userData` DE PROPÓSITO. Este arquivo é FOLHA — o
+       pipeline offline de renders (`tools/studio-render/`) e a bancada o
+       importam para não arrastar `scene/scene.ts` junto —, então ele não pode
+       importar `vehicle/merge.ts`, que precisa da cena. Um campo em `userData`
+       atravessa a fronteira sem criar a dependência. */
+    const banda = o.userData.tsMergeBand;
+    if (typeof banda === 'number') {
+      o.castShadow = banda >= minM;
+      baldes++;
+      if (o.castShadow) cast++; else skip++;
+      return;
+    }
     const g = o.geometry;
     if (!g) { o.castShadow = false; return; }
     if (!g.boundingSphere) g.computeBoundingSphere();
@@ -262,12 +315,13 @@ export function setShadowCasters(root: THREE.Object3D) {
        `castShadow` da linha abaixo ficaria igualmente errado. Ou seja, não há um
        dever novo; há um segundo consumidor do dever que já existia. */
     o.userData.tsWorldDiameter = diameter;
-    o.castShadow = diameter >= SHADOW_CASTER_MIN_M;
+    o.castShadow = diameter >= minM;
     if (o.castShadow) cast++; else skip++;
   });
   if (skip) {
     console.info('[sombra] emissores:', cast, '· descartados', skip,
-      `(< ${SHADOW_CASTER_MIN_M * 100} cm — abaixo do filtro PCF de ~7,8 cm)`);
+      `(< ${(minM * 100).toFixed(0)} cm)`,
+      baldes ? `· ${baldes} baldes decididos pela banda` : '');
   }
 }
 
@@ -357,6 +411,68 @@ export function setupCommon(root: THREE.Object3D) {
           // Body panels / decals wrongly flagged transparent: keep texture alpha
           // (alphaTest) but WRITE depth — depthWrite=false here is what made the
           // cab look foggy/blurred (interior blending through the shell).
+          /* ---------------------------------------------------------------
+             ⚠️ E `m.transparent` CONTINUA `true` DE PROPÓSITO — a tentação de
+             virá-lo para `false` foi medida e recusada em 2026-08-16.
+             ---------------------------------------------------------------
+             O CANDIDATO. Um material marcado transparente que não é transparente
+             é o clássico "falso transparente": ele cai na lista TRANSPARENTE do
+             three, que é ordenada de trás para frente por profundidade
+             (`reversePainterSortStable`, three.module.js:7522) e portanto NÃO
+             agrupa por material — ao contrário da lista opaca, que ordena por
+             `material.id` (`painterSortStable`, :7506). Menos agrupamento é mais
+             troca de programa; e mistura ligada é mais banda de ROP. Virar
+             `transparent` para `false` devolveria as duas coisas.
+
+             ⚠️ E O EFEITO É REAL NO PROGRAMA, o que corrige uma afirmação em
+             sentido contrário registrada em `vehicle/headlight-cover.ts`: a
+             chave de cache de programa do three **inclui** `transparent`, só
+             que por um apelido. `getParameters()` publica
+             `opaque = material.transparent === false && blending === Normal &&
+             !alphaToCoverage`, e `getProgramCacheKeyBooleans()` acende o bit 17
+             da segunda máscara com ele (three.module.js:7335). Ou seja: ligar e
+             desligar `transparent` num material é recompilar aquele material.
+
+             A MEDIÇÃO QUE DERRUBOU A IDEIA — os 55 .glb de veículo do acervo,
+             lidos direto do chunk JSON (materiais glTF, alphaMode e alfa base):
+
+                 3 118 materiais · 5 241 primitivas
+                 alphaMode BLEND            385 materiais / 405 primitivas
+                 destes, alfa base >= 0,99  197 materiais / 197 primitivas
+                   · COM baseColorTexture   197
+                   · SEM fonte de alfa        0
+
+             Duas leituras, e cada uma sozinha já fecha a questão:
+
+             1. **NENHUM dos 197 é um falso transparente COMPROVADO.** Todos têm
+                `baseColorTexture`, ou seja o alfa pode estar na textura — que é
+                precisamente o motivo de este ramo preservar o recorte por
+                `alphaTest` em vez de descartá-lo. Provar o contrário exigiria
+                ler os pixels de cada mapa, e um erro nessa leitura apaga um
+                decalque (os dois piores casos nominais são
+                `t_king_slx_mat_0002_decals_2` e `..._tk_logo_3`, do Thermo King,
+                onde o alfa é o desenho);
+             2. **a população é irrelevante no quadro.** Na cena de referência
+                (Scania R 2009 4x2 + implemento + distrito) são **5 materiais /
+                5 primitivas** — 3 do volante, 2 do Thermo King — contra 552
+                chamadas de desenho pós-fusão. Menos de 1 %. E o implemento
+                inteiro não tem nenhum: os únicos 2 materiais BLEND do
+                `trailer.glb` são `lente-sinaleita-traseira` e
+                `vidro-lanternas-pisca`, com alfa base 0,06 — transparentes de
+                verdade, e é o ramo de baixo que cuida deles.
+
+             Trabalho com risco de apagar decalque, por menos de 1 % das
+             chamadas. Não entra.
+
+             ⚠️ O QUE ESTA LINHA CUSTA, dito por inteiro, para quem for medir
+             depois: `alphaTest > 0` num material que tem `map` faz
+             `WebGLShadowMap.getDepthMaterial()` alocar um material de
+             profundidade EXCLUSIVO para ele (a condição literal é
+             `material.map && material.alphaTest > 0`), em vez de reusar o
+             `_depthMaterial` compartilhado. São 5 materiais de profundidade e 5
+             programas a mais no passe de sombra da cena de referência — o preço
+             de o recorte da textura continuar valendo na sombra, que é o
+             comportamento certo. */
           m.depthWrite = true;
           m.alphaTest = Math.max(m.alphaTest || 0, 0.02);
         } else {

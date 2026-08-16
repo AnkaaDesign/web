@@ -291,10 +291,29 @@ void main() {
   float t = uTime / period + aRand * 7.31;
   float cycle = floor( t );
 
-  // sorteio novo a cada ciclo: onde cai, que tamanho tem, quanto dura, quanto marca
-  vec2 h = hash22( vec2( aRand * 137.0 + cycle, aVar.y * 91.0 - cycle * 1.7 ) );
+  /* SÓ O HASH QUE DECIDE O DESCARTE VEM ANTES DO DESCARTE.
+     ---------------------------------------------------------------------
+     Os tres hash22 eram calculados em bloco aqui em cima, e a auditoria de
+     2026-08-14 registrou o custo — ~50 ALU pagos antes do early-out de fase,
+     com ~58 % das instancias sendo descartadas DEPOIS de pagar — e concluiu
+     que "reordenar isso nao da: o lifeT que decide o descarte sai justamente
+     do segundo hash".
+
+     ⚠️ SEM CRASE EM NENHUM LUGAR DESTE BLOCO, e nao e estilo: ele mora DENTRO
+     de um template literal de JavaScript, e uma crase aqui o encerra no meio do
+     GLSL. E o mesmo aviso que floor-reflection.ts carrega no shader do piso.
+
+     A premissa esta certa e a conclusao nao. Quem decide e SO o hash g: lifeT
+     sai de g.y. O h (onde a gota cai) e o k (espessura do aro e forca do
+     respingo) nao entram no teste — eles so sao LIDOS depois dele. Descer os
+     dois para baixo do return nao muda um bit do resultado (hash22 e funcao
+     pura dos mesmos argumentos, que nao dependem de nada calculado no meio) e
+     deixa de pagar DOIS TERCOS do trabalho de hash nas instancias que nao vao
+     desenhar.
+
+     Por vertice, e sao 4 por instancia: ~34 ALU economizados em ~58 % de
+     1 400 x 4 invocacoes por quadro, com a chuva no talo. */
   vec2 g = hash22( vec2( cycle * 3.1 - aVar.z * 57.0, aRand * 11.0 + cycle ) );
-  vec2 k = hash22( vec2( aVar.x * 63.0 - cycle, cycle * 7.7 + aRand * 29.0 ) );
 
   float lifeT = mix( 0.30, 0.62, g.y );      // duração do aro, em segundos
   float phase = fract( t ) * period;         // segundos desde a batida
@@ -304,6 +323,10 @@ void main() {
     return;
   }
   float life = phase / lifeT;
+
+  // onde cai e quanto marca — só para quem sobreviveu ao teste de fase
+  vec2 h = hash22( vec2( aRand * 137.0 + cycle, aVar.y * 91.0 - cycle * 1.7 ) );
+  vec2 k = hash22( vec2( aVar.x * 63.0 - cycle, cycle * 7.7 + aRand * 29.0 ) );
 
   float radius = ( 0.04 + life * mix( 0.20, 0.46, g.x ) );
 
@@ -420,11 +443,14 @@ export function initWeather() {
      · `rainRipples` esconde o campo de ondulações inteiro no nível Baixo. São
        quads DEITADOS com `NormalBlending` e `depthWrite:false` — overdraw
        transparente sem early-Z, a categoria mais cara numa integrada — e o custo
-       de VÉRTICE deles é o que a auditoria achou de pior: os `~3× hash22`
-       (~50 ALU) das linhas 294-296 são pagos ANTES do early-out de fase
-       (`phase > lifeT`), e ~58 % das instâncias são descartadas DEPOIS de
-       pagá-los. Reordenar isso não dá: o `lifeT` que decide o descarte sai
-       justamente do segundo hash.
+       de VÉRTICE deles era o que a auditoria achou de pior: os `~3× hash22`
+       (~50 ALU) eram pagos ANTES do early-out de fase (`phase > lifeT`), e
+       ~58 % das instâncias são descartadas DEPOIS de pagá-los.
+       ⚠️ **ISSO FOI CONSERTADO EM 2026-08-16 e a conclusão antiga ("reordenar
+       não dá") era falsa**: só o hash `g` decide o descarte (é dele que sai
+       `lifeT`); `h` e `k` desceram para depois do `return`. Dois terços do
+       trabalho de hash deixaram de ser pagos em quem não desenha, sem mudar um
+       bit da imagem. Ver o bloco no `RIPPLE_VERT`.
        O que se perde: o chão molhado volta a ler como "choveu há uma hora" —
        as gotas visivelmente nunca chegam (ver o cabeçalho da seção). É uma
        perda REAL, e é por isso que ela só acontece no nível Baixo.

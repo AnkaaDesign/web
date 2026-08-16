@@ -67,7 +67,10 @@ out.push(['atravessar', st ? JSON.stringify({
   solidos: st.solidos, grupos: st.grupos, plantas: st.plantas, alvo: st.alvo,
 }) : '(não exposto)']);
 
-/* ---- contagem de triângulos e draw calls, medida no renderer ---- */
+/* ---- contagem de triângulos e draw calls, medida no renderer ----
+   Total do último quadro do laço, com o passe de sombra DENTRO: `scene.ts`
+   desligou o zeramento automático do three em 2026-08-15 justamente porque ele
+   rodava depois de `shadowMap.render()` e escondia esse passe. */
 const r = S.renderer.info.render;
 out.push(['render por quadro', `${r.triangles} triângulos, ${r.calls} draw calls`]);
 

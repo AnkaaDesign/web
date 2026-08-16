@@ -16,6 +16,14 @@ import '../../src/pages/tools/truck-studio/engine/ui/selector.css';
 import '../../src/pages/tools/truck-studio/engine/ui/loader.css';
 import '../../src/pages/tools/truck-studio/engine/ui/hud.css';
 import '../../src/pages/tools/truck-studio/engine/ui/paint-panel.css';
+/* ⚠️ ESTA LISTA É UMA CÓPIA DA DE `src/pages/tools/truck-studio/index.tsx`, E AS
+   DUAS TÊM DE ANDAR JUNTAS. Um `.css` que exista lá e falte aqui não quebra a
+   bancada com erro nenhum: o componente aparece SEM ESTILO, e como
+   `position: absolute` é justamente uma das coisas que a folha traz, ele cai no
+   fluxo normal e some da foto — enquanto todos os portões de comportamento
+   continuam passando. Foi assim que o criador de vídeo (2026-08-16) apareceu
+   "funcionando e invisível" na primeira rodada. */
+import '../../src/pages/tools/truck-studio/engine/ui/timeline.css';
 
 import { mountStudio } from '../../src/pages/tools/truck-studio/engine';
 import * as sceneMod from '../../src/pages/tools/truck-studio/engine/scene/scene';

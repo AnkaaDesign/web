@@ -65,6 +65,26 @@ export const ROOT_ASSETS = {
 export const BRAND_ASSETS = {
   /** Logotipo Ankaa. Também embutido nos e-mails pela API — ver nota abaixo. */
   logo: "/branding/logo.png",
+  /**
+   * A vinheta de encerramento dos vídeos do Estúdio 3D — a estrela montando o
+   * logotipo sobre um fundo cinza, 1280 × 720 a 24 fps, 7,8 s.
+   *
+   * ⚠️ ELA JÁ VEM CORTADA E SEM ÁUDIO, e as duas coisas são decisão de asset e
+   * não de código. O original tinha 10 s, e os 2,2 s iniciais eram fundo vazio —
+   * *"a animação está demorando muito iniciar, então corte o início"*. E a faixa
+   * de áudio saiu porque o gravador não tem trilha (ver `scene/record.ts`): ela
+   * seria 160 KB baixados para nada em toda gravação.
+   *
+   * ⚠️⚠️ SÃO DOIS ARQUIVOS, E O WEBM É O PREFERIDO. Não é redundância: um
+   * `<video>` com H.264 **derruba o processo de GPU** no
+   * `chrome-headless-shell` (medido — o contexto WebGL é perdido e a gravação
+   * inteira sai preta), e o VP9 não. O mesmo par existe do outro lado do
+   * estúdio, no gravador, e pela mesma razão: codec livre onde ele basta,
+   * proprietário só como reserva. `scene/outro.ts` escolhe por `canPlayType`.
+   * O VP9 ainda por cima pesa 295 KB contra 1,5 MB do MP4.
+   */
+  studioOutroWebm: "/branding/outro.webm",
+  studioOutroMp4: "/branding/outro.mp4",
   /** Assinatura digitalizada do diretor comercial, usada no PDF do Orçamento. */
   directorSignature: "/branding/sergio-signature.webp",
 } as const;

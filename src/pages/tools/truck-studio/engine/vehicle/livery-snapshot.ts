@@ -83,6 +83,18 @@ export interface FaceSnapshot {
   box: { x: number; y: number; w: number; h: number };
   /** A área pintável, MEDIDA na própria ferragem — ver `PaintRect`. */
   paint: PaintRect;
+  /**
+   * ONDE O THERMO KING CAI NO RETRATO — só na testeira, e só quando ele existe
+   * e está visível. Mesmas frações de `box`.
+   *
+   * Não é decoração: o Thermo King é uma CAMADA da testeira (ver a linha fixa
+   * dele em `ui/livery-editor.ts`) e clicar nele no palco selecionava o Fundo,
+   * porque o palco não tinha como saber que aquela região da FOTO é uma peça.
+   * O retângulo sai da MESMA câmera que produziu a foto, então ele está em
+   * registro com ela por construção — qualquer segunda conta divergiria na
+   * primeira medida digitada.
+   */
+  tk?: { x: number; y: number; w: number; h: number };
 }
 
 /* O QUADRO É A CHAPA — "do frame metálico para dentro, nada do chassi".
@@ -504,10 +516,48 @@ function measurePaintRect(crop: HTMLCanvasElement): PaintRect {
   return r;
 }
 
+/**
+ * Onde uma subárvore cai no quadro desta câmera, em frações [0..1] com y para
+ * baixo — o mesmo sistema de `FaceSnapshot.box`.
+ *
+ * `null` quando ela não existe, está escondida ou cai inteiramente fora.
+ *
+ * `Box3.setFromObject()` e não medição por vértice, e aqui isso é DELIBERADO:
+ * o resto deste módulo proíbe a caixa de nó girado porque as medidas dele viram
+ * geometria (o quadro, o datum, a área pintável). Este retângulo é um ALVO DE
+ * CLIQUE. A unidade está alinhada ao implemento a menos da inclinação de engate
+ * (~0,5°), o que sobre 2 m de carcaça dá 17 mm de folga — folga a mais num alvo
+ * de clique é o lado certo de errar, e percorrer os vértices das cinco malhas
+ * dela a cada retrato não seria.
+ */
+function projetarNoQuadro(
+  alvo: THREE.Object3D | null | undefined, cam: THREE.Camera, wPx: number, hPx: number,
+): { x: number; y: number; w: number; h: number } | null {
+  if (!alvo || !alvo.visible) return null;
+  for (let n: THREE.Object3D | null = alvo; n; n = n.parent) if (!n.visible) return null;
+  const b = new THREE.Box3().setFromObject(alvo);
+  if (b.isEmpty()) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const p = new THREE.Vector3();
+  for (let i = 0; i < 8; i++) {
+    p.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z);
+    p.project(cam);
+    const px = (p.x * 0.5 + 0.5) * wPx;
+    const py = (0.5 - p.y * 0.5) * hPx;
+    if (px < x0) x0 = px; if (px > x1) x1 = px;
+    if (py < y0) y0 = py; if (py > y1) y1 = py;
+  }
+  x0 = Math.max(0, x0); y0 = Math.max(0, y0);
+  x1 = Math.min(wPx, x1); y1 = Math.min(hPx, y1);
+  if (!(x1 > x0 && y1 > y0)) return null;
+  return { x: x0 / wPx, y: y0 / hPx, w: (x1 - x0) / wPx, h: (y1 - y0) / hPx };
+}
+
 interface RawShot { bgCanvas: HTMLCanvasElement; snap: FaceSnapshot }
 
 function snapFace(
   scene: THREE.Scene, panel: THREE.Mesh, alsoHide: THREE.Object3D[],
+  tk: THREE.Object3D | null,
 ): RawShot | null {
   const lb = attrBox(panel);
   const key: SnapshotKey = panel.name === 'SIDE_L' ? 'left'
@@ -792,6 +842,11 @@ function snapFace(
   /* A ÁREA PINTÁVEL sai do recorte da frente, que é onde a ferragem está. */
   const paint = measurePaintRect(crop);
 
+  /* E ONDE O THERMO KING CAIU, na MESMA câmera. Só na testeira: ele é montado
+     na parede dianteira e não aparece em nenhuma outra face — ver
+     `placeThermoKing()` em models.ts. */
+  const tkRect = key === 'front' ? projetarNoQuadro(tk, cam, wPx, hPx) : null;
+
   return {
     /* O canvas do FUNDO viaja separado da estrutura: ele ainda vai ser
        codificado, e a codificação é assíncrona (ver `encodeBg`). Um campo
@@ -804,6 +859,7 @@ function snapFace(
       ar: wPx / hPx,
       box: { x: bx / wPx, y: by / hPx, w: bw / wPx, h: bh / hPx },
       paint,
+      ...(tkRect ? { tk: tkRect } : {}),
     },
   };
 }
@@ -894,16 +950,28 @@ export async function takeFaceSnapshots(
   onFace: (key: SnapshotKey, snap: FaceSnapshot) => void,
   /** O que mais tem de sair de cena durante o disparo — hoje, o cavalo. */
   alsoHide: THREE.Object3D[] = [],
+  /** A unidade de refrigeração, para o retângulo de clique da testeira. */
+  tk: THREE.Object3D | null = null,
+  /**
+   * SÓ ESTAS FACES, quando quem chama sabe que só uma mudou.
+   *
+   * Existe por causa da cor do Thermo King: ela muda a testeira e mais nada, e
+   * refotografar as quatro faces por causa dela é pagar ~0,7 s e três renders
+   * de 2 816 px por um pixel que não mudou. `undefined` = todas, que é o caminho
+   * do rebuild (lá tudo mudou mesmo).
+   */
+  only?: readonly SnapshotKey[],
 ): Promise<void> {
   const names: Record<string, SnapshotKey> = {
     SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear', FRONT: 'front',
   };
+  const querida = only ? new Set(only) : null;
   const panels: [SnapshotKey, THREE.Mesh][] = [];
   trailerRoot.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
     const key = names[o.name];
-    if (key) panels.push([key, o]);
+    if (key && (!querida || querida.has(key))) panels.push([key, o]);
   });
 
   for (const [key, mesh] of panels) {
@@ -917,7 +985,7 @@ export async function takeFaceSnapshots(
        entre as duas e nenhuma face divide tarefa com nada. */
     await nextFrame();
     try {
-      const shot = snapFace(scene, mesh, alsoHide);
+      const shot = snapFace(scene, mesh, alsoHide, tk);
       if (!shot) continue;
       logExposure(key, shot.bgCanvas);
       shot.snap.bg = await encodeBg(shot.bgCanvas);

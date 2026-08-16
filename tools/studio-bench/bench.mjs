@@ -64,6 +64,13 @@ const MIME = {
   '.wasm': 'application/wasm', '.glb': 'model/gltf-binary', '.hdr': 'image/vnd.radiance',
   '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml', '.bin': 'application/octet-stream',
+  /* ⚠️ `.mp4` ENTROU COM A VINHETA DE ENCERRAMENTO (2026-08-16), e a falta dele
+     não dava 404 — dava `application/octet-stream`, com o qual o `<video>` lê os
+     metadados e NUNCA chega a `canplaythrough`. O sintoma foi uma gravação
+     inteira preta, porque a espera pelo evento que não vinha acontecia no meio
+     da preparação, com o laço já parado. Um tipo errado é pior que um arquivo
+     ausente: ele passa por meio-certo. */
+  '.mp4': 'video/mp4', '.webm': 'video/webm',
 };
 
 async function bundle() {
@@ -132,14 +139,52 @@ async function startServer(port = 0) {
       let file = null;
       if (path.startsWith('/studio-assets/v1/')) {
         file = safeJoin(resolve(ASSETS_ROOT), '/' + path.slice('/studio-assets/v1/'.length));
-      } else if (path.startsWith('/vendor/') || path.startsWith('/fonts/')) {
+      } else if (path.startsWith('/vendor/') || path.startsWith('/fonts/')
+        /* `/branding/` entrou em 2026-08-16 com a MARCA D'ÁGUA do vídeo. Como o
+           decodificador Draco e as fontes, o logotipo é servido pelo WEB e não
+           pela árvore do studio (ver `BRAND_LOGO` em `core/paths.ts`) — uma
+           bancada que não o servisse faria toda gravação sair com a ressalva "a
+           marca d'água não pôde ser carregada", que é o caminho de degradação
+           passando por certo e escondendo o que se queria medir. */
+        || path.startsWith('/branding/')) {
         file = safeJoin(join(WEB, 'public'), path);
       }
       if (!file) { res.writeHead(404); return res.end('404'); }
       const s = await stat(file);
+      /* ---------------- REQUISIÇÃO PARCIAL (HTTP Range) ----------------
+         ⚠️ ENTROU COM A VINHETA DE ENCERRAMENTO (2026-08-16), e a falta dela não
+         dava erro nenhum: dava um `<video>` com `readyState 4`, a duração certa,
+         e **`seekable` vazio** — ou seja, `currentTime = 3` era silenciosamente
+         aparado para 0. O laço offline da vinheta busca quadro a quadro, então o
+         fecho saía CONGELADO no primeiro quadro, sete segundos de fundo parado.
+
+         Um navegador só habilita a busca em mídia quando o servidor anuncia
+         `Accept-Ranges` — ter o arquivo inteiro em memória não basta. Todo host
+         estático de verdade (o Vite, o Nginx da API) responde a Range; uma
+         bancada que não respondesse mediria um comportamento que a produção não
+         tem, que é exatamente o que ela existe para não fazer. */
+      const tipo = MIME[extname(file).toLowerCase()] || 'application/octet-stream';
+      const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (range) {
+        const ini = range[1] ? Number(range[1]) : 0;
+        const fim = range[2] ? Math.min(Number(range[2]), s.size - 1) : s.size - 1;
+        if (ini >= s.size || fim < ini) {
+          res.writeHead(416, { 'content-range': `bytes */${s.size}` });
+          return res.end();
+        }
+        res.writeHead(206, {
+          'content-type': tipo,
+          'content-length': fim - ini + 1,
+          'content-range': `bytes ${ini}-${fim}/${s.size}`,
+          'accept-ranges': 'bytes',
+          'access-control-allow-origin': '*',
+        });
+        return createReadStream(file, { start: ini, end: fim }).pipe(res);
+      }
       res.writeHead(200, {
-        'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream',
+        'content-type': tipo,
         'content-length': s.size,
+        'accept-ranges': 'bytes',
         /* O MESMO cabeçalho da API (api/src/main.ts). Não é cosmética: o
            pré-aquecimento do `core/prefetch.ts` só compensa se a resposta for
            armazenável, e uma bancada que servisse sem cache mediria um
@@ -310,9 +355,21 @@ function cdp(ws) {
 }
 
 /** Avalia no navegador e devolve o valor. Erros da página viram erros aqui. */
+/* A LINHA DE COMANDO CHEGA À PÁGINA, e é por isso que um check pode ser
+   PARAMETRIZADO. Sem isto, um check que precise rodar em lotes (a frota da
+   placa são 47 cabines, ~50 s cada, muito além de qualquer prazo razoável numa
+   corrida só) só tinha um caminho: editar o arquivo entre as corridas. `argv` é
+   o array cru, e o check lê com o helper que quiser:
+
+       const marca = (window.__benchArgv || []).includes('--marca')
+         ? window.__benchArgv[window.__benchArgv.indexOf('--marca') + 1] : null;
+
+   Não muda nada para quem não lê — é uma variável a mais no escopo global da
+   página de teste. */
 async function evalIn(send, session, expr) {
+  const argv = JSON.stringify(ARGV);
   const r = await send('Runtime.evaluate', {
-    expression: `(async () => { ${expr} })()`,
+    expression: `(async () => { window.__benchArgv = ${argv}; ${expr} })()`,
     awaitPromise: true, returnByValue: true,
   }, session);
   if (r.exceptionDetails) {
@@ -385,6 +442,21 @@ async function main() {
       await (await import('node:fs/promises')).mkdir(join(HERE, 'shots'), { recursive: true });
       await writeFile(file, Buffer.from(value.split(',')[1], 'base64'));
       console.log(`  =    ${name} → ${file}`);
+      continue;
+    }
+    /* ---- VÍDEO, pelo mesmo motivo e com um a mais (2026-08-15) ----
+       O gravador passou a montar o arquivo à mão (WebCodecs + mediabunny), e
+       validar isso DENTRO do navegador que o produziu é fraco: se o carimbo de
+       tempo estiver errado por um fator de 10⁶, o mesmo motor que escreveu o
+       erro é quem leria o arquivo de volta. Gravando em disco, o juiz passa a
+       ser externo — `ffprobe -show_entries stream=r_frame_rate,nb_frames`. */
+    if (typeof value === 'string' && value.startsWith('data:video/')) {
+      const ext = /mp4/.test(value.slice(0, 30)) ? '.mp4' : '.webm';
+      const file = join(HERE, 'shots', name.replace(/[^\w.-]+/g, '_') + ext);
+      await (await import('node:fs/promises')).mkdir(join(HERE, 'shots'), { recursive: true });
+      const bytes = Buffer.from(value.split(',')[1], 'base64');
+      await writeFile(file, bytes);
+      console.log(`  =    ${name} → ${file} (${(bytes.length / 1048576).toFixed(2)} MB)`);
       continue;
     }
     const info = value === true || value === false ? '' : ' → ' + JSON.stringify(value);

@@ -29,7 +29,9 @@
 
    A única exceção é `DRACO_DECODER_DIR`: continua absoluto e continua no web —
    é dependência de build vendorizada, não asset de cena. Ver `VENDOR_ASSETS`. */
-import { STUDIO_ASSETS, STUDIO_ASSETS_BASE, VENDOR_ASSETS } from '@/config/assets';
+import {
+  BRAND_ASSETS, STUDIO_ASSETS, STUDIO_ASSETS_BASE, VENDOR_ASSETS,
+} from '@/config/assets';
 
 /**
  * Raiz de onde a árvore do studio é servida — sem barra no fim
@@ -72,3 +74,28 @@ export const RENDERS_DIR = STUDIO_ASSETS.rendersDir;
  * por `assetUrl()`. Ver a nota em `VENDOR_ASSETS.dracoDecoderDir`.
  */
 export const DRACO_DECODER_DIR = VENDOR_ASSETS.dracoDecoderDir;
+
+/**
+ * `/branding/logo.png` — o logotipo Ankaa, usado como MARCA D'ÁGUA do vídeo.
+ *
+ * ⚠️ ABSOLUTO E SERVIDO PELO WEB, como o `DRACO_DECODER_DIR` e ao contrário de
+ * todo o resto daqui: **NÃO passe por `assetUrl()`**. Ele não é asset de cena —
+ * não vive na árvore de ~300 MB sob `STUDIO_BASE`, vive em `web/public/` junto
+ * com o favicon, e é o MESMO arquivo que os e-mails da API embutem (ver o ⚠️ de
+ * `BRAND_ASSETS.logo`). Prefixá-lo com a base do studio daria um 404 mudo.
+ */
+export const BRAND_LOGO = BRAND_ASSETS.logo;
+
+/**
+ * A vinheta de encerramento dos vídeos, nos DOIS contêineres — o WebM primeiro,
+ * que é a ordem de preferência. Ver o ⚠️⚠️ de `BRAND_ASSETS.studioOutroWebm`:
+ * um `<video>` com H.264 derruba o processo de GPU em alguns motores, e o VP9
+ * não.
+ *
+ * Mesma natureza e mesma armadilha do `BRAND_LOGO`: **absolutos, servidos pelo
+ * WEB, e NÃO passam por `assetUrl()`**.
+ */
+export const BRAND_OUTRO: readonly { url: string; type: string }[] = [
+  { url: BRAND_ASSETS.studioOutroWebm, type: 'video/webm; codecs="vp9"' },
+  { url: BRAND_ASSETS.studioOutroMp4, type: 'video/mp4; codecs="avc1.640028"' },
+];

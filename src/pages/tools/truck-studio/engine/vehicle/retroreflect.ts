@@ -162,6 +162,79 @@ const RETRO_GANHO = 2.6;
 /** O piso "esta superfície é fita", ainda multiplicado por N·L e pela cor da luz. */
 const RETRO_BASE = 0.30;
 
+/* ===========================================================================
+   O TETO MACIO — por que a fita vermelha saía LARANJA. (2026-08-16)
+   ===========================================================================
+   O relato: *"a faixa refletiva fica muito alaranjada quando está com luz, fica
+   muito estranha; queria que ficasse mais vermelha"*. Ele veio com as duas
+   fotos que provam a queixa, e as duas foram medidas pixel a pixel:
+
+     · na lateral ampla, com a fita de perfil ......... (234, 57, 49)  VERMELHO
+     · no close, com a fita encarando a chave ......... (255, 168, 136) LARANJA
+
+   É a MESMA fita, o MESMO material e a MESMA textura. O que muda é só quanta
+   luz ela devolve — e a passagem de uma para a outra não é uma perda de
+   saturação qualquer: é uma propriedade conhecida da ACES, e a conta fecha.
+
+   O QUE A ACES FAZ COM UM VERMELHO FORTE. `ACESFilmicToneMapping` (scene.ts)
+   começa multiplicando pela matriz de entrada, cuja primeira coluna é
+
+       [ 0,59719 ; 0,07600 ; 0,02840 ]
+
+   ou seja **7,6 % do canal VERMELHO é despejado no VERDE antes de qualquer
+   compressão**. Num vermelho de baixa intensidade isso é invisível: 7,6 % de
+   pouco é nada. Num vermelho estourado é o valor dominante do canal verde, e a
+   curva ainda comprime o vermelho (que já saturou) mais do que o verde (que
+   ainda tem folga). O resultado é literal: quanto mais forte a luz, mais verde
+   a ACES FABRICA, e o vermelho anda para laranja. Rodada a cadeia inteira com
+   albedo (0,55; 0,03; 0,03) e a exposição deste preset (0,95 x 1,05):
+
+     | multiplicador sobre o albedo | linear   | na tela          |
+     |---|---|---|
+     | 1,0x | 0,55 | (210,  34,  42) vermelho |
+     | 1,5x | 0,83 | (237,  65,  60) vermelho — **é a foto boa** |
+     | 2,5x | 1,38 | (255, 108,  90) já saiu |
+     | 5,0x | 2,75 | (255, 168, 136) **é a foto ruim, no pixel** |
+
+   ⚠️ NÃO É UM DEFEITO DE COR, É UM DEFEITO DE NÍVEL. Mexer no albedo, na
+   textura ou na cor da luz não conserta: o que tem de parar é a fita chegar a
+   5x. E ela chegava com folga — só a chave do `ciclorama` vale 3,4 e o lóbulo
+   vale 0,30 + 2,6 = 2,90, ou seja **9,86x** no pico, com o recorte por cima.
+   Um lóbulo de 986 % de retorno também não é fisicamente coisa nenhuma: lâmina
+   prismática nenhuma devolve dez vezes o que recebe.
+
+   O CONSERTO É UM TETO, e ele é do tipo certo: a lâmina real SATURA. Acima de um
+   ponto, mais luz sobre a fita não a deixa mais clara — deixa a foto mais
+   estourada, que é outra coisa. Então o somatório passa por um joelho de
+   Reinhard PARCIAL:
+
+       y = min(x, J)  +  F · s/(F + s),   com s = max(x − J, 0)
+
+   Abaixo de `J` ele é a identidade EXATA — nada muda no regime em que o pedido
+   original foi calibrado —, a derivada em `s = 0` vale 1 (não há quina) e a
+   assíntota é `J + F`. Com J = 0,55 e F = 0,85 o teto é 1,40:
+
+     · o piso de dia (chave a 3,4, lóbulo rasante = 0,30) vai de 1,02 para 0,86,
+       ou seja −16 %: a leitura "esta superfície é muito mais clara que a chapa
+       ao lado", que o bloco do custo por fragmento defende, continua de pé;
+     · o pico vai de 9,86 para 1,33, que na tabela acima é vermelho e não
+       laranja;
+     · o segmento BRANCO continua estourando para branco, como deve.
+
+   POR QUE REINHARD E NÃO `exp()`: as duas formas são C¹ e assintóticas, e esta
+   custa uma divisão de vec3 contra três funções especiais. O arquivo já trocou
+   um `pow` por multiplicações pela mesma razão — ver `lobuloGLSL()`.
+
+   POR QUE POR CANAL E NÃO NA LUMINÂNCIA: `tsRetro` carrega a COR DA LÂMPADA, e
+   um teto escalar a lavaria. A cor da FITA entra depois, no albedo, e não passa
+   pelo joelho — é o que garante que o conserto muda o NÍVEL sem tocar no matiz.
+
+   ⚠️ QUEM MEXER AQUI: o número que se ajusta é `RETRO_TETO_FOLGA`. Baixá-lo
+   escurece só o pico; baixar `RETRO_TETO_JOELHO` junto tira também o piso, que é
+   o que faz a fita existir de dia. São dois botões e eles não são o mesmo. */
+const RETRO_TETO_JOELHO = 0.55;
+const RETRO_TETO_FOLGA = 0.85;
+
 /**
  * O LÓBULO SEM `pow`, quando dá — e com `RETRO_K = 4` sempre dá.
  *
@@ -253,10 +326,22 @@ const MAIN = /* glsl */`
       tsRetro += tsRetroTermo( tsLuz.color, tsLuz.direction, geometryNormal, geometryViewDir );
     }
   #endif
+  /* O TETO MACIO, ANTES DO ALBEDO — ver o bloco do TETO MACIO no cabecalho.
+     Abaixo do joelho e a identidade exata; acima dele a fita para de clarear.
+     Ele fica AQUI, no somatorio, e nao dentro de tsRetroTermo(): o que estoura
+     e a SOMA das fontes, e um teto por fonte deixaria duas luzes fracas
+     somarem alem dele. */
+  vec3 tsSobra = max( tsRetro - TS_RETRO_JOELHO, 0.0 );
+  tsRetro = min( tsRetro, TS_RETRO_JOELHO )
+    + TS_RETRO_FOLGA * tsSobra / ( TS_RETRO_FOLGA + tsSobra );
   /* A COR DA FITA ENTRA, e é o que faz a faixa vermelha devolver vermelho e a
      branca devolver branco: diffuseColor.rgb ja e o albedo texturizado do
      material naquele fragmento. Sem isto a fita inteira devolveria a cor da
      lampada e as faixas alternadas sumiriam.
+     ⚠️ Ela entra DEPOIS do teto, de proposito: o teto limita o NIVEL e o albedo
+     escolhe o MATIZ. Invertida a ordem, o teto passaria a cortar o vermelho e o
+     branco em pontos diferentes e a fita mudaria de cor com a luz — que e
+     exatamente o defeito que ele existe para consertar.
      NADA DE CRASE AQUI — ver o aviso no cabecalho deste arquivo. */
   reflectedLight.directSpecular += tsRetro * diffuseColor.rgb;
 }
@@ -296,12 +381,14 @@ function injetar(mat: THREE.MeshStandardMaterial) {
          ou já foi impresso pelo próprio `lobuloGLSL()`.) */
       .replace(/TS_RETRO_LOBULO/g, LOBULO)
       .replace(/TS_RETRO_BASE/g, num(RETRO_BASE))
-      .replace(/TS_RETRO_GANHO/g, num(RETRO_GANHO));
+      .replace(/TS_RETRO_GANHO/g, num(RETRO_GANHO))
+      .replace(/TS_RETRO_JOELHO/g, num(RETRO_TETO_JOELHO))
+      .replace(/TS_RETRO_FOLGA/g, num(RETRO_TETO_FOLGA));
   };
   /* Sem isto o three serve o programa CACHEADO, sem a injeção, para o segundo
      material em diante — a chave de cache dele não conhece onBeforeCompile. */
   mat.customProgramCacheKey = function () {
-    return 'ts-retro-v1|' + (antesChave ? antesChave.call(this) : '');
+    return 'ts-retro-v2|' + (antesChave ? antesChave.call(this) : '');
   };
   mat.needsUpdate = true;
   return true;
@@ -341,6 +428,10 @@ export function registerRetroreflective(root: THREE.Object3D | null | undefined)
 export function getRetroreflective() {
   return {
     materiais: contados, k: RETRO_K, ganho: RETRO_GANHO, base: RETRO_BASE,
+    /* O teto macio, e o valor em que ele satura — ver o bloco do TETO MACIO.
+       `teto` é o número que se compara com a tabela de tela daquele bloco. */
+    joelho: RETRO_TETO_JOELHO, folga: RETRO_TETO_FOLGA,
+    teto: +(RETRO_TETO_JOELHO + RETRO_TETO_FOLGA).toFixed(3),
     /* Confere, do console, que o lóbulo saiu sem `pow`. Se alguém mexer em
        `RETRO_K` e isto virar `false`, o custo por luz subiu — ver `lobuloGLSL()`. */
     lobuloSemPow: !LOBULO.includes('pow('),

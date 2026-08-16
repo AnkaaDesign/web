@@ -17,6 +17,11 @@ import "./engine/ui/selector.css";
 import "./engine/ui/loader.css";
 import "./engine/ui/hud.css";
 import "./engine/ui/paint-panel.css";
+/* O criador de vídeo (a linha do tempo de câmera). Como as outras quatro, ele
+   só LÊ os tokens de studio.css e não redeclara nenhum seletor de lá — que é a
+   propriedade que faz a ordem destes imports não ser carregante. Ver a nota
+   logo abaixo. */
+import "./engine/ui/timeline.css";
 
 /**
  * Truck Studio — configurador 3D (visualizador three.js + editor de plotagem

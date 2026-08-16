@@ -1,7 +1,23 @@
-/* O LOD POR TAMANHO EM TELA — e a primeira coisa a dizer sobre ele é que ele
-   NÃO é de graça.
+/* O LOD POR TAMANHO EM TELA — ⚠️⚠️ **APOSENTADO EM 2026-08-15.**
    ===========================================================================
-   ⚠️⚠️ **NÃO CHAME ISTO DE "CORTE SUB-PIXEL".** A tentação é enorme e a
+   ┌───────────────────────────────────────────────────────────────────────────┐
+   │ `lodMinPx` vale **0 nos TRÊS níveis**. Nenhuma tabela de `core/quality.ts`  │
+   │ liga este mecanismo. O código abaixo continua correto, testado e de pé —   │
+   │ ele só não é acionado por ninguém.                                        │
+   └───────────────────────────────────────────────────────────────────────────┘
+
+   POR QUE O ARQUIVO NÃO FOI APAGADO: ele carrega a MEDIÇÃO, e a medição é boa.
+   A distribuição de tamanhos do `trailer.glb`, a aritmética de pixel projetado e
+   a máquina de posse positiva de `.visible` não existem em nenhum outro lugar
+   deste repositório. Apagar o arquivo perderia tudo isso e a próxima pessoa
+   reinventaria o LOD do zero — provavelmente pelo mesmo raciocínio errado.
+
+   ---------------------------------------------------------------------------
+   POR QUE ELE FOI APOSENTADO — três achados, e cada um bastaria
+
+   **1. Ele era o único botão do perfil que apagava PEÇA DO CAMINHÃO.**
+
+   ⚠️⚠️ **NUNCA CHAME ISTO DE "CORTE SUB-PIXEL".** A tentação é enorme e a
    aritmética a desmente. A lente do estúdio é `CARD_FOV = 30°` (scene.ts:590) e
    `setVehicleFocus()` prende a órbita entre ~8,6 e ~22,4 m. Com isso o tamanho
    projetado de uma peça é
@@ -23,15 +39,62 @@
        < 50   mm →   592 prims / 697 996 tri
        < 100  mm → 1 045 prims / 1 174 034 tri
 
-   **CONCLUSÃO, e ela é o cabeçalho deste arquivo: este LOD CUSTA QUALIDADE.**
-   Ele vale ~600 chamadas de desenho e ~0,7 M de triângulos por quadro no nível
-   Médio, e isso é muito — mas o que ele tira do quadro é parafusaria e ferragem
-   que o olho VÊ, ainda que pequena. É degradação legítima para os níveis Média e
-   Baixa, escolhida por quem clicou em "Baixa" ou por um medidor que já provou
-   que a máquina não dá conta. É por isso que `lodMinPx` vale **0 no nível Alto**
-   e por isso que a captura roda no TETO. Chamar isto de otimização invisível
-   seria mentir, e a mentira apareceria como "sumiram os parafusos do meu
-   caminhão" — que é um relato de defeito, não de desempenho.
+   As tabelas antigas usavam **1,5 px no Médio e 3,0 px no Baixo**. Nessa faixa
+   some parafusaria e ferragem que o olho VÊ. É metade literal do relato que
+   originou esta passagem: *"no baixo a qualidade visual fica horrível"*.
+
+   E é a régua do portão de aceitação
+   (`tools/studio-bench/checks-aceitacao.mjs`), escrita como um inteiro sem
+   interpretação: **a contagem de malhas VISÍVEIS do veículo tem de ser IDÊNTICA
+   nos três níveis.** Com `lodMinPx > 0` ela não é, e o portão reprova — com
+   razão.
+
+   **2. Ele não tocava o passe de sombra, que é metade do problema.**
+
+   Medido em `GARGALO-2026-08-15.md` §1.1: das 588 chamadas que o LOD tirava do
+   nível Médio, **ZERO** saíam do passe de sombra. O motivo é bonito e ninguém
+   tinha percebido: `setShadowCasters()` já tira do passe de sombra tudo abaixo
+   de 5 cm, que é exatamente a população que este LOD mais toca. **As duas
+   otimizações se sobrepunham**, e o contador de chamadas escondia isso porque
+   `renderer.info.render.calls` nunca contou o passe de sombra (o `info.reset()`
+   do three 0.179.1 roda na linha 16477, DEPOIS do `shadowMap.render()` da
+   16471). O passe de sombra são **1 574 das 3 804 chamadas** de um quadro de
+   arrasto no nível Alto.
+
+   **3. A fusão por material o deixou sem assunto.**
+
+   `mergeVehicle: 'all'` funde o veículo por material: 2 146 malhas → 104, e o
+   passe principal cai de 2 230 para **168 chamadas**, com quadro 14,9× mais
+   rápido e **triângulos idênticos**. Este LOD existe para tirar CHAMADAS DE
+   DESENHO. Depois da fusão não há chamada para tirar — e, pior, as malhas
+   fundidas têm diâmetro de mundo grande por construção, então o registro abaixo
+   não encontraria quase nada para registrar.
+
+   ---------------------------------------------------------------------------
+   O QUE O RESSUSCITARIA
+
+   Uma condição, e ela é específica: **um quadro em que a contagem de chamadas
+   volte a dominar, com a fusão indisponível.** Concretamente:
+
+     · `mergeVehicle` em `'off'` ou `'floor'` — porque um dono novo (a lista está
+       em `GARGALO-2026-08-15.md` §6.3: `vehicle/trim.ts` casa por NÓ,
+       `setTrailerDims()` regenera o corpo branco) obrigou a tirar uma faixa
+       grande da fusão; **e**
+     · um acervo novo que volte a trazer milhares de primitivas separadas — o
+       `trailer.glb` de hoje tem 2 157 primitivas e **nenhuma** instância de GPU,
+       enquanto o `set.glb` do distrito faz 805 árvores em ~2 chamadas com
+       `EXT_mesh_gpu_instancing`. Um acervo consertado (§6.5) reduz a chance
+       ainda mais.
+
+   E, se voltar, **volta com limiar honesto**: 12,4 mm é o número que não custa
+   nada, e nessa faixa há 2 primitivas. Ou seja, mesmo ressuscitado ele quase não
+   vale a pena — que é a conclusão a que se deveria ter chegado em 2026-08-14, e
+   está registrada aqui para não se ter de chegar a ela uma terceira vez.
+
+   ⚠️ E NÃO SE RESSUSCITA POR "está lento". A resposta certa para "está lento"
+   nesta cena, em ordem de ganho medido, é: estrangular a reassadura do mapa de
+   sombra (−34 % do quadro no Médio), fundir por material (14,9×), e KTX2 nos
+   conjuntos de chão (−256 MB). Nenhuma das três custa um pixel do caminhão.
 
    ---------------------------------------------------------------------------
    POSSE POSITIVA DE `.visible`, E POR QUE UMA HEURÍSTICA NÃO SERVE AQUI
@@ -85,7 +148,8 @@
    escreveu antes. Daí `renderer.shadowMap.needsUpdate = true` quando algo muda.
 
    Mas o número é pequeno, e a razão é bonita: `setShadowCasters()` já tirou do
-   passe de sombra TUDO abaixo de 5 cm (`SHADOW_CASTER_MIN_M`), e é justamente
+   passe de sombra TUDO abaixo de 5 cm (`SHADOW_CASTER_MIN_M`, que desde
+   2026-08-15 é `shadowCasterMinM` do perfil: 5 / 10 / 15 cm), e é justamente
    essa a população que este LOD mais toca. Cruzando as duas medidas: das 1 045
    primitivas abaixo de 100 mm, 592 estão abaixo de 50 mm e portanto **já não
    projetam sombra nenhuma** — só as ~453 restantes (50…100 mm) podem sujar o
@@ -93,20 +157,74 @@
    Por isso a marcação é CONDICIONAL (`if (m.castShadow)`): num arrasto que só
    mexa em parafuso o mapa de sombra não é refeito uma vez sequer.
 
-   ---------------------------------------------------------------------------
-   ONDE ELE RODA, E POR QUE NÃO É `onFrame`
+   ⚠️ E ESSA SOBREPOSIÇÃO É EXATAMENTE O ACHADO QUE APOSENTOU ESTE ARQUIVO. O que
+   aqui estava escrito como uma virtude ("o número é pequeno") é, lido do outro
+   lado, o veredito: o LOD tirava 588 chamadas do passe principal do nível Médio
+   e **zero** do passe de sombra, que são 1 574 chamadas. Ver o cabeçalho.
 
-   `onDrawFrame()` (scene.ts:644) e nunca `onFrame()`. `onFrame` roda também em
-   quadro PULADO, e o próprio bloco de lá diz o que aquilo pressupõe: *"são umas
-   poucas operações de vetor, não uma chamada de desenho"*. Um LOD em quadro
-   pulado seria trabalho de CPU para decidir a visibilidade de um quadro que não
-   vai existir — e, pior, escreveria `shadowMap.needsUpdate` para um passe que
-   ninguém vai rodar. `onDrawFrame` roda depois de `drawSuspended`/`dirtyFrames`
+   ---------------------------------------------------------------------------
+   ONDE ELE RODA — A DECISÃO EM `onDrawFrame`, O PAGAMENTO DA SOMBRA EM `onFrame`
+
+   Parecem contraditórios e não são: são duas coisas diferentes com prazos
+   diferentes, e cada uma está no gancho que o prazo dela exige.
+
+   **A DECISÃO é `onDrawFrame()` (scene.ts) e nunca `onFrame()`.** `onFrame` roda
+   também em quadro PULADO, e o próprio bloco de lá diz o que aquilo pressupõe:
+   *"são umas poucas operações de vetor, não uma chamada de desenho"*. Um LOD em
+   quadro pulado seria trabalho de CPU para decidir a visibilidade de um quadro
+   que não vai existir. `onDrawFrame` roda depois de `drawSuspended`/`dirtyFrames`
    e IMEDIATAMENTE antes do `render()`, que é exatamente o instante em que a
-   decisão vale: o que escrevermos aqui é o que aquele `render()` desenha, e o
-   `needsUpdate` que marcarmos é honrado no mesmo quadro. Nenhum `invalidate()` é
-   necessário nem desejável — pedir um quadro extra de dentro do quadro que já
-   está sendo desenhado só faria o laço sob demanda nunca dormir.
+   decisão vale: o que escrevermos ali é o que aquele `render()` desenha.
+
+   **O PAGAMENTO DA DÍVIDA DE SOMBRA é `onFrame()`, e a razão é de ORDEM.** Ver
+   o bloco A TEMPESTADE DE SOMBRA logo abaixo.
+
+   ---------------------------------------------------------------------------
+   ⚠️⚠️ A TEMPESTADE DE SOMBRA — o defeito que este arquivo escondia atrás de outro
+
+   `applyLod()` marcava `renderer.shadowMap.needsUpdate = true` **direto**, dentro
+   do `onDrawFrame`, sempre que uma peça com `castShadow` cruzasse o limiar. Num
+   ZOOM CONTÍNUO isso é uma peça cruzando o limiar em quase todo quadro — ou
+   seja, **uma reassadura completa do mapa de sombra por quadro**, que é
+   exatamente a classe de defeito medida em `GARGALO-2026-08-15.md` §1.2 e
+   estrangulada em 2026-08-15 do lado do `seethrough.ts`: +6,06 ms por quadro no
+   nível Alta, ~40 % do quadro, 1 574 chamadas.
+
+   Ele ficava INVISÍVEL porque a tempestade do `seethrough` já sujava o mapa em
+   100 % dos quadros de arrasto: uma segunda fonte sujando um mapa já sujo não
+   custa nada. Conserta-se a primeira e a segunda aparece. Esta é a segunda.
+
+   O CONSERTO É A MESMA DOUTRINA, e ela é REUSADA e não duplicada — o padrão está
+   em `scene.ts` (`seeShadowDebt`/`seeShadowNextAt`, que por sua vez copia o
+   `shadowStale`/`scrubUntil` do arrasto do relógio):
+
+     · a mudança CONTÍNUA vira DÍVIDA, cobrada no ritmo de
+       `getProfile().shadowRefreshHz` (20/12/8);
+     · a dívida é PAGA, sempre — senão a peça reaparece sem sombra, que é o
+       defeito que a marcação existe para não ter;
+     · enquanto houver dívida o laço é invalidado, porque num laço SOB DEMANDA
+       ninguém desenha o quadro que pagaria;
+     · uma reassadura pedida por OUTRO dono quita a dívida de graça.
+
+   ⚠️ **E O PAGAMENTO TEM DE ACONTECER EM `onFrame`, NÃO EM `onDrawFrame`, POR UMA
+   RAZÃO DE ORDEM DENTRO DO LAÇO.** `startLoop()` amostra `const assaSombra =
+   renderer.shadowMap.needsUpdate` na linha 4903, **antes** de rodar os
+   `drawHooks` (4921) e **depois** dos `frameHooks` (4827). Um `needsUpdate`
+   escrito de dentro de um `drawHook` chega tarde demais para o laço saber que o
+   passe rodou, e isso estraga três coisas de uma vez:
+
+     1. `seeShadowNextAt` não avança — ou seja o estrangulamento do `seethrough`
+        passa a permitir uma reassadura extra por cima da nossa;
+     2. o contador de `reassaduras` não registra — e é ele que alimenta o
+        `shadowRefreshHz` OBSERVADO do painel, o número que prova o conserto;
+     3. pior de todas, o laço credita a contagem daquele quadro a
+        `callsSemSombra` (4943) num quadro que **assou a sombra**, e o split
+        `shadowCalls` do diagnóstico sai errado — no limite, negativo.
+
+   ⚠️ **E ISTO ESTÁ ADORMECIDO HOJE.** Com o LOD aposentado (`lodMinPx: 0` nos
+   três níveis) nada aqui chega a marcar sombra nenhuma. O conserto entra assim
+   mesmo, e a etiqueta fica: quem ressuscitar o LOD ressuscita junto uma segunda
+   tempestade de sombra, e ela é cara.
 
    ---------------------------------------------------------------------------
    POR QUE ESTE MÓDULO NÃO É IMPORTADO POR `material-setup.ts`
@@ -125,7 +243,7 @@
    barato, e é o que `models.ts` deveria chamar no dia em que alguém encostar
    nele). */
 import * as THREE from 'three';
-import { camera, onDrawFrame, renderer, scene } from '../scene/scene';
+import { camera, invalidate, onDrawFrame, onFrame, renderer, scene } from '../scene/scene';
 import { getProfile, onQualityChange } from '../core/quality';
 
 /**
@@ -135,10 +253,10 @@ import { getProfile, onQualityChange } from '../core/quality';
  * limiar, distância e resolução, então registrar seria pagar uma transformação
  * de vetor por quadro para sempre decidir "fica".
  *
- * A CONTA: o maior limiar da tabela de qualidade é `lodMinPx = 3` (nível Baixa),
- * a órbita mais distante é ~22,4 m e o buffer mais BAIXO que este produto
- * desenha é o de uma janela pequena já com a escala de render do nível Baixa —
- * digamos 600 px de CSS a 0,65, ou seja 390 px. Invertendo a fórmula do
+ * A CONTA (feita quando o maior limiar da tabela era `lodMinPx = 3`, no nível
+ * Baixa): a órbita mais distante é ~22,4 m e o buffer mais BAIXO que este
+ * produto desenha é o de uma janela pequena já com a escala de render do nível
+ * Baixa — digamos 600 px de CSS a 0,65, ou seja 390 px. Invertendo a fórmula do
  * cabeçalho:
  *
  *     D_max = px · 2 · tan(15°) · L / H = 3 · 0,5359 · 22,4 / 390 = 0,092 m
@@ -147,6 +265,13 @@ import { getProfile, onQualityChange } from '../core/quality';
  * põe no registro a população "abaixo de 15 cm" — 1 045 primitivas até 100 mm
  * mais uma faixa 100…150 mm que NÃO FOI MEDIDA; da ordem de 1 100 a 1 400
  * entradas, ESTIMADO.
+ *
+ * ⚠️ **ESTE NÚMERO GANHOU UM SEGUNDO DONO EM 2026-08-15.** Com o LOD aposentado,
+ * `core/quality.ts` adotou 0,15 m como `shadowCasterMinM` do nível Baixa, e a
+ * justificativa de lá aponta para cá: é o teto do que ESTE arquivo mediu e
+ * chamou de parafusaria. Os dois mecanismos passam a compartilhar uma definição
+ * só de "peça pequena" — o que muda entre eles é o preço. O LOD tirava a PEÇA; o
+ * corte de sombra tira só a SOMBRA dela, e por isso sobreviveu.
  */
 const LOD_MAX_DIAM = 0.15;
 
@@ -181,6 +306,77 @@ let ocultas = 0;
 const _sph = new THREE.Sphere();
 const _camPos = new THREE.Vector3();
 const _p = new THREE.Vector3();
+
+/* ---------------------------------------------------------------------------
+   A DÍVIDA DE SOMBRA — ver ⚠️⚠️ A TEMPESTADE DE SOMBRA, no cabeçalho.
+   --------------------------------------------------------------------------- */
+
+/** Há um emissor que mudou e cuja sombra ainda não foi reassada. */
+let sombraDevida = false;
+/** Antes deste instante a dívida espera. `performance.now()`. */
+let sombraProximaEm = 0;
+
+/**
+ * Teto de reassaduras por segundo, do perfil.
+ *
+ * ⚠️ RESERVA NO NÍVEL MAIS PESADO (20 Hz), e é a mesma escolha que `scene.ts`
+ * faz e pelo mesmo motivo: uma reserva alta pode deixar desempenho na mesa;
+ * uma reserva baixa daria ao nível Alto uma sombra mais defasada do que o dono do
+ * perfil autorizou, e "a sombra arrasta" é indistinguível de um bug.
+ */
+function hzSombra(): number {
+  const hz = (getProfile() as { shadowRefreshHz?: number }).shadowRefreshHz;
+  return hz && hz > 0 ? hz : 20;
+}
+
+/**
+ * A mudança CONTÍNUA — uma peça cruzou o limiar num quadro de zoom. Vira dívida.
+ *
+ * Nunca escreve `needsUpdate` na hora: é este caminho que, num zoom, dispara em
+ * quase todo quadro.
+ */
+function marcarSombraDevida() { sombraDevida = true; }
+
+/**
+ * A BORDA — a devolução em massa de `releaseLod()`.
+ *
+ * ⚠️ **NÃO É ESTRANGULADA, E A DISTINÇÃO É A DOUTRINA INTEIRA.** Estrangula-se
+ * uma fonte CONTÍNUA (o zoom cruzando limiares quadro a quadro); jamais uma
+ * BORDA. `releaseLod()` roda em troca de nível, em desligamento do LOD e —
+ * decisivo — dentro de `scene/capture.ts`, que devolve todas as peças e
+ * fotografa em seguida. Uma foto tirada com a sombra estrangulada sairia com o
+ * mapa do estado anterior, e a foto é o produto: ela sai sempre no teto.
+ */
+function marcarSombraAgora() {
+  sombraDevida = false;
+  renderer.shadowMap.needsUpdate = true;
+}
+
+/* O PAGAMENTO, em `onFrame` e não em `onDrawFrame` — ver o ⚠️ de ORDEM no
+   cabeçalho. Em quadro pulado o custo é uma comparação de booleano.
+
+   O laço é SOB DEMANDA: sem `invalidate()` a dívida ficaria aberta para sempre
+   assim que o zoom parasse, e a peça reapareceria sem sombra. `invalidate(2)`
+   (o mesmo número que `scene.ts` usa para a dívida da dissolvência) cobre o
+   quadro que assa e o que apresenta. Isto TERMINA por construção: a dívida se
+   fecha dentro de 1/`shadowRefreshHz` e o gancho volta a sair na primeira
+   linha. */
+onFrame(() => {
+  if (!sombraDevida) return;
+  const agora = performance.now();
+  /* DE CARONA: se outro dono já pediu a reassadura, a nossa acontece junto e não
+     gasta a janela. É a mesma regra do `seeShadowDebt = false` de `scene.ts`. */
+  if (renderer.shadowMap.needsUpdate) {
+    sombraDevida = false;
+    sombraProximaEm = agora + 1000 / hzSombra();
+    return;
+  }
+  invalidate(2);
+  if (agora < sombraProximaEm) return;
+  renderer.shadowMap.needsUpdate = true;
+  sombraDevida = false;
+  sombraProximaEm = agora + 1000 / hzSombra();
+});
 
 /**
  * Registra as malhas de `root` que o LOD pode alcançar. Idempotente por malha —
@@ -301,8 +497,10 @@ export function applyLod(
       if (m.castShadow) mexeuEmSombra = true;
     }
   }
-  /* Só quando um EMISSOR mudou — ver A SOMBRA, E O QUANTO DELA SOBRA. */
-  if (mexeuEmSombra) renderer.shadowMap.needsUpdate = true;
+  /* Só quando um EMISSOR mudou — ver A SOMBRA, E O QUANTO DELA SOBRA.
+     ⚠️ DÍVIDA e não escrita direta: este caminho dispara em quase todo quadro de
+     um zoom contínuo. Ver ⚠️⚠️ A TEMPESTADE DE SOMBRA no cabeçalho. */
+  if (mexeuEmSombra) marcarSombraDevida();
   return mudou;
 }
 
@@ -324,7 +522,9 @@ export function releaseLod(): number {
     if (e.mesh.castShadow) mexeuEmSombra = true;
   }
   ocultas = 0;
-  if (mexeuEmSombra) renderer.shadowMap.needsUpdate = true;
+  /* ⚠️ AGORA, SEM ESTRANGULAMENTO — é BORDA, não fonte contínua, e um dos
+     chamadores é a captura. Ver `marcarSombraAgora()`. */
+  if (mexeuEmSombra) marcarSombraAgora();
   return n;
 }
 
@@ -416,9 +616,18 @@ onQualityChange(() => { minPxCache = -1; });
 onDrawFrame(() => {
   const minPx = minPxAtual();
   if (!(minPx > 0)) {
-    /* Nível Alto (ou LOD desligado): devolve o que houver e não varre nada. O
-       registro fica de pé de propósito — voltar a um nível baixo não deve pagar
-       uma varredura de 2 157 nós no primeiro quadro. */
+    /* ⚠️ **DESDE 2026-08-15 ESTE É O CAMINHO PERMANENTE**, nos três níveis: o
+       LOD está aposentado e `lodMinPx` vale 0 em toda a tabela. O custo por
+       quadro desenhado é uma chamada de função e a leitura de um número em
+       cache — `garantirRegistro()` nem chega a rodar, então o registro fica
+       vazio e não há entrada nenhuma a percorrer.
+
+       O `releaseLod()` continua aqui porque desligar tem de DEVOLVER o que já
+       estava escondido, e não só parar de esconder: sem ele, quem estivesse num
+       nível antigo com o LOD ligado (uma sessão que sobreviveu a um deploy)
+       ficaria com o caminhão sem os parafusos que o nível anterior apagou. O
+       registro fica de pé de propósito — voltar a um nível com LOD não deve
+       pagar uma varredura de 2 157 nós no primeiro quadro. */
     if (ocultas) releaseLod();
     return;
   }
@@ -445,6 +654,12 @@ export function getLodInfo() {
     histerese: HISTERESE,
     diametroMax: LOD_MAX_DIAM,
     alturaDoBuffer: h,
+    /* ⚠️ `aposentado` é a resposta que a bancada precisa numa palavra: um limiar
+       0 nos três níveis não é um defeito de configuração, é a doutrina de
+       2026-08-15. Ver o cabeçalho. */
+    aposentado: !(minPx > 0),
+    sombraDevida,
+    sombraTetoHz: hzSombra(),
     /* O diâmetro que este quadro esconderia na órbita mais distante (22,4 m) —
        o número que diz, em milímetros, o que se está perdendo AGORA. */
     cortaAbaixoDeMm: minPx > 0

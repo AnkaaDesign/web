@@ -141,7 +141,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { setKeyLight } from '../vehicle/paint';
+import { setKeyLight, setPaintPixelScale } from '../vehicle/paint';
 import { $ } from '../core/dom';
 /* MÓDULO FOLHA, IMPORTADO NO TOPO — e a posição é o ponto, não o acaso. O
    renderer nasce no escopo deste módulo (ver a primeira linha do cabeçalho), e
@@ -351,6 +351,53 @@ markColdApplied();
    few and all of them are load/visibility edges. */
 renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
+
+/* ---------------- ⚠️ O CONTADOR DE CHAMADAS MENTIA ----------------
+   E mentia em TODO documento de desempenho deste projeto. `WebGLRenderer
+   .render()` do three 0.179.1, nesta ordem exata (WebGLRenderer.js:1606/1612):
+
+       shadowMap.render( shadowsArray, scene, camera );
+       if ( this.info.autoReset === true ) this.info.reset();
+
+   O contador é zerado DEPOIS do passe de sombra, logo
+   `renderer.info.render.calls` NUNCA contou uma única chamada da sombra. E é
+   esse o número que `getRenderStats()` publica, que o painel de Configurações
+   mostra, e que o comentário de FRAME SCHEDULING logo abaixo cita como
+   "~2200-2900 draw calls".
+
+   Medido com o reset feito à mão (`GARGALO-2026-08-15.md` §1.1), num quadro de
+   arrasto do `distrito-industrial`:
+
+       nível   principal   sombra   TOTAL
+       Alta      2 230      1 574   3 804
+       Média     1 642      1 574   3 216
+       Baixa     1 158      1 138   2 296
+
+   Ou seja: todo orçamento de desempenho escrito aqui está 40 a 70 % abaixo do
+   real, e uma otimização julgada por este número seria aprovada por um ganho
+   que não é o dela.
+
+   ⚠️ E COM `autoReset = false` TUDO PASSA A ACUMULAR — é a contrapartida, e ela
+   é uma DECISÃO, não um efeito colateral. Sem o zeramento automático, toda
+   renderização extra soma nos mesmos contadores: o reflexo do piso
+   (`floor-reflection.ts`, que roda nos `drawHooks`, antes do render principal),
+   a sonda (`probe.ts`, ~14 000 chamadas), a captura (`capture.ts`) e o PMREM da
+   mistura de céus (`skyblend.ts`).
+
+   O reset manual fica no TOPO do trecho de quadro DESENHADO, antes dos
+   `drawHooks` (ver `startLoop()`), e a escolha é essa de propósito: `calls`
+   passa a significar **tudo que este quadro submeteu**, que é exatamente o que
+   a máquina paga. A alternativa — resetar imediatamente antes do
+   `renderer.render()` — daria um número mais "limpo" e mais inútil, porque
+   esconderia o reflexo do piso, que num quadro do cenário Estúdio é uma cena
+   inteira a mais.
+
+   Duas consequências a não confundir com defeito:
+     · um quadro que calhe de conter uma sonda ou uma captura reporta um PICO
+       legítimo de milhares de chamadas — é trabalho que aconteceu mesmo;
+     · com o laço parado (`capture.ts` chama `stopLoop()`), ninguém zera, e os
+       contadores acumulam até o próximo quadro desenhado. */
+renderer.info.autoReset = false;
 
 /* ---------------- A JANELA DE "NÃO APRENDA COM ISTO" ----------------
    Os primeiros quadros depois de uma carga são os mais caros da sessão e os
@@ -619,7 +666,128 @@ camera.position.set(14, 6, 18);   // semente; frameAll() reposiciona ao carregar
 
 export const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.06;
+
+/* ---------------- A INÉRCIA DA ÓRBITA ERA CONTADA EM QUADROS ----------------
+   ⚠️ ISTO É UM DEFEITO DE RESPOSTA, NÃO DE DESEMPENHO — e é a resposta direta ao
+   relato *"não sinto fluida a movimentação da câmera"*. Ele não some quando o
+   quadro fica mais barato; ele PIORA quando o quadro fica mais caro, o que é a
+   pior combinação possível, porque disfarça de "está lento" uma coisa que não é.
+
+   O mecanismo está no `update()` do OrbitControls r179 (linhas 615-704), e não
+   depende de interpretação:
+
+       spherical.theta      += sphericalDelta.theta * dampingFactor;
+       sphericalDelta.theta *= ( 1 - dampingFactor );
+
+   `dampingFactor` é aplicado POR CHAMADA de `update()`, ou seja POR QUADRO. O
+   ÂNGULO TOTAL entregue é o mesmo em qualquer taxa (é uma série geométrica que
+   soma 1) — o que muda é EM QUANTO TEMPO. A resposta da câmera é inversamente
+   proporcional aos quadros por segundo. Simulado sobre a fórmula acima, com um
+   arrasto de 0,02 rad numa órbita de 24 m, o tempo até 90 % do giro pedido:
+
+       120 fps   317 ms          20 fps   1 900 ms
+        60 fps   633 ms          30 fps   1 267 ms
+        45 fps   844 ms
+
+   Ou seja: a máquina que cai para 30 fps não fica só com metade dos quadros,
+   ela fica com uma câmera que leva o DOBRO do tempo para chegar onde o ponteiro
+   mandou. É por isso que "cair às vezes para menos de 60 fps" é sentido como
+   arrasto pastoso e não como engasgo.
+
+   A CORREÇÃO é a mesma que o laço já faz para o giro de apresentação e pelo
+   mesmo argumento (ver o bloco do `dt` em `controls.update()`): o fator deixa de
+   ser por quadro e passa a ser função do RELÓGIO.
+
+       f(dt) = 1 − (1 − f₆₀)^(dt·60)
+
+   ⚠️ A 60 fps ISTO DEVOLVE `f₆₀` EXATAMENTE. A troca é bit a bit invisível na
+   máquina que já está boa; ela só age onde havia defeito. Simulado com a
+   correção: 622 a 650 ms até 90 % do giro em TODAS as taxas de 20 a 120 fps.
+
+   E ela ainda encurta a cauda no lugar certo: a 30 fps a inércia assenta em 34
+   quadros em vez de 56, ou seja o laço sob demanda para de desenhar antes.
+
+   ---------------------------------------------------------------------------
+   ⚠️ E SE, MESMO A 60 fps, A CÂMERA CONTINUAR PARECENDO SOLTA — É ESTE NÚMERO,
+   E SÓ ELE. A correção acima conserta a DEPENDÊNCIA da taxa de quadros; ela não
+   toca no quanto de inércia foi AUTORADO, que é `AMORTECIMENTO_60` e mais nada.
+   E o valor de hoje é pesado: 0,06 põe a câmera a 633 ms de onde o ponteiro
+   mandou, mesmo com a máquina folgada. Isso é dois terços de segundo de atraso
+   entre a mão e a imagem — que é uma escolha legítima (dá peso de "câmera de
+   estúdio sobre trilho"), mas é também a descrição literal de "não sinto
+   fluida".
+
+   A tabela, para quem for girar o botão — mesma simulação, tempo até 90 % do
+   giro, agora igual em qualquer taxa:
+
+       0,06 (hoje)   633 ms       0,15   250 ms
+       0,10          367 ms       0,25   150 ms
+
+   Não mexido aqui de propósito: é decisão de PRODUTO, não de desempenho, e uma
+   mudança de tato de câmera tem de ser vista rodando antes de virar padrão. */
+/* ⚠️ MUTÁVEL, e SÓ pela afordance de console de `setOrbitDamping()`, logo abaixo.
+   Era `const` até 2026-08-16. O valor é o TATO da câmera e é decisão de produto
+   que só se toma OLHANDO, com o mouse na mão — não escolhendo um número no
+   escuro. A tabela, agora que o fator é função do relógio e não do quadro:
+
+       0,06 → 633 ms   peso de câmera de estúdio sobre trilho
+       0,10 → 367 ms   ainda desliza, mas responde
+       0,15 → 250 ms   parece colada na mão
+       0,25 → 150 ms   seca; some o deslize macio do fim do movimento
+
+   (milissegundos até a câmera chegar a 90 % de onde o ponteiro mandou.) */
+let AMORTECIMENTO_60 = 0.06;
+
+/**
+ * Reescreve `dampingFactor` para o `dt` deste quadro. Ver o bloco acima.
+ *
+ * ⚠️ SEMPRE IMEDIATAMENTE ANTES de `controls.update(dt)`, e nos DOIS laços (o
+ * vivo e o offline) — são espelhos um do outro por contrato.
+ *
+ * `drainControlsInertia()` de `record.ts` chama `update(0)` duzentas vezes sem
+ * passar por aqui, e isso continua certo: ela roda com o fator que o último
+ * quadro deixou, que é o que ela sempre fez.
+ */
+function sincronizarAmortecimento(dt: number) {
+  /* O `dt` já vem limitado a 0,1 s pelo laço; o `clamp` é contra um chamador
+     futuro, porque um fator ≥ 1 faria a órbita saltar o giro inteiro num quadro
+     e um fator ≤ 0 a congelaria para sempre. */
+  const d = THREE.MathUtils.clamp(dt, 1 / 480, 0.1);
+  controls.dampingFactor = 1 - Math.pow(1 - AMORTECIMENTO_60, d * 60);
+}
+controls.dampingFactor = AMORTECIMENTO_60;
+
+/** O tato atual da órbita — o fator que valeria a 60 fps. */
+export const orbitDamping = () => AMORTECIMENTO_60;
+
+/**
+ * Muda o tato da câmera AO VIVO, para ser decidido olhando.
+ *
+ *     __studio.lighting.setOrbitDamping(0.12)
+ *
+ * ⚠️ NÃO É PERSISTIDO, DE PROPÓSITO. É botão de experimento: um tato de câmera
+ * que sobrevive a um F5 é indistinguível de um defeito para a próxima pessoa que
+ * abrir o estúdio nesta máquina. Se um valor graduar, ele graduta virando a
+ * constante nova, com o número na tabela acima.
+ *
+ * ⚠️ E `drainControlsInertia()` (`scene/record.ts`) chama `update(0)` duzentas
+ * vezes SEM passar por `sincronizarAmortecimento()`, então ela drena com o fator
+ * que o último quadro deixou. Mexer nisto no meio de uma gravação muda como a
+ * inércia é drenada — inofensivo para um botão de experimento, e é por isso que
+ * ele é só um botão de experimento.
+ *
+ * Os limites não são números no escuro: abaixo de 0,02 o assentamento passa de
+ * 2 s e a câmera lê como QUEBRADA em vez de pesada; acima de 0,6 a expressão já
+ * se aproxima de 1 num `dt` pequeno, ou seja um salto seco, e some o peso que o
+ * valor de fábrica compra.
+ */
+export function setOrbitDamping(f: number) {
+  AMORTECIMENTO_60 = THREE.MathUtils.clamp(f, 0.02, 0.6);
+  controls.dampingFactor = AMORTECIMENTO_60;
+  invalidate(30);
+  return AMORTECIMENTO_60;
+}
+
 controls.maxPolarAngle = Math.PI / 2 - 0.02;      // never orbit below the horizon
 /* Belt and braces over the `controls.update()` return value the loop already
    reads. In r179 the two are the same signal — 'change' is dispatched from
@@ -669,6 +837,36 @@ export function onFrame(fn: (dt: number) => void) { frameHooks.push(fn); }
    `onDrawFrame`. Se ele CORRIGE ESTADO, é `onFrame`. */
 const drawHooks: ((dt: number) => void)[] = [];
 export function onDrawFrame(fn: (dt: number) => void) { drawHooks.push(fn); }
+
+/* ---------------- ganchos de SOBREPOSIÇÃO ----------------
+   A TERCEIRA lista, e ela existe porque as outras duas correm ANTES do
+   `renderer.render()` — o que é exatamente o que um carimbo não pode fazer.
+
+     `onFrame`      corrige ESTADO. Roda até em quadro pulado.
+     `onDrawFrame`  DESENHA para um alvo próprio (o reflexo do piso), e tem de
+                    terminar antes de a cena ser desenhada, para o piso lê-lo no
+                    mesmo quadro.
+     `onOverlay`    compõe POR CIMA do quadro já pronto.
+
+   ⚠️ QUEM ENTRA AQUI ESCREVE NO BUFFER JÁ COMPOSTO, e é isso que o torna a
+   única porta para algo que precise estar NO PIXEL DO ARQUIVO — overlay de DOM
+   nunca é composto no canvas, e um canvas 2D intermediário custaria uma cópia de
+   quadro inteiro por quadro (ver o cabeçalho de `scene/record.ts`). Hoje o único
+   assinante é a VINHETA de encerramento do vídeo (`scene/outro.ts`) — e o
+   primeiro foi uma marca d'água que existiu por algumas horas no mesmo dia e foi
+   substituída por ela.
+
+   ⚠️ E QUEM ENTRA AQUI É RESPONSÁVEL PELO `autoClear`. Um segundo `render()` com
+   a bandeira ligada — que é o padrão — LIMPA o buffer e joga fora a cena que
+   acabou de ser desenhada, sem erro nenhum. O assinante guarda e devolve.
+
+   Chamados nos DOIS sítios de desenho (o laço vivo e `renderOfflineFrame`),
+   porque as duas gravações possíveis passam cada uma por um deles: o caminho
+   offline desenha à mão, e a reserva em tempo real lê o canvas que o laço
+   compôs. Uma marca que só existisse num dos dois faria alguns vídeos saírem
+   sem ela — e o usuário não teria como saber qual caminho a máquina dele pegou. */
+const overlayHooks: ((dt: number) => void)[] = [];
+export function onOverlay(fn: (dt: number) => void) { overlayHooks.push(fn); }
 export function onRig(fn: (rig: Rig) => void) {
   rigHooks.push(fn);
   /* Fired immediately so a late subscriber is not one preset change behind —
@@ -2276,6 +2474,70 @@ let shadowFrame = 0;
    sempre, porque nada chama applyRig depois que o dedo sai. Um bool paga a
    promessa; o laço o cobra quando a janela do arrasto expira. */
 let shadowStale = false;
+
+/* ---- MODO ARRASTO DA SOMBRA, SEGUNDO DONO: A DISSOLVÊNCIA DO ATRAVESSAR ----
+   O bloco acima estrangula a sombra do arrasto do RELÓGIO. Este estrangula a do
+   ATRAVESSAR, e é o mesmo padrão disparado por outro evento — por isso mora aqui
+   colado, e não numa segunda máquina em seethrough.ts.
+
+   ⚠️ O DIAGNÓSTICO (`GARGALO-2026-08-15.md` §1.2) É MEDIDO. Com uma armadilha
+   get/set em `needsUpdate` sobre 90 quadros de arrasto no `distrito-industrial`,
+   o passe de sombra era reassado em **90 de 90 quadros no nível Alta (100 %)** e
+   70 de 90 no Média, e o culpado era uma linha: `escrever()` de seethrough.ts
+   marcava o mapa a cada passo de dissolvência de cada prédio. Custo medido numa
+   RX 570: **+6,06 ms (Alta), +5,31 ms (Média), +4,02 ms (Baixa)** por quadro —
+   perto de metade do quadro, gasto redesenhando uma sombra que mudou 1 %.
+
+   Não é decisão visual: a dissolvência de um prédio muda a sombra dele de forma
+   gradual e a 60 Hz; reassar a 12–20 Hz é invisível e devolve metade do quadro.
+
+   AS DUAS PONTAS DA CORREÇÃO, e nenhuma delas sozinha resolve:
+     · seethrough.ts parou de PEDIR o que não muda nada (quem não projeta
+       sombra, e passo de rampa abaixo de 1/8);
+     · daqui para baixo, o que sobra é estrangulado por `shadowRefreshHz` do
+       perfil e a dívida é COBRADA quando a janela expira, exatamente como
+       `shadowStale` faz para o relógio.
+
+   ⚠️ A DÍVIDA TEM DE SER PAGA, E É POR ISSO QUE ELA SEGURA O LAÇO. Se a
+   dissolvência terminar dentro da janela estrangulada e ninguém pedir a
+   reassadura depois, o prédio fica com a sombra do estado anterior — o defeito
+   que o pedido existe para não ter. O laço sob demanda torna isso concreto:
+   `updateSeeThrough()` devolve false assim que a rampa assenta, e sem uma
+   invalidação a viewport pararia de desenhar com a dívida em aberto. Enquanto
+   houver dívida, o laço pede quadro. */
+let seeShadowDebt = false;
+/** Antes deste instante, a dívida do atravessar espera. `performance.now()`. */
+let seeShadowNextAt = 0;
+
+/**
+ * Teto de reassaduras por segundo sob mudança contínua, do perfil de qualidade.
+ *
+ * ⚠️ LEITURA COM RESERVA, E A RESERVA É O NÍVEL ALTO. O campo é do AGENTE 3 e
+ * pode ainda não existir na tabela quando este arquivo for lido (as duas
+ * mudanças correm em paralelo). Cair no valor do nível mais PESADO é a reserva
+ * segura: ela pode deixar desempenho na mesa, nunca imagem errada. O contrário
+ * — presumir 8 Hz — daria ao nível Alto uma sombra mais defasada do que o dono
+ * do perfil autorizou, e o defeito apareceria como "a sombra arrasta", que é
+ * indistinguível de bug.
+ */
+function shadowRefreshHz() {
+  const hz = (getProfile() as { shadowRefreshHz?: number }).shadowRefreshHz;
+  return hz && hz > 0 ? hz : 20;
+}
+
+/* ---- QUANTAS REASSADURAS DE FATO ACONTECERAM ----
+   O número que PROVA o estrangulamento, e o único honesto: contar as escritas em
+   `needsUpdate` contaria pedidos, não assados — e um pedido que chega com a
+   bandeira já em true não custa nada. Aqui se carimba o instante em que o passe
+   REALMENTE vai rodar (ver `startLoop()`), e a janela deslizante de 1 s devolve
+   a taxa observada em hertz, direto, sem divisão.
+
+   Com o laço parado ou ocioso ele cai para 0 sozinho, que é a leitura certa: não
+   houve reassadura nenhuma. */
+const reassaduras: number[] = [];
+function podarReassaduras(t: number) {
+  while (reassaduras.length && t - reassaduras[0] > 1000) reassaduras.shift();
+}
 
 /** Sinaliza que a luz está sendo arrastada AGORA. Ver o bloco acima. */
 export function beginLightScrub() {
@@ -4353,6 +4615,46 @@ let renderScale = getProfile().renderScale;
 const effectivePixelRatio = () =>
   Math.min(devicePixelRatio, getProfile().pixelRatioCap) * renderScale;
 
+/* ---------------- O FLOCO É ANCORADO AO PIXEL QUE O OLHO VÊ ----------------
+   ⚠️ ISTO ESTAVA ESCRITO COMO DEVER E NÃO EXISTIA COMO CÓDIGO. `vehicle/paint.ts`
+   avisa, no bloco de `renderScale`: *"Quem mexer aqui tem de alimentar
+   `uPxScale` com o inverso, ou o floco metálico muda de tamanho aparente junto
+   com a escala"*. O único chamador de `setPaintPixelScale()` em todo o engine
+   era `scene/capture.ts`. Ou seja: **a escala de render nunca alimentou o
+   floco**, e o grão da lataria mudava sozinho toda vez que o nível de qualidade
+   trocava ou que o controlador dinâmico dava um degrau — no meio de um arrasto,
+   que é exatamente quando o usuário está olhando a tinta.
+
+   A REGRA, e ela é uma só para os três casos (tela, gravação e captura):
+
+       uPxScale = altura do BUFFER  /  altura da imagem que o olho vê
+
+   `fwidth()` mede o pixel do buffer; multiplicar por essa razão devolve o
+   "mundo por pixel" da imagem final, que é a referência com que o floco foi
+   autorado. Os três casos caem na mesma conta:
+
+     · tela a `renderScale` 0,72 → buffer menor → razão < 1 → o floco escolhe
+       uma oitava mais FINA e compensa o pixel gordo;
+     · gravação forçada a 1080p sobre um viewport de 720 → razão 1,5 → o floco
+       para de virar chuvisco de alta frequência (que é, de quebra, o pior caso
+       possível para o codec de vídeo — ver `scene/record.ts`);
+     · captura em 7680 → razão ~4,8 → é o caso que `capture.ts` já resolvia
+       sozinho, e continua resolvendo com o piso de 1 dele.
+
+   A referência é `clientHeight × devicePixelRatio` — os pixels FÍSICOS que o
+   painel realmente acende — e não `effectivePixelRatio()`: esta última carrega
+   `renderScale` e o teto do perfil, e usá-la aqui faria a razão dar 1 sempre,
+   que é precisamente o defeito. */
+function anchorPaintPixel() {
+  const ref = holder.clientHeight * (window.devicePixelRatio || 1);
+  const buf = renderer.domElement.height;
+  if (ref > 0 && buf > 0) setPaintPixelScale(buf / ref);
+}
+
+/** Reancora o floco depois que ALGUÉM DE FORA mexeu no buffer — hoje só
+ *  `scene/record.ts`, que força 1080p/1440p sobre o canvas visível. */
+export function reanchorPaintPixel() { anchorPaintPixel(); }
+
 /* ---------------- A ESCALA É APLICADA NO INÍCIO DO QUADRO ----------------
    ⚠️ E NÃO NO GANCHO, e esta é a correção de uma PISCADA relatada.
 
@@ -4392,6 +4694,8 @@ function flushPendingScale() {
   if (!w || !h) return;
   renderer.setPixelRatio(effectivePixelRatio());
   renderer.setSize(w, h);
+  /* O buffer mudou de tamanho ⇒ o pixel do floco mudou de tamanho. */
+  anchorPaintPixel();
   /* O buffer novo nasce em branco e ESTE quadro é quem o preenche — mas a
      sombra vive num alvo próprio, que a realocação não toca. */
 }
@@ -4409,6 +4713,7 @@ export function resize() {
      value, so the common case is one comparison. */
   renderer.setPixelRatio(effectivePixelRatio());
   renderer.setSize(w, h);
+  anchorPaintPixel();
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   /* A resized drawing buffer is a BLANK drawing buffer. Under the dirty loop,
@@ -4466,12 +4771,118 @@ resize();
    `frame` is in here for the dirty loop specifically: it is the only way to tell
    a correctly idle renderer from a frozen one. Watch it across a few seconds of
    an untouched viewport — flat is on-demand working, climbing at 60/s is the
-   loop still running flat out. */
+   loop still running flat out.
+
+   ⚠️ E ELE MENTIA — ver o bloco de `info.autoReset` no topo deste arquivo. O
+   `calls` daqui contava só o passe principal porque o three zera o contador
+   DEPOIS do passe de sombra; desde 2026-08-15 o zeramento é manual e o número é
+   o total submetido. Três campos novos saem daqui, e nenhum campo antigo mudou
+   de nome — o HUD e a bancada leem desta função:
+
+     calls                 total do quadro (principal + sombra + drawHooks)
+     shadowCalls           quanto disso é sombra, por diferença de amostras
+     shadowCallsEstimated  true enquanto faltar uma das duas amostras
+     shadowRefreshHz       reassaduras OBSERVADAS no último segundo
+
+   O último é o que prova o estrangulamento da §6.1 do diagnóstico: era 60 (uma
+   por quadro de arrasto) e tem de ficar no teto do perfil. */
+/* As duas amostras do split, escritas pelo laço. `-1` = ainda não medida. */
+let callsSemSombra = -1;
+let callsComSombra = -1;
+
+/* ---------------- A PAREDE, REPARTIDA EM QUATRO ----------------
+   ⚠️ ESTE BLOCO EXISTE PORQUE OS DOIS NÚMEROS QUE HAVIA NÃO RESPONDIAM A
+   PERGUNTA. O painel mostrava
+
+       parede 36,86 ms  ·  submissão 3,93 ms
+
+   e o comentário do próprio handle dizia a única leitura possível: *"parede
+   muito maior = limitado por CPU FORA do `render()` OU por espera de vsync"*.
+   As duas hipóteses pedem consertos OPOSTOS — a primeira manda cortar trabalho
+   de JavaScript, a segunda manda cortar trabalho de placa — e nenhuma medição
+   deste projeto sabia separá-las. Otimizar sem separá-las é apostar.
+
+   Quatro carimbos de `performance.now()` no laço bastam, e a soma dos quatro
+   canais é a parede por construção:
+
+     fora        fim do `render()` anterior → `requestAnimationFrame` deste
+                 quadro. É TUDO que o engine NÃO executa: composição, entrega do
+                 quadro anterior, eventos e DOM da interface, coleta de lixo, e a
+                 espera do vsync. Uma placa saturada aparece AQUI, no bloqueio do
+                 swap, e nunca dentro do `render()`.
+     laço        rAF → antes dos `drawHooks`. CPU pura nossa: `controls.update`,
+                 as guardas de câmera, `updateLighting`, todos os `frameHooks`,
+                 `applyAvoidance`, `tuneShadowSpan` e `updateSeeThrough`.
+     ganchos     os `drawHooks`. Separado do anterior porque é lá que mora o
+                 REFLEXO DO PISO, que é uma cena inteira a mais — juntá-lo ao
+                 laço esconderia a única segunda passada completa do engine
+                 dentro de um número chamado "CPU".
+     submissão   o `renderer.render()` do laço, principal + sombra.
+
+   COMO LER, e é para isto que os quatro existem:
+
+     · `fora` domina e os outros três são pequenos  → é PLACA (ou vsync). O botão
+       é `renderScale`, a resolução do mapa de sombra, o reflexo do piso.
+     · `laço` domina                                → é JavaScript por quadro. O
+       botão é contagem de objetos, não resolução.
+     · `ganchos` domina                             → é o reflexo do piso, e ele
+       tem interruptor próprio no perfil (`floorReflection`).
+     · `submissão` domina                           → é contagem de CHAMADAS de
+       desenho, que é o gargalo que a fusão por material atacou.
+
+   ⚠️ `fora` NÃO É DESPERDÍCIO. Numa máquina folgada ele É o quadro: o laço
+   termina em 2 ms e espera 14 ms pelo vsync. Um `fora` grande com os outros três
+   pequenos e a taxa em 60 fps é a leitura de uma cena SAUDÁVEL. O que denuncia é
+   `fora` grande com a taxa BAIXA — aí a espera não é vsync, é a placa.
+
+   RELAÇÃO COM OS DOIS NÚMEROS ANTIGOS, para quem estiver lendo o painel:
+
+       frameTimeEma()   ==  parede
+       submitTimeEma()  ==  ganchos + submissao
+
+   A segunda igualdade é de 2026-08-16 e é um CONSERTO — ver o ⚠️ de `submitMs`
+   no laço. Antes ela valia só `submissao`, e no cenário Estúdio isso deixava uma
+   cena inteira (o reflexo do piso) fora de um número que existe justamente para
+   dizer quanto de trabalho o quadro submeteu.
+
+   Mesmas travas de `reportFrameTime()`, e de propósito: mesmo `busy`, mesmo teto
+   de 400 ms, mesmo α. Os cinco números têm de descrever a MESMA população, senão
+   a repartição não fecha com a parede que o painel mostra ao lado. */
+const REPART_ALPHA = 0.1;
+const reparticao = { parede: 0, fora: 0, laco: 0, ganchos: 0, submissao: 0 };
+
+function amostrarReparticao(parede: number, fora: number, laco: number,
+  ganchos: number, submissao: number, ocupado: boolean) {
+  if (ocupado || !Number.isFinite(parede) || parede <= 0 || parede > 400) return;
+  const e = (v: number, x: number) => (v ? v + (x - v) * REPART_ALPHA : x);
+  reparticao.parede = e(reparticao.parede, parede);
+  reparticao.fora = e(reparticao.fora, fora);
+  reparticao.laco = e(reparticao.laco, laco);
+  reparticao.ganchos = e(reparticao.ganchos, ganchos);
+  reparticao.submissao = e(reparticao.submissao, submissao);
+}
+
 export function getRenderStats() {
   const { render, memory, programs } = renderer.info;
+  /* A diferença só é publicada quando as DUAS amostras existem e a com-sombra é
+     de fato a maior — o contrário só pode vir de deriva entre os dois quadros
+     (mudou o corte de frustum, entrou um LOD) e publicá-lo seria inventar um
+     número negativo de chamadas de sombra. */
+  const temSplit = callsSemSombra >= 0 && callsComSombra > callsSemSombra;
+  podarReassaduras(performance.now());
   return {
     frame: render.frame,
+    /* ⚠️ AGORA É O TOTAL DE VERDADE — passe principal MAIS passe de sombra, mais
+       tudo que os `drawHooks` submeteram neste quadro. Ver `info.autoReset`. Até
+       2026-08-15 este campo relatava só o passe principal, e todo orçamento
+       escrito neste projeto saiu 40 a 70 % baixo por causa disso. */
     calls: render.calls,
+    /** Quanto do `calls` acima é passe de sombra. Estimativa por diferença. */
+    shadowCalls: temSplit ? callsComSombra - callsSemSombra : 0,
+    /** true = ainda não há as duas amostras; `shadowCalls` não vale nada. */
+    shadowCallsEstimated: !temSplit,
+    /** Reassaduras do mapa de sombra no último segundo — a taxa OBSERVADA. */
+    shadowRefreshHz: reassaduras.length,
     triangles: render.triangles,
     lines: render.lines,
     points: render.points,
@@ -4481,6 +4892,18 @@ export function getRenderStats() {
     /* Not from renderer.info — this module's own procedural IBL cache, which is
        the one pool of VRAM here that grows with USE rather than with content. */
     envCacheSize: envCache.size,
+    /**
+     * A REPARTIÇÃO DO QUADRO em ms — ver o bloco A PAREDE, REPARTIDA EM QUATRO.
+     *
+     * `fora + laco + ganchos + submissao === parede`, por construção. Zeros
+     * significam "ainda não houve dois quadros desenhados consecutivos fora de
+     * uma janela ocupada", que é um estado legítimo numa cena parada.
+     *
+     * Cópia e não a referência viva: o consumidor é um painel que lê a cada meio
+     * segundo, e entregar o objeto do laço deixaria os cinco números mudando por
+     * baixo de quem estivesse formatando.
+     */
+    frameSplit: { ...reparticao },
   };
 }
 
@@ -4577,6 +5000,13 @@ export function pinFrames(on: boolean) {
    sombra na hora, e na anisotropia no próximo carregamento. */
 function applyQualityProfile() {
   const p = getProfile();
+  /* AS AMOSTRAS DO SPLIT MORREM COM O NÍVEL. Elas são uma diferença entre dois
+     quadros, e o LOD e a vegetação mudam a contagem do passe principal em
+     centenas de chamadas — casar a amostra "sem sombra" do Alto com a "com
+     sombra" do Baixo daria um `shadowCalls` NEGATIVO ou absurdo. Ver
+     `getRenderStats()`. */
+  callsSemSombra = -1;
+  callsComSombra = -1;
   /* A escala vem junto do teto — ver `effectivePixelRatio()`. Sem ela esta
      função apagaria a escala corrente toda vez que o nível mudasse, e o
      controlador dinâmico só a recuperaria no próximo degrau. */
@@ -4584,6 +5014,7 @@ function applyQualityProfile() {
   renderer.setPixelRatio(effectivePixelRatio());
   const w = holder.clientWidth, h = holder.clientHeight;
   if (w && h) renderer.setSize(w, h);
+  anchorPaintPixel();
 
   const size = Math.min(p.shadowMapSize, renderer.capabilities.maxTextureSize || 3072);
   if (key.shadow.mapSize.x !== size) {
@@ -4606,6 +5037,74 @@ function applyQualityProfile() {
 }
 onQualityChange(applyQualityProfile);
 
+/* ---------------- O QUADRO OFFLINE — a gravação a 60 fps travados ----------
+   Existe porque `MediaRecorder` carimba cada quadro pelo RELÓGIO DE PAREDE: uma
+   máquina que desenha a 12 fps produz, por definição, um vídeo de 12 fps. Não
+   há bitrate nem codec que conserte isso — é a natureza da API.
+
+   A saída é desacoplar o vídeo do tempo real. Aqui o mundo anda por um `dt`
+   FORNECIDO (1/60 s), não pelo `clock`, e quem consome o quadro (WebCodecs, em
+   `scene/record.ts`) o carimba com o timestamp que o `dt` implica. O render pode
+   levar 300 ms por quadro numa integrada: o vídeo continua saindo com 60 quadros
+   por segundo de vídeo, perfeitamente liso. O preço é a espera, e é um preço que
+   o dono aceitou explicitamente — *"mesmo que tenha que ter um loading enorme"*.
+
+   ⚠️⚠️ ESTA FUNÇÃO É UM ESPELHO DO CORPO DE `startLoop()` E AS DUAS TÊM DE
+   ANDAR JUNTAS. Não foi possível fatorar uma da outra sem desmontar o laço vivo,
+   que é código medido e recém-consertado. Quem mexer numa confira a outra. O que
+   ela DELIBERADAMENTE não faz, e por quê:
+
+     · `clock.getDelta()` — o `dt` é do chamador; é o ponto inteiro do arquivo;
+     · o laço sob demanda (`draw`, `dirtyFrames`, `drawSuspended`) — offline
+       TODO quadro é desenhado, senão faltaria quadro no vídeo;
+     · `reportFrameTime()` — alimentar o medidor com quadros offline (que são
+       lentos de propósito, no perfil de TETO e em 1080p) faria o adaptador
+       concluir que a máquina é fraca e derrubar o nível DEPOIS da gravação;
+     · `flushPendingScale()` — o tamanho do buffer é do gravador aqui, e deixar o
+       controlador de escala mexer nele no meio do vídeo mudaria a resolução da
+       faixa no ar;
+     · o ESTRANGULAMENTO da sombra — offline não há fps a proteger, então toda
+       dívida é paga no mesmo quadro. Um vídeo com sombra defasada é um defeito
+       permanente, não um engasgo passageiro. */
+export function renderOfflineFrame(dt: number) {
+  releaseAvoidance();
+  /* `controls.update(dt)` é quem move o giro de apresentação (`autoRotate`), e é
+     por ele receber o `dt` que "uma volta em N segundos" é promessa e não
+     estimativa — ver o bloco no laço. Com `dt` fixo em 1/60, a volta fecha no
+     mesmo ângulo sempre, em qualquer máquina. É isso que faz a emenda do laço de
+     vídeo ser exata. */
+  /* Com `dt` fixo em 1/60 esta linha devolve exatamente `AMORTECIMENTO_60`, ou
+     seja o vídeo sai idêntico ao que saía. Ela está aqui porque o espelho tem de
+     ser espelho: o dia em que `record.ts` gravar a 30 fps de vídeo, a inércia
+     tem de andar pelo relógio dele. */
+  sincronizarAmortecimento(dt);
+  controls.update(dt);
+  if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
+  if (controls.target.y < 0.05) controls.target.y = 0.05;
+  const dist = camera.position.distanceTo(controls.target);
+  const near = THREE.MathUtils.clamp(dist / 40, 0.08, 0.5);
+  if (Math.abs(near - camera.near) > near * 0.15) {
+    camera.near = near;
+    camera.updateProjectionMatrix();
+  }
+
+  updateLighting(dt);
+  for (const fn of frameHooks) fn(dt);
+  applyAvoidance(dt);
+  tuneShadowSpan();
+  updateSeeThrough(camera, dt);
+  /* Toda dívida de sombra é quitada AQUI, sem janela: ver o cabeçalho. */
+  if (takeSeeThroughShadowDirty() || seeShadowDebt || shadowStale) {
+    renderer.shadowMap.needsUpdate = true;
+    seeShadowDebt = false;
+    shadowStale = false;
+  }
+  for (const fn of drawHooks) fn(dt);
+  renderer.render(scene, camera);
+  /* DEPOIS do render, e é o ponto: ver `onOverlay`. */
+  for (const fn of overlayHooks) fn(dt);
+}
+
 export function stopLoop() {
   renderer.setAnimationLoop(null);
   /* A cadeia se rompe junto com o laço: remontar depois de uma troca de rota não
@@ -4619,6 +5118,11 @@ export function startLoop() {
      restored viewport is the frame that has to land. */
   invalidate();
   renderer.setAnimationLoop(() => {
+    /* O PRIMEIRO DOS QUATRO CARIMBOS — ver A PAREDE, REPARTIDA EM QUATRO, junto
+       de `getRenderStats()`. Antes de qualquer trabalho: o que está ANTES dele é
+       navegador, compositor e espera de vsync, e é justamente a fatia que o
+       engine não executa e que ninguém tinha como separar. */
+    const tRaf = performance.now();
     /* PRIMEIRA COISA DO QUADRO, e a posição é o conserto — ver o bloco de
        `flushPendingScale()`. Realocar o drawing buffer o limpa, então a
        realocação tem de acontecer no mesmo quadro que o desenho, nunca depois
@@ -4647,6 +5151,10 @@ export function startLoop() {
        fórmulas dão exatamente o mesmo número, então nada muda no caso comum.
        O `dt` já vem limitado a 0,1 s lá em cima, então uma aba que volta do
        segundo plano não teleporta o giro. */
+    /* ⚠️ ANTES do `update()`, e é o conserto de *"não sinto fluida a
+       movimentação da câmera"* — ver o bloco A INÉRCIA DA ÓRBITA ERA CONTADA EM
+       QUADROS. A 60 fps não muda um bit. */
+    sincronizarAmortecimento(dt);
     if (controls.update(dt)) invalidate();
     // hard floor guard — right-click panning can otherwise drag under the ground
     if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
@@ -4691,8 +5199,26 @@ export function startLoop() {
     if (updateSeeThrough(camera, dt)) invalidate();
     /* A sombra de quem está sendo atravessado dissolve junto (ver o bloco A
        SOMBRA SAI COM O OBJETO em seethrough.ts), e o mapa de sombra deste engine
-       só se redesenha quando alguém pede. */
-    if (takeSeeThroughShadowDirty()) renderer.shadowMap.needsUpdate = true;
+       só se redesenha quando alguém pede.
+
+       ⚠️ O PEDIDO VIRA DÍVIDA, NÃO REASSADURA. Era aqui que estava a tempestade
+       medida em `GARGALO-2026-08-15.md` §1.2 — 90 de 90 quadros de arrasto. Ver
+       o bloco de `seeShadowDebt`: quem paga é o trecho de quadro desenhado, no
+       ritmo de `shadowRefreshHz`. */
+    if (takeSeeThroughShadowDirty()) seeShadowDebt = true;
+    /* E ENQUANTO A DÍVIDA EXISTIR, O LAÇO NÃO PODE DORMIR. `updateSeeThrough()`
+       devolve false no quadro em que a rampa assenta, e é justamente esse quadro
+       que costuma ficar devendo — sem isto a viewport pararia de desenhar com a
+       sombra do estado anterior no ar. A corrente se mantém sozinha enquanto a
+       dívida durar (no máximo 1/`shadowRefreshHz`, ~7 quadros no nível Baixa) e
+       se rompe assim que ela é paga.
+
+       ⚠️ DOIS QUADROS E NÃO UM, e a razão é a ORDEM dentro do laço: esta linha
+       roda ANTES do `dirtyFrames--` lá embaixo, então um `invalidate(1)` seria
+       gasto pelo próprio quadro que o levantou e a cadeia desenharia um quadro
+       sim, um não. Com 2 sobra exatamente um, que é o que mantém a corrente
+       contínua até a janela expirar. */
+    if (seeShadowDebt) invalidate(2);
 
     /* Checked AFTER the hooks and BEFORE the dirty counter is spent: a frame
        skipped because the scene graph is deliberately wrong must not consume the
@@ -4713,12 +5239,75 @@ export function startLoop() {
       renderer.shadowMap.needsUpdate = true;
       shadowStale = false;
     }
+
+    /* ---- A DÍVIDA DA DISSOLVÊNCIA, COBRADA NO RITMO DO PERFIL ----
+       Depois de `shadowStale` de propósito: se o relógio já mandou reassar, a
+       dissolvência viaja de carona e não gasta a própria janela. */
+    const agora = performance.now();
+    if (seeShadowDebt && agora >= seeShadowNextAt) {
+      renderer.shadowMap.needsUpdate = true;
+      seeShadowDebt = false;
+    }
+
+    /* ---- O PASSE DE SOMBRA VAI RODAR NESTE QUADRO? ----
+       ⚠️ LIDO AQUI, ANTES DOS `drawHooks`, E A POSIÇÃO É A CORREÇÃO. O reflexo
+       do piso renderiza a cena inteira de dentro de um `drawHook`, e
+       `WebGLShadowMap.render()` só sai cedo quando `autoUpdate` E `needsUpdate`
+       são AMBOS falsos — ou seja, a passada do reflexo ASSA o mapa e LIMPA a
+       bandeira, e o render principal reusa (é a economia que floor-reflection.ts
+       documenta). Ler depois dos hooks acharia `false` num quadro que assou. */
+    const assaSombra = renderer.shadowMap.needsUpdate;
+    if (assaSombra) {
+      /* Qualquer reassadura serve à dissolvência, venha de onde vier — de um
+         `applyRig()`, de uma carga, do passo da caixa. Zerar a dívida aqui é o
+         que impede o estrangulamento de pedir uma segunda varredura por cima de
+         uma que acabou de acontecer. */
+      seeShadowDebt = false;
+      seeShadowNextAt = agora + 1000 / shadowRefreshHz();
+      podarReassaduras(agora);
+      reassaduras.push(agora);
+    }
+
+    /* O CONTADOR ZERA AQUI — ver o bloco de `info.autoReset` lá em cima. Antes
+       dos `drawHooks` para que `calls` signifique tudo que este quadro submeteu,
+       reflexo do piso incluído. */
+    renderer.info.reset();
+    /* SEGUNDO CARIMBO: fecha o trecho de CPU pura do laço (controles, guardas,
+       luz, `frameHooks`, desvio, caixa de sombra, atravessar) e abre o dos
+       ganchos de desenho — onde mora o reflexo do piso, que é uma cena inteira a
+       mais. Separá-los é o ponto: os dois eram "o que não é render()". */
+    const tPre = performance.now();
     /* Só agora, e nunca antes do `return` acima: o que está aqui DESENHA. Ver a
        nota de `onDrawFrame`. */
     for (const fn of drawHooks) fn(dt);
     const t0 = performance.now();
     renderer.render(scene, camera);
+    /* DENTRO da janela medida, e de propósito: uma sobreposição é submissão como
+       qualquer outra, e `info.autoReset` é `false` neste renderizador (ver o
+       bloco lá em cima), então a chamada dela SOMA ao contador em vez de zerá-lo.
+       O diagnóstico continua dizendo tudo que o quadro submeteu. */
+    for (const fn of overlayHooks) fn(dt);
     const t1 = performance.now();
+    /* ---- AS DUAS AMOSTRAS QUE DÃO O SPLIT PRINCIPAL × SOMBRA ----
+       Não há contador separado do passe de sombra em lugar nenhum do three, e o
+       total já contém os dois. Mas quem controla `needsUpdate` é este laço, então
+       ele SABE se o passe rodou — e a diferença entre a última contagem de um
+       quadro que assou e a do último que não assou é a estimativa honesta.
+
+       ⚠️ É ESTIMATIVA E ESTÁ ROTULADA COMO TAL (`shadowCallsEstimated` enquanto
+       faltar uma das duas amostras). As duas medições vêm de quadros diferentes,
+       e entre eles a câmera pode ter movido o suficiente para o corte de frustum
+       mudar a contagem do passe principal. A ordem de grandeza é o que importa,
+       e ela bate com a bancada: Alta 2 230 + 1 574, Média 1 642 + 1 574, Baixa
+       1 158 + 1 138.
+
+       O `busyUntil` é a mesma trava do medidor de quadro, e pela mesma razão:
+       numa janela de carga há sonda, PMREM e compilação somando milhares de
+       chamadas ao total, e uma amostra tirada de lá envenenaria a diferença. */
+    if (agora >= busyUntil) {
+      if (assaSombra) callsComSombra = renderer.info.render.calls;
+      else callsSemSombra = renderer.info.render.calls;
+    }
     /* ---------------- O MEDIDOR DO PERFIL DE QUALIDADE ----------------
        AQUI E EM NENHUM OUTRO LUGAR, porque é depois do `return` do laço sujo —
        ou seja **só em quadro DESENHADO**. Um quadro pulado custa ~0 ms;
@@ -4747,6 +5336,18 @@ export function startLoop() {
        CONSECUTIVOS: ela inclui CPU, GPU, compositor e swap, que é o que a
        pessoa na frente da tela sente.
 
+       ⚠️ O PRIMEIRO DOS DOIS ARGUMENTOS ACIMA ESTAVA CERTO NA CONCLUSÃO E
+       ERRADO NO CULPADO (medido em 2026-08-16). `updateSeeThrough()` sobre esta
+       cena custa **0,011 ms**, não milissegundos — a prova e o método estão no
+       bloco ⚠️⚠️ ESTE MÓDULO NÃO É O GARGALO, em `scene/seethrough.ts`. A
+       premissa "o medidor não via nada disso" continua valendo; o exemplo
+       escolhido para ilustrá-la é que não pesava.
+       É essa confusão que a REPARTIÇÃO EM QUATRO existe para não deixar
+       acontecer de novo: parede e submissão sozinhas nunca disseram QUEM está
+       consumindo a diferença, e três otimizações deste projeto foram escolhidas
+       adivinhando. Ver A PAREDE, REPARTIDA EM QUATRO, junto de
+       `getRenderStats()`.
+
        ⚠️ **CONSECUTIVOS é a palavra que carrega a correção.** Sob o laço sob
        demanda, o intervalo entre um quadro desenhado e o próximo pode conter
        minutos de cena parada — e passar isso como tempo de quadro seria uma
@@ -4767,8 +5368,52 @@ export function startLoop() {
        cima de um pico conhecido faria o nível cair toda vez que o usuário
        trocasse de caminhão — que é o momento em que ele mais está olhando. */
     const wall = lastDrawnAt ? t1 - lastDrawnAt : 0;
+    /* A FATIA QUE O ENGINE NÃO EXECUTA: do fim do `render()` anterior até o rAF
+       deste quadro. Ela só existe quando houve quadro anterior desenhado, pela
+       mesma razão que `wall` — ver `lastDrawnAt`. */
+    const fora = lastDrawnAt ? tRaf - lastDrawnAt : 0;
     lastDrawnAt = t1;
-    reportFrameTime(wall, t1 - t0,
-      framePins > 0 || tweenT < 1 || performance.now() < busyUntil);
+    /* UM SÓ predicado de "não aprenda com isto" para os dois medidores: se a
+       amostra não serve para adaptar, ela também não serve para o painel dizer
+       onde está o gargalo. */
+    const ocupado = framePins > 0 || tweenT < 1 || performance.now() < busyUntil;
+    amostrarReparticao(wall, fora, tPre - tRaf, t0 - tPre, t1 - t0, ocupado);
+    /* ---- ⚠️ `submitMs` VAI DE `tPre`, E NÃO DE `t0` ----
+       O canal de submissão do medidor contava só a linha final, e no cenário
+       Estúdio isso o fazia errar por uma CENA INTEIRA: o reflexo do piso é uma
+       segunda passada completa (`cyclorama.ts` → `floor-reflection.ts`) e ela
+       roda num `drawHook`, ou seja entre `tPre` e `t0`. A razão parede ÷
+       submissão — que é como se lê "limitado por GPU" contra "limitado por CPU
+       fora do render()" — vinha inflada por ela, e um diagnóstico de GPU tirado
+       no Estúdio podia ser só isso.
+
+       ⚠️ A INCOERÊNCIA ERA COM O CONTADOR AO LADO, e é ela que fecha o
+       argumento: `renderer.info.reset()` JÁ foi movido para antes dos
+       `drawHooks` de propósito, justamente para que `calls` signifique "tudo que
+       este quadro submeteu, reflexo do piso incluído" (ver o bloco de
+       `info.autoReset`). O painel mostrava as duas medidas lado a lado
+       descrevendo populações DIFERENTES. Agora não.
+
+       POR QUE NÃO SOMAR `floorReflectionCost()` NO LUGAR — a outra saída
+       possível, e ela é pior por duas razões independentes:
+         · **fecharia um ciclo de importação.** `floor-reflection.ts` e
+           `cyclorama.ts` importam ESTE módulo; importar qualquer um deles daqui
+           é o `ReferenceError` na carga que o cabeçalho deste arquivo abre
+           dizendo que não pode existir. Sairia caro: um gancho de injeção só
+           para contabilidade;
+         · **não generaliza.** Seria um caso especial para UM gancho. O próximo
+           `drawHook` que submetesse trabalho voltaria a ficar de fora, e o
+           defeito reapareceria com outro nome. Medir a JANELA cobre todos.
+
+       O que se perde é nada: a repartição acima continua separando `ganchos` de
+       `submissao`, então quem quiser saber quanto do quadro é o reflexo do piso
+       lê `frameSplit.ganchos` — que existe exatamente para isso.
+
+       ⚠️ E ISTO NÃO MEXE NO CONTROLADOR. `submitMs` alimenta só `emaSubmit`, que
+       é DIAGNÓSTICO; os portões de escala e de nível decidem por `wallMs` e pelo
+       piso de vsync (ver O PISO DE VSYNC em `core/quality.ts`). Conferido antes
+       de mexer, porque o conserto da catraca de mão única mora do outro lado
+       desta mesma chamada. */
+    reportFrameTime(wall, t1 - tPre, ocupado);
   });
 }

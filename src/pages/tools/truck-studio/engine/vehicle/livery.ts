@@ -11,13 +11,16 @@
    studio.ts continua falando só com este arquivo. */
 import * as THREE from 'three';
 import * as fabric from 'fabric';
-import { root, $, isMounted, evTarget } from '../core/dom';
+import { root, $, $opt, isMounted, evTarget } from '../core/dom';
 import { probeHardware } from '../core/quality';
 import { VEHICLES_DIR } from '../core/paths';
 import { assetUrl } from '../catalog/catalog';
 import { invalidate, scene } from '../scene/scene';
 import { setPaintTarget, state as vehicleState } from './models';
-import { takeFaceSnapshots, type FaceSnapshot } from './livery-snapshot';
+/* `trim.ts` importa `models.ts` e mais nada deste lado, então a seta aponta
+   numa direção só — ver `scheduleTrimSnapshot()`. */
+import { onTrimChanged, type TrimKey } from './trim';
+import { takeFaceSnapshots, type FaceSnapshot, type SnapshotKey } from './livery-snapshot';
 import { setStatus } from '../ui/chrome';
 import { initLiveryEditor } from '../ui/livery-editor';
 /* A REPRESENTAÇÃO do painel — faixa refletiva, cantoneira e vãos de porta
@@ -536,10 +539,60 @@ const textures: Record<SurfaceKey, THREE.CanvasTexture> = {
 };
 
 /* ---------------- 3D overlays ----------------
-   Não há registro dos overlays criados. Havia um `liveryMeshes` colecionando os
+   Não há registro das MALHAS de overlay. Havia um `liveryMeshes` colecionando os
    três arrays e NADA nunca o leu: um índice que só é escrito é uma referência
    que segura geometria depois de a carreta ter sido trocada. A textura já é
-   compartilhada e viva, e o descarte vem junto com o descarte do baú. */
+   compartilhada e viva, e o descarte vem junto com o descarte do baú.
+
+   ---------------------------------------------------------------------------
+   O QUE EXISTE É UM REGISTRO DOS MATERIAIS, E ELE NÃO TEM AQUELE DEFEITO
+
+   A camada de arte é uma SEGUNDA passagem transparente sobre a chapa: mesma
+   geometria, `MeshStandardMaterial` (laço de luz completo), `transparent: true`
+   — ou seja, sem early-Z, desenhada na ordem transparente, cobrindo a silhueta
+   inteira do baú. Ela é criada para as CINCO faces e para as DUAS malhas de
+   rebite assim que o implemento monta, tenha o cliente desenhado alguma coisa
+   ou não. Numa sessão em que ninguém abriu o editor — que é a esmagadora
+   maioria — são até SETE chamadas de desenho e sete varreduras de fragmento
+   para compor RGBA(0,0,0,0) sobre a chapa.
+
+   `material.visible = false` tira a malha da lista de render em
+   `projectObject()`, antes de qualquer trabalho, e é reversível num booleano.
+   Para isso é preciso ALCANÇAR o material — daí o registro.
+
+   ⚠️ E ele é de MATERIAIS, não de malhas, de propósito: um material não
+   referencia geometria nenhuma (a textura é a do módulo, que já vive para
+   sempre), então guardá-lo não segura a carreta trocada — que é exatamente o
+   defeito pelo qual `liveryMeshes` foi apagado. Os conjuntos são zerados no
+   topo de `attachOverlays()`, que é o único lugar onde overlays nascem. */
+const overlayMats: Record<SurfaceKey, Set<THREE.MeshStandardMaterial>> = {
+  left: new Set(), right: new Set(), rear: new Set(),
+  front: new Set(), roof: new Set(),
+};
+
+/**
+ * Esta face tem alguma coisa desenhada?
+ *
+ * As DUAS fontes de pixel da tela do fabric, e não há uma terceira: os objetos
+ * do cliente e o FUNDO (`backgroundColor`, que é a camada "Fundo" do editor —
+ * ver `setBackground()` em ../ui/livery-editor.ts). A silhueta tracejada é SVG
+ * no wrapper do DOM e a pilha estrutural é um canvas IRMÃO (`installGuide()`),
+ * então nenhuma das duas põe pixel na tela que vira textura.
+ *
+ * `DEFAULT_BG` é a string vazia, então uma face intocada devolve `false`.
+ */
+function faceHasArt(key: SurfaceKey): boolean {
+  const c = surfaces[key];
+  if (c.getObjects().length > 0) return true;
+  const bg = c.backgroundColor as unknown;
+  return typeof bg === 'string' ? bg.length > 0 : !!bg;
+}
+
+/** Liga ou desliga a camada de arte de uma face conforme ela tenha conteúdo. */
+function syncOverlayVisibility(key: SurfaceKey) {
+  const on = faceHasArt(key);
+  for (const m of overlayMats[key]) m.visible = on;
+}
 
 /* NO polygonOffset. It was here to win the depth test against the panel this
    overlay sits on, and it is not needed for that: the overlay SHARES the panel's
@@ -561,7 +614,8 @@ const textures: Record<SurfaceKey, THREE.CanvasTexture> = {
  * clears the canvas background to transparent, so the overlay stops covering
  * anything. The bias was still there; there was simply nothing left to draw with
  * it. Everything else about the two states is identical. */
-function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
+function makeLiveryOverlay(mesh: THREE.Mesh, key: SurfaceKey) {
+  const texture = textures[key];
   /* ---- UMA SOBREPOSIÇÃO POR CHAPA, SEMPRE ----
      As quatro chapas recortadas são malhas NOVAS a cada recorte, então nelas
      esta função nunca encontra nada. O TETO é outro caso: `TRAILER_ROOF`
@@ -583,6 +637,12 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
     roughness: 0.55,
   });
   if (mat.map) mat.map.channel = 1;
+  /* NASCE NO ESTADO CERTO. Uma face que já tem arte (configuração restaurada,
+     ou um recorte de porta no meio de uma edição) precisa da camada ligada no
+     PRIMEIRO quadro; uma face intocada nunca chega a ser submetida. Sem esta
+     linha o overlay nasceria ligado e só se corrigiria na próxima edição. */
+  mat.visible = faceHasArt(key);
+  overlayMats[key].add(mat);
   const overlay = new THREE.Mesh(mesh.geometry, mat);
   overlay.userData.liveryOverlay = true;      // ver a limpeza no topo da função
   overlay.renderOrder = 2;
@@ -613,9 +673,22 @@ function replaceBgUrl(key: SurfaceKey, next: string) {
   if (old && old !== next) setTimeout(() => URL.revokeObjectURL(old), 10000);
 }
 
-/** Uma refotografia em voo por face; a mais nova ganha (as fotos agora cedem
- *  quadros, então duas podem se cruzar num arrasto de medida). */
-let snapToken = 0;
+/** As quatro faces que o retrato conhece. O TETO não é fotografado — ele é malha
+ *  do corpo paramétrico e não tem chapa recortada; ver `attachOverlays()`. */
+const SNAP_KEYS = ['left', 'right', 'rear', 'front'] as const;
+
+/* Uma refotografia em voo POR FACE, e o "por face" não é preciosismo.
+   ---------------------------------------------------------------------------
+   Era um contador só, e ele bastava enquanto toda refotografia pedia as quatro
+   faces: a mais nova ganhava, e a anterior era descartada inteira. Desde que a
+   cor de uma peça passa a pedir SÓ A TESTEIRA (`scheduleTrimSnapshot()`), um
+   contador global cria uma corrida real: arrastar uma medida dispara as quatro
+   e trocar a cor do Thermo King 200 ms depois incrementa o contador — as três
+   faces que ainda não aterrissaram do primeiro disparo são jogadas fora, e o
+   palco fica com o retrato de uma medida que não existe mais.
+   Um contador por face resolve porque o conflito é por face: duas fotos da MESMA
+   face ainda se cancelam, e duas de faces diferentes convivem. */
+const snapToken: Record<SnapshotKey, number> = { left: 0, right: 0, rear: 0, front: 0 };
 
 /**
  * Refotografa as três faces do implemento corrente e republica janelas,
@@ -626,12 +699,25 @@ let snapToken = 0;
  * comportamento certo para um editor (nunca fica em branco) e o que tira ~0,7 s
  * do bloqueio de thread que um "adicionar porta" causava.
  */
-export async function refreshSnapshots(trailerRoot: THREE.Object3D) {
+export async function refreshSnapshots(
+  trailerRoot: THREE.Object3D,
+  /** SÓ estas faces — ver o parâmetro `only` de `takeFaceSnapshots()`. */
+  only?: readonly SurfaceKey[],
+) {
   if (!isMounted()) return;
   trailerForSnapshots = trailerRoot;
-  const mine = ++snapToken;
+  /* O TETO nunca é fotografado (`takeFaceSnapshots()` só conhece as quatro
+     chapas recortadas), então ele é filtrado aqui em vez de virar um caso
+     especial lá — e um `only` que só pedisse o teto tem de virar nenhuma face,
+     não todas. */
+  const faces = only
+    ? (only.filter((k): k is SnapshotKey => k !== 'roof'))
+    : undefined;
+  if (faces && !faces.length) return;
+  const mine: Partial<Record<SnapshotKey, number>> = {};
+  for (const k of faces ?? SNAP_KEYS) mine[k] = ++snapToken[k];
   await takeFaceSnapshots(scene, trailerRoot, (key, snap) => {
-    if (mine !== snapToken) return;
+    if (mine[key] !== snapToken[key]) return;
     replaceBgUrl(key, snap.bg);
     snapshots[key] = snap;
     /* A ÁREA PINTÁVEL MEDIDA NA FOTO GANHA DA MEDIDA POR CAIXA DE MALHA.
@@ -654,7 +740,48 @@ export async function refreshSnapshots(trailerRoot: THREE.Object3D) {
        registro só se corrigiria no próximo resize da janela. */
     if (key === activeSurface) resizeStage?.(key);
     drawPreview(key);
-  }, [vehicleState.cabGroup]);
+  }, [vehicleState.cabGroup], vehicleState.tk ?? null, faces);
+}
+
+/* ---------------- A COR DE UMA PEÇA TAMBÉM É A CHAPA ----------------
+   O relato de 2026-08-16: *"quando aplico uma cor no Thermo King, não recarrega
+   o livery — a cor é aplicada ao modelo 3D mas não reflete no livery"*. Está
+   exato, e a causa é a mesma de `scheduleRepaintSnapshot()` logo acima, só que
+   por outra porta: desde que o painel do editor virou uma FOTOGRAFIA do baú
+   (ver livery-snapshot.ts), toda peça que aparece na foto passou a ser conteúdo
+   do editor — e a unidade de refrigeração aparece inteira na testeira.
+
+   `vehicle/trim.ts` avisa quando uma peça muda (`onTrimChanged`), e é só isso
+   que falta ligar. Duas decisões:
+
+     · SÓ A TESTEIRA. É a única face em que a unidade aparece (ela é montada na
+       parede dianteira), e refotografar as quatro custaria ~0,7 s e três renders
+       de 2 816 px para reconfirmar pixels que não mudaram. As outras três peças
+       — teto, para-lamas, caixa de cozinha — não entram em retrato nenhum: o
+       teto não é fotografado e as outras duas ficam abaixo da margem inferior do
+       quadro (90 mm nas laterais; ver `M_BOTTOM`).
+     · DEBOUNCED, pelo mesmo motivo do outro: o commit chega no `change` do
+       seletor nativo, mas apagar a cor, escolher outra e desfazer são três
+       eventos em poucos milissegundos.
+
+   O ARRASTO NÃO PASSA POR AQUI de propósito: `setTrimColorLive()` não avisa os
+   ouvintes (é o caminho barato, trinta vezes por segundo), então a foto é refeita
+   uma vez, quando a escolha assenta. */
+let trimTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleTrimSnapshot(key?: TrimKey) {
+  /* SÓ O THERMO KING. As outras três peças não entram em retrato nenhum: o
+     teto não é fotografado e o para-lama e a caixa de cozinha ficam abaixo da
+     margem inferior do quadro (ver `M_BOTTOM` em livery-snapshot.ts). Sem esta
+     linha, trocar a cor do para-lama pagaria um render ortográfico de 150 ms
+     para reconfirmar pixels que não podem ter mudado. */
+  if (key && key !== 'thermoking') return;
+  const trailer = trailerForSnapshots;
+  if (!trailer || !isMounted()) return;
+  if (trimTimer) clearTimeout(trimTimer);
+  trimTimer = setTimeout(() => {
+    trimTimer = null;
+    void refreshSnapshots(trailer, ['front']);
+  }, 200);
 }
 
 /* O reenquadramento do palco é do EDITOR (ele é quem sabe o zoom corrente), e
@@ -673,6 +800,15 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
   };
   /* As calotas de rebite da emenda, filhas da chapa. Ver o bloco abaixo. */
   const rivetsOf: Record<string, SurfaceKey> = { SIDE_L_RIVETS: 'left', SIDE_R_RIVETS: 'right' };
+  /* O REGISTRO DE MATERIAIS É REFEITO AQUI, e este é o único lugar em que ele
+     pode ser: `attachOverlays()` é a única fonte de overlay do motor, e ela roda
+     em toda montagem de implemento e em todo recorte de chapa. Os materiais da
+     geração anterior morrem com as malhas que os vestiam (as quatro chapas são
+     recriadas a cada recorte) ou são descartados no topo de
+     `makeLiveryOverlay()` (o caso do teto, que sobrevive ao rebuild). Sem esta
+     limpeza os conjuntos cresceriam um material por face por rebuild — inertes,
+     mas percorridos a cada edição. */
+  for (const k of SURFACE_KEYS) overlayMats[k].clear();
   trailerRoot.traverse(node => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
@@ -686,7 +822,7 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
        — bake fundido, que não gera rebite — não há o que vestir. */
     const rk = rivetsOf[o.name];
     if (rk) {
-      if (o.geometry?.getAttribute('uv1')) makeLiveryOverlay(o, textures[rk]);
+      if (o.geometry?.getAttribute('uv1')) makeLiveryOverlay(o, rk);
       return;
     }
     const key = byName[o.name];
@@ -699,7 +835,7 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
        que marcar, a malha fica vazia — e um material com `map.channel = 1`
        sobre uma geometria sem o canal 1 amostra lixo em vez de não desenhar. */
     if (!o.geometry?.getAttribute('uv1')) return;
-    makeLiveryOverlay(o, textures[key]);
+    makeLiveryOverlay(o, key);
     measurePanel(o, key);          // a régua em cm sai daqui, não de um número escrito à mão
     /* E a TELA segue a chapa que acabou de ser medida. Sem esta linha o buffer
        ficaria no tamanho literal de core/template.ts e a arte sairia esticada
@@ -1141,6 +1277,13 @@ for (const k of SURFACE_KEYS) {
     paintControlsOnTop(c);
     if (uploaded[k] === rev[k]) return;
     uploaded[k] = rev[k];
+    /* A CAMADA DE ARTE SEGUE O CONTEÚDO, e este é o gancho certo por
+       construção: `rev` só anda quando o conteúdo da tela anda — pelos
+       `DIRTY_EVENTS` (objeto entrou, saiu, moveu, texto mudou) e pelo
+       `markDirty()` que `setBackground()` dispara ao escrever o FUNDO. Trocar a
+       seleção ou arrastar a alça não chega aqui, e é isso que faz o teste ser
+       barato: ele roda uma vez por mudança real, não por quadro. */
+    syncOverlayVisibility(k);
     textures[k].needsUpdate = true;
     /* Sem isto, desenhar no baú NÃO chega ao 3D. O laço de scene/scene.ts é sob
        demanda, e o fabric dispara este evento a partir dos próprios handlers de
@@ -1696,6 +1839,17 @@ export function setSpecialEdition(on: boolean) {
     box.dispatchEvent(new Event('change'));
   }
   if (row) row.classList.toggle('hidden', on);
+  /* E A CÓPIA DELA NA SEÇÃO DO THERMO KING (2026-08-16). Ela espelha o mesmo
+     estado, então some pelo mesmo motivo — deixá-la de pé ofereceria, numa
+     edição especial, a tinta de um caminhão que não tem tinta. Não precisa
+     desligar nada: quem desliga é o `dispatchEvent` acima, e `syncThermoKing()`
+     relê o checkbox de lá. */
+  ($('tk-row-cab') as HTMLElement | null)?.classList.toggle('hidden', on);
+  /* E A TERCEIRA (2026-08-16): a linha do card de Configurações, que oferece a
+     mesma tinta ao para-lama. Ela é construída em runtime por `ui/trim-panel.ts`
+     e pode não existir ainda — daí o `?.`, e daí também `cabPaintRow()` copiar
+     este estado ao nascer: as duas pontas se cobrem. */
+  ($opt('ts-cfg-row-cab'))?.classList.toggle('hidden', on);
 }
 
 /* ---------------- palco ---------------- */
@@ -1852,6 +2006,10 @@ function bindTrailerPaint() {
 export function initLivery() {
   bindTrailerPaint();
   syncImplementColor();
+  /* A cor (ou a ausência) de uma peça muda a FOTO da testeira — ver
+     `scheduleTrimSnapshot()`. Assinado aqui e não no tempo de avaliação do
+     módulo porque a foto só faz sentido com o estúdio montado. */
+  onTrimChanged(scheduleTrimSnapshot);
   /* A miniatura do card não observa o canvas estrutural — ela é um `drawImage`
      de uma vez só. Então quem recompõe avisa, e o card se redesenha. Sem isto,
      mudar uma medida atualizaria o 3D e o palco e deixaria o card velho. */
@@ -1918,7 +2076,38 @@ export function resumeLivery() {
   if (watchdogTimer !== null) return;
   watchdogTimer = setInterval(() => {
     if (!isMounted() || document.hidden) return;
-    try { for (const c of Object.values(surfaces)) c.renderAll(); } catch { /* ignora */ }
+    /* ⚠️ SÓ AS FACES QUE TÊM O QUE PERDER — e a diferença é grande.
+       -------------------------------------------------------------------
+       O guarda de `rev` acima já impede o REENVIO da textura, que era o custo
+       de GPU. O que ele não impede é a REPINTURA 2D, que é síncrona, roda na
+       thread principal e cai no meio de qualquer coisa que o usuário esteja
+       fazendo — inclusive arrastar a câmera.
+
+       E ela não é pequena. `renderAll()` limpa a tela de baixo e, pelo
+       `after:render`, `paintControlsOnTop()` limpa a de CIMA: dois
+       `clearRect` do tamanho do buffer, por face. No baú de fábrica os cinco
+       buffers somam ~13,9 Mpx (lateral 4096x776 duas vezes, traseira e
+       testeira 1465x1536, teto 4096x724), ou seja ~27,8 Mpx de limpeza a cada
+       4 segundos, para sempre, com o estúdio parado.
+
+       O watchdog existe porque um buffer de canvas 2D pode ser DESCARTADO sob
+       pressão de memória, e a repintura o reconstrói a partir do modelo de
+       objetos do fabric — que é a fonte de verdade. Mas uma face SEM objetos e
+       SEM fundo não tem modelo de objetos nenhum: repintá-la produz os mesmos
+       pixels transparentes que o descarte já deixaria. A proteção não perde
+       nada e passa a custar zero na sessão em que ninguém desenhou, que é a
+       esmagadora maioria.
+
+       NÃO se pergunta ao overlay (`material.visible`) e sim a `faceHasArt()`
+       de novo: são perguntas diferentes. O overlay é sobre o que a GPU
+       desenha; isto é sobre o que o canvas tem a reconstruir, e uma face pode
+       ter conteúdo antes de existir chapa em que pendurar overlay. */
+    try {
+      for (const k of SURFACE_KEYS) {
+        if (!faceHasArt(k)) continue;
+        surfaces[k].renderAll();
+      }
+    } catch { /* ignora */ }
   }, 4000);
 }
 

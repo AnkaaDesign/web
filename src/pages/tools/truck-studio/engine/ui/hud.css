@@ -200,17 +200,32 @@
    rule on purpose — a keyboard user tabbing into a slider needs the readable state a mouse
    user gets, and it also holds the panel legible while a pointer drag wanders off the box
    mid-gesture (the dial takes pointer capture, so :hover is genuinely lost there). */
+/* ⚠️ A BORDA DO HOVER É `--accent`, E ISSO É CONSISTÊNCIA E NÃO GOSTO.
+   Relato de 2026-08-16: *"todos os cards têm um border green no hover, exceto a
+   iluminação"*. Ele está certo — `.ts-panel:hover` e `.ts-cfg:hover`
+   (core/studio.css) acendem em verde, e este painel era o único a acender em
+   branco. Um branco a 20 % lê como "o vidro ficou mais opaco"; o verde lê como
+   "isto responde ao ponteiro", que é a mesma coisa que os cards do outro lado da
+   tela estão dizendo. Duas gramáticas para o mesmo gesto, em duas colunas
+   visíveis ao mesmo tempo, é o tipo de diferença que ninguém consegue não ver
+   depois de ver uma vez.
+
+   O par de NOITE fica, e continua sendo uma linha própria: ele não muda mais a
+   COR (as duas são o accent agora), muda o resto — ver o bloco da noite acima,
+   que troca opacidade por borda. Mantê-lo explícito é o que impede a regra de
+   noite (1,1,0) de vencer esta (1,1,0) pela ordem de fonte, que é a armadilha
+   que aquele bloco documenta. */
 .truck-studio-root #ts-hud:hover,
 .truck-studio-root #ts-hud:focus-within {
   background-color: var(--ts-glass-bg-hover);
   backdrop-filter: var(--ts-glass-filter-hover);
   -webkit-backdrop-filter: var(--ts-glass-filter-hover);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--accent);
   box-shadow: var(--ts-glass-shadow-ctl-hover);
 }
 .truck-studio-root #ts-hud[data-tod="noite"]:hover,
 .truck-studio-root #ts-hud[data-tod="noite"]:focus-within {
-  border-color: rgba(255, 255, 255, 0.26);
+  border-color: var(--accent);
 }
 
 /* The DAY surfaces' no-blur fallback lives in studio.css, where swapping the --ts-glass-*

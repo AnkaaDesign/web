@@ -36,9 +36,14 @@ import {
   qualityInfo, setQualityMode, qualityLevel, qualityMode, getProfile,
   coldPending, coldProfile, appliedColdProfile, markColdApplied,
   setAvailableVariants, renderScale, setRenderScale, scaleBand,
-  setColdApplier, cancelPendingColdApply,
+  setColdApplier, cancelPendingColdApply, onQualityChange,
   frameTimeEma, submitTimeEma,
 } from './core/quality';
+import * as merge from './vehicle/merge';
+import * as landingGear from './vehicle/landing-gear';
+import * as licensePlate from './vehicle/license-plate';
+import * as geometryShare from './vehicle/geometry-share';
+import { setShadowCasters } from './vehicle/material-setup';
 import { ENVIRONMENTS_DIR } from './core/paths';
 import * as captureMod from './scene/capture';
 import * as cyclorama from './scene/cyclorama';
@@ -58,16 +63,20 @@ import type { PaintColorDef } from './catalog/colors';
 import type { FinishDef } from './catalog/catalog';
 import { applyEnvironment, getCurrentEnvironment, disposeEnvironments } from './scene/environment';
 import { disposeReflectionProbe } from './scene/probe';
-import { stopRecording } from './scene/record';
+import { stopRecording, recordScene, canRecord, isRecording } from './scene/record';
 import * as trim from './vehicle/trim';
 import { loadLiveryArt } from './vehicle/livery-art';
 import {
   initLoader, showLoader, setLoaderProgress, finishLoader, hideLoader,
   claimPill, paintFrame, withPill,
 } from './ui/loader';
-import { initHud, syncHud, setColdApplyHandler } from './ui/hud';
+import { initHud, syncHud } from './ui/hud';
 import { initWeather } from './scene/weather';
 import { initUI, setStatus, setCaptureSubject, exitFullscreen } from './ui/chrome';
+import * as timelineMod from './scene/timeline';
+import * as outroMod from './scene/outro';
+import { disposeOutro } from './scene/outro';
+import { teardownTimeline } from './ui/timeline';
 /* Ligado daqui e não de dentro de initUI(): ui/paint-panel importa setStatus de
    ui/chrome, então chrome chamar o painel fecharia um ciclo de import. O motor
    já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
@@ -569,6 +578,203 @@ function focusOnRig() {
   invalidateShadows();
 }
 
+/* ===========================================================================
+   A FUSÃO POR MATERIAL — a costura, que é o que mora aqui
+
+   O motor da fusão está em `vehicle/merge.ts`; o QUE não pode ser fundido está
+   com quem é dono de cada peça (`TRIM_MERGE_EXCLUSIONS` em `vehicle/trim.ts`,
+   `PAINT_MERGE_EXCLUSIONS` em `vehicle/models.ts`). Este arquivo é o único que
+   conhece os três ao mesmo tempo, e é essa a definição de raiz de composição.
+
+   O QUE A FUSÃO DEVOLVE, MEDIDO (GARGALO-2026-08-15.md §2.1): 2 230 → 168
+   chamadas no passe principal, quadro 14,9× mais rápido, **com os mesmos
+   triângulos**. Não há qualidade trocada por velocidade: há trabalho
+   desperdiçado sendo removido.
+
+   ---------------------------------------------------------------------------
+   O CAVALO NÃO ENTRA, E ISSO NÃO É CAUTELA — É ARITMÉTICA
+
+   Os bakes de cabine trazem ~85 primitivas em ~85 materiais (§2.3 do GARGALO):
+   fundir por material devolveria 85 baldes para 85 malhas, ou seja ZERO chamada
+   poupada, ao preço de uma cópia inteira da geometria em memória. Todo o ganho
+   vem do implemento, que traz 2 157 primitivas em 38 materiais. Deixar o cavalo
+   fora custa nada e tira do caminho a rip FBX da Scania, o `headlight-cover`, os
+   halos e os feixes de farol.
+
+   ---------------------------------------------------------------------------
+   QUANDO ELA RODA, E POR QUE NESTES DOIS PONTOS SÓ
+
+   1. no fim de `runApply()`, depois de TUDO que mexe em malha ou material —
+      `placeTrailer()`, `refreshVehicleReflection()`, `applyColor()`,
+      `trim.setTrimChoice()` — e antes do primeiro quadro, debaixo da cortina que
+      já está de pé. É o instante em que a cena parou de se mexer;
+   2. em volta de `models.setTrailerDims()`, por `setGeometryGuard()`: solta
+      antes, refaz depois. `TrailerBody.rebuild()` regenera o corpo branco e
+      `TrailerAssembly.set()` transforma a ferragem peça por peça — um balde de
+      pé nesse instante seria medido como se fosse geometria de origem.
+
+   ⚠️ NÃO HÁ UM TERCEIRO PONTO, e isso é uma aposta explícita: quem trocar
+   `mesh.material` de uma malha FORA da lista de exclusões, depois da carga, vai
+   ver a troca não aparecer. As duas listas cobrem os donos que existem hoje
+   (`setPaintTarget`, as quatro peças de `trim.ts`); um dono novo tem de entrar
+   numa delas. O sintoma de esquecer está escrito no cabeçalho de `trim.ts`. */
+
+/** O piso do baú em espaço LOCAL da raiz do implemento — o corte do modo `floor`.
+ *
+ * ⚠️ MEDIDO NA MALHA DO CORPO PARAMÉTRICO, e não em `profile.floorY`. Os dois
+ * dizem a mesma coisa, e só um deles diz no referencial certo: `profile.floorY`
+ * é a coordenada de MUNDO na pose de carga (`TrailerBody` mede por
+ * `mesh.matrixWorld`), e no instante da fusão o implemento já foi engatado,
+ * transladado e INCLINADO pelo engate. Dois graus sobre quinze metros movem a
+ * ponta mais de trinta centímetros — mais que a saia inteira, que é a folga com
+ * que o corte trabalha. A caixa da geometria do corpo, essa, é do referencial da
+ * própria raiz e não sabe nada sobre a pose.
+ */
+function trailerFloorLocalY(): number | null {
+  const body = models.state.trailerRig?.body.mesh;
+  const g = body?.geometry as THREE.BufferGeometry | undefined;
+  if (!g) return null;
+  if (!g.boundingBox) g.computeBoundingBox();
+  return g.boundingBox ? g.boundingBox.min.y : null;
+}
+
+/* ---------------- OS ESCOPOS DA FUSÃO ----------------
+   Ver A FUSÃO POR ESCOPO em `vehicle/merge.ts`. Um escopo é um conjunto de nós
+   que se funde ENTRE SI, num grupo próprio cujo NOME o dono da peça consegue
+   casar com o matcher que ele já tem — e por isso ele preserva a unidade que o
+   dono liga e desliga, em vez de exigir que a peça fique fora da fusão.
+
+   O CRITÉRIO É UMA PERGUNTA SÓ, e ela é respondida por `trim.ts`, não aqui:
+
+       a peça é uma UNIDADE DE VISIBILIDADE, e ela NUNCA troca de material?
+       ou seja, em `TrimSpec`:  hideable && !paintable
+
+   Hoje só a CAIXA DE COZINHA responde sim (`box.paintable` virou `false` em
+   2026-08-13, quando o produto tirou a cor dela), e ela vale **80 → 6 chamadas**
+   — 74 poupadas, 13,4 % do quadro. O teto é `paintable`, os paralamas são
+   `paintable`, o Thermo King é `paintable`.
+
+   ⚠️ ESTA LEITURA PERTENCE A `trim.ts` E ESTÁ AQUI DE PASSAGEM. O campo certo é
+   um `scope?: boolean` em `TRIM_MERGE_EXCLUSIONS.nodes`, escrito por quem possui
+   `SPECS` — ver o patch descrito para o dono daquele arquivo. Enquanto ele não
+   existir, a decisão é tomada aqui pelo `label`, que é a única chave que as duas
+   listas já compartilham.
+
+   ⚠️ E ELA FALHA PARA O LADO SEGURO, de propósito: se o rótulo mudar em
+   `trim.ts`, o `Set` deixa de casar, a caixa volta a ser uma EXCLUSÃO e o
+   comportamento é o de antes desta funcionalidade — 74 chamadas a mais e mais
+   nada. Um acoplamento por string que quebra devolvendo o estado anterior é
+   aceitável; um que quebra desenhando errado não seria. */
+/* ⚠️ O MAPA DE COMPATIBILIDADE FOI APAGADO (2026-08-16). Ele existia porque
+   `TRIM_MERGE_EXCLUSIONS` ainda não tinha o campo `scope`, e a decisão precisava
+   sair de algum lugar enquanto isso. Agora ela sai do DONO da peça — `trim.ts`
+   declara `scope` ao lado da própria regexp, que é onde a invariante
+   (`hideable && !paintable`) pode ser conferida por quem mexe nela. Ter os dois
+   ao mesmo tempo era duas fontes de verdade para a mesma pergunta. */
+
+/** A política da fusão, montada das três fontes que a possuem. */
+function mergePolicy(): merge.MergePolicy | null {
+  const root = models.state.trailer;
+  if (!root) return null;
+  /* Um escopo por exclusão de NÓ que DECLARE um. As que não declaram continuam
+     sendo exclusões, exatamente como antes — o padrão é o comportamento
+     conservador, e acrescentar um escopo é um ato explícito de quem é dono da
+     peça, em `trim.ts`. */
+  const scopes: merge.MergeScope[] = [];
+  for (const e of trim.TRIM_MERGE_EXCLUSIONS.nodes) {
+    if (e.scope) scopes.push({ re: e.re, motivo: e.label, nome: e.scope });
+  }
+  return {
+    root,
+    scopes,
+    excludeRoots: [
+      /* A UNIDADE INTEIRA do Thermo King, e não só a chapa dela: `trim.ts`
+         esconde por `hideRoot` porque a peça tem CINCO malhas (chapa, decalques,
+         logo, corpo e detalhe impresso) e casar por material tirava a carcaça
+         deixando os decalques flutuando. Fundir as outras quatro reproduziria
+         exatamente esse defeito, com o agravante de elas voltarem de dentro de um
+         balde que ninguém consegue desligar. */
+      { root: models.state.tk, motivo: 'trim: Thermo King' },
+    ],
+    excludeNodeRe: [
+      ...trim.TRIM_MERGE_EXCLUSIONS.nodes,
+      /* A PATOLA, e é a única exclusão desta lista que não é sobre COR nem sobre
+         VISIBILIDADE: é sobre POSE. As duas pernas telescópicas descem 301 mm
+         quando a vista é "só o implemento" (ver `vehicle/landing-gear.ts`), e um
+         balde guarda os vértices ASSADOS na pose do instante da fusão — dentro
+         de um balde de `metal-preto` que atravessa o implemento inteiro, mover
+         um pedaço é impossível. Custa DUAS chamadas: o balde continua existindo
+         com 575 membros em vez de 577. */
+      ...landingGear.LANDING_GEAR_MERGE_EXCLUSIONS.nodes,
+      /* A PLACA, pelo mesmo motivo da patola e com o mesmo preço. A do
+         implemento anda o resize inteiro junto com o para-choque (o comprimento
+         cresce para trás), e um balde a congelaria no comprimento antigo. As
+         duas placas ficam de fora; ver `vehicle/license-plate.ts`. */
+      ...licensePlate.LICENSE_PLATE_MERGE_EXCLUSIONS.nodes,
+    ].map((e) => ({ re: e.re, motivo: e.label })),
+    excludeMaterialRe: [
+      ...trim.TRIM_MERGE_EXCLUSIONS.materials,
+      ...models.PAINT_MERGE_EXCLUSIONS.materials,
+    ].map((e) => ({ re: e.re, motivo: e.label })),
+    excludeMeshRe: [
+      ...trim.TRIM_MERGE_EXCLUSIONS.meshes,
+      ...models.PAINT_MERGE_EXCLUSIONS.meshes,
+    ].map((e) => ({ re: e.re, motivo: e.label })),
+    floorY: trailerFloorLocalY(),
+  };
+}
+
+/** Refaz a fusão no modo que o perfil pedir. Sem implemento em cena, não faz nada. */
+function applyMergeNow(mode?: merge.MergeMode): merge.MergeInfo | null {
+  const pol = mergePolicy();
+  if (!pol) return null;
+  const info = merge.applyMerge(pol, mode);
+  /* O passe de sombra desenha outro CONJUNTO de objetos agora — os mesmos
+     triângulos, em outras malhas. Com `shadowMap.autoUpdate = false` o mapa
+     ficaria com o que as origens escreveram antes de sumirem. */
+  invalidateShadows();
+  invalidate();
+  return info;
+}
+
+/* O par suspende/retoma que `models.setTrailerDims()` chama. Registrado no tempo
+   de avaliação deste módulo, como as outras duas assinaturas logo abaixo — não
+   há cena para reconstruir antes do primeiro `applyChoice()`, e `releaseMerge()`
+   sem fusão de pé devolve 0 sem tocar em nada. */
+models.setGeometryGuard(() => {
+  const modo = merge.mergeMode();
+  merge.releaseMerge();
+  /* Refaz no MESMO modo em que estava, e não no que o perfil pede agora: se o
+     usuário trocou de nível no meio do arrasto de medidas, quem manda nisso é o
+     ouvinte de qualidade — refazer aqui pelo perfil faria as duas decisões
+     correrem na mesma janela, e a última a escrever ganharia. */
+  return () => { if (modo !== 'off') applyMergeNow(modo); };
+});
+
+/* ---------------- o nível mudou ----------------
+   Duas coisas, e são independentes.
+
+   1. `mergeVehicle` pode ter mudado de valor. A tabela de qualidade traz os três
+      níveis em `all`, então na prática isto não dispara — mas o campo existe
+      para poder ser desligado num diagnóstico, e um modo que só valesse no boot
+      seria um botão que mente.
+
+   2. `shadowCasterMinM` pode ter mudado, e aí o `castShadow` de TODA malha do
+      veículo está velho — as fundidas e as de origem. `setShadowCasters()` é
+      quem sabe reescrever as duas: nos baldes ele lê a BANDA
+      (`userData.tsMergeBand`) e nas demais o diâmetro de mundo. **Nenhuma
+      refusão acontece aqui**, e é para isso que a banda entra na chave do balde. */
+onQualityChange(() => {
+  const quer = merge.mergeModeFromProfile();
+  if (quer !== merge.mergeMode()) {
+    if (models.state.trailer) applyMergeNow(quer);
+  }
+  for (const raiz of [models.state.trailer, models.state.cab]) {
+    if (raiz) setShadowCasters(raiz);
+  }
+  invalidateShadows();
+});
+
 /* ---------------- redimensionamento do baú ----------------
    A interface disto NÃO mora aqui, e não deve: este é o engine. O que mora aqui
    é a costura entre os três donos que um resize toca e que não se conhecem —
@@ -973,6 +1179,28 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        já avisava. */
     warnIfUnpaintable(color);
 
+    /* ---- A FUSÃO POR MATERIAL ----
+       AQUI, e o lugar é contrato. Depois de `setupCommon()` (que escreveu
+       `tsWorldDiameter` e decidiu quem projeta sombra), depois de
+       `extractDoorKit()` e `buildLiveryPanels()` (que guardam referências e
+       recortam chapas), depois de `placeTrailer()` e `applyColor()` — ou seja,
+       depois de a última coisa que mexe em malha ou material ter mexido. E ANTES
+       de `warmLightPrograms()`, de propósito: quem compila é `renderer.compile()`,
+       que percorre só o que está VISÍVEL. Fundir depois dele deixaria os baldes
+       sem programa compilado e devolveria o engasgo do primeiro quadro que a
+       cortina existe para pagar adiantado.
+
+       ⚠️ `trim.setTrimChoice()` ainda roda LÁ EMBAIXO e troca material das quatro
+       peças de acabamento. Isso é seguro porque as quatro estão na lista de
+       exclusões (`TRIM_MERGE_EXCLUSIONS`) — se um dia não estiverem, a cor
+       escolhida vai parar num material que nenhuma malha visível usa.
+
+       Custa 99 ms (só o que está sob o piso) a 360 ms (tudo), UMA vez, com a
+       cortina de pé — medido na bancada, §2.1 do GARGALO. */
+    phase(0.30, 'Agrupando chamadas de desenho…');
+    await paint();
+    applyMergeNow();
+
     phase(0.35, 'Compilando materiais…');
     await paint();
     /* POR ÚLTIMO, porque compila o que estiver na cena e tudo acima acrescenta a
@@ -1261,6 +1489,12 @@ function releaseScene() {
        por preset), e é o que o `armazem` usa o tempo todo, já que ele não tem
        HDRI. Sem isto, o cenário sem HDRI era justamente o que menos liberava. */
     releaseProceduralEnvCache();
+    /* A vinheta de encerramento é um `<video>` de 1,5 MB com uma textura de
+       1280 × 720 pendurada nele, e não tem por que sobreviver a um minuto fora
+       da rota. Soltar também zera a promessa de carga, então a próxima gravação
+       a busca de novo — e é assim que uma sessão aberta a noite inteira não
+       guarda um vídeo decorativo que ninguém vai ver. */
+    disposeOutro();
     console.info('[truck-studio] cenário liberado após', RELEASE_MS / 1000, 's fora da rota');
   } catch (e) {
     console.warn('[truck-studio] falha ao liberar o cenário', e);
@@ -1515,7 +1749,9 @@ async function boot() {
        "retorno void aceita qualquer coisa" do TypeScript só vale quando o
        retorno alvo é exatamente `void`, não uma união que o contém). O `await`
        aqui é o que mantém o botão podendo esperar a cortina descer. */
-    setColdApplyHandler(async () => { await applyColdQuality(); });
+    /* O HUD não aplica mais a parte fria — ver o bloco MUDANÇA FRIA A CAMINHO
+       em `ui/hud.ts`. `applyColdQuality()` continua publicado em
+       `window.__studio`, que é por onde o console e a bancada a alcançam. */
     /* E O MESMO CAMINHO, DISPARADO POR ATO DO USUÁRIO — ver `setColdApplier()`
        em core/quality.ts para o porquê e para os números.
 
@@ -1575,6 +1811,31 @@ async function boot() {
          de que a imagem baixada sai no teto mesmo com a vista no piso — ver
          `tools/studio-bench/checks-qualidade.mjs`. */
       capture: captureMod,
+      /* O GRAVADOR, pelo console e pela bancada.
+         Ele passou a montar o arquivo à mão (WebCodecs + mediabunny, quadro a
+         quadro, com carimbo próprio) e isso criou três formas NOVAS de errar em
+         silêncio: vídeo preto (o canvas só é legível na mesma tarefa síncrona do
+         render), carimbo com fator de 10⁶ trocado, e emenda de laço com salto de
+         zoom. ⚠️ Nenhuma das três aparece na interface — todas produzem um
+         arquivo que ABRE. `tools/studio-bench/checks-gravacao.mjs` é o portão
+         das três, e sem este afordance ele não tem por onde entrar. */
+      record: { recordScene, stopRecording, canRecord, isRecording },
+      /* O CRIADOR DE VÍDEO, pelo console e pela bancada.
+         Ele é o modo `percurso` do gravador, e a coisa que precisa de afordance
+         é a CURVA: `buildTimelinePath()` devolve `place(t)`, então dá para
+         amostrar o percurso inteiro sem gravar nada e conferir as duas
+         propriedades que o cabeçalho de `scene/timeline.ts` promete — que
+         nenhum instante intermediário sai do intervalo das chaves (a
+         monotonicidade da PCHIP) e que o azimute pega sempre o arco menor. As
+         duas produzem vídeo errado em silêncio se quebrarem: a primeira põe a
+         câmera dentro da carroceria, a segunda dá uma volta inteira ao
+         contrário — e nenhuma das duas aparece antes de alguém assistir. */
+      timeline: timelineMod,
+      /* A VINHETA DE ENCERRAMENTO, para a bancada. Ela substituiu a marca
+         d'água em 2026-08-16, e o que precisa ser conferido mudou junto: não é
+         mais "a bandeira foi solta?" e sim se o fecho de fato ENTROU no arquivo
+         e se a emenda com a cena é uma dissolvência e não um corte. */
+      outro: outroMod,
       /* O handle acompanha o que o perfil GANHOU nesta rodada, e isso não é
          cosmética: é a bancada (`tools/studio-bench/checks-qualidade.mjs`) que
          lê daqui, e um afordance que não alcança o botão dominante deixa de
@@ -1582,6 +1843,14 @@ async function boot() {
            `renderScale`/`setRenderScale`/`scaleBand` — a escala de render, que é
              o multiplicador que o custo de preenchimento segue ao QUADRADO. Era
              o único jeito de medir "quanto disto é resolução".
+           ⚠️ **PARA DIAGNOSTICAR, PREFIRA `stats().frameSplit` AOS DOIS ABAIXO.**
+             Os dois canais dizem que a parede é maior que a submissão e não
+             dizem QUEM consome a diferença — e as duas leituras possíveis (CPU
+             do laço × espera de placa/vsync) pedem consertos OPOSTOS. O
+             `frameSplit` reparte a parede em `fora` (navegador, compositor,
+             vsync, swap), `laco` (a CPU do nosso laço), `ganchos` (os
+             `drawHooks`, onde mora o reflexo do piso) e `submissao`. Ver
+             A PAREDE, REPARTIDA EM QUATRO em `scene/scene.ts`.
            `frameTimeEma`/`submitTimeEma` — os dois canais do medidor. Próximos
              um do outro = limitado por GPU/submissão; parede muito maior =
              limitado por CPU fora do `render()` ou por espera de vsync, e aí
@@ -1606,6 +1875,90 @@ async function boot() {
         get coldPending() { return coldPending(); },
         applyCold: applyColdQuality,
         stats: getRenderStats,
+      },
+      /* A FUSÃO POR MATERIAL, pelo console e pela bancada — e a bancada JÁ
+         PROCURA por aqui: `tools/studio-bench/checks-aceitacao.mjs` lê
+         `S.merge` e chama `S.merge.info?.()`, e reporta "AUSENTE" se não achar.
+
+         `info()` responde as cinco perguntas de uma vez: em que modo está,
+         quantas malhas de origem entraram, em quantos baldes, quantas chamadas
+         isso poupou e quantos milissegundos custou construir — mais o motivo de
+         cada exclusão, por DONO, que é o que se lê quando a conta não fecha
+         ("por que 1 100 malhas ficaram de fora?" tem resposta nominal).
+
+         `apply()` / `release()` existem para o portão de aceitação, que é uma
+         comparação PIXEL A PIXEL do render antes e depois na mesma pose: sem os
+         dois no mesmo processo não há "antes" para comparar. O ciclo
+         aplica→solta→aplica é idempotente de propósito (`applyMerge()` começa
+         soltando), então a bancada pode alternar quantas vezes quiser. */
+      merge: {
+        info: merge.mergeInfo,
+        apply: (mode?: merge.MergeMode) => applyMergeNow(mode),
+        /* O caminho CURTO da sombra: reescreve `castShadow` nos 45 baldes a
+           partir da banda, sem tocar nas ~2 000 origens e sem refundir. O
+           caminho longo (`setShadowCasters()` na raiz inteira) é o que roda na
+           troca de nível, porque lá as origens também envelhecem; este é para
+           quem estiver medindo o corte de sombra do console e não quiser pagar
+           a varredura de 5 852 nós a cada tentativa. */
+        refreshShadow: (minM?: number) => {
+          const n = merge.refreshMergedShadowCasters(minM);
+          invalidateShadows();
+          return n;
+        },
+        release: () => {
+          const n = merge.releaseMerge();
+          invalidateShadows();
+          invalidate();
+          return n;
+        },
+      },
+      /* A PATOLA, pela bancada. `info()` responde as três perguntas que a trava
+         de aceitação faz — ela foi reconhecida?, está descida?, qual é o curso?
+         — e `down()` exercita o ciclo sem depender do card de vista, que é
+         interface. Ver `tools/studio-bench/checks-patola-0816.mjs`. */
+      patola: {
+        info: landingGear.landingGearInfo,
+        down: landingGear.setLandingGearDown,
+      },
+      /* A PLACA, pela bancada. `info()` responde as quatro perguntas do portão
+         de aceitação de uma vez — o manifesto chegou?, a placa do cavalo entrou
+         e em que sítio?, a do implemento achou o para-choque?, e a arte
+         decodificou? A última é a que separa "a peça está lá" de "a peça está
+         lá com a placa desenhada nela", e ela só existe DEPOIS que a textura
+         volta do servidor. Ver `tools/studio-bench/checks-placa-0816.mjs`. */
+      placa: {
+        info: licensePlate.licensePlateInfo,
+        sitio: licensePlate.plateSiteFor,
+      },
+      /* AS QUATRO PEÇAS, pelo console e pela bancada.
+         ---------------------------------------------------------------------
+         Publicado por causa da FUSÃO POR ESCOPO: a caixa de cozinha agora se
+         funde consigo mesma, e o portão de aceitação dela não é uma comparação
+         de pixel e sim QUATRO — fundida/solta × mostrada/escondida (ver
+         `tools/studio-bench/checks-fusao-escopo.mjs`). Sem uma porta para ligar
+         e desligar a peça no mesmo processo, o ciclo que o casulo existe para
+         sustentar não tem como ser exercido, e o defeito que ele previne — as
+         origens reacendendo por cima dos baldes — passaria despercebido.
+         `setTrim()` e não `setTrimChoice()`: o primeiro mexe numa peça e refaz o
+         alvo da tinta, que é o caminho que o card de Configurações usa. */
+      trim: {
+        get: trim.getTrim,
+        set: trim.setTrim,
+        keys: trim.TRIM_KEYS,
+      },
+      /* POSSE DE GEOMETRIA — o par de leituras que diz com qual ACERVO a sessão
+         está falando, e o que o redimensionamento cobrou por ele.
+         `shareStats(raiz)`: quantas malhas dividem uma `BufferGeometry`. Com o
+         `trailer.glb` cru a maior família é 1; com o acervo deduplicado por
+         `tools/studio-assets/dedup-cargas.mjs` ela chega a 104. É a única forma
+         de uma bancada saber qual arquivo foi servido sem ler o arquivo.
+         `claimStats()`: quantos clones o clone-na-escrita fez — o preço, em
+         cópias de buffer intercalado, de manter o compartilhamento correto.
+         Ver `vehicle/geometry-share.ts` e
+         `tools/studio-bench/checks-geometria-partilhada.mjs`. */
+      geometria: {
+        shareStats: geometryShare.shareStats,
+        claimStats: geometryShare.claimStats,
       },
       /* Também no topo, porque a pergunta "quantas chamadas de desenho custa
          isto?" é anterior a qualquer nível de qualidade — ela é o número de que
@@ -1750,6 +2103,14 @@ export function unmountStudio() {
      trocou. O descarte é o que separa isso de "parar", que continua entregando
      o vídeo. Sem efeito quando não há gravação. */
   stopRecording(true);
+  /* ⚠️ DEPOIS do descarte da gravação e ANTES do `stopLoop()`. O DOM do criador
+     sai sozinho — ele mora dentro de `root`, que é solto inteiro logo abaixo —,
+     mas o que ele segurava na CENA não sai: o desvio das construções suspenso e
+     a LENTE, que pode estar numa teleobjetiva de 13°. Sem esta linha, sair da
+     rota com o criador aberto devolveria o estúdio na próxima visita com o
+     enquadramento errado e sem correção de desvio, e nada na interface teria
+     como explicar por quê. */
+  teardownTimeline();
   /* Uma aplicação fria agendada e não disparada reconstruiria a cena depois de
      a rota já ter trocado — cortina no ar sobre uma tela que ninguém está
      vendo, e trabalho de GPU pago por nada. */

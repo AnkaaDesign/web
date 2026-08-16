@@ -31,6 +31,7 @@
 
 import * as THREE from 'three';
 import { WHITE_RE, LOW_FRAME_TOP } from './trailer-geometry';
+import { claimGeometry } from './geometry-share';
 
 /** Grade de solda, em metros. 0,5 mm: fino para separar peças, grosso o
  *  bastante para a chave caber em 45 bits num modelo de 15 m. */
@@ -80,10 +81,26 @@ const SKIRT_BAND = 0.15;
  *  travessa de 2,59 m. */
 const TRIM_MAX = 0.35;
 
-/** Malha sob o piso que ainda vale a pena decompor. Os monstros que o filtro
- *  precisa continuar pulando têm 335 k–924 k vértices; a lanterna lateral que
- *  ele precisa deixar passar tem 150. */
-const HEAVY_VERTS = 50000;
+/**
+ * Malha sob o piso que ainda vale a pena decompor. Os monstros que o filtro
+ * precisa continuar pulando têm 335 k–924 k vértices; a lanterna lateral que
+ * ele precisa deixar passar tem 150.
+ *
+ * ⚠️ ERA 50 000, E PARTIA O PORTA-PLACA EM DOIS. (2026-08-16)
+ *
+ * O painel sob a lanterna traseira vem em DUAS malhas coincidentes — a chapa
+ * furada (53 533 vértices, e é a furação que a engorda) e o fundo dela
+ * (16 069). Com o corte em 50 000 só o fundo passava: num baú alongado em 2 m,
+ * o fundo recuava com a porta e a chapa furada ficava para trás. Medido na
+ * bancada, `plastico-preto_0_8` ia para z −9,273 e `_0_7` ficava em −7,273.
+ *
+ * O acervo sob o piso, contado no `trailer.glb` servido hoje, não tem nada
+ * entre 58 763 e os monstros: para-lama 58 763 · **porta-placa 53 533** ·
+ * estepe e pneus 44 593. 56 000 cai no vazio entre o porta-placa e o
+ * para-lama, e os para-lamas continuam de fora pelo Z de qualquer jeito (eles
+ * moram em z −5,5…−1,5, longe do rabo da traseira).
+ */
+const HEAVY_VERTS = 56000;
 
 /** Fração da meia-largura a partir da qual uma casca é "face externa".
  *  Medido: a face externa fica em |x| 1,28…1,33; a parafusaria de chassi que
@@ -118,9 +135,39 @@ const OUTBOARD = 0.85;
    nos últimos 25 cm do veículo. Daí a faixa abaixo — e ela é estreita de
    propósito: o pneu estepe começa em z = −7,233 e continua fora. */
 
-/** Profundidade da faixa traseira que leva ferragem presa à porta.
- *  A peça mais à frente é a tampa da lanterna, z máx −7,266 → 215 mm de z0. */
-const REAR_TAIL = 0.25;
+/**
+ * Profundidade da faixa traseira que leva ferragem presa à porta.
+ *
+ * ⚠️ ERA 0,25, E DEIXAVA O PORTA-PLACA PARA TRÁS — por 17 mm. (2026-08-16)
+ *
+ * O corte antigo foi calibrado na peça mais dianteira que alguém tinha olhado,
+ * a tampa da lanterna (z máx −7,266, ou 215 mm de z0). Abaixo da lanterna há
+ * mais conjunto, e ele passava despercebido porque também mora sob o piso e
+ * portanto morria no filtro `below` logo acima. Medido no `trailer.glb`, com
+ * z0 = −7,480, as OITO malhas na janela entre 250 e 275 mm são:
+ *
+ *     porta-placa esquerdo/direito (4)  z máx −7,213   z0 + 267 mm
+ *     mão-francesa do quadro (2)        z máx −7,228   z0 + 252 mm
+ *     parafusos dela (2)                z máx −7,205   z0 + 275 mm
+ *
+ * As oito são traseira sem nenhuma dúvida — e as oito ficavam paradas enquanto
+ * a lanterna logo acima delas recuava. Num baú alongado em 2 m, o porta-placa
+ * (e a placa de licenciamento montada nele) ficava 2 m dentro do veículo.
+ *
+ * 0,28 é escolhido no MEIO DO VAZIO, não no limite: a próxima malha para cima é
+ * a prateleira do quadro em z máx −7,176 (z0 + 304 mm), ou seja há 24 mm de
+ * folga antes de varrer qualquer coisa a mais. E a faixa continua estreita pelo
+ * motivo de sempre — o pneu estepe começa em z = −7,233 e continua fora, e as
+ * lanternas laterais e as fitas da saia vivem em z máx −7,136 e além.
+ *
+ * ⚠️ O QUE ESTE NÚMERO **NÃO** CONSERTA, e fica registrado: a prateleira
+ * `Metal-preto_0_20/_0_21` (13 mm de espessura, x ±0,42…0,55, z máx −7,176)
+ * continua parada, porque ela também erra `REAR_GRIP` por 4 mm no outro
+ * extremo. É uma chapa fina e escondida sob o quadro; consertá-la pede rever a
+ * regra, não esticar mais a faixa — esticar até 0,31 varreria junto as
+ * lanternas laterais, que são da SAIA e têm de ficar.
+ */
+const REAR_TAIL = 0.28;
 
 /* --------------------------------------------------------------------------
    BRAÇO ANCORADO NA TRASEIRA — o que começa na porta e avança para a frente
@@ -1678,7 +1725,21 @@ export class TrailerAssembly {
     const inv = new THREE.Matrix4();
 
     for (const piece of this.pieces) {
-      const geo = piece.mesh.geometry as THREE.BufferGeometry;
+      /* ⚠️ CLONE-NA-ESCRITA, E TEM DE SER AQUI — antes de `getAttribute`.
+         Com o acervo deduplicado (`tools/studio-assets/dedup-cargas.mjs`) até
+         104 malhas compartilham UMA `BufferGeometry`, e o laço abaixo escreve
+         nela usando a `matrixWorld` DESTA peça. Sem a posse, a segunda peça
+         sobrescreveria a deformação da primeira e as duas renderizariam a
+         mesma — e no ramo `part.repeated`, que COLAPSA a casca num ponto, a
+         irmã que não virou conjunto simplesmente sumiria.
+
+         `claimGeometry()` devolve a original para a PRIMEIRA peça que escrever
+         e um clone para as seguintes, então uma família que ninguém deforma
+         continua compartilhada. Quem nunca escreve nunca clona.
+
+         Os índices sobrevivem ao clone, que é do que `piece.base` e `part.idx`
+         dependem: mesmos vértices, mesma ordem. Ver `vehicle/geometry-share.ts`. */
+      const geo = claimGeometry(piece.mesh);
       const pos = geo.getAttribute('position') as THREE.BufferAttribute;
       const m4 = piece.mesh.matrixWorld;
       inv.copy(m4).invert();
