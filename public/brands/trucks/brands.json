@@ -71,7 +71,16 @@
     "",
     "Os .glb continuam no disco; o que saiu foi a entrada no catalogo. O S-Way 480",
     "(models/vehicles/iveco.glb) FICA: ele nao duplica geracao nenhuma — e a unica",
-    "S-Way comum do catalogo."
+    "S-Way comum do catalogo.",
+    "",
+    "ORDEM (2026-08-17): dentro de cada fabricante, do mais NOVO para o mais",
+    "antigo, pelo ano de lancamento da cabine. O seletor nao ordena nada — ele",
+    "desenha na ordem deste arquivo (catalog.ts nao tem .sort), entao inserir um",
+    "modelo novo significa por no lugar certo aqui.",
+    "",
+    "Os quatro Volvo sao 'FH <ano>', sem o 16. O UV do emblema dos 2021/2024 diz",
+    "FH16 e a textura do Globetrotter do 2024 e fh16_xl, mas rotular so metade da",
+    "familia de FH16 ficava incoerente na lista, e o pedido foi explicito."
   ],
   "schema": "truck-studio/brands@2",
   "generated": "2026-08-09",
@@ -90,49 +99,43 @@
       "accent": "#041E42",
       "models": [
         {
-          "id": "scania-r-2009",
-          "name": "R 2009",
-          "subtitle": "4x2 · 6x2 · 6x2a-tl",
-          "image": "brands/trucks/scania/models/r-2009.webp",
+          "id": "scania-s-2024e",
+          "name": "S elétrico",
+          "subtitle": "4x2",
+          "image": "brands/trucks/scania/models/s-2024e.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/scania_r_2009_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2",
-              "name": "6x2 (eixo de apoio direcional)",
-              "file": "models/trucks/scania_r_2009_6x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2a-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/scania_r_2009_6x2a_tl.glb",
+              "file": "models/trucks/scania_s_2024e_4x2.glb",
               "available": true
             }
           ]
         },
         {
-          "id": "scania-streamline",
-          "name": "R Streamline",
-          "subtitle": "4x2 · 6x2a-tl",
-          "image": "brands/trucks/scania/models/streamline.webp",
+          "id": "scania-s-2016",
+          "name": "S 2016",
+          "subtitle": "4x2 · 6x2 · 6x2-4",
+          "image": "brands/trucks/scania/models/s-2016.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/scania_streamline_4x2.glb",
+              "file": "models/trucks/scania_s_2016_4x2.glb",
               "available": true
             },
             {
-              "id": "6x2a-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/scania_streamline_6x2a_tl.glb",
+              "id": "6x2",
+              "name": "6x2",
+              "file": "models/trucks/scania_s_2016_6x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2-4",
+              "name": "6x2/4 (eixo de apoio direcional)",
+              "file": "models/trucks/scania_s_2016_6x2_4.glb",
               "available": true
             }
           ]
@@ -173,43 +176,49 @@
           ]
         },
         {
-          "id": "scania-s-2016",
-          "name": "S 2016",
-          "subtitle": "4x2 · 6x2 · 6x2-4",
-          "image": "brands/trucks/scania/models/s-2016.webp",
+          "id": "scania-streamline",
+          "name": "R Streamline",
+          "subtitle": "4x2 · 6x2a-tl",
+          "image": "brands/trucks/scania/models/streamline.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/scania_s_2016_4x2.glb",
+              "file": "models/trucks/scania_streamline_4x2.glb",
               "available": true
             },
             {
-              "id": "6x2",
-              "name": "6x2",
-              "file": "models/trucks/scania_s_2016_6x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2-4",
-              "name": "6x2/4 (eixo de apoio direcional)",
-              "file": "models/trucks/scania_s_2016_6x2_4.glb",
+              "id": "6x2a-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/scania_streamline_6x2a_tl.glb",
               "available": true
             }
           ]
         },
         {
-          "id": "scania-s-2024e",
-          "name": "S elétrico",
-          "subtitle": "4x2",
-          "image": "brands/trucks/scania/models/s-2024e.webp",
+          "id": "scania-r-2009",
+          "name": "R 2009",
+          "subtitle": "4x2 · 6x2 · 6x2a-tl",
+          "image": "brands/trucks/scania/models/r-2009.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/scania_s_2024e_4x2.glb",
+              "file": "models/trucks/scania_r_2009_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2",
+              "name": "6x2 (eixo de apoio direcional)",
+              "file": "models/trucks/scania_r_2009_6x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2a-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/scania_r_2009_6x2a_tl.glb",
               "available": true
             }
           ]
@@ -223,50 +232,29 @@
       "accent": "#1E3A8A",
       "models": [
         {
-          "id": "volvo-fh16-2009",
-          "name": "FH16 2009",
-          "subtitle": "4x2 · 6x2-tl",
-          "image": "brands/trucks/volvo/models/fh16-2009.webp",
+          "id": "volvo-fh-2024",
+          "name": "FH 2024",
+          "subtitle": "4x2 · 6x2-t",
+          "image": "brands/trucks/volvo/models/fh-2024.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/volvo_fh16_2009_4x2.glb",
+              "file": "models/trucks/volvo_fh_2024_4x2.glb",
               "available": true
             },
             {
-              "id": "6x2-tl",
+              "id": "6x2-t",
               "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/volvo_fh16_2009_6x2_tl.glb",
-              "available": true
-            }
-          ]
-        },
-        {
-          "id": "volvo-fh16-2012",
-          "name": "FH16 2012",
-          "subtitle": "4x2 · 6x2-tl",
-          "image": "brands/trucks/volvo/models/fh16-2012.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2",
-              "name": "4x2",
-              "file": "models/trucks/volvo_fh16_2012_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/volvo_fh16_2012_6x2_tl.glb",
+              "file": "models/trucks/volvo_fh_2024_6x2_t.glb",
               "available": true
             }
           ]
         },
         {
           "id": "volvo-fh-2021",
-          "name": "FH16 2021",
+          "name": "FH 2021",
           "subtitle": "4x2 · 6x2-t",
           "image": "brands/trucks/volvo/models/fh-2021.webp",
           "available": true,
@@ -286,22 +274,43 @@
           ]
         },
         {
-          "id": "volvo-fh-2024",
-          "name": "FH16 2024",
-          "subtitle": "4x2 · 6x2-t",
-          "image": "brands/trucks/volvo/models/fh-2024.webp",
+          "id": "volvo-fh16-2012",
+          "name": "FH 2012",
+          "subtitle": "4x2 · 6x2-tl",
+          "image": "brands/trucks/volvo/models/fh16-2012.webp",
           "available": true,
           "chassis": [
             {
               "id": "4x2",
               "name": "4x2",
-              "file": "models/trucks/volvo_fh_2024_4x2.glb",
+              "file": "models/trucks/volvo_fh16_2012_4x2.glb",
               "available": true
             },
             {
-              "id": "6x2-t",
+              "id": "6x2-tl",
               "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/volvo_fh_2024_6x2_t.glb",
+              "file": "models/trucks/volvo_fh16_2012_6x2_tl.glb",
+              "available": true
+            }
+          ]
+        },
+        {
+          "id": "volvo-fh16-2009",
+          "name": "FH 2009",
+          "subtitle": "4x2 · 6x2-tl",
+          "image": "brands/trucks/volvo/models/fh16-2009.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2",
+              "name": "4x2",
+              "file": "models/trucks/volvo_fh16_2009_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/volvo_fh16_2009_6x2_tl.glb",
               "available": true
             }
           ]
@@ -314,48 +323,6 @@
       "logo": "brands/trucks/daf/logo-light.webp",
       "accent": "#0072CE",
       "models": [
-        {
-          "id": "daf-xf-105",
-          "name": "XF 105",
-          "subtitle": "4x2 · 6x2a-tl",
-          "image": "brands/trucks/daf/models/xf-105.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2",
-              "name": "4x2",
-              "file": "models/trucks/daf_xf_105_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2a-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/daf_xf_105_6x2a_tl.glb",
-              "available": true
-            }
-          ]
-        },
-        {
-          "id": "daf-xf-euro6",
-          "name": "XF Euro 6",
-          "subtitle": "4x2 · 6x2-tl",
-          "image": "brands/trucks/daf/models/xf-euro6.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2",
-              "name": "4x2",
-              "file": "models/trucks/daf_xf_euro6_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/daf_xf_euro6_6x2_tl.glb",
-              "available": true
-            }
-          ]
-        },
         {
           "id": "daf-xd",
           "name": "XD",
@@ -409,6 +376,48 @@
               "available": true
             }
           ]
+        },
+        {
+          "id": "daf-xf-euro6",
+          "name": "XF Euro 6",
+          "subtitle": "4x2 · 6x2-tl",
+          "image": "brands/trucks/daf/models/xf-euro6.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2",
+              "name": "4x2",
+              "file": "models/trucks/daf_xf_euro6_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/daf_xf_euro6_6x2_tl.glb",
+              "available": true
+            }
+          ]
+        },
+        {
+          "id": "daf-xf-105",
+          "name": "XF 105",
+          "subtitle": "4x2 · 6x2a-tl",
+          "image": "brands/trucks/daf/models/xf-105.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2",
+              "name": "4x2",
+              "file": "models/trucks/daf_xf_105_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2a-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/daf_xf_105_6x2a_tl.glb",
+              "available": true
+            }
+          ]
         }
       ]
     },
@@ -418,48 +427,6 @@
       "logo": "brands/trucks/iveco/logo.webp",
       "accent": "#003D7D",
       "models": [
-        {
-          "id": "iveco-stralis",
-          "name": "Stralis",
-          "subtitle": "4x2 · 6x2-tl",
-          "image": "brands/trucks/iveco/models/stralis.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2",
-              "name": "4x2",
-              "file": "models/trucks/iveco_stralis_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/iveco_stralis_6x2_tl.glb",
-              "available": true
-            }
-          ]
-        },
-        {
-          "id": "iveco-hi-way",
-          "name": "Stralis Hi-Way",
-          "subtitle": "4x2 · 6x2a-tl",
-          "image": "brands/trucks/iveco/models/hi-way.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2",
-              "name": "4x2",
-              "file": "models/trucks/iveco_hiway_4x2.glb",
-              "available": true
-            },
-            {
-              "id": "6x2a-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/iveco_hiway_6x2a_tl.glb",
-              "available": true
-            }
-          ]
-        },
         {
           "id": "iveco-s-way-480",
           "name": "S-Way",
@@ -486,6 +453,48 @@
               "image": "brands/trucks/iveco/models/s-way-metallica.webp"
             }
           ]
+        },
+        {
+          "id": "iveco-hi-way",
+          "name": "Stralis Hi-Way",
+          "subtitle": "4x2 · 6x2a-tl",
+          "image": "brands/trucks/iveco/models/hi-way.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2",
+              "name": "4x2",
+              "file": "models/trucks/iveco_hiway_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2a-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/iveco_hiway_6x2a_tl.glb",
+              "available": true
+            }
+          ]
+        },
+        {
+          "id": "iveco-stralis",
+          "name": "Stralis",
+          "subtitle": "4x2 · 6x2-tl",
+          "image": "brands/trucks/iveco/models/stralis.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2",
+              "name": "4x2",
+              "file": "models/trucks/iveco_stralis_4x2.glb",
+              "available": true
+            },
+            {
+              "id": "6x2-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/iveco_stralis_6x2_tl.glb",
+              "available": true
+            }
+          ]
         }
       ]
     },
@@ -495,27 +504,6 @@
       "logo": "brands/trucks/mb/logo-light.webp",
       "accent": "#00ADEF",
       "models": [
-        {
-          "id": "mb-actros-mp3",
-          "name": "Actros MP3",
-          "subtitle": "4x2a · 6x2a-tl",
-          "image": "brands/trucks/mb/models/actros-mp3.webp",
-          "available": true,
-          "chassis": [
-            {
-              "id": "4x2a",
-              "name": "4x2",
-              "file": "models/trucks/mercedes_actros_mp3_4x2a.glb",
-              "available": true
-            },
-            {
-              "id": "6x2a-tl",
-              "name": "6x2 (eixo de apoio elevatorio)",
-              "file": "models/trucks/mercedes_actros_mp3_6x2a_tl.glb",
-              "available": true
-            }
-          ]
-        },
         {
           "id": "mb-actros-mp4",
           "name": "Actros MP4",
@@ -533,6 +521,27 @@
               "id": "6x2-tl",
               "name": "6x2 (eixo de apoio elevatorio)",
               "file": "models/trucks/mercedes_actros2014_6x2_tl.glb",
+              "available": true
+            }
+          ]
+        },
+        {
+          "id": "mb-actros-mp3",
+          "name": "Actros MP3",
+          "subtitle": "4x2a · 6x2a-tl",
+          "image": "brands/trucks/mb/models/actros-mp3.webp",
+          "available": true,
+          "chassis": [
+            {
+              "id": "4x2a",
+              "name": "4x2",
+              "file": "models/trucks/mercedes_actros_mp3_4x2a.glb",
+              "available": true
+            },
+            {
+              "id": "6x2a-tl",
+              "name": "6x2 (eixo de apoio elevatorio)",
+              "file": "models/trucks/mercedes_actros_mp3_6x2a_tl.glb",
               "available": true
             }
           ]
