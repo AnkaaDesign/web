@@ -94,8 +94,35 @@ export interface TractorHitch {
    * manifesto). O `rearBody.z` de `hitch.json` é a caixa envolvente do modelo
    * inteiro — a ponta do chassi, 1,6 m ATRÁS da quinta roda — e usá-lo como
    * datum de folga empurraria o implemento 2,4 m para trás. Ver §5 do solver.
+   *
+   * Este é o perfil LARGO — todo x. É o certo para a testeira, que é tão larga
+   * quanto a cabine. Para o que é mais estreito, ver `rearProfiles`.
    */
   rearProfile?: Profile | null;
+  /**
+   * A ESCADA DE LARGURAS — o mesmo perfil, medido dentro de |x| cada vez menor.
+   *
+   * Uma traseira de cabine NÃO É UM PLANO EM X, e tratá-la como um custou o
+   * furo traseiro do FH 2021 4x2. O que fica mais atrás nas alturas do Thermo
+   * King é a ASA (o defletor lateral), e ela vive entre |x| 1,0 e 1,3 — fora da
+   * largura da unidade, que tem 1,996 m. Medindo tudo junto, a asa respondia por
+   * uma folga que o Thermo King nunca teve de vencer: 354 mm a menos em 1,45 m
+   * de altura, o suficiente para reprovar um furo que na verdade cabia.
+   *
+   * Ordenada por `halfWidth` CRESCENTE. `profileFor(w)` toma a primeira entrada
+   * com `halfWidth >= w` — a janela mais justa que ainda cobre o obstáculo
+   * inteiro. Errar para o lado largo só encolhe a folga, então a escolha é
+   * conservadora por construção; errar para o estreito inventaria folga.
+   */
+  rearProfiles?: { halfWidth: number; profile: Profile }[] | null;
+}
+
+/** O perfil válido para um obstáculo de meia-largura `w`. Ver `rearProfiles`. */
+export function profileFor(t: TractorHitch, w: number): Profile | null | undefined {
+  const ladder = t.rearProfiles;
+  if (!ladder || !ladder.length) return t.rearProfile;
+  for (const step of ladder) if (step.halfWidth >= w) return step.profile;
+  return t.rearProfile;
 }
 
 /** O lado IMPLEMENTO — calculado, de `TrailerRig.hitch`, no espaço do rig. */
@@ -126,6 +153,34 @@ export interface ImplementHitch {
   landingGear: { z: number; retractedY: number; extendedY: number } | null;
   /** diagnóstico: as medidas correntes do baú, para a sonda casar as linhas */
   dims?: { width: number; height: number; length: number };
+  /**
+   * TODAS as posições de pino da chapa, no espaço do rig — não só a em uso.
+   *
+   * A chapa deste baú é FURADA PARA DUAS, 800 mm entre elas, e um semirreboque
+   * de verdade é assim: o pino é aparafusado no furo que o cavalo pede, e o
+   * outro fica com a flange cega. Enquanto o engate acreditava numa posição
+   * única — a dianteira, que foi a que o bake congelou —, TODO conjunto do
+   * catálogo ficava com 0,9 a 2,1 m de luz do dia entre a cabine e a testeira,
+   * porque o balanço do pino à testeira é o que fecha essa conta.
+   *
+   * Vazio ou com um item só = baú de furo único; `pickKingpinStation()` devolve
+   * o que está lá e ninguém mexe em nada.
+   */
+  kingpinStations?: KingpinStation[];
+}
+
+/**
+ * Um furo de pino-rei da chapa do implemento.
+ *
+ * `z` é o EIXO DO FURO no espaço do rig, medido da geometria — nunca um offset
+ * declarado. É o mesmo referencial de `ImplementHitch.kingpin.z`, e por isso
+ * trocar de estação é trocar esse número (e mudar o pino de lugar na malha,
+ * que é o que `TrailerRig.setKingpinStation()` faz).
+ */
+export interface KingpinStation {
+  z: number;
+  /** `true` na estação que hoje carrega o pino; as outras têm a flange cega. */
+  hasPin: boolean;
 }
 
 export interface CouplingDefaults {
@@ -273,6 +328,11 @@ export function swingReachZ(
 export interface SolveOptions {
   /** profundidade do Thermo King, que avança na direção da cabine */
   tkDepth?: number;
+  /**
+   * Meia-largura do Thermo King. Sem ela, a unidade é medida contra a traseira
+   * INTEIRA da cabine — inclusive a asa, que passa longe dela. Ver `rearProfiles`.
+   */
+  tkHalfWidth?: number;
   /** limite de articulação considerado no teste de varredura (rad) */
   maxArticulationRad?: number;
   /**
@@ -421,29 +481,53 @@ export function solveCoupling(
   const kingpinResidual = { x: pinNow.x - 0, y: pinNow.y - plateY, z: pinNow.z - 0 };
   const plateResidual = kingpinResidual.y;
 
-  /* §5 — folga: PERFIL + VARREDURA, e ela DENUNCIA em vez de escorregar. */
+  /* §5 — folga: PERFIL + VARREDURA, e ela DENUNCIA em vez de escorregar.
+
+     DOIS OBSTÁCULOS, DUAS LARGURAS. A dianteira do conjunto não é uma parede só:
+     é a TESTEIRA, larga como a cabine, e o THERMO KING, que avança mais 451 mm
+     e é 300 mm mais estreito de cada lado. Medir os dois contra a traseira
+     INTEIRA da cabine é o que reprovava um furo que cabia — nas alturas da
+     unidade quem está mais atrás é a ASA, e ela passa por FORA dela. Cada
+     obstáculo agora responde ao perfil da sua própria largura; ver
+     `rearProfiles` e `profileFor()`. */
   const required = defaults.cabTrailerClearance;
+  const wallHalf = i.dims ? i.dims.width / 2 : 0;
+  const perfilTesteira = profileFor(t, wallHalf);
+  const perfilTk = tkDepth > 0
+    ? profileFor(t, opts.tkHalfWidth ?? wallHalf)
+    : perfilTesteira;
   let gap = Infinity, atY = 0;
   const front: { y: number; z: number }[] = [];
   for (const band of i.frontProfile) {
     const w = toWorldI({ x: 0, y: band.y, z: band.z });
     front.push({ y: w.y, z: w.z });
-    const rear = profileAt(t.rearProfile, w.y);
-    if (rear === null) continue;
-    const g = toWorldT({ x: 0, y: w.y, z: rear }).z - w.z - tkDepth;
-    if (g < gap) { gap = g; atY = w.y; }
+    const rearWall = profileAt(perfilTesteira, w.y);
+    if (rearWall !== null) {
+      const g = toWorldT({ x: 0, y: w.y, z: rearWall }).z - w.z;
+      if (g < gap) { gap = g; atY = w.y; }
+    }
+    if (tkDepth > 0) {
+      const rearTk = profileAt(perfilTk, w.y);
+      if (rearTk !== null) {
+        const g = toWorldT({ x: 0, y: w.y, z: rearTk }).z - w.z - tkDepth;
+        if (g < gap) { gap = g; atY = w.y; }
+      }
+    }
   }
   if (!Number.isFinite(gap)) gap = Infinity;
 
   /* Varredura: o canto dianteiro girando sobre o pino alcança `reachZ` — e é
      na linha de centro que ele chega lá, bem em frente à traseira da cabine. */
-  const halfWidth = i.dims ? i.dims.width / 2 : 0;
+  const halfWidth = wallHalf;
   const overhang = normalize({ x: 0, y: 0, z: i.frontWallZ }, i).z - kp.z;
   const reachZ = swingReachZ(i.swingRadius, halfWidth, overhang, maxArt);
   const kingpinWorldZ = toWorldI({ x: kp.x, y: kpPlateY, z: kp.z }).z;
   let swingGap = Infinity;
   for (const w of front) {
-    const rear = profileAt(t.rearProfile, w.y);
+    /* Aqui o obstáculo é o CANTO do baú varrendo, e ele varre para FORA da
+       largura em repouso — então a janela larga é a certa, e o Thermo King
+       continua descontado por cima dela. */
+    const rear = profileAt(perfilTesteira, w.y);
     if (rear === null) continue;
     const g = toWorldT({ x: 0, y: w.y, z: rear }).z - (kingpinWorldZ + reachZ) - tkDepth;
     if (g < swingGap) swingGap = g;
@@ -562,6 +646,8 @@ export interface ImplementMeasurements {
   landingGear?: { z: number; retractedY: number; extendedY: number } | null;
   /** nº de bandas do perfil da testeira */
   profileBands?: number;
+  /** os furos da chapa, medidos por `TrailerRig.measureKingpinStations()` */
+  kingpinStations?: KingpinStation[];
 }
 
 /**
@@ -602,7 +688,106 @@ export function deriveImplementHitch(m: ImplementMeasurements): ImplementHitch {
     swingRadius: Math.hypot(m.halfWidth, overhang),
     landingGear: m.landingGear ?? null,
     dims: m.dims,
+    kingpinStations: m.kingpinStations,
   };
+}
+
+/* ------------------------------------------------- a ESCOLHA DO FURO DE PINO */
+
+/**
+ * O mesmo implemento com o pino em OUTRO furo.
+ *
+ * Só três campos dependem do furo, e os três saem daqui em vez de serem
+ * digitados em dois lugares: o eixo do pino, o RAIO DE GIRO (que é a hipotenusa
+ * do balanço do pino à testeira com a meia-largura) e nada mais — a chapa, o
+ * bogie, o piso e a testeira são os mesmos furo a furo, porque é o PINO que
+ * muda de lugar, não o baú.
+ */
+export function withKingpinAt(i: ImplementHitch, z: number): ImplementHitch {
+  const halfWidth = i.dims ? i.dims.width / 2 : 0;
+  const overhang = i.frontWallZ - z;
+  return {
+    ...i,
+    kingpin: { ...i.kingpin, z },
+    swingRadius: Math.hypot(halfWidth, overhang),
+  };
+}
+
+export interface StationChoice {
+  /** o furo escolhido, no espaço do rig */
+  z: number;
+  /** a folga cabine↔testeira que ele produz, em metros */
+  gap: number;
+  /** balanço do pino à testeira do furo escolhido */
+  overhang: number;
+  /** todos os furos avaliados, do mais justo para o mais folgado */
+  ranked: { z: number; gap: number; overhang: number; fits: boolean }[];
+  /**
+   * - `justo`: o furo mais recuado que ainda respeita a folga mínima. É o caso
+   *   normal e é o que aproxima o conjunto.
+   * - `unico`: o baú só tem um furo — nada a escolher.
+   * - `nenhum-cabe`: nem o furo mais dianteiro fecha a folga neste cavalo.
+   *   Escolhe o MENOS ruim e denuncia; ninguém fica sem pino.
+   */
+  reason: 'justo' | 'unico' | 'nenhum-cabe';
+}
+
+/**
+ * Qual furo da chapa usar COM ESTE CAVALO.
+ *
+ * A regra é a da vida real, e ela não tem número mágico nenhum: **o furo mais
+ * RECUADO que ainda deixa a testeira livrar a cabine**. Recuar o pino aumenta o
+ * balanço até a testeira e, como o pino é a âncora do conjunto, é a testeira que
+ * vem para a frente — cada milímetro de balanço é um milímetro a menos de luz do
+ * dia atrás da cabine. O limite é a própria folga mínima do manifesto
+ * (`cabTrailerClearance`); abaixo dela o baú bate na cabine.
+ *
+ * Por que a decisão é do CAVALO e não da configuração de eixos: o que ela mede é
+ * a distância da traseira da cabine à garganta da quinta roda, e essa distância
+ * não pergunta quantos eixos o chassi tem. Um 4x2 de quinta roda recuada (o
+ * Volvo FH 2021 mede 2,02 m) pede o mesmo furo que um 6x2; um 4x2 de quinta roda
+ * colada na cabine (o Iveco S-Way, 1,65 m) não tem onde pôr o baú e fica no furo
+ * dianteiro. Amarrar isso a "4x2 usa o furo A, 6x2 usa o B" seria acertar a
+ * maioria e errar as pontas em silêncio.
+ *
+ * A conta de cada furo é o SOLVER INTEIRO, não uma subtração: a inclinação de
+ * engate mexe em z, e é a folga que o conjunto REALMENTE terá que decide. São
+ * dois ou três `solveCoupling()` de aritmética pura por troca de cavalo.
+ */
+export function pickKingpinStation(
+  t: TractorHitch,
+  i: ImplementHitch,
+  stations: KingpinStation[],
+  defaults: CouplingDefaults = FALLBACK_DEFAULTS,
+  opts: SolveOptions = {},
+): StationChoice | null {
+  const list = (stations ?? []).filter((s) => Number.isFinite(s.z));
+  if (!list.length) return null;
+
+  /* Do mais RECUADO (maior balanço, conjunto mais curto) para o mais dianteiro.
+     A ordem É a preferência — a primeira que couber ganha. */
+  const ranked = list
+    .map((s) => {
+      const sol = solveCoupling(t, withKingpinAt(i, s.z), defaults, opts);
+      return {
+        z: s.z,
+        gap: sol.clearance.gap,
+        overhang: i.frontWallZ - s.z,
+        fits: sol.clearance.gap >= defaults.cabTrailerClearance,
+      };
+    })
+    .sort((a, b) => b.overhang - a.overhang);
+
+  if (ranked.length === 1) {
+    const only = ranked[0];
+    return { z: only.z, gap: only.gap, overhang: only.overhang, ranked, reason: 'unico' };
+  }
+  const fit = ranked.find((r) => r.fits);
+  if (fit) return { z: fit.z, gap: fit.gap, overhang: fit.overhang, ranked, reason: 'justo' };
+
+  /* Nenhum cabe: o menos ruim é o de MAIOR folga, que é o último da ordem. */
+  const best = ranked[ranked.length - 1];
+  return { z: best.z, gap: best.gap, overhang: best.overhang, ranked, reason: 'nenhum-cabe' };
 }
 
 /* --------------------------------------------------------------- manifesto */
