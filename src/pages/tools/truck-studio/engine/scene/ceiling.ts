@@ -108,7 +108,36 @@ const EXTENT_MIN = 24, EXTENT_MAX = 44;
    A FAIXA existe para não haver estalo. Ela termina abaixo de `H` e não em `H`
    porque o que incomoda não é atravessar a laje, é a viga entrar entre a lente e
    a cabine — e isso começa a acontecer alguns metros antes. */
-const FADE_LO = 10.6, FADE_HI = 13.2;
+/* ⚠️ A FAIXA SEGUE `H`, E ANTES ERA CRAVADA — o defeito que o comentário de
+   `CEIL_RATIO` previu, uma constante acima: *"um número cravado aqui volta a
+   divergir sem aviso"*. A altura da laje virou dinâmica (11…17 m) e estes dois
+   números ficaram absolutos, em 10,6 e 13,2.
+
+   O relato foi *"as lâmpadas do teto, as quadradas, às vezes somem quando
+   movimento a câmera"*, e a conta explica o "às vezes": o próprio bloco de
+   `CEIL_RATIO` registra que a pose de catálogo põe a câmera a **9,8 m** do chão
+   — a 80 cm do início da faixa antiga. Orbitar um palmo para cima já começava a
+   apagar o teto, com a laje ainda 3,4 m acima da lente.
+
+   E divergia nas duas pontas: com a sala no mínimo (H = 11) o fim da faixa
+   (13,2) ficava ACIMA da laje, então o teto nunca apagava por completo nem com a
+   câmera acima dele; com a sala no máximo (H = 17) ele apagava inteiro a 3,8 m
+   ABAIXO da laje.
+
+   Agora são recuos A PARTIR da laje, que é o que a intenção autorada sempre
+   disse — "termina abaixo de `H` porque a viga entra entre a lente e a cabine
+   alguns metros antes". O que muda é o "alguns": 1,6 m em vez de 3,4, porque a
+   3,4 m a viga ainda está muito acima da linha de visada e o que se perdia era
+   só a softbox, que é a única coisa ACESA do teto — daí ela ser a que some
+   primeiro aos olhos, mesmo o esmaecimento sendo uniforme (todos os cinco
+   materiais estão em `materials`).
+
+   POR QUE NÃO ZERO: a laje tem espessura e a viga pende abaixo dela, então
+   apagar só ao cruzar `H` deixaria a câmera atravessar a grelha visível. Vinte
+   centímetros de folga cobrem a viga sem antecipar o apagamento. */
+const FADE_BELOW_LO = 1.6, FADE_BELOW_HI = 0.2;
+const fadeLo = () => H - FADE_BELOW_LO;
+const fadeHi = () => H - FADE_BELOW_HI;
 
 /* ---------------- cinzas ----------------
    Todos R=G=B exatos, pela mesma razão que o ciclorama inteiro é: esta é a cena
@@ -756,7 +785,7 @@ function applyFade() {
   if (!group.visible || !built) return;
   /* Altura ABSOLUTA da câmera: o piso do mundo é y=0 e a sala segue o rig só em
      x/z, então a faixa não precisa ser relativa ao grupo. */
-  const k = 1 - THREE.MathUtils.smoothstep(camera.position.y, FADE_LO, FADE_HI);
+  const k = 1 - THREE.MathUtils.smoothstep(camera.position.y, fadeLo(), fadeHi());
   if (Math.abs(k - faded) < 0.01) return;
   faded = k;
   const on = k > 0.004;
