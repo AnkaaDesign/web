@@ -159,16 +159,83 @@ const sameRig = (a: Choice | null, b: Choice | null) =>
    duas superfícies passariam a discordar. */
 const withTrim = (choice: Choice): Choice => {
   const t = trim.trimChoice();
-  return t ? { ...choice, trim: t } : choice;
+  const base = t ? { ...choice, trim: t } : choice;
+  return withMeasures(base);
 };
+
+/* AS MEDIDAS DO BAÚ ENTRAM EM TODA GRAVAÇÃO, pelo mesmo motivo do `trim` logo
+   acima: elas não vêm do seletor, mudam a qualquer momento pelo editor, e sem
+   isso viveriam só até o próximo F5.
+   E aqui isso não é conveniência — é correção. A PLOTAGEM é persistida e as
+   medidas não eram, então um F5 devolvia a arte de um baú de 15,4 m colada num
+   baú de fábrica: *"continua perdendo a referência de tamanho, posição etc."*.
+   Lidas de `getImplementMeasures()` NA HORA, nunca de uma cópia guardada aqui —
+   é como as duas superfícies passariam a discordar.
+   AUSENTE quando o baú está na medida de fábrica: gravar o padrão faria
+   `sameRig()` enxergar diferença onde não há. */
+function withMeasures(choice: Choice): Choice {
+  const m = liveryStructure.getImplementMeasures();
+  if (!m.resizable) return choice;
+  const base = models.state.trailerRig?.base;
+  const mudou = !base
+    || Math.abs(m.height - base.height) > 1e-4
+    || Math.abs(m.length - base.length) > 1e-4;
+  const doors: NonNullable<Choice['measures']>['doors'] = {};
+  let temPorta = false;
+  for (const k of liveryStructure.STRUCTURE_KEYS) {
+    const list = m.doors[k];
+    if (list?.length) { doors[k] = list.map((d) => ({ ...d })); temPorta = true; }
+  }
+  if (!mudou && !temPorta) return choice;
+  return {
+    ...choice,
+    measures: {
+      height: m.height,
+      length: m.length,
+      ...(temPorta ? { doors } : {}),
+    },
+  };
+}
+
+/* Uma mudança de MEDIDA grava a escolha de novo — mesma assinatura que
+   `onTrimChanged` usa para os acabamentos, e pelo mesmo motivo. */
+liveryStructure.onMeasuresChanged(persistChoice);
 
 /* Uma mudança de acabamento grava a escolha ATUAL de novo. Sem isto a cor do
    teto viveria só até o próximo F5 — e ela é uma decisão de produto, não um
    estado de sessão. Ver `onTrimChanged` em vehicle/trim.ts para por que a
    notificação vem por assinatura. */
-trim.onTrimChanged(() => {
-  if (currentChoice) saveChoice(withTrim(currentChoice));
-});
+trim.onTrimChanged(persistChoice);
+
+/**
+ * Grava a escolha corrente E ATUALIZA A CÓPIA EM MEMÓRIA.
+ *
+ * ⚠️ A SEGUNDA METADE É A CORREÇÃO, e a ausência dela era um defeito relatado:
+ * *"navego e volto para a página, quase tudo está correto, só o Thermo King que
+ * volta para a cor original"*.
+ *
+ * Os dois ouvintes acima faziam `saveChoice(withTrim(currentChoice))` — ou seja
+ * escreviam o acabamento no `localStorage` e deixavam `currentChoice` como
+ * estava, SEM `trim`. E é a cópia em memória que a saída de rota carrega:
+ * `releaseScene()` faz `releasedChoice = currentChoice`, e a volta reaplica
+ * ELA. Resultado: `trim.setTrimChoice(undefined)` no `runApply`, e a peça volta
+ * de fábrica.
+ *
+ * POR QUE SÓ O THERMO KING APARECIA, e não as medidas: o implemento NÃO é
+ * remontado na volta (só a cena é liberada), então a geometria redimensionada
+ * simplesmente continua lá. O acabamento não tem essa sorte — ele é
+ * ATIVAMENTE reescrito por `trim.setTrimChoice()`, e reescrever com vazio é o
+ * que apaga. Estado que sobrevive por inércia esconde o defeito; estado que é
+ * reaplicado o denuncia.
+ *
+ * `withTrim()` já embute as medidas (ver `withMeasures`), então uma função
+ * cobre os dois ouvintes.
+ */
+function persistChoice() {
+  if (!currentChoice) return;
+  currentChoice = withTrim(currentChoice);
+  saveChoice(currentChoice);
+}
 
 /* "É a mesma escolha, ponto?" — a pergunta do dedupe. A cor ENTRA aqui: sem
    ela, escolher outra cor para o mesmo caminhão seria descartado como repetido
@@ -1461,6 +1528,18 @@ async function runApply(
        não antes: `setTrimChoice()` escreve material em malhas do implemento, e
        até esta linha o implemento pode ser o do caminhão anterior. */
     trim.setTrimChoice(choice.trim);
+    /* E AS MEDIDAS GRAVADAS, aqui e não antes, pela mesma razão que o `trim`:
+       até esta linha o implemento pode ser o do caminhão anterior.
+       ANTES da plotagem assentar, e é isso que torna a restauração exata: o
+       recorte redimensiona as chapas, `attachOverlays()` remede o painel e
+       `syncSurfaceAspect()` põe a tela do fabric na proporção nova. A arte que
+       chegar depois disso encontra a tela do tamanho em que foi autorada — e a
+       que já tiver chegado é remapeada preservando o milímetro. Sem isto o F5
+       devolvia arte de um baú de 15,4 m sobre um baú de fábrica.
+       Um recorte só, com portas e medida juntas: `models.setTrailerDoors()`
+       delega a `setTrailerDims()`, então encenar as portas antes e disparar uma
+       vez é a diferença entre um recorte de ~3 s e quatro deles. */
+    applySavedMeasures(choice.measures);
     /* E a escolha de VISTA (conjunto / só cavalo / só implemento) é reescrita
        nos grupos: a troca de caminhão acabou de repovoá-los, e um grupo novo
        nasce visível. Sem esta linha, quem estivesse olhando só o implemento
@@ -1606,6 +1685,40 @@ function applyChoice(
     `${resolved.model.name} · aguardando o carregamento atual…`,
     () => runApply(resolved, first, curtain, !!opts.keepCurtain),
   );
+}
+
+/**
+ * Escreve as medidas gravadas no implemento recém-montado.
+ *
+ * Silencioso quando não há o que fazer: bake que não redimensiona, escolha sem
+ * o campo (o caso comum — baú de fábrica sem porta), ou geometria ausente.
+ * Nunca lança: uma medida que a geometria recuse não pode impedir o caminhão de
+ * aparecer, e o `catch` de `runApply` está longe demais para dizer o que foi.
+ */
+function applySavedMeasures(m: Choice['measures']) {
+  if (!m) return;
+  const rig = models.state.trailerRig;
+  if (!rig) return;
+  try {
+    /* As portas ENCENADAS primeiro — `stageDoors()` só enfileira. Só `left` e
+       `right` chegam à geometria: a traseira já traz as folhas modeladas no
+       bake, a testeira carrega o pino-rei e o teto não tem porta. É a mesma
+       inclusão que `pushDoorsToGeometry()` faz, pelas mesmas razões. */
+    for (const face of ['left', 'right'] as const) {
+      const list = m.doors?.[face] ?? [];
+      rig.stageDoors(face, list.map((d) => ({ ...d })));
+    }
+    const patch: { height?: number; length?: number } = {};
+    if (m.height !== undefined) patch.height = m.height;
+    if (m.length !== undefined) patch.length = m.length;
+    models.setTrailerDims(patch);
+    /* E as medidas voltam da GEOMETRIA para os campos do editor: a altura fecha
+       um número inteiro de frisos, então o que o baú aceitou raramente é o que
+       foi pedido. */
+    liveryStructure.refreshFromTrailer();
+  } catch (e) {
+    console.warn('[truck-studio] medidas gravadas não puderam ser aplicadas —', e);
+  }
 }
 
 /* ---------------- liberação diferida da GPU ----------------

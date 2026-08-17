@@ -39,22 +39,15 @@ import type { Popover } from './chrome';
    documento (a leitura do ZIP) é esta camada, e ela não tem por que pedir isso
    emprestado ao modelo de documento. `showLoader()` é idempotente, então as duas
    mãos no mesmo volante não brigam: a segunda chamada não reinicia nada. */
-/* `withPill` FICA, e só para SALVAR: gravar na biblioteca não muda um pixel da
-   cena, então tomar a tela com a cortina seria desproporcional. A cortina é para
-   quem REMONTA a cena — abrir e importar. */
-import {
-  claimPill, withPill, showLoader, setLoaderProgress, finishLoader, hideLoader,
-} from './loader';
-
-const showCurtain = (label: string) => { showLoader(); setLoaderProgress(0, label); };
-const setCurtainProgress = (p: number, label?: string) => setLoaderProgress(p, label);
-const finishCurtain = async () => {
-  /* Sem `flyToBadge`: aqui a cortina está saindo porque NADA foi montado (erro
-     de leitura ou desistência), e voar a foto para o crachá anunciaria uma troca
-     de veículo que não houve. */
-  try { await finishLoader({ flyToBadge: false }); }
-  catch { hideLoader(); }
-};
+/* A CORTINA NÃO É DESTA CAMADA — ela é de `applyProject()`, que a levanta
+   depois da última pergunta e a segura até a plotagem estar no 3D. Esta camada
+   chegou a comandá-la para cobrir a leitura do ZIP, e isso foi REMOVIDO: uma
+   cortina que sobe, desce para perguntar e sobe de novo é o que o dono do
+   produto chamou de "2 loadings meio que remontados". Ver o ⚠️ em
+   `importFile()`.
+   `withPill` fica, e só para SALVAR: gravar na biblioteca não muda um pixel da
+   cena, então tomar a tela com a cortina seria desproporcional. */
+import { claimPill, withPill } from './loader';
 import {
   captureProject, applyProject, newProject, verifyProject,
 } from '../project/document';
@@ -544,20 +537,24 @@ async function importFile(file: File) {
      então ela cabe aqui, antes de tudo. Quem cancela nunca vê cortina nenhuma. */
   if (!await confirmDestructive('Importar projeto')) return;
 
-  showCurtain('Lendo o arquivo do projeto…');
-  setCurtainProgress(0.04, 'Lendo o arquivo do projeto…');
+  /* ⚠️ NENHUMA CORTINA ATÉ A ÚLTIMA PERGUNTA. Regra do dono do produto, dita
+     depois de ver a conferência flutuando sobre a barra de progresso: *"eu
+     deveria primeiro falar se quero substituir o atual projeto, para depois
+     mostrar o loading atrás"*.
+     A tentação era subir a cortina durante a LEITURA e derrubá-la para
+     perguntar. Já foi tentado e é o que a foto mostra: cortina → pergunta →
+     cortina é a mesma coisa que ele chamou de "2 loadings meio que remontados",
+     só que em série. Então a leitura acontece SEM indicador — ela é local, e o
+     seletor de arquivo acabou de fechar, o que já é o sinal de que algo está
+     acontecendo. A cortina entra uma vez só, quando não há mais nada a
+     perguntar, e vai até o fim. */
   let doc: StudioProject;
   let problems: string[];
   try {
     const read = await readProjectFile(file);
     doc = read.doc;
     problems = read.problems;
-    setCurtainProgress(0.15, 'Conferindo o projeto…');
   } catch (err) {
-    /* A cortina TEM de sair antes do diálogo: ela é z-index 400 e o diálogo
-       10000, então ele apareceria por cima de uma cortina viva — e se o usuário
-       desistisse, ela ficaria de pé sobre uma cena que ninguém vai montar. */
-    await finishCurtain();
     const message = err instanceof ProjectFileError
       ? err.message
       : 'Não foi possível ler este arquivo: ' + errText(err);
@@ -581,15 +578,10 @@ async function importFile(file: File) {
      deixar a cortina pendurada sobre uma cena que ninguém vai montar, então as
      duas saídas a derrubam. Quando o usuário confirma, a cortina é entregue de
      pé para `applyProject()`, que a segura até o fim e a desce no `finally`. */
-  /* A LISTA DE PROBLEMAS, quando existe, é a exceção — e ela também não pode ser
-     lida por cima de uma barra andando. Aqui a cortina DESCE para perguntar e
-     `applyProject()` a levanta de novo se o usuário seguir. No caminho comum
-     (nenhum problema) nada disto roda e a cortina atravessa inteira, que é o
-     que foi pedido: um loading só. */
-  if (all.length) {
-    await finishCurtain();
-    if (!await confirmProblems(all, 'Importar projeto')) return;
-  }
+  /* A última pergunta, quando há o que perguntar. Ainda sem cortina nenhuma —
+     ver o ⚠️ acima. Depois desta linha não se pergunta mais nada, e é aí que
+     `applyProject()` levanta a cortina e a segura até o fim. */
+  if (all.length && !await confirmProblems(all, 'Importar projeto')) return;
 
   await runApply(doc, () => {
     /* SEM id: um projeto importado ainda não é da biblioteca desta máquina. O

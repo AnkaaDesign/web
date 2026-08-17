@@ -629,6 +629,36 @@ export async function restorePersisted(): Promise<boolean> {
   let payload: (Partial<LiveryDocState> & { v?: number }) | null;
   try { payload = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch { return false; }
   if (!payload || payload.v !== 1) return false;
+
+  /* ⚠️ RASCUNHO SEM QUADRO DE AUTORIA É DESCARTADO, e a alternativa era pior.
+     -------------------------------------------------------------------------
+     O `frame` (tela em px + chapa em mm) passou a ser gravado só agora; um
+     rascunho anterior traz coordenadas de pixel de uma tela cujo tamanho
+     ninguém sabe. `remapArtFrom()` devolve `false` para quadro ausente, então a
+     arte entraria CRUA — e como a resolução da tela segue o tamanho exibido, ela
+     entra ampliada ou encolhida. Foi exatamente o relato, com foto: *"olhe só
+     como está o livery"* depois de um F5.
+
+     A instrução do dono do produto foi explícita e dá os dois lados aceitáveis:
+     *"ou mantém exatamente o posicionamento dos elementos, logos, textos no
+     livery, ou reseta ele quando atualizar"*. Com quadro, mantém-se exatamente
+     (é o caminho normal daqui para a frente). Sem quadro, não há como manter
+     exatamente — então reseta, que é o outro lado da mesma instrução.
+
+     Uma face VAZIA não é descartada: não há o que posicionar errado nela, e
+     apagá-la só custaria a cor de fundo que o usuário escolheu. */
+  const semQuadro = SURFACE_KEYS.some((k) => {
+    const st = payload[k];
+    const objs = (st?.o?.objects as unknown[] | undefined) ?? [];
+    return objs.length > 0 && !st?.frame;
+  });
+  if (semQuadro) {
+    console.info('[livery] rascunho anterior descartado: ele não registra em que'
+      + ' escala foi desenhado, e reposicioná-lo seria adivinhação.');
+    try { localStorage.removeItem(STORE_KEY); } catch { /* idem */ }
+    return false;
+  }
+
   return importLivery(payload);
 }
 
