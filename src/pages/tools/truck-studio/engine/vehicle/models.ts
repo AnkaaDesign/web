@@ -3306,8 +3306,18 @@ function addLiveryUV(geo: THREE.BufferGeometry, key: LiveryPanelName) {
        plano XZ — `y` não entra em nada.
        ---------------------------------------------------------------------
        O quadro é o de quem olha o baú DE CIMA, com a traseira à esquerda e a
-       dianteira à direita, que é o mesmo sentido da lateral do MOTORISTA
-       (SIDE_L). Fixada a leitura, `v` está determinado e não é escolha: com a
+       dianteira à direita, que é o mesmo sentido da SIDE_L.
+
+       ⚠️ ESTA LINHA DIZIA "a lateral do MOTORISTA (SIDE_L)", E ESTAVA ERRADA.
+       A SIDE_L sai do MENOR x; com a frente no +Z, o lado esquerdo do veículo é
+       o +X, ou seja a SIDE_R. Logo a SIDE_L é o lado do PASSAGEIRO, e o teto
+       compartilha o sentido de leitura DELE, não o do motorista. O erro não
+       estava na geometria — o `u` do teto continua o mesmo — mas o comentário
+       era a origem documental do rótulo trocado que o dono do produto relatou
+       (ver `SIDE_LABEL` em vehicle/livery.ts).
+       Se um dia o teto tiver de acompanhar o motorista, o que muda é este `u`
+       para `(b.max.z − z)/spanZ` — e isso INVERTE a arte de teto já salva, então
+       é decisão de produto, não arrumação. Fixada a leitura, `v` está determinado e não é escolha: com a
        lente apontando para −Y e o +Z indo para a direita da tela, o para-cima
        da tela é o +X (regra da mão direita). Como `v` cresce para BAIXO — a
        CanvasTexture é construída com flipY = false —, ele tem de correr de

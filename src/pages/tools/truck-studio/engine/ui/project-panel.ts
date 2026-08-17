@@ -534,6 +534,16 @@ function ensureFileInput(): HTMLInputElement {
    a primeira fatia da mesma barra — 0 a 15 %, antes de o `applyProject()` assumir
    em 15 e seguir até o fim. A pílula sai. */
 async function importFile(file: File) {
+  /* A PERGUNTA DESTRUTIVA VEM ANTES DE QUALQUER CORTINA.
+     Relato: *"2 loadings meio que remontados"* — e a foto mostra o diálogo
+     "Substituir?" flutuando sobre uma cortina que já dizia "Montando a cena".
+     Perguntar por cima de um indicador de progresso é dizer duas coisas
+     contraditórias ao mesmo tempo: "estou trabalhando" e "não vou fazer nada até
+     você responder".
+     Esta confirmação NÃO precisa do arquivo — ela só conta o que está na tela —,
+     então ela cabe aqui, antes de tudo. Quem cancela nunca vê cortina nenhuma. */
+  if (!await confirmDestructive('Importar projeto')) return;
+
   showCurtain('Lendo o arquivo do projeto…');
   setCurtainProgress(0.04, 'Lendo o arquivo do projeto…');
   let doc: StudioProject;
@@ -571,8 +581,15 @@ async function importFile(file: File) {
      deixar a cortina pendurada sobre uma cena que ninguém vai montar, então as
      duas saídas a derrubam. Quando o usuário confirma, a cortina é entregue de
      pé para `applyProject()`, que a segura até o fim e a desce no `finally`. */
-  if (!await confirmDestructive('Importar projeto')) { await finishCurtain(); return; }
-  if (!await confirmProblems(all, 'Importar projeto')) { await finishCurtain(); return; }
+  /* A LISTA DE PROBLEMAS, quando existe, é a exceção — e ela também não pode ser
+     lida por cima de uma barra andando. Aqui a cortina DESCE para perguntar e
+     `applyProject()` a levanta de novo se o usuário seguir. No caminho comum
+     (nenhum problema) nada disto roda e a cortina atravessa inteira, que é o
+     que foi pedido: um loading só. */
+  if (all.length) {
+    await finishCurtain();
+    if (!await confirmProblems(all, 'Importar projeto')) return;
+  }
 
   await runApply(doc, () => {
     /* SEM id: um projeto importado ainda não é da biblioteca desta máquina. O

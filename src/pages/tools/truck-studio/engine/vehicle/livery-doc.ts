@@ -5,8 +5,11 @@
    persistência. Importa só de ./livery.ts; quem chama tudo isto é
    ../ui/livery-editor.ts. */
 import * as fabric from 'fabric';
-import { surfaces, SURFACE_KEYS, active, activeKey, markDirty, cmToPx, outlineFrame, DEFAULT_BG } from './livery';
-import type { SurfaceKey } from './livery';
+import {
+  surfaces, SURFACE_KEYS, active, activeKey, markDirty, cmToPx, outlineFrame, DEFAULT_BG,
+  currentArtFrame, remapArtFrom,
+} from './livery';
+import type { SurfaceKey, ArtFrame } from './livery';
 
 /* Campos nossos que precisam sobreviver ao toObject/loadFromJSON.
    ATENÇÃO: no fabric v6 canvas.toJSON() NÃO aceita argumentos — passar as
@@ -412,6 +415,22 @@ let persistTimer = 0;
 export interface LiverySurfaceState {
   o: Record<string, unknown>;
   bg: string;
+  /**
+   * O QUADRO em que esta arte foi autorada — tela em pixels e chapa em
+   * milímetros.
+   *
+   * ⚠️ SEM ISTO A ARTE NÃO É PORTÁTIL, e essa foi a lição de um defeito
+   * relatado com foto (*"voltei e a logo estava toda esticada"*): o fabric
+   * guarda tudo em PIXELS DE TELA, e a resolução dessa tela não é constante —
+   * `canvasFor()` a deriva do tamanho EXIBIDO e da chapa medida, então ela muda
+   * com a janela, com o editor estar aberto, e com o comprimento do baú. Um
+   * arquivo com coordenadas cruas volta na escala de outra máquina.
+   *
+   * OPCIONAL de propósito: um rascunho de `localStorage` gravado antes desta
+   * correção não tem o campo, e `remapArtFrom()` devolve `false` para quadro
+   * ausente — a arte entra como entrava antes, sem tradução e sem quebrar.
+   */
+  frame?: ArtFrame;
 }
 
 /** As cinco telas, do jeito que atravessam um round trip. */
@@ -456,7 +475,7 @@ function toPersistable(key: SurfaceKey): LiverySurfaceState {
      gradiente serializado como `[object Object]` seria um fundo perdido em
      silêncio. Um filler vira "sem fundo", que é o padrão e é honesto. */
   const bg = surfaces[key].backgroundColor;
-  return { o: json, bg: typeof bg === 'string' ? bg : '' };
+  return { o: json, bg: typeof bg === 'string' ? bg : '', frame: currentArtFrame(key) };
 }
 
 /**
@@ -578,6 +597,13 @@ export async function importLivery(doc: Partial<LiveryDocState> | null | undefin
          `CanvasTexture` recebe `needsUpdate` e o `invalidate(3)` de lá pede os
          quadros. É por isso que este é o único lugar do módulo que usa a versão
          síncrona — nos outros o custo de bloquear não se paga. */
+      /* E A TRADUÇÃO DE ESCALA, antes de desenhar.
+         O quadro gravado diz em que densidade (px/mm) esta arte foi autorada; o
+         atual diz qual vale aqui. Iguais, não faz nada — exportar e reimportar
+         na mesma janela não move um pixel. Diferentes, `remapArtFrom()` reusa o
+         mesmo `remapObjects()` que toda mudança de medida já usa: preserva o
+         MILÍMETRO físico e a distância até o PISO do baú, que é o datum. */
+      remapArtFrom(k, st.frame);
       surfaces[k].renderAll();
     }
   } catch (err) {

@@ -147,8 +147,31 @@ export const otherSide = (key: SurfaceKey): SurfaceKey | null =>
    porque aquele arquivo não pode importar este — o ciclo livery ↔ livery-editor
    já existe de propósito e um basta. Mudar o vocabulário mexe nos três; o
    comentário de lá aponta para cá. */
+/* ⚠️ `left`/`right` SÃO COORDENADAS, NÃO LADOS DO VEÍCULO — e é por isso que o
+   motorista é o `right`.
+   ---------------------------------------------------------------------------
+   As chapas são recortadas por posição: a `SIDE_R` sai do MAIOR x e a `SIDE_L`
+   do menor (ver `buildLiveryPanels()`). Com a frente do baú no +Z e o +Y para
+   cima, quem olha na direção da frente tem a direita em −X — logo o lado
+   ESQUERDO do veículo é o +X, que é a `SIDE_R`. No Brasil o motorista senta à
+   esquerda: **o lado do motorista é a `SIDE_R`**.
+
+   A GEOMETRIA SEMPRE ESTEVE CERTA e não foi tocada. `addLiveryUV()` dá à
+   `SIDE_R` o `u = (maxZ − z)/span`, que põe a FRENTE na esquerda da tela — que é
+   exatamente como se enxerga o flanco do motorista de fora, e é o que o dono do
+   produto pediu: *"no livery do motorista, a frente deve estar na esquerda,
+   enquanto a traseira na direita"*. Os rótulos de borda do palco
+   (`◄ FRENTE … TRASEIRA ►` no `stage-right`) já diziam isso.
+
+   O que estava errado era só o NOME colado em cada superfície, e o sintoma foi
+   *"esse é o lado do motorista, mas o que está aplicado nele é o passageiro"*.
+   Corrigir aqui — e não invertendo a ligação malha↔tela — é o que mantém
+   intactos os cinco lugares que dependem da orientação de cada face
+   (`livery-snapshot`, `livery-layers`, `livery-guides`, os UVs e os rótulos de
+   borda), e o que faz a arte já salva continuar exatamente na chapa em que foi
+   desenhada. Só o rótulo dela muda. */
 export const SIDE_LABEL: Record<SurfaceKey, string> = {
-  left: 'Motorista', right: 'Passageiro', rear: 'Traseira', front: 'Frente',
+  left: 'Passageiro', right: 'Motorista', rear: 'Traseira', front: 'Frente',
   roof: 'Teto',
 };
 
@@ -156,8 +179,8 @@ export const SIDE_LABEL: Record<SurfaceKey, string> = {
    `installGuide`). O que substitui a frase é o que substituiu a linha — a
    ferragem do próprio implemento, desenhada por cima da arte. */
 export const CAPTIONS: Record<SurfaceKey, string> = {
-  left: 'Lado do motorista · a ferragem passa por cima da pintura, como no baú',
-  right: 'Lado do passageiro · a ferragem passa por cima da pintura, como no baú',
+  left: 'Lado do passageiro · a ferragem passa por cima da pintura, como no baú',
+  right: 'Lado do motorista · a ferragem passa por cima da pintura, como no baú',
   rear: 'Portas traseiras · a ferragem passa por cima da pintura, como no baú',
   /* A frente tem um obstáculo que nenhuma outra face tem, e ele não é ferragem:
      é o Thermo King, montado na testeira e cobrindo a parte de cima dela. Ele
@@ -483,6 +506,70 @@ export function syncSurfaceAspect(key: SurfaceKey): boolean {
   textures[key].dispose();
 
   fab.requestRenderAll();
+  markDirty(key);
+  return true;
+}
+
+/* ---------------- arte que vem de FORA ----------------
+   O PIXEL DO FABRIC NÃO É PORTÁTIL, e é isso que estas duas funções resolvem.
+
+   A arte é guardada em pixels da tela, e a RESOLUÇÃO dessa tela não é uma
+   constante: `canvasFor()` a deriva do tamanho EXIBIDO (`setPanelDisplaySize`,
+   teto de 4 096 px, histerese de 1,5×) e da chapa medida. Ou seja, ela muda com
+   o tamanho da janela, com o editor estar aberto ou fechado, com o zoom — e,
+   claro, com o comprimento do baú.
+
+   Consequência: um projeto exportado numa máquina e aberto em outra traz
+   coordenadas de uma tela que não existe aqui. Sem tradução, um logotipo de
+   400 mm vira um logotipo de 400 px-de-outra-máquina, e a arte entra ampliada
+   ou encolhida — o defeito relatado como *"voltei e a logo estava toda
+   esticada"*. É a mesma tradução que `syncSurfaceAspect()` já faz quando a
+   MEDIDA muda; o que faltava era fazê-la quando a TELA muda por baixo da arte.
+
+   Guardar milímetro em vez de pixel no arquivo resolveria pela raiz, mas
+   reescreveria o formato do fabric inteiro (cada objeto, cada tipo, cada
+   propriedade derivada). Traduzir na fronteira é a mesma correção com uma
+   fração do risco — e reusa `remapObjects()`, que já é o código testado por
+   toda mudança de medida. */
+
+/** A tela de uma face e a chapa que ela representa, no instante da leitura. */
+export interface ArtFrame {
+  /** tamanho do buffer da tela, em pixels */
+  px: { w: number; h: number };
+  /** chapa que essa tela representa, em milímetros */
+  mm: { w: number; h: number };
+}
+
+/** O quadro ATUAL de uma face — o que um arquivo tem de gravar para poder
+ *  voltar na escala certa em qualquer outra máquina. */
+export function currentArtFrame(key: SurfaceKey): ArtFrame {
+  const c = surfaces[key];
+  return {
+    px: { w: c.getWidth(), h: c.getHeight() },
+    mm: { ...PANEL_MM[key] },
+  };
+}
+
+/**
+ * Traduz a arte JÁ CARREGADA de um quadro de origem para o quadro atual.
+ *
+ * Devolve `false` quando não há nada a fazer — quadro ausente (arquivo gravado
+ * antes desta correção), quadro inválido, ou densidade idêntica. O caso
+ * "idêntico" é o comum e tem de sair barato: exportar e importar na mesma
+ * máquina, com a mesma janela, não deve mexer em um pixel sequer.
+ */
+export function remapArtFrom(key: SurfaceKey, from: ArtFrame | null | undefined): boolean {
+  if (!from || !from.px || !from.mm) return false;
+  const to = currentArtFrame(key);
+  const vals = [from.px.w, from.px.h, from.mm.w, from.mm.h, to.px.w, to.px.h, to.mm.w, to.mm.h];
+  if (vals.some((v) => !(Number.isFinite(v) && v > 0))) return false;
+  /* A comparação é de DENSIDADE (px/mm), não de pixels: uma tela maior para uma
+     chapa proporcionalmente maior representa a mesma arte física e não precisa
+     de tradução nenhuma. */
+  const dx = (to.px.w / to.mm.w) / (from.px.w / from.mm.w);
+  const dy = (to.px.h / to.mm.h) / (from.px.h / from.mm.h);
+  if (Math.abs(dx - 1) < 1e-6 && Math.abs(dy - 1) < 1e-6) return false;
+  remapObjects(surfaces[key], from, to);
   markDirty(key);
   return true;
 }

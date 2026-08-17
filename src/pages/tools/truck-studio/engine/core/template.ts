@@ -216,18 +216,36 @@ export const STUDIO_HTML = /* html */ `
               <span class="ts-panel__edit" aria-hidden="true">Editar</span>
             </button>
           </div>
-          <button type="button" class="ts-panel preview-card" data-surface="left"
+          <!-- ⚠️ MOTORISTA É data-surface="right", E ISSO NÃO É ENGANO.
+               (Sem crase nenhuma neste comentário: STUDIO_HTML É um template
+               literal, e uma crase o encerra no meio — ver o topo do arquivo.)
+               SIDE_L e SIDE_R são recortadas por COORDENADA — a SIDE_R sai do
+               MAIOR x —, e não por lado do veículo. Com a frente do baú no +Z e
+               o +Y para cima, quem olha na direção da frente tem a direita em
+               −X; logo o lado ESQUERDO do veículo é o +X, que é a SIDE_R. No
+               Brasil o motorista senta à esquerda, então o lado do motorista é
+               a SIDE_R, e o do passageiro é a SIDE_L.
+               A geometria sempre esteve certa — addLiveryUV() dá à SIDE_R o
+               u = (maxZ−z)/span, que põe a FRENTE na esquerda da tela, que é
+               como se olha o flanco do motorista de fora. Só os RÓTULOS estavam
+               trocados, e o relato foi exatamente esse: "esse é o lado do
+               motorista, mas o que está aplicado nele é o passageiro" e "no
+               livery do motorista, a frente deve estar na esquerda".
+               A ORDEM na tela não mudou (Motorista em cima); o que mudou é a
+               superfície que cada card abre. Ver SIDE_LABEL em
+               vehicle/livery.ts. -->
+          <button type="button" class="ts-panel preview-card" data-surface="right"
                   title="Editar o lado do motorista">
-            <span class="ts-panel__media"><canvas id="prev-left" width="600" height="101"></canvas></span>
+            <span class="ts-panel__media"><canvas id="prev-right" width="600" height="101"></canvas></span>
             <span class="ts-panel__body">
               <span class="ts-panel__label">Lateral</span>
               <span class="ts-panel__name">Motorista</span>
             </span>
             <span class="ts-panel__edit" aria-hidden="true">Editar</span>
           </button>
-          <button type="button" class="ts-panel preview-card" data-surface="right"
+          <button type="button" class="ts-panel preview-card" data-surface="left"
                   title="Editar o lado do passageiro">
-            <span class="ts-panel__media"><canvas id="prev-right" width="600" height="101"></canvas></span>
+            <span class="ts-panel__media"><canvas id="prev-left" width="600" height="101"></canvas></span>
             <span class="ts-panel__body">
               <span class="ts-panel__label">Lateral</span>
               <span class="ts-panel__name">Passageiro</span>
@@ -377,8 +395,9 @@ export const STUDIO_HTML = /* html */ `
              são legitimamente assimétricas (o Thermo King fica de um lado só, e
              as fitas 3M não devem ser espelhadas: ver CONVENTIONS.md). -->
         <div class="tabs" id="surface-tabs">
-          <button class="tab active" data-surface="left">Motorista<i class="sync-dot"></i></button>
-          <button class="tab" data-surface="right">Passageiro<i class="sync-dot"></i></button>
+          <!-- Motorista = right (a SIDE_R, do maior x). Ver o ⚠️ nos cards. -->
+          <button class="tab active" data-surface="right">Motorista<i class="sync-dot"></i></button>
+          <button class="tab" data-surface="left">Passageiro<i class="sync-dot"></i></button>
           <button class="tab" data-surface="rear">Traseira</button>
           <!-- Sem ponto de sincronia: espelhar é entre as duas LATERAIS, e a
                testeira não tem par (ver otherSide() em vehicle/livery.ts). -->

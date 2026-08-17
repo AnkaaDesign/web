@@ -88,7 +88,14 @@ function makeDoc(overrides: Partial<StudioProject> = {}): StudioProject {
       doors: { left: [{ position: 1.234567, width: 1.2, height: 2.1 }] },
     },
     livery: {
-      left: { o: { version: '6.0.0', objects: [] }, bg: '#101010' },
+      /* O QUADRO DE AUTORIA viaja junto — sem ele o pixel do fabric não é
+         portátil e a arte volta na escala de outra máquina. Aqui ele existe só
+         na face `left` de propósito: as outras provam que o campo é OPCIONAL e
+         que um arquivo gravado antes desta correção continua abrindo. */
+      left: {
+        o: { version: '6.0.0', objects: [] }, bg: '#101010',
+        frame: { px: { w: 2048, h: 389 }, mm: { w: 15400, h: 2777 } },
+      },
       right: { o: { version: '6.0.0', objects: [] }, bg: '' },
       rear: { o: { version: '6.0.0', objects: [] }, bg: '' },
       front: { o: { version: '6.0.0', objects: [] }, bg: '' },
@@ -341,6 +348,14 @@ describe('.ankaastudio — o percurso de câmera', () => {
     const { doc: back } = await roundTrip(doc);
     expect(back.timeline![0].thumb).toBe(PNG_1PX);
     expect((back.livery.left.o.objects as { src: string }[])[0].src).toBe(PNG_1PX);
+  });
+
+  it('o quadro de autoria da plotagem atravessa intacto', async () => {
+    /* Se este campo se perder, a arte volta na escala da máquina de origem e o
+       sintoma é uma logo "esticada" — sem erro em lugar nenhum. */
+    const { doc: back } = await roundTrip(makeDoc());
+    expect(back.livery.left.frame).toEqual({ px: { w: 2048, h: 389 }, mm: { w: 15400, h: 2777 } });
+    expect(back.livery.right.frame).toBeUndefined();
   });
 
   it('um documento sem percurso continua sem percurso', async () => {
