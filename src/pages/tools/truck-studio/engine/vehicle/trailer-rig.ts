@@ -51,7 +51,10 @@ import * as THREE from 'three';
 import { TrailerBody, type TrailerDims, type DoorSpec, type Face } from './trailer-geometry';
 import { TrailerAssembly } from './trailer-assembly';
 import { applyBakeFixes } from './trailer-bake-fixes';
-import { deriveImplementHitch, type ImplementHitch, type ImplementMeasurements } from './coupling';
+import {
+  deriveImplementHitch,
+  type ImplementHitch, type ImplementMeasurements, type KingpinStation,
+} from './coupling';
 import { invalidateVehicleLightBounds } from './lights';
 
 export type { TrailerDims };
@@ -97,6 +100,34 @@ const KP_MAX_DROP = 0.20;
 /** Anel em que a chapa de apoio é votada, medido do eixo do pino. */
 const PLATE_RING = [0.08, 0.30] as const;
 
+/* ---------------------------------------------------------------------------
+   OS FUROS DA CHAPA — as constantes de `measureKingpinStations()`.
+
+   A chapa do pino deste baú é furada para DUAS posições. As duas são pads
+   congruentes na linha de centro, 800 mm entre eixos; uma carrega o pino de 2"
+   e a outra, a flange cega. Nada aqui procura NOME: procura-se a FORMA — um
+   disco pequeno, na linha de centro, sob a dianteira —, que é a mesma doutrina
+   de `measureKingpin()` e pelo mesmo motivo (não existe nó chamado "furo", e um
+   re-bake renomeia tudo). */
+
+/** Raio máximo, em planta, de uma flange de pino. Acima disso é chapa, não furo. */
+const KP_STATION_MAX_R = 0.22;
+/** E abaixo disto é parafuso, não flange. */
+const KP_STATION_MIN_R = 0.07;
+/** Duas peças a menos que isto em Z são do MESMO furo. */
+const KP_STATION_CLUSTER = 0.12;
+/** Gêmeas de pads congruentes casam a menos disto na pegada. */
+const KP_TWIN_TOL = 0.02;
+
+interface Station {
+  /** eixo do furo no referencial da RAIZ do implemento */
+  z: number;
+  /** a malha do PINO, quando este furo é o que o carrega */
+  pin: THREE.Object3D | null;
+  /** a gêmea cega deste furo — a peça que troca de lugar com o pino */
+  blind: THREE.Object3D | null;
+}
+
 interface Anchors {
   contactY: number;
   centerX: number;
@@ -119,6 +150,8 @@ export class TrailerRig {
 
   private readonly root: THREE.Object3D;
   private anchors: Anchors | null = null;
+  /** Os furos da chapa, remedidos junto com as âncoras. Ver `Station`. */
+  private stations: Station[] = [];
 
   /**
    * @param root o nó do implemento. As ÂNCORAS DE ENGATE medem no referencial
@@ -292,12 +325,102 @@ export class TrailerRig {
       dims: { ...d },
       landingGear: null,   // não existe nó de patola neste GLB; ver measureAnchors()
       profileBands: 12,
+      kingpinStations: this.kingpinStations,
     };
     return deriveImplementHitch(m);
   }
 
   /** Diagnóstico das âncoras cruas, para a HUD e para a sonda. */
   get anchorsDebug(): Readonly<Anchors> | null { return this.anchors; }
+
+  /* ------------------------------------------------ os furos da chapa */
+
+  /**
+   * Os furos de pino da chapa, do mais dianteiro para o mais traseiro.
+   *
+   * Medidos da geometria a cada `measureAnchors()`, como tudo mais deste lado —
+   * um baú que voltar do bake com três furos passa a ter três aqui sem uma linha
+   * de mudança, e um com furo único devolve um item só.
+   */
+  get kingpinStations(): KingpinStation[] {
+    return this.stations.map((s) => ({ z: s.z, hasPin: !!s.pin }));
+  }
+
+  /** Onde o pino está AGORA, ou `null` se não há pino medido. */
+  get kingpinStationZ(): number | null {
+    const s = this.stations.find((x) => x.pin);
+    return s ? s.z : null;
+  }
+
+  /**
+   * Aparafusa o pino no furo mais próximo de `z` — e devolve a flange cega de lá
+   * para o furo que vagou, que é o que um mecânico faz com as duas peças.
+   *
+   * Move MALHA, não um número: o pino é a âncora do conjunto e quem a lê é
+   * `measureKingpin()`, que OBSERVA onde ele está. Deslocar só a medida deixaria
+   * o pino pendurado no vazio a 800 mm da quinta roda — visível de qualquer
+   * ângulo baixo, e exatamente o defeito que a medição por forma existe para
+   * impedir.
+   *
+   * ⚠️ CHAME COM A FUSÃO SOLTA. `vehicle/merge.ts` assa os triângulos num balde
+   * por material e esconde as origens; mexer numa origem depois disso não muda
+   * um pixel. Quem cuida disso é `placeTrailer()`, pelo guarda de geometria.
+   *
+   * ⚠️ E NA POSE DE CARGA, pelo mesmo motivo de `set()`: a remedição no fim roda
+   * `measureKingpin()`, cujos limiares vivem no referencial da raiz.
+   *
+   * @returns `true` se alguma coisa se moveu.
+   */
+  setKingpinStation(z: number): boolean {
+    const from = this.stations.find((s) => s.pin);
+    if (!from || !from.pin) return false;
+    let to = from;
+    for (const s of this.stations) {
+      if (Math.abs(s.z - z) < Math.abs(to.z - z)) to = s;
+    }
+    const d = to.z - from.z;
+    if (Math.abs(d) < 1e-4) return false;
+
+    this.shiftAlongRigZ(from.pin, d);
+    /* A gêmea cega do destino volta para o furo que vagou. Sem isso o furo
+       novo ganharia pino E tampa sobrepostos, e o antigo ficaria aberto. */
+    if (to.blind) this.shiftAlongRigZ(to.blind, -d);
+
+    console.info('[engate] pino-rei aparafusado no furo z', to.z.toFixed(4),
+      `(${d > 0 ? '+' : ''}${(d * 1000).toFixed(0)} mm),`,
+      'balanço até a testeira', (this.body.profile.z1 - to.z).toFixed(3), 'm');
+
+    this.measureAnchors();
+    return true;
+  }
+
+  /**
+   * Translada `o` de `d` metros ao longo do Z DA RAIZ do implemento.
+   *
+   * A conta passa pela matriz pai→raiz e volta porque a direção tem de ser
+   * expressa em espaço LOCAL do nó: um `position.z += d` cru só está certo
+   * enquanto nenhum pai girar ou escalar, e essa é a suposição que
+   * `rigMatrixOf()` já pagou caro para não ter. Dois pontos transformados em vez
+   * de uma direção normalizada — `transformDirection()` normaliza, e aqui o
+   * comprimento É o dado.
+   */
+  private shiftAlongRigZ(o: THREE.Object3D, d: number): void {
+    const parent = o.parent;
+    const delta = new THREE.Vector3(0, 0, d);
+    if (parent) {
+      parent.updateWorldMatrix(true, false);
+      const toLocal = new THREE.Matrix4()
+        .multiplyMatrices(this.rigInverse(), parent.matrixWorld).invert();
+      const a = new THREE.Vector3(0, 0, 0).applyMatrix4(toLocal);
+      const b = new THREE.Vector3(0, 0, d).applyMatrix4(toLocal);
+      delta.copy(b).sub(a);
+    }
+    o.position.add(delta);
+    /* Nó CONGELADO — `freezeMatrices()` desliga `matrixAutoUpdate` no implemento
+       inteiro, então quem escreve `position` escreve a matriz também. */
+    o.updateMatrix();
+    o.updateWorldMatrix(false, true);
+  }
 
   /* --------------------------------------------------------------- medição */
 
@@ -341,9 +464,18 @@ export class TrailerRig {
       console.warn('[engate] pino-rei não encontrado sob a dianteira — '
         + 'sem âncora de implemento, o engate cai no caminho legado.');
       this.anchors = null;
+      this.stations = [];
       return;
     }
     this.anchors = { ...tyres, ...kp };
+    /* DEPOIS do pino: as estações precisam da chapa para saber qual delas está
+       com o pino (a que desce abaixo dela) e quais estão cegas. */
+    this.stations = this.measureKingpinStations(kp.plateBottomY);
+    if (this.stations.length > 1) {
+      console.info('[engate] chapa do pino com', this.stations.length, 'furos —',
+        this.stations.map((s) => `${s.z.toFixed(3)}${s.pin ? '*' : ''}`).join(' · '),
+        '(* = pino)');
+    }
     console.info('[engate] implemento medido — pino x', kp.kingpinX.toFixed(4),
       'z', kp.kingpinZ.toFixed(4), '· chapa', kp.plateBottomY.toFixed(4),
       `(${((kp.plateBottomY - tyres.contactY) * 1000).toFixed(0)} mm do solo)`,
@@ -407,6 +539,105 @@ export class TrailerRig {
     }
     if (!n) return null;
     return { contactY, centerX: xSum / n, bogieZMin: zMin, bogieZMax: zMax, contactVerts: n };
+  }
+
+  /**
+   * TODOS os furos de pino da chapa, medidos PELA FORMA.
+   *
+   * O que se procura é o que um furo de pino É na malha: um DISCO PEQUENO na
+   * linha de centro, sob a dianteira — flange de 70 a 220 mm de raio. Neste baú
+   * cada pad devolve três peças (a face da chapa, o degrau do pad e a flange),
+   * então as candidatas são AGRUPADAS por z: cada grupo é um furo, e o eixo do
+   * furo é o centro do grupo. Os dois grupos deste modelo caem em 6,427 e 5,627,
+   * 800 mm exatos entre eles, que é a distância entre furos que a chapa tem.
+   *
+   * O PINO é a candidata que desce abaixo da chapa (o mesmo `KP_MIN_DROP` de
+   * `measureKingpin()`); o resto do grupo é o pad em volta. A GÊMEA CEGA de cada
+   * furo é a peça do outro grupo com a MESMA PEGADA da flange do pino — os pads
+   * são congruentes, então a pegada casa em milímetros e é o que identifica a
+   * peça que troca de lugar com ele sem depender de nome nem de contagem de
+   * vértice.
+   *
+   * Um baú de furo único devolve UM item e `pickKingpinStation()` não tem o que
+   * escolher; o caminho continua o de sempre.
+   */
+  private measureKingpinStations(plateBottomY: number): Station[] {
+    const p = this.body.profile;
+    const zHi = p.z1;
+    const zLo = Math.max(p.z0, zHi - KP_SEARCH_DEPTH);
+    const inv = this.rigInverse();
+
+    interface Cand {
+      o: THREE.Object3D;
+      cz: number; yMin: number;
+      sx: number; sz: number;
+      /** desce abaixo da chapa? então é o pino */
+      isPin: boolean;
+    }
+    const cands: Cand[] = [];
+    const box = new THREE.Box3();
+    this.root.traverse((node) => {
+      const o = node as THREE.Mesh;
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const gb = o.geometry.boundingBox;
+      if (!gb) return;
+      /* Caixa no referencial da RAIZ — o mesmo motivo de `rigMatrixOf()`. Aqui
+         ela é MEDIDA e não só rejeição, e pode ser: a flange é um cilindro de
+         eixo vertical, e a caixa de um cilindro alinhado é o cilindro. */
+      box.copy(gb).applyMatrix4(this.rigMatrixOf(o, inv));
+      if (box.isEmpty()) return;
+      if (box.max.z < zLo || box.min.z > zHi) return;
+      if (box.min.y > p.floorY) return;
+      const sx = box.max.x - box.min.x;
+      const sz = box.max.z - box.min.z;
+      const r = Math.max(sx, sz) / 2;
+      if (r > KP_STATION_MAX_R || r < KP_STATION_MIN_R) return;
+      const cx = (box.min.x + box.max.x) / 2;
+      if (Math.abs(cx) > KP_HALF_X) return;
+      cands.push({
+        o, cz: (box.min.z + box.max.z) / 2, yMin: box.min.y, sx, sz,
+        isPin: plateBottomY - box.min.y >= KP_MIN_DROP,
+      });
+    });
+    if (!cands.length) return [];
+
+    /* Agrupa por z. Ordenar primeiro torna o agrupamento uma varredura. */
+    cands.sort((a, b) => a.cz - b.cz);
+    const groups: Cand[][] = [];
+    for (const c of cands) {
+      const last = groups[groups.length - 1];
+      if (last && Math.abs(c.cz - last[0].cz) <= KP_STATION_CLUSTER) last.push(c);
+      else groups.push([c]);
+    }
+
+    const pinCand = cands.find((c) => c.isPin) ?? null;
+    const stations: Station[] = groups.map((g) => {
+      const pin = g.find((c) => c.isPin) ?? null;
+      return {
+        z: g.reduce((s, c) => s + c.cz, 0) / g.length,
+        pin: pin ? pin.o : null,
+        blind: null as THREE.Object3D | null,
+      };
+    });
+
+    /* A gêmea cega: a peça do grupo que tem a pegada da flange do pino. Sem
+       pino medido não há gêmea a procurar — e sem gêmea a troca ainda funciona,
+       só deixa o furo antigo aberto (ver `setKingpinStation()`). */
+    if (pinCand) {
+      for (let k = 0; k < groups.length; k++) {
+        if (stations[k].pin) continue;
+        let best: Cand | null = null, bestD = Infinity;
+        for (const c of groups[k]) {
+          const d = Math.abs(c.sx - pinCand.sx) + Math.abs(c.sz - pinCand.sz);
+          if (d < bestD) { bestD = d; best = c; }
+        }
+        if (best && bestD <= KP_TWIN_TOL * 2) stations[k].blind = best.o;
+      }
+    }
+
+    /* Do mais DIANTEIRO para o mais traseiro — a ordem em que se fala deles. */
+    return stations.sort((a, b) => b.z - a.z);
   }
 
   /**

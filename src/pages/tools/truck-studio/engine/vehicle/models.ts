@@ -29,9 +29,9 @@ import {
   loadPlateManifest, attachCabPlate, detachCabPlate, attachTrailerPlate, placeTrailerPlate,
 } from './license-plate';
 import {
-  solveCoupling, findTractor, defaultsOf, FALLBACK_DEFAULTS,
+  solveCoupling, pickKingpinStation, findTractor, defaultsOf, FALLBACK_DEFAULTS,
   type TractorHitch, type HitchManifest, type CouplingSolution,
-  type CouplingDefaults, type Profile,
+  type CouplingDefaults, type Profile, type ImplementHitch,
 } from './coupling';
 
 export { makePaintMaterial };
@@ -1875,7 +1875,9 @@ export async function loadCab(
     cab.rotation.set(0, 0, 0);
     cab.position.set(0, 0, 0);
     cab.updateWorldMatrix(true, true);
-    hitchEntry.rearProfile = measureCabRearProfile(cab, hitchEntry);
+    const perfis = measureCabRearProfiles(cab, hitchEntry);
+    hitchEntry.rearProfile = perfis.wide;
+    hitchEntry.rearProfiles = perfis.ladder;
     state.cabHitch = hitchEntry;
     const fw = hitchEntry.fifthWheel;
     console.info('[engate] cavalo', hitchEntry.id, '· quinta roda z', fw.z.toFixed(4),
@@ -4424,11 +4426,29 @@ export function placeThermoKing() {
  */
 const REAR_PROFILE_BAND = 0.10;
 
-function measureCabRearProfile(cab: THREE.Object3D, h: TractorHitch): Profile {
+/**
+ * A ESCADA DE LARGURAS, em meia-largura (m). Ver `TractorHitch.rearProfiles`.
+ *
+ * Os dois degraus que fazem trabalho hoje são o de 1,05 m — que cobre o Thermo
+ * King (1,996 m de largura, meia 0,998) sem alcançar a asa, que começa por
+ * volta de 1,0 — e o mais largo, que é a testeira. Os outros existem para que a
+ * escolha continue certa se a unidade ou o baú mudarem de medida: `profileFor()`
+ * toma o primeiro degrau que ainda cobre o obstáculo, e um degrau a mais só
+ * torna a resposta mais justa. São cinco varreduras na mesma passada de
+ * vértices, então o custo é uma comparação a mais por vértice, não uma leitura
+ * a mais da malha.
+ */
+const REAR_PROFILE_WIDTHS = [0.75, 1.05, 1.20, 1.35, 1.60] as const;
+
+function measureCabRearProfiles(
+  cab: THREE.Object3D, h: TractorHitch,
+): { wide: Profile; ladder: { halfWidth: number; profile: Profile }[] } {
   cab.updateWorldMatrix(true, true);
   const cos = Math.cos(h.orientYaw), sin = Math.sin(h.orientYaw);
   const v = new THREE.Vector3();
-  const bands = new Map<number, number>();
+  /* Um mapa por degrau, mais o largo no fim. */
+  const bands = REAR_PROFILE_WIDTHS.map(() => new Map<number, number>());
+  const wide = new Map<number, number>();
   cab.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh || !o.visible) return;
@@ -4441,14 +4461,32 @@ function measureCabRearProfile(cab: THREE.Object3D, h: TractorHitch): Profile {
       const dx = v.x - h.centerX;
       const ny = v.y - h.groundY;
       const nz = -dx * sin + v.z * cos;
+      /* O x NORMALIZADO, que faltava: sem ele não há como perguntar "o que está
+         atrás DENTRO desta largura", e a asa entrava na conta do Thermo King. */
+      const nx = dx * cos + v.z * sin;
+      const ax = Math.abs(nx);
       const b = Math.floor(ny / REAR_PROFILE_BAND);
-      const cur = bands.get(b);
-      if (cur === undefined || nz < cur) bands.set(b, nz);
+      const cur = wide.get(b);
+      if (cur === undefined || nz < cur) wide.set(b, nz);
+      for (let k = 0; k < REAR_PROFILE_WIDTHS.length; k++) {
+        if (ax > REAR_PROFILE_WIDTHS[k]) continue;
+        const m = bands[k];
+        const c = m.get(b);
+        if (c === undefined || nz < c) m.set(b, nz);
+      }
     }
   });
-  return [...bands.entries()]
+  const toProfile = (m: Map<number, number>): Profile => [...m.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([b, z]) => ({ y: (b + 0.5) * REAR_PROFILE_BAND, z }));
+  return {
+    wide: toProfile(wide),
+    ladder: REAR_PROFILE_WIDTHS
+      .map((halfWidth, k) => ({ halfWidth, profile: toProfile(bands[k]) }))
+      /* Um degrau que não pegou vértice nenhum não é "sem obstáculo": é uma
+         medida que não existe, e devolvê-la daria folga infinita. */
+      .filter((s) => s.profile.length > 0),
+  };
 }
 
 /** Escreve a pose normalizada de uma raiz. Congelada: `updateMatrix()` é lei. */
@@ -4459,6 +4497,156 @@ function applyRootPose(
   root.position.set(p.x, p.y, p.z);
   root.updateMatrix();
   root.updateWorldMatrix(true, true);
+}
+
+/**
+ * Aparafusa o pino-rei no furo que ESTE cavalo pede, e devolve o lado
+ * implemento já remedido.
+ *
+ * A chapa do baú é furada para duas posições, 800 mm entre elas. Quem decide é
+ * `pickKingpinStation()`, em `coupling.ts`, sobre a geometria dos dois lados —
+ * e a razão de a escolha existir está no cabeçalho de lá. Aqui só há a
+ * ORQUESTRAÇÃO, que tem três exigências e nenhuma delas é opcional:
+ *
+ *  1. **A fusão tem de estar solta.** `vehicle/merge.ts` assa os triângulos das
+ *     origens num balde por material e esconde as origens; mover uma origem com
+ *     o balde de pé não muda um pixel — o pino ficaria no lugar velho na
+ *     imagem e no lugar novo na medida, que é o pior dos dois mundos. O guarda
+ *     de geometria (`setGeometryGuard`) é o mesmo par solta/refaz que
+ *     `setTrailerDims()` usa, e ele é reentrante por construção: chamado com a
+ *     fusão já solta, `mergeMode()` devolve `off` e o retomar não faz nada.
+ *
+ *  2. **Na POSE DE CARGA.** A remedição no fim de `setKingpinStation()` compara
+ *     vértices contra `profile.z0/z1/floorY`, que vivem no referencial da raiz.
+ *     Com o conjunto engatado — `rigGroup` a 22 m, girado 180° e com a
+ *     inclinação de engate em X — a janela de busca não pega vértice nenhum e a
+ *     âncora volta `null` em silêncio. É a mesma armadilha que `rigMatrixOf()`
+ *     documenta, e a saída é a mesma de `setTrailerDims()`: desfazer a pose,
+ *     medir, e deixar `placeTrailer()` refazê-la logo abaixo.
+ *
+ *  3. **Só quando MUDA.** A comparação é um número contra outro e roda em todo
+ *     `placeTrailer()`; o caminho caro só abre na troca de cavalo.
+ */
+/**
+ * ⚠️ PORTÃO DE IMPLANTAÇÃO — TEMPORÁRIO, e a única coisa provisória deste
+ * conserto.
+ *
+ * O mecanismo é geral: `pickKingpinStation()` decide por CAVALO, sobre a
+ * geometria dos dois lados, e a conta fecha nas 47 cabines do catálogo (a
+ * varredura está em `tools/trailer-bench/pinprobe.mjs`). O que este portão faz é
+ * segurar a mudança em UM cavalo enquanto ela é avaliada no olho — 45 das 47
+ * cabines mudam de furo, e trocar todas de uma vez tira a referência de
+ * comparação de quem está olhando.
+ *
+ * PARA LIBERAR A FROTA: troque por `null`. Não há mais nada a fazer — nenhum
+ * caminho depende deste recorte, e as cabines de fora dele passam por
+ * `restoreMetaKingpinStation()`, que devolve o pino ao furo do bake.
+ *
+ * O id é o do manifesto (`hitch.json`), que é `<modelId>-<chassisId>`, então o
+ * recorte é por prefixo de montadora ou de modelo: `/^volvo-fh-2021\b/` pega os
+ * três chassis daquele cavalo, `/^(volvo|scania)-/` pega duas montadoras.
+ */
+const KINGPIN_STATION_ROLLOUT: RegExp | null = null;
+
+function applyKingpinStation(ht: TractorHitch, hi: ImplementHitch): ImplementHitch {
+  const rig = state.trailerRig;
+  const stations = hi.kingpinStations ?? [];
+  if (!rig || stations.length < 2) return hi;
+
+  /* Fora do recorte, o pino VOLTA — e essa é a metade que não pode faltar. Sem
+     ela, escolher um FH 2021 (que manda o pino para o furo traseiro) e em
+     seguida qualquer outro cavalo deixaria o pino no furo novo com a conta feita
+     no antigo: 800 mm de engate no vazio, e nada para reclamar. */
+  if (KINGPIN_STATION_ROLLOUT && !KINGPIN_STATION_ROLLOUT.test(ht.id)) {
+    restoreMetaKingpinStation();
+    return rig.hitch ?? hi;
+  }
+
+  const pick = pickKingpinStation(ht, hi, stations, state.hitchDefaults, {
+    tkDepth: state.tkDepth || 0,
+    tkHalfWidth: state.tkSize ? state.tkSize.x / 2 : undefined,
+  });
+  if (!pick) return hi;
+
+  if (pick.reason === 'nenhum-cabe') {
+    console.warn('[engate] nenhum furo da chapa fecha a folga mínima com',
+      ht.id, '— fica o de maior folga,', (pick.gap * 1000).toFixed(0), 'mm.');
+  }
+  if (!moveKingpinTo(pick.z)) return hi;
+
+  console.info('[engate] furo de pino escolhido para', ht.id, '· z', pick.z.toFixed(4),
+    '· balanço', pick.overhang.toFixed(3), 'm · folga', (pick.gap * 1000).toFixed(0), 'mm ·',
+    pick.ranked.map((r) => `${r.z.toFixed(3)}=${(r.gap * 1000).toFixed(0)}mm`).join(' '));
+  return rig.hitch ?? hi;
+}
+
+/**
+ * Devolve o pino ao furo que `trailer_meta.json` mede — o mais DIANTEIRO, que é
+ * onde o bake o deixou.
+ *
+ * Existe por causa do engate LEGADO, e é uma correção de ESTADO VAZADO, não um
+ * detalhe: o caminho legado posiciona o implemento por `kingpin.zFromFront` do
+ * manifesto, uma CONSTANTE de 0,879 m. Ela descreve o furo dianteiro e não tem
+ * como saber que o pino andou. Sem esta linha, escolher um Volvo (que manda o
+ * pino para o furo traseiro) e em seguida um `vw-constellation` (que não tem
+ * entrada em `hitch.json`) deixaria o implemento 800 mm fora do lugar — com o
+ * pino desenhado num furo e a conta feita no outro, e nada para reclamar.
+ *
+ * A alternativa seria o legado medir o pino em vez de ler a constante. Não é
+ * este o lugar de refazê-lo: ele existe para as cabines sem manifesto e a saída
+ * de verdade para elas é ENTRAR no manifesto.
+ */
+function restoreMetaKingpinStation(): void {
+  const rig = state.trailerRig;
+  const stations = rig?.kingpinStations ?? [];
+  if (!rig || stations.length < 2) return;
+  const frente = stations.reduce((a, b) => (b.z > a.z ? b : a));
+  moveKingpinTo(frente.z);
+}
+
+/**
+ * A ORQUESTRAÇÃO da troca de furo — o que `TrailerRig.setKingpinStation()` exige
+ * do chamador, num lugar só. São três exigências e nenhuma é opcional:
+ *
+ *  1. **A fusão tem de estar solta.** `vehicle/merge.ts` assa os triângulos das
+ *     origens num balde por material e esconde as origens; mover uma origem com
+ *     o balde de pé não muda um pixel — o pino ficaria no lugar velho na imagem
+ *     e no lugar novo na medida, que é o pior dos dois mundos. O guarda de
+ *     geometria (`setGeometryGuard`) é o mesmo par solta/refaz de
+ *     `setTrailerDims()`, e ele é reentrante por construção: chamado com a fusão
+ *     já solta, `mergeMode()` devolve `off` e o retomar não faz nada.
+ *
+ *  2. **Na POSE DE CARGA.** A remedição no fim de `setKingpinStation()` compara
+ *     vértices contra `profile.z0/z1/floorY`, que vivem no referencial da raiz.
+ *     Com o conjunto engatado — `rigGroup` a 22 m, girado 180° e com a
+ *     inclinação de engate em X — a janela de busca não pega vértice nenhum e a
+ *     âncora volta `null` em silêncio. É a mesma armadilha que `rigMatrixOf()`
+ *     documenta, e a saída é a de `setTrailerDims()`: desfazer a pose, medir, e
+ *     deixar `placeTrailer()` refazê-la logo abaixo. Por isso esta função só
+ *     pode ser chamada de dentro de `placeTrailer()`.
+ *
+ *  3. **Só quando MUDA.** A comparação é um número contra outro e roda em todo
+ *     `placeTrailer()`; o caminho caro só abre na troca de cavalo.
+ */
+function moveKingpinTo(z: number): boolean {
+  const rig = state.trailerRig;
+  const t = state.trailer;
+  const base = state.trailerBase;
+  if (!rig || !t || !base) return false;
+  const cur = rig.kingpinStationZ;
+  if (cur === null || Math.abs(z - cur) < 1e-4) return false;
+
+  const retomarGeometria = geometryGuard ? geometryGuard() : null;
+  try {
+    setRigPlacement(false);
+    t.rotation.set(0, 0, 0);
+    t.position.copy(base.pos);
+    t.updateMatrix();
+    t.updateWorldMatrix(true, true);
+    return rig.setKingpinStation(z);
+  } finally {
+    retomarGeometria?.();
+  }
 }
 
 /**
@@ -4476,11 +4664,22 @@ export function placeTrailer() {
   const t = state.trailer;
   const cab = state.cab;
   const ht = state.cabHitch;
-  const hi = state.trailerRig ? state.trailerRig.hitch : null;
+  let hi = state.trailerRig ? state.trailerRig.hitch : null;
+
+  /* O FURO DE PINO É ESCOLHIDO ANTES DE RESOLVER, e é a primeira decisão do
+     engate porque é a única que muda a GEOMETRIA.
+
+     A condição é a MESMA do `if` abaixo, de propósito: `applyKingpinStation()`
+     desfaz a pose do conjunto para medir e conta com quem a refaça. Entrar aqui
+     num caso em que o bloco abaixo não roda deixaria o implemento parado na pose
+     de carga — o caminhão no lugar errado até a próxima carga, que é exatamente
+     o que o cabeçalho de `placeTrailer()` avisa. */
+  if (ht && hi && cab && t) hi = applyKingpinStation(ht, hi);
 
   if (ht && hi && cab && t) {
     const sol = solveCoupling(ht, hi, state.hitchDefaults, {
       tkDepth: state.tkDepth || 0,
+      tkHalfWidth: state.tkSize ? state.tkSize.x / 2 : undefined,
       /* Reporta e MANTÉM O ENGATE. Recuar o implemento por causa de folga é
          desengatar o pino — o defeito que este módulo existe para apagar. */
       onClearanceFail: 'report',
@@ -4514,6 +4713,9 @@ export function placeTrailer() {
      seis chassis "resolvidos" que nunca tinham passado pelo solver. */
   state.coupled = null;
   if (!t || !state.trailerBase) { setRigPlacement(true); return; }
+  /* O pino volta ao furo do manifesto ANTES da conta legada, que o lê de uma
+     constante e não teria como saber que ele andou. Ver `restoreMetaKingpinStation()`. */
+  restoreMetaKingpinStation();
   /* Uma vez POR CABINE, não uma vez por página: com um único `legacyWarned`
      global a segunda cabine sem manifesto caía no legado em silêncio. */
   if (legacyWarnedFor !== state.cabId) {
