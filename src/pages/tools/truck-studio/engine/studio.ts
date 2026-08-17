@@ -83,6 +83,8 @@ import { teardownTimeline } from './ui/timeline';
    e um é o suficiente. */
 import { initPaintPanel, setPaintPanelColor, closePaintPanel } from './ui/paint-panel';
 import { initTrimPanel, refreshTrimPanel } from './ui/trim-panel';
+import { initProjectPanel } from './ui/project-panel';
+import { setStudioHooks } from './project/document';
 import { root, $ } from './core/dom';
 import { prefetchStats, isWarm } from './core/prefetch';
 import type {
@@ -944,6 +946,64 @@ function applyTrailerDimsDebounced(
    pela porta crua. */
 liveryStructure.setDimsApplier((patch) => applyTrailerDimsDebounced(patch));
 
+/* E o MESMO desenho para o carregamento de projeto.
+   ---------------------------------------------------------------------------
+   `project/document.ts` sabe escrever todo o estado do estúdio, menos um: como
+   se CARREGA um caminhão. Isso é `applyChoice()`, que resolve a escolha contra o
+   catálogo, deduplica, enfileira e baixa cabine/implemento/cenário sob a
+   cortina — reimplementar qualquer parte disso lá seria criar um segundo caminho
+   de carga, e o segundo caminho é sempre o que fica sem as correções.
+
+   Injetado em vez de importado pelo mesmo motivo do aplicador de medidas logo
+   acima: a interface do projeto vive em `ui/`, `studio.ts` importa `ui/`, e uma
+   seta de volta de `project/` para cá fecharia o ciclo. Feito na avaliação do
+   módulo, portanto antes de qualquer boot — não existe janela em que o menu de
+   projeto exista e o aplicador não.
+
+   `{ curtain: true }` é o padrão e é o certo aqui: abrir um projeto de outro
+   caminhão baixa centenas de megabytes, e a cortina é o estado de carregamento
+   honesto para isso. */
+setStudioHooks({
+  applyChoice: (choice, opts) => applyChoice(choice, opts),
+  /* A CORTINA, sob controle de quem carrega um PROJETO.
+     Ela existe porque um projeto se monta em etapas que o `applyChoice` não
+     conhece — medidas, plotagem, tinta, luz — e cada uma delas muda a imagem.
+     Sem isto o usuário via o caminhão nu e depois a plotagem aparecendo por cima
+     dele, que foi o relato: *"prefiro ter um loading até tudo estar correto —
+     iluminação, cores, logos"*.
+     `showCurtain` é para o caso em que `applyChoice` NÃO levanta cortina
+     nenhuma: escolha idêntica cai no dedupe e volta na hora, e as etapas
+     seguintes ainda precisam de cobertura. `showLoader()` é idempotente. */
+  showCurtain: (label) => { showLoader(); if (label) setLoaderProgress(0, label); },
+  setCurtainProgress: (p, label) => setLoaderProgress(p, label),
+  /* `paintFrame()` de ui/loader.ts — ele já existe para deixar a cortina PINTAR
+     um anúncio antes de um trabalho pesado, e a espera aqui é a mesma coisa
+     vista do outro lado: deixar o quadro sair antes de decidir que acabou. */
+  nextFrame: paintFrame,
+  finishCurtain: async () => {
+    try { await finishLoader({ flyToBadge: true }); }
+    catch (e) { console.warn('[truck-studio] transição de saída falhou', e); hideLoader(); }
+  },
+  /* A RECEITA DA COR CORRENTE, reaplicada sem recarregar um byte.
+     `applyColor()` é privado deste arquivo (ele fala com o painel de tinta, o
+     crachá, o editor de arte e o `lastColor`), e é ele que traduz
+     `PaintColorDef.effect` — a receita curada do banco — nos parâmetros do
+     shader. Reimplementar isso do lado do projeto seria uma segunda tradução da
+     mesma coisa, e a que não é exercitada todo dia é a que fica errada. */
+  reapplyColor: () => {
+    const r = currentChoice && resolveChoice(currentChoice);
+    if (r) applyColor(r.color);
+  },
+  /* O SELETOR COMPLETO — cenário → montadora → modelo → chassi → cor.
+     `cancellable: true` porque aqui existe um caminho de volta que no boot não
+     existe: lá o estúdio não tem o que mostrar sem uma escolha, e aqui já há um
+     caminhão em cena. Cancelar deixa o projeto zerado com o veículo atual.
+     Nada é feito com o resultado de propósito — `selector.onChange` (registrado
+     no fim de boot()) já leva toda seleção concluída para applyChoice(). Ver o
+     docstring de `openPicker` em project/document.ts. */
+  openPicker: () => selector.openSelector({ flow: 'full', cancellable: true }),
+});
+
 /* ---------------- O VÃO DE PORTA, COM CARREGAMENTO ----------------
    MEDIDO (`tools/studio-bench/checks-livery-registro.mjs`): um "+ Adicionar
    porta" prendia a thread principal por **2 932 ms**. O motivo está no
@@ -1016,7 +1076,9 @@ function applyTrailerDoorsDebounced(
 
 liveryStructure.setDoorsApplier(applyTrailerDoorsDebounced);
 
-async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean) {
+async function runApply(
+  resolved: ResolvedPick, first: boolean, curtain: boolean, keepCurtain = false,
+) {
   const { choice, env, model, chassis, manufacturer, color, finish } = resolved;
   /* 'Highline · 6x4' — o chassi é um passo do seletor agora, então tudo que
      nomeia o veículo (a cortina, o crachá, a linha de estado) tem de dizer qual
@@ -1362,6 +1424,38 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        variações não pode acabar com `truck-studio (4).png`. */
     setCaptureSubject([truckLabel(manufacturer.name, model.name), chassis.name, color.name]);
 
+    /* ---- TROCOU DE MARCA: a tinta do cavalo SAI do implemento ----
+       Pedido do dono do produto: *"uma pintura da cor do cavalo quando aplicada
+       deve sempre ser removida ao trocar a marca do cavalo — por exemplo estava
+       com um scania, trocou para um volvo"*.
+
+       E a razão é mecânica, não só de gosto: a paleta é POR MONTADORA
+       (`PaintColorDef.manufacturer`), então trocar de marca troca
+       obrigatoriamente a cor. O material do baú compartilha os uniformes da
+       tinta, então ele SEGUIRIA a cor nova sem reclamar — e é justamente esse o
+       problema: o baú mudaria de cor sozinho, por causa de uma decisão que o
+       usuário tomou sobre OUTRO caminhão e que nada na tela liga a este.
+
+       A MARCA e não o MODELO, que é o que foi pedido e é a granularidade certa:
+       dentro de uma mesma montadora a cor sobrevive à troca de modelo, então a
+       decisão continua fazendo sentido. Já entre marcas ela não tem como
+       continuar significando o que significava.
+
+       É a mesma doutrina de `livery.setSpecialEdition()`, que desliga esta mesma
+       caixa ao entrar num cavalo sem tinta — e pelo mesmo motivo declarado lá:
+       *"quem vem de um caminhão pintável com a caixa marcada trocaria de modelo
+       e ficaria com o baú tingido, sem controle visível para desfazer"*.
+
+       ANTES de `currentChoice = choice`, porque a comparação é contra a escolha
+       ANTERIOR. E só quando havia uma: no primeiro carregamento da página não
+       há marca de onde vir, e desligar ali jogaria fora o estado restaurado. */
+    const prevManufacturer = currentChoice?.manufacturerId ?? null;
+    if (prevManufacturer && prevManufacturer !== choice.manufacturerId
+        && models.state.paintTarget === 'both') {
+      livery.setImplementPainted(false, { echo: true });
+      setStatus(`Marca trocada para ${manufacturer.name} — a tinta do cavalo saiu do implemento.`);
+    }
+
     currentChoice = choice;
     /* Os acabamentos gravados entram na PEÇA que acabou de ser montada. Aqui e
        não antes: `setTrimChoice()` escreve material em malhas do implemento, e
@@ -1397,7 +1491,13 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     await warmUp();
     /* A saída é cosmética: um soluço na animação de flip não pode transformar
        uma cena perfeitamente carregada num erro, mas a cortina TEM de descer. */
-    if (curtain) {
+    /* `keepCurtain` ADIA a descida — não a cancela. Quem pediu assume o dever de
+       chamar `finishLoader()` depois, e hoje o único que pede é o carregamento
+       de PROJETO: ali a cena só está pronta várias etapas adiante (medidas,
+       plotagem, tinta, luz), e descer a cortina aqui mostraria o caminhão nu
+       enquanto a plotagem ainda está sendo montada por cima dele — que é
+       exatamente o que foi relatado. Ver `applyProject()`. */
+    if (curtain && !keepCurtain) {
       try {
         await finishLoader({ flyToBadge: true });
       } catch (e) {
@@ -1451,7 +1551,7 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
  */
 function applyChoice(
   choice: Choice,
-  opts: { first?: boolean; curtain?: boolean } = {},
+  opts: { first?: boolean; curtain?: boolean; keepCurtain?: boolean } = {},
 ): Promise<Choice | null> {
   const first = !!opts.first;
   const curtain = opts.curtain !== false;
@@ -1504,7 +1604,7 @@ function applyChoice(
   pendingChoice = resolved.choice;
   return enqueue(
     `${resolved.model.name} · aguardando o carregamento atual…`,
-    () => runApply(resolved, first, curtain),
+    () => runApply(resolved, first, curtain, !!opts.keepCurtain),
   );
 }
 
@@ -1770,6 +1870,10 @@ async function boot() {
     initUI();
     initPaintPanel();
     initTrimPanel();
+    /* Pelo MESMO motivo de initPaintPanel() logo acima: ui/project-panel importa
+       setStatus, makePopover e o cadeado de captura de ui/chrome, então chrome
+       chamá-lo fecharia um segundo ciclo de import. */
+    initProjectPanel();
     /* A arte estrutural do painel (fita 3M, cantoneira, porta). Sem `await`, e
        de propósito: são 37 kB que só melhoram o desenho do editor, e nenhum
        passo do boot depende deles. O que chega antes de o usuário abrir o editor

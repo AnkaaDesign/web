@@ -209,6 +209,16 @@ export { setLamps, setLampModel } from './lamps';
    luminária que ele acende? —, então ela vira porta de bancada. */
 export { getLampInfo } from './lamps';
 
+/* E `setLampSites`, pela mesma razão de porta de bancada — não porque alguém
+   deva chamá-la de fora em produção.
+   `tools/studio-bench/checks-postes-fantasma.mjs` precisa PRODUZIR o estado
+   "o cenário não entregou torre nenhuma", que em produção nasce de um `set.glb`
+   que falhou ou que não tem torre (scene/set.ts e scene/scenery.ts chamam
+   exatamente `setLampSites(null, null)`). Sem esta linha o check só saberia
+   observar o caminho feliz — e o defeito que ele trava mora justamente no
+   outro. */
+export { setLampSites } from './lamps';
+
 export const holder = $('canvas-holder');
 
 /* DEPTH PRECISION — why this is NOT a logarithmic buffer.
@@ -4375,7 +4385,7 @@ setVehicleLightsRigRefresh(() => { if (rigCur) applyRig(rigCur); });
 /* The persisted blob, as WRITTEN — nothing here is trusted; restore() validates
    and clamps every field. Widened where a hand edit could plausibly land
    (`hour` as a string), which is what the validators already handle. */
-interface SavedScene {
+export interface SavedScene {
   preset?: string;
   timeOfDay?: string;
   hour?: number | string | null;
@@ -4393,9 +4403,30 @@ interface SavedScene {
   temp?: number | string | null;
 }
 
-(function restore() {
-  let s: SavedScene | null = null;
-  try { s = JSON.parse(localStorage.getItem(SCENE_KEY) as string); } catch (_) { /* ignore */ }
+/** O estado da luz como ele seria GRAVADO agora. */
+export const sceneStateSnapshot = (): SavedScene => ({ ...sceneState });
+
+/**
+ * Escreve um blob de luz sobre `sceneState`, validando e limitando CADA campo.
+ *
+ * UM LEITOR, DOIS CHAMADORES, e é essa a razão de esta função existir em vez de
+ * o corpo abaixo continuar dentro da IIFE de boot: o segundo chamador é o
+ * arquivo de projeto (`project/document.ts`), e um projeto aberto tem de
+ * atravessar exatamente a mesma validação que um blob de `localStorage` — senão
+ * são duas definições do que "uma cena válida" quer dizer, e a que não é
+ * exercitada todo dia é a que fica errada. É a mesma disciplina que
+ * `livery-doc.ts` aplica ao hidratador das telas de plotagem.
+ *
+ * @param opts.animate anima a transição (o boot não anima: não há de onde vir).
+ * @param opts.persist grava de volta no `localStorage`. Falso no boot — reescrever
+ *   no carregamento o que se acabou de ler não acrescenta nada —, verdadeiro
+ *   quando quem escreveu foi um projeto, que É uma mudança de estado.
+ */
+export function restoreSceneState(
+  saved: SavedScene | null | undefined,
+  opts: { animate?: boolean; persist?: boolean } = {},
+) {
+  let s = saved;
   if (!s || typeof s !== 'object') s = {};
   /* Stale or hand-edited state must never throw: validate and clamp every
      field, or fall back to the default. */
@@ -4440,7 +4471,15 @@ interface SavedScene {
   syncSunToHour();
   if (sceneState.azManual) sceneState.az = num(s.az, sceneState.az, 0, 360);
   if (sceneState.elManual) sceneState.el = num(s.el, sceneState.el, 2, 85);
-  beginTween(false);
+  beginTween(!!opts.animate);
+  if (opts.persist) save();
+  return sceneState;
+}
+
+(function restore() {
+  let s: SavedScene | null = null;
+  try { s = JSON.parse(localStorage.getItem(SCENE_KEY) as string); } catch (_) { /* ignore */ }
+  restoreSceneState(s);
 })();
 
 /* ---------------- framing / resize / loop ---------------- */

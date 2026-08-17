@@ -369,6 +369,54 @@ export function clearTimeline() {
   emit();
 }
 
+/** Uma chave como ela viaja num arquivo de projeto — sem o `id`, que é local. */
+export type TimelineKeyData = Omit<TimelineKey, 'id'>;
+
+/** O percurso inteiro, para gravar. Vazio quando não há nenhum. */
+export function exportTimeline(): TimelineKeyData[] {
+  return keys.map(({ id: _id, ...rest }) => ({ ...rest }));
+}
+
+/**
+ * Escreve um percurso inteiro por cima do atual.
+ *
+ * ⚠️ **QUEM CHAMA ISTO ASSUME A RESPONSABILIDADE DO ⚠️ LÁ EM CIMA.** O bloco de
+ * `keys` explica por que este estado não vai para o `localStorage`: as poses são
+ * ABSOLUTAS EM MUNDO, e restaurar um percurso numa cena diferente aponta a
+ * câmera para um pátio vazio com toda a naturalidade — um estado inválido com
+ * cara de válido, que é a pior classe de bug de persistência.
+ *
+ * Um ARQUIVO DE PROJETO é o caso em que a objeção não se aplica, e é por isso
+ * que esta porta existe em vez de a decisão ter sido revertida: o projeto
+ * carrega o cenário e o veículo JUNTO com o percurso, e `project/document.ts` só
+ * chama isto depois de conferir que a escolha restaurada é a mesma que estava
+ * gravada. Mundo igual, poses válidas. Se a conferência falha, o percurso é
+ * descartado com um aviso — nunca aplicado "na dúvida".
+ *
+ * Os ids são NOVOS: eles são identidade de sessão (a interface referencia por
+ * id, e o contador é de módulo), não conteúdo do documento.
+ */
+export function importTimeline(list: readonly TimelineKeyData[] | null | undefined): number {
+  if (!Array.isArray(list)) { clearTimeline(); return 0; }
+  const num = (v: unknown, d: number) => (Number.isFinite(+(v as number)) ? +(v as number) : d);
+  /* O TETO É REAFIRMADO AQUI, e não presumido do arquivo: um documento com 40
+     chaves (escrito à mão, ou por uma versão futura com outro limite) não pode
+     entrar e deixar a interface num estado que ela própria não sabe produzir. */
+  keys = list.slice(0, MAX_TIMELINE_KEYS).map((k, i) => ({
+    id: nextId++,
+    px: num(k?.px, 0), py: num(k?.py, 0), pz: num(k?.pz, 0),
+    tx: num(k?.tx, 0), ty: num(k?.ty, 0), tz: num(k?.tz, 0),
+    fov: clamp(num(k?.fov, CARD_FOV), MIN_LENS_FOV, MAX_LENS_FOV),
+    /* A primeira não tem viagem — `timelineTimes()` a ignora, e gravar um número
+       ali só criaria um campo que mente. */
+    travel: i === 0 ? 0
+      : clamp(num(k?.travel, DEFAULT_TRAVEL_SECONDS), MIN_TRAVEL_SECONDS, MAX_TRAVEL_SECONDS),
+    thumb: typeof k?.thumb === 'string' && k.thumb ? k.thumb : null,
+  }));
+  emit();
+  return keys.length;
+}
+
 /* ---------------- a lente VIVA ----------------
    Mexer no `fov` da câmera do estúdio é seguro enquanto alguém devolver o valor
    de fábrica: `resize()` reescreve `aspect` e recalcula a projeção, mas NÃO

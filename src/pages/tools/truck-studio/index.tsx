@@ -22,6 +22,10 @@ import "./engine/ui/paint-panel.css";
    propriedade que faz a ordem destes imports não ser carregante. Ver a nota
    logo abaixo. */
 import "./engine/ui/timeline.css";
+/* O menu de projeto (novo/salvar/abrir/exportar/importar) e o diálogo da
+   biblioteca. Mesma propriedade: os prefixos dele são `.ts-projitem` e
+   `.ts-proj-*`, e nenhum dos dois é declarado em outra folha. */
+import "./engine/ui/project-panel.css";
 
 /**
  * Truck Studio — configurador 3D (visualizador three.js + editor de plotagem

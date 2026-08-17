@@ -1978,22 +1978,62 @@ export function sizeModalCanvas(key: SurfaceKey, zoom = 1) {
    a chapa que o editor desenha atrás da arte. */
 function bindTrailerPaint() {
   $('paint-trailer').addEventListener('change', (e) => {
-    const { checked } = evTarget<HTMLInputElement>(e);
-    setPaintTarget(checked ? 'both' : 'cab');
-    /* A chapa que aparece pela janela do painel segue a mesma decisão: ligado,
-       o baú é da cor do cavalo, e o editor tem de mostrar a arte sobre ELA — um
-       desenho que sumia no branco pode gritar sobre o vermelho, e vice-versa. */
-    paintedImplement = checked;
-    syncImplementColor();
-    /* As faces com cor própria continuam com ela, e o status diz isso: sem a
-       contagem, alguém que tenha preto na traseira liga a opção, vê a traseira
-       continuar preta e lê como falha. */
-    const own = SURFACE_KEYS.filter((k) => !!surfaces[k].backgroundColor).length;
-    const kept = own ? ` · ${own} ${own === 1 ? 'face mantém' : 'faces mantêm'} a cor própria` : '';
-    setStatus((checked
-      ? 'Pintura aplicada à cabine e ao implemento (incluindo a frente)'
-      : 'Pintura somente na cabine') + kept);
+    setImplementPainted(evTarget<HTMLInputElement>(e).checked);
   });
+}
+
+/**
+ * Liga/desliga "pintar o implemento com a cor do cavalo" — a porta ÚNICA.
+ *
+ * O checkbox delega para cá, e o carregamento de projeto também. Antes o corpo
+ * disto morava dentro do listener, e um estado escrito de fora (um projeto
+ * aberto) tinha de reproduzi-lo: três escritas — o material do 3D, o flag
+ * `paintedImplement` e a caixa em si — que ninguém garantia continuarem juntas.
+ * Uma delas esquecida é o baú pintado com a caixa desmarcada.
+ *
+ * `echo` é para quem escreve DE FORA (o "Novo" e o carregamento de projeto), e
+ * ele NÃO escreve `checked` e segue em frente — ele escreve a caixa e DESPACHA o
+ * `change` dela, voltando por este mesmo caminho um passo depois.
+ *
+ * A diferença importa porque `#paint-trailer` tem TRÊS espelhos, e nem todos
+ * escutam o motor:
+ *
+ *   · o card de Configurações (ui/trim-panel.ts) assina `onPaintTargetApplied`,
+ *     ou seja segue o motor e estaria certo de qualquer jeito;
+ *   · a seção do Thermo King e a lista de camadas do editor (ui/livery-editor.ts)
+ *     assinam o `change` DA CAIXA. Um `checked = v` cru não emite `change`, então
+ *     elas ficavam anunciando o estado anterior — a camada "Fundo" dizendo que a
+ *     chapa está com a cor do cavalo depois de o "Novo" tê-la tirado.
+ *
+ * É o mesmo idioma que `setSpecialEdition()` logo acima já usa, e pela mesma
+ * razão que o comentário de lá dá: as duas metades andam juntas ou não andam.
+ */
+export function setImplementPainted(on: boolean, opts: { echo?: boolean } = {}) {
+  const checked = !!on;
+  if (opts.echo) {
+    const box = $<HTMLInputElement>('paint-trailer');
+    box.checked = checked;
+    /* E o trabalho acontece na volta, pelo listener. `return` para ele não ser
+       feito duas vezes — inofensivo, porque tudo aqui é idempotente, mas
+       `setPaintTarget()` troca material em dezenas de malhas e refotografa o
+       painel; fazer isso em dobro num "Novo" é engasgo visível de graça. */
+    box.dispatchEvent(new Event('change'));
+    return;
+  }
+  setPaintTarget(checked ? 'both' : 'cab');
+  /* A chapa que aparece pela janela do painel segue a mesma decisão: ligado,
+     o baú é da cor do cavalo, e o editor tem de mostrar a arte sobre ELA — um
+     desenho que sumia no branco pode gritar sobre o vermelho, e vice-versa. */
+  paintedImplement = checked;
+  syncImplementColor();
+  /* As faces com cor própria continuam com ela, e o status diz isso: sem a
+     contagem, alguém que tenha preto na traseira liga a opção, vê a traseira
+     continuar preta e lê como falha. */
+  const own = SURFACE_KEYS.filter((k) => !!surfaces[k].backgroundColor).length;
+  const kept = own ? ` · ${own} ${own === 1 ? 'face mantém' : 'faces mantêm'} a cor própria` : '';
+  setStatus((checked
+    ? 'Pintura aplicada à cabine e ao implemento (incluindo a frente)'
+    : 'Pintura somente na cabine') + kept);
 }
 
 /* ---------------- init ----------------

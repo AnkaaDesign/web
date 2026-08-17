@@ -88,6 +88,29 @@ let capturing = false;
 let recording = false;
 const busy = () => capturing || recording;
 
+/** Alguma coisa está lendo o canvas agora (imagem ou vídeo)? */
+export const isCanvasBusy = busy;
+
+/**
+ * Reserva o canvas para uma leitura, ou devolve `null` se já há uma em curso.
+ *
+ * Existe porque a MINIATURA do menu de projeto também renderiza
+ * (`captureViewport` no preset baixo), e uma leitura que não passasse por este
+ * mesmo cadeado poderia rodar no meio de uma gravação — congelando o vídeo pelos
+ * segundos da captura, que é exatamente o defeito que o bloco acima descreve.
+ * Fora do cadeado, o flag não existiria e o bug voltaria pela porta nova.
+ */
+export function claimCapture(): (() => void) | null {
+  if (busy()) return null;
+  capturing = true;
+  let freed = false;
+  return () => { if (!freed) { freed = true; capturing = false; } };
+}
+
+/** Baixa um blob com o nome dado. Exportado para o menu de projeto reusar — a
+ *  armadilha do `revokeObjectURL` na mesma volta está resolvida aqui dentro. */
+export const downloadFile = (blob: Blob, filename: string) => downloadBlob(blob, filename);
+
 /* ---------------- topbar + view controls ----------------
    Os dois toggles de visibilidade seguem na topbar; enquadrar/girar/capturar
    ficam SOBRE o render, no canto superior direito (#view-controls, em
@@ -406,7 +429,12 @@ let quality: CaptureQuality = readQuality();
    `paint` DEVOLVE a lista de itens percorríveis em vez de escrevê-la numa
    variável de módulo: com dois painéis, uma variável compartilhada faria as
    setas do teclado de um andarem sobre os itens do outro. */
-interface Popover {
+/* EXPORTADA a partir de 2026-08-17, para o menu de PROJETO (ui/project-panel.ts)
+   nascer com as sete propriedades acima em vez de uma oitava aproximação delas.
+   A alternativa era um `<div>` com um `click` de fora — e ela reintroduziria,
+   uma a uma, as decisões que este cabeçalho registra: o fechamento por perda de
+   foco (item 6) é a que mais custou para ser removida. */
+export interface Popover {
   panel: HTMLElement;
   isOpen(): boolean;
   open(): void;
@@ -415,7 +443,7 @@ interface Popover {
   repaint(): void;
 }
 
-interface PopoverSpec {
+export interface PopoverSpec {
   trigger: HTMLButtonElement;
   /** id do painel, para o `aria-controls` do botão. */
   id: string;
@@ -427,7 +455,7 @@ interface PopoverSpec {
   canOpen?: () => boolean;
 }
 
-function makePopover(spec: PopoverSpec): Popover {
+export function makePopover(spec: PopoverSpec): Popover {
   const cluster = $('view-controls');
   const { trigger } = spec;
 

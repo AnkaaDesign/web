@@ -1096,6 +1096,34 @@ export function setImplementMeasures(patch: { height?: number; length?: number }
  * na geometria não apareceria no editor.
  */
 export function setDoorsFor(key: StructureKey, doors: DoorSpec[]): DoorSpec[] {
+  const applied = setDoorsQuiet(key, doors);
+  pushDoorsToGeometry(key, applied);
+  return applied;
+}
+
+/**
+ * A METADE 2D de `setDoorsFor()` — o cadastro e o desenho, sem tocar na malha.
+ *
+ * EXISTE PARA O CARREGAMENTO DE PROJETO, e o motivo é a conta: `setDoorsFor()`
+ * termina em `pushDoorsToGeometry()`, que delega ao aplicador coalescido de
+ * studio.ts, que chama `models.setTrailerDoors()`, que corre a sequência
+ * DESTRUTIVA de oito passos de `setTrailerDims()` — medida em quase três
+ * segundos de thread presa por chamada. Um projeto escreve as portas de várias
+ * faces MAIS altura e comprimento de uma vez; pela porta normal isso são três a
+ * quatro recortes em série, cada um jogando fora e recortando de novo as chapas
+ * de plotagem que o recorte anterior acabou de fazer.
+ *
+ * Com esta porta, quem carrega um projeto encena as portas na geometria
+ * (`rig.stageDoors()`, que só ENFILEIRA) e dispara UM `setTrailerDims()` com
+ * tudo dentro — um recorte, não quatro. Ver `applyMeasures()` em
+ * `project/document.ts`, que é o único chamador e explica a sequência do lado de
+ * lá.
+ *
+ * NÃO É A PORTA DO FORMULÁRIO. De lá, uma porta cadastrada que não chegasse à
+ * malha seria um desenho de porta — exatamente o defeito que o cabeçalho de
+ * `setDoorsFor()` diz que as duas metades juntas evitam.
+ */
+export function setDoorsQuiet(key: StructureKey, doors: DoorSpec[]): DoorSpec[] {
   panels[key].spec.doors = doors.map((d) => ({
     position: Number(d.position) || 0,
     width: Number(d.width) || 0,
@@ -1111,7 +1139,6 @@ export function setDoorsFor(key: StructureKey, doors: DoorSpec[]): DoorSpec[] {
      no ato; o recorte 3D vai atrás, com indicador. */
   void recompose(key);
   emitMeasures();
-  pushDoorsToGeometry(key, applied);
   return applied;
 }
 

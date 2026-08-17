@@ -1,0 +1,414 @@
+/* O menu de PROJETO e o diálogo da biblioteca.
+   ---------------------------------------------------------------------------
+   Duas superfícies, e elas são de naturezas diferentes de propósito:
+
+     · o MENU é vidro fumê sobre o render, como os outros dois da régua. Ele
+       reusa `.ts-shotmenu` inteiro (core/studio.css) e só acrescenta a linha,
+       que é diferente: no menu de captura a linha ESCOLHE e um botão separado
+       AGE; aqui cada linha age, então ela é maior, tem ícone e diz o que faz;
+
+     · o DIÁLOGO é um card OPACO sobre um escurecido. Ele não flutua sobre a
+       cena, ele INTERROMPE — e vidro translúcido por cima de um caminhão
+       colorido é exatamente o material errado para uma pergunta que a pessoa
+       precisa ler antes de apagar o trabalho dela.
+
+   NENHUM SELETOR DAQUI EXISTE EM OUTRO ARQUIVO. É o que mantém a ordem dos
+   imports de index.tsx não-carregante — a propriedade que o cabeçalho de
+   core/studio.css mede e defende. Os prefixos são `.ts-projitem` (menu) e
+   `.ts-proj-*` (diálogo); nenhum dos dois aparece em studio.css, hud.css,
+   selector.css, loader.css ou paint-panel.css. */
+
+/* ---------------- o menu ---------------- */
+
+/* O painel é mais largo que o de captura: as linhas carregam uma frase
+   explicando o destino de cada ação, e "Gera um .ankaastudio para mandar a outra
+   pessoa" quebrada em três linhas leria como parágrafo, não como legenda. */
+.truck-studio-root .ts-shotgroup--proj .ts-shotmenu {
+  min-width: 292px;
+  /* ANCORADO À ESQUERDA, e é o oposto dos outros dois. Este botão é o PRIMEIRO
+     da régua e ela mora no canto superior DIREITO da tela: um menu alinhado à
+     direita do gatilho cairia quase inteiro fora do viewport pela esquerda em
+     tela estreita. */
+  right: auto;
+  left: 0;
+}
+
+.truck-studio-root .ts-projitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+/* O FILETE MARCA AS TRÊS NATUREZAS — zerar, guardar aqui, atravessar máquina.
+   Ele é o que responde "por que Exportar não é a mesma coisa que Salvar?" sem
+   que ninguém precise ler a legenda. `margin-top` em vez de `border-top` no
+   item: a borda encostaria nas laterais do painel, e o respiro é o que a faz
+   parecer deliberada em vez de sobra. */
+.truck-studio-root .ts-projitem.is-grouped {
+  margin-top: 7px;
+  padding-top: 13px;
+  position: relative;
+}
+.truck-studio-root .ts-projitem.is-grouped::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: 3px;
+  border-top: 1px solid var(--stroke);
+}
+
+.truck-studio-root .ts-projitem:hover,
+.truck-studio-root .ts-projitem:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+.truck-studio-root .ts-projitem:focus-visible {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.truck-studio-root .ts-projitem:active { background: rgba(255, 255, 255, 0.12); }
+
+.truck-studio-root .ts-projitem__ico {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: color 140ms ease;
+}
+.truck-studio-root .ts-projitem:hover .ts-projitem__ico,
+.truck-studio-root .ts-projitem:focus-visible .ts-projitem__ico { color: var(--accent); }
+
+.truck-studio-root .ts-projitem__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.truck-studio-root .ts-projitem__name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.truck-studio-root .ts-projitem__hint {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* ---------------- o diálogo ---------------- */
+
+/* `fixed`, e não `absolute` — a MESMA escolha de `#editor-modal`, e pelo mesmo
+   par de razões:
+
+     · `.truck-studio-root` não declara `position`, então um `absolute` aqui
+       resolveria contra o primeiro ancestral posicionado do Ankaa, ou contra o
+       bloco inicial. Um diálogo ancorado em algo que este arquivo não controla é
+       um diálogo que sai do lugar quando a página em volta mudar;
+     · em TELA CHEIA o elemento é o `root` (ver §9.1 de ARCHITECTURE.md — o alvo
+       é `root` e nunca `#canvas-holder`, porque o editor de plotagem é IRMÃO de
+       `#app`). O scrim é filho de `root`, então ele acompanha.
+
+   z-index 10000: um a mais que `#editor-modal`. Os dois não coexistem hoje — não
+   se chega ao menu de projeto de dentro do editor —, mas a cortina de
+   carregamento (400) SIM coexiste: abrir um projeto de outro caminhão baixa
+   centenas de megabytes, e uma pergunta escondida atrás da cortina é uma
+   interface travada. */
+.truck-studio-root .ts-proj-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: ts-proj-fade 120ms ease backwards;
+}
+@keyframes ts-proj-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.truck-studio-root .ts-proj-card {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  /* Teto de ALTURA e não de linhas: a lista de projetos cresce sem limite, e é
+     ela (`.ts-proj-list`) que rola — nunca o card, ou o rodapé com os botões
+     sairia da tela justamente quando há muito o que ler. */
+  max-height: min(560px, 100%);
+  padding: 20px;
+  gap: 14px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.85);
+  animation: ts-proj-rise 150ms cubic-bezier(0.22, 0.7, 0.3, 1) backwards;
+}
+@keyframes ts-proj-rise {
+  from { opacity: 0; translate: 0 10px; scale: 0.985; }
+  to   { opacity: 1; translate: none; scale: 1; }
+}
+
+.truck-studio-root .ts-proj-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.truck-studio-root .ts-proj-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-height: 0;                  /* deixa a lista rolar dentro do flex */
+  overflow: hidden;
+}
+.truck-studio-root .ts-proj-p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---- o campo de nome ---- */
+.truck-studio-root .ts-proj-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.truck-studio-root .ts-proj-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.truck-studio-root .ts-proj-input {
+  padding: 9px 11px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.truck-studio-root .ts-proj-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.22);
+}
+
+/* ---- a lista de problemas ---- */
+.truck-studio-root .ts-proj-problems {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+/* A COR É O ÚNICO SINAL DE NÍVEL, e ela vem numa BARRA à esquerda em vez de no
+   texto: um parágrafo inteiro em vermelho é mais difícil de ler do que um em
+   cinza, e o que se quer aqui é que a pessoa LEIA. */
+.truck-studio-root .ts-proj-problem {
+  padding: 7px 10px 7px 11px;
+  border-left: 3px solid var(--muted);
+  border-radius: 0 7px 7px 0;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.truck-studio-root .ts-proj-problem.is-erro { border-left-color: var(--accent-2); }
+.truck-studio-root .ts-proj-problem.is-aviso { border-left-color: #d9a326; }
+
+/* ---- a lista de projetos ---- */
+.truck-studio-root .ts-proj-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  /* Espaço para o anel de foco não ser cortado pela borda da rolagem. */
+  padding: 2px;
+  margin: -2px;
+}
+
+.truck-studio-root .ts-proj-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.truck-studio-root .ts-proj-item:hover { background: #383838; }
+.truck-studio-root .ts-proj-item:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+/* O projeto que está ABERTO agora ganha um anel verde discreto — é a resposta a
+   "qual destes eu estou vendo na tela?", que é a primeira pergunta de quem abre
+   esta lista para trocar de projeto. */
+.truck-studio-root .ts-proj-item.is-open { border-color: rgba(34, 197, 94, 0.55); }
+
+.truck-studio-root .ts-proj-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 84px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--bg);
+}
+.truck-studio-root .ts-proj-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.truck-studio-root .ts-proj-thumb.is-empty {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--ts-plate-panel);
+}
+
+.truck-studio-root .ts-proj-itembody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+  /* Reserva a coluna do botão de apagar: sem ela, um nome longo passa por baixo
+     do ícone e as duas coisas se sobrepõem. */
+  padding-right: 24px;
+}
+.truck-studio-root .ts-proj-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.truck-studio-root .ts-proj-sub,
+.truck-studio-root .ts-proj-meta {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.truck-studio-root .ts-proj-meta { opacity: 0.78; }
+
+/* APAGAR só aparece no hover/foco da linha — mas continua ALCANÇÁVEL pelo
+   teclado o tempo todo (`:focus-within` cobre o foco nele mesmo). Escondê-lo com
+   `display:none` o tiraria da ordem de tabulação, que é o erro clássico deste
+   padrão. */
+.truck-studio-root .ts-proj-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+.truck-studio-root .ts-proj-item:hover .ts-proj-del,
+.truck-studio-root .ts-proj-item:focus-within .ts-proj-del,
+.truck-studio-root .ts-proj-del:focus-visible { opacity: 1; }
+.truck-studio-root .ts-proj-del:hover {
+  color: #fff;
+  background: var(--accent-2);
+}
+.truck-studio-root .ts-proj-del:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- o rodapé ---- */
+.truck-studio-root .ts-proj-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+.truck-studio-root .ts-proj-btn {
+  padding: 9px 16px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.truck-studio-root .ts-proj-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.truck-studio-root .ts-proj-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-proj-btn.is-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: #071108;
+}
+.truck-studio-root .ts-proj-btn.is-primary:hover { background: #34d36c; }
+/* O VERMELHO É PREENCHIMENTO, e não só borda: o botão que apaga tem de ser
+   visualmente diferente do que confirma, senão a única coisa que separa
+   "Substituir" de "Salvar" é a palavra — e é justamente na pressa que a palavra
+   não é lida. */
+.truck-studio-root .ts-proj-btn.is-danger {
+  border-color: transparent;
+  background: var(--accent-2);
+  color: #fff;
+}
+.truck-studio-root .ts-proj-btn.is-danger:hover { background: #e0233f; }
+
+/* O input de arquivo é acionado por `.click()` e nunca desenhado. `display:none`
+   e não `visibility`/`opacity`: um input de arquivo invisível mas presente no
+   layout pode receber um clique perdido e abrir o seletor do sistema do nada. */
+.truck-studio-root .ts-proj-file { display: none; }
+
+@media (max-width: 640px) {
+  .truck-studio-root .ts-shotgroup--proj .ts-shotmenu { min-width: 252px; }
+  .truck-studio-root .ts-proj-scrim { padding: 12px; }
+  .truck-studio-root .ts-proj-card { padding: 16px; }
+  .truck-studio-root .ts-proj-thumb { width: 64px; height: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-proj-scrim,
+  .truck-studio-root .ts-proj-card { animation: none; }
+  .truck-studio-root .ts-projitem,
+  .truck-studio-root .ts-proj-item,
+  .truck-studio-root .ts-proj-btn,
+  .truck-studio-root .ts-proj-del { transition: none; }
+}

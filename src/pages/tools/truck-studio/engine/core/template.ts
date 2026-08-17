@@ -50,6 +50,27 @@ export const STUDIO_HTML = /* html */ `
              anunciam a mudança sem ocupar um pixel. -->
         <span id="status" class="ts-sr" role="status" aria-live="polite">Carregando…</span>
         <div id="view-controls" role="group" aria-label="Controles de visualização">
+          <!-- PROJETO — novo, salvar, abrir, exportar, importar.
+               PRIMEIRO DA RÉGUA, e é a única posição que se defende. Os outros
+               seis controles são sobre a VISTA (enquadrar, girar, esconder,
+               tela cheia) ou sobre PRODUZIR a partir dela (foto, vídeo, tinta);
+               este é sobre o DOCUMENTO, que é a moldura de todos eles — a mesma
+               razão pela qual "Arquivo" é o primeiro menu de todo programa que
+               tem um. Pô-lo entre a câmera e o pincel o faria ler como mais uma
+               forma de exportar imagem, que é justamente o que ele não é.
+               O ícone é uma PASTA e não um disquete: salvar é uma das cinco
+               coisas que ele faz, e um disquete anunciaria só aquela.
+               ui/project-panel.ts constrói o menu por makePopover(), a mesma
+               fábrica do menu de captura — ver o cabeçalho dela em ui/chrome.ts. -->
+          <button id="btn-project" class="ts-vbtn" type="button" title="Projeto"
+                  aria-label="Projeto — novo, salvar, abrir, exportar e importar">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <path d="M3.2 7.4a1.6 1.6 0 0 1 1.6-1.6h4l1.9 2.2h7.5a1.6 1.6 0 0 1 1.6 1.6v8.4
+                       a1.6 1.6 0 0 1-1.6 1.6H4.8a1.6 1.6 0 0 1-1.6-1.6Z"/>
+            </svg>
+          </button>
           <button id="btn-reset" class="ts-vbtn" type="button" title="Enquadrar o veículo"
                   aria-label="Enquadrar o veículo">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"

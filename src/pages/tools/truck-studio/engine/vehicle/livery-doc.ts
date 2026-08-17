@@ -408,23 +408,105 @@ export function sidesMatch(): boolean {
 const STORE_KEY = 'truckstudio.livery.v1';
 let persistTimer = 0;
 
+/** Uma tela serializada: os objetos do fabric mais a cor de fundo dela. */
+export interface LiverySurfaceState {
+  o: Record<string, unknown>;
+  bg: string;
+}
+
+/** As cinco telas, do jeito que atravessam um round trip. */
+export type LiveryDocState = Record<SurfaceKey, LiverySurfaceState>;
+
+/** Um nó serializado do fabric, do jeito que nos interessa: pode ser imagem
+ *  (`src`/`assetId`) e pode conter outros (um `Group`). */
+type SerializedNode = {
+  assetId?: string; src?: string; name?: string; objects?: SerializedNode[];
+};
+
+/**
+ * Percorre a árvore serializada inteira, e não só o primeiro nível.
+ *
+ * UM GRUPO ESCONDE IMAGENS. `toObject()` aninha os filhos de um `Group` em
+ * `objects`, e a versão anterior disto só varria o topo: agrupar um logo com um
+ * texto — que é a coisa mais natural do mundo a se fazer num editor — fazia a
+ * imagem daquele grupo ser gravada com a `blob:` URL da sessão, que morre com a
+ * aba. O sintoma era um logo que voltava vazio depois do F5, só quando estava
+ * dentro de um grupo, o que é exatamente o tipo de defeito que ninguém liga a
+ * causa nenhuma.
+ */
+function walkNodes(list: SerializedNode[] | undefined, visit: (n: SerializedNode) => void) {
+  for (const n of list ?? []) {
+    if (!n || typeof n !== 'object') continue;
+    visit(n);
+    if (Array.isArray(n.objects)) walkNodes(n.objects, visit);
+  }
+}
+
 /* blob: URLs valem só a sessão, então o data URL entra na saída e uma blob nova
    é criada na volta */
-function toPersistable(key: SurfaceKey) {
+function toPersistable(key: SurfaceKey): LiverySurfaceState {
   const json = surfaces[key].toObject(EXTRA);
-  for (const o of (json.objects as { assetId?: string; src?: string }[] | undefined) ?? []) {
+  walkNodes(json.objects as SerializedNode[] | undefined, (o) => {
     const a = assetOf(o.assetId);
     if (a) o.src = a.dataUrl;
-  }
-  return { o: json, bg: surfaces[key].backgroundColor ?? '' };
+  });
+  /* `backgroundColor` é `string | TFiller` no fabric v6 — um `Gradient` ou um
+     `Pattern` também cabem ali. O estúdio só escreve cor sólida (o seletor de
+     fundo da face é um `<input type=color>`), mas o campo permite mais, e um
+     gradiente serializado como `[object Object]` seria um fundo perdido em
+     silêncio. Um filler vira "sem fundo", que é o padrão e é honesto. */
+  const bg = surfaces[key].backgroundColor;
+  return { o: json, bg: typeof bg === 'string' ? bg : '' };
 }
+
+/**
+ * As cinco telas AGORA, com cada imagem embutida como data URL.
+ *
+ * É a saída de `persistNow()` sem o envelope de versão — o que o arquivo de
+ * projeto grava e o que `localStorage` grava são o MESMO documento, e é por isso
+ * que uma imagem colada aqui reabre igual dos dois lados.
+ */
+export function exportLivery(): LiveryDocState {
+  const out = {} as LiveryDocState;
+  for (const k of SURFACE_KEYS) out[k] = toPersistable(k);
+  return out;
+}
+
+/* A cota já foi avisada nesta sessão? Um aviso por sessão e não por gravação: o
+   `schedulePersist` dispara a cada 400 ms de edição, e repetir a mensagem a cada
+   um deles seria a linha de estado piscando enquanto a pessoa desenha. */
+let quotaWarned = false;
+
+/** Chamado quando a gravação do rascunho falha por cota. Injetado por
+ *  `vehicle/livery.ts` (que é quem sabe escrever na linha de estado) para este
+ *  módulo não precisar conhecer DOM. */
+let onQuota: ((msg: string) => void) | null = null;
+export function setLiveryQuotaReporter(fn: (msg: string) => void) { onQuota = fn; }
 
 export function persistNow() {
   try {
-    const payload: Record<string, unknown> = { v: 1 };
-    for (const k of SURFACE_KEYS) payload[k] = toPersistable(k);
-    localStorage.setItem(STORE_KEY, JSON.stringify(payload));
-  } catch { /* cota ou aba anônima — persistir aqui é conveniência */ }
+    localStorage.setItem(STORE_KEY, JSON.stringify({ v: 1, ...exportLivery() }));
+  } catch (e) {
+    /* ⚠️ A COTA ESTOURA EM SILÊNCIO E O VALOR ANTIGO FICA — este `catch` era
+       vazio, com a justificativa de que persistir aqui é "conveniência". Ela
+       vale para uma aba anônima; NÃO vale para cota, e a diferença é grande:
+       quando o `setItem` é recusado, o `localStorage` continua com a ÚLTIMA
+       versão que coube, então o F5 devolve uma plotagem antiga sem nada dizendo
+       por quê. E a cota é de ~5 MB por ORIGEM, compartilhada com o Ankaa inteiro
+       — um logo de 2 MB vira ~2,7 MB de base64 e chega perto sozinho.
+       Pior: estourada aqui, ela derruba junto a gravação da ESCOLHA, da CENA e
+       da qualidade — o sintoma vira "ele esqueceu meu caminhão".
+       Avisar uma vez é o mínimo honesto; o caminho de verdade é Salvar/Exportar,
+       que vão para o IndexedDB e para o arquivo, sem essa cota. */
+    const full = e instanceof DOMException
+      && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22);
+    if (full && !quotaWarned) {
+      quotaWarned = true;
+      console.warn('[livery] cota do localStorage estourada — o rascunho não foi gravado.', e);
+      onQuota?.('As imagens da plotagem não cabem mais na memória do navegador. '
+        + 'Use Projeto → Salvar para não perdê-las.');
+    }
+  }
 }
 
 function schedulePersist() {
@@ -432,36 +514,71 @@ function schedulePersist() {
   persistTimer = window.setTimeout(persistNow, 400);   // sliders não podem martelar o localStorage
 }
 
-export async function restorePersisted(): Promise<boolean> {
-  let payload: Record<string, { o: Record<string, unknown>; bg?: string }> & { v?: number };
-  try { payload = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch { return false; }
-  if (!payload || payload.v !== 1) return false;
+/**
+ * Escreve um documento de plotagem sobre as cinco telas.
+ *
+ * O HIDRATADOR ÚNICO — `restorePersisted()` e o carregamento de projeto entram
+ * os dois por aqui. Duas cópias desta função divergiriam na primeira correção, e
+ * a correção que ela mais recebe é justamente a ordem das três coisas abaixo,
+ * que TEM de ser esta:
+ *
+ *   1. as FONTES antes de tudo. O fabric mede a largura dos glifos no
+ *      nascimento do objeto e memoiza por família; se a webfont ainda não
+ *      chegou ele mede a SUBSTITUTA e guarda aquilo com o nome da família certa
+ *      — o texto passa a pintar certo e a manter largura errada para sempre.
+ *      É a armadilha que `ensureFont()` documenta, e é ela que faz um projeto
+ *      aberto em outro PC sair com o texto do tamanho errado;
+ *   2. o data URL vira uma blob URL NOVA e um `assetId` novo. As blob URLs do
+ *      documento de origem morreram com a sessão que as criou — reusá-las
+ *      restauraria um vazio;
+ *   3. `reapplyLocks()`, porque o fabric não serializa `selectable`/`evented`/
+ *      `lockMovement*`: só o nosso `locked` atravessa, e sem reconstruir os
+ *      flags a partir dele o objeto volta dizendo que está travado e arrastando
+ *      normalmente.
+ */
+export async function importLivery(doc: Partial<LiveryDocState> | null | undefined): Promise<boolean> {
+  if (!doc || typeof doc !== 'object') return false;
 
   const fams = new Set<string>();
   for (const k of SURFACE_KEYS) {
-    for (const o of (payload[k]?.o?.objects as { fontFamily?: string }[] | undefined) ?? []) {
-      if (o.fontFamily) fams.add(o.fontFamily);
-    }
+    walkNodes(doc[k]?.o?.objects as SerializedNode[] | undefined, (o) => {
+      const f = (o as { fontFamily?: string }).fontFamily;
+      if (f) fams.add(f);
+    });
   }
   await Promise.all([...fams].map(ensureFont));
 
   restoring = true;
   try {
     for (const k of SURFACE_KEYS) {
-      const st = payload[k];
+      const st = doc[k];
       if (!st?.o) continue;
-      for (const o of (st.o.objects as { src?: string; assetId?: string; name?: string }[] | undefined) ?? []) {
+      walkNodes(st.o.objects as SerializedNode[] | undefined, (o) => {
         if (typeof o.src === 'string' && o.src.startsWith('data:')) {
           const a = registerDataUrl(o.src, o.name);
           o.assetId = a.id;
           o.src = a.url;
         }
-      }
+      });
       await surfaces[k].loadFromJSON(st.o);
       surfaces[k].backgroundColor = st.bg ?? DEFAULT_BG;
       reapplyLocks(surfaces[k]);
       markDirty(k);
-      surfaces[k].requestRenderAll();
+      /* `renderAll()` SÍNCRONO, e não `requestRenderAll()`.
+         -------------------------------------------------------------------
+         Relato: *"depois que o loading acaba, parte do livery ainda está branca
+         e só depois fica colorido"*. A causa é o agendamento: `requestRenderAll`
+         só marca a tela como suja e deixa o desenho para o próximo quadro do
+         fabric. Só que quem sobe a textura para o 3D é o gancho `after:render`
+         (ver vehicle/livery.ts) — então, quando esta função resolve, NENHUMA das
+         cinco faces foi desenhada e NENHUMA textura foi enviada. A cortina
+         descia sobre um baú ainda com a chapa branca, e a arte aparecia um ou
+         dois quadros depois.
+         Desenhando aqui, o `after:render` dispara DENTRO deste await: a
+         `CanvasTexture` recebe `needsUpdate` e o `invalidate(3)` de lá pede os
+         quadros. É por isso que este é o único lugar do módulo que usa a versão
+         síncrona — nos outros o custo de bloquear não se paga. */
+      surfaces[k].renderAll();
     }
   } catch (err) {
     console.error('[livery] restaurar:', err);
@@ -470,7 +587,58 @@ export async function restorePersisted(): Promise<boolean> {
     restoring = false;
   }
   for (const f of fams) remeasureFamily(f);
+  /* ⚠️ O RASCUNHO TEM DE SEGUIR O QUE ACABOU DE ENTRAR.
+     `restoring = true` desliga o `schedulePersist` (a guarda está em
+     `history.push`), então esta função escrevia as cinco telas e NÃO tocava no
+     `localStorage`. Consequência medida na auditoria: abrir um projeto mostrava
+     a arte dele, o rascunho continuava com a arte ANTERIOR, e o próximo F5
+     chamava `restorePersisted()` e ressuscitava a de duas sessões atrás — com a
+     escolha, a tinta e a luz vindas do projeto e só a plotagem vindo do passado.
+     `clearLivery()` logo abaixo já fazia isto certo; era esta que faltava. */
+  schedulePersist();
   return true;
+}
+
+export async function restorePersisted(): Promise<boolean> {
+  let payload: (Partial<LiveryDocState> & { v?: number }) | null;
+  try { payload = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch { return false; }
+  if (!payload || payload.v !== 1) return false;
+  return importLivery(payload);
+}
+
+/**
+ * Esvazia as cinco telas e o histórico delas — o "Novo" da plotagem.
+ *
+ * O HISTÓRICO SAI JUNTO, e não é detalhe: um desfazer logo depois de um "Novo"
+ * traria de volta a arte que o usuário acabou de mandar embora, o que é a coisa
+ * mais confusa que este botão poderia fazer. Cada pilha é semeada de novo com a
+ * tela VAZIA, então o desfazer volta a existir a partir da primeira edição nova.
+ *
+ * Os `assets` NÃO são descartados de propósito: as blob URLs deles ainda podem
+ * estar penduradas em objetos vivos no histórico de OUTRA superfície ou num
+ * documento sendo importado neste instante, e revogá-las restauraria vazios
+ * exatamente como o defeito que o cabeçalho de "imagens" registra. Eles são
+ * strings curtas num Map que vive a sessão; deixá-los é o mais barato dos dois
+ * erros possíveis.
+ */
+export function clearLivery() {
+  restoring = true;
+  try {
+    for (const k of SURFACE_KEYS) {
+      const c = surfaces[k];
+      for (const o of c.getObjects().slice()) c.remove(o);
+      c.backgroundColor = DEFAULT_BG;
+      c.discardActiveObject();
+      hist[k].u.length = 0;
+      hist[k].r.length = 0;
+      markDirty(k);
+      c.requestRenderAll();
+    }
+  } finally {
+    restoring = false;
+  }
+  for (const k of SURFACE_KEYS) history.seed(k);
+  schedulePersist();
 }
 
 export function bindPersistFlush() {

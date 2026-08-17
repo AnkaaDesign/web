@@ -1134,11 +1134,44 @@ export function applyLampLayout() {
      pegar as primeiras deixaria o caminhão no escuro com oito refletores a 200 m
      de distância. `siteRank()` ordena por distância à origem e é reavaliada a
      cada `setLampSites()` — ou seja, uma vez por carga de cenário. */
-  if (o.layout === 'set' && lampSiteGeo && lampSites.length) {
-    const ordem = lampSites
-      .map((s, i) => ({ i, d: s.x * s.x + s.z * s.z }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, LAMP_COUNT);
+  /* ⚠️ `'set'` NUNCA CAI NA FILEIRA PROCEDURAL, e a condição é do LAYOUT — não
+     de o cenário já ter entregado as torres.
+     ---------------------------------------------------------------------------
+     Este `if` testava `layout === 'set' && lampSiteGeo && lampSites.length`, e
+     era um defeito relatado: *"às vezes do nada aparece alguns postes de
+     iluminação perto do truck, não importa a cena, até parece estar atrelado ao
+     modelo e não à cena"*.
+
+     A JANELA, medida na ordem de `applyToScene()` (scene/environment.ts):
+     `setLamps()` roda na linha 663 e `applySet()` só na 697 — e quem entrega as
+     torres é `scenery.ts`, DEPOIS de o `set.glb` (18 MB no distrito) baixar e
+     ser medido. Ou seja, entre uma coisa e outra `lampSites` está vazio: a
+     guarda falhava, a função seguia para o ramo de baixo e `roadside` distribuía
+     oito postes PROCEDURAIS em x = ±7,9 m e z = −87,5…+87,5 m. Os de i=3 e i=4
+     caem a 12,5 m da origem — que é exatamente onde o caminhão está.
+
+     Por isso os três sintomas do relato batem:
+       · "às vezes" — só se vê a janela com o cache frio; quente, ela fecha antes
+         de um quadro sair;
+       · "não importa a cena" — vale para toda cena que declara `layout: 'set'`;
+       · "parece atrelado ao modelo" — um cavalo mais pesado disputa banda com o
+         `set.glb` e ALARGA a janela. O modelo não causa; ele expõe.
+
+     E havia o caso permanente: `setLampSites(null, null)` (o set falhou, ou não
+     tem torre nenhuma — ver set.ts e scenery.ts) deixava a fileira procedural em
+     cena PARA SEMPRE.
+
+     `'set'` quer dizer "o cenário traz o poste". Enquanto ele não trouxe, o
+     estado honesto é NENHUM poste — nunca um substituto que o cenário não pediu
+     e que vai ser escondido um segundo depois. `ordem` vazia faz todas as
+     unidades saírem como inativas, e `updateLampFixtures()` as esconde. */
+  if (o.layout === 'set') {
+    const ordem = (lampSiteGeo && lampSites.length)
+      ? lampSites
+        .map((s, i) => ({ i, d: s.x * s.x + s.z * s.z }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, LAMP_COUNT)
+      : [];
     for (let i = 0; i < LAMP_COUNT; i++) {
       const u = lampUnits[i];
       const alvo = o.enabled ? ordem[i] : undefined;
@@ -1282,5 +1315,22 @@ export function getLampInfo() {
     lampSites: lampSites.length,
     lampSiteGeo: lampSiteGeo ? { ...lampSiteGeo } : null,
     lampSiteLenses: siteLensGroup ? siteLensGroup.children.length : 0,
+    /* QUANTOS POSTES NOSSOS ESTÃO DE FATO NA TELA — a medida que faltava, e a
+       única que responde à pergunta que o defeito fez: *"às vezes do nada
+       aparece alguns postes de iluminação perto do truck"*.
+
+       `lampActive` é a intenção (o que `applyLampLayout()` decidiu) e
+       `lampFixturesVisible` é o resultado (o que `updateLampFixtures()`
+       desenhou). Os dois, e não um: num cenário `layout: 'set'` eles divergem
+       DE PROPÓSITO — as unidades ficam ativas para levar o refletor às torres do
+       cenário, e o fixture nosso fica invisível porque quem desenha o mastro é o
+       `set.glb`. Uma medida só não distinguiria isso de um bug.
+
+       É por aqui que `tools/studio-bench/checks-postes-fantasma.mjs` trava a
+       regressão: com `layout: 'set'` e nenhuma torre entregue, `visible` tem de
+       ser ZERO — nunca a fileira procedural. */
+    lampActive: lampUnits.reduce((n, u) => n + (u.active ? 1 : 0), 0),
+    lampFixturesVisible: lampUnits.reduce(
+      (n, u) => n + (u.proc.visible || u.model.visible ? 1 : 0), 0),
   };
 }

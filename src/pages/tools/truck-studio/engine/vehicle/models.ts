@@ -927,6 +927,15 @@ function groundAndCenter(
    are nobody else's. Unregistering them from vehicle/paint.ts is the part that must
    never be skipped: a paint material left in that registry keeps receiving
    every setPaint() write for the rest of the session. */
+/** Materiais que pertencem à CENA e não a uma chapa: sobrevivem ao descarte.
+ *  DECLARADO AQUI, acima do primeiro consumidor: `disposeTree` passou a usá-lo
+ *  (ver o ⚠️ lá dentro) e ele é um `const`, portanto em zona morta temporal se
+ *  ficasse na posição antiga, ~2 700 linhas abaixo. O outro consumidor,
+ *  `disposeLiveryPanels`, vem bem depois e enxerga daqui sem problema. */
+const isSharedMat = (m: THREE.Material | null | undefined) =>
+  !!m && (m === (state.trailerPaintMat as THREE.Material | null)
+    || m === (state.frontWallMat as THREE.Material | null));
+
 function disposeTree(root: THREE.Object3D) {
   /* ⚠️ AVISA O REGISTRO DE LUZES ANTES DE SOLTAR QUALQUER COISA. `lights.ts`
      parou de usar "não tem pai" como sinal de morte — entre `setupCommon()` e o
@@ -940,6 +949,19 @@ function disposeTree(root: THREE.Object3D) {
     if (o.geometry && !shared) o.geometry.dispose();
     const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
     for (const m of mats) {
+      /* ⚠️ OS MATERIAIS DA CENA NÃO MORREM COM UMA RAIZ. `isSharedMat` é o mesmo
+         guarda que `disposeLiveryPanels()` já aplica, e a assimetria entre as
+         duas funções era uma armadilha ARMADA: hoje a única raiz VIVA que passa
+         por aqui é a cabine, e `trailerPaintMat`/`frontWallMat` só existem sob
+         `state.trailer` — então não dispara. No dia em que existir "trocar de
+         implemento", a implementação óbvia (espelhar o que `loadCab` faz) chama
+         isto sobre o baú e dispara os dois lados de uma vez: `forgetPaintMaterial`
+         tira o material do registro e `dispose()` mata o programa — enquanto
+         `state.trailerPaintMat` continua não-nulo apontando para o cadáver, e a
+         guarda de criação é um teste de NULIDADE, que passa calada.
+         O sintoma seria o baú parando de acompanhar a cor do cavalo. Dois testes
+         de identidade por material é o preço de nunca descobrir isso em produção. */
+      if (isSharedMat(m)) continue;
       forgetPaintMaterial(m);          // drop it from the paint registry too
       if (!shared) {
         for (const v of Object.values(m as unknown as Record<string, unknown>)) {
@@ -1353,10 +1375,6 @@ export function setPaintTarget(mode: 'cab' | 'both') {
     if (!state.trailerPaintMat) {
       state.trailerPaintMat = makePaintMaterial();
       state.trailerPaintMat.name = 'carpaint';
-      /* NASCEU DEPOIS DA SONDA — ver `adoptProbeMaterial()`. Sem esta linha o
-         implemento pintado reflete o HDRI cru enquanto a cabine reflete a
-         vizinhança, e uma tinta preta sai cinza no baú e preta no cavalo. */
-      adoptProbeMaterial(state.trailerPaintMat);
       /* NO polygonOffset here. It was added when buildLiveryPanels() duplicated
          the skin — painting swapped the bias away and the flank flickered between
          white and the chosen colour. The panels are now CUT OUT of the body
@@ -1364,6 +1382,25 @@ export function setPaintTarget(mode: 'cab' | 'both') {
          only make it fight the perimeter rail below it. The overlay for the front
          wall still needs one; see frontWallMat. */
     }
+    /* ⚠️ FORA DO `if`, e a diferença é um defeito real de reincidência.
+       -----------------------------------------------------------------------
+       NASCEU DEPOIS DA SONDA — sem isto o implemento pintado reflete o HDRI cru
+       enquanto a cabine reflete a vizinhança, e uma tinta preta sai cinza no baú
+       e preta no cavalo. Esse relato já aconteceu uma vez (ver o bloco de
+       `adoptProbeMaterial`), e a correção morava DENTRO da criação — ou seja,
+       valia uma vez na vida do material.
+
+       O buraco: com "pintar o implemento" DESLIGADO, este material não está em
+       malha nenhuma, então `refreshVehicleReflection()` não o alcança (ela
+       percorre `state.cab` e `state.trailer`). Se nesse meio-tempo a sonda for
+       reconstruída — `releaseScene()` depois de 60 s fora da rota, ou uma troca
+       de nível que mude o tamanho dela —, o alvo antigo é descartado. Religar a
+       caixa depois disso reusa o material com um `envMap` apontando para um
+       render target morto: baú escuro e chapado ao lado de um cavalo correto.
+
+       `adoptProbeMaterial()` é documentadamente idempotente, então chamá-la a
+       cada `setPaintTarget('both')` custa uma atribuição e fecha a janela. */
+    adoptProbeMaterial(state.trailerPaintMat);
     for (const mesh of meshes) {
       /* O ORIGINAL É O DE FÁBRICA, e `mesh.material` pode não ser ele.
          `vehicle/trim.ts` pinta teto e Thermo King com uma tinta PRÓPRIA e
@@ -3639,10 +3676,6 @@ let geometryGuard: GeometryGuard | null = null;
 /** Registra (ou remove, com `null`) o guarda. Ver o bloco acima. */
 export function setGeometryGuard(g: GeometryGuard | null) { geometryGuard = g; }
 
-/** Materiais que pertencem à CENA e não a uma chapa: sobrevivem ao descarte. */
-const isSharedMat = (m: THREE.Material | null | undefined) =>
-  !!m && (m === (state.trailerPaintMat as THREE.Material | null)
-    || m === (state.frontWallMat as THREE.Material | null));
 
 /**
  * Devolve à GPU as três chapas recortadas — e as sobreposições de arte que

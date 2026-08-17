@@ -75,11 +75,12 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import {
-  pmrem, applyPreset, setTimeOfDay, setHourOfDay, OPEN_HOUR,
+  pmrem, applyPreset, setTimeOfDay, setHourOfDay, OPEN_HOUR, LIGHT_DEFAULTS,
   setExternalEnvironment, setExposureBase, getNightness,
   setSkyDomeVisible, setLamps, setLampModel,
   setHorizonHaze, setHorizonTint, setInteriorBounds,
 } from './scene';
+import { LIGHT_PRESETS } from './presets';
 import { applySet, disposeSet, disposeSetTextures } from './set';
 import { setCyclorama } from './cyclorama';
 import { setSkyPair, disposeSkyBlend } from './skyblend';
@@ -748,17 +749,7 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
      re-read from sceneState afterwards.
      It is also what drives the rig hook that colours the dome, so the dome
      picks up its envIntensity on this call, not a frame later. */
-  setTimeOfDay(envDef.timeOfDay === 'noite' ? 'noite' : 'dia', { animate: false });
-  /* setTimeOfDay() estaciona o relógio na hora canônica da face — 12:00 para
-     `dia` — porque é o que reproduz os dois rigs legados exatamente. Para um
-     ambiente de DIA isso desfaria a hora de abertura a cada troca de ambiente: o
-     estúdio abriria às 17:45 e voltaria para o sol a pino no primeiro clique do
-     seletor, que é justamente a queixa que OPEN_HOUR existe para resolver.
-     Devolver a hora ANTES do applyPreset() e não depois: applyPreset() re-deriva
-     o sol da hora CORRENTE (ver o seu docstring), então nesta ordem o preset já
-     nasce com a geometria rasante em vez de ser corrigido um passo atrás. */
-  if (envDef.timeOfDay !== 'noite') setHourOfDay(OPEN_HOUR, { animate: false });
-  applyPreset(envDef.preset, { animate: false });
+  applyEnvironmentLighting(envDef, { animate: false });
 
   current = envDef;
   /* O set é o único trabalho assíncrono que sobrou aqui. applyEnvironment() só
@@ -982,5 +973,84 @@ export async function applyEnvironment(envDef: EnvironmentDef | null | undefined
 /** @returns {Object|null} the envDef last applied */
 export function getCurrentEnvironment() {
   return current;
+}
+
+/**
+ * A LUZ QUE ESTE CENÁRIO PEDE — hora, face do relógio e preset.
+ *
+ * Extraída de `applyToScene()` porque ela tem um SEGUNDO chamador: o "Novo" do
+ * menu de projeto (`project/document.ts`), que precisa devolver a iluminação ao
+ * estado de fábrica **deste** cenário e não a um padrão global.
+ *
+ * A diferença não é cosmética, e foi ela que gerou o defeito: `LIGHT_DEFAULTS`
+ * abre em `dourado` — sol rasante às 17:45 —, mas o cenário Estúdio pede
+ * `ciclorama`, que é um preset de SALA (`env: 'room'`, `solar: false`). Um
+ * "Novo" dentro do estúdio caía no `dourado` e punha luz de fim de tarde a céu
+ * aberto dentro de um ciclorama fechado. Cada cenário declara o preset dele no
+ * manifesto; quem reseta a luz tem de perguntar ao cenário, nunca a uma
+ * constante.
+ *
+ * A ORDEM DAS TRÊS CHAMADAS É CARREGANTE, e é a razão de isto ser uma função em
+ * vez de três linhas copiadas:
+ *
+ *  1. `setTimeOfDay()` antes do preset — `applyPreset()` deriva o azimute e a
+ *     elevação padrão do sol a partir do `timeOfDay` CORRENTE, então a ordem
+ *     inversa entrega a um preset de noite os ângulos de dia;
+ *  2. a HORA antes do preset também. `setTimeOfDay()` estaciona o relógio na
+ *     hora canônica da face (12:00 para `dia`), e num ambiente diurno isso
+ *     desfaria a hora de abertura — o estúdio abriria às 17:45 e voltaria para o
+ *     sol a pino. Devolver `OPEN_HOUR` ANTES do preset faz ele já nascer com a
+ *     geometria rasante em vez de ser corrigido um passo depois;
+ *  3. `applyPreset()` por último, e ele TAMBÉM reseta az/el/brightness para os
+ *     padrões do preset — que é exatamente o que um reset quer.
+ *
+ * `animate: false` numa troca de cenário (ela acontece atrás da cortina, e um
+ * crossfade de 0,8 s entre dois rigs sem relação lê como falha); animado quando
+ * é o "Novo", onde a cena na tela é a mesma e a transição é a resposta visual de
+ * que algo aconteceu.
+ */
+export function applyEnvironmentLighting(
+  envDef: EnvironmentDef | null | undefined = current,
+  opts: { animate?: boolean; reset?: boolean } = {},
+) {
+  if (!envDef) return false;
+  const animate = !!opts.animate;
+  setTimeOfDay(envDef.timeOfDay === 'noite' ? 'noite' : 'dia', { animate });
+  if (envDef.timeOfDay !== 'noite') setHourOfDay(OPEN_HOUR, { animate });
+  applyPreset(resetPreset(envDef, opts.reset), { animate });
+  return true;
+}
+
+/**
+ * Qual preset um RESET deve escolher — e por que ele nem sempre é o do manifesto.
+ *
+ * ⚠️ DEFEITO RELATADO com print: depois de um "Novo" no `distrito-industrial` a
+ * cena ficou *"totalmente lavada"*. A causa: o manifesto daquele cenário declara
+ * `preset: 'ensolarado'`, que é autorado para SOL A PINO — e o relógio do estúdio
+ * abre às 17:45 (`OPEN_HOUR`), com o sol a 11°. Preset de meio-dia com geometria
+ * de fim de tarde é exatamente a metade lavada do problema que a nota de
+ * `OPEN_HOUR` descreve na direção oposta ("dourado no tom, meio-dia na forma").
+ *
+ * `LIGHT_DEFAULTS.preset` é `dourado`, e a escolha é DELIBERADA e está
+ * documentada em scene.ts: *"é luz RASANTE, e é ela que faz a lataria mostrar o
+ * que a tinta tem. Sol a pino bate quase perpendicular à chapa: a casca de
+ * laranja some, o floco não cintila e o flop do perolizado não tem raspagem para
+ * aparecer."* Num estúdio de PINTURA esse é o ponto inteiro do produto.
+ *
+ * Então um reset devolve o padrão do PRODUTO, não o do manifesto — com uma
+ * exceção que não é negociável: um cenário de ESTÚDIO precisa de um preset de
+ * estúdio. `ciclorama` é `env: 'room'` e `solar: false`; pôr `dourado` num
+ * ciclorama fechado é o defeito irmão, que foi o relato anterior. A pergunta que
+ * separa os dois casos é a do próprio preset (`LightPreset.studio`), não uma
+ * lista de ids que a próxima cena esqueceria de atualizar.
+ *
+ * `reset: false` (o padrão, e o caminho da TROCA de cenário) mantém o manifesto
+ * mandando: ali o preset é a apresentação autoral daquele lugar, e trocá-la seria
+ * o estúdio discordando do catálogo.
+ */
+function resetPreset(envDef: EnvironmentDef, reset?: boolean): string {
+  if (!reset) return envDef.preset;
+  const doCenario = LIGHT_PRESETS[envDef.preset];
+  return doCenario && doCenario.studio ? envDef.preset : LIGHT_DEFAULTS.preset;
 }
 

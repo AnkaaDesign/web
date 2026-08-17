@@ -21,8 +21,11 @@ import {
   FONTS, DEFAULT_FONT, ensureFont, fontLoaded, isText, isImage, stamp, assetOf,
   addImageFile, normalizeTextScale, applyLockState, history, isRestoring, EXTRA,
   align, distribute, withSelectionFlattened, restoreSelection,
-  copySurface, sidesMatch, restorePersisted, bindPersistFlush,
+  copySurface, sidesMatch, restorePersisted, bindPersistFlush, setLiveryQuotaReporter,
 } from '../vehicle/livery-doc';
+/* Só a linha de estado. `ui/chrome.ts` não importa nada deste arquivo, então
+   esta aresta é simples e não fecha ciclo. */
+import { setStatus } from './chrome';
 import { initSnapping, setSnapEnabled, drawRulers, resizeSnapLayers } from './livery-guides';
 /* O painel de medidas do implemento, no inspetor. Ele NÃO importa
    ../vehicle/livery (o ciclo desta dupla já é um a mais do que se quer), então é
@@ -1632,6 +1635,12 @@ export function initLiveryEditor() {
   }
 
   bindPersistFlush();
+  /* A COTA DO RASCUNHO PASSA A TER VOZ. Quem descobre que o `localStorage`
+     recusou a gravação é `livery-doc`; quem sabe escrever na linha de estado é a
+     chrome. Os dois não podem se importar (a seta `livery-doc → livery` já
+     existe e a de volta fecharia ciclo), então é aqui — no editor, que já
+     importa os dois — que o fio é ligado. Ver `persistNow()` lá. */
+  setLiveryQuotaReporter(setStatus);
 
   /* Semeia o estado vazio de forma SÍNCRONA: restorePersisted() é assíncrono, e
      uma edição que chegasse antes dele resolver empilharia sobre uma pilha sem
