@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, type NavigateOptions } from "react-router-dom";
+import { registerDirtyForm, unregisterDirtyForm } from "@/lib/dirty-forms";
 
 interface UseUnsavedChangesGuardOptions {
   isDirty: boolean;
@@ -43,12 +44,25 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
   // shouldBlockRef true. This flag is what breaks the back-button loop: it is
   // set once and is intentionally NOT reset on every render.
   const bypassRef = useRef(false);
+  // Dirty state WITHOUT the `isSubmitting` relaxation — see isDirtyUnsaved below.
+  const isDirtyRef = useRef(false);
+  // Identity of this form inside the global unsaved-work registry.
+  const registryToken = useRef({}).current;
 
   const shouldBlock = isDirty && !isSubmitting;
 
   // Single source of truth for "intercept navigation right now?". Used by all
   // three handlers so confirming/saving reliably disables every channel.
   const isActive = useCallback(() => shouldBlockRef.current && !bypassRef.current, []);
+
+  // `isSubmitting` deliberately does NOT relax this one. It suppresses the two
+  // in-app channels so a post-save navigate() runs clean, but a submit can hang
+  // (uploads carry a 3-minute timeout) and while it hangs the tab was left
+  // completely unprotected: a reload during "Salvando..." discarded the whole
+  // form with no prompt at all. The successful-save case is already covered by
+  // allowNavigation(), which every form calls before redirecting — so gating
+  // this on `isDirty` alone costs nothing and closes the window.
+  const isDirtyUnsaved = useCallback(() => isDirtyRef.current && !bypassRef.current, []);
 
   useEffect(() => {
     dialogVisibleRef.current = showDialog;
@@ -57,18 +71,33 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
   // Synced during render (not in an effect) so the handlers always observe the
   // latest dirty state immediately.
   shouldBlockRef.current = shouldBlock;
+  isDirtyRef.current = isDirty;
+
+  // Publish to the global registry so the app's self-initiated reloads
+  // (stale-chunk recovery, new-version prompt) can see there is work to lose.
+  useEffect(() => {
+    if (isDirty && !bypassRef.current) {
+      registerDirtyForm(registryToken);
+    } else {
+      unregisterDirtyForm(registryToken);
+    }
+  }, [isDirty, registryToken]);
+
+  // Unregister on unmount regardless of the last dirty state, so a token can
+  // never outlive its form and wedge `hasUnsavedWork()` at true forever.
+  useEffect(() => () => unregisterDirtyForm(registryToken), [registryToken]);
 
   // (3) Native browser dialog on tab close / refresh / hard navigation.
-  // Always attached; it no-ops unless the guard is currently active.
+  // Always attached; it no-ops unless there are unsaved changes.
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (!isActive()) return;
+      if (!isDirtyUnsaved()) return;
       e.preventDefault();
       e.returnValue = ""; // Required for Chrome/Edge to show the prompt.
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [isActive]);
+  }, [isDirtyUnsaved]);
 
   // (1) + (2) SPA navigation and browser back/forward.
   useEffect(() => {
@@ -155,6 +184,7 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
     bypassRef.current = true;
     dialogVisibleRef.current = false;
     setShowDialog(false);
+    unregisterDirtyForm(registryToken);
 
     const target = pendingNavigationRef.current;
     const options = pendingOptionsRef.current;
@@ -169,7 +199,7 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
       // fires and syncs its location; ours bails because bypass is set.
       window.history.go(-2);
     }
-  }, [navigate]);
+  }, [navigate, registryToken]);
 
   const cancelNavigation = useCallback(() => {
     setShowDialog(false);
@@ -188,7 +218,10 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
     bypassRef.current = true;
     dialogVisibleRef.current = false;
     setShowDialog(false);
-  }, []);
+    // Setting bypass does not change `isDirty`, so the registry effect will not
+    // re-run — drop the token here or a saved form keeps blocking reloads.
+    unregisterDirtyForm(registryToken);
+  }, [registryToken]);
 
   return { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation };
 }

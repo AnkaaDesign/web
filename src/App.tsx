@@ -26,6 +26,7 @@ import { PushNotificationSetup } from "@/components/common/push-notification-set
 import { SocketNotificationsListener } from "@/components/common/socket-notifications-listener";
 import { SpotlightSearch } from "@/components/navigation/spotlight";
 import { SocketReconnectHandler } from "@/components/common/socket-reconnect-handler";
+import { DeferredReloadHandler } from "@/components/common/deferred-reload-handler";
 import { useAppVersion } from "@/hooks/use-app-version";
 
 function AppVersionChecker() {
@@ -670,6 +671,7 @@ function App() {
                     <AttentionProvider>
                     <SocketNotificationsListener />
                     <SocketReconnectHandler />
+                    <DeferredReloadHandler />
                     <AppVersionChecker />
                     <FavoritesProvider>
                       <FileViewerProvider>

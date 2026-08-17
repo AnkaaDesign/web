@@ -54,6 +54,23 @@ function getDefaultExpiresAt() {
   return date;
 }
 
+// Per-file ceiling for the uploads that run inside the submit. The api-client
+// default is 3 minutes, which on a flaky link means the Salvar button sits at
+// "Salvando..." for three silent minutes before anything is reported.
+const UPLOAD_TIMEOUT_MS = 90_000;
+const UPLOAD_PROGRESS_TOAST_ID = "budget-create-upload-progress";
+
+/** Axios surfaces a timeout as a bare "timeout of Nms exceeded" — translate it. */
+function describeUploadError(error: any): string {
+  if (error?.code === "ECONNABORTED" || /timeout/i.test(error?.message ?? "")) {
+    return "o envio demorou demais e foi interrompido. Verifique a conexão e tente novamente.";
+  }
+  if (!error?.response) {
+    return "falha de conexão durante o envio.";
+  }
+  return error?.message ?? "erro desconhecido";
+}
+
 export const FinancialBudgetCreatePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -563,6 +580,28 @@ export const FinancialBudgetCreatePage = () => {
       // cujo status precisa sobreviver ao upload que acontece logo abaixo.
       const statusForFile = (file: (typeof layouts)[number]): string | undefined =>
         layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id] ?? file.status;
+
+      // Every upload below runs INSIDE the submit, so each second one hangs is a
+      // second the button sits at "Salvando..." saying nothing. One stalled
+      // upload used to hold it there for minutes (the client default is 3), and
+      // the user reloaded to escape — losing the whole form. Narrate the
+      // progress and cap each file, so a dead connection surfaces as a message
+      // instead of a frozen button.
+      const pendingUploads =
+        layouts.filter((f) => !(f.uploaded && f.uploadedFileId) && !f.error).length +
+        baseFiles.filter((f) => !f.uploaded && !f.error).length +
+        layoutFiles.filter((lf) => !lf.uploaded).length;
+      let uploadIndex = 0;
+      const narrateUpload = (name: string) => {
+        uploadIndex += 1;
+        if (pendingUploads > 0) {
+          toast.loading("Salvando orçamento", {
+            id: UPLOAD_PROGRESS_TOAST_ID,
+            description: `Enviando arquivo ${uploadIndex} de ${pendingUploads}: ${name}`,
+          });
+        }
+      };
+
       for (const file of layouts) {
         const status = statusForFile(file);
         if (file.uploaded && file.uploadedFileId) {
@@ -572,7 +611,11 @@ export const FinancialBudgetCreatePage = () => {
           }
         } else if (!file.error) {
           try {
-            const response = await uploadSingleFile(file, { fileContext: 'tasksLayouts' });
+            narrateUpload(file.name);
+            const response = await uploadSingleFile(file, {
+              fileContext: 'tasksLayouts',
+              timeout: UPLOAD_TIMEOUT_MS,
+            });
             if (response.success && response.data) {
               uploadedLayoutIds.push(response.data.id);
               localIdToRealFileId[file.id] = response.data.id;
@@ -581,7 +624,7 @@ export const FinancialBudgetCreatePage = () => {
               }
             }
           } catch (error: any) {
-            toast.error(`Erro ao enviar layout ${file.name}: ${error.message}`);
+            toast.error(`Erro ao enviar layout ${file.name}: ${describeUploadError(error)}`);
           }
         }
       }
@@ -591,12 +634,16 @@ export const FinancialBudgetCreatePage = () => {
       for (const file of baseFiles) {
         if (!file.uploaded && !file.error) {
           try {
-            const response = await uploadSingleFile(file, { fileContext: 'taskBaseFiles' });
+            narrateUpload(file.name);
+            const response = await uploadSingleFile(file, {
+              fileContext: 'taskBaseFiles',
+              timeout: UPLOAD_TIMEOUT_MS,
+            });
             if (response.success && response.data) {
               uploadedBaseFileIds.push(response.data.id);
             }
           } catch (error: any) {
-            toast.error(`Erro ao enviar arquivo base ${file.name}: ${error.message}`);
+            toast.error(`Erro ao enviar arquivo base ${file.name}: ${describeUploadError(error)}`);
           }
         }
       }
@@ -615,12 +662,16 @@ export const FinancialBudgetCreatePage = () => {
           resolvedLayoutIds.push(remapped);
         } else if (!lf.uploaded) {
           try {
-            const response = await uploadSingleFile(lf, { fileContext: "quote-layouts" });
+            narrateUpload(lf.name ?? "layout");
+            const response = await uploadSingleFile(lf, {
+              fileContext: "quote-layouts",
+              timeout: UPLOAD_TIMEOUT_MS,
+            });
             if (response.success && response.data) {
               resolvedLayoutIds.push(response.data.id);
             }
           } catch (error: any) {
-            toast.error(`Erro ao enviar layout: ${error.message}`);
+            toast.error(`Erro ao enviar layout: ${describeUploadError(error)}`);
           }
         } else if (existingId && isUuid(existingId)) {
           resolvedLayoutIds.push(existingId);
@@ -849,6 +900,7 @@ export const FinancialBudgetCreatePage = () => {
       // Error toast is emitted by the axios error interceptor.
       console.error("Error in budget creation:", error);
     } finally {
+      toast.dismiss(UPLOAD_PROGRESS_TOAST_ID);
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }

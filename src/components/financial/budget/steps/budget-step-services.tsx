@@ -115,13 +115,34 @@ export function BudgetStepServices({
   // Observation modal state
   const [observationModal, setObservationModal] = useState<{ index: number; value: string } | null>(null);
 
-  // Customer options for invoice-to combobox
+  // Customer options for invoice-to combobox.
+  //
+  // Driven by `customerConfigs` — the form's own source of truth for who is
+  // being billed — NOT by `selectedCustomers`. That map is rebuilt from a
+  // best-effort search cache and silently DROPS any customer that was never
+  // returned by a search (`if (cached) newMap.set(...)` in budget-step-info),
+  // which on the edit screen is every customer loaded straight from the server.
+  // A dropped customer had no option here, so its services could not be
+  // assigned, and the multi-customer save guard then rejected the budget with
+  // "Atribua um cliente a todos os serviços" and no way out through the UI.
+  // The cache and the map are now only used to enrich the label.
   const customerOptions = useMemo(() => {
-    return Array.from(selectedCustomers.entries()).map(([id, c]) => ({
-      value: id,
-      label: c?.corporateName || c?.fantasyName || id,
-    }));
-  }, [selectedCustomers]);
+    return (customerConfigs as any[])
+      .filter((config) => config?.customerId)
+      .map((config) => {
+        const cached = selectedCustomers.get(config.customerId);
+        const data = config.customerData || {};
+        return {
+          value: config.customerId,
+          label:
+            cached?.corporateName ||
+            cached?.fantasyName ||
+            data.corporateName ||
+            data.fantasyName ||
+            "Cliente sem nome",
+        };
+      });
+  }, [customerConfigs, selectedCustomers]);
 
 
   // Service order sync — runs only after the parent has called form.reset() with server data

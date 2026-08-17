@@ -14,6 +14,8 @@
  * A timestamp guard prevents a reload loop if a chunk is genuinely missing.
  */
 
+import { emitDeferredReload, hasUnsavedWork } from "./dirty-forms";
+
 const RELOAD_GUARD_KEY = "ankaa:chunk-reload-ts";
 const RELOAD_WINDOW_MS = 10_000;
 
@@ -31,6 +33,17 @@ export function isChunkLoadError(input: unknown): boolean {
 
 /** Reload the page at most once per RELOAD_WINDOW_MS (prevents reload loops). */
 export function reloadForStaleChunk(reason: string): void {
+  // NEVER reload over unsaved work. Deploys land during business hours, so this
+  // path fires while people are mid-form — it has already discarded a filled-in
+  // budget without so much as a prompt. A stale chunk only breaks the route the
+  // user is navigating TO; the form they are standing on still works, so the
+  // reload can wait for them to finish. Hand it to the UI as an explicit
+  // "Atualizar" action instead.
+  if (hasUnsavedWork()) {
+    emitDeferredReload("stale-chunk");
+    return;
+  }
+
   try {
     const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
     if (Date.now() - last < RELOAD_WINDOW_MS) return;

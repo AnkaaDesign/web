@@ -259,11 +259,19 @@ export function BudgetStepInfo({
 
       setValue("customerConfigs", newConfigs, { shouldDirty: true });
 
-      // Update selected customers map
+      // Update selected customers map.
+      //
+      // Always keep an ENTRY per selected id. Dropping the ones missing from the
+      // search cache erased the customer from every downstream consumer (the
+      // per-service "Faturar para" options, the per-config totals label, the
+      // review step) even though the config itself was there — leaving a billing
+      // customer that existed for the save guard but not for the UI. Fall back to
+      // whatever the config already carries so the entry is at worst unlabelled.
       const newMap = new Map<string, any>();
       selectedIds.forEach((id: string) => {
         const cached = customersCache.current.get(id);
-        if (cached) newMap.set(id, cached);
+        const fromConfig = newConfigs.find((c: any) => c.customerId === id)?.customerData;
+        newMap.set(id, cached ?? { id, ...(fromConfig ?? {}) });
       });
       setSelectedCustomers(newMap);
     },
