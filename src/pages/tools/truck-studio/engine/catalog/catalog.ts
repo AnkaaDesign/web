@@ -353,6 +353,38 @@ export interface Choice {
    * motivo para reabrir o seletor inteiro.
    */
   trim?: TrimChoiceRaw;
+  /**
+   * AS MEDIDAS DO BAÚ — altura, comprimento e as portas de cada face.
+   *
+   * ⚠️ ELAS PRECISAM VIVER JUNTO DA PLOTAGEM, e é por isso que entram aqui.
+   * A arte é persistida (`truckstudio.livery.v1`) e as medidas não eram — então
+   * um F5 devolvia a arte de um baú de 15,4 m colada num baú de fábrica. O
+   * relato foi *"continua perdendo a referência de tamanho, posição etc. das
+   * logos depois de um F5 ou navegação"*, e a instrução foi explícita: *"ou
+   * mantém exatamente o posicionamento, ou reseta"*. Persistir é o lado que
+   * mantém.
+   *
+   * MORA NA ESCOLHA e não no rascunho da plotagem por causa do MOMENTO: só dá
+   * para redimensionar depois de o implemento existir, e quem sabe disso é
+   * `runApply()`. O rascunho é restaurado no boot, antes de haver geometria.
+   *
+   * Mesma disciplina de `trim`: opcional, ausente enquanto ninguém mexer, e
+   * descartada em silêncio quando vem estranha — nunca motivo para invalidar a
+   * escolha inteira.
+   */
+  measures?: MeasuresRaw;
+}
+
+/**
+ * A forma GRAVADA das medidas. Frouxa e local a este arquivo pelo mesmo motivo
+ * que `TrimChoiceRaw`: `catalog.ts` valida JSON externo e não importa
+ * `vehicle/*` — ele é lido por todo o resto, e uma aresta para a geometria o
+ * transformaria no centro do grafo.
+ */
+export interface MeasuresRaw {
+  height?: number;
+  length?: number;
+  doors?: Record<string, { position: number; width: number; height: number }[]>;
 }
 
 /**
@@ -376,6 +408,48 @@ const HEX_RE = /^#[0-9a-f]{6}$/i;
  * resto — um `'vermelho'` viraria preto e o usuário veria a peça sumir em vez
  * de ver a escolha ser ignorada.
  */
+/**
+ * Valida as medidas gravadas. Números finitos e positivos, e nada mais — os
+ * LIMITES (mínimo, máximo, encaixe em número inteiro de frisos) são de
+ * `livery-structure`/`trailer-rig`, e duplicá-los aqui criaria uma segunda
+ * definição do que é um baú possível. O que este arquivo garante é só que o que
+ * sai daqui é número.
+ */
+function normalizeMeasures(raw: unknown): MeasuresRaw | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const src = raw as Raw;
+  const num = (v: unknown) => (Number.isFinite(+(v as number)) && +(v as number) > 0
+    ? +(v as number) : undefined);
+  const out: MeasuresRaw = {};
+  let any = false;
+  const h = num(src.height); if (h !== undefined) { out.height = h; any = true; }
+  const l = num(src.length); if (l !== undefined) { out.length = l; any = true; }
+
+  const rawDoors = src.doors;
+  if (rawDoors && typeof rawDoors === 'object') {
+    const doors: NonNullable<MeasuresRaw['doors']> = {};
+    let anyDoor = false;
+    for (const [face, list] of Object.entries(rawDoors as Record<string, unknown>)) {
+      if (!Array.isArray(list)) continue;
+      const clean = list
+        .map((d) => {
+          const o = d as Raw;
+          const position = num(o?.position) ?? 0;
+          const width = num(o?.width);
+          const height = num(o?.height);
+          /* Uma porta sem largura ou sem altura não é uma porta — some, em vez
+             de virar um vão de zero que a geometria recortaria mesmo assim. */
+          return width !== undefined && height !== undefined
+            ? { position, width, height } : null;
+        })
+        .filter((d): d is { position: number; width: number; height: number } => !!d);
+      if (clean.length) { doors[face] = clean; anyDoor = true; }
+    }
+    if (anyDoor) { out.doors = doors; any = true; }
+  }
+  return any ? out : undefined;
+}
+
 function normalizeTrim(raw: unknown): TrimChoiceRaw | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const src = raw as Raw;
@@ -408,6 +482,8 @@ export interface ResolvedChoice {
   finishId: string | null;
   /** Ausente enquanto as quatro peças estiverem no padrão. Ver `Choice.trim`. */
   trim?: TrimChoiceRaw;
+  /** Ausente enquanto o baú estiver na medida de fábrica. Ver `Choice.measures`. */
+  measures?: MeasuresRaw;
 }
 
 export interface Catalog {
@@ -1292,6 +1368,7 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
        ausente, mas apareceria em qualquer comparação de objetos feita antes
        disso, e `sameRig()` é exatamente uma dessas. */
     ...(normalizeTrim(c.trim) ? { trim: normalizeTrim(c.trim) } : {}),
+    ...(normalizeMeasures(c.measures) ? { measures: normalizeMeasures(c.measures) } : {}),
   };
 }
 

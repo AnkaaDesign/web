@@ -79,6 +79,61 @@ const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
    alcance é só risco. */
 const PAINT_NAME_RE = /carpaint|plain_grey/;
 
+/* NEM TODO `plain_grey` É LATARIA — 2026-08-17.
+   ---------------------------------------------------------------------------
+   O bloco acima acertou o diagnóstico (cor de origem assada no
+   `baseColorFactor`) e errou o remédio para uma parte da lista. Relato: *"a cor
+   do cavalo é aplicada ao Scania na frontal"*.
+
+   MEDIDO o `baseColorFactor` de todos os `plain_grey` da frota, que é o que
+   separa os dois grupos de verdade:
+
+     LATARIA — laranja assado, e a tinta por cima é o conserto certo:
+       · `f_fender_mat_0002`  (0.315, 0.182, 0.022)   R/S 2016
+       · `s_panel_mat_0002`   (0.234, 0.135, 0.017)   R/S 2016
+       · `r_bumper_mat_0008`  (0.315, 0.182, 0.022)   R/S 2016
+       · `cabin_mat_0001`     neutro, e é A cabine
+
+     NÃO É LATARIA — pintar põe a cor do cavalo onde ela nunca vai:
+       · `chassis_mat_0011`     (0.526, 0.304, 0.037)  longarina
+       · `chassis_mat_0012`     (0.290, 0.053, 0.007)  longarina
+       · `f_light_mid_mat_0006` (0.215, 0.039, 0.005)  FAROL — o relato
+       · `doorstep_mat_0000`    (0.358, 0.362, 0.358)  já neutro, degrau
+
+   As duas saídas óbvias estão erradas: pintar leva a cor do cavalo para a
+   frente, e simplesmente não pintar devolve o laranja de origem que a regra de
+   09/08 existia para matar. O certo é o terceiro caminho — tirar da tinta E
+   DESSATURAR a cor assada (`neutralizeBakedChroma()`), que é o que essas peças
+   são num caminhão de verdade: cinza/preto, não laranja e não da cor da cabine.
+
+   `carpaint` no nome AFIRMA ser tinta; `plain_grey` é só o nome da TEXTURA que
+   dezenas de peças compartilham. Por isso o filtro cai sobre o segundo. Medido:
+   nenhum material da frota casa `carpaint` e esta lista ao mesmo tempo, então
+   aplicá-lo aos dois é inócuo hoje e mais seguro amanhã. */
+const NEVER_BODY_RE = /chassis|f_light|r_light|light_|lamp|doorstep/;
+
+/**
+ * Peça estrutural com a cor do caminhão de ORIGEM assada no `baseColorFactor`:
+ * troca o croma por cinza de mesma luminância. Sem isto, tirar a peça da tinta
+ * (ver `NEVER_BODY_RE`) faria voltar a grade laranja de 2026-08-09.
+ *
+ * Só mexe em quem casa os dois filtros e ainda tem croma — é idempotente, e um
+ * material já neutro sai intacto.
+ */
+export function neutralizeBakedChroma(m: THREE.Material | null | undefined): boolean {
+  if (!m) return false;
+  const name = (m.name || '').toLowerCase();
+  if (!PAINT_NAME_RE.test(name) || !NEVER_BODY_RE.test(name)) return false;
+  const col = (m as THREE.MeshStandardMaterial).color;
+  if (!col) return false;
+  const hsl = { h: 0, s: 0, l: 0 };
+  col.getHSL(hsl);
+  if (hsl.s <= 0.25) return false;
+  col.setHSL(0, 0, hsl.l);
+  m.needsUpdate = true;
+  return true;
+}
+
 const PAINT_ROUGHNESS = 0.089;
 const PAINT_METALNESS = [0.15, 0.55];
 const PAINT_TOL = 0.02;
@@ -110,7 +165,10 @@ export function isPaintableMaterial(
   const name = (m.name || '').toLowerCase();
   if (GLASS_RE.test(name)) return false;
   if (authored) return authored.some((s) => name.includes(s.toLowerCase()));
-  if (PAINT_NAME_RE.test(name)) return true;
+  /* O denylist vale SÓ para o atalho por nome. A assinatura de shader abaixo é
+     medição do bake, não convenção de nomenclatura: se o artista deu clearcoat
+     de tinta à peça, ela é tinta e o nome não desmente. */
+  if (PAINT_NAME_RE.test(name)) return !NEVER_BODY_RE.test(name);
   return looksLikeTruckPaint(m);
 }
 

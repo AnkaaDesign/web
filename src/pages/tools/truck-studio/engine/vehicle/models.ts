@@ -11,7 +11,7 @@ import {
 } from './paint';
 import {
   setupCommon, setShadowCasters, isPaintableMaterial, materialNamesOf, maskOnly,
-  textureAnisotropy,
+  textureAnisotropy, neutralizeBakedChroma,
 } from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
@@ -643,6 +643,35 @@ const GLASS_OK_RE = /glass|vidro|lente|windshield|window|winscreen|cristal|glazi
    no sorting. `transparent` goes back to false for exactly that reason — with
    alphaTest the discarded fragments never reach the blend stage, and an opaque
    draw is what keeps the mark from flickering against the surface behind it. */
+/* `trim` ENTROU E SAIU EM 2026-08-17. Fica registrado porque a tentação de
+   acrescentá-lo de novo é grande, e o raciocínio que a justificava é sedutor e
+   ERRADO.
+   ---------------------------------------------------------------------------
+   Relato, com foto de um FH vermelho: *"a separação entre a janela do motorista
+   e aquela coberta por adesivo, onde fica a cama, sangra a cor um pouco"*. Daí
+   `w_trim_*` foi acrescentado a esta lista, sob o argumento de que mover um
+   material de "forçado opaco" para `alphaTest = 0.5` seria um NO-OP quando a
+   textura não tem transparência de verdade.
+
+   A premissa era falsa, e MEDIR as duas texturas derrubou o argumento inteiro:
+
+     · `volvo-fh-2024 → w_trim_dif` (128×512): alfa 0 em 100% DOS TEXELS, com RGB
+       útil (~[35, 29, 33], o preto da divisória). Alfa zero em toda a imagem não
+       é opacidade — é a convenção SCS de usar o canal alfa como máscara de
+       brilho. Sob `alphaTest = 0.5` NADA passa no teste e a divisória inteira é
+       descartada, deixando à mostra o vermelho da cabine que está atrás;
+     · `volvo-fh-2021 → detail_c` (1024²): 40,4% dos texels com alfa PARCIAL. O
+       limiar binariza esse degradê e transforma o acabamento numa tela
+       perfurada, com o vermelho aparecendo pelos furos.
+
+   Ou seja: a mudança não corrigiu o sangramento, ela trocou "vaza um pouco de
+   cor" por "a peça some / vira peneira" — que é o que a segunda foto mostrava.
+   O tratamento certo para `w_trim` é o de baixo, FORÇADO OPACO: nestes dois
+   bakes o alfa não é recorte, e honrá-lo é justamente o defeito.
+
+   Se o sangramento original voltar a ser relatado, ele NÃO está aqui — sob
+   opacidade forçada nenhuma cor de carroceria atravessa este material. Procure
+   em outro lugar antes de mexer neste regex. */
 const DECAL_OK_RE = /logo|marca|adesivo|decal|faixa-?3m|placa/i;
 
 function auditTransparency(root: THREE.Object3D, label: string) {
@@ -1904,6 +1933,7 @@ export async function loadCab(
 
   const authored = def.paintMaterials ?? null;
   const painted: string[] = [];
+  const neutralized: string[] = [];
   // GLB cabs (volvo): upgrade the paint materials to automotive flake paint
   if (def.format !== 'fbx-scania') {
     const cache = new Map<string, THREE.Material>();
@@ -1938,6 +1968,12 @@ export async function loadCab(
           painted.push(m.name || '(sem nome)');
           return paint;
         }
+        /* NÃO pintou. Se for peça estrutural que a rip assou com a cor do
+           caminhão de origem (longarina, farol), o croma sai agora — senão
+           tirá-la da tinta devolveria a grade laranja de 2026-08-09. A função é
+           idempotente, então material compartilhado entre malhas conta uma vez
+           só. Ver `NEVER_BODY_RE` em material-setup.ts. */
+        if (neutralizeBakedChroma(m)) neutralized.push(m.name || '(sem nome)');
         return m;
       });
       o.material = Array.isArray(o.material) ? rep : rep[0];
@@ -1955,6 +1991,10 @@ export async function loadCab(
      caminhão e cor de uma vez (o fluxo normal do seletor) falhava calado. O log
      lista os nomes do arquivo justamente para não ser preciso abrir o .glb. */
   if (def.format !== 'fbx-scania') {
+    if (neutralized.length) {
+      console.info(`[tinta] ${def.file} · croma de origem removido de ${neutralized.length}:`,
+        neutralized.join(', '));
+    }
     if (painted.length) {
       console.info(`[tinta] ${def.file} · ${painted.length} material(is):`,
         painted.join(', '), authored ? '(lista autorada)' : '(por detecção)');
