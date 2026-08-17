@@ -108,13 +108,25 @@ const vaoEntreFuros = Math.abs(T.stations[0].z - T.stations[1].z);
 
 /* O THERMO KING ENTRA NA CONTA, e ele é quem manda.
    ---------------------------------------------------------------------------
-   A unidade fica pendurada na testeira e avança 451 mm NA DIREÇÃO DA CABINE, e
-   ela não é opcional: `loadTrailer()` chama `attachThermoKing()` sempre. Rodar
-   esta sonda sem `tkDepth` foi o que fez a primeira tabela discordar da bancada
-   em ~450 mm em TODAS as linhas — a mesma diferença nas 47, que é a assinatura
-   de uma parcela faltando e não de um erro de medida. `solveCoupling()` desconta
+   A unidade fica pendurada na testeira e avança na DIREÇÃO DA CABINE, e ela não
+   é opcional: `loadTrailer()` chama `attachThermoKing()` sempre. Rodar esta
+   sonda sem `tkDepth` foi o que fez a primeira tabela discordar da bancada em
+   ~450 mm em TODAS as linhas — a mesma diferença nas 47, que é a assinatura de
+   uma parcela faltando e não de um erro de medida. `solveCoupling()` desconta
    `tkDepth` de toda banda do perfil, então a folga que sai daqui é da cabine à
-   FACE DO THERMO KING, e é essa que decide o furo. */
+   FACE DO THERMO KING, medida na LARGURA dela, e é essa que decide o furo.
+
+   ⚠️ O TAMANHO AQUI É O DO PRODUTO — 1,996 × 2,02 × 0,451 m, o `dims` de
+   `thermoking_meta.json`, que é o que `attachThermoKing()` diz querer usar
+   ("o produto é real e não pode ser esticado"). Se a bancada devolver folgas
+   MENORES que esta tabela, confira o `tkSize` que ela imprime
+   (`checks-engate-diag.mjs`): em 2026-08-17 ela mediu 2,169 × 2,195 × 0,490,
+   8,7 % maior, porque o `fetch` de `thermoking_meta.json` falhou em silêncio
+   (o `catch` daquela linha não registra nada) e a escala caiu na degradação
+   `widthFrac = 0,83 × largura do baú`. Uma unidade 173 mm mais larga alcança a
+   ASA do defletor, e aí a escolha do furo muda — foi exatamente o que separou
+   as duas medições no Volvo FH 2021 4x2. A divergência é da UNIDADE, não da
+   escolha: as duas concordam quando recebem o mesmo tamanho. */
 const opts = { tkDepth: med.tkDepth ?? 0, tkHalfWidth: med.tkHalfWidth };
 
 const nomes = new Map();

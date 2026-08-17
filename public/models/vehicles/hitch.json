@@ -1,2514 +1,2202 @@
 {
-  "schema": "truck-studio/hitch@1",
-  "units": "m",
-  "generated": "2026-08-09",
-  "_comment": [
-    "Geometria de acoplamento em espaco CRU do GLB (A2 §7.2). NADA aqui passou",
-    "por groundAndCenter() nem pelo ancoramento em z do estudio — foi exatamente",
-    "esse acoplamento entre dado e pipeline que tornou cabs.json ilegivel para o",
-    "desktop, que normaliza diferente.",
-    "",
-    "`orientYaw: 3.14159` porque os 56 saem do exportador Blender com a FRENTE em",
-    "-Z e o estudio usa +Z. Medido uma vez, guardado; nunca adivinhado em runtime.",
-    "",
-    "`fifthWheel.confidence`: alta = furo do pino-rei medido na malha;",
-    "media = apice da garganta + constante de 0,295 m calibrada (sd 7 mm);",
-    "baixa = os tres mercedes_actros_mp3, incerteza +-9,5 cm, `needsManualReview`.",
-    "Validado contra producao no iveco-metallica: z 1,893 medido contra 1,890",
-    "declarado a mao em live-cabs.json (erro 3 mm).",
-    "",
-    "Os RIGIDOS (vw_titan x2, scania_r_2016_6x2t) NAO estao aqui: nao tem quinta",
-    "roda. Eles existem em brands.json marcados `available:false`.",
-    "",
-    "LIMPEZA 2026-08-09.",
-    "",
-    "SEIS entradas removidas por serem um SEGUNDO registro do MESMO .glb com outro",
-    "`axles.config` — `iveco-hi-way-6x4` sobre iveco_hiway_6x2a_tl.glb dizendo 6x4,",
-    "e mais cinco iguais. Como findTractor() casa por `sourceFile` ANTES do id,",
-    "qual das duas respondia dependia da ordem das chaves — e uma delas afirmava",
-    "uma tracao que a malha nao tem. Os sete chassis correspondentes sairam do",
-    "brands.json no mesmo dia (ver o _comment de la).",
-    "",
-    "UMA entrada removida por orfandade: `iveco-s-way-metallica-prod-4x2`, do bake",
-    "duplicado do S-Way Metallica, que saiu do catalogo.",
-    "",
-    "DUAS entradas renomeadas: `scania-s730-v8-6x2` e `volvo-fh16-750-6x4` viraram",
-    "`...-4x2`, porque os dois chassis foram rerrotulados no brands.json para a",
-    "tracao que a malha de fato tem (os `axles.config` daqui, medidos, sempre",
-    "disseram 4x2). A chave nao e o que findTractor() consulta primeiro, mas manter",
-    "as duas taxonomias iguais e o que torna a divergencia DETECTAVEL.",
-    "",
-    "INVARIANTE que passou a valer: UMA entrada por `sourceFile`, com a chave",
-    "sempre em `<modelId>-<chassisId>` do brands.json. Conferido por",
-    "tools/verify-manifests/catalog-resolves.test.ts.",
-    "",
-    "2026-08-09 (2a passada): saem tambem `scania-s730-v8-4x2` e",
-    "`volvo-fh16-750-4x2`, com os dois modelos que os usavam."
-  ],
-  "axes": {
-    "forward": "+Z",
-    "up": "+Y",
-    "right": "+X",
-    "handedness": "right"
-  },
-  "tractors": {
-    "daf-xd-4x2-sl": {
-      "sourceFile": "models/trucks/daf_xd_4x2_sl.glb",
-      "fingerprint": {
-        "bytes": 27957000,
-        "sha256": "b118b7932022bc629dca94890e97f96d14d93dfef6fa84dbb438a9c3b9cde1a8",
-        "meshCount": 144
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.157,
-        "z": 1.36,
-        "plateTopY": 1.157,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta",
-        "plate": {
-          "zMin": 1.07,
-          "zMax": 1.738,
-          "width": 0.984
-        }
-      },
-      "rearBody": {
-        "z": 2.979,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7605
-        ],
-        "driveZ": [
-          1.837
-        ],
-        "liftZ": [],
-        "wheelbase": 3.5975
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          3.834,
-          2.979
-        ]
-      }
-    },
-    "daf-xd-6x2s-sl": {
-      "sourceFile": "models/trucks/daf_xd_6x2s_sl.glb",
-      "fingerprint": {
-        "bytes": 29623000,
-        "sha256": "7616d77270b8ae0f97bd6d09fbf9ad584c90f459ea12fc72308ecacc03039765",
-        "meshCount": 155
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.157,
-        "z": 2.2493,
-        "plateTopY": 1.157,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.95,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2s",
-        "steerZ": [
-          -1.7605
-        ],
-        "driveZ": [
-          1.6368,
-          3.0345
-        ],
-        "liftZ": [],
-        "wheelbase": 4.795
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          3.834,
-          3.95
-        ]
-      }
-    },
-    "daf-xd-6x4t-sl": {
-      "sourceFile": "models/trucks/daf_xd_6x4t_sl.glb",
-      "fingerprint": {
-        "bytes": 30400000,
-        "sha256": "8e2c274a0d79f7f69ef5c2784a89294cf0324628e0687b889e37472d306f416d",
-        "meshCount": 155
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.157,
-        "z": 2.0283,
-        "plateTopY": 1.157,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.861,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4t",
-        "steerZ": [
-          -1.7605
-        ],
-        "driveZ": [
-          1.4351,
-          2.8363
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5968
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          3.834,
-          3.861
-        ]
-      }
-    },
-    "daf-xf-105-4x2": {
-      "sourceFile": "models/trucks/daf_xf_105_4x2.glb",
-      "fingerprint": {
-        "bytes": 8022000,
-        "sha256": "db1fc869f5da929ae1d1ebbd00468207639dc4264eba0addaea98900d29db24e",
-        "meshCount": 88
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.15,
-        "z": 1.4625,
-        "plateTopY": 1.15,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.169,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.6319
-        ],
-        "driveZ": [
-          2.182
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8139
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.542,
-          0,
-          -3.177
-        ],
-        "max": [
-          1.541,
-          4.183,
-          3.169
-        ]
-      }
-    },
-    "daf-xf-105-6x2a-tl": {
-      "sourceFile": "models/trucks/daf_xf_105_6x2a_tl.glb",
-      "fingerprint": {
-        "bytes": 8703000,
-        "sha256": "79396466aece85b4545777adf415133f8b4a2b7a463f1c800b01ed7e2f120b07",
-        "meshCount": 97
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.15,
-        "z": 2.1665,
-        "plateTopY": 1.15,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 4.113,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2a",
-        "steerZ": [
-          -1.6319
-        ],
-        "driveZ": [
-          1.7709,
-          3.1753
-        ],
-        "liftZ": [],
-        "wheelbase": 4.8072
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.542,
-          0,
-          -3.177
-        ],
-        "max": [
-          1.541,
-          4.183,
-          4.113
-        ]
-      }
-    },
-    "daf-xf-105-6x4": {
-      "sourceFile": "models/trucks/daf_xf_105_6x4.glb",
-      "fingerprint": {
-        "bytes": 8746000,
-        "sha256": "90e3079cdb4413a514e200525c5592fa136ac7b7c30d7ee6b3948c0d43543d54",
-        "meshCount": 98
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.15,
-        "z": 2.1665,
-        "plateTopY": 1.15,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 4.113,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          -1.6319
-        ],
-        "driveZ": [
-          1.7709,
-          3.1753
-        ],
-        "liftZ": [],
-        "wheelbase": 4.8072
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.542,
-          0,
-          -3.177
-        ],
-        "max": [
-          1.541,
-          4.183,
-          4.113
-        ]
-      }
-    },
-    "daf-xf-euro6-4x2": {
-      "sourceFile": "models/trucks/daf_xf_euro6_4x2.glb",
-      "fingerprint": {
-        "bytes": 15938000,
-        "sha256": "bee9b549cf717b8b46a148a4dbdd136bdc9f9958ed498be7b38e48f7f18b69f1",
-        "meshCount": 102
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.16,
-        "z": 1.5382,
-        "plateTopY": 1.16,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.135,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.6393
-        ],
-        "driveZ": [
-          2.1407
-        ],
-        "liftZ": [],
-        "wheelbase": 3.78
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.588,
-          -0.006,
-          -3.016
-        ],
-        "max": [
-          1.587,
-          4.041,
-          3.135
-        ]
-      }
-    },
-    "daf-xf-euro6-6x2-tl": {
-      "sourceFile": "models/trucks/daf_xf_euro6_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 16651000,
-        "sha256": "f68322a52ebd7495277cd31c330fdc2300adf2028dc9e558c41fc3a726aa2740",
-        "meshCount": 109
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.155,
-        "z": 1.5062,
-        "plateTopY": 1.155,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.486,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.6393
-        ],
-        "driveZ": [
-          1.1475,
-          2.5113
-        ],
-        "liftZ": [],
-        "wheelbase": 4.1506
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.588,
-          -0.006,
-          -3.016
-        ],
-        "max": [
-          1.587,
-          4.041,
-          3.486
-        ]
-      }
-    },
-    "daf-xg-2021-4x2": {
-      "sourceFile": "models/trucks/daf_xg_2021_4x2.glb",
-      "fingerprint": {
-        "bytes": 36648000,
-        "sha256": "b63bc759b711f78e1468d40b441a7f357cf2db38511b40662f077cfb6041bc1f",
-        "meshCount": 215
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.1559,
-        "z": 1.6101,
-        "plateTopY": 1.1559,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.26,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7453
-        ],
-        "driveZ": [
-          2.2441
-        ],
-        "liftZ": [],
-        "wheelbase": 3.9894
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          4.122,
-          3.26
-        ]
-      }
-    },
-    "daf-xg-2021-6x2s": {
-      "sourceFile": "models/trucks/daf_xg_2021_6x2s.glb",
-      "fingerprint": {
-        "bytes": 38158000,
-        "sha256": "c6be2c4e3b53a713757a4cf08040a0548136ec267904ec364008e60cdc5df883",
-        "meshCount": 221
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.1571,
-        "z": 2.1405,
-        "plateTopY": 1.1571,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.95,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2s",
-        "steerZ": [
-          -1.7453,
-          3.0345
-        ],
-        "driveZ": [
-          1.6368
-        ],
-        "liftZ": [],
-        "wheelbase": 4.7798
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          4.122,
-          3.95
-        ]
-      }
-    },
-    "daf-xg-2021-6x4t": {
-      "sourceFile": "models/trucks/daf_xg_2021_6x4t.glb",
-      "fingerprint": {
-        "bytes": 39704000,
-        "sha256": "0c990378abed2d6459ae7a52d3e9c6a302e96bca707f9ab38de9fad5a77eba28",
-        "meshCount": 221
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0082,
-        "y": 1.157,
-        "z": 2.0283,
-        "plateTopY": 1.157,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.861,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4t",
-        "steerZ": [
-          -1.7453
-        ],
-        "driveZ": [
-          1.4351,
-          2.8363
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5816
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.503,
-          -0.006,
-          -3.295
-        ],
-        "max": [
-          1.502,
-          4.122,
-          3.861
-        ]
-      }
-    },
-    "iveco-hi-way-4x2": {
-      "sourceFile": "models/trucks/iveco_hiway_4x2.glb",
-      "fingerprint": {
-        "bytes": 10307000,
-        "sha256": "21a2d4f4bc990c743be106779eee429b7f3ab67f5732446e963199e7262a1ef6",
-        "meshCount": 63
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.185,
-        "z": 1.4275,
-        "plateTopY": 1.185,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.031,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.55
-        ],
-        "driveZ": [
-          2
-        ],
-        "liftZ": [],
-        "wheelbase": 3.55
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.598,
-          0,
-          -3.03
-        ],
-        "max": [
-          1.598,
-          3.995,
-          3.031
-        ]
-      }
-    },
-    "iveco-hi-way-6x2a-tl": {
-      "sourceFile": "models/trucks/iveco_hiway_6x2a_tl.glb",
-      "fingerprint": {
-        "bytes": 10967000,
-        "sha256": "e4a4296004c80cb96718c3c8135e1a24392aa96c83239be9e6a9a47a9e783166",
-        "meshCount": 68
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.185,
-        "z": 1.5815,
-        "plateTopY": 1.185,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.479,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2a",
-        "steerZ": [
-          -1.55
-        ],
-        "driveZ": [
-          1.2025,
-          2.5525
-        ],
-        "liftZ": [],
-        "wheelbase": 4.1025
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.598,
-          0,
-          -3.03
-        ],
-        "max": [
-          1.598,
-          3.995,
-          3.479
-        ]
-      }
-    },
-    "iveco-stralis-4x2": {
-      "sourceFile": "models/trucks/iveco_stralis_4x2.glb",
-      "fingerprint": {
-        "bytes": 7151000,
-        "sha256": "74977558c9fcc6e4acc267b5a3bd2db8e0834eec54018962e055c0dbf15e1b31",
-        "meshCount": 66
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.15,
-        "z": 1.5695,
-        "plateTopY": 1.15,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.358,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.5318
-        ],
-        "driveZ": [
-          2.3185
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8503
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.595,
-          0,
-          -2.983
-        ],
-        "max": [
-          1.595,
-          4.005,
-          3.358
-        ]
-      }
-    },
-    "iveco-stralis-6x2-tl": {
-      "sourceFile": "models/trucks/iveco_stralis_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 7654000,
-        "sha256": "0c539d826c8f1d3797a20494de960f1074f6f76901511f29d16f686d04b3c8d0",
-        "meshCount": 72
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.155,
-        "z": 1.5395,
-        "plateTopY": 1.155,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.558,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.5318
-        ],
-        "driveZ": [
-          1.2947,
-          2.5185
-        ],
-        "liftZ": [],
-        "wheelbase": 4.0503
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.595,
-          0,
-          -2.983
-        ],
-        "max": [
-          1.595,
-          4.005,
-          3.558
-        ]
-      }
-    },
-    "man-tgx-4x2": {
-      "sourceFile": "models/trucks/man_tgx_4x2.glb",
-      "fingerprint": {
-        "bytes": 7876000,
-        "sha256": "acc78a1995f70e2d331911bf00599347a144dab9b11a68c44d0666d4cddcdd47",
-        "meshCount": 66
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.175,
-        "z": 1.6708,
-        "plateTopY": 1.175,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media",
-        "plate": {
-          "zMin": 1.385,
-          "zMax": 2.105,
-          "width": 0.74
-        }
-      },
-      "rearBody": {
-        "z": 3.038,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.5648
-        ],
-        "driveZ": [
-          2.2443
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8091
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.584,
-          -0.004,
-          -3.177
-        ],
-        "max": [
-          1.584,
-          4.179,
-          3.038
-        ]
-      }
-    },
-    "man-tgx-6x2-tl": {
-      "sourceFile": "models/trucks/man_tgx_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 8336000,
-        "sha256": "dd1956bdbb66d08ee2193dfc2e93fe0da6da9c05eef5d63550f8f037ed99c635",
-        "meshCount": 71
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.175,
-        "z": 2.1503,
-        "plateTopY": 1.175,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.854,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.5648
-        ],
-        "driveZ": [
-          1.6599,
-          3.0599
-        ],
-        "liftZ": [],
-        "wheelbase": 4.6247
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.584,
-          -0.004,
-          -3.177
-        ],
-        "max": [
-          1.584,
-          4.179,
-          3.854
-        ]
-      }
-    },
-    "man-tgx-6x4": {
-      "sourceFile": "models/trucks/man_tgx_6x4.glb",
-      "fingerprint": {
-        "bytes": 8336000,
-        "sha256": "faa0bdabfee08feb9ff2e0e1f98277242d3a478eac6d866539571930a56abda7",
-        "meshCount": 71
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.175,
-        "z": 2.1503,
-        "plateTopY": 1.175,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.854,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          -1.5648
-        ],
-        "driveZ": [
-          1.6599,
-          3.0599
-        ],
-        "liftZ": [],
-        "wheelbase": 4.6247
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.584,
-          -0.004,
-          -3.177
-        ],
-        "max": [
-          1.584,
-          4.179,
-          3.854
-        ]
-      }
-    },
-    "mb-actros-mp4-4x2": {
-      "sourceFile": "models/trucks/mercedes_actros2014_4x2.glb",
-      "fingerprint": {
-        "bytes": 25275000,
-        "sha256": "d1cab922e6ce1c3e674d2ab4b243f0494c4ba65d93ffbd9c218cea438a2c3cb1",
-        "meshCount": 140
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0061,
-        "y": 1.1446,
-        "z": 1.4426,
-        "plateTopY": 1.1446,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.103,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7432
-        ],
-        "driveZ": [
-          2.0181
-        ],
-        "liftZ": [],
-        "wheelbase": 3.7613
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.52,
-          -0.004,
-          -3.212
-        ],
-        "max": [
-          1.52,
-          4.07,
-          3.103
-        ]
-      }
-    },
-    "mb-actros-mp4-6x2-tl": {
-      "sourceFile": "models/trucks/mercedes_actros2014_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 25946000,
-        "sha256": "904ffd85b4bc37bd977dbdcf28d15d1b8ee13835e79dbabb620671ebf6d6ae83",
-        "meshCount": 149
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1669,
-        "z": 2.3521,
-        "plateTopY": 1.1669,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 4.285,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.7432
-        ],
-        "driveZ": [
-          1.8172,
-          3.2019
-        ],
-        "liftZ": [],
-        "wheelbase": 4.9451
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.52,
-          -0.004,
-          -3.212
-        ],
-        "max": [
-          1.52,
-          4.07,
-          4.285
-        ]
-      }
-    },
-    "mb-actros-mp4-6x4": {
-      "sourceFile": "models/trucks/mercedes_actros2014_6x4.glb",
-      "fingerprint": {
-        "bytes": 25967000,
-        "sha256": "9c70fe9e4521b6765058ed12b726e9efb6055366f878cfd1659dc9f215a90b13",
-        "meshCount": 148
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0095,
-        "y": 1.1645,
-        "z": 2.3357,
-        "plateTopY": 1.1645,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 4.285,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          -1.7432
-        ],
-        "driveZ": [
-          1.8172,
-          3.2019
-        ],
-        "liftZ": [],
-        "wheelbase": 4.9451
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.52,
-          -0.004,
-          -3.212
-        ],
-        "max": [
-          1.52,
-          4.07,
-          4.285
-        ]
-      }
-    },
-    "mb-actros-mp3-4x2a": {
-      "sourceFile": "models/trucks/mercedes_actros_mp3_4x2a.glb",
-      "fingerprint": {
-        "bytes": 14345000,
-        "sha256": "f27b27fdbf269bb1c5b6824afb3d50677c051ae511d295824a3d99b3d04f0223",
-        "meshCount": 109
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0033,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.16,
-        "z": 1.4448,
-        "plateTopY": 1.16,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "baixa",
-        "needsManualReview": true,
-        "uncertaintyM": 0.095
-      },
-      "rearBody": {
-        "z": 2.969,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2a",
-        "steerZ": [
-          -1.5648
-        ],
-        "driveZ": [
-          1.9377
-        ],
-        "liftZ": [],
-        "wheelbase": 3.5025
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.481,
-          -0.003,
-          -3.253
-        ],
-        "max": [
-          1.481,
-          4.03,
-          2.969
-        ]
-      }
-    },
-    "mb-actros-mp3-6x2a-tl": {
-      "sourceFile": "models/trucks/mercedes_actros_mp3_6x2a_tl.glb",
-      "fingerprint": {
-        "bytes": 15644000,
-        "sha256": "16cff42dc5c59119c8ead4d428bea8279e2dce9fff2f11a371529fddc887c061",
-        "meshCount": 117
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0033,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.16,
-        "z": 2.2388,
-        "plateTopY": 1.16,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "baixa",
-        "needsManualReview": true,
-        "uncertaintyM": 0.095
-      },
-      "rearBody": {
-        "z": 4.316,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2a",
-        "steerZ": [
-          -1.5648
-        ],
-        "driveZ": [
-          1.9377,
-          3.3
-        ],
-        "liftZ": [],
-        "wheelbase": 4.8648
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.481,
-          -0.003,
-          -3.253
-        ],
-        "max": [
-          1.481,
-          4.03,
-          4.316
-        ]
-      }
-    },
-    "scania-r-2009-4x2": {
-      "sourceFile": "models/trucks/scania_r_2009_4x2.glb",
-      "fingerprint": {
-        "bytes": 13810000,
-        "sha256": "0ff70014dbd544cb3caba550c3313a3a7bbebb1fa4d2dac4007ec3f3f99d9fd9",
-        "meshCount": 88
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.205,
-        "z": 0.9171,
-        "plateTopY": 1.205,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media",
-        "plate": {
-          "zMin": 0.602,
-          "zMax": 1.494
-        }
-      },
-      "rearBody": {
-        "z": 2.66,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.9893
-        ],
-        "driveZ": [
-          1.7527
-        ],
-        "liftZ": [],
-        "wheelbase": 3.742
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.512,
-          0,
-          -3.561
-        ],
-        "max": [
-          1.511,
-          4.035,
-          2.66
-        ]
-      }
-    },
-    "scania-r-2009-6x2": {
-      "sourceFile": "models/trucks/scania_r_2009_6x2.glb",
-      "fingerprint": {
-        "bytes": 15320000,
-        "sha256": "9e8b167fb07c9f41bb0bb16a442edbd63b4c74526dbb49ccd796f085441c8b70",
-        "meshCount": 102
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.21,
-        "z": 0.9931,
-        "plateTopY": 1.21,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 2.891,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.9893,
-          0.6594
-        ],
-        "driveZ": [
-          1.9857
-        ],
-        "liftZ": [],
-        "wheelbase": 3.975
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.512,
-          0,
-          -3.561
-        ],
-        "max": [
-          1.511,
-          4.035,
-          2.891
-        ]
-      }
-    },
-    "scania-r-2009-6x2a-tl": {
-      "sourceFile": "models/trucks/scania_r_2009_6x2a_tl.glb",
-      "fingerprint": {
-        "bytes": 15530000,
-        "sha256": "9f53e265b7ca9fa3e07c6f69d49752e851d4016844fc6219821b91c674748aff",
-        "meshCount": 102
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.21,
-        "z": 0.9931,
-        "plateTopY": 1.21,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 2.891,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2a",
-        "steerZ": [
-          -1.9893
-        ],
-        "driveZ": [
-          0.6594,
-          1.9857
-        ],
-        "liftZ": [],
-        "wheelbase": 3.975
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.512,
-          0,
-          -3.561
-        ],
-        "max": [
-          1.511,
-          4.035,
-          2.891
-        ]
-      }
-    },
-    "scania-r-2016-4x2": {
-      "sourceFile": "models/trucks/scania_r_2016_4x2.glb",
-      "fingerprint": {
-        "bytes": 26907000,
-        "sha256": "def8a6b91d9870d0d968d8b8eb6e7b0f808a91b21e55c1d8ee2ffad7d28ea3d9",
-        "meshCount": 241
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0071,
-        "y": 1.1486,
-        "z": 1.4293,
-        "plateTopY": 1.1486,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta",
-        "plate": {
-          "zMin": 1.138,
-          "zMax": 1.818
-        }
-      },
-      "rearBody": {
-        "z": 3.062,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.64
-        ],
-        "driveZ": [
-          2.0943
-        ],
-        "liftZ": [],
-        "wheelbase": 3.7343
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          3.971,
-          3.062
-        ]
-      }
-    },
-    "scania-r-2016-6x2": {
-      "sourceFile": "models/trucks/scania_r_2016_6x2.glb",
-      "fingerprint": {
-        "bytes": 28234000,
-        "sha256": "84ef85fb23c29522face5deee771b86cf16c5977219bacad4dfc470747f84301",
-        "meshCount": 253
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1595,
-        "z": 1.7457,
-        "plateTopY": 1.1595,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.397,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.64
-        ],
-        "driveZ": [
-          1.1671,
-          2.4362
-        ],
-        "liftZ": [],
-        "wheelbase": 4.0762
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          3.971,
-          3.397
-        ]
-      }
-    },
-    "scania-r-2016-6x2-4": {
-      "sourceFile": "models/trucks/scania_r_2016_6x2_4.glb",
-      "fingerprint": {
-        "bytes": 28062000,
-        "sha256": "101d2bc1d9305b4a56405a5ee699f43108d0a519b093ce21af44203ee96bd987",
-        "meshCount": 253
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1595,
-        "z": 1.7457,
-        "plateTopY": 1.1595,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.397,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.64,
-          1.1671
-        ],
-        "driveZ": [
-          2.4362
-        ],
-        "liftZ": [],
-        "wheelbase": 4.0762
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          3.971,
-          3.397
-        ]
-      }
-    },
-    "scania-s-2016-4x2": {
-      "sourceFile": "models/trucks/scania_s_2016_4x2.glb",
-      "fingerprint": {
-        "bytes": 27075000,
-        "sha256": "e1cad0cbebd0e58248337467116ab9534595c370e125e4ab0b430f28852ba300",
-        "meshCount": 242
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0071,
-        "y": 1.1486,
-        "z": 1.4293,
-        "plateTopY": 1.1486,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.062,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.64
-        ],
-        "driveZ": [
-          2.0943
-        ],
-        "liftZ": [],
-        "wheelbase": 3.7343
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          4.016,
-          3.062
-        ]
-      }
-    },
-    "scania-s-2016-6x2": {
-      "sourceFile": "models/trucks/scania_s_2016_6x2.glb",
-      "fingerprint": {
-        "bytes": 28402000,
-        "sha256": "aee412a9c8897c350e1f58a4037e8b225bf6e1d25a4c656d4eb161fce146f8dd",
-        "meshCount": 254
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1595,
-        "z": 1.7457,
-        "plateTopY": 1.1595,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.397,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.64
-        ],
-        "driveZ": [
-          1.1671,
-          2.4362
-        ],
-        "liftZ": [],
-        "wheelbase": 4.0762
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          4.016,
-          3.397
-        ]
-      }
-    },
-    "scania-s-2016-6x2-4": {
-      "sourceFile": "models/trucks/scania_s_2016_6x2_4.glb",
-      "fingerprint": {
-        "bytes": 28221000,
-        "sha256": "a5bafe713e9b264028bab43b8412ec746db226180e839f94fec48653351c4fd2",
-        "meshCount": 254
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1595,
-        "z": 1.7457,
-        "plateTopY": 1.1595,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.397,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.64,
-          1.1671
-        ],
-        "driveZ": [
-          2.4362
-        ],
-        "liftZ": [],
-        "wheelbase": 4.0762
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          4.016,
-          3.397
-        ]
-      }
-    },
-    "scania-s-2024e-4x2": {
-      "sourceFile": "models/trucks/scania_s_2024e_4x2.glb",
-      "fingerprint": {
-        "bytes": 28113000,
-        "sha256": "48c9ef00500ce6cf94872f5e1455840f5f9b6ba539355bf765839ca9237b1e40",
-        "meshCount": 232
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1579,
-        "z": 1.7457,
-        "plateTopY": 1.1579,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.375,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.64
-        ],
-        "driveZ": [
-          2.5006
-        ],
-        "liftZ": [],
-        "wheelbase": 4.1406
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.494,
-          -0.006,
-          -3.121
-        ],
-        "max": [
-          1.494,
-          4.016,
-          3.375
-        ]
-      }
-    },
-    "scania-streamline-4x2": {
-      "sourceFile": "models/trucks/scania_streamline_4x2.glb",
-      "fingerprint": {
-        "bytes": 14700000,
-        "sha256": "9aac7abcab41a6a34a1220428edcfb28199ff64854e67f225e919c8b5536fd08",
-        "meshCount": 93
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.205,
-        "z": 0.9171,
-        "plateTopY": 1.205,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 2.66,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.9893
-        ],
-        "driveZ": [
-          1.7527
-        ],
-        "liftZ": [],
-        "wheelbase": 3.742
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.512,
-          0,
-          -3.561
-        ],
-        "max": [
-          1.511,
-          4.035,
-          2.66
-        ]
-      }
-    },
-    "scania-streamline-6x2a-tl": {
-      "sourceFile": "models/trucks/scania_streamline_6x2a_tl.glb",
-      "fingerprint": {
-        "bytes": 16243000,
-        "sha256": "dd20545c6376416318878fe0e99335ea004c4651430e5a79817fdc51885bb55e",
-        "meshCount": 107
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.21,
-        "z": 0.9931,
-        "plateTopY": 1.21,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 2.891,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2a",
-        "steerZ": [
-          -1.9893
-        ],
-        "driveZ": [
-          0.6594,
-          1.9857
-        ],
-        "liftZ": [],
-        "wheelbase": 3.975
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.512,
-          0,
-          -3.561
-        ],
-        "max": [
-          1.511,
-          4.035,
-          2.891
-        ]
-      }
-    },
-    "volvo-fh16-2009-4x2": {
-      "sourceFile": "models/trucks/volvo_fh16_2009_4x2.glb",
-      "fingerprint": {
-        "bytes": 10276000,
-        "sha256": "8b84e1a332916ddc42814f098eb6bae2675c8a2e9fde2a4ba0cfc04bc9a6620f",
-        "meshCount": 99
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.16,
-        "z": 1.1563,
-        "plateTopY": 1.16,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.052,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.8103
-        ],
-        "driveZ": [
-          2.0426
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8529
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.465,
-          0,
-          -3.27
-        ],
-        "max": [
-          1.464,
-          4.092,
-          3.052
-        ]
-      }
-    },
-    "volvo-fh16-2009-6x2-tl": {
-      "sourceFile": "models/trucks/volvo_fh16_2009_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 10957000,
-        "sha256": "4160cfd72f56e6c352ef160aa9ffa3fafd1fc70eaee6e970d4623b6e541259ba",
-        "meshCount": 104
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0003,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0,
-        "y": 1.16,
-        "z": 1.5973,
-        "plateTopY": 1.16,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "derivado",
-        "confidence": "media"
-      },
-      "rearBody": {
-        "z": 3.627,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.8103
-        ],
-        "driveZ": [
-          1.1936,
-          2.6167
-        ],
-        "liftZ": [],
-        "wheelbase": 4.427
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.465,
-          0,
-          -3.27
-        ],
-        "max": [
-          1.464,
-          4.092,
-          3.627
-        ]
-      }
-    },
-    "volvo-fh16-2012-4x2": {
-      "sourceFile": "models/trucks/volvo_fh16_2012_4x2.glb",
-      "fingerprint": {
-        "bytes": 54043000,
-        "sha256": "114b04d0ccaa8c580bf822ddce4cb754df290c1b2c350b6a4af4f79b559906e5",
-        "meshCount": 202
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1376,
-        "z": 1.5569,
-        "plateTopY": 1.1376,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 2.836,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7931
-        ],
-        "driveZ": [
-          2.0316
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8247
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          2.836
-        ]
-      }
-    },
-    "volvo-fh16-2012-6x2-tl": {
-      "sourceFile": "models/trucks/volvo_fh16_2012_6x2_tl.glb",
-      "fingerprint": {
-        "bytes": 55491000,
-        "sha256": "8739c23ea84428d232becb809010d29f8a39fc0c85fcaae8ec34d1887bc74f5e",
-        "meshCount": 212
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.7152,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.7931
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5609
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "volvo-fh16-2012-6x4a": {
-      "sourceFile": "models/trucks/volvo_fh16_2012_6x4a.glb",
-      "fingerprint": {
-        "bytes": 55795000,
-        "sha256": "520759810f5b25d75465081da901bca57c7ac2ea1506b612b35941c88eec62c7",
-        "meshCount": 212
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.7152,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4a",
-        "steerZ": [
-          -1.7931
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5609
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "volvo-fh-2021-4x2": {
-      "sourceFile": "models/trucks/volvo_fh_2021_4x2.glb",
-      "fingerprint": {
-        "bytes": 42718000,
-        "sha256": "8c4abf90afff150e20f1eb40d31c797e1df6d353bd0c8c33596742475a0d6790",
-        "meshCount": 210
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1376,
-        "z": 1.5751,
-        "plateTopY": 1.1376,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 2.838,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          2.0316
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8241
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          2.838
-        ]
-      }
-    },
-    "volvo-fh-2021-6x2-t": {
-      "sourceFile": "models/trucks/volvo_fh_2021_6x2_t.glb",
-      "fingerprint": {
-        "bytes": 43977000,
-        "sha256": "0a71d3ad9c246850120950664c7c390d09d29e27d331b428abce144cd53e46c2",
-        "meshCount": 220
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.8518,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5603
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "volvo-fh-2021-6x4": {
-      "sourceFile": "models/trucks/volvo_fh_2021_6x4.glb",
-      "fingerprint": {
-        "bytes": 43705000,
-        "sha256": "4b20aa11746c5e7838227fc7d2d042834092c18ee40ed1eec4a4aef409a717d4",
-        "meshCount": 220
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.8465,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5603
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.241
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "volvo-fh-2024-4x2": {
-      "sourceFile": "models/trucks/volvo_fh_2024_4x2.glb",
-      "fingerprint": {
-        "bytes": 43663000,
-        "sha256": "ced667396851f8d1f5b4ee8281746b519398906eb4bfaca675f1c6c0fdcbb260",
-        "meshCount": 218
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.1376,
-        "z": 1.5751,
-        "plateTopY": 1.1376,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 2.838,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          2.0316
-        ],
-        "liftZ": [],
-        "wheelbase": 3.8241
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.393
-        ],
-        "max": [
-          1.498,
-          3.968,
-          2.838
-        ]
-      }
-    },
-    "volvo-fh-2024-6x2-t": {
-      "sourceFile": "models/trucks/volvo_fh_2024_6x2_t.glb",
-      "fingerprint": {
-        "bytes": 45414000,
-        "sha256": "1776ad72965cf5f822026d501eb63c65e59bb6fd2dfaf9aaef72cf2d8f6875d8",
-        "meshCount": 228
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.8518,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x2",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5603
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.393
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "volvo-fh-2024-6x4": {
-      "sourceFile": "models/trucks/volvo_fh_2024_6x4.glb",
-      "fingerprint": {
-        "bytes": 45142000,
-        "sha256": "d15fa31aedfd6cf44b36ac63a9f7d7321053dd6f5666d12663f22d5e3a3de25e",
-        "meshCount": 228
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0044,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0063,
-        "y": 1.2136,
-        "z": 1.8465,
-        "plateTopY": 1.2136,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta"
-      },
-      "rearBody": {
-        "z": 3.58,
-        "profile": null
-      },
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          -1.7925
-        ],
-        "driveZ": [
-          1.4181,
-          2.7678
-        ],
-        "liftZ": [],
-        "wheelbase": 4.5603
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.499,
-          -0.004,
-          -3.393
-        ],
-        "max": [
-          1.498,
-          3.968,
-          3.58
-        ]
-      }
-    },
-    "iveco-s-way-480-4x2": {
-      "sourceFile": "models/trucks/iveco_metallica_4x2.glb",
-      "fingerprint": {
-        "bytes": 41533000,
-        "sha256": "9a22bd3f8b7f28d142c026975f956607dc4be8f17ca0d5b75be8c5ca34e59cc1",
-        "meshCount": 215
-      },
-      "measuredBy": "A1-probe@1",
-      "measuredAt": "2026-08-08",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0063,
-      "centerX": 0,
-      "fifthWheel": {
-        "x": 0.0071,
-        "y": 1.1266,
-        "z": 1.4213,
-        "plateTopY": 1.1266,
-        "rakeDeg": 0,
-        "slideRange": null,
-        "method": "furo",
-        "confidence": "alta",
-        "plate": {
-          "zMin": 1.13,
-          "zMax": 1.814
-        }
-      },
-      "rearBody": {
-        "z": 3.214,
-        "profile": null
-      },
-      "axles": {
-        "config": "4x2",
-        "steerZ": [
-          -1.546
-        ],
-        "driveZ": [
-          2.0874
-        ],
-        "liftZ": [],
-        "wheelbase": 3.6334
-      },
-      "wheelMeshRegex": "^wheel_",
-      "bbox": {
-        "min": [
-          -1.402,
-          -0.006,
-          -3.07
-        ],
-        "max": [
-          1.402,
-          3.981,
-          3.214
-        ]
-      }
+ "schema": "truck-studio/hitch@1",
+ "units": "m",
+ "generated": "2026-08-09",
+ "_comment": [
+  "Geometria de acoplamento em espaco CRU do GLB (A2 §7.2). NADA aqui passou",
+  "por groundAndCenter() nem pelo ancoramento em z do estudio — foi exatamente",
+  "esse acoplamento entre dado e pipeline que tornou cabs.json ilegivel para o",
+  "desktop, que normaliza diferente.",
+  "",
+  "`orientYaw: 3.14159` porque os 56 saem do exportador Blender com a FRENTE em",
+  "-Z e o estudio usa +Z. Medido uma vez, guardado; nunca adivinhado em runtime.",
+  "",
+  "`fifthWheel.confidence`: alta = furo do pino-rei medido na malha;",
+  "media = apice da garganta + constante de 0,295 m calibrada (sd 7 mm);",
+  "baixa = os tres mercedes_actros_mp3, incerteza +-9,5 cm, `needsManualReview`.",
+  "Validado contra producao no iveco-metallica: z 1,893 medido contra 1,890",
+  "declarado a mao em live-cabs.json (erro 3 mm).",
+  "",
+  "Os RIGIDOS (vw_titan x2, scania_r_2016_6x2t) NAO estao aqui: nao tem quinta",
+  "roda. Eles existem em brands.json marcados `available:false`.",
+  "",
+  "LIMPEZA 2026-08-09.",
+  "",
+  "SEIS entradas removidas por serem um SEGUNDO registro do MESMO .glb com outro",
+  "`axles.config` — `iveco-hi-way-6x4` sobre iveco_hiway_6x2a_tl.glb dizendo 6x4,",
+  "e mais cinco iguais. Como findTractor() casa por `sourceFile` ANTES do id,",
+  "qual das duas respondia dependia da ordem das chaves — e uma delas afirmava",
+  "uma tracao que a malha nao tem. Os sete chassis correspondentes sairam do",
+  "brands.json no mesmo dia (ver o _comment de la).",
+  "",
+  "UMA entrada removida por orfandade: `iveco-s-way-metallica-prod-4x2`, do bake",
+  "duplicado do S-Way Metallica, que saiu do catalogo.",
+  "",
+  "DUAS entradas renomeadas: `scania-s730-v8-6x2` e `volvo-fh16-750-6x4` viraram",
+  "`...-4x2`, porque os dois chassis foram rerrotulados no brands.json para a",
+  "tracao que a malha de fato tem (os `axles.config` daqui, medidos, sempre",
+  "disseram 4x2). A chave nao e o que findTractor() consulta primeiro, mas manter",
+  "as duas taxonomias iguais e o que torna a divergencia DETECTAVEL.",
+  "",
+  "INVARIANTE que passou a valer: UMA entrada por `sourceFile`, com a chave",
+  "sempre em `<modelId>-<chassisId>` do brands.json. Conferido por",
+  "tools/verify-manifests/catalog-resolves.test.ts.",
+  "",
+  "2026-08-09 (2a passada): saem tambem `scania-s730-v8-4x2` e",
+  "`volvo-fh16-750-4x2`, com os dois modelos que os usavam."
+ ],
+ "axes": {
+  "forward": "+Z",
+  "up": "+Y",
+  "right": "+X",
+  "handedness": "right"
+ },
+ "tractors": {
+  "daf-xd-4x2-sl": {
+   "sourceFile": "models/trucks/daf_xd_4x2_sl.glb",
+   "fingerprint": {
+    "bytes": 27957000,
+    "sha256": "b118b7932022bc629dca94890e97f96d14d93dfef6fa84dbb438a9c3b9cde1a8",
+    "meshCount": 144
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.157,
+    "z": 1.36,
+    "plateTopY": 1.157,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta",
+    "plate": {
+     "zMin": 1.07,
+     "zMax": 1.738,
+     "width": 0.984
     }
+   },
+   "rearBody": {
+    "z": 2.979,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7605
+    ],
+    "driveZ": [
+     1.837
+    ],
+    "liftZ": [],
+    "wheelbase": 3.5975
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     3.834,
+     2.979
+    ]
+   }
   },
-  "implements": {},
-  "defaults": {
-    "cabTrailerClearance": 0.15,
-    "maxCouplingPitchRad": 0.2527,
-    "minPitchArm": 0.5,
-    "tyreContactBand": 0.05
+  "daf-xd-6x2s-sl": {
+   "sourceFile": "models/trucks/daf_xd_6x2s_sl.glb",
+   "fingerprint": {
+    "bytes": 29623000,
+    "sha256": "7616d77270b8ae0f97bd6d09fbf9ad584c90f459ea12fc72308ecacc03039765",
+    "meshCount": 155
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.157,
+    "z": 2.2493,
+    "plateTopY": 1.157,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.95,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2s",
+    "steerZ": [
+     -1.7605
+    ],
+    "driveZ": [
+     1.6368,
+     3.0345
+    ],
+    "liftZ": [],
+    "wheelbase": 4.795
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     3.834,
+     3.95
+    ]
+   }
+  },
+  "daf-xd-6x4t-sl": {
+   "sourceFile": "models/trucks/daf_xd_6x4t_sl.glb",
+   "fingerprint": {
+    "bytes": 30400000,
+    "sha256": "8e2c274a0d79f7f69ef5c2784a89294cf0324628e0687b889e37472d306f416d",
+    "meshCount": 155
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.157,
+    "z": 2.0283,
+    "plateTopY": 1.157,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.861,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x4t",
+    "steerZ": [
+     -1.7605
+    ],
+    "driveZ": [
+     1.4351,
+     2.8363
+    ],
+    "liftZ": [],
+    "wheelbase": 4.5968
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     3.834,
+     3.861
+    ]
+   }
+  },
+  "daf-xf-105-4x2": {
+   "sourceFile": "models/trucks/daf_xf_105_4x2.glb",
+   "fingerprint": {
+    "bytes": 8022000,
+    "sha256": "db1fc869f5da929ae1d1ebbd00468207639dc4264eba0addaea98900d29db24e",
+    "meshCount": 88
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.15,
+    "z": 1.4625,
+    "plateTopY": 1.15,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.169,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.6319
+    ],
+    "driveZ": [
+     2.182
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8139
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.542,
+     0,
+     -3.177
+    ],
+    "max": [
+     1.541,
+     4.183,
+     3.169
+    ]
+   }
+  },
+  "daf-xf-105-6x2a-tl": {
+   "sourceFile": "models/trucks/daf_xf_105_6x2a_tl.glb",
+   "fingerprint": {
+    "bytes": 8703000,
+    "sha256": "79396466aece85b4545777adf415133f8b4a2b7a463f1c800b01ed7e2f120b07",
+    "meshCount": 97
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.15,
+    "z": 2.1665,
+    "plateTopY": 1.15,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 4.113,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2a",
+    "steerZ": [
+     -1.6319
+    ],
+    "driveZ": [
+     1.7709,
+     3.1753
+    ],
+    "liftZ": [],
+    "wheelbase": 4.8072
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.542,
+     0,
+     -3.177
+    ],
+    "max": [
+     1.541,
+     4.183,
+     4.113
+    ]
+   }
+  },
+  "daf-xf-euro6-4x2": {
+   "sourceFile": "models/trucks/daf_xf_euro6_4x2.glb",
+   "fingerprint": {
+    "bytes": 15938000,
+    "sha256": "bee9b549cf717b8b46a148a4dbdd136bdc9f9958ed498be7b38e48f7f18b69f1",
+    "meshCount": 102
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.16,
+    "z": 1.5382,
+    "plateTopY": 1.16,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.135,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.6393
+    ],
+    "driveZ": [
+     2.1407
+    ],
+    "liftZ": [],
+    "wheelbase": 3.78
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.588,
+     -0.006,
+     -3.016
+    ],
+    "max": [
+     1.587,
+     4.041,
+     3.135
+    ]
+   }
+  },
+  "daf-xf-euro6-6x2-tl": {
+   "sourceFile": "models/trucks/daf_xf_euro6_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 16651000,
+    "sha256": "f68322a52ebd7495277cd31c330fdc2300adf2028dc9e558c41fc3a726aa2740",
+    "meshCount": 109
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.155,
+    "z": 1.5062,
+    "plateTopY": 1.155,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.486,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.6393
+    ],
+    "driveZ": [
+     1.1475,
+     2.5113
+    ],
+    "liftZ": [],
+    "wheelbase": 4.1506
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.588,
+     -0.006,
+     -3.016
+    ],
+    "max": [
+     1.587,
+     4.041,
+     3.486
+    ]
+   }
+  },
+  "daf-xg-2021-4x2": {
+   "sourceFile": "models/trucks/daf_xg_2021_4x2.glb",
+   "fingerprint": {
+    "bytes": 36648000,
+    "sha256": "b63bc759b711f78e1468d40b441a7f357cf2db38511b40662f077cfb6041bc1f",
+    "meshCount": 215
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.1559,
+    "z": 1.6101,
+    "plateTopY": 1.1559,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.26,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7453
+    ],
+    "driveZ": [
+     2.2441
+    ],
+    "liftZ": [],
+    "wheelbase": 3.9894
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     4.122,
+     3.26
+    ]
+   }
+  },
+  "daf-xg-2021-6x2s": {
+   "sourceFile": "models/trucks/daf_xg_2021_6x2s.glb",
+   "fingerprint": {
+    "bytes": 38158000,
+    "sha256": "c6be2c4e3b53a713757a4cf08040a0548136ec267904ec364008e60cdc5df883",
+    "meshCount": 221
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.1571,
+    "z": 2.1405,
+    "plateTopY": 1.1571,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.95,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2s",
+    "steerZ": [
+     -1.7453,
+     3.0345
+    ],
+    "driveZ": [
+     1.6368
+    ],
+    "liftZ": [],
+    "wheelbase": 4.7798
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     4.122,
+     3.95
+    ]
+   }
+  },
+  "daf-xg-2021-6x4t": {
+   "sourceFile": "models/trucks/daf_xg_2021_6x4t.glb",
+   "fingerprint": {
+    "bytes": 39704000,
+    "sha256": "0c990378abed2d6459ae7a52d3e9c6a302e96bca707f9ab38de9fad5a77eba28",
+    "meshCount": 221
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0082,
+    "y": 1.157,
+    "z": 2.0283,
+    "plateTopY": 1.157,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.861,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x4t",
+    "steerZ": [
+     -1.7453
+    ],
+    "driveZ": [
+     1.4351,
+     2.8363
+    ],
+    "liftZ": [],
+    "wheelbase": 4.5816
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.503,
+     -0.006,
+     -3.295
+    ],
+    "max": [
+     1.502,
+     4.122,
+     3.861
+    ]
+   }
+  },
+  "iveco-hi-way-4x2": {
+   "sourceFile": "models/trucks/iveco_hiway_4x2.glb",
+   "fingerprint": {
+    "bytes": 10307000,
+    "sha256": "21a2d4f4bc990c743be106779eee429b7f3ab67f5732446e963199e7262a1ef6",
+    "meshCount": 63
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.185,
+    "z": 1.4275,
+    "plateTopY": 1.185,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.031,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.55
+    ],
+    "driveZ": [
+     2
+    ],
+    "liftZ": [],
+    "wheelbase": 3.55
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.598,
+     0,
+     -3.03
+    ],
+    "max": [
+     1.598,
+     3.995,
+     3.031
+    ]
+   }
+  },
+  "iveco-hi-way-6x2a-tl": {
+   "sourceFile": "models/trucks/iveco_hiway_6x2a_tl.glb",
+   "fingerprint": {
+    "bytes": 10967000,
+    "sha256": "e4a4296004c80cb96718c3c8135e1a24392aa96c83239be9e6a9a47a9e783166",
+    "meshCount": 68
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.185,
+    "z": 1.5815,
+    "plateTopY": 1.185,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.479,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2a",
+    "steerZ": [
+     -1.55
+    ],
+    "driveZ": [
+     1.2025,
+     2.5525
+    ],
+    "liftZ": [],
+    "wheelbase": 4.1025
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.598,
+     0,
+     -3.03
+    ],
+    "max": [
+     1.598,
+     3.995,
+     3.479
+    ]
+   }
+  },
+  "iveco-stralis-4x2": {
+   "sourceFile": "models/trucks/iveco_stralis_4x2.glb",
+   "fingerprint": {
+    "bytes": 7151000,
+    "sha256": "74977558c9fcc6e4acc267b5a3bd2db8e0834eec54018962e055c0dbf15e1b31",
+    "meshCount": 66
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.15,
+    "z": 1.5695,
+    "plateTopY": 1.15,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.358,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.5318
+    ],
+    "driveZ": [
+     2.3185
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8503
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.595,
+     0,
+     -2.983
+    ],
+    "max": [
+     1.595,
+     4.005,
+     3.358
+    ]
+   }
+  },
+  "iveco-stralis-6x2-tl": {
+   "sourceFile": "models/trucks/iveco_stralis_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 7654000,
+    "sha256": "0c539d826c8f1d3797a20494de960f1074f6f76901511f29d16f686d04b3c8d0",
+    "meshCount": 72
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.155,
+    "z": 1.5395,
+    "plateTopY": 1.155,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.558,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.5318
+    ],
+    "driveZ": [
+     1.2947,
+     2.5185
+    ],
+    "liftZ": [],
+    "wheelbase": 4.0503
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.595,
+     0,
+     -2.983
+    ],
+    "max": [
+     1.595,
+     4.005,
+     3.558
+    ]
+   }
+  },
+  "man-tgx-4x2": {
+   "sourceFile": "models/trucks/man_tgx_4x2.glb",
+   "fingerprint": {
+    "bytes": 7876000,
+    "sha256": "acc78a1995f70e2d331911bf00599347a144dab9b11a68c44d0666d4cddcdd47",
+    "meshCount": 66
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.175,
+    "z": 1.6708,
+    "plateTopY": 1.175,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media",
+    "plate": {
+     "zMin": 1.385,
+     "zMax": 2.105,
+     "width": 0.74
+    }
+   },
+   "rearBody": {
+    "z": 3.038,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.5648
+    ],
+    "driveZ": [
+     2.2443
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8091
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.584,
+     -0.004,
+     -3.177
+    ],
+    "max": [
+     1.584,
+     4.179,
+     3.038
+    ]
+   }
+  },
+  "man-tgx-6x2-tl": {
+   "sourceFile": "models/trucks/man_tgx_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 8336000,
+    "sha256": "dd1956bdbb66d08ee2193dfc2e93fe0da6da9c05eef5d63550f8f037ed99c635",
+    "meshCount": 71
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.175,
+    "z": 2.1503,
+    "plateTopY": 1.175,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.854,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.5648
+    ],
+    "driveZ": [
+     1.6599,
+     3.0599
+    ],
+    "liftZ": [],
+    "wheelbase": 4.6247
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.584,
+     -0.004,
+     -3.177
+    ],
+    "max": [
+     1.584,
+     4.179,
+     3.854
+    ]
+   }
+  },
+  "mb-actros-mp4-4x2": {
+   "sourceFile": "models/trucks/mercedes_actros2014_4x2.glb",
+   "fingerprint": {
+    "bytes": 25275000,
+    "sha256": "d1cab922e6ce1c3e674d2ab4b243f0494c4ba65d93ffbd9c218cea438a2c3cb1",
+    "meshCount": 140
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0061,
+    "y": 1.1446,
+    "z": 1.4426,
+    "plateTopY": 1.1446,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.103,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7432
+    ],
+    "driveZ": [
+     2.0181
+    ],
+    "liftZ": [],
+    "wheelbase": 3.7613
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.52,
+     -0.004,
+     -3.212
+    ],
+    "max": [
+     1.52,
+     4.07,
+     3.103
+    ]
+   }
+  },
+  "mb-actros-mp4-6x2-tl": {
+   "sourceFile": "models/trucks/mercedes_actros2014_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 25946000,
+    "sha256": "904ffd85b4bc37bd977dbdcf28d15d1b8ee13835e79dbabb620671ebf6d6ae83",
+    "meshCount": 149
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1669,
+    "z": 2.3521,
+    "plateTopY": 1.1669,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 4.285,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.7432
+    ],
+    "driveZ": [
+     1.8172,
+     3.2019
+    ],
+    "liftZ": [],
+    "wheelbase": 4.9451
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.52,
+     -0.004,
+     -3.212
+    ],
+    "max": [
+     1.52,
+     4.07,
+     4.285
+    ]
+   }
+  },
+  "mb-actros-mp3-4x2a": {
+   "sourceFile": "models/trucks/mercedes_actros_mp3_4x2a.glb",
+   "fingerprint": {
+    "bytes": 14345000,
+    "sha256": "f27b27fdbf269bb1c5b6824afb3d50677c051ae511d295824a3d99b3d04f0223",
+    "meshCount": 109
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0033,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.16,
+    "z": 1.4448,
+    "plateTopY": 1.16,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "baixa",
+    "needsManualReview": true,
+    "uncertaintyM": 0.095
+   },
+   "rearBody": {
+    "z": 2.969,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2a",
+    "steerZ": [
+     -1.5648
+    ],
+    "driveZ": [
+     1.9377
+    ],
+    "liftZ": [],
+    "wheelbase": 3.5025
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.481,
+     -0.003,
+     -3.253
+    ],
+    "max": [
+     1.481,
+     4.03,
+     2.969
+    ]
+   }
+  },
+  "mb-actros-mp3-6x2a-tl": {
+   "sourceFile": "models/trucks/mercedes_actros_mp3_6x2a_tl.glb",
+   "fingerprint": {
+    "bytes": 15644000,
+    "sha256": "16cff42dc5c59119c8ead4d428bea8279e2dce9fff2f11a371529fddc887c061",
+    "meshCount": 117
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0033,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.16,
+    "z": 2.2388,
+    "plateTopY": 1.16,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "baixa",
+    "needsManualReview": true,
+    "uncertaintyM": 0.095
+   },
+   "rearBody": {
+    "z": 4.316,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2a",
+    "steerZ": [
+     -1.5648
+    ],
+    "driveZ": [
+     1.9377,
+     3.3
+    ],
+    "liftZ": [],
+    "wheelbase": 4.8648
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.481,
+     -0.003,
+     -3.253
+    ],
+    "max": [
+     1.481,
+     4.03,
+     4.316
+    ]
+   }
+  },
+  "scania-r-2009-4x2": {
+   "sourceFile": "models/trucks/scania_r_2009_4x2.glb",
+   "fingerprint": {
+    "bytes": 13810000,
+    "sha256": "0ff70014dbd544cb3caba550c3313a3a7bbebb1fa4d2dac4007ec3f3f99d9fd9",
+    "meshCount": 88
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.205,
+    "z": 0.9171,
+    "plateTopY": 1.205,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media",
+    "plate": {
+     "zMin": 0.602,
+     "zMax": 1.494
+    }
+   },
+   "rearBody": {
+    "z": 2.66,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.9893
+    ],
+    "driveZ": [
+     1.7527
+    ],
+    "liftZ": [],
+    "wheelbase": 3.742
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.512,
+     0,
+     -3.561
+    ],
+    "max": [
+     1.511,
+     4.035,
+     2.66
+    ]
+   }
+  },
+  "scania-r-2009-6x2": {
+   "sourceFile": "models/trucks/scania_r_2009_6x2.glb",
+   "fingerprint": {
+    "bytes": 15320000,
+    "sha256": "9e8b167fb07c9f41bb0bb16a442edbd63b4c74526dbb49ccd796f085441c8b70",
+    "meshCount": 102
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.21,
+    "z": 0.9931,
+    "plateTopY": 1.21,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 2.891,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.9893,
+     0.6594
+    ],
+    "driveZ": [
+     1.9857
+    ],
+    "liftZ": [],
+    "wheelbase": 3.975
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.512,
+     0,
+     -3.561
+    ],
+    "max": [
+     1.511,
+     4.035,
+     2.891
+    ]
+   }
+  },
+  "scania-r-2009-6x2a-tl": {
+   "sourceFile": "models/trucks/scania_r_2009_6x2a_tl.glb",
+   "fingerprint": {
+    "bytes": 15530000,
+    "sha256": "9f53e265b7ca9fa3e07c6f69d49752e851d4016844fc6219821b91c674748aff",
+    "meshCount": 102
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.21,
+    "z": 0.9931,
+    "plateTopY": 1.21,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 2.891,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2a",
+    "steerZ": [
+     -1.9893
+    ],
+    "driveZ": [
+     0.6594,
+     1.9857
+    ],
+    "liftZ": [],
+    "wheelbase": 3.975
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.512,
+     0,
+     -3.561
+    ],
+    "max": [
+     1.511,
+     4.035,
+     2.891
+    ]
+   }
+  },
+  "scania-r-2016-4x2": {
+   "sourceFile": "models/trucks/scania_r_2016_4x2.glb",
+   "fingerprint": {
+    "bytes": 26907000,
+    "sha256": "def8a6b91d9870d0d968d8b8eb6e7b0f808a91b21e55c1d8ee2ffad7d28ea3d9",
+    "meshCount": 241
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0071,
+    "y": 1.1486,
+    "z": 1.4293,
+    "plateTopY": 1.1486,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta",
+    "plate": {
+     "zMin": 1.138,
+     "zMax": 1.818
+    }
+   },
+   "rearBody": {
+    "z": 3.062,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.64
+    ],
+    "driveZ": [
+     2.0943
+    ],
+    "liftZ": [],
+    "wheelbase": 3.7343
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     3.971,
+     3.062
+    ]
+   }
+  },
+  "scania-r-2016-6x2": {
+   "sourceFile": "models/trucks/scania_r_2016_6x2.glb",
+   "fingerprint": {
+    "bytes": 28234000,
+    "sha256": "84ef85fb23c29522face5deee771b86cf16c5977219bacad4dfc470747f84301",
+    "meshCount": 253
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1595,
+    "z": 1.7457,
+    "plateTopY": 1.1595,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.397,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.64
+    ],
+    "driveZ": [
+     1.1671,
+     2.4362
+    ],
+    "liftZ": [],
+    "wheelbase": 4.0762
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     3.971,
+     3.397
+    ]
+   }
+  },
+  "scania-r-2016-6x2-4": {
+   "sourceFile": "models/trucks/scania_r_2016_6x2_4.glb",
+   "fingerprint": {
+    "bytes": 28062000,
+    "sha256": "101d2bc1d9305b4a56405a5ee699f43108d0a519b093ce21af44203ee96bd987",
+    "meshCount": 253
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1595,
+    "z": 1.7457,
+    "plateTopY": 1.1595,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.397,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.64,
+     1.1671
+    ],
+    "driveZ": [
+     2.4362
+    ],
+    "liftZ": [],
+    "wheelbase": 4.0762
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     3.971,
+     3.397
+    ]
+   }
+  },
+  "scania-s-2016-4x2": {
+   "sourceFile": "models/trucks/scania_s_2016_4x2.glb",
+   "fingerprint": {
+    "bytes": 27075000,
+    "sha256": "e1cad0cbebd0e58248337467116ab9534595c370e125e4ab0b430f28852ba300",
+    "meshCount": 242
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0071,
+    "y": 1.1486,
+    "z": 1.4293,
+    "plateTopY": 1.1486,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.062,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.64
+    ],
+    "driveZ": [
+     2.0943
+    ],
+    "liftZ": [],
+    "wheelbase": 3.7343
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     4.016,
+     3.062
+    ]
+   }
+  },
+  "scania-s-2016-6x2": {
+   "sourceFile": "models/trucks/scania_s_2016_6x2.glb",
+   "fingerprint": {
+    "bytes": 28402000,
+    "sha256": "aee412a9c8897c350e1f58a4037e8b225bf6e1d25a4c656d4eb161fce146f8dd",
+    "meshCount": 254
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1595,
+    "z": 1.7457,
+    "plateTopY": 1.1595,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.397,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.64
+    ],
+    "driveZ": [
+     1.1671,
+     2.4362
+    ],
+    "liftZ": [],
+    "wheelbase": 4.0762
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     4.016,
+     3.397
+    ]
+   }
+  },
+  "scania-s-2016-6x2-4": {
+   "sourceFile": "models/trucks/scania_s_2016_6x2_4.glb",
+   "fingerprint": {
+    "bytes": 28221000,
+    "sha256": "a5bafe713e9b264028bab43b8412ec746db226180e839f94fec48653351c4fd2",
+    "meshCount": 254
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1595,
+    "z": 1.7457,
+    "plateTopY": 1.1595,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.397,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.64,
+     1.1671
+    ],
+    "driveZ": [
+     2.4362
+    ],
+    "liftZ": [],
+    "wheelbase": 4.0762
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     4.016,
+     3.397
+    ]
+   }
+  },
+  "scania-s-2024e-4x2": {
+   "sourceFile": "models/trucks/scania_s_2024e_4x2.glb",
+   "fingerprint": {
+    "bytes": 28113000,
+    "sha256": "48c9ef00500ce6cf94872f5e1455840f5f9b6ba539355bf765839ca9237b1e40",
+    "meshCount": 232
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1579,
+    "z": 1.7457,
+    "plateTopY": 1.1579,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.375,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.64
+    ],
+    "driveZ": [
+     2.5006
+    ],
+    "liftZ": [],
+    "wheelbase": 4.1406
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.494,
+     -0.006,
+     -3.121
+    ],
+    "max": [
+     1.494,
+     4.016,
+     3.375
+    ]
+   }
+  },
+  "scania-streamline-4x2": {
+   "sourceFile": "models/trucks/scania_streamline_4x2.glb",
+   "fingerprint": {
+    "bytes": 14700000,
+    "sha256": "9aac7abcab41a6a34a1220428edcfb28199ff64854e67f225e919c8b5536fd08",
+    "meshCount": 93
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.205,
+    "z": 0.9171,
+    "plateTopY": 1.205,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 2.66,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.9893
+    ],
+    "driveZ": [
+     1.7527
+    ],
+    "liftZ": [],
+    "wheelbase": 3.742
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.512,
+     0,
+     -3.561
+    ],
+    "max": [
+     1.511,
+     4.035,
+     2.66
+    ]
+   }
+  },
+  "scania-streamline-6x2a-tl": {
+   "sourceFile": "models/trucks/scania_streamline_6x2a_tl.glb",
+   "fingerprint": {
+    "bytes": 16243000,
+    "sha256": "dd20545c6376416318878fe0e99335ea004c4651430e5a79817fdc51885bb55e",
+    "meshCount": 107
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.21,
+    "z": 0.9931,
+    "plateTopY": 1.21,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 2.891,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2a",
+    "steerZ": [
+     -1.9893
+    ],
+    "driveZ": [
+     0.6594,
+     1.9857
+    ],
+    "liftZ": [],
+    "wheelbase": 3.975
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.512,
+     0,
+     -3.561
+    ],
+    "max": [
+     1.511,
+     4.035,
+     2.891
+    ]
+   }
+  },
+  "volvo-fh16-2009-4x2": {
+   "sourceFile": "models/trucks/volvo_fh16_2009_4x2.glb",
+   "fingerprint": {
+    "bytes": 10276000,
+    "sha256": "8b84e1a332916ddc42814f098eb6bae2675c8a2e9fde2a4ba0cfc04bc9a6620f",
+    "meshCount": 99
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.16,
+    "z": 1.1563,
+    "plateTopY": 1.16,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.052,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.8103
+    ],
+    "driveZ": [
+     2.0426
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8529
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.465,
+     0,
+     -3.27
+    ],
+    "max": [
+     1.464,
+     4.092,
+     3.052
+    ]
+   }
+  },
+  "volvo-fh16-2009-6x2-tl": {
+   "sourceFile": "models/trucks/volvo_fh16_2009_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 10957000,
+    "sha256": "4160cfd72f56e6c352ef160aa9ffa3fafd1fc70eaee6e970d4623b6e541259ba",
+    "meshCount": 104
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0003,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0,
+    "y": 1.16,
+    "z": 1.5973,
+    "plateTopY": 1.16,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "derivado",
+    "confidence": "media"
+   },
+   "rearBody": {
+    "z": 3.627,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.8103
+    ],
+    "driveZ": [
+     1.1936,
+     2.6167
+    ],
+    "liftZ": [],
+    "wheelbase": 4.427
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.465,
+     0,
+     -3.27
+    ],
+    "max": [
+     1.464,
+     4.092,
+     3.627
+    ]
+   }
+  },
+  "volvo-fh16-2012-4x2": {
+   "sourceFile": "models/trucks/volvo_fh16_2012_4x2.glb",
+   "fingerprint": {
+    "bytes": 54043000,
+    "sha256": "114b04d0ccaa8c580bf822ddce4cb754df290c1b2c350b6a4af4f79b559906e5",
+    "meshCount": 202
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1376,
+    "z": 1.5569,
+    "plateTopY": 1.1376,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 2.836,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7931
+    ],
+    "driveZ": [
+     2.0316
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8247
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.241
+    ],
+    "max": [
+     1.498,
+     3.968,
+     2.836
+    ]
+   }
+  },
+  "volvo-fh16-2012-6x2-tl": {
+   "sourceFile": "models/trucks/volvo_fh16_2012_6x2_tl.glb",
+   "fingerprint": {
+    "bytes": 55491000,
+    "sha256": "8739c23ea84428d232becb809010d29f8a39fc0c85fcaae8ec34d1887bc74f5e",
+    "meshCount": 212
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.2136,
+    "z": 1.7152,
+    "plateTopY": 1.2136,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.58,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.7931
+    ],
+    "driveZ": [
+     1.4181,
+     2.7678
+    ],
+    "liftZ": [],
+    "wheelbase": 4.5609
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.241
+    ],
+    "max": [
+     1.498,
+     3.968,
+     3.58
+    ]
+   }
+  },
+  "volvo-fh-2021-4x2": {
+   "sourceFile": "models/trucks/volvo_fh_2021_4x2.glb",
+   "fingerprint": {
+    "bytes": 42718000,
+    "sha256": "8c4abf90afff150e20f1eb40d31c797e1df6d353bd0c8c33596742475a0d6790",
+    "meshCount": 210
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1376,
+    "z": 1.5751,
+    "plateTopY": 1.1376,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 2.838,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7925
+    ],
+    "driveZ": [
+     2.0316
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8241
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.241
+    ],
+    "max": [
+     1.498,
+     3.968,
+     2.838
+    ]
+   }
+  },
+  "volvo-fh-2021-6x2-t": {
+   "sourceFile": "models/trucks/volvo_fh_2021_6x2_t.glb",
+   "fingerprint": {
+    "bytes": 43977000,
+    "sha256": "0a71d3ad9c246850120950664c7c390d09d29e27d331b428abce144cd53e46c2",
+    "meshCount": 220
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.2136,
+    "z": 1.8518,
+    "plateTopY": 1.2136,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.58,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.7925
+    ],
+    "driveZ": [
+     1.4181,
+     2.7678
+    ],
+    "liftZ": [],
+    "wheelbase": 4.5603
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.241
+    ],
+    "max": [
+     1.498,
+     3.968,
+     3.58
+    ]
+   }
+  },
+  "volvo-fh-2024-4x2": {
+   "sourceFile": "models/trucks/volvo_fh_2024_4x2.glb",
+   "fingerprint": {
+    "bytes": 43663000,
+    "sha256": "ced667396851f8d1f5b4ee8281746b519398906eb4bfaca675f1c6c0fdcbb260",
+    "meshCount": 218
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.1376,
+    "z": 1.5751,
+    "plateTopY": 1.1376,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 2.838,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.7925
+    ],
+    "driveZ": [
+     2.0316
+    ],
+    "liftZ": [],
+    "wheelbase": 3.8241
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.393
+    ],
+    "max": [
+     1.498,
+     3.968,
+     2.838
+    ]
+   }
+  },
+  "volvo-fh-2024-6x2-t": {
+   "sourceFile": "models/trucks/volvo_fh_2024_6x2_t.glb",
+   "fingerprint": {
+    "bytes": 45414000,
+    "sha256": "1776ad72965cf5f822026d501eb63c65e59bb6fd2dfaf9aaef72cf2d8f6875d8",
+    "meshCount": 228
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0044,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0063,
+    "y": 1.2136,
+    "z": 1.8518,
+    "plateTopY": 1.2136,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta"
+   },
+   "rearBody": {
+    "z": 3.58,
+    "profile": null
+   },
+   "axles": {
+    "config": "6x2",
+    "steerZ": [
+     -1.7925
+    ],
+    "driveZ": [
+     1.4181,
+     2.7678
+    ],
+    "liftZ": [],
+    "wheelbase": 4.5603
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.499,
+     -0.004,
+     -3.393
+    ],
+    "max": [
+     1.498,
+     3.968,
+     3.58
+    ]
+   }
+  },
+  "iveco-s-way-480-4x2": {
+   "sourceFile": "models/trucks/iveco_metallica_4x2.glb",
+   "fingerprint": {
+    "bytes": 41533000,
+    "sha256": "9a22bd3f8b7f28d142c026975f956607dc4be8f17ca0d5b75be8c5ca34e59cc1",
+    "meshCount": 215
+   },
+   "measuredBy": "A1-probe@1",
+   "measuredAt": "2026-08-08",
+   "orientYaw": 3.141592653589793,
+   "groundY": -0.0063,
+   "centerX": 0,
+   "fifthWheel": {
+    "x": 0.0071,
+    "y": 1.1266,
+    "z": 1.4213,
+    "plateTopY": 1.1266,
+    "rakeDeg": 0,
+    "slideRange": null,
+    "method": "furo",
+    "confidence": "alta",
+    "plate": {
+     "zMin": 1.13,
+     "zMax": 1.814
+    }
+   },
+   "rearBody": {
+    "z": 3.214,
+    "profile": null
+   },
+   "axles": {
+    "config": "4x2",
+    "steerZ": [
+     -1.546
+    ],
+    "driveZ": [
+     2.0874
+    ],
+    "liftZ": [],
+    "wheelbase": 3.6334
+   },
+   "wheelMeshRegex": "^wheel_",
+   "bbox": {
+    "min": [
+     -1.402,
+     -0.006,
+     -3.07
+    ],
+    "max": [
+     1.402,
+     3.981,
+     3.214
+    ]
+   }
   }
+ },
+ "implements": {},
+ "defaults": {
+  "cabTrailerClearance": 0.15,
+  "maxCouplingPitchRad": 0.2527,
+  "minPitchArm": 0.5,
+  "tyreContactBand": 0.05
+ }
 }
