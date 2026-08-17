@@ -373,6 +373,25 @@ export interface Choice {
    * escolha inteira.
    */
   measures?: MeasuresRaw;
+  /**
+   * O IMPLEMENTO VESTE A TINTA DO CAVALO? `'both'` sim; ausente = não.
+   *
+   * Entra pelo mesmo motivo de `trim` e `measures`, e fecha o último buraco da
+   * mesma família: o ACABAMENTO do Thermo King era persistido e o ALVO DA TINTA
+   * não, então marcar "pintar o implemento" e recarregar devolvia a unidade
+   * branca de fábrica — *"o thermo king quando recarrego continua voltando para
+   * branco"*. O que não sobrevivia não era a cor, era a decisão que fazia a
+   * peça seguir o cavalo.
+   *
+   * O SINTOMA APONTAVA PARA O THERMO KING E A CAUSA NÃO ERA DELE: `followsBody`
+   * vale também para o teto e o para-lama, e os três voltavam juntos. A unidade
+   * é só a mais visível — é branca de fábrica, então a perda salta aos olhos,
+   * enquanto um teto branco parece intencional.
+   *
+   * AUSENTE quando é `'cab'`, que é o padrão — mesma disciplina dos dois
+   * vizinhos: gravar o padrão faria `sameRig()` ver diferença onde não há.
+   */
+  paintTarget?: 'both';
 }
 
 /**
@@ -1369,6 +1388,9 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
        disso, e `sameRig()` é exatamente uma dessas. */
     ...(normalizeTrim(c.trim) ? { trim: normalizeTrim(c.trim) } : {}),
     ...(normalizeMeasures(c.measures) ? { measures: normalizeMeasures(c.measures) } : {}),
+    /* Só `'both'` é gravável: qualquer outra coisa (inclusive `'cab'`, que é o
+       padrão) some da chave pela mesma regra dos dois vizinhos acima. */
+    ...(c.paintTarget === 'both' ? { paintTarget: 'both' as const } : {}),
   };
 }
 

@@ -160,8 +160,20 @@ const sameRig = (a: Choice | null, b: Choice | null) =>
 const withTrim = (choice: Choice): Choice => {
   const t = trim.trimChoice();
   const base = t ? { ...choice, trim: t } : choice;
-  return withMeasures(base);
+  return withMeasures(withPaintTarget(base));
 };
+
+/* O ALVO DA TINTA ENTRA EM TODA GRAVAÇÃO, pelo mesmo motivo dos outros dois: não
+   vem do seletor, muda a qualquer momento pela caixa "pintar o implemento", e
+   sem isto vivia só até o próximo F5. Era o que devolvia o Thermo King branco ao
+   recarregar — ver `Choice.paintTarget`.
+   Lido de `models.state` NA HORA, nunca de cópia guardada aqui. Ausente quando é
+   'cab', que é o padrão. */
+function withPaintTarget(choice: Choice): Choice {
+  return models.state.paintTarget === 'both'
+    ? { ...choice, paintTarget: 'both' }
+    : (choice.paintTarget ? { ...choice, paintTarget: undefined } : choice);
+}
 
 /* AS MEDIDAS DO BAÚ ENTRAM EM TODA GRAVAÇÃO, pelo mesmo motivo do `trim` logo
    acima: elas não vêm do seletor, mudam a qualquer momento pelo editor, e sem
@@ -206,6 +218,13 @@ liveryStructure.onMeasuresChanged(persistChoice);
    estado de sessão. Ver `onTrimChanged` em vehicle/trim.ts para por que a
    notificação vem por assinatura. */
 trim.onTrimChanged(persistChoice);
+
+/* E uma mudança no ALVO DA TINTA também. A caixa "pintar o implemento" não passa
+   por applyChoice() — ela chama `setPaintTarget()` direto —, então sem esta
+   assinatura a decisão nunca chegava ao disco. Era o defeito do Thermo King
+   branco depois do F5. Barato e idempotente: só dispara quando o alvo é de fato
+   reaplicado, e `persistChoice()` sai calado antes do primeiro applyChoice(). */
+models.onPaintTargetApplied(persistChoice);
 
 /**
  * Grava a escolha corrente E ATUALIZA A CÓPIA EM MEMÓRIA.
@@ -1524,6 +1543,17 @@ async function runApply(
     }
 
     currentChoice = choice;
+    /* O ALVO DA TINTA ANTES DO TRIM, e a ordem é o conserto.
+       `setTrimChoice()` termina em `setPaintTarget(state.paintTarget === 'both'
+       ? 'both' : 'cab')` — ele LÊ o alvo corrente em vez de decidi-lo. Restaurar
+       depois obrigaria a uma segunda varredura das ~2 150 malhas do implemento;
+       restaurar antes faz a hidratação do trim já sair no alvo certo, numa
+       passada só.
+       Só quando a marca NÃO acabou de mudar: o bloco acima desliga a tinta do
+       implemento de propósito nesse caso, e reacendê-la aqui desfaria a regra. */
+    if (!(prevManufacturer && prevManufacturer !== choice.manufacturerId)) {
+      livery.setImplementPainted(choice.paintTarget === 'both', { echo: true });
+    }
     /* Os acabamentos gravados entram na PEÇA que acabou de ser montada. Aqui e
        não antes: `setTrimChoice()` escreve material em malhas do implemento, e
        até esta linha o implemento pode ser o do caminhão anterior. */
