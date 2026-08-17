@@ -61,6 +61,8 @@ import { SetStatusModal } from "./set-status-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetTermModal } from "./set-term-modal";
 import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
+import { useConfirm } from "../detail/use-confirm";
+import { taskCancelConfirmOpts } from "../cancel-confirmation";
 import { CopyFromTaskModal } from "./copy-from-task-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
@@ -140,6 +142,7 @@ export function TaskScheduleTablePage() {
 
   const { update, updateAsync, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // --- user privilege flags (mirror the legacy context menu) ---
   const priv = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
@@ -369,18 +372,19 @@ export function TaskScheduleTablePage() {
 
   const handleCancel = useCallback(
     async (targets: Task[]) => {
+      const pending = targets.filter((t) => t.status !== TASK_STATUS.CANCELLED);
+      if (pending.length === 0) return;
+      if (!(await confirm(taskCancelConfirmOpts(pending)))) return;
       try {
-        for (const t of targets) {
-          if (t.status !== TASK_STATUS.CANCELLED) {
-            await update({ id: t.id, data: { status: TASK_STATUS.CANCELLED } });
-          }
+        for (const t of pending) {
+          await update({ id: t.id, data: { status: TASK_STATUS.CANCELLED } });
         }
-        toast.success(targets.length > 1 ? "Tarefas canceladas" : "Tarefa cancelada");
+        toast.success(pending.length > 1 ? "Tarefas canceladas" : "Tarefa cancelada");
       } catch {
         toast.error("Erro ao cancelar tarefa(s)");
       }
     },
-    [update],
+    [update, confirm],
   );
 
   const handleEdit = useCallback(
@@ -891,6 +895,8 @@ export function TaskScheduleTablePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {confirmDialog}
     </div>
   );
 }

@@ -57,6 +57,8 @@ import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { getTaskQuoteEditRoute } from "@/utils/task";
+import { useConfirm } from "../../detail/use-confirm";
+import { taskCancelConfirmOpts } from "../../cancel-confirmation";
 import { SetStatusModal } from "../../schedule/set-status-modal";
 import { SetSectorModal } from "../../schedule/set-sector-modal";
 import { SetTermModal } from "../../schedule/set-term-modal";
@@ -98,6 +100,7 @@ export function TaskHistoryTablePage() {
 
   const { update, updateAsync, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // --- user privilege flags (mirror the legacy context menu) ---
   const priv = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
@@ -298,18 +301,19 @@ export function TaskHistoryTablePage() {
 
   const handleCancel = useCallback(
     async (targets: Task[]) => {
+      const pending = targets.filter((t) => t.status !== TASK_STATUS.CANCELLED);
+      if (pending.length === 0) return;
+      if (!(await confirm(taskCancelConfirmOpts(pending)))) return;
       try {
-        for (const t of targets) {
-          if (t.status !== TASK_STATUS.CANCELLED) {
-            await update({ id: t.id, data: { status: TASK_STATUS.CANCELLED } });
-          }
+        for (const t of pending) {
+          await update({ id: t.id, data: { status: TASK_STATUS.CANCELLED } });
         }
-        toast.success(targets.length > 1 ? "Tarefas canceladas" : "Tarefa cancelada");
+        toast.success(pending.length > 1 ? "Tarefas canceladas" : "Tarefa cancelada");
       } catch {
         toast.error("Erro ao cancelar tarefa(s)");
       }
     },
-    [update],
+    [update, confirm],
   );
 
   const handleEdit = useCallback(
@@ -778,6 +782,8 @@ export function TaskHistoryTablePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {confirmDialog}
     </>
   );
 }

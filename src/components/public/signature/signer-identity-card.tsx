@@ -1,12 +1,17 @@
 /**
  * Bloco de identificação do signatário — leitura, não formulário.
  *
- * Nome, CPF, e-mail e cargo vêm do cadastro do cliente e o signatário não os
- * escolhe: é isso que dá peso probatório ao código enviado ao e-mail. Então
- * eles aparecem como **dados do documento** (rótulo + valor, com fio pontilhado
- * entre as linhas), na mesma tipografia do resto da página, e não como campos
- * editáveis. A conferência dos dígitos que faltam acontece no modal disparado
- * por "Enviar código por e-mail".
+ * Nome, CPF, contato e cargo vêm do cadastro do cliente e o signatário não os
+ * escolhe: é isso que dá peso probatório ao código enviado. Então eles aparecem
+ * como **dados do documento** (rótulo + valor, com fio pontilhado entre as
+ * linhas), na mesma tipografia do resto da página, e não como campos editáveis.
+ * A conferência dos dígitos que faltam acontece no modal disparado por "Enviar
+ * código".
+ *
+ * A linha de contato mostra o contato DO CANAL da coleta. Imprimir o e-mail numa
+ * coleta por WhatsApp seria pior do que inútil: o bloco existe para provar posse
+ * do canal, e mostraria um endereço que não recebeu nada — quando existe, porque
+ * num cadastro de WhatsApp o e-mail costuma ser nulo e a máscara vira `***@***`.
  *
  * O CPF é impresso com a máscara do §5.9 (`***.456.789-**` — três primeiros e os
  * dois verificadores ocultos, PARECER 00001/2021/CONJUR-CGU/AGU). Antes da
@@ -54,7 +59,10 @@ export interface SignerIdentityCardProps {
   name: string;
   /** Já mascarado pela regra do §5.9. */
   cpfDisplay: string;
-  emailDisplay: string;
+  /** Contato do canal, já mascarado (`contactMasked` da API). */
+  contactDisplay: string;
+  /** Canal da coleta — decide o rótulo da linha e o texto do rodapé. */
+  channel?: "WHATSAPP" | "EMAIL";
   cargo: string | null;
   company: string | null;
   /** True depois que os dígitos foram aceitos pela API. */
@@ -66,12 +74,14 @@ export interface SignerIdentityCardProps {
 export function SignerIdentityCard({
   name,
   cpfDisplay,
-  emailDisplay,
+  contactDisplay,
+  channel = "EMAIL",
   cargo,
   company,
   confirmed,
   children,
 }: SignerIdentityCardProps) {
+  const isWhatsApp = channel === "WHATSAPP";
   return (
     <Card>
       <CardContent className="space-y-4 py-5">
@@ -91,8 +101,10 @@ export function SignerIdentityCard({
             confirmed={confirmed}
           />
           <IdentityRow
-            label="E-mail"
-            value={<span className="break-all">{emailDisplay}</span>}
+            label={isWhatsApp ? "WhatsApp" : "E-mail"}
+            value={
+              <span className={isWhatsApp ? "tabular-nums" : "break-all"}>{contactDisplay}</span>
+            }
             confirmed={confirmed}
           />
           <IdentityRow label="Cargo na empresa" value={cargo?.trim() ? cargo : "—"} />
@@ -101,8 +113,8 @@ export function SignerIdentityCard({
 
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <IconLock className="mt-0.5 h-3 w-3 shrink-0" />
-          O e-mail que recebe o código vem do cadastro e não pode ser trocado por quem
-          assina — é o que liga esta assinatura a você.
+          {isWhatsApp ? "O número" : "O e-mail"} que recebe o código vem do cadastro e não
+          pode ser trocado por quem assina — é o que liga esta assinatura a você.
         </p>
 
         {children && <div className="border-t border-border pt-4">{children}</div>}

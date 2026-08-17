@@ -107,8 +107,16 @@ for (const man of brands.manufacturers) {
       if (!file) continue;
       const key = `${man.id}/${model.id}`;
       if (only.length && !only.some((o) => key.startsWith(o) || o === man.id)) continue;
-      const out = join(OUT_ROOT, 'trucks', man.id, model.id, chassis.id, NEUTRAL + '.webp');
-      if (!force && existsSync(out)) continue;
+      /* NÃO EXISTE MAIS UM ATALHO PELO NEUTRO AQUI. Havia um
+         `if (!force && existsSync(<neutro>)) continue`, e ele descartava o
+         CHASSI INTEIRO — as cores nem eram consideradas. Numa árvore já
+         renderizada o neutro existe sempre, então o efeito era: uma TINTA NOVA
+         no banco não tinha como entrar. `--cores volvo` respondia "nada a
+         renderizar" com três cards Volvo faltando no disco, e a única saída era
+         `--force`, que refaz as 877 imagens para produzir 36.
+         Pular o que já existe é trabalho de `enfileira()`, arquivo por arquivo
+         (logo abaixo); o atalho era redundante para o neutro e errado para todo
+         o resto. O laço que ele economizava é um existsSync por card. */
       /* SÓ `specialEdition` força `[]`. Um modelo com ACABAMENTOS continua
          pintável — o acabamento é um card no passo da cor, não o produto
          inteiro —, e o NEUTRO dele é justamente o caminhão liso. Passar `[]`

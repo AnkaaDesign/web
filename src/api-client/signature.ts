@@ -9,6 +9,24 @@ import type { QuoteChange } from "@/components/signature/quote-change-list";
  * cabeçalho de autorização envolvidos, então esta página funciona deslogada.
  */
 
+/** Canal de entrega do convite e do código. Espelha `SignatureDeliveryChannel` na api. */
+export type DeliveryChannel = "WHATSAPP" | "EMAIL";
+
+/** Modo configurado no servidor (`SIGNATURE_DELIVERY_CHANNEL`). */
+export type DeliveryMode = "whatsapp" | "email" | "both";
+
+export interface DeliverySettings {
+  mode: DeliveryMode;
+  /** Canais que o modo permite. Comprimento 1 = seletor não deve aparecer. */
+  channels: DeliveryChannel[];
+  defaultChannel: DeliveryChannel;
+}
+
+export const DELIVERY_CHANNEL_LABELS: Record<DeliveryChannel, string> = {
+  WHATSAPP: "WhatsApp",
+  EMAIL: "E-mail",
+};
+
 export interface PublicSignerState {
   envelope: {
     id: string;
@@ -31,10 +49,23 @@ export interface PublicSignerState {
   signer: {
     id: string;
     name: string;
-    /** Sempre mascarado. O signatário confirma o número, nunca o escolhe. */
+    /** @deprecated Use `contactMasked` — vale só quando `channel === "EMAIL"`. */
     emailMasked: string;
-    /** Partes da máscara, para o campo de confirmação parcial. */
+    /** @deprecated Use `contactParts` — vale só quando `channel === "EMAIL"`. */
     emailParts: { prefix: string; hiddenLength: number; suffix: string; domain: string };
+    /**
+     * Canal em que ESTA coleta foi emitida. Gravado no signatário na emissão,
+     * não lido da configuração atual: uma coleta em andamento continua no canal
+     * em que nasceu mesmo que o servidor mude de modo depois.
+     */
+    channel: DeliveryChannel;
+    /** Contato mascarado do canal — e-mail ou telefone, conforme `channel`. */
+    contactMasked: string;
+    /**
+     * Partes da máscara do contato, para o campo de confirmação parcial.
+     * `domain` vem vazio no WhatsApp (telefone não tem domínio).
+     */
+    contactParts: { prefix: string; hiddenLength: number; suffix: string; domain: string };
     /**
      * Âncoras do CPF cadastrado (3 primeiros + 2 verificadores), para a
      * confirmação parcial. Null quando o cadastro não tem CPF — aí o signatário
@@ -61,7 +92,10 @@ export const signatureService = {
   documentUrl: (token: string) =>
     `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/${token}/document.pdf`,
 
-  requestCode: (token: string, data: { cpf: string; cargo: string; emailConfirm: string }) =>
+  requestCode: (
+    token: string,
+    data: { cpf: string; cargo: string; contactConfirm: string },
+  ) =>
     // `suppressToast`: o interceptor de sucesso do axiosClient toasta TODO write,
     // e esta rota não devolve `message` — então o cliente via um "Criado com
     // sucesso" genérico por cima do "Código enviado para +55 43 9****-2403" que
@@ -116,7 +150,21 @@ export const signatureService = {
     `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/orcamento/${quoteId}/documento.pdf`,
 
   // ---- interno ----
-  createEnvelope: (quoteId: string) => apiClient.post(`/signature-envelopes/quote/${quoteId}`),
+  /**
+   * Modo de entrega configurado no servidor.
+   *
+   * A tela precisa disto ANTES de desenhar o botão de envio: no modo fixo não há
+   * seletor, no modo `both` há. Rota sem parâmetro de propósito — não depende do
+   * orçamento.
+   */
+  getDeliverySettings: () => apiClient.get(`/signature-envelopes/delivery-settings`),
+
+  /**
+   * Emite a coleta. `channel` só é honrado quando o servidor está em `both`;
+   * nos modos fixos ele é ignorado e o canal configurado prevalece.
+   */
+  createEnvelope: (quoteId: string, data?: { channel?: DeliveryChannel | null }) =>
+    apiClient.post(`/signature-envelopes/quote/${quoteId}`, data ?? {}),
 
   listForQuote: (quoteId: string) => apiClient.get(`/signature-envelopes/quote/${quoteId}`),
 
@@ -124,7 +172,7 @@ export const signatureService = {
 
   cancel: (envelopeId: string) => apiClient.post(`/signature-envelopes/${envelopeId}/cancel`),
 
-  /** Reenvia o convite por e-mail para um signatário. */
+  /** Reenvia o convite para um signatário, no canal em que a coleta foi emitida. */
   resendInvitation: (signerId: string) =>
     apiClient.post(`/signature-envelopes/signers/${signerId}/resend`),
 

@@ -12,8 +12,15 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { signatureService } from "@/api-client/signature";
+import {
+  signatureService,
+  DELIVERY_CHANNEL_LABELS,
+  type DeliveryChannel,
+  type DeliverySettings,
+} from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -27,6 +34,7 @@ import {
   IconFileTypePdf,
   IconLoader2,
   IconMail,
+  IconBrandWhatsapp,
   IconLink,
   IconPencilExclamation,
   IconSend,
@@ -60,6 +68,8 @@ interface EnvelopeSigner {
   lastViewedAt: string | null;
   ipAddress: string | null;
   phone: string;
+  /** Canal em que a coleta foi emitida — grava em EnvelopeSigner.authMethod. */
+  channel: DeliveryChannel;
   signingUrl: string;
   /** INVITATION_SENT | INVITATION_FAILED | null (ainda não tentado). */
   inviteState: string | null;
@@ -257,6 +267,46 @@ export function SignatureEnvelopeCard({
   const [busy, setBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
+  /**
+   * Modo de entrega do servidor + canal escolhido pelo operador.
+   *
+   * `useState` puro, sem react-hook-form: este componente não tem formulário
+   * nenhum (é `useState` + um helper `run()`), e arrastar RHF para cá por causa
+   * de UM campo de rádio custaria mais do que resolve.
+   *
+   * `null` enquanto carrega. No modo fixo (`whatsapp`/`email`) o seletor não é
+   * desenhado — o servidor ignoraria a escolha de qualquer jeito.
+   */
+  const [delivery, setDelivery] = useState<DeliverySettings | null>(null);
+  const [channel, setChannel] = useState<DeliveryChannel | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res: any = await signatureService.getDeliverySettings();
+        const data: DeliverySettings | undefined = res?.data?.data ?? res?.data;
+        if (!alive || !data) return;
+        setDelivery(data);
+        setChannel(data.defaultChannel);
+      } catch {
+        // Falha aqui não pode travar o envio: sem configuração conhecida a tela
+        // esconde o seletor e o servidor decide sozinho, que é o comportamento
+        // de antes desta feature.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Só há escolha a fazer quando o servidor está em `both`. */
+  const canChooseChannel = (delivery?.channels.length ?? 0) > 1;
+  /** Canal efetivo do próximo envio — para o texto explicativo e o payload. */
+  const effectiveChannel: DeliveryChannel | null = canChooseChannel
+    ? channel
+    : (delivery?.defaultChannel ?? null);
+
   const load = useCallback(async () => {
     if (!quoteId) return setLoading(false);
     try {
@@ -293,6 +343,27 @@ export function SignatureEnvelopeCard({
     } catch {
       toast.error("Não foi possível copiar o link.");
     }
+  };
+
+  /**
+   * Fallback manual no canal da coleta.
+   *
+   * Existe pela mesma razão que o `mailto:` existia: quando o envio automático
+   * falha, o operador precisa conseguir entregar o link à mão. `wa.me` abre a
+   * conversa com o texto pronto — não envia nada sozinho, o operador confirma.
+   */
+  const openManualFallback = (s: EnvelopeSigner) => {
+    if (s.channel === "WHATSAPP") {
+      if (!s.phone) return;
+      const digits = String(s.phone).replace(/\D+/g, "");
+      // `wa.me` exige o número com código do país. O cadastro guarda só o
+      // nacional (DDD + assinante), então prefixa 55 quando ainda não veio.
+      const intl = digits.startsWith("55") ? digits : `55${digits}`;
+      const text = `Olá, ${s.name}. Seu orçamento está pronto para revisão e assinatura eletrônica:\n\n${s.signingUrl}`;
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      return;
+    }
+    openMailClient(s);
   };
 
   const openMailClient = (s: EnvelopeSigner) => {
@@ -368,7 +439,12 @@ export function SignatureEnvelopeCard({
               size="sm"
               className="h-8 gap-1.5"
               disabled={busy}
-              onClick={() => run(() => signatureService.createEnvelope(quoteId), "Reenviado para assinatura.")}
+              onClick={() =>
+                run(
+                  () => signatureService.createEnvelope(quoteId, { channel: effectiveChannel }),
+                  "Reenviado para assinatura.",
+                )
+              }
             >
               {busy ? <IconLoader2 className="h-3.5 w-3.5 animate-spin" /> : <IconSend className="h-3.5 w-3.5" />}
               Reenviar
@@ -378,6 +454,50 @@ export function SignatureEnvelopeCard({
       )}
     </div>
   );
+
+  /**
+   * Seletor de canal, compartilhado entre o PRIMEIRO envio e o REENVIO.
+   *
+   * Antes vivia embutido só no estado vazio. O efeito colateral era o pior caso
+   * possível: uma coleta cancelada justamente porque o WhatsApp não chegou ao
+   * signatário só podia ser reemitida pelo mesmo canal que tinha falhado, sem
+   * nenhum caminho na tela para trocar para e-mail.
+   */
+  const channelPicker =
+    canManage && canChooseChannel ? (
+      <div className="pt-1">
+        <p className="mb-1.5 text-xs font-medium text-foreground">Canal de envio</p>
+        <RadioGroup
+          value={channel ?? undefined}
+          onValueChange={(v) => setChannel(v as DeliveryChannel)}
+          className="flex flex-col gap-2 sm:flex-row"
+          disabled={busy}
+        >
+          {delivery?.channels.map((c) => (
+            <label
+              key={c}
+              htmlFor={`signature-channel-${c}`}
+              className={cn(
+                "flex flex-1 items-start gap-2.5 rounded-lg border border-border p-2.5 cursor-pointer hover:bg-muted/40",
+                channel === c && "border-primary bg-muted/40",
+              )}
+            >
+              <RadioGroupItem value={c} id={`signature-channel-${c}`} className="mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium leading-none text-foreground">
+                  {DELIVERY_CHANNEL_LABELS[c]}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {c === "WHATSAPP"
+                    ? "exige telefone com DDD no cadastro"
+                    : "exige e-mail no cadastro"}
+                </p>
+              </div>
+            </label>
+          ))}
+        </RadioGroup>
+      </div>
+    ) : null;
 
   const body = loading ? (
       <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
@@ -390,19 +510,30 @@ export function SignatureEnvelopeCard({
             é o ato. Empilhados, o botão ficava solto no canto inferior
             esquerdo, longe de onde o olho termina de ler. Só empilha no
             celular, onde os dois não cabem lado a lado. */}
-        <div className="space-y-1">
+        <div className="space-y-2">
           <p className="text-sm font-medium">Nenhuma coleta emitida</p>
           <p className="text-xs text-muted-foreground">
-            Ao enviar, o documento é congelado e cada responsável recebe um link pessoal por
-            e-mail para revisar e assinar. O código de assinatura vai para o mesmo e-mail.
+            Ao enviar, o documento é congelado e cada responsável recebe um link pessoal
+            {effectiveChannel === "WHATSAPP"
+              ? " por WhatsApp"
+              : effectiveChannel === "EMAIL"
+                ? " por e-mail"
+                : ""}{" "}
+            para revisar e assinar. O código de assinatura vai pelo mesmo canal.
           </p>
+          {channelPicker}
         </div>
         {canManage && (
           <Button
             size="sm"
             className="shrink-0 gap-1.5"
             disabled={busy}
-            onClick={() => run(() => signatureService.createEnvelope(quoteId), "Enviado para assinatura.")}
+            onClick={() =>
+              run(
+                () => signatureService.createEnvelope(quoteId, { channel: effectiveChannel }),
+                "Enviado para assinatura.",
+              )
+            }
           >
             {busy ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconSend className="h-4 w-4" />}
             Enviar para assinatura
@@ -413,14 +544,42 @@ export function SignatureEnvelopeCard({
       <div className="space-y-3">
         <ChangePanel envelope={current} />
 
+        {/* Coleta encerrada sem assinatura: o canal volta a ser uma escolha, e é
+            aqui que ela importa mais — o motivo mais comum de reenviar é o canal
+            anterior não ter chegado ao signatário. */}
+        {channelPicker && current.status !== "RUNNING" && current.status !== "COMPLETED" && (
+          <div className="rounded-lg border border-border px-4 py-3">{channelPicker}</div>
+        )}
+
         {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
             <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <span>
-              <strong>Não foi possível enviar o e-mail do convite.</strong> Confira o
-              endereço cadastrado do responsável. Use o ícone de link para copiar o
-              endereço pessoal do signatário e enviá-lo manualmente.
-            </span>
+            {/* O canal sai dos signatários que falharam, não de um literal: com
+                SIGNATURE_DELIVERY_CHANNEL=whatsapp esta faixa dizia "e-mail" para
+                um convite que nunca passou por e-mail, mandando o operador
+                conferir o cadastro errado. */}
+            {(() => {
+              const failed = current.signers.filter(s => s.inviteState === "INVITATION_FAILED");
+              const viaWhatsApp = failed.some(s => s.channel === "WHATSAPP");
+              const viaEmail = failed.some(s => s.channel !== "WHATSAPP");
+              const label = viaWhatsApp && viaEmail
+                ? "o convite"
+                : viaWhatsApp
+                  ? "o convite por WhatsApp"
+                  : "o e-mail do convite";
+              const contato = viaWhatsApp && viaEmail
+                ? "o contato cadastrado"
+                : viaWhatsApp
+                  ? "o telefone cadastrado"
+                  : "o endereço cadastrado";
+              return (
+                <span>
+                  <strong>Não foi possível enviar {label}.</strong> Confira {contato} do
+                  responsável. Use o ícone de link para copiar o endereço pessoal do
+                  signatário e enviá-lo manualmente.
+                </span>
+              );
+            })()}
           </div>
         )}
 
@@ -492,7 +651,12 @@ export function SignatureEnvelopeCard({
                       </Tooltip>
                     )}
                     {shownRoles.length > 0 && <span className="shrink-0">·</span>}
-                    <span className="truncate">{s.emailMasked}</span>
+                    {/* Contato do CANAL da coleta. Mostrar o e-mail numa coleta
+                        por WhatsApp fazia o operador conferir o endereço errado
+                        quando o convite não chegava. */}
+                    <span className="truncate">
+                      {s.channel === "WHATSAPP" ? s.phoneMasked : s.emailMasked}
+                    </span>
                   </p>
                   {/* Sem o IP. Ele é PROVA, não estado: vive na trilha de
                       auditoria, no selo impresso no PDF e no dossiê — os
@@ -530,17 +694,25 @@ export function SignatureEnvelopeCard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title="Abrir e-mail com a mensagem pronta"
-                        onClick={() => openMailClient(s)}
-                        disabled={!s.email}
+                        title={
+                          s.channel === "WHATSAPP"
+                            ? "Abrir WhatsApp com a mensagem pronta"
+                            : "Abrir e-mail com a mensagem pronta"
+                        }
+                        onClick={() => openManualFallback(s)}
+                        disabled={s.channel === "WHATSAPP" ? !s.phone : !s.email}
                       >
-                        <IconMail className="h-3.5 w-3.5" />
+                        {s.channel === "WHATSAPP" ? (
+                          <IconBrandWhatsapp className="h-3.5 w-3.5" />
+                        ) : (
+                          <IconMail className="h-3.5 w-3.5" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title="Reenviar convite por e-mail"
+                        title={`Reenviar convite por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"}`}
                         disabled={busy}
                         onClick={() =>
                           run(() => signatureService.resendInvitation(s.id), "Convite reenviado.")

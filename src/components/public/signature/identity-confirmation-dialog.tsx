@@ -1,18 +1,27 @@
 /**
- * Modal de conferência de identidade — a porta do "Enviar código por e-mail".
+ * Modal de conferência de identidade — a porta do "Enviar código".
  *
  * Por que modal, e não campos na página: a tela de assinatura é um documento, e
  * documento não tem formulário no meio. Aqui o signatário faz um ato único e
- * deliberado — completar os caracteres que faltam do CPF e do e-mail — e só então
- * o código é disparado. O erro da API (dígitos divergentes, cooldown de 60s,
- * prazo vencido) volta **para dentro deste modal**, sem limpar o que foi
+ * deliberado — completar os caracteres que faltam do CPF e do CONTATO — e só
+ * então o código é disparado. O erro da API (dígitos divergentes, cooldown de
+ * 60s, prazo vencido) volta **para dentro deste modal**, sem limpar o que foi
  * digitado: quem errou um dígito precisa corrigir um dígito, não redigitar tudo.
  *
- * As âncoras do cadastro (3 primeiros e os 2 verificadores do CPF; DDD e os 4
- * da parte local do e-mail) aparecem como afixos fixos ao redor do campo. Elas existem
+ * As âncoras do cadastro (3 primeiros e os 2 verificadores do CPF; a parte
+ * visível do contato) aparecem como afixos fixos ao redor do campo. Elas existem
  * para o signatário RECONHECER o registro; o que ele digita é o miolo, que é a
  * parte que a página não conhece — e é justamente por isso que digitá-la
  * corretamente vale como conferência.
+ *
+ * O CONTATO É O DO CANAL, NÃO SEMPRE O E-MAIL
+ *   A coleta nasce por WhatsApp ou por e-mail (`EnvelopeSigner.authMethod`), e o
+ *   servidor compara o que se digita aqui contra o contato DAQUELE canal. Este
+ *   modal recebe `contactParts`/`contactMasked` já resolvidos pela API — nunca
+ *   `emailParts`. A distinção não é cosmética: num orçamento por WhatsApp o
+ *   responsável pode não ter e-mail nenhum no cadastro (a coluna é anulável), e
+ *   pedir os caracteres de um endereço inexistente não desenhava campo algum —
+ *   o signatário ficava preso numa janela sem nada para preencher.
  */
 
 import { Fragment, useState } from "react";
@@ -33,10 +42,12 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
+  IconBrandWhatsapp,
   IconMail,
   IconLoader2,
   IconShieldLock,
 } from "@tabler/icons-react";
+import type { DeliveryChannel } from "@/api-client/signature";
 import {
   assembleCpf,
   isCpfWellFormed,
@@ -49,8 +60,11 @@ export interface IdentityConfirmation {
   /** 11 dígitos, sem pontuação. */
   cpf: string;
   cargo: string;
-  /** Caracteres ocultos da parte local do e-mail, na forma que a API compara. */
-  emailConfirm: string;
+  /**
+   * Caracteres ocultos do CONTATO — parte local do e-mail, ou dígitos do meio do
+   * telefone, conforme o canal em que a coleta foi emitida.
+   */
+  contactConfirm: string;
 }
 
 interface AffixDigitsProps {
@@ -246,8 +260,15 @@ export interface IdentityConfirmationDialogProps {
   signerName: string;
   /** Âncoras do CPF cadastrado. Null quando o cadastro não tem CPF. */
   cpfParts: SignatureMaskParts | null;
-  emailParts: SignatureEmailMaskParts | null;
-  emailMasked: string;
+  /**
+   * Partes da máscara do CONTATO DO CANAL — `contactParts` da API, nunca
+   * `emailParts`. No WhatsApp `domain` vem vazio e as caixas são dígitos.
+   */
+  contactParts: SignatureEmailMaskParts | null;
+  /** Máscara já pronta do mesmo contato, para o texto de ajuda. */
+  contactMasked: string;
+  /** Canal da coleta. Decide o rótulo, o teclado e o texto de ajuda. */
+  channel?: DeliveryChannel;
   /** Cargo do cadastro. Quando existe, não se digita cargo nenhum. */
   registryCargo: string | null;
   initialCargo?: string | null;
@@ -268,8 +289,9 @@ export function IdentityConfirmationDialog({
   onOpenChange,
   signerName,
   cpfParts,
-  emailParts,
-  emailMasked,
+  contactParts,
+  contactMasked,
+  channel = "EMAIL",
   registryCargo,
   initialCargo,
   intent = "sign",
@@ -281,14 +303,28 @@ export function IdentityConfirmationDialog({
   // que já foi digitado (o Radix desmonta só o conteúdo do portal).
   const [cpfHidden, setCpfHidden] = useState("");
   const [cpfFull, setCpfFull] = useState("");
-  const [emailHidden, setEmailHidden] = useState("");
+  const [contactHidden, setContactHidden] = useState("");
   const [cargo, setCargo] = useState(initialCargo ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const isWhatsApp = channel === "WHATSAPP";
   const cpfAnchored = !!cpfParts && cpfParts.hiddenLength > 0;
-  const emailHiddenLength = emailParts?.hiddenLength ?? 0;
+  const contactHiddenLength = contactParts?.hiddenLength ?? 0;
   const needsCargo = !registryCargo?.trim();
+
+  /**
+   * O "+55" sai da sequência de caixas e vira texto fixo.
+   *
+   * `phoneMaskParts` devolve `prefix: "+55 43 9"`, e em `mode="digits"` o
+   * `AffixDigits` roda `onlyDigits` sobre o prefixo — os cinco dígitos `5 5 4 3 9`
+   * virariam caixas iguais às do número, como se o código do país fizesse parte
+   * do telefone. Separando, lê-se `+55 [4][3][9] ...`, que é como um número
+   * brasileiro se lê.
+   */
+  const contactPrefix = isWhatsApp
+    ? onlyDigits(contactParts?.prefix).replace(/^55/, "")
+    : (contactParts?.prefix ?? "");
 
   const touch = <T,>(setter: (value: T) => void) => (value: T) => {
     setError(null);
@@ -325,8 +361,17 @@ export function IdentityConfirmationDialog({
       }
     }
 
-    if (emailHiddenLength > 0 && emailHidden.trim().length !== emailHiddenLength) {
-      setError(`Complete os ${emailHiddenLength} caracteres ocultos do e-mail.`);
+    // No WhatsApp o que conta são DÍGITOS: medir `.trim().length` deixaria passar
+    // um campo com máscara ou espaço e reprovaria um preenchimento correto.
+    const contactTyped = isWhatsApp
+      ? onlyDigits(contactHidden)
+      : contactHidden.trim().toLowerCase();
+    if (contactHiddenLength > 0 && contactTyped.length !== contactHiddenLength) {
+      setError(
+        isWhatsApp
+          ? `Complete os ${contactHiddenLength} dígitos que faltam do telefone.`
+          : `Complete os ${contactHiddenLength} caracteres ocultos do e-mail.`,
+      );
       return;
     }
 
@@ -343,7 +388,7 @@ export function IdentityConfirmationDialog({
     const message = await onConfirm({
       cpf: cpfDigits,
       cargo: effectiveCargo,
-      emailConfirm: emailHidden.trim().toLowerCase(),
+      contactConfirm: contactTyped,
     });
     setSubmitting(false);
     if (message) setError(message);
@@ -426,28 +471,35 @@ export function IdentityConfirmationDialog({
             )}
           </div>
 
-          {/* E-mail — canal do código. O domínio aparece inteiro: ele é da
-              própria empresa do signatário e escondê-lo custaria reconhecimento
-              sem proteger nada. O que se confirma é a parte local. */}
-          {emailHiddenLength > 0 && emailParts && (
+          {/* Contato — canal do código. No e-mail o domínio aparece inteiro: ele
+              é da própria empresa do signatário e escondê-lo custaria
+              reconhecimento sem proteger nada; o que se confirma é a parte
+              local. No WhatsApp confirmam-se os dígitos do meio, com DDD e os
+              quatro finais visíveis. */}
+          {contactHiddenLength > 0 && contactParts && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
-              <Label htmlFor="email-confirm" className="text-sm">
-                E-mail <span className="text-destructive">*</span>
+              <Label htmlFor="contact-confirm" className="text-sm">
+                {isWhatsApp ? "Telefone" : "E-mail"}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <AffixDigits
-                id="email-confirm"
-                mode="text"
-                prefix={emailParts.prefix}
-                suffix={emailParts.suffix}
-                length={emailHiddenLength}
-                value={emailHidden}
-                onChange={touch(setEmailHidden)}
+                id="contact-confirm"
+                // Teclado numérico no celular quando o contato é telefone —
+                // `mode="text"` abriria o alfabético para preencher dígitos.
+                mode={isWhatsApp ? "digits" : "text"}
+                staticPrefix={isWhatsApp ? "+55" : undefined}
+                prefix={contactPrefix}
+                suffix={contactParts.suffix}
+                length={contactHiddenLength}
+                value={contactHidden}
+                onChange={touch(setContactHidden)}
                 disabled={submitting}
-                trailing={`@${emailParts.domain}`}
+                trailing={contactParts.domain ? `@${contactParts.domain}` : undefined}
               />
               <p className="text-xs text-muted-foreground">
-                Complete a parte oculta de {emailMasked}. O código vai para este endereço
-                — ele não pode ser trocado aqui.
+                Complete a parte oculta de {contactMasked}. O código vai para
+                {isWhatsApp ? " este número, pelo WhatsApp" : " este endereço"} — ele não
+                pode ser trocado aqui.
               </p>
             </div>
           )}
@@ -491,10 +543,16 @@ export function IdentityConfirmationDialog({
           <Button onClick={handleSubmit} disabled={blocked} className="w-full sm:w-auto">
             {submitting ? (
               <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : isWhatsApp ? (
+              <IconBrandWhatsapp className="mr-2 h-4 w-4" />
             ) : (
               <IconMail className="mr-2 h-4 w-4" />
             )}
-            {cooldownSeconds > 0 ? `Aguarde ${cooldownSeconds}s` : "Enviar código por e-mail"}
+            {cooldownSeconds > 0
+              ? `Aguarde ${cooldownSeconds}s`
+              : isWhatsApp
+                ? "Enviar código por WhatsApp"
+                : "Enviar código por e-mail"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -24,7 +24,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { signatureService, type PublicSignerState } from "@/api-client/signature";
+import {
+  signatureService,
+  type DeliveryChannel,
+  type PublicSignerState,
+} from "@/api-client/signature";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,6 +60,7 @@ import {
 import { QuoteChangeList } from "@/components/signature/quote-change-list";
 import {
   IconAlertCircle,
+  IconBrandWhatsapp,
   IconCheck,
   IconChevronRight,
   IconCircleCheck,
@@ -246,7 +251,7 @@ export default function PublicSignaturePage() {
         const res: any = await signatureService.requestCode(token, {
           cpf: values.cpf,
           cargo: values.cargo,
-          emailConfirm: values.emailConfirm,
+          contactConfirm: values.contactConfirm,
         });
         const data = res?.data?.data ?? res?.data;
         setChallengeId(data.challengeId);
@@ -421,6 +426,19 @@ export default function PublicSignaturePage() {
   const { envelope, signer, company, declarations } = state;
   const identityVisible = state.canSign && (step === "review" || step === "code");
 
+  /**
+   * Canal DESTA coleta, como o servidor a emitiu — não uma preferência da
+   * página. Toda a cópia desta tela depende dele: pedir na caixa de spam um
+   * código que chegou pelo WhatsApp manda o signatário procurar no lugar errado
+   * e o faz pedir código novo, o que invalida o anterior.
+   *
+   * `?? "EMAIL"` cobre um envelope servido por uma API anterior ao campo; por
+   * construção esses são sempre de e-mail.
+   */
+  const channel: DeliveryChannel = signer.channel ?? "EMAIL";
+  const isWhatsApp = channel === "WHATSAPP";
+  const channelLabel = isWhatsApp ? "WhatsApp" : "e-mail";
+
   return (
     <Shell>
       <div className="mx-auto max-w-5xl space-y-4">
@@ -557,7 +575,11 @@ export default function PublicSignaturePage() {
             <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-5 text-center">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-center gap-2">
-                  <IconMail className="h-4 w-4 text-primary" aria-hidden />
+                  {isWhatsApp ? (
+                    <IconBrandWhatsapp className="h-4 w-4 text-primary" aria-hidden />
+                  ) : (
+                    <IconMail className="h-4 w-4 text-primary" aria-hidden />
+                  )}
                   <p className="text-sm font-semibold text-foreground">Código de confirmação</p>
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -573,8 +595,9 @@ export default function PublicSignaturePage() {
 
                     `autocomplete="one-time-code"` foi removido de propósito: é uma
                     dica de SMS (WebOTP no Android, leitura da mensagem no iOS) e
-                    não faz nada para um código que chegou por e-mail. Deixá-la
-                    ali só promete um preenchimento automático que nunca vem. */}
+                    não faz nada para um código que chegou por e-mail nem por
+                    WhatsApp. Deixá-la ali só promete um preenchimento
+                    automático que nunca vem. */}
                 <InputOTP
                   id="code"
                   maxLength={6}
@@ -608,24 +631,45 @@ export default function PublicSignaturePage() {
                   {secondsLeft > 0 ? `Reenviar em ${secondsLeft}s` : "Reenviar código"}
                 </button>
 
-                {/* E-mail não chega em segundos como o WhatsApp chegava: passa por
-                    fila do servidor, antispam e, no primeiro contato, greylisting.
-                    Sem esta orientação o signatário conclui que falhou e fica
-                    pedindo código novo — o que invalida o anterior e piora tudo. */}
+                {/* Sem esta orientação o signatário conclui que falhou e fica
+                    pedindo código novo — o que invalida o anterior e piora tudo.
+                    O conselho MUDA com o canal: e-mail não chega em segundos
+                    (fila, antispam e, no primeiro contato, greylisting) e cai em
+                    spam; WhatsApp chega na hora, mas de um número desconhecido,
+                    e some no filtro de mensagens não lidas de quem tem muitos
+                    grupos. Mandar procurar no spam quem recebeu por WhatsApp é
+                    orientação inútil, e o inverso também. */}
                 <details className="text-left" open={secondsLeft > 0}>
                   <summary className="cursor-pointer text-center text-xs text-muted-foreground underline">
-                    Não recebi o e-mail
+                    Não recebi o {channelLabel}
                   </summary>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-muted-foreground">
-                    <li>O envio pode levar alguns minutos. Vale esperar antes de pedir outro.</li>
+                    {isWhatsApp ? (
+                      <>
+                        <li>
+                          A mensagem chega de um número da{" "}
+                          <span className="font-medium">{COMPANY_INFO.name}</span> que talvez não
+                          esteja nos seus contatos. Procure também em{" "}
+                          <span className="font-medium">arquivadas</span> e nos pedidos de
+                          mensagem.
+                        </li>
+                        <li>
+                          Confira se <span className="font-medium">{destinationMask}</span> é o seu
+                          número e se ele tem WhatsApp ativo.
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li>O envio pode levar alguns minutos. Vale esperar antes de pedir outro.</li>
+                        <li>
+                          Procure por <span className="font-medium">{COMPANY_INFO.name}</span> na
+                          caixa de spam ou lixo eletrônico.
+                        </li>
+                      </>
+                    )}
                     <li>
-                      Procure por <span className="font-medium">{COMPANY_INFO.name}</span> na caixa
-                      de spam ou lixo eletrônico.
-                    </li>
-                    <li>
-                      Confira se <span className="font-medium">{destinationMask}</span> está
-                      correto. Ele vem do cadastro e não pode ser alterado aqui — se estiver
-                      errado, fale com a {COMPANY_INFO.name}.
+                      {isWhatsApp ? "O número" : "O endereço"} vem do cadastro e não pode ser
+                      alterado aqui — se estiver errado, fale com a {COMPANY_INFO.name}.
                     </li>
                   </ul>
                 </details>
@@ -696,8 +740,13 @@ export default function PublicSignaturePage() {
             onOpenChange={setIdentityOpen}
             signerName={signer.name}
             cpfParts={signer.cpfParts ?? null}
-            emailParts={signer.emailParts ?? null}
-            emailMasked={signer.emailMasked}
+            // `contactParts`/`contactMasked` são do canal DESTA coleta. O
+            // fallback para os campos de e-mail cobre um envelope servido por uma
+            // API anterior ao canal — nunca o caso do WhatsApp, que só existe
+            // depois deles.
+            contactParts={signer.contactParts ?? signer.emailParts ?? null}
+            contactMasked={signer.contactMasked ?? signer.emailMasked}
+            channel={channel}
             registryCargo={signer.registryCargo}
             initialCargo={signer.cargo}
             intent={refusing ? "refuse" : "sign"}
@@ -824,7 +873,8 @@ export default function PublicSignaturePage() {
                confirmado só existe depois de assinar. Sem CPF nenhum no
                cadastro, aí sim cai na forma inteiramente oculta. */
             cpfDisplay={confirmed?.cpf ? maskCpfCgu(confirmed.cpf) : (signer.cpfMasked ?? maskCpfCgu(null))}
-            emailDisplay={signer.emailMasked}
+            contactDisplay={signer.contactMasked ?? signer.emailMasked}
+            channel={channel}
             cargo={effectiveCargo || null}
             company={company.name}
             confirmed={!!confirmed}
@@ -838,8 +888,8 @@ export default function PublicSignaturePage() {
                   <Alert variant="warning">
                     <AlertDescription>
                       Para registrar a recusa também é preciso confirmar sua identidade e
-                      receber o código por e-mail — é o que prova que a recusa é sua. O
-                      motivo você descreve logo depois.
+                      receber o código por {channelLabel} — é o que prova que a recusa é sua.
+                      O motivo você descreve logo depois.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -864,10 +914,12 @@ export default function PublicSignaturePage() {
                   >
                     {busy ? (
                       <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : isWhatsApp ? (
+                      <IconBrandWhatsapp className="mr-2 h-4 w-4" />
                     ) : (
                       <IconDeviceMobileMessage className="mr-2 h-4 w-4" />
                     )}
-                    Enviar código por e-mail
+                    Enviar código por {channelLabel}
                     <IconChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>

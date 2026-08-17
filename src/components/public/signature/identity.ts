@@ -63,31 +63,23 @@ export function assembleCpf(parts: SignatureMaskParts, hiddenDigits: string): st
 }
 
 /**
- * Traduz os dígitos digitados para o que `requestOtp` compara.
+ * Espelha `emailMaskParts` / `phoneMaskParts` da API — as duas têm a mesma
+ * forma, e `domain` vem vazio no telefone.
  *
- * A API confere `phoneDigits.slice(-8, -4)` — os quatro dígitos que antecedem os
- * quatro finais. Para celular (9 dígitos de assinante) isso coincide com o que a
- * máscara esconde. Para número de 8 dígitos (fixo), a máscara esconde só três, e
- * o quarto que a API espera é justamente o dígito que o prefixo já revela
- * (`+55 43 3`). Recuperá-lo do prefixo mantém a confirmação possível nesse caso;
- * sem isso, todo contato de telefone fixo receberia "os dígitos não conferem" e
- * ficaria travado.
+ * Aqui morava um `buildPhoneConfirm`, que remendava os dígitos digitados para o
+ * que a API comparava na época (`phoneDigits.slice(-8, -4)`, sempre quatro,
+ * pegando um dígito emprestado do prefixo quando o fixo só escondia três). Essa
+ * regra não existe mais: o servidor compara exatamente os `hiddenLength` dígitos
+ * do meio (`rest.slice(1, rest.length - 4)`), que é o mesmo número de caixas que
+ * a tela desenha. Emprestar um dígito hoje enviaria `3228` onde se espera `228`
+ * e travaria todo signatário de telefone fixo — o oposto do que o remendo fazia.
+ * O que se digita sobe verbatim.
  */
-/** Espelha `emailMaskParts` da API. */
 export interface SignatureEmailMaskParts {
   prefix: string;
   hiddenLength: number;
   suffix: string;
   domain: string;
-}
-
-export function buildPhoneConfirm(parts: SignatureMaskParts | null, typed: string): string {
-  const digits = onlyDigits(typed);
-  if (!parts) return digits;
-  if (digits.length >= 4) return digits.slice(-4);
-  const prefixDigits = onlyDigits(parts.prefix);
-  const borrowed = prefixDigits.slice(-(4 - digits.length));
-  return `${borrowed}${digits}`;
 }
 
 /**

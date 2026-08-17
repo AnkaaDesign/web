@@ -9,6 +9,8 @@ import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
+import { useConfirm } from "../detail/use-confirm";
+import { taskCancelConfirmOpts } from "../cancel-confirmation";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
 import { SetTermModal } from "../schedule/set-term-modal";
@@ -58,6 +60,7 @@ export function TaskHistoryContextMenu({
   const { update, updateAsync, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const { open: openSendWarning } = useSendWarning();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
@@ -483,22 +486,26 @@ export function TaskHistoryContextMenu({
   };
 
   const handleCancel = async () => {
+    // Update all non-cancelled tasks to CANCELLED status
+    const pending = tasks.filter((t) => t.status !== TASK_STATUS.CANCELLED);
+    setDropdownOpen(false);
+    if (pending.length === 0) return;
+    // O cancelamento cascateia para ordens de serviço, orçamento e faturamento — confirma antes.
+    if (!(await confirm(taskCancelConfirmOpts(pending)))) return;
+
     try {
-      // Update all non-cancelled tasks to CANCELLED status
-      for (const t of tasks) {
-        if (t.status !== TASK_STATUS.CANCELLED) {
-          await update({
-            id: t.id,
-            data: { status: TASK_STATUS.CANCELLED },
-          });
-        }
+      for (const t of pending) {
+        await update({
+          id: t.id,
+          data: { status: TASK_STATUS.CANCELLED },
+        });
       }
 
       toast.success(
-        isBulk ? "Tarefas canceladas" : "Tarefa cancelada",
+        pending.length > 1 ? "Tarefas canceladas" : "Tarefa cancelada",
         {
-          description: isBulk
-            ? `${tasks.length} tarefa(s) foram canceladas`
+          description: pending.length > 1
+            ? `${pending.length} tarefa(s) foram canceladas`
             : "A tarefa foi cancelada com sucesso",
         }
       );
@@ -510,7 +517,6 @@ export function TaskHistoryContextMenu({
         description: "Não foi possível cancelar. Tente novamente.",
       });
     }
-    setDropdownOpen(false);
   };
 
   const handleDuplicate = () => {
@@ -912,6 +918,8 @@ export function TaskHistoryContextMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {confirmDialog}
     </>
   );
 }

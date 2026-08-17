@@ -73,6 +73,8 @@ import {
 } from "@/constants";
 import type { Task } from "@/types";
 import { clusterTasks, expandClusterTasks, expandClusterTaskIds, resolveClusterActionRows, type ClusteredTask } from "./cluster-tasks";
+import { useConfirm } from "../detail/use-confirm";
+import { taskCancelConfirmOpts } from "../cancel-confirmation";
 import { cn } from "@/lib/utils";
 import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
@@ -287,6 +289,7 @@ export function TaskPreparationPage() {
   const { data: user } = useCurrentUser();
   const priv = (user as { sector?: { privileges?: SECTOR_PRIVILEGES } } | undefined)?.sector?.privileges;
   const { deleteAsync } = useTaskMutations();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const { batchDeleteAsync } = useTaskBatchMutations();
   // Opt-in escape hatch for the "aguardando logística" hide (see useSplitClusters). Off by default so
   // the board only shows what the viewer can still act on; toggled on to chase a task stuck in check-out.
@@ -518,6 +521,17 @@ export function TaskPreparationPage() {
       if (mutated) await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
     [queryClient],
+  );
+
+  // O cancelamento cascateia para ordens de serviço, orçamento e faturamento — confirma antes.
+  const handleCancel = useCallback(
+    async (rows: Task[]) => {
+      const pending = expandClusterTasks(rows).filter((t) => t.status !== TASK_STATUS.CANCELLED);
+      if (pending.length === 0) return;
+      if (!(await confirm(taskCancelConfirmOpts(pending)))) return;
+      await set(pending, () => ({ status: TASK_STATUS.CANCELLED }));
+    },
+    [confirm, set],
   );
 
   const inPrepOrWaiting = (t: Task) => t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION;
@@ -848,11 +862,7 @@ export function TaskPreparationPage() {
         variant: "destructive",
         separatorBefore: true,
         hidden: (rows) => !rows.some((t) => t.status !== TASK_STATUS.CANCELLED),
-        onClick: (rows) =>
-          void set(
-            expandClusterTasks(rows).filter((t) => t.status !== TASK_STATUS.CANCELLED),
-            () => ({ status: TASK_STATUS.CANCELLED }),
-          ),
+        onClick: (rows) => void handleCancel(rows),
       });
     }
     actions.push({
@@ -877,7 +887,7 @@ export function TaskPreparationPage() {
       .map((a, i) => ({ ...a, group: ADVANCED_GROUP, separatorBefore: i === 0 }));
     const destructive = actions.filter(isDestructive);
     return [...primary, ...advanced, ...destructive];
-  }, [priv, canEdit, canFinish, canManageStatus, leaderCanManage, canLiberar, canDarEntrada, canCancel, navigate, set, startCopyFrom, openSendWarning]);
+  }, [priv, canEdit, canFinish, canManageStatus, leaderCanManage, canLiberar, canDarEntrada, canCancel, navigate, set, handleCancel, startCopyFrom, openSendWarning]);
 
   // --- declarative filters (client-mode; the whole active set is already loaded) ---
   const filterDefs = useMemo<DataTableFilterDef<ClusteredTask>[]>(() => {
@@ -1093,6 +1103,8 @@ export function TaskPreparationPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {confirmDialog}
     </div>
   );
 }
