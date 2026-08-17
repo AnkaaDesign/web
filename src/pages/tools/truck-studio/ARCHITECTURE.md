@@ -2366,3 +2366,99 @@ meio-certo.
 quando ela saiu congelada. O conteúdo é julgado fora, com ffmpeg: quadro 110 é a
 cena, 135 é a dissolvência (o caminhão sumindo enquanto a estrela entra), 165 em
 diante é a animação correndo até o logotipo montado.
+
+## 23. 2026-08-16 — o Thermo King caía ao trocar de cavalo, e a culpa era da fusão
+
+> *"quando troco o cavalo o thermo king fica errado a posição, se eu recarrego
+> fica correta"*
+
+**"Se eu recarrego fica correta" é a metade informativa do relato**, e ela sozinha
+já elimina quase tudo. Um defeito que existe no caminho de TROCA e não no de
+CARGA não pode ser uma conta errada — a mesma função roda nos dois. Ele depende
+de alguma coisa que a carga ainda não construiu e que a troca já encontra de pé.
+Nesta cena existe exatamente uma coisa assim, e ela é nova: a **fusão por
+material** de `vehicle/merge.ts` (§ da rodada de 15/08).
+
+### 23.1 A fusão apaga a identidade da PEÇA, e essa medida vivia dela
+
+`placeThermoKing()` não usa um recuo fixo desde 16/08: ele pergunta onde está a
+travessa metálica que fecha o topo da testeira, e `measureFrontRailUnderside()`
+responde varrendo o implemento e devolvendo **a face de BAIXO da candidata de
+topo mais alto**. Toda a regra pressupõe uma coisa que ninguém escreveu:
+
+> **uma malha é uma peça.**
+
+`merge.ts` assa os triângulos de centenas de peças do mesmo material numa malha
+só e esconde as origens (`.visible = false`) — e `measureFrontRailUnderside()`
+**pula malha invisível**. Com a fusão de pé ela deixa de ver peças e passa a ver
+um balde. O topo continua certo, porque a travessa é a peça mais alta do balde;
+a face de baixo vira o ponto mais baixo de TODA a ferragem da testeira, que é o
+estrado.
+
+Medido na bancada (`checks-tk-troca-0816.mjs`, Scania R 2009 4x2):
+
+| | face de baixo | topo | malha vencedora |
+|---|---|---|---|
+| fusão **solta** | **4 093,9 mm** | 4 163,8 mm | `stitch_result_…_estrutura-principal_0_12` · 344 vért. |
+| fusão **aplicada** | **1 539,0 mm** | 4 163,9 mm | `FUSAO__inox-ferragem__b3` · 1 920 vért. |
+
+**−2 554,9 mm**, e o topo idêntico nas duas — a assinatura exata de "é a mesma
+travessa, medida por um objeto que virou outra coisa".
+
+Na tela: a unidade caía de **38,0 mm** abaixo do teto para **719,9 mm**, com a
+base parando em **−0,0 mm** sobre o piso. Não foi coincidência: é a trava de
+piso do próprio `placeThermoKing()` (`Math.max(wantTop, sideBox.min.y + altura)`)
+segurando a queda, porque a unidade é produto físico e não encolhe. O sintoma que
+se vê na captura do relato — a unidade assentada no assoalho, com um vão enorme
+até o teto — é essa trava trabalhando.
+
+### 23.2 Por que a carga escapava
+
+`applyMergeNow()` roda no **fim** de `runApply()` (fase "Agrupando chamadas de
+desenho…"). `models.loadCab()` termina em `placeTrailer()` → `placeThermoKing()`,
+e ele roda **antes**. No boot não há fusão nesse instante; numa troca, há — ela
+ficou de pé desde a aplicação anterior. Uma linha de tempo, dois estados.
+
+### 23.3 O conserto: o TERCEIRO ponto da fusão
+
+O bloco A FUSÃO POR MATERIAL de `studio.ts` dizia **"NÃO HÁ UM TERCEIRO PONTO"** e
+nomeava um risco só — trocar `mesh.material` de uma malha fora das exclusões, que
+não aparece. Faltava a outra metade, e é ela que custou este defeito. A regra
+completa é:
+
+> **com a fusão de pé, não se troca material NEM se mede peça.**
+
+`runApply()` passou a **soltar** a fusão no topo, quando há cabine nova. Não
+refaz: quem refaz é o ponto 1, no fim da mesma função — então isto não é uma
+segunda fusão, é a mesma, adiada até depois da medição. Custo: uma escrita de
+`.visible` em ~2 000 malhas, e o download seguinte roda sob a cortina.
+
+Não solta numa troca só de CENÁRIO: ali `loadCab()` nem é chamado, nada do
+implemento é medido, e soltar pagaria uma refusão por nada.
+
+⚠️ **O `catch` também refaz.** Ele existe para deixar a cena anterior de pé
+("meio aplicada é pior do que velha") — e sem isso a deixaria de pé **sem
+fusão**, com as ~2 000 chamadas de volta e a imagem idêntica, ou seja um quadro
+14,9× mais caro em silêncio até a próxima troca que desse certo.
+
+### 23.4 E o cinto, na própria medida
+
+`measureFrontRailUnderside()` passou a **recusar balde** (`userData.tsMergeBand`,
+o mesmo contrato por `userData` que `material-setup.ts` usa para não importar
+`merge.ts`). Quem medir com a fusão de pé recebe `null` — a degradação
+DOCUMENTADA, que devolve o recuo fixo de `topGap` — mais um aviso no console, em
+vez de um número plausível e errado por dois metros e meio. O erro de 155 mm do
+`topGap` é uma coisa que se vê; o de 2 554,9 mm passa por conserto.
+
+### 23.5 O que ficou provado
+
+`checks-tk-troca-0816.mjs` roda em três atos e cada um responde uma pergunta
+diferente: **mecanismo** (a mesma travessa medida nos dois estados),
+**sintoma** (uma troca de cavalo de verdade, por `applyChoice`) e **controle** (a
+mesma troca com a fusão solta antes). Antes do conserto: −2 554,9 mm · a unidade
+desceu 681,9 mm · com a fusão solta, 0,0 mm. Depois: a troca deixa a unidade em
+**38,0 mm abaixo do teto, 0,0 mm de desvio contra o boot**.
+
+O ato 1 continua acusando os −2 554,9 mm de propósito — ele mede o mecanismo com
+uma reimplementação local, e é isso que documenta *por que* a fusão sai de pé em
+vez de deixar a regra parecer arbitrária.

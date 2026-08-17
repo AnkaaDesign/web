@@ -4220,12 +4220,37 @@ function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
   const loc = new THREE.Vector3();
   const wld = new THREE.Vector3();
   let bestTop = -Infinity, bestUnder: number | null = null;
+  let baldes = 0;
   trailer.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh || !o.visible || !o.geometry?.attributes?.position) return;
     if (state.tk && (o === state.tk || !!state.tk.getObjectById(o.id))) return;   // a unidade não se mede
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     if (!mats.some((m) => !!m && FRONT_RAIL_MAT_RE.test(m.name || ''))) return;
+    /* ⚠️ UM BALDE DE FUSÃO NÃO É UMA PEÇA, E ESTA MEDIDA SÓ FAZ SENTIDO POR PEÇA.
+       -----------------------------------------------------------------------
+       Daqui para baixo a regra é "o topo mais alto ganha, e o que vale é a face
+       de BAIXO DELE". Ela pressupõe que uma malha seja uma peça. `merge.ts`
+       assa os triângulos de centenas de peças do mesmo material numa malha só e
+       esconde as origens — e aí `wHi` continua sendo o topo da travessa (é a
+       peça mais alta do balde) enquanto `wLo` passa a ser o ponto mais baixo de
+       TODA a ferragem da testeira, que é o estrado.
+
+       Medido (`checks-tk-troca-0816.mjs`, Scania R 2009 4x2): a mesma travessa
+       dá face de baixo em 4093,9 mm pela peça e 1539,0 mm pelo balde
+       `FUSAO__inox-ferragem__b3` — 2554,9 mm de erro, que a unidade herdava
+       inteiro numa troca de cavalo.
+
+       O CONTRATO CERTO é não medir com a fusão de pé, e quem o cumpre é
+       `runApply()` em `studio.ts` (ver A FUSÃO SAI DE PÉ ANTES DA CABINE). Este
+       filtro é o cinto: se alguém medir mesmo assim, o resultado é `null` — a
+       degradação DOCUMENTADA, que devolve o recuo fixo de `topGap` — e não um
+       número plausível e errado por dois metros e meio.
+
+       Por `userData.tsMergeBand`, e não por importar `merge.ts`: este módulo é
+       anterior a ele na composição, e o campo já é o contrato que
+       `material-setup.ts` usa pela mesma razão. */
+    if (o.userData?.tsMergeBand !== undefined) { baldes++; return; }
     const pos = o.geometry.attributes.position;
     let n = 0, wLo = Infinity, wHi = -Infinity, xLo = Infinity, xHi = -Infinity;
     for (let i = 0; i < pos.count; i++) {
@@ -4239,6 +4264,12 @@ function measureFrontRailUnderside(trailer: THREE.Object3D): number | null {
     if (!n || xLo > -0.5 || xHi < 0.5) return;        // tem de atravessar o centro
     if (wHi > bestTop) { bestTop = wHi; bestUnder = wLo; }
   });
+  if (bestUnder === null && baldes) {
+    console.warn('[tk] a travessa da testeira foi medida com a FUSÃO DE PÉ —',
+      baldes, 'balde(s) de ferragem no caminho e nenhuma peça visível.',
+      'A unidade cai no recuo fixo de topGap. Solte a fusão antes de medir'
+      + ' (ver A FUSÃO SAI DE PÉ ANTES DA CABINE, em studio.ts).');
+  }
   return bestUnder;
 }
 

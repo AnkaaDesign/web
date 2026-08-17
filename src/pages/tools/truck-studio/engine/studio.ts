@@ -602,7 +602,7 @@ function focusOnRig() {
    halos e os feixes de farol.
 
    ---------------------------------------------------------------------------
-   QUANDO ELA RODA, E POR QUE NESTES DOIS PONTOS SÓ
+   QUANDO ELA RODA, E POR QUE NESTES TRÊS PONTOS SÓ
 
    1. no fim de `runApply()`, depois de TUDO que mexe em malha ou material —
       `placeTrailer()`, `refreshVehicleReflection()`, `applyColor()`,
@@ -611,13 +611,28 @@ function focusOnRig() {
    2. em volta de `models.setTrailerDims()`, por `setGeometryGuard()`: solta
       antes, refaz depois. `TrailerBody.rebuild()` regenera o corpo branco e
       `TrailerAssembly.set()` transforma a ferragem peça por peça — um balde de
-      pé nesse instante seria medido como se fosse geometria de origem.
+      pé nesse instante seria medido como se fosse geometria de origem;
+   3. SOLTA (e só solta) no topo de `runApply()`, quando há cabine nova —
+      acrescentado em 2026-08-16, depois de o Thermo King sair do lugar a cada
+      troca de cavalo. Quem refaz é o ponto 1, logo abaixo, então isto não é uma
+      segunda fusão: é a mesma, adiada até depois da medição. Ver A FUSÃO SAI DE
+      PÉ ANTES DA CABINE, no corpo de `runApply()`.
 
-   ⚠️ NÃO HÁ UM TERCEIRO PONTO, e isso é uma aposta explícita: quem trocar
-   `mesh.material` de uma malha FORA da lista de exclusões, depois da carga, vai
-   ver a troca não aparecer. As duas listas cobrem os donos que existem hoje
-   (`setPaintTarget`, as quatro peças de `trim.ts`); um dono novo tem de entrar
-   numa delas. O sintoma de esquecer está escrito no cabeçalho de `trim.ts`. */
+   ⚠️ ESTA LISTA ERA DE DOIS PONTOS E A APOSTA ESTAVA MAL ESCRITA. Ela dizia
+   "não há um terceiro ponto" e nomeava um risco só — trocar `mesh.material` de
+   uma malha fora das exclusões, que não aparece. O terceiro ponto existe porque
+   **há um segundo risco, e é MEDIR**: `loadCab()` termina medindo a malharia do
+   implemento (`placeThermoKing()` → `measureFrontRailUnderside()`), e um balde
+   responde a essa pergunta com o número errado por 2,5 m — o defeito está
+   medido em `checks-tk-troca-0816.mjs`. A regra completa é:
+
+       com a fusão de pé, não se troca material NEM se mede peça.
+
+   O primeiro risco continua valendo como estava: as duas listas de exclusão
+   cobrem os donos que existem hoje (`setPaintTarget`, as quatro peças de
+   `trim.ts`); um dono novo tem de entrar numa delas. O sintoma de esquecer está
+   escrito no cabeçalho de `trim.ts`. Para o segundo, o cinto está em
+   `measureFrontRailUnderside()`: ela recusa baldes e devolve `null`. */
 
 /** O piso do baú em espaço LOCAL da raiz do implemento — o corte do modo `floor`.
  *
@@ -1100,7 +1115,62 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
     });
   }
 
+  /* Quantos baldes de fusão foram soltos para esta aplicação — fora do `try`
+     porque o `catch` também o lê. Ver o bloco logo abaixo. */
+  let soltou = 0;
+
   try {
+    /* ---- A FUSÃO SAI DE PÉ ANTES DA CABINE, E ISSO É O TERCEIRO PONTO ----
+       -----------------------------------------------------------------------
+       O bloco A FUSÃO POR MATERIAL, acima, dizia "NÃO HÁ UM TERCEIRO PONTO" e
+       listava só a mutação de material como risco. Faltava a outra metade, e
+       ela custou um defeito: **o caminho da troca de cavalo MEDE a malharia do
+       implemento com a fusão de pé.**
+
+       `models.loadCab()` termina em `placeTrailer()` → `placeThermoKing()`, e
+       essa última pergunta a altura da travessa da testeira a
+       `measureFrontRailUnderside()`, que varre o implemento por peça e devolve
+       a face de BAIXO da candidata mais alta. Com os baldes na cena ela deixa
+       de ver peças: vê um balde por material, com os triângulos de todas elas
+       juntos. O topo continua certo — é a mesma travessa —, mas a face de baixo
+       vira o ponto mais baixo de TODA a ferragem da testeira.
+
+       Medido na bancada (`checks-tk-troca-0816.mjs`), Scania R 2009 4x2:
+
+           fusão solta     face de baixo 4093,9 mm   (peça, 344 vértices)
+           fusão aplicada  face de baixo 1539,0 mm   (balde, 1920 vértices)
+                                        −2554,9 mm
+
+       O efeito na tela: o Thermo King caía de 38,0 mm abaixo do teto para
+       719,9 mm, com a base parando exatamente no assoalho — a trava de piso de
+       `placeThermoKing()` segurando a queda. E some ao recarregar a página,
+       porque no boot `applyMergeNow()` só roda no FIM de `runApply()`: na
+       carga não há fusão quando a unidade é assentada, na troca há.
+
+       ISTO É O MESMO GUARDA DE `setTrailerDims()`, no caminho que faltava — e o
+       cabeçalho de `setGeometryGuard()` em `vehicle/models.ts` já descrevia a
+       falha com todas as letras: "um derivado que ainda estivesse de pé nesse
+       instante seria MEDIDO COMO SE FOSSE GEOMETRIA DE ORIGEM".
+
+       ⚠️ NÃO SE REFAZ AQUI, de propósito. `applyMergeNow()` já roda no fim
+       desta mesma função (fase "Agrupando chamadas de desenho…"), depois de
+       tudo que mexe em malha — refazer também aqui seria uma segunda fusão
+       inteira por troca, 99 a 360 ms jogados fora. Soltar custa uma escrita de
+       `.visible` em ~2 000 malhas e o download seguinte roda sob a cortina, que
+       é onde ninguém está olhando o número de chamadas de desenho.
+
+       Só quando há cabine nova: uma troca só de CENÁRIO não chama `loadCab()`,
+       não mede nada do implemento, e soltar ali pagaria uma refusão por nada.
+
+       O RETORNO É GUARDADO porque o caminho de ERRO precisa dele — e por isso
+       `soltou` é declarado FORA do `try`, logo acima. O `catch` lá embaixo
+       deixa a cena anterior de pé de propósito ("meio aplicada é pior do que
+       velha") — e sem esta contagem ele a deixaria de pé SEM FUSÃO, com as
+       ~2 000 chamadas de desenho de volta, até a próxima troca que desse certo.
+       A imagem seria a mesma (é o contrato do portão de aceitação); o quadro é
+       que ficaria 14,9× mais caro, em silêncio. */
+    soltou = needCab ? merge.releaseMerge() : 0;
+
     /* Cenário e geometria são downloads independentes — rodam juntos. */
     const tasks: Promise<unknown>[] = [];
     if (needCab) {
@@ -1342,6 +1412,13 @@ async function runApply(resolved: ResolvedPick, first: boolean, curtain: boolean
        sai de qualquer jeito: mantê-la de pé esconderia a linha de estado, que é
        quem carrega a mensagem. */
     setStatus('Erro ao aplicar seleção: ' + errText(err));
+    /* A FUSÃO VOLTA. Ela foi solta lá em cima para que `loadCab()` medisse a
+       malharia de origem, e quem a refaz no caminho feliz é a fase "Agrupando
+       chamadas de desenho…", que este erro pulou. Sem isto a cena antiga — que
+       este `catch` existe para preservar — continuaria de pé pagando as ~2 000
+       chamadas. Só se houve o que soltar: com o modo em `off` por perfil,
+       `soltou` é 0 e nada aqui acontece. */
+    if (soltou) applyMergeNow();
     if (curtain) hideLoader();
     if (first) {
       /* Não foi construído absolutamente nada, então um viewport vazio só leria
