@@ -112,6 +112,43 @@ const PAINT_NAME_RE = /carpaint|plain_grey/;
    aplicá-lo aos dois é inócuo hoje e mais seguro amanhã. */
 const NEVER_BODY_RE = /chassis|f_light|r_light|light_|lamp|doorstep/;
 
+/* O ACABAMENTO ENTRE AS JANELAS SAI NA COR DA CABINE — 2026-08-17.
+   ---------------------------------------------------------------------------
+   `w_trim` é a tira de 24 cm entre a janela da porta e a da cama (medido:
+   X ±1,20 · Y 2,27–2,94 · Z −1,94…−1,70, nos dois lados). Ela passou por dois
+   tratamentos errados antes deste, e vale registrar por quê, porque os dois
+   PARECEM razoáveis lendo só o material:
+
+     · `alphaTest` — o alfa vira recorte. No FH 2024 o alfa é 0 em 100% da
+       superfície, então a tira some inteira e aparece a cabine pintada atrás:
+       vermelho liso, que É o resultado certo, mas por acidente. No FH 2021 o
+       alfa tem 48,3% de buraco medido triângulo a triângulo na face externa
+       (não é a face de dentro — testei), e o mesmo recorte vira uma hachura
+       com a cor da cabine piscando entre os furos. Foi o relato *"sangra a
+       cor, e conforme o ângulo da câmera piora"*;
+     · FORÇADO OPACO — o alfa é ignorado. O 2024 fica com o cinza-escuro
+       [35, 29, 33] do `w_trim_dif` e o 2021 com o bege [236, 222, 180] do
+       vazio do atlas `detail_c`. Um acabamento escuro parece plausível, mas o
+       dono do produto foi direto: *"o correto não é ser preto, e sim colorido
+       como o 2024"*.
+
+   Os dois erros têm a mesma raiz: tratar como TEXTURA uma tira que num FH de
+   verdade é CHAPA PINTADA. Recebendo a tinta ela sai lisa e na cor escolhida
+   nos dois modelos, sem depender de haver lataria atrás — que é o que fazia o
+   2024 acertar por acaso.
+
+   O `map` NÃO acompanha (ver `isBodyTrim` no laço de tinta de models.ts): a UV
+   desta tira cai sobre região de recado do atlas — avisos de "CAUTION", símbolo
+   de reciclagem, pedaço da palavra VOLVO —, e multiplicar tinta por aquilo
+   devolveria o lixo em tons da cor. Medido: 2 materiais na frota inteira, os
+   dois Volvo FH, então o alcance é este parágrafo e mais nada. */
+const BODY_TRIM_RE = /w_trim/;
+
+/** A tira entre as janelas: pinta, mas SEM o mapa de origem. */
+export function isBodyTrim(m: THREE.Material | null | undefined): boolean {
+  return !!m && BODY_TRIM_RE.test((m.name || '').toLowerCase());
+}
+
 /**
  * Peça estrutural com a cor do caminhão de ORIGEM assada no `baseColorFactor`:
  * troca o croma por cinza de mesma luminância. Sem isto, tirar a peça da tinta
@@ -165,6 +202,7 @@ export function isPaintableMaterial(
   const name = (m.name || '').toLowerCase();
   if (GLASS_RE.test(name)) return false;
   if (authored) return authored.some((s) => name.includes(s.toLowerCase()));
+  if (BODY_TRIM_RE.test(name)) return true;
   /* O denylist vale SÓ para o atalho por nome. A assinatura de shader abaixo é
      medição do bake, não convenção de nomenclatura: se o artista deu clearcoat
      de tinta à peça, ela é tinta e o nome não desmente. */

@@ -11,7 +11,7 @@ import {
 } from './paint';
 import {
   setupCommon, setShadowCasters, isPaintableMaterial, materialNamesOf, maskOnly,
-  textureAnisotropy, neutralizeBakedChroma,
+  textureAnisotropy, neutralizeBakedChroma, isBodyTrim,
 } from './material-setup';
 import { captureReflectionProbe } from '../scene/probe';
 import { VEHICLES_DIR, DRACO_DECODER_DIR } from '../core/paths';
@@ -666,12 +666,13 @@ const GLASS_OK_RE = /glass|vidro|lente|windshield|window|winscreen|cristal|glazi
 
    Ou seja: a mudança não corrigiu o sangramento, ela trocou "vaza um pouco de
    cor" por "a peça some / vira peneira" — que é o que a segunda foto mostrava.
-   O tratamento certo para `w_trim` é o de baixo, FORÇADO OPACO: nestes dois
-   bakes o alfa não é recorte, e honrá-lo é justamente o defeito.
 
-   Se o sangramento original voltar a ser relatado, ele NÃO está aqui — sob
-   opacidade forçada nenhuma cor de carroceria atravessa este material. Procure
-   em outro lugar antes de mexer neste regex. */
+   E o tratamento certo também NÃO é o ramo de baixo, forçado opaco: aquilo
+   deixa o 2024 cinza-escuro e o 2021 bege, e o veredito do dono do produto foi
+   *"o correto não é ser preto, e sim colorido como o 2024"*. `w_trim` não é
+   textura, é CHAPA PINTADA — ela sai daqui por cima, pelo seletor de tinta
+   (`BODY_TRIM_RE` em material-setup.ts), e por isso nem chega a depender de
+   qual ramo deste `if` a pegaria. Este regex não é o lugar de mexer. */
 const DECAL_OK_RE = /logo|marca|adesivo|decal|faixa-?3m|placa/i;
 
 function auditTransparency(root: THREE.Object3D, label: string) {
@@ -1959,9 +1960,12 @@ export async function loadCab(
              marca exatamente esse caso — as tomadas de ar, cuja colmeia é o
              alfa da textura —, e aí ele passa como MÁSCARA, sem o desenho.
              Fora isso, tinta assada não atravessa tinta. */
-          const src = m.alphaTest > 0
+          /* A tira entre as janelas pinta LISA. A UV dela cai sobre região de
+             recado do atlas (avisos, reciclagem, pedaço de VOLVO), então o mapa
+             não pode atravessar — ver `isBodyTrim` em material-setup.ts. */
+          const src = isBodyTrim(m) ? null : (m.alphaTest > 0
             ? (maskOnly(m.map) ?? m.map)
-            : (BAKED_FINISH_RE.test(m.map?.name || '') ? null : m.map);
+            : (BAKED_FINISH_RE.test(m.map?.name || '') ? null : m.map));
           const paint = makePaintMaterial(m.color, src);
           paint.name = m.name;
           cache.set(m.uuid, paint);
