@@ -281,6 +281,7 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                                         bankSlip={installment.bankSlip}
                                         installmentStatus={installment.status}
                                         installmentPaymentMethod={installment.paymentMethod}
+                                        paidAt={installment.paidAt}
                                         receiptFiles={installment.receiptFiles}
                                         observations={installment.observations}
                                       />

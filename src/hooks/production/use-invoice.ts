@@ -209,16 +209,20 @@ export function useMarkBoletoPaid() {
     mutationFn: ({
       installmentId,
       paymentMethod,
+      paidAt,
       receiptFileIds,
       observations,
     }: {
       installmentId: string;
       paymentMethod: string;
+      /** ISO instant of the actual payment date. Omit to let the server stamp now. */
+      paidAt?: string;
       receiptFileIds?: string[];
       observations?: string | null;
     }) =>
       invoiceService.markBoletoPaid(installmentId, {
         paymentMethod,
+        paidAt,
         receiptFileIds,
         observations,
       }),
@@ -228,7 +232,8 @@ export function useMarkBoletoPaid() {
   });
 }
 
-// Replace the installment's receipt files and/or update observations
+// Edit a paid installment's settlement record: receipt files, observations, and the
+// payment info (forma de pagamento / data do pagamento).
 export function useUpdateInstallmentReceipts() {
   const queryClient = useQueryClient();
 
@@ -237,14 +242,21 @@ export function useUpdateInstallmentReceipts() {
       installmentId,
       receiptFileIds,
       observations,
+      paymentMethod,
+      paidAt,
     }: {
       installmentId: string;
       receiptFileIds?: string[];
       observations?: string | null;
+      paymentMethod?: string;
+      /** ISO instant. See invoiceService.markBoletoPaid for the date-only pitfall. */
+      paidAt?: string;
     }) =>
       invoiceService.updateInstallmentReceipts(installmentId, {
         receiptFileIds,
         observations,
+        paymentMethod,
+        paidAt,
       }),
     onSuccess: () => {
       invalidateAllBillingCaches(queryClient);

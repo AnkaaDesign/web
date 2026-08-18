@@ -885,6 +885,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                             dueDate={installment.dueDate}
                                             installmentStatus={installment.status}
                                             installmentPaymentMethod={installment.paymentMethod}
+                                            paidAt={installment.paidAt}
                                             receiptFiles={installment.receiptFiles}
                                             observations={installment.observations}
                                             canManage={!disabled}

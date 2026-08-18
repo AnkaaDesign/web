@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   IconRefresh,
@@ -29,7 +29,10 @@ import { invoiceService } from '@/api-client/invoice';
 import { uploadSingleFile } from '@/api-client/file';
 import { toast } from '@/components/ui/sonner';
 import type { BankSlip, Installment } from '@/types/invoice';
-import { MANUAL_PAYMENT_METHOD_OPTIONS } from '@/utils/installment-payment-method';
+import {
+  MANUAL_PAYMENT_METHOD_OPTIONS,
+  formatInstallmentPaymentMethod,
+} from '@/utils/installment-payment-method';
 import { FileUploadField } from '@/components/common/file/file-upload-field';
 import type { FileWithPreview } from '@/components/common/file/file-uploader';
 import {
@@ -59,6 +62,8 @@ interface BoletoActionsProps {
   installmentStatus?: string | null;
   /** Payment method used (PIX, CASH, TRANSFER, BANK_SLIP, etc.) */
   installmentPaymentMethod?: string | null;
+  /** When the money actually arrived — prefills the edit-payment-info dialog */
+  paidAt?: string | Date | null;
   /** Receipt files attached to this installment */
   receiptFiles?: Installment['receiptFiles'];
   /** Free-text observations on the installment */
@@ -67,6 +72,16 @@ interface BoletoActionsProps {
    *  date/mark paid/manage receipts) are hidden, leaving only read-only
    *  view/download/copy — for read-only viewers (e.g. ACCOUNTING). Default true. */
   canManage?: boolean;
+}
+
+/** True when `date` falls on a calendar day after today. Compares days, not
+ *  instants: DateTimeInput stamps 13:00 on a date-only selection, so an instant
+ *  comparison against `new Date()` would flag a payment marked today at any time
+ *  before 13:00 as "future". Mirrors the server's BRT day-key guard. */
+function isFutureDay(date: Date): boolean {
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return date.getTime() > endOfToday.getTime();
 }
 
 function getDefaultRegenerateDate(dueDate?: string | Date | null, bankSlipDueDate?: string | Date | null): Date {
@@ -91,7 +106,8 @@ export function BoletoActions({
   bankSlip,
   dueDate,
   installmentStatus,
-  installmentPaymentMethod: _installmentPaymentMethod,
+  installmentPaymentMethod,
+  paidAt,
   receiptFiles,
   observations: observationsProp,
   canManage = true,
@@ -111,6 +127,9 @@ export function BoletoActions({
   // Mark Paid dialog state
   const [markPaidFiles, setMarkPaidFiles] = useState<FileWithPreview[]>([]);
   const [markPaidObservations, setMarkPaidObservations] = useState<string>('');
+  // The date the money arrived, which is not necessarily today: the baixa is
+  // typed whenever someone gets to it, often a day or more after the payment.
+  const [markPaidDate, setMarkPaidDate] = useState<Date | null>(null);
 
   // Manage Receipts dialog state — initialized from props when the dialog opens.
   // Existing files are tracked outside the FileUploadField so they keep view/download
@@ -118,6 +137,28 @@ export function BoletoActions({
   const [keptReceipts, setKeptReceipts] = useState<AttachedReceipt[]>([]);
   const [newReceiptFiles, setNewReceiptFiles] = useState<FileWithPreview[]>([]);
   const [receiptObservations, setReceiptObservations] = useState<string>('');
+  // Payment info of an already-settled parcela, correctable after the fact.
+  const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<string>('');
+  const [receiptPaidAt, setReceiptPaidAt] = useState<Date | null>(null);
+
+  // The manual list deliberately omits BANK_SLIP/MANUAL — they are system-set, not
+  // something a user picks when recording a payment. But a parcela already settled
+  // by Sicredi carries BANK_SLIP, and the edit dialog has to be able to SHOW that.
+  // Without this the Forma box renders blank for every boleto-settled parcela, so
+  // someone opening the dialog just to fix the DATE would see an empty method.
+  const editPaymentMethodOptions = useMemo(() => {
+    const base = MANUAL_PAYMENT_METHOD_OPTIONS as { value: string; label: string }[];
+    if (!receiptPaymentMethod || base.some((o) => o.value === receiptPaymentMethod)) {
+      return base;
+    }
+    return [
+      ...base,
+      {
+        value: receiptPaymentMethod,
+        label: formatInstallmentPaymentMethod(receiptPaymentMethod) ?? receiptPaymentMethod,
+      },
+    ];
+  }, [receiptPaymentMethod]);
 
   const regenerateBoleto = useRegenerateBoleto();
   const cancelBoleto = useCancelBoleto();
@@ -131,8 +172,16 @@ export function BoletoActions({
       setKeptReceipts(receiptFiles ?? []);
       setNewReceiptFiles([]);
       setReceiptObservations(observationsProp ?? '');
+      setReceiptPaymentMethod(installmentPaymentMethod ?? '');
+      setReceiptPaidAt(paidAt ? new Date(paidAt) : null);
     }
-  }, [showReceiptsDialog, receiptFiles, observationsProp]);
+  }, [showReceiptsDialog, receiptFiles, observationsProp, installmentPaymentMethod, paidAt]);
+
+  // Prefill the payment date with today each time the Mark Paid dialog opens —
+  // "paid today" is the common case; the picker is there for when it wasn't.
+  useEffect(() => {
+    if (showMarkPaidDialog) setMarkPaidDate(new Date());
+  }, [showMarkPaidDialog]);
 
   const openRegenerateDialog = () => {
     setRegenerateDate(getDefaultRegenerateDate(dueDate, bankSlip?.dueDate));
@@ -302,6 +351,12 @@ export function BoletoActions({
       toast.error('Selecione o método de pagamento.');
       return;
     }
+    // Mirrors the server guard. A future paidAt would misfile the parcela in
+    // reconciliation, in the cash-in analytics and in the stale-paid sweep.
+    if (markPaidDate && isFutureDay(markPaidDate)) {
+      toast.error('A data do pagamento não pode ser futura.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -312,6 +367,10 @@ export function BoletoActions({
         {
           installmentId,
           paymentMethod,
+          // Full ISO instant, not yyyy-MM-dd: the server turns this into a DateTime,
+          // and a date-only string would land on UTC midnight = 21:00 BRT the day
+          // before. DateTimeInput stamps 13:00 local, so the instant is unambiguous.
+          paidAt: markPaidDate ? markPaidDate.toISOString() : undefined,
           receiptFileIds: uploadedIds.length > 0 ? uploadedIds : undefined,
           observations: markPaidObservations.trim() ? markPaidObservations.trim() : undefined,
         },
@@ -321,6 +380,7 @@ export function BoletoActions({
             setPaymentMethod('');
             setMarkPaidFiles([]);
             setMarkPaidObservations('');
+            setMarkPaidDate(null);
           },
         },
       );
@@ -330,6 +390,12 @@ export function BoletoActions({
   };
 
   const handleSaveReceipts = async () => {
+    // Same guard as the mark-paid path — a correction must not introduce a future date.
+    if (receiptPaidAt && isFutureDay(receiptPaidAt)) {
+      toast.error('A data do pagamento não pode ser futura.');
+      return;
+    }
+
     setIsUploading(true);
     try {
       const filesToUpload = newReceiptFiles.filter((f) => !f.uploaded && !f.error);
@@ -345,6 +411,17 @@ export function BoletoActions({
             trimmedObservations === (observationsProp ?? '')
               ? undefined
               : trimmedObservations || null,
+          // Send only what actually changed: '' would fail the server's enum guard,
+          // and echoing an untouched value back adds nothing (the server skips the
+          // audit row when a field is unchanged anyway).
+          paymentMethod:
+            receiptPaymentMethod && receiptPaymentMethod !== (installmentPaymentMethod ?? '')
+              ? receiptPaymentMethod
+              : undefined,
+          paidAt:
+            receiptPaidAt && receiptPaidAt.getTime() !== (paidAt ? new Date(paidAt).getTime() : NaN)
+              ? receiptPaidAt.toISOString()
+              : undefined,
         },
         {
           onSuccess: () => {
@@ -443,8 +520,8 @@ export function BoletoActions({
                 onClick={() => setShowReceiptsDialog(true)}
                 title={
                   hasReceipts
-                    ? `Comprovantes (${receiptCount})${observationsProp ? ' / Observações' : ''}`
-                    : 'Anexar Comprovantes'
+                    ? `Informações de pagamento · comprovantes (${receiptCount})${observationsProp ? ' / observações' : ''}`
+                    : 'Informações de pagamento e comprovantes'
                 }
                 className={`h-7 ${hasReceipts ? 'px-1.5' : 'w-7 p-0'} ${
                   hasReceipts ? 'text-foreground' : 'text-blue-600 hover:text-blue-700'
@@ -655,16 +732,31 @@ export function BoletoActions({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">Método de Pagamento</Label>
-              <Combobox
-                value={paymentMethod}
-                onValueChange={(v) => setPaymentMethod((v as string) || '')}
-                options={MANUAL_PAYMENT_METHOD_OPTIONS as { value: string; label: string }[]}
-                placeholder="Selecione o método..."
-                searchable={false}
-                clearable={false}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">Método de Pagamento</Label>
+                <Combobox
+                  value={paymentMethod}
+                  onValueChange={(v) => setPaymentMethod((v as string) || '')}
+                  options={MANUAL_PAYMENT_METHOD_OPTIONS as { value: string; label: string }[]}
+                  placeholder="Selecione o método..."
+                  searchable={false}
+                  clearable={false}
+                />
+              </div>
+
+              <div>
+                <DateTimeInput
+                  label="Data do Pagamento"
+                  mode="date"
+                  value={markPaidDate}
+                  onChange={(date) => setMarkPaidDate(date as Date | null)}
+                  constraints={{ maxDate: new Date() }}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Quando o cliente pagou, não quando a baixa foi lançada.
+                </p>
+              </div>
             </div>
 
             <div>
@@ -710,12 +802,40 @@ export function BoletoActions({
       <Dialog open={showReceiptsDialog} onOpenChange={setShowReceiptsDialog}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Comprovantes e Observações</DialogTitle>
+            <DialogTitle>Informações de Pagamento</DialogTitle>
             <DialogDescription>
-              Anexe, visualize ou remova comprovantes e edite as observações desta parcela.
+              Corrija a forma e a data do pagamento, e anexe, visualize ou remova
+              comprovantes desta parcela.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">Forma de Pagamento</Label>
+                <Combobox
+                  value={receiptPaymentMethod}
+                  onValueChange={(v) => setReceiptPaymentMethod((v as string) || '')}
+                  options={editPaymentMethodOptions}
+                  placeholder="Selecione o método..."
+                  searchable={false}
+                  clearable={false}
+                />
+              </div>
+
+              <div>
+                <DateTimeInput
+                  label="Pago em"
+                  mode="date"
+                  value={receiptPaidAt}
+                  onChange={(date) => setReceiptPaidAt(date as Date | null)}
+                  constraints={{ maxDate: new Date() }}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Data em que o cliente efetuou o pagamento.
+                </p>
+              </div>
+            </div>
+
             {keptReceipts.length > 0 && (
               <div>
                 <Label className="text-sm font-medium mb-1.5 block">

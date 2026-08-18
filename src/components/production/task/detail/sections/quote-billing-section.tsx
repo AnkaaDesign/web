@@ -465,7 +465,16 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                                       <InstallmentStatusBadge status={installment.status} size="sm" />
                                       {installment.bankSlip && <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />}
                                     </div>
-                                    <BoletoActions installmentId={installment.id} bankSlip={installment.bankSlip} installmentStatus={installment.status} />
+                                    <BoletoActions
+                                      installmentId={installment.id}
+                                      bankSlip={installment.bankSlip}
+                                      dueDate={installment.dueDate}
+                                      installmentStatus={installment.status}
+                                      installmentPaymentMethod={installment.paymentMethod}
+                                      paidAt={installment.paidAt}
+                                      receiptFiles={installment.receiptFiles}
+                                      observations={installment.observations}
+                                    />
                                   </div>
                                 </div>
                               ))}
@@ -660,7 +669,16 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                           <InstallmentStatusBadge status={installment.status} size="sm" />
                           {installment.bankSlip && <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />}
                         </div>
-                        <BoletoActions installmentId={installment.id} bankSlip={installment.bankSlip} installmentStatus={installment.status} />
+                        <BoletoActions
+                                      installmentId={installment.id}
+                                      bankSlip={installment.bankSlip}
+                                      dueDate={installment.dueDate}
+                                      installmentStatus={installment.status}
+                                      installmentPaymentMethod={installment.paymentMethod}
+                                      paidAt={installment.paidAt}
+                                      receiptFiles={installment.receiptFiles}
+                                      observations={installment.observations}
+                                    />
                       </div>
                       {installment.bankSlip?.pdfFile && (
                         <div className="mt-1.5">

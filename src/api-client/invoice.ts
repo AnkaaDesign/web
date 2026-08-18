@@ -78,16 +78,30 @@ export const invoiceService = {
   cancelNfse: (invoiceId: string, data: any) =>
     apiClient.put(`/invoices/${invoiceId}/nfse/cancel`, data),
 
-  // Mark boleto as paid via PIX/cash (with optional multiple receipts + observations)
+  // Mark boleto as paid via PIX/cash (with optional multiple receipts + observations).
+  // `paidAt` is the date the money actually arrived — send a full ISO instant, never a
+  // bare yyyy-MM-dd: the server parses it into a DateTime, and a date-only string becomes
+  // UTC midnight, i.e. 21:00 BRT of the PREVIOUS day. Omitted => server stamps now.
   markBoletoPaid: (
     installmentId: string,
-    data: { paymentMethod: string; receiptFileIds?: string[]; observations?: string | null },
+    data: {
+      paymentMethod: string;
+      paidAt?: string;
+      receiptFileIds?: string[];
+      observations?: string | null;
+    },
   ) => apiClient.put(`/invoices/${installmentId}/boleto/mark-paid`, data),
 
-  // Replace receipt file list and/or update observations on a paid installment
+  // Edit the settlement record of a paid installment: receipts, observations, and the
+  // payment info itself (paymentMethod / paidAt). Same ISO-instant rule as above.
   updateInstallmentReceipts: (
     installmentId: string,
-    data: { receiptFileIds?: string[]; observations?: string | null },
+    data: {
+      receiptFileIds?: string[];
+      observations?: string | null;
+      paymentMethod?: string;
+      paidAt?: string;
+    },
   ) => apiClient.put(`/invoices/${installmentId}/receipts`, data),
 
   // Download a single receipt file attached to an installment
