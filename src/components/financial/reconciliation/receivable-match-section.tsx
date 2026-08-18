@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+ 
   useReceivableCandidates,
+  useReceivableSuggestion,
   useReceivableMutations,
 } from "@/hooks/financial/use-receivable";
 import { routes } from "@/constants";
@@ -64,6 +66,8 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
     matchAsync,
     unmatchAsync,
     allocateAsync,
+    confirmSuggestionMutation,
+    confirmSuggestionAsync,
   } = useReceivableMutations();
 
   const isReconciled = useMemo(
@@ -77,6 +81,13 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
     txId,
     !isReconciled,
   );
+
+  // The server's identity-resolved plan, fetched only while the credit is open.
+  // It answers a different question from the candidate list: not "which parcelas
+  // resemble this value" but "who paid, and what does this settle for them" —
+  // which is the only way a lump payment spanning many parcelas, or one landing
+  // on parcelas already marked paid, can be expressed at all.
+  const { data: suggestion } = useReceivableSuggestion(txId, !isReconciled);
 
   // Reset selections when the transaction identity changes (post-save).
   useEffect(() => {
@@ -100,11 +111,16 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
       // A boleto bridge is atomic (the boleto IS the settlement) — mutually
       // exclusive with every other candidate.
       if (c.viaBankSlip) return { [c.installmentId]: (c.remaining ?? c.amount).toFixed(2) };
-      // Selecting a direct installment drops any boleto selection, then prefills
+      // An already-PAID parcela is a LINK, not a receipt. Its `remaining` is 0, so
+      // prefilling from it would allocate R$ 0,00 and leave the button dead; the
+      // value at stake is the whole parcela. Exclusive like the boleto bridge,
+      // because POST /receivables/match settles exactly one installment.
+      if (c.linkOnly) return { [c.installmentId]: c.amount.toFixed(2) };
+      // Selecting a direct installment drops any boleto/link selection, then prefills
       // the outstanding balance so topping up a partial receipt is correct.
       const next = { ...prev };
       for (const cand of candidates ?? []) {
-        if (cand.viaBankSlip) delete next[cand.installmentId];
+        if (cand.viaBankSlip || cand.linkOnly) delete next[cand.installmentId];
       }
       next[c.installmentId] = (c.remaining ?? c.amount).toFixed(2);
       return next;
@@ -116,13 +132,21 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
   const entries = Object.entries(selections);
   // A single selected boleto candidate is a full bridge of the whole credit — its
   // amount is authoritative and not editable, so the credit counts as fully allocated.
-  const boletoSelected =
-    entries.length === 1 && candidateById.get(entries[0][0])?.viaBankSlip === true;
+  const singleCandidate =
+    entries.length === 1 ? candidateById.get(entries[0][0]) : undefined;
+  const boletoSelected = singleCandidate?.viaBankSlip === true;
+  // A PAID parcela is linked, not allocated: its value is the whole parcela and is
+  // not editable. Without this the row prefills from `remaining` (0 once paid), so
+  // `allocated` stays R$ 0,00 and "Conciliar recebimento" can never enable.
+  const linkOnlySelected = !boletoSelected && singleCandidate?.linkOnly === true;
+  const linkSelected = boletoSelected || linkOnlySelected;
   const allocated = boletoSelected
     ? creditAmount
-    : entries.reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
-  const overCredit = !boletoSelected && allocated > creditAmount + TOLERANCE;
-  const anyInvalid = !boletoSelected && entries.some(([, v]) => !(parseFloat(v) > 0));
+    : linkOnlySelected
+      ? (singleCandidate?.amount ?? 0)
+      : entries.reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
+  const overCredit = !linkSelected && allocated > creditAmount + TOLERANCE;
+  const anyInvalid = !linkSelected && entries.some(([, v]) => !(parseFloat(v) > 0));
   const isPending =
     matchMutation.isPending ||
     allocateMutation.isPending ||
@@ -155,11 +179,24 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
         cand != null &&
         (cand.paidAmount ?? 0) <= TOLERANCE &&
         Math.abs((cand.remaining ?? cand.amount) - single.amount) <= TOLERANCE;
-      if (single && singleFull) {
+      // /allocate refuses a PAID parcela outright ("já está totalmente conciliada")
+      // and would overwrite paidAt with the credit's postedAt on the ones it does
+      // accept. /match is the only endpoint that links an already-baixada parcela,
+      // and it leaves the recorded payment date and amount untouched.
+      if (single && (singleFull || cand?.viaBankSlip || cand?.linkOnly)) {
         await matchAsync({ transactionId: txId, installmentId: single.installmentId });
       } else {
         await allocateAsync({ transactionId: txId, allocations });
       }
+      setSelections({});
+    } catch {
+      // Errors are toasted by the API client.
+    }
+  };
+
+  const handleConfirmSuggestion = async () => {
+    try {
+      await confirmSuggestionAsync(txId);
       setSelections({});
     } catch {
       // Errors are toasted by the API client.
@@ -282,6 +319,52 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
         )}
       </CardHeader>
       <CardContent className="pt-0 space-y-4">
+        {/* Identity-resolved plan. Shown above the candidate list because it is
+            strictly more informed: the list scores parcelas by value/date alone,
+            while this knows WHO paid (CNPJ/nome) and sums the exact set that
+            settles the credit — including already-baixadas parcelas, which the
+            list can only offer one at a time. */}
+        {suggestion && suggestion.allocations.length > 0 && (
+          <div className="rounded-lg border border-green-600/40 bg-green-600/5 p-3 space-y-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Sugestão: {suggestion.customerName ?? "cliente identificado"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {suggestion.allocations.length === 1
+                    ? "1 parcela"
+                    : `${suggestion.allocations.length} parcelas`}{" "}
+                  somando {formatCurrency(suggestion.totalAmount)}
+                  {Math.abs(suggestion.totalAmount - creditAmount) > 0.005 && (
+                    <>
+                      {" "}
+                      <span className="text-amber-600 dark:text-amber-500">
+                        (diferença de{" "}
+                        {formatCurrency(Math.abs(suggestion.totalAmount - creditAmount))})
+                      </span>
+                    </>
+                  )}
+                  {" · identificado por "}
+                  {suggestion.via}
+                  {suggestion.allocations.some((a) => a.linkOnly) &&
+                    " · inclui parcelas já baixadas (só vincula o extrato)"}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleConfirmSuggestion}
+                disabled={confirmSuggestionMutation.isPending}
+                className="shrink-0"
+              >
+                {confirmSuggestionMutation.isPending
+                  ? "Conciliando..."
+                  : "Conciliar tudo"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-16 w-full" />
@@ -289,7 +372,9 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
           </div>
         ) : !candidates || candidates.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Nenhuma parcela em aberto encontrada para conciliar este crédito.
+            {suggestion && suggestion.allocations.length > 0
+              ? "Nenhuma parcela avulsa a listar — use a sugestão acima."
+              : "Nenhuma parcela em aberto encontrada para conciliar este crédito."}
           </p>
         ) : (
           <div className="space-y-3">
@@ -574,10 +659,19 @@ function CandidateRow({
               </td>
               <td className={cn("text-right font-semibold tabular-nums whitespace-nowrap", cell)}>
                 {formatCurrency(c.amount)}
-                {(c.paidAmount ?? 0) > 0 && (
-                  <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-500">
-                    Resta {formatCurrency(c.remaining ?? c.amount)}
+                {/* "Resta R$ 0,00" on a fully-baixada parcela reads as "nothing to do
+                    here" — it is the opposite: the money is in, only the bank line is
+                    missing. Say that instead, and keep "Resta" for real partials. */}
+                {c.linkOnly ? (
+                  <span className="block text-[10px] font-normal text-muted-foreground">
+                    Já baixada · aguardando extrato
                   </span>
+                ) : (
+                  (c.paidAmount ?? 0) > 0 && (
+                    <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-500">
+                      Resta {formatCurrency(c.remaining ?? c.amount)}
+                    </span>
+                  )
                 )}
               </td>
             </tr>
@@ -585,24 +679,50 @@ function CandidateRow({
         </table>
       </div>
 
+      {/* An already-baixada parcela is linked in full — there is nothing left to
+          allocate (remaining is 0), so it gets a read-only summary instead of an
+          amount box. Same shape as the NF sections' allocation row. */}
+      {checked && c.linkOnly && (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2.5 border-t border-border bg-muted/10">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            Valor a vincular
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              {formatCurrency(c.amount)}
+            </span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              (parcela já baixada — só vincula o extrato)
+            </span>
+          </span>
+        </div>
+      )}
+
       {/* Boleto candidates link in full (the boleto IS the settlement) — no partial
-          allocation. Direct installments allow editing the allocated value. */}
-      {checked && !c.viaBankSlip && (
-        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-border bg-muted/10">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
+          allocation. Direct installments allow editing the allocated value.
+          The Input renders its own `w-full` wrapper, so it has to be boxed to a
+          fixed width here: left to grow it eats the row and squeezes the trailing
+          "de R$ …" into a two-line column against the right edge. */}
+      {checked && !c.viaBankSlip && !c.linkOnly && (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2.5 border-t border-border bg-muted/10">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
             Valor a alocar
           </span>
-          <Input
-            type="number"
-            step={0.01}
-            min={0}
-            value={amount ?? ""}
-            onChange={(v) => onAmountChange(v == null ? "" : String(v))}
-            onClick={(e) => e.stopPropagation()}
-            className="h-8 w-36 tabular-nums"
-          />
-          <span className="text-xs text-muted-foreground">
-            de {formatCurrency(c.remaining ?? c.amount)}
+          <span className="flex items-center gap-2">
+            <span className="w-36 shrink-0">
+              <Input
+                type="number"
+                step={0.01}
+                min={0}
+                value={amount ?? ""}
+                onChange={(v) => onAmountChange(v == null ? "" : String(v))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 tabular-nums"
+              />
+            </span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              de {formatCurrency(c.remaining ?? c.amount)}
+            </span>
           </span>
         </div>
       )}

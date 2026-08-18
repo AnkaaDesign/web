@@ -104,6 +104,16 @@ export interface ReceivableCandidate {
    *  matching it bridges the credit to the boleto (full link only, no partial). */
   bankSlipId: string | null;
   viaBankSlip: boolean;
+  /** The parcela is already stamped PAID (baixa manual) and is offered only so the
+   *  operator can attach the confirming bank line to it. It is a LINK, not a
+   *  receipt: the money was already recorded, `remaining` is 0, and POST
+   *  /receivables/allocate rejects it outright ("já está totalmente conciliada").
+   *  The only endpoint that accepts it is POST /receivables/match.
+   *
+   *  Optional because the API only sets it on installment candidates —
+   *  findBoletoCandidates omits the key, and those are already handled by
+   *  `viaBankSlip`, which every check below tests first. */
+  linkOnly?: boolean;
 }
 
 export interface ReceivableCandidatesResponse {
@@ -231,4 +241,38 @@ export interface TaskMatchResponse {
     reconciliationStatus: string;
     outcomes: TaskMatchOutcome[];
   };
+}
+
+/**
+ * The server's identity-resolved allocation plan for a credit: who paid (matched
+ * by CNPJ, CNPJ raiz or name) and which parcelas the value reconciles against.
+ *
+ * This is the only path that can express a lump payment covering SEVERAL
+ * parcelas, and the only one that can settle already-PAID parcelas as link-only
+ * clearance — POST /receivables/allocate rejects those outright. `auto: false`
+ * means identity resolved below the automatic bar, so the plan is offered for
+ * confirmation instead of being applied on its own.
+ */
+export interface ReceivableSuggestion {
+  customerId: string;
+  customerName: string | null;
+  via: string;
+  auto: boolean;
+  confidence: number;
+  /** How the value was reconciled: "single", "batch:10d", "subset", … */
+  kind: string;
+  totalAmount: number;
+  allocations: Array<{
+    installmentId: string;
+    amount: number;
+    linkOnly: boolean;
+    number: number;
+    dueDate: string;
+  }>;
+}
+
+export interface ReceivableSuggestionResponse {
+  success: boolean;
+  message: string;
+  data: { suggestion: ReceivableSuggestion | null };
 }

@@ -5,6 +5,7 @@ import type {
   ReceivableMatchPayload,
   ReceivableMatchResponse,
   ReceivablesResponse,
+  ReceivableSuggestionResponse,
   ReceivableUnmatchPayload,
   TaskCandidatesResponse,
   TaskMatchPayload,
@@ -32,6 +33,20 @@ export const receivableService = {
   // (partial receipt / lump payment of several parcelas).
   allocateReceivable: (payload: ReceivableAllocatePayload) =>
     apiClient.post<ReceivableMatchResponse>(`${basePath}/allocate`, payload),
+
+  // The server's identity-resolved plan for a credit (who paid + which parcelas).
+  // Expresses what the candidate list structurally cannot: lump payments spanning
+  // several parcelas, and already-PAID parcelas as link-only clearance.
+  getReceivableSuggestion: (transactionId: string) =>
+    apiClient.get<ReceivableSuggestionResponse>(
+      `${basePath}/suggestion/${transactionId}`,
+    ),
+
+  // Apply that plan in one click.
+  confirmReceivableSuggestion: (transactionId: string) =>
+    apiClient.post<ReceivableMatchResponse>(`${basePath}/confirm-suggestion`, {
+      transactionId,
+    }),
 
   // Undo a previous credit↔installment conciliation.
   unmatchReceivable: (payload: ReceivableUnmatchPayload) =>

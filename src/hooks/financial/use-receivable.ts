@@ -48,6 +48,32 @@ export function useReceivableCandidates(
 }
 
 /**
+ * The server's identity-resolved allocation plan for a credit. Separate from the
+ * candidate list because it answers a different question: the candidate list asks
+ * "which parcelas look like this value?", the suggestion asks "who paid, and what
+ * does this value settle for them?" — which is what resolves a lump payment
+ * covering many parcelas, or one landing on parcelas already marked paid.
+ */
+export function useReceivableSuggestion(
+  transactionId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: transactionId
+      ? [...receivableKeys.candidates(transactionId), "suggestion"]
+      : receivableKeys.all,
+    queryFn: () =>
+      transactionId
+        ? receivableService
+            .getReceivableSuggestion(transactionId)
+            .then((r) => r.data.data.suggestion)
+        : Promise.reject(),
+    enabled: !!transactionId && enabled,
+    staleTime: 30_000,
+  });
+}
+
+/**
  * Tarefas a bank CREDIT can be conciliated against, including tasks with no
  * orçamento at all.
  *
@@ -112,6 +138,15 @@ export function useReceivableMutations() {
     onSuccess: () => invalidate(),
   });
 
+  // One-click apply of the identity-resolved plan. Routed through the server's
+  // own confirm path (not allocate) because that is the only one that accepts a
+  // multi-parcela batch containing already-PAID link-only clearance.
+  const confirmSuggestionMutation = useMutation({
+    mutationFn: (transactionId: string) =>
+      receivableService.confirmReceivableSuggestion(transactionId).then((r) => r.data),
+    onSuccess: () => invalidate(),
+  });
+
   // Conciliate against tarefas, minting the missing orçamento/fatura/parcela.
   const matchTasksMutation = useMutation({
     mutationFn: (payload: TaskMatchPayload) =>
@@ -123,10 +158,12 @@ export function useReceivableMutations() {
     matchMutation,
     unmatchMutation,
     allocateMutation,
+    confirmSuggestionMutation,
     matchTasksMutation,
     matchAsync: matchMutation.mutateAsync,
     unmatchAsync: unmatchMutation.mutateAsync,
     allocateAsync: allocateMutation.mutateAsync,
     matchTasksAsync: matchTasksMutation.mutateAsync,
+    confirmSuggestionAsync: confirmSuggestionMutation.mutateAsync,
   };
 }
