@@ -145,9 +145,20 @@ export const signatureService = {
   /** Resumo da coleta pela chave do orçamento — alimenta /cliente/orcamento/:id. */
   getQuoteSummary: (quoteId: string) => apiClient.get(`/assinatura/publico/orcamento/${quoteId}`),
 
-  /** PDF da coleta corrente. Rota pública: mesma capability da página (o UUID do orçamento). */
-  quoteDocumentUrl: (quoteId: string) =>
-    `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/orcamento/${quoteId}/documento.pdf`,
+  /**
+   * PDF da coleta corrente. Rota pública: mesma capability da página (o UUID do
+   * orçamento).
+   *
+   * `customerId` recorta o documento para um dos clientes do faturamento
+   * dividido — os serviços dele, o total dele, a condição de pagamento dele. Sem
+   * ele, a página mostrava na tela a fatia de um cliente e o download vinha com
+   * os serviços e o total dos dois. O recorte só alcança o orçamento renderizado
+   * sob demanda: havendo coleta de assinaturas, o que sai é o documento
+   * congelado, inteiro, e o servidor sinaliza isso em `X-Orcamento-Recorte`.
+   */
+  quoteDocumentUrl: (quoteId: string, customerId?: string | null) =>
+    `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/orcamento/${quoteId}/documento.pdf` +
+    (customerId ? `?cliente=${encodeURIComponent(customerId)}` : ""),
 
   // ---- interno ----
   /**

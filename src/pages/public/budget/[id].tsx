@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
 import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
-import { signatureService } from "@/api-client/signature";
+import { signatureService, filenameFromDisposition } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -188,18 +188,60 @@ export function PublicBudgetPage() {
   // Calculate derived data
   // Find the relevant customer config (filtered by URL param, or first available)
   const activeConfig = quote.customerConfigs?.find(c => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
-  // The budget's contact is ALWAYS the task's first responsible — the quote no longer
-  // carries its own (which went stale after duplicating a task + changing its responsible).
-  const contactName = quote.task?.responsibles?.[0]?.name || "";
-  // Invoice-to customer (woven into the intro): corporate/fantasy name + CNPJ or CPF
-  // when present. Prefer the active config's customer, fall back to the task's.
-  const billCustomer: any = activeConfig?.customer || quote.task?.customer;
+  /**
+   * "À <fulano>" — TODOS os contatos a quem o orçamento é endereçado.
+   *
+   * Duas fontes, unidas e deduplicadas por id: o contato de cada configuração de
+   * faturamento (o "responsável do cliente 1 e do cliente 2") e os responsáveis
+   * da TAREFA, que são quem assina. Aqui saía `responsibles[0]`, então toda
+   * tarefa com dois responsáveis endereçava o documento a um só — e as
+   * configurações herdam por padrão o mesmo responsável da tarefa, de modo que
+   * olhar só para elas não resolve. Mesma regra da API (`renderQuoteDocument`).
+   *
+   * No recorte vale a regra estrita: só o contato daquela configuração, senão o
+   * orçamento de um pagador chega endereçado à pessoa do outro.
+   */
+  const contactName: string = (() => {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    const push = (r: any) => {
+      if (!r?.name || seen.has(r.id)) return;
+      seen.add(r.id);
+      names.push(r.name);
+    };
+    if (selectedCustomerId) {
+      push((activeConfig as any)?.responsible);
+      if (!names.length) (quote.task?.responsibles ?? []).forEach(push);
+    } else {
+      (quote.customerConfigs ?? []).forEach((c: any) => push(c.responsible));
+      (quote.task?.responsibles ?? []).forEach(push);
+    }
+    if (names.length <= 1) return names[0] ?? "";
+    return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+  })();
+  // Cliente da frase de abertura: o da TAREFA — aquele para quem o serviço é
+  // executado, dono do veículo descrito na mesma frase. Usar o cliente da
+  // configuração punha a proposta "para a <financiadora>" num serviço que não é
+  // dela, e na visão completa escolhia arbitrariamente um dos dois pagadores.
+  // Quem paga aparece onde importa: na coluna "Faturar para", na apuração por
+  // cliente e nas condições de pagamento.
+  const billCustomer: any = quote.task?.customer || activeConfig?.customer;
   const invoiceName: string = billCustomer?.corporateName || billCustomer?.fantasyName || "";
   const invoiceDoc: string = billCustomer?.cnpj
     ? `CNPJ ${formatCNPJ(billCustomer.cnpj)}`
     : billCustomer?.cpf
       ? `CPF ${billCustomer.cpf}`
       : "";
+  // Razão social sob a linha de assinatura do cliente: no recorte é o cliente
+  // daquela fatia (o documento é dele), fora dele o da tarefa — o mesmo critério
+  // que a API usa em `renderUnsignedQuoteDocument` e nos selos do envelope.
+  const signatureCustomerName: string =
+    (selectedCustomerId
+      ? (activeConfig?.customer as any)?.corporateName || (activeConfig?.customer as any)?.fantasyName
+      : "") ||
+    quote.task?.customer?.corporateName ||
+    quote.task?.customer?.fantasyName ||
+    "";
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = quote.budgetNumber
     ? String(quote.budgetNumber).padStart(4, '0')
@@ -272,14 +314,36 @@ export function PublicBudgetPage() {
    */
   const handleExportPdf = async () => {
     try {
-      const res = await fetch(signatureService.quoteDocumentUrl(id!), { credentials: "omit" });
+      // O cliente do recorte viaja junto — a mesma correção que o dossiê já
+      // tinha. Esta página mostra na tela só os serviços, o subtotal, o desconto
+      // e o total do cliente da URL, e o PDF vinha com o escopo dos dois
+      // clientes do faturamento: quem abria o anexo via o preço do outro.
+      const res = await fetch(signatureService.quoteDocumentUrl(id!, selectedCustomerId), {
+        credentials: "omit",
+      });
       if (!res.ok) throw new Error(String(res.status));
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
-      a.download = budgetPdfFilename(quote?.task?.customer, quote?.budgetNumber);
+      // O nome vem do SERVIDOR quando ele anuncia um: no recorte quem nomeia é o
+      // cliente da fatia, e `task.customer` é sempre o da tarefa — os dois
+      // downloads de um faturamento de dois clientes chegavam com o mesmo nome e
+      // o segundo sobrescrevia o primeiro. O recuo mantém o nome de antes.
+      a.download =
+        filenameFromDisposition(res.headers.get("content-disposition")) ??
+        budgetPdfFilename(activeConfig?.customer ?? quote?.task?.customer, quote?.budgetNumber);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // Recorte pedido que não pôde ser aplicado: o documento está congelado na
+      // coleta de assinaturas, e o que foi ao cliente para assinar é um contrato
+      // só, com o escopo inteiro. Dizer isso é obrigatório — receber o documento
+      // completo em silêncio, achando que se baixou a fatia de um cliente, é
+      // exatamente o defeito que este recorte corrige.
+      if (res.headers.get("x-orcamento-recorte") === "ignorado") {
+        toast.info(
+          "Este orçamento já está em assinatura: o PDF sai com o escopo completo, como foi assinado.",
+        );
+      }
     } catch {
       toast.error("Não foi possível gerar o PDF deste orçamento. Tente novamente.");
     }
@@ -438,6 +502,20 @@ export function PublicBudgetPage() {
                   which only insets its content via padding. */}
               <div className="pl-4">
                 <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                  {/* Cabeçalho só existe quando há a coluna do meio: com serviço
+                      e valor a leitura já se explica. Espelha `.service-head`
+                      no PDF. */}
+                  {isCompleteView && (
+                    <thead>
+                      <tr style={{ borderBottom: "0.5px solid #ccc" }}>
+                        <th className="text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500 py-1 pr-2">Serviço</th>
+                        {/* Largura fixa: é ela que garante que QUEM quebra é o
+                            nome do cliente, e não a descrição do serviço. */}
+                        <th className="w-[34%] text-right text-[10px] font-semibold uppercase tracking-wide text-gray-500 py-1 px-2">Faturar para</th>
+                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-500 py-1">Valor</th>
+                      </tr>
+                    </thead>
+                  )}
                   <tbody>
                   {filteredServices.map((service, index) => {
                     const isOutros = service.description?.trim().toLowerCase() === "outros";
@@ -461,15 +539,18 @@ export function PublicBudgetPage() {
                         className="align-top"
                         style={isLast ? undefined : { borderBottom: "0.5px dotted #ccc" }}
                       >
-                        <td className="text-gray-800 py-1 pr-2">
+                        {/* Três colunas na mesma linha pedem um corpo menor —
+                            no tamanho normal a razão social empurrava tudo e a
+                            linha do serviço virava um bloco de três linhas. */}
+                        <td className={`text-gray-800 py-1 pr-2 ${isCompleteView ? 'text-sm' : ''}`}>
                           {index + 1} - {displayText}
                         </td>
                         {isCompleteView && (
-                          <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
-                            {invoiceToName || '-'}
+                          <td className="text-[11px] leading-tight text-gray-500 text-right py-1 px-2 break-words">
+                            {invoiceToName || '—'}
                           </td>
                         )}
-                        <td className="text-gray-800 font-semibold whitespace-nowrap text-right py-1">
+                        <td className={`text-gray-800 font-semibold whitespace-nowrap text-right py-1 ${isCompleteView ? 'text-sm' : ''}`}>
                           {formatCurrency(amount)}
                         </td>
                       </tr>
@@ -481,15 +562,52 @@ export function PublicBudgetPage() {
 
               {/* Totals */}
               {isCompleteView ? (
-                // Completo: show per-customer subtotals
+                // Completo: a apuração de CADA cliente, não só o total dele.
+                // O desconto de um faturamento dividido só aparecia ao abrir a
+                // fatia de um cliente — nesta visão o cliente via um total menor
+                // que a soma dos serviços dele, sem nada explicando a diferença.
                 <div className="mt-6 pl-4 space-y-3">
                   {quote.customerConfigs!.map((config: any) => {
+                    const configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
                     const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
                     const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
+                    // O abatimento é a DIFERENÇA gravada, não o percentual
+                    // recalculado: é o único número que fecha com o total da
+                    // configuração. O percentual entra só no rótulo.
+                    const configDiscount = Math.max(0, Math.round((configSubtotal - configTotal) * 100) / 100);
+                    if (!configDiscount) {
+                      return (
+                        <div key={config.id} className="flex justify-between items-baseline">
+                          <span className="text-gray-700 text-sm font-medium">{customerName}</span>
+                          <span className="text-gray-800 font-medium">{formatCurrency(configTotal)}</span>
+                        </div>
+                      );
+                    }
                     return (
-                      <div key={config.id} className="flex justify-between items-baseline">
-                        <span className="text-gray-700 text-sm">{customerName}</span>
-                        <span className="text-gray-800 font-medium">{formatCurrency(configTotal)}</span>
+                      <div key={config.id}>
+                        <p className="text-sm font-medium text-gray-700 mb-1">{customerName}</p>
+                        <div className="pl-4 space-y-1">
+                          <div className="flex justify-between items-baseline text-sm">
+                            <span className="text-gray-700">Subtotal</span>
+                            <span className="text-gray-800">{formatCurrency(configSubtotal)}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline text-sm">
+                            <span className="text-gray-700">
+                              {config.discountType === 'PERCENTAGE' && config.discountValue
+                                ? `Desconto (${config.discountValue}%)`
+                                : 'Desconto'}
+                              {config.discountReference && <> — {config.discountReference}</>}
+                            </span>
+                            <span className="text-red-600">- {formatCurrency(configDiscount)}</span>
+                          </div>
+                          <div
+                            className="flex justify-between items-baseline text-sm pt-1"
+                            style={{ borderTop: "0.5px solid #ccc" }}
+                          >
+                            <span className="text-gray-700 font-medium">Total</span>
+                            <span className="text-gray-800 font-medium">{formatCurrency(configTotal)}</span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -684,7 +802,7 @@ export function PublicBudgetPage() {
                 signatário, pelo link pessoal que recebe por WhatsApp. */}
             <BudgetSignaturePanel
               quoteId={id!}
-              customerName={invoiceName || undefined}
+              customerName={signatureCustomerName || undefined}
               onEnvelope={handleEnvelope}
             />
 

@@ -29,6 +29,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "@/api-client/file";
@@ -147,6 +148,14 @@ const FinancialBudgetDetailPageInner = () => {
   const formInitializedRef = useRef(false);
   const [formInitialized, setFormInitialized] = useState(false);
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
+  /**
+   * Cliente do link público do orçamento, no faturamento dividido.
+   *
+   * "all" = documento completo, como no seletor do dossiê na página de
+   * Faturamento. Vale para a página pública E para o PDF que ela baixa: o
+   * recorte por cliente é o mesmo dos dois lados.
+   */
+  const [publicBudgetCustomerId, setPublicBudgetCustomerId] = useState<string>("all");
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
     new Map(),
@@ -1542,11 +1551,26 @@ const FinancialBudgetDetailPageInner = () => {
 
   // Public "Ver Orçamento" link — lives in the page header (mirrors the invoice
   // page's "Ver Dossiê"), not in a body card.
-  const budgetCustomerId = task?.customer?.id || task?.customerId;
-  const publicBudgetUrl =
-    existingQuote?.id && budgetCustomerId
+  //
+  // No faturamento DIVIDIDO quem escolhe é o seletor ao lado, não a tarefa. A
+  // página pública recorta serviços, desconto e total pelo cliente da URL (e
+  // agora o PDF sai recortado junto) — mas isto usava sempre `task.customer`, o
+  // cliente da TAREFA: abria a fatia de um dos dois sem dizer qual, e não havia
+  // caminho nenhum para abrir a do outro. Com uma configuração só nada muda: o
+  // cliente da tarefa continua sendo o único que existe.
+  const splitBilling = (customerConfigs || []).length > 1;
+  const budgetCustomerId = splitBilling
+    ? publicBudgetCustomerId === "all"
+      ? null
+      : publicBudgetCustomerId
+    : task?.customer?.id || task?.customerId;
+  // Sem cliente a URL é a do orçamento COMPLETO — que é o que "Completo"
+  // significa. Só o caminho não-dividido exige um cliente para existir.
+  const publicBudgetUrl = existingQuote?.id
+    ? splitBilling || budgetCustomerId
       ? routes.customer.budget(budgetCustomerId, existingQuote.id)
-      : null;
+      : null
+    : null;
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -1565,6 +1589,32 @@ const FinancialBudgetDetailPageInner = () => {
             {/* Left of "Ver Orçamento" on purpose: as a PageAction it lands beside the wizard's own
                 "Anterior / Próximo", and two adjacent pairs of arrows read as one control. */}
             <RecordPager nav={recordNav} keyboard={false} />
+            {/* Seletor do faturamento dividido. Mesmo controle, mesmos rótulos e
+                mesmo padrão ("Completo" primeiro) do seletor do dossiê na página
+                de Faturamento — é a mesma escolha, sobre o mesmo orçamento. */}
+            {publicBudgetUrl && splitBilling && (
+              <Combobox
+                value={publicBudgetCustomerId}
+                onValueChange={(v) => setPublicBudgetCustomerId((v as string) || "all")}
+                options={[
+                  { value: "all", label: "Completo" },
+                  ...(customerConfigs || []).map((config: any, i: number) => {
+                    const cached = customersCache.current.get(config?.customerId);
+                    const name =
+                      config?.customerData?.fantasyName ||
+                      config?.customerData?.corporateName ||
+                      cached?.fantasyName ||
+                      cached?.corporateName ||
+                      `Cliente ${i + 1}`;
+                    return { value: config?.customerId, label: name };
+                  }).filter((o: any) => o.value),
+                ]}
+                searchable={false}
+                clearable={false}
+                className="w-[260px]"
+                triggerClassName="h-8 text-sm"
+              />
+            )}
             {publicBudgetUrl && (
               <Button
                 variant="outline"
