@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusCard, ExamCard, DocumentsCard, UserCard, AdmissionDetailSkeleton } from "@/components/personnel-department/admission/detail";
-import { isAdmissionFinal, hasBlockingRequiredDocs, getNextAdmissionStatus, getPreviousAdmissionStatus } from "@/components/personnel-department/admission/utils";
+import { isAdmissionFinal, getNextAdmissionStatus, getPreviousAdmissionStatus } from "@/components/personnel-department/admission/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +53,7 @@ export const AdmissionDetailPage = () => {
         },
       },
       createdBy: true,
-      documents: { include: { file: true, signedFile: true, signedBy: true }, orderBy: { type: "asc" } },
+      documents: { include: { file: true, files: true, signedFile: true, signedBy: true }, orderBy: { type: "asc" } },
     },
     enabled: !!id,
   });
@@ -84,7 +84,6 @@ export const AdmissionDetailPage = () => {
   }
 
   const isFinal = isAdmissionFinal(admission.status);
-  const blockedByDocs = hasBlockingRequiredDocs(admission);
   const nextStatus = getNextAdmissionStatus(admission.status);
   const previousStatus = getPreviousAdmissionStatus(admission.status);
   const title = admission.user?.name ? `Admissão — ${admission.user.name}` : "Admissão";
@@ -161,9 +160,8 @@ export const AdmissionDetailPage = () => {
           },
         ]
       : []),
-    // Avançar — oculto quando final; desabilitado (com explicação no card de
-    // status) enquanto houver documentos obrigatórios pendentes (espelha o guard
-    // do servidor).
+    // Avançar — oculto quando final. Documento pendente NÃO trava: o checklist
+    // é lembrete de coleta, não requisito de etapa.
     // Ordem desejada no header: Voltar etapa · Avançar · Editar · Cancelar.
     // O PageHeader renderiza secondary (Voltar/outline) e depois [primary, danger];
     // por isso Avançar+Editar usam group "primary" e Cancelar/Excluir, "danger".
@@ -171,12 +169,12 @@ export const AdmissionDetailPage = () => {
       ? [
           {
             key: "advance",
-            label: blockedByDocs ? "Avançar (documentos pendentes)" : "Avançar",
+            label: "Avançar",
             icon: IconPlayerTrackNext,
             onClick: () => setAdvanceDialogOpen(true),
             variant: "default" as const,
             group: "primary" as const,
-            disabled: blockedByDocs || advanceMutation.isPending,
+            disabled: advanceMutation.isPending,
           },
         ]
       : []),

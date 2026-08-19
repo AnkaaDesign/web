@@ -2,7 +2,7 @@
 // Mirrors the server status machine at api/src/modules/personnel-department/admission/admission.service.ts
 
 import { ADMISSION_STATUS, ADMISSION_DOCUMENT_STATUS, ADMISSION_DOCUMENT_TYPE } from "../../../constants";
-import type { Admission, AdmissionDocument } from "../../../types/admission";
+import type { AdmissionDocument } from "../../../types/admission";
 
 // ---- Admission document checklist (single source of truth, mirrors the API) ----
 // Only these document types belong to the admission. Everything else (LGPD,
@@ -18,10 +18,8 @@ export const ADMISSION_CHECKLIST_DOC_TYPES: ADMISSION_DOCUMENT_TYPE[] = [
   ADMISSION_DOCUMENT_TYPE.PHOTO,
 ];
 
-// Sempre obrigatórios.
-export const ADMISSION_HARD_REQUIRED_DOC_TYPES: ADMISSION_DOCUMENT_TYPE[] = [ADMISSION_DOCUMENT_TYPE.CPF, ADMISSION_DOCUMENT_TYPE.CTPS];
-// Obrigatório "um destes": RG OU CNH.
-export const ADMISSION_EITHER_REQUIRED_DOC_TYPES: ADMISSION_DOCUMENT_TYPE[] = [ADMISSION_DOCUMENT_TYPE.RG, ADMISSION_DOCUMENT_TYPE.DRIVER_LICENSE];
+// Nenhum tipo é obrigatório: o checklist orienta a coleta, mas não trava o
+// avanço da etapa (espelha o servidor — o guard de DOCS_PENDING foi removido).
 
 /** Only the documents that belong to the admission checklist (hides legacy extras). */
 export function getAdmissionChecklistDocuments(documents?: AdmissionDocument[]): AdmissionDocument[] {
@@ -54,25 +52,6 @@ export function getPreviousAdmissionStatus(status: ADMISSION_STATUS): ADMISSION_
   const index = ADMISSION_STATUS_CHAIN.indexOf(status);
   if (index <= 0) return null;
   return ADMISSION_STATUS_CHAIN[index - 1];
-}
-
-/**
- * Mirrors the server guard. An admission cannot leave DOCS_PENDING (forward)
- * while a REQUIRED document is still PENDING. Required = CPF + CTPS (hard) AND
- * at least one of RG / CNH. Legacy document types are ignored (they are no
- * longer part of the admission), so old admissions are never stuck on them.
- */
-export function hasBlockingRequiredDocs(admission: Pick<Admission, "status"> & { documents?: AdmissionDocument[] }): boolean {
-  if (admission.status !== ADMISSION_STATUS.DOCS_PENDING) return false;
-  const docs = admission.documents || [];
-
-  const hardPending = docs.some((doc) => ADMISSION_HARD_REQUIRED_DOC_TYPES.includes(doc.type) && doc.status === ADMISSION_DOCUMENT_STATUS.PENDING);
-
-  const eitherDocs = docs.filter((doc) => ADMISSION_EITHER_REQUIRED_DOC_TYPES.includes(doc.type));
-  // Satisfied when no RG/CNH rows exist (legacy) or at least one is provided.
-  const eitherSatisfied = eitherDocs.length === 0 || eitherDocs.some((doc) => doc.status !== ADMISSION_DOCUMENT_STATUS.PENDING);
-
-  return hardPending || !eitherSatisfied;
 }
 
 /** Progress over the admission checklist only (legacy extras excluded). */

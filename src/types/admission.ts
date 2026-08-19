@@ -60,7 +60,11 @@ export interface AdmissionDocument extends BaseEntity {
 
   // Relations (optional, populated based on query)
   admission?: Admission;
+  /** Anexo PRINCIPAL — o primeiro do conjunto. É ele que alimenta a miniatura
+   *  e o pipeline de assinatura, que operam sobre um arquivo só. */
   file?: File;
+  /** Conjunto COMPLETO de anexos (frente + verso, páginas da CTPS…). */
+  files?: File[];
   signedFile?: File;
   signedBy?: User;
 }
@@ -79,6 +83,7 @@ export interface AdmissionIncludes {
 export interface AdmissionDocumentIncludes {
   admission?: boolean | { include?: AdmissionIncludes };
   file?: boolean | { include?: FileIncludes };
+  files?: boolean | { include?: FileIncludes };
   signedFile?: boolean | { include?: FileIncludes };
   signedBy?: boolean | { include?: UserIncludes };
 }

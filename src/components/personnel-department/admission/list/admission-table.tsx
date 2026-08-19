@@ -28,7 +28,7 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { createAdmissionColumns } from "./admission-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { AdmissionListSkeleton } from "./admission-list-skeleton";
-import { isAdmissionFinal, hasBlockingRequiredDocs, getNextAdmissionStatus } from "../utils";
+import { isAdmissionFinal, getNextAdmissionStatus } from "../utils";
 
 interface AdmissionTableProps {
   visibleColumns: Set<string>;
@@ -178,7 +178,6 @@ export function AdmissionTable({ visibleColumns, className, onCancel, onDelete, 
   // Guard flags for the context menu
   const ctxAdmission = contextMenu?.admission;
   const ctxIsFinal = ctxAdmission ? isAdmissionFinal(ctxAdmission.status) : true;
-  const ctxBlockedByDocs = ctxAdmission ? hasBlockingRequiredDocs(ctxAdmission) : false;
   const ctxNextStatus = ctxAdmission ? getNextAdmissionStatus(ctxAdmission.status) : null;
 
   return (
@@ -324,15 +323,11 @@ export function AdmissionTable({ visibleColumns, className, onCancel, onDelete, 
           {!ctxIsFinal && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleAdvance} disabled={ctxBlockedByDocs || advanceMutation.isPending}>
+              <DropdownMenuItem onClick={handleAdvance} disabled={advanceMutation.isPending}>
                 <IconPlayerTrackNext className="mr-2 h-4 w-4" />
                 <div className="flex flex-col">
                   <span>Avançar etapa</span>
-                  {ctxBlockedByDocs ? (
-                    <span className="text-xs text-muted-foreground">Existem documentos obrigatórios pendentes</span>
-                  ) : (
-                    ctxNextStatus && <span className="text-xs text-muted-foreground">Próxima: {ADMISSION_STATUS_LABELS[ctxNextStatus]}</span>
-                  )}
+                  {ctxNextStatus && <span className="text-xs text-muted-foreground">Próxima: {ADMISSION_STATUS_LABELS[ctxNextStatus]}</span>}
                 </div>
               </DropdownMenuItem>
 

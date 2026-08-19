@@ -39,7 +39,7 @@ import type {
   AdmissionBatchDeleteResponse,
   Admission,
 } from "../../types/admission";
-import { admissionKeys, userKeys, changeLogKeys } from "../common/query-keys";
+import { admissionKeys, userKeys, changeLogKeys, medicalExamKeys } from "../common/query-keys";
 import { createEntityHooks } from "../common/create-entity-hooks";
 
 // =====================================================
@@ -80,7 +80,10 @@ const baseHooks = createEntityHooks<
   queryKeys: admissionKeys,
   service: admissionServiceAdapter,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [userKeys, changeLogKeys], // Admission create/advance updates the user (contractKind)
+  // Avançar para a etapa "Exame admissional" faz o SERVIDOR criar o ASO
+  // (admission.service.ts). Sem medicalExamKeys aqui o cartão do exame segue
+  // servindo o cache "nenhum exame agendado" e o operador clica em Agendar de novo.
+  relatedQueryKeys: [userKeys, changeLogKeys, medicalExamKeys], // Admission create/advance updates the user (contractKind) + auto-creates the ASO
 });
 
 // Export base hooks with standard names
@@ -100,6 +103,9 @@ function useInvalidateAdmissions() {
     queryClient.invalidateQueries({ queryKey: admissionKeys.all });
     queryClient.invalidateQueries({ queryKey: userKeys.all });
     queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
+    // O avanço de etapa cria o exame admissional no servidor — sem isto o
+    // ExamCard continua mostrando "Agendar exame" sobre um ASO que já existe.
+    queryClient.invalidateQueries({ queryKey: medicalExamKeys.all });
   };
 }
 
@@ -116,7 +122,7 @@ export function useAdmissionAdvance() {
 export function useAdmissionDocumentUpload() {
   const invalidate = useInvalidateAdmissions();
   return useMutation({
-    mutationFn: ({ id, data, file }: { id: string; data: AdmissionDocumentUploadFormData; file: File }) => uploadAdmissionDocument(id, data, file),
+    mutationFn: ({ id, data, file }: { id: string; data: AdmissionDocumentUploadFormData; file: File | File[] }) => uploadAdmissionDocument(id, data, file),
     onSuccess: invalidate,
   });
 }
@@ -154,7 +160,7 @@ export function useAdmissionByUser(userId: string | undefined, params?: any, opt
 export function useAdmissionDocumentUploadByUser() {
   const invalidate = useInvalidateAdmissions();
   return useMutation({
-    mutationFn: ({ userId, data, file }: { userId: string; data: AdmissionDocumentUploadFormData; file: File }) => uploadAdmissionDocumentByUser(userId, data, file),
+    mutationFn: ({ userId, data, file }: { userId: string; data: AdmissionDocumentUploadFormData; file: File | File[] }) => uploadAdmissionDocumentByUser(userId, data, file),
     onSuccess: invalidate,
   });
 }

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { ADMISSION_STATUS, ADMISSION_STATUS_LABELS, MEDICAL_EXAM_RESULT, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_TYPE } from "../../../../constants";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { Admission } from "../../../../types/admission";
-import { ADMISSION_STATUS_CHAIN, hasBlockingRequiredDocs } from "../utils";
+import { ADMISSION_STATUS_CHAIN } from "../utils";
 import { WorkflowStepper, type WorkflowStep } from "../../shared/workflow-stepper";
 import { useLinkedMedicalExam } from "@/components/occupational-health/medical-exam/detail/linked-exam-status";
 
@@ -31,7 +31,6 @@ export function StatusCard({ admission, className }: StatusCardProps) {
   // Index within STEPPER_STEPS (offset by the always-done registration step).
   const stepperIndex = currentIndex + 1;
   const isCompleted = admission.status === ADMISSION_STATUS.COMPLETED;
-  const blockedByDocs = hasBlockingRequiredDocs(admission);
 
   // The step the process stopped on when cancelled (offset by registration).
   const cancelledFromIndex = admission.cancelledFromStatus ? ADMISSION_STATUS_CHAIN.indexOf(admission.cancelledFromStatus) + 1 : 1;
@@ -70,17 +69,6 @@ export function StatusCard({ admission, className }: StatusCardProps) {
             <div className="text-sm">
               <p className="font-medium">Aguardando ASO admissional</p>
               <p className="text-muted-foreground">O exame admissional precisa ser concluído com resultado Apto para avançar para o contrato.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Guard explanation (mirrors the server rule) */}
-        {blockedByDocs && (
-          <div className="flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-            <IconAlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium">Existem documentos obrigatórios pendentes</p>
-              <p className="text-muted-foreground">Receba, assine ou dispense os documentos obrigatórios para avançar a etapa.</p>
             </div>
           </div>
         )}

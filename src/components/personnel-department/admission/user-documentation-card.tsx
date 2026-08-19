@@ -11,7 +11,7 @@
 // (mesmo @Roles dos endpoints de admissão).
 
 import { useEffect, useRef, useState } from "react";
-import { IconFileText, IconLoader2, IconUpload } from "@tabler/icons-react";
+import { IconFileText, IconLoader2, IconUpload, IconX } from "@tabler/icons-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -96,13 +96,14 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
   };
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     // Reset so the same file can be re-selected later
     event.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     setIsBusy(true);
     try {
-      await uploadMutation.mutateAsync({ userId, data: { type: document.type }, file });
+      // Envio ACUMULA: escolher o verso não substitui a frente já enviada.
+      await uploadMutation.mutateAsync({ userId, data: { type: document.type }, file: files });
     } catch (error) {
       // Error toast is handled by the API client
       if (process.env.NODE_ENV !== "production") {
@@ -112,6 +113,22 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
       setIsBusy(false);
     }
   };
+
+  const handleRemoveFile = async (fileId: string) => {
+    setIsBusy(true);
+    try {
+      await updateMutation.mutateAsync({ documentId: document.id, data: { removeFileIds: [fileId] } });
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error removing user document file:", error);
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  // `files` é o conjunto completo; documentos anteriores à migração só têm `file`.
+  const attachments = document.files?.length ? document.files : document.file ? [document.file] : [];
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -140,16 +157,33 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
             placeholder="Status"
             triggerClassName="h-8 w-44 text-xs"
           />
-          {/* Preview — reserved 48px slot so rows without a file keep the columns aligned. */}
-          {document.file ? (
-            <FileThumbnail file={document.file} size="sm" className="shrink-0" onClick={() => window.open(getFileUrl(document.file!), "_blank", "noopener,noreferrer")} />
+          {/* Anexos — vários por documento (frente/verso, páginas da CTPS). Faixa
+              rolável para não empurrar o botão; slot vazio mantém o alinhamento. */}
+          {attachments.length > 0 ? (
+            <div className="flex max-w-[10.5rem] shrink-0 items-center gap-1.5 overflow-x-auto">
+              {attachments.map((file) => (
+                <div key={file.id} className="group relative shrink-0">
+                  <FileThumbnail file={file} size="sm" onClick={() => window.open(getFileUrl(file), "_blank", "noopener,noreferrer")} />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(file.id)}
+                    disabled={isBusy}
+                    title={`Remover ${file.filename ?? "anexo"}`}
+                    aria-label={`Remover ${file.filename ?? "anexo"}`}
+                    className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow group-hover:flex focus-visible:flex disabled:opacity-50"
+                  >
+                    <IconX className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="h-12 w-12 shrink-0" aria-hidden />
           )}
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelected} />
           <Button type="button" variant="outline" size="sm" className="w-32 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
             {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
-            {document.fileId ? "Substituir" : "Enviar"}
+            {attachments.length > 0 ? "Adicionar" : "Enviar"}
           </Button>
         </div>
       ) : (
@@ -167,7 +201,7 @@ export function UserDocumentationCard({ userId, className, embedded = false, onC
 
   const { data, isLoading } = useAdmissionByUser(
     userId,
-    { include: { documents: { include: { file: true }, orderBy: { type: "asc" } } } },
+    { include: { documents: { include: { file: true, files: true }, orderBy: { type: "asc" } } } },
     { enabled: canView },
   );
 

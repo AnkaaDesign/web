@@ -38,7 +38,7 @@ interface InlineExamPanelProps {
 
 export function InlineExamPanel({ userId, type, processField, processId, createdAfter, title, disabled, bare, hideTitle }: InlineExamPanelProps) {
   const { exam, isLoading } = useLinkedMedicalExam(userId, type, createdAfter);
-  const { createAsync, isCreating } = useMedicalExamMutations();
+  const { createAsync, isCreating, refresh } = useMedicalExamMutations();
 
   const isCompleted = exam?.status === MEDICAL_EXAM_STATUS.COMPLETED;
 
@@ -46,7 +46,12 @@ export function InlineExamPanel({ userId, type, processField, processId, created
     try {
       await createAsync({ userId, type: type as any, status: MEDICAL_EXAM_STATUS.SCHEDULED, [processField]: processId } as any);
     } catch {
-      /* erro tratado pelo api-client */
+      // O servidor cria o ASO sozinho ao avançar a etapa do processo, e
+      // admissionId/terminationId são únicos: se o POST falhou, o exame quase
+      // sempre JÁ existe e esta tela é que está velha. Revalidar aqui faz o
+      // painel se corrigir no primeiro clique, em vez de deixar o operador
+      // repetindo o botão contra um erro. Mensagem tratada pelo api-client.
+      refresh();
     }
   };
 

@@ -100,9 +100,13 @@ export class AdmissionService {
   // Document Operations
   // =====================
 
-  async uploadAdmissionDocument(id: string, data: AdmissionDocumentUploadFormData, file: File): Promise<AdmissionDocumentUpdateResponse> {
+  /** `files` aceita 1..N anexos do MESMO documento (RG frente + verso, páginas da CTPS). */
+  async uploadAdmissionDocument(id: string, data: AdmissionDocumentUploadFormData, files: File | File[]): Promise<AdmissionDocumentUpdateResponse> {
     const formData = new FormData();
-    formData.append("file", file);
+    // Campo "file" repetido — é o que o FilesInterceptor('file', N) espera.
+    for (const file of Array.isArray(files) ? files : [files]) {
+      formData.append("file", file);
+    }
     formData.append("type", data.type);
     if (data.note) {
       formData.append("note", data.note);
@@ -123,9 +127,11 @@ export class AdmissionService {
    * Documentação do colaborador — upload pelo userId; o processo de admissão é
    * criado preguiçosamente no servidor quando ainda não existe.
    */
-  async uploadAdmissionDocumentByUser(userId: string, data: AdmissionDocumentUploadFormData, file: File): Promise<AdmissionDocumentUpdateResponse> {
+  async uploadAdmissionDocumentByUser(userId: string, data: AdmissionDocumentUploadFormData, files: File | File[]): Promise<AdmissionDocumentUpdateResponse> {
     const formData = new FormData();
-    formData.append("file", file);
+    for (const file of Array.isArray(files) ? files : [files]) {
+      formData.append("file", file);
+    }
     formData.append("type", data.type);
     if (data.note) {
       formData.append("note", data.note);
@@ -188,9 +194,10 @@ export const deleteAdmission = (id: string) => admissionService.deleteAdmission(
 export const advanceAdmission = (id: string, data?: AdmissionAdvanceFormData, query?: any) => admissionService.advanceAdmission(id, data, query);
 
 // Document Operations
-export const uploadAdmissionDocument = (id: string, data: AdmissionDocumentUploadFormData, file: File) => admissionService.uploadAdmissionDocument(id, data, file);
+export const uploadAdmissionDocument = (id: string, data: AdmissionDocumentUploadFormData, files: File | File[]) => admissionService.uploadAdmissionDocument(id, data, files);
 export const updateAdmissionDocument = (documentId: string, data: AdmissionDocumentUpdateFormData) => admissionService.updateAdmissionDocument(documentId, data);
-export const uploadAdmissionDocumentByUser = (userId: string, data: AdmissionDocumentUploadFormData, file: File) => admissionService.uploadAdmissionDocumentByUser(userId, data, file);
+export const uploadAdmissionDocumentByUser = (userId: string, data: AdmissionDocumentUploadFormData, files: File | File[]) =>
+  admissionService.uploadAdmissionDocumentByUser(userId, data, files);
 
 // Batch Operations
 export const batchCreateAdmissions = (data: AdmissionBatchCreateFormData, query?: any) => admissionService.batchCreateAdmissions(data, query);

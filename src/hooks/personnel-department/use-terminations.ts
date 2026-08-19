@@ -44,7 +44,7 @@ import type {
   TerminationBatchUpdateResponse,
   TerminationBatchDeleteResponse,
 } from "../../types/termination";
-import { terminationKeys, userKeys, changeLogKeys } from "../common/query-keys";
+import { terminationKeys, userKeys, changeLogKeys, medicalExamKeys } from "../common/query-keys";
 import { createEntityHooks } from "../common/create-entity-hooks";
 
 // =====================================================
@@ -85,7 +85,9 @@ const baseHooks = createEntityHooks<
   queryKeys: terminationKeys,
   service: terminationServiceAdapter,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [userKeys, changeLogKeys], // COMPLETED dismisses the collaborator
+  // O avanço para o exame demissional cria o ASO no servidor
+  // (termination.service.ts) — mesma armadilha de cache da admissão.
+  relatedQueryKeys: [userKeys, changeLogKeys, medicalExamKeys], // COMPLETED dismisses the collaborator + auto-creates the ASO
 });
 
 // Export base hooks with standard names
@@ -105,6 +107,9 @@ function useInvalidateTerminations() {
     queryClient.invalidateQueries({ queryKey: terminationKeys.all });
     queryClient.invalidateQueries({ queryKey: userKeys.all });
     queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
+    // O avanço de etapa cria o exame demissional no servidor — sem isto o
+    // painel do ASO continua oferecendo "Agendar exame" sobre um já existente.
+    queryClient.invalidateQueries({ queryKey: medicalExamKeys.all });
   };
 }
 
