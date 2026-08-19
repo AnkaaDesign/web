@@ -1293,7 +1293,12 @@ function getPaymentMethodLabel(bankSlip: any, installment?: any): string {
   if (method === 'PAID_CASH') return 'Paga (Dinheiro)';
   if (method === 'PAID_TRANSFER') return 'Paga (Transferência)';
   if (method?.startsWith('PAID_')) return 'Paga (por fora)';
-  return 'Paga (Boleto)';
+  // Only claim "Boleto" when a slip actually exists. This branch used to be the
+  // unconditional default, so a parcela paid WITHOUT any boleto and without a
+  // recorded method rendered "Paga (Boleto)" — while the Forma column, which
+  // does check for a slip, correctly showed "-". The badge was inventing the
+  // one fact the row was missing. When we don't know, say we don't know.
+  return bankSlip ? 'Paga (Boleto)' : 'Paga';
 }
 
 function UnifiedInstallmentBadge({ installment }: { installment: any }) {

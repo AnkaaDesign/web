@@ -116,7 +116,23 @@ export function paymentMethodLabels(task: Task): string[] {
   for (const config of task.quote?.customerConfigs ?? []) {
     const cfg = (config as { paymentConfig?: PaymentConfig | null }).paymentConfig ?? legacyToConfig((config as { paymentCondition?: string | null }).paymentCondition);
     const label = PAYMENT_TYPE_OPTIONS.find((o) => o.value === configToTypeValue(cfg))?.label;
-    if (label) seen.add(label);
+    if (label) {
+      seen.add(label);
+      continue;
+    }
+    // No payment shape recorded on the config — but the parcelas exist and can be
+    // counted, and a quote that already has parcelas is not "unknown", it is
+    // "unlabelled". 21 configs are in this state, and they read "-" here while the
+    // detail page shows the parcela as Boleto (which it infers from the slip),
+    // so the two screens contradicted each other over the same quote.
+    //
+    // Only the COUNT is claimed. The list does not load the parcelas' bank slips,
+    // so "À Vista - Boleto" vs "- Pix" is not knowable here; saying just "À Vista"
+    // states what can be counted and stays silent on the method — which also keeps
+    // these visibly distinct from configured rows, which always carry a method.
+    const parcelas = (config as { installments?: unknown[] }).installments?.length ?? 0;
+    if (parcelas > 1) seen.add(`Parcelado ${parcelas}x`);
+    else if (parcelas === 1) seen.add("À Vista");
   }
   return [...seen];
 }

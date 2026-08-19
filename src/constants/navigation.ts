@@ -1160,6 +1160,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {
+    // Contas a Receber existe no grupo "Financeiro" (que o FINANCIAL enxerga),
+    // mas o menu do FINANCIAL é plano — é nessa lista que ele procura as
+    // páginas do dia a dia, e a cobrança é trabalho dele. Entrada plana,
+    // igual às demais deste bloco.
+    id: "contas-a-receber-financeiro",
+    title: "Contas a Receber",
+    icon: "receipt",
+    path: "/financeiro/contas-a-receber",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+  },
+  {
     id: "faturamento-financeiro",
     title: "Faturamento",
     icon: "fileInvoice",

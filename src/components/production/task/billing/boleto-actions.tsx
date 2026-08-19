@@ -148,16 +148,28 @@ export function BoletoActions({
   // someone opening the dialog just to fix the DATE would see an empty method.
   const editPaymentMethodOptions = useMemo(() => {
     const base = MANUAL_PAYMENT_METHOD_OPTIONS as { value: string; label: string }[];
-    if (!receiptPaymentMethod || base.some((o) => o.value === receiptPaymentMethod)) {
-      return base;
+    const extra: { value: string; label: string }[] = [];
+    // "Boleto" is absent from the manual list on purpose — nobody PICKS it when
+    // recording a payment, the Sicredi liquidation writes it. But this dialog
+    // also CORRECTS history, and a parcela can genuinely have been received by
+    // boleto while carrying no method at all (a settlement recorded before the
+    // enum existed, or by hand). Without the option there was no way to say so,
+    // which is why such rows were stuck: the value was wrong and unfixable.
+    if (!base.some((o) => o.value === 'BANK_SLIP')) {
+      extra.push({ value: 'BANK_SLIP', label: 'Boleto' });
     }
-    return [
-      ...base,
-      {
+    // Preserve whatever the row already carries, even if it is outside both lists.
+    if (
+      receiptPaymentMethod &&
+      !base.some((o) => o.value === receiptPaymentMethod) &&
+      !extra.some((o) => o.value === receiptPaymentMethod)
+    ) {
+      extra.push({
         value: receiptPaymentMethod,
         label: formatInstallmentPaymentMethod(receiptPaymentMethod) ?? receiptPaymentMethod,
-      },
-    ];
+      });
+    }
+    return [...base, ...extra];
   }, [receiptPaymentMethod]);
 
   const regenerateBoleto = useRegenerateBoleto();
