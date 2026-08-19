@@ -147,6 +147,13 @@ export function useReceivableMutations() {
     onSuccess: () => invalidate(),
   });
 
+  // Declare / undo a conciliação sem extrato.
+  const externalClearanceMutation = useMutation({
+    mutationFn: (payload: { installmentId: string; cleared: boolean; note?: string | null }) =>
+      receivableService.setExternalClearance(payload).then((r) => r.data),
+    onSuccess: () => invalidate(),
+  });
+
   // Conciliate against tarefas, minting the missing orçamento/fatura/parcela.
   const matchTasksMutation = useMutation({
     mutationFn: (payload: TaskMatchPayload) =>
@@ -159,11 +166,13 @@ export function useReceivableMutations() {
     unmatchMutation,
     allocateMutation,
     confirmSuggestionMutation,
+    externalClearanceMutation,
     matchTasksMutation,
     matchAsync: matchMutation.mutateAsync,
     unmatchAsync: unmatchMutation.mutateAsync,
     allocateAsync: allocateMutation.mutateAsync,
     matchTasksAsync: matchTasksMutation.mutateAsync,
     confirmSuggestionAsync: confirmSuggestionMutation.mutateAsync,
+    externalClearanceAsync: externalClearanceMutation.mutateAsync,
   };
 }

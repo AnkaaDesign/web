@@ -10,15 +10,15 @@ import {
 } from "@tabler/icons-react";
 
 import type { ClearanceState, ReceivableRow, ReceivableState } from "../../../types";
-import { routes } from "../../../constants";
-import { useReceivables } from "@/hooks/financial/use-receivable";
+import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { useReceivables, useReceivableMutations } from "@/hooks/financial/use-receivable";
 import { PeriodNav, currentPeriod, type Period } from "@/components/financial/reconciliation/period-nav";
 import { formatCurrency, formatDate, formatInstallmentPaymentMethod } from "../../../utils";
 import { cn } from "@/lib/utils";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
+import { DataTable, type DataTableColumnDef, type DataTableRowAction } from "@/components/ui/datatable";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
 import { buildDateGroups, pruneDateGroup, isDateGroup, GroupDateLabel, GroupProgressBar, type GroupedRow } from "@/components/financial/common/date-grouped-rows";
 
@@ -515,6 +515,57 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
     }
   };
 
+  const { externalClearanceAsync } = useReceivableMutations();
+
+  // Right-click: declare a receipt conciliated with no bank line behind it.
+  //
+  // Restricted to ADMIN/ACCOUNTING via `requiredPrivilege` (ADMIN always passes).
+  // FINANCIAL records and chases receipts, but this asserts that money arrived
+  // somewhere the system cannot see — a partner's personal account — and nothing
+  // downstream can ever contradict it, so it is an accounting call. The route
+  // enforces the same gate; this only keeps the menu honest about it.
+  const rowActions = useMemo<DataTableRowAction<ReceivableRow>[]>(
+    () => [
+      {
+        key: "receivable-external-clearance",
+        label: "Marcar como conciliado",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+        // Only a received parcela that is not already cleared: "entrou por fora"
+        // presupposes it entered, and re-declaring a matched one would be a lie
+        // about which evidence backs it.
+        hidden: (rows) => {
+          const row = rows[0];
+          if (!row || isDateGroup(row as never)) return true;
+          return row.state !== "RECEIVED" || isConciliada(row);
+        },
+        onClick: (rows) => {
+          const row = rows[0];
+          if (!row || isDateGroup(row as never)) return;
+          void externalClearanceAsync({ installmentId: row.id, cleared: true });
+        },
+      },
+      {
+        key: "receivable-external-clearance-undo",
+        label: "Desfazer conciliação manual",
+        variant: "destructive",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+        // Only offered for the manual kind — a real bank match is undone from the
+        // Extrato, where the transaction it belongs to actually lives.
+        hidden: (rows) => {
+          const row = rows[0];
+          if (!row || isDateGroup(row as never)) return true;
+          return !row.externallyCleared;
+        },
+        onClick: (rows) => {
+          const row = rows[0];
+          if (!row || isDateGroup(row as never)) return;
+          void externalClearanceAsync({ installmentId: row.id, cleared: false });
+        },
+      },
+    ],
+    [externalClearanceAsync],
+  );
+
   // Inline value-range + period stepper, rendered in the DataTable toolbar.
   const toolbarActions = (
     <div className="flex items-center gap-2">
@@ -565,6 +616,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
       {/* Column-managed, resizable, sortable list — no pagination (shows all). */}
       <div className="flex-1 min-h-0">
         <DataTable<GroupedRow<ReceivableRow>>
+          rowActions={rowActions as unknown as DataTableRowAction<GroupedRow<ReceivableRow>>[]}
           tableId="financial-receivables"
           data={groupedRows}
           columns={RECEIVABLE_COLUMNS as unknown as DataTableColumnDef<GroupedRow<ReceivableRow>>[]}

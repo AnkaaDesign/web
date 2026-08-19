@@ -55,6 +55,12 @@ export interface ReceivableRow {
   clearanceState: ClearanceState;
   /** When the confirming bank credit cleared this row. */
   clearedAt: string | null;
+  /** Conciliação DECLARADA à mão, sem linha de extrato — recebimento que caiu na
+   *  conta de um sócio, onde a transação bancária correspondente nunca vai
+   *  existir. Separado de `reconciled` para a lista poder distinguir "bate com o
+   *  extrato" de "alguém afirmou que entrou por fora". */
+  externallyCleared?: boolean;
+  externalClearedNote?: string | null;
 }
 
 export interface ReceivablesSummaryBucket {

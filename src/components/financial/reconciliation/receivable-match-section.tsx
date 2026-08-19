@@ -111,18 +111,17 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
       // A boleto bridge is atomic (the boleto IS the settlement) — mutually
       // exclusive with every other candidate.
       if (c.viaBankSlip) return { [c.installmentId]: (c.remaining ?? c.amount).toFixed(2) };
-      // An already-PAID parcela is a LINK, not a receipt. Its `remaining` is 0, so
-      // prefilling from it would allocate R$ 0,00 and leave the button dead; the
-      // value at stake is the whole parcela. Exclusive like the boleto bridge,
-      // because POST /receivables/match settles exactly one installment.
-      if (c.linkOnly) return { [c.installmentId]: c.amount.toFixed(2) };
-      // Selecting a direct installment drops any boleto/link selection, then prefills
-      // the outstanding balance so topping up a partial receipt is correct.
+      // Selecting a direct installment drops any boleto selection (that bridge is
+      // atomic), then prefills what this candidate is worth.
       const next = { ...prev };
       for (const cand of candidates ?? []) {
-        if (cand.viaBankSlip || cand.linkOnly) delete next[cand.installmentId];
+        if (cand.viaBankSlip) delete next[cand.installmentId];
       }
-      next[c.installmentId] = (c.remaining ?? c.amount).toFixed(2);
+      // An already-PAID parcela contributes its FACE value: `remaining` is 0 once
+      // paid, so prefilling from it would allocate R$ 0,00 and leave the button
+      // dead. It combines freely with open parcelas — /allocate now takes it as
+      // link-only, which is what a lump payment covering both kinds requires.
+      next[c.installmentId] = (c.linkOnly ? c.amount : (c.remaining ?? c.amount)).toFixed(2);
       return next;
     });
 
@@ -135,18 +134,15 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
   const singleCandidate =
     entries.length === 1 ? candidateById.get(entries[0][0]) : undefined;
   const boletoSelected = singleCandidate?.viaBankSlip === true;
-  // A PAID parcela is linked, not allocated: its value is the whole parcela and is
-  // not editable. Without this the row prefills from `remaining` (0 once paid), so
-  // `allocated` stays R$ 0,00 and "Conciliar recebimento" can never enable.
-  const linkOnlySelected = !boletoSelected && singleCandidate?.linkOnly === true;
-  const linkSelected = boletoSelected || linkOnlySelected;
+  // Only the boleto bridge is exclusive — it IS the settlement, whole and atomic.
+  // Already-paid parcelas are ordinary members of a selection: a lump payment
+  // routinely covers a mix of open and already-baixadas parcelas across several
+  // serviços, and the amounts simply add up.
   const allocated = boletoSelected
     ? creditAmount
-    : linkOnlySelected
-      ? (singleCandidate?.amount ?? 0)
-      : entries.reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
-  const overCredit = !linkSelected && allocated > creditAmount + TOLERANCE;
-  const anyInvalid = !linkSelected && entries.some(([, v]) => !(parseFloat(v) > 0));
+    : entries.reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
+  const overCredit = !boletoSelected && allocated > creditAmount + TOLERANCE;
+  const anyInvalid = !boletoSelected && entries.some(([, v]) => !(parseFloat(v) > 0));
   const isPending =
     matchMutation.isPending ||
     allocateMutation.isPending ||
@@ -179,10 +175,11 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
         cand != null &&
         (cand.paidAmount ?? 0) <= TOLERANCE &&
         Math.abs((cand.remaining ?? cand.amount) - single.amount) <= TOLERANCE;
-      // /allocate refuses a PAID parcela outright ("já está totalmente conciliada")
-      // and would overwrite paidAt with the credit's postedAt on the ones it does
-      // accept. /match is the only endpoint that links an already-baixada parcela,
-      // and it leaves the recorded payment date and amount untouched.
+      // A single candidate that settles the whole credit goes through /match, which
+      // is the boleto bridge's only path and the cleanest record for a 1:1 receipt.
+      // Everything else — including any mix of open and already-baixada parcelas —
+      // goes through /allocate, which now takes paid ones as link-only and leaves
+      // their recorded payment date and amount untouched.
       if (single && (singleFull || cand?.viaBankSlip || cand?.linkOnly)) {
         await matchAsync({ transactionId: txId, installmentId: single.installmentId });
       } else {
@@ -663,7 +660,13 @@ function CandidateRow({
                     here" — it is the opposite: the money is in, only the bank line is
                     missing. Say that instead, and keep "Resta" for real partials. */}
                 {c.linkOnly ? (
-                  <span className="block text-[10px] font-normal text-muted-foreground">
+                  // whitespace-normal: the cell is nowrap (so the value never breaks)
+                  // and the column is pinned at 8.75rem by the colgroup, so a label
+                  // longer than that had nowhere to go — it overflowed the fixed
+                  // column, pushed the table past the card and turned the wrapper's
+                  // overflow-x-auto into a real scrollbar on every already-baixada
+                  // row. Let this second line wrap inside its own column instead.
+                  <span className="block whitespace-normal leading-tight text-[10px] font-normal text-muted-foreground">
                     Já baixada · aguardando extrato
                   </span>
                 ) : (
@@ -679,34 +682,15 @@ function CandidateRow({
         </table>
       </div>
 
-      {/* An already-baixada parcela is linked in full — there is nothing left to
-          allocate (remaining is 0), so it gets a read-only summary instead of an
-          amount box. Same shape as the NF sections' allocation row. */}
-      {checked && c.linkOnly && (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2.5 border-t border-border bg-muted/10">
-          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-            Valor a vincular
-          </span>
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              {formatCurrency(c.amount)}
-            </span>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              (parcela já baixada — só vincula o extrato)
-            </span>
-          </span>
-        </div>
-      )}
-
       {/* Boleto candidates link in full (the boleto IS the settlement) — no partial
           allocation. Direct installments allow editing the allocated value.
           The Input renders its own `w-full` wrapper, so it has to be boxed to a
           fixed width here: left to grow it eats the row and squeezes the trailing
           "de R$ …" into a two-line column against the right edge. */}
-      {checked && !c.viaBankSlip && !c.linkOnly && (
+      {checked && !c.viaBankSlip && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2.5 border-t border-border bg-muted/10">
           <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-            Valor a alocar
+            {c.linkOnly ? "Valor a vincular" : "Valor a alocar"}
           </span>
           <span className="flex items-center gap-2">
             <span className="w-36 shrink-0">
@@ -721,7 +705,10 @@ function CandidateRow({
               />
             </span>
             <span className="text-xs text-muted-foreground whitespace-nowrap">
-              de {formatCurrency(c.remaining ?? c.amount)}
+              {/* Face value for an already-baixada parcela: `remaining` is 0 once
+                  paid, and the credit can cover all of it or — as when one parcela
+                  was received as two boleto payments — only a slice. */}
+              de {formatCurrency(c.linkOnly ? c.amount : (c.remaining ?? c.amount))}
             </span>
           </span>
         </div>

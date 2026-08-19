@@ -48,6 +48,11 @@ export const receivableService = {
       transactionId,
     }),
 
+  // Declare a receipt conciliated with NO bank line behind it (money paid into a
+  // partner's personal account). ADMIN/ACCOUNTING only — enforced at the route.
+  setExternalClearance: (payload: { installmentId: string; cleared: boolean; note?: string | null }) =>
+    apiClient.post<{ success: boolean; message: string }>(`${basePath}/external-clearance`, payload),
+
   // Undo a previous credit↔installment conciliation.
   unmatchReceivable: (payload: ReceivableUnmatchPayload) =>
     apiClient.post<ReceivableMatchResponse>(`${basePath}/unmatch`, payload),
