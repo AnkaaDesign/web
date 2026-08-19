@@ -15,7 +15,7 @@ import type { Airbrushing, File } from "@/types";
  * An airbrushing's artwork records may be bare File rows or Layout wrappers carrying a
  * nested `file` relation (mirrors the Layouts section) — normalise to the backing File.
  */
-type LayoutLike = File & { file?: File | null };
+type LayoutLike = File & { file?: File | null; status?: string | null };
 
 /**
  * The backing File objects for an airbrushing's layouts. A layout row is a Layout WRAPPER
@@ -34,6 +34,21 @@ export function getAirbrushingLayouts(airbrushing: Airbrushing): File[] {
       return art as File;
     })
     .filter((f): f is File => Boolean(f && typeof f === "object" && "id" in f));
+}
+
+/**
+ * `fileId → LAYOUT_STATUS` para os layouts de uma aerografia. O status mora no wrapper
+ * `Layout` e se perde ao normalizar para o `File` de baixo (`getAirbrushingLayouts`), então
+ * é extraído em paralelo — é o que o visualizador usa para carimbar a arte reprovada.
+ */
+export function getAirbrushingLayoutStatuses(airbrushing: Airbrushing): Record<string, string | null | undefined> {
+  const statuses: Record<string, string | null | undefined> = {};
+  for (const art of (airbrushing.layouts ?? []) as LayoutLike[]) {
+    const a = art as any;
+    const fileId = a?.file?.id || a?.fileId || a?.id;
+    if (fileId) statuses[fileId] = a?.status;
+  }
+  return statuses;
 }
 
 /**
@@ -111,11 +126,12 @@ export function AirbrushingsSection({
   const navigate = useNavigate();
   const fileViewer = useFileViewer();
 
-  // Preview opens the whole artwork collection of THIS airbrushing at the clicked index.
+  // Preview opens the whole artwork collection of THIS airbrushing at the clicked index,
+  // levando o status de cada layout para o visualizador carimbar a arte reprovada.
   const handlePreview = useCallback(
-    (files: File[]) => (file: File) => {
+    (files: File[], layoutStatusByFileId: Record<string, string | null | undefined>) => (file: File) => {
       const index = files.findIndex((f) => f.id === file.id);
-      fileViewer.actions.viewFiles(files, index >= 0 ? index : 0);
+      fileViewer.actions.viewFiles(files, index >= 0 ? index : 0, { layoutStatusByFileId });
     },
     [fileViewer],
   );
@@ -128,7 +144,8 @@ export function AirbrushingsSection({
     <div className="space-y-3">
       {airbrushings.map((airbrushing, index) => {
         const layouts = getAirbrushingLayouts(airbrushing);
-        const previewFrom = handlePreview(layouts);
+        const layoutStatuses = getAirbrushingLayoutStatuses(airbrushing);
+        const previewFrom = handlePreview(layouts, layoutStatuses);
 
         return (
           <div key={airbrushing.id} className="border border-border dark:border-border/30 rounded-lg p-4 space-y-3">

@@ -292,8 +292,16 @@ export function FileCardUploadField({
               thumbnailUrl: f.thumbnailUrl || null,
             }) as unknown as AnkaaFile,
         );
+        // Layout tem status (DRAFT/APPROVED/REPROVED) gravado no próprio arquivo do campo;
+        // levá-lo junto é o que faz a arte reprovada abrir com a faixa vermelha. Campos sem
+        // fluxo de aprovação (base, projetos, evidências) mandam um mapa vazio — inócuo.
+        const layoutStatusByFileId: Record<string, string | null | undefined> = {};
+        uploadedFiles.forEach((f) => {
+          const id = f.uploadedFileId || f.id;
+          if (id && (f as { status?: string }).status) layoutStatusByFileId[id] = (f as { status?: string }).status;
+        });
         const index = uploadedFiles.findIndex((f) => f.id === clicked.id);
-        fileViewer.actions.viewFiles(viewerFiles, index >= 0 ? index : 0);
+        fileViewer.actions.viewFiles(viewerFiles, index >= 0 ? index : 0, { layoutStatusByFileId });
       } else if (clicked instanceof File) {
         // Open the ACTUAL local file (for PDFs `preview` is a rendered JPEG thumbnail,
         // not the document itself), so the browser shows the real PDF/image.

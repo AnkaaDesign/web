@@ -7,6 +7,19 @@ import { VideoPlayer } from "./video-player";
 import { PDFViewer } from "./pdf-viewer";
 import { toast } from "@/components/ui/sonner";
 
+/**
+ * Contexto extra que o chamador pode anexar aos arquivos abertos no visualizador.
+ *
+ * Hoje só carrega o status de aprovação do LAYOUT: quem lista layouts (tarefa,
+ * aerografia, formulários) tem o status na mão, mas o visualizador recebe apenas o
+ * `File` puro — o status mora no wrapper `Layout`, não no arquivo. Sem esse mapa a
+ * arte reprovada abre em tela cheia indistinguível de uma aprovada.
+ */
+export interface FileViewerOptions {
+  /** fileId → LAYOUT_STATUS. `REPROVED` desenha a faixa vermelha sobre o preview. */
+  layoutStatusByFileId?: Record<string, string | null | undefined>;
+}
+
 export interface FileViewerState {
   isImageModalOpen: boolean;
   isVideoModalOpen: boolean;
@@ -17,6 +30,8 @@ export interface FileViewerState {
   currentVideoUrl: string | null;
   currentPdfFile: AnkaaFile | null;
   currentPdfUrl: string | null;
+  /** Status de layout dos arquivos abertos agora (ver `FileViewerOptions`). */
+  layoutStatusByFileId?: Record<string, string | null | undefined>;
 }
 
 export interface FileViewerProps {
@@ -33,14 +48,14 @@ export interface FileViewerProps {
 export const FileViewerContext = React.createContext<{
   state: FileViewerState;
   actions: {
-    openImageModal: (files: AnkaaFile[], initialIndex?: number) => void;
+    openImageModal: (files: AnkaaFile[], initialIndex?: number, options?: FileViewerOptions) => void;
     closeImageModal: () => void;
     openVideoModal: (file: AnkaaFile, url: string) => void;
     closeVideoModal: () => void;
     openPdfModal: (file: AnkaaFile, url: string) => void;
     closePdfModal: () => void;
-    viewFile: (file: AnkaaFile) => void;
-    viewFiles: (files: AnkaaFile[], initialIndex: number) => void;
+    viewFile: (file: AnkaaFile, options?: FileViewerOptions) => void;
+    viewFiles: (files: AnkaaFile[], initialIndex: number, options?: FileViewerOptions) => void;
     downloadFile: (file: AnkaaFile) => void;
   };
 } | null>(null);
@@ -70,12 +85,13 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
   const actionsRef = React.useRef<any>(null);
 
   // Create actions without circular dependencies
-  const openImageModal = React.useCallback((files: AnkaaFile[], initialIndex: number = 0) => {
+  const openImageModal = React.useCallback((files: AnkaaFile[], initialIndex: number = 0, options?: FileViewerOptions) => {
     setState((prev) => ({
       ...prev,
       isImageModalOpen: true,
       currentFiles: files,
       currentFileIndex: initialIndex,
+      layoutStatusByFileId: options?.layoutStatusByFileId,
     }));
   }, []);
 
@@ -85,6 +101,9 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
       isImageModalOpen: false,
       currentFiles: [],
       currentFileIndex: 0,
+      // Zerado junto com a lista: o mapa é da ABERTURA, não do provider. Mantê-lo
+      // faria a próxima galeria (recibos, notas) herdar a faixa da anterior.
+      layoutStatusByFileId: undefined,
     }));
   }, []);
 
@@ -142,19 +161,19 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
     }
   }, [viewerConfig, onDownload]);
 
-  const viewFile = React.useCallback((file: AnkaaFile) => {
+  const viewFile = React.useCallback((file: AnkaaFile, options?: FileViewerOptions) => {
     const action = fileViewerService.determineFileViewAction(file, viewerConfig);
 
     fileViewerService.executeFileViewAction(action, {
       onModalOpen: (component, _url, _targetFile) => {
         if (component === "image-modal") {
-          openImageModal([file], 0);
+          openImageModal([file], 0, options);
         } else if (component === "video-player") {
           // Route videos to the unified FilePreview modal (which now supports inline video playback)
-          openImageModal([file], 0);
+          openImageModal([file], 0, options);
         } else if (component === "pdf-viewer") {
           // Route PDFs to the FilePreview modal (which now supports inline PDF viewing)
-          openImageModal([file], 0);
+          openImageModal([file], 0, options);
         }
       },
       onInlinePlayer: (_url, _targetFile) => {
@@ -179,7 +198,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
     });
   }, [viewerConfig, onDownload, onSecurityWarning, openImageModal, openVideoModal, openPdfModal]);
 
-  const viewFiles = React.useCallback((files: AnkaaFile[], initialIndex: number) => {
+  const viewFiles = React.useCallback((files: AnkaaFile[], initialIndex: number, options?: FileViewerOptions) => {
     // Filter to only files that can be previewed in image modal
     const previewableFiles = files.filter(f => fileViewerService.canPreviewFile(f));
 
@@ -197,7 +216,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
     const finalIndex = adjustedIndex >= 0 ? adjustedIndex : 0;
 
     // Open image modal with all previewable files
-    openImageModal(previewableFiles, finalIndex);
+    openImageModal(previewableFiles, finalIndex, options);
   }, [downloadFile, openImageModal]);
 
   const actions = React.useMemo(
@@ -239,6 +258,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
             if (!open) actions.closeImageModal();
           }}
           baseUrl={viewerConfig.baseUrl}
+          layoutStatusByFileId={state.layoutStatusByFileId}
         />
       )}
 

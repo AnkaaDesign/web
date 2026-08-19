@@ -25,7 +25,7 @@ export type { FileUploaderProps, FileWithPreview } from "./file-uploader";
 export type { FileUploadFieldProps } from "./file-upload-field";
 export type { FileItemProps, FileViewMode } from "./file-item";
 export type { VideoPlayerProps } from "./video-player";
-export type { FileViewerProps, FileViewerState, FileViewerButtonProps } from "./file-viewer";
+export type { FileViewerProps, FileViewerState, FileViewerButtonProps, FileViewerOptions } from "./file-viewer";
 export type { PDFViewerProps } from "./pdf-viewer";
 export type { InlinePdfViewerProps } from "./inline-pdf-viewer";
 export type { FileViewerCardProps, FileType } from "./file-viewer-card";

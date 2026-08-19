@@ -49,16 +49,30 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
   // Only layouts that carry file data AND are visible to this user (privileged, or APPROVED).
   const filteredLayouts = useMemo<LayoutLike[]>(() => getVisibleLayouts(task, canViewBadges), [task, canViewBadges]);
 
-  // Preview opens the whole artwork collection in the app-level file viewer at the clicked index.
+  /**
+   * Preview abre a coleção de artes no visualizador da aplicação, no índice clicado.
+   *
+   * A galeria usa a MESMA lista visível dos cards (`filteredLayouts`): abrir a partir de
+   * `task.layouts` cru levava quem não pode aprovar a navegar, com as setas, até layouts
+   * reprovados/rascunho que a seção justamente esconde dele.
+   *
+   * Vai junto o mapa `fileId → status`, senão a arte reprovada abre em tela cheia sem
+   * nenhuma marca — o status é do wrapper `Layout`, não viaja no `File`.
+   */
   const handlePreview = useCallback(
     (file: File) => {
-      const layouts = ((task.layouts ?? []) as LayoutLike[])
-        .map((artwork) => (artwork.file ?? artwork) as File)
-        .filter((f): f is File => Boolean(f && typeof f === "object" && "id" in f));
+      const layouts: File[] = [];
+      const layoutStatusByFileId: Record<string, string | null | undefined> = {};
+      for (const artwork of filteredLayouts) {
+        const backing = (artwork.file ?? artwork) as File;
+        if (!backing || typeof backing !== "object" || !("id" in backing)) continue;
+        layouts.push(backing);
+        layoutStatusByFileId[backing.id] = artwork.status;
+      }
       const index = layouts.findIndex((f) => f.id === file.id);
-      fileViewer.actions.viewFiles(layouts, index >= 0 ? index : 0);
+      fileViewer.actions.viewFiles(layouts, index >= 0 ? index : 0, { layoutStatusByFileId });
     },
-    [task.layouts, fileViewer],
+    [filteredLayouts, fileViewer],
   );
 
   const handleDownload = useCallback(

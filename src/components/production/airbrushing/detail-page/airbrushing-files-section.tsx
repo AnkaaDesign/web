@@ -57,7 +57,8 @@ export function AirbrushingFilesSection({
 
   const handleFileClick = (file: AnkaaFile) => {
     const index = files.findIndex((f) => f.id === file.id);
-    actions.viewFiles(files, index >= 0 ? index : 0);
+    // O mapa só existe na seção de LAYOUTS; recibos e notas abrem sem status nenhum.
+    actions.viewFiles(files, index >= 0 ? index : 0, layoutStatusByFileId ? { layoutStatusByFileId } : undefined);
   };
 
   return (

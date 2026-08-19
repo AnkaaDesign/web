@@ -16,8 +16,10 @@ import {
   IconColorPicker,
   IconCopy,
   IconCheck,
+  IconAlertTriangleFilled,
 } from "@tabler/icons-react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { LAYOUT_STATUS } from "@/constants/enums";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -75,6 +77,12 @@ export interface FilePreviewModalProps {
   enableRotation?: boolean;
   showThumbnailStrip?: boolean;
   showImageCounter?: boolean;
+  /**
+   * fileId → LAYOUT_STATUS, para quem abre LAYOUTS (tarefa, aerografia, formulários).
+   * O arquivo aberto aqui é um `File` puro: o status de aprovação mora no wrapper
+   * `Layout`, então tem de chegar por fora. `REPROVED` carimba a faixa vermelha.
+   */
+  layoutStatusByFileId?: Record<string, string | null | undefined>;
 }
 
 export function FilePreviewModal({
@@ -88,6 +96,7 @@ export function FilePreviewModal({
   enableRotation = true,
   showThumbnailStrip = true,
   showImageCounter = true,
+  layoutStatusByFileId,
 }: FilePreviewModalProps) {
   // State management
   const [currentIndex, setCurrentIndex] = React.useState(initialFileIndex);
@@ -145,6 +154,9 @@ export function FilePreviewModal({
   // bail out for file types that manage their own scrolling (PDF) or input (video).
   const isPDF = !!currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
   const isVideo = !!currentFile && isVideoFile(currentFile);
+  // Layout reprovado: a faixa vermelha atravessa o preview. Só REPROVED carimba —
+  // rascunho é estado de trabalho e aprovado não precisa de aviso.
+  const isLayoutReproved = !!currentFile && layoutStatusByFileId?.[currentFile.id] === LAYOUT_STATUS.REPROVED;
 
   // Find current image index within previewable files
   const currentImageIndex = React.useMemo(() => {
@@ -1209,6 +1221,25 @@ export function FilePreviewModal({
                     <IconDownload className="h-4 w-4 mr-2" />
                     Baixar arquivo
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Faixa de ARTE REPROVADA — atravessa o centro do preview, por cima da
+                imagem/PDF/vídeo. `pointer-events-none` porque o preview continua
+                utilizável (zoom, pan, conta-gotas); a faixa é aviso, não bloqueio.
+                z-20 fica acima da imagem (z-10 do loading) e abaixo das setas (z-90)
+                e da barra de ferramentas, então não engole nenhum controle.
+                Some enquanto o conta-gotas está ativo: o EyeDropper lê o PIXEL DA TELA,
+                então com a faixa no ar uma cor capturada no meio da arte voltaria vermelha. */}
+            {isLayoutReproved && !isPickerRunning && (
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 select-none">
+                <div className="flex items-center justify-center gap-3 border-y-2 border-red-900/70 bg-red-600/90 px-4 py-3 shadow-2xl sm:gap-4 sm:py-4">
+                  <IconAlertTriangleFilled className="h-6 w-6 shrink-0 text-white sm:h-8 sm:w-8" />
+                  <span className="text-center text-base font-extrabold uppercase leading-tight tracking-[0.2em] text-white sm:text-2xl sm:tracking-[0.3em]">
+                    Arte reprovada
+                  </span>
+                  <IconAlertTriangleFilled className="h-6 w-6 shrink-0 text-white sm:h-8 sm:w-8" />
                 </div>
               </div>
             )}

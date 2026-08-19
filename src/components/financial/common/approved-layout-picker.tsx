@@ -251,15 +251,21 @@ export function ApprovedLayoutPicker({
         mimeFromName(filename) ||
         mimeFromName(artwork.originalName) ||
         "image/png";
-      fileViewer.actions.viewFile({
-        id: artwork.id,
-        filename,
-        originalName: artwork.originalName || filename,
-        mimetype,
-        size: artwork.size || 0,
-        thumbnailUrl: artwork.thumbnailUrl || null,
-        path: artwork.path || null,
-      } as any);
+      fileViewer.actions.viewFile(
+        {
+          id: artwork.id,
+          filename,
+          originalName: artwork.originalName || filename,
+          mimetype,
+          size: artwork.size || 0,
+          thumbnailUrl: artwork.thumbnailUrl || null,
+          path: artwork.path || null,
+        } as any,
+        // O status é da arte da TAREFA, não do File — sem passá-lo aqui a arte reprovada
+        // abriria em tela cheia sem a faixa, e é exatamente nesta tela que se escolhe
+        // qual arte entra no layout aprovado do orçamento.
+        { layoutStatusByFileId: { [artwork.id]: artwork.status } },
+      );
     },
     [fileViewer],
   );
