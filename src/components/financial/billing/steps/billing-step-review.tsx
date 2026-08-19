@@ -862,10 +862,15 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               <table className="w-full text-sm table-fixed">
                                 <thead>
                                   <tr className="border-b border-border/50 bg-muted/40 text-muted-foreground">
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-24">Parcela</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-36">Status</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Vencimento</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Pago em</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-28">Parcela</th>
+                                    {/* O selo de Status carrega o meio do pagamento junto
+                                        ("Paga (Conta Genivaldo)"), e o Badge é max-w-full com
+                                        overflow-hidden: numa coluna de 9rem ele cortava o
+                                        próprio texto. A coluna vazia ao lado absorve a largura
+                                        que estas quatro passam a ocupar. */}
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-56">Status</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-48">Vencimento</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-48">Pago em</th>
                                     <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-40">Forma</th>
                                     <th aria-hidden />
                                     <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">Valor</th>
@@ -1340,9 +1345,13 @@ function UnifiedInstallmentBadge({ installment }: { installment: any }) {
 
   // Paid (by bank slip or externally)
   if (installment.status === 'PAID') {
+    // O rótulo é o único de tamanho livre aqui (leva o meio do pagamento junto), então
+    // vai também no `title`: se um nome de conta ainda estourar a coluna, o texto inteiro
+    // continua alcançável no hover em vez de morrer no corte.
+    const paidLabel = getPaymentMethodLabel(bankSlip, installment);
     return (
-      <Badge variant="green" size="sm" className="font-medium whitespace-nowrap">
-        {getPaymentMethodLabel(bankSlip, installment)}
+      <Badge variant="green" size="sm" className="font-medium whitespace-nowrap" title={paidLabel}>
+        {paidLabel}
       </Badge>
     );
   }
