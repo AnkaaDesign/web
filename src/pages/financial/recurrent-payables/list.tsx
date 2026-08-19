@@ -612,9 +612,20 @@ function OccurrencesPayDialog({
                 key={o.occurrenceId ?? `idx-${idx}`}
                 className="flex items-center gap-3 rounded-md border border-border p-2"
               >
-                <div className="w-16 text-sm font-medium tabular-nums">
+                <div className="w-16 shrink-0 text-sm font-medium tabular-nums">
                   {format(new Date(o.dueDate), "dd/MM")}
                 </div>
+                {/* With billed installations a month holds one charge per meter,
+                    all sharing the same due date — the label is the only thing
+                    that tells the user which one they are settling. */}
+                {o.installation && (
+                  <div
+                    className="w-28 shrink-0 truncate text-xs text-muted-foreground"
+                    title={`${o.installation.label ?? ""} ${o.installation.code}`.trim()}
+                  >
+                    {o.installation.label ?? o.installation.code}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   {paid ? (
                     <Badge variant="completed" size="sm">

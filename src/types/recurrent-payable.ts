@@ -35,6 +35,33 @@ export const isWeeklyRecurrentFrequency = (f: RecurrentFrequency): boolean =>
 // Lifecycle of a single materialized monthly bill.
 export type RecurrentPayableStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
+/**
+ * A BILLED INSTALLATION inside one bill: the SAMAE matrícula, the COPEL UC, the
+ * operator's line.
+ *
+ * The same payee issues one invoice — and one nota — per installation, and the
+ * statement carries one debit per installation with the code printed in the memo.
+ * A bill with installations materializes ONE occurrence per installation per
+ * competence, which is what gives each of those debits its own obligation to bind
+ * to; without them only the first debit of the month found one and the rest
+ * closed on the category alone ("Sem vínculo" on the Extrato).
+ */
+export interface RecurrentPayableInstallation {
+  id: string;
+  recurrentPayableId: string;
+  /** As printed on the statement ("00113942"). Compared digits-only, leading
+   *  zeros trimmed, so "00113942" and "113942" are the same matrícula. */
+  code: string;
+  /** Human label shown next to the bill's name ("Matriz", "Galpão 2"). */
+  label: string | null;
+  /** Per-installation estimate for VARIABLE bills; null → derived server-side. */
+  estimatedAmount: string | number | null;
+  /** Retired installations stay for history but stop materializing. */
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RecurrentPayable {
   id: string;
   name: string;
@@ -73,6 +100,8 @@ export interface RecurrentPayable {
   // Relations (optional, populated based on query)
   supplier?: Pick<Supplier, "id" | "fantasyName" | "cnpj"> | null;
   category?: TransactionCategory | null;
+  // Billed installations (list + detail endpoints), active first then by code.
+  installations?: RecurrentPayableInstallation[];
   // Last 12 occurrences (detail endpoint only).
   occurrences?: RecurrentPayableOccurrence[];
 }
@@ -94,6 +123,9 @@ export interface RecurrentPayableOccurrence {
   bankTransactionId: string | null;
   nfLinkedAt: string | null;
   reconciledAt: string | null;
+  // Which billed installation this occurrence is for. Null when the bill has none.
+  installationId?: string | null;
+  installation?: Pick<RecurrentPayableInstallation, "id" | "code" | "label"> | null;
 }
 
 // =====================
@@ -123,6 +155,23 @@ export interface CreateRecurrentPayablePayload {
   pixKey?: string | null;
   expectsNf: boolean;
   isActive: boolean;
+  /**
+   * The bill's billed installations. Omit to leave the current list untouched;
+   * send the FULL desired list to reconcile it — the API adds, updates, and
+   * retires, but never deletes a row that already carries occurrences (those are
+   * deactivated instead, and the response message says so).
+   */
+  installations?: RecurrentPayableInstallationInput[];
+}
+
+/** One row of the installations editor. `id` is present when editing an existing
+ *  installation and absent when adding one. */
+export interface RecurrentPayableInstallationInput {
+  id?: string | null;
+  code: string;
+  label?: string | null;
+  estimatedAmount?: number | null;
+  isActive?: boolean;
 }
 
 export type UpdateRecurrentPayablePayload = Partial<CreateRecurrentPayablePayload> & {
@@ -172,6 +221,9 @@ export interface RecurrentPayableMonthlyOccurrence {
   paidAt: string | null;
   transactionCount: number;
   nfLinked: boolean;
+  // The meter/line this charge is for — the only thing distinguishing several
+  // same-month rows of a bill with installations. Null when it has none.
+  installation: Pick<RecurrentPayableInstallation, "id" | "code" | "label"> | null;
 }
 
 // One row of the monthly Recorrentes dashboard — a bill aggregated over ALL its

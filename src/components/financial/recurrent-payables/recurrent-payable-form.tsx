@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useForm, FormProvider, useWatch, useFormState } from "react-hook-form";
+import { useForm, FormProvider, useWatch, useFormState, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -24,6 +24,8 @@ import { useReconciliationCategories } from "@/hooks/financial/use-reconciliatio
 import { PAYMENT_METHOD, PAYMENT_METHOD_LABELS, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "@/constants";
 import { formatPixKey } from "@/utils/formatters";
 import type { CreateRecurrentPayablePayload, RecurrentPayable } from "@/types/recurrent-payable";
+import { Button } from "@/components/ui/button";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 
 // Frequencies offered for recurrent bills. WEEKLY/BIWEEKLY are sub-monthly (use
 // weekdays — e.g. a faxineira 2× por semana); the rest are monthly-family (use a
@@ -104,6 +106,40 @@ const formSchema = z
     // Opt-in to the ONE retroactive write the API allows (see the field in the
     // form below). Never sent unless the user actually turns "emite nota" off.
     applyExpectsNfToPast: z.boolean().default(false),
+    // Billed installations (matrícula SAMAE, UC COPEL, linha da operadora). See
+    // the card below for why a bill needs them.
+    installations: z
+      .array(
+        z.object({
+          id: z.string().nullable().optional(),
+          code: z
+            .string()
+            .trim()
+            .min(1, { message: "Informe o código" })
+            .max(40, { message: "Máx. 40 caracteres" })
+            .refine((v) => /\d/.test(v), { message: "O código precisa conter dígitos" }),
+          label: z.string().max(120, { message: "Máx. 120 caracteres" }).optional(),
+          estimatedAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).optional(),
+          isActive: z.boolean().default(true),
+        }),
+      )
+      .default([]),
+  })
+  .superRefine((d, ctx) => {
+    // Two rows pointing at the same meter would fight over the same debit.
+    const seen = new Map<string, number>();
+    d.installations.forEach((item, index) => {
+      const key = item.code.replace(/\D/g, "").replace(/^0+/, "");
+      if (!key) return;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Código repetido nesta conta",
+          path: ["installations", index, "code"],
+        });
+      }
+      seen.set(key, index);
+    });
   })
   .refine((d) => d.amountKind !== "FIXED" || (typeof d.fixedAmount === "number" && d.fixedAmount > 0), {
     message: "Informe o valor fixo (maior que zero)",
@@ -138,6 +174,7 @@ const EMPTY_DEFAULTS: FormData = {
   expectsNf: false,
   isActive: true,
   applyExpectsNfToPast: false,
+  installations: [],
 };
 
 export interface RecurrentPayableFormState {
@@ -199,6 +236,13 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
         expectsNf: payable.expectsNf,
         isActive: payable.isActive,
         applyExpectsNfToPast: false,
+        installations: (payable.installations ?? []).map((i) => ({
+          id: i.id,
+          code: i.code,
+          label: i.label ?? "",
+          estimatedAmount: i.estimatedAmount != null ? Number(i.estimatedAmount) : undefined,
+          isActive: i.isActive,
+        })),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,6 +262,14 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
   // Only meaningful when an EXISTING bill that expected notes stops expecting
   // them — a brand-new bill has no closed competences to reach back into.
   const isTurningExpectsNfOff = !!payable?.expectsNf && !expectsNf;
+
+  const installations = useFieldArray({ control: form.control, name: "installations" });
+  // Only rows that already exist server-side can be carrying settled occurrences,
+  // so only those get the "desativar em vez de remover" treatment.
+  const persistedIds = useMemo(
+    () => new Set((payable?.installations ?? []).map((i) => i.id)),
+    [payable?.installations],
+  );
 
   const handleSubmit = (data: FormData) => {
     const cnpjDigits = (data.payeeCnpj ?? "").replace(/\D/g, "");
@@ -247,6 +299,15 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
       pixKey: pix,
       expectsNf: data.expectsNf,
       isActive: data.isActive,
+      // Always the FULL desired list — the API reconciles against it, retiring
+      // (never deleting) installations that already carry occurrences.
+      installations: data.installations.map((i) => ({
+        id: i.id ?? null,
+        code: i.code.trim(),
+        label: i.label?.trim() ? i.label.trim() : null,
+        estimatedAmount: typeof i.estimatedAmount === "number" ? i.estimatedAmount : null,
+        isActive: i.isActive,
+      })),
     };
     // Only ever sent alongside an actual expectsNf → false edit; the API ignores
     // it otherwise, but not sending it keeps the payload honest about intent.
@@ -613,6 +674,138 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Instalações faturadas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconAdjustments className="h-5 w-5 text-muted-foreground" />
+                Instalações faturadas
+              </CardTitle>
+              <CardDescription>
+                Quando o mesmo credor cobra várias instalações — matrículas do SAMAE, UCs da COPEL,
+                linhas da operadora — cada uma gera a sua própria fatura, a sua própria nota e o seu
+                próprio débito no extrato. Cadastre o código que aparece no memo (
+                <span className="font-mono text-xs">DEBITO CONVENIOS-SAMAEIB ID 00113942</span>) para
+                que cada débito encontre a sua obrigação. Sem isso só o primeiro débito do mês é
+                conciliado e os demais ficam em "Sem vínculo".
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {installations.fields.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma instalação cadastrada — a conta gera uma única cobrança por competência.
+                </p>
+              )}
+
+              {installations.fields.map((field, index) => (
+                <div key={field.id} className="rounded-md border p-3 space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                    <FormField
+                      control={form.control}
+                      name={`installations.${index}.code`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Código</FormLabel>
+                          <FormControl>
+                            <Input {...f} placeholder="00113942" disabled={isSubmitting} className="font-mono" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`installations.${index}.label`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Apelido</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...f}
+                              value={f.value ?? ""}
+                              placeholder="Matriz, Galpão 2…"
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormDescription>Aparece na coluna Vínculo e em Contas a Pagar.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="space-y-1">
+                      <FormMoneyInput
+                        name={`installations.${index}.estimatedAmount`}
+                        label="Estimativa"
+                        disabled={isSubmitting}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Em branco: estimada pelo histórico de débitos desta instalação.
+                      </p>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <FormField
+                        control={form.control}
+                        name={`installations.${index}.isActive`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <label className="flex items-center gap-2 cursor-pointer pb-2">
+                              <FormControl>
+                                <Switch checked={f.value} onCheckedChange={f.onChange} disabled={isSubmitting} />
+                              </FormControl>
+                              <span className="text-sm">Ativa</span>
+                            </label>
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mb-1"
+                        disabled={isSubmitting}
+                        onClick={() => installations.remove(index)}
+                        aria-label="Remover instalação"
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* An installation with settled history cannot be deleted — the API
+                      retires it instead. Say so before the user clicks, not after. */}
+                  {field.id && persistedIds.has(form.getValues(`installations.${index}.id`) ?? "") && (
+                    <p className="text-xs text-muted-foreground">
+                      Se esta instalação já tiver ocorrências, remover aqui a DESATIVA (o histórico é
+                      preservado). O código também deixa de ser editável depois da primeira conciliação.
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSubmitting}
+                onClick={() =>
+                  installations.append({
+                    id: null,
+                    code: "",
+                    label: "",
+                    estimatedAmount: undefined,
+                    isActive: true,
+                  })
+                }
+              >
+                <IconPlus className="mr-2 h-4 w-4" />
+                Adicionar instalação
+              </Button>
             </CardContent>
           </Card>
 
