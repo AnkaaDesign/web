@@ -1,4 +1,4 @@
-import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
+import { expandInlineFormat, parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
 import { getApiBaseUrl } from "@/config/api";
 import type { MessageFormData } from "@/components/administration/message/editor/types";
 import {
@@ -74,25 +74,28 @@ export const exportMessageToPdf = (data: Pick<MessageFormData, "title" | "blocks
   const escAttr = (s: string) =>
     String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-  const fmtToHtml = (text: string): string => {
-    const segments = parseMarkdownToInlineFormat(text);
+  // Blocks reach here in editor format (content: string), but a re-saved
+  // message can carry already-structured runs — stringifying those would print
+  // "[object Object]" into the PDF.
+  const fmtToHtml = (text: string | any[]): string => {
+    const segments = typeof text === "string"
+      ? parseMarkdownToInlineFormat(text)
+      : Array.isArray(text)
+        ? text.flatMap((run) =>
+            typeof run === "string" ? parseMarkdownToInlineFormat(run) : expandInlineFormat(run),
+          )
+        : [];
+    // A run carries a style SET (`{c:#hex}**x**{/c}` is bold *and* colored),
+    // so the tags are composed rather than switched on a single type.
     return segments
       .map((seg: any) => {
-        const c = esc(seg.content ?? "").replace(/\n/g, "<br>");
-        switch (seg.type) {
-          case "bold":
-            return `<strong>${c}</strong>`;
-          case "italic":
-            return `<em>${c}</em>`;
-          case "underline":
-            return `<u>${c}</u>`;
-          case "link":
-            return `<a href="${escAttr(seg.url ?? "")}" style="color:${PRIMARY_GREEN}">${c}</a>`;
-          case "color":
-            return `<span style="color:${escAttr(seg.color ?? "")}">${c}</span>`;
-          default:
-            return c;
-        }
+        let c = esc(seg.content ?? "").replace(/\n/g, "<br>");
+        if (seg.italic || seg.type === "italic") c = `<em>${c}</em>`;
+        if (seg.underline || seg.type === "underline") c = `<u>${c}</u>`;
+        if (seg.bold || seg.type === "bold") c = `<strong>${c}</strong>`;
+        if (seg.color) c = `<span style="color:${escAttr(seg.color)}">${c}</span>`;
+        if (seg.url) c = `<a href="${escAttr(seg.url)}" style="color:${PRIMARY_GREEN}">${c}</a>`;
+        return c;
       })
       .join("");
   };

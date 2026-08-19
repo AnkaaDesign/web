@@ -73,11 +73,12 @@ function isUnderline(el: HTMLElement): boolean {
 }
 
 // ─── inline serialization (DOM → markdown string) ─────────────────────────────
-// We intentionally do NOT carry over text color: pasted content (Google Docs in
-// particular) nests colored spans, which would produce nested {c:..} markers the
-// flat markdown parser cannot handle, leaking literal markers into the output.
+// We intentionally do NOT carry over text color. The parser handles nested
+// {c:..} markers now, but pasted content (Google Docs, Word) bakes an explicit
+// near-black or near-white color into nearly every span, which then fights the
+// reader's theme instead of following it.
 // `active` tracks formats already applied by ancestors so we never double-wrap
-// (e.g. nested bold spans → ****text**** which also breaks the parser).
+// (e.g. nested bold spans → ****text**** which the parser reads as literal).
 interface ActiveFormats {
   bold?: boolean;
   italic?: boolean;

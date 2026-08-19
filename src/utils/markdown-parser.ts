@@ -1,8 +1,15 @@
 /**
  * Markdown Parser for Message Content
  *
- * Parses markdown-style formatting markers into structured InlineFormat objects.
- * Supports: **bold**, *italic*, __underline__, and [link](url)
+ * Parses the inline markdown the composer stores — `{c:#hex}text{/c}`,
+ * `[text](url)`, `**bold**`, `__underline__`, `*italic*` — into styled
+ * InlineFormat runs.
+ *
+ * Markers NEST. The composer emits `{c:#hex}**texto**{/c}` whenever a colored
+ * selection is bolded, and `{c:#a}{c:#b}x{/c}{/c}` whenever an already-colored
+ * selection is recolored. So the parser descends recursively, and closes a
+ * color tag with a balanced scan instead of a lazy regex — a lazy `.*?` closes
+ * on the first `{/c}` and leaks the leftover markers into the rendered text.
  */
 
 import type { InlineFormat } from '@/components/messaging/types';
@@ -29,155 +36,205 @@ export function sanitizeUrl(url: string): string {
   return '';
 }
 
+// ─────────────────────────────── Inline parser ───────────────────────────────
+
+/** Sticky matchers, used as "does a marker start exactly at index i?". */
+const COLOR_OPEN = /\{c:#([0-9a-fA-F]{3,6})\}/y;
+const LINK = /\[([^\]]+)\]\(([^)]*)\)/y;
+const COLOR_CLOSE = '{/c}';
+
+/** Style accumulated while descending through nested markers. */
+interface RunStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string;
+  url?: string;
+}
+
 /**
- * Parses text with markdown-style formatting into InlineFormat array
+ * The run's dominant style, kept so consumers that switch on `type` keep
+ * working. The full style set always lives on the flags/color/url fields.
+ */
+function primaryType(style: RunStyle): InlineFormat['type'] {
+  if (style.url) return 'link';
+  if (style.color) return 'color';
+  if (style.bold) return 'bold';
+  if (style.underline) return 'underline';
+  if (style.italic) return 'italic';
+  return 'text';
+}
+
+function makeRun(content: string, style: RunStyle): InlineFormat {
+  const run: InlineFormat = { type: primaryType(style), content };
+  if (style.bold) run.bold = true;
+  if (style.italic) run.italic = true;
+  if (style.underline) run.underline = true;
+  if (style.color) run.color = style.color;
+  if (style.url) run.url = style.url;
+  return run;
+}
+
+/**
+ * Index of the `{/c}` closing the color run that starts at `from`, skipping
+ * over nested `{c:#…}` pairs. Returns -1 when the run is never closed.
+ */
+function findColorClose(text: string, from: number): number {
+  let depth = 0;
+  let i = from;
+  while (i < text.length) {
+    if (text.startsWith(COLOR_CLOSE, i)) {
+      if (depth === 0) return i;
+      depth--;
+      i += COLOR_CLOSE.length;
+      continue;
+    }
+    COLOR_OPEN.lastIndex = i;
+    const open = COLOR_OPEN.exec(text);
+    if (open) {
+      depth++;
+      i = COLOR_OPEN.lastIndex;
+      continue;
+    }
+    i++;
+  }
+  return -1;
+}
+
+function parseInline(text: string, style: RunStyle): InlineFormat[] {
+  const runs: InlineFormat[] = [];
+  let plain = '';
+
+  const flush = () => {
+    if (!plain) return;
+    runs.push(makeRun(plain, style));
+    plain = '';
+  };
+
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+
+    // {c:#RRGGBB}…{/c}
+    if (ch === '{') {
+      COLOR_OPEN.lastIndex = i;
+      const open = COLOR_OPEN.exec(text);
+      if (open) {
+        const contentStart = COLOR_OPEN.lastIndex;
+        const close = findColorClose(text, contentStart);
+        if (close !== -1) {
+          const inner = text.substring(contentStart, close);
+          if (inner.trim()) {
+            flush();
+            runs.push(...parseInline(inner, { ...style, color: `#${open[1]}` }));
+          } else {
+            // Empty color run — keep the markers as written.
+            plain += text.substring(i, close + COLOR_CLOSE.length);
+          }
+          i = close + COLOR_CLOSE.length;
+          continue;
+        }
+      }
+    }
+
+    // [text](url)
+    if (ch === '[') {
+      LINK.lastIndex = i;
+      const link = LINK.exec(text);
+      if (link) {
+        const label = link[1].trim();
+        // Unsafe scheme (javascript:, data:, …) → keep the readable label,
+        // drop the dangerous link.
+        const url = sanitizeUrl(link[2].trim());
+        if (label) {
+          flush();
+          runs.push(...parseInline(label, url ? { ...style, url } : style));
+          i = LINK.lastIndex;
+          continue;
+        }
+      }
+    }
+
+    // **bold**, __underline__, *italic*
+    if (ch === '*' || ch === '_') {
+      const token = text.startsWith('**', i)
+        ? '**'
+        : text.startsWith('__', i)
+          ? '__'
+          : ch === '*'
+            ? '*'
+            : null;
+      if (token) {
+        const close = text.indexOf(token, i + token.length);
+        if (close !== -1) {
+          const inner = text.substring(i + token.length, close);
+          if (inner.trim()) {
+            flush();
+            const nested: RunStyle =
+              token === '**'
+                ? { ...style, bold: true }
+                : token === '__'
+                  ? { ...style, underline: true }
+                  : { ...style, italic: true };
+            runs.push(...parseInline(inner, nested));
+            i = close + token.length;
+            continue;
+          }
+        }
+      }
+    }
+
+    plain += ch;
+    i++;
+  }
+
+  flush();
+  return runs;
+}
+
+/**
+ * Parses text with markdown-style formatting into InlineFormat runs.
  *
- * Supported formats:
- * - **text** -> bold (handles spaces: ** text ** or **text**)
- * - *text* -> italic (handles spaces: * text * or *text*)
- * - __text__ -> underline (not in InlineFormat spec, treated as bold for now)
- * - [text](url) -> link
+ * Supported markers:
+ * - `{c:#rrggbb}text{/c}` -> colored (nestable; innermost color wins)
+ * - `[text](url)` -> link (unsafe schemes are dropped, label kept)
+ * - `**text**` -> bold
+ * - `__text__` -> underline
+ * - `*text*` -> italic
  *
- * Edge cases handled:
- * - Spaces inside markers: ** text ** is parsed correctly
- * - Nested formatting: **bold *and italic* text** (outer wins)
- * - Empty markers: ** ** is treated as plain text
- * - Single markers: * or ** without closing are treated as plain text
+ * Markers combine: `{c:#3bc914}**texto**{/c}` yields ONE run that is both bold
+ * and green, instead of a green run printing literal `**` markers.
+ *
+ * Unmatched or empty markers (`2 ** 3`, `{c:#3bc914}{/c}`) stay literal text.
  *
  * @param text - Text with markdown-style markers
  * @returns Array of InlineFormat objects
  */
 export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
   if (!text) return [];
+  const runs = parseInline(text, {});
+  if (runs.length === 0) return [{ type: 'text', content: text }];
+  return runs;
+}
 
-  const result: InlineFormat[] = [];
-  let currentIndex = 0;
-
-  // Combined regex to match all formatting patterns
-  // Order matters: color first (avoid conflicts), then links (most specific), then bold/underline, then italic
-  // Using [\s\S] instead of . to match any character including newlines
-  // Using *? for non-greedy matching to avoid over-matching
-  // Allowing spaces around content: ** text ** or **text**
-  const formatRegex = /(\{c:#([0-9a-fA-F]{3,6})\}([\s\S]*?)\{\/c\})|(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+?)\*\*)|(__([^_]+?)__)|(\*([^*]+?)\*)/g;
-
-  let match: RegExpExecArray | null;
-
-  while ((match = formatRegex.exec(text)) !== null) {
-    // Add any plain text before this match
-    if (match.index > currentIndex) {
-      const plainText = text.substring(currentIndex, match.index);
-      if (plainText) {
-        result.push({ type: 'text', content: plainText });
-      }
-    }
-
-    // Determine which pattern matched and add formatted content
-    if (match[1]) {
-      // Color: {c:#RRGGBB}text{/c}
-      const colorHex = `#${match[2]}`;
-      const colorContent = match[3];
-      if (colorContent.trim()) {
-        result.push({
-          type: 'color',
-          content: colorContent,
-          color: colorHex,
-        });
-      } else {
-        result.push({
-          type: 'text',
-          content: match[0],
-        });
-      }
-    } else if (match[4]) {
-      // Link: [text](url)
-      const linkText = match[5].trim();
-      const linkUrl = sanitizeUrl(match[6].trim());
-      // Only add link if both text and a SAFE URL are non-empty
-      if (linkText && linkUrl) {
-        result.push({
-          type: 'link',
-          content: linkText,
-          url: linkUrl,
-        });
-      } else if (linkText) {
-        // Unsafe scheme (javascript:, data:, …) or empty URL — keep the
-        // readable text but drop the dangerous link.
-        result.push({
-          type: 'text',
-          content: linkText,
-        });
-      } else {
-        // Invalid link format - treat as plain text
-        result.push({
-          type: 'text',
-          content: match[0],
-        });
-      }
-    } else if (match[7]) {
-      // Bold: **text**
-      const boldText = match[8];
-      // Skip if content is only whitespace
-      if (boldText.trim()) {
-        result.push({
-          type: 'bold',
-          content: boldText,
-        });
-      } else {
-        // Empty bold markers - treat as plain text
-        result.push({
-          type: 'text',
-          content: match[0],
-        });
-      }
-    } else if (match[9]) {
-      // Underline: __text__
-      const underlineText = match[10];
-      if (underlineText.trim()) {
-        result.push({
-          type: 'underline',
-          content: underlineText,
-        });
-      } else {
-        result.push({
-          type: 'text',
-          content: match[0],
-        });
-      }
-    } else if (match[11]) {
-      // Italic: *text*
-      const italicText = match[12];
-      // Skip if content is only whitespace
-      if (italicText.trim()) {
-        result.push({
-          type: 'italic',
-          content: italicText,
-        });
-      } else {
-        // Empty italic markers - treat as plain text
-        result.push({
-          type: 'text',
-          content: match[0],
-        });
-      }
-    }
-
-    currentIndex = match.index + match[0].length;
-  }
-
-  // Add any remaining plain text
-  if (currentIndex < text.length) {
-    const remainingText = text.substring(currentIndex);
-    if (remainingText) {
-      result.push({ type: 'text', content: remainingText });
-    }
-  }
-
-  // If no formatting was found, return the entire text as plain
-  if (result.length === 0) {
-    return [{ type: 'text', content: text }];
-  }
-
-  return result;
+/**
+ * Re-parses a run's own text for markers, keeping the run's style as the base.
+ *
+ * Stored content mixes both shapes — a plain string, or already-structured runs
+ * whose text still carries markers (`{ type: 'color', content: '**texto**' }`)
+ * — so renderers expand every run through this instead of only plain-text ones.
+ */
+export function expandInlineFormat(run: InlineFormat): InlineFormat[] {
+  if (!run || !run.content) return [];
+  return parseInline(run.content, {
+    bold: run.bold ?? run.type === 'bold',
+    italic: run.italic ?? run.type === 'italic',
+    underline: run.underline ?? run.type === 'underline',
+    color: run.color,
+    // Structured content can come straight from the API, so a stored href is
+    // sanitized here — every renderer downstream trusts the parsed run.
+    url: run.url ? sanitizeUrl(run.url) || undefined : undefined,
+  });
 }
 
 /**
@@ -189,18 +246,11 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
  */
 export function stripMarkdownFormatting(text: string): string {
   if (!text) return '';
-
-  return text
-    // Remove color {c:#hex}text{/c} -> text
-    .replace(/\{c:#[0-9a-fA-F]{3,6}\}(.*?)\{\/c\}/g, '$1')
-    // Remove links [text](url) -> text
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove bold **text** -> text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    // Remove underline __text__ -> text
-    .replace(/__([^_]+)__/g, '$1')
-    // Remove italic *text* -> text
-    .replace(/\*([^*]+)\*/g, '$1');
+  // Parsing (rather than pair-matching regexes) is what makes nested markers
+  // strip cleanly instead of leaving a stray `{/c}` behind.
+  return parseMarkdownToInlineFormat(text)
+    .map((run) => run.content)
+    .join('');
 }
 
 /**
@@ -211,7 +261,7 @@ export function stripMarkdownFormatting(text: string): string {
  */
 export function hasMarkdownFormatting(text: string): boolean {
   if (!text) return false;
-  return /(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))/.test(text);
+  return /(\{c:#[0-9a-fA-F]{3,6}\})|(\*\*[\s\S]+?\*\*)|(__[\s\S]+?__)|(\*[\s\S]+?\*)|(\[[^\]]+\]\([^)]*\))/.test(text);
 }
 
 /**
@@ -260,15 +310,16 @@ export function removeMarkdownFormat(
 
   switch (format) {
     case 'bold':
-      return text.replace(/\*\*([^*]+)\*\*/g, '$1');
+      return text.replace(/\*\*([\s\S]+?)\*\*/g, '$1');
     case 'italic':
-      return text.replace(/\*([^*]+)\*/g, '$1');
+      return text.replace(/\*([\s\S]+?)\*/g, '$1');
     case 'underline':
-      return text.replace(/__([^_]+)__/g, '$1');
+      return text.replace(/__([\s\S]+?)__/g, '$1');
     case 'link':
-      return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      return text.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
     case 'color':
-      return text.replace(/\{c:#[0-9a-fA-F]{3,6}\}(.*?)\{\/c\}/g, '$1');
+      // Markers are dropped individually: nested runs have no matching pairs.
+      return text.replace(/\{c:#[0-9a-fA-F]{3,6}\}/g, '').replace(/\{\/c\}/g, '');
     default:
       return text;
   }

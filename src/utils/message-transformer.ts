@@ -71,6 +71,26 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
       };
     }
 
+    // Handle heading blocks already in renderer format ({ type: 'heading', level })
+    // — templates and re-saved content carry this shape, and without it the
+    // block falls through to `return null` and disappears from the page.
+    if ((block as any).type === 'heading') {
+      const headingBlock = block as any;
+      const level = Math.min(Math.max(Number(headingBlock.level) || 1, 1), 6);
+      const content = isInlineFormatArray(headingBlock.content)
+        ? (headingBlock.content as InlineFormat[])
+        : textToInlineFormat(headingBlock.content || '');
+
+      return {
+        id: headingBlock.id,
+        type: 'heading',
+        level: level as 1 | 2 | 3 | 4 | 5 | 6,
+        content,
+        fontSize: headingBlock.fontSize,
+        fontWeight: headingBlock.fontWeight,
+      };
+    }
+
     // Handle paragraph blocks
     if (block.type === 'paragraph') {
       const content = isInlineFormatArray((block as any).content)

@@ -1,12 +1,22 @@
 // Message Block Types for Rendering
 
-export type InlineFormat =
-  | { type: 'text'; content: string }
-  | { type: 'bold'; content: string }
-  | { type: 'italic'; content: string }
-  | { type: 'underline'; content: string }
-  | { type: 'link'; content: string; url: string }
-  | { type: 'color'; content: string; color: string };
+/**
+ * One styled inline run.
+ *
+ * Markers nest — `{c:#3bc914}**texto**{/c}` is a single run that is BOTH bold
+ * and green — so a run carries a style set, not a single style. `type` is the
+ * run's dominant style, kept so consumers that switch on it keep working;
+ * renderers should apply every field.
+ */
+export interface InlineFormat {
+  type: 'text' | 'bold' | 'italic' | 'underline' | 'link' | 'color';
+  content: string;
+  url?: string;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
 
 export type MessageBlock =
   | HeadingBlock

@@ -1,68 +1,13 @@
 import * as React from "react";
 import type { InlineFormat } from "./types";
+import { expandInlineFormat, parseMarkdownToInlineFormat, sanitizeUrl } from "@/utils/markdown-parser";
 import { cn } from "@/lib/utils";
 
 interface InlineContentProps {
-  content: InlineFormat[];
+  /** Structured runs, or a raw markdown string when a block was stored unparsed. */
+  content: InlineFormat[] | string;
   className?: string;
 }
-
-/**
- * Parses markdown-style formatting from a plain string into InlineFormat array.
- * Supports:
- * - **bold** or __bold__
- * - *italic* or _italic_
- * - [text](url) links
- */
-const parseMarkdownText = (text: string): InlineFormat[] => {
-  const result: InlineFormat[] = [];
-
-  const pattern = /(\{c:#([0-9a-fA-F]{3,6})\}(.*?)\{\/c\})|(\*\*(.+?)\*\*)|(__(.+?)__)|(\*(.+?)\*)|(_(.+?)_)|(\[(.+?)\]\((.+?)\))/g;
-
-  let lastIndex = 0;
-  let match;
-
-  while ((match = pattern.exec(text)) !== null) {
-    // Add any text before this match
-    if (match.index > lastIndex) {
-      result.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-    }
-
-    if (match[1]) {
-      // {c:#hex}text{/c}
-      result.push({ type: 'color', content: match[3], color: `#${match[2]}` });
-    } else if (match[4]) {
-      // **bold**
-      result.push({ type: 'bold', content: match[5] });
-    } else if (match[6]) {
-      // __underline__
-      result.push({ type: 'underline', content: match[7] });
-    } else if (match[8]) {
-      // *italic*
-      result.push({ type: 'italic', content: match[9] });
-    } else if (match[10]) {
-      // _italic_
-      result.push({ type: 'italic', content: match[11] });
-    } else if (match[13] && match[14]) {
-      // [text](url) — match[12]=full, match[13]=text, match[14]=url
-      result.push({ type: 'link', content: match[13], url: match[14] });
-    }
-
-    lastIndex = pattern.lastIndex;
-  }
-
-  // Add any remaining text after the last match
-  if (lastIndex < text.length) {
-    result.push({ type: 'text', content: text.slice(lastIndex) });
-  }
-
-  // If no matches were found, return the original text
-  if (result.length === 0) {
-    result.push({ type: 'text', content: text });
-  }
-
-  return result;
-};
 
 /**
  * Renders text content with newlines converted to <br /> elements
@@ -82,74 +27,73 @@ const renderTextWithLineBreaks = (text: string): React.ReactNode => {
 };
 
 /**
- * Renders inline formatted text content with support for bold, italic, and links.
- * Handles nested formatting and ensures proper semantic HTML.
+ * Renders one run with every style it carries. Wrapping order matters: the
+ * color/link wrapper is outermost, so `text-foreground` on <strong> can never
+ * override a colored run.
+ */
+const renderRun = (run: InlineFormat, key: string): React.ReactNode => {
+  let node: React.ReactNode = renderTextWithLineBreaks(run.content);
+
+  if (run.italic || run.type === 'italic') {
+    node = <em className="italic">{node}</em>;
+  }
+  if (run.underline || run.type === 'underline') {
+    node = <u>{node}</u>;
+  }
+  if (run.bold || run.type === 'bold') {
+    node = <strong className={cn("font-semibold", !run.color && "text-foreground")}>{node}</strong>;
+  }
+
+  // Structured content can reach the renderer straight from the API, so the
+  // href is sanitized here too — never trust a stored URL.
+  const href = run.url ? sanitizeUrl(run.url) : '';
+  if (href) {
+    return (
+      <a
+        key={key}
+        href={href}
+        className="text-primary hover:underline underline-offset-2 transition-all focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:ring-offset-1 rounded-sm outline-none"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Link to ${href}`}
+      >
+        {node}
+      </a>
+    );
+  }
+
+  if (run.color) {
+    return (
+      <span key={key} style={{ color: run.color }}>
+        {node}
+      </span>
+    );
+  }
+
+  return <React.Fragment key={key}>{node}</React.Fragment>;
+};
+
+/**
+ * Renders inline formatted text content with support for bold, italic,
+ * underline, color and links, including nested combinations.
  * Preserves line breaks by converting \n to <br /> elements.
  */
 export const InlineContent = React.memo<InlineContentProps>(({ content, className }) => {
-  // Parse markdown in text content and flatten the result
-  const parsedContent = content.flatMap((format) => {
-    if (format.type === 'text') {
-      return parseMarkdownText(format.content);
-    }
-    return [format];
-  });
+  // Every run is re-expanded: stored content mixes plain strings with typed
+  // runs whose text still carries markers (`{type:'color', content:'**x**'}`).
+  const parsedContent = React.useMemo(() => {
+    if (typeof content === 'string') return parseMarkdownToInlineFormat(content);
+    if (!Array.isArray(content)) return [];
+    return content.flatMap((format) =>
+      typeof format === 'string'
+        ? parseMarkdownToInlineFormat(format)
+        : expandInlineFormat(format),
+    );
+  }, [content]);
 
   return (
     <span className={cn("inline", className)}>
-      {parsedContent.map((format, index) => {
-        const key = `inline-${index}`;
-
-        switch (format.type) {
-          case 'text':
-            return <React.Fragment key={key}>{renderTextWithLineBreaks(format.content)}</React.Fragment>;
-
-          case 'bold':
-            return (
-              <strong key={key} className="font-semibold text-foreground">
-                {renderTextWithLineBreaks(format.content)}
-              </strong>
-            );
-
-          case 'italic':
-            return (
-              <em key={key} className="italic">
-                {renderTextWithLineBreaks(format.content)}
-              </em>
-            );
-
-          case 'underline':
-            return (
-              <u key={key}>
-                {renderTextWithLineBreaks(format.content)}
-              </u>
-            );
-
-          case 'color':
-            return (
-              <span key={key} style={{ color: (format as any).color }}>
-                {renderTextWithLineBreaks(format.content)}
-              </span>
-            );
-
-          case 'link':
-            return (
-              <a
-                key={key}
-                href={format.url}
-                className="text-primary hover:underline underline-offset-2 transition-all focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:ring-offset-1 rounded-sm outline-none"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Link to ${format.url}`}
-              >
-                {renderTextWithLineBreaks(format.content)}
-              </a>
-            );
-
-          default:
-            return null;
-        }
-      })}
+      {parsedContent.map((format, index) => renderRun(format, `inline-${index}`))}
     </span>
   );
 });

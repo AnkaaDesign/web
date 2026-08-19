@@ -19,18 +19,20 @@ interface RichTextEditorProps {
   onBlur?: (e: React.FocusEvent<HTMLDivElement>) => void;
 }
 
-// rgb(r,g,b) or #hex → lowercase #hex
+// rgb()/rgba() or #hex → lowercase #hex. Browsers normalise `style.color` to
+// rgba() as soon as an alpha channel is present, and a dropped match here means
+// the color is silently lost on the next serialization.
 function toHex(color: string): string {
   if (!color) return '';
   if (color.startsWith('#')) return color.toLowerCase();
-  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  const m = color.match(/rgba?\s*\(\s*(\d+)\s*,?\s*(\d+)\s*,?\s*(\d+)/);
   if (!m) return '';
   return '#' + [m[1], m[2], m[3]]
     .map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('');
 }
 
-// DOM → markdown string
-function domToMarkdown(el: HTMLElement): string {
+// DOM → markdown string (exported for round-trip tests)
+export function domToMarkdown(el: HTMLElement): string {
   function walk(node: Node): string {
     if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
@@ -70,27 +72,63 @@ function escAttr(s: string) {
   return s.replace(/"/g, '&quot;');
 }
 
-function segToHtml(seg: InlineFormat): string {
-  const c = escHtml(seg.content || '');
-  switch (seg.type) {
-    case 'bold':      return `<b>${c}</b>`;
-    case 'italic':    return `<i>${c}</i>`;
-    case 'underline': return `<u>${c}</u>`;
-    case 'link': {
-      const safe = sanitizeUrl((seg as any).url || '');
-      return safe ? `<a href="${escAttr(safe)}">${c}</a>` : c;
-    }
-    case 'color':     return `<span style="color:${(seg as any).color}">${c}</span>`;
-    default:          return c;
-  }
+/**
+ * A run carries a style SET (`{c:#hex}**x**{/c}` is bold *and* colored), and
+ * runs are a flat list, so the HTML is rebuilt as a tree: consecutive runs that
+ * share a layer's value sit inside ONE tag. Emitting a tag per run instead
+ * would round-trip `**a {c:#x}b{/c} c**` back out as
+ * `**a **{c:#x}**b**{/c}** c**` — semantically the same, but the stored markers
+ * multiply every time the message is reopened.
+ *
+ * Layer order is the nesting order. Links are outermost so a partly-colored
+ * link stays one link; color is innermost so it hugs the text it applies to.
+ */
+interface HtmlLayer {
+  key: (run: InlineFormat) => string | null;
+  open: (key: string) => string;
+  close: string;
 }
 
-// Markdown string → HTML string for contentEditable innerHTML
-function markdownToHtml(text: string): string {
+const HTML_LAYERS: HtmlLayer[] = [
+  {
+    key: (r) => (r.url ? sanitizeUrl(r.url) || null : null),
+    open: (k) => `<a href="${escAttr(k)}">`,
+    close: '</a>',
+  },
+  { key: (r) => (r.bold || r.type === 'bold' ? 'b' : null), open: () => '<b>', close: '</b>' },
+  { key: (r) => (r.underline || r.type === 'underline' ? 'u' : null), open: () => '<u>', close: '</u>' },
+  { key: (r) => (r.italic || r.type === 'italic' ? 'i' : null), open: () => '<i>', close: '</i>' },
+  {
+    key: (r) => r.color ?? null,
+    open: (k) => `<span style="color:${escAttr(k)}">`,
+    close: '</span>',
+  },
+];
+
+function runsToHtml(runs: InlineFormat[], depth = 0): string {
+  if (runs.length === 0) return '';
+  const layer = HTML_LAYERS[depth];
+  if (!layer) return runs.map((r) => escHtml(r.content || '')).join('');
+
+  let out = '';
+  let i = 0;
+  while (i < runs.length) {
+    const key = layer.key(runs[i]);
+    let j = i + 1;
+    while (j < runs.length && layer.key(runs[j]) === key) j++;
+    const inner = runsToHtml(runs.slice(i, j), depth + 1);
+    out += key === null ? inner : layer.open(key) + inner + layer.close;
+    i = j;
+  }
+  return out;
+}
+
+// Markdown string → HTML string for contentEditable innerHTML (exported for tests)
+export function markdownToHtml(text: string): string {
   if (!text) return '';
   const lines = text.split('\n');
   return lines.map((line, i) => {
-    const html = parseMarkdownToInlineFormat(line).map(segToHtml).join('');
+    const html = runsToHtml(parseMarkdownToInlineFormat(line));
     // First line: raw; subsequent lines: wrapped in <div> (matches contentEditable behavior)
     return i === 0 ? html : `<div>${html || '<br>'}</div>`;
   }).join('');
