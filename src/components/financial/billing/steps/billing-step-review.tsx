@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { generatePaymentText } from "@/utils/quote-text-generators";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
-import { TaskNfseHistoryCard } from "@/components/production/task/billing/task-nfse-history";
+import { NfseCancelDialog } from "@/components/financial/nfse/nfse-cancel-dialog";
 import { useTaskNfseHistory } from "@/hooks/production/use-invoice";
 import { useNfseDetail } from "@/hooks/financial/use-nfse";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink } from "@tabler/icons-react";
+import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink, IconX } from "@tabler/icons-react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState, useCallback } from "react";
 import { invoiceService } from "@/api-client/invoice";
@@ -131,8 +131,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // ciclo anterior fica com `invoiceId = null` quando o faturamento é revertido. Sem isto,
   // uma NF que existe de verdade na prefeitura (a NF 3199 da "Tati Minas 8,50", substituída
   // pela 3215) simplesmente não aparecia em lugar nenhum da tabela.
-  const { data: nfseHistoryResponse } = useTaskNfseHistory(task?.id ?? "");
+  // O poll veio junto com o card "Histórico de NFS-e", que a tabela abaixo absorveu: enquanto
+  // um cancelamento está em análise (CANCEL_REQUESTED), quem muda o estado da nota é o fiscal
+  // da prefeitura, sem nenhum evento nosso — então a lista se repesca a cada 15s até resolver.
+  const [nfsePollInterval, setNfsePollInterval] = useState<number | false>(false);
+  const { data: nfseHistoryResponse } = useTaskNfseHistory(task?.id ?? "", {
+    refetchInterval: nfsePollInterval,
+  });
   const taskNfseHistory: any[] = (nfseHistoryResponse as any)?.data?.nfses ?? [];
+  const hasPendingNfseCancellation = taskNfseHistory.some(
+    (doc: any) => doc?.status === "CANCEL_REQUESTED",
+  );
+  useEffect(() => {
+    setNfsePollInterval(hasPendingNfseCancellation ? 15000 : false);
+  }, [hasPendingNfseCancellation]);
 
   // Notas que NÃO pertencem a nenhuma fatura atual desta tela — os ciclos anteriores.
   const previousCycleNfses = useMemo(() => {
@@ -208,6 +220,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     if (!filterCustomerId) return invoices;
     return invoices.filter((inv: any) => inv.customerId === filterCustomerId);
   }, [invoices, filterCustomerId]);
+
+  // As notas órfãs (ciclos revertidos) não pertencem a nenhuma fatura desta tela, mas a tabela
+  // de NFS-e vive DENTRO do cartão de cada cliente — então elas entram só no primeiro cartão
+  // que de fato tem fatura, senão a mesma nota apareceria repetida em cada cliente.
+  const firstInvoicedConfigId = useMemo(() => {
+    const found = filteredCustomerConfigs.find((c: any) =>
+      invoices.some((inv: any) => inv.customerConfigId === c.id),
+    );
+    return found?.id ?? null;
+  }, [filteredCustomerConfigs, invoices]);
 
   const subtotal = validServices.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
   const totalFromConfigs = customerConfigs.reduce((sum: number, c: any) => sum + (Number(c?.total) || 0), 0);
@@ -817,6 +839,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       ?? nfseDocuments.find((d: any) => d.status === "ERROR")
                       ?? null;
                     const canceledNfses = nfseDocuments.filter((d: any) => d.status === "CANCELLED");
+                    // Antes as órfãs viviam no card "Histórico de NFS-e" do rodapé, que repetia na
+                    // mesma tela a nota já listada aqui; agora esta tabela é o lugar único da
+                    // NFS-e da tarefa: vigente, canceladas e ciclos anteriores.
+                    const orphanNfses = config.id === firstInvoicedConfigId ? previousCycleNfses : [];
+                    const nfseRowCount =
+                      (activeNfse ? 1 : 0) + canceledNfses.length + orphanNfses.length;
 
                     return (
                       <div className="mt-4 space-y-3">
@@ -905,6 +933,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                           <div className="flex items-center gap-2 text-sm font-semibold">
                             <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
                             NFS-e
+                            {nfseRowCount > 0 && (
+                              <Badge variant="secondary" size="sm" className="font-medium">
+                                {nfseRowCount}
+                              </Badge>
+                            )}
                           </div>
                           <div className="rounded-md border border-border/50 overflow-x-auto">
                             <table className="w-full text-sm table-fixed">
@@ -926,7 +959,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               </thead>
                               <tbody className="divide-y divide-border/50">
                                 {/* No NFS-e at all — single row with emit button */}
-                                {!activeNfse && canceledNfses.length === 0 && previousCycleNfses.length === 0 && (
+                                {!activeNfse && canceledNfses.length === 0 && orphanNfses.length === 0 && (
                                   <tr>
                                     <td colSpan={7} className="px-3 py-2 text-muted-foreground">Não emitida</td>
                                     <td className="px-3 py-2">
@@ -958,19 +991,21 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                   />
                                 ))}
                                 {/* Notas de ciclos ANTERIORES da tarefa — órfãs de fatura porque o
-                                    faturamento foi revertido, mas reais na prefeitura. Sem ações
-                                    inline: elas não pertencem a esta fatura, e o card "Histórico de
-                                    NFS-e" abaixo expõe o "Corrigir e reenviar" por nota, pelo
-                                    endpoint por documento, que é o caminho correto para órfãs. */}
-                                {previousCycleNfses.map((doc: any) => (
+                                    faturamento foi revertido, mas reais na prefeitura. Não recebem
+                                    as ações de fatura (emitir/reconciliar não fazem sentido para
+                                    quem não tem fatura), e sim o Cancelar por DOCUMENTO, que é o
+                                    endpoint que alcança órfã — era o que o card de histórico
+                                    oferecia antes de ser absorvido por esta tabela. */}
+                                {orphanNfses.map((doc: any) => (
                                   <NfseTableRow
                                     key={doc.id}
                                     doc={doc}
                                     showActions={false}
                                     invoiceId={configInvoice.id}
                                     nfseDocuments={nfseDocuments}
-                                    canManage={false}
+                                    canManage={!disabled}
                                     supersededNote
+                                    docScopedCancel
                                   />
                                 ))}
                               </tbody>
@@ -1267,12 +1302,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Histórico completo de NFS-e da tarefa. As tabelas acima só enxergam as notas da
-          fatura viva; este card alcança também as notas de ciclos revertidos (que ficam
-          órfãs de fatura, mas VÁLIDAS na prefeitura) e expõe o "Corrigir e reenviar" por
-          nota. Ele já existia, mas só na página de detalhe da tarefa — não aqui, que é
-          justamente onde o financeiro trabalha. */}
-      {task?.id && <TaskNfseHistoryCard taskId={task.id} />}
+      {/* O card "Histórico de NFS-e" que ficava aqui saiu: ele repetia, num segundo lugar da
+          mesma tela, a nota que a tabela de NFS-e já mostrava — a mesma NF aparecia duas vezes,
+          com dois botões de cancelar. Tudo o que ele fazia mora agora naquela tabela: as notas
+          de ciclos revertidos entram como linhas apagadas e o Cancelar por documento vive na
+          própria linha. */}
     </div>
   );
 }
@@ -1523,6 +1557,7 @@ function NfseTableRow({
   nfseDocuments,
   canManage,
   supersededNote = false,
+  docScopedCancel = false,
 }: {
   doc: any;
   showActions: boolean;
@@ -1531,8 +1566,11 @@ function NfseTableRow({
   canManage: boolean;
   /** Nota de um ciclo de faturamento anterior — exibida em tom apagado, como histórico. */
   supersededNote?: boolean;
+  /** Oferece o Cancelar por DOCUMENTO (não depende de fatura) — usado nas notas órfãs. */
+  docScopedCancel?: boolean;
 }) {
   const navigate = useNavigate();
+  const [showDocCancelDialog, setShowDocCancelDialog] = useState(false);
   // enabled:!!elotechNfseId inside the hook — passing 0 is a no-op (docs not yet emitted).
   const { data } = useNfseDetail(doc.elotechNfseId ?? 0);
   const detail: any = data?.data;
@@ -1549,6 +1587,11 @@ function NfseTableRow({
     valorBruto != null && valorLiquido != null && Math.abs(valorBruto - valorLiquido) >= 0.01;
   const iss = detail?.formImposto?.valorIss ?? null;
   const clickable = !!doc.elotechNfseId;
+  // Nota ainda VIVA na prefeitura: não cancelada e ou autorizada, ou com um cancelamento que o
+  // fiscal recusou (aí ela continua valendo e o que cabe é corrigir e reenviar o pedido).
+  const liveAtPrefeitura =
+    !doc.cancelada && (doc.status === "AUTHORIZED" || doc.status === "CANCEL_REJECTED");
+  const canCancelDocument = docScopedCancel && canManage && liveAtPrefeitura;
 
   return (
     <>
@@ -1562,7 +1605,15 @@ function NfseTableRow({
     >
       <td className="px-3 py-2 tabular-nums font-medium whitespace-nowrap">{numero ?? "-"}</td>
       <td className="px-3 py-2">
-        <NfseStatusBadge status={doc.status} size="sm" />
+        {/* `cancelada` é o que a PREFEITURA diz. Uma nota pode estar AUTHORIZED aqui e já
+            cancelada lá (cancelamento feito por fora), e nesse caso a verdade é a de lá. */}
+        {doc.cancelada ? (
+          <Badge variant="cancelled" size="sm" className="font-medium">
+            Cancelada
+          </Badge>
+        ) : (
+          <NfseStatusBadge status={doc.status} size="sm" />
+        )}
       </td>
       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
         {emissao ? formatDate(emissao) : "-"}
@@ -1586,28 +1637,45 @@ function NfseTableRow({
           {showActions && (
             <NfseActions invoiceId={invoiceId} nfseDocuments={nfseDocuments} canManage={canManage} />
           )}
+          {canCancelDocument && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDocCancelDialog(true)}
+                title={
+                  doc.status === "CANCEL_REJECTED"
+                    ? "Corrigir e reenviar o cancelamento"
+                    : "Cancelar NFS-e"
+                }
+                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+              >
+                <IconX className="h-4 w-4" />
+              </Button>
+              <NfseCancelDialog
+                open={showDocCancelDialog}
+                onOpenChange={setShowDocCancelDialog}
+                // Sem invoiceId de propósito: usa o endpoint por documento, o único que
+                // alcança nota órfã de fatura.
+                nfseDocumentId={doc.id}
+                nfseNumber={doc.nfseNumber}
+                previousRejectionMessage={
+                  doc.status === "CANCEL_REJECTED" ? doc.cancelRejectionMessage : null
+                }
+                supersededByNfseNumber={doc.supersededByNfseNumber}
+                onCancelled={() => setShowDocCancelDialog(false)}
+              />
+            </>
+          )}
         </div>
       </td>
     </tr>
     {/* O motivo vivia só num `title=` — invisível no toque e sem nenhuma pista de que
         existia. A recusa do fiscal é estado persistente e acionável (ela diz o que corrigir
         no reenvio), então fica visível na linha. */}
-    {(supersededNote || doc.errorMessage || doc.cancelRejectionMessage) && (
+    {(doc.errorMessage || doc.cancelRejectionMessage) && (
       <tr className={cn(supersededNote && "opacity-70")}>
         <td colSpan={8} className="px-3 pb-2 pt-0">
-          {supersededNote && (
-            <p className="text-xs text-muted-foreground">
-              Faturamento anterior desta tarefa
-              {doc.supersededByNfseNumber
-                ? ` — substituída pela NFS-e nº ${doc.supersededByNfseNumber}`
-                : ""}
-              {doc.status === "CANCEL_REQUESTED"
-                ? ". Cancelamento solicitado, aguardando o fiscal da prefeitura."
-                : doc.status === "CANCELLED"
-                  ? ". Cancelada na prefeitura."
-                  : ""}
-            </p>
-          )}
           {doc.errorMessage && (
             <p className="text-xs text-destructive">{doc.errorMessage}</p>
           )}

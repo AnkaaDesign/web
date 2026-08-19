@@ -479,15 +479,26 @@ export function BoletoActions({
   // CREATING/REGISTERING entram na lista porque a API sempre os aceitou
   // (invoice.controller.ts). Só o web os excluía, e o resultado era uma parcela parada em
   // "Gerando" para sempre, sem um único botão que a movesse — o beco da "Tati Minas 8,50".
+  // Parcela PAGA ou CANCELADA nunca regenera boleto — é a mesma guarda do servidor
+  // (invoice.controller.ts: "Não é possível gerar boleto para parcela paga ou cancelada"),
+  // que só faltava aqui. Uma parcela quitada por PIX/dinheiro fica com o boleto em
+  // CANCELLED, e era justamente esse estado que acendia o botão: a linha aparecia como
+  // "Paga (Outro)" e ainda oferecia Regenerar, que só levava a um 400.
   const canRegenerate =
     canManage &&
     bankSlip &&
+    !isPaid &&
+    installmentStatus !== 'CANCELLED' &&
     ['ERROR', 'REJECTED', 'CANCELLED', 'CREATING', 'REGISTERING'].includes(bankSlip.status);
   const canCancel = canManage && bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canCopyDigitableLine =
     !!bankSlip?.digitableLine && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
-  const canChangeDueDate = canManage && bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
+  // Mesma ideia: alterar o vencimento de uma parcela que já foi quitada não muda nada na
+  // parcela — se o boleto seguiu vivo no banco, o que se faz com ele é CANCELAR, não
+  // reagendar. (Cancelar continua disponível abaixo.)
+  const canChangeDueDate =
+    canManage && bankSlip && !isPaid && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
   // Allow mark-as-paid whenever the installment is not already paid: PENDING, ACTIVE,
   // OVERDUE — or CANCELLED. PENDING is the generateBankSlip=false flow (PIX/transfer, no
   // bank slip). CANCELLED is included so a cancelled installment can be revived straight
