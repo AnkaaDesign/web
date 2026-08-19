@@ -55,6 +55,16 @@ const TOLERANCE = 0.01;
 export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props) {
   const txId = transaction.id;
   const creditAmount = Math.abs(Number(transaction.amount));
+  // A Sicredi collection credit ("LIQ.COBRANCA SIMPLES-COBnnnnnn") is one day of
+  // liquidated boletos posted as a single line — it can only be composed of
+  // boletos of our carteira, never of a PIX/TED parcela or one baixada by hand.
+  // The API filters the candidate pool accordingly; here it only changes what the
+  // empty state says, so "nenhuma parcela" doesn't read as a bug.
+  const isCollectionCredit =
+    transaction.subtype === "BOLETO" ||
+    /LIQ[\s.\-]*COBRAN|COBRAN[CÇ]A\s+SIMPLES/i.test(
+      `${transaction.memo ?? ""} ${transaction.counterpartyName ?? ""}`,
+    );
 
   // installmentId -> amount string (presence = selected).
   const [selections, setSelections] = useState<Record<string, string>>({});
@@ -371,7 +381,9 @@ export function ReceivableMatchSection({ transaction, onSaveStateChange }: Props
           <p className="py-8 text-center text-sm text-muted-foreground">
             {suggestion && suggestion.allocations.length > 0
               ? "Nenhuma parcela avulsa a listar — use a sugestão acima."
-              : "Nenhuma parcela em aberto encontrada para conciliar este crédito."}
+              : isCollectionCredit
+                ? "Liquidação de cobrança: este crédito é um lote de boletos, então só boletos podem compô-lo — e nenhum boleto liquidado em aberto corresponde a ele. Parcelas pagas por PIX/TED ou baixadas manualmente não entram neste lote. Use \"Conciliar por tarefa\" abaixo se o boleto não existir no sistema."
+                : "Nenhuma parcela em aberto encontrada para conciliar este crédito."}
           </p>
         ) : (
           <div className="space-y-3">

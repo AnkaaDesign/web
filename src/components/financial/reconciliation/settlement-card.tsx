@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconAlertTriangle,
@@ -11,6 +12,8 @@ import {
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AcknowledgeTransactionDialog } from "./acknowledge-transaction-dialog";
+import { useAcknowledgeTransaction } from "@/hooks/financial/use-reconciliation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import { routes } from "@/constants";
@@ -155,6 +158,11 @@ export function SettlementCard({
    *  only card on the page that names what would be undone. */
   onRequestUnmatch?: () => void;
 }) {
+  // "Marcar como resolvido" mora nas duas faixas amarelas abaixo porque é ali
+  // que a pergunta aparece: falta a âncora, e às vezes ela não existe mesmo.
+  const [ackOpen, setAckOpen] = useState(false);
+  const ackMut = useAcknowledgeTransaction();
+
   const s = transaction.settlement;
   if (!s) return null;
 
@@ -348,6 +356,48 @@ export function SettlementCard({
             justifique. Vincule uma nota ou atribua uma categoria.
           </p>
         )}
+        {(s.state === "UNTIED" || s.state === "UNBACKED") && (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAckOpen(true)}
+              disabled={ackMut.isPending}
+            >
+              Marcar como resolvido
+            </Button>
+          </div>
+        )}
+        {s.acknowledged && (
+          <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Marcada como resolvida manualmente — sem conta recorrente nem nota a vincular
+              {s.acknowledgedNote ? `: ${s.acknowledgedNote}` : "."}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={ackMut.isPending}
+              onClick={() =>
+                ackMut.mutate({ transactionId: transaction.id, acknowledged: false })
+              }
+            >
+              Desfazer
+            </Button>
+          </p>
+        )}
+        <AcknowledgeTransactionDialog
+          open={ackOpen}
+          onOpenChange={setAckOpen}
+          isLoading={ackMut.isPending}
+          category={s.resolvedByCategory}
+          onConfirm={note =>
+            ackMut.mutate(
+              { transactionId: transaction.id, acknowledged: true, note },
+              { onSuccess: () => setAckOpen(false) },
+            )
+          }
+        />
       </CardContent>
     </Card>
   );

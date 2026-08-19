@@ -15,10 +15,17 @@ import type {
  * the 4-state summary — the ENTRADA analog of the payables query. Cached briefly
  * since receipts trickle in via boleto/conciliation.
  */
-export function useReceivables() {
+export function useReceivables(period?: { year: number; months: string[] } | null) {
+  // The period is part of the key: receipts are fetched for the months on screen,
+  // so changing the selector must refetch instead of re-filtering a payload that
+  // only ever held the last 60 days.
+  const scope = period?.months?.length
+    ? { year: period.year, months: [...period.months].sort().join(",") }
+    : null;
   return useQuery({
-    queryKey: receivableKeys.list(),
-    queryFn: () => receivableService.getReceivables().then((r) => r.data.data),
+    queryKey: [...receivableKeys.list(), scope],
+    queryFn: () =>
+      receivableService.getReceivables(period ?? null).then((r) => r.data.data),
     staleTime: 60_000,
     placeholderData: (previous) => previous,
   });

@@ -426,7 +426,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   };
 
   // --- Unified receivables endpoint (task-quotes + external operations + invoices) -
-  const { data: response, isLoading } = useReceivables();
+  const { data: response, isLoading } = useReceivables(period);
   const allRows = useMemo(() => response?.rows ?? [], [response?.rows]);
 
   // --- Period scope: keep only the rows that belong to the selected period ---
@@ -438,7 +438,13 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
     const now = new Date();
     const currentInPeriod = dateInPeriod(now, period, monthsSet);
     return allRows.filter((row) => {
-      if (row.state === "RECEIVED") return row.paidAt ? dateInPeriod(new Date(row.paidAt), period, monthsSet) : false;
+      // A received parcela's month is the day the customer paid; one recorded
+      // without a payment date falls back to its due date instead of vanishing
+      // from every month.
+      if (row.state === "RECEIVED") {
+        const received = row.paidAt ?? row.dueDate;
+        return received ? dateInPeriod(new Date(received), period, monthsSet) : false;
+      }
       if (row.dueDate) return dateInPeriod(new Date(row.dueDate), period, monthsSet);
       return currentInPeriod;
     });

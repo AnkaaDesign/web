@@ -17,7 +17,15 @@ const basePath = "/financial/receivables";
 export const receivableService = {
   // Unified receivables list (task-quotes + external operations + invoices) with
   // the 4-state summary, the ENTRADA analog of the payables endpoint.
-  getReceivables: () => apiClient.get<ReceivablesResponse>(basePath),
+  // `period` scopes the RECEIVED rows to the months the screen is showing; open
+  // parcelas always come whole. Without it the API falls back to the last 60 days
+  // of receipts, which is why every older month used to render empty.
+  getReceivables: (period?: { year: number; months: string[] } | null) =>
+    apiClient.get<ReceivablesResponse>(basePath, {
+      params: period?.months?.length
+        ? { year: period.year, months: period.months.join(",") }
+        : undefined,
+    }),
 
   // Open installments a bank CREDIT can be conciliated against.
   getReceivableCandidates: (transactionId: string) =>

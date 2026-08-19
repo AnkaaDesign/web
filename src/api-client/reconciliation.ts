@@ -128,6 +128,17 @@ export const reconciliationService = {
       payload,
     ),
 
+  // "Marcar como resolvido": a linha que a categoria explica e que não tem conta
+  // recorrente nem nota a vincular. `acknowledged: false` desfaz.
+  acknowledgeTransaction: (
+    transactionId: string,
+    payload: { acknowledged: boolean; note?: string | null },
+  ) =>
+    apiClient.post<{ success: boolean; message: string; data: BankTransaction }>(
+      `/financial/reconciliation/transactions/${transactionId}/acknowledge`,
+      payload,
+    ),
+
   ignoreTransaction: (transactionId: string, payload: IgnoreReasonPayload) =>
     apiClient.post<BankTransaction>(
       `/financial/reconciliation/transactions/${transactionId}/ignore`,

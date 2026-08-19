@@ -429,7 +429,13 @@ export function MatchStatusBadge({
             ? "Os vínculos somam mais do que o valor da transação — o pagamento está lançado em duplicidade"
             : mismatch
               ? "Os valores de extrato, obrigação e nota não fecham"
-              : p.title
+              : // Verde por declaração de gente, não por vínculo encontrado: quem
+                // olhar a linha depois precisa saber a diferença.
+                settlement.acknowledged
+                ? `Marcada como resolvida manualmente — sem conta recorrente nem nota a vincular${
+                    settlement.acknowledgedNote ? `: ${settlement.acknowledgedNote}` : "."
+                  }`
+                : p.title
         }
       >
         {label}

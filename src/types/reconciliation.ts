@@ -325,6 +325,11 @@ export interface TransactionSettlement {
   allocated: number;
   /** The matches claim more money than the transaction moved (double booking). */
   overAllocated: boolean;
+  /** Someone declared this line resolved: the category explains it and there is
+   *  no bill or note to attach. Only reachable from "Sem vínculo"/"Sem lastro". */
+  acknowledged: boolean;
+  /** Reason typed when it was marked resolved, shown in the badge tooltip. */
+  acknowledgedNote: string | null;
 }
 
 /** Installment relation nested on a receivable (entrada) match, with just

@@ -11,7 +11,7 @@ import {
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
-import { IconBan, IconCategory } from "@tabler/icons-react";
+import { IconBan, IconCategory, IconCheck, IconRotate } from "@tabler/icons-react";
 import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
 import { parseMonthKey } from "@/components/financial/reconciliation/month-nav";
@@ -33,6 +33,7 @@ import { deriveDateRange } from "@/components/financial/reconciliation/date-util
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
 import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
+import { AcknowledgeTransactionDialog } from "@/components/financial/reconciliation/acknowledge-transaction-dialog";
 import { CategoryPickerDialog } from "@/components/financial/reconciliation/category-picker-dialog";
 import {
   ALL_BUCKETS,
@@ -47,6 +48,7 @@ import {
   useBankTransactions,
   useChangeCategory,
   useIgnoreTransaction,
+  useAcknowledgeTransaction,
   useRunAutoMatch,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
@@ -381,7 +383,9 @@ export const ReconciliationStatementPage = () => {
   // ----- row quick actions (URL-driven dialogs) ----------------------------
   const ignoreDialog = useUrlDialog("ignore");
   const categoryDialog = useUrlDialog("editCategory");
+  const ackDialog = useUrlDialog("resolver");
   const ignoreMut = useIgnoreTransaction();
+  const ackMut = useAcknowledgeTransaction();
   const categoryMut = useChangeCategory();
   const runMut = useRunAutoMatch();
 
@@ -394,6 +398,12 @@ export const ReconciliationStatementPage = () => {
     ignoreDialogId && !ignoreTxFromList ? ignoreDialogId : undefined,
   );
   const ignoreTx = ignoreTxFromList ?? fetchedIgnoreTx ?? null;
+
+  const ackDialogId = asUuid(ackDialog.value);
+  const ackTx = useMemo<BankTransaction | null>(
+    () => (ackDialogId ? rows.find(t => t.id === ackDialogId) ?? null : null),
+    [ackDialogId, rows],
+  );
 
   const categoryDialogId = asUuid(categoryDialog.value);
   const categoryTxFromList = useMemo<BankTransaction | null>(
@@ -608,6 +618,41 @@ export const ReconciliationStatementPage = () => {
                 },
               },
               {
+                // "Sem vínculo" / "Sem lastro" são os dois amarelos que existem
+                // por FALTA DE ÂNCORA: a linha está fechada, o que falta é a
+                // conta ou o documento por trás dela. Quando não há nenhum dos
+                // dois — um pagamento avulso dentro de uma categoria que tem
+                // recorrentes, por exemplo — alguém precisa poder dizer isso.
+                key: "acknowledge",
+                label: "Marcar como resolvido",
+                icon: <IconCheck className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  if (!r || isDateGroup(r)) return true;
+                  const state = r.settlement?.state;
+                  return state !== "UNTIED" && state !== "UNBACKED";
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) ackDialog.set(r.id);
+                },
+              },
+              {
+                key: "unacknowledge",
+                label: "Desfazer marcação",
+                icon: <IconRotate className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  return !r || isDateGroup(r) || !r.settlement?.acknowledged;
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) {
+                    ackMut.mutate({ transactionId: r.id, acknowledged: false });
+                  }
+                },
+              },
+              {
                 key: "ignore",
                 label: "Ignorar",
                 icon: <IconBan className="h-4 w-4" />,
@@ -631,6 +676,21 @@ export const ReconciliationStatementPage = () => {
           />
         </div>
       </div>
+
+      <AcknowledgeTransactionDialog
+        open={ackDialog.open}
+        onOpenChange={open => !open && ackDialog.clear()}
+        isLoading={ackMut.isPending}
+        category={ackTx?.settlement?.resolvedByCategory ?? null}
+        onConfirm={note => {
+          if (!ackDialogId) return;
+          ackMut.mutate(
+            { transactionId: ackDialogId, acknowledged: true, note },
+            // Success/error toasts come from the axios interceptors.
+            { onSuccess: () => ackDialog.clear() },
+          );
+        }}
+      />
 
       <IgnoreTransactionDialog
         open={ignoreDialog.open}

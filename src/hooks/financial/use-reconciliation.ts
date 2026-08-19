@@ -247,6 +247,28 @@ export function useSetOffBankResolution() {
   });
 }
 
+/** Marca (ou desmarca) uma transação como resolvida sem vínculo. */
+export function useAcknowledgeTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      acknowledged,
+      note,
+    }: {
+      transactionId: string;
+      acknowledged: boolean;
+      note?: string | null;
+    }) =>
+      reconciliationService
+        .acknowledgeTransaction(transactionId, { acknowledged, note })
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
 export function useIgnoreTransaction() {
   const qc = useQueryClient();
   return useMutation({
