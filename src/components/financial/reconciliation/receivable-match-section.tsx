@@ -434,7 +434,9 @@ function LinkedInstallmentsTable({
       <table className="w-full table-fixed text-sm">
         <colgroup>
           <col style={{ width: "5.625rem" }} />
-          <col style={{ width: "16rem" }} />
+          {/* Tarefa é serial + nome + medidas ("38229 · TMR Marques Roberto 15,5x2,60"):
+              cabe muito pouco em 16rem, e o que sobrava invadia a coluna do cliente. */}
+          <col style={{ width: "22rem" }} />
           <col />
           <col style={{ width: "10rem" }} />
           <col style={{ width: "6.25rem" }} />
@@ -477,12 +479,17 @@ function LinkedInstallmentsTable({
                 </td>
                 <td className={cell}>
                   {taskLabel && task?.id ? (
+                    // `flex` e não `inline-flex`: o inline-flex se dimensiona pelo
+                    // CONTEÚDO, então o `truncate` não tinha largura contra a qual cortar
+                    // e o nome da tarefa saía por cima da coluna do cliente. Em bloco ele
+                    // herda a largura fixa da coluna, e o `min-w-0` deixa o filho encolher
+                    // abaixo do próprio texto — sem isso um item de flex nunca corta.
                     <Link
                       to={routes.financial.billing.details(task.id)}
-                      className="inline-flex items-center gap-1 truncate text-base font-medium text-blue-600 hover:underline dark:text-blue-400"
-                      title="Ver tarefa"
+                      className="flex items-center gap-1 text-base font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      title={taskLabel}
                     >
-                      <span className="truncate">{taskLabel}</span>
+                      <span className="min-w-0 truncate">{taskLabel}</span>
                       <IconExternalLink className="h-3.5 w-3.5 shrink-0" />
                     </Link>
                   ) : taskLabel ? (
@@ -653,13 +660,14 @@ function CandidateRow({
             <tr className="align-middle">
               <td className={cell}>
                 {taskLabel ? (
-                  <span className="truncate text-foreground" title={taskLabel}>{taskLabel}</span>
+                  // `block`: `truncate` não faz efeito em caixa inline.
+                  <span className="block truncate text-foreground" title={taskLabel}>{taskLabel}</span>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
               </td>
               <td className={cell}>
-                <span className="truncate text-muted-foreground" title={c.customerName ?? undefined}>
+                <span className="block truncate text-muted-foreground" title={c.customerName ?? undefined}>
                   {c.customerName || "—"}
                 </span>
               </td>
