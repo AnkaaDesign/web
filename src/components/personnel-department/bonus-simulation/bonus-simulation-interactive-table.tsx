@@ -29,7 +29,7 @@ import {
   IconSelector
 } from "@tabler/icons-react";
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
-import { useUsers, useSectors } from "../../../hooks";
+import { useUsers, useSectors, usePositions } from "../../../hooks";
 import { bonusService } from "../../../api-client";
 import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/personnel-department/use-bonus";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,31 @@ const OVERRIDES_STORAGE_KEY = "bonus-simulation-row-overrides";
 // Performance changes survive navigation. Only touched fields are stored.
 type RowOverride = { position?: string; performanceLevel?: number };
 
-// Position levels mapping
+/**
+ * Divisor do período (headcount médio) → texto pt-BR com 2 casas.
+ *
+ * O divisor é FRACIONÁRIO por construção — quem entrou ou saiu no meio do
+ * período conta a fração de dias úteis que trabalhou — e o campo "Colaboradores"
+ * imprimia o `number` cru: `12.5002`, com ponto decimal e quatro casas. Mesma
+ * regra da coluna "Colaboradores" da página de Bônus, para os dois números
+ * baterem à vista.
+ */
+const formatDivisor = (value: number): string =>
+  Number.isInteger(value)
+    ? value.toLocaleString("pt-BR")
+    : value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Quantidade de tarefas → texto pt-BR com 1 casa ("43,0"). */
+const formatTaskInput = (value: number): string => value.toFixed(1).replace(".", ",");
+
+// Escada de cargos usada como ÚLTIMO recurso.
+//
+// A lista de verdade vem do banco (`usePositions({ bonifiable: true })`). Esta
+// constante existia sozinha e era o handle de resolução de salário: a simulação
+// mandava `positionName`, o servidor fazia `salaryByPositionName.get(nome)` e,
+// quando não achava, caía em `salary = 0` — que `calculateBonus` devolve como
+// R$ 0,00 SEM erro. Renomear "Senior IV" para "Sênior IV" no cadastro zeraria
+// toda linha que passasse pelo seletor, em silêncio.
 const POSITIONS = [
   "Junior I", "Junior II", "Junior III", "Junior IV",
   "Pleno I", "Pleno II", "Pleno III", "Pleno IV",
@@ -201,9 +225,35 @@ interface BonusSimulationInteractiveTableProps {
 
 export function BonusSimulationInteractiveTable({ className, embedded: _embedded = false }: BonusSimulationInteractiveTableProps) {
   // State
-  const [taskQuantity, setTaskQuantity] = usePersistedState<number>(`${TASK_STORAGE_KEY}-quantity`, 0); // Will be set from current period
+  // Quantidade de tarefas do período. `originalTaskQuantity` é SEMPRE o número
+  // vivo vindo da API; `taskOverride` é o "e se" que o operador digitou —
+  // `null` significa "siga o período", não "zero".
+  //
+  // Antes `taskQuantity` era persistido em localStorage numa chave sem período
+  // (`bonus-simulation-task-quantity`) e o seed vivo só rodava quando o valor
+  // guardado fosse EXATAMENTE 0. Qualquer número deixado para trás — inclusive
+  // o derivado de uma edição no campo "Média", que grava `média × divisor` —
+  // sobrevivia a todo reload e a toda virada de mês, e a simulação abria com a
+  // base de outro período. Foi o que abriu a divergência de 24/08/2026: o
+  // simulador abriu com 33,4 tarefas (B1 = 2,67) enquanto o período vivo tinha
+  // 43,0 (B1 = 3,44) — e como o polinômio é de 5º grau e MUITO íngreme nessa
+  // faixa, 22% de erro na base virou 145% de erro em todo bônus da tela.
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore (always the fetched value)
-  const [taskInput, setTaskInput] = usePersistedState<string>(`${TASK_STORAGE_KEY}-input`, '0,0'); // String value for controlled input (Brazilian format) - 1 decimal
+  // O período vai DENTRO do valor, não na chave.
+  //
+  // `usePersistedState` lê o localStorage só no inicializador (na montagem) e
+  // depois GRAVA o estado atual sempre que a chave muda — então uma chave
+  // dinâmica por período faria o pior dos dois mundos na virada do dia 26: não
+  // releria o valor do período novo E carimbaria o override do período velho
+  // por cima dele. Chave fixa + carimbo no valor: período diferente do atual é
+  // simplesmente ignorado, sem depender do hook reagir a nada.
+  const [storedOverride, setStoredOverride] = usePersistedState<{
+    period: string;
+    value: number;
+  } | null>(`${TASK_STORAGE_KEY}-override`, null);
+  // Buffer de digitação — deliberadamente NÃO persistido: quem manda no valor é
+  // `taskOverride`, e o texto é sempre derivado dele.
+  const [taskInput, setTaskInput] = useState<string>('0,0');
   const [averageInput, setAverageInput] = useState<string>('0,00'); // String value for controlled input (Brazilian format) - 2 decimals
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -251,6 +301,14 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // If today is Sept 26th or later, this returns October
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
   const currentPeriod = getBonusPeriod(periodYear, periodMonth);
+  const periodKey = `${periodYear}-${periodMonth}`;
+
+  // Override só vale para o período que o gravou. De outro período = inexistente.
+  const taskOverride =
+    storedOverride && storedOverride.period === periodKey ? storedOverride.value : null;
+  const setTaskOverride = (value: number | null) =>
+    setStoredOverride(value === null ? null : { period: periodKey, value });
+  const taskQuantity = taskOverride ?? originalTaskQuantity;
 
   // Saved period reajuste (the "Reajuste: +X%" badge value). The simulation
   // applies it by sending the period (year/month) to /bonus/simulate; the API
@@ -266,6 +324,27 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     orderBy: { name: "asc" },
     limit: 100
   });
+
+  // Cargos bonificáveis do banco — nomes para o seletor e o id para o cálculo.
+  const { data: positionsData } = usePositions({
+    where: { bonifiable: true },
+    orderBy: { hierarchy: "asc" },
+    limit: 100,
+  });
+  const positionOptions = useMemo<string[]>(() => {
+    const names = (positionsData?.data ?? [])
+      .map((p: any) => p?.name)
+      .filter((n: unknown): n is string => typeof n === 'string' && n.length > 0);
+    return names.length > 0 ? names : POSITIONS;
+  }, [positionsData]);
+  // Nome → id, para mandar `positionId` e não depender de casar string.
+  const positionIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of positionsData?.data ?? []) {
+      if (p?.name && p?.id) map.set(String(p.name).toLowerCase().trim(), String(p.id));
+    }
+    return map;
+  }, [positionsData]);
 
   // Fetch weighted task count from the lightweight period stats endpoint
   // This returns only task counts without Secullum integration (fast)
@@ -305,17 +384,11 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         setFullyAbsent(Array.isArray(liveData.fullyAbsent) ? liveData.fullyAbsent : []);
         setAbsenceMeasured(liveData.absenceDataAvailable !== false);
 
-        if (weightedTaskCount > 0) {
-          // originalTaskQuantity is always the fetched period value (baseline
-          // for "Restaurar" + the modified indicator).
-          setOriginalTaskQuantity(weightedTaskCount);
-          // Only seed the working quantity when the user has no persisted
-          // override (still at the initial 0) — otherwise keep their value.
-          if (taskQuantity === 0) {
-            setTaskQuantity(weightedTaskCount);
-            setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
-          }
-        }
+        // O número do período é a BASE, sempre. `taskQuantity` deriva dele
+        // enquanto `taskOverride` for null — não há mais seed condicional, que
+        // era exatamente o ponto onde um valor velho de localStorage se
+        // eternizava (o seed só rodava se o guardado fosse 0).
+        setOriginalTaskQuantity(weightedTaskCount);
       } catch (err) {
         console.error('[BonusSimulation] Failed to fetch weighted task count:', err);
       }
@@ -501,11 +574,26 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     filters.includeUserIds.length > 0 ||
     filters.excludeUserIds.length > 0;
 
-  // Use backend eligible count (accurate, queries all users without limit) when no manual filters are applied
-  // Falls back to filtered users count when manual filters are active or backend data isn't available
-  const eligibleUserCount = !hasManualFilters && liveTaskInfo?.eligibleUsers
-    ? liveTaskInfo.eligibleUsers
-    : filteredUsers.length;
+  /**
+   * Divisor de B1 = o divisor DO PERÍODO, sempre. Nunca a lista visível.
+   *
+   * Todo filtro desta tela — setor, cargo, incluir, excluir — é recorte de
+   * VISTA. Nenhum deles muda quantas pessoas o período teve, então nenhum deles
+   * pode mexer em B1: o divisor é propriedade do período, e olhar um setor não o
+   * altera. Antes, qualquer filtro manual jogava o divisor para
+   * `filteredUsers.length` e o bônus de TODO MUNDO na tela mudava junto —
+   * escolher "Produção 1" recalculava B1 sobre 8 pessoas em vez de 12,5002.
+   *
+   * A tentativa intermediária de tratar incluir/excluir como "e se de população"
+   * era pior que o bug original em dois pontos: somava pesos sobre
+   * `filteredUsers`, que JÁ vinha filtrado por setor/cargo (bastava um exclude
+   * junto de um filtro de setor para o divisor desabar), e `includeUserIds` é
+   * whitelist — incluir uma pessoa de peso 0,05 dava divisor 0,05 e B1 = 860.
+   *
+   * Quem quiser simular outra população muda o campo "Média" direto: ele
+   * resolve `tarefas = média × divisor` e é o botão honesto para isso.
+   */
+  const eligibleUserCount = liveTaskInfo?.eligibleUsers ?? 0;
 
   // Average is calculated using eligible users (not included users)
   // This matches how the backend calculates: total tasks / total eligible users
@@ -527,6 +615,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             users: simulatedUsers.map(u => ({
               id: u.id,
               name: u.name,
+              // `positionId` primeiro: o servidor resolve salário por id e só cai
+              // no nome quando o id falta. Mandar só o nome deixava a conta
+              // refém de casar string com o cadastro.
+              positionId: positionIdByName.get(u.position.toLowerCase().trim()),
               positionName: u.position,
               sectorName: u.sectorName ?? undefined,
               performanceLevel: u.performanceLevel,
@@ -536,7 +628,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             year: periodYear,
             month: periodMonth,
           },
-    [simulatedUsers, averageTasksPerUser, periodYear, periodMonth],
+    [simulatedUsers, averageTasksPerUser, periodYear, periodMonth, positionIdByName],
   );
   const { data: simulation } = useBonusSimulation(simulationInput, {
     enabled: simulationInput !== null,
@@ -574,6 +666,22 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     sortedUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
     [sortedUsers]
   );
+
+  // Effect 0: mantém o texto do campo "Tarefas" colado em `taskQuantity`.
+  // Mesmo padrão do campo "Média" logo abaixo: só reescreve quando o texto atual
+  // não representa mais o valor, para não atrapalhar quem está digitando.
+  useEffect(() => {
+    // Campo vazio (ou só a vírgula) é estado LEGÍTIMO de digitação: reescrever
+    // "0,0" por cima no instante em que o operador apaga tudo devolvia o cursor
+    // depois do zero e transformava o "43" seguinte em "0,043".
+    if (taskInput === '' || taskInput === ',') return;
+    const currentParsed = parseFloat(taskInput.replace(',', '.'));
+    if (isNaN(currentParsed) || Math.abs(currentParsed - taskQuantity) > 0.05) {
+      setTaskInput(formatTaskInput(taskQuantity));
+    }
+    // `taskInput` fica de fora das deps de propósito: ele é a SAÍDA deste efeito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskQuantity]);
 
   // Effect 1: Update average input when task quantity or eligible count changes
   // Don't overwrite if user is typing (check if current value matches calculated)
@@ -638,11 +746,13 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
       if (value !== '' && value !== ',') {
         const num = parseFloat(value.replace(',', '.'));
         if (!isNaN(num) && num >= 0) {
-          setTaskQuantity(num);
+          setTaskOverride(num);
         }
-      } else if (value === '') {
-        setTaskQuantity(0);
       }
+      // Campo vazio NÃO vira `setTaskOverride(0)`: isso PERSISTIA um override de
+      // zero, e quem apagasse o campo e saísse da tela voltava com todos os
+      // bônus zerados — a mesma armadilha de valor velho que esta refatoração
+      // existe para matar. Vazio só limpa o texto; o valor segue o que estava.
     }
   };
 
@@ -671,13 +781,11 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
           // Update task quantity based on average (reverse calculation)
           // Formula: taskQuantity = average × eligible_users
           const newTaskQuantity = num * eligibleUserCount;
-          setTaskQuantity(newTaskQuantity);
-          setTaskInput(newTaskQuantity.toFixed(1).replace('.', ',')); // Format with 1 decimal, Brazilian format
+          setTaskOverride(newTaskQuantity);
+          setTaskInput(formatTaskInput(newTaskQuantity)); // Format with 1 decimal, Brazilian format
         }
-      } else if (value === '') {
-        setTaskQuantity(0);
-        setTaskInput('0');
       }
+      // Vazio não zera o override — mesma decisão do campo "Tarefas" acima.
     }
   };
 
@@ -840,9 +948,15 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   }, [filters, sectorsData?.data, simulatedUsers, usersData]);
 
   const restoreCurrentPeriodTasks = () => {
-    setTaskQuantity(originalTaskQuantity);
-    setTaskInput(originalTaskQuantity.toFixed(1).replace('.', ','));
-    setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(2).replace('.', ','));
+    // `null` = volta a SEGUIR o período. Gravar o número de agora congelaria a
+    // simulação de novo na primeira tarefa concluída depois do clique.
+    setTaskOverride(null);
+    setTaskInput(formatTaskInput(originalTaskQuantity));
+    setAverageInput(
+      eligibleUserCount > 0
+        ? (originalTaskQuantity / eligibleUserCount).toFixed(2).replace('.', ',')
+        : '0,00',
+    );
   };
 
   // Export handlers
@@ -1159,7 +1273,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     }
   };
 
-  const isTaskQuantityModified = taskQuantity !== originalTaskQuantity && originalTaskQuantity > 0;
+  // Ter override é o que importa, não o valor coincidir. Digitar exatamente as
+  // 43,0 de agora fixava o número e escondia o botão "Restaurar" — e na tarefa
+  // seguinte a simulação ficava congelada em 43 sem nada na tela dizendo isso.
+  const isTaskQuantityModified = taskOverride !== null;
+  const taskQuantityDiffersFromPeriod =
+    isTaskQuantityModified && Math.abs(taskQuantity - originalTaskQuantity) > 0.005;
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
@@ -1191,10 +1310,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               </Label>
               <Input
                 type="text"
-                value={eligibleUserCount}
+                value={eligibleUserCount > 0 ? formatDivisor(eligibleUserCount) : '—'}
                 readOnly
                 className="h-10 text-center font-semibold bg-transparent cursor-default"
-                title={`${eligibleUserCount} usuários elegíveis para cálculo (todos os filtrados/selecionados)`}
+                title={`Divisor do período: ${formatDivisor(eligibleUserCount)}. É a soma dos PESOS de elegibilidade — quem entrou, saiu ou esteve afastado no meio do período conta só a fração de dias úteis que trabalhou, por isso o número é quebrado.`}
               />
             </div>
 
@@ -1285,8 +1404,11 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
           />
         )}
 
-        {/* Current Period Info - Only show when there's actual data and task quantity is not modified */}
-        {!isTaskQuantityModified && liveTaskInfo && liveTaskInfo.weightedCount > 0 && (
+        {/* Números REAIS do período. Ficavam escondidos justamente quando a
+            simulação estava fora do período (`!isTaskQuantityModified`) — ou
+            seja, o painel que denunciaria a divergência sumia exatamente no
+            caso em que ele era necessário. Agora aparece sempre. */}
+        {liveTaskInfo && liveTaskInfo.weightedCount > 0 && (
           <div className="mt-4 p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/30">
             <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
               <IconCalculator className="h-4 w-4" />
@@ -1305,6 +1427,26 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                 </Badge>
               )}
             </div>
+            {/* Simulação rodando fora do número do período precisa DIZER isso —
+                senão o operador compara com a página de Bônus e conclui que uma
+                das duas está errada. */}
+            {taskQuantityDiffersFromPeriod && (
+              <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                Simulação com {formatTaskInput(taskQuantity)} tarefas — diferente das{' '}
+                {formatTaskInput(originalTaskQuantity)} do período. Os valores abaixo NÃO são
+                os da página de Bônus. Use "Restaurar" para voltar ao período.
+              </div>
+            )}
+            {/* Suspensa entra 1,0 no BRUTO e 0,0 no líquido: a simulação usa a
+                contagem ponderada, então bate com o bruto da página de Bônus só
+                quando não há suspensa. */}
+            {liveTaskInfo.suspendedCount > 0 && (
+              <div className="mt-2 text-xs text-blue-700/80 dark:text-blue-300/80">
+                A simulação usa as tarefas PONDERADAS, então o valor abaixo já é líquido de
+                suspensão — o "Bônus Bruto" da página de Bônus, que conta a suspensa como
+                inteira, sai maior; a diferença é a linha "Tarefas Suspensas".
+              </div>
+            )}
             {/* Exclusão por afastamento precisa ser DITA. Sumir com a pessoa da
                 lista sem explicação foi o que fez a Simulação parecer errada. */}
             {fullyAbsent.length > 0 && (
@@ -1464,7 +1606,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                                 handlePositionChange(user.id, value);
                               }
                             }}
-                            options={POSITIONS.map(pos => ({
+                            options={positionOptions.map(pos => ({
                               value: pos,
                               label: pos
                             }))}

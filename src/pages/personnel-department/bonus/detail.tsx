@@ -290,7 +290,9 @@ export default function BonusDetailPage() {
     const totalRawTasksFromBonus = tasks.length;
     const totalRawTasks = bonus
       ? totalRawTasksFromBonus
-      : (periodStats?.totalRawTasks ?? periodStats?.totalTasks ?? 0);
+      // `getPeriodTaskStats` devolve `totalRawTaskCount` — nem `totalRawTasks`
+      // nem `totalTasks` existem na resposta, então este fallback era 0 fixo.
+      : (periodStats?.totalRawTaskCount ?? periodStats?.totalRawTasks ?? periodStats?.totalTasks ?? 0);
 
     const totalPonderedTasksFromBonus = bonus?.weightedTasks
       ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
@@ -299,7 +301,8 @@ export default function BonusDetailPage() {
       : 0;
     const totalPonderedTasks = bonus
       ? totalPonderedTasksFromBonus
-      : (periodStats?.weightedTasks ?? periodStats?.totalPonderedTasks ?? 0);
+      // idem: o campo da API é `totalWeightedTasks`.
+      : (periodStats?.totalWeightedTasks ?? periodStats?.weightedTasks ?? periodStats?.totalPonderedTasks ?? 0);
 
     // Saved bonus.users may include stale entries (users connected before the
     // perf>0 filter was added to the save path). The list endpoint already
@@ -310,7 +313,8 @@ export default function BonusDetailPage() {
     ).length;
     const totalCollaborators = bonus
       ? (eligibleUsersFromBonus || users.length)
-      : (periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
+      // idem: a API expõe a contagem inteira como `eligibleHeadcount`.
+      : (periodStats?.eligibleHeadcount ?? periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
 
     // O que essa contagem NÃO é mais: o divisor. B1 usa `periodDivisor` — a soma
     // dos pesos de elegibilidade, FRACIONÁRIA — e vem pronto da API. Contar
@@ -327,7 +331,8 @@ export default function BonusDetailPage() {
       : 0;
     const averageTasksPerUser = bonus
       ? averageTasksPerUserFromBonus
-      : (periodStats?.averageTasksPerUser ?? periodStats?.averageTaskPerUser ?? 0);
+      // idem: o campo da API é `averageTasksPerEmployee`.
+      : (periodStats?.averageTasksPerEmployee ?? periodStats?.averageTasksPerUser ?? periodStats?.averageTaskPerUser ?? 0);
 
     return {
       totalRawTasks,
