@@ -14,13 +14,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   signatureService,
-  DELIVERY_CHANNEL_LABELS,
   type DeliveryChannel,
   type DeliverySettings,
 } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -41,6 +38,7 @@ import {
   IconSignature,
   IconX,
 } from "@tabler/icons-react";
+import { SignatureSendDialog } from "./signature-send-dialog";
 import {
   QuoteChangeList,
   quoteChangesHeadline,
@@ -278,7 +276,15 @@ export function SignatureEnvelopeCard({
    * desenhado — o servidor ignoraria a escolha de qualquer jeito.
    */
   const [delivery, setDelivery] = useState<DeliverySettings | null>(null);
-  const [channel, setChannel] = useState<DeliveryChannel | null>(null);
+
+  /**
+   * O modal de envio. `null` = fechado.
+   *
+   * O mesmo componente serve o primeiro envio e a reemissão: a diferença é uma
+   * palavra no título e a mensagem de sucesso. Duplicar o modal para isso
+   * garantiria que um dos dois envelhecesse.
+   */
+  const [sendDialog, setSendDialog] = useState<"create" | "reissue" | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -288,7 +294,6 @@ export function SignatureEnvelopeCard({
         const data: DeliverySettings | undefined = res?.data?.data ?? res?.data;
         if (!alive || !data) return;
         setDelivery(data);
-        setChannel(data.defaultChannel);
       } catch {
         // Falha aqui não pode travar o envio: sem configuração conhecida a tela
         // esconde o seletor e o servidor decide sozinho, que é o comportamento
@@ -300,12 +305,21 @@ export function SignatureEnvelopeCard({
     };
   }, []);
 
-  /** Só há escolha a fazer quando o servidor está em `both`. */
-  const canChooseChannel = (delivery?.channels.length ?? 0) > 1;
-  /** Canal efetivo do próximo envio — para o texto explicativo e o payload. */
-  const effectiveChannel: DeliveryChannel | null = canChooseChannel
-    ? channel
-    : (delivery?.defaultChannel ?? null);
+  /**
+   * Como o texto do estado vazio descreve o canal.
+   *
+   * No modo `both` ele NÃO pode nomear um canal: quem escolhe é o operador, no
+   * modal. Antes o card já anunciava "por WhatsApp" com base no padrão do
+   * servidor, e quem depois escolhesse e-mail tinha lido uma promessa errada.
+   */
+  const channelSentence =
+    (delivery?.channels.length ?? 0) > 1
+      ? " por WhatsApp ou e-mail — você escolhe ao enviar"
+      : delivery?.defaultChannel === "WHATSAPP"
+        ? " por WhatsApp"
+        : delivery?.defaultChannel === "EMAIL"
+          ? " por e-mail"
+          : "";
 
   const load = useCallback(async () => {
     if (!quoteId) return setLoading(false);
@@ -322,6 +336,39 @@ export function SignatureEnvelopeCard({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Re-consulta enquanto houver convite sem desfecho.
+   *
+   * O envio deixou de acontecer dentro do POST: a guarda de saída do WhatsApp
+   * espaça mensagens consecutivas, e uma tarefa com vários responsáveis levaria
+   * mais de um minuto de espera deliberada — mais do que o proxy aguenta. O
+   * convite sai logo depois, e cada resultado vira INVITATION_SENT ou
+   * INVITATION_FAILED na trilha. Sem esta sondagem o card ficaria em "Aguardando
+   * envio do convite" até alguém recarregar a página à mão.
+   *
+   * Para sozinha: no máximo seis tentativas, e só enquanto algum signatário
+   * pendente ainda não tem desfecho.
+   */
+  useEffect(() => {
+    const current = envelopes[0];
+    if (!current || current.status !== "RUNNING") return;
+    const pending = current.signers.some(
+      s => s.status !== "SIGNED" && s.status !== "REFUSED" && !s.inviteState,
+    );
+    if (!pending) return;
+
+    let attempts = 0;
+    const id = setInterval(() => {
+      attempts += 1;
+      if (attempts > 6) {
+        clearInterval(id);
+        return;
+      }
+      void load();
+    }, 7000);
+    return () => clearInterval(id);
+  }, [envelopes, load]);
 
   const run = async (fn: () => Promise<any>, okMsg: string) => {
     setBusy(true);
@@ -439,12 +486,7 @@ export function SignatureEnvelopeCard({
               size="sm"
               className="h-8 gap-1.5"
               disabled={busy}
-              onClick={() =>
-                run(
-                  () => signatureService.createEnvelope(quoteId, { channel: effectiveChannel }),
-                  "Reenviado para assinatura.",
-                )
-              }
+              onClick={() => setSendDialog("reissue")}
             >
               {busy ? <IconLoader2 className="h-3.5 w-3.5 animate-spin" /> : <IconSend className="h-3.5 w-3.5" />}
               Reenviar
@@ -454,50 +496,6 @@ export function SignatureEnvelopeCard({
       )}
     </div>
   );
-
-  /**
-   * Seletor de canal, compartilhado entre o PRIMEIRO envio e o REENVIO.
-   *
-   * Antes vivia embutido só no estado vazio. O efeito colateral era o pior caso
-   * possível: uma coleta cancelada justamente porque o WhatsApp não chegou ao
-   * signatário só podia ser reemitida pelo mesmo canal que tinha falhado, sem
-   * nenhum caminho na tela para trocar para e-mail.
-   */
-  const channelPicker =
-    canManage && canChooseChannel ? (
-      <div className="pt-1">
-        <p className="mb-1.5 text-xs font-medium text-foreground">Canal de envio</p>
-        <RadioGroup
-          value={channel ?? undefined}
-          onValueChange={(v) => setChannel(v as DeliveryChannel)}
-          className="flex flex-col gap-2 sm:flex-row"
-          disabled={busy}
-        >
-          {delivery?.channels.map((c) => (
-            <label
-              key={c}
-              htmlFor={`signature-channel-${c}`}
-              className={cn(
-                "flex flex-1 items-start gap-2.5 rounded-lg border border-border p-2.5 cursor-pointer hover:bg-muted/40",
-                channel === c && "border-primary bg-muted/40",
-              )}
-            >
-              <RadioGroupItem value={c} id={`signature-channel-${c}`} className="mt-0.5" />
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium leading-none text-foreground">
-                  {DELIVERY_CHANNEL_LABELS[c]}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {c === "WHATSAPP"
-                    ? "exige telefone com DDD no cadastro"
-                    : "exige e-mail no cadastro"}
-                </p>
-              </div>
-            </label>
-          ))}
-        </RadioGroup>
-      </div>
-    ) : null;
 
   const body = loading ? (
       <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
@@ -514,26 +512,16 @@ export function SignatureEnvelopeCard({
           <p className="text-sm font-medium">Nenhuma coleta emitida</p>
           <p className="text-xs text-muted-foreground">
             Ao enviar, o documento é congelado e cada responsável recebe um link pessoal
-            {effectiveChannel === "WHATSAPP"
-              ? " por WhatsApp"
-              : effectiveChannel === "EMAIL"
-                ? " por e-mail"
-                : ""}{" "}
-            para revisar e assinar. O código de assinatura vai pelo mesmo canal.
+            {channelSentence} para revisar e assinar. O código de assinatura vai pelo
+            mesmo canal.
           </p>
-          {channelPicker}
         </div>
         {canManage && (
           <Button
             size="sm"
             className="shrink-0 gap-1.5"
             disabled={busy}
-            onClick={() =>
-              run(
-                () => signatureService.createEnvelope(quoteId, { channel: effectiveChannel }),
-                "Enviado para assinatura.",
-              )
-            }
+            onClick={() => setSendDialog("create")}
           >
             {busy ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconSend className="h-4 w-4" />}
             Enviar para assinatura
@@ -543,13 +531,6 @@ export function SignatureEnvelopeCard({
     ) : (
       <div className="space-y-3">
         <ChangePanel envelope={current} />
-
-        {/* Coleta encerrada sem assinatura: o canal volta a ser uma escolha, e é
-            aqui que ela importa mais — o motivo mais comum de reenviar é o canal
-            anterior não ter chegado ao signatário. */}
-        {channelPicker && current.status !== "RUNNING" && current.status !== "COMPLETED" && (
-          <div className="rounded-lg border border-border px-4 py-3">{channelPicker}</div>
-        )}
 
         {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
@@ -833,6 +814,24 @@ export function SignatureEnvelopeCard({
       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
         {header}
         {body}
+      {quoteId && canManage && (
+        <SignatureSendDialog
+          open={sendDialog !== null}
+          onOpenChange={o => !o && setSendDialog(null)}
+          quoteId={quoteId}
+          mode={sendDialog ?? "create"}
+          busy={busy}
+          onSend={async ch => {
+            setSendDialog(null);
+            await run(
+              () => signatureService.createEnvelope(quoteId, { channel: ch }),
+              sendDialog === "reissue"
+                ? "Reenviado para assinatura."
+                : "Enviado para assinatura.",
+            );
+          }}
+        />
+      )}
       </div>
     );
   }
@@ -841,6 +840,24 @@ export function SignatureEnvelopeCard({
     <Card>
       <CardHeader className="pb-3">{header}</CardHeader>
       <CardContent>{body}</CardContent>
+      {quoteId && canManage && (
+        <SignatureSendDialog
+          open={sendDialog !== null}
+          onOpenChange={o => !o && setSendDialog(null)}
+          quoteId={quoteId}
+          mode={sendDialog ?? "create"}
+          busy={busy}
+          onSend={async ch => {
+            setSendDialog(null);
+            await run(
+              () => signatureService.createEnvelope(quoteId, { channel: ch }),
+              sendDialog === "reissue"
+                ? "Reenviado para assinatura."
+                : "Enviado para assinatura.",
+            );
+          }}
+        />
+      )}
     </Card>
   );
 }

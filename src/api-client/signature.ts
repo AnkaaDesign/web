@@ -27,6 +27,39 @@ export const DELIVERY_CHANNEL_LABELS: Record<DeliveryChannel, string> = {
   EMAIL: "E-mail",
 };
 
+/** Quem recebe o convite, e por onde é possível alcançá-lo. */
+export interface PreflightRecipient {
+  id: string;
+  name: string;
+  phoneMasked: string;
+  emailMasked: string;
+  hasPhone: boolean;
+  hasEmail: boolean;
+}
+
+export interface PreflightChannelStatus {
+  /** Todos alcançáveis por este canal (inclusive o signatário da Ankaa). */
+  ready: boolean;
+  /** Nomes dos responsáveis sem o contato deste canal. */
+  missing: string[];
+  /** Nome do representante da Ankaa, quando é ELE quem está sem o contato. */
+  ankaaMissing: string | null;
+}
+
+/**
+ * Tudo o que o modal de envio precisa saber ANTES do ato.
+ *
+ * Existe porque validar só no POST fazia o operador descobrir "fulano não tem
+ * e-mail" DEPOIS de confirmar, sem meio de saber que o outro canal funcionaria.
+ */
+export interface DeliveryPreflight extends DeliverySettings {
+  /** Impedem qualquer canal (coleta em andamento, orçamento vencido, sem responsável). */
+  blockers: string[];
+  recipients: PreflightRecipient[];
+  ankaa: { name: string; hasPhone: boolean; hasEmail: boolean } | null;
+  channelStatus: Record<DeliveryChannel, PreflightChannelStatus>;
+}
+
 export interface PublicSignerState {
   envelope: {
     id: string;
@@ -158,6 +191,15 @@ export const signatureService = {
    * orçamento.
    */
   getDeliverySettings: () => apiClient.get(`/signature-envelopes/delivery-settings`),
+
+  /**
+   * Canais permitidos + quem está alcançável em cada um, para ESTE orçamento.
+   *
+   * Chamado ao abrir o modal, não no carregamento da página: é uma leitura do
+   * grafo da tarefa e só interessa a quem vai de fato enviar.
+   */
+  getDeliveryPreflight: (quoteId: string) =>
+    apiClient.get(`/signature-envelopes/quote/${quoteId}/delivery-preflight`),
 
   /**
    * Emite a coleta. `channel` só é honrado quando o servidor está em `both`;
