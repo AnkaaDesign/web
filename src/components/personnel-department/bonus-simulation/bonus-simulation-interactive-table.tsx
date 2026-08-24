@@ -33,7 +33,6 @@ import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
 import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/personnel-department/use-bonus";
 import { cn } from "@/lib/utils";
-import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { usePersistedState } from "@/hooks/common/use-persisted-state";
@@ -155,6 +154,44 @@ interface SimulatedUser {
   position: string;
   performanceLevel: number;
   bonusAmount: number;
+  /**
+   * Peso de elegibilidade do período (0–1), vindo do MESMO cadastro que a folha
+   * usa. 1 = período inteiro. Menor que 1 = entrou, saiu ou esteve afastado no
+   * meio do período — e o valor exibido já vem prorrateado por ele.
+   */
+  eligibilityWeight: number;
+  /** Rótulo do motivo do peso parcial, para a tela explicar o número. */
+  eligibilityReason: string;
+}
+
+/** Cadastro de elegibilidade do período, como o endpoint de stats devolve. */
+interface EligibilityRow {
+  userId: string;
+  userName: string;
+  weight: number;
+  temporalWeight: number;
+  absenceFactor: number;
+  eligibleDays: number;
+  reason: string;
+  terminatedInPeriod: boolean;
+  currentlyEmployed: boolean;
+}
+
+/** Texto curto do porquê de alguém não valer período inteiro. */
+function describeWeight(row: EligibilityRow): string {
+  if (row.weight >= 1) return '';
+  const parts: string[] = [];
+  if (row.temporalWeight < 1) {
+    parts.push(
+      row.terminatedInPeriod
+        ? `desligado no período (${row.eligibleDays} dia(s) úteis)`
+        : `entrou no período (${row.eligibleDays} dia(s) úteis)`,
+    );
+  }
+  if (row.absenceFactor < 1) {
+    parts.push(`afastamento médico (fator ${row.absenceFactor.toFixed(2)})`);
+  }
+  return parts.join(' + ');
 }
 
 interface BonusSimulationInteractiveTableProps {
@@ -171,6 +208,23 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [liveTaskInfo, setLiveTaskInfo] = useState<{ rawCount: number; weightedCount: number; suspendedCount: number; eligibleUsers: number; averageTasksPerEmployee: number } | null>(null);
+
+  /**
+   * Cadastro de elegibilidade do período (userId → peso e motivo), servido pelo
+   * mesmo endpoint das estatísticas.
+   *
+   * A tela NÃO decide mais sozinha quem entra. Antes ela montava a lista com
+   * "vínculo ACTIVE + cargo bonificável" e errava dos dois lados: mostrava quem
+   * a folha EXCLUI (afastamento médico integral zera o peso) e escondia quem a
+   * folha INCLUI (desligado no meio do período, que é justamente o número da
+   * rescisão) — e pagava todo mundo como se fosse período inteiro.
+   *
+   * `null` = ainda não chegou; a lista fica vazia até chegar, em vez de
+   * mostrar um recorte errado por um instante.
+   */
+  const [eligibility, setEligibility] = useState<Map<string, EligibilityRow> | null>(null);
+  const [fullyAbsent, setFullyAbsent] = useState<Array<{ userId: string; userName: string }>>([]);
+  const [absenceMeasured, setAbsenceMeasured] = useState(true);
 
   // Filter state - no default filters, show all eligible users (persisted)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -245,6 +299,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         // Store task info for the period info display
         setLiveTaskInfo({ rawCount, weightedCount: weightedTaskCount, suspendedCount, eligibleUsers, averageTasksPerEmployee });
 
+        // Cadastro de elegibilidade — quem está no período e com que peso.
+        const rows: EligibilityRow[] = Array.isArray(liveData.eligibility) ? liveData.eligibility : [];
+        setEligibility(new Map(rows.map(r => [r.userId, { ...r, weight: Number(r.weight) || 0 }])));
+        setFullyAbsent(Array.isArray(liveData.fullyAbsent) ? liveData.fullyAbsent : []);
+        setAbsenceMeasured(liveData.absenceDataAvailable !== false);
+
         if (weightedTaskCount > 0) {
           // originalTaskQuantity is always the fetched period value (baseline
           // for "Restaurar" + the modified indicator).
@@ -264,16 +324,22 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     fetchWeightedTaskCount();
   }, [periodYear, periodMonth]);
 
-  // Fetch all effected users for bonus simulation
-  // Client-side filters will handle eligibility, sectors, positions, etc.
+  /**
+   * Ids exatamente do cadastro de elegibilidade do período.
+   *
+   * Antes o recorte era `CLT + ACTIVE + tem secullumEmployeeId`, três
+   * aproximações que a folha não usa:
+   *   • `ACTIVE` derrubava quem foi desligado no meio do período — que RECEBE
+   *     proporcional, e é o número que o RH precisa para a rescisão;
+   *   • `secullumEmployeeId != null` derrubava os mesmos desligados de novo (a
+   *     demissão desvincula a pessoa do Secullum);
+   *   • nada disso enxergava o afastamento médico, que zera o peso e tira a
+   *     pessoa da folha — o caso que trouxe este bug à tona.
+   */
+  const eligibleUserIds = useMemo(() => (eligibility ? [...eligibility.keys()] : []), [eligibility]);
+
   const { data: usersData } = useUsers({
-    where: {
-      // Bonus eligibility = confirmed CLT bond (CLT + ACTIVE). Client-side
-      // filters still apply the full eligibility predicate on top of this.
-      currentEmployeeType: EMPLOYEE_TYPE.CLT,
-      currentContractStatus: CONTRACT_STATUS.ACTIVE,
-      secullumEmployeeId: { not: null }, // Only users registered in Secullum
-    },
+    where: { id: { in: eligibleUserIds } },
     include: {
       position: true,
       sector: true
@@ -284,11 +350,13 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
 
   // Initialize simulated users from fetched data
   useEffect(() => {
+    if (!eligibility) return; // sem o cadastro do período não há lista honesta a montar
     if (usersData?.data) {
       if (usersData.data.length > 0) {
         const users = usersData.data.map(user => {
           const initialPosition = user.position?.name || "Pleno I";
           const initialPerformanceLevel = user.performanceLevel ?? 0;
+          const elig = eligibility.get(user.id);
 
           return {
             id: user.id,
@@ -304,6 +372,8 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             // Populated by the simulation sync effect once /bonus/simulate
             // returns. Starts at 0 to avoid a flash of stale legacy values.
             bonusAmount: 0,
+            eligibilityWeight: elig?.weight ?? 1,
+            eligibilityReason: elig ? describeWeight(elig) : '',
           };
         }) as SimulatedUser[];
 
@@ -322,7 +392,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
       }
       setIsLoading(false);
     }
-  }, [usersData]); // Only reinitialize when usersData changes, not when taskQuantity changes
+  }, [usersData, eligibility]); // Only reinitialize when usersData changes, not when taskQuantity changes
 
   // Apply filters to get visible users
   const filteredUsers = useMemo(() => {
@@ -486,7 +556,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     if (!simulation?.users) return;
     setSimulatedUsers(prev => {
       const next = prev.map(u => {
-        const newBonus = bonusByUserId.get(u.id) ?? 0;
+        // `/bonus/simulate` calcula o valor de PERÍODO INTEIRO — ele só recebe
+        // cargo e nível, e não tem como saber que a pessoa entrou no dia 14 ou
+        // saiu no dia 17. O prorrateio é o mesmo `weight` que entra no divisor:
+        // quem contou 0,73 no denominador recebe 73% do valor.
+        const fullPeriodBonus = bonusByUserId.get(u.id) ?? 0;
+        const newBonus = Math.round(fullPeriodBonus * u.eligibilityWeight * 100) / 100;
         return Math.abs(u.bonusAmount - newBonus) < 0.005 ? u : { ...u, bonusAmount: newBonus };
       });
       // Reference equality short-circuit if nothing changed.
@@ -1230,6 +1305,20 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                 </Badge>
               )}
             </div>
+            {/* Exclusão por afastamento precisa ser DITA. Sumir com a pessoa da
+                lista sem explicação foi o que fez a Simulação parecer errada. */}
+            {fullyAbsent.length > 0 && (
+              <div className="mt-2 text-xs text-blue-700/80 dark:text-blue-300/80">
+                Fora do cálculo por afastamento médico integral:{' '}
+                {fullyAbsent.map(p => p.userName).join(', ')}.
+              </div>
+            )}
+            {!absenceMeasured && (
+              <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                Afastamento médico não pôde ser medido (Secullum indisponível) — todos estão
+                com fator 1. Os valores podem cair quando a medição voltar.
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1348,6 +1437,16 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                       <TableCell className="p-0">
                         <div className="px-4 py-2 font-medium truncate">
                           {user.name}
+                          {/* Peso parcial precisa aparecer: sem isto, um valor
+                              prorrateado parece erro de cálculo. */}
+                          {user.eligibilityWeight < 1 && (
+                            <span
+                              className="ml-2 text-xs font-normal text-muted-foreground"
+                              title={user.eligibilityReason}
+                            >
+                              ({Math.round(user.eligibilityWeight * 100)}% do período)
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="w-48 p-0">
