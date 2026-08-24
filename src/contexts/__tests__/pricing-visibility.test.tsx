@@ -16,18 +16,31 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { PricingProvider, usePricingVisible } from "../pricing-context";
+import { MemoryRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { PricingProvider, usePricing, usePricingVisible } from "../pricing-context";
 import { setPricingVisible, togglePricingVisible } from "@/utils/pricing-visibility";
 import { formatCurrency } from "@/utils";
 
-// `PricingProvider` reads the per-user "Mostrar valores por padrão" through `useMyPreferences`,
-// which needs an AuthProvider and a query client. None of that is what these tests are about —
-// they exercise how a TOGGLE propagates — and mounting the real auth stack would make them
-// depend on the network. Stub the preference at its default (masked), which is the state every
-// case below starts from anyway.
+// `PricingProvider` reads/writes the per-user "valores em dinheiro" preference through
+// `useMyPreferences` + `useAuth`, which need a provider stack and a query client. None of that
+// is what these tests are about — they exercise how a change PROPAGATES through the tree — and
+// mounting the real auth stack would make them depend on the network. Stub the preference at
+// its default (masked), which is the state every case below starts from anyway.
+const mocks = vi.hoisted(() => ({
+  updateMine: vi.fn().mockResolvedValue(undefined),
+  refetchMine: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/dashboard/hooks/use-my-preferences", () => ({
-  useMyPreferences: () => ({ preferences: { pricesVisibleByDefault: false } }),
+  useMyPreferences: () => ({
+    preferences: { id: "prefs-1", userId: "user-1", pricesVisibleByDefault: false },
+    updateMine: mocks.updateMine,
+    refetchMine: mocks.refetchMine,
+  }),
+}));
+
+vi.mock("@/contexts/auth-context", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
 }));
 
 /** A page that formats currency and holds unsaved local state (a typed-in draft). */
@@ -78,6 +91,9 @@ const toggle = async () => {
 afterEach(() => {
   cleanup();
   setPricingVisible(false);
+  mocks.updateMine.mockClear();
+  mocks.refetchMine.mockClear();
+  localStorage.clear();
 });
 
 describe("pricing visibility toggle", () => {
@@ -120,5 +136,76 @@ describe("pricing visibility toggle", () => {
     // Documents WHY App() must create the route elements in its own render: React bails
     // out at a reference-equal element, so this page never re-formats.
     expect(screen.getByTestId("value").textContent).toBe("R$ ••••••");
+  });
+});
+
+// =====================
+// The setting is SAVED, not a per-page peek
+// =====================
+
+/** Mirrors the sidebar eye, plus a link so a route change can be exercised. */
+function EyeApp() {
+  usePricingVisible();
+  return (
+    <MemoryRouter initialEntries={["/x"]}>
+      <PricingProvider>
+        <Eye />
+        <Routes>
+          <Route path="/x" element={<Page />} />
+          <Route path="/y" element={<Page />} />
+        </Routes>
+      </PricingProvider>
+    </MemoryRouter>
+  );
+}
+
+function Eye() {
+  const { togglePricing } = usePricing();
+  const navigate = useNavigate();
+  return (
+    <>
+      <button data-testid="eye" onClick={togglePricing} />
+      <button data-testid="go" onClick={() => navigate("/y")} />
+    </>
+  );
+}
+
+describe("pricing visibility is a saved preference", () => {
+  it("writes Preferences.pricesVisibleByDefault when the eye is clicked", async () => {
+    render(<EyeApp />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("eye"));
+    });
+    expect(mocks.updateMine).toHaveBeenCalledWith({ pricesVisibleByDefault: true });
+    expect(screen.getByTestId("value").textContent).toContain("1.234,50");
+  });
+
+  it("mirrors the choice per user so a reload does not flash the wrong state", async () => {
+    render(<EyeApp />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("eye"));
+    });
+    expect(localStorage.getItem("ankaa:prices-visible:user-1")).toBe("1");
+  });
+
+  it("survives navigation — there is no per-page reset any more", async () => {
+    render(<EyeApp />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("eye"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("go"));
+    });
+    expect(screen.getByTestId("value").textContent).toContain("1.234,50");
+  });
+
+  it("rolls back with the values re-masked when the write fails", async () => {
+    mocks.updateMine.mockRejectedValueOnce(new Error("offline"));
+    render(<EyeApp />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("eye"));
+    });
+    expect(screen.getByTestId("value").textContent).toBe("R$ ••••••");
+    expect(localStorage.getItem("ankaa:prices-visible:user-1")).toBe("0");
   });
 });

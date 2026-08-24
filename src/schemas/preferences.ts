@@ -194,9 +194,10 @@ export const preferencesCreateSchema = z
         errorMap: () => ({ message: "esquema de cores inválido" }),
       })
       .default(COLOR_SCHEMA.LIGHT),
-    // "Mostrar valores por padrão": false = money starts masked on every load/navigation
-    // (the eye reveals it), true = starts visible (the eye hides it). Only the DEFAULT is
-    // persisted; the live on/off state stays in memory (utils/pricing-visibility.ts).
+    // "Valores em dinheiro": the user's saved money-visibility — false (default) = every
+    // money value renders masked (R$ ••••••), true = renders normally. One setting shared
+    // with the Flutter app; the sidebar eye and the Preferências radio both write it
+    // (contexts/pricing-context.tsx).
     pricesVisibleByDefault: z.boolean().default(false).optional(),
     favorites: z
       .array(
@@ -220,7 +221,7 @@ export const preferencesUpdateSchema = z
         errorMap: () => ({ message: "esquema de cores inválido" }),
       })
       .optional(),
-    // See create schema — only the DEFAULT visibility is persisted.
+    // See create schema — one saved money-visibility, shared with the Flutter app.
     pricesVisibleByDefault: z.boolean().optional(),
     favorites: z
       .array(

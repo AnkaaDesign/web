@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
-import { setPricingVisible } from "@/utils/pricing-visibility";
+import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { budgetPdfFilename } from "@/utils/document-filename";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,13 @@ export function PublicBudgetPage() {
   // makes sense inside the authenticated app, where the button to reveal
   // values actually exists).
   useEffect(() => {
+    // Restore on the way out: money visibility is a SAVED preference now
+    // (nothing resets it on navigation any more), so forcing it on here and
+    // walking away would leave the authenticated app showing values the user
+    // had deliberately hidden.
+    const previous = getPricingVisible();
     setPricingVisible(true);
+    return () => setPricingVisible(previous);
   }, []);
 
   // A config's customer: the FK when the payload carries it, else the nested

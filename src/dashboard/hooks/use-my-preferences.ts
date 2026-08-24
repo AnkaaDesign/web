@@ -1,7 +1,7 @@
 // Hook fetching (and lazily creating) the current user's Preferences record.
 // Used by the dashboard layout hook to read/write dashboardLayoutWeb.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/auth-context";
 import { usePreferences, useCreatePreferences, useUpdatePreferences } from "../../hooks/common/use-preferences";
@@ -81,6 +81,16 @@ export function useMyPreferences() {
     };
   }, [existing?.id, updateMutation, queryClient]);
 
+  // Explicit re-read of the row. The list query is cached for 10 minutes, so an
+  // open tab would otherwise never notice a preference changed on another device
+  // (PricingProvider calls this when the tab regains focus).
+  // `refetch` is stable across renders (react-query memoizes it), so this stays
+  // identity-stable and callers can safely put it in an effect dependency list.
+  const listRefetch = list.refetch;
+  const refetchMine = useCallback(async () => {
+    await listRefetch();
+  }, [listRefetch]);
+
   return {
     preferences: existing ?? null,
     isLoading: list.isLoading || (createMutation.isPending && !hasExisting),
@@ -88,5 +98,6 @@ export function useMyPreferences() {
     error: list.error,
     isUpdating: updateMutation.isPending,
     updateMine,
+    refetchMine,
   };
 }

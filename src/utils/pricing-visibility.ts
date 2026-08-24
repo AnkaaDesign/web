@@ -1,23 +1,26 @@
-// Single source of truth for "show/hide currency values".
+// Single source of truth for "mostrar/ocultar valores em dinheiro".
 //
 // This is read synchronously (and outside React) by the formatCurrency* helpers
 // in number.ts, so it must stay a plain module value. To make toggling reactive
 // it also behaves as a tiny external store: React subscribes via
 // useSyncExternalStore (see pricing-context.tsx) and re-renders on change.
 //
-// The live on/off state is deliberately NOT persisted (no localStorage): every
-// full page reload comes back at the user's DEFAULT, regardless of what they last
-// toggled. SPA route changes also reset it (PricingProvider resets on every
-// `pathname` change), so revealing values on one page never carries over.
+// ## The value is a PERSISTED per-user preference
 //
-// What IS persisted is only the DEFAULT the reset lands on — the per-user
-// `Preferences.pricesVisibleByDefault` ("Mostrar valores por padrão"), pushed in
-// here by PricingProvider once the user's preferences resolve:
-//   false (default) → each page starts masked, the eye reveals.
-//   true            → each page starts visible, the eye hides.
+// It lives in `Preferences.pricesVisibleByDefault` — the same column the Flutter
+// app writes. The sidebar eye and the "Valores em dinheiro" radio on
+// /perfil/preferencias are two controls over that ONE setting, so hiding values
+// on web hides them on the phone too, and a reload comes back where you left it.
+// `PricingProvider` owns both directions (read on login/tab-focus, write on
+// toggle); nothing else may call `setPricingVisible` except the public pages,
+// which force values on for documents that are meant to be readable.
+//
+// The localStorage entry written here is ONLY a per-user mirror, so a reload
+// paints the right thing in the same frame instead of flashing `R$ ••••••`
+// before the API answers. The database is the source of truth: whatever the
+// server returns overwrites the mirror, never the other way around.
 
-let _default = false;
-let _visible = _default;
+let _visible = false;
 
 // Depth of active withPricingVisible() scopes (see below). Nestable, hence a counter.
 let _forceVisible = 0;
@@ -73,23 +76,28 @@ export const togglePricingVisible = (): void => {
   setPricingVisible(!_visible);
 };
 
-export const getPricingDefault = (): boolean => _default;
+// =====================
+// Per-user local mirror (NOT the source of truth — see the file header)
+// =====================
 
-/**
- * Sets the value every reset (page load / navigation) lands on.
- *
- * Called by PricingProvider when the user's `Preferences.pricesVisibleByDefault`
- * resolves — and again whenever the user changes it in Preferências. Applying it
- * immediately is what makes the setting take effect on the current page too,
- * instead of only on the next navigation.
- */
-export const setPricingDefault = (visible: boolean): void => {
-  if (_default === visible) return;
-  _default = visible;
-  setPricingVisible(visible);
+/** Keyed by user so a shared browser never shows account A's choice to account B. */
+export const pricingCacheKey = (userId: string): string => `ankaa:prices-visible:${userId}`;
+
+/** The last value we saw for this user, or null when this browser has never seen one. */
+export const readCachedPricingVisible = (userId: string): boolean | null => {
+  try {
+    const raw = localStorage.getItem(pricingCacheKey(userId));
+    return raw === null ? null : raw === "1";
+  } catch {
+    // Private mode / storage disabled — the server value is a round-trip away anyway.
+    return null;
+  }
 };
 
-/** Back to the user's default — what a page load or navigation does. */
-export const resetPricingVisible = (): void => {
-  setPricingVisible(_default);
+export const cachePricingVisible = (userId: string, visible: boolean): void => {
+  try {
+    localStorage.setItem(pricingCacheKey(userId), visible ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
 };

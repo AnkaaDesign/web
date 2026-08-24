@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { IconAdjustments, IconBell, IconEye, IconEyeOff } from "@tabler/icons-react";
 
-import { toast } from "@/components/ui/sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +13,7 @@ import { usePricing } from "@/contexts/pricing-context";
 import { NotificationPreferencesPage } from "./notification-preferences";
 
 // =====================
-// Exibição — "Mostrar valores por padrão"
+// Exibição — "Valores em dinheiro" (Preferences.pricesVisibleByDefault)
 // =====================
 
 type PricingDefaultMode = "hidden" | "visible";
@@ -29,46 +27,32 @@ const PRICING_MODES: Array<{
   {
     mode: "hidden",
     icon: IconEyeOff,
-    title: "Ocultos por padrão",
+    title: "Sempre ocultos",
     description:
-      "Todo valor em dinheiro aparece embaçado (R$ ••••••) ao abrir ou trocar de página. Clique no olho da barra lateral para revelar — e ao navegar eles voltam a ficar ocultos.",
+      "Todo valor em dinheiro aparece embaçado (R$ ••••••), em qualquer página. Continua assim ao navegar, ao recarregar e no aplicativo do celular, até você escolher o contrário.",
   },
   {
     mode: "visible",
     icon: IconEye,
-    title: "Visíveis por padrão",
+    title: "Sempre visíveis",
     description:
-      "Os valores aparecem normalmente ao abrir qualquer página. O olho da barra lateral passa a OCULTAR — útil para mostrar a tela a outra pessoa — e a próxima navegação volta a exibi-los.",
+      "Os valores aparecem normalmente em qualquer página, aqui e no aplicativo do celular. Use o olho da barra lateral para ocultá-los rapidamente — por exemplo, ao mostrar a tela a outra pessoa.",
   },
 ];
 
 function DisplayPreferencesTab() {
-  const { preferences, isLoading, updateMine } = useMyPreferences();
-  // The live default comes from the pricing store (already fed by this same preference), so the
-  // selection reflects what the app is actually doing — including a change made in another tab.
-  const { pricingVisibleByDefault } = usePricing();
-  const [saving, setSaving] = useState(false);
+  const { isLoading } = useMyPreferences();
+  // Same setting the sidebar eye writes, read straight from the pricing store — so this
+  // card also reflects a change made with the eye, in another tab or on the phone.
+  const { pricingVisible, setPricingPreference, isSavingPricing } = usePricing();
 
-  const current: PricingDefaultMode = pricingVisibleByDefault ? "visible" : "hidden";
+  const current: PricingDefaultMode = pricingVisible ? "visible" : "hidden";
 
-  const select = async (mode: PricingDefaultMode) => {
-    if (saving || mode === current) return;
-    // updateMine rejects until the Preferences row exists (it self-creates on first load).
-    if (!preferences) {
-      toast.error("Suas preferências ainda estão carregando. Tente novamente em instantes.");
-      return;
-    }
-    setSaving(true);
-    try {
-      // updateMine writes the row AND updates the query cache optimistically, which flows back
-      // through PricingProvider → setPricingDefault, so the change applies to this page instantly.
-      await updateMine({ pricesVisibleByDefault: mode === "visible" } as never);
-      toast.success(mode === "visible" ? "Valores passam a aparecer por padrão." : "Valores passam a ficar ocultos por padrão.");
-    } catch {
-      toast.error("Não foi possível salvar a preferência.");
-    } finally {
-      setSaving(false);
-    }
+  const select = (mode: PricingDefaultMode) => {
+    if (isSavingPricing || mode === current) return;
+    // PricingProvider applies it immediately and persists it to
+    // Preferences.pricesVisibleByDefault, rolling back with a toast if the write fails.
+    setPricingPreference(mode === "visible");
   };
 
   return (
@@ -79,8 +63,8 @@ function DisplayPreferencesTab() {
           Valores em dinheiro
         </CardTitle>
         <CardDescription>
-          Define como cada página começa. O botão do olho continua valendo para a tela atual — esta escolha é só o ponto
-          de partida, ao qual o app volta a cada recarga ou troca de página.
+          Escolha salva na sua conta: vale para todas as páginas, sobrevive a recarregar o navegador e acompanha você no
+          aplicativo do celular. O olho da barra lateral é um atalho para esta mesma escolha.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -98,13 +82,13 @@ function DisplayPreferencesTab() {
                   key={mode}
                   type="button"
                   onClick={() => select(mode)}
-                  disabled={saving}
+                  disabled={isSavingPricing}
                   aria-pressed={active}
                   className={cn(
                     "flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
-                    saving && "cursor-not-allowed opacity-70",
+                    isSavingPricing && "cursor-not-allowed opacity-70",
                   )}
                 >
                   <span className="flex items-center gap-2 font-medium">
