@@ -44,12 +44,53 @@
     <meta name="keywords" content="gestão, industrial, manufatura, brasil, ankaa" />
     <meta name="author" content="Ankaa Systems" />
 
-    <!-- Open Graph (WhatsApp, Facebook, LinkedIn link previews) -->
+    <!--
+      Open Graph — o cartão que WhatsApp, e-mail e redes montam a partir de um
+      link nosso.
+
+      QUEM DE FATO VÊ ISTO É O CLIENTE, não a equipe. Os únicos links da Ankaa
+      que circulam para fora são os da assinatura eletrônica (/cliente/assinar)
+      e o da verificação pública de documento (/v/CODIGO). O sistema interno
+      ninguém compartilha por link — então o texto aqui descreve o que o
+      destinatário externo está prestes a abrir, e não o ERP.
+
+      DUAS CORREÇÕES QUE ERAM DEFEITO, NÃO GOSTO:
+
+      1. `og:image` era RELATIVA (`/icons/...`). Open Graph exige URL absoluta;
+         parte dos consumidores simplesmente descarta a imagem, e o cartão sai
+         sem miniatura — que é metade do sinal de que o link é legítimo.
+      2. Não havia `og:url`. Sem ela o consumidor usa a URL crua, e a de
+         assinatura carrega um token opaco de 43 caracteres: o cartão exibia
+         aquilo como endereço, o que é exatamente a cara de um link de phishing.
+         Com `og:url` o cartão mostra o domínio.
+
+      A prévia do WhatsApp NÃO depende mais destas tags — o servidor monta o
+      cartão explicitamente (ver `WhatsAppLinkPreview` na api), justamente porque
+      esta é uma SPA e o nginx devolve o MESMO index.html para toda rota. Estas
+      tags continuam valendo para todo o resto, e para o caso de a montagem
+      explícita falhar.
+    -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ankaadesign.com.br" />
     <meta property="og:title" content="Ankaa Design" />
-    <meta property="og:description" content="Ankaa - Sistema de Gestão Industrial Brasileiro" />
-    <meta property="og:image" content="/icons/apple-touch-icon.png" />
+    <meta
+      property="og:description"
+      content="Documentos e assinatura eletrônica da Ankaa Design — orçamentos para revisão, assinatura e verificação de autenticidade."
+    />
+    <meta property="og:image" content="https://ankaadesign.com.br/icons/android-chrome-512x512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Ankaa Design" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="Ankaa Design" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Ankaa Design" />
+    <meta
+      name="twitter:description"
+      content="Documentos e assinatura eletrônica da Ankaa Design."
+    />
+    <meta name="twitter:image" content="https://ankaadesign.com.br/icons/android-chrome-512x512.png" />
 
     <!-- Prevent browser translation and password saving for security -->
     <meta name="google" content="notranslate" />
