@@ -8,22 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
+import { taskDuplicateCopySchema } from "../../../../schemas";
 
-// Schema for a single copy entry
-const copyEntrySchema = z.object({
-  serialNumber: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim().toUpperCase() || undefined),
-  plate: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim().toUpperCase() || undefined),
-  chassisNumber: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim().replace(/\s/g, "").toUpperCase() || undefined),
-});
+// Schema for a single copy entry — regra canônica de placa/chassi compartilhada
+// com o modal de duplicar da tarefa (ver schemas/task.ts).
+const copyEntrySchema = taskDuplicateCopySchema;
 
 // Schema for multiple copies
 const duplicateTaskSchema = z.object({
@@ -33,7 +22,7 @@ const duplicateTaskSchema = z.object({
 type DuplicateTaskFormData = z.infer<typeof duplicateTaskSchema>;
 
 // Type for what the parent component receives (array of copies)
-export type DuplicateTaskCopyData = { serialNumber?: string; plate?: string; chassisNumber?: string }[];
+export type DuplicateTaskCopyData = z.infer<typeof copyEntrySchema>[];
 
 interface DuplicateTaskModalProps {
   open: boolean;
@@ -199,10 +188,10 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
                           render={({ field: controllerField }) => (
                             <Input
                               id={`plate-${index}`}
+                              type="plate"
                               placeholder="Ex: ABC1D23"
-                              className="uppercase"
                               value={controllerField.value || ""}
-                              onChange={(val) => controllerField.onChange(typeof val === 'string' ? val.toUpperCase() : val)}
+                              onChange={controllerField.onChange}
                             />
                           )}
                         />
@@ -218,10 +207,10 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
                           render={({ field: controllerField }) => (
                             <Input
                               id={`chassisNumber-${index}`}
+                              type="chassis"
                               placeholder="Ex: 9BWZZZ377VT004251"
-                              className="uppercase"
                               value={controllerField.value || ""}
-                              onChange={(val) => controllerField.onChange(typeof val === 'string' ? val.toUpperCase() : val)}
+                              onChange={controllerField.onChange}
                             />
                           )}
                         />

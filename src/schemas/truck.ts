@@ -4,6 +4,103 @@ import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
 import type { Truck } from "../types";
 import { TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
+import {
+  cleanPlate,
+  cleanChassis,
+  PLATE_REGEX,
+  CHASSIS_LENGTH_REGEX,
+  CHASSIS_FORBIDDEN_LETTERS,
+  PLATE_INVALID_MESSAGE,
+  CHASSIS_INVALID_MESSAGE,
+  CHASSIS_FORBIDDEN_LETTERS_MESSAGE,
+} from "../utils";
+
+// =====================================================================
+// Placa e chassi — regra canônica (ver utils/truck.ts e utils/cleaners.ts)
+// =====================================================================
+// Ordem obrigatória, sempre nesta sequência:
+//   1. normaliza com cleanPlate/cleanChassis (maiúsculas, só [A-Z0-9]) — ANTES
+//      de qualquer refine, senão "ABC-1D23" reprova por causa do hífen;
+//   2. string vazia vira null;
+//   3. só então valida contra PLATE_REGEX/CHASSIS_REGEX.
+// `undefined` é preservado de propósito: em um update, campo ausente significa
+// "não mexe" e campo `null` significa "limpa" — colapsar os dois apagaria dado.
+
+export const optionalPlateSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((val) => {
+    if (val === undefined) return undefined;
+    if (val === null) return null;
+    const cleaned = cleanPlate(val);
+    return cleaned === "" ? null : cleaned;
+  })
+  .refine((val) => val === null || val === undefined || PLATE_REGEX.test(val), {
+    message: PLATE_INVALID_MESSAGE,
+  });
+
+export const optionalChassisSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((val) => {
+    if (val === undefined) return undefined;
+    if (val === null) return null;
+    const cleaned = cleanChassis(val);
+    return cleaned === "" ? null : cleaned;
+  })
+  // Duas mensagens distintas de propósito: "17 caracteres" não ajuda em nada
+  // quem digitou um O no lugar do 0 num chassi que já tem 17.
+  .superRefine((val, ctx) => {
+    if (val === null || val === undefined) return;
+    if (!CHASSIS_LENGTH_REGEX.test(val)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: CHASSIS_INVALID_MESSAGE });
+      return;
+    }
+    if (CHASSIS_FORBIDDEN_LETTERS.test(val)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: CHASSIS_FORBIDDEN_LETTERS_MESSAGE });
+    }
+  });
+
+/**
+ * Normaliza o termo de um filtro de placa. O banco guarda "ABC1234" (sem
+ * separador), então filtrar por "ABC-1234" cru não acha nada.
+ */
+type PlateFilterObject = {
+  equals?: string | null;
+  not?: string | null;
+  in?: string[];
+  notIn?: string[];
+  contains?: string;
+  startsWith?: string;
+  endsWith?: string;
+  mode?: "default" | "insensitive";
+};
+
+type PlateFilterValue = string | null | PlateFilterObject | undefined;
+
+const normalizePlateTerm = (value: string): string => {
+  const cleaned = cleanPlate(value);
+  // Termo sem nenhum caractere aproveitável (ex: "-") volta cru: filtrar por ""
+  // casaria com o banco inteiro.
+  return cleaned === "" ? value : cleaned;
+};
+
+const normalizePlateFilter = (value: PlateFilterValue): PlateFilterValue => {
+  if (typeof value === "string") return normalizePlateTerm(value);
+  if (!value || typeof value !== "object") return value;
+
+  const next: PlateFilterObject = { ...value };
+  if (typeof next.equals === "string") next.equals = normalizePlateTerm(next.equals);
+  if (typeof next.not === "string") next.not = normalizePlateTerm(next.not);
+  if (typeof next.contains === "string") next.contains = normalizePlateTerm(next.contains);
+  if (typeof next.startsWith === "string") next.startsWith = normalizePlateTerm(next.startsWith);
+  if (typeof next.endsWith === "string") next.endsWith = normalizePlateTerm(next.endsWith);
+  if (Array.isArray(next.in)) next.in = next.in.map(normalizePlateTerm);
+  if (Array.isArray(next.notIn)) next.notIn = next.notIn.map(normalizePlateTerm);
+  return next;
+};
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -188,7 +285,9 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
             mode: z.enum(["default", "insensitive"]).optional(),
           }),
         ])
-        .optional(),
+        .optional()
+        // A coluna guarda a placa limpa; normaliza o termo antes de ir ao banco.
+        .transform(normalizePlateFilter),
 
       chassisNumber: z
         .union([
@@ -317,7 +416,11 @@ const truckFilters = {
   // Search and filtering
   searchingFor: z.string().optional(),
   taskIds: z.array(z.string()).optional(),
-  plates: z.array(z.string()).optional(),
+  plates: z
+    .array(z.string())
+    .optional()
+    // Idem: "ABC-1234" digitado precisa virar "ABC1234" para casar com a coluna.
+    .transform((val) => (val ? val.map((plate) => cleanPlate(plate)).filter((plate) => plate !== "") : val)),
   spots: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
   categories: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
   implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
@@ -344,9 +447,13 @@ const truckTransform = (data: any) => {
 
   // Handle searchingFor
   if (data.searchingFor && typeof data.searchingFor === "string" && data.searchingFor.trim()) {
+    // A coluna `plate` guarda a placa limpa ("ABC1234"), então buscar por
+    // "ABC-1234" cru não acha nada — vai a versão normalizada junto.
+    const searchPlate = cleanPlate(data.searchingFor.trim());
     andConditions.push({
       OR: [
         { plate: { contains: data.searchingFor.trim(), mode: "insensitive" } },
+        ...(searchPlate && searchPlate !== data.searchingFor.trim().toUpperCase() ? [{ plate: { contains: searchPlate, mode: "insensitive" } }] : []),
         { task: { name: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
         { task: { serialNumber: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
         { task: { customer: { fantasyName: { contains: data.searchingFor.trim(), mode: "insensitive" } } } },
@@ -459,29 +566,14 @@ export const truckGetManySchema = z
   })
   .transform(truckTransform);
 
-// Brazilian license plate patterns (after hyphen removal by transform)
-// Old format: ABC1234 (3 letters + 4 numbers)
-// Mercosul format: ABC1D23 (3 letters + 1 number + 1 letter + 2 numbers)
-const brazilianPlateRegex = /^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$/i;
-
 // =====================
 // CRUD Schemas
 // =====================
 
 export const truckCreateSchema = z.object({
   // Optional identification fields
-  plate: z
-    .string()
-    .max(8, "Placa deve ter no máximo 8 caracteres")
-    .optional()
-    .nullable()
-    .transform((val) => (val === "" ? null : val?.toUpperCase().replace(/[^A-Z0-9]/g, "")))
-    .refine((val) => !val || brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
-  chassisNumber: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => (val === "" ? null : val)),
+  plate: optionalPlateSchema,
+  chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications
@@ -502,18 +594,8 @@ export const truckCreateSchema = z.object({
 
 export const truckUpdateSchema = z.object({
   // Optional identification fields
-  plate: z
-    .string()
-    .max(8, "Placa deve ter no máximo 8 caracteres")
-    .optional()
-    .nullable()
-    .transform((val) => (val === "" ? null : val?.toUpperCase().replace(/[^A-Z0-9]/g, "")))
-    .refine((val) => !val || brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
-  chassisNumber: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => (val === "" ? null : val)),
+  plate: optionalPlateSchema,
+  chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications

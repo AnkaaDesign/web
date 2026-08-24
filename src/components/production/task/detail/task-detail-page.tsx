@@ -54,7 +54,7 @@ import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCan
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { isTeamLeader } from "@/utils/user";
-import { formatChassis, formatTruckSpot } from "@/utils";
+import { formatChassis, formatPlate, cleanChassis, cleanPlate, formatTruckSpot } from "@/utils";
 import { ForecastHistoryTimeline } from "@/components/production/task/form/forecast-history-timeline";
 import {
   routes,
@@ -629,20 +629,31 @@ function TaskDetailContent() {
           {
             id: "plate",
             label: "Placa",
+            // `dataType: "plate"` faz a edição inline herdar a máscara posicional do Input
+            // (antiga AAA9999 e Mercosul AAA9A99); o `cleanPlate` no commit é a garantia de
+            // que o que vai para a API é o valor LIMPO, mesmo se o valor chegar colado de fora.
+            dataType: "plate",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.plate || null,
-            render: (t) => <span>{t.truck?.plate?.toUpperCase() || "—"}</span>,
-            edit: canEdit && task?.truck ? { get: (t) => t.truck?.plate ?? "", onCommit: (v) => setTaskField({ truck: { plate: (v as string) || null } }) } : undefined,
+            render: (t) => <span>{t.truck?.plate ? formatPlate(t.truck.plate) : "—"}</span>,
+            edit:
+              canEdit && task?.truck
+                ? { get: (t) => t.truck?.plate ?? "", onCommit: (v) => setTaskField({ truck: { plate: cleanPlate(String(v ?? "")) || null } }) }
+                : undefined,
           },
           {
             id: "chassisNumber",
             label: "Nº Chassi",
+            dataType: "chassis",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.chassisNumber || null,
             render: (t) => <span>{t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}</span>,
-            edit: canEdit && task?.truck ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: (v as string) || null } }) } : undefined,
+            edit:
+              canEdit && task?.truck
+                ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: cleanChassis(String(v ?? "")) || null } }) }
+                : undefined,
           },
           {
             // A plaqueta é uma FOTO (truck.vinPlate -> File), não um texto — por isso não

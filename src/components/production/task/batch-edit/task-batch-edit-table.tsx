@@ -25,6 +25,7 @@ import { useBatchUpdateTasks } from "../../../../hooks";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { createNameSchema, createDescriptionSchema, nullableDate } from "../../../../schemas";
+import { optionalPlateSchema, optionalChassisSchema } from "../../../../schemas/truck";
 
 // Task batch edit schema for UI form
 const taskBatchEditSchema = z.object({
@@ -43,16 +44,9 @@ const taskBatchEditSchema = z.object({
             .regex(/^[A-Z0-9-]*$/, "Número de série deve conter apenas letras maiúsculas, números e hífens")
             .nullable()
             .optional(),
-          plate: z
-            .string()
-            .regex(/^[A-Z0-9-]*$/, "A placa deve conter apenas letras maiúsculas, números e hífens")
-            .nullable()
-            .optional(),
-          chassisNumber: z
-            .string()
-            .regex(/^[A-Z0-9-]*$/, "O chassi deve conter apenas letras maiúsculas, números e hífens")
-            .nullable()
-            .optional(),
+          // Regra canônica: normaliza antes de validar (ver schemas/truck.ts).
+          plate: optionalPlateSchema,
+          chassisNumber: optionalChassisSchema,
           details: createDescriptionSchema(1, 1000, false).nullable().optional(),
           forecastDate: nullableDate.optional(),
           term: nullableDate.optional(),
@@ -380,12 +374,12 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         </TableCell>
                         <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput name={`tasks.${index}.data.plate`} placeholder="Placa" className="uppercase" />
+                            <FormInput name={`tasks.${index}.data.plate`} type="plate" placeholder="Placa" />
                           </div>
                         </TableCell>
                         <TableCell className="w-48 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput name={`tasks.${index}.data.chassisNumber`} placeholder="Chassi" className="uppercase" />
+                            <FormInput name={`tasks.${index}.data.chassisNumber`} type="chassis" placeholder="Chassi" />
                           </div>
                         </TableCell>
                         <TableCell className="w-72 p-0 !border-r-0">

@@ -11,6 +11,7 @@ import { TASK_STATUS, SERVICE_ORDER_STATUS, PAYMENT_CONDITION } from "../../../.
 import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
 import type { Task } from "../../../../types";
+import { taskDuplicateCopySchema } from "../../../../schemas";
 
 // Full include config for refetching the task with ALL relations needed for duplication
 const DUPLICATE_TASK_INCLUDE = {
@@ -58,24 +59,9 @@ const DUPLICATE_TASK_INCLUDE = {
   },
 };
 
-// Schema for a single copy entry
-const copyEntrySchema = z.object({
-  serialNumber: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => val?.trim().toUpperCase() || null),
-  plate: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => val?.trim().toUpperCase() || null),
-  chassisNumber: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => val?.trim().replace(/\s/g, "").toUpperCase() || null),
-});
+// Schema for a single copy entry — regra canônica de placa/chassi compartilhada
+// com o modal de duplicar da agenda (ver schemas/task.ts).
+const copyEntrySchema = taskDuplicateCopySchema;
 
 // Schema for multiple copies
 const duplicateSchema = z.object({
@@ -440,10 +426,10 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                             <FormControl>
                               <Input
                                 ref={field.ref}
+                                type="plate"
                                 value={field.value || ""}
                                 placeholder="Ex: ABC1D23"
-                                className="uppercase"
-                                onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
+                                onChange={field.onChange}
                                 onBlur={field.onBlur}
                                 disabled={isSubmitting}
                               />
@@ -463,10 +449,10 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                             <FormControl>
                               <Input
                                 ref={field.ref}
+                                type="chassis"
                                 value={field.value || ""}
                                 placeholder="Ex: 9BWZZZ377VT004251"
-                                className="uppercase"
-                                onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
+                                onChange={field.onChange}
                                 onBlur={field.onBlur}
                                 disabled={isSubmitting}
                               />

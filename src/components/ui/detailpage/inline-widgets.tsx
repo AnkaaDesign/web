@@ -5,7 +5,7 @@ import { getBadgeColors } from "@/constants";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/number";
 import { formatDate, formatDateTime } from "@/utils/date";
-import { formatCPF, formatCNPJ, formatPIS, formatCEP, formatBrazilianPhone } from "@/utils";
+import { formatCPF, formatCNPJ, formatPIS, formatCEP, formatBrazilianPhone, formatPlate, formatChassis } from "@/utils";
 import type { EnumEditConfig, FieldDataType, InlineEditDef } from "./detail-page-types";
 
 // Display helpers accept the enum config structurally (just the bits they read) so they
@@ -130,6 +130,12 @@ export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown,
       return empty ? undefined : formatPIS(String(value));
     case "cep":
       return empty ? undefined : formatCEP(String(value));
+    // Placa antiga sai "ABC-1234"; Mercosul sai "ABC1D23" (o layout Contran não tem separador).
+    case "plate":
+      return empty ? undefined : formatPlate(String(value));
+    // Chassi agrupado pela estrutura ISO 3779 — WMI(3) · VDS(6) · VIS(8).
+    case "chassis":
+      return empty ? undefined : formatChassis(String(value));
     case "date":
       return empty ? undefined : formatDate(new Date(value as string | number | Date));
     case "datetime":

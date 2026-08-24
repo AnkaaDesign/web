@@ -1151,9 +1151,11 @@ const FinancialBudgetDetailPageInner = () => {
       // untouched save never re-writes (and never clobbers) the truck's
       // implementType. This is the core of finding I39.
       const truckPayload: Record<string, unknown> = {};
-      if (dirtyFields.plate) truckPayload.plate = data.plate || undefined;
-      if (dirtyFields.chassisNumber)
-        truckPayload.chassisNumber = data.chassisNumber || undefined;
+      // Placa e chassi limpos vão como null EXPLÍCITO, nunca undefined: undefined
+      // é como se diz "não mexe" à API, então apagar o campo mantinha o valor
+      // antigo — a mesma armadilha que o `vinPlateId` logo abaixo já documenta.
+      if (dirtyFields.plate) truckPayload.plate = data.plate || null;
+      if (dirtyFields.chassisNumber) truckPayload.chassisNumber = data.chassisNumber || null;
       if (dirtyFields.category)
         truckPayload.category = data.category || undefined;
       if (dirtyFields.implementType)

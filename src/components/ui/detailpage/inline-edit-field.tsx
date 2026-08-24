@@ -26,7 +26,9 @@ import { enumOptions, enumTriggerClass, renderFieldValue } from "./inline-widget
 // dataType → the `<Input type=...>` the inline TextEditor renders. The Brazilian document/contact
 // types (cpf/cnpj/phone/pis/cep) map 1:1 onto the Input's own masked types — the Input formats while
 // typing and emits the RAW digits via onChange, so the committed value stays the unmasked digits.
-const TEXT_INPUT_TYPE: Partial<Record<FieldDataType, "text" | "number" | "integer" | "decimal" | "currency" | "percentage" | "cpf" | "cnpj" | "phone" | "pis" | "cep">> = {
+const TEXT_INPUT_TYPE: Partial<
+  Record<FieldDataType, "text" | "number" | "integer" | "decimal" | "currency" | "percentage" | "cpf" | "cnpj" | "phone" | "pis" | "cep" | "plate" | "chassis">
+> = {
   text: "text",
   number: "number",
   integer: "integer",
@@ -38,8 +40,12 @@ const TEXT_INPUT_TYPE: Partial<Record<FieldDataType, "text" | "number" | "intege
   phone: "phone",
   pis: "pis",
   cep: "cep",
+  // Sem estes dois, a edição inline de placa/chassi caía em texto puro: sem máscara, sem
+  // uppercase e sem limite — e gravava exatamente o que foi digitado.
+  plate: "plate",
+  chassis: "chassis",
 };
-const TEXT_LIKE = new Set<FieldDataType>(["text", "number", "integer", "decimal", "money", "percentage", "cpf", "cnpj", "phone", "pis", "cep"]);
+const TEXT_LIKE = new Set<FieldDataType>(["text", "number", "integer", "decimal", "money", "percentage", "cpf", "cnpj", "phone", "pis", "cep", "plate", "chassis"]);
 
 // How long the inline "Desfazer" affordance stays on the field after a successful edit.
 const UNDO_SECONDS = 5;

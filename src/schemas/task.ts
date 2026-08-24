@@ -8,6 +8,7 @@ import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { taskQuoteCreateNestedSchema } from "./task-quote";
 import { responsibleCreateInlineSchema } from "./responsible";
+import { optionalPlateSchema, optionalChassisSchema } from "./truck";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -1136,19 +1137,8 @@ const measureSideSchema = z
 // Consolidated truck schema with basic fields AND implement measures
 const taskTruckCreateSchema = z.object({
   // Basic truck fields
-  plate: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((val) => (val === "" ? null : val?.toUpperCase()))
-    .refine((val) => !val || /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}-?[0-9]{4}$/i.test(val), {
-      message: "Formato de placa inválido (ex: ABC1234 ou ABC-1234)",
-    }),
-  chassisNumber: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((val) => (val === "" ? null : val?.toUpperCase())),
+  plate: optionalPlateSchema,
+  chassisNumber: optionalChassisSchema,
   // Foto da plaqueta (VIN). Id de um File já enviado; o upload multipart vai no campo `truckVinPlate`.
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").optional().nullable(),
   // Truck spot in garage (e.g., "B1_F1_V1", "B2_F2_V3") — null means patio
@@ -1561,3 +1551,27 @@ export const taskRescheduleForecastSchema = z.object({
 });
 
 export type TaskRescheduleForecastFormData = z.infer<typeof taskRescheduleForecastSchema>;
+
+
+// =====================
+// Duplicação de tarefa — entrada de cada cópia
+// =====================
+// Compartilhado pelos dois modais de duplicar tarefa para que a regra de placa
+// e chassi seja literalmente a mesma nos dois.
+
+export const taskDuplicateCopySchema = z.object({
+  serialNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => {
+      if (val === undefined) return undefined;
+      if (val === null) return null;
+      const trimmed = val.trim().toUpperCase();
+      return trimmed === "" ? null : trimmed;
+    }),
+  plate: optionalPlateSchema,
+  chassisNumber: optionalChassisSchema,
+});
+
+export type TaskDuplicateCopyFormData = z.infer<typeof taskDuplicateCopySchema>;

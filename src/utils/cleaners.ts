@@ -4,6 +4,22 @@ export const cleanNumeric = (value: string): string => {
   return value.replace(/\D/g, "");
 };
 
+// Placa e chassi — regra ÚNICA de armazenamento: maiúsculas, só [A-Z0-9], sem
+// separador. O hífen é camada de apresentação (ver `formatPlate`): as colunas
+// `plateNormalized`/`chassisNumberNormalized` do banco são geradas com
+// `lower(unaccent(col))` e PRESERVAM pontuação, então uma placa gravada como
+// "ABC-1234" desaparece da busca por "abc1234".
+export const cleanPlate = (value: string): string => {
+  if (!value || typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .substring(0, 7);
+};
+
 export const cleanChassis = (value: string): string => {
   if (!value || typeof value !== "string") {
     return "";

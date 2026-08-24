@@ -8,6 +8,8 @@ import {
   formatCurrency,
   formatNumberWithDecimals,
   formatChassis,
+  formatPlate,
+  maskPlateInput,
   cleanCPF,
   cleanCNPJ,
   cleanPhone,
@@ -187,7 +189,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             return String(intVal);
           }
           case "plate":
-            return strValue.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 8);
+            return formatPlate(strValue);
           case "chassis":
             return formatChassis(strValue);
           case "rg":
@@ -250,7 +252,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             return isNaN(natVal) || natVal < 0 ? null : natVal;
           }
           case "plate":
-            return val.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+            // Máscara POSICIONAL: aceita placa antiga (AAA9999) e Mercosul (AAA9A99)
+            // sem travar no 4º caractere. O valor que sai é sempre LIMPO — o hífen
+            // de `formatPlate` é só exibição (as colunas de busca preservam pontuação).
+            return maskPlateInput(val);
           case "chassis":
             return cleanChassis(val);
           case "rg":
@@ -271,19 +276,22 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       return Math.round(ratio * newVal.length);
     };
 
-    // Helper for formatted input cursor positioning (CPF, CNPJ, phone, etc)
+    // Helper for formatted input cursor positioning (CPF, CNPJ, phone, placa, chassi, etc).
+    // Conta caracteres SIGNIFICATIVOS (alfanuméricos), não só dígitos: para CPF/CNPJ/CEP/
+    // telefone dá exatamente o mesmo resultado (os separadores são "." "/" "-" "(" ")" " "),
+    // e é o que permite reaproveitar a mesma conta em placa e chassi, que têm letras.
     const calculateFormattedCursorPosition = (oldVal: string, newVal: string, oldPos: number): number => {
-      // Count digits before cursor in old value
+      // Count significant chars before cursor in old value
       let digitsBeforeCursor = 0;
       for (let i = 0; i < oldPos && i < oldVal.length; i++) {
-        if (/\d/.test(oldVal[i])) digitsBeforeCursor++;
+        if (/[0-9A-Za-z]/.test(oldVal[i])) digitsBeforeCursor++;
       }
 
-      // Find position in new value after same number of digits
+      // Find position in new value after same number of significant chars
       let newPos = 0;
       let digitsSeen = 0;
       for (let i = 0; i < newVal.length; i++) {
-        if (/\d/.test(newVal[i])) {
+        if (/[0-9A-Za-z]/.test(newVal[i])) {
           digitsSeen++;
           if (digitsSeen === digitsBeforeCursor) {
             newPos = i + 1;
@@ -1183,12 +1191,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       // Format for display
       const formattedValue = formatValue(cleanedValue, type, documentType);
 
-      // Calculate new cursor position
-      const newCursorPos = calculateSimpleCursorPosition(
-        rawValue,
-        formattedValue,
-        oldCursorPos
-      );
+      // Calculate new cursor position. Placa e chassi são tipos FORMATADOS (hífen /
+      // espaços entram e saem do display), então a conta por proporção do
+      // `calculateSimpleCursorPosition` pularia o cursor — use a mesma conta por
+      // caractere significativo do CPF/CNPJ.
+      const isFormattedAlnumType = type === "plate" || type === "chassis";
+      const newCursorPos = isFormattedAlnumType
+        ? oldCursorPos >= rawValue.length
+          ? formattedValue.length
+          : calculateFormattedCursorPosition(rawValue, formattedValue, oldCursorPos)
+        : calculateSimpleCursorPosition(rawValue, formattedValue, oldCursorPos);
 
       setInternalValue(formattedValue);
       if (!naturalTyping) {
@@ -1405,9 +1417,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         case "percentage":
           return "0%";
         case "plate":
-          return "ABC1234";
+          return "ABC-1234";
         case "chassis":
-          return "9BD 17205 1R 123456";
+          return "9BM 979026 CS006622";
         case "rg":
           return "12.345.678-9";
         case "integer":
@@ -1441,7 +1453,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         case "plate":
           return 8;
         case "chassis":
-          return 20; // 17 chars + 3 spaces
+          return 19; // 17 caracteres + 2 espaços do agrupamento 3-6-8
         case "rg":
           return 15;
         case "currency":

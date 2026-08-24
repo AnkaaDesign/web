@@ -3362,101 +3362,53 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       <FormField
                         control={form.control}
                         name="truck.plate"
-                        render={({ field }) => {
-                          // Format Brazilian license plate for display
-                          // Old format: ABC-1234 (3 letters + hyphen + 4 numbers)
-                          // Mercosul format: ABC-1D23 (3 letters + hyphen + 1 number + 1 letter + 2 numbers)
-                          const formatPlate = (value: string) => {
-                            const clean = value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-                            if (clean.length <= 3) {
-                              return clean;
-                            }
-
-                            // Check if it's Mercosul format (5th character is a letter)
-                            const fifthChar = clean.charAt(4);
-                            const isMercosul = fifthChar && /[A-Z]/i.test(fifthChar);
-
-                            if (isMercosul) {
-                              // Mercosul format: ABC-1D23
-                              return clean.slice(0, 3) + '-' + clean.slice(3, 7);
-                            } else {
-                              // Old format: ABC-1234
-                              return clean.slice(0, 3) + '-' + clean.slice(3, 7);
-                            }
-                          };
-
-                          return (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2">
-                                <IconLicense className="h-4 w-4" />
-                                Placa
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  value={formatPlate(field.value || "")}
-                                  placeholder="Ex: ABC-1234 ou ABC-1D23"
-                                  className="uppercase bg-transparent"
-                                  maxLength={8}
-                                  onChange={(value: string | number | null) => {
-                                    // Remove all non-alphanumeric characters, convert to uppercase
-                                    const cleanValue = String(value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
-                                    // Limit to 7 characters (3 letters + 4 chars)
-                                    const limitedValue = cleanValue.slice(0, 7);
-                                    field.onChange(limitedValue);
-                                  }}
-                                  disabled={isSubmitting || !canEditIdentity}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconLicense className="h-4 w-4" />
+                              Placa
+                            </FormLabel>
+                            <FormControl>
+                              {/* type="plate": máscara posicional (antiga e Mercosul) no Input;
+                                  o valor guardado é sempre LIMPO, o hífen é só exibição. */}
+                              <Input
+                                type="plate"
+                                value={field.value || ""}
+                                className="uppercase bg-transparent"
+                                onChange={(value: string | number | null) => field.onChange(value ? String(value) : "")}
+                                onBlur={field.onBlur}
+                                disabled={isSubmitting || !canEditIdentity}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
 
                       {/* Chassis - 2/4 (col-span-2) */}
                       <FormField
                         control={form.control}
                         name="truck.chassisNumber"
-                        render={({ field }) => {
-                          // Format chassis for display: XXX XXXXX XX XXXXXX
-                          const formatChassis = (value: string) => {
-                            const clean = value.replace(/\s/g, "");
-                            if (clean.length > 10) {
-                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8) + ' ' + clean.slice(8, 10) + ' ' + clean.slice(10, 17);
-                            } else if (clean.length > 8) {
-                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8) + ' ' + clean.slice(8, 10);
-                            } else if (clean.length > 3) {
-                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8);
-                            }
-                            return clean.slice(0, 3);
-                          };
-
-                          return (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2">
-                                <IconId className="h-4 w-4" />
-                                Chassi
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  value={formatChassis(field.value || "")}
-                                  placeholder="Ex: 9BW ZZZ37 7V T004251"
-                                  className="bg-transparent uppercase"
-                                  maxLength={20}
-                                  onChange={(value: string | number | null) => {
-                                    // Remove all non-alphanumeric characters and spaces, convert to uppercase
-                                    const cleanValue = String(value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
-                                    // Limit to exactly 17 characters (VIN standard)
-                                    const limitedValue = cleanValue.slice(0, 17);
-                                    field.onChange(limitedValue);
-                                  }}
-                                  disabled={isSubmitting || !canEditIdentity}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconId className="h-4 w-4" />
+                              Chassi
+                            </FormLabel>
+                            <FormControl>
+                              {/* type="chassis": agrupamento 3-6-8 só na exibição; guarda 17 alfanuméricos. */}
+                              <Input
+                                type="chassis"
+                                value={field.value || ""}
+                                className="bg-transparent uppercase"
+                                onChange={(value: string | number | null) => field.onChange(value ? String(value) : "")}
+                                onBlur={field.onBlur}
+                                disabled={isSubmitting || !canEditIdentity}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
 
                       {/* Plaqueta — FOTO da plaqueta de identificação (VIN), imagem única. */}

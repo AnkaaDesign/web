@@ -244,12 +244,16 @@ export function BudgetStepTask({
                             Placa
                           </FormLabel>
                           <FormControl>
+                            {/* Mesma regra do formulário de Tarefa: guarda a placa LIMPA em
+                                maiúsculas (ABC1234) e exibe com hífen. O campo aceitava o texto
+                                cru, então uma placa digitada em minúsculas ia para a API assim e
+                                voltava 400 de validação. */}
                             <Input
+                              type="plate"
                               value={field.value || ""}
-                              onChange={(value) => field.onChange(value ?? "")}
-                              placeholder="Ex: ABC-1234"
+                              onChange={(value) => field.onChange(value ? String(value) : "")}
                               disabled={disabled}
-                              className="bg-transparent"
+                              className="uppercase bg-transparent"
                             />
                           </FormControl>
                           <FormMessage />
@@ -267,11 +271,11 @@ export function BudgetStepTask({
                           </FormLabel>
                           <FormControl>
                             <Input
+                              type="chassis"
                               value={field.value || ""}
-                              onChange={(value) => field.onChange(value ?? "")}
-                              placeholder="Ex: 9BW..."
+                              onChange={(value) => field.onChange(value ? String(value) : "")}
                               disabled={disabled}
-                              className="bg-transparent font-mono"
+                              className="bg-transparent font-mono uppercase"
                             />
                           </FormControl>
                           <FormMessage />

@@ -680,8 +680,10 @@ const BillingDetailPageInner = () => {
         details: formData.details?.trim() ? formData.details : null,
         serialNumber: formData.serialNumber || null,
         truck: {
-          plate: formData.plate || undefined,
-          chassisNumber: formData.chassisNumber || undefined,
+          // null explícito, nunca undefined — undefined é "não mexe", então
+          // apagar a placa ou o chassi mantinha o valor antigo.
+          plate: formData.plate || null,
+          chassisNumber: formData.chassisNumber || null,
           // Explicit null, never undefined: undefined is how the repo is told "don't touch",
           // so clearing the field would silently keep the old photo.
           vinPlateId,

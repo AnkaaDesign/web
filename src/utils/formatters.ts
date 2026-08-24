@@ -1,22 +1,28 @@
 // packages/utils/src/formatters.ts
 
+import { PLATE_OLD_REGEX, PLATE_REGEX } from "./truck";
+import { cleanChassis, cleanPlate } from "./cleaners";
+
+/**
+ * Placa para exibição: `ABC-1234` no padrão antigo, `ABC1D23` no Mercosul (o
+ * layout Contran da Mercosul não imprime separador). Valor parcial ou fora dos
+ * dois padrões sai limpo, sem hífen — assim o campo não "pisca" um separador
+ * enquanto a pessoa ainda está digitando.
+ */
+export const formatPlate = (plate: string): string => {
+  const cleaned = cleanPlate(plate ?? "");
+  if (!PLATE_REGEX.test(cleaned)) return cleaned;
+  return PLATE_OLD_REGEX.test(cleaned) ? `${cleaned.slice(0, 3)}-${cleaned.slice(3)}` : cleaned;
+};
+
+/**
+ * Chassi agrupado pela estrutura ISO 3779: WMI (3) · VDS (6) · VIS (8) —
+ * `9BM 979026 CS006622`. O agrupamento antigo era 3-5-2-6, que soma 16 de 17 e
+ * deixava o último caractere colado no grupo final.
+ */
 export const formatChassis = (chassis: string): string => {
-  // Remove all non-alphanumeric characters and convert to uppercase
-  const cleaned = chassis.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-
-  // Format as: XXX XXXXX XX XXXXXX (3-5-2-6 groups)
-  if (cleaned.length <= 3) {
-    return cleaned;
-  } else if (cleaned.length <= 8) {
-    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{1,5})/, "$1 $2");
-  } else if (cleaned.length <= 10) {
-    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{1,2})/, "$1 $2 $3");
-  } else if (cleaned.length <= 17) {
-    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{2})([A-Z0-9]{1,6})/, "$1 $2 $3 $4");
-  }
-
-  // Limit to 17 characters
-  return cleaned.substring(0, 17).replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{2})([A-Z0-9]{6})/, "$1 $2 $3 $4");
+  const cleaned = cleanChassis(chassis ?? "");
+  return [cleaned.slice(0, 3), cleaned.slice(3, 9), cleaned.slice(9, 17)].filter(Boolean).join(" ");
 };
 
 export const formatCPF = (cpf: string): string => {

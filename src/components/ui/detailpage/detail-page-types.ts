@@ -33,6 +33,10 @@ export type FieldDataType =
   | "phone"
   | "pis"
   | "cep"
+  // Placa (AAA9999 / AAA9A99) e chassi (17 alfanuméricos): mesmo contrato dos tipos acima —
+  // o Input mascara na digitação e emite o valor LIMPO, e a leitura formata para exibição.
+  | "plate"
+  | "chassis"
   | "date"
   | "datetime"
   | "time"

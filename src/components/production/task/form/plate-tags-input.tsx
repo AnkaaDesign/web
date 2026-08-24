@@ -3,6 +3,8 @@ import { useState, useRef } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/sonner";
+import { formatPlate, isValidPlate, maskPlateInput, PLATE_INVALID_MESSAGE } from "@/utils";
 import { IconX, IconLicense } from "@tabler/icons-react";
 
 interface PlateTagsInputProps {
@@ -33,14 +35,28 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
       justCommittedRef.current = false;
       return;
     }
-    const trimmedPlate = newPlate.trim().toUpperCase();
+    // O array do formulário guarda SEMPRE a placa limpa (ABC1234 / ABC1D23); o hífen
+    // que aparece na tag vem de `formatPlate` e nunca é gravado — as colunas de busca
+    // do banco preservam pontuação, então placa com hífen some da busca.
+    const plate = maskPlateInput(newPlate);
 
-    // Simple validation: just check if not empty and not duplicate
-    if (trimmedPlate && !plates.includes(trimmedPlate)) {
-      append(trimmedPlate as any);
-      setNewPlate("");
-      justCommittedRef.current = true;
+    if (!plate) return;
+
+    if (!isValidPlate(plate)) {
+      // `id` fixo: Enter e o blur seguinte disparam a mesma rejeição — sem isso o
+      // usuário levaria dois toasts idênticos empilhados.
+      toast.error(PLATE_INVALID_MESSAGE, { id: "plate-tags-invalid" });
+      return;
     }
+
+    if (plates.includes(plate)) {
+      toast.error("Esta placa já foi adicionada", { id: "plate-tags-duplicate" });
+      return;
+    }
+
+    append(plate as any);
+    setNewPlate("");
+    justCommittedRef.current = true;
   };
 
   return (
@@ -60,14 +76,11 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
 
             <div className="space-y-2">
               <Input
-                type="text"
+                type="plate"
                 value={newPlate}
                 onChange={(value) => {
-                  // Handle both event and direct value from custom Input component
-                  const newValue = typeof value === "string"
-                    ? value
-                    : (value as any)?.target?.value || "";
-                  setNewPlate(newValue.toUpperCase());
+                  // `type="plate"` já devolve o valor mascarado e limpo (ou null quando vazio).
+                  setNewPlate(maskPlateInput(typeof value === "string" ? value : ""));
                 }}
                 onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === "Enter") {
@@ -76,7 +89,7 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
                   }
                 }}
                 onBlur={handleAddPlate}
-                placeholder={disabled ? "Desabilitado (remova números de série extras)" : "Digite uma placa e pressione Enter (ex: ABC1234)"}
+                placeholder={disabled ? "Desabilitado (remova números de série extras)" : "Digite uma placa e pressione Enter (ex: ABC-1234 ou ABC1D23)"}
                 disabled={disabled}
                 transparent={true}
               />
@@ -95,7 +108,7 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
                       className="flex items-center gap-1.5 text-sm pr-1.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => remove(index)}
                     >
-                      <span>{plate}</span>
+                      <span>{formatPlate(plate)}</span>
                       <IconX className="h-3.5 w-3.5" />
                     </Badge>
                   ))}
