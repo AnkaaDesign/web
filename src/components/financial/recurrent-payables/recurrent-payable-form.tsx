@@ -701,7 +701,10 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
               )}
 
               {installations.fields.map((field, index) => (
-                <div key={field.id} className="rounded-md border p-3 space-y-3">
+                <div
+                  key={field.id}
+                  className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-3"
+                >
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                     <FormField
                       control={form.control}
@@ -737,44 +740,49 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                    <div className="space-y-1">
+                  {/* `items-end` alinha o rodapé do input de estimativa com a
+                      linha de controles; a nota de ajuda fica FORA do grid, senão
+                      ela entra na altura da coluna e empurra o toggle e a lixeira
+                      para baixo do input. */}
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                       <FormMoneyInput
                         name={`installations.${index}.estimatedAmount`}
                         label="Estimativa"
                         disabled={isSubmitting}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Em branco: estimada pelo histórico de débitos desta instalação.
-                      </p>
+                      {/* h-10 = altura do Input/Button icon, para o Switch (baixo)
+                          centralizar na mesma faixa em vez de encostar na base. */}
+                      <div className="flex h-10 items-center gap-1">
+                        <FormField
+                          control={form.control}
+                          name={`installations.${index}.isActive`}
+                          render={({ field: f }) => (
+                            <FormItem className="space-y-0">
+                              <label className="flex h-10 items-center gap-2 cursor-pointer">
+                                <FormControl>
+                                  <Switch checked={f.value} onCheckedChange={f.onChange} disabled={isSubmitting} />
+                                </FormControl>
+                                <span className="text-sm">Ativa</span>
+                              </label>
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={isSubmitting}
+                          onClick={() => installations.remove(index)}
+                          aria-label="Remover instalação"
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-end gap-2">
-                      <FormField
-                        control={form.control}
-                        name={`installations.${index}.isActive`}
-                        render={({ field: f }) => (
-                          <FormItem>
-                            <label className="flex items-center gap-2 cursor-pointer pb-2">
-                              <FormControl>
-                                <Switch checked={f.value} onCheckedChange={f.onChange} disabled={isSubmitting} />
-                              </FormControl>
-                              <span className="text-sm">Ativa</span>
-                            </label>
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="mb-1"
-                        disabled={isSubmitting}
-                        onClick={() => installations.remove(index)}
-                        aria-label="Remover instalação"
-                      >
-                        <IconTrash className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Em branco: estimada pelo histórico de débitos desta instalação.
+                    </p>
                   </div>
 
                   {/* An installation with settled history cannot be deleted — the API
