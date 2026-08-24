@@ -821,8 +821,8 @@ export const routes = {
     wasteCertificate: {
       root: "/ferramentas/certificado-residuos",
     },
-    employeeCost: {
-      root: "/ferramentas/custo-de-funcionario",
+    collaboratorCost: {
+      root: "/ferramentas/custo-de-colaborador",
     },
     notes: {
       root: "/ferramentas/notas",

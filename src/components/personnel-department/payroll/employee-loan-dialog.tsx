@@ -85,7 +85,7 @@ export function EmployeeLoanDialog({ open, onOpenChange, userId, onSaved }: Empl
   }, [open]);
 
   // Async colaborador search for the optional selector (same pattern as the
-  // employee-cost calculator / salary-adjustment tools).
+  // collaborator-cost calculator / salary-adjustment tools).
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const pageSize = 50;

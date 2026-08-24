@@ -101,9 +101,9 @@ const toolGroups: ToolGroup[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.COMMERCIAL],
       },
       {
-        label: "Custo de Funcionário",
+        label: "Custo de Colaborador",
         description: "Estime o custo total de um colaborador para a empresa",
-        route: routes.tools.employeeCost.root,
+        route: routes.tools.collaboratorCost.root,
         icon: IconCalendarDollar,
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },

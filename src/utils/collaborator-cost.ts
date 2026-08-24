@@ -1,4 +1,4 @@
-// Custo de Funcionário — pure client-side math (ACCOUNTING_AREA_CONTRACT §6).
+// Custo de Colaborador — pure client-side math (ACCOUNTING_AREA_CONTRACT §6).
 //
 // Formulas (implemented EXACTLY as specified):
 //   horaNormal        = baseSalary / 220
@@ -21,7 +21,7 @@
 // fap as a pure multiplier (0.5–2.0).
 
 /** Tax regime for the employer-cost simulation. */
-export enum EMPLOYEE_COST_TAX_REGIME {
+export enum COLLABORATOR_COST_TAX_REGIME {
   /** Simples Nacional, anexos I–III/V — CPP included in the DAS (INSS patronal = 0). */
   SIMPLES = "SIMPLES",
   /** Simples Nacional Anexo IV — pays 20% CPP + RAT×FAP outside the DAS (no terceiros). */
@@ -30,10 +30,10 @@ export enum EMPLOYEE_COST_TAX_REGIME {
   LUCRO_PRESUMIDO_REAL = "LUCRO_PRESUMIDO_REAL",
 }
 
-export const EMPLOYEE_COST_TAX_REGIME_LABELS: Record<EMPLOYEE_COST_TAX_REGIME, string> = {
-  [EMPLOYEE_COST_TAX_REGIME.SIMPLES]: "Simples Nacional (exceto Anexo IV)",
-  [EMPLOYEE_COST_TAX_REGIME.SIMPLES_ANEXO_IV]: "Simples Nacional — Anexo IV",
-  [EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL]: "Lucro Presumido / Lucro Real",
+export const COLLABORATOR_COST_TAX_REGIME_LABELS: Record<COLLABORATOR_COST_TAX_REGIME, string> = {
+  [COLLABORATOR_COST_TAX_REGIME.SIMPLES]: "Simples Nacional (exceto Anexo IV)",
+  [COLLABORATOR_COST_TAX_REGIME.SIMPLES_ANEXO_IV]: "Simples Nacional — Anexo IV",
+  [COLLABORATOR_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL]: "Lucro Presumido / Lucro Real",
 };
 
 /** Monthly divisor for the normal hourly rate (220h: 44h/week CLT standard). */
@@ -51,10 +51,10 @@ export const DEFAULT_TERCEIROS_PCT = 5.8;
 /** VT legal employee-discount cap: 6% of the base salary (CLT/Lei 7.418). */
 export const VT_DISCOUNT_CAP_PCT = 6;
 
-export interface EmployeeCostInput {
+export interface CollaboratorCostInput {
   /** Monthly base salary (R$). */
   baseSalary: number;
-  taxRegime: EMPLOYEE_COST_TAX_REGIME;
+  taxRegime: COLLABORATOR_COST_TAX_REGIME;
   /** RAT percentage: 1, 2 or 3 (%). */
   ratPct: number;
   /** FAP multiplier: 0.5–2.0 (default 1.0). */
@@ -74,7 +74,7 @@ export interface EmployeeCostInput {
   domingosFeriados?: number;
 }
 
-export interface EmployeeCostBreakdown {
+export interface CollaboratorCostBreakdown {
   // Remuneration block
   horaNormal: number;
   he50: number;
@@ -108,7 +108,7 @@ export interface EmployeeCostBreakdown {
 const safe = (n: number): number => (Number.isFinite(n) ? n : 0);
 
 /** Full §6 employer-cost computation. Pure function. */
-export function computeEmployeeCost(input: EmployeeCostInput): EmployeeCostBreakdown {
+export function computeCollaboratorCost(input: CollaboratorCostInput): CollaboratorCostBreakdown {
   const baseSalary = Math.max(0, safe(input.baseSalary));
   const h50 = Math.max(0, safe(input.he50Hours));
   const h100 = Math.max(0, safe(input.he100Hours));
@@ -140,10 +140,10 @@ export function computeEmployeeCost(input: EmployeeCostInput): EmployeeCostBreak
   let inssRatFap = 0;
   let inssTerceiros = 0;
 
-  if (input.taxRegime === EMPLOYEE_COST_TAX_REGIME.SIMPLES_ANEXO_IV) {
+  if (input.taxRegime === COLLABORATOR_COST_TAX_REGIME.SIMPLES_ANEXO_IV) {
     inssPatronal20 = 0.2 * base;
     inssRatFap = ratFapRate * base;
-  } else if (input.taxRegime === EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL) {
+  } else if (input.taxRegime === COLLABORATOR_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL) {
     inssPatronal20 = 0.2 * base;
     inssRatFap = ratFapRate * base;
     inssTerceiros = terceirosRate * base;

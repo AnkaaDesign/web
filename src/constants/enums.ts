@@ -2628,7 +2628,7 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_CONTAS_A_PAGAR_LISTAR = "/financeiro/contas-a-pagar",
 
   // Ferramentas
-  FERRAMENTAS_CUSTO_DE_FUNCIONARIO = "/ferramentas/custo-de-funcionario",
+  FERRAMENTAS_CUSTO_DE_COLABORADOR = "/ferramentas/custo-de-colaborador",
   FERRAMENTAS_NOTAS = "/ferramentas/notas",
 
   // Favorites coverage — list/index pages wired for the favorites button

@@ -19,16 +19,16 @@ import { getPositionMonthlySalary } from "@/utils/overtime-cost";
 import { calculateBenefitSplit } from "@/utils/benefit-discount";
 import { COMPANY_FISCAL } from "@/config/company";
 import {
-  EMPLOYEE_COST_TAX_REGIME,
+  COLLABORATOR_COST_TAX_REGIME,
   DEFAULT_RAT_PCT,
   DEFAULT_FAP_FACTOR,
   DEFAULT_TERCEIROS_PCT,
   DEFAULT_DIAS_UTEIS,
   DEFAULT_DOMINGOS_FERIADOS,
-  computeEmployeeCost,
+  computeCollaboratorCost,
   computeVtDiscountPreview,
   formatMultiplier,
-} from "@/utils/employee-cost";
+} from "@/utils/collaborator-cost";
 
 const RAT_OPTIONS: ComboboxOption[] = [
   { value: "1", label: "1% — risco leve" },
@@ -45,11 +45,11 @@ const toNumber = (value: string | number | null, fallback = 0): number => {
   return fallback;
 };
 
-function EmployeeCostCalculatorContent() {
+function CollaboratorCostCalculatorContent() {
   // --- Inputs ---------------------------------------------------------------
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [baseSalary, setBaseSalary] = useState<number>(0);
-  const taxRegime = EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL;
+  const taxRegime = COLLABORATOR_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL;
   const [ratPct, setRatPct] = useState<number>(COMPANY_FISCAL.ratPct);
   const [fapFactor, setFapFactor] = useState<number>(COMPANY_FISCAL.fapFactor);
   const [terceirosPct, setTerceirosPct] = useState<number>(COMPANY_FISCAL.terceirosPct);
@@ -183,7 +183,7 @@ function EmployeeCostCalculatorContent() {
   // --- Computation (pure, §6) -------------------------------------------------
   const breakdown = useMemo(
     () =>
-      computeEmployeeCost({
+      computeCollaboratorCost({
         baseSalary,
         taxRegime,
         ratPct,
@@ -221,13 +221,13 @@ function EmployeeCostCalculatorContent() {
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
-            title="Custo de Funcionário"
+            title="Custo de Colaborador"
             icon={IconBusinessplan}
-            favoritePage={FAVORITE_PAGES.FERRAMENTAS_CUSTO_DE_FUNCIONARIO}
+            favoritePage={FAVORITE_PAGES.FERRAMENTAS_CUSTO_DE_COLABORADOR}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Ferramentas", href: routes.tools.root },
-              { label: "Custo de Funcionário" },
+              { label: "Custo de Colaborador" },
             ]}
           />
         </div>
@@ -247,7 +247,7 @@ function EmployeeCostCalculatorContent() {
                   <Label>Colaborador (opcional)</Label>
                   <Combobox
                     async
-                    queryKey={["employee-cost", "user-search"]}
+                    queryKey={["collaborator-cost", "user-search"]}
                     queryFn={queryUsers}
                     minSearchLength={0}
                     pageSize={50}
@@ -452,10 +452,10 @@ function EmployeeCostCalculatorContent() {
   );
 }
 
-export function EmployeeCostCalculatorPage() {
+export function CollaboratorCostCalculatorPage() {
   // Track page access
   usePageTracker({
-    title: "Custo de Funcionário",
+    title: "Custo de Colaborador",
     icon: "businessplan",
   });
 
@@ -478,9 +478,9 @@ export function EmployeeCostCalculatorPage() {
         SECTOR_PRIVILEGES.ACCOUNTING,
       ]}
     >
-      <EmployeeCostCalculatorContent />
+      <CollaboratorCostCalculatorContent />
     </PrivilegeRoute>
   );
 }
 
-export default EmployeeCostCalculatorPage;
+export default CollaboratorCostCalculatorPage;

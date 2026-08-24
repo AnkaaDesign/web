@@ -525,7 +525,7 @@ const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").the
 const ToolsHubPage = lazy(() => import("@/pages/tools").then((module) => ({ default: module.ToolsHubPage })));
 const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) => ({ default: module.QrCodeToolPage })));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
-const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cost-calculator"));
+const CollaboratorCostCalculatorPage = lazy(() => import("@/pages/tools/collaborator-cost-calculator"));
 const NotesPage = lazy(() => import("@/pages/tools/notes"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
@@ -3682,10 +3682,10 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.tools.employeeCost.root}
+                  path={routes.tools.collaboratorCost.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <EmployeeCostCalculatorPage />
+                      <CollaboratorCostCalculatorPage />
                     </Suspense>
                   }
                 />

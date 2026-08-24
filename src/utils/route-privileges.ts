@@ -331,8 +331,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/ferramentas/custo-horas-extras": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "HUMAN_RESOURCES", "ACCOUNTING"],
   // Calculadora de Mistura
   "/ferramentas/calculadora-de-mistura": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL"],
-  // Custo de Funcionário — ADMIN only
-  "/ferramentas/custo-de-funcionario": ["ADMIN"],
+  // Custo de Colaborador — ADMIN only
+  "/ferramentas/custo-de-colaborador": ["ADMIN"],
   // Notas board — hub child (ADMIN/PM/COMMERCIAL/ACCOUNTING) + FINANCIAL (flat) + LOGISTIC (Pessoal)
   "/ferramentas/notas": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "ACCOUNTING", "FINANCIAL", "LOGISTIC"],
   // QR generator, color palette — ADMIN only

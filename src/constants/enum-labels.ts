@@ -2239,7 +2239,7 @@ export const FAVORITE_PAGES_LABELS: Record<FAVORITE_PAGES, string> = {
   [FAVORITE_PAGES.FINANCEIRO_CONTAS_A_PAGAR_LISTAR]: "Contas a Pagar",
 
   // Ferramentas
-  [FAVORITE_PAGES.FERRAMENTAS_CUSTO_DE_FUNCIONARIO]: "Custo de Funcionário",
+  [FAVORITE_PAGES.FERRAMENTAS_CUSTO_DE_COLABORADOR]: "Custo de Colaborador",
   [FAVORITE_PAGES.FERRAMENTAS_NOTAS]: "Notas",
 
   // Favorites coverage — list/index pages wired for the favorites button

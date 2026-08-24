@@ -2274,10 +2274,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
-        id: "ferramentas-custo-de-funcionario",
-        title: "Custo de Funcionário",
+        id: "ferramentas-custo-de-colaborador",
+        title: "Custo de Colaborador",
         icon: "calendarDollar",
-        path: "/ferramentas/custo-de-funcionario",
+        path: "/ferramentas/custo-de-colaborador",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {

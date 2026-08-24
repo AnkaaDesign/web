@@ -88,12 +88,12 @@ export const SICREDI_BENEFICIARIO = {
 /**
  * Company fiscal setup — the actual tax/payroll parameters for Ankaa Design.
  *
- * Used to pre-fill the "Custo de Funcionário" simulator so the owner doesn't
+ * Used to pre-fill the "Custo de Colaborador" simulator so the owner doesn't
  * re-enter what the company already knows. All values remain editable in the
  * tool (the simulator may model hypotheticals).
  *
  * Used by:
- * - Employee cost calculator (src/pages/tools/employee-cost-calculator.tsx)
+ * - Collaborator cost calculator (src/pages/tools/collaborator-cost-calculator.tsx)
  */
 export const COMPANY_FISCAL = {
   /** Regime tributário da empresa: Lucro Presumido (compartilha o cálculo com Lucro Real). */

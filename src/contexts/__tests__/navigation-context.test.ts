@@ -264,7 +264,7 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(byId(FINANCIAL, "financeiro")).toBeDefined();
   });
 
-  it("Ferramentas (ACCOUNTING): Calendário, Certificado de Resíduos, Custo de Horas Extras, Notas; no QR Code/Paleta/Mistura/Custo de Funcionário", () => {
+  it("Ferramentas (ACCOUNTING): Calendário, Certificado de Resíduos, Custo de Horas Extras, Notas; no QR Code/Paleta/Mistura/Custo de Colaborador", () => {
     const tools = byId(ACCOUNTING, "ferramentas")!;
     expect((tools.children || []).map((c) => c.title)).toEqual([
       "Calendário",
