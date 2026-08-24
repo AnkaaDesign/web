@@ -1,0 +1,157 @@
+/* Escuro por escolha, não por moda: o guia é branco sobre transparente e o
+   único fundo que não mente sobre como ele vai aparecer no visor da câmera é
+   um fundo escuro. */
+:root {
+  --fundo: #0d1117;
+  --painel: #151b23;
+  --linha: #232c38;
+  --texto: #e6ebf2;
+  --fraco: #8a97a8;
+  --acento: #f2b544;
+  --ok: #4ec98a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--fundo); color: var(--texto);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+button {
+  font: inherit; color: var(--texto);
+  background: #222c39; border: 1px solid var(--linha);
+  border-radius: 7px; padding: 7px 12px; cursor: pointer;
+}
+button:hover { background: #2c3949; }
+button.ghost { background: transparent; }
+input {
+  font: inherit; color: var(--texto);
+  background: #0f151d; border: 1px solid var(--linha);
+  border-radius: 7px; padding: 7px 10px;
+}
+input::placeholder { color: #5c6979; }
+
+/* ------------------------------------------------------------------ topo */
+.topo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 10px 16px;
+  border-bottom: 1px solid var(--linha); background: var(--painel);
+}
+.marca strong { font-size: 15px; letter-spacing: .2px; }
+.marca .sub { color: var(--fraco); margin-left: 8px; font-size: 12px; }
+.conta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.conta input { width: 190px; }
+.quem { color: var(--ok); font-size: 12px; }
+
+/* ------------------------------------------------------------------ corpo */
+.corpo {
+  display: grid; grid-template-columns: 380px 1fr;
+  height: calc(100% - 53px);
+}
+@media (max-width: 900px) { .corpo { grid-template-columns: 1fr; } }
+
+.painel { overflow: auto; padding: 14px; }
+.lista { border-right: 1px solid var(--linha); background: #111720; }
+
+.busca { display: flex; gap: 8px; }
+.busca input { flex: 1; }
+.dica { color: var(--fraco); font-size: 12px; }
+
+.oss { list-style: none; margin: 12px 0 0; padding: 0; }
+.oss li {
+  border: 1px solid var(--linha); border-radius: 9px;
+  padding: 9px 11px; margin-bottom: 8px; cursor: pointer;
+}
+.oss li:hover { border-color: #38465a; background: #151d27; }
+.oss li.sel { border-color: var(--acento); background: #1b2130; }
+.oss .d { font-weight: 600; }
+.oss .m { color: var(--fraco); font-size: 12px; margin-top: 2px; }
+.oss .g { margin-top: 5px; }
+
+.tag {
+  display: inline-block; font-size: 11px; padding: 1px 7px;
+  border: 1px solid var(--linha); border-radius: 999px;
+  color: var(--fraco); margin-right: 4px;
+}
+.tag.on { color: #10161f; background: var(--acento); border-color: var(--acento); font-weight: 600; }
+
+/* --------------------------------------------------------------- detalhe */
+.vazio { color: var(--fraco); margin-top: 40px; text-align: center; }
+.vazio .mini { font-size: 12px; max-width: 380px; margin: 6px auto; }
+
+.cab h2 { margin: 0 0 4px; font-size: 18px; }
+.cab .meta { color: var(--fraco); font-size: 12px; }
+.cab .chips { margin-top: 8px; }
+
+.grade {
+  display: grid; gap: 14px; margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.card {
+  border: 1px solid var(--linha); border-radius: 11px; overflow: hidden;
+  background: #101821;
+}
+.card .thumb {
+  position: relative; display: block; width: 100%;
+  background: #1b232e center/contain no-repeat;
+  border-bottom: 1px solid var(--linha); cursor: pointer;
+}
+.card .thumb img { display: block; width: 100%; height: auto; }
+.card .rot { padding: 8px 10px; font-size: 13px; }
+.card .num {
+  display: inline-block; width: 20px; height: 20px; line-height: 20px;
+  text-align: center; border-radius: 50%; background: var(--acento);
+  color: #10161f; font-weight: 700; font-size: 11px; margin-right: 7px;
+}
+.card .cam { padding: 0 10px 9px; color: var(--fraco); font-size: 11px; }
+
+/* ----------------------------------------------------------------- palco */
+.palco {
+  position: fixed; inset: 0; z-index: 40; background: #05080c;
+  display: flex; flex-direction: column;
+}
+.palcoTopo {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px; border-bottom: 1px solid var(--linha);
+}
+.palcoTopo span { color: var(--fraco); font-size: 13px; flex: 1; }
+.modos { display: flex; gap: 6px; }
+.modo.ativo { background: var(--acento); color: #10161f; border-color: var(--acento); font-weight: 600; }
+
+.quadroWrap {
+  flex: 1; display: grid; place-items: center; padding: 12px; min-height: 0;
+}
+/* O QUADRO carrega a proporção da pose (1600×900 ou 900×1600) via `aspect-ratio`.
+   É ele que garante que o guia e o que está por baixo estejam no MESMO
+   enquadramento — sem isso a comparação não vale nada. */
+.quadro {
+  position: relative; background: #0b1017;
+  max-width: 100%; max-height: 100%;
+  border: 1px solid var(--linha); border-radius: 6px; overflow: hidden;
+}
+.quadro > * {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+}
+/* `cover` no vídeo porque é assim que o preview nativo do celular se comporta
+   (iOS `resizeAspectFill`); `contain` na foto porque ela JÁ tem a proporção do
+   quadro e qualquer corte seria invenção. */
+#video { object-fit: cover; }
+#fundo { object-fit: contain; }
+#guia { object-fit: contain; pointer-events: none; }
+
+.palcoBase {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 10px 14px; border-top: 1px solid var(--linha);
+}
+.palcoBase label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fraco); }
+.palcoBase input[type=range] { width: 200px; }
+.camMeta { color: var(--fraco); font-size: 11px; margin-left: auto; }
+
+.tiras { display: flex; gap: 6px; overflow: auto; }
+.tiras img {
+  height: 46px; width: auto; border-radius: 5px; cursor: pointer;
+  border: 2px solid transparent; opacity: .65;
+}
+.tiras img.sel { border-color: var(--acento); opacity: 1; }

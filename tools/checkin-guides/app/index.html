@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guias de foto — check-in / check-out</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <strong>Guias de foto</strong>
+    <span class="sub">check-in · check-out</span>
+  </div>
+  <div class="conta" id="conta">
+    <input id="contato" placeholder="e-mail ou telefone" autocomplete="username">
+    <input id="senha" type="password" placeholder="senha" autocomplete="current-password">
+    <button id="entrar">Entrar</button>
+    <span class="quem" id="quem"></span>
+  </div>
+</header>
+
+<main class="corpo">
+
+  <section class="painel lista">
+    <div class="busca">
+      <input id="q" placeholder="Buscar O.S. — descrição, placa, cliente…">
+      <button id="buscar">Buscar</button>
+    </div>
+    <p class="dica" id="dicaLista">Entre com sua conta para listar as ordens de serviço de produção.</p>
+    <ul id="oss" class="oss"></ul>
+  </section>
+
+  <section class="painel detalhe" id="detalhe">
+    <div class="vazio" id="vazio">
+      <p>Escolha uma ordem de serviço à esquerda.</p>
+      <p class="mini">O jogo de fotos é derivado da descrição da O.S. — as mesmas regras
+        que o app usaria.</p>
+    </div>
+
+    <div id="conteudo" hidden>
+      <div class="cab">
+        <h2 id="osDesc"></h2>
+        <div class="meta" id="osMeta"></div>
+        <div class="chips" id="osChips"></div>
+      </div>
+      <div class="grade" id="grade"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Palco: guia em tela cheia, sobre a câmera ou sobre uma foto de check-in -->
+<div class="palco" id="palco" hidden>
+  <div class="palcoTopo">
+    <button id="fechar" class="ghost">✕ Fechar</button>
+    <span id="palcoTitulo"></span>
+    <div class="modos">
+      <button data-modo="guia" class="modo ativo">Só o guia</button>
+      <button data-modo="camera" class="modo">Câmera</button>
+      <button data-modo="foto" class="modo">Sobre a foto</button>
+    </div>
+  </div>
+
+  <div class="quadroWrap">
+    <div class="quadro" id="quadro">
+      <video id="video" playsinline muted autoplay hidden></video>
+      <img id="fundo" alt="" hidden>
+      <img id="guia" alt="guia">
+    </div>
+  </div>
+
+  <div class="palcoBase">
+    <label>Intensidade do guia
+      <input type="range" id="opac" min="0" max="100" value="70">
+    </label>
+    <div id="tirasFoto" class="tiras"></div>
+    <div class="camMeta" id="camMeta"></div>
+  </div>
+</div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2160 @@
+{
+ "meshes": 2170,
+ "materiais": [
+  {
+   "material": "inox-ferragem",
+   "malhas": 1155,
+   "tris": 1561084,
+   "box": {
+    "x": [
+     -1.316,
+     1.308
+    ],
+    "y": [
+     -0.003,
+     4.187
+    ],
+    "z": [
+     -7.523,
+     7.547
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_parafusos_0",
+    "stitch_result_stitch_all_parafusos_0_1",
+    "stitch_result_stitch_all_parafusos_0_2",
+    "stitch_result_stitch_all_parafusos_0_3",
+    "stitch_result_stitch_all_metal-pouco-polido_0",
+    "stitch_result_stitch_all_metal-pouco-polido_0_1",
+    "stitch_result_stitch_all_metal-pouco-polido_0_2",
+    "stitch_result_stitch_all_metal-pouco-polido_0_3"
+   ]
+  },
+  {
+   "material": "metal-preto",
+   "malhas": 585,
+   "tris": 1109218,
+   "box": {
+    "x": [
+     -1.301,
+     1.301
+    ],
+    "y": [
+     -0.022,
+     1.529
+    ],
+    "z": [
+     -7.48,
+     7.434
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_Metal-preto_0",
+    "stitch_result_stitch_all_Metal-preto_0_1",
+    "stitch_result_stitch_all_Metal-preto_0_2",
+    "stitch_result_stitch_all_Metal-preto_0_3",
+    "stitch_result_stitch_all_Metal-preto_0_4",
+    "stitch_result_stitch_all_Metal-preto_0_5",
+    "stitch_result_stitch_all_Metal-preto_0_6",
+    "stitch_result_stitch_all_Metal-preto_0_7"
+   ]
+  },
+  {
+   "material": "pneu-corpo",
+   "malhas": 14,
+   "tris": 748720,
+   "box": {
+    "x": [
+     -1.286,
+     1.279
+    ],
+    "y": [
+     -0.02,
+     1.07
+    ],
+    "z": [
+     -6.978,
+     -1.734
+    ]
+   },
+   "exemplos": [
+    "pneu-estepe-02_pneu-corpo_0",
+    "pneu-estepe-01_pneu-corpo_0",
+    "pneu-12_pneu-corpo_0",
+    "pneu-11_pneu-corpo_0",
+    "pneu-10_pneu-corpo_0",
+    "pneu-09_pneu-corpo_0",
+    "pneu-08_pneu-corpo_0",
+    "pneu-07_pneu-corpo_0"
+   ]
+  },
+  {
+   "material": "plastico-preto",
+   "malhas": 45,
+   "tris": 640203,
+   "box": {
+    "x": [
+     -1.304,
+     1.304
+    ],
+    "y": [
+     -0.019,
+     4.144
+    ],
+    "z": [
+     -7.491,
+     7.456
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_plastico-preto_0",
+    "stitch_result_stitch_all_plastico-preto_0_1",
+    "stitch_result_stitch_all_plastico-preto_0_2",
+    "stitch_result_stitch_all_plastico-preto_0_3",
+    "stitch_result_stitch_all_plastico-preto_0_4",
+    "stitch_result_stitch_all_plastico-preto_0_5",
+    "stitch_result_stitch_all_plastico-preto_0_6",
+    "stitch_result_stitch_all_plastico-preto_0_7"
+   ]
+  },
+  {
+   "material": "aro-rodas",
+   "malhas": 14,
+   "tris": 452648,
+   "box": {
+    "x": [
+     -1.244,
+     1.235
+    ],
+    "y": [
+     0.226,
+     0.937
+    ],
+    "z": [
+     -6.737,
+     -1.976
+    ]
+   },
+   "exemplos": [
+    "aro-pneu-001_aro-rodas_0",
+    "aro-pneu-003_aro-rodas_0",
+    "aro-pneu-005_aro-rodas_0",
+    "aro-pneu-002_aro-rodas_0",
+    "aro-pneu-004_aro-rodas_0",
+    "aro-pneu-006_aro-rodas_0",
+    "aro-pneu-007_aro-rodas_0",
+    "aro-pneu-09_aro-rodas_0"
+   ]
+  },
+  {
+   "material": "paralamas",
+   "malhas": 11,
+   "tris": 450180,
+   "box": {
+    "x": [
+     -1.303,
+     1.303
+    ],
+    "y": [
+     0.803,
+     1.508
+    ],
+    "z": [
+     -5.511,
+     7.459
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_paralamas_0",
+    "paralama-05_paralamas_0",
+    "paralama-05_paralamas_0_1",
+    "paralama-06_paralamas_0",
+    "paralama-06_paralamas_0_1",
+    "paralama-01_paralamas_0",
+    "paralama-02_paralamas_0",
+    "paralama-02_paralamas_0_1"
+   ]
+  },
+  {
+   "material": "platico-branco",
+   "malhas": 7,
+   "tris": 90516,
+   "box": {
+    "x": [
+     -1.234,
+     1.234
+    ],
+    "y": [
+     3.742,
+     4.067
+    ],
+    "z": [
+     -6.264,
+     7.106
+    ]
+   },
+   "exemplos": [
+    "lanternas-internas-03_platico-branco_0",
+    "lanternas-internas-02_platico-branco_0",
+    "lanternas-internas-01_platico-branco_0",
+    "lanternas-internas-06_platico-branco_0",
+    "lanternas-internas-05_platico-branco_0",
+    "lanternas-internas-04_platico-branco_0",
+    "Pa-entrada-ar-interno-frente_platico-branco_0"
+   ]
+  },
+  {
+   "material": "pneu-lateral",
+   "malhas": 14,
+   "tris": 54880,
+   "box": {
+    "x": [
+     -1.287,
+     1.28
+    ],
+    "y": [
+     0.051,
+     1.001
+    ],
+    "z": [
+     -6.908,
+     -1.8
+    ]
+   },
+   "exemplos": [
+    "pneu-estepe-02_pneu-lateral_0",
+    "pneu-estepe-01_pneu-lateral_0",
+    "pneu-12_pneu-lateral_0",
+    "pneu-11_pneu-lateral_0",
+    "pneu-10_pneu-lateral_0",
+    "pneu-09_pneu-lateral_0",
+    "pneu-08_pneu-lateral_0",
+    "pneu-07_pneu-lateral_0"
+   ]
+  },
+  {
+   "material": "Cor_padrao_branco(metalBranco)__parametric",
+   "malhas": 2,
+   "tris": 46016,
+   "box": {
+    "x": [
+     -1.304,
+     1.304
+    ],
+    "y": [
+     1.392,
+     4.169
+    ],
+    "z": [
+     -7.481,
+     7.233
+    ]
+   },
+   "exemplos": [
+    "TRAILER_BODY",
+    "TRAILER_ROOF"
+   ]
+  },
+  {
+   "material": "Cor_padrao_branco(metalBranco)",
+   "malhas": 63,
+   "tris": 45548,
+   "box": {
+    "x": [
+     -1.304,
+     1.304
+    ],
+    "y": [
+     1.392,
+     4.169
+    ],
+    "z": [
+     -7.481,
+     7.233
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_1",
+    "Lataria_externa_direita_Cor_padrao_branco(metalBranco)_0",
+    "Lataria_externa_esquerda_Cor_padrao_branco(metalBranco)_0",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_4",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_6",
+    "teto-interno_Cor_padrao_branco(metalBranco)_0",
+    "teto-externo_Cor_padrao_branco(metalBranco)_0"
+   ]
+  },
+  {
+   "material": "borracha-preta",
+   "malhas": 26,
+   "tris": 33948,
+   "box": {
+    "x": [
+     -1.335,
+     1.335
+    ],
+    "y": [
+     0.651,
+     4.087
+    ],
+    "z": [
+     -7.547,
+     7.263
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_borracha-preta_0",
+    "stitch_result_stitch_all_borracha-preta_0_1",
+    "Borrachas_protefe_porta_laterais_portas-01_borracha-preta_0",
+    "Borrachas_protefe_porta_laterais_portas-02_borracha-preta_0",
+    "stitch_result_stitch_all_borracha-preta_0_2",
+    "stitch_result_stitch_all_borracha-preta_0_3",
+    "stitch_result_stitch_all_borracha-preta_0_4",
+    "stitch_result_stitch_all_borracha-preta_0_5"
+   ]
+  },
+  {
+   "material": "caixa-estrutura-preta",
+   "malhas": 10,
+   "tris": 30575,
+   "box": {
+    "x": [
+     -1.284,
+     -0.662
+    ],
+    "y": [
+     0.489,
+     1.13
+    ],
+    "z": [
+     1.897,
+     3.039
+    ]
+   },
+   "exemplos": [
+    "Caixa-ferrmantas-modelo1_p01_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p02_plastico-cinza-polido_0",
+    "Caixa-ferrmantas-modelo1_p06_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p09_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p12_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p14_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p24_plastico-cinza-polido_0",
+    "Caixa-ferrmantas-modelo1_p31_metal-claro_0"
+   ]
+  },
+  {
+   "material": "plastico-preto-polido",
+   "malhas": 2,
+   "tris": 29228,
+   "box": {
+    "x": [
+     -1.206,
+     1.211
+    ],
+    "y": [
+     1.089,
+     1.254
+    ],
+    "z": [
+     -7.328,
+     -7.266
+    ]
+   },
+   "exemplos": [
+    "lanterna-traseira-2024_002_plastico-preto-polido_0",
+    "lanterna-traseira-2024_001_plastico-preto-polido_0"
+   ]
+  },
+  {
+   "material": "vidro-lanternas-pisca",
+   "malhas": 22,
+   "tris": 28996,
+   "box": {
+    "x": [
+     -1.299,
+     1.299
+    ],
+    "y": [
+     -0.012,
+     4.144
+    ],
+    "z": [
+     -7.501,
+     7.257
+    ]
+   },
+   "exemplos": [
+    "lanterna-pequena-cantos-redondo(vidro)-001_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-002_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-003_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-004_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-005_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-006_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-008_vidro-lanternas-pisca_0",
+    "lanterna-pequena-cantos-redondo(vidro)-009_vidro-lanternas-pisca_0"
+   ]
+  },
+  {
+   "material": "lente-sinaleita-traseira",
+   "malhas": 2,
+   "tris": 18946,
+   "box": {
+    "x": [
+     -1.205,
+     1.21
+    ],
+    "y": [
+     1.099,
+     1.236
+    ],
+    "z": [
+     -7.328,
+     -7.288
+    ]
+   },
+   "exemplos": [
+    "lanterna-traseira-2024_002_lente-sinaleita-traseira_0",
+    "lanterna-traseira-2024_001_lente-sinaleita-traseira_0"
+   ]
+  },
+  {
+   "material": "metal-estrutura-principal-padrao",
+   "malhas": 37,
+   "tris": 12156,
+   "box": {
+    "x": [
+     -1.308,
+     1.308
+    ],
+    "y": [
+     1.312,
+     4.162
+    ],
+    "z": [
+     -7.477,
+     7.238
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_1",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_2",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_3",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_4",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_5",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_6",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_7",
+    "stitch_result_stitch_all_metal-estrutura-principal-padrao_0_8"
+   ]
+  },
+  {
+   "material": "metal-galvanizado-mantido",
+   "malhas": 10,
+   "tris": 11504,
+   "box": {
+    "x": [
+     -1.307,
+     1.307
+    ],
+    "y": [
+     0.51,
+     4.171
+    ],
+    "z": [
+     -7.407,
+     7.237
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_2",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_3",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_5",
+    "stitch_result_stitch_all_Cor_padrao_branco(metalBranco)_0_7",
+    "stitch_result_stitch_all_platico-branco_0",
+    "stitch_result_stitch_all_platico-branco_0_1",
+    "stitch_result_stitch_all_platico-branco_0_2",
+    "stitch_result_stitch_all_platico-branco_0_3"
+   ]
+  },
+  {
+   "material": "lona-fria-figorifico-paleteiro",
+   "malhas": 1,
+   "tris": 9716,
+   "box": {
+    "x": [
+     -0.976,
+     0.985
+    ],
+    "y": [
+     3.915,
+     4.066
+    ],
+    "z": [
+     -6.507,
+     6.493
+    ]
+   },
+   "exemplos": [
+    "lona-fria-interna_lona-fria-figorifico-paleteiro_0"
+   ]
+  },
+  {
+   "material": "painel-curva-led-vermelho",
+   "malhas": 4,
+   "tris": 8396,
+   "box": {
+    "x": [
+     -1.198,
+     1.203
+    ],
+    "y": [
+     1.102,
+     1.235
+    ],
+    "z": [
+     -7.322,
+     -7.283
+    ]
+   },
+   "exemplos": [
+    "lanterna-triangulo-sinaleira-traseira-002_painel-curva-led-vermelho_0",
+    "painel-curva-led-vermelho-002_painel-curva-led-vermelho_0",
+    "lanterna-triangulo-sinaleira-traseira-001_painel-curva-led-vermelho_0",
+    "painel-curva-led-vermelho-001_painel-curva-led-vermelho_0"
+   ]
+  },
+  {
+   "material": "metal-pouco-polido",
+   "malhas": 4,
+   "tris": 6090,
+   "box": {
+    "x": [
+     -1.32,
+     1.32
+    ],
+    "y": [
+     1.525,
+     1.674
+    ],
+    "z": [
+     -7.486,
+     -6.388
+    ]
+   },
+   "exemplos": [
+    "mesh_826",
+    "mesh_827",
+    "mesh_1841",
+    "mesh_1895"
+   ]
+  },
+  {
+   "material": "lanterna-pequena-cantos-redondo(VERMELHO)",
+   "malhas": 8,
+   "tris": 5472,
+   "box": {
+    "x": [
+     -1.201,
+     1.201
+    ],
+    "y": [
+     1.34,
+     4.143
+    ],
+    "z": [
+     -7.491,
+     7.246
+    ]
+   },
+   "exemplos": [
+    "lanterna-pequena-cantos-redondo(leds)-001_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-002_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-003_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-004_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-005_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-006_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-008_lanterna-pequena-cantos-redondo(VERMELHO)_0",
+    "lanterna-pequena-cantos-redondo(leds)-009_lanterna-pequena-cantos-redondo(VERMELHO)_0"
+   ]
+  },
+  {
+   "material": "suporte-varao-preto",
+   "malhas": 8,
+   "tris": 3200,
+   "box": {
+    "x": [
+     -0.629,
+     0.629
+    ],
+    "y": [
+     2.458,
+     3.186
+    ],
+    "z": [
+     -7.517,
+     -7.476
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_metal-pouco-polido_0_30",
+    "stitch_result_stitch_all_metal-pouco-polido_0_34",
+    "stitch_result_stitch_all_metal-pouco-polido_0_38",
+    "stitch_result_stitch_all_metal-pouco-polido_0_42",
+    "stitch_result_stitch_all_metal-pouco-polido_0_63",
+    "stitch_result_stitch_all_metal-pouco-polido_0_67",
+    "stitch_result_stitch_all_metal-pouco-polido_0_71",
+    "stitch_result_stitch_all_metal-pouco-polido_0_75"
+   ]
+  },
+  {
+   "material": "registro-tubo-marrom",
+   "malhas": 2,
+   "tris": 2843,
+   "box": {
+    "x": [
+     -0.675,
+     0.665
+    ],
+    "y": [
+     1.147,
+     1.266
+    ],
+    "z": [
+     -7.422,
+     -7.339
+    ]
+   },
+   "exemplos": [
+    "mesh_847",
+    "mesh_848"
+   ]
+  },
+  {
+   "material": "engate-femea-preto",
+   "malhas": 2,
+   "tris": 2218,
+   "box": {
+    "x": [
+     -1.32,
+     1.32
+    ],
+    "y": [
+     1.552,
+     1.631
+    ],
+    "z": [
+     -6.436,
+     -6.379
+    ]
+   },
+   "exemplos": [
+    "mesh_826_1",
+    "mesh_827_1"
+   ]
+  },
+  {
+   "material": "engate-macho-preto",
+   "malhas": 2,
+   "tris": 1624,
+   "box": {
+    "x": [
+     -0.232,
+     0.262
+    ],
+    "y": [
+     1.609,
+     1.674
+    ],
+    "z": [
+     -7.488,
+     -7.475
+    ]
+   },
+   "exemplos": [
+    "mesh_1841_1",
+    "mesh_1895_1"
+   ]
+  },
+  {
+   "material": "plastico-cinza-polido",
+   "malhas": 1,
+   "tris": 1332,
+   "box": {
+    "x": [
+     -1.284,
+     -1.257
+    ],
+    "y": [
+     0.493,
+     1.074
+    ],
+    "z": [
+     1.953,
+     2.983
+    ]
+   },
+   "exemplos": [
+    "Caixa-ferrmantas-modelo1_p21_plastico-cinza-polido_0"
+   ]
+  },
+  {
+   "material": "metal-claro",
+   "malhas": 2,
+   "tris": 1300,
+   "box": {
+    "x": [
+     -1.284,
+     -1.214
+    ],
+    "y": [
+     0.493,
+     1.072
+    ],
+    "z": [
+     1.897,
+     3.039
+    ]
+   },
+   "exemplos": [
+    "Caixa-ferrmantas-modelo1_p30_metal-claro_0",
+    "Caixa-ferrmantas-modelo1_p53_metal-claro_0"
+   ]
+  },
+  {
+   "material": "registro-corpo-laranja",
+   "malhas": 2,
+   "tris": 1213,
+   "box": {
+    "x": [
+     -0.693,
+     0.651
+    ],
+    "y": [
+     1.166,
+     1.267
+    ],
+    "z": [
+     -7.444,
+     -7.37
+    ]
+   },
+   "exemplos": [
+    "mesh_847_1",
+    "mesh_848_1"
+   ]
+  },
+  {
+   "material": "borracha",
+   "malhas": 2,
+   "tris": 984,
+   "box": {
+    "x": [
+     -1.299,
+     1.295
+    ],
+    "y": [
+     0.274,
+     0.856
+    ],
+    "z": [
+     -5.488,
+     -5.479
+    ]
+   },
+   "exemplos": [
+    "PARABARRO-E_aparabarro_borracha_0",
+    "PARABARRO-D_aparabarro_borracha_0"
+   ]
+  },
+  {
+   "material": "Faixa-3M",
+   "malhas": 78,
+   "tris": 936,
+   "box": {
+    "x": [
+     -1.309,
+     1.309
+    ],
+    "y": [
+     -0.025,
+     4.152
+    ],
+    "z": [
+     -7.478,
+     7.234
+    ]
+   },
+   "exemplos": [
+    "fitas3M_lataria68_Faixa-3M_0",
+    "fitas3M_lataria71_Faixa-3M_0",
+    "fitas3M_lataria73_Faixa-3M_0",
+    "fitas3M_lataria69_Faixa-3M_0",
+    "fitas3M_lataria70_Faixa-3M_0",
+    "fitas3M_lataria76_Faixa-3M_0",
+    "fitas3M_lataria56_Faixa-3M_0",
+    "fitas3M_lataria57_Faixa-3M_0"
+   ]
+  },
+  {
+   "material": "metal-galvanizado-polido",
+   "malhas": 2,
+   "tris": 852,
+   "box": {
+    "x": [
+     -1.24,
+     1.24
+    ],
+    "y": [
+     1.537,
+     1.727
+    ],
+    "z": [
+     -7.425,
+     7.125
+    ]
+   },
+   "exemplos": [
+    "stitch_result_stitch_all_metal-galvanizado-polido_0_15",
+    "lateral-proteco-piso-02_metal-galvanizado-polido_0"
+   ]
+  },
+  {
+   "material": "plastico-cinza-lona-fria-figorifico-paleteiro-SR",
+   "malhas": 6,
+   "tris": 768,
+   "box": {
+    "x": [
+     -0.786,
+     0.794
+    ],
+    "y": [
+     4.057,
+     4.065
+    ],
+    "z": [
+     -6.507,
+     6.823
+    ]
+   },
+   "exemplos": [
+    "fixa-lonaFriaInterna-teto-06_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0",
+    "fixa-lonaFriaInterna-teto-03_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0",
+    "fixa-lonaFriaInterna-teto-02_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0",
+    "fixa-lonaFriaInterna-teto-01_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0",
+    "fixa-lonaFriaInterna-teto-04_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0",
+    "fixa-lonaFriaInterna-teto-05_plastico-cinza-lona-fria-figorifico-paleteiro-SR_0"
+   ]
+  },
+  {
+   "material": "led-branco-e-red-sinaleira",
+   "malhas": 2,
+   "tris": 320,
+   "box": {
+    "x": [
+     -1.156,
+     1.161
+    ],
+    "y": [
+     1.103,
+     1.205
+    ],
+    "z": [
+     -7.317,
+     -7.313
+    ]
+   },
+   "exemplos": [
+    "led-branco-e-red-sinaleira-002_led-branco-e-red-sinaleira_0",
+    "led-branco-e-red-sinaleira-001_led-branco-e-red-sinaleira_0"
+   ]
+  },
+  {
+   "material": "lanterna-interna-lente",
+   "malhas": 6,
+   "tris": 300,
+   "box": {
+    "x": [
+     -1.222,
+     1.222
+    ],
+    "y": [
+     4.025,
+     4.046
+    ],
+    "z": [
+     -6.25,
+     6.016
+    ]
+   },
+   "exemplos": [
+    "lanternas-internas-03_lanterna-interna-lente_0",
+    "lanternas-internas-02_lanterna-interna-lente_0",
+    "lanternas-internas-01_lanterna-interna-lente_0",
+    "lanternas-internas-06_lanterna-interna-lente_0",
+    "lanternas-internas-05_lanterna-interna-lente_0",
+    "lanternas-internas-04_lanterna-interna-lente_0"
+   ]
+  },
+  {
+   "material": "lanterna-pisca-quadrado(LEDs)",
+   "malhas": 12,
+   "tris": 192,
+   "box": {
+    "x": [
+     -1.295,
+     1.295
+    ],
+    "y": [
+     -0.013,
+     1.296
+    ],
+    "z": [
+     -7.271,
+     4.238
+    ]
+   },
+   "exemplos": [
+    "lanterna-lateral-chassis(leds)-002_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-001_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-003_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-004_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-005_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-006_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-007_lanterna-pisca-quadrado(LEDs)_0",
+    "lanterna-lateral-chassis(leds)-008_lanterna-pisca-quadrado(LEDs)_0"
+   ]
+  },
+  {
+   "material": "cano-ar-preto",
+   "malhas": 2,
+   "tris": 184,
+   "box": {
+    "x": [
+     -0.655,
+     0.655
+    ],
+    "y": [
+     1.228,
+     1.537
+    ],
+    "z": [
+     -7.399,
+     -7.35
+    ]
+   },
+   "exemplos": [
+    "cano-Mangueida+registro-Traseira-E_metal-pouco-polido_0",
+    "cano-Mangueida+registro-Traseira-D_metal-pouco-polido_0"
+   ]
+  },
+  {
+   "material": "lanterna-pisca-circular",
+   "malhas": 2,
+   "tris": 80,
+   "box": {
+    "x": [
+     -1.209,
+     1.209
+    ],
+    "y": [
+     1.32,
+     1.413
+    ],
+    "z": [
+     7.251,
+     7.251
+    ]
+   },
+   "exemplos": [
+    "lanterna-pisca-circular-E_lanterna-pisca-circular_0",
+    "lanterna-pisca-circular-D_lanterna-pisca-circular_0"
+   ]
+  },
+  {
+   "material": "Material",
+   "malhas": 2,
+   "tris": 12,
+   "box": {
+    "x": [
+     -1.079,
+     1.084
+    ],
+    "y": [
+     1.1,
+     1.152
+    ],
+    "z": [
+     -7.315,
+     -7.304
+    ]
+   },
+   "exemplos": [
+    "lanterna-traseira-2024_002_Material_#2_0",
+    "lanterna-traseira-2024_001_Material_#2_0"
+   ]
+  },
+  {
+   "material": "faixa3M-parachoque-traseiro",
+   "malhas": 1,
+   "tris": 12,
+   "box": {
+    "x": [
+     -1.201,
+     1.199
+    ],
+    "y": [
+     0.472,
+     0.572
+    ],
+    "z": [
+     -7.476,
+     -7.475
+    ]
+   },
+   "exemplos": [
+    "suporte-FITA-3M_parachoque_faixa3M-parachoque-traseiro_0"
+   ]
+  }
+ ],
+ "grandes": [
+  {
+   "name": "paralama-02_paralamas_0",
+   "mat": "paralamas",
+   "tris": 99106,
+   "box": {
+    "x": [
+     -1.301,
+     -0.618
+    ],
+    "y": [
+     0.804,
+     1.322
+    ],
+    "z": [
+     -2.121,
+     -1.533
+    ]
+   }
+  },
+  {
+   "name": "paralama-04_paralamas_0",
+   "mat": "paralamas",
+   "tris": 99106,
+   "box": {
+    "x": [
+     0.62,
+     1.303
+    ],
+    "y": [
+     0.804,
+     1.322
+    ],
+    "z": [
+     -5.511,
+     -4.923
+    ]
+   }
+  },
+  {
+   "name": "paralama-05_paralamas_0",
+   "mat": "paralamas",
+   "tris": 99000,
+   "box": {
+    "x": [
+     -1.303,
+     -0.62
+    ],
+    "y": [
+     0.804,
+     1.322
+    ],
+    "z": [
+     -5.511,
+     -4.923
+    ]
+   }
+  },
+  {
+   "name": "paralama-06_paralamas_0",
+   "mat": "paralamas",
+   "tris": 99000,
+   "box": {
+    "x": [
+     0.62,
+     1.303
+    ],
+    "y": [
+     0.803,
+     1.324
+    ],
+    "z": [
+     -2.131,
+     -1.547
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_plastico-preto_0_7",
+   "mat": "plastico-preto",
+   "tris": 83484,
+   "box": {
+    "x": [
+     -1.167,
+     -0.705
+    ],
+    "y": [
+     0.913,
+     1.098
+    ],
+    "z": [
+     -7.273,
+     -7.213
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_plastico-preto_0_9",
+   "mat": "plastico-preto",
+   "tris": 83484,
+   "box": {
+    "x": [
+     0.705,
+     1.167
+    ],
+    "y": [
+     0.913,
+     1.098
+    ],
+    "z": [
+     -7.273,
+     -7.213
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_525",
+   "mat": "metal-preto",
+   "tris": 74630,
+   "box": {
+    "x": [
+     0.807,
+     1.032
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -3.71,
+     -3.341
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_503",
+   "mat": "metal-preto",
+   "tris": 74591,
+   "box": {
+    "x": [
+     0.807,
+     1.032
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -4.96,
+     -4.591
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_514",
+   "mat": "metal-preto",
+   "tris": 74574,
+   "box": {
+    "x": [
+     -1.033,
+     -0.808
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -3.71,
+     -3.341
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_492",
+   "mat": "metal-preto",
+   "tris": 74517,
+   "box": {
+    "x": [
+     -1.033,
+     -0.808
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -4.96,
+     -4.591
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_542",
+   "mat": "metal-preto",
+   "tris": 74482,
+   "box": {
+    "x": [
+     0.807,
+     1.032
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -2.46,
+     -2.091
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_536",
+   "mat": "metal-preto",
+   "tris": 74472,
+   "box": {
+    "x": [
+     -1.033,
+     -0.808
+    ],
+    "y": [
+     0.335,
+     0.709
+    ],
+    "z": [
+     -2.46,
+     -2.091
+    ]
+   }
+  },
+  {
+   "name": "pneu-estepe-02_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.147,
+     1.22
+    ],
+    "y": [
+     0.585,
+     0.931
+    ],
+    "z": [
+     -6.969,
+     -5.897
+    ]
+   }
+  },
+  {
+   "name": "pneu-estepe-01_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -1.229,
+     -0.157
+    ],
+    "y": [
+     0.587,
+     0.933
+    ],
+    "z": [
+     -6.978,
+     -5.905
+    ]
+   }
+  },
+  {
+   "name": "pneu-12_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.935,
+     1.279
+    ],
+    "y": [
+     -0.007,
+     1.07
+    ],
+    "z": [
+     -2.813,
+     -1.735
+    ]
+   }
+  },
+  {
+   "name": "pneu-11_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.595,
+     0.937
+    ],
+    "y": [
+     -0.01,
+     1.063
+    ],
+    "z": [
+     -2.81,
+     -1.738
+    ]
+   }
+  },
+  {
+   "name": "pneu-10_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.93,
+     1.274
+    ],
+    "y": [
+     -0.02,
+     1.057
+    ],
+    "z": [
+     -4.064,
+     -2.987
+    ]
+   }
+  },
+  {
+   "name": "pneu-09_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.587,
+     0.929
+    ],
+    "y": [
+     -0.012,
+     1.06
+    ],
+    "z": [
+     -4.062,
+     -2.989
+    ]
+   }
+  },
+  {
+   "name": "pneu-08_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.927,
+     1.271
+    ],
+    "y": [
+     -0.008,
+     1.07
+    ],
+    "z": [
+     -5.313,
+     -4.236
+    ]
+   }
+  },
+  {
+   "name": "pneu-07_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     0.588,
+     0.93
+    ],
+    "y": [
+     -0.009,
+     1.063
+    ],
+    "z": [
+     -5.314,
+     -4.242
+    ]
+   }
+  },
+  {
+   "name": "pneu-06_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -0.933,
+     -0.59
+    ],
+    "y": [
+     -0.009,
+     1.063
+    ],
+    "z": [
+     -2.806,
+     -1.734
+    ]
+   }
+  },
+  {
+   "name": "pneu-05_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -1.277,
+     -0.933
+    ],
+    "y": [
+     -0.007,
+     1.07
+    ],
+    "z": [
+     -2.813,
+     -1.735
+    ]
+   }
+  },
+  {
+   "name": "pneu-04_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -0.937,
+     -0.595
+    ],
+    "y": [
+     -0.012,
+     1.06
+    ],
+    "z": [
+     -4.058,
+     -2.986
+    ]
+   }
+  },
+  {
+   "name": "pneu-03_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -1.286,
+     -0.941
+    ],
+    "y": [
+     -0.02,
+     1.058
+    ],
+    "z": [
+     -4.06,
+     -2.983
+    ]
+   }
+  },
+  {
+   "name": "pneu-02_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -0.941,
+     -0.598
+    ],
+    "y": [
+     -0.009,
+     1.063
+    ],
+    "z": [
+     -5.314,
+     -4.242
+    ]
+   }
+  },
+  {
+   "name": "pneu-01_pneu-corpo_0",
+   "mat": "pneu-corpo",
+   "tris": 53480,
+   "box": {
+    "x": [
+     -1.282,
+     -0.938
+    ],
+    "y": [
+     -0.018,
+     1.06
+    ],
+    "z": [
+     -5.317,
+     -4.239
+    ]
+   }
+  },
+  {
+   "name": "TRAILER_BODY",
+   "mat": "Cor_padrao_branco(metalBranco)__parametric",
+   "tris": 45996,
+   "box": {
+    "x": [
+     -1.304,
+     1.304
+    ],
+    "y": [
+     1.392,
+     4.132
+    ],
+    "z": [
+     -7.481,
+     7.233
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_plastico-preto_0_22",
+   "mat": "plastico-preto",
+   "tris": 36594,
+   "box": {
+    "x": [
+     0.783,
+     1.259
+    ],
+    "y": [
+     0.498,
+     1.014
+    ],
+    "z": [
+     2.016,
+     3.066
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-001_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -1.244,
+     -0.941
+    ],
+    "y": [
+     0.229,
+     0.825
+    ],
+    "z": [
+     -5.076,
+     -4.48
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-003_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -1.244,
+     -0.941
+    ],
+    "y": [
+     0.226,
+     0.822
+    ],
+    "z": [
+     -3.823,
+     -3.228
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-005_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -1.244,
+     -0.941
+    ],
+    "y": [
+     0.233,
+     0.829
+    ],
+    "z": [
+     -2.572,
+     -1.976
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-002_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -0.941,
+     -0.638
+    ],
+    "y": [
+     0.229,
+     0.825
+    ],
+    "z": [
+     -5.076,
+     -4.48
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-004_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -0.941,
+     -0.638
+    ],
+    "y": [
+     0.226,
+     0.822
+    ],
+    "z": [
+     -3.823,
+     -3.228
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-006_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -0.941,
+     -0.638
+    ],
+    "y": [
+     0.233,
+     0.829
+    ],
+    "z": [
+     -2.572,
+     -1.976
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-007_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.629,
+     0.932
+    ],
+    "y": [
+     0.229,
+     0.825
+    ],
+    "z": [
+     -5.076,
+     -4.48
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-09_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.629,
+     0.932
+    ],
+    "y": [
+     0.226,
+     0.822
+    ],
+    "z": [
+     -3.823,
+     -3.228
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-011_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.629,
+     0.932
+    ],
+    "y": [
+     0.233,
+     0.829
+    ],
+    "z": [
+     -2.572,
+     -1.976
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-008_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.932,
+     1.235
+    ],
+    "y": [
+     0.229,
+     0.825
+    ],
+    "z": [
+     -5.076,
+     -4.48
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-010_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.932,
+     1.235
+    ],
+    "y": [
+     0.226,
+     0.822
+    ],
+    "z": [
+     -3.823,
+     -3.228
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-012_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.932,
+     1.235
+    ],
+    "y": [
+     0.233,
+     0.829
+    ],
+    "z": [
+     -2.572,
+     -1.976
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-estepe-02_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     0.388,
+     0.984
+    ],
+    "y": [
+     0.634,
+     0.937
+    ],
+    "z": [
+     -6.737,
+     -6.141
+    ]
+   }
+  },
+  {
+   "name": "aro-pneu-estepe-01_aro-rodas_0",
+   "mat": "aro-rodas",
+   "tris": 32332,
+   "box": {
+    "x": [
+     -0.985,
+     -0.389
+    ],
+    "y": [
+     0.634,
+     0.937
+    ],
+    "z": [
+     -6.737,
+     -6.141
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_333",
+   "mat": "metal-preto",
+   "tris": 27646,
+   "box": {
+    "x": [
+     0.485,
+     0.725
+    ],
+    "y": [
+     0.281,
+     0.915
+    ],
+    "z": [
+     3.071,
+     3.312
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_plastico-preto_0_8",
+   "mat": "plastico-preto",
+   "tris": 27216,
+   "box": {
+    "x": [
+     -1.165,
+     -0.708
+    ],
+    "y": [
+     0.913,
+     1.095
+    ],
+    "z": [
+     -7.273,
+     -7.213
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_plastico-preto_0_10",
+   "mat": "plastico-preto",
+   "tris": 27216,
+   "box": {
+    "x": [
+     0.708,
+     1.165
+    ],
+    "y": [
+     0.913,
+     1.095
+    ],
+    "z": [
+     -7.273,
+     -7.213
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-002_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     1.264,
+     1.299
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     4.102,
+     4.244
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-001_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -1.299,
+     -1.265
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     4.102,
+     4.244
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-003_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -1.299,
+     -1.265
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     1.257,
+     1.399
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-004_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     1.264,
+     1.299
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     1.257,
+     1.399
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-005_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -1.299,
+     -1.265
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -1.588,
+     -1.446
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-006_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     1.264,
+     1.299
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -1.588,
+     -1.446
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-007_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -1.299,
+     -1.265
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -4.433,
+     -4.291
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-008_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     1.264,
+     1.299
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -4.433,
+     -4.291
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-009_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -1.299,
+     -1.265
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -7.278,
+     -7.136
+    ]
+   }
+  },
+  {
+   "name": "lanterna-lateral-chassis(corpo)-010_plastico-preto_0",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     1.264,
+     1.299
+    ],
+    "y": [
+     1.264,
+     1.302
+    ],
+    "z": [
+     -7.278,
+     -7.136
+    ]
+   }
+  },
+  {
+   "name": "REPEAT_skirt_5",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -0.017,
+     0.017
+    ],
+    "y": [
+     -0.019,
+     0.019
+    ],
+    "z": [
+     -0.071,
+     0.071
+    ]
+   }
+  },
+  {
+   "name": "REPEAT_skirt_5",
+   "mat": "plastico-preto",
+   "tris": 25465,
+   "box": {
+    "x": [
+     -0.017,
+     0.017
+    ],
+    "y": [
+     -0.019,
+     0.019
+    ],
+    "z": [
+     -0.071,
+     0.071
+    ]
+   }
+  },
+  {
+   "name": "Pa-entrada-ar-interno-frente_platico-branco_0",
+   "mat": "platico-branco",
+   "tris": 24744,
+   "box": {
+    "x": [
+     -0.775,
+     0.775
+    ],
+    "y": [
+     3.742,
+     4.067
+    ],
+    "z": [
+     6.426,
+     7.106
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_Metal-preto_0_328",
+   "mat": "metal-preto",
+   "tris": 19613,
+   "box": {
+    "x": [
+     -1.17,
+     -0.492
+    ],
+    "y": [
+     0.303,
+     1.11
+    ],
+    "z": [
+     3.071,
+     3.364
+    ]
+   }
+  },
+  {
+   "name": "stitch_result_stitch_all_metal-galvanizado-polido_0_29",
+   "mat": "inox-ferragem",
+   "tris": 18304,
+   "box": {
+    "x": [
+     -0.323,
+     -0.076
+    ],
+    "y": [
+     1.723,
+     1.847
+    ],
+    "z": [
+     -7.519,
+     -7.476
+    ]
+   }
+  }
+ ]
+}

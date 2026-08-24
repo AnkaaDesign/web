@@ -1,0 +1,591 @@
+{
+ "gerado": "2026-08-24T13:04:00.173Z",
+ "modelo": "models/vehicles/trailer.glb",
+ "dims": {
+  "width": 2.6074599027633667,
+  "height": 2.7949534587860057,
+  "length": 14.695382595062256
+ },
+ "regras": [
+  {
+   "grupos": [],
+   "re": "cabine|gabine",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "carenagem"
+   ],
+   "re": "carenag",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "carenagem"
+   ],
+   "re": "aparelho",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "rodas"
+   ],
+   "re": "\\brodas?\\b|paralama",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "chassi"
+   ],
+   "re": "chassi|chassis|caixa de ferramenta",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "lateral",
+    "traseira"
+   ],
+   "re": "faixas? refletiv",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "lateral",
+    "traseira",
+    "frontal"
+   ],
+   "re": "geral|padrao|padr o|completa|completo",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "lateral",
+    "traseira"
+   ],
+   "re": "lateral|laterais",
+   "mais": "traseir"
+  },
+  {
+   "grupos": [
+    "lateral",
+    "frontal"
+   ],
+   "re": "lateral|laterais",
+   "mais": "frontal|frente|testeira"
+  },
+  {
+   "grupos": [
+    "lateral"
+   ],
+   "re": "lateral|laterais",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "traseira",
+    "frontal"
+   ],
+   "re": "traseir",
+   "mais": "frontal|frente"
+  },
+  {
+   "grupos": [
+    "traseira"
+   ],
+   "re": "traseir|porta traseira|portas traseiras",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "frontal"
+   ],
+   "re": "frontal|frente|testeira",
+   "mais": null
+  },
+  {
+   "grupos": [
+    "lateral"
+   ],
+   "re": "aerografia",
+   "mais": null
+  }
+ ],
+ "poses": [
+  {
+   "name": "lateral-esquerda-dianteira",
+   "grupo": "lateral",
+   "lado": "esquerda",
+   "ordem": 0,
+   "rotulo": "Lateral esquerda — puxada para a frente",
+   "espelhoDe": null,
+   "w": 1600,
+   "h": 900,
+   "azDeg": 60,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 12.069372179529958,
+    "aim": [
+     -0.7758039276177501,
+     2.3461843303293484,
+     1.3152340082572382
+    ],
+    "pos": [
+     9.676578987584353,
+     1.55,
+     7.349920098022219
+    ],
+    "fov": 41.554596568495995,
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 2234366
+    }
+   },
+   "guia": "guia/lateral-esquerda-dianteira.png",
+   "render": "render/lateral-esquerda-dianteira.png"
+  },
+  {
+   "name": "lateral-esquerda-centro",
+   "grupo": "lateral",
+   "lado": "esquerda",
+   "ordem": 1,
+   "rotulo": "Lateral esquerda — no meio",
+   "espelhoDe": null,
+   "w": 1600,
+   "h": 900,
+   "azDeg": 90,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 13.715143708948109,
+    "aim": [
+     -0.03628535254455771,
+     1.5278414553714506,
+     -0.11239096028381476
+    ],
+    "pos": [
+     13.67885835640355,
+     1.55,
+     -0.11239096028381391
+    ],
+    "fov": 41.554596568495995,
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 1888519
+    }
+   },
+   "guia": "guia/lateral-esquerda-centro.png",
+   "render": "render/lateral-esquerda-centro.png"
+  },
+  {
+   "name": "lateral-esquerda-traseira",
+   "grupo": "lateral",
+   "lado": "esquerda",
+   "ordem": 2,
+   "rotulo": "Lateral esquerda — puxada para trás",
+   "espelhoDe": null,
+   "w": 1600,
+   "h": 900,
+   "azDeg": 120,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 12.069372179529958,
+    "aim": [
+     -0.8005640213233783,
+     2.0781709192255895,
+     -1.38442982308293
+    ],
+    "pos": [
+     9.651818893878724,
+     1.55,
+     -7.419115912847906
+    ],
+    "fov": 41.554596568495995,
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 2458011
+    }
+   },
+   "guia": "guia/lateral-esquerda-traseira.png",
+   "render": "render/lateral-esquerda-traseira.png"
+  },
+  {
+   "name": "lateral-direita-dianteira",
+   "grupo": "lateral",
+   "lado": "direita",
+   "ordem": 0,
+   "rotulo": "Lateral direita — puxada para a frente",
+   "espelhoDe": "lateral-esquerda-dianteira",
+   "w": 1600,
+   "h": 900,
+   "azDeg": -60,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 12.069372179529958,
+    "fov": 41.554596568495995,
+    "aim": [
+     0.7758039276177501,
+     2.3461843303293484,
+     1.3152340082572382
+    ],
+    "pos": [
+     -9.676578987584353,
+     1.55,
+     7.349920098022219
+    ],
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 2229262
+    }
+   },
+   "guia": "guia/lateral-direita-dianteira.png",
+   "render": "render/lateral-direita-dianteira.png"
+  },
+  {
+   "name": "lateral-direita-centro",
+   "grupo": "lateral",
+   "lado": "direita",
+   "ordem": 1,
+   "rotulo": "Lateral direita — no meio",
+   "espelhoDe": "lateral-esquerda-centro",
+   "w": 1600,
+   "h": 900,
+   "azDeg": -90,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 13.715143708948109,
+    "fov": 41.554596568495995,
+    "aim": [
+     0.03628535254455771,
+     1.5278414553714506,
+     -0.11239096028381476
+    ],
+    "pos": [
+     -13.67885835640355,
+     1.55,
+     -0.11239096028381391
+    ],
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 1890144
+    }
+   },
+   "guia": "guia/lateral-direita-centro.png",
+   "render": "render/lateral-direita-centro.png"
+  },
+  {
+   "name": "lateral-direita-traseira",
+   "grupo": "lateral",
+   "lado": "direita",
+   "ordem": 2,
+   "rotulo": "Lateral direita — puxada para trás",
+   "espelhoDe": "lateral-esquerda-traseira",
+   "w": 1600,
+   "h": 900,
+   "azDeg": -120,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 12.069372179529958,
+    "fov": 41.554596568495995,
+    "aim": [
+     0.8005640213233783,
+     2.0781709192255895,
+     -1.38442982308293
+    ],
+    "pos": [
+     -9.651818893878724,
+     1.55,
+     -7.419115912847906
+    ],
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 2460627
+    }
+   },
+   "guia": "guia/lateral-direita-traseira.png",
+   "render": "render/lateral-direita-traseira.png"
+  },
+  {
+   "name": "traseira-centro",
+   "grupo": "traseira",
+   "lado": null,
+   "ordem": 0,
+   "rotulo": "Traseira — de frente para as portas",
+   "espelhoDe": null,
+   "w": 900,
+   "h": 1600,
+   "azDeg": 180,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 3.9299363208665112,
+    "aim": [
+     0,
+     2.004891394292435,
+     -7.404682680912554
+    ],
+    "pos": [
+     4.812783936202099e-16,
+     1.55,
+     -11.334619001779066
+    ],
+    "fov": 68,
+    "stats": {
+     "W": 1800,
+     "H": 3200,
+     "cobertos": 3255187
+    }
+   },
+   "guia": "guia/traseira-centro.png",
+   "render": "render/traseira-centro.png"
+  },
+  {
+   "name": "frontal-centro",
+   "grupo": "frontal",
+   "lado": null,
+   "ordem": 0,
+   "rotulo": "Frontal — de frente para a testeira",
+   "espelhoDe": null,
+   "w": 900,
+   "h": 1600,
+   "azDeg": 0,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 3.9349682495744065,
+    "aim": [
+     0,
+     2.2316502196303736,
+     7.167678444488405
+    ],
+    "pos": [
+     0,
+     1.55,
+     11.10264669406281
+    ],
+    "fov": 68,
+    "stats": {
+     "W": 1800,
+     "H": 3200,
+     "cobertos": 2632450
+    }
+   },
+   "guia": "guia/frontal-centro.png",
+   "render": "render/frontal-centro.png"
+  },
+  {
+   "name": "carenagem-esquerda",
+   "grupo": "carenagem",
+   "lado": "esquerda",
+   "ordem": 0,
+   "rotulo": "Carenagem de frio — esquerda",
+   "espelhoDe": null,
+   "w": 900,
+   "h": 1600,
+   "azDeg": 46,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 4.6,
+    "aim": [
+     0.4,
+     3.3,
+     6.9
+    ],
+    "pos": [
+     3.7089630815577945,
+     1.55,
+     10.095428504111387
+    ],
+    "fov": 68,
+    "stats": {
+     "W": 1800,
+     "H": 3200,
+     "cobertos": 2275569
+    }
+   },
+   "guia": "guia/carenagem-esquerda.png",
+   "render": "render/carenagem-esquerda.png"
+  },
+  {
+   "name": "carenagem-direita",
+   "grupo": "carenagem",
+   "lado": "direita",
+   "ordem": 0,
+   "rotulo": "Carenagem de frio — direita",
+   "espelhoDe": "carenagem-esquerda",
+   "w": 900,
+   "h": 1600,
+   "azDeg": -46,
+   "camY": 1.55,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 4.6,
+    "fov": 68,
+    "aim": [
+     -0.4,
+     3.3,
+     6.9
+    ],
+    "pos": [
+     -3.7089630815577945,
+     1.55,
+     10.095428504111387
+    ],
+    "stats": {
+     "W": 1800,
+     "H": 3200,
+     "cobertos": 2271443
+    }
+   },
+   "guia": "guia/carenagem-direita.png",
+   "render": "render/carenagem-direita.png"
+  },
+  {
+   "name": "rodas-esquerda",
+   "grupo": "rodas",
+   "lado": "esquerda",
+   "ordem": 0,
+   "rotulo": "Rodagem — esquerda",
+   "espelhoDe": null,
+   "w": 1600,
+   "h": 900,
+   "azDeg": 90,
+   "camY": 1.05,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 5.2,
+    "aim": [
+     1.2917439340398573e-9,
+     0.75,
+     -3.5
+    ],
+    "pos": [
+     5.200000001291744,
+     1.05,
+     -3.4999999999999996
+    ],
+    "fov": 41.554596568495995,
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 3803206
+    }
+   },
+   "guia": "guia/rodas-esquerda.png",
+   "render": "render/rodas-esquerda.png"
+  },
+  {
+   "name": "rodas-direita",
+   "grupo": "rodas",
+   "lado": "direita",
+   "ordem": 0,
+   "rotulo": "Rodagem — direita",
+   "espelhoDe": "rodas-esquerda",
+   "w": 1600,
+   "h": 900,
+   "azDeg": -90,
+   "camY": 1.05,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 5.2,
+    "fov": 41.554596568495995,
+    "aim": [
+     -1.2917439340398573e-9,
+     0.75,
+     -3.5
+    ],
+    "pos": [
+     -5.200000001291744,
+     1.05,
+     -3.4999999999999996
+    ],
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 3823810
+    }
+   },
+   "guia": "guia/rodas-direita.png",
+   "render": "render/rodas-direita.png"
+  },
+  {
+   "name": "chassi-esquerda",
+   "grupo": "chassi",
+   "lado": "esquerda",
+   "ordem": 0,
+   "rotulo": "Chassi — esquerda",
+   "espelhoDe": null,
+   "w": 1600,
+   "h": 900,
+   "azDeg": 104,
+   "camY": 1.2,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 9,
+    "aim": [
+     1.2917439340398573e-9,
+     0.95,
+     -2
+    ],
+    "pos": [
+     8.732661537775712,
+     1.2,
+     -4.177297060397009
+    ],
+    "fov": 41.554596568495995,
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 3355906
+    }
+   },
+   "guia": "guia/chassi-esquerda.png",
+   "render": "render/chassi-esquerda.png"
+  },
+  {
+   "name": "chassi-direita",
+   "grupo": "chassi",
+   "lado": "direita",
+   "ordem": 0,
+   "rotulo": "Chassi — direita",
+   "espelhoDe": "chassi-esquerda",
+   "w": 1600,
+   "h": 900,
+   "azDeg": -104,
+   "camY": 1.2,
+   "fovLongDeg": 68,
+   "camera": {
+    "dist": 9,
+    "fov": 41.554596568495995,
+    "aim": [
+     -1.2917439340398573e-9,
+     0.95,
+     -2
+    ],
+    "pos": [
+     -8.732661537775712,
+     1.2,
+     -4.177297060397009
+    ],
+    "stats": {
+     "W": 3200,
+     "H": 1800,
+     "cobertos": 3363713
+    }
+   },
+   "guia": "guia/chassi-direita.png",
+   "render": "render/chassi-direita.png"
+  }
+ ]
+}
