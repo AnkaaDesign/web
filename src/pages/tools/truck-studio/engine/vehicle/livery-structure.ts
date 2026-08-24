@@ -129,6 +129,25 @@ export type DoorFaceKey = 'left' | 'right';
 export const isEndFace = (k: StructureKey): k is EndFaceKey => k === 'rear' || k === 'front';
 
 /**
+ * As faces feitas de CHAPAS REMONTADAS de 1 m — as duas laterais, e só elas.
+ *
+ * EXISTE PORQUE `!isEndFace()` DEIXOU DE SIGNIFICAR "lateral". Enquanto o baú
+ * tinha quatro faces as duas coisas eram a mesma; o TETO entrou como quinta
+ * `StructureKey` em 2026-08-13, depois que `plateLayers()` já testava a
+ * negação — e a negação passou a deixar o teto entrar. Resultado, relatado
+ * pelo Kennedy em 2026-08-19 (*"o livery do teto que está mostrando esses
+ * furos"*): as ~14 emendas da lateral e as colunas de rebite delas eram
+ * desenhadas POR CIMA da arte do teto, com as alturas de rebite medidas nos
+ * rebaixos de friso da LATERAL — cotas que no teto não querem dizer nada.
+ *
+ * O teto é chapa inteira: não tem emenda de 1 m nem coluna de rebite, e o 3D
+ * nunca desenhou nenhuma das duas nele (`LIVERY_PANEL_NAMES` em models.ts não
+ * inclui `ROOF`, e `getPlateGrid()` só publica a grade das laterais). O
+ * desenho 2D é que estava inventando peça.
+ */
+export const isFlank = (k: StructureKey): k is DoorFaceKey => k === 'left' || k === 'right';
+
+/**
  * O lado como o formulário de medidas o chama (`back`, não `rear`).
  *
  * A TESTEIRA NÃO TEM LADO DE FORMULÁRIO, e é correto que não tenha: o
@@ -673,9 +692,11 @@ function plateSeamSvg(
 
 /** As camadas de emenda de um painel lateral, da grade publicada pelo 3D. */
 function plateLayers(key: StructureKey, spec: PanelSpec): LiveryLayer[] {
-  /* Só as LATERAIS são remontadas de chapas de 1 m; traseira e testeira são
-     chapa inteira. `getPlateGrid()` também só publica a grade das laterais. */
-  if (isEndFace(key)) return [];
+  /* Só as LATERAIS são remontadas de chapas de 1 m; traseira, testeira e TETO
+     são chapa inteira. `getPlateGrid()` também só publica a grade das
+     laterais. Teste POSITIVO (`isFlank`) e não `!isEndFace()`: a negação
+     deixava o teto passar — ver a nota de `isFlank`. */
+  if (!isFlank(key)) return [];
   const grid = getPlateGrid();
   if (!grid || !grid.seamsFromFront.length) return [];
   const { length, height } = spec;
