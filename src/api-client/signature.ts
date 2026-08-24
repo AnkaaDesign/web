@@ -58,6 +58,14 @@ export interface DeliveryPreflight extends DeliverySettings {
   recipients: PreflightRecipient[];
   ankaa: { name: string; hasPhone: boolean; hasEmail: boolean } | null;
   channelStatus: Record<DeliveryChannel, PreflightChannelStatus>;
+  /**
+   * Identificação do veículo no momento do envio. Aviso, nunca bloqueio.
+   *
+   * O documento é congelado com o que existe AGORA: placa e chassi preenchidos
+   * depois não entram nele — nem podem, é o documento que foi assinado. É o caso
+   * comum do implemento 0 km, orçado antes de emplacar.
+   */
+  vehicle: { plate: string | null; chassisNumber: string | null; missing: string[] } | null;
 }
 
 export interface PublicSignerState {

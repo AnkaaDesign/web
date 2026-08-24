@@ -48,6 +48,7 @@ import {
   IconLoader2,
   IconMail,
   IconSend,
+  IconTruck,
   IconUser,
 } from "@tabler/icons-react";
 
@@ -269,6 +270,24 @@ export function SignatureSendDialog({
                         ? "Escolha o outro canal ou complete o cadastro antes de enviar."
                         : "Complete o cadastro antes de enviar."}
                     </span>
+                  </span>
+                </div>
+              )}
+
+              {/* ---- Identificação do veículo ---- */}
+              {preflight?.vehicle && preflight.vehicle.missing.length > 0 && !blocked && (
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
+                  <IconTruck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-foreground">
+                    <strong>
+                      Este orçamento está sem {preflight.vehicle.missing.join(" e ")} do
+                      veículo.
+                    </strong>{" "}
+                    O documento é congelado como está — {preflight.vehicle.missing.length === 1
+                      ? "esse dado"
+                      : "esses dados"}{" "}
+                    não vão constar do documento assinado, mesmo que sejam preenchidos
+                    depois. Se já souber, preencha antes de enviar.
                   </span>
                 </div>
               )}
