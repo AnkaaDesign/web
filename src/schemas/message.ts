@@ -38,8 +38,9 @@ export interface MessageCreateFormData {
   contentBlocks: any[]; // Array of content blocks
   targets?: string[]; // Array of target user IDs (empty = all users)
   isActive?: boolean; // Whether message is active/published (default: true)
-  startsAt?: string; // ISO date string for visibility start
-  endsAt?: string; // ISO date string for visibility end
+  // `null` limpa a janela; `undefined` no update = "não mexa neste campo".
+  startsAt?: string | null; // ISO date string for visibility start
+  endsAt?: string | null; // ISO date string for visibility end
 }
 
 export interface MessageUpdateFormData {
@@ -47,8 +48,8 @@ export interface MessageUpdateFormData {
   contentBlocks?: any[]; // Array of content blocks
   targets?: string[]; // Array of target user IDs (empty = all users)
   isActive?: boolean;
-  startsAt?: string;
-  endsAt?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 // Batch operations

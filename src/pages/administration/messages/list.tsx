@@ -117,7 +117,9 @@ export const MessageListPage = () => {
     if (filters.status?.length) {
       const statusLabels: Record<string, string> = {
         draft: "Rascunho",
+        scheduled: "Agendada",
         active: "Ativa",
+        expired: "Expirada",
         archived: "Arquivada",
       };
       const statusText = filters.status.map(s => statusLabels[s] || s).join(", ");

@@ -142,6 +142,9 @@ export class MessageService {
       uniqueViewers: number;
       targetedUsers: number;
       totalDismissals: number;
+      /** Endereçados/leitores já desligados — fora das contas acima. */
+      formerEmployeeTargets?: number;
+      formerEmployeeViews?: number;
     };
     message: string;
   }> {

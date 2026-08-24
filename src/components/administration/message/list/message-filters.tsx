@@ -9,9 +9,14 @@ import { getUsers } from "@/api-client/user";
 import { CONTRACT_STATUS } from "@/constants";
 import { getSectors } from "@/api-client/sector";
 
+// Espelha MessageStatus da API. "Agendada" e "Expirada" existiam no enum desde
+// sempre, mas não havia como filtrá-las porque nada as escrevia — agora o
+// MessageLifecycleScheduler escreve.
 const STATUS_OPTIONS = [
   { value: "draft", label: "Rascunho" },
+  { value: "scheduled", label: "Agendada" },
   { value: "active", label: "Ativa" },
+  { value: "expired", label: "Expirada" },
   { value: "archived", label: "Arquivada" },
 ];
 

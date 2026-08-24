@@ -9,6 +9,7 @@ import type { MessageFormData } from "@/components/administration/message/editor
 import { useMessage, useUpdateMessage } from "@/hooks/administration/use-message";
 import type { MessageUpdateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
+import { startsAtISO, endsAtISO } from "@/utils/message-scheduling";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
@@ -63,17 +64,12 @@ export const EditMessagePage = () => {
         },
       };
 
-      console.log('[EditMessagePage] Loaded message data:', message);
-      console.log('[EditMessagePage] Transformed to form data:', formData);
-
       setInitialData(formData);
     }
   }, [response]);
 
   const handleSubmit = useCallback(async (data: MessageFormData, isDraft: boolean) => {
     try {
-      console.log("Updating message:", id, data, "isDraft:", isDraft);
-
       // Resolve targeting to user IDs (sectors/positions → user IDs)
       const targets = await resolveTargetingToUserIds(data.targeting);
 
@@ -83,18 +79,11 @@ export const EditMessagePage = () => {
         contentBlocks: data.blocks,
         targets, // Simple array of user IDs (empty = all users)
         isActive: !isDraft,
+        // Sempre enviados: mandar só quando havia valor tornava IMPOSSÍVEL limpar
+        // o período pelo formulário — a API lê `undefined` como "não mexa".
+        startsAt: startsAtISO(data.scheduling?.startDate),
+        endsAt: endsAtISO(data.scheduling?.endDate),
       };
-
-      // Add scheduling fields if provided
-      if (data.scheduling?.startDate) {
-        apiData.startsAt = data.scheduling.startDate.toISOString();
-      }
-
-      if (data.scheduling?.endDate) {
-        apiData.endsAt = data.scheduling.endDate.toISOString();
-      }
-
-      console.log("Transformed update API data:", apiData);
 
       await updateMessage.mutateAsync({ id: id!, data: apiData });
 

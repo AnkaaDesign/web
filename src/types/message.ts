@@ -4,7 +4,8 @@
  * Defines types for in-app messages that can be displayed to users
  */
 
-export type MessageStatus = 'draft' | 'active' | 'archived';
+/** Valores de filtro (minúsculos); a API responde em MAIÚSCULAS — use `statusOf()`. */
+export type MessageStatus = 'draft' | 'scheduled' | 'active' | 'expired' | 'archived';
 export type MessageTargetType = 'all' | 'specific' | 'sector' | 'position';
 
 export interface MessageTargeting {
@@ -19,11 +20,21 @@ export interface MessageScheduling {
   endDate?: Date | string;
 }
 
+/**
+ * Leitura e público SEMPRE sobre a mesma população: só quem hoje está empregado
+ * e pertence ao público da mensagem entra em `views`/`targetUsers`. Quem foi
+ * desligado depois de ser endereçado (ou depois de ler) sai das contas e aparece
+ * separado, para a interface poder explicar a diferença em vez de escondê-la.
+ */
 export interface MessageStats {
   views: number;
   uniqueViews: number;
   targetUsers: number;
   dismissals: number;
+  /** Endereçados que já não estão na folha — fora de `targetUsers`. */
+  formerEmployeeTargets?: number;
+  /** Leituras de quem já não está na folha — fora de `views`. */
+  formerEmployeeViews?: number;
 }
 
 export interface Message {

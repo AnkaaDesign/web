@@ -87,6 +87,22 @@ const STATUS_VARIANTS: Record<string, "secondary" | "active" | "pending" | "expi
  *  local `MessageStatus` type is lowercase — normalise before comparing. */
 const statusOf = (message: Message) => String(message.status ?? "").toUpperCase();
 
+const shortDate = (value: string | Date) => format(new Date(value), "dd/MM/yy", { locale: ptBR });
+
+/**
+ * Janela de exibição em uma linha. A lista não mostrava período nenhum, então
+ * "por que essa mensagem sumiu?" só tinha resposta abrindo o detalhe — e uma
+ * mensagem sem prazo (que nunca se encerra sozinha) era indistinguível de uma
+ * com prazo já vencido.
+ */
+const displayWindow = (message: Message) => {
+  const { startDate, endDate } = message;
+  if (!startDate && !endDate) return "Sem prazo";
+  if (startDate && endDate) return `${shortDate(startDate)} – ${shortDate(endDate)}`;
+  if (startDate) return `A partir de ${shortDate(startDate)}`;
+  return `Até ${shortDate(endDate!)}`;
+};
+
 type ConfirmAction = {
   type: "delete" | "archive" | "activate";
   items: Message[];
@@ -231,16 +247,46 @@ export function MessageTable({
       },
     },
     {
+      key: "period",
+      header: "PERÍODO",
+      sortable: false,
+      className: "w-40",
+      align: "left",
+      accessor: (message) => (
+        <div
+          className={cn(
+            "text-sm",
+            !message.startDate && !message.endDate && "text-muted-foreground"
+          )}
+        >
+          {displayWindow(message)}
+        </div>
+      ),
+    },
+    {
       key: "stats",
       header: "VISUALIZAÇÕES",
       sortable: false,
       className: "w-32",
       align: "center",
-      accessor: (message) => (
-        <div className="text-sm">
-          {message.stats ? `${message.stats.views} / ${message.stats.targetUsers}` : "-"}
-        </div>
-      ),
+      accessor: (message) => {
+        const stats = message.stats;
+        if (!stats) return <div className="text-sm">-</div>;
+
+        // Os dois lados vêm da mesma população (só quem está na folha hoje).
+        // Endereçados que já saíram entram como nota, nunca no denominador.
+        const former = stats.formerEmployeeTargets ?? 0;
+        return (
+          <div className="text-sm">
+            {stats.views} / {stats.targetUsers}
+            {former > 0 && (
+              <span className="ml-1 text-xs text-muted-foreground">
+                (+{former} desl.)
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "createdBy",
@@ -641,19 +687,24 @@ export function MessageTable({
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.length === 1 && statusOf(contextMenu.items[0]) !== 'ACTIVE' && (
-            <DropdownMenuItem onClick={handleActivate}>
-              <IconCheck className="mr-2 h-4 w-4" />
-              Ativar
-            </DropdownMenuItem>
-          )}
+          {/* Publicar só faz sentido no que ainda não foi ao ar (ou voltou da
+              gaveta). EXPIRED/SCHEDULED não entram: "Ativar" ali não muda nada —
+              quem manda é a janela, então o caminho honesto é editar o período. */}
+          {contextMenu?.items.length === 1 &&
+            ["DRAFT", "ARCHIVED"].includes(statusOf(contextMenu.items[0])) && (
+              <DropdownMenuItem onClick={handleActivate}>
+                <IconCheck className="mr-2 h-4 w-4" />
+                Ativar
+              </DropdownMenuItem>
+            )}
 
-          {contextMenu?.items.length === 1 && statusOf(contextMenu.items[0]) === 'ACTIVE' && (
-            <DropdownMenuItem onClick={handleArchive}>
-              <IconArchive className="mr-2 h-4 w-4" />
-              Arquivar
-            </DropdownMenuItem>
-          )}
+          {contextMenu?.items.length === 1 &&
+            ["ACTIVE", "SCHEDULED", "EXPIRED"].includes(statusOf(contextMenu.items[0])) && (
+              <DropdownMenuItem onClick={handleArchive}>
+                <IconArchive className="mr-2 h-4 w-4" />
+                Arquivar
+              </DropdownMenuItem>
+            )}
 
           <DropdownMenuSeparator />
 

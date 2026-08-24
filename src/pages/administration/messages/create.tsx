@@ -9,6 +9,7 @@ import type { MessageFormData } from "@/components/administration/message/editor
 import { useCreateMessage } from "@/hooks/administration/use-message";
 import type { MessageCreateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
+import { startsAtISO, endsAtISO } from "@/utils/message-scheduling";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 export const CreateMessagePage = () => {
@@ -30,8 +31,6 @@ export const CreateMessagePage = () => {
 
   const handleSubmit = useCallback(async (data: MessageFormData, isDraft: boolean) => {
     try {
-      console.log("Submitting message:", data, "isDraft:", isDraft);
-
       // Resolve targeting to user IDs (sectors/positions → user IDs)
       const targets = await resolveTargetingToUserIds(data.targeting);
 
@@ -41,23 +40,10 @@ export const CreateMessagePage = () => {
         contentBlocks: data.blocks,
         targets, // Simple array of user IDs (empty = all users)
         isActive: !isDraft,
+        // Dia-calendário cheio; sem período escolhido vai `null` (exibição indefinida).
+        startsAt: startsAtISO(data.scheduling?.startDate),
+        endsAt: endsAtISO(data.scheduling?.endDate),
       };
-
-      // Add scheduling fields if provided
-      if (data.scheduling?.startDate) {
-        apiData.startsAt = data.scheduling.startDate.toISOString();
-      }
-
-      if (data.scheduling?.endDate) {
-        apiData.endsAt = data.scheduling.endDate.toISOString();
-      }
-
-      console.log("Transformed API data:", apiData);
-      console.log("Transformed API data (stringified):", JSON.stringify(apiData, null, 2));
-      console.log("contentBlocks type:", typeof apiData.contentBlocks, "isArray:", Array.isArray(apiData.contentBlocks));
-      console.log("contentBlocks length:", apiData.contentBlocks?.length);
-      console.log("First block:", apiData.contentBlocks?.[0]);
-      console.log("targets:", apiData.targets);
 
       await createMessage.mutateAsync(apiData);
 

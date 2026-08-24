@@ -263,23 +263,24 @@ export const MessageDetailsPage = () => {
                     </div>
                   )}
 
-                  {/* Date range */}
-                  {message.startDate && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground">Início</span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {format(new Date(message.startDate), "dd/MM/yyyy", { locale: ptBR })}
-                      </span>
-                    </div>
-                  )}
-                  {message.endDate && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground">Término</span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {format(new Date(message.endDate), "dd/MM/yyyy", { locale: ptBR })}
-                      </span>
-                    </div>
-                  )}
+                  {/* Janela de exibição. Sem prazo é informação, não ausência dela:
+                      a mensagem fica no ar até alguém arquivá-la à mão. */}
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground">Início</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {message.startDate
+                        ? format(new Date(message.startDate), "dd/MM/yyyy", { locale: ptBR })
+                        : "Imediato"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground">Término</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {message.endDate
+                        ? format(new Date(message.endDate), "dd/MM/yyyy", { locale: ptBR })
+                        : "Sem prazo"}
+                    </span>
+                  </div>
 
                   {/* Stats Section */}
                   <div className="pt-3 mt-3 border-t border-border">
@@ -307,6 +308,21 @@ export const MessageDetailsPage = () => {
                           <span className="text-sm font-medium text-muted-foreground">Usuários Alvo</span>
                           <span className="text-sm font-semibold text-foreground">{stats.targetedUsers}</span>
                         </div>
+                        {/* Público e leitura saem da mesma população (quem está na
+                            folha hoje). Quem foi desligado depois de ser endereçado
+                            aparece aqui em vez de inflar/estragar o par acima. */}
+                        {((stats.formerEmployeeTargets ?? 0) > 0 ||
+                          (stats.formerEmployeeViews ?? 0) > 0) && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Desligados
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {stats.formerEmployeeTargets ?? 0} alvo(s) ·{" "}
+                              {stats.formerEmployeeViews ?? 0} leitura(s)
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">
