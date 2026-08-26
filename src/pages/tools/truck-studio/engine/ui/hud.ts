@@ -1816,9 +1816,32 @@ function build() {
   bodyEl.setAttribute('role', 'group');
   bodyEl.setAttribute('aria-label', 'Iluminação');
 
+  /* PASSO DE 5 MINUTOS (`1/12` de hora), e ele foi 0,25 h até 2026-08-24.
+     -----------------------------------------------------------------------
+     ⚠️ ISTO É UM CONTROLE DE SUAVIDADE, e não de precisão — ninguém precisa
+     escolher 18:35 num configurador. A travessia dos dois plates de céu
+     (`skyMixAt()` em scene/scene.ts) cabe entre o sol a +10° e a −12°, ou seja
+     **uma hora e vinte**, e ela não pode ser alargada: o lado "dia" do par é um
+     POENTE estático, então todo peso residual dele é uma foto de poente
+     sobreposta à noite (é o relato "mesmo estando escuro ainda mostra nuvens").
+
+     Com o passo de 0,25 h essa janela eram QUATRO paradas — e quatro paradas
+     para ir de 0 a 1 são saltos de 0,25, faça-se a curva que se fizer. A 5
+     minutos são dezesseis. Medido sobre a varredura inteira, o maior salto de
+     mistura entre paradas vizinhas cai de **0,363 para 0,100**.
+
+     `formatHour()` já resolve fração de hora em minutos ("18:05"), e 18 h ÷
+     (1/12) dá 216 passos exatos, sem sobra no fim da faixa.
+
+     ⚠️ O CUSTO É REAL E JÁ ESTÁ PAGO: mais eventos `input` por arrasto significa
+     mais `applyRig()`. Quem segura isso é `beginLightScrub()` logo abaixo (o
+     mapa de sombra passa a ser redesenhado a cada 4º quadro) e, do lado do céu,
+     o limitador de taxa do PMREM em `scene/skyblend.ts` — que é por passo de
+     mistura e por milissegundo, não por evento. O passe que roda a cada evento é
+     só o `pintar()` do alvo, abaixo de um milissegundo. */
   const hour = buildRangeRow(
     'hour', 'Hora do dia', 'sun', 'moon',
-    HOUR_MIN, HOUR_MAX, 0.25, 'sun', 'moon',
+    HOUR_MIN, HOUR_MAX, 1 / 12, 'sun', 'moon',
   );
   hourInput = hour.input;
   hourVal = hour.val;

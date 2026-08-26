@@ -59,8 +59,69 @@ quer mostrar. Três medidas confirmam o casamento:
 | luminância média ponderada por sólido | 0,717 | 0,310 | 43 % ⇒ o plate JÁ escurece; daí os pisos de `nightness` terem subido |
 | pico | 33,0 (disco domado do `_puresky`) | 55 633 (lua, ~3 texels) | daí o peso da noite entrar por `smoothstep(0,25…0,95)` e não linear |
 
-Medidas feitas com o leitor de RGBE de `tools/env-build` (decodifica RLE e pondera por
+Medidas feitas com `tools/env-build/hdri_stats.py` (decodifica RGBE com RLE e pondera por
 `sin θ`); reproduzíveis. Os md5 conferidos contra `api.polyhaven.com/files/`.
+
+> ⚠️ **O LEITOR NÃO EXISTIA QUANDO ESTA TABELA FOI ESCRITA.** A frase acima dizia
+> "reproduzíveis" e apontava para `tools/env-build`, onde não havia leitor de RGBE
+> nenhum — os três números eram, na prática, inconferíveis. `hdri_stats.py` passou a
+> existir em 2026-08-24 e **reproduz a tabela exatamente** (0,717 / 0,310 / 55 633 /
+> u 0,599), o que é o único motivo de ela continuar aqui em vez de ser refeita.
+> Escolher um plate de noite pelo rótulo "night" do Poly Haven é como se chega a um
+> céu de noite com 43 % da luz do de dia; é para isso que o medidor serve.
+
+### 1.0-a As variantes `@1k` (2026-08-24)
+
+| arquivo | asset | tamanho | md5 |
+|---|---|---|---|
+| `sky@1k.hdr` | [Kloppenheim 06 (Pure Sky)](https://polyhaven.com/a/kloppenheim_06_puresky) 1k | 1,17 MB | `995d68b1656f26452572645c0ffe898b` |
+| `sky-night@1k.hdr` | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) 1k | 1,39 MB | `283ef04d37153527e5407df494eaf339` |
+
+São os arquivos que o **próprio Poly Haven publica**, e não um resize local — foi uma
+escolha deliberada. Um `oiiotool --resize:filter=box` local ficou a 0,3 % do 1k oficial
+em luz média, ou seja empatou; o que o oficial tem a mais é PROVENIÊNCIA: mesma página
+de asset, md5 citável e conferível contra `api.polyhaven.com/files/`, exatamente como as
+duas linhas de 2k acima. Um asset derivado à mão é um asset sem origem, e este arquivo
+existe para que nenhum asset do acervo fique sem origem.
+
+Quem os pede é `ColdProfile.hdrVariant` nos níveis **Média e Baixa**
+(`engine/core/quality.ts`), e eles só são pedidos porque `environments.json` os declara
+em `textureVariants` — ver §47.1 do ARCHITECTURE.md para o buraco de dez dias em que a
+tabela pedia `@1k` e nada descia. A luz que eles devolvem é a mesma:
+
+| | 2048×1024 | 1024×512 |
+|---|---|---|
+| média sólida, plate de dia | 0,71701 | 0,71700 |
+| média sólida, plate de noite | 0,30995 | 0,30970 |
+| coluna da fonte em `u` | 0,5815 | 0,5805 |
+
+⚠️ **`@1k` É SUFIXO DE HDR E DE MAIS NADA.** `setAvailableVariants()` guarda uma lista
+só para chão e céu, e não existe textura de chão `*@1k.*` no disco — por isso `'@1k'`
+foi retirado da união de `ColdProfile.groundVariant` na mesma rodada. Quem publicar um
+chão a 1024² sem compressão tem de escolher outro sufixo.
+
+### 1.0-b Os plates de noite que foram medidos e recusados (2026-08-24)
+
+A pedido de *"ache uma que encaixe bem"*, as 61 HDRIs de noite do acervo Poly Haven
+foram filtradas e as finalistas renderizadas na faixa que a câmera de um veículo de fato
+enquadra. **Só `_puresky` entra**: o cenário traz o próprio chão (`set.glb`), então um
+plate com TERRENO na metade de baixo está fora por construção — o que elimina
+`rogland_clear_night`, `rogland_moonlit_night`, `moonlit_golf`, `moonless_golf` e
+`satara_night_no_lamps` antes de qualquer julgamento de gosto.
+
+| plate | céu (mediana do hemisfério de cima) | fonte | energia na fonte | por que não |
+|---|---|---|---|---|
+| **kloppenheim_02_puresky** | 0,128 | lua a **17,1°**, u 0,599 | 48 % | **é o que está no ar, e venceu** |
+| `qwantani_moon_noon_puresky` | 0,193 | lua a 60,6°, u 0,600 | 82 % | a lua sai da faixa da lente: fundo sem leitura |
+| `qwantani_moonrise_puresky` | 0,243 | lua a 13,9°, u 0,600 | 63 % | lava o céu — lê como hora azul |
+| `qwantani_night_puresky` | 0,477 | — | 1,5 % | poluição luminosa, claro demais |
+| `kloppenheim_07_puresky` | 0,298 | — | 0,4 % | noite encoberta, sem lua: contradiz `NIGHT_CLEAR` |
+
+O que decidiu não foi nenhuma métrica isolada — foi o render na faixa −26°…+9° em torno
+do horizonte. O `qwantani_moon_noon` ganha em quase toda coluna e ainda assim perde,
+porque uma lua a 60° está fora do enquadramento quase horizontal de uma foto de veículo
+(o mesmo argumento que o `studioNote` de `environments.json` faz sobre o gradiente do
+domo). Registrado aqui para que a próxima pessoa não refaça a busca.
 
 ### 1.1 Histórico — os três cenários só-HDRI (removidos em 2026-08-03)
 

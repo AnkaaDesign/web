@@ -56,6 +56,27 @@ export const RIG_BASE = {
      applyRig() já casado com a pose que está sendo aplicada — que é o requisito,
      porque applyRig roda por quadro de tween e não por evento. */
   golden: 0,
+  /* O PESO DO PLATE DE NOITE na dissolvência dos dois céus (scene/skyblend.ts),
+     0 = o plate de dia inteiro, 1 = o de noite inteiro. Calculado por
+     resolveRig() a partir da ALTITUDE DO SOL e guardado aqui pela mesma razão
+     que `golden` e `vehLights`: para atravessar `lerpRig()` como qualquer outro
+     campo, de modo que um `setTimeOfDay('noite')` — que SALTA a hora — atravesse
+     em 0,8 s em vez de estalar.
+
+     ⚠️ POR QUE ELE NÃO PODE SER DERIVADO DE `nightness`, que é o que ele era até
+     2026-08-24. `nightness` satura quando o sol cruza −14°, ou seja **19:20**, e
+     a curva que o consumia (`smoothstep(n, 0,25…0,95)`) saturava ainda antes,
+     às **18:55**. O relógio vai até 24:00: de 19:00 a 24:00 o céu era
+     BIT-A-BIT IDÊNTICO, e toda a travessia dia→noite acontecia em 1h15 — quatro
+     paradas de um controle que tem 72. Era esse o "a transição depois das 19:00
+     não é suave": não havia transição nenhuma depois das 19:00, e a que havia
+     antes era um degrau.
+
+     Um campo saturado não tem como expressar o resto da noite, então o peso
+     passou a sair direto da altitude do sol, que continua caindo até −70,6° à
+     meia-noite. Ver `skyMixAt()` em scene/scene.ts, que é quem tem a régua
+     solar e portanto quem calcula. Este arquivo só declara o campo. */
+  skyMix: 0,
   /* O ALBEDO DA SALA DE CICLORAMA, como MULTIPLICADOR da rampa autorada em
      scene/cyclorama.ts. 1 = a rampa como ela está escrita lá.
 

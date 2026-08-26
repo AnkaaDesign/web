@@ -1507,6 +1507,98 @@ function sunAltitude(h: number) { return EL_MAX * Math.sin(Math.PI * dayFraction
 /** Day↔night blend weight: 0 = undiluted `dia` face, 1 = undiluted `noite`. */
 function nightnessAt(h: number) { return 1 - smooth(sunAltitude(h), NIGHT_ALT, DAY_ALT); }
 
+/* ---------------------------------------------------------------------------
+   A TRAVESSIA DOS DOIS PLATES DE CÉU — a segunda banda de crepúsculo, e por que
+   ela não é `nightness` (2026-08-24)
+
+   `scene/skyblend.ts` dissolve o plate de dia no de noite. Até aqui o peso saía
+   de `pesoDe(nightness) = smoothstep(nightness, 0,25…0,95)`, e as duas
+   saturações se somavam:
+
+       nightness satura em alt −14°  ⇒  19:20
+       a curva satura em n = 0,95    ⇒  **18:55**
+
+   Ou seja: **toda a travessia acontecia entre 17:45 e 18:55, e de 19:00 a 24:00
+   o céu era bit-a-bit o mesmo.** Medido no controle de hora, que anda de 0,25 em
+   0,25 sobre 06:00–24:00: 5 paradas de 72 carregavam a mudança inteira e 20
+   paradas não mudavam nada. É o relato "a transição depois das 19:00 não é
+   suave" — e ele está certo por inteiro, porque depois das 19:00 não havia
+   transição, e a de antes era um degrau de 0,08 para 1,00 em quatro paradas.
+
+   O CONSERTO É A ENTRADA, NÃO A CURVA. `nightness` é um campo saturado: ele
+   existe para atravessar as duas FACES de preset (`dia`/`noite`) e não tem
+   nada a dizer sobre o que acontece com o sol a −40°. Mas o sol continua
+   descendo — a −70,6° à meia-noite — e é ele quem sabe a hora de verdade. Então
+   o peso passa a sair da ALTITUDE, com banda própria.
+
+   ⚠️⚠️ A PRIMEIRA TENTATIVA DESTA BANDA ERRADA — +12°…−30°, E O DONO A REPROVOU
+   NA FOTO, com uma frase que diz exatamente o que aconteceu:
+
+       *"mesmo estando escuro ainda mostra nuvens, por isso pedi outra hdri,
+        um realmente de noite"*
+
+   E a leitura dele estava meio certa e meio errada, de um jeito que só o render
+   separa. **O plate de noite NÃO tem nuvem** — é céu azul-escuro limpo, com lua
+   e estrelas; renderizado sozinho a `mix = 1` não há uma única nuvem nele. As
+   nuvens da foto são do plate de **DIA**, que é um POENTE com cúmulo iluminado
+   por baixo. Espalhar a travessia até −30° deixava **44 % do plate de dia no ar
+   às 19:00**, e 44 % de um poente encoberto é um céu encoberto.
+
+   ⚠️ **A LIÇÃO É SOBRE O ACOPLAMENTO, e ela não é óbvia:** neste par não existe
+   plate de crepúsculo. O lado "dia" é um POENTE ESTÁTICO — o sol dele está
+   sempre a +4,7°, as nuvens dele estão sempre acesas por baixo. Logo **todo peso
+   residual do lado de dia é literalmente uma foto de poente sobreposta à noite**,
+   e ele não desbota sozinho: `backgroundIntensity` escala os DOIS lados por
+   igual, então escurecer não apaga a nuvem, só a deixa mais escura. Não há
+   janela em que "meio a meio" leia como crepúsculo — leia como poente com
+   estrela. **A travessia tem de ACABAR quando a noite começa, e o que pode ser
+   espalhado é só o caminho até lá.**
+
+   ---------------------------------------------------------------------------
+   A BANDA, e ela foi escolhida por RENDER e não por gosto. Quatro candidatas
+   foram compostas fora do navegador (o mesmo `mix()` do shader, o mesmo
+   `lerp(1, 0,22, n)` de `applyRig()`, o mesmo ACES) e olhadas às 18:00, 18:30,
+   19:00, 19:30, 20:00 e 21:00:
+
+   | banda | 18:00 | 18:30 | 19:00 | veredito |
+   |---|---|---|---|---|
+   | `n` 0,25…0,95 (a original) | 0,083 | 0,770 | 1,000 | a noite chega, mas num degrau |
+   | +12°…−30° (a 1ª tentativa) | 0,038 | 0,252 | **0,556** | ⚠️ **44 % de poente às 19:00 — a foto do dono** |
+   | **+10°…−12°** | **0,049** | 0,552 | **0,988** | **as duas coisas ao mesmo tempo** |
+   | +6°…−34° | 0,000 | 0,100 | 0,370 | pior ainda: a noite só chega às 20:00 |
+
+   ⚠️ **E O LIMITE DE CIMA NÃO É FOLGA: ele é a trava da lua.** O cabeçalho de
+   `skyblend.ts` mede o motivo — o pico do plate de noite é 55 633 (a lua, três
+   texels) contra 33 do sol domado do `_puresky` de dia. Qualquer peso não
+   desprezível antes de o poente ceder crava um ponto branco num céu laranja. Os
+   +10° entregam **0,049 às 18:00**, contra os 0,083 da curva original: a banda
+   nova não afrouxa aquela trava, ela aperta.
+
+   ---------------------------------------------------------------------------
+   ⚠️ E A SUAVIDADE NÃO VEM DAQUI — VEM DO PASSO DO CONTROLE.
+
+   É a parte que a 1ª tentativa errou de alvo. A travessia tem de caber entre o
+   sol a +10° (17:50) e a −12° (19:15): **uma hora e vinte de relógio**, e não há
+   como alargar isso sem pôr poente dentro da noite. Com o passo de **0,25 h** que
+   o controle tinha, essa janela são **quatro paradas** — e quatro paradas para ir
+   de 0 a 1 são saltos de 0,25 por definição, faça-se a curva que se fizer.
+
+   O que muda a experiência é o passo: `ui/hud.ts` passou a oferecer **5 minutos**
+   (`1/12`), e aí a MESMA janela vira dezesseis paradas. Medido sobre a varredura
+   inteira, o maior salto entre paradas vizinhas:
+
+       curva original, passo 0,25 h    0,363
+       curva original, passo 5 min     0,129
+       **esta banda,   passo 5 min     0,100**
+
+   Ou seja a suavidade é 3,6× melhor que o estado original **e** a noite continua
+   chegando às 19:00. Quem for mexer na banda tem de olhar as duas colunas: uma
+   banda mais larga melhora o salto e paga em nuvem. */
+const SKY_DAY_ALT = 10, SKY_NIGHT_ALT = -12;
+
+/** O peso do plate de NOITE em `scene/skyblend.ts`, 0..1. */
+function skyMixAt(h: number) { return 1 - smooth(sunAltitude(h), SKY_NIGHT_ALT, SKY_DAY_ALT); }
+
 /** Low-sun reddening weight, before the nightness/cloud damping in resolveRig. */
 function goldenAt(h: number) {
   const alt = sunAltitude(h);
@@ -1616,6 +1708,12 @@ function resolveRig(st: SceneState) {
     st.brightness, VEH_LIGHTS_DIM_FULL, VEH_LIGHTS_DIM_ON);
   rig.vehLights = Math.max(
     THREE.MathUtils.smoothstep(st.hour, VEH_LIGHTS_ON, VEH_LIGHTS_FULL), escuro);
+
+  /* O PESO DO PLATE DE NOITE. Campo do rig pelo mesmo motivo que os dois acima:
+     atravessa `lerpRig()` de graça, então um salto de hora (`setTimeOfDay`) vira
+     crossfade em vez de estalo. Ver `skyMixAt()` para a banda e para por que ela
+     não é `nightness`. */
+  rig.skyMix = skyMixAt(st.hour);
 
   /* ---- A CAMADA DE ESTÚDIO ----
      Só nos presets marcados `studio: true` (hoje, só o `ciclorama`). Ela entra
@@ -2647,7 +2745,12 @@ function applyRig(rig: Rig) {
        graça quando não há par, e quando há, o fundo atravessa liso e o PMREM é
        reassado por taxa — scene/skyblend.ts. */
     const comPar = hasSkyPair();
-    if (comPar) updateSkyBlend(rig.nightness);
+    /* `rig.skyMix` e NÃO `rig.nightness`: a mistura tem banda própria, mais larga
+       e mais tardia, porque `nightness` satura às 19:20 e o relógio vai até
+       24:00. Ver `skyMixAt()`. E é o valor do RIG — ou seja o já tweenado —,
+       nunca `skyMixAt(sceneState.hour)`: applyRig roda por quadro de tween, e ler
+       a hora aqui faria a mistura saltar enquanto todo o resto atravessa. */
+    if (comPar) updateSkyBlend(rig.skyMix);
     /* NIGHT OVER A DAYLIGHT PHOTOGRAPH.
        Every HDRI in the acervo was shot in daylight, and the preset system has
        no way to make a photograph set. Before this, midnight left
@@ -3089,6 +3192,12 @@ export function getHourOfDay() { return sceneState.hour; }
 /** 0 = full day, 1 = full night: the weight the two preset faces crossfade on
  *  and, through the rig, the weight behind the stars, the lamps and the fog. */
 export function getNightness() { return nightnessAt(sceneState.hour); }
+
+/** O peso do plate de NOITE na dissolvência dos dois céus, 0..1 — a banda LARGA,
+ *  que é a de `skyMixAt()` e não a de `nightness`. Quem chama é
+ *  `scene/environment.ts`, ao montar o par: a primeira mistura tem de nascer na
+ *  hora vigente, ou o cenário abre com o céu errado por um quadro. */
+export function getSkyMix() { return skyMixAt(sceneState.hour); }
 
 /**
  * Weather. NIGHT IS A WEATHER-ORTHOGONAL AXIS — that is what lets "overcast at

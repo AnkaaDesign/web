@@ -76,7 +76,7 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import {
   pmrem, applyPreset, setTimeOfDay, setHourOfDay, OPEN_HOUR, LIGHT_DEFAULTS,
-  setExternalEnvironment, setExposureBase, getNightness,
+  setExternalEnvironment, setExposureBase, getSkyMix,
   setSkyDomeVisible, setLamps, setLampModel,
   setHorizonHaze, setHorizonTint, setInteriorBounds,
 } from './scene';
@@ -704,8 +704,13 @@ function applyToScene(envDef: EnvironmentDef, entry: CacheEntry,
   /* O PAR DE CÉUS PRIMEIRO, porque ele produz as duas texturas que vão ser
      ligadas. `setSkyPair()` devolve null se faltar um lado — e aí o `||` abaixo
      cai no caminho de sempre, com o plate único. */
+  /* `getSkyMix()` e nao `getNightness()`: desde 2026-08-24 a dissolvencia dos
+     dois plates tem banda propria — mais larga e mais tardia —, porque
+     `nightness` satura as 19:20 e o relogio vai ate 24:00. Ver `skyMixAt()` em
+     scene/scene.ts. Aqui vale a hora CRUA e nao a tweenada: e a montagem, nao
+     um quadro de tween. */
   const par = (entry.dia && entry.noite)
-    ? setSkyPair(entry.dia, entry.noite, getNightness()) : null;
+    ? setSkyPair(entry.dia, entry.noite, getSkyMix()) : null;
   if (!par) disposeSkyBlend();
 
   if (par) {

@@ -52,14 +52,48 @@
    de pé.
 
    ===========================================================================
-   A CURVA NÃO É LINEAR, E O MOTIVO É A LUA. O pico do plate de noite é 55 633
-   (a lua, três texels de diâmetro) contra 33 do sol do plate de dia — os
-   `_puresky` domam o disco solar, e ninguém domou a lua. Numa interpolação
-   linear, com `nightness` em 0,3 — que é 18h20, céu ainda de poente — já haveria
-   meia lua de 28 mil unidades no meio do crepúsculo, um ponto branco cravado num
-   céu laranja. Então o peso da noite entra por `smoothstep(0,25 … 0,95)`: até um
-   quarto de escuridão o céu é o de dia inteiro, e a lua só começa a aparecer
-   quando o poente já cedeu. É também o que o pedido chama de sutil.
+   ⚠️ A CURVA SAIU DAQUI EM 2026-08-24, E É PRECISO SABER PARA ONDE.
+
+   Este módulo recebia `nightness` e aplicava `smoothstep(n, 0,25 … 0,95)`. Ele
+   passa a receber o PESO PRONTO, 0..1, e a única coisa que faz com ele é
+   `clamp`. Quem calcula é `skyMixAt()` em scene/scene.ts, e o campo que o
+   carrega é `rig.skyMix`.
+
+   POR QUE MUDOU. As duas saturações se somavam — `nightness` satura quando o sol
+   cruza −14° (19:20) e a curva saturava em n = 0,95 (**18:55**) —, então a
+   travessia inteira acontecia entre 17:45 e 18:55 e **de 19:00 a 24:00 o céu era
+   bit-a-bit o mesmo**. Cinco paradas de um controle de 72 carregavam tudo e
+   vinte não mudavam nada. Um campo saturado não tem como falar sobre o resto da
+   noite; a ALTITUDE DO SOL tem, e continua caindo até −70,6°.
+
+   POR QUE A CURVA FOI JUNTO, e não só a entrada. Ela é `smoothstep` sobre uma
+   BANDA, e uma banda em `nightness` não é conversível numa banda em graus: o
+   extremo de baixo da faixa nova (−12°) cai no trecho onde `nightness` já está
+   quase saturado, e um `smoothstep` sobre um domínio esmagado deixa de ser um
+   `smoothstep`. Manter meia curva aqui e meia lá daria duas réguas para um
+   número só — que é a armadilha que o aviso de quantização mais abaixo descreve,
+   chegando por outra porta.
+
+   ⚠️ O QUE NÃO PODE SE PERDER NA MUDANÇA — A TRAVA DA LUA, e ela é medida aqui.
+   O pico do plate de noite é **55 633** (a lua, três texels de diâmetro) contra
+   **33** do sol do plate de dia: os `_puresky` domam o disco solar, e ninguém
+   domou a lua. Numa interpolação linear, com o peso em 0,3 às 18h20 — céu ainda
+   de poente — já haveria meia lua de 28 mil unidades no meio do crepúsculo, um
+   ponto branco cravado num céu laranja. Era o `0,25` da curva antiga que
+   segurava isso, e é o `+10°` da banda nova que segura agora: às 18:00 o peso é
+   **0,049**, contra os 0,083 que a curva antiga entregava. A trava não afrouxou —
+   apertou. Quem for mexer na banda de scene.ts tem de reconferir esta linha.
+
+   ⚠️⚠️ E O OUTRO EXTREMO É AINDA MAIS APERTADO, POR UM MOTIVO QUE SÓ APARECE NA
+   FOTO. O lado "dia" deste par é um POENTE ESTÁTICO — sol sempre a +4,7°, cúmulo
+   sempre aceso por baixo —, e o par não tem plate de crepúsculo. Logo **todo peso
+   residual do lado de dia é literalmente uma foto de poente sobreposta à noite**,
+   e ele não desbota sozinho: `applyRig()` escala os DOIS lados pelo mesmo
+   `backgroundIntensity`, então escurecer deixa a nuvem mais escura, nunca ausente.
+   A primeira tentativa levou a banda a −30° para espalhar a travessia até as
+   20:15 e deixou 44 % de poente no ar às 19:00 — o relato *"mesmo estando escuro
+   ainda mostra nuvens"*. **A travessia tem de ACABAR quando a noite começa
+   (−12°, 19:15); o que se pode espalhar é só o caminho até lá.**
 
    O QUE ESTE MÓDULO NÃO FAZ: mexer em intensidade, exposição ou cor. Quem
    escurece a noite continua sendo `applyRig()`, e os fatores dele foram
@@ -118,9 +152,6 @@ const passos = () => Math.max(1, getProfile().pmremSteps);
 /** Piso entre duas reassaduras, em ms. ~9 por segundo no pior arrasto (Alta). */
 const minMs = () => getProfile().pmremMinMs;
 
-/* A janela em que a noite entra, em unidades de `nightness`. Ver o cabeçalho:
-   o 0,25 é o que mantém a lua fora do céu de poente. */
-const NOITE_DE = 0.25, NOITE_ATE = 0.95;
 
 const VERT = /* glsl */`
 varying vec2 vUv;
@@ -197,11 +228,6 @@ function montarQuad() {
   quadCam = new THREE.Camera();
 }
 
-/** O peso da noite a partir de `nightness`. Ver a nota da curva no cabeçalho. */
-function pesoDe(nightness: number) {
-  const n = THREE.MathUtils.clamp(nightness, 0, 1);
-  return THREE.MathUtils.smoothstep(n, NOITE_DE, NOITE_ATE);
-}
 
 /** Reescreve o alvo com a mistura corrente. Um passe, sub-milissegundo. */
 function pintar() {
@@ -244,12 +270,16 @@ function assar() {
  * assa. Aqui elas são o insumo de cada mistura, e soltá-las congelaria o céu na
  * primeira hora aplicada.
  *
+ * @param peso o peso do plate de NOITE, 0..1, JÁ COM A CURVA APLICADA. Desde
+ *   2026-08-24 este módulo não conhece mais `nightness` nem a banda de
+ *   crepúsculo: quem calcula é `skyMixAt()` em scene/scene.ts, que é quem tem a
+ *   régua solar. Ver o bloco "A CURVA SAIU DAQUI" no cabeçalho.
  * @returns null quando falta um dos dois lados — e aí quem chama segue pelo
  *   caminho de sempre (um plate só, escurecido). Um HDRI de noite que não baixou
  *   nunca pode ser motivo de tela preta.
  */
 export function setSkyPair(d: THREE.Texture | null, n: THREE.Texture | null,
-  nightness: number) {
+  peso: number) {
   if (!d || !n || !d.image || !n.image) { disposeSkyBlend(); return null; }
   disposeSkyBlend();
   dia = d;
@@ -280,7 +310,7 @@ export function setSkyPair(d: THREE.Texture | null, n: THREE.Texture | null,
   alvo.texture.wrapT = THREE.ClampToEdgeWrapping;
 
   montarQuad();
-  pesoAtual = pesoDe(nightness);
+  pesoAtual = THREE.MathUtils.clamp(peso, 0, 1);
   passosAssados = passos();
   passoAssado = Math.round(pesoAtual * passosAssados);
   ultimoBake = performance.now();
@@ -297,10 +327,15 @@ export function setSkyPair(d: THREE.Texture | null, n: THREE.Texture | null,
  * O FUNDO SEMPRE, o PMREM por taxa — ver o cabeçalho. A reassadura atrasada é
  * agendada e não descartada: sem ela, soltar o controle no meio de um passo
  * deixaria o reflexo permanentemente numa mistura que não é a da tela.
+ *
+ * @param peso o peso do plate de NOITE, 0..1, já com a curva aplicada — é
+ *   `rig.skyMix`, ou seja o valor JÁ TWEENADO por `lerpRig()`. Passar
+ *   `skyMixAt(hora)` daqui seria ler a hora crua no meio de um tween e fazer a
+ *   mistura saltar enquanto o resto do rig atravessa.
  */
-export function updateSkyBlend(nightness: number) {
+export function updateSkyBlend(peso: number) {
   if (!alvo) return;
-  const p = pesoDe(nightness);
+  const p = THREE.MathUtils.clamp(peso, 0, 1);
   if (Math.abs(p - pesoAtual) < 1e-4) return;
   pesoAtual = p;
   pintar();

@@ -387,8 +387,14 @@ if (sb0 && sb0.ativo) {
   for (let i = 0; i < 4; i++) await B.frame();
   const meioPeso = L.getSkyBlend().peso;
   out.push(['peso a 18:12 (poente)', r2(meioPeso)]);
-  /* A curva mantém o poente sem lua: `nightness` a 18h12 é baixo, e o peso da
-     noite só começa em 0,25 de escuridão. */
+  /* A CURVA MANTÉM O POENTE SEM LUA — a trava que o cabeçalho de skyblend.ts
+     mede (pico 55 633 da lua contra 33 do sol domado do `_puresky`).
+     ⚠️ O MECANISMO MUDOU EM 2026-08-24 E O LIMITE FICOU MAIS APERTADO, não mais
+     frouxo: o peso saía de `smoothstep(nightness, 0,25…0,95)` e passou a sair da
+     ALTITUDE do sol (`skyMixAt()`, banda +10°…−12°), porque `nightness` satura
+     às 19:20 e o céu ficava congelado de lá até as 24:00 — ver §47.3 do
+     ARCHITECTURE.md. Às 18:12, com o sol ainda a +3,5°, o peso caiu de 0,34 para
+     0,21. O teto de 0,35 desta linha continua valendo e agora com folga. */
   out.push(['18:12 ainda é quase todo de dia', meioPeso < 0.35]);
 
   /* A VARREDURA. Anda o relógio de 12 a 24 em passos de 0,25 h (o passo do

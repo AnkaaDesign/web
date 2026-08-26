@@ -236,8 +236,16 @@
    | `antialias` | true | true | true | nada — ver o bloco dele | — |
    | `spotPool` | 14 | 6 | 0 | a poça de luz sob os postes à noite | ⚠️ **EXCEÇÃO NOMEADA**, e a única da tabela. Ver o cabeçalho |
    | `shadowType` | pcf | pcf | basic | borda de sombra dura; `shadow.radius` deixa de existir | 17 taps viram 1: é contagem de amostras, o caso mais literal da regra |
-   | `groundVariant` | — | `@ktx2` | `@ktx2` | UASTC/BC7 a 2048²: erro de 0,11 a 5,80 | mesma imagem, 1/4 dos bytes. Só entra se o manifesto declarar |
-   | `hdrVariant` | — | — | `@1k` | o FUNDO de céu amolece | a ILUMINAÇÃO não muda: o PMREM já borra o irradiance |
+   | `groundVariant` | — | `@ktx2` | `@ktx2-1k` | UASTC/BC7 a 2048²: erro de 0,11 a 5,80 | mesma imagem, 1/4 dos bytes. Só entra se o manifesto declarar |
+   | `hdrVariant` | — | **`@1k`** | `@1k` | o FUNDO de céu amolece | a ILUMINAÇÃO não muda — MEDIDO em −0,08 %; ver o bloco do campo |
+
+   ⚠️ **AS DUAS ÚLTIMAS LINHAS SÓ SAÍRAM DO PAPEL EM 2026-08-15 E 2026-08-24**, e
+   as datas são diferentes porque os arquivos subiram em datas diferentes. Um
+   degrau de ASSET não está no ar quando esta tabela o escreve: ele está no ar
+   quando o arquivo existe **e** o manifesto o declara. Entre 14/08 e 24/08 o
+   `hdrVariant` do Baixo era uma linha desta tabela e nada mais — `hdrVariant()`
+   devolvia `''` nos três níveis e o Baixo carregava os mesmos 75,5 MB do Alto.
+   Ver o bloco do campo.
 
    ---------------------------------------------------------------------------
    ⚠️⚠️ A FUSÃO ATERRISSOU, E A MEDIÇÃO MUDA COMO ESTA TABELA SE LÊ
@@ -995,8 +1003,34 @@ export interface ColdProfile {
    *  melhor dos dois mundos mantém ESSES QUATRO a 2048² e o resto a 1024²:
    *  37,3 MB de VRAM com erro máximo 5,68. Não é expressável neste enum, que é
    *  uma escolha por CONJUNTO — seria uma escolha por ARQUIVO.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * ⚰️ `'@1k'` FOI ARRANCADO DESTA UNIÃO EM 2026-08-24, e a lápide fica aqui
+   * porque este é o arquivo que DECLARA o enum — a mesma razão pela qual a de
+   * `floorReflection: 'lod'` ficou no bloco daquele campo.
+   *
+   * DOIS motivos, e o segundo é o que torna a remoção obrigatória em vez de
+   * arrumação:
+   *
+   *   1. **Ele já era dominado, e a própria tabela acima mede isso.**
+   *      `@ktx2-1k` ganha do resize simples nos DOIS eixos (17,96 MB de fio
+   *      contra 22,20 e 21,3 MB de VRAM contra 341,3) com o erro dentro de 4 %.
+   *      Nenhum nível o pedia, e um valor que nenhum nível pede é um estado
+   *      morto — a pior forma de um estado morrer, como diz o bloco do reflexo.
+   *   2. ⚠️ **`@1k` PASSOU A SIGNIFICAR OUTRA COISA.** `setAvailableVariants()`
+   *      guarda UMA lista para os DOIS consumidores (chão e HDR), e desde
+   *      2026-08-24 o manifesto declara `@1k` para liberar `sky@1k.hdr` /
+   *      `sky-night@1k.hdr`. Não existe — e nunca existiu — nenhuma textura de
+   *      chão `*@1k.*` no disco. Enquanto `'@1k'` fosse um valor legal AQUI, um
+   *      nível que o escolhesse passaria pela peneira de `coldProfile()`
+   *      (porque a lista o declara) e pediria 16 arquivos que não existem: 16
+   *      404 mudos e o chão sem textura. O enum é a única trava que impede
+   *      isso, então ela vale mais fechada do que aberta.
+   *
+   * Quem um dia quiser mesmo o chão a 1024² sem compressão publica os arquivos,
+   * escolhe um sufixo que NÃO colida com o do HDR e devolve o valor à união.
    */
-  groundVariant: '' | '@1k' | '@ktx2' | '@ktx2-1k';
+  groundVariant: '' | '@ktx2' | '@ktx2-1k';
   /**
    * A variante dos HDRs de ambiente.
    *
@@ -1009,6 +1043,47 @@ export interface ColdProfile {
    * Custo visual: o PMREM já borra o irradiance, então a ILUMINAÇÃO não sofre
    * nada perceptível — quem sofre é o FUNDO, que é a mesma textura posta em
    * `scene.background`. Defensável no Médio, certo no Baixo, **nunca na Alta**.
+   *
+   * ---------------------------------------------------------------------------
+   * ⚠️⚠️ ESTE CAMPO FOI INERTE DE 2026-08-14 A 2026-08-24, E POR ISSO O NÍVEL
+   * BAIXO NUNCA RECEBEU O DEGRAU QUE A TABELA PROMETIA.
+   *
+   * A causa é a peneira logo abaixo (`coldProfile()`): o sufixo só é emitido
+   * quando o MANIFESTO declara que o arquivo existe, e `environments.json`
+   * declarava `["@ktx2", "@ktx2-1k"]` — nunca `@1k`. Os arquivos também não
+   * existiam. Então `hdrVariant()` devolvia `''` nos três níveis e o Baixo
+   * carregava os mesmos 75,5 MB do Alto.
+   *
+   * ⚠️ A PENEIRA NÃO ERRADA — ela fez exatamente o que existe para fazer, e
+   * silenciosamente, que é o que ela existe para fazer. A lição é a outra: **um
+   * degrau que depende de arquivo não está pronto quando a tabela o escreve;
+   * está pronto quando o arquivo sobe E o manifesto o declara.** Foi o mesmo
+   * buraco de `groundVariant` entre 2026-08-14 e 2026-08-15, e agora está
+   * fechado nos dois.
+   *
+   * MEDIDO com `tools/env-build/hdri_stats.py` (o leitor de RGBE que a §1.0 do
+   * CREDITS.md afirmava ser reproduzível e não era — ele passou a existir junto
+   * com este degrau), comparando o arquivo de 2048×1024 com o de 1024×512 que o
+   * Poly Haven publica:
+   *
+   *     média sólida (a luz que o PMREM devolve)   0,71701 → 0,71700   (−0,001 %)
+   *     média sólida, plate de noite               0,30995 → 0,30970   (−0,08 %)
+   *     coluna da fonte em `u`                     0,5815  → 0,5805
+   *     pico (o disco domado / a lua)              33,0 → 19,6 · 55 633 → 36 416
+   *
+   * A ILUMINAÇÃO É A MESMA a menos de um décimo de por cento, que é o que o
+   * bloco acima afirmava sem prova. O pico cai porque quatro texels viram um —
+   * e a lua continua sendo um disco branco estourado depois do tonemap.
+   *
+   * ⚠️ E O MÉDIO PASSOU A PEDI-LO TAMBÉM (2026-08-24), revertendo o `''` da
+   * versão anterior. Três razões, em ordem de peso: (a) o alvo de mistura de
+   * `scene/skyblend.ts` é alocado NO TAMANHO DA FONTE, então a variante leva
+   * junto 16,8 MB de meio-float e o PMREM de 25 MB — é o único botão desta
+   * tabela que devolve memória em TRÊS lugares de uma vez; (b) o pico de
+   * assadura do PMREM é o engasgo do arrasto do relógio, e ele escala com a
+   * ÁREA — no Médio, que já reduziu os passos de 12 para 8, é o que falta para
+   * o arrasto ficar liso; (c) o que se perde é a nitidez de um CÉU visto atrás
+   * de um caminhão, e mip 0 do PMREM continua dando 256 px por face de cubo.
    */
   hdrVariant: '' | '@1k';
 }
@@ -1195,7 +1270,12 @@ const PROFILES: Record<QualityLevel, QualityProfile> = {
 
 const COLD: Record<QualityLevel, ColdProfile> = {
   alta:  { antialias: true, spotPool: 14, shadowType: 'pcf',   groundVariant: '',      hdrVariant: '' },
-  media: { antialias: true, spotPool: 6,  shadowType: 'pcf',   groundVariant: '@ktx2',    hdrVariant: '' },
+  /* `hdrVariant: '@1k'` E NÃO `''` DESDE 2026-08-24 — ver o bloco do campo. Em
+     resumo: é o único botão frio que devolve memória em TRÊS lugares de uma vez
+     (os dois equirects crus, o alvo de mistura de skyblend e o PMREM dele), e o
+     pico de assadura que ele barateia é justamente o engasgo do arrasto do
+     relógio. A iluminação fica a −0,08 % da de 2048², medida. */
+  media: { antialias: true, spotPool: 6,  shadowType: 'pcf',   groundVariant: '@ktx2',    hdrVariant: '@1k' },
   /* O Baixo desce para 1024² comprimido, e não para 2048² comprimido: ele é o
      nível da máquina que não tem memória NEM banda, e é o único degrau que
      baixa as duas ao mesmo tempo. Ver a tabela em `groundVariant`. */
