@@ -7508,3 +7508,47 @@ node tools/studio-bench/bench.mjs --gpu --geometry \
 node tools/chassis-bake/probe-regiao.cjs public/models/trucks/vw_titan_4x2_tl.glb \
      --caixa 1.130 3.0 0.500 1.100 -12 12 --norm -0.0036 --abs-x --top 60
 ```
+
+### 50.8 O TRAÇADO saiu do catálogo — `scania-p/6x4r`
+
+*"remova os traçados, não são necessários"* — Kennedy, 2026-08-26, depois de ver
+os cards de todas as cores.
+
+**Traçado é o 6x4** (dois eixos trativos), e entre os dez rígidos ele era um só:
+`scania/scania-p/6x4r`. §42 já tinha medido por que ele é um mau card —
+**difere do 6x2 em 0,63 %**, e a diferença inteira é um DIFERENCIAL clonado do
+eixo trativo para o auxiliar (12 994 triângulos transladados −1 356 mm) mais a
+viga morta retirada. Dois cards praticamente idênticos no passo de CHASSI, um
+deles com 26 cartões de cor renderizados minutos antes.
+
+Sai dos QUATRO manifestos, que é onde ele existe como produto:
+
+| arquivo | o que saiu |
+|---|---|
+| `brands/trucks/brands.json` | o bloco do chassi (o seletor deixa de oferecê-lo) |
+| `models/vehicles/mounts.json` | `scania-p-6x4r` — a mesa da longarina |
+| `models/vehicles/plates.json` | o sítio de placa de `scania_p_6x4r.glb` |
+| `renders/renders.json` | os 26 cartões · 54 → **53** combinações, 975 → **949** imagens |
+
+⚠️ **O ARQUIVO E OS CARTÕES FICAM NO SERVIDOR, e não é desleixo:**
+`/studio-assets/v1/` responde `immutable` e `--delete` é proibido naquela
+árvore (ver `api/docs/DEPLOYMENT-studio-assets.md`). Deixar de ANUNCIAR já tira
+o caminhão do produto — o seletor lê o manifesto antes de montar qualquer URL —,
+e apagar bytes de uma árvore imutável é o que quebra um navegador que ainda tem
+o `brands.json` velho em cache. Os 28,6 MB e os 26 webp ficam lá, mudos.
+
+⚠️ **E A RECEITA CONTINUA VIVA.** `tools/chassis-bake/cut-scania.cjs` mantém a
+entrada `{ arquivo: 'scania_p_6x4r.glb', rotulo: 'traçado 6x4', cortes:
+[CORTE_DIR2], enxerto: ENXERTO_DIF }`, e `tools/placa/probe.mjs` mantém a altura
+medida da placa dele. Tirar do catálogo é uma decisão de PRODUTO; refazer o bake
+é meia hora de trabalho que não precisa ser feita duas vezes. Se ele voltar a
+`brands.json`, volta inteiro.
+
+Os dois portões que traziam o chassi na mão foram acertados —
+`checks-estepe-conjunto-0825.mjs` passa a varrer três configurações e a régua de
+★ D perde a linha dele. Portão de pré-publicação: **7 marcas · 22 modelos ·
+51 chassis**.
+
+> Os outros dois 6x4 do catálogo (`daf/daf-xd/6x4t-sl` e `daf/daf-xg-2021/6x4t`)
+> **ficaram**: são CAVALOS, estão no ar desde muito antes desta rodada, e a
+> decisão foi sobre o rígido.

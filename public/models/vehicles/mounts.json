@@ -350,48 +350,6 @@
       "measuredBy": "tools/chassis-bake/cut-scania.cjs@1",
       "measuredAt": "2026-08-20"
     },
-    "scania-p-6x4r": {
-      "sourceFile": "models/trucks/scania_p_6x4r.glb",
-      "orientYaw": 3.141592653589793,
-      "groundY": -0.0607,
-      "centerX": 0,
-      "frameTopY": 1.0373,
-      "frameSlope": -0.01591,
-      "cabRearZ": 0.6876,
-      "cabTopY": 3.3072,
-      "frameEndZ": -8.6802,
-      "railX": 0.425,
-      "axles": {
-        "config": "6x4",
-        "steerZ": [
-          1.6402
-        ],
-        "driveZ": [
-          -4.9318,
-          -6.288
-        ],
-        "liftZ": []
-      },
-      "tail": {
-        "railEndZ": -8.6305,
-        "tailEndZ": -8.6802,
-        "cutZ": -7.6605,
-        "bays": [
-          {
-            "z": -7.6605,
-            "cap": 0.6678
-          },
-          {
-            "z": -7.0055,
-            "cap": 0.2863
-          }
-        ]
-      },
-      "_derivadoDe": "models/trucks/scania_p_8x2r.glb",
-      "_derivacao": "tracado 6x4 — 2o direcional removido e o DIFERENCIAL do trativo clonado no auxiliar (12 994 tri), com a viga morta dele retirada. A GEOMETRIA NAO SE MOVEU: frameTopY, frameSlope, cabRearZ, groundY, centerX, railX e o bloco tail sao os mesmos do 8x2 por construcao — a cirurgia so REMOVE e, no 6x4, CLONA em Z. Ver tools/chassis-bake/cut-scania.cjs.",
-      "measuredBy": "tools/chassis-bake/cut-scania.cjs@1",
-      "measuredAt": "2026-08-20"
-    },
     "volvo-vm-2015-4x2r": {
       "sourceFile": "models/trucks/volvo_vm_2015_4x2r.glb",
       "orientYaw": 3.141592653589793,

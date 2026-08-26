@@ -197,7 +197,13 @@ const perto = (a, b, tol) => Math.abs(a - b) <= tol;
 const casaCaixa = (it, [x, y, z]) => perto(it.d.x * 1000, x, TOL)
   && perto(it.d.y * 1000, y, TOL) && perto(it.d.z * 1000, z, TOL);
 
-for (const chassi of ['4x2r', '6x2r', '6x4r', '8x2r']) {
+/* ⚠️ TRÊS, e não quatro: o `6x4r` (o traçado) SAIU DO CATÁLOGO em 2026-08-26 —
+   ele diferia do 6x2 em 0,63 % (um diferencial enxertado) e eram dois cards
+   quase idênticos no seletor. O GLB continua no disco e a receita continua em
+   `tools/chassis-bake/cut-scania.cjs`; se ele voltar a `brands.json`, volta
+   aqui também. Medir um chassi que o catálogo não declara faria este portão
+   carregar um caminhão que o usuário não tem como escolher. */
+for (const chassi of ['4x2r', '6x2r', '8x2r']) {
   const M = await mede(chassi);
   const doMotor = (marca) => M.relato.filter((l) => l.includes(marca)).join(' ⏎ ');
   out.push([`${chassi} · varredura`, `${M.itens.length} peça(s) soldada(s) na vizinhança do estepe`

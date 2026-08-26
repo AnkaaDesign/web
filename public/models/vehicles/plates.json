@@ -487,27 +487,6 @@
    "fonte": "altura autorada",
    "motivo": "idem scania_p_8x2r — mesmo para-choque, recorte só remove eixo"
   },
-  "models/trucks/scania_p_6x4r.glb": {
-   "pos": [
-    -0.00111,
-    0.3597,
-    -3.06338
-   ],
-   "normal": [
-    0.00062,
-    0.02757,
-    -0.99962
-   ],
-   "vao": 0.014,
-   "alturaSolo": 0.42,
-   "ajuste": {
-    "rms": 1.25,
-    "res": 6.86,
-    "inclinacaoGraus": 1.58
-   },
-   "fonte": "altura autorada",
-   "motivo": "idem scania_p_8x2r — mesmo para-choque, recorte só remove eixo"
-  },
   "models/trucks/scania_p_8x2r.glb": {
    "pos": [
     -0.00111,

@@ -28,8 +28,8 @@
     "height": 600
   },
   "counts": {
-    "combinacoes": 54,
-    "imagens": 975
+    "combinacoes": 53,
+    "imagens": 949
   },
   "have": {
     "daf/daf-xd/4x2-sl": [
@@ -275,34 +275,6 @@
       "f284cdba-7a61-4ed5-b584-02a4ed184815"
     ],
     "scania/scania-p/6x2r": [
-      "neutro",
-      "0af68af1-aa39-46de-b050-7a8e3941a30c",
-      "139f8361-82be-472b-bdf7-840c9de5141e",
-      "17f6dac7-bd26-4eaf-ba59-fc875a18690f",
-      "2e1fef79-16c9-4042-9e10-0e04f7cea56c",
-      "32313886-2d7d-4301-828e-8bef36cd47c8",
-      "3e904fb5-5e3e-4647-bb79-a75075de2a67",
-      "46d6ee0f-f911-44ee-973b-14ec9a013fcb",
-      "56870dfb-02c0-4a34-876d-c2477f25faaf",
-      "5e5eb2f0-c0d0-4f1f-842b-8de767adc516",
-      "603e16af-5c3b-4f0e-90f2-4ffb716d3861",
-      "8a953875-0206-4ca3-af2e-3a8e076762bc",
-      "8e8ae3c9-6fe0-4956-83a7-97aa18447584",
-      "9c2913e5-e39d-4fd2-9f98-6d754e465c00",
-      "a40dc298-be64-41f4-b932-bd8cb198b6a2",
-      "ae25bb49-af02-4cc8-8cde-ec5f5227c9c0",
-      "b5e8578a-8d21-4c4d-903a-5e516b75b978",
-      "bff173a3-856b-4f25-abd3-5ad611813e56",
-      "c079552a-c856-46c8-985e-63cccff960bd",
-      "cc101215-6fcf-4146-b4af-062427d5467f",
-      "cd4f162d-08fe-48fa-a857-de64b01185a3",
-      "d2d16bb1-f623-43f7-ae11-b1bb51ab1a58",
-      "d8c52457-ab85-4c8b-bc63-cbc5699b6181",
-      "de11bf84-9e49-4974-b3d6-e5dd81142cf1",
-      "df7794d8-7d33-4a5f-b7ea-5550fd09a349",
-      "f284cdba-7a61-4ed5-b584-02a4ed184815"
-    ],
-    "scania/scania-p/6x4r": [
       "neutro",
       "0af68af1-aa39-46de-b050-7a8e3941a30c",
       "139f8361-82be-472b-bdf7-840c9de5141e",

@@ -276,18 +276,6 @@
               ],
               "_derivadoDe": "8x2r",
               "_note": "Idem, mais o eixo auxiliar inteiro — 919 116 triangulos a menos que a fonte. ⚠️ O balanco traseiro de fabrica (3,75 m do eixo trativo ao para-choque) estoura o limite de 3,50 m da CONTRAN 882/2021; quem o encurta e stretchRigidFrame(), e este arquivo tem 1 657,9 mm de baia para isso (uma a mais que os irmaos, no vao do eixo que saiu)."
-            },
-            {
-              "id": "6x4r",
-              "name": "6x4 traçado",
-              "file": "models/trucks/scania_p_6x4r.glb",
-              "available": true,
-              "paintMaterials": [
-                "pintura",
-                "paralama_f_0_mat_0001_plastic_hard_64"
-              ],
-              "_derivadoDe": "8x2r",
-              "_note": "Idem do 6x2, mais o DIFERENCIAL do eixo trativo clonado no auxiliar (12 994 triangulos, transladados -1 356 mm, o vao do tandem) e a viga morta do auxiliar retirada — um eixo trativo nao tem viga morta, quem carrega ali e a carcaca."
             }
           ]
         }

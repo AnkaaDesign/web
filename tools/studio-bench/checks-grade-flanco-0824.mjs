@@ -89,7 +89,6 @@ const REGUA = {
   'scania-p/8x2r': 4.907,
   'scania-p/6x2r': 5.113,
   'scania-p/4x2r': 5.469,
-  'scania-p/6x4r': 5.113,
   'volvo-vm-2015/8x2r': 4.780,
   'volvo-vm-2015/6x2r': 5.410,
   'volvo-vm-2015/4x2r': 5.703,
