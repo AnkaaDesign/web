@@ -1,0 +1,47 @@
+{
+ "_note": "Medidas do implemento em ESPACO DO MODELO, no mesmo referencial que engine/vehicle/models.ts usa: frontZ = maior z das chapas SIDE_L/SIDE_R/REAR, que neste glb da 7.175.",
+ "kingpin": {
+  "zFromFront": 0.879,
+  "plateBottomY": 1.2418,
+  "_note": "zFromFront era 1.679. A chapa do pino e furada para DUAS posicoes, 800 mm entre elas na linha de centro; o rip trouxe o pino na traseira e o Kennedy pediu na dianteira, que e o que a passagem moveKingpin() faz no viewer do Semirreboque (frame.js: pino z 5.627 <-> anel cego z 6.427). Este glb ja sai com o pino na frente, entao a distancia dele ate a dianteira encurtou EXATAMENTE 800 mm. Sem esta correcao o pino ficava 0,8 m a frente da quinta roda e o conjunto engatava no vazio. Os 800 mm sao a unica coisa alterada ali: o offset de ~131 mm que o valor antigo ja carregava (1.679 contra 1.548 de centro a centro) foi mantido de proposito, porque foi calibrado contra o render.\n\nplateBottomY era 1.223 e foi MEDIDO de novo: 1.2418, por raycast para cima sob a quinta roda no proprio app, com o implemento assentado pelos pneus. Vale so para ESTE glb - o modelo corrigido teve as rodas refeitas por roundWheels() e o app assenta pelos pneus, entao o zero nao e o mesmo do export antigo; remedir se as rodas mudarem. A chapa fica 91 mm ACIMA da quinta roda desta cabine (topY 1.151), e era essa a folga visivel no engate: placeTrailer() fazia Math.max(0, lift) e descartava o caso negativo, entao nenhum valor aqui conseguia fechar. Agora o lift negativo vira INCLINACAO - o implemento cai de nariz sobre o pino girando no contato dos pneus, ~0,5 grau para 91 mm num braco de ~10 m - que e o que um conjunto real faz."
+ },
+ "front": {
+  "bodyBottomY": 1.392
+ },
+ "outlineSide": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   1.0,
+   0.0
+  ],
+  [
+   1.0,
+   1.0
+  ],
+  [
+   0.0,
+   1.0
+  ]
+ ],
+ "outlineRear": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   1.0,
+   0.0
+  ],
+  [
+   1.0,
+   1.0
+  ],
+  [
+   0.0,
+   1.0
+  ]
+ ]
+}

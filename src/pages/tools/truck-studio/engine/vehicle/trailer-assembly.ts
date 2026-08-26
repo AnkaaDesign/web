@@ -619,6 +619,41 @@ export interface AssemblyRefs {
   z1: number;
   baseHeight: number;
   baseLength: number;
+  /**
+   * ESTE IMPLEMENTO TRAZ O PRÓPRIO SUB-CHASSI — e por isso o que está sob o
+   * piso NÃO é chassi alheio.
+   *
+   * Todo o filtro de saia deste arquivo nasceu no SEMIRREBOQUE, onde a
+   * premissa "abaixo do piso ⇒ imóvel" é verdadeira e valiosa: ali embaixo
+   * estão o bogie, a rodagem, a patola, o estepe e os para-lamas — 3,3 M de
+   * vértices que não mudam de lugar quando o baú cresce, e cujo desperdício
+   * de decomposição o corte evita.
+   *
+   * Num SOBRECHASSI a premissa se inverte. Ele não tem rodagem nenhuma
+   * (`has.wheels: false`): o que mora sob o piso é o SUB-CHASSI, que é
+   * carroceria e é fabricado no comprimento do baú. Medido no gancheiro, o
+   * corte de saia descartava, uma por uma:
+   *
+   *     longarinas auxiliares   65 × 180 × 8 450 mm   y 0,801…0,981
+   *     travessas do sub-chassi 855 × 100 × 40        y 0,806…0,906
+   *     cartelas                300 × 220 × 6,4       y 0,813…1,033
+   *     mãos-francesas          52 × 160 × 108        y 0,806……
+   *     perfil corrido          54,9 × 15 × 8 260     y 0,966  (some pelo VÃO)
+   *
+   * As quatro primeiras morrem em `min.y < floorY − SKIRT_BAND` (0,15 m); a
+   * quinta passa a altura e morre em `dz > TRIM_MAX` (0,35 m). Nenhuma delas
+   * entra em `parts`, logo `set()` nunca as toca: **um baú de 10 m fica sobre
+   * um sub-chassi de 8,45 m.**
+   *
+   * A régua que separa os dois casos é a mesma de `measureMountDatum()` em
+   * `vehicle/mounting.ts` — quem ATRAVESSA a carroceria é estrutura dela — e
+   * ela já foi validada ali. Aqui a decisão é DECLARADA e não medida, de
+   * propósito: um bake de sobrechassi que perdesse o sub-chassi seria
+   * indistinguível, por medida, de um semirreboque, e o modo de falhar dos
+   * dois é oposto (aqui sobra peça parada; lá some rodagem inteira do corte
+   * de desempenho). Ver `TrailerBodyOptions.subframe`.
+   */
+  subframe?: boolean;
 }
 
 export class TrailerAssembly {
@@ -670,8 +705,14 @@ export class TrailerAssembly {
          de recuar com a porta — sem isto elas ficavam paradas a 6,04 m da
          traseira nova. Elas se distinguem do chassi pelo Z, não pela altura. */
       const rearTail = box.max.z <= z0 + REAR_TAIL && pos.count <= HEAVY_VERTS;
-      if (!rearTail && box.max.y <= floorY + 0.02
-        && (box.max.y < floorY - SKIRT_BAND || pos.count > HEAVY_VERTS)) {
+      /* COM SUB-CHASSI PRÓPRIO, só o corte de PESO continua valendo: o que
+         mora sob o piso é carroceria e tem de acompanhar o comprimento. O
+         corte por DISTÂNCIA do piso existe para pular rodagem, e um
+         sobrechassi não tem rodagem. Ver `AssemblyRefs.subframe`. */
+      const foraDoCorte = ref.subframe
+        ? pos.count > HEAVY_VERTS
+        : (box.max.y < floorY - SKIRT_BAND || pos.count > HEAVY_VERTS);
+      if (!rearTail && box.max.y <= floorY + 0.02 && foraDoCorte) {
         this.stats.skipped++; continue;
       }
 
@@ -700,6 +741,39 @@ export class TrailerAssembly {
     this.bindFamilies();
     this.pinLowFrame();
     this.stats.repeats = this.repeats.length;
+
+    /* ⚠️⚠️ E ASSENTA NA MEDIDA DE FÁBRICA — o conjunto NÃO nasce montado.
+       -----------------------------------------------------------------------
+       Todo `InstancedMesh` deste construtor nasce com `count = 0` (o bloco de
+       `buildRepeats()` explica por quê: o three entrega a capacidade inteira em
+       matriz IDENTIDADE, e uma fileira de fita empilhada na origem aparece como
+       uma lasca no asfalto). Quem os preenche é `set()`, e quem chamava `set()`
+       era só `TrailerRig.set()` — ou seja, o PRIMEIRO ARRASTE DO CONTROLE DE
+       MEDIDA. Até lá o conjunto ficava num estado que o motor nunca produz:
+       instâncias vazias E as cascas de origem ainda de pé.
+
+       MEDIDO no sobrechassi sobre o Scania P (2026-08-22, boot limpo, sem tocar
+       em medida nenhuma):
+
+           REPEAT_skirt_14 [Faixa-3M]      count 0   (own 0…13, cap 42)
+           REPEAT_skirt_3  [lanternas]     count 0   (×7)
+           RIVET_LOW_L/R                   count 0
+           fam.count                       1         ← `set()` nunca escreveu
+
+       e o que a tela mostrava era a fita DO BAKE, com os buracos do bake: no
+       flanco −x faltavam duas peças de 300 mm, abrindo um vão de **1 368 mm**
+       onde o passo é 256, e nos dois flancos a peça de canto traseiro deixava
+       550 mm em vez de 256. *"as faixas refletivas não possuem um espaçamento
+       perfeito entre si"* — Kennedy. Um `set()` manual na mesma sessão devolve
+       `count 14` e o passo de 556 mm certinho, o que prova que não faltava
+       régua: faltava a chamada.
+
+       Assentar aqui é a IDENTIDADE para tudo o que não é conjunto repetido —
+       `ky = kz = 1`, `dRoof = dzRear = 0`, e cada vértice mapeia em si mesmo.
+       O único efeito é colapsar as cascas que viraram instância e preencher as
+       instâncias. Ou seja: o estado de boot passa a ser o MESMO estado que o
+       motor produz para essas medidas, que é a invariante que faltava. */
+    this.set(ref.baseHeight, ref.baseLength);
   }
 
   /**
@@ -1603,9 +1677,22 @@ export class TrailerAssembly {
            1,267), a tampa da lanterna (1,089…1,254) e o para-choque (0,457…
            0,608) morrem aqui se o corte olhar só a altura, e ficam parados no
            meio do baú. Eles sobrevivem à malha e morriam na casca. */
-        if (min.y < floorY - SKIRT_BAND) continue;
-        if (max.x - min.x > TRIM_MAX || max.y - min.y > TRIM_MAX || max.z - min.z > TRIM_MAX) continue;
-        below = true;
+        const saia = min.y >= floorY - SKIRT_BAND
+          && max.x - min.x <= TRIM_MAX
+          && max.y - min.y <= TRIM_MAX
+          && max.z - min.z <= TRIM_MAX;
+        if (saia) below = true;
+        /* O QUE NÃO É SAIA. Sem sub-chassi próprio é chassi alheio e fica
+           parado — o comportamento de sempre, e é ele que mantém o bogie, o
+           estepe e os para-lamas do semirreboque no lugar.
+
+           Com sub-chassi, cai no fluxo normal logo abaixo, e as duas regras
+           já dão a resposta certa sem caso especial: `touchesFloor` o ancora
+           em Y (o sub-chassi assenta na mesa da longarina e não sobe quando a
+           altura do baú sobe) e a regra de Z separa sozinha a longarina
+           auxiliar de 8,45 m, que ESTICA (`span`), da travessa de 40 mm, que
+           acompanha o vão sem engordar (`rigidZ`). */
+        else if (!this.ref.subframe) continue;
       }
       if (max.x > this.outerX) this.outerX = max.x;
       if (-min.x > this.outerX) this.outerX = -min.x;

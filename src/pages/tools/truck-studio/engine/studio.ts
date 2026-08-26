@@ -1187,6 +1187,30 @@ async function runApply(
      (os pares byte-idênticos) não pagam um download por troca de carta. */
   const needCab = first || models.state.cabId !== cabFile;
 
+  /* ---- O IMPLEMENTO SEGUE O CHASSI ----
+     -----------------------------------------------------------------------
+     Um caminhão RÍGIDO não engata semirreboque: ele leva carroceria, e a
+     carroceria é um SOBRECHASSI aparafusado no quadro. Um cavalo mecânico é o
+     contrário. Não é preferência do usuário — é o que o veículo é —, então
+     não há um seletor de implemento: a escolha do chassi já decidiu.
+
+     `setImplement()` só GUARDA a escolha (ver o ⚠️ do cabeçalho dele): quem
+     recarrega é este bloco, dentro da orquestração que solta a fusão, baixa a
+     cortina e refaz `applyMergeNow()` no fim. Recarregar de dentro do catálogo
+     deixaria a fusão do implemento ANTIGO de pé sobre malhas que não existem
+     mais — a armadilha de §23.
+     E o `first ||` do `needTrailer` é o que mantém o boot idêntico ao de
+     antes: na primeira carga o implemento vem de qualquer jeito. */
+  const querKind = model.rigid ? 'sobrechassi' : 'semirreboque';
+  const implAtual = models.getCurrentImplement();
+  if (implAtual.kind !== querKind) {
+    const alvo = models.getImplements().find((d) => d.kind === querKind);
+    if (alvo) models.setImplement(alvo.id);
+    else console.warn('[implemento] nenhum', querKind, 'no catálogo —',
+      'o conjunto fica com', implAtual.label);
+  }
+  const needTrailer = first || models.getCurrentImplement().id !== models.state.implement.id;
+
   /* PESOS EM MEGABYTES, não em contagem de tarefas.
      ---------------------------------------------------------------------------
      Eram `{cab: 2, env: 3, trailer: 2}` — três tarefas, fatias parecidas — e
@@ -1326,7 +1350,7 @@ async function runApply(
         paintMaterialsOf(model, chassis, finish?.id ?? null)));
     }
     if (needEnv) tasks.push(applyEnvironment(env, progress.track('env')));
-    if (first) tasks.push(models.loadTrailer(progress.track('trailer')));
+    if (needTrailer) tasks.push(models.loadTrailer(progress.track('trailer')));
 
     /* allSettled, e NÃO Promise.all — ESTA É A CORREÇÃO DO ESTADO RASGADO.
        ---------------------------------------------------------------------
@@ -1365,8 +1389,13 @@ async function runApply(
        captura) passaram a precisar exatamente do mesmo quadro cedido. */
     const paint = paintFrame;
 
-    if (first) {
-      livery.attachOverlays(models.state.trailer as THREE.Object3D);
+    /* `needTrailer` e não `first`: desde que o implemento passou a ser trocável
+       (2026-08-18), uma troca de cavalo para rígido baixa OUTRA geometria, e as
+       sobreposições de arte ficariam penduradas nas chapas do implemento que
+       saiu — que já foram descartadas. O sintoma seria a plotagem sumir no
+       primeiro clique de chassi rígido, sem erro nenhum. */
+    if (needTrailer && models.state.trailer) {
+      livery.attachOverlays(models.state.trailer);
       livery.setOutlines(models.state.trailerMeta);
     }
     phase(0, 'Posicionando o veículo…');

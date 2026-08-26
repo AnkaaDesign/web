@@ -49,8 +49,9 @@
    mede a pele. `u×up` é, nas três faces, exatamente o "para fora". */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { TRAILER_ROOF_MESH } from './trailer-geometry';
 
-export type SnapshotKey = 'left' | 'right' | 'rear' | 'front';
+export type SnapshotKey = 'left' | 'right' | 'rear' | 'front' | 'roof';
 
 /**
  * A área LIVRE da chapa — do frame metálico para dentro — em frações da
@@ -124,8 +125,75 @@ export interface FaceSnapshot {
 /* A TESTEIRA usa a margem da traseira, e pela mesma razão: os montantes de
    canto já entram na caixa da chapa dos dois lados, e 3 cm fecham a peça sem
    começar a mostrar a parede lateral, que é outra face. */
-const M_SIDE: Record<SnapshotKey, number> = { left: 0.15, right: 0.15, rear: 0.03, front: 0.03 };
-const M_TOP = 0.01;
+/* O TETO: 3 cm nas pontas, pelo mesmo motivo da traseira — os arremates de
+   canto já entram na caixa da chapa, e mais que isso começaria a mostrar a
+   parede, que é outra face. */
+const M_SIDE: Record<SnapshotKey, number> = {
+  left: 0.15, right: 0.15, rear: 0.03, front: 0.03, roof: 0.03,
+};
+/**
+ * A folga de CIMA — e ela é MEDIDA, não constante.
+ *
+ * ⚠️⚠️ ELA ERA 0,01 m FIXO, E ISSO SÓ ESTAVA CERTO NUM DOS DOIS IMPLEMENTOS.
+ * *"veja, está cortando mais do que deveria no topo"* — Kennedy, 2026-08-22,
+ * com o editor da lateral do motorista aberto no sobrechassi. Medido no mesmo
+ * dia, quanto de ferragem existe ACIMA da caixa da chapa, na pegada do flanco:
+ *
+ *     semirreboque   5,1 mm   (a cantoneira de topo é rente à chapa)
+ *     sobrechassi    72,1 mm  (o trilho de topo sobe 72 mm além dela)
+ *
+ * Ou seja o 1 cm era a medida do PADRÃO OURO virada constante, e no bake novo
+ * ele decepava o frame — que é a peça que o card existe para mostrar, do mesmo
+ * jeito que os 9 cm de baixo existem para mostrar o trilho inferior inteiro.
+ *
+ * Agora ela sai da malha: a coroa medida mais uma folga, com PISO no valor
+ * antigo (para o semirreboque continuar exatamente como está) e TETO de 12 cm
+ * (acima disso não é arremate de topo, é outra peça, e o quadro começaria a
+ * mostrar céu).
+ */
+const M_TOP_MIN = 0.01;
+const M_TOP_MAX = 0.12;
+/** Folga acima da ferragem, para ela não fechar rente na borda do quadro. */
+const M_TOP_FOLGA = 0.008;
+
+/**
+ * Quanto de ferragem existe ACIMA da caixa da chapa, na pegada deste painel.
+ *
+ * Por VÉRTICE e não por caixa de malha, pela razão de sempre: no instante do
+ * retrato a fusão está de pé e a caixa de um balde é a do implemento inteiro.
+ * O passo de 3 vértices é seguro aqui porque a peça procurada é um perfil
+ * corrido de metros — não há como ela ter só dois vértices no flanco.
+ */
+function coroaAcimaDaChapa(panel: THREE.Mesh, lb: THREE.Box3, ehFlanco: boolean): number {
+  const raiz = panel.parent;
+  if (!raiz) return 0;
+  const inv = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
+  const meioX = (lb.min.x + lb.max.x) / 2;
+  const sgn = Math.sign(meioX) || 1;
+  const v = new THREE.Vector3();
+  const m = new THREE.Matrix4();
+  let topo = lb.max.y;
+  raiz.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.visible || o === panel) return;
+    /* O que NÃO conta como arremate: o que este módulo mesmo cria, a placa, e
+       a unidade de refrigeração (ela tem fatia própria, ver `D_OUT.front`). */
+    if (/RIVETS|FILETE|PLACA|^TS_|thermo/i.test(o.name || '')) return;
+    const a = o.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!a) return;
+    m.multiplyMatrices(inv, o.matrixWorld);
+    for (let i = 0; i < a.count; i += 3) {
+      v.set(a.getX(i), a.getY(i), a.getZ(i)).applyMatrix4(m);
+      if (v.y <= topo) continue;
+      if (v.z < lb.min.z - 0.02 || v.z > lb.max.z + 0.02) continue;
+      if (ehFlanco) {
+        if (Math.sign(v.x) !== sgn || Math.abs(v.x) < Math.abs(meioX) - 0.10) continue;
+      } else if (v.x < lb.min.x - 0.02 || v.x > lb.max.x + 0.02) continue;
+      topo = v.y;
+    }
+  });
+  return Math.max(0, topo - lb.max.y);
+}
 /**
  * A folga de baixo é POR FACE, e a das laterais não é sangria: é o trilho.
  *
@@ -182,7 +250,24 @@ const M_TOP = 0.01;
    dianteira, mais alta, e ela desce abaixo da linha em que a lateral já acabou.
    22 cm fecham a travessa inteira e param antes do conjunto do pino-rei e das
    patolas, que é o "nada do chassi" do mesmo pedido. */
-const M_BOTTOM: Record<SnapshotKey, number> = { left: 0.09, right: 0.09, rear: 0.31, front: 0.22 };
+/* ⚠️ NO TETO ESTA MARGEM NÃO É "PARA BAIXO", É PARA OS LADOS — e é ela que faz
+   o pedido de 2026-08-22 acontecer: *"a visão superior possui um frame
+   metálico, mas não aparece no livery do teto"*.
+
+   O quadro do teto tem u = z (comprimento) e v = x (largura), então `M_TOP` e
+   `M_BOTTOM` alargam o retrato em X. MEDIDO no gancheiro: a chapa do teto vai a
+   |x| 1 245 e o TRILHO DE TOPO — o frame que o dono vê de cima — ocupa
+   1 245…1 310. Com a margem das laterais (9 cm) o trilho entraria, mas com 20 cm
+   de asfalto junto; 8 cm mostram o frame inteiro e param 15 mm depois dele.
+
+   O teto declara a sua e `snapFace()` usa a MESMA nos dois lados quando a face
+   é horizontal — um retrato de cima não tem "em cima" e "embaixo" para
+   desequilibrar, e a coroa medida (que é o que resolve o corte das laterais)
+   não se aplica: lá o que sobe acima do plano da chapa é o próprio frame, e ele
+   já entra pelas margens de 80 mm. */
+const M_BOTTOM: Record<SnapshotKey, number> = {
+  left: 0.09, right: 0.09, rear: 0.31, front: 0.22, roof: 0.08,
+};
 
 /* Fatia de profundidade fotografada, a partir da pele: para FORA e para DENTRO.
    Dentro, o suficiente para a saia e o trilho — e pouco o bastante para o
@@ -204,8 +289,12 @@ const M_BOTTOM: Record<SnapshotKey, number> = { left: 0.09, right: 0.09, rear: 0
  * `hide` em `takeFaceSnapshots`), que é a resposta certa de qualquer forma: o
  * retrato é do IMPLEMENTO.
  */
+/* O TETO olha para BAIXO de 3 m de altura, e o que está "para fora" dele é o
+   céu. 25 cm bastam para o frame (26 mm acima do plano da chapa) e para as
+   fitas de canto, e param bem antes do Thermo King (141 mm acima do teto, mas
+   FORA da caixa da chapa em z) e de qualquer coisa do cenário. */
 const D_OUT: Record<SnapshotKey, number> = {
-  left: 0.30, right: 0.30, rear: 0.30, front: 0.75,
+  left: 0.30, right: 0.30, rear: 0.30, front: 0.75, roof: 0.25,
 };
 /**
  * E a fatia PARA DENTRO é por face, porque a traseira tem uma peça funda.
@@ -222,7 +311,13 @@ const D_OUT: Record<SnapshotKey, number> = {
  * oclui todo o interior do baú acima da travessa, então aumentar a fatia só
  * revela o que está ABAIXO das folhas — que é justamente a travessa.
  */
-const D_IN: Record<SnapshotKey, number> = { left: 0.30, right: 0.30, rear: 0.60, front: 0.30 };
+/* E PARA DENTRO, no teto, o suficiente para o trilho INTEIRO: ele vai de 77 mm
+   abaixo do plano da chapa a 26 mm acima (y 2 948…3 051 contra o teto em
+   3 025). 15 cm o trazem completo; a chapa do teto é opaca e oclui o interior,
+   então o que a fatia revela é só o que está por FORA dela — o frame. */
+const D_IN: Record<SnapshotKey, number> = {
+  left: 0.30, right: 0.30, rear: 0.60, front: 0.30, roof: 0.15,
+};
 
 /** Densidades: lateral tem 15 m — o teto de textura manda; a traseira é
  *  pequena e merece mais pixel por metro. */
@@ -442,7 +537,9 @@ function attrBox(mesh: THREE.Mesh): THREE.Box3 {
 
 /** Os eixos LOCAIS do desenho de cada face — os mesmos de `addLiveryUV()`:
  *  u corre o comprimento no sentido em que o painel é lido de fora, v desce. */
-const AXES: Record<SnapshotKey, { u: THREE.Vector3; skin: 'minX' | 'maxX' | 'minZ' | 'maxZ' }> = {
+const AXES: Record<SnapshotKey, {
+  u: THREE.Vector3; skin: 'minX' | 'maxX' | 'minZ' | 'maxZ' | 'maxY';
+}> = {
   left: { u: new THREE.Vector3(0, 0, 1), skin: 'minX' },
   right: { u: new THREE.Vector3(0, 0, -1), skin: 'maxX' },
   rear: { u: new THREE.Vector3(-1, 0, 0), skin: 'minZ' },
@@ -451,10 +548,19 @@ const AXES: Record<SnapshotKey, { u: THREE.Vector3; skin: 'minX' | 'maxX' | 'min
      duas tabelas têm de concordar ou o retrato sai invertido em relação à arte
      que ele emoldura. */
   front: { u: new THREE.Vector3(1, 0, 0), skin: 'maxZ' },
+  /* O TETO É A ÚNICA FACE HORIZONTAL. `addLiveryUV()` dá a ele `u = (z − minZ)/
+     spanZ` e `v = (max.x − x)/spanX`, ou seja: o comprimento corre em +Z e o
+     "para cima da tela" é +X. A base da câmera sai daí sem escolha nenhuma —
+     `out = u × up = (0,0,1) × (1,0,0) = (0,1,0)`, a lente apontando para baixo,
+     que é exatamente o que aquele bloco descreve. As duas tabelas TÊM de
+     concordar, ou o retrato sai espelhado em relação à arte que ele emoldura. */
+  roof: { u: new THREE.Vector3(0, 0, 1), skin: 'maxY' },
 };
 
 /** As faces de PONTA: o painel delas corre no X e a pele é um plano de z. */
 const isEndSkin = (skin: string) => skin === 'minZ' || skin === 'maxZ';
+/** A face HORIZONTAL: a pele é um plano de y e o "para cima" da tela é +X. */
+const isRoofSkin = (skin: string) => skin === 'maxY';
 
 /* ---------------- A ÁREA PINTÁVEL, MEDIDA NA FERRAGEM ----------------
    O passe da FRENTE já é, por construção, a resposta: ele contém exatamente o
@@ -562,33 +668,55 @@ function snapFace(
   const lb = attrBox(panel);
   const key: SnapshotKey = panel.name === 'SIDE_L' ? 'left'
     : panel.name === 'SIDE_R' ? 'right'
-      : panel.name === 'FRONT' ? 'front' : 'rear';
+      : panel.name === 'FRONT' ? 'front'
+        : panel.name === TRAILER_ROOF_MESH ? 'roof' : 'rear';
   const axes = AXES[key];
   const mBottom = M_BOTTOM[key];
   const mSide = M_SIDE[key];
+  const teto = isRoofSkin(axes.skin);
 
+  /* ⚠️ NO TETO O "ALTO" DO QUADRO É O X, e não o Y. A chapa do teto tem 2 mm de
+     espessura: medir a altura do retrato no y dela daria 2 mm e a foto sairia
+     numa tira de dois pixels. A segunda dimensão de uma face é sempre a que
+     não é `u` nem a normal — em pé isso é o y, deitado é o x. */
   const chapaW = axes.u.z !== 0 ? lb.max.z - lb.min.z : lb.max.x - lb.min.x;
-  const chapaH = lb.max.y - lb.min.y;
+  const chapaH = teto ? lb.max.x - lb.min.x : lb.max.y - lb.min.y;
   if (!(chapaW > 0.5 && chapaH > 0.5)) return null;
 
   const skinAt = axes.skin === 'minX' ? lb.min.x
     : axes.skin === 'maxX' ? lb.max.x
-      : axes.skin === 'maxZ' ? lb.max.z : lb.min.z;
+      : axes.skin === 'maxY' ? lb.max.y
+        : axes.skin === 'maxZ' ? lb.max.z : lb.min.z;
 
   /* Centro do QUADRO em coordenadas locais: o centro da chapa deslocado por
-     meia diferença de margens (as laterais são iguais; a vertical não). */
+     meia diferença de margens (as laterais são iguais; a vertical não).
+     No TETO as duas margens da segunda dimensão são a MESMA (`mBottom` dos dois
+     lados): um retrato de cima não tem "em cima" e "embaixo" para desequilibrar,
+     e o frame que ele existe para mostrar corre nos DOIS flancos. */
+  /* A COROA DE CIMA, MEDIDA — ver `coroaAcimaDaChapa()`. No TETO a segunda
+     dimensão é o x e as duas margens dela são iguais (`mBottom` dos dois
+     lados), então não há coroa a medir: quem mostra o frame lá é a margem
+     lateral, e ela já foi calibrada em 80 mm. */
+  const mTop = teto
+    ? mBottom
+    : Math.min(M_TOP_MAX, Math.max(M_TOP_MIN,
+      coroaAcimaDaChapa(panel, lb, !isEndSkin(axes.skin)) + M_TOP_FOLGA));
+
   const c = lb.getCenter(new THREE.Vector3());
-  if (isEndSkin(axes.skin)) c.z = skinAt; else c.x = skinAt;
-  c.y += (M_TOP - mBottom) / 2;
+  if (teto) c.y = skinAt;
+  else if (isEndSkin(axes.skin)) c.z = skinAt;
+  else c.x = skinAt;
+  if (!teto) c.y += (mTop - mBottom) / 2;
 
   const frameW = chapaW + 2 * mSide;
-  const frameH = chapaH + M_TOP + mBottom;
+  const frameH = chapaH + (teto ? 2 * mBottom : mTop + mBottom);
 
   /* Base da câmera no MUNDO, tirada da matriz do painel. */
   panel.updateWorldMatrix(true, false);
   const m = panel.matrixWorld;
   const uW = axes.u.clone().transformDirection(m);
-  const upW = new THREE.Vector3(0, 1, 0).transformDirection(m);
+  const upW = (teto ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0))
+    .transformDirection(m);
   const outW = new THREE.Vector3().crossVectors(uW, upW).normalize();
   const centerW = c.clone().applyMatrix4(m);
 
@@ -809,7 +937,7 @@ function snapFace(
   /* A FERRAGEM recortada na caixa da chapa: é o que o compositor da frente
      estica sobre a tela — mesma caixa, mesmo datum, registro exato. */
   const bx = Math.round(mSide * ppm);
-  const by = Math.round(M_TOP * ppm);
+  const by = Math.round(mTop * ppm);
   const bw = Math.max(1, Math.round(chapaW * ppm));
   const bh = Math.max(1, Math.round(chapaH * ppm));
   const crop = document.createElement('canvas');
@@ -962,8 +1090,13 @@ export async function takeFaceSnapshots(
    */
   only?: readonly SnapshotKey[],
 ): Promise<void> {
+  /* ⚠️ O TETO ENTROU EM 2026-08-22, e ele NÃO é chapa recortada: `TRAILER_ROOF`
+     é malha do corpo paramétrico (ver `tagRoofLiveryUV()` em `models.ts`).
+     Nada mais aqui precisou saber disso — o que `snapFace()` pede de um painel
+     é uma caixa e uma matriz, e os dois ele tem. */
   const names: Record<string, SnapshotKey> = {
     SIDE_L: 'left', SIDE_R: 'right', REAR: 'rear', FRONT: 'front',
+    [TRAILER_ROOF_MESH]: 'roof',
   };
   const querida = only ? new Set(only) : null;
   const panels: [SnapshotKey, THREE.Mesh][] = [];

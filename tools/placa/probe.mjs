@@ -156,6 +156,20 @@ const AUTORADOS = {
   'daf_xf_105_4x2.glb': { cy: 0.415, motivo: 'sem trecho plano de 130 mm; montada no pad do para-choque' },
   'daf_xf_105_6x2a_tl.glb': { cy: 0.415, motivo: 'idem daf_xf_105_4x2' },
   'daf_xf_105_6x4.glb': { cy: 0.415, motivo: 'idem daf_xf_105_4x2' },
+
+  /* ⚠️ A FAMÍLIA DERIVADA DO SCANIA P — a MESMA altura do bitruck, e por
+     construção.
+     `tools/chassis-bake/cut-scania.cjs` gera `_6x2r`, `_4x2r` e `_6x4r` a partir
+     de `scania_p_8x2r.glb` REMOVENDO eixo; o para-choque dianteiro sai byte a
+     byte idêntico. Medidos soltos (2026-08-22), os três caem em **0,450** contra
+     os **0,420** do bitruck, com `rms` 4,4 mm contra 1,2 — não porque a chapa
+     mudou, mas porque o que o segundo eixo direcional ocupava no z-buffer some e
+     a banda contínua passa a ir mais alto. Trinta milímetros de diferença na
+     MESMA peça é justamente o que um manifesto tem de não deixar acontecer: o
+     usuário troca 8x2 por 6x2 no seletor e a placa pula. */
+  'scania_p_6x2r.glb': { cy: 0.420, motivo: 'idem scania_p_8x2r — mesmo para-choque, recorte só remove eixo' },
+  'scania_p_4x2r.glb': { cy: 0.420, motivo: 'idem scania_p_8x2r — mesmo para-choque, recorte só remove eixo' },
+  'scania_p_6x4r.glb': { cy: 0.420, motivo: 'idem scania_p_8x2r — mesmo para-choque, recorte só remove eixo' },
 };
 
 /* ------------------------------------------------------------------ medidas */

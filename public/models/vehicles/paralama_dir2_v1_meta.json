@@ -1,0 +1,52 @@
+{
+  "_nota": "Para-lama do 2º eixo direcional, extraído do Scania P 8x2 (t_paralama_0_p0…p7) por tools/chassis-bake/rip-paralama.cjs. O VM e o VW são bitrucks DERIVADOS e não têm a peça; o Scania é bitruck de fábrica e tem. Montado por engine/vehicle/front-fender.ts.",
+  "origem": "models/trucks/scania_p_8x2r.glb",
+  "datum": {
+    "x": "linha de centro do caminhão (a peça é dos dois lados)",
+    "y": "CENTRO DO PNEU",
+    "z": "CENTRO DO EIXO",
+    "espaco": "cru do glTF (os três rígidos apontam para -Z; orientYaw = PI)"
+  },
+  "doador": {
+    "pneuDiametro": 0.9922,
+    "pneuFora": 1.193,
+    "pneuDentro": 0.9086,
+    "meiaBitola": 1.0508,
+    "_reguaDeX": "front-fender.ts escala x por pneuFora, e nao por meiaBitola: a varredura de runtime apanha pneu, aro, cubo e porca, e o |x| MINIMO entre eles muda de rip para rip. Medido, a meia-bitola punha o arco do VW em 1 355 mm de meia-largura — mais largo que o bau (1 335).",
+    "eixoZn": -0.5745,
+    "centroPneuYn": 0.4961
+  },
+  "caixa": {
+    "x": [
+      -1.2414,
+      1.2314
+    ],
+    "yRelativoAoCentro": [
+      -0.2641,
+      0.7095
+    ],
+    "zRelativoAoEixo": [
+      -0.7017,
+      0.6812
+    ]
+  },
+  "materiais": [
+    "ts_paralama_preto",
+    "ts_paralama_pintura",
+    "ts_paralama_metal",
+    "ts_paralama_plastico"
+  ],
+  "nos": [
+    "t_paralama_0_p0",
+    "t_paralama_0_p1",
+    "t_paralama_0_p2",
+    "t_paralama_0_p3",
+    "t_paralama_0_p4",
+    "t_paralama_0_p5",
+    "t_paralama_0_p6",
+    "t_paralama_0_p7"
+  ],
+  "componentes": 112,
+  "triangulos": 51736,
+  "medidoEm": "2026-08-23"
+}

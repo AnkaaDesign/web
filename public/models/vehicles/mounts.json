@@ -1,0 +1,601 @@
+{
+  "schema": "mounts@1",
+  "units": "m",
+  "axes": {
+    "forward": "+Z",
+    "up": "+Y",
+    "right": "+X",
+    "handedness": "right"
+  },
+  "_comment": [
+    "MONTAGEM DE CARROCERIA SOBRE CHASSI RIGIDO. E a contraparte de hitch.json:",
+    "aquele descreve a QUINTA RODA de um cavalo mecanico, este descreve a MESA DA",
+    "LONGARINA de um caminhao rigido. Um sobrechassi nao engata, ele e aparafusado.",
+    "",
+    "ESPACO. Os numeros estao no espaco NORMALIZADO (axes acima), NAO no cru do",
+    "GLB — mesma convencao de hitch.json. Os dois rigidos vem da mesma fonte que a",
+    "frota e apontam para -Z no arquivo, entao orientYaw e PI e os valores abaixo",
+    "ja estao com o giro aplicado (o eixo direcional fica no +Z).",
+    "",
+    "MEDIDO POR tools/trailer-bench/mountprobe.ts, em 2026-08-18, com o pneu",
+    "assentado em y = 0. Nao e conta: frameTopY sai do percentil 90 do maximo POR",
+    "CELULA de 250 mm na faixa da longarina (|x| 0,25 a 0,55) e foi conferido em",
+    "foto — a bancada desenha laminas coloridas nas alturas candidatas e a que",
+    "rasa a mesa e a que vale. O percentil existe porque a malha de chassi de um",
+    "rip traz travessa, suporte de para-lama e berco de eixo na mesma peca: o",
+    "maximo global e sempre um suporte e a mediana pega a alma, nao a mesa.",
+    "",
+    "A ALMA DA LONGARINA DOS DOIS ESTA EM |x| = 0,425 — 8,6 m2 de face lateral no",
+    "VM e 10,0 m2 no P, o que e a assinatura do perfil e nao coincidencia. Foi ela",
+    "que fixou a faixa de medicao.",
+    "",
+    "frameSlope e a INCLINACAO DA MESA no espaco normalizado (dy/dz, forward=+Z):",
+    "NEGATIVA porque a mesa CAI para a FRENTE. Medida em 2026-08-20 por",
+    "tools/studio-bench/checks-mesa-0820.mjs, e nao pelo mesmo caminho de",
+    "frameTopY: o percentil por celula nao isola a mesa (a faixa da longarina pega",
+    "travessa, tanque e berco de eixo, e os dois rigidos discordavam por 6x). O que",
+    "mede e o VAO: raios para baixo do fundo da carroceria ate a primeira coisa do",
+    "caminhao, ao longo da pegada, e a inclinacao sai por Theil-Sen sobre os pares.",
+    "No VM o perfil do vao e uma reta com 0,1 mm de residuo — 200 mm na frente e",
+    "6 mm atras, 27,63 mm/m. No P, 15,91 mm/m.",
+    "",
+    "cabRearZ e o MENOR z da cabine (ela fica no +Z); frameEndZ e o menor z do",
+    "quadro. A carroceria e montada com a testeira em cabRearZ - cabGap e cresce",
+    "para -Z, que e o mesmo sentido do semirreboque."
+  ],
+  "generated": "2026-08-18",
+  "_cabGapNote": "2026-08-20: 0,15 -> 0,25 m. *\"afaste um pouco o implemento da cabine\"* — Kennedy. A folga vale para os DOIS rigidos porque e convencao de montagem, nao propriedade do chassi: entre a parede da cabine e a testeira do bau tem de caber o basculamento da cabine, e 150 mm nao cabem em caminhao nenhum. CUSTO: `solveRigidMount` calcula `dz = (cabRearZ - cabGap) - body.frontZ`, entao afastar da cabine empurra a carroceria para -z e PIORA o balanco traseiro — o gancheiro no VM ja passava 213 mm da ponta do quadro e passa a 313 mm. E o preco de a testeira ficar onde ela fica na fabrica; a alternativa seria encurtar o bau, que nao e desenho meu.",
+  "_frameTopNote": [
+    "2026-08-20 — DUAS CORRECOES MINHAS, AS DUAS REVERTIDAS. Fica registrado",
+    "porque a segunda foi por confiar numa medida mal recortada.",
+    "",
+    "*\"o implemento esta muito baixo, entrando dentro do chassi\"* levou a",
+    "levantar frameTopY em 25…85 mm, medindo interferencia por CAMPO DE ALTURA",
+    "em (x, z). A resposta foi *\"tem um espaco entre o implemento e o truck",
+    "vw\"* — e o campo de altura tinha dois defeitos de recorte:",
+    "",
+    "  1. CELULA DE 100 mm. As longarinas auxiliares da carroceria estao em",
+    "     |x| 0,374…0,439; uma peca do caminhao em x 0,485 — 46 mm AO LADO —",
+    "     caia na mesma coluna e virava interferencia.",
+    "  2. O FUNDO ERA \"a malha mais baixa da coluna\". A carroceria pendura",
+    "     suporte, mangueira e travessa curta abaixo do piso, e nenhum deles e",
+    "     o que ela APOIA. Os 80 mm do VW eram suporte contra suporte.",
+    "",
+    "A regua certa e a de measureMountDatum(): apoia quem ATRAVESSA a",
+    "carroceria. Com celula de 50 mm e o fundo restrito a esses membros, nas",
+    "cotas ABAIXO (as originais, de 2026-08-18): VM 0 mm, Scania P 0 mm, VW",
+    "0 mm. NADA do caminhao encosta no sub-chassi — nao havia o que corrigir.",
+    "",
+    "MEDIDO POR tools/trailer-bench/chassiprobe.ts (campo SUBIR_mm)."
+  ],
+  "_tailNote": [
+    "2026-08-20 — O RABO DO QUADRO, para o balanco traseiro acompanhar o bau.",
+    "MEDIDO POR tools/trailer-bench/tailprobe.cjs (Node puro, sem Chromium).",
+    "",
+    "⚠️ frameEndZ NAO E A PONTA DO QUADRO em nenhum dos tres, e nunca foi: e a",
+    "face da fita refletiva do para-choque no VM e no Scania, e a LANTERNA no",
+    "VW. A longarina acaba 89,4 / 173,2 / 49,7 mm antes. Quem quiser a ponta do",
+    "quadro le tail.railEndZ; quem quiser o plano mais traseiro le tail.tailEndZ.",
+    "frameEndZ fica onde esta porque solveRigidMount() so o usa para RELATAR",
+    "balanco, e mudar o significado dele quebraria a leitura de um relatorio",
+    "antigo sem melhorar nenhum.",
+    "",
+    "PARA QUE SERVE. Com o gancheiro de fabrica (8,510 m de corpo branco) a",
+    "traseira do bau cai 313 mm ATRAS do para-choque no VM (o bau passa), e 247",
+    "mm / 740 mm A FRENTE dele no VW e no Scania (sobra quadro nu). Nao existe",
+    "comprimento de bau que sirva aos tres: o comprimento em que dZ = 0 e",
+    "8,196 m no VM, 8,742 no VW e 9,250 no Scania. Entao quem segue a medida e",
+    "o quadro — ver stretchRigidFrame() em engine/vehicle/chassis-tail.ts.",
+    "",
+    "cutZ e o PLANO DE CORTE: atras dele tudo translada rigido (para-choque,",
+    "fita, lanterna, porta-placa, travessas do rabo), e a longarina que o cruza",
+    "estica. A sonda o escolhe varrendo z de 5 em 5 mm e aceitando so o plano",
+    "que nenhuma peca nao-longarina cruza com vertice a menos de 100 mm dele:",
+    "uma quad atravessada acompanha a translacao sem artefato, um vertice em",
+    "cima do plano nao. Nada de travessa, berco de eixo, tanque, roda, estepe ou",
+    "cabine cruza qualquer um dos planos abaixo — esta medido.",
+    "",
+    "bays[] sao as BAIAS, da traseira para a frente: cada uma tem um plano de",
+    "corte proprio (z) e uma capacidade de ENCURTAMENTO (cap), que e o vao entre",
+    "a peca de tras e a de frente. Encurtar consome baia por baia; ALONGAR nao",
+    "consome nada (so estica a quad da longarina) e nao tem limite geometrico —",
+    "o limite dele e legal. Duas janelas seguras podem cair na MESMA baia: a",
+    "sonda deduplica, senao a capacidade seria contada em dobro.",
+    "",
+    "⚠️ O Scania tem uma terceira baia, de 278,2 mm em z -8,1255, que NAO esta",
+    "na lista: a janela segura dela tem largura ZERO (um plano isolado achado",
+    "pela amostragem de 5 mm). Cortar ali dependeria de a geometria nao se mexer",
+    "um milimetro. As duas listadas somam 954,1 mm, que ja cobre os 740 mm que",
+    "ele precisa hoje.",
+    "",
+    "A TRANSLACAO NAO E SO EM Z. A mesa da longarina e uma reta inclinada",
+    "(frameSlope, conferido aqui: -27,62 / -8,78 / -15,88 mm/m contra os",
+    "-27,63 / -8,30 / -15,91 do manifesto), entao o rabo anda por",
+    "dy = frameSlope * dz. Com isso frameTopY e frameSlope continuam validos",
+    "depois do alongamento, sem re-medicao."
+  ],
+  "defaults": {
+    "cabGap": 0.25,
+    "railBand": [
+      0.25,
+      0.55
+    ],
+    "percentile": 0.9
+  },
+  "rigids": {
+    "volvo-vm-2015-6x2r": {
+      "sourceFile": "models/trucks/volvo_vm_2015_6x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0042,
+      "centerX": 0,
+      "frameTopY": 1.189,
+      "frameSlope": -0.02763,
+      "cabRearZ": 1.033,
+      "cabTopY": 2.9055,
+      "frameEndZ": -7.2473,
+      "railX": 0.425,
+      "axles": {
+        "config": "6x2",
+        "steerZ": [
+          1.8475
+        ],
+        "driveZ": [
+          -3.4933
+        ],
+        "liftZ": [
+          -4.7892
+        ]
+      },
+      "tail": {
+        "railEndZ": -7.1579,
+        "tailEndZ": -7.2473,
+        "cutZ": -6.5579,
+        "bays": [
+          {
+            "z": -6.5579,
+            "cap": 0.594
+          },
+          {
+            "z": -6.0029,
+            "cap": 0.3551
+          }
+        ]
+      },
+      "measuredBy": "tools/trailer-bench/mountprobe@1",
+      "measuredAt": "2026-08-18"
+    },
+    "vw-constellation-6x2r": {
+      "_gradeNote": "2026-08-23: sourceFile passou de vw_titan_6x2_tl.glb para vw_titan_6x2r.glb. O rip do VW e o UNICO dos tres rigidos que traz para-ciclista ASSADO (oito componentes de truck_p5, dois corridos por lado partidos pelo tandem), e o estudio pendura o dele no implemento — a grade aparecia DUPLICADA. O corte esta em tools/chassis-bake/cut-chassi.cjs (vwGradeLateral). O arquivo antigo NAO foi sobrescrito porque ja esta servido com Cache-Control immutable; ele continua na arvore como FONTE das quatro derivacoes.",
+      "sourceFile": "models/trucks/vw_titan_6x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0036,
+      "centerX": 0,
+      "frameTopY": 1.2466,
+      "frameSlope": -0.0083,
+      "cabRearZ": 0.9225,
+      "cabTopY": 3.3931,
+      "frameEndZ": -7.7068,
+      "railX": 0.425,
+      "axles": {
+        "config": "6x2",
+        "steerZ": [
+          1.6302
+        ],
+        "driveZ": [
+          -4.0272
+        ],
+        "liftZ": [
+          -5.2815
+        ]
+      },
+      "tail": {
+        "railEndZ": -7.5336,
+        "tailEndZ": -7.7068,
+        "cutZ": -6.7186,
+        "bays": [
+          {
+            "z": -6.7186,
+            "cap": 1.0933
+          }
+        ]
+      },
+      "measuredBy": "tools/trailer-bench/chassiprobe@1",
+      "measuredAt": "2026-08-20",
+      "_note": [
+        "O TERCEIRO RIGIDO, e o primeiro cujo GLB nao tem no de chassi: cabine e",
+        "quadro estao fundidos em `truck_p4`/`truck_p5`, que vao de ponta a ponta",
+        "do caminhao. `mountprobe.ts` filtra o quadro por /chassis|chs_base/ e aqui",
+        "isso nao acha nada — as medidas abaixo saem de chassiprobe.ts, que mede o",
+        "quadro por FAIXA DE X e por NORMAL, sem depender de nome de no.",
+        "",
+        "frameTopY NAO e o percentil desta vez, e sim o percentil CORRIGIDO PELO",
+        "VAO: com a carroceria assentada no p90 (1,2937) sobravam 53 mm de ar no",
+        "eixo traseiro e 113 mm na dianteira — um vao limpo e linear, 8,3 mm/m.",
+        "Descontado o vao no pivo (a traseira do bau), 1,2937 - 0,0471 = 1,2466.",
+        "",
+        "cabRearZ e a traseira da CASCA DA CABINE (`clima_p2`, que e tambem a peca",
+        "que recebe tinta). A caixa por nome daria 0,3727 por causa de",
+        "`interior_anim_p1` — 116 vertices de painel que se esticam 550 mm para",
+        "tras da cabine e nao sao cabine nenhuma."
+      ]
+    },
+    "scania-p-8x2r": {
+      "sourceFile": "models/trucks/scania_p_8x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0607,
+      "centerX": 0,
+      "frameTopY": 1.0373,
+      "frameSlope": -0.01591,
+      "cabRearZ": 0.6876,
+      "cabTopY": 3.3072,
+      "frameEndZ": -8.6802,
+      "railX": 0.425,
+      "axles": {
+        "config": "8x2",
+        "steerZ": [
+          1.6403,
+          -0.5745
+        ],
+        "driveZ": [
+          -4.9335
+        ],
+        "liftZ": [
+          -6.2898
+        ]
+      },
+      "tail": {
+        "railEndZ": -8.6305,
+        "tailEndZ": -8.6802,
+        "cutZ": -7.6605,
+        "bays": [
+          {
+            "z": -7.6605,
+            "cap": 0.6678
+          },
+          {
+            "z": -7.0055,
+            "cap": 0.2863
+          }
+        ]
+      },
+      "measuredBy": "tools/trailer-bench/mountprobe@1",
+      "measuredAt": "2026-08-18"
+    },
+    "scania-p-6x2r": {
+      "sourceFile": "models/trucks/scania_p_6x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0607,
+      "centerX": 0,
+      "frameTopY": 1.0373,
+      "frameSlope": -0.01591,
+      "cabRearZ": 0.6876,
+      "cabTopY": 3.3072,
+      "frameEndZ": -8.6802,
+      "railX": 0.425,
+      "axles": {
+        "config": "6x2",
+        "steerZ": [
+          1.6402
+        ],
+        "driveZ": [
+          -4.9318
+        ],
+        "liftZ": [
+          -6.288
+        ]
+      },
+      "tail": {
+        "railEndZ": -8.6305,
+        "tailEndZ": -8.6802,
+        "cutZ": -7.6605,
+        "bays": [
+          {
+            "z": -7.6605,
+            "cap": 0.6678
+          },
+          {
+            "z": -7.0055,
+            "cap": 0.2863
+          }
+        ]
+      },
+      "_derivadoDe": "models/trucks/scania_p_8x2r.glb",
+      "_derivacao": "truck 6x2 — o 2o eixo direcional do bitruck removido (259 componentes, 231 602 tri). A GEOMETRIA NAO SE MOVEU: frameTopY, frameSlope, cabRearZ, groundY, centerX, railX e o bloco tail sao os mesmos do 8x2 por construcao — a cirurgia so REMOVE e, no 6x4, CLONA em Z. Ver tools/chassis-bake/cut-scania.cjs.",
+      "measuredBy": "tools/chassis-bake/cut-scania.cjs@1",
+      "measuredAt": "2026-08-20"
+    },
+    "scania-p-4x2r": {
+      "_tailNote": "⚠️ TEM UMA BAIA A MAIS que os irmaos: 703,8 mm em z -6 213, no vao que o eixo auxiliar liberou. Capacidade de encurtamento 1 657,9 mm contra 954,1 dos outros tres — e ela importa, porque um 4x2 com o balanco traseiro de fabrica (3,75 m do eixo trativo ao para-choque) estoura o limite de 3,50 m da CONTRAN 882/2021. MEDIDO por tools/trailer-bench/tailprobe.cjs sobre o arquivo DERIVADO, nao copiado do 8x2.",
+      "sourceFile": "models/trucks/scania_p_4x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0607,
+      "centerX": 0,
+      "frameTopY": 1.0373,
+      "frameSlope": -0.01591,
+      "cabRearZ": 0.6876,
+      "cabTopY": 3.3072,
+      "frameEndZ": -8.6802,
+      "railX": 0.425,
+      "axles": {
+        "config": "4x2",
+        "steerZ": [
+          1.6402
+        ],
+        "driveZ": [
+          -4.9318
+        ],
+        "liftZ": []
+      },
+      "tail": {
+        "railEndZ": -8.6305,
+        "tailEndZ": -8.6802,
+        "cutZ": -7.6605,
+        "bays": [
+          {
+            "z": -7.6605,
+            "cap": 0.6678
+          },
+          {
+            "z": -7.0055,
+            "cap": 0.2863
+          },
+          {
+            "z": -6.213,
+            "cap": 0.7038
+          }
+        ]
+      },
+      "_derivadoDe": "models/trucks/scania_p_8x2r.glb",
+      "_derivacao": "toco 4x2 — 2o direcional e eixo auxiliar removidos (919 116 tri a menos que a fonte). A GEOMETRIA NAO SE MOVEU: frameTopY, frameSlope, cabRearZ, groundY, centerX, railX e o bloco tail sao os mesmos do 8x2 por construcao — a cirurgia so REMOVE e, no 6x4, CLONA em Z. Ver tools/chassis-bake/cut-scania.cjs.",
+      "measuredBy": "tools/chassis-bake/cut-scania.cjs@1",
+      "measuredAt": "2026-08-20"
+    },
+    "scania-p-6x4r": {
+      "sourceFile": "models/trucks/scania_p_6x4r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0607,
+      "centerX": 0,
+      "frameTopY": 1.0373,
+      "frameSlope": -0.01591,
+      "cabRearZ": 0.6876,
+      "cabTopY": 3.3072,
+      "frameEndZ": -8.6802,
+      "railX": 0.425,
+      "axles": {
+        "config": "6x4",
+        "steerZ": [
+          1.6402
+        ],
+        "driveZ": [
+          -4.9318,
+          -6.288
+        ],
+        "liftZ": []
+      },
+      "tail": {
+        "railEndZ": -8.6305,
+        "tailEndZ": -8.6802,
+        "cutZ": -7.6605,
+        "bays": [
+          {
+            "z": -7.6605,
+            "cap": 0.6678
+          },
+          {
+            "z": -7.0055,
+            "cap": 0.2863
+          }
+        ]
+      },
+      "_derivadoDe": "models/trucks/scania_p_8x2r.glb",
+      "_derivacao": "tracado 6x4 — 2o direcional removido e o DIFERENCIAL do trativo clonado no auxiliar (12 994 tri), com a viga morta dele retirada. A GEOMETRIA NAO SE MOVEU: frameTopY, frameSlope, cabRearZ, groundY, centerX, railX e o bloco tail sao os mesmos do 8x2 por construcao — a cirurgia so REMOVE e, no 6x4, CLONA em Z. Ver tools/chassis-bake/cut-scania.cjs.",
+      "measuredBy": "tools/chassis-bake/cut-scania.cjs@1",
+      "measuredAt": "2026-08-20"
+    },
+    "volvo-vm-2015-4x2r": {
+      "sourceFile": "models/trucks/volvo_vm_2015_4x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0042,
+      "centerX": 0,
+      "frameTopY": 1.189,
+      "frameSlope": -0.02763,
+      "cabRearZ": 1.033,
+      "cabTopY": 2.9055,
+      "frameEndZ": -7.2473,
+      "railX": 0.425,
+      "axles": {
+        "config": "4x2",
+        "steerZ": [
+          1.8475
+        ],
+        "driveZ": [
+          -3.4933
+        ],
+        "liftZ": []
+      },
+      "tail": {
+        "railEndZ": -7.1579,
+        "tailEndZ": -7.2473,
+        "cutZ": -6.5579,
+        "bays": [
+          {
+            "z": -6.5579,
+            "cap": 0.594
+          },
+          {
+            "z": -6.0029,
+            "cap": 0.3551
+          }
+        ]
+      },
+      "measuredBy": "tools/chassis-bake/cut-chassi.cjs@1",
+      "measuredAt": "2026-08-22",
+      "_derivadoDe": "models/trucks/volvo_vm_2015_6x2r.glb",
+      "_derivacao": "toco 4x2 — o eixo auxiliar do 6x2 removido: 14 nos de roda inteiros mais 167 componentes de suspensao (19 728 tri). A GEOMETRIA NAO SE MOVEU: frameTopY, frameSlope, cabRearZ, groundY, centerX, railX e o bloco tail sao os mesmos do 6x2 por construcao — a cirurgia so REMOVE. O VM tem feixe com BALANCIM, entao a janela de corte e ASSIMETRICA: comeca depois do suporte central (z -4 197, que fica e vira o apoio traseiro do eixo trativo) e acaba depois da mao-de-mola de tras (-5 457). Ver tools/chassis-bake/cut-chassi.cjs."
+    },
+    "vw-constellation-4x2r": {
+      "sourceFile": "models/trucks/vw_titan_4x2_tl.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0036,
+      "centerX": 0,
+      "frameTopY": 1.2466,
+      "frameSlope": -0.0083,
+      "cabRearZ": 0.9225,
+      "cabTopY": 3.3931,
+      "frameEndZ": -7.7068,
+      "railX": 0.425,
+      "axles": {
+        "config": "4x2",
+        "steerZ": [
+          1.6302
+        ],
+        "driveZ": [
+          -4.0272
+        ],
+        "liftZ": []
+      },
+      "tail": {
+        "railEndZ": -7.5336,
+        "tailEndZ": -7.7068,
+        "cutZ": -6.7186,
+        "bays": [
+          {
+            "z": -6.7186,
+            "cap": 1.0932
+          },
+          {
+            "z": -5.7561,
+            "cap": 0.5304
+          },
+          {
+            "z": -5.1486,
+            "cap": 1.0912
+          }
+        ]
+      },
+      "measuredBy": "tools/chassis-bake/cut-chassi.cjs@1",
+      "measuredAt": "2026-08-22",
+      "_note": [
+        "O TERCEIRO RIGIDO, e o primeiro cujo GLB nao tem no de chassi: cabine e",
+        "quadro estao fundidos em `truck_p4`/`truck_p5`, que vao de ponta a ponta",
+        "do caminhao. `mountprobe.ts` filtra o quadro por /chassis|chs_base/ e aqui",
+        "isso nao acha nada — as medidas abaixo saem de chassiprobe.ts, que mede o",
+        "quadro por FAIXA DE X e por NORMAL, sem depender de nome de no.",
+        "",
+        "frameTopY NAO e o percentil desta vez, e sim o percentil CORRIGIDO PELO",
+        "VAO: com a carroceria assentada no p90 (1,2937) sobravam 53 mm de ar no",
+        "eixo traseiro e 113 mm na dianteira — um vao limpo e linear, 8,3 mm/m.",
+        "Descontado o vao no pivo (a traseira do bau), 1,2937 - 0,0471 = 1,2466.",
+        "",
+        "cabRearZ e a traseira da CASCA DA CABINE (`clima_p2`, que e tambem a peca",
+        "que recebe tinta). A caixa por nome daria 0,3727 por causa de",
+        "`interior_anim_p1` — 116 vertices de painel que se esticam 550 mm para",
+        "tras da cabine e nao sao cabine nenhuma."
+      ],
+      "_derivadoDe": "models/trucks/vw_titan_6x2_tl.glb",
+      "_derivacao": "toco 4x2 — o eixo auxiliar do 6x2 removido: 90 componentes de `truck_p4` mais as rodas dele, que no VW sao COMPONENTES de malha compartilhada e nao nos (16 438 tri no total). Sai tambem a GRADE LATERAL de fabrica (10 componentes de truck_p5, 1 878 tri), que o implemento duplicava. As rodas tem de sair do ARQUIVO: swapTruckWheels() mede a rodagem original para saber onde por a roda nova, e um pneu esquecido faria o toco nascer com tres eixos. Janela assimetrica pelo mesmo motivo do VM (bogie). Ver tools/chassis-bake/cut-chassi.cjs."
+    },
+    "volvo-vm-2015-8x2r": {
+      "sourceFile": "models/trucks/volvo_vm_2015_8x2r.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0042,
+      "centerX": 0,
+      "frameTopY": 1.189,
+      "frameSlope": -0.02763,
+      "cabRearZ": 1.033,
+      "cabTopY": 2.9055,
+      "frameEndZ": -7.2473,
+      "railX": 0.425,
+      "axles": {
+        "config": "8x2",
+        "steerZ": [
+          1.8475,
+          -0.3725
+        ],
+        "driveZ": [
+          -3.4933
+        ],
+        "liftZ": [
+          -4.7892
+        ]
+      },
+      "_tailNote": "⚠️ UMA BAIA A MENOS que o 6x2, e de proposito: o estepe passou para o balanco traseiro (Zn -5 400…-6 336) e cruza o plano de -6 003. MEDIDO por tools/trailer-bench/tailprobe.cjs sobre o arquivo DERIVADO. Capacidade de encurtamento 574,7 mm contra 949,1 do 6x2 — um bitruck leva bau longo, entao o encurtamento e o que menos falta a ele.",
+      "tail": {
+        "railEndZ": -7.1579,
+        "tailEndZ": -7.2473,
+        "cutZ": -6.5579,
+        "bays": [
+          {
+            "z": -6.5579,
+            "cap": 0.5747
+          }
+        ]
+      },
+      "measuredBy": "tools/chassis-bake/cut-chassi.cjs@2",
+      "measuredAt": "2026-08-23",
+      "_derivadoDe": "models/trucks/volvo_vm_2015_6x2r.glb",
+      "_derivacao": "bitruck 8x2 — 2o eixo direcional enxertado em Zn -0,3725, ou seja a 2 220 mm do 1o direcional. ⚠️ 2 220 mm e COTA DE FABRICA (Ficha-Tecnica-VM-8x2R.pdf, linha D, igual nos quatro entre-eixos); a 1a versao punha o eixo a 1 092 mm, METADE da cota, porque o numero saiu do vao que sobrava e nao da ficha. Com o eixo no lugar certo abre 1 164 mm entre os dois pneus dianteiros e o DPF (Zn 1 012…467, flanco direito) e a caixa de bateria (1 043…147, esquerdo) NAO PRECISAM ANDAR — e onde o caminhao real os leva. Andam so os tanques (+1 350 mm, para -1 162…-2 580) e o estepe (+3 777 mm, para o balanco traseiro, porque o entre-eixos deste rip e 5 341 e a Volvo so vende o 8x2 com 5 900). A rodagem do eixo novo sao os 14 nos do 1o direcional CLONADOS com deslocamento — o no novo aponta para a MESMA malha, entao nao custa um triangulo. NOVO em 2026-08-23: o PARA-LAMA do 2o direcional, que era a pendencia conhecida da familia — o arco (3 componentes de cabin_p0, 2 398 tri) e o para-barro (2 de chs_base_0_p7, 4 008 tri) sao clonados junto. Ver tools/chassis-bake/cut-chassi.cjs."
+    },
+    "vw-constellation-8x2r": {
+      "sourceFile": "models/trucks/vw_titan_8x2_tl.glb",
+      "orientYaw": 3.141592653589793,
+      "groundY": -0.0036,
+      "centerX": 0,
+      "frameTopY": 1.2466,
+      "frameSlope": -0.0083,
+      "cabRearZ": 0.9225,
+      "cabTopY": 3.3931,
+      "frameEndZ": -7.7068,
+      "railX": 0.425,
+      "axles": {
+        "config": "8x2",
+        "steerZ": [
+          1.6302,
+          -0.7178
+        ],
+        "driveZ": [
+          -4.0272
+        ],
+        "liftZ": [
+          -5.2815
+        ]
+      },
+      "tail": {
+        "railEndZ": -7.5336,
+        "tailEndZ": -7.7068,
+        "cutZ": -6.9536,
+        "bays": [
+          {
+            "z": -6.9536,
+            "cap": 0.6141
+          },
+          {
+            "z": -6.2086,
+            "cap": 0.075
+          }
+        ]
+      },
+      "measuredBy": "tools/chassis-bake/cut-chassi.cjs@1",
+      "measuredAt": "2026-08-22",
+      "_note": [
+        "O TERCEIRO RIGIDO, e o primeiro cujo GLB nao tem no de chassi: cabine e",
+        "quadro estao fundidos em `truck_p4`/`truck_p5`, que vao de ponta a ponta",
+        "do caminhao. `mountprobe.ts` filtra o quadro por /chassis|chs_base/ e aqui",
+        "isso nao acha nada — as medidas abaixo saem de chassiprobe.ts, que mede o",
+        "quadro por FAIXA DE X e por NORMAL, sem depender de nome de no.",
+        "",
+        "frameTopY NAO e o percentil desta vez, e sim o percentil CORRIGIDO PELO",
+        "VAO: com a carroceria assentada no p90 (1,2937) sobravam 53 mm de ar no",
+        "eixo traseiro e 113 mm na dianteira — um vao limpo e linear, 8,3 mm/m.",
+        "Descontado o vao no pivo (a traseira do bau), 1,2937 - 0,0471 = 1,2466.",
+        "",
+        "cabRearZ e a traseira da CASCA DA CABINE (`clima_p2`, que e tambem a peca",
+        "que recebe tinta). A caixa por nome daria 0,3727 por causa de",
+        "`interior_anim_p1` — 116 vertices de painel que se esticam 550 mm para",
+        "tras da cabine e nao sao cabine nenhuma."
+      ],
+      "_derivadoDe": "models/trucks/vw_titan_6x2_tl.glb",
+      "_derivacao": "bitruck 8x2 — 2o eixo direcional enxertado em Zn -0,7178, ou seja a 2 348 mm do 1o direcional. ⚠️ 2 348 mm e COTA DE FABRICA (VW Constellation 30.320 8x2, linha R \"Distancia entre-eixos: 1o ao 2o\"); a 1a versao punha o eixo a 1 050 mm. Ela tambem recuava 180 componentes (62 030 tri) EM BLOCO por uma regua de CAIXA; medida a INTERFERENCIA de volume com o pneu novo, o que de fato conflita e muito menos: o tanque do flanco esquerdo (no tanque_p0, recua 1 750 mm — quem manda no vao nao e o pneu, e o para-barro clonado, que cai em -1 076…-1 421), o reservatorio de ar transversal do flanco direito (10 componentes, 1 291 tri, que nao tem para onde ir no entre-eixos e vai para o balanco traseiro, +5 727 mm) e um gusset de quadro na estacao do eixo (2 componentes, 148 tri, cortado). ⚠️ AS CHAPAS DE 696x706 SAO GUSSET DE QUADRO, e nao berco de tanque: elas se repetem em Zn 206, -340, -1 231, -1 375 e -6 135 — a regua antiga as recuava junto e isso e deformar o chassi em silencio. A rodagem e a suspensao do 1o direcional sao clonadas por componente. Sai tambem a GRADE LATERAL de fabrica (10 componentes, 1 878 tri), que o implemento duplicava. Ver tools/chassis-bake/cut-chassi.cjs."
+    }
+  }
+}

@@ -467,7 +467,54 @@ function warnHidden(key: TrimKey) {
  * existir. Um re-bake das chapas cria malhas novas, sem carimbo, que voltam a
  * ser casadas pelo material — que é o comportamento certo: quem some é o objeto,
  * não a regra.
+ *
+ * ⚠️⚠️ E O CARIMBO SÓ NASCE SE HOUVER UM PRIMEIRO ENCONTRO — foi este o defeito
+ * de 2026-08-25, *"apenas os thermo kings não estão persistindo a cor durante
+ * navegação, recarregamento"*.
+ *
+ * A carcaça do Thermo King é a ÚNICA das quatro peças que casa por MATERIAL **e**
+ * está em `models.trailerPanelMeshes()` (por `tk-housing-white`, ver
+ * `TK_PAINT_SUB` lá). O teto está na lista mas casa por NÓ; o para-lama casa por
+ * material mas não está na lista. Só ela junta as duas coisas — e é essa
+ * interseção que a torna o único acabamento que não sobrevive a um F5.
+ *
+ * A SEQUÊNCIA, medida na bancada (`checks-diag-tkcor2-0825.mjs`):
+ *
+ *   1. `runApply()` restaura o ALVO DA TINTA primeiro —
+ *      `livery.setImplementPainted(choice.paintTarget === 'both')`;
+ *   2. `setPaintTarget('both')` escreve `carpaint` na carcaça (e guarda o de
+ *      fábrica em `origMat`) ANTES de chamar os ouvintes;
+ *   3. `applyTrim()` roda como ouvinte — e a malha já não tem
+ *      `tk-housing-white`, então `spec.match()` falha e o carimbo NUNCA é
+ *      escrito;
+ *   4. `trim.setTrimChoice(choice.trim)` põe a cor gravada em `pieces` e
+ *      `applyTrim()` não acha uma única malha para pintar.
+ *
+ * Com o alvo `cab` o passo 2 não troca material nenhum, o carimbo nasce, e a cor
+ * volta — que é por que o defeito só aparece com "pintar o implemento" LIGADO.
+ *
+ * A resposta é a mesma de `factoryMaterials()` em models.ts, e pelo mesmo
+ * motivo: o que identifica a peça é o que ela ERA, e isso está guardado em
+ * `origMat`/`trimOrigMat`/`trimFactoryMat`. Casar pelo material de FÁBRICA torna
+ * o carimbo uma otimização de novo, em vez da única chance de existir.
  */
+/**
+ * Os materiais DE FÁBRICA de uma malha — os que dizem QUE PEÇA ela é.
+ *
+ * A ordem é a de `factoryMaterials()` em models.ts, e pela mesma razão:
+ * `origMat` é o de fábrica de verdade (escrito por `setPaintTarget()` antes de
+ * trocar); `trimOrigMat` vem depois porque numa peça que segue o corpo ele já
+ * pode ser a tinta do baú; `trimFactoryMat` é o que ESTE arquivo anota; e o
+ * material corrente por último, que é o caso de quem nunca foi pintado.
+ */
+function factoryMats(o: THREE.Mesh): (THREE.Material | null)[] {
+  const raw = (o.userData.origMat ?? o.userData.trimOrigMat
+    ?? o.userData.trimFactoryMat ?? o.material) as
+    THREE.Material | THREE.Material[] | null | undefined;
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
 function meshesOf(key: TrimKey): THREE.Mesh[] {
   const root = state.trailer;
   if (!root) return [];
@@ -481,8 +528,8 @@ function meshesOf(key: TrimKey): THREE.Mesh[] {
        disjuntas por construção, e um material trocado poderia fazer uma casar
        na regra da vizinha. */
     if (o.userData.trimKey) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (!spec.match(o, mats)) return;
+    /* PELO MATERIAL DE FÁBRICA, nunca pelo corrente — ver o bloco acima. */
+    if (!spec.match(o, factoryMats(o))) return;
     o.userData.trimKey = key;
     out.push(o);
   });
@@ -590,7 +637,15 @@ export function applyTrim() {
         /* O filtro de material é por MALHA, não por peça: dentro da caixa
            convivem chapa e plástico preto, e só a chapa é pintada. */
         if (spec.paintMats && !anyMat(mats, spec.paintMats)) continue;
-        if (!mesh.userData.trimOrigMat) mesh.userData.trimOrigMat = mesh.material;
+        /* A MESMA GUARDA DO `trimFactoryMat` LOGO ACIMA, e pelo mesmo motivo.
+           Numa peça que SEGUE O CORPO, `applyTrim()` roda DEPOIS de
+           `setPaintTarget()` — então com "pintar o implemento" ligado o material
+           que está na malha neste instante É a tinta do baú. Anotá-lo como
+           "original" fazia `restoreOf()` devolver a cor do CAVALO quando o
+           usuário tirasse a cor própria da peça, em vez do branco de fábrica. */
+        if (!mesh.userData.trimOrigMat && mesh.material !== state.trailerPaintMat) {
+          mesh.userData.trimOrigMat = mesh.material;
+        }
         mesh.material = paintOf(key);
       } else {
         const back = restoreOf(key, mesh);

@@ -21,12 +21,42 @@ import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
 import type { Rig } from '../scene/presets';
 import { TrailerRig, type TrailerDims, type DoorSpec, type Face } from './trailer-rig';
-import { RIB_FLAT_CENTER, TRAILER_ROOF_MESH } from './trailer-geometry';
+import { TRAILER_ROOF_MESH } from './trailer-geometry';
 import { TRIM_WIDTH } from './trailer-door';
 import { swapTrailerWheels } from './wheels';
-import { buildLandingGear, setLandingGearDown } from './landing-gear';
+import { swapTruckWheels, tuneVmWheelMaterials, swapSpareWheel, SPARE_SWAP_RE } from './truck-wheels';
+import { swapTruckTanks, tuneVmTankMaterials, recessFlankEquipment, TANK_SWAP_RE } from './truck-tanks';
+import { shiftRearBogie } from './rear-bogie';
+import { swapRearTape } from './rear-tape';
+import {
+  getCurrentImplement, setImplementCatalog, setCurrentImplement, getImplements,
+  getImplement, frameRegexOf, sillRegexOf, type ImplementDef,
+} from './implements';
+import { applyCabBakeFixes, normalizeExteriorGlass, normalizeBlackPlastic } from './cab-bake-fixes';
+import {
+  findRigid, solveRigidMount, measureMountDatum, cabGapOf, measureCabRearWall, rearOverhangLimit,
+  type MountManifest, type RigidMount,
+} from './mounting';
+import { stretchRigidFrame, tailDeltaFor, tailShiftWorth, primeTailBase } from './chassis-tail';
+import { buildChassisParts, trimFlapsForGuard } from './chassis-parts';
+import { attachSideGuard, guardInnerX, truckObstacles, truckArmObstacles, implementRail,
+  implementBelly, implementBracket, removeSideGuard, wheelBayReach,
+  RECUO_DA_PELE, GRADE_FACE_DENTRO, FOLGA_BARRA, ESTACAO_Y, SUPORTE_Y, TOPO_BARRA, DESCIDA,
+  SIDE_GUARD_ASSET } from './side-guard';
+import { attachSecondSteerFender, tuneFenderMaterials, clearSecondSteerBay,
+  FENDER_ASSET } from './front-fender';
+import { buildLandingGear, setLandingGearDown, forgetLandingGear } from './landing-gear';
+import {
+  removeBakedSideDoor, removeMakerBranding, attachBrandPlate, fixLowFrameSkin,
+  dressTopRail, addTopRailRivets, TOPRAIL_RIVET_MESH_RE,
+  routeThermoKingLines, TK_LINE_MESH_RE,
+  removeExtraRearHose, splitEngateHardware, removeStrayConduits, fixRegistroAndHose,
+  removeSideDoorCatches,
+} from './trailer-bake-fixes';
 import {
   loadPlateManifest, attachCabPlate, detachCabPlate, attachTrailerPlate, placeTrailerPlate,
+  attachRigidRearPlate, detachRigidRearPlate,
+  detachTrailerPlate,
 } from './license-plate';
 import {
   solveCoupling, pickKingpinStation, findTractor, defaultsOf, FALLBACK_DEFAULTS,
@@ -130,6 +160,15 @@ export interface TrailerMeta {
 /** Everything loaded into the scene about the vehicle itself. */
 export interface VehicleState {
   trailerMeta: TrailerMeta | null;
+  /**
+   * O implemento QUE ESTÁ EM CENA — não o escolhido.
+   *
+   * Os dois divergem entre `setImplement()` e o `loadTrailer()` que a
+   * orquestração de `studio.ts` dispara depois dele, e nessa janela toda medida
+   * (pose, ferragem, acabamento) é da geometria VELHA. Quem pergunta ao
+   * catálogo nessa janela recebe a resposta certa para a pergunta errada.
+   */
+  implement: ImplementDef;
   cabGroup: THREE.Group;
   trailerGroup: THREE.Group;
   cab: THREE.Object3D | null;
@@ -145,6 +184,22 @@ export interface VehicleState {
   /** captured after grounding, so placeTrailer() can re-derive from a fixed pose */
   trailerBase: { pos: THREE.Vector3; frontZ: number } | null;
   trailerBox?: THREE.Box3;
+  /**
+   * O datum de MONTAGEM do implemento, em espaço local dele, depois do
+   * assentamento: o fundo do sub-chassi. Só existe em implemento sem rodagem.
+   *
+   * Guardado porque `state.trailerBox` é a caixa do BAÚ (as chapas brancas), e o
+   * sub-chassi fica abaixo dela — usar `trailerBox.min.y` como datum montaria a
+   * carroceria pelo piso do baú e enterraria o sub-chassi no quadro.
+   */
+  trailerMountDatum?: number;
+  /**
+   * O PLANO DE MONTAGEM da unidade de refrigeração, como deslocamento em Z a
+   * partir de `tk.position` — ver `attachThermoKing()` e o `mount` do
+   * `*_meta.json`. É ele, e não `bbox.min.z`, que encosta na testeira: a
+   * unidade pequena tem 255 mm de evaporador que entram PARA DENTRO do baú.
+   */
+  tkMountOffZ?: number;
   /** metres from the front wall back to the tyre contact patch — the pivot the
    *  coupling pitch turns about. Constant for a given implement. */
   trailerPivotFromFront?: number;
@@ -165,6 +220,27 @@ export interface VehicleState {
   paintTarget: 'cab' | 'both';
   /** `models/vehicles/hitch.json` — o lado CAVALO do contrato de engate. */
   hitch: HitchManifest | null;
+  /** `models/vehicles/mounts.json` — o lado CAMINHÃO RÍGIDO. Ver `mounting.ts`. */
+  mounts: MountManifest | null;
+  /**
+   * A entrada de montagem do chassi corrente, ou `null` se ele não for rígido.
+   *
+   * `cabHitch` e `cabMount` são MUTUAMENTE EXCLUSIVOS por construção: um chassi
+   * ou tem quinta roda ou tem quadro de carroceria. Os dois preenchidos ao
+   * mesmo tempo seria um manifesto se contradizendo, e `placeTrailer()` daria
+   * preferência ao engate sem dizer por quê.
+   */
+  cabMount: RigidMount | null;
+  /**
+   * A frente e a TRASEIRA das chapas do baú, no espaço normalizado do
+   * caminhão, medidas em `placeTrailer()`.
+   *
+   * Existe porque o balanço traseiro só é conferível a partir dela: a caixa do
+   * IMPLEMENTO inteiro inclui o Thermo King (que avança sobre a cabine) e as
+   * mangueiras traseiras, e mede 9 229 mm onde o baú tem 7 481. Quem lê é o
+   * portão de bancada e o console. `null` até o primeiro assentamento.
+   */
+  bodyZ: { frente: number; traseira: number } | null;
   /** os `defaults` do manifesto, já com degradação campo a campo */
   hitchDefaults: CouplingDefaults;
   /**
@@ -206,11 +282,13 @@ try { localStorage.removeItem('truckstudio.coupling.v1'); } catch { /* legacy ke
 
 export const state: VehicleState = {
   trailerMeta: null,
+  implement: getCurrentImplement(),      // o padrão de código até a 1ª carga
   cabGroup: new THREE.Group(),
   trailerGroup: new THREE.Group(),
   cab: null, cabId: null, cabDef: null, cabBox: null,
   trailer: null, trailerRig: null,
   hitch: null, hitchDefaults: FALLBACK_DEFAULTS, cabHitch: null, coupled: null,
+  mounts: null, cabMount: null, bodyZ: null,
   trailerBase: null,                    // { pos, frontZ } captured after grounding
   tk: null, tkDepth: 0,                 // Thermo King unit (protrudes toward the cab)
   paintMats: [],
@@ -510,25 +588,45 @@ async function fetchJSON(url: string) {
 }
 
 export async function loadManifests() {
-  /* THE TWO MANIFESTS ARE INDEPENDENT, so they leave together.
-     The chain used to be cabs.json → (await) → four HEAD probes → (await) →
-     trailer_meta.json, three strictly serial waits on a cold boot. But
-     trailer_meta.json describes the IMPLEMENT — the kingpin and the panel
-     outlines — and nothing in it is read to decide anything about the cabs, so
-     the only reason it went last is that it was written last. Firing both now
-     saves two round trips on every boot, and on a mobile link two RTTs is a
-     visible slice of the time before the curtain moves at all.
+  /* OS MANIFESTOS SAEM JUNTOS. A cadeia já foi cabs.json → (await) → quatro
+     sondas HEAD → (await) → trailer_meta.json, três esperas estritamente
+     seriais num boot frio. O `*_meta.json` descreve o IMPLEMENTO — pino-rei e
+     contorno de chapa — e nada nele decide coisa nenhuma sobre cavalo, então a
+     única razão de ele ir por último era ter sido escrito por último. Disparar
+     tudo agora economiza duas idas e voltas em todo boot, e num link móvel duas
+     RTT são uma fatia visível do tempo até a cortina se mexer.
+
+     ⚠️ UMA SERIALIZAÇÃO SOBROU, E É DELIBERADA: `implements.json` → o
+     `*_meta.json` do implemento corrente. O catálogo é quem DIZ qual meta pedir
+     (o nome deixou de ser fixo em 2026-08-18, com o segundo implemento), então
+     essa RTT não tem como ser paralelizada sem adivinhar o arquivo. Custa uma
+     ida e volta de ~2 kB, e só ela; `hitch.json` e `plates.json` continuam
+     partindo do mesmo instante que o catálogo.
 
      Each request carries its OWN catch, attached at creation. That is not style:
      an awaited-later promise that rejects meanwhile is an unhandled rejection in
      the console (and a hard error under some CSP/report setups), and the whole
      point of this block is that a missing manifest is a normal, survivable
      state. The fallbacks below are exactly the ones the serial version had. */
-  const metaReq: Promise<TrailerMeta | null> = fetchJSON(VEHICLES_DIR + 'trailer_meta.json')
+  /* O CATÁLOGO DE IMPLEMENTOS vem antes do `*_meta.json` porque é ele que diz
+     QUAL meta pedir — o arquivo deixou de ser `trailer_meta.json` fixo e passou
+     a ser o declarado pelo implemento corrente. Ausência não é erro: o catálogo
+     cai no padrão de código, que aponta para o nome ANTIGO do asset e continua
+     servido. Ver o ⚠️ do cabeçalho de `vehicle/implements.ts`. */
+  const catalogReq: Promise<unknown> = fetchJSON(VEHICLES_DIR + 'implements.json')
     .catch((e: unknown) => {
-      console.warn('[manifest] trailer_meta.json indisponível — engate legado + painéis retangulares.', errText(e));
+      console.warn('[implemento] implements.json indisponível —', errText(e));
       return null;
     });
+  const metaReq: Promise<TrailerMeta | null> = catalogReq.then((manifest) => {
+    setImplementCatalog(manifest);
+    const impl = getCurrentImplement();
+    if (!impl.meta) return null;          // sem pino-rei e sem contorno medido
+    return fetchJSON(VEHICLES_DIR + impl.meta).catch((e: unknown) => {
+      console.warn('[manifest]', impl.meta, 'indisponível — engate legado + painéis retangulares.', errText(e));
+      return null;
+    }) as Promise<TrailerMeta | null>;
+  });
   /* O TERCEIRO MANIFESTO — `plates.json`, onde a placa de licenciamento mora em
      cada cavalo. Disparado AQUI, junto com os outros dois, e AGUARDADO no fim
      desta função (não neste ponto).
@@ -542,8 +640,21 @@ export async function loadManifests() {
      propriedade do código. `loadPlateManifest()` já traz o próprio `catch`. */
   const placasReq = loadPlateManifest();
 
+  /* O QUARTO MANIFESTO — `mounts.json`, o lado CAMINHÃO RÍGIDO. Sai junto com
+     os outros e é aguardado no fim, como o de placas. Ausência não é erro: sem
+     ele nenhum chassi é reconhecido como rígido, o catálogo continua inteiro e
+     o sobrechassi fica na pose de carga (ver `placeTrailer()`). */
+  const mountsReq: Promise<MountManifest | null> = fetchJSON(VEHICLES_DIR + 'mounts.json')
+    .then((j) => j as MountManifest)
+    .catch((e: unknown) => {
+      console.warn('[montagem] mounts.json indisponível —', errText(e),
+        '· nenhum chassi rígido será reconhecido.');
+      return null;
+    });
+
   /* Já em voo desde o topo da função — este await normalmente não espera nada. */
   state.trailerMeta = await metaReq;
+  metaFor = getCurrentImplement().id;
 
   /* O CONTRATO DE ENGATE. Um arquivo, um caminho relativo, os dois apps:
      `models/vehicles/hitch.json`, resolvido por `assetUrl()` como todo o resto.
@@ -564,8 +675,13 @@ export async function loadManifests() {
     state.hitch = null;
     state.hitchDefaults = FALLBACK_DEFAULTS;
   }
-  /* Em voo desde o topo da função — este await normalmente não espera nada. */
+  /* Em voo desde o topo da função — estes awaits normalmente não esperam nada. */
   await placasReq;
+  state.mounts = await mountsReq;
+  if (state.mounts?.rigids) {
+    console.info('[montagem] mounts.json —', Object.keys(state.mounts.rigids).length,
+      'chassi(s) rígido(s) · folga de cabine', cabGapOf(state.mounts), 'm');
+  }
   return state;
 }
 
@@ -1373,6 +1489,15 @@ export const PAINT_MERGE_EXCLUSIONS: {
   meshes: [
     { re: /^(SIDE_L|SIDE_R|REAR|FRONT|SIDE_[LR]_RIVETS)$/, label: 'pintura: chapa de carroceria' },
     { re: new RegExp(`^${TRAILER_ROOF_MESH}$`), label: 'pintura: chapa de carroceria' },
+    /* A rebitagem do trilho de topo é REFEITA a cada medida (ver
+       `addTopRailRivets()`), e um balde guarda os vértices assados no instante
+       da fusão: fundida, ela ficaria no comprimento antigo dentro de um balde
+       que atravessa o implemento. Custa duas chamadas de desenho. */
+    { re: TOPRAIL_RIVET_MESH_RE, label: 'rebite do trilho: refeito a cada medida' },
+    /* Idem as linhas do Thermo King: elas nascem na ponta das mangueiras da
+       unidade e morrem no piso, e as duas cotas andam com a medida. Ver
+       `routeThermoKingLines()`. */
+    { re: TK_LINE_MESH_RE, label: 'linha do TK: refeita a cada medida' },
   ],
 };
 
@@ -1497,6 +1622,20 @@ export function setPaintTarget(mode: 'cab' | 'both') {
    OLHAR, não de produto. Um `Choice` gravado com "só o implemento" abriria o
    estúdio, na sessão seguinte, sem o caminhão — e o usuário procuraria o
    caminhão, não a opção. */
+/* O CATÁLOGO DE IMPLEMENTOS sai por aqui, e não direto de `./implements`.
+   `models.ts` já é a porta única do veículo para o resto do engine (o
+   `index.ts` reexporta este módulo inteiro); um segundo caminho de import para
+   a mesma informação daria duas versões de "qual implemento está carregado" —
+   a do catálogo e a de quem tivesse guardado a sua. */
+export { getImplements, getImplement, getCurrentImplement, type ImplementDef };
+
+/**
+ * Escolhe o implemento. Devolve `true` quando mudou — e aí quem chama PRECISA
+ * recarregar dentro da orquestração de `studio.ts` (soltar a fusão, cortina,
+ * `loadTrailer()`, refazer a fusão). Ver o ⚠️ de `setCurrentImplement()`.
+ */
+export function setImplement(id: string): boolean { return setCurrentImplement(id); }
+
 export type VehicleView = 'both' | 'cab' | 'trailer';
 
 let vehicleView: VehicleView = 'both';
@@ -1505,6 +1644,12 @@ export const getVehicleView = (): VehicleView => vehicleView;
 
 /** Escreve a escolha corrente nos dois grupos. Idempotente. */
 export function applyVehicleView() {
+  /* ⚠️ A ESCOLHA É REVALIDADA A CADA CARGA. Esta função roda depois de todo
+     `runApply()`, e é o único lugar por onde a troca de implemento passa: quem
+     estava em "só o implemento" com um semirreboque e escolhe um rígido cai
+     aqui, e sem esta linha entraria com a carroceria pairando. Ver o bloco de
+     `setVehicleView()`. */
+  if (vehicleView === 'trailer' && state.implement.kind === 'sobrechassi') vehicleView = 'both';
   state.cabGroup.visible = vehicleView !== 'trailer';
   state.trailerGroup.visible = vehicleView !== 'cab';
   /* E A PATOLA ACOMPANHA, porque ela é a mesma decisão vista de outro ângulo:
@@ -1558,8 +1703,19 @@ function frameVisible() {
  */
 export function setVehicleView(mode: VehicleView): VehicleView {
   const want: VehicleView = mode === 'cab' || mode === 'trailer' ? mode : 'both';
+  /* ⚠️ "SÓ O IMPLEMENTO" NÃO EXISTE PARA UM SOBRECHASSI, e o gate mora AQUI e
+     não só no card. Uma carroceria aparafusada não tem patola nem bogie: sem o
+     caminhão ela paira a um metro do chão, com a proteção lateral (filha dela)
+     flutuando junto. *"não faz sentido nesse caso ter apenas o implemento, ou
+     ele ficaria flutuando"* — Kennedy, 2026-08-22.
+
+     No motor e não só na interface porque a vista SOBREVIVE À TROCA: quem
+     estava em "só o implemento" com um semirreboque e escolhe um rígido
+     entraria no chassi novo já flutuando, sem ter clicado em nada. Aqui a
+     escolha degrada para `both`, que é o mesmo caminho de "não há geometria". */
   const ok = want === 'both'
-    || (want === 'cab' ? !!state.cab : !!state.trailer);
+    || (want === 'cab' ? !!state.cab
+      : !!state.trailer && state.implement.kind !== 'sobrechassi');
   vehicleView = ok ? want : 'both';
   applyVehicleView();
   /* SÓ AQUI, e não em `applyVehicleView()`: aquela também roda depois de cada
@@ -1838,6 +1994,9 @@ async function loadScaniaOriginal(def: CabDef, onProgress?: (t: number) => void)
    caller is awaiting it inside a Promise.all that must not fail. */
 let cabGen = 0;
 let trailerGen = 0;
+/** De qual implemento é a `state.trailerMeta` carregada. `loadManifests()` já
+ *  traz a do padrão; sem esta marca, a primeira carga a rebaixaria de graça. */
+let metaFor: string | null = null;
 
 /**
  * Carrega a geometria de um cavalo A PARTIR DO CAMINHO DO ARQUIVO.
@@ -1879,11 +2038,43 @@ export async function loadCab(
        morto. Não é hipótese: é a mesma armadilha que `tsSharedSource` existe
        para desviar no clone do FBX, três linhas acima. */
     detachCabPlate();
+    detachRigidRearPlate();
     state.cabGroup.remove(state.cab);
     disposeTree(state.cab);
   }
   setupCommon(cab);
   auditTransparency(cab, def.id);            // only glass may be transparent
+  /* AS CORREÇÕES DE BAKE DESTE ARQUIVO, e elas rodam AQUI por contrato: antes
+     de qualquer medida (esconder ou mover peça muda o que a montagem mede) e
+     antes da fusão (depois dela a malha de origem já está escondida e o
+     material é de um balde inteiro). Ver `cab-bake-fixes.ts`. */
+  for (const linha of applyCabBakeFixes(cab, def.file)) {
+    console.info('[bake-cabine]', def.file, '·', linha);
+  }
+  /* E O VIDRO NA RÉGUA DA FROTA. Não é tabela por arquivo: é medição do acervo
+     (56 materiais de vidro externo em α 0,80 / rugosidade 0,040 contra 12 em
+     α 0,35 / 0,200, que são só o Scania P e o Volvo VM). Ver
+     `normalizeExteriorGlass()`. Silencioso quando o bake já está no padrão — o
+     caso de 46 dos 49 cavalos. */
+  {
+    const vidros = normalizeExteriorGlass(cab);
+    if (vidros.length) {
+      console.info('[vidro]', def.file, '·', vidros.length, 'material(is) na régua da frota:',
+        vidros.join(' · '));
+    }
+  }
+  /* E O PLÁSTICO PRETO EXTERNO, pela mesma razão e com a mesma forma: censo do
+     acervo, não tabela por peça. Os três bakes brasileiros trazem a lataria
+     plástica com o fator de cor-base ZERADO (o Scania P tem 41 materiais
+     abaixo de 0,03 linear, contra 0 a 4 nos 46 cavalos aprovados, e lá sempre
+     peça pequena de interior). Ver `normalizeBlackPlastic()`. */
+  {
+    const pretos = normalizeBlackPlastic(cab);
+    if (pretos.length) {
+      console.info('[preto]', def.file, '·', pretos.length,
+        'material(is) levantados ao piso da frota:', pretos.join(' · '));
+    }
+  }
   state.cabGroup.add(cab);
   /* NORMALIZAÇÃO A PARTIR DE DADO, quando existe entrada no manifesto.
      ------------------------------------------------------------------------
@@ -1909,6 +2100,7 @@ export async function loadCab(
     hitchEntry.rearProfile = perfis.wide;
     hitchEntry.rearProfiles = perfis.ladder;
     state.cabHitch = hitchEntry;
+    state.cabMount = null;                   // exclusivos — ver `VehicleState.cabMount`
     const fw = hitchEntry.fifthWheel;
     console.info('[engate] cavalo', hitchEntry.id, '· quinta roda z', fw.z.toFixed(4),
       'prato', fw.plateTopY.toFixed(4), `(${((fw.plateTopY - hitchEntry.groundY) * 1000).toFixed(0)} mm do solo)`,
@@ -1916,12 +2108,193 @@ export async function loadCab(
       fw.needsManualReview ? `· ⚠ ±${((fw.uncertaintyM ?? 0) * 1000).toFixed(0)} mm` : '');
   } else {
     state.cabHitch = null;
-    const wheelRe = new RegExp(def.wheelMeshRegex || 'tire|rim|pneu', 'i');
-    // FBX mesh names may not carry wheel words — match material names too
-    const wheelPred = (o: THREE.Mesh) => wheelRe.test(o.name) || wheelRe.test(firstMatName(o));
-    const box = groundAndCenter(cab, /./, wheelPred);
-    cab.position.z -= box.min.z;             // legado: traseira em z=0 → ocupa [0, length]
-    cab.updateWorldMatrix(true, true);
+    /* O TERCEIRO RAMO — CHASSI RÍGIDO. Ele vem antes do legado de propósito:
+       um rígido não tem quinta roda e portanto NUNCA terá entrada em
+       `hitch.json`, então cairia no legado — que assenta por caixa envolvente e
+       ancora a traseira em z = 0. Isso desfaz exatamente a normalização de que
+       `mounts.json` depende (os números de lá estão no espaço normalizado), e o
+       sintoma seria uma carroceria montada num quadro que já andou.
+       Aqui NÃO se escreve pose: quem escreve é `placeTrailer()`, como no ramo
+       do cavalo, para que o conjunto inteiro tenha uma dona só. */
+    state.cabMount = findRigid(state.mounts, { id: def.id, file: def.file });
+    if (state.cabMount) {
+      const m = state.cabMount;
+      console.info('[montagem] rígido', m.id, '·', m.axles.config,
+        '· mesa da longarina y', m.frameTopY.toFixed(4),
+        `(${((m.frameTopY - m.groundY) * 1000).toFixed(0)} mm do solo)`,
+        '· traseira da cabine z', m.cabRearZ.toFixed(4),
+        '· quadro útil', (m.cabRearZ - m.frameEndZ).toFixed(3), 'm');
+    } else {
+      const wheelRe = new RegExp(def.wheelMeshRegex || 'tire|rim|pneu', 'i');
+      // FBX mesh names may not carry wheel words — match material names too
+      const wheelPred = (o: THREE.Mesh) => wheelRe.test(o.name) || wheelRe.test(firstMatName(o));
+      const box = groundAndCenter(cab, /./, wheelPred);
+      cab.position.z -= box.min.z;           // legado: traseira em z=0 → ocupa [0, length]
+      cab.updateWorldMatrix(true, true);
+    }
+  }
+
+  /* A RODAGEM DO RÍGIDO, trocada pela roda do VM — e AQUI, antes de
+     `state.cabBox` e de `placeTrailer()`, porque a troca mexe na silhueta e as
+     duas medem a cabine inteira. Só rígido: um cavalo mecânico é um dos 49
+     bakes já aprovados e não se toca nele. Ver `truck-wheels.ts`. */
+  /* ⚠️ O DOADOR NÃO SE TROCA. A roda vem do próprio Volvo VM, e trocá-la pela
+     cópia dela mesma só acrescenta risco (uma medida errada de eixo estraga o
+     caminhão que É a referência) sem mudar um pixel. *"até mesmo o do volvo,
+     que deveria ser a referência, não deveria ter trocado ela"* — Kennedy. */
+  let rodagem: Rodagem = null;
+  if (state.cabMount && !WHEEL_DONOR_RE.test(def.file || '')) {
+    rodagem = await attachVmWheels(cab, mine);
+  }
+  if (mine !== cabGen) { disposeTree(cab); return def; }
+
+  /* O TANQUE DO SCANIA P, trocado pelo do VM — e AQUI, pelo mesmo contrato de
+     ordem da roda: antes de `state.cabBox` e de `placeTrailer()`, porque a troca
+     mexe na silhueta, e antes de `truckObstacles()` (que roda dentro de
+     `placeTrailer()`), porque é ele quem lê a malha VISÍVEL para saber onde a
+     proteção lateral pode ter suporte. Ver `truck-tanks.ts`. */
+  if (state.cabMount && TANK_SWAP_RE.test(def.file || '')) {
+    await attachVmTanks(cab, mine);
+  }
+  if (mine !== cabGen) { disposeTree(cab); return def; }
+
+
+  /* O PARA-LAMA DO 2º EIXO DIRECIONAL, para os bitrucks DERIVADOS.
+     ------------------------------------------------------------------------
+     O VM e o VW ganham o 2º direcional por enxerto (`cut-chassi.cjs`) e o 6x2
+     de origem nunca teve arco ali; o Scania P é bitruck de fábrica e tem, e o
+     módulo MEDE isso em vez de decidir por nome de arquivo. Aqui, depois da
+     roda (que é a régua do arco) e antes de `state.cabBox` e da tinta. Ver
+     `front-fender.ts`. */
+  if (state.cabMount) await attachSteerFender(cab, state.cabMount, mine);
+  if (mine !== cabGen) { disposeTree(cab); return def; }
+
+  /* POSSE DE GEOMETRIA TAMBÉM NO CAMINHÃO — e ela faltava.
+     ------------------------------------------------------------------------
+     `markShared()` só era chamado no implemento, porque até agora nada escrevia
+     dentro da malha do caminhão. `stretchRigidFrame()` escreve, e os rips de
+     rígido compartilham `BufferGeometry` entre malhas: 139 nós para 125 malhas
+     no VM, 256 para 219 no Scania. Sem esta marca `claimGeometry()` devolve o
+     MOLDE e a deformação do rabo vaza para os irmãos — o defeito de 3,92 mm que
+     `geometry-share.ts` documenta ter sido pego num portão, não deduzido.
+
+     Roda DEPOIS de `applyCabBakeFixes()` e de `attachVmWheels()`, que é o mesmo
+     contrato de ordem do implemento: marcar antes transformaria uma geometria
+     já modificada em molde. */
+  const cabCompartilhadas = markShared(cab);
+  if (cabCompartilhadas) console.info('[chassi] geometria compartilhada —', cabCompartilhadas,
+    'malhas dividem um molde; a escrita clona (ver geometry-share.ts)');
+
+  /* O ESTEPE, e ele é a ÚNICA peça desta troca que roda DEPOIS de
+     `markShared()` — por isso não mora dentro de `attachVmWheels()`.
+     ------------------------------------------------------------------------
+     Roda e tanque só escondem malha e penduram clone; o estepe RECORTA ÍNDICE
+     dentro da malha do caminhão, porque o aro dele está fundido em três malhas
+     de `chassis_*` que atravessam o veículo inteiro. Escrever antes da marca
+     entregaria o MOLDE de uma família compartilhada, e o recorte vazaria para
+     as irmãs. Ver o bloco "O ESTEPE DO SCANIA P" em `truck-wheels.ts`.
+
+     Continua ANTES de `state.cabBox` e do primeiro `placeTrailer()`, que é o
+     que importa para a silhueta e para `truckObstacles()`. */
+  /* ▶▶ A BAIA DO 2º DIRECIONAL — a ferragem que o rip deixou dentro do arco.
+     ------------------------------------------------------------------------
+     AQUI, e não junto de `attachSteerFender()`: esta passada APAGA FACE, e
+     apagar face antes de `markShared()` levaria o buraco para as malhas irmãs
+     do mesmo molde. O para-lama já está pendurado (roda lá em cima, porque
+     precisa medir a roda antes da tinta) e não é cortado — quem sai é a
+     ferragem. Ver `clearSecondSteerBay()`. */
+  if (state.cabMount) {
+    for (const l of clearSecondSteerBay(cab, state.cabMount)) {
+      console.info('[para-lama]', def.file, '·', l);
+    }
+  }
+
+  if (rodagem && SPARE_SWAP_RE.test(def.file || '')) {
+    for (const linha of swapSpareWheel(cab, rodagem.asset, rodagem.direcao)) {
+      console.info('[estepe]', def.file, '·', linha);
+    }
+  }
+
+  /* O RECUO DO FLANCO — para a grade lateral passar POR FORA do equipamento.
+     ------------------------------------------------------------------------
+     Vale para TODO rígido, e roda AQUI, ao lado do estepe, pelo mesmo motivo
+     que ele: escreve VÉRTICE, e por isso tem de vir depois de `markShared()`.
+     O tanque de um caminhão é UM nó com os DOIS flancos dentro — transladar o
+     nó põe um lado dentro e o outro fora —, então o aperto é por vértice. O
+     tanque que `swapTruckTanks()` põe já nasce no teto; quem ele não toca (o
+     tanque de fábrica do VM, o ARLA e o bocal do Scania) passa por aqui.
+     Ver `truck-tanks.ts`. */
+  if (state.cabMount) {
+    for (const l of recessFlankEquipment(cab, state.cabMount)) {
+      console.info('[flanco]', def.file, '·', l);
+    }
+  }
+
+  /* ▶▶ O CONJUNTO TRASEIRO — tandem, para-barro e estepe, na cota que o dono
+     mandou (bitruck 400 mm para trás, truck 300 para a frente, toco parado).
+     ------------------------------------------------------------------------
+     Aqui, ao lado do recuo de flanco: depois de `markShared()` (ele move NÓ,
+     mas o estepe que ele leva junto teve índice recortado por
+     `swapSpareWheel()`), depois da roda nova (é ela que anda) e ANTES de
+     `state.cabBox` e do primeiro `placeTrailer()` — a silhueta muda e o teto de
+     balanço traseiro é calculado sobre os eixos NOVOS.
+
+     ⚠️ E O MANIFESTO ANDA JUNTO. `axles.driveZ`/`liftZ` são a régua da grade
+     lateral e do balanço; deixá-las na cota antiga faria a grade nascer numa
+     baia que não existe mais. Ver `rear-bogie.ts`. */
+  if (state.cabMount) {
+    /* ▶▶ ANTES DO CONJUNTO ANDAR: quem é RABO se decide agora.
+       ------------------------------------------------------------------------
+       `stretchRigidFrame()` (dentro de `placeTrailer()`) memoriza os vértices
+       atrás do plano de corte na PRIMEIRA chamada — que acontece depois daqui.
+       Sem esta linha, o que `shiftRearBogie()` levar para trás atravessa aquele
+       plano e passa a ser lido como rabo: medido no VM, o estepe inteiro e uma
+       FATIA de 2 891 vértices da roda do tandem, que saía rasgada. Ver
+       `primeTailBase()`. */
+    const comRabo = primeTailBase(cab, state.cabMount);
+    console.info('[quadro]', def.file, '· rabo definido na pose de fábrica —',
+      comRabo, 'malha(s) com vértice atrás do corte');
+
+    const bogie = shiftRearBogie(cab, state.cabMount);
+    for (const l of bogie.linhas) console.info('[tandem]', def.file, '·', l);
+    if (bogie.dzNorm) {
+      const ax = state.cabMount.axles;
+      ax.driveZ = ax.driveZ.map((z) => z + bogie.dzNorm);
+      ax.liftZ = ax.liftZ.map((z) => z + bogie.dzNorm);
+    }
+  }
+
+  /* AS PEÇAS QUE O RIP NÃO TEM — proteção lateral e suporte do para-barro.
+     ------------------------------------------------------------------------
+     Depois de `applyCabBakeFixes()` (o que foi escondido não pode entrar no
+     envelope de largura) e depois de `attachVmWheels()` (a roda nova muda a
+     largura), e ANTES de `state.cabBox` e do primeiro `placeTrailer()`, que
+     são quem lê a silhueta. Ver `chassis-parts.ts`. */
+  if (state.cabMount) {
+    for (const linha of buildChassisParts(cab, state.cabMount)) {
+      console.info('[chassi-peças]', def.file, '·', linha);
+    }
+    /* E A PLACA TRASEIRA, que num RÍGIDO é do chassi e não do implemento.
+       ------------------------------------------------------------------------
+       ⚠️ AQUI, ANTES DO PRIMEIRO `placeTrailer()`, e a posição é contrato. A
+       placa é montada NO SÍTIO DA PLACA DE FÁBRICA (medido na malha dela), e
+       `stretchRigidFrame()` — que roda dentro de `placeTrailer()` — TRANSLADA
+       essa malha junto com o resto do rabo. Montada depois, a nossa nasceria já
+       no lugar deslocado e levaria o deslocamento OUTRA VEZ na passada
+       seguinte: medido, 740 mm à frente do porta-placa. Montada antes, ela é só
+       mais uma peça do rabo e acompanha por construção.
+
+       Ver `attachRigidRearPlate()`. Um cavalo mecânico não passa por aqui —
+       `state.cabMount` só existe para quem está em `mounts.json`, ou seja para
+       quem carrega carroceria. */
+    attachRigidRearPlate(cab, def.file);
+    /* E A FAIXA REFLETIVA TRASEIRA, a do VM — no mesmo slot e pelo mesmo
+       contrato de ordem da placa: ela mora no RABO, e `stretchRigidFrame()`
+       (que roda dentro de `placeTrailer()`) translada o rabo. Montada depois,
+       nasceria no lugar já deslocado e levaria o deslocamento outra vez. Ver
+       `rear-tape.ts`. */
+    await attachRearTape(cab, mine, def.file || '');
+    if (mine !== cabGen) { disposeTree(cab); return def; }
   }
 
   state.cab = cab;
@@ -2146,6 +2519,35 @@ const BOX_HARDWARE_RE = /__caixa$/;
 /** Acima disto em Z a peça é trilho, não ferragem. Ver a medição acima. */
 const STAINLESS_RAIL_Z = 2.0;
 /**
+ * O TRILHO DE TOPO NÃO É DA FAMÍLIA DO INOX — medido, e foi uma surpresa.
+ *
+ * No semirreboque os dois perfis corridos de arremate da lateral (topo em
+ * y 3,961…4,171 e base em 1,309…1,519, os dois de 14,58 m em |x| 1,281…1,307)
+ * são `metal-galvanizado-mantido`. No sobrechassi os dois equivalentes são
+ * `metal-estrutura-principal-padrao`, em segmentos de 3,00 m — topo em
+ * y 2,948…3,051 e base em 0,214…0,309, os dois em |x| 1,199…1,310.
+ *
+ * Ou seja: `STAINLESS_FAMILY_RE` não alcança nenhum dos dois, e uma marca de
+ * "trilho de topo em inox" que só olhasse aquela família não faria nada. Esta
+ * segunda família é consultada SÓ quando o implemento declara
+ * `stainlessTopRail`, e ainda assim só para peça longa que more no teto.
+ */
+const TOP_RAIL_EXTRA_RE = /^metal-estrutura-principal-padrao$/i;
+/**
+ * Quão abaixo do teto do baú um perfil corrido ainda conta como trilho DE TOPO.
+ *
+ * O corte é folgado porque a distribuição é BIMODAL e o vazio é enorme: entre
+ * as peças que passam no teste de comprimento (`z-span ≥ STAINLESS_RAIL_Z`),
+ * o sobrechassi só tem duas alturas — os trilhos de topo em y ≥ 2,948 e os de
+ * piso em y ≤ 0,309. São 2,64 m de vazio. Com o teto branco em 3,026, um corte
+ * de 0,25 m cai em 2,776, a 172 mm abaixo do trilho de topo mais fundo e a
+ * 2,47 m acima do de piso.
+ *
+ * O comprimento é o que faz a folga caber: sem ele entrariam os montantes de
+ * canto e os arcos de teto, que atravessam a faixa e não são trilho nenhum.
+ */
+const TOP_RAIL_BAND = 0.25;
+/**
  * A rugosidade do inox: **0,30 — o escalar do próprio bake.**
  *
  * `inox-ferragem` chega do rip com `metalness 1, roughness 0.3`, que é
@@ -2209,7 +2611,30 @@ function splitTrailerHardware(root: THREE.Object3D): void {
   const clones = new Map<string, THREE.Material>();
   const m4 = new THREE.Matrix4();
   const box = new THREE.Box3();
-  let polished = 0, boxed = 0, rails = 0;
+  let polished = 0, boxed = 0, rails = 0, topRails = 0;
+
+  /* O TRILHO DE TOPO, quando o implemento declara que ele é INOX.
+     ---------------------------------------------------------------------
+     O corte por vão em Z (`STAINLESS_RAIL_Z`) foi medido NO SEMIRREBOQUE, e lá
+     ele está certo: o trilho de 14,5 m que corre o flanco é galvanizado de
+     usinagem, acetinado. No sobrechassi o perfil SUPERIOR das laterais é inox
+     e o inferior é galvanizado — diferença de linha de produto, não de bake.
+
+     A faixa sai do próprio baú, não de um número escrito: mede-se a caixa das
+     chapas brancas e toma-se `TOP_RAIL_BAND` abaixo do teto. Medido no
+     sobrechassi: teto branco em y 3,026 e os perfis de topo entre 2,775 e
+     2,985 — 250 mm de folga com o piso do baú a 2,86 m abaixo, ou seja sem
+     nenhuma chance de alcançar o trilho de piso ou o friso de flanco.
+
+     O teste é pelo MÍNIMO da peça (`box.min.y`), não pelo centro: um perfil de
+     canto que sobe do piso ao teto atravessa a faixa e não é trilho de topo —
+     ele é um montante, e um montante inteiro de inox não é o pedido. */
+  const stainlessTop = state.implement.stainlessTopRail === true;
+  /* `bboxOfMatching()` nunca devolve caixa vazia — sem branco ela cai na caixa
+     do implemento inteiro, cujo topo é o mesmo teto por 1 mm de cantoneira. */
+  const topFrom = stainlessTop
+    ? bboxOfMatching(root, bodyPanelPred(root)).applyMatrix4(toLocal).max.y - TOP_RAIL_BAND
+    : Infinity;
 
   const variantOf = (m: THREE.Material, suffix: string): THREE.Material => {
     const key = m.uuid + suffix;
@@ -2226,21 +2651,35 @@ function splitTrailerHardware(root: THREE.Object3D): void {
     const o = node as THREE.Mesh;
     if (!o.isMesh || !o.geometry) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (!mats.some((m) => !!m && STAINLESS_FAMILY_RE.test(m.name || ''))) return;
+    const family = mats.some((m) => !!m && STAINLESS_FAMILY_RE.test(m.name || ''));
+    /* A segunda família só é sequer olhada quando o implemento pede — ver
+       `TOP_RAIL_EXTRA_RE`. Para o semirreboque isto é `false` e a varredura se
+       comporta exatamente como antes desta marca existir. */
+    const extra = stainlessTop && !family
+      && mats.some((m) => !!m && TOP_RAIL_EXTRA_RE.test(m.name || ''));
+    if (!family && !extra) return;
 
     let suffix: string;
-    if (underTrailerNode(o, root, TRAILER_BOX_NODE_RE)) {
+    if (family && underTrailerNode(o, root, TRAILER_BOX_NODE_RE)) {
       suffix = BOX_HW_SUFFIX; boxed++;
     } else {
       if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
       const bb = o.geometry.boundingBox;
       if (!bb) return;
       box.copy(bb).applyMatrix4(m4.multiplyMatrices(toLocal, o.matrixWorld));
-      if (box.max.z - box.min.z >= STAINLESS_RAIL_Z) { rails++; return; }
+      const long = box.max.z - box.min.z >= STAINLESS_RAIL_Z;
+      const onTop = stainlessTop && long && box.min.y >= topFrom;
+      /* Da família estrutural entra SÓ o trilho de topo: ela é o marco da
+         porta, o montante de canto e o arco de teto, e nenhum desses vira inox
+         por causa desta marca. */
+      if (extra && !onTop) return;
+      if (long && !onTop) { rails++; return; }
+      if (onTop) topRails++;
       suffix = STAINLESS_SUFFIX; polished++;
     }
-    const swap = (m: THREE.Material | null) =>
-      (m && STAINLESS_FAMILY_RE.test(m.name || '') ? variantOf(m, suffix) : m);
+    const mine = (m: THREE.Material | null) => !!m
+      && (STAINLESS_FAMILY_RE.test(m.name || '') || (extra && TOP_RAIL_EXTRA_RE.test(m.name || '')));
+    const swap = (m: THREE.Material | null) => (mine(m) ? variantOf(m as THREE.Material, suffix) : m);
     o.material = Array.isArray(o.material)
       ? o.material.map(swap) as THREE.Material[]
       : swap(o.material) as THREE.Material;
@@ -2248,6 +2687,7 @@ function splitTrailerHardware(root: THREE.Object3D): void {
 
   console.info('[ferragem] dividida —', polished, 'malhas de inox ·',
     boxed, 'da caixa ·', rails, `de trilho intocadas (z ≥ ${STAINLESS_RAIL_Z} m) ·`,
+    stainlessTop ? `${topRails} de trilho de TOPO em inox (y ≥ ${topFrom.toFixed(3)}) ·` : '',
     clones.size, 'material(is) clonado(s):',
     [...clones.values()].map((m) => m.name).join(', ') || '(nenhum)');
 }
@@ -2405,8 +2845,18 @@ function applyTrailerFinish(root: THREE.Object3D) {
         m.roughness = Math.max(m.roughness ?? 0, 0.32);
         m.envMapIntensity = 0.85;
         log.push(`${name}: dielétrico, rug ≥0.32, env 0.85`);
-      } else if (TRAILER_STRUCT_METAL_RE.test(name)) {
-        /* THE HORIZON IN THE RAIL — Kennedy's own diagnosis, and it is right.
+      } else if (TRAILER_STRUCT_METAL_RE.test(name) && !TRAILER_STAINLESS_RE.test(name)) {
+        /* O `!TRAILER_STAINLESS_RE` É O QUE FAZ O CLONE ESCAPAR, e ele é a
+           generalização do truque das âncoras logo acima: `^inox-ferragem$` e
+           `^metal-pouco-polido$` já impediam `…__polido` de voltar para cá,
+           mas `galvanizado` e `estrutura-principal` NÃO TÊM âncora — nunca
+           precisaram, porque nenhum dos dois era clonado. Passaram a ser em
+           2026-08-18, com o trilho de topo em inox do sobrechassi
+           (`TOP_RAIL_EXTRA_RE`): sem esta guarda o clone cairia neste ramo,
+           levaria o piso de 0,62 e a marca não faria absolutamente nada — sem
+           erro, sem aviso, e com o `log` abaixo dizendo que funcionou.
+
+           THE HORIZON IN THE RAIL — Kennedy's own diagnosis, and it is right.
            These are `metalness: 1` surfaces: what you see on them is not their
            colour, it is the ENVIRONMENT. The studio's environment is a
            photographic HDRI standing in for the rest of the map, and a
@@ -3065,113 +3515,280 @@ function applyPlateLap(
 }
 
 /**
- * A coluna de rebites de cada emenda — um por REBAIXO de friso, como nas
- * fotos. Os rebaixos são MEDIDOS na própria sopa: histograma do x mais
- * externo por faixa de 2 mm de altura; rebaixo é onde a superfície recua mais
- * de 2,5 mm da crista. Nada de perfil teórico: é a chapa que acabou de ser
- * recortada que diz onde ela é funda.
+ * A coluna de rebites de cada emenda — um por REBAIXO de friso, como nas fotos.
+ *
+ * A FASE DA FILEIRA É MEDIDA NA PRÓPRIA CHAPA, e isso é o conserto de
+ * 2026-08-20. Ela era uma CONSTANTE (`RIB_FLAT_CENTER − pitch/2`), e uma
+ * constante não podia estar certa nos dois implementos ao mesmo tempo:
+ *
+ *   · `row0` (= `floorY + skirtHeight`) é onde `findRows()` MARCA a fileira —
+ *     o último vértice antes do maior vão em y. Esse ponto cai em lugares
+ *     DIFERENTES do perfil em cada bake, porque a malha é outra. Medido: com a
+ *     mesma fase de grade, a fileira sai na fase 40 mm no semirreboque e na
+ *     19 mm no sobrechassi (`tools/studio-bench/checks-referencial-0820.mjs`).
+ *   · e havia um segundo termo, que é o que fazia a constante "funcionar" num
+ *     dos dois: `row0` vem de `TrailerBody`, que mede em espaço de MUNDO
+ *     (`collect()` aplica `matrixWorld`), enquanto a sopa `k` deste painel vem
+ *     em espaço da RAIZ (`buildLiveryPanels()` monta `toLocal · matrixWorld`).
+ *     Os dois diferem pela translação de `groundAndCenter()` — **+20,0 mm no
+ *     semirreboque e −1,0 mm no sobrechassi**, medidos. Somando as duas coisas,
+ *     `RIB_FLAT_CENTER = 46,7` caía no centro do platô recuado do semirreboque
+ *     (dois erros que se cancelavam) e na CRISTA do sobrechassi.
+ *
+ * Daí as três queixas encaixarem: *"os rebites estão na parte elevada dos
+ * frisos em vez de centralizada na parte lisa"* (sobrechassi, antes da §28) e
+ * *"estão melhores mas ainda não 100% centralizados na parte lisa"* (depois
+ * dela, quando a §28 tirou meio passo e a fileira caiu DENTRO do platô, 5,7 mm
+ * acima do centro).
+ *
+ * Agora não há constante nem `row0` nesta conta: a sopa é DOBRADA pelo passo e
+ * o perfil sai dela. Ver `measureRibProfile()`.
  */
+/** Resolução da dobra do perfil, em metros. A pele extrudada só tem vértice nas
+ *  QUEBRAS do perfil, então meio milímetro já separa todas elas. */
+const RIB_FOLD_BIN = 0.0005;
+/** Quão perto do máximo uma fase ainda é CRISTA. */
+const RIB_CREST_TOL = 0.0003;
+
+/**
+ * O PERFIL DO FRISO, dobrado pelo passo — a seção transversal, medida.
+ *
+ * A pele é uma extrusão em Z: os vértices dela existem só onde o perfil quebra.
+ * Dobrar a nuvem por `pitch` não é, portanto, uma amostragem do perfil — é o
+ * perfil, dobra a dobra. Medido nos dois implementos (as fases relativas a
+ * `y = 0`, que é origem arbitrária e não importa: o que se usa é a DIFERENÇA
+ * entre a crista e o platô):
+ *
+ *   semirreboque  crista 1,3037 · platô 1,2984 · relevo 5,3 mm · platô 28,4 mm
+ *   sobrechassi   crista 1,3101 · platô 1,3048 · relevo 5,3 mm · platô 28,0 mm
+ *
+ * — a MESMA chapa, como o dono disse que era.
+ *
+ * @returns a fase (em y) do centro do platô RECUADO e a profundidade dele, ou
+ *   `null` se a dobra não tiver forma de friso.
+ */
+function measureRibProfile(
+  k: { p: number[]; n: number[] }, sgnOut: number, pitch: number,
+): { flatPhase: number; flatDepth: number; crest: number; relief: number } | null {
+  if (!(pitch > 0.01)) return null;
+  const nBins = Math.round(pitch / RIB_FOLD_BIN);
+  const fold = new Map<number, number>();
+  for (let i = 0; i < k.p.length; i += 3) {
+    /* SÓ a pele que olha para o LADO — a mesma nota de `measureValeRows()`. */
+    if (Math.abs(k.n[i]) < 0.7) continue;
+    const d = sgnOut * k.p[i];
+    if (d < 0.5) continue;                       // e no flanco certo
+    const fase = ((k.p[i + 1] % pitch) + pitch) % pitch;
+    /* A CHAVE É CÍCLICA: uma fase a um décimo de milímetro do passo arredonda
+       para `nBins`, que é o mesmo lugar que zero. Sem o módulo aqui as duas
+       pontas do mesmo platô viram dois grupos. */
+    const bin = Math.round(fase / RIB_FOLD_BIN) % nBins;
+    if (!(d <= (fold.get(bin) ?? -Infinity))) fold.set(bin, d);
+  }
+  if (fold.size < 6) return null;
+  const crest = Math.max(...fold.values());
+
+  /* A CRISTA é a corrida CÍCLICA de fases a menos de `RIB_CREST_TOL` do
+     máximo, e o centro dela é a fase da crista. Cíclica porque a crista pode
+     estar a cavalo da origem da dobra, que é arbitrária. */
+  const naCrista = (b: number) => {
+    const d = fold.get(((b % nBins) + nBins) % nBins);
+    return d !== undefined && crest - d < RIB_CREST_TOL;
+  };
+  let topo = -1;
+  for (const [b, d] of fold) if (crest - d < RIB_CREST_TOL) { topo = b; break; }
+  if (topo < 0) return null;
+  let lo = topo, hi = topo;
+  while (hi - lo < nBins && naCrista(lo - 1)) lo--;
+  while (hi - lo < nBins && naCrista(hi + 1)) hi++;
+  const crestPhase = (((lo + hi) / 2) * RIB_FOLD_BIN + pitch) % pitch;
+
+  /* O PLATÔ RECUADO fica MEIO PASSO da crista, e isso é medida e não simetria
+     suposta: nos dois bakes o centro do platô mede exatamente `crista ±
+     pitch/2` (13,3 mm contra 40,0 no semirreboque; 13,5 contra 40,0 no
+     sobrechassi). Usar a crista como âncora é o que torna a conta robusta — ela
+     é um argmax, e o platô é uma faixa larga cujo centro oscila com o ruído. */
+  const flatPhase = (crestPhase + pitch / 2) % pitch;
+  /* ⚠️ O PLATÔ É LISO, E POR ISSO NÃO TEM VÉRTICE NO MEIO. A dobra é ESPARSA:
+     a pele é uma extrusão e só quebra nas bordas do platô — no sobrechassi as
+     fases medidas são 0 · 27 · 27,5 · 28 · 31 · 31,5 · 35,5 · 40 · 44,5 · 48,5
+     · 49 · 52 · 52,5 · 53, e o centro do platô (13,5) simplesmente não está
+     entre elas. Pedir `fold.get(fase do centro)` devolvia `undefined` e a
+     coluna de rebites inteira sumia, calada.
+
+     A profundidade sai do bin EXISTENTE mais próximo, e a busca é cíclica e
+     limitada a um quarto de passo — dentro do platô, que tem meio passo de
+     largura, qualquer bin dá o mesmo x. */
+  const alvoBin = Math.round(flatPhase / RIB_FOLD_BIN) % nBins;
+  const limite = Math.round(nBins / 4);
+  let flatDepth: number | undefined;
+  for (let dd = 0; dd <= limite && flatDepth === undefined; dd++) {
+    flatDepth = fold.get((alvoBin + dd) % nBins);
+    if (flatDepth === undefined) flatDepth = fold.get((alvoBin - dd + nBins) % nBins);
+  }
+  if (flatDepth === undefined) return null;
+  const relief = crest - flatDepth;
+  /* Um friso deste baú tem 5,3 mm de relevo. Fora de uma faixa generosa em
+     torno disso, a dobra não é friso e a medida não vale — melhor não desenhar
+     rebite nenhum que desenhá-lo num plano inventado. */
+  if (relief < 0.002 || relief > 0.015) return null;
+  return { flatPhase, flatDepth, crest, relief };
+}
+
 /**
  * Mede as fileiras de rebite na sopa AINDA SEM REMONTE — a ordem importa: a
  * inclinacao da chapa mexe em x ate 2,2 mm, da grandeza do proprio relevo do
  * friso, e medir depois dela contamina a regua de profundidade (a rodada que
  * mediu numa janela estreita pos-remonte achou ZERO fileiras: a pele extrudada
  * quase nao tem vertice fora dos planos de corte).
- *
- * Com a sopa intacta, a amostra e o painel INTEIRO: o x mais externo por faixa
- * de 2 mm de altura e denso e limpo. As alturas saem da regua publica do rig
- * (`floorY + skirtHeight + k*pitch`), e o CENTRO de cada rebaixo e medido
- * rebaixo a rebaixo — um `valeH` unico deixava rebite encostado na borda da
- * parte lisa ("ainda nao estao perfeitamente nos centros", com print).
  */
 function measureValeRows(
   k: { p: number[]; n: number[] }, sgnOut: number,
 ): { rows: { y: number; d: number }[]; yMin: number; yMax: number } {
-  const BIN = 0.002;
-  const outer = new Map<number, number>();
   let yMin = Infinity, yMax = -Infinity;
-  for (let i = 0; i < k.p.length; i += 3) {
-    const x = k.p[i], y = k.p[i + 1];
+  for (let i = 1; i < k.p.length; i += 3) {
+    const y = k.p[i];
     if (y < yMin) yMin = y;
     if (y > yMax) yMax = y;
-    /* SO a pele que olha para o LADO: nas pontas o painel enrola para o
-       montante e essa curva, vista por altura, poe x de CRISTA em todo
-       rebaixo — foi o que derrubou 45 fileiras para 7. O wrap olha para ±z;
-       o friso olha para ±x. */
-    if (Math.abs(k.n[i]) < 0.7) continue;
-    const bin = Math.round(y / BIN);
-    const d = sgnOut * x;
-    if (!(d <= (outer.get(bin) ?? -Infinity))) outer.set(bin, d);
   }
   const rows: { y: number; d: number }[] = [];
-  if (!outer.size) return { rows, yMin, yMax };
-  const crest = Math.max(...outer.values());
-
-
-  /* FORMULA FECHADA, sem deteccao — o fim de uma saga medida em quatro
-     rodadas (2026-08-11): a sopa PRE-remonte e ESPARSA (391 bins em 1390;
-     vertice so nas quebras de perfil — o bin do centro da lisa NEM EXISTE),
-     entao qualquer detector de contiguidade ou de plano oscila entre pares,
-     buracos e zero. Os quatro numeros necessarios ja foram MEDIDOS
-     (checks-perfil.mjs): a lisa de ~27 mm fica centrada a `RIB_FLAT_CENTER` de
-     cada passo da grade do rig, no plano crista − 5,3 mm. O rebuild ladrilha a
-     MESMA unidade, entao a fase vale em qualquer altura. A constante mora em
-     `trailer-geometry.ts` porque a ferragem da porta traseira assenta na MESMA
-     regua (`trailer-bake-fixes.ts`) — e um segundo numero por perto foi
-     exatamente o que pos aquela peca em cima da crista. */
   const prof = state.trailerRig?.profile ?? null;
-  if (prof && prof.ribCount) {
-    const row0 = prof.floorY + prof.skirtHeight;
-    const dFlat = crest - 0.0053;
-    /* n = −1 INCLUSO (prints do usuário, 2026-08-11): o último friso de baixo
-       da chapa — o rebaixo ANTERIOR a row0, centro a row0 − 6,7 mm ≈ +168 mm
-       do pé, logo acima do trilho — ficava sem rebite porque o laço nascia em
-       n = 0. O guarda de yMin + 0,14 continua filtrando o que cair no trilho
-       (n = −2 daria +115 mm). */
-    for (let n = -1; ; n++) {
-      const y = row0 + RIB_FLAT_CENTER + n * prof.pitch;
-      if (y > yMax - 0.20) break;
-      if (y < yMin + 0.14) continue;
-      rows.push({ y, d: dFlat });
-    }
+  if (!prof || !prof.ribCount) return { rows, yMin, yMax };
+
+  const row0Prof = prof.floorY + prof.skirtHeight;
+  const perfil = measureRibProfile(k, sgnOut, prof.pitch);
+  if (!perfil) {
+    console.warn('[livery] o perfil do friso não saiu da chapa —',
+      'a coluna de rebites fica de fora desta lateral.');
+    return { rows, yMin, yMax };
+  }
+
+  /* O TETO DA COLUNA É MEDIDO, e a constante que ele substitui era um número de
+     OUTRO implemento. `yMax − 0,20` valia porque 200 mm é a altura do perfil de
+     arremate DO SEMIRREBOQUE; o do sobrechassi tem 103 mm, e a diferença saía
+     como ~97 mm de parede pelada no alto do flanco.
+
+     ⚠️ E entra como MARGEM, não como cota: `prof.topRailY` é de `TrailerBody`,
+     que mede em mundo, e `yMax` é desta sopa, que está no espaço da raiz. A
+     diferença entre os dois referenciais é a translação de `groundAndCenter()`
+     — pequena, mas foi ela que desalinhou a fase do rebite por uma rodada
+     inteira. Uma margem (`roofY − topRailY`) atravessa a fronteira sem erro. */
+  const margemDoTopo = prof.topRailY === null ? 0.20 : prof.roofY - prof.topRailY;
+  const topLimit = yMax - margemDoTopo;
+  /* O PISO DA COLUNA — e ele conta do PRIMEIRO FRISO, não do pé da chapa.
+     ⚠️ CONSERTO DE 2026-08-20: era `yMin + 0,14`, e os 140 mm eram a altura do
+     trilho DO SEMIRREBOQUE contada do pé do painel. O trilho não tem altura
+     fixa (ver `RAIL_TOP_UNDER_ROW0` em `trailer-bake-fixes.ts`): ele para
+     47,8 mm abaixo do primeiro friso, e a saia de cada baú é outra — 175,3 mm
+     no semirreboque contra 120,2 no sobrechassi. Com a régua velha o
+     sobrechassi começava a coluna em `floorY + 140`, que é ACIMA da segunda
+     faixa lisa: *"descubra por que os dois primeiros frisos não têm rebite"*.
+
+     A régua nova é o topo do quadro MAIS o raio da calota, para que nem a borda
+     da cabeça encoste no perfil. No semirreboque ela devolve `row0 − 38,8` =
+     `floorY + 136,5`, contra os `+140` de antes — a mesma primeira fileira, que
+     é o teste de que ela não mexe no padrão ouro. No sobrechassi devolve
+     `floorY + 81,4`: a faixa lisa #1 (piso +77,6) fica de fora porque metade
+     dela está atrás do quadro, e a #2 (+130,6) passa a ter rebite — que é a
+     fileira que faltava. */
+  const baseLimit = row0Prof - RAIL_TOP_UNDER_ROW0_MM + RIVET_DOME_R;
+
+  /* A fase é ABSOLUTA (dobrada a partir de y = 0) porque foi assim que ela foi
+     medida — nenhum `row0` entra, e com ele some a fronteira de referencial. */
+  const n0 = Math.ceil((baseLimit - perfil.flatPhase) / prof.pitch);
+  for (let n = n0; ; n++) {
+    const y = perfil.flatPhase + n * prof.pitch;
+    if (y > topLimit) break;
+    rows.push({ y, d: perfil.flatDepth });
   }
   return { rows, yMin, yMax };
 }
 
 /**
- * Faixa em z que uma PORTA proíbe à coluna de rebites da emenda.
+ * Retângulo que uma PORTA proíbe à coluna de rebites da emenda.
  *
  * PEDIDO DO KENNEDY, 2026-08-12, com print: "a porta não deve ter rebites, e
  * quando uma fileira de rebite for pegar no frame metálico da porta, não deve
  * ser gerada".
  *
- * As duas frases viram UMA regra, e é uma regra só de Z: todo rebite de uma
- * coluna divide o z da emenda que o gerou (`oz = sSeam + 12 mm`), então ou a
- * coluna inteira cai sobre a porta ou nenhum rebite dela encosta nela. Não há
- * caso intermediário para tratar — e uma coluna que atravessasse a folha,
- * cortada só no trecho do vão, deixaria dois cotocos de rebite colados no
- * marco, que é justamente o que o print reprova.
+ * ⚠️⚠️ ISTO ERA UMA REGRA SÓ DE Z, E A REGRA SÓ DE Z MATAVA A COLUNA INTEIRA.
+ * ---------------------------------------------------------------------------
+ * A versão anterior peneirava EMENDAS (`seams.filter(...)`) e o argumento
+ * escrito aqui era "ou a coluna inteira cai sobre a porta ou nenhum rebite dela
+ * encosta nela". Isso é falso, e a foto do dono é a prova: uma porta de serviço
+ * tem 2,10 m e a parede do gancheiro tem 2,78 m, então a coluna atravessa a
+ * porta e sobra parede ACIMA dela — 680 mm, treze fileiras — e um pouco abaixo
+ * da soleira. Matar a coluna apagava as treze também.
  *
- * A faixa é o VÃO (`hole`, que já inclui o recuo do marco) mais a moldura
- * galvanizada (`TRIM_WIDTH`) e o raio da calota, para que nem a borda da
- * cabeça toque o arremate.
+ * MEDIDO (2026-08-22, sobrechassi sobre o Scania P, uma porta em `right`):
+ *
+ *     sem porta   SIDE_L 400 calotas · SIDE_R 400   (8 emendas × 50 fileiras)
+ *     com porta   SIDE_L 400 calotas · SIDE_R 350   ← uma coluna inteira a menos
+ *
+ * e é exatamente o par de fotos do relato — *"os rebites aqui não estão
+ * corretos, enquanto do outro lado estão"*. O lado "certo" é o que não tem
+ * porta. Nada mais difere entre os dois flancos: as 8 colunas caem nos mesmos
+ * z, as 50 fileiras nos mesmos y, e as duas caixas são espelhadas ao milímetro.
+ *
+ * A regra certa é a que a frase do pedido já dizia: **o que não pode ter rebite
+ * é a PORTA**, não a emenda dela. Um rebite é um ponto, o vão é um retângulo, e
+ * quem decide é o retângulo — chapa acima do vão continua sendo chapa, e chapa
+ * remontada leva rebite na emenda, na fábrica e aqui.
+ *
+ * A margem é a moldura galvanizada (`TRIM_WIDTH`) mais o raio da calota, para
+ * que nem a BORDA da cabeça toque o arremate — em z e em y, porque o marco
+ * cerca o vão pelos quatro lados.
  */
 const RIVET_DOME_R = 0.009;
-function seamHitsDoor(z: number, holes: { z0: number; z1: number }[]): boolean {
+/** A folga entre o topo do quadro de baixo e o primeiro friso — a MESMA de
+ *  `RAIL_TOP_UNDER_ROW0` em `trailer-bake-fixes.ts`, repetida aqui porque este
+ *  arquivo não importa daquele e as duas descrevem a mesma medida do doador.
+ *  Se uma mudar, a outra muda junto. */
+const RAIL_TOP_UNDER_ROW0_MM = 0.0478;
+/**
+ * DESLOCAMENTO DA COLUNA DE REBITES EM RELAÇÃO À EMENDA — 12 mm, **sobre a aba
+ * que cavalga**.
+ *
+ * Ele foi a zero em 2026-08-19 e voltou no mesmo dia, e o vaivém vale como
+ * registro: o dono tinha dito *"o rebite não está na posição correta"* e a
+ * leitura de pixel apontou o deslocamento; ele voltou com a frase inteira —
+ * *"os rebites estão na parte elevada dos frisos em vez de centralizada na
+ * parte lisa, **e não estão na parte remontada das chapas**"*. São DOIS
+ * defeitos, e o primeiro é o que a foto mostrava: a fase da FILEIRA (ver
+ * `RIB_FLAT_CENTER` e a nota de `measureValeRows()`). O deslocamento em Z
+ * estava certo — um rebite de emenda atravessa a aba, e a aba fica à frente da
+ * dobra.
+ */
+const RIVET_FROM_SEAM = 0.012;
+function rivetHitsDoor(
+  y: number, z: number, holes: { y0: number; y1: number; z0: number; z1: number }[],
+): boolean {
   const pad = TRIM_WIDTH + RIVET_DOME_R;
-  return holes.some((h) => z >= h.z0 - pad && z <= h.z1 + pad);
+  return holes.some((h) => z >= h.z0 - pad && z <= h.z1 + pad
+    && y >= h.y0 - pad && y <= h.y1 + pad);
 }
 
 function addPlateRivets(
   _trailer: THREE.Object3D, panel: THREE.Mesh,
   vales: { rows: { y: number; d: number }[]; yMin: number; yMax: number },
-  sgnOut: number, seams: number[], holes: { z0: number; z1: number }[] = [],
+  sgnOut: number, seams: number[],
+  holes: { y0: number; y1: number; z0: number; z1: number }[] = [],
+  /** O remonte desta face foi APLICADO por `applyPlateLap()`? Quando ele vem do
+   *  bake (pele de folhas), somar `PLATE_T` deixaria a calota 2,2 mm no ar. */
+  lapSintetico = true,
 ): { y: number; d: number }[] {
   const { rows, yMin, yMax } = vales;
+  if (!seams.length || !rows.length) return [];
   /* A emenda continua desenhada onde a porta está — é chapa, e a chapa passa
-     por trás do marco. O que some é só a COLUNA DE REBITES. */
-  const live = seams.filter((s) => !seamHitsDoor(s + 0.012, holes));
-  if (!live.length || !rows.length) return [];
+     por trás do marco. O que some é o rebite que cairia DENTRO do vão (ou no
+     marco dele): ver `rivetHitsDoor()`. */
+  const casas: { s: number; r: { y: number; d: number } }[] = [];
+  for (const s of seams) {
+    for (const r of rows) {
+      if (!rivetHitsDoor(r.y, s + RIVET_FROM_SEAM, holes)) casas.push({ s, r });
+    }
+  }
+  if (!casas.length) return [];
 
   /* A cabeça: calota de 17 mm, achatada, apontada para fora. O material é o
      `inox-ferragem` do próprio bake — o rebite tem de envelhecer junto com a
@@ -3187,12 +3804,16 @@ function addPlateRivets(
   });
   mat.name = 'livery-rebite';
 
-  /* A CABECA PASSA DA CRISTA — medido na sessao do Kennedy (2026-08-11): com
-     calota de 3,4 mm o apex ficava vale + 6,2 mm, 1 mm ABAIXO do plano das
-     cristas (relevo 5,2 mm) — visivel de frente (a bancada fotografa
-     ortogonal) e ENGOLIDO pelas cristas em qualquer vista obliqua, que e como
-     o estudio e usado. Calota de ~5 mm poe o apex ~2,5 mm acima da crista,
-     como nas fotos de referencia. */
+  /* A CALOTA APOIA NO PLATÔ RECUADO, que é onde `measureRibProfile()` a manda
+     (`r.d` é a profundidade MEDIDA daquele plano). O escalar em X é a
+     PROTUBERÂNCIA: 0,58 × 9 mm = 5,2 mm, que somados aos 0,6 mm de folga põem
+     a cabeça 0,5 mm à frente da crista — um rebite no vale cuja calota alcança
+     a linha do friso, que é como ele aparece na foto aprovada.
+
+     ⚠️ Ele foi a 0,29 em 2026-08-19, quando a §28 acreditou que a fileira ia
+     para a CRISTA; com a fileira de volta ao vale, 2,6 mm deixariam a cabeça
+     2,7 mm ATRÁS da linha do friso e ela sumiria de perfil. Os dois números
+     andam juntos: quem mudar `r.d` muda este. */
   const dome = new THREE.SphereGeometry(0.009, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   dome.rotateZ(sgnOut > 0 ? -Math.PI / 2 : Math.PI / 2);
   dome.scale(0.58, 1, 1);
@@ -3207,34 +3828,32 @@ function addPlateRivets(
   const bNor = dome.getAttribute('normal') as THREE.BufferAttribute;
   const bIdx = dome.getIndex() as THREE.BufferAttribute;
   const vc = bPos.count, ic = bIdx.count;
-  const total = live.length * rows.length;
+  const total = casas.length;
   const P = new Float32Array(vc * 3 * total);
   const Nn = new Float32Array(vc * 3 * total);
   const I = new (vc * total > 65535 ? Uint32Array : Uint16Array)(ic * total);
   const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
   let n = 0;
-  for (const sSeam of live) {
-    for (const r of rows) {
-      /* Sobre a borda que cavalga, 12 mm a frente da emenda; a cabeca assenta
-         no fundo do rebaixo mais a inclinacao local da chapa (os envelopes
-         zeram o remonte perto do trilho e da cantoneira). */
-      const env = clamp01((r.y - yMin - 0.13) / 0.05)
-        * clamp01((yMax - 0.21 - r.y) / 0.06);
-      const ox = sgnOut * (r.d + PLATE_T * env + 0.0006);
-      const oy = r.y;
-      const oz = sSeam + 0.012;
-      for (let v = 0; v < vc; v++) {
-        const o3 = (n * vc + v) * 3;
-        P[o3] = bPos.getX(v) + ox;
-        P[o3 + 1] = bPos.getY(v) + oy;
-        P[o3 + 2] = bPos.getZ(v) + oz;
-        Nn[o3] = bNor.getX(v);
-        Nn[o3 + 1] = bNor.getY(v);
-        Nn[o3 + 2] = bNor.getZ(v);
-      }
-      for (let i = 0; i < ic; i++) I[n * ic + i] = bIdx.getX(i) + n * vc;
-      n++;
+  for (const { s: sSeam, r } of casas) {
+    /* NA PRÓPRIA EMENDA — ver `RIVET_FROM_SEAM`. A cabeça assenta no fundo do
+       rebaixo mais a inclinação local da chapa (os envelopes zeram o remonte
+       perto do trilho e da cantoneira). */
+    const env = clamp01((r.y - yMin - 0.13) / 0.05)
+      * clamp01((yMax - 0.21 - r.y) / 0.06);
+    const ox = sgnOut * (r.d + (lapSintetico ? PLATE_T * env : 0) + 0.0006);
+    const oy = r.y;
+    const oz = sSeam + RIVET_FROM_SEAM;
+    for (let v = 0; v < vc; v++) {
+      const o3 = (n * vc + v) * 3;
+      P[o3] = bPos.getX(v) + ox;
+      P[o3 + 1] = bPos.getY(v) + oy;
+      P[o3 + 2] = bPos.getZ(v) + oz;
+      Nn[o3] = bNor.getX(v);
+      Nn[o3 + 1] = bNor.getY(v);
+      Nn[o3 + 2] = bNor.getZ(v);
     }
+    for (let i = 0; i < ic; i++) I[n * ic + i] = bIdx.getX(i) + n * vc;
+    n++;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
@@ -3454,6 +4073,47 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
     for (let i = 0; i < pos.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(p.mat));
   }
 
+  /* ---- OS PLANOS DAS DUAS PAREDES, MEDIDOS NA PELE ----
+     ⚠️ `box.min.z`/`box.max.z` NÃO são as paredes, e supor que sejam é o
+     defeito de 2026-08-20: *"olhe como está o livery da frontal, totalmente
+     errado"*. O que eles dão é o vértice branco mais avançado do corpo INTEIRO,
+     e o quanto ele passa da parede é uma propriedade do bake:
+
+       semirreboque   box.max.z 7,233 contra a parede em 7,215 →  18 mm
+       sobrechassi    box.max.z 4,307 contra a parede em 4,194 → 113 mm
+
+     Com a fatia de 50 mm, no semirreboque a parede cai dentro dela e a chapa
+     sai inteira; no sobrechassi a fatia inteira fica À FRENTE da parede e o que
+     sobra é o que passa dela — uma tira de 170 mm de largura por 2 645 de
+     altura, que é exatamente o que o editor mostrava.
+
+     A parede é a mesma face que `TrailerBody` mede como `z0`/`z1`: o z extremo
+     dos vértices que estão NA PELE (o x mais externo). Medi-la aqui, na mesma
+     sopa e no mesmo referencial, tira o bake da conta — e no semirreboque
+     devolve a mesma fatia de antes, porque lá os dois números já coincidiam. */
+  const cxSkin = (box.min.x + box.max.x) / 2;
+  const halfSkin = (box.max.x - box.min.x) / 2;
+  let skinZmin = Infinity, skinZmax = -Infinity;
+  for (const p of prepared) {
+    const pos = p.mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(p.mat);
+      if (Math.abs(v.x - cxSkin) < halfSkin - LIVERY_SKIN_SIDE) continue;
+      if (v.z < skinZmin) skinZmin = v.z;
+      if (v.z > skinZmax) skinZmax = v.z;
+    }
+  }
+  /* Sem pele medível a régua antiga volta a valer — ela é o comportamento
+     conhecido, e um baú sem flanco não tem testeira para recortar de todo o
+     jeito. */
+  const paredeFrente = isFinite(skinZmax) ? skinZmax : box.max.z;
+  const paredeTras = isFinite(skinZmin) ? skinZmin : box.min.z;
+  if (Math.abs(paredeFrente - box.max.z) > 0.02 || Math.abs(paredeTras - box.min.z) > 0.02) {
+    console.info('[livery] paredes medidas na pele —',
+      `frente ${paredeFrente.toFixed(3)} (caixa ${box.max.z.toFixed(3)}) ·`,
+      `traseira ${paredeTras.toFixed(3)} (caixa ${box.min.z.toFixed(3)})`);
+  }
+
   const keep: Record<LiveryPanelName, { p: number[]; n: number[]; u: number[] }> = {
     SIDE_L: { p: [], n: [], u: [] }, SIDE_R: { p: [], n: [], u: [] },
     REAR: { p: [], n: [], u: [] }, FRONT: { p: [], n: [], u: [] },
@@ -3510,7 +4170,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
          seria um no-op hoje e um risco de capturar returns de porta amanhã. */
       if (minX >= box.max.x - LIVERY_SKIN_SIDE) where = 'SIDE_R';
       else if (maxX <= box.min.x + LIVERY_SKIN_SIDE) where = 'SIDE_L';
-      if (!where && Math.max(a.z, b2.z, c.z) <= box.min.z + LIVERY_SKIN_REAR) {
+      if (!where && Math.max(a.z, b2.z, c.z) <= paredeTras + LIVERY_SKIN_REAR) {
         e1.subVectors(b2, a); e2.subVectors(c, a);
         fn.crossVectors(e1, e2).normalize();
         /* abs(): ~0.2 % of these ripped triangles are wound backwards, so the
@@ -3524,7 +4184,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
          sairia com as duas quinas dobradas para dentro dela.
          O TETO passa longe deste teste: ele atravessa o baú inteiro em z, então
          o `minZ` dele nunca alcança a fatia; e a normal dele é +Y. */
-      if (!where && Math.min(a.z, b2.z, c.z) >= box.max.z - LIVERY_SKIN_FRONT) {
+      if (!where && Math.min(a.z, b2.z, c.z) >= paredeFrente - LIVERY_SKIN_FRONT) {
         e1.subVectors(b2, a); e2.subVectors(c, a);
         fn.crossVectors(e1, e2).normalize();
         if (Math.abs(fn.z) >= 0.7) where = 'FRONT';
@@ -3579,6 +4239,9 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
      medida na própria sopa de cada lado; a traseira não tem emenda (as folhas
      das portas são chapas inteiras). */
   const seamsOf: Partial<Record<'SIDE_L' | 'SIDE_R', number[]>> = {};
+  /** O remonte desta face é NOSSO (inventado) ou do bake? Decide se a calota do
+   *  rebite ganha os 2,2 mm de `PLATE_T` — ver `addPlateRivets()`. */
+  const lapOf: Partial<Record<'SIDE_L' | 'SIDE_R', boolean>> = {};
   const valesOf: Partial<Record<'SIDE_L' | 'SIDE_R',
     { rows: { y: number; d: number }[]; yMin: number; yMax: number }>> = {};
   /* OS VÃOS DE PORTA, UMA VEZ SÓ. Duas coisas os consultam — o remonte (a
@@ -3597,11 +4260,32 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
       if (k.p[i] < zLo) zLo = k.p[i];
       if (k.p[i] > zHi) zHi = k.p[i];
     }
-    const seams = plateSeams(zHi, zLo);
+    /* ---- A GRADE DO BAKE MANDA, E SÓ SE INVENTA UMA QUANDO NÃO HÁ ----
+       Ver `mergeSkinSheets()` em trailer-geometry.ts. O semirreboque é chapa
+       CORRIDA (uma folha de 14,58 m no `.glb`) e as emendas têm de ser
+       inventadas; o sobrechassi já vem com nove folhas de 1 m, e sobrepor uma
+       segunda grade de 1 000 mm à do bake (~958) foi o defeito de 2026-08-25:
+       *"tem uma chapa ali que não deveria, e ela não tem rebites"*. As duas
+       coincidiam a 14 mm na testeira e chegavam a 184 mm na traseira. */
+    const doBake = state.trailerRig?.body
+      .sheetSeamsFromFront(key === 'SIDE_R' ? 'right' : 'left') ?? [];
+    const seams = doBake.length
+      ? doBake.map((d) => +(zHi - d).toFixed(4))
+        /* A MESMA folga de ponta da grade inventada: uma emenda a 42 mm do
+           montante de canto é o hem da folha, não uma emenda — e uma coluna de
+           rebites ali cairia dentro do perfil. */
+        .filter((s) => s < zHi - PLATE_END_CLEAR && s > zLo + PLATE_END_CLEAR)
+        .sort((a, b) => b - a)
+      : plateSeams(zHi, zLo);
     seamsOf[key] = seams;
+    lapOf[key] = !doBake.length;
     /* As fileiras de rebite saem da sopa INTACTA — ver measureValeRows(). */
     valesOf[key] = measureValeRows(k, key === 'SIDE_R' ? 1 : -1);
-    applyPlateLap(k, key === 'SIDE_R' ? 1 : -1, seams, holesOf(key));
+    /* E O REMONTE SÓ ENTRA ONDE ELE NÃO ESTÁ NA MALHA. Aplicá-lo sobre uma pele
+       que já é feita de folhas somaria 2,2 mm de degrau ao degrau que o bake já
+       tem, em OUTRA cota — que é a metade "parece ter 2 chapas menores" do
+       mesmo relato. */
+    if (lapOf[key]) applyPlateLap(k, key === 'SIDE_R' ? 1 : -1, seams, holesOf(key));
     if (key === 'SIDE_L') gridFront = zHi;
   }
 
@@ -3634,13 +4318,22 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
       const seams = seamsOf[key] ?? [];
       const sgn = key === 'SIDE_R' ? 1 : -1;
       const rows = addPlateRivets(trailer, mesh,
-        valesOf[key] ?? { rows: [], yMin: 0, yMax: 0 }, sgn, seams, holesOf(key));
+        valesOf[key] ?? { rows: [], yMin: 0, yMax: 0 }, sgn, seams, holesOf(key),
+        lapOf[key] !== false);
       if (key === 'SIDE_L' && seams.length) {
         let yLo = Infinity;
         for (let i = 1; i < k.p.length; i += 3) if (k.p[i] < yLo) yLo = k.p[i];
+        const daFrente = seams.map((s) => +(gridFront - s).toFixed(4));
+        /* O PASSO PUBLICADO É O QUE ESTÁ NA CHAPA, não a constante. Numa pele de
+           folhas as emendas vêm do bake e marcham em ~958 mm com remonte
+           irregular; publicar 1 000 faria o editor 2D desenhar uma grade que o
+           3D não tem — que é o mesmo defeito, movido de sala. A MEDIANA porque
+           uma folha curta na ponta não pode definir o passo de todas. */
+        const vaos = daFrente.slice(1).map((d, i) => d - daFrente[i]).sort((a, b) => a - b);
         plateGrid = {
-          pitch: PLATE_PITCH, lap: PLATE_LAP,
-          seamsFromFront: seams.map((s) => +(gridFront - s).toFixed(4)),
+          pitch: vaos.length ? +vaos[vaos.length >> 1].toFixed(4) : PLATE_PITCH,
+          lap: PLATE_LAP,
+          seamsFromFront: daFrente,
           rivetRowsFromBottom: rows.map((r) => +(r.y - yLo).toFixed(4)),
         };
       }
@@ -3808,7 +4501,7 @@ function disposeFrontWallOverlays() {
  * Falhar aqui não é fatal. Um bake sem o material branco de fábrica continua
  * carregando, pintando e exportando imagem — só não redimensiona.
  */
-function buildTrailerRig(trailer: THREE.Object3D) {
+function buildTrailerRig(trailer: THREE.Object3D, kitAsset: THREE.Object3D | null) {
   try {
     /* QUAIS GEOMETRIAS SÃO MOLDE — e tem de ser AQUI, antes de `new TrailerRig`.
        O construtor do rig chama `applyBakeFixes()`, que é o PRIMEIRO a escrever
@@ -3825,7 +4518,19 @@ function buildTrailerRig(trailer: THREE.Object3D) {
     if (compartilhadas) console.info('[baú] geometria compartilhada —', compartilhadas,
       'malhas dividem um molde; a escrita clona (ver geometry-share.ts)');
 
-    const rig = new TrailerRig(trailer);
+    /* O QUE VARIA DE BAKE PARA BAKE ENTRA AQUI, e só isto. `trailer-geometry.ts`
+       é arquivo espelhado e depende só de `three`; ele não pode perguntar ao
+       catálogo, então quem sabe o implemento é quem responde. Ver
+       `TrailerBodyOptions`. */
+    const rig = new TrailerRig(trailer, {
+      frameMaterial: frameRegexOf(state.implement),
+      sillMaterial: sillRegexOf(state.implement),
+      kit: kitAsset ?? undefined,
+      cornerTape: state.implement.cornerTape,
+      lowFrameRail: state.implement.lowFrameRail,
+      flankCatchOnFlat: state.implement.flankCatchOnFlat,
+      subframe: state.implement.subframe,
+    });
     state.trailerRig = rig;
     const p = rig.profile;
     console.info('[baú] paramétrico —', p.shells, 'cascas ·', p.ribbedShells, 'frisada(s) ·',
@@ -3839,6 +4544,7 @@ function buildTrailerRig(trailer: THREE.Object3D) {
   }
 }
 
+/** As medidas correntes do baú, ou `null` se este bake não redimensiona. */
 /** As medidas correntes do baú, ou `null` se este bake não redimensiona. */
 export function getTrailerDims(): TrailerDims | null {
   return state.trailerRig ? state.trailerRig.current : null;
@@ -3906,6 +4612,15 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
   disposeLiveryPanels(t);
   disposeFrontWallOverlays();
   buildLiveryPanels(t);
+  /* E A REBITAGEM DO TRILHO DE TOPO, que é o outro conjunto de rebite gerado
+     por medida. Ela some e volta como as chapas: o trilho acabou de esticar
+     (`z: 'span'`) e subir (o teto anda com a altura), então a fileira antiga
+     está no comprimento antigo. `addTopRailRivets()` é idempotente e devolve 0
+     num bake sem receita (o semirreboque), então não precisa de gate. */
+  {
+    const teto = rig.profile.roofY;
+    if (typeof teto === 'number') addTopRailRivets(t, teto);
+  }
   /* E o TETO ganha o `uv1` dele no mesmo passo — a geometria dele acabou de ser
      reescrita por `rig.set()`. Ver `tagRoofLiveryUV()`. */
   tagRoofLiveryUV(t);
@@ -4059,22 +4774,133 @@ const TRAILER_ASSET = 'trailer_v2.glb';
  * kilobytes, `loadManifests()` já os pediu, e a rota de manifesto responde
  * `no-cache` — enfileirá-los só tiraria uma vaga das duas de `MAX_IN_FLIGHT`.
  */
+/**
+ * O KIT DA PORTA, compartilhado por todos os implementos.
+ *
+ * Asset opcional, como a roda do FH16 e o Thermo King: se faltar, cada bake
+ * volta a montar a porta com as peças da própria traseira e o console diz. É a
+ * mesma degradação, e ela importa porque a árvore servida pode estar atrasada
+ * em relação ao web (ver `core/paths.ts`).
+ *
+ * ⚠️ O `_v1` é a mesma regra da roda: um asset publicado sob
+ * `Cache-Control: immutable` NÃO pode ser sobrescrito. Um kit novo é
+ * `porta_kit_v2.glb`.
+ */
+const DOOR_KIT_ASSET = 'porta_kit_v1.glb';
+
+/** Cache do kit por SESSÃO: ele não muda, e é o mesmo objeto para todos os
+ *  implementos — as geometrias são compartilhadas de propósito. */
+let doorKit: THREE.Object3D | null = null;
+let doorKitReq: Promise<THREE.Object3D | null> | null = null;
+
+function loadDoorKit(): Promise<THREE.Object3D | null> {
+  if (doorKit) return Promise.resolve(doorKit);
+  doorKitReq ||= loadGLB(VEHICLES_DIR + DOOR_KIT_ASSET)
+    .then((g) => { doorKit = g; return g; })
+    .catch((e: unknown) => {
+      console.warn('[porta]', DOOR_KIT_ASSET, 'indisponível —', errText(e),
+        '· cada implemento monta a porta com as peças da própria traseira.');
+      return null;
+    });
+  return doorKitReq;
+}
+
+let guardKit: THREE.Object3D | null = null;
+let guardKitReq: Promise<THREE.Object3D | null> | null = null;
+
+/**
+ * A PROTEÇÃO LATERAL, extraída do semirreboque para `protecao_lateral_v1.glb`.
+ *
+ * Mesma forma de `loadDoorKit()`: um asset compartilhado, pedido uma vez por
+ * sessão, e a falta dele NÃO derruba o implemento — o baú carrega sem grade e
+ * o console diz por quê. Ver `vehicle/side-guard.ts`.
+ */
+function loadSideGuardKit(): Promise<THREE.Object3D | null> {
+  if (guardKit) return Promise.resolve(guardKit);
+  guardKitReq ||= loadGLB(VEHICLES_DIR + SIDE_GUARD_ASSET)
+    .then((g) => { guardKit = g; return g; })
+    .catch((e: unknown) => {
+      console.warn('[grade]', SIDE_GUARD_ASSET, 'indisponível —', errText(e),
+        '· o implemento carrega sem proteção lateral.');
+      return null;
+    });
+  return guardKitReq;
+}
+
 export function prefetchTrailerAssets(): void {
-  prefetch([
-    VEHICLES_DIR + TRAILER_ASSET,
-    VEHICLES_DIR + WHEEL_ASSET,
-    VEHICLES_DIR + 'thermoking.glb',
-  ], 'trailer');
+  const impl = getCurrentImplement();
+  /* Só o que este implemento TEM. Especular a rodagem de um baú que não tem
+     rodagem é 646 kB de banda gastos antes de a cortina subir — e num link
+     móvel isso disputa com o cavalo, que é o download do caminho crítico. */
+  const list = [VEHICLES_DIR + impl.file];
+  if (impl.has.wheels) list.push(VEHICLES_DIR + WHEEL_ASSET);
+  if (impl.has.thermoKing) list.push(VEHICLES_DIR + (impl.thermoKingFile || 'thermoking.glb'));
+  list.push(VEHICLES_DIR + DOOR_KIT_ASSET);
+  prefetch(list, 'trailer');
 }
 
 export async function loadTrailer(onProgress?: (t: number) => void) {
   const mine = ++trailerGen;
-  const trailer = await loadGLB(VEHICLES_DIR + TRAILER_ASSET, onProgress);
+  /* CONGELADO NO INÍCIO, e lido de novo em nenhum lugar abaixo: o catálogo é
+     mutável (`setImplement()`), e uma troca no meio dos vários `await` daqui
+     faria metade da montagem seguir um implemento e a outra metade o seguinte.
+     A guarda de `trailerGen` já descarta a carga inteira nesse caso; guardar a
+     definição é o que garante que o descarte seja da coisa certa. */
+  const impl = getCurrentImplement();
+  const trailer = await loadGLB(VEHICLES_DIR + impl.file, onProgress);
   /* Mesma guarda de loadCab(), mesmo motivo — ver a nota lá. Aqui ela é ainda
      mais barata de errar: loadTrailer() não remove um implemento anterior, então
      duas cargas concorrentes deixariam DOIS implementos dentro do trailerGroup,
      um deles invisível ao resto do módulo. */
   if (mine !== trailerGen) { disposeTree(trailer); return state.trailer; }
+  /* O IMPLEMENTO ANTERIOR SAI AQUI, e este bloco nasceu com o catálogo: até
+     2026-08-18 `loadTrailer()` rodava UMA vez por página e não tinha o que
+     remover. Agora ele roda a cada troca entre cavalo e rígido, e sem isto a
+     cena acumularia implementos — o novo por cima do velho, os dois visíveis.
+
+     A ordem importa: os painéis de livery e as sobreposições da testeira têm
+     material PRÓPRIO por painel (um `MeshStandardMaterial` e um programa de
+     shader cada) e `disposeTree()` da raiz não os alcança depois que
+     `panel.removeFromParent()` já rodou — por isso eles são liberados ANTES.
+     E os dois módulos com estado de MÓDULO (patola e placa) são avisados, ou
+     ficariam apontando para malhas descartadas. */
+  if (state.trailer) {
+    disposeLiveryPanels(state.trailer);
+    disposeFrontWallOverlays();
+    detachTrailerPlate();
+    forgetLandingGear();
+    state.trailerGroup.remove(state.trailer);
+    disposeTree(state.trailer);
+    state.trailer = null;
+    state.trailerRig = null;
+    state.trailerBase = null;
+    state.trailerBox = undefined;
+    state.trailerMountDatum = undefined;
+    state.trailerPivotFromFront = undefined;
+    state.trailerTyreHalfSpan = undefined;
+    state.tk = null; state.tkDepth = 0; state.tkSize = undefined; state.tkTopGap = undefined;
+    state.tkMountOffZ = undefined;
+    state.coupled = null;
+  }
+  /* A PARTIR DAQUI é ESTE o implemento em cena, e tudo que mede lê daqui e não
+     do catálogo. Antes desta linha ainda é o anterior — a geometria dele é que
+     está pendurada no `trailerGroup`. */
+  state.implement = impl;
+  /* O `*_meta.json` É DO IMPLEMENTO, e trocar de implemento sem trocar a meta
+     deixaria o contorno das chapas e o pino-rei do OUTRO baú de pé — o pino
+     principalmente, porque `placeTrailer()` o lê no caminho legado. Um
+     implemento sem meta declarada zera o campo, que é a resposta certa para o
+     sobrechassi: ele não tem pino nem contorno medido. */
+  if (metaFor !== impl.id) {
+    metaFor = impl.id;
+    state.trailerMeta = impl.meta
+      ? await fetchJSON(VEHICLES_DIR + impl.meta).catch((e: unknown) => {
+        console.warn('[manifest]', impl.meta, 'indisponível —', errText(e));
+        return null;
+      }) as TrailerMeta | null
+      : null;
+    if (mine !== trailerGen) { disposeTree(trailer); return state.trailer; }
+  }
   setRigPlacement(false);       // a conta abaixo é em espaço de mundo; ver rigGroup
   setupCommon(trailer);
   state.trailerGroup.add(trailer);
@@ -4082,24 +4908,112 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
      contact plane, and translating the whole trailer cannot change that. */
   const tyres = runningTyres(trailer);
   const tyreSet = tyres ? tyres.meshes : new Set<THREE.Mesh>();
+  /* O IMPLEMENTO SEM RODAGEM NÃO SE ASSENTA PELO PONTO MAIS BAIXO.
+     Sem pneu, o casador de rodagem não casa nada e `bboxOfMatching()` cai na
+     caixa do implemento INTEIRO — que no sobrechassi é a ponta das duas
+     mangueiras traseiras, 800 mm abaixo do sub-chassi. Assentar por elas põe a
+     carroceria 0,8 m alta, e todo o resto (montagem, Thermo King, livery)
+     herda o erro. O datum certo é o fundo do sub-chassi, medido por FORMA em
+     `measureMountDatum()` — ver o cabeçalho de `vehicle/mounting.ts`. */
+  let groundRef = tyres ? tyres.minY : undefined;
+  if (!tyres && !impl.has.wheels) {
+    const datum = measureMountDatum(trailer);
+    if (datum !== null) groundRef = datum;
+    else console.warn('[montagem] nenhum membro atravessa metade do baú —',
+      'o datum cai no ponto mais baixo e a carroceria pode nascer alta.');
+  }
   const box = groundAndCenter(trailer, bodyPanelPred(trailer),
-    (o: THREE.Mesh) => tyreSet.has(o), tyres ? tyres.minY : undefined);
+    (o: THREE.Mesh) => tyreSet.has(o), groundRef);
+  /* Depois de `groundAndCenter()` o datum ESTÁ NO ZERO — é ele que a função
+     acabou de encostar no chão. Guardá-lo assim explícito é o que impede que a
+     montagem passe a depender de "o assentamento por acaso põe o fundo em 0". */
+  state.trailerMountDatum = (!tyres && !impl.has.wheels) ? 0 : undefined;
   auditTransparency(trailer, 'trailer');     // glass blends, decals alphaTest
+  /* AS REMOÇÕES DO BAKE ENTRAM AQUI, e a posição é contrato: antes de
+     `splitTrailerHardware()` (que clona material por peça) e MUITO antes de
+     `buildTrailerRig()` — `TrailerBody` decompõe o branco em cascas conexas no
+     construtor, e uma folha de porta ainda pendurada entra na conta da parede.
+     Ver `vehicle/trailer-bake-fixes.ts`. */
+  if (impl.bakedSideDoor) removeBakedSideDoor(trailer);
+  /* A ESTAÇÃO DE ENCOSTO da porta que acabou de sair. Ela mora a mais de um
+     metro do vão — fora do retângulo que `removeBakedSideDoor()` varre — e por
+     isso sobrevivia à remoção da porta. Ver `removeSideDoorCatches()`. */
+  if (impl.sideDoorCatches) removeSideDoorCatches(trailer);
+  /* A MANGUEIRA A MAIS sai na mesma janela das outras remoções — antes de
+     `splitTrailerHardware()` e de `buildTrailerRig()`. Ela não entra em medida
+     nenhuma (`measureMountDatum()` a exclui por FORMA, e `bodyPanelPred` por
+     material), então a posição aqui é por coerência, não por dependência. */
+  if (impl.singleRearHose) removeExtraRearHose(trailer);
+  /* OS TUBOS EMBUTIDOS, na mesma janela e pela mesma razão: antes de
+     `splitTrailerHardware()` e de `buildTrailerRig()`. Eles são
+     `metal-pouco-polido`, o mesmo material da ferragem, então tirá-los depois
+     da divisão significaria tirar peças que já ganharam material próprio. Ver
+     `removeStrayConduits()`. */
+  if (impl.strayConduits) removeStrayConduits(trailer);
+  const marca = impl.makerBranding ? removeMakerBranding(trailer) : null;
+  /* A BANDA DE BAIXO ANTES DO RIG, e a ordem é contrato: tirar a banda da
+     família branca sobe o `floorY` do baú para o pé da chapa frisada, e o
+     `floorY` é a régua de tudo o que `TrailerBody` mede depois. */
+  if (impl.lowFrameSkin) {
+    fixLowFrameSkin(trailer, frameRegexOf(impl) ?? /metal-galvanizado-mantido/i);
+  }
   /* A FERRAGEM SE DIVIDE AQUI — inox, caixa e trilho —, e a posição é
      contrato: o construtor de `TrailerBody` (dentro de buildTrailerRig) extrai
      o kit da porta lateral e guarda a referência do material de cada peça.
      Dividir depois deixaria a lateral com o material velho. Ver
      `splitTrailerHardware()`. */
   splitTrailerHardware(trailer);
+  /* A FERRAGEM DE DUAS CORES, DEPOIS DA DIVISÃO E NÃO ANTES: quem separa o inox
+     do resto reescreve `mesh.material` como VALOR ÚNICO, e uma malha que já
+     estivesse em array voltaria a ter uma cor só. Ver `splitEngateHardware()`.
+     Roda em qualquer implemento e não acha nada onde não há malha fundida — o
+     semirreboque já traz as duas peças separadas. */
+  splitEngateHardware(trailer);
+  /* O REGISTRO E A MANGUEIRA, na MESMA janela e pela mesma razão: a divisão
+     escreve `mesh.material` como ARRAY, e `splitTrailerHardware()` (que roda
+     antes) o reescreve como valor único. Ver `fixRegistroAndHose()` — ela é
+     auto-portante e não faz nada num bake que já traga o tubo separado. */
+  fixRegistroAndHose(trailer);
+  /* O KIT DA PORTA CHEGA ANTES DO RIG, e tem de ser assim: `TrailerBody` monta
+     o `Map` do kit no CONSTRUTOR, e um kit que chegasse depois não teria como
+     entrar sem refazer o corpo. O download é pequeno (2,5 MB) e já foi
+     especulado por `prefetchTrailerAssets()`. */
+  const kitAsset = await loadDoorKit();
+  if (state.implement.sideGuard) await loadSideGuardKit();
+  if (mine !== trailerGen) { disposeTree(trailer); return state.trailer; }
+  /* A CHAPA DA ANKAA ENTRA ONDE A DO FABRICANTE SAIU, e só aqui: antes o kit
+     não estava carregado, depois `freezeMatrices()` já teria passado. Ela é
+     filha da raiz do implemento, com transformação local — a mesma regra da
+     placa de licenciamento, e é o que a faz atravessar de graça o engate, a
+     montagem e a `RIG_PLACEMENT`. */
+  if (marca?.site && kitAsset) attachBrandPlate(trailer, kitAsset, marca.site);
   /* O BAÚ PARAMÉTRICO ENTRA AQUI — depois do assentamento (as duas metades
      medem em espaço de mundo e esta é a pose de referência de toda medida
      posterior), antes do acabamento e do recorte das chapas. Ver
      buildTrailerRig() para o porquê de cada uma dessas duas fronteiras. */
-  buildTrailerRig(trailer);
+  buildTrailerRig(trailer, kitAsset);
   applyTrailerFinish(trailer);               // AFTER setupCommon: it overrides env 1.35
   /* After grounding, before studio.ts calls livery.attachOverlays(). */
   buildLiveryPanels(trailer);
   tagRoofLiveryUV(trailer);
+  /* O TRILHO DE TOPO SE VESTE POR ÚLTIMO, e a posição é decisão. Ele acrescenta
+     um filete 5 mm SALIENTE ao flanco, e no meio da construção isso seria uma
+     mentira para toda régua que mede o baú pela sua peça mais externa
+     (`groundAndCenter()`, `measureTopRail()`, a medida da pele em
+     `buildLiveryPanels()`). Aqui já não há quem meça. O fechamento dos rebaixos
+     poderia rodar bem antes — ele não mexe em caixa envolvente nenhuma —, mas
+     as duas coisas saem da MESMA medição das mesmas peças e separá-las seria
+     responder duas vezes à pergunta cara. Ver `dressTopRail()`. */
+  if (impl.topRailDressing) {
+    const teto = state.trailerRig?.profile.roofY;
+    if (typeof teto === 'number') {
+      dressTopRail(trailer, teto);
+      /* E A REBITAGEM VOLTA, agora na medida do baú. `dressTopRail()` acabou de
+         apagar o relevo de fábrica e de guardar a RECEITA dele na raiz; esta
+         chamada a reproduz no comprimento corrente. Ver `addTopRailRivets()`. */
+      addTopRailRivets(trailer, teto);
+    } else console.warn('[bake] trilho de topo: sem baú paramétrico — sem régua de teto.');
+  }
   state.trailer = trailer;
   /* Remedida DEPOIS do baú paramétrico: `box` veio de groundAndCenter(), que
      rodou sobre as chapas originais — as mesmas que `TrailerBody` acabou de
@@ -4119,21 +5033,26 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
     state.trailerTyreHalfSpan = (tyres.zMax - tyres.zMin) / 2;
   }
   placeTrailer();
-  await attachFh16Wheels(trailer);   // optional — a roda original fica se faltar
-  await attachThermoKing();   // optional — skips gracefully if the GLB is absent
+  /* AS TRÊS PEÇAS OPCIONAIS SÃO DECLARADAS, não descobertas. Um sobrechassi
+     não tem rodagem (quem roda é o caminhão), não tem patola e não tem placa
+     própria: chamar as funções mesmo assim não quebra — todas degradam —, mas
+     gasta 646 kB de download da roda, deixa três avisos por carga e, no caso
+     da patola, INVENTA uma que o produto não tem. Ver `vehicle/implements.ts`. */
+  if (impl.has.wheels) await attachFh16Wheels(trailer);   // a roda original fica se faltar
+  if (impl.has.thermoKing) await attachThermoKing();      // pula em silêncio se o GLB faltar
   reapplyVehicleWetness();
   /* A PATOLA GANHA UM GRUPO — depois das rodas (o plano de contato sai do ponto
      mais baixo do implemento, e `attachFh16Wheels()` acabou de trocar a rodagem
      inteira) e ANTES do congelamento, porque mudar um nó de pai depois dele é
      justamente a armadilha que o bloco de `freezeMatrices()` documenta.
      Ver `vehicle/landing-gear.ts`. */
-  buildLandingGear(trailer);
+  if (impl.has.landingGear) buildLandingGear(trailer);
   /* A PLACA TRASEIRA — no para-choque, MEDIDO. Depois da patola (as duas
      disputam a mesma janela de "antes do congelamento") e depois do Thermo King,
      pela mesma razão dele: o que entra na árvore depois de `freezeMatrices()`
      nasce fora da varredura e recompõe matriz a cada quadro.
      Ver `vehicle/license-plate.ts`. */
-  attachTrailerPlate(trailer);
+  if (impl.has.plate) attachTrailerPlate(trailer);
   /* DEPOIS do Thermo King: ele entra como filho do implemento, então congelar
      antes deixaria a unidade recompondo a matriz dela a cada quadro e — pior —
      fora da varredura, o que faria a intenção do congelamento mentir sobre o
@@ -4184,6 +5103,113 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
  *  mount em `api/src/main.ts`. */
 const WHEEL_ASSET = 'wheel_fh16_v2.glb';
 
+/** A RODA DOS RÍGIDOS. `_v1` desde o primeiro dia, e pelo motivo escrito no
+ *  bloco de `WHEEL_ASSET` logo acima: `/studio-assets/v1/` sai da API com
+ *  `immutable`, então SOBRESCREVER um `.glb` publicado prende a versão errada
+ *  no navegador de quem abriu o estúdio naquela janela. Toda bake seguinte
+ *  ganha o próximo sufixo. */
+const TRUCK_WHEEL_ASSET = 'wheel_vm_v1.glb';
+/** O caminhão de onde a roda foi assada. Ele já a tem — ver `attachVmWheels`. */
+const WHEEL_DONOR_RE = /volvo_vm_2015_6x2r\.glb$/i;
+
+/** O TANQUE DOS RÍGIDOS. `_v1` pelo mesmo motivo do bloco de `WHEEL_ASSET`
+ *  acima: `/studio-assets/v1/` sai da API com `immutable`, então sobrescrever um
+ *  `.glb` publicado prende a versão errada no navegador de quem abriu o estúdio
+ *  naquela janela. Assado por `tools/tank-bake/bake_tank_vm.py`. */
+const TRUCK_TANK_ASSET = 'tank_vm_v1.glb';
+
+/** A FAIXA REFLETIVA TRASEIRA — a do VM, nos três rígidos. `_v1` imutável pelo
+ *  mesmo motivo do bloco de `WHEEL_ASSET`. Assada por
+ *  `tools/chassis-bake/bake_faixa_vm.py`. Ver `rear-tape.ts`. */
+const REAR_TAPE_ASSET = 'faixa_refletiva_vm_v1.glb';
+
+async function attachRearTape(cab: THREE.Object3D, mine: number, file: string) {
+  let asset: THREE.Group;
+  try {
+    asset = await loadGLB(VEHICLES_DIR + REAR_TAPE_ASSET);
+  } catch (e: unknown) {
+    console.warn('[faixa]', REAR_TAPE_ASSET,
+      'indisponível — a faixa original fica.', errText(e));
+    return;
+  }
+  if (mine !== cabGen) { disposeTree(asset); return; }
+  /* `setupCommon()` é quem chama `registerRetroreflective()` — é por aqui que a
+     faixa ganha o termo de retrorreflexão, e é a razão de o bake batizar o
+     material de `Faixa-3M-traseira`. */
+  setupCommon(asset);
+  const linhas = swapRearTape(cab, asset);
+  for (const l of linhas) console.info('[faixa]', file, '·', l);
+  if (!cab.getObjectByName('TS_FAIXA_TRASEIRA')) disposeTree(asset);
+}
+
+async function attachVmTanks(cab: THREE.Object3D, mine: number) {
+  let asset: THREE.Group;
+  try {
+    asset = await loadGLB(VEHICLES_DIR + TRUCK_TANK_ASSET);
+  } catch (e: unknown) {
+    console.warn('[tanque]', TRUCK_TANK_ASSET,
+      'indisponível — o tanque original fica.', errText(e));
+    return;
+  }
+  if (mine !== cabGen) { disposeTree(asset); return; }
+  setupCommon(asset);
+  const ajustes = tuneVmTankMaterials(asset);
+  if (ajustes.length) console.info('[tanque] acabamento:', ajustes.join(' · '));
+  if (!swapTruckTanks(cab, asset)) disposeTree(asset);
+}
+
+/** O que a troca de rodagem deixa para o ESTEPE: o asset vivo (o clone divide
+ *  geometria e material com ele, então descartá-lo levaria os buffers das oito
+ *  cópias) e o diâmetro medido na direção. `null` = a rodagem original ficou. */
+type Rodagem = { asset: THREE.Group; direcao: number } | null;
+
+async function attachVmWheels(cab: THREE.Object3D, mine: number): Promise<Rodagem> {
+  let asset: THREE.Group;
+  try {
+    asset = await loadGLB(VEHICLES_DIR + TRUCK_WHEEL_ASSET);
+  } catch (e: unknown) {
+    console.warn('[rodas-truck]', TRUCK_WHEEL_ASSET,
+      'indisponível — a rodagem original fica.', errText(e));
+    return null;
+  }
+  if (mine !== cabGen) { disposeTree(asset); return null; }
+  setupCommon(asset);
+  const ajustes = tuneVmWheelMaterials(asset);
+  if (ajustes.length) console.info('[rodas-truck] acabamento:', ajustes.join(' · '));
+  const r = swapTruckWheels(cab, asset);
+  if (!r.postas) { disposeTree(asset); return null; }
+  return { asset, direcao: r.direcao };
+}
+
+/**
+ * O PARA-LAMA DO 2º EIXO DIRECIONAL — só bitruck, e só bitruck DERIVADO.
+ *
+ * Roda DEPOIS de `attachVmWheels()` de propósito: `front-fender.ts` mede o pneu
+ * QUE ESTÁ NA TELA para dimensionar o arco, e antes da troca o que está na tela
+ * é a roda do rip. E roda ANTES da passada de tinta, que é o que faz o material
+ * `ts_paralama_pintura` receber a cor da cabine — ver `isPaintableMaterial()` e
+ * a lista `chassis[].paintMaterials` no brands.json.
+ */
+async function attachSteerFender(cab: THREE.Object3D, mount: RigidMount, mine: number) {
+  if ((mount.axles.steerZ || []).length < 2) return;
+  let asset: THREE.Group;
+  try {
+    asset = await loadGLB(VEHICLES_DIR + FENDER_ASSET);
+  } catch (e: unknown) {
+    console.warn('[para-lama]', FENDER_ASSET,
+      'indisponível — o 2º direcional fica sem arco.', errText(e));
+    return;
+  }
+  if (mine !== cabGen) { disposeTree(asset); return; }
+  setupCommon(asset);
+  const ajustes = tuneFenderMaterials(asset);
+  if (ajustes.length) console.info('[para-lama] acabamento:', ajustes.join(' · '));
+  const linhas = attachSecondSteerFender(cab, mount, asset);
+  for (const l of linhas) console.info('[para-lama]', l);
+  /* O clone divide geometria e material com o asset, então o asset FICA vivo —
+     mesma razão de `Rodagem.asset` em `attachVmWheels()`. */
+}
+
 async function attachFh16Wheels(trailer: THREE.Object3D) {
   const mine = trailerGen;
   let asset: THREE.Group;
@@ -4204,24 +5230,206 @@ async function attachFh16Wheels(trailer: THREE.Object3D) {
    Attached as a child of the trailer root: follows coupling moves and hides
    with the Implemento toggle. Back mounting face sits flush on the front-wall
    plane, centered on X, top ~0.15 m below the trailer roof line. */
+/** Lê um número do manifesto com piso e teto. Declarado fora porque a
+ *  orientação da unidade é lida ANTES do bloco de escala. */
+const readNumEarly = (v: unknown, d: number, lo: number, hi: number) =>
+  Number.isFinite(+(v as number)) ? Math.min(hi, Math.max(lo, +(v as number))) : d;
+
 export async function attachThermoKing() {
   /* Lido, não incrementado: esta unidade pertence ao implemento que estava
      carregado quando a função começou. Se um loadTrailer() novo passar por aqui
      no meio dos dois awaits abaixo, esta unidade não tem mais em que se montar. */
   const mine = trailerGen;
-  let meta: { dims?: unknown; widthFrac?: unknown; topGap?: unknown } | null = null;
-  try { meta = await fetchJSON(VEHICLES_DIR + 'thermoking_meta.json'); } catch { /* optional */ }
+  /* A UNIDADE É DO IMPLEMENTO. A do semirreboque tem 2,49 m de largura de
+     carenagem e fica fora de escala numa testeira de 2,6 m com 2,86 m de altura
+     — o sobrechassi veio com a sua, menor, no mesmo pacote do modelo. O
+     `_meta.json` continua sendo o da unidade grande: ele traz `widthFrac` e
+     `topGap`, que são FRAÇÕES da testeira e valem para as duas. */
+  const tkFile = state.implement.thermoKingFile || 'thermoking.glb';
+  /* ⚠️ O `_meta.json` É DO ASSET, não do implemento, e derivá-lo do nome do
+     arquivo é o que impede o defeito mais silencioso desta troca: `dims.w` do
+     manifesto é a LARGURA REAL da carcaça, e `placeThermoKing()` ESCALA a
+     unidade uniformemente até ela. Com o meta da unidade grande (1,996 m), a
+     unidade pequena (1,654 m) seria esticada 21 % para cima — ou seja, a troca
+     de asset não mudaria nada na imagem, que é justamente o oposto do pedido
+     ("o vão da frente é menor porque o Thermo King é menor"). */
+  const tkMetaFile = tkFile.replace(/\.glb$/i, '_meta.json');
+  let meta: {
+    dims?: unknown; widthFrac?: unknown; topGap?: unknown; mount?: unknown;
+  } | null = null;
+  try { meta = await fetchJSON(VEHICLES_DIR + tkMetaFile); } catch { /* opcional */ }
   let tk: THREE.Group;
   try {
-    tk = await loadGLB(VEHICLES_DIR + 'thermoking.glb');
+    tk = await loadGLB(VEHICLES_DIR + tkFile);
   } catch (e: unknown) {
-    console.warn('[tk] thermoking.glb indisponível —', errText(e));
+    console.warn('[tk]', tkFile, 'indisponível —', errText(e));
     return;
   }
   if (mine !== trailerGen || !state.trailer) { disposeTree(tk); return; }
   setRigPlacement(false);       // idem: medidas de mundo daqui para baixo
   setupCommon(tk);
   auditTransparency(tk, 'thermoking');       // only glass may be transparent
+
+  /* ---- A CHAMINÉ SAI, quando o meta pede ----
+     *"remova o cano acima dele"* — Kennedy, 2026-08-20, com print, e repetido
+     depois de uma primeira tentativa que removeu a peça errada.
+
+     ⚠️ O TUBO NÃO É UMA MALHA: ele é UMA COMPONENTE CONEXA de `refri_p0_3`,
+     a carenagem traseira da unidade. Medido no app (`checks-tk-0820.mjs`):
+
+       refri_p0_3   1 793 tris, 10 componentes
+                    97 tris  · topo do teto **+139,6 mm** · 72 × 196 × 73 mm  ← o tubo
+                    400 tris · topo −129,3 · 1 068 × 99 × 120
+                    456 tris · topo −138,8 · 86 × 82 × 37
+                    …e mais sete, todas abaixo de −150
+
+     A primeira tentativa buscou por material (`crome`) e por forma esbelta, e
+     levou `refri_p0_1` — um tubo CROMADO que estava embutido na carenagem e que
+     ninguém via. O que se vê é este, e a régua que o isola é a única que ele
+     tem de próprio: **ser a parte da unidade que passa da linha do teto do
+     baú**. Nada mais da carcaça chega lá (a segunda componente para 129 mm
+     abaixo), então o corte é limpo e não depende de nome de material.
+
+     A remoção é por ÍNDICE, não por vértice: reindexar não move nada e não
+     toca nas outras nove componentes da mesma malha. */
+  if ((meta as { removeStack?: unknown } | null)?.removeStack === true) {
+    const roofY = state.trailerRig?.profile.roofY;
+    if (roofY === undefined) {
+      console.warn('[tk] chaminé: sem baú paramétrico, sem linha de teto — fica.');
+    } else {
+      /* ⚠️ AS ALTURAS SÃO NO ESPAÇO DA UNIDADE, NÃO NO DA GEOMETRIA — e foi
+         essa confusão que fez a primeira versão desta remoção não remover nada.
+         Este `.glb` veio de FBX: o nó carrega a rotação da conversão, e o `+y`
+         do buffer não é o `+y` da unidade. Comparar `pos.getY()` entre
+         componentes ordena por um eixo que não é o vertical.
+
+         E a busca é GLOBAL, sobre as componentes de TODAS as malhas: o escape
+         são DUAS peças que se sobrepõem — um tubo cromado (`refri_p0_1`, malha
+         inteira, uma componente só) dentro de um tubo plástico (uma das dez
+         componentes de `refri_p0_3`, a carenagem). Uma regra por malha pega uma
+         e deixa a outra; foi o que aconteceu, e o dono viu o cano continuar lá.
+
+         O corte é o MAIOR SALTO no topo: as componentes ordenadas por altura
+         têm o escape em +140 mm do teto e o resto da carcaça a −129 ou abaixo.
+         269 mm de salto contra 9 mm entre as vizinhas seguintes. */
+      const toTk = tk.matrixWorld.clone().invert();
+      type Comp = { geo: THREE.BufferGeometry; pos: THREE.BufferAttribute;
+        idx: THREE.BufferAttribute; tris: number[]; top: number };
+      const todas: Comp[] = [];
+      const vv = new THREE.Vector3();
+      tk.updateWorldMatrix(true, true);
+      tk.traverse((node) => {
+        const o = node as THREE.Mesh;
+        if (!o.isMesh || !o.geometry) return;
+        const geo = o.geometry as THREE.BufferGeometry;
+        const pos = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
+        const idx = geo.getIndex();
+        if (!pos || !idx) return;
+        const m4 = new THREE.Matrix4().multiplyMatrices(toTk, o.matrixWorld);
+        const chave = new Map<string, number>();
+        const pai = new Int32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) {
+          const k = `${Math.round(pos.getX(i) * 1e5)},${Math.round(pos.getY(i) * 1e5)},`
+            + `${Math.round(pos.getZ(i) * 1e5)}`;
+          const j = chave.get(k);
+          if (j === undefined) { chave.set(k, i); pai[i] = i; } else pai[i] = j;
+        }
+        const acha = (i: number): number => {
+          let r = i;
+          while (pai[r] !== r) r = pai[r];
+          while (pai[i] !== r) { const n = pai[i]; pai[i] = r; i = n; }
+          return r;
+        };
+        const une = (x: number, y: number) => {
+          const rx = acha(x), ry = acha(y);
+          if (rx !== ry) pai[rx] = ry;
+        };
+        const nTri = idx.count / 3;
+        for (let q = 0; q < nTri; q++) {
+          une(idx.getX(q * 3), idx.getX(q * 3 + 1));
+          une(idx.getX(q * 3 + 1), idx.getX(q * 3 + 2));
+        }
+        const grupos = new Map<number, number[]>();
+        for (let q = 0; q < nTri; q++) {
+          const r = acha(idx.getX(q * 3));
+          const e = grupos.get(r);
+          if (e) e.push(q); else grupos.set(r, [q]);
+        }
+        for (const tris of grupos.values()) {
+          let top = -Infinity;
+          for (const q of tris) {
+            for (let kk = 0; kk < 3; kk++) {
+              vv.fromBufferAttribute(pos, idx.getX(q * 3 + kk)).applyMatrix4(m4);
+              if (vv.y > top) top = vv.y;
+            }
+          }
+          todas.push({ geo, pos, idx, tris, top });
+        }
+      });
+      todas.sort((a, b) => b.top - a.top);
+      /* Onde está o salto: procura-se entre as primeiras, porque o escape é
+         pequeno — no máximo umas poucas componentes acima do resto. */
+      let corte = -1;
+      for (let i = 0; i < Math.min(6, todas.length - 1); i++) {
+        if (todas[i].top - todas[i + 1].top > 0.10) { corte = i; break; }
+      }
+      if (corte < 0) {
+        console.info('[tk] chaminé: nada se destaca da carcaça — nada a remover.');
+      } else {
+        const fora = todas.slice(0, corte + 1);
+        const porGeo = new Map<THREE.BufferGeometry, Comp[]>();
+        for (const c of fora) {
+          const l = porGeo.get(c.geo);
+          if (l) l.push(c); else porGeo.set(c.geo, [c]);
+        }
+        let tirados = 0;
+        for (const [geo, lista] of porGeo) {
+          const idx = lista[0].idx, pos = lista[0].pos;
+          const drop = new Set<number>();
+          for (const c of lista) for (const q of c.tris) drop.add(q);
+          const nTri = idx.count / 3;
+          const novoIdx: number[] = [];
+          for (let q = 0; q < nTri; q++) {
+            if (drop.has(q)) continue;
+            novoIdx.push(idx.getX(q * 3), idx.getX(q * 3 + 1), idx.getX(q * 3 + 2));
+          }
+          const Arr = pos.count > 65535 ? Uint32Array : Uint16Array;
+          geo.setIndex(new THREE.BufferAttribute(new Arr(novoIdx), 1));
+          geo.computeBoundingBox();
+          geo.computeBoundingSphere();
+          tirados += drop.size;
+        }
+        console.info('[tk] chaminé removida —', tirados, 'triângulos em',
+          porGeo.size, 'malha(s) ·',
+          `salto de ${((todas[corte].top - todas[corte + 1].top) * 1000).toFixed(0)} mm`);
+      }
+    }
+  }
+
+  /* ---- ORIENTAÇÃO: a CONVENÇÃO É DO ARQUIVO, e a unidade pequena não a segue.
+     -----------------------------------------------------------------------
+     `thermoking.glb` sai com a face de montagem rente em z = 0 e a grelha para
+     +Z — o próprio manifesto dele registra que isso custou um giro de 180° no
+     export do ETS2. `thermoking_p360.glb`, que veio no pacote do sobrechassi,
+     está EXATAMENTE ao contrário, e a medida prova: a chapa de fundo da
+     carcaça (`refri_mat_0007_cor_7`) tem **0,881 m² de face virada para +Z**
+     concentrados em z = 0,201, enquanto o outro extremo (z = −0,456) é a
+     grelha. Montada como está, a unidade encosta a GRELHA na parede e joga os
+     912 mm de profundidade inteiros para a frente — que é o "o Thermo King
+     está fora do lugar e com peças flutuando" do relato: o que flutua à frente
+     da carcaça é o evaporador, que deveria estar DENTRO do baú.
+
+     O giro vai no manifesto e não aqui porque ele é propriedade do ASSET: um
+     `thermoking_p360_v2.glb` reexportado na convenção certa só apaga a linha
+     do JSON, sem tocar em código. */
+  const mount = (meta?.mount && typeof meta.mount === 'object' ? meta.mount : null) as
+    { yawDeg?: number; z?: number } | null;
+  const tkYaw = readNumEarly(mount?.yawDeg, 0, -360, 360) * (Math.PI / 180);
+  if (tkYaw) {
+    tk.rotation.y = tkYaw;
+    tk.updateMatrix();
+    tk.updateWorldMatrix(true, true);
+  }
 
   /* ---- TAMANHO: o do PRODUTO, e ESCALA ÚNICA ----
      `thermoking_meta.json` traz `dims` — 2,03 x 1,68 x 0,796 m, a carcaça
@@ -4246,8 +5454,7 @@ export async function attachThermoKing() {
      eixos saem da proporção do rip, e o log confere os três contra `dims`
      para que uma divergência apareça em vez de passar calada.
      `widthFrac` fica só como degradação para um manifesto sem `dims`. */
-  const readNum = (v: unknown, d: number, lo: number, hi: number) =>
-    Number.isFinite(+(v as number)) ? Math.min(hi, Math.max(lo, +(v as number))) : d;
+  const readNum = readNumEarly;
   const dims = (meta?.dims && typeof meta.dims === 'object' ? meta.dims : null) as
     { w?: number; h?: number; d?: number } | null;
 
@@ -4278,7 +5485,27 @@ export async function attachThermoKing() {
   const b = new THREE.Box3().setFromObject(tk);      // measured, not assumed
   state.tkSize = b.getSize(new THREE.Vector3());
   state.tkTopGap = readNum(meta?.topGap, 0.23, 0, 1);
-  state.tkDepth = state.tkSize.z;                    // extends cab-clearance clamp
+  /* ---- O PLANO QUE ENCOSTA NA PAREDE ----
+     Era `b.min.z`, e para `thermoking.glb` os dois são a MESMA coisa: aquela
+     unidade não traz evaporador, então a face mais recuada dela É a de
+     montagem. A pequena traz — 255 mm que atravessam a testeira e vivem dentro
+     do baú —, e encostar `b.min.z` na parede empurraria a carcaça inteira para
+     fora. `mount.z` é a cota do plano NO ARQUIVO; aqui ela vira deslocamento a
+     partir de `tk.position`, que é onde `placeThermoKing()` a consome.
+
+     Só o giro em Y e a escala uniforme entram na conversão — é tudo o que a
+     unidade carrega —, então a componente em Z do vetor (0, 0, mount.z) é
+     `cos(yaw) · mount.z · escala`. Sem `mount` no manifesto, o padrão reproduz
+     `b.min.z` e nada muda para os assets antigos. */
+  const escalaTk = tk.scale.x || 1;
+  state.tkMountOffZ = mount && Number.isFinite(+(mount.z as number))
+    ? Math.cos(tkYaw) * (+(mount.z as number)) * escalaTk
+    : b.min.z - tk.position.z;
+  /* A PROFUNDIDADE QUE INTERESSA AO ENGATE é a que fica PARA FORA da parede —
+     o evaporador não disputa espaço com a cabine do cavalo. Para a unidade
+     grande isto continua sendo a caixa inteira, porque lá o plano é a face
+     traseira. */
+  state.tkDepth = Math.max(0, b.max.z - (tk.position.z + state.tkMountOffZ));
   trailerRoot.add(tk);
   state.tk = tk;
   placeThermoKing();
@@ -4286,8 +5513,77 @@ export async function attachThermoKing() {
   console.info('[tk] attached — bbox',
     [got.x, got.y, got.z].map((v) => +v.toFixed(3)).join(' x '),
     dims ? '· meta ' + [dims.w, dims.h, dims.d].join(' x ') : '· (sem meta: escala por widthFrac)',
-    '· topGap', state.tkTopGap.toFixed(3));
+    '· topGap', state.tkTopGap.toFixed(3),
+    '· giro', ((tkYaw * 180) / Math.PI).toFixed(0) + '°',
+    '· para fora da parede', (state.tkDepth * 1000).toFixed(0), 'mm');
   placeTrailer();                                    // re-clamp with tk depth
+}
+
+/**
+ * O VÃO DA TESTEIRA — o recorte de fábrica por onde o evaporador passa.
+ *
+ * *"precisa centralizar corretamente o thermo king no vão que existe pra ele"* —
+ * Kennedy, 2026-08-19, com print: a unidade estava presa pelo TOPO (a travessa
+ * de arremate) e por isso nascia 220 mm abaixo do recorte, com a abertura
+ * aparecendo inteira acima dela.
+ *
+ * O vão é MEDIDO, e a assinatura é a do próprio quadro: na testeira do
+ * sobrechassi há duas travessas horizontais de `metal-estrutura-principal-padrao`
+ * com 1,25 m de largura e 28 mm de altura, uma em y 2,462…2,490 e a outra em
+ * 2,858…2,886. O vão é o que fica ENTRE elas, e a largura dele é a largura
+ * delas — as duas colunas laterais (60 × 2 710 × 100 mm em |x| 0,655) confirmam
+ * o mesmo 1,25 m entre faces.
+ *
+ * `null` quando não há par de travessas: aí `placeThermoKing()` volta a pendurar
+ * a unidade na travessa de arremate, que é o comportamento do semirreboque (ele
+ * não tem recorte — a unidade dele é aparafusada na chapa).
+ */
+const TK_RECESS_MAT_RE = /estrutura-principal|galvanizado-mantido/i;
+/** Uma travessa do vão é LARGA em x e FINA em y. */
+const TK_RECESS_MIN_W = 0.60;
+const TK_RECESS_MAX_H = 0.06;
+/** …e mora na testeira, dentro desta profundidade a partir dela. */
+const TK_RECESS_BAND = 0.30;
+/** Menor vão vertical que ainda é um recorte, e não duas travessas coladas. */
+const TK_RECESS_MIN_GAP = 0.15;
+
+function measureTkRecess(
+  trailer: THREE.Object3D,
+): { x0: number; x1: number; y0: number; y1: number } | null {
+  const corpo = bboxInFrame(trailer, trailer, bodyPanelPred(trailer));
+  if (corpo.isEmpty()) return null;
+  const frente = corpo.max.z;
+  const barras: { b: THREE.Box3 }[] = [];
+  trailer.updateWorldMatrix(true, true);
+  const inv = trailer.matrixWorld.clone().invert();
+  const v = new THREE.Vector3();
+  trailer.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.visible || !o.geometry?.attributes?.position) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (!mats.some((m) => !!m && TK_RECESS_MAT_RE.test(m.name || ''))) return;
+    const pos = o.geometry.attributes.position as THREE.BufferAttribute;
+    const m4 = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    const b = new THREE.Box3();
+    for (let i = 0; i < pos.count; i++) b.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m4));
+    if (b.max.z < frente - TK_RECESS_BAND) return;
+    if (b.max.x - b.min.x < TK_RECESS_MIN_W) return;
+    if (b.max.y - b.min.y > TK_RECESS_MAX_H) return;
+    barras.push({ b });
+  });
+  if (barras.length < 2) return null;
+  /* As DUAS MAIS ALTAS, e o vão entre elas — o recorte fica no alto da
+     testeira, e mais abaixo há travessas de piso com a mesma assinatura. */
+  barras.sort((a, b) => b.b.max.y - a.b.max.y);
+  const cima = barras[0];
+  const baixo = barras.find((c) => cima.b.min.y - c.b.max.y >= TK_RECESS_MIN_GAP);
+  if (!baixo) return null;
+  return {
+    x0: Math.max(cima.b.min.x, baixo.b.min.x),
+    x1: Math.min(cima.b.max.x, baixo.b.max.x),
+    y0: baixo.b.max.y,
+    y1: cima.b.min.y,
+  };
 }
 
 /** Ferragem estrutural da testeira — o critério é o MATERIAL, não o nome do nó. */
@@ -4432,6 +5728,21 @@ export function placeThermoKing() {
      NÃO existe recorte na parede para encaixar a unidade — o relevo da
      testeira é de milímetros, não de centímetros. Encostar na travessa é o que
      a geometria oferece, e é a metade acionável do pedido. */
+  /* ---- O VÃO MANDA, quando ele existe ----
+     A regra de encostar na travessa de arremate vale para o semirreboque, cuja
+     testeira é chapa lisa: lá não há recorte e o alto é a única referência. O
+     sobrechassi TEM recorte, e a unidade é montada CENTRADA nele — foi o que o
+     dono pediu com print. Ver `measureTkRecess()`.
+
+     E o que se centra é a CARCAÇA (`tk-housing-white`), não a caixa inteira: a
+     caixa inclui o evaporador, que atravessa a parede e vive dentro do baú, e
+     centrar por ela poria a parte visível fora do vão. */
+  const vao = measureTkRecess(trailer);
+  const carcaca = bboxInFrame(trailer, tk,
+    (o: THREE.Mesh) => {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      return mats.some((m) => !!m && (m.name || '').toLowerCase().includes(TK_PAINT_SUB));
+    });
   const rail = measureFrontRailUnderside(trailer);
   const wantTop = rail ?? (sideBox.max.y - (state.tkTopGap ?? 0.23));
   /* A carcaça tem 1,68 m e não encolhe, então num baú baixo a regra acima
@@ -4446,14 +5757,41 @@ export function placeThermoKing() {
      inteira. A versão anterior resolvia em mundo e convertia pela parte linear
      da matriz do pai; a conversão estava correta, o referencial da MEDIDA é que
      não estava. */
+  /* O PLANO DE MONTAGEM, não a face mais recuada da caixa — ver
+     `state.tkMountOffZ` em `attachThermoKing()`. Na unidade grande os dois
+     coincidem; na pequena, `b.min.z` é a ponta do EVAPORADOR, que mora dentro
+     do baú, e encostá-lo na parede joga a carcaça 255 mm para fora. */
+  const planoZ = state.tkMountOffZ !== undefined
+    ? tk.position.z + state.tkMountOffZ
+    : b.min.z;
+  const alvo = vao && !carcaca.isEmpty()
+    ? {
+      x: (vao.x0 + vao.x1) / 2 - (carcaca.min.x + carcaca.max.x) / 2,
+      y: (vao.y0 + vao.y1) / 2 - (carcaca.min.y + carcaca.max.y) / 2,
+    }
+    : {
+      x: (sideBox.min.x + sideBox.max.x) / 2 - (b.min.x + b.max.x) / 2,
+      y: top - b.max.y,
+    };
   const move = new THREE.Vector3(
-    (sideBox.min.x + sideBox.max.x) / 2 - (b.min.x + b.max.x) / 2,   // centrada em X
-    top - b.max.y,                                                   // topo sob a travessa
-    sideBox.max.z - b.min.z,                                         // costas rentes à parede
+    alvo.x,                                                          // centrada no vão
+    alvo.y,                                                          // idem, em altura
+    sideBox.max.z - planoZ,                                          // montagem rente à parede
   );
+  /* A TRAVA DE PISO CONTINUA VALENDO: um vão medido errado não pode enterrar a
+     unidade no estrado. */
+  const pe = b.min.y + move.y;
+  if (pe < sideBox.min.y) move.y += sideBox.min.y - pe;
   tk.position.add(move);
   tk.updateMatrix();
   tk.updateMatrixWorld(true);
+
+  /* E AS LINHAS SEGUEM ATÉ EMBAIXO DO BAÚ, agora que a unidade está no lugar.
+     Aqui e não em `attachThermoKing()`: o percurso nasce na PONTA das
+     mangueiras, e a ponta só está onde vai ficar depois do `position.add()`
+     acima. Ver `routeThermoKingLines()` — ela é idempotente e devolve 0 num
+     bake cujas linhas já cheguem embaixo. */
+  routeThermoKingLines(trailer, tk, sideBox.min.y, sideBox.max.z);
 }
 
 /* ===========================================================================
@@ -4734,11 +6072,365 @@ function moveKingpinTo(z: number): boolean {
  * posiciona AS DUAS metades: a âncora do conjunto é a garganta do acoplador, e
  * quem a leva até a origem é o cavalo.
  */
+/** O guarda de recursão do teto de balanço traseiro — ver o bloco dentro de
+ *  `placeTrailer()`. `setTrailerDims()` chama `placeTrailer()` de volta. */
+let cortandoBau = false;
+/**
+ * ▶▶ O COMPRIMENTO PADRÃO DO BAÚ, por configuração de chassi. 2026-08-24.
+ *
+ * *"defina as medidas padrões do implemento para: bitruck 9,50, truck 8,50 e
+ * toco 7,50"* — Kennedy.
+ *
+ * ⚠️ ELE É O ALVO, e não um teto: o baú de fábrica deste implemento tem 8,66 m
+ * e o bitruck pede 9,50, ou seja o corpo CRESCE. Quem continua podendo
+ * encurtá-lo é a CONTRAN 882/2021 — o teto de balanço traseiro roda logo abaixo
+ * e, quando morde, o relato diz de quanto. A regra de mão dupla passa a devolver
+ * o baú até ESTE número em vez do comprimento do asset.
+ */
+const BAU_PADRAO: Record<string, number> = {
+  '8x2': 9.50,      // bitruck
+  '6x2': 8.50,      // truck
+  '6x4': 8.50,      // truck traçado
+  '4x2': 7.50,      // toco
+};
+/** Para qual (chassi × implemento) o padrão já foi aplicado — sem isto ele
+ *  reescreveria o comprimento a cada quadro de um arraste, e o dono não
+ *  conseguiria mudar a medida na interface. */
+let bauPadraoPara: string | null = null;
+
 export function placeTrailer() {
   const t = state.trailer;
   const cab = state.cab;
   const ht = state.cabHitch;
   let hi = state.trailerRig ? state.trailerRig.hitch : null;
+
+  /* SEM PINO-REI NÃO HÁ ENGATE — e nem o caminho legado serve.
+     ---------------------------------------------------------------------
+     Um sobrechassi é aparafusado no chassi de um caminhão RÍGIDO. Esse
+     contrato (topo da longarina, recuo da cabine, comprimento útil) ainda não
+     existe: `hitch.json` só descreve quinta roda, e os dois rígidos do acervo
+     — Scania P360 e Volvo VM — ainda não entraram no catálogo.
+
+     Enquanto não entrar, ele fica na POSE DE CARGA: a que `groundAndCenter()`
+     deixou. É o único lugar em que ele está certo sozinho, e é o que a visão
+     "Implemento" mostra.
+
+     O `return` daqui é o que importa. Cair no legado abaixo seria pior que
+     não fazer nada: aquele ramo lê `state.trailerMeta.kingpin`, que este
+     implemento não tem, e desce para `LEGACY_TRAILER_FRONT_Z` — uma constante
+     MEDIDA NO SEMIRREBOQUE, que plantaria o baú 2,65 m à frente do cavalo sem
+     um aviso sequer. `state.coupled = null` porque não há engate para reportar
+     e uma solução do implemento anterior sobrevivendo aqui faria a HUD e a
+     sonda lerem o engate do modelo passado (o defeito que o comentário do
+     ramo legado registra). */
+  if (!state.implement.has.kingpin) {
+    state.coupled = null;
+    const mount = state.cabMount;
+    if (mount && t && cab && state.trailerBox) {
+      /* ⚠️ A CAIXA É MEDIDA NO REFERENCIAL DO PRÓPRIO IMPLEMENTO, e isto é o
+         conserto de 2026-08-19.
+         -------------------------------------------------------------------
+         Era `state.trailerBox`, que é a caixa em espaço de MUNDO congelada na
+         pose de carga — e a pose que sai de `solveRigidMount()` é ABSOLUTA
+         (`applyRootPose()` faz `position.set()`, não soma). As duas só fecham
+         enquanto a caixa de mundo tiver sido medida com a raiz na origem E
+         pertencer a ESTE implemento. Qualquer caminho que chegue aqui com uma
+         caixa do implemento ANTERIOR planta a carroceria a
+         `frenteAntiga − frenteNova` da cabine — 3,2 m no par
+         semirreboque→sobrechassi (7,233 contra 4,307), sem erro nenhum no
+         console e com todos os números do relatório de montagem corretos,
+         porque o erro mora entre a medida e a escrita.
+
+         Medir aqui, no referencial da raiz, tira a pose da conta por
+         construção: o resultado não depende de onde o implemento está nem de
+         quando a caixa foi tirada. É a mesma doutrina de `placeThermoKing()`,
+         que já mede assim — e pelo mesmo custo, uma varredura das três chapas.
+
+         `bodyPanelPred` continua sendo o filtro: ele deixa de fora as duas
+         mangueiras traseiras que penduram 800 mm abaixo do sub-chassi e que
+         `measureMountDatum()` existe para excluir. */
+      const bb = bboxInFrame(t, t, bodyPanelPred(t));
+      if (bb.isEmpty()) {
+        console.warn('[montagem] o baú não tem chapa medível — fica na pose de carga.');
+        setRigPlacement(true);
+        return;
+      }
+      /* O DATUM TAMBÉM VAI PARA O REFERENCIAL DA RAIZ. `trailerMountDatum` é a
+         cota em MUNDO na pose de carga (zero, por construção — é o que
+         `groundAndCenter()` acabou de encostar no chão), e a pose de carga tem
+         `position.y = base.pos.y`. Subtraí-la é a conversão inteira. */
+      const datumLocal = state.trailerMountDatum !== undefined && state.trailerBase
+        ? state.trailerMountDatum - state.trailerBase.pos.y
+        : bb.min.y;
+      /* A PAREDE DA CABINE É MEDIDA, e o manifesto vira só a rede.
+         `mounts.json` traz o menor z da malha, e no VM isso são 200 mm de
+         chaminé e suporte atrás da parede — o vão que o dono fotografou. Ver
+         `measureCabRearWall()`. A medida é feita uma vez por cabine: ela não
+         muda com a pose nem com o tamanho do baú. */
+      if (cabRearFor !== state.cabId) {
+        cabRearFor = state.cabId;
+        cabRearMedido = measureCabRearWall(cab, mount);
+        console.info('[montagem] parede da cabine —',
+          cabRearMedido === null ? 'não medida (usa o manifesto ' + mount.cabRearZ + ')'
+            : `${cabRearMedido.toFixed(3)} m (manifesto ${mount.cabRearZ})`);
+      }
+      const encosto = cabRearMedido ?? mount.cabRearZ;
+      const gap = cabGapOf(state.mounts);
+      /* O QUADRO SEGUE A MEDIDA DO BAÚ, e não o contrário.
+         --------------------------------------------------------------------
+         A testeira encosta na cabine, então a traseira do baú é consequência do
+         COMPRIMENTO dele — e ela raramente cai onde o quadro acaba. Medido com
+         o gancheiro de fábrica: a carroceria passa 313 mm da ponta no VM e
+         sobra 247 / 740 mm de quadro nu no VW e no Scania. Não há comprimento
+         que sirva aos três (8,196 / 8,742 / 9,250 m), então o balanço traseiro
+         do caminhão é esticado ou encurtado para casar. Ver `chassis-tail.ts`.
+
+         A conta de `dzBau` é A MESMA de `solveRigidMount()` logo abaixo, de
+         propósito: repetir a fórmula seria abrir espaço para as duas
+         divergirem, e o que se quer aqui é justamente a traseira que ele vai
+         produzir. */
+      const dzBau = (encosto - gap) - bb.max.z;
+
+      /* ▶▶ O TETO LEGAL DO BALANÇO TRASEIRO — CONTRAN 882/2021.
+         ------------------------------------------------------------------
+         ⚠️ ELE MORA AQUI, e não em `setTrailerDims()`, porque só aqui existe a
+         medida certa. `TrailerDims.length` é o comprimento PARAMÉTRICO do
+         corpo branco; o que a norma mede é a TRASEIRA DO CONJUNTO, e as duas
+         não são a mesma coisa — no gancheiro sobre o VM a caixa do implemento
+         tem 9 229 mm contra 7 481 de `length`, porque o Thermo King avança
+         sobre a cabine e as mangueiras penduram atrás. A 1ª versão desta regra
+         cortava `length` contra `cabRearZ − cabGap` e errava por 846 mm: o
+         portão continuava acusando 4 050 mm de balanço com o corte já
+         aplicado. `bb` é a caixa das CHAPAS do baú (`bodyPanelPred`), e
+         `bb.min.z + dzBau` é literalmente a traseira dele já montada.
+
+         ⚠️ E A REGRA É DE MÃO DUPLA. Cortar e não devolver deixaria o toco
+         cortar o baú e o bitruck seguinte herdar o corte — foi o que a bancada
+         mostrou (o VW inteiro ficou em 7 481 mm depois de passar pelo toco do
+         VM). Quando o teto do caminhão novo é maior, o baú volta a crescer, no
+         limite do comprimento de fábrica.
+
+         ⚠️ E ELA RECORRE UMA VEZ: `setTrailerDims()` chama `placeTrailer()` de
+         volta. O guarda é o que impede a recursão infinita, e o `return` é o
+         que impede esta passada de assentar um conjunto que vai ser refeito. */
+      /* ▶▶ O COMPRIMENTO PADRÃO DA CONFIGURAÇÃO — ver `BAU_PADRAO`.
+         ------------------------------------------------------------------
+         Roda UMA VEZ por (chassi × implemento), e antes do teto legal: o padrão
+         é o que o implementador entrega, e a norma é quem corta depois se o
+         caminhão não comportar. */
+      const padraoBau = BAU_PADRAO[mount.axles.config];
+      const chaveBau = `${mount.id}|${state.implement.id}`;
+      if (padraoBau && state.trailerRig && !cortandoBau && bauPadraoPara !== chaveBau) {
+        bauPadraoPara = chaveBau;
+        if (Math.abs(state.trailerRig.current.length - padraoBau) > 1e-3) {
+          console.info('[carroceria]', mount.id, '·', mount.axles.config,
+            '— comprimento padrão da configuração:',
+            (state.trailerRig.current.length * 1000).toFixed(0), '→',
+            (padraoBau * 1000).toFixed(0), 'mm');
+          cortandoBau = true;
+          try { setTrailerDims({ length: padraoBau }); } finally { cortandoBau = false; }
+          return;
+        }
+      }
+      if (state.trailerRig && !cortandoBau) {
+        const lim = rearOverhangLimit(mount);
+        const traseira = bb.min.z + dzBau;
+        if (lim) {
+          const sobra = traseira - lim.traseiraMinZ;      // <0 = passou do teto
+          const atual = state.trailerRig.current.length;
+          /* ⚠️ O TETO DE CRESCIMENTO É O PADRÃO DA CONFIGURAÇÃO, e não mais o
+             comprimento do ASSET: com `BAU_PADRAO` o bitruck pede 9,50 m contra
+             8,66 de fábrica, e devolver "até o de fábrica" desfaria o padrão no
+             primeiro quadro. Sem padrão para a configuração, vale o asset. */
+          const fabrica = padraoBau ?? state.trailerRig.base.length;
+          let novo = atual;
+          if (sobra < -1e-4) novo = atual + sobra;                    // encurta
+          else if (atual < fabrica - 1e-4) novo = Math.min(fabrica, atual + sobra);
+          if (Math.abs(novo - atual) > 1e-3) {
+            console.info('[carroceria]', mount.id, '·', mount.axles.config,
+              '— comprimento', (atual * 1000).toFixed(0), '→', (novo * 1000).toFixed(0),
+              'mm · balanço traseiro máximo', (lim.maximo * 1000).toFixed(0),
+              'mm (60 % de', (lim.vaoExtremos * 1000).toFixed(0), 'mm · teto 3 500),',
+              'CONTRAN 882/2021.');
+            cortandoBau = true;
+            try { setTrailerDims({ length: novo }); } finally { cortandoBau = false; }
+            return;
+          }
+        }
+        /* O que a bancada e o console leem — a medida, não a conta. */
+        state.bodyZ = { frente: bb.max.z + dzBau, traseira };
+      }
+
+      const querido = tailDeltaFor(mount, bb.min.z + dzBau);
+      const alongado = tailShiftWorth(querido)
+        ? stretchRigidFrame(cab, mount, querido) : 0;
+      if (Math.abs(querido - alongado) > 0.001) {
+        console.warn('[quadro]', mount.id, '— o encurtamento esgotou as baias:',
+          'faltaram', ((querido - alongado) * 1000).toFixed(0), 'mm.',
+          'O para-choque fica adiantado em relação à traseira do baú.');
+      }
+      /* A SILHUETA MUDOU. `state.cabBox` foi medida em `loadCab()`, antes de o
+         rabo andar; quem a lê é o enquadramento e a sombra. Remedir, nunca
+         somar um delta — a mesma doutrina de `placeThermoKing()`. */
+      if (alongado !== 0) state.cabBox = bboxOfMatching(cab, /./);
+      const sol = solveRigidMount({
+        ...mount, cabRearZ: encosto,
+        /* `frameEndZ` só serve para RELATAR o balanço; com o rabo movido, o
+           número de fábrica passaria a mentir. */
+        frameEndZ: mount.frameEndZ + alongado,
+      }, {
+        bottom: datumLocal, frontZ: bb.max.z, rearZ: bb.min.z, roofY: bb.max.y,
+        centerX: (bb.min.x + bb.max.x) / 2,
+      }, gap);
+      applyRootPose(cab, sol.cab);
+      applyRootPose(t, {
+        ...sol.body,
+        y: sol.body.y + state.coupling.y,
+        z: sol.body.z + state.coupling.z,
+      });
+      /* A PROTEÇÃO LATERAL — montada AQUI, e não em `loadTrailer()`.
+         ------------------------------------------------------------------
+         Ela é filha da RAIZ DO IMPLEMENTO (é assim que ela herda a inclinação
+         de `pitchX`, que foi a queixa que a trouxe para cá), mas o CORRIDO
+         dela se parte nas rodas do CAMINHÃO — e as duas coisas só se conhecem
+         depois de `solveRigidMount()`. Daí este ser o único lugar em que ela
+         cabe.
+
+         As cotas do baú vêm de `bb`, que já está no referencial da raiz; o
+         piso vem do perfil, que mede em MUNDO, e por isso desconta
+         `trailerBase.pos.y` — a mesma conversão que `datumLocal` faz acima, e
+         a fronteira que §29.2 manda atravessar com cuidado. */
+      if (state.implement.sideGuard && state.trailerRig && state.trailerBase) {
+        /* Do espaço NORMALIZADO do caminhão para o LOCAL do implemento. A
+           inclinação entra como cosseno e é desprezível (0,912° no Scania dá
+           0,013 % em z); o que não é desprezível é a translação. */
+        const zRaiz = sol.body.z + state.coupling.z;
+        const paraImpl = (zNorm: number) => zNorm - zRaiz;
+        const yGround = -(sol.body.y + state.coupling.y);
+        const xGuarda = bb.max.x - RECUO_DA_PELE;
+        const N = new THREE.Matrix4().makeRotationY(mount.orientYaw)
+          .multiply(new THREE.Matrix4().makeTranslation(-mount.centerX, -mount.groundY, 0));
+        const eixos = [...mount.axles.steerZ, ...mount.axles.driveZ, ...mount.axles.liftZ];
+        /* ⚠️ A LISTA QUE AMPUTA O CORRIDO USA A FOLGA DA **BARRA**, e não a do
+           suporte — 2026-08-24. Quem corre no plano do tanque é a barra
+           (|x| 1 210…1 242 medidos) e a tampa (1 154); o suporte, que vai a
+           1 112, tem a lista dele logo abaixo. Com a folga do suporte nas duas,
+           o tanque recuado a `TETO_FLANCO` (1 100) ficava 13 mm acima do limiar
+           e AMPUTAVA o corrido: a ponta dianteira do Scania 8x2 morria em
+           1 932 em vez de 2 425, deixando o ARLA e o vão até o 2º direcional
+           sem grade. Ver `FOLGA_BARRA` em `side-guard.ts`. */
+        const obstaculos = truckObstacles(cab, paraImpl, N, xGuarda, 0,
+          SUPORTE_Y, false, FOLGA_BARRA);
+        /* ⚠️ E UMA SEGUNDA LISTA, na faixa de altura da ESTAÇÃO INTEIRA. A de
+           cima decide o que AMPUTA o corrido (faixa do suporte, 840…1090); esta
+           decide onde cabe um APOIO, e vai até 500 porque o montante desce até
+           lá. Ver `ESTACAO_Y` em `side-guard.ts`. */
+        const obstaculosEstacao = truckObstacles(cab, paraImpl, N, xGuarda, 0, ESTACAO_Y, true);
+        const mats = new Map<string, THREE.Material>();
+        t.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          for (const mm of (Array.isArray(m.material) ? m.material : [m.material])) {
+            if (mm?.name && !mats.has(mm.name)) mats.set(mm.name, mm);
+          }
+        });
+        /* ⚠️ O VÃO DA RODA É MEDIDO, e por eixo. O para-lama do 2º direcional
+           tem 1,4 m e passa dos 620 mm da constante: com o vão do pneu, a
+           ponta do corrido nascia dentro do arco. Ver `wheelBayReach()`. */
+        /* O CORREDOR por onde a BARRA passa — a face dela, não o suporte. Ver
+           `wheelBayReach()` e `GRADE_FACE_DENTRO`. */
+        const meias = wheelBayReach(cab, N, eixos, xGuarda - GRADE_FACE_DENTRO);
+        /* ▶ A FERRAGEM DA GRADE (v2 do asset) precisa de duas coisas que só
+           existem aqui: onde o braço não passa (é o vão de baixo do CAMINHÃO) e
+           onde está a longarina do SOBRECHASSI (é o que ele abraça). */
+        /* ▶▶▶ O IMPLEMENTO É MEDIDO ANTES DE RECEBER A GRADE.
+           ----------------------------------------------------------------
+           *"analise os implementos individualmente, sem considerar o chassi do
+           truck"* — Kennedy, 2026-08-23. As duas cotas abaixo são do
+           IMPLEMENTO e de mais ninguém, e as duas são medidas na árvore dele.
+
+           ⚠️ COM A GRADE ANTERIOR FORA. `placeTrailer()` passa por aqui a cada
+           quadro de um arraste, e a grade da passagem anterior ainda está
+           pendurada — com o suporte dela subindo justamente até a barriga. Medir
+           com ela dentro dá o topo do próprio suporte, e a cota fica presa no
+           primeiro valor que sair. Ver `removeSideGuard()`. */
+        removeSideGuard(t);
+        /* A BARRIGA: a peça mais baixa do implemento acima da barra de cima, no
+           corredor em que a estação e o braço vivem. Medida, ela é a MESMA peça
+           nos três rígidos (os dois trilhos do assoalho, y local 166) e sai em
+           1 135 mm de solo no Scania, 1 237 no VM e 1 376 no VW — contra um topo
+           de estação fixo em 1 090 mm, que é cota do semirreboque. */
+        const barrigaY = implementBelly(t, yGround, xGuarda - 0.33,
+          xGuarda - 0.01) ?? undefined;
+        /* E A PONTA DA MÃO-FRANCESA — onde o braço se prende. |x| 739 no
+           sobrechassi; sem ela, o braço volta a mirar a longarina. */
+        const pontaTravessa = barrigaY === undefined ? undefined
+          : implementBracket(t, yGround, barrigaY - 0.22, barrigaY - 0.01) ?? undefined;
+        const rail = implementRail(t, yGround);
+        /* …e o que o CAMINHÃO tem no corredor de cima. A estação que cair numa
+           destas faixas não cresce — ver `cabeTopo()`. A faixa vai do topo da
+           barra à barriga, que é exatamente o pedaço novo do suporte. */
+        const obstaculosTopo = barrigaY === undefined ? [] : truckObstacles(
+          cab, paraImpl, N, xGuarda, 0, [TOPO_BARRA - DESCIDA, barrigaY], true);
+        /* ⚠️ A FERRAGEM SOBE ATÉ A BARRIGA DO IMPLEMENTO, e a varredura do braço
+           tem de subir junto: procurar obstáculo na faixa nominal (780…990)
+           enquanto o braço mora 230 mm acima dela — que é o caso do Scania, e
+           471 no VW — é medir o vão errado. `subida` já existia na assinatura e
+           vinha zerada desde que a ferragem entrou. */
+        const subida = barrigaY === undefined ? 0 : (barrigaY - 0.015) - 0.890;
+        const braco = truckArmObstacles(cab, paraImpl, N, 0, subida);
+        /* ⚠️ QUEM MANDA NA PONTA DO BRAÇO É A MAIS EXTERNA DAS DUAS LONGARINAS.
+           Num rígido o sobrechassi senta na longarina do caminhão, e as duas
+           estão quase no mesmo |x|: parar na do implemento e ignorar a do
+           caminhão põe a ferragem dentro do chassi. Só vale como CAMINHO DE
+           VOLTA — com `pontaTravessa` medida, quem manda é o implemento. */
+        const chassiX = Math.max(rail?.x ?? 0, braco.chassiFora);
+        const linhas = attachSideGuard(t, guardKit, {
+          yGround, skinX: bb.max.x, z0: bb.min.z, z1: bb.max.z,
+          obstaculos, rodasZ: eixos.map(paraImpl), rodasMeia: meias, materiais: mats,
+          obstaculosEstacao, obstaculosBraco: braco.faixas, obstaculosTopo,
+          chassiX: chassiX > 0.2 ? chassiX : undefined, chassiBaixoY: rail?.y,
+          barrigaY, pontaTravessa,
+        });
+        /* A face interna vem do KIT, em espaço local — ver `guardInnerX()`. */
+        linhas.push(...trimFlapsForGuard(cab, mount, guardInnerX(guardKit, bb.max.x)));
+        const chave = linhas.join('|');
+        if (chave !== guardLoggedFor) {
+          guardLoggedFor = chave;
+          for (const l of linhas) console.info('[grade]', l);
+        }
+      }
+      if (mountLoggedFor !== mount.id + '|' + state.implement.id) {
+        mountLoggedFor = mount.id + '|' + state.implement.id;
+        console.info('[montagem]', state.implement.short, 'sobre', mount.id,
+          '· piso', (mount.frameTopY * 1000).toFixed(0), 'mm ·',
+          'teto', sol.roofY.toFixed(3), 'm ·',
+          'balanço traseiro', (sol.rearOverhang * 1000).toFixed(0), 'mm',
+          sol.rearOverhang < 0 ? '(a carroceria passa da ponta do quadro)' : '');
+      }
+      setRigPlacement(true);
+      return;
+    }
+    /* SEM ENTRADA DE MONTAGEM não há onde assentar, e o caminho legado abaixo é
+       PIOR que não fazer nada: ele lê `state.trailerMeta.kingpin`, que este
+       implemento não tem, e desce para `LEGACY_TRAILER_FRONT_Z` — uma constante
+       MEDIDA NO SEMIRREBOQUE, que plantaria o baú 2,65 m à frente do cavalo sem
+       um aviso sequer. Fica na pose de carga, que é onde ele está certo
+       sozinho, e é o que a visão "Implemento" mostra. */
+    if (t && state.trailerBase) {
+      t.rotation.x = 0;
+      t.position.copy(state.trailerBase.pos);
+      t.updateMatrix();
+      t.updateWorldMatrix(true, true);
+    }
+    if (noHitchWarnedFor !== state.implement.id) {
+      noHitchWarnedFor = state.implement.id;
+      console.info('[montagem]', state.implement.label,
+        '— sem pino-rei e sem chassi rígido carregado: fica na pose de carga.');
+    }
+    setRigPlacement(true);
+    return;
+  }
 
   /* O FURO DE PINO É ESCOLHIDO ANTES DE RESOLVER, e é a primeira decisão do
      engate porque é a única que muda a GEOMETRIA.
@@ -4848,3 +6540,14 @@ export function placeTrailer() {
 }
 
 let legacyWarnedFor: string | null = null;
+/** Uma vez por IMPLEMENTO, como o legado é uma vez por cabine: `placeTrailer()`
+ *  roda em todo resize e o aviso viraria ruído de console. */
+let noHitchWarnedFor: string | null = null;
+/** Idem para a montagem, e a chave é o PAR — trocar de caminhão ou de
+ *  carroceria muda o número que interessa. */
+let mountLoggedFor: string | null = null;
+/** A grade se refaz a cada resize; só se loga quando o texto MUDA. */
+let guardLoggedFor: string | null = null;
+/** A parede traseira medida da cabine em cena, e de qual arquivo ela é. */
+let cabRearFor: string | null = null;
+let cabRearMedido: number | null = null;

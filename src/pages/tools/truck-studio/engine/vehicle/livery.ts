@@ -701,6 +701,14 @@ function syncOverlayVisibility(key: SurfaceKey) {
  * clears the canvas background to transparent, so the overlay stops covering
  * anything. The bias was still there; there was simply nothing left to draw with
  * it. Everything else about the two states is identical. */
+/** O acabamento da CHAPA de cada face, guardado quando ela passa por
+ *  `makeLiveryOverlay()` — ver o ▶▶▶ lá dentro. As calotas de rebite leem
+ *  daqui em vez de do hospedeiro delas. */
+const acabamentoDaChapa: Partial<Record<SurfaceKey, {
+  metalness: number; roughness: number;
+  envMap: THREE.Texture | null; envMapIntensity: number;
+}>> = {};
+
 function makeLiveryOverlay(mesh: THREE.Mesh, key: SurfaceKey) {
   const texture = textures[key];
   /* ---- UMA SOBREPOSIÇÃO POR CHAPA, SEMPRE ----
@@ -717,12 +725,61 @@ function makeLiveryOverlay(mesh: THREE.Mesh, key: SurfaceKey) {
     for (const one of Array.isArray(m) ? m : [m]) one?.dispose();
   }
   texture.channel = 1;
+  /* ▶▶▶ A ARTE É PINTADA NO ACABAMENTO DA CHAPA, E NÃO NUM ACABAMENTO PRÓPRIO.
+     ------------------------------------------------------------------------
+     *"a logo que coloquei na traseira parece muito mais lavada, opaca e
+     esbranquiçada que a da lateral, que está muito mais vívida"* — Kennedy,
+     2026-08-22 (duas vezes, e a segunda cobrando).
+
+     A leitura de código dizia "o material é o mesmo nas cinco faces, então não
+     é ele" — e estava certa e irrelevante. As cinco sobreposições eram iguais
+     ENTRE SI e DIFERENTES DA CHAPA que vestem. Medido na bancada:
+
+         chapa .......... metal 0,05 · rugosidade 1,00 · envMapIntensity 1,35
+         sobreposição ... metal 0,10 · rugosidade 0,55 · envMapIntensity 1,00
+
+     Rugosidade 0,55 num dielétrico é um espelho borrado: ele soma ao pigmento
+     um reflexo do ambiente que CRESCE COM O ÂNGULO DE VISADA (Fresnel). De
+     frente quase não aparece; de esguelha vira um véu branco por cima da arte.
+     E é exatamente essa a diferença entre as duas fotos do dono: a lateral ele
+     olha quase de frente, a traseira ele olha de canto. A chapa em volta não
+     denuncia porque ela é rugosidade 1 — não tem véu para somar.
+
+     Some-se a isso a luz: a direcional de sombra da cena está em x −200, ou
+     seja bate quase de FRENTE num flanco e de RASPÃO na traseira. Numa face
+     de raspão o difuso é fraco, o véu especular é forte, e o resultado é
+     leitoso — "lavado" é a palavra exata.
+
+     Adesivo de recorte não é mais brilhante que a pintura do baú; num baú
+     frigorífico ele é fosco como ela. Então a sobreposição passa a HERDAR o
+     acabamento da chapa. Ela deixa de ter opinião própria sobre brilho, e as
+     cinco faces voltam a diferir só pela luz que recebem — que é a diferença
+     que tem de existir.
+
+     ⚠️ AS CALOTAS DE REBITE HERDAM O DA CHAPA, NÃO O DELAS. A arte corre por
+     cima das cabeças (pedido de 2026-08-12) e ali o hospedeiro é metal
+     polido: copiar o acabamento do hospedeiro faria a mesma logo brilhar em
+     cima do rebite e não brilhar na chapa, que é o defeito ao contrário. Por
+     isso o acabamento fica guardado POR FACE quando a chapa passa — e a chapa
+     passa antes, que a calota é filha dela. */
+  const hosp = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as
+    THREE.MeshStandardMaterial | undefined;
+  const daChapa = mesh.userData?.liveryRivets ? acabamentoDaChapa[key] : null;
+  const acab = daChapa ?? {
+    metalness: hosp?.metalness ?? 0.05,
+    roughness: hosp?.roughness ?? 1,
+    envMap: hosp?.envMap ?? null,
+    envMapIntensity: hosp?.envMapIntensity ?? 1,
+  };
+  if (!daChapa) acabamentoDaChapa[key] = acab;
   const mat = new THREE.MeshStandardMaterial({
     map: texture,
     transparent: true,
-    metalness: 0.1,
-    roughness: 0.55,
+    metalness: acab.metalness,
+    roughness: acab.roughness,
   });
+  if (acab.envMap) mat.envMap = acab.envMap;
+  mat.envMapIntensity = acab.envMapIntensity;
   if (mat.map) mat.map.channel = 1;
   /* NASCE NO ESTADO CERTO. Uma face que já tem arte (configuração restaurada,
      ou um recorte de porta no meio de uma edição) precisa da camada ligada no
@@ -733,6 +790,36 @@ function makeLiveryOverlay(mesh: THREE.Mesh, key: SurfaceKey) {
   const overlay = new THREE.Mesh(mesh.geometry, mat);
   overlay.userData.liveryOverlay = true;      // ver a limpeza no topo da função
   overlay.renderOrder = 2;
+  /* ▶▶▶ A ARTE RECEBE SOMBRA. UMA LINHA, E ERA ESTE O DEFEITO.
+     ------------------------------------------------------------------------
+     *"a logo na traseira continua errada, fica muito mais opaca que a
+     lateral"* — Kennedy, 2026-08-22, terceira cobrança.
+
+     `THREE.Mesh` nasce com `receiveShadow = false`, e esta linha nunca existiu.
+     TODA chapa hospedeira liga o dela (`trailer-geometry.ts` em quatro lugares,
+     `models.ts` em dois) — então numa face que está na sombra do próprio
+     veículo a CHAPA escurece e a ARTE não. O adesivo passa a flutuar iluminado
+     sobre um painel apagado: leitoso, sem contraste, "lavado".
+
+     E é por isso que só a traseira aparecia. Numa face batida de sol não há
+     sombra para ignorar e os dois concordam; na que está de costas para o sol,
+     a chapa cai e a arte fica onde estava.
+
+     ▶ A MEDIDA, na screenshot do próprio dono (recorte da porta traseira ×
+       recorte do flanco, mediana dos pixels de adesivo e dos de chapa):
+
+           face        arte (val)   chapa (val)   arte/chapa
+           traseira      0,663        0,620         1,069   ← a arte MAIS CLARA
+           lateral       0,565        0,898         0,629      que a chapa branca
+
+       Um azul-marinho sobre chapa branca tem de dar ~0,05…0,17 dessa razão (é
+       a razão dos albedos, e luz nenhuma a muda: ela multiplica os dois). 1,069
+       não é "pouca luz na traseira" — é a arte fora do cálculo de sombra.
+
+     ⚠️ `castShadow` continua FALSO de propósito: a sobreposição divide a
+     geometria com a chapa, que já projeta. Ligar os dois faria a peça projetar
+     sombra sobre si mesma, que é acne garantida no mapa. */
+  overlay.receiveShadow = mesh.receiveShadow;
   mesh.add(overlay);
   overlay.position.set(0, 0, 0);
   return overlay;
@@ -760,9 +847,20 @@ function replaceBgUrl(key: SurfaceKey, next: string) {
   if (old && old !== next) setTimeout(() => URL.revokeObjectURL(old), 10000);
 }
 
-/** As quatro faces que o retrato conhece. O TETO não é fotografado — ele é malha
- *  do corpo paramétrico e não tem chapa recortada; ver `attachOverlays()`. */
-const SNAP_KEYS = ['left', 'right', 'rear', 'front'] as const;
+/** As CINCO faces que o retrato conhece.
+ *
+ *  ⚠️ O TETO ENTROU EM 2026-08-22 e o comentário anterior ("o teto não é
+ *  fotografado — ele é malha do corpo paramétrico e não tem chapa recortada")
+ *  descrevia uma limitação que não existia: o que `snapFace()` pede de um
+ *  painel é uma CAIXA e uma MATRIZ, e a malha do teto tem as duas. O que
+ *  faltava era a base da câmera para uma face horizontal.
+ *
+ *  E o preço de não a ter era o relato: *"a visão superior possui um frame
+ *  metálico, mas não aparece no livery do teto"* — o card do teto era a janela
+ *  sintética de `roofWindow()`, uma chapa branca lisa, enquanto o baú de cima
+ *  mostra o trilho de topo correndo os dois flancos. Ver `AXES.roof` em
+ *  `livery-snapshot.ts`. */
+const SNAP_KEYS = ['left', 'right', 'rear', 'front', 'roof'] as const;
 
 /* Uma refotografia em voo POR FACE, e o "por face" não é preciosismo.
    ---------------------------------------------------------------------------
@@ -775,11 +873,11 @@ const SNAP_KEYS = ['left', 'right', 'rear', 'front'] as const;
    palco fica com o retrato de uma medida que não existe mais.
    Um contador por face resolve porque o conflito é por face: duas fotos da MESMA
    face ainda se cancelam, e duas de faces diferentes convivem. */
-const snapToken: Record<SnapshotKey, number> = { left: 0, right: 0, rear: 0, front: 0 };
+const snapToken: Record<SnapshotKey, number> = { left: 0, right: 0, rear: 0, front: 0, roof: 0 };
 
 /**
- * Refotografa as três faces do implemento corrente e republica janelas,
- * ferragem e área pintável.
+ * Refotografa as faces do implemento corrente e republica janelas, ferragem e
+ * área pintável.
  *
  * ASSÍNCRONA — ver `takeFaceSnapshots()`. Quem chama não espera: o palco
  * continua mostrando o retrato anterior até o novo chegar, que é o
@@ -793,12 +891,11 @@ export async function refreshSnapshots(
 ) {
   if (!isMounted()) return;
   trailerForSnapshots = trailerRoot;
-  /* O TETO nunca é fotografado (`takeFaceSnapshots()` só conhece as quatro
-     chapas recortadas), então ele é filtrado aqui em vez de virar um caso
-     especial lá — e um `only` que só pedisse o teto tem de virar nenhuma face,
-     não todas. */
+  /* As cinco, o teto incluído desde 2026-08-22 — ver `SNAP_KEYS`. O filtro
+     continua existindo porque `only` é `SurfaceKey[]` e nem toda `SurfaceKey`
+     é fotografável no dia em que uma sexta entrar. */
   const faces = only
-    ? (only.filter((k): k is SnapshotKey => k !== 'roof'))
+    ? (only.filter((k): k is SnapshotKey => (SNAP_KEYS as readonly string[]).includes(k)))
     : undefined;
   if (faces && !faces.length) return;
   const mine: Partial<Record<SnapshotKey, number>> = {};
@@ -819,7 +916,15 @@ export async function refreshSnapshots(
     measuredOutline[key] = true;
     setSnapshotFront(key, snap.front);
     const win = windows[key];
-    publishWindow(key, win ?? { photoAr: snap.ar, x: 0, y: 0, w: 1, h: 1 });
+    /* ▶▶ A JANELA É A CHAPA, E O RETRATO JÁ A MEDIU.
+       ⚠️ ERA `{x:0, y:0, w:1, h:1}` — "a chapa é a foto inteira" —, e não é: a
+       foto tem MARGENS por construção (`M_SIDE`, `M_BOTTOM` e a coroa medida em
+       `livery-snapshot.ts`), e é nelas que moram o trilho de topo, o trilho de
+       piso e a fita 3M. Com a janela mentindo, a tela do fabric era esticada
+       sobre chapa + ferragem, e o cm da régua não caía no cm do baú.
+       `snap.box` é exatamente "onde a chapa cai dentro do fundo", medido na
+       mesma câmera — é ele que fecha o registro. */
+    publishWindow(key, win ?? { photoAr: snap.ar, ...snap.box, exata: true });
     sizePreviewCanvas(key);
     installGuide(key);
     /* O palco tem de ser REENQUADRADO: a caixa da tela sai de `snap.box`, e a
@@ -909,7 +1014,10 @@ export function attachOverlays(trailerRoot: THREE.Object3D) {
        — bake fundido, que não gera rebite — não há o que vestir. */
     const rk = rivetsOf[o.name];
     if (rk) {
-      if (o.geometry?.getAttribute('uv1')) makeLiveryOverlay(o, rk);
+      if (o.geometry?.getAttribute('uv1')) {
+        o.userData.liveryRivets = true;      // ver o ⚠️ em makeLiveryOverlay
+        makeLiveryOverlay(o, rk);
+      }
       return;
     }
     const key = byName[o.name];
@@ -1405,6 +1513,16 @@ interface PanelWindow {
   photoAr: number;
   /** posição e tamanho da janela, em fração da foto */
   x: number; y: number; w: number; h: number;
+  /**
+   * A janela é a CHAPA, medida na mesma câmera que fez a foto.
+   *
+   * ⚠️ QUANDO ELA É EXATA, `canvasRect()` NÃO CORRIGE NADA. A correção por
+   * faixa existe para a foto de DEGRADAÇÃO, em que a janela é o vazado do PNG e
+   * a tela precisa ser esticada até a chapa inteira. Num retrato ortográfico a
+   * chapa já vem medida (`snap.box`), e aplicar a correção por cima dela
+   * deslocaria a arte pela margem do quadro.
+   */
+  exata?: boolean;
 }
 
 /* `assetUrl()` e não o caminho cru: os arquivos do estúdio moram na API, sob
@@ -1467,9 +1585,17 @@ function roofWindow(): PanelWindow {
   return { photoAr: p.h > 0 ? p.w / p.h : 4, x: 0, y: 0, w: 1, h: 1 };
 }
 
-/** A janela de uma face: a medida na foto, ou a sintética do teto. */
+/** A janela de uma face: a medida na foto, ou a sintética do teto.
+ *
+ *  ⚠️ A DO TETO VIROU FALLBACK em 2026-08-22. Desde que ele é fotografado
+ *  (`SNAP_KEYS`), `refreshSnapshots()` publica uma janela medida para ele como
+ *  para as outras quatro, e a sintética só vale enquanto o primeiro retrato não
+ *  chega — que é o mesmo estado em que as outras quatro caem na foto de
+ *  degradação. Devolver a sintética por cima da medida deixaria o card do teto
+ *  na proporção da CHAPA quando o retrato está na proporção do QUADRO (chapa +
+ *  as margens que trazem o frame), e as duas discordam em 6 %. */
 const windowFor = (key: SurfaceKey): PanelWindow | undefined =>
-  key === 'roof' ? roofWindow() : windows[key];
+  (key === 'roof' ? (windows.roof ?? roofWindow()) : windows[key]);
 
 /** alpha até aqui conta como vazado — margem para o antialias da borda */
 const CLEAR_A = 8;
@@ -1561,6 +1687,9 @@ const pct = (v: number) => (v * 100).toFixed(3) + '%';
  * a ferragem no editor exatamente como desaparece no baú.
  */
 function canvasRect(key: SurfaceKey, win: PanelWindow) {
+  /* Janela EXATA: a tela é a chapa e a janela é a chapa. Nada a corrigir —
+     ver o ⚠️ de `PanelWindow.exata`. */
+  if (win.exata) return { x: win.x, y: win.y, w: win.w, h: win.h };
   const band = measured[key];
   if (!band) return { x: win.x, y: win.y, w: win.w, h: win.h };
   const [v0, v1] = band;

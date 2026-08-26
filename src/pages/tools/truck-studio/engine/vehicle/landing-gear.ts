@@ -179,6 +179,22 @@ function caixaLocal(o: THREE.Mesh, inv: THREE.Matrix4, mm: THREE.Matrix4, vv: TH
  * Nunca lança. Quando não reconhece a peça, avisa com o motivo e desliga —
  * a patola fica exatamente onde o bake a pôs.
  */
+/**
+ * Esquece a patola do implemento que saiu de cena.
+ *
+ * `patola` é estado de MÓDULO e guarda referências para malhas do implemento.
+ * Enquanto `loadTrailer()` rodava uma vez por página isso era inofensivo; com
+ * o catálogo de implementos (2026-08-18) ele passou a rodar a cada troca de
+ * chassi entre cavalo e rígido, e uma patola velha faria `setLandingGearDown()`
+ * escrever pose em objetos que já foram descartados.
+ *
+ * Não descarta geometria: as malhas da patola são do implemento, e quem as
+ * libera é o `disposeTree()` da raiz dele.
+ */
+export function forgetLandingGear(): void {
+  patola = null;
+}
+
 export function buildLandingGear(raiz: THREE.Object3D): void {
   if (patola && patola.raiz === raiz) return;
   patola = null;

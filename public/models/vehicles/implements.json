@@ -1,0 +1,37 @@
+{
+  "_note": "Catálogo de implementos do Truck Studio. Lido por engine/vehicle/implements.ts. Um campo ausente cai no padrão do `kind` (semirreboque tem pino/rodagem/patola; sobrechassi não tem nenhum dos três). Convenção de nome de arquivo: <semirreboque|sobrechassi>_<frigorifico|carga_seca>_<gancheiro|paleteiro>.glb — ver tools/implement-bake/README.md.",
+  "default": "semirreboque-frigorifico-paleteiro",
+  "implements": [
+    {
+      "id": "semirreboque-frigorifico-paleteiro",
+      "label": "Semirreboque frigorífico paleteiro",
+      "short": "Paleteiro",
+      "file": "semirreboque_frigorifico_paleteiro.glb",
+      "meta": "semirreboque_frigorifico_paleteiro_meta.json",
+      "kind": "semirreboque",
+      "_note": "É o `trailer.glb` de sempre, renomeado. O arquivo antigo CONTINUA na árvore servida — ela sai com Cache-Control immutable e `--delete` é proibido nela."
+    },
+    {
+      "id": "sobrechassi-frigorifico-gancheiro",
+      "label": "Sobrechassi frigorífico gancheiro",
+      "short": "Gancheiro",
+      "file": "sobrechassi_frigorifico_gancheiro.glb",
+      "kind": "sobrechassi",
+      "stainlessTopRail": true,
+      "frameMaterial": "^metal-estrutura-principal-padrao$",
+      "sillMaterial": "^metal-preto$",
+      "bakedSideDoor": true,
+      "makerBranding": true,
+      "lowFrameSkin": true,
+      "cornerTape": true,
+      "lowFrameRail": true,
+      "singleRearHose": true,
+      "strayConduits": true,
+      "sideDoorCatches": true,
+      "flankCatchOnFlat": true,
+      "topRailDressing": true,
+      "thermoKingFile": "thermoking_p360.glb",
+      "_note": "Sem *_meta.json: nao tem pino-rei e o contorno das chapas ainda nao foi medido. 2,68 x 2,89 x 8,66 m; traseira em -z. Assado por tools/implement-bake/materialize.mjs e CORRIGIDO por tools/implement-bake/graft-materials.mjs (2026-08-19), que devolveu ao arquivo cinco nomes de material que o export tinha fundido em `metal-pouco-polido`: suporte-varao-preto, engate-femea-preto, cano-ar-preto, registro-corpo-laranja e metal-galvanizado-mantido — mais o remapeamento de `metal-claro` (o manipulo da porta traseira) para `inox-ferragem`.\n\n`lowFrameSkin` continua LIGADO de proposito mesmo depois do enxerto: com a banda ja galvanizada no asset ele nao acha nada e devolve zero, e e essa a rede para um re-bake que esqueca o passo do enxerto.\n\n2026-08-20: uma SEGUNDA passada do enxerto (`--only quadro-da-testeira`) deu `metal-galvanizado-mantido` aos DOIS RETORNOS do quadro de baixo nos cantos dianteiros (26 x 140 x 300 mm). Eles eram as unicas malhas brancas abaixo da linha da chapa do flanco e puxavam o `floorY` de todo o engine 82,5 mm para baixo — com eles brancos, o trilho de piso, a fileira de fita 3M e as travessas do piso liam +82,5 mm em relacao ao semirreboque, e a fita vertical de canto sobrava por baixo do quadro. Ver ARCHITECTURE.md §30."
+    }
+  ]
+}

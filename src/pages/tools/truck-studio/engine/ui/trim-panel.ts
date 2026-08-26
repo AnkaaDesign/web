@@ -307,6 +307,38 @@ const VIEWS: { id: VehicleView; label: string; title: string }[] = [
 ];
 
 /**
+ * "Só o implemento" faz sentido? — e a resposta depende do TIPO dele.
+ *
+ * *"nas configurações não faz sentido nesse caso ter apenas o implemento, ou
+ * ele ficaria flutuando"* — Kennedy, 2026-08-22, com o Scania P em cena.
+ *
+ * E é literal. Um SEMIRREBOQUE fica de pé sozinho: ele tem patola e bogie, e
+ * `vehicle/landing-gear.ts` existe justamente para descer as pernas 301 mm
+ * quando o cavalo sai de cena. Um SOBRECHASSI não tem nem uma coisa nem outra —
+ * ele é uma carroceria aparafusada na mesa da longarina, e sem o caminhão ela
+ * paira a 1 037 mm do chão sem nada por baixo. Pior: a proteção lateral é filha
+ * do implemento (ver `vehicle/side-guard.ts`), então ela vai junto e flutua com
+ * ele, o que dobra o absurdo da imagem.
+ *
+ * A opção fica DESABILITADA e não some, pela mesma razão que já vale para a
+ * ausência de geometria: um controle que muda de tamanho conforme o veículo faz
+ * o usuário procurar o botão em vez de entender por que ele não serve.
+ *
+ * ⚠️ "Só o cavalo" continua valendo, e é o par natural desta: um chassi-cabine
+ * sem carroceria é um veículo que existe e se vende assim.
+ */
+function viewDisabled(v: VehicleView): string | null {
+  if (v === 'cab' && !state.cab) return 'Sem cavalo em cena';
+  if (v === 'trailer') {
+    if (!state.trailer) return 'Sem implemento em cena';
+    if (state.implement.kind === 'sobrechassi') {
+      return 'Um sobrechassi é aparafusado no caminhão — sozinho, ele flutuaria';
+    }
+  }
+  return null;
+}
+
+/**
  * O que fica em cena, num controle segmentado de três posições.
  *
  * TRÊS POSIÇÕES E NÃO DOIS CHECKBOXES, e a diferença não é estética: dois
@@ -328,9 +360,10 @@ function viewControl(): HTMLElement {
     btn.type = 'button';
     btn.id = `ts-cfg-view-${v.id}`;
     btn.textContent = v.label;
-    btn.title = v.title;
+    const motivo = viewDisabled(v.id);
+    btn.title = motivo ?? v.title;
     btn.setAttribute('aria-pressed', v.id === now ? 'true' : 'false');
-    btn.disabled = (v.id === 'cab' && !state.cab) || (v.id === 'trailer' && !state.trailer);
+    btn.disabled = !!motivo;
     btn.addEventListener('click', () => {
       /* `setVehicleView()` reenquadra E reancora a órbita na metade que ficou —
          ver `frameVisible()` lá. Não é o card que decide isso: com "só o

@@ -59,6 +59,19 @@ tools/iveco-bake/ultimo-bake.log.txt
 # de distribuição é o .zip em Downloads.
 public/models/vehicles/trailer.glb
 
+# E OS IMPLEMENTOS SEGUINTES, pela mesma regra e pela mesma rota de entrega.
+# Desde 2026-08-18 o implemento deixou de ser um só: `implements.json` (que É
+# versionado, como os outros manifestos) lista os bakes, e cada bake é saída de
+# `tools/implement-bake/materialize.mjs` + a receita da §6 do ARCHITECTURE.md —
+# fonte é o `.gltf` do fornecedor, que nunca entrou no repo.
+#
+# O padrão cobre os quatro que ainda vão chegar (sobrechassi/semirreboque ×
+# gancheiro/paleteiro, mais as cargas secas) sem uma linha nova aqui.
+public/models/vehicles/semirreboque_*.glb
+public/models/vehicles/sobrechassi_*.glb
+public/models/vehicles/porta_kit_*.glb
+public/models/vehicles/thermoking_p360.glb
+
 # AS CABINES TAMBÉM FICAM FORA, pelo mesmo motivo e pela mesma rota de entrega.
 # `public/models/trucks/` são as 49 cabines do catálogo novo (320 MB, a maior
 # com 22 MB) e `iveco_sway_metallica.glb` tem 22 MB. Nenhum arquivo isolado
@@ -105,6 +118,18 @@ tools/env-build/_shots_*/
 tools/trailer-bench/shots/
 tools/trailer-bench/shots-porta/
 tools/trailer-bench/shots-resize/
+tools/trailer-bench/shots-implemento/
+tools/trailer-bench/shots-montagem/
+tools/trailer-bench/shots-kit/
+tools/trailer-bench/shots-chassi/
+# A sonda de medida de 2026-08-20 grava JSON e PNG na mesma convenção (43 MB por
+# rodada dos dois implementos). O JSON é REGENERÁVEL em ~40 s e o PNG é foto de
+# conferência — ver `tools/trailer-bench/medir-0820.mjs`.
+tools/trailer-bench/medidas-0820/
+# E as fotos A/B da rodada do sobrechassi (2026-08-19): 2,1 MB de PNG de
+# conferência, tiradas por `shoot-impl.mjs`/`shoot-mount.mjs` e regeneráveis.
+# Mesma regra dos `shots*/` logo abaixo — foto de conferência não é fonte.
+tools/trailer-bench/comparacao-0819/
 
 # E a mesma regra para a bancada do estúdio e a da livery, que seguem a mesma
 # convenção `shots*/` ao lado dos scripts: `tools/studio-bench/shots/` sozinha

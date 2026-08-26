@@ -114,7 +114,14 @@ export const LOW_FRAME_TOP = 0.25;
  */
 export const RIB_FLAT_CENTER = 0.0467;
 
-/** Perfil galvanizado da saia lateral — é o topo dele que dá o batente. */
+/** Perfil galvanizado da saia lateral — é o topo dele que dá o batente.
+ *
+ *  ⚠️ É O NOME DO SEMIRREBOQUE, e nem todo baú chama a mesma peça assim: o
+ *  sobrechassi não tem material `metal-galvanizado-mantido` nenhum. Quem usa
+ *  outro nome passa `frameMaterial` em `TrailerBodyOptions` — sem isso
+ *  `measureSill()` não acha perfil, avisa, e devolve a linha do PISO, o que faz
+ *  a porta nascer dentro da cantoneira (o defeito 4 do
+ *  `PORTA-LATERAL-HANDOFF.md`). */
 const FRAME_MAT_RE = /metal-galvanizado-mantido/i;
 
 /** O MARCO da porta: o perfil escuro da estrutura. Medido no `.gltf` com
@@ -141,6 +148,88 @@ const NOMINAL_PITCH = 0.053;
 
 /** Uma casca só é aceita como chapa frisada com pelo menos isto de fileiras. */
 const MIN_RIB_ROWS = 20;
+
+/**
+ * Espessura máxima, em X, de uma FOLHA de chapa de pele.
+ *
+ * O semirreboque tem UMA casca por lateral, de ponta a ponta: a chapa é uma
+ * extrusão pura em Z e a decomposição por casca conexa devolve exatamente ela.
+ * O sobrechassi NÃO — a lateral dele são **folhas de 1,000 m** montadas com
+ * remonte de 42 mm (medido: 17 cascas de 5 108 triângulos cada, dx 6 mm,
+ * y 1,049…3,779, com o passo de z em 0,958 m). São folhas de verdade, não um
+ * defeito, e é exatamente o que o produto tem.
+ *
+ * Só que nenhuma delas atravessa 90 % do vão sozinha, então nenhuma era aceita
+ * como frisada — e um baú com ZERO chapa frisada não redimensiona em altura,
+ * não recorta painel de livery e não ganha rebite, tudo em silêncio (ver
+ * `buildTrailerRig()`, que engole a exceção de propósito).
+ *
+ * `mergeSkinSheets()` une as folhas de um mesmo lado ANTES da classificação, e
+ * esta constante é o que separa "folha de pele" de "membro estrutural na
+ * pele": 60 mm, contra os 6 mm medidos na folha (0,8 mm de chapa + 5,2 mm de
+ * relevo do friso) e contra os 95…205 mm dos perfis de arremate. O vazio entre
+ * as duas famílias é de mais de uma ordem de grandeza.
+ */
+const SHEET_THICK = 0.06;
+
+/**
+ * Quanto duas folhas podem divergir em X e ainda serem a MESMA parede.
+ *
+ * 3 mm, contra os 5 mm que separam a parede da folha da porta no sobrechassi e
+ * contra os 0 mm que separam as folhas da parede entre si (as 8 do flanco
+ * esquerdo têm a face externa no mesmo x −1,298 até a quarta casa). O vazio é
+ * pequeno em valor absoluto e enorme em relação ao ruído do bake, que aqui é
+ * zero — as folhas saíram da mesma extrusão.
+ */
+const SKIN_PLANE_TOL = 0.003;
+
+/**
+ * O DEGRAU DO REMONTE, em metros — a espessura da chapa.
+ *
+ * As folhas do sobrechassi se sobrepõem 42 mm e, no bake, as duas ficam **no
+ * mesmo plano em X até a quarta casa**. Duas superfícies exatamente coplanares
+ * brigam no z-buffer em QUALQUER distância — não é falta de precisão, é empate
+ * — e o resultado é a costura tracejada que aparece a cada 958 mm ao longo do
+ * flanco. Foi confirmada por A/B na bancada (`rasante` × `rasante-cru`): ela
+ * está no BAKE, não no corpo paramétrico.
+ *
+ * Um remonte de verdade não é coplanar: a folha de cima monta SOBRE a de baixo
+ * e fica saliente pela espessura da chapa. 0,8 mm é a espessura medida
+ * (a casca tem 6,0 mm de vão em X e o relevo do friso mede 5,2). Alternando as
+ * folhas em z — uma no plano, a seguinte 0,8 mm para fora — o empate acaba e o
+ * flanco passa a ler como chapeamento montado, que é o que ele é.
+ *
+ * Zero é o valor certo para um baú de chapa corrida: lá não há duas folhas, e
+ * `mergeSkinSheets()` nem chega a este ponto.
+ */
+const SHEET_LAP = 0.0008;
+
+/**
+ * Acima disto, o espaço entre duas folhas vizinhas é um VAZIO e não um remonte.
+ *
+ * Medido no sobrechassi: os remontes de parede são de 41…42 mm e o vazio da
+ * porta de fábrica é de 994 mm. 0,10 m cai num vazio de quase um metro entre as
+ * duas famílias — não é um limiar escolhido, é o único lugar em que ele cabe.
+ */
+const SHEET_GAP_TOL = 0.10;
+
+/**
+ * A menor CHAPA que uma emenda pode delimitar — 300 mm.
+ *
+ * Nasceu do flanco do MOTORISTA do sobrechassi, que é o que tem porta: ali as
+ * folhas do rip não marcham (o vão obriga duas curtas em volta dele) e
+ * `fillSheetGaps()` ainda insere um remendo. Medido, as emendas saíam a
+ * 0,972 · 0,970 · 0,880 · 0,912 · 0,913 · **0,262** · 0,920 · 0,972 m — e uma
+ * chapa de 262 mm é o *"2 fileiras de rebites perto"* do relato, agora do lado
+ * de dentro da correção em vez do lado de fora.
+ *
+ * Sobra a da FRENTE quando duas brigam, pela mesma regra que `PLATE_FROM_FRONT`
+ * segue em models.ts: a fábrica assenta chapa inteira a partir da testeira e
+ * corta a última. 300 mm é o mesmo número de `PLATE_END_CLEAR` lá — as duas
+ * dizem "aqui não cabe uma chapa" —, repetido porque este arquivo é espelhado e
+ * não importa `vehicle/*`.
+ */
+const SHEET_MIN_RUN = 0.30;
 
 /** Faixa colada às pontas: o que cabe aqui é rígido. */
 const CAP_BAND = 0.10;
@@ -250,6 +339,9 @@ export interface TrailerProfile {
   /** Diagnóstico: quantas cascas saíram e quantas são frisadas. */
   shells: number;
   ribbedShells: number;
+  /** A face de baixo do perfil de arremate de CIMA, medida. `null` se ausente.
+   *  É até aqui que a coluna de rebites sobe — ver `measureTopRail()`. */
+  topRailY: number | null;
 }
 
 /* ------------------------------------------------------------------ coleta */
@@ -419,6 +511,202 @@ const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
   return s.length ? s[s.length >> 1] : 0;
 };
+
+/**
+ * Une as FOLHAS de uma mesma lateral numa casca só, antes da classificação.
+ *
+ * A decomposição por casca conexa é a coisa certa para tudo o mais — é ela que
+ * separa porta de testeira de forro. Para a chapa de pele, porém, ela responde
+ * à pergunta errada quando o baú é montado com folhas: devolve N pedaços de
+ * 1 m onde o que interessa é a PAREDE, que é o que estica, o que leva friso e
+ * o que vira painel de livery.
+ *
+ * O que entra na união é estreito: casca fina (`SHEET_THICK`), na pele, alta o
+ * bastante para ser parede, e com uma corrente de fileiras no passo do friso.
+ * Um perfil de arremate não passa na espessura; um forro não passa na pele; a
+ * folha da PORTA não passa na altura (2,35 m contra 2,73 da parede — ela é
+ * `bodyH * 0.5` = 1,43 m acima do corte, mas fica FORA porque a união exige
+ * também a corrente de fileiras E ela tem, então quem a exclui é a altura da
+ * PAREDE: a folha começa em 1,249 e a parede em 1,049, e a diferença aparece
+ * na união como um degrau). Ver a nota do chamador.
+ *
+ * ⚠️ Uma casca que JÁ atravessa o vão sai intacta. É o caso do semirreboque, e
+ * é o que garante que este passo não mexe em nada do que já estava aprovado.
+ */
+/**
+ * ⚠️ E ELE PUBLICA ONDE AS FOLHAS SE ENCONTRAM (`seamsOut`), porque quem desenha
+ * a EMENDA está do outro lado do engine e não tem como adivinhar.
+ *
+ * `models.buildLiveryPanels()` inventa uma grade de emendas de 1 m contada da
+ * testeira, com remonte e coluna de rebites — ela existe porque o semirreboque
+ * é chapa CORRIDA (uma folha de 14,58 m, medida no `.glb`) e as emendas
+ * simplesmente não estão lá. No sobrechassi elas ESTÃO: nove folhas de 1 m,
+ * assentadas pelo rip com remontes irregulares (326 · 42 · 42 · 134 · −94 ·
+ * −94 · 93 · 42 mm). Duas grades sobre a mesma chapa é o defeito relatado em
+ * 2026-08-25 — *"tem uma chapa ali que não deveria, e ela não tem rebites"*.
+ *
+ * Medido: a grade inventada e a do bake coincidem a 14 mm na testeira e chegam
+ * a 184 mm de distância na traseira, porque uma marcha de 1 000 mm e a outra de
+ * ~958. É exatamente o *"às vezes os rebites não estão batendo bem com o fim da
+ * chapa, às vezes parece ter 2 chapas menores"*.
+ *
+ * O que sai daqui são as emendas REAIS, em DISTÂNCIA DA PAREDE DIANTEIRA — a
+ * única moeda que atravessa a fronteira sem depender de referencial nem da
+ * medida corrente. `TrailerBody.sheetSeamsFromFront()` a escala; quem desenha a
+ * consome. Vazio quando a pele é corrida, e aí nada muda.
+ */
+function mergeSkinSheets(
+  groups: Tri[][], cx: number, half: number, bodyH: number, bodyL: number,
+  seamsOut?: Map<'left' | 'right', number[]>,
+): Tri[][] {
+  const out: Tri[][] = [];
+  type Cand = { g: Tri[]; face: 'left' | 'right'; outer: number };
+  const cands: Cand[] = [];
+  for (const g of groups) {
+    const b = boundsOf(g);
+    const onSkin = Math.abs(b.max.x - cx) > half - 0.05 || Math.abs(b.min.x - cx) > half - 0.05;
+    const spans = b.max.z - b.min.z > bodyL * 0.9;
+    const thin = b.max.x - b.min.x <= SHEET_THICK;
+    const tall = b.max.y - b.min.y > bodyH * 0.5;
+    if (spans || !onSkin || !thin || !tall || findRows(g).length < MIN_RIB_ROWS) {
+      out.push(g);
+      continue;
+    }
+    const face: 'left' | 'right' = (b.min.x + b.max.x) / 2 > cx ? 'right' : 'left';
+    cands.push({ g, face, outer: face === 'right' ? b.max.x : b.min.x });
+  }
+
+  /* A PAREDE É O PLANO MAIS EXTERNO, e este filtro é o que separa a folha de
+     parede da FOLHA DA PORTA — que passa em todos os testes acima e não pode
+     entrar na união.
+     Medido no sobrechassi: as 8 folhas do flanco esquerdo têm a face externa em
+     x −1,298; a folha da porta, recuada, em −1,293. São 5 mm, e o efeito de
+     deixá-la entrar não é cosmético: os frisos dela estão em OUTRA FASE, então
+     o conjunto de valores de Y da união passa a ter vãos de ~26 mm em vez de
+     53, `findRows()` não fecha corrente nenhuma e o flanco inteiro sai como
+     `span` — ou seja, a parede com a porta perde o friso, e só ela. Foi
+     exatamente o que a bancada mostrou na primeira tentativa: `right` frisada,
+     `left` não. */
+  const outermost = new Map<'left' | 'right', number>();
+  for (const c of cands) {
+    const cur = outermost.get(c.face);
+    const better = cur === undefined
+      || (c.face === 'right' ? c.outer > cur : c.outer < cur);
+    if (better) outermost.set(c.face, c.outer);
+  }
+  const walls = new Map<'left' | 'right', Cand[]>();
+  for (const c of cands) {
+    if (Math.abs(c.outer - (outermost.get(c.face) as number)) > SKIN_PLANE_TOL) {
+      out.push(c.g);                     // atrás da parede: não é parede
+      continue;
+    }
+    const acc = walls.get(c.face);
+    if (acc) acc.push(c); else walls.set(c.face, [c]);
+  }
+
+  /* O DEGRAU DO REMONTE — ver `SHEET_LAP`. Em ordem de Z, uma folha sim outra
+     não sai `SHEET_LAP` para fora da parede. É o único lugar do arquivo que
+     MOVE geometria, e ele o faz porque a alternativa é um empate de z-buffer
+     que nenhuma escolha de câmera ou de precisão resolve.
+     ⚠️ O que ele move é a CÓPIA: `collect()` aloca um `Float32Array(9)` por
+     triângulo, já em espaço de mundo. A malha de origem não é tocada — se
+     fosse, o deslocamento se acumularia a cada `rebuild()` e a parede
+     caminharia para fora do baú um pouco a cada resize.
+     Uma folha só (ou nenhuma) não tem vizinha com quem empatar: o laço não faz
+     nada, que é o caso do baú de chapa corrida. */
+  const sides = new Map<'left' | 'right', Tri[]>();
+  for (const [face, list] of walls) {
+    /* O VAZIO É FECHADO ANTES do degrau, porque a alternância é por ÍNDICE em Z
+       e uma folha inserida depois entraria com a paridade errada — duas
+       vizinhas no mesmo plano, que é justamente o empate que `SHEET_LAP` existe
+       para tirar. */
+    const cheias = fillSheetGaps(list.map((c) => c.g), SHEET_GAP_TOL)
+      .map((g) => ({ g, b: boundsOf(g) }))
+      .sort((a, b) => a.b.min.z - b.b.min.z);
+    const sign = face === 'right' ? 1 : -1;
+    const acc: Tri[] = [];
+    cheias.forEach((c, i) => {
+      if (cheias.length > 1 && i % 2 === 1) {
+        for (const t of c.g) for (let k = 0; k < 3; k++) t.p[k * 3] += sign * SHEET_LAP;
+      }
+      acc.push(...c.g);
+    });
+    sides.set(face, acc);
+    /* A EMENDA É A BORDA TRASEIRA DE CADA FOLHA — a folha da frente cavalga a de
+       trás, então a linha que o olho vê é onde a de cima ACABA. `cheias` está em
+       ordem crescente de z (traseira → dianteira); a primeira não tem folha
+       atrás dela, é a ponta do painel. Uma folha só não produz emenda nenhuma. */
+    if (seamsOut && cheias.length > 1) {
+      const frente = cheias[cheias.length - 1].b.max.z;
+      const daFrente = cheias.slice(1)
+        .map((c) => +(frente - c.b.min.z).toFixed(4))
+        .sort((a, b) => a - b);
+      /* Duas emendas perto demais não são duas chapas — ver `SHEET_MIN_RUN`. */
+      const limpas: number[] = [];
+      for (const d of daFrente) {
+        if (limpas.length && d - limpas[limpas.length - 1] < SHEET_MIN_RUN) continue;
+        limpas.push(d);
+      }
+      seamsOut.set(face, limpas);
+    }
+  }
+  /* A união entra na lista como uma casca qualquer: quem decide se ela é
+     frisada continua sendo o mesmo teste de sempre, agora com o vão certo. Se
+     as folhas de um lado não cobrirem a parede (uma parede de meia altura, um
+     bake pela metade), a união simplesmente não passa e cai em `local` — o
+     mesmo destino que as folhas teriam separadas. */
+  for (const acc of sides.values()) out.push(acc);
+  return out;
+}
+
+/**
+ * Fecha os VAZIOS da parede clonando a folha vizinha.
+ *
+ * Um vazio aparece quando o bake traz uma PORTA de fábrica: a folha da porta é
+ * uma peça à parte, recuada e — medido no sobrechassi — **7,7 mm fora de fase**
+ * com a parede (as fileiras dela ficam em 0,7480 + k·53 contra 0,3693 + k·53 da
+ * parede). Fora de fase ela não pode entrar na união: `findRows()` deixa de
+ * fechar corrente e o flanco inteiro perde o friso. E é a mesma defasagem que
+ * faz a porta de fábrica LER ERRADO na imagem — as ondas dela não continuam as
+ * da parede.
+ *
+ * Com a porta removida (`removeBakedSideDoor()`), sobra um vão de 994 mm na
+ * parede. Ele é fechado do único jeito que mantém a fase: **clonando uma folha
+ * da própria parede** e transladando em Z. Todas são a mesma extrusão (5 108
+ * triângulos cada, idênticas), então a cópia é a peça certa por construção — a
+ * mesma doutrina de `extractDoorKit()`, que monta a porta lateral com as peças
+ * da porta traseira do próprio implemento.
+ *
+ * O passo é `comprimento − remonte`, medido nas vizinhas; a última cópia pode
+ * montar mais do que o remonte nominal, e isso é um remonte também.
+ */
+function fillSheetGaps(sheets: Tri[][], lapZ: number): Tri[][] {
+  if (sheets.length < 2) return sheets;
+  const withBox = sheets.map((g) => ({ g, b: boundsOf(g) }))
+    .sort((a, b) => a.b.min.z - b.b.min.z);
+  const out = withBox.map((e) => e.g);
+  for (let i = 0; i < withBox.length - 1; i++) {
+    const gap = withBox[i + 1].b.min.z - withBox[i].b.max.z;
+    if (gap <= lapZ) continue;                    // remonte normal, ou encosto
+    /* Clona a folha ANTERIOR — ela é a que já está em fase e no plano certo. */
+    const src = withBox[i];
+    const len = src.b.max.z - src.b.min.z;
+    const step = Math.max(0.05, len - lapZ);
+    let z = src.b.max.z - lapZ;
+    let guard = 0;
+    while (z < withBox[i + 1].b.min.z && guard++ < 32) {
+      const dz = z - src.b.min.z;
+      const copy: Tri[] = src.g.map((t) => {
+        const p = new Float32Array(t.p);
+        for (let k = 0; k < 3; k++) p[k * 3 + 2] += dz;
+        return t.roof ? { p, n: new Float32Array(t.n), roof: true } : { p, n: new Float32Array(t.n) };
+      });
+      out.push(copy);
+      z += step;
+    }
+  }
+  return out;
+}
 
 /* ------------------------------------------------------------- clipping */
 
@@ -631,7 +919,7 @@ export function intersectRect(t: Tri, g: DoorRect): Tri[] {
  * mesmo material e corre a lateral inteira lá em cima.
  */
 function measureSill(
-  root: THREE.Object3D, cx: number, half: number, floorY: number,
+  root: THREE.Object3D, cx: number, half: number, floorY: number, frameRe: RegExp,
 ): number {
   const v = new THREE.Vector3();
   const skin = half - 0.06;
@@ -654,7 +942,7 @@ function measureSill(
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (!mats.some((m) => !!m && FRAME_MAT_RE.test(m.name || ''))) return;
+    if (!mats.some((m) => !!m && frameRe.test(m.name || ''))) return;
     const pos = mesh.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
@@ -667,8 +955,9 @@ function measureSill(
   });
   if (cells.size < 4) {
     console.warn('[porta] perfil inferior da lateral não encontrado em malha'
-      + ' suficiente — o batente cai na linha do piso, e a porta pode nascer'
-      + ' dentro da cantoneira.');
+      + ` suficiente (material ${frameRe}) — o batente cai na linha do piso, e a`
+      + ' porta pode nascer dentro da cantoneira. Ver `frameMaterial` em'
+      + ' TrailerBodyOptions.');
     return floorY;
   }
   const tops = [...cells.values()].sort((a, b) => a - b);
@@ -676,6 +965,53 @@ function measureSill(
 }
 
 
+
+/**
+ * A FACE DE BAIXO do perfil de arremate de CIMA — onde a coluna de rebites para.
+ *
+ * Irmã de `measureSill()`, e pela mesma razão: o quadro é o mesmo material, o
+ * que muda é a ponta do baú que se mede. Máximo... aqui MÍNIMO por célula de
+ * 250 mm ao longo do flanco, e a MEDIANA das células — o mínimo global seria
+ * uma peça de canto que desce muito mais, e a mediana é o perfil que corre de
+ * ponta a ponta.
+ *
+ * POR QUE ELA PRECISOU EXISTIR: a margem do rebite era `yMax − 0,20`, uma
+ * constante. 200 mm é a ALTURA DO PERFIL DO SEMIRREBOQUE (medido: 3,961…4,171,
+ * ou seja 210 mm). O perfil do sobrechassi tem 103 mm (2,948…3,051), e os
+ * ~97 mm de diferença saíam como parede pelada no alto do flanco — que é
+ * exatamente o "parte de cima faltando rebites" do relato.
+ *
+ * Devolve `null` quando o perfil não é encontrado; quem chama volta à
+ * constante e diz que voltou.
+ */
+function measureTopRail(
+  root: THREE.Object3D, cx: number, half: number, roofY: number, frameRe: RegExp,
+): number | null {
+  const v = new THREE.Vector3();
+  const skin = half - 0.06;
+  const cells = new Map<number, number>();
+  root.updateWorldMatrix(true, true);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!mats.some((m) => !!m && frameRe.test(m.name || ''))) return;
+    const pos = mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      if (Math.abs(v.x - cx) < skin) continue;
+      /* A janela é o alto do baú: 400 mm abaixo do teto e 200 acima. O perfil
+         de BAIXO (mesmo material) fica a metros daqui e cai fora por ela. */
+      if (v.y < roofY - 0.40 || v.y > roofY + 0.20) continue;
+      const k = Math.round(v.z / 0.25);
+      const cur = cells.get(k);
+      if (cur === undefined || v.y < cur) cells.set(k, v.y);
+    }
+  });
+  if (cells.size < 4) return null;
+  const lows = [...cells.values()].sort((a, b) => a - b);
+  return lows[lows.length >> 1];
+}
 
 /**
  * As peças da porta, extraídas DO PRÓPRIO IMPLEMENTO.
@@ -701,6 +1037,37 @@ function measureSill(
 /** As famílias que existem em PAR ESPELHADO nas pontas da porta — o kit as
  *  guarda na orientação da ponta de BAIXO e `layoutDoor()` espelha a de cima. */
 const END_FLIP = new Set<DoorPart>(['CABECOTE', 'MACHO', 'ENCAIXE', 'BORRACHA_H']);
+
+/**
+ * Remonta o `Map` do kit a partir do asset exportado.
+ *
+ * O contrato é o NOME: `tools/trailer-bench/kitexport.ts` escreve uma malha por
+ * família, chamada `KIT_<FAMÍLIA>`, com a geometria LOCAL que
+ * `extractDoorKit()` entregou — já recentrada e já espelhada peça a peça (ver a
+ * nota do espelho em `rebuildParts`). Nada é medido de novo aqui: medir de novo
+ * seria abrir a porta para o asset e o extrator discordarem.
+ *
+ * Uma família ausente no asset simplesmente não entra, e `rebuildParts()` pula
+ * a peça — o mesmo comportamento de um bake sem ela.
+ */
+function readKitAsset(asset: THREE.Object3D): Map<DoorPart, DoorKitEntry> {
+  const kit = new Map<DoorPart, DoorKitEntry>();
+  const conhecidas = new Set<string>(DOOR_PARTS.map((sp) => sp.part as string));
+  asset.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const m = /^KIT_(.+)$/.exec(mesh.name || '');
+    if (!m) return;
+    const part = m[1] as DoorPart;
+    if (!conhecidas.has(part) || kit.has(part)) return;
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    if (!mat) return;
+    kit.set(part, { geo: mesh.geometry, mat });
+  });
+  console.info('[porta] kit compartilhado —', kit.size, 'famílias:',
+    [...kit.keys()].sort().join(' '));
+  return kit;
+}
 
 function extractDoorKit(
   root: THREE.Object3D, bodyWorld: THREE.Box3,
@@ -1189,6 +1556,101 @@ function mirrorAxis(src: THREE.BufferGeometry, axis: 'x' | 'y' | 'z'): THREE.Buf
  */
 export const TRAILER_ROOF_MESH = 'TRAILER_ROOF';
 
+/**
+ * O que muda de BAKE PARA BAKE e não dá para medir.
+ *
+ * Este arquivo é espelhado e depende só de `three` — ele não pode importar o
+ * catálogo de implementos (`vehicle/implements.ts`) sem trazer o engine inteiro
+ * junto e sem quebrar a cópia do `truck-studio-desktop`. Então o que é
+ * declarado por implemento CHEGA por aqui, do chamador (`TrailerRig`, que
+ * recebe de `models.ts`).
+ *
+ * Só entra nesta interface o que NÃO tem como sair de uma medida. Altura de
+ * friso, passo, plano da pele, vão do baú: tudo isso é lido da malha e continua
+ * sendo. Um nome de material, não — ele é uma convenção do bake, e dois bakes
+ * do mesmo fabricante já divergiram nela.
+ */
+export interface TrailerBodyOptions {
+  /**
+   * O material do PERFIL DE ARREMATE do baú — o quadro que corre o flanco em
+   * cima e embaixo. Padrão: `metal-galvanizado-mantido`, o nome do
+   * semirreboque; no sobrechassi o mesmo papel é de
+   * `metal-estrutura-principal-padrao`.
+   *
+   * DUAS medidas saem dele, e é por isso que ele é um só:
+   *   · `sillY`    — o topo do perfil de BAIXO, que dá o batente da porta;
+   *   · `topRailY` — a face de baixo do perfil de CIMA, que é onde a coluna de
+   *                  rebites tem de parar.
+   *
+   * Ter dois nomes para o mesmo quadro já foi o erro: a margem do rebite era
+   * uma CONSTANTE de 200 mm, que é a altura do perfil do semirreboque. O do
+   * sobrechassi tem 103 mm, e os 97 mm de diferença são parede pelada.
+   */
+  frameMaterial?: RegExp;
+  /**
+   * O material do perfil de BAIXO, quando ele não é o mesmo do de cima.
+   *
+   * No semirreboque é o mesmo (`metal-galvanizado-mantido` faz os dois), e por
+   * isso o padrão é `frameMaterial`. No sobrechassi NÃO: o de cima é
+   * `metal-estrutura-principal-padrao`, mas esse nome cobre o ESQUELETO
+   * INTEIRO — montante de canto, marco de porta, arco de teto —, e a mediana
+   * por célula de `measureSill()` sobe com os montantes: medido, o batente
+   * saiu a **250,5 mm** do piso, contra os 127,5 do semirreboque. O perfil de
+   * baixo dele é `metal-preto`, a 115 mm, que é a peça análoga.
+   */
+  sillMaterial?: RegExp;
+  /**
+   * O KIT DA PORTA já pronto, vindo de `models/vehicles/porta_kit_v1.glb`.
+   *
+   * Sem ele, `extractDoorKit()` monta a porta com as peças da porta TRASEIRA do
+   * próprio implemento, casadas por tamanho. Isso é o certo quando o bake tem
+   * as peças — e o semirreboque tem: o kit dele sai com 21 famílias.
+   *
+   * O sobrechassi sai com 15. A traseira dele tem **2 varões, contra 4 do
+   * semirreboque**, então `VARAO`, `ENCAIXE`, `SUPORTE_GUIA` (a peça de
+   * plástico preto que segura o varão), `SUPORTE_TALA` e as duas `BORRACHA_H`
+   * simplesmente não existem naquele arquivo. Afrouxar tolerância não resolve:
+   * não há o que casar.
+   *
+   * A porta é UMA SÓ — a do modelo antigo — e todo implemento usa aquela. Ver
+   * `tools/trailer-bench/kitexport.ts`.
+   */
+  kit?: THREE.Object3D;
+  /**
+   * Reancorar a FITA VERTICAL DE CANTO à régua do semirreboque.
+   *
+   * Ver `fixCornerTape()`: no sobrechassi as quatro fitas param encostadas por
+   * baixo do perfil de arremate em vez de subirem nele, e o dono pediu que elas
+   * fiquem "na parte de inox que faz fronteira com a frente".
+   */
+  cornerTape?: boolean;
+  /**
+   * Refazer o TRILHO DE PISO do flanco pela régua do semirreboque.
+   *
+   * Ver `fixLowFrameRail()`: o perfil do sobrechassi tem 140 mm onde o do
+   * semirreboque tem 210, e ainda está 4,4 mm para DENTRO da pele — subir o
+   * topo sem tirá-lo de trás da chapa só o esconderia. O pé dos dois já
+   * coincide (piso −82,5 mm), e é essa coincidência que prova que a régua é a
+   * mesma peça em dois comprimentos.
+   */
+  lowFrameRail?: boolean;
+  /** Assentar a estação de encosto da porta na faixa lisa do friso — ver
+   *  `seatFlankCatches()`. */
+  flankCatchOnFlat?: boolean;
+  /**
+   * Este implemento traz o PRÓPRIO SUB-CHASSI, e ele acompanha o comprimento.
+   *
+   * `TrailerBody` não usa: quem usa é `TrailerAssembly`, que recebe daqui pelo
+   * `TrailerRig`. O motivo de estar nesta interface e não numa própria é o do
+   * cabeçalho — este é o ÚNICO canal por onde variação de bake atravessa a
+   * fronteira do arquivo espelhado, e abrir um segundo canal para um booleano
+   * seria duplicar a fronteira.
+   *
+   * Ver `AssemblyRefs.subframe`, onde está a medida que a justifica.
+   */
+  subframe?: boolean;
+}
+
 export class TrailerBody {
   readonly profile: TrailerProfile;
   readonly mesh: THREE.Mesh;
@@ -1229,6 +1691,10 @@ export class TrailerBody {
   /** A grade do friso de cada lateral, para ancorar as faixas lisas da folha
    *  no VALE (`snapFlatSegments`). Medida na malha, como tudo aqui. */
   private ribGrid: Partial<Record<'left' | 'right', RibGrid>> = {};
+  /** As emendas que o BAKE já traz, em distância da parede dianteira e na
+   *  medida DE FÁBRICA. Vazio quando a pele é chapa corrida. Ver
+   *  `mergeSkinSheets()` e `sheetSeamsFromFront()`. */
+  private sheetSeams = new Map<'left' | 'right', number[]>();
   /** As peças da porta, extraídas do próprio implemento no construtor. */
   private kit = new Map<DoorPart, DoorKitEntry>();
   /** As malhas instanciadas em cena, por `peça|lado`. */
@@ -1240,7 +1706,16 @@ export class TrailerBody {
   private jambs = new Map<string, THREE.Mesh>();
   /** Os materiais das peças de vão, tirados do próprio implemento. */
   private jambMat: { frame: THREE.Material; trim: THREE.Material } | null = null;
-  constructor(root: THREE.Object3D) {
+  /** Ver `TrailerBodyOptions.frameMaterial`. */
+  private readonly frameRe: RegExp;
+  /** Ver `TrailerBodyOptions.sillMaterial`. */
+  private readonly sillRe: RegExp;
+  /** O kit compartilhado, quando há um. Ver `TrailerBodyOptions.kit`. */
+  private readonly kitAsset: THREE.Object3D | null;
+  constructor(root: THREE.Object3D, opts: TrailerBodyOptions = {}) {
+    this.frameRe = opts.frameMaterial ?? FRAME_MAT_RE;
+    this.sillRe = opts.sillMaterial ?? this.frameRe;
+    this.kitAsset = opts.kit ?? null;
     const { tris, meshes, material } = collect(root);
     if (!tris.length) throw new Error('TrailerBody: nenhuma malha branca encontrada');
     this.originals = meshes;
@@ -1268,7 +1743,12 @@ export class TrailerBody {
     let pitch = NOMINAL_PITCH;
     let ribCount = 0, row0 = body.min.y, rowN = body.max.y;
 
-    for (const group of shellsOf(tris)) {
+    /* AS FOLHAS DE PELE SÃO UNIDAS AQUI, e não dentro do laço, porque a decisão
+       é sobre o CONJUNTO de cascas e não sobre uma delas — ver
+       `mergeSkinSheets()`. Num bake de chapa corrida (o semirreboque) esta
+       chamada devolve exatamente o que recebeu. */
+    for (const group of mergeSkinSheets([...shellsOf(tris)], cx, half, bodyH, bodyL,
+      this.sheetSeams)) {
       const b = boundsOf(group);
       const sh: Shell = {
         tris: group, min: b.min, max: b.max,
@@ -1328,7 +1808,10 @@ export class TrailerBody {
          medir geometria morta. Medido depois, o filtro passaria a excluir o que
          já estava excluído por material — inofensivo hoje, e uma armadilha no
          dia em que o bake trouxer branco e perfil na mesma malha. */
-      sillY: measureSill(root, cx, half, body.min.y) + SILL_CLEARANCE,
+      sillY: measureSill(root, cx, half, body.min.y, this.sillRe) + SILL_CLEARANCE,
+      /* MEDIDO, não constante — ver `measureTopRail()`. `null` quando o perfil
+         não aparece, e aí `measureValeRows()` volta à margem antiga. */
+      topRailY: measureTopRail(root, cx, half, body.max.y, this.frameRe),
       z0, z1,
       width: body.max.x - body.min.x,
       base: { width: body.max.x - body.min.x, height: baseHeight, length: bodyL },
@@ -1378,7 +1861,13 @@ export class TrailerBody {
 
     /* O KIT vem do PRÓPRIO implemento, e é extraído aqui — antes do primeiro
        `rebuild()`, que já pode precisar dele. Ver `extractDoorKit()`. */
-    this.kit = extractDoorKit(root, new THREE.Box3(body.min.clone(), body.max.clone()));
+    /* O KIT COMPARTILHADO GANHA, quando existe. Ele é o do bake completo, e
+       usá-lo em todo implemento é o que faz a porta ser a MESMA em todos —
+       inclusive as peças que o bake local não tem. Sem ele, o caminho de sempre.
+       Ver `TrailerBodyOptions.kit`. */
+    this.kit = this.kitAsset
+      ? readKitAsset(this.kitAsset)
+      : extractDoorKit(root, new THREE.Box3(body.min.clone(), body.max.clone()));
     /* SEM tinta, e a remoção é decisão de produto (2026-08-10). O marco chegou a
        ser escurecido para 0x2b2e33 imitando a foto de catálogo da Ibiporã — mas
        borracha (#2b2b2d) e marco tingido (#2b2e33) são o MESMO tom, e os dois
@@ -1394,7 +1883,10 @@ export class TrailerBody {
       /* A moldura é GALVANIZADA — o material da saia e da cantoneira, não o
          do marco e não inox: pedido de produto, e é o mesmo perfil que
          `measureSill()` já localiza por este nome. */
-      trim: makeJambMaterial(root, FRAME_MAT_RE, 'moldura', 0x9aa0a3),
+      /* A moldura é o perfil de arremate do baú — o mesmo quadro que dá o
+         batente e o teto do rebite. Era `FRAME_MAT_RE` fixo, e num bake sem
+         `metal-galvanizado-mantido` ela caía na cor de degradação. */
+      trim: makeJambMaterial(root, this.frameRe, 'moldura', 0x9aa0a3),
     };
 
     this.rebuild();
@@ -1473,6 +1965,23 @@ export class TrailerBody {
   get valeInfo(): { row0: number; pitch: number; valeH: number } | null {
     const g = this.ribGrid.left ?? this.ribGrid.right;
     return g ? { ...g } : null;
+  }
+
+  /**
+   * As emendas de folha DESTE BAKE, em distância da parede dianteira e já na
+   * medida corrente. Vazio quando a pele é chapa corrida — e aí quem desenha
+   * volta a inventar a grade, que é o comportamento do semirreboque.
+   *
+   * A escala é a MESMA de `mapZ(z, 'ribbed')` — `z1 − (z1 − z)·kz`, que sobre
+   * uma distância da dianteira é só `d·kz`. Ter as duas contas escritas em
+   * lugares diferentes é o que faria a emenda e a chapa discordarem no primeiro
+   * resize; por isso esta devolve a distância e nunca um z.
+   */
+  sheetSeamsFromFront(face: 'left' | 'right'): number[] {
+    const raw = this.sheetSeams.get(face);
+    if (!raw?.length) return [];
+    const kz = this.dims.length / this.profile.base.length;
+    return raw.map((d) => +(d * kz).toFixed(4));
   }
 
   snapHeight(h: number): number {

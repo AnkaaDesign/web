@@ -80,7 +80,17 @@
     "",
     "Os quatro Volvo sao 'FH <ano>', sem o 16. O UV do emblema dos 2021/2024 diz",
     "FH16 e a textura do Globetrotter do 2024 e fh16_xl, mas rotular so metade da",
-    "familia de FH16 ficava incoerente na lista, e o pedido foi explicito."
+    "familia de FH16 ficava incoerente na lista, e o pedido foi explicito.",
+    "",
+    "4. OS DOIS RIGIDOS DE 2026-08-18. `volvo-vm-2015` e `scania-p` sao os",
+    "   primeiros caminhoes de CARROCERIA do catalogo: nao tem quinta roda e",
+    "   portanto nao tem entrada em hitch.json. Quem os posiciona e",
+    "   models/vehicles/mounts.json, medido por tools/trailer-bench/mountprobe.ts.",
+    "   A marca `rigid: true` no MODELO e o que faz o estudio trocar o implemento",
+    "   de semirreboque para sobrechassi — ver engine/vehicle/implements.ts.",
+    "   Eles ficam no FIM da lista da marca de proposito: `defaultChoice()` abre o",
+    "   estudio no primeiro modelo com geometria, e um rigido na frente trocaria o",
+    "   caminhao padrao de quem abre a ferramenta."
   ],
   "schema": "truck-studio/brands@2",
   "generated": "2026-08-09",
@@ -222,6 +232,64 @@
               "available": true
             }
           ]
+        },
+        {
+          "id": "scania-p",
+          "name": "P 360",
+          "subtitle": "8x2 bitruck · carroceria",
+          "image": "brands/trucks/scania/models/p.webp",
+          "available": true,
+          "rigid": true,
+          "_note": "RÍGIDO, bitruck (dois eixos direcionais). O nome comercial veio do arquivo de origem (p360); se o modelo for outro, é este campo que muda.",
+          "chassis": [
+            {
+              "id": "8x2r",
+              "name": "8x2 bitruck",
+              "file": "models/trucks/scania_p_8x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "pintura",
+                "paralama_f_0_mat_0001_plastic_hard_64"
+              ],
+              "_paintNote": "MEDIDO em 2026-08-20: sem esta lista o P360 tinha ZERO material pintável e a cor escolhida não fazia nada — o caminhão ficava no verde-água [0, 0,30, 0,30] do rip, que é o que o dono fotografou. Nenhum material dele casa `carpaint`/`plain_grey` e nenhum tem a assinatura de shader da SCS (clearcoat 0,65 · rugosidade 0,125 · metalicidade 0,10). O bake é brasileiro e chama a lataria de `pintura`, que pega os 5 certos: casca da cabine, para-choque, para-lama traseiro, o painel interno e o `treco`. 31,7 m² no total. O SEGUNDO nome é o para-lama do 1º eixo direcional, acrescentado depois — ele saía preto ao lado do para-lama do 2º eixo, que é `pintura` e fica pintado (*\"esse paralama do scania deveria ser pintado junto\"*). Ele NÃO casa por substring de `plastic_hard`: o nome vai inteiro de propósito, porque `plastic_hard` sozinho pegaria mais oito materiais, entre eles os 110 m² de plástico preto da cabine."
+            },
+            {
+              "id": "6x2r",
+              "name": "6x2 truck",
+              "file": "models/trucks/scania_p_6x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "pintura",
+                "paralama_f_0_mat_0001_plastic_hard_64"
+              ],
+              "_derivadoDe": "8x2r",
+              "_note": "Derivado de scania_p_8x2r.glb por tools/chassis-bake/cut-scania.cjs: o 2o eixo direcional saiu (259 componentes, 231 602 triangulos). paintMaterials e o MESMO do 8x2 e continua certo — `pintura` cobre casca da cabine, para-choque dianteiro e `treco`, e o segundo nome e o para-lama do 1o direcional, que fica. O que sai com o eixo e `t_paralama_0_mat_0001_pintura_75`, que ja era coberto por `pintura`."
+            },
+            {
+              "id": "4x2r",
+              "name": "4x2 toco",
+              "file": "models/trucks/scania_p_4x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "pintura",
+                "paralama_f_0_mat_0001_plastic_hard_64"
+              ],
+              "_derivadoDe": "8x2r",
+              "_note": "Idem, mais o eixo auxiliar inteiro — 919 116 triangulos a menos que a fonte. ⚠️ O balanco traseiro de fabrica (3,75 m do eixo trativo ao para-choque) estoura o limite de 3,50 m da CONTRAN 882/2021; quem o encurta e stretchRigidFrame(), e este arquivo tem 1 657,9 mm de baia para isso (uma a mais que os irmaos, no vao do eixo que saiu)."
+            },
+            {
+              "id": "6x4r",
+              "name": "6x4 traçado",
+              "file": "models/trucks/scania_p_6x4r.glb",
+              "available": true,
+              "paintMaterials": [
+                "pintura",
+                "paralama_f_0_mat_0001_plastic_hard_64"
+              ],
+              "_derivadoDe": "8x2r",
+              "_note": "Idem do 6x2, mais o DIFERENCIAL do eixo trativo clonado no auxiliar (12 994 triangulos, transladados -1 356 mm, o vao do tandem) e a viga morta do auxiliar retirada — um eixo trativo nao tem viga morta, quem carrega ali e a carcaca."
+            }
+          ]
         }
       ]
     },
@@ -312,6 +380,47 @@
               "name": "6x2 (eixo de apoio elevatorio)",
               "file": "models/trucks/volvo_fh16_2009_6x2_tl.glb",
               "available": true
+            }
+          ]
+        },
+        {
+          "id": "volvo-vm-2015",
+          "name": "VM",
+          "subtitle": "8x2 bitruck · carroceria",
+          "image": "brands/trucks/volvo/models/vm-2015.webp",
+          "available": true,
+          "rigid": true,
+          "_note": "RIGIDO: nao tem quinta roda. O implemento dele e um SOBRECHASSI, aparafusado no quadro — ver models/vehicles/mounts.json e engine/vehicle/mounting.ts. As tres configuracoes (bitruck, truck e toco) saem do 6x2 por tools/chassis-bake/cut-chassi.cjs.",
+          "chassis": [
+            {
+              "id": "8x2r",
+              "name": "8x2 bitruck",
+              "file": "models/trucks/volvo_vm_2015_8x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "vm_cab"
+              ],
+              "_note": "Derivado de volvo_vm_2015_6x2r.glb por tools/chassis-bake/cut-chassi.cjs: 2o eixo direcional enxertado a 2 220 mm do 1o (cota da ficha VM 8x2R), para-lama dele clonado, tanques e estepe reposicionados."
+            },
+            {
+              "id": "6x2r",
+              "name": "6x2 truck",
+              "file": "models/trucks/volvo_vm_2015_6x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "vm_cab"
+              ],
+              "_paintNote": "MEDIDO em 2026-08-20: sem esta lista o VM tinha ZERO material pintável e a cor escolhida não fazia nada — a cabine ficava no quase-preto [0,08, 0,10, 0,11] do rip. `cabin_mat_0001_vm_cab_0` é a casca inteira (38,2 m², 16% da malha): cabine, teto, portas e para-choque, sem textura por baixo. Ela não passa na assinatura de shader (clearcoat 0,75 · rugosidade 0,161 · metalicidade 0,18) nem no casamento por nome."
+            },
+            {
+              "id": "4x2r",
+              "name": "4x2 toco",
+              "file": "models/trucks/volvo_vm_2015_4x2r.glb",
+              "available": true,
+              "paintMaterials": [
+                "vm_cab"
+              ],
+              "_note": "Derivado de volvo_vm_2015_6x2r.glb por tools/chassis-bake/cut-chassi.cjs. paintMaterials e o MESMO do 6x2 e continua certo — o corte so tira eixo, nao encosta na cabine."
             }
           ]
         }
@@ -557,18 +666,42 @@
         {
           "id": "vw-constellation",
           "name": "Constellation",
-          "subtitle": "Em breve · baseado no Titan",
+          "subtitle": "8x2 bitruck · carroceria",
           "image": "brands/trucks/vw/models/constellation.webp",
-          "available": false,
-          "unavailableReason": "rigido",
+          "available": true,
+          "rigid": true,
+          "_note": "RÍGIDO, o terceiro do catálogo. Estava desligado por `unavailableReason: \"rigido\"` desde antes de existir montagem de sobrechassi; agora tem entrada em models/vehicles/mounts.json (`vw-constellation-6x2r`) e sobe com o implemento certo. O id do chassi continua `6x2-tl` de propósito: é a chave do card em public/renders/renders.json, e renomeá-la trocaria o card por um placeholder.",
           "chassis": [
             {
+              "id": "8x2-tl",
+              "name": "8x2 bitruck",
+              "file": "models/trucks/vw_titan_8x2_tl.glb",
+              "available": true,
+              "paintMaterials": [
+                "clima_mat_0002_color"
+              ],
+              "_note": "Derivado de vw_titan_6x2_tl.glb por tools/chassis-bake/cut-chassi.cjs: 2o eixo direcional enxertado a 2 348 mm do 1o (cota de ficha), tanque e reservatorio transversal reposicionados, grade lateral de fabrica cortada."
+            },
+            {
               "id": "6x2-tl",
-              "name": "6x2",
-              "file": "models/trucks/vw_titan_6x2_tl.glb",
-              "available": false,
-              "unavailableReason": "rigido",
-              "note": "Chassi rigido com carroceria — nao e cavalo mecanico, nao tem quinta roda."
+              "name": "6x2 truck",
+              "file": "models/trucks/vw_titan_6x2r.glb",
+              "_gradeNote": "2026-08-23: era vw_titan_6x2_tl.glb. O rip do VW e o UNICO dos tres rigidos que traz para-ciclista ASSADO, e o estudio pendura o dele no implemento — a grade aparecia DUPLICADA na foto. vw_titan_6x2r.glb e o mesmo arquivo com os 10 componentes da grade cortados (tools/chassis-bake/cut-chassi.cjs, saida vw-6x2). O arquivo antigo NAO foi sobrescrito: ele ja esta servido com Cache-Control immutable e continua na arvore como FONTE das quatro derivacoes.",
+              "available": true,
+              "paintMaterials": [
+                "clima_mat_0002_color"
+              ],
+              "_paintNote": "A casca da cabine inteira (37,2 m², 15% da malha) — cabine, capô e para-choque. O nome vem do rip: neste bake o prefixo de nó da cabine é `clima`. É o ÚNICO dos três rígidos que a detecção por assinatura de shader já achava sozinha (clearcoat 1 · rugosidade 0,089 · metalicidade 0,15); a lista existe para o acerto não depender disso."
+            },
+            {
+              "id": "4x2-tl",
+              "name": "4x2 toco",
+              "file": "models/trucks/vw_titan_4x2_tl.glb",
+              "available": true,
+              "paintMaterials": [
+                "clima_mat_0002_color"
+              ],
+              "_note": "Derivado de vw_titan_6x2_tl.glb por tools/chassis-bake/cut-chassi.cjs — eixo auxiliar e grade lateral de fabrica removidos. paintMaterials e o MESMO do 6x2: a cabine nao foi tocada."
             }
           ]
         }

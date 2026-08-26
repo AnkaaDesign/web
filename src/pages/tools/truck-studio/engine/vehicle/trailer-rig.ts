@@ -48,16 +48,20 @@
    vez, como REJEIÇÃO barata de malha longe da região de interesse, onde errar
    para mais só custa varrer vértice à toa. */
 import * as THREE from 'three';
-import { TrailerBody, type TrailerDims, type DoorSpec, type Face } from './trailer-geometry';
+import {
+  TrailerBody, type TrailerBodyOptions, type TrailerDims, type DoorSpec, type Face,
+} from './trailer-geometry';
 import { TrailerAssembly } from './trailer-assembly';
-import { applyBakeFixes } from './trailer-bake-fixes';
+import {
+  applyBakeFixes, fixCornerTape, fixLowFrameRail, seatFlankCatches,
+} from './trailer-bake-fixes';
 import {
   deriveImplementHitch,
   type ImplementHitch, type ImplementMeasurements, type KingpinStation,
 } from './coupling';
 import { invalidateVehicleLightBounds } from './lights';
 
-export type { TrailerDims };
+export type { TrailerDims, TrailerBodyOptions };
 export type { ImplementHitch };
 export type { DoorSpec, Face };
 
@@ -142,6 +146,54 @@ interface Anchors {
   contactVerts: number;
 }
 
+/**
+ * A FASE DA FAIXA LISA do friso, medida no corpo paramétrico.
+ *
+ * Gêmea de `measureRibProfile()` em `vehicle/models.ts`, e a razão de haver
+ * duas é a ENTRADA: aquela dobra a SOPA do painel de livery (que é o que leva
+ * rebite), esta dobra a MALHA do corpo (que é o que existe nesta janela, antes
+ * de `buildLiveryPanels()`). A régua é a mesma — a crista é o argmax do x mais
+ * externo por fase, e a faixa lisa fica meio passo dela — e as duas foram
+ * medidas juntas: crista na fase 40,0 mm e platô na 13,3/13,5 nos dois
+ * implementos. Se um dia divergirem, é sinal de que o corpo e o painel deixaram
+ * de ser a mesma chapa, e isso é um defeito por si.
+ *
+ * @returns a fase em y ABSOLUTO do centro do platô recuado, ou `null`.
+ */
+function medeFasePlana(mesh: THREE.Mesh, pitch: number): number | null {
+  const geo = mesh.geometry as THREE.BufferGeometry;
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
+  const nor = geo.getAttribute('normal') as THREE.BufferAttribute | undefined;
+  if (!pos || !nor || !(pitch > 0.01)) return null;
+  const BIN = 0.0005;
+  const nBins = Math.round(pitch / BIN);
+  const fold = new Map<number, number>();
+  for (let i = 0; i < pos.count; i++) {
+    /* Só a pele que olha para o LADO, e só o flanco DIREITO: dobrar os dois
+       juntos misturaria duas peles que não têm o mesmo x. */
+    if (Math.abs(nor.getX(i)) < 0.7) continue;
+    const d = pos.getX(i);
+    if (d < 0.5) continue;
+    const fase = ((pos.getY(i) % pitch) + pitch) % pitch;
+    const bin = Math.round(fase / BIN) % nBins;
+    if (!(d <= (fold.get(bin) ?? -Infinity))) fold.set(bin, d);
+  }
+  if (fold.size < 6) return null;
+  const crest = Math.max(...fold.values());
+  const naCrista = (b: number) => {
+    const v = fold.get(((b % nBins) + nBins) % nBins);
+    return v !== undefined && crest - v < 0.0003;
+  };
+  let topo = -1;
+  for (const [b, v] of fold) if (crest - v < 0.0003) { topo = b; break; }
+  if (topo < 0) return null;
+  let lo = topo, hi = topo;
+  while (hi - lo < nBins && naCrista(lo - 1)) lo--;
+  while (hi - lo < nBins && naCrista(hi + 1)) hi++;
+  const crista = (((lo + hi) / 2) * BIN + pitch) % pitch;
+  return (crista + pitch / 2) % pitch;
+}
+
 export class TrailerRig {
   readonly body: TrailerBody;
   readonly assembly: TrailerAssembly;
@@ -161,9 +213,11 @@ export class TrailerRig {
    *   todo `set()` ainda tem de rodar na pose de carga — quem garante isso é
    *   `setTrailerDims()` em `vehicle/models.ts`, que é o dono da pose.
    */
-  constructor(root: THREE.Object3D) {
+  /** `opts` é repassado INTEIRO ao `TrailerBody` — o que varia por bake é dele,
+   *  não do rig. Ver `TrailerBodyOptions`. */
+  constructor(root: THREE.Object3D, private opts: TrailerBodyOptions = {}) {
     this.root = root;
-    this.body = new TrailerBody(root);
+    this.body = new TrailerBody(root, opts);
     this.base = this.body.profile.base;
     root.add(this.body.group);
 
@@ -180,9 +234,30 @@ export class TrailerRig {
       vale: this.body.valeInfo,
     });
 
+    /* A FITA DE CANTO É REANCORADA AQUI, na mesma janela de `applyBakeFixes()`
+       e pela mesma razão: ela precisa do `floorY`/`roofY` que só `TrailerBody`
+       mede, e precisa acontecer ANTES de `TrailerAssembly`, que congela
+       `piece.base` no construtor — uma peça movida depois volta ao lugar velho
+       no primeiro resize. */
+    if (opts.cornerTape) fixCornerTape(root, p.floorY, p.roofY);
+    /* O TRILHO DE PISO, na MESMA janela e pela mesma razão: ele precisa do
+       `floorY` que só `TrailerBody` mede, e precisa acontecer antes de
+       `TrailerAssembly` congelar `piece.base`. Ver `fixLowFrameRail()`. */
+    if (opts.lowFrameRail) fixLowFrameRail(root, p.floorY, p.floorY + p.skirtHeight);
+    /* A ESTAÇÃO DE ENCOSTO DA PORTA assenta na faixa lisa do friso, e por isso
+       ela precisa da FASE do perfil — que só existe depois de `TrailerBody`. A
+       janela é a mesma das duas acima e pela mesma razão: antes de
+       `TrailerAssembly` congelar `piece.base`. */
+    if (opts.flankCatchOnFlat) {
+      const fase = medeFasePlana(this.body.mesh, p.pitch);
+      if (fase !== null) seatFlankCatches(root, p.pitch, fase);
+      else console.warn('[bake] encosto da porta: o perfil do friso não saiu da chapa.');
+    }
+
     this.assembly = new TrailerAssembly(root, {
       floorY: p.floorY, roofY: p.roofY, z0: p.z0, z1: p.z1,
       baseHeight: p.base.height, baseLength: p.base.length,
+      subframe: opts.subframe,
     });
 
     /* DEPOIS de `TrailerAssembly`: o construtor dele roda `roundOutScales()`,
@@ -452,17 +527,31 @@ export class TrailerRig {
 
   private measureAnchors(): void {
     this.root.updateWorldMatrix(true, true);
+    /* ⚠️ UM SOBRECHASSI NÃO TEM ÂNCORA DE ENGATE, E ISSO NÃO É FALHA.
+       Ele não tem rodagem nem pino-rei: é aparafusado na mesa da longarina, e
+       quem o assenta é `solveRigidMount()`, que nem passa por aqui. Os dois
+       avisos abaixo existem para um SEMIRREBOQUE cujo bake não traga o que ele
+       promete; disparados num sobrechassi, eles gritam a cada carga e a cada
+       arraste de medida — e um aviso que grita sempre deixa de ser lido, que é
+       como um aviso de verdade passa despercebido depois. Mesma disciplina do
+       `opcional` de `cab-bake-fixes.ts`: só se cala o que falta POR
+       CONSTRUÇÃO. */
+    const semEngate = this.opts.subframe === true;
     const tyres = this.measureTyres();
     if (!tyres) {
-      console.warn('[engate] nenhum pneu encontrado no implemento — '
-        + 'sem plano de contato, o engate cai no caminho legado.');
+      if (!semEngate) {
+        console.warn('[engate] nenhum pneu encontrado no implemento — '
+          + 'sem plano de contato, o engate cai no caminho legado.');
+      }
       this.anchors = null;
       return;
     }
     const kp = this.measureKingpin(tyres.contactY);
     if (!kp) {
-      console.warn('[engate] pino-rei não encontrado sob a dianteira — '
-        + 'sem âncora de implemento, o engate cai no caminho legado.');
+      if (!semEngate) {
+        console.warn('[engate] pino-rei não encontrado sob a dianteira — '
+          + 'sem âncora de implemento, o engate cai no caminho legado.');
+      }
       this.anchors = null;
       this.stations = [];
       return;

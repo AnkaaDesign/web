@@ -1,0 +1,20 @@
+{
+ "dims": {
+  "w": 1.654,
+  "h": 1.213,
+  "d": 0.912
+ },
+ "widthFrac": 0.63,
+ "topGap": 0.23,
+ "removeStack": true,
+ "removeStackNote": "A unidade traz um tubo de escape de 74 x 301 x 76 mm (material refri_mat_0001_crome_1) que sobe 140 mm ACIMA da linha do teto do bau. Numa carroceria de sobrechassi ele e a unica coisa que passa do teto, e o dono pediu que saisse (2026-08-20, com print). A remocao vive em attachThermoKing() e busca por FORMA sobre o material — tubo esbelto — para que um re-bake que renomeie o material nao leve a carenagem junto.",
+ "_note": "UNIDADE PEQUENA, a que veio no mesmo pacote do sobrechassi gancheiro (p360_thermoking.glb). Ela existe porque a do semirreboque tem 2,00 m de carcaca e fica fora de escala numa testeira de 2,6 m — o vao livre da testeira do sobrechassi e menor justamente por causa disso.",
+ "dimsNote": "MEDIDO no proprio .glb, por vertice: x -0,827..0,827 (1,654), y 0,000..1,213, z -0,456..0,456 (0,912). ATENCAO: este asset NAO segue a convencao do thermoking.glb grande — a altura dele nasce em y=0 (contra centrada), a profundidade e centrada, e o FUNDO fica em +Z em vez de -Z. As duas primeiras sao inofensivas (placeThermoKing() posiciona pela CAIXA MEDIDA, nunca pela origem do no); a terceira NAO e, e e o que o bloco `mount` conserta.",
+ "widthFracNote": "0,63 = 1,654 / 2,607 (a largura do bau do sobrechassi). So degradacao, para o caso de `dims` sumir: com `dims` presente a escala sai da largura declarada, uniforme.",
+ "sourceNote": "Extraido de `glb.zip` (2026-08-18) como `p360_thermoking.glb` e comprimido pela receita da secao 6 do ARCHITECTURE.md: 3,06 -> 1,78 MB. Os materiais sao do rip (`refri_mat_00NN_*`); a carcaca foi renomeada para `tk-housing-white` por tools/implement-bake/rename-material.mjs, que e o substring que TK_PAINT_SUB procura em models.ts — sem isso ela nao entrava no conjunto de pintura do implemento.",
+ "mount": {
+  "yawDeg": 180,
+  "z": 0.201
+ },
+ "mountNote": "A CONVENCAO DESTE ARQUIVO E O INVERSO DA DO thermoking.glb, e foi MEDIDA: a chapa de fundo da carcaca (`refri_mat_0007_cor_7`, hoje `tk-housing-white`) tem 0,881 m2 de face virada para +Z concentrados em z = 0,201 — ou seja o FUNDO da unidade esta em +Z e a grelha em -Z, enquanto o thermoking.glb tem a face de montagem em z = 0 e a grelha em +Z. Dai `yawDeg: 180`.\\n\\n`z` e a cota do PLANO QUE ENCOSTA NA TESTEIRA, no arquivo cru. Ela nao coincide com o extremo da caixa porque esta unidade traz o EVAPORADOR: de z 0,201 a 0,456 ha 255 mm que atravessam a parede e vivem DENTRO do bau. Encostar `bbox.min.z` na testeira — que e o que placeThermoKing() fazia — jogava os 912 mm de profundidade inteiros para fora, e o evaporador aparecia flutuando a frente da carcaca. Com o plano certo sobram 657 mm para fora, que e a profundidade real de um T-800R.\\n\\nSem este bloco o comportamento e o de sempre (`bbox.min.z` encosta na parede, sem giro), que e exatamente o que o thermoking.glb precisa."
+}

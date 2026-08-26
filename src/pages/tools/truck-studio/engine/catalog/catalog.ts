@@ -299,6 +299,17 @@ export interface ModelDef {
    * sequência e escolhe sozinho — ver `STEP_INDEX`/`seqFor()` em ui/selector.ts.
    */
   chassis: ChassisDef[];
+  /**
+   * Caminhão RÍGIDO: sem quinta roda, com quadro de carroceria.
+   *
+   * É a única coisa do catálogo que muda QUAL IMPLEMENTO o estúdio carrega —
+   * um rígido leva SOBRECHASSI, um cavalo leva SEMIRREBOQUE (ver
+   * `vehicle/implements.ts`). O posicionamento sai de `models/vehicles/mounts.json`,
+   * não de `hitch.json`.
+   *
+   * Default `false`: nenhum manifesto existente vira rígido por omissão.
+   */
+  rigid: boolean;
 }
 
 export interface ManufacturerDef {
@@ -971,6 +982,9 @@ function normalizeModel(input: unknown): ModelDef | null {
     /* Default FALSE pelo mesmo motivo: nenhum manifesto existente vira edição
        especial por omissão. */
     specialEdition: bool(raw.specialEdition, false),
+    /* Idem, e aqui o default errado seria caro: um cavalo marcado como rígido
+       perderia o semirreboque e ficaria sem implemento nenhum. */
+    rigid: bool(raw.rigid, false),
     /* `null` = não declarado. O PADRÃO não mora aqui: catalog.ts diz o que o
        manifesto declarou, não o que o bake assume. */
     paintMaterials: strArr(raw.paintMaterials),

@@ -105,7 +105,7 @@ export const LICENSE_PLATE_GROUP = 'PLACA';
 export const LICENSE_PLATE_MERGE_EXCLUSIONS: {
   nodes: { re: RegExp; label: string }[];
 } = {
-  nodes: [{ re: new RegExp(`^${LICENSE_PLATE_GROUP}$`), label: 'placa: acompanha a traseira' }],
+  nodes: [{ re: new RegExp(`^${LICENSE_PLATE_GROUP}(_TRASEIRA)?$`), label: 'placa: acompanha a traseira' }],
 };
 
 /* ---------------------------------------------------------------------------
@@ -485,6 +485,174 @@ export function attachCabPlate(cab: THREE.Object3D, file: string): boolean {
   return true;
 }
 
+/* -------------------------------------------------------- traseira do RÍGIDO */
+
+/* ---------------------------------------------------------------------------
+   UM RÍGIDO CARREGA AS DUAS PLACAS, E A DE TRÁS É DELE
+
+   Num cavalo mecânico a placa traseira é do IMPLEMENTO — o semirreboque tem a
+   dele, emplacada em separado, e é por isso que este arquivo nasceu com duas
+   metades e não três. Um rígido não: a carroceria é aparafusada, não emplacada,
+   e a placa de trás fica no CHASSI, sob a lanterna.
+
+   *"a placa traseira precisa ser substituída pela nossa"* — Kennedy,
+   2026-08-22, com a foto da traseira do Scania P mostrando a placa BRASILEIRA
+   DO RIP (`MAC 4U25`) montada no porta-placa do para-barro. Medido no app na
+   mesma data: `licensePlateInfo()` devolvia `cavalo: null` e `implemento: null`
+   — ou seja, o estúdio não tinha placa nenhuma em cena e o que se via era o
+   desenho que veio no `.glb`.
+
+   ⚠️ O SÍTIO NÃO VAI PARA `plates.json`, e a razão é a mesma que mantém o
+   implemento fora de lá: aquele manifesto é medido por `tools/placa/probe.mjs`,
+   que rasteriza a DIANTEIRA (o eixo direcional define a frente e a janela de
+   busca sai dela). A traseira de um rígido não é um para-choque plano — é
+   travessa, para-barro, lanterna e engate de reboque, e a peça em que a placa
+   assenta é justamente a que o rip já desenhou. Então a régua é essa:
+
+     **a placa nova vai EXATAMENTE onde a placa de fábrica está, e a de fábrica
+     some no mesmo ato.**
+
+   É medida (a caixa sai da malha), é auto-adaptativa (vale para qualquer rip
+   que traga a peça) e é honesta: se o arquivo não tem placa de trás, não há
+   sítio a inventar e o console diz isso.
+
+   ⚠️ E O FALLBACK É A LUZ DE PLACA. O Volvo VM não traz placa desenhada, mas
+   traz `luz_placa` — e uma luz de placa só existe onde há placa: por norma ela
+   ilumina a placa de cima para baixo, a menos de 100 mm dela. Quando não há
+   placa de fábrica, o sítio é o RETÂNGULO LOGO ABAIXO da luz. */
+
+/** O que é placa de fábrica (a arte e a base coplanar dela). */
+const PLACA_FABRICA_RE = /brasilmercosul|baseplaca|mercosul|^placa_mat|_placa_mat/i;
+/** A LUZ de placa — o fallback, e o que NÃO pode ser confundido com a placa. */
+const LUZ_PLACA_RE = /luz_placa|licence_light|license_light/i;
+/** Quanto abaixo da luz o centro da placa fica, quando o sítio sai da luz. */
+const ABAIXO_DA_LUZ = 0.105;
+
+let placaTraseiraCab: THREE.Group | null = null;
+
+/** Tira a placa traseira do rígido antes de a cabine ser descartada. */
+export function detachRigidRearPlate() {
+  descartar(placaTraseiraCab);
+  placaTraseiraCab = null;
+}
+
+/**
+ * Monta a placa traseira de um CHASSI RÍGIDO e esconde a de fábrica.
+ *
+ * ⚠️ O SINAL DA FRENTE SAI DO SÍTIO DIANTEIRO, e não de `mounts.json`. A placa
+ * da frente olha para a frente por definição, e `plates.json` já traz a normal
+ * dela medida no espaço CRU do arquivo — nos três rígidos ela dá `z ≈ −1`,
+ * porque os rips apontam para −Z e é por isso que `orientYaw` é π. Ler daqui
+ * evita uma segunda verdade sobre a orientação, que é como este arquivo já
+ * errou uma vez (ver o ⚠️ do lado do veículo em `acharPortaPlaca`).
+ *
+ * @param cab   a raiz do caminhão (espaço CRU do arquivo, como `attachCabPlate`)
+ * @param file  o `.glb`, para achar a normal dianteira no manifesto
+ * @returns `true` se a placa entrou.
+ */
+export function attachRigidRearPlate(cab: THREE.Object3D, file: string): boolean {
+  detachRigidRearPlate();
+  const frente = plateSiteFor(file);
+  if (!frente) {
+    console.warn('[placa] sem sítio dianteiro para', file,
+      '— sem a normal dele não dá para saber onde é a traseira; o rígido fica sem placa atrás.');
+    return false;
+  }
+  const frenteZ = frente.normal[2] >= 0 ? 1 : -1;
+  cab.updateWorldMatrix(true, true);
+  const paraCab = new THREE.Matrix4().copy(cab.matrixWorld).invert();
+  const mm = new THREE.Matrix4();
+  const bx = new THREE.Box3();
+
+  /* A caixa de TUDO, para saber onde é "atrás". */
+  const todo = new THREE.Box3();
+  const fabrica: THREE.Mesh[] = [];
+  const luzes: THREE.Mesh[] = [];
+  cab.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh || !o.geometry) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const gb = o.geometry.boundingBox;
+    if (!gb) return;
+    bx.copy(gb).applyMatrix4(mm.multiplyMatrices(paraCab, o.matrixWorld));
+    todo.union(bx);
+    const mats = (Array.isArray(o.material) ? o.material : [o.material])
+      .map((m) => m?.name || '').join('+');
+    const rotulo = `${o.name || ''}[${mats}]`;
+    /* Só a PENEIRA DE NOME aqui. Quem separa dianteira de traseira é a metade
+       do caminhão, e ela só existe depois de a travessia acabar — ver o ⚠️
+       logo abaixo. Isto importa: a placa dianteira do Scania usa os MESMOS dois
+       materiais da traseira (`brasilmercosul`/`baseplaca`), então o material
+       sozinho não separa as duas. */
+    if (LUZ_PLACA_RE.test(rotulo)) { luzes.push(o); return; }
+    if (PLACA_FABRICA_RE.test(rotulo)) fabrica.push(o);
+  });
+
+  /* ⚠️ SEGUNDA PASSADA. `todo` só está completa no fim da travessia, e o teste
+     de "metade de trás" depende dela — decidir na primeira passada dependeria
+     da ordem dos nós, que é o defeito que `medeChassi()` já documenta. */
+  const meio = (todo.min.z + todo.max.z) / 2;
+  const naMetadeDeTras = (o: THREE.Mesh): boolean => {
+    const gb = o.geometry.boundingBox;
+    if (!gb) return false;
+    bx.copy(gb).applyMatrix4(mm.multiplyMatrices(paraCab, o.matrixWorld));
+    return frenteZ > 0 ? bx.max.z < meio : bx.min.z > meio;
+  };
+  const placas = fabrica.filter(naMetadeDeTras);
+  const luz = luzes.filter(naMetadeDeTras);
+
+  const sitio = new THREE.Box3();
+  let origem: string;
+  if (placas.length) {
+    for (const o of placas) {
+      const gb = o.geometry.boundingBox;
+      if (gb) sitio.union(bx.copy(gb).applyMatrix4(mm.multiplyMatrices(paraCab, o.matrixWorld)));
+    }
+    origem = `placa de fábrica (${placas.length} malha(s))`;
+  } else if (luz.length) {
+    for (const o of luz) {
+      const gb = o.geometry.boundingBox;
+      if (gb) sitio.union(bx.copy(gb).applyMatrix4(mm.multiplyMatrices(paraCab, o.matrixWorld)));
+    }
+    const c = sitio.getCenter(new THREE.Vector3());
+    sitio.setFromCenterAndSize(
+      new THREE.Vector3(c.x, c.y - ABAIXO_DA_LUZ, c.z),
+      new THREE.Vector3(LARGURA, ALTURA, 0.004));
+    origem = `${ABAIXO_DA_LUZ * 1000} mm abaixo da luz de placa (${luz.length} malha(s))`;
+  } else {
+    console.warn('[placa] o rígido não traz placa de fábrica nem luz de placa na traseira'
+      + ' — sem sítio medido, ele fica sem placa atrás.');
+    return false;
+  }
+
+  const c = sitio.getCenter(new THREE.Vector3());
+  const g = new THREE.Group();
+  g.name = LICENSE_PLATE_GROUP + '_TRASEIRA';
+  /* Berço mínimo: a placa de fábrica JÁ está encostada na chapa em que a nossa
+     vai — não há vão a preencher, e um berço fundo abriria uma caixa atrás dela
+     onde a peça real tem 2 mm de alumínio. */
+  g.add(montar(BERCO_MIN));
+  g.position.copy(c);
+  /* A normal aponta para TRÁS, que é o oposto da frente. */
+  orientar(g, _n.set(0, 0, frenteZ > 0 ? -1 : 1));
+  /* E ela sai 1 mm à frente da chapa que substitui, para não disputar o
+     z-buffer com o que sobrar da peça de fábrica. */
+  g.position.z += (frenteZ > 0 ? -1 : 1) * ((sitio.max.z - sitio.min.z) / 2 + 0.001);
+  g.updateMatrix();
+  cab.add(g);
+  placaTraseiraCab = g;
+
+  /* ⚠️ SÓ AGORA A DE FÁBRICA SOME, e a ordem é a garantia: uma placa escondida
+     antes de a nossa ser montada deixaria o caminhão sem placa nenhuma se
+     qualquer coisa acima falhasse. */
+  for (const o of placas) o.visible = false;
+
+  console.info('[placa] traseira do rígido —', origem, '· centro',
+    c.toArray().map((v) => v.toFixed(3)).join(', '),
+    '·', placas.length, 'malha(s) de fábrica escondida(s)');
+  return true;
+}
+
 /* ------------------------------------------------------------------ implemento */
 
 /* ---------------------------------------------------------------------------
@@ -724,6 +892,23 @@ function acharPortaPlaca(trailer: THREE.Object3D): THREE.Mesh[] {
  * Chamado uma vez em `loadTrailer()`. Depois disso quem repõe a pose é
  * `placeTrailerPlate()`, e ele é chamado de todo caminho que mexe na traseira.
  */
+/**
+ * Solta a placa traseira e esquece o porta-placa.
+ *
+ * Contraparte de `detachCabPlate()`, e ela passou a ser necessária em
+ * 2026-08-18: com mais de um implemento no catálogo, `loadTrailer()` deixou de
+ * rodar uma vez só. Sem isto, a troca de implemento deixaria `placaTrailer`
+ * apontando para um grupo já descartado e `portaPlaca` para malhas que saíram
+ * da cena — e `placeTrailerPlate()` reporia a placa no lugar do implemento
+ * ANTERIOR, sem erro nenhum.
+ */
+export function detachTrailerPlate() {
+  descartar(placaTrailer);
+  placaTrailer = null;
+  portaPlaca = [];
+  raizTrailer = null;
+}
+
 export function attachTrailerPlate(trailer: THREE.Object3D): boolean {
   descartar(placaTrailer);
   placaTrailer = null;
@@ -782,6 +967,12 @@ export function licensePlateInfo() {
       vao: sitioCab?.vao ?? null,
       fonte: sitioCab?.fonte ?? null,
       alturaSolo: sitioCab?.alturaSolo ?? null,
+    } : null,
+    /* A TRASEIRA DO RÍGIDO — nula num cavalo mecânico, que emplaca no
+       implemento. Ver `attachRigidRearPlate()`. */
+    rigidoTraseira: placaTraseiraCab ? {
+      local: placaTraseiraCab.position.toArray().map((v) => +v.toFixed(4)),
+      mundo: caixa(placaTraseiraCab),
     } : null,
     implemento: placaTrailer ? {
       local: placaTrailer.position.toArray().map((v) => +v.toFixed(4)),
