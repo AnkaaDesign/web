@@ -7,6 +7,8 @@ import { MessageEditor } from "@/components/administration/message/editor/messag
 import { MessagePreviewDialog } from "@/components/administration/message/editor/message-preview-dialog";
 import type { MessageFormData } from "@/components/administration/message/editor/types";
 import { useCreateMessage } from "@/hooks/administration/use-message";
+import { useCreateMessageSchedule } from "@/hooks/administration/use-message-schedule";
+import { buildSchedulePayload } from "@/utils/message-recurrence";
 import type { MessageCreateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
 import { startsAtISO, endsAtISO } from "@/utils/message-scheduling";
@@ -15,6 +17,7 @@ import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 export const CreateMessagePage = () => {
   const navigate = useNavigate();
   const createMessage = useCreateMessage();
+  const createSchedule = useCreateMessageSchedule();
 
   // Context-aware trail: shared page — accounting users have root-level "Mensagens"
   // (no "Administração" section in their menu).
@@ -31,6 +34,16 @@ export const CreateMessagePage = () => {
 
   const handleSubmit = useCallback(async (data: MessageFormData, isDraft: boolean) => {
     try {
+      // Comunicado RECORRENTE é outro recurso: grava-se a REGRA, e quem publica
+      // as mensagens é o agendador. O público vai como regra, sem
+      // `resolveTargetingToUserIds` — resolver aqui congelaria a lista no dia da
+      // criação, e meses depois o aviso continuaria indo para quem saiu do setor.
+      if (data.recurrence?.enabled) {
+        await createSchedule.mutateAsync(buildSchedulePayload(data));
+        navigate(routes.administration.messages?.root || routes.administration.root);
+        return;
+      }
+
       // Resolve targeting to user IDs (sectors/positions → user IDs)
       const targets = await resolveTargetingToUserIds(data.targeting);
 
@@ -55,7 +68,7 @@ export const CreateMessagePage = () => {
         console.error("Error creating message:", error);
       }
     }
-  }, [createMessage, navigate]);
+  }, [createMessage, createSchedule, navigate]);
 
   const handlePreview = useCallback((data: MessageFormData) => {
     setCurrentData(data);
@@ -84,7 +97,7 @@ export const CreateMessagePage = () => {
     }
   };
 
-  const isSubmitting = createMessage.isPending;
+  const isSubmitting = createMessage.isPending || createSchedule.isPending;
 
   const actions = [
     // Preview - only visible when there are blocks (LEFT POSITION)

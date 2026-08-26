@@ -4,7 +4,11 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { IconCalendar, IconFileText, IconUsers, IconAlertTriangle } from "@tabler/icons-react";
+import { MessageRecurrenceForm } from "./message-recurrence-form";
+import { SCHEDULE_FREQUENCY } from "@/constants";
+import type { MessageRecurrenceFormData } from "./types";
 import { getUsers, getSectors, getPositions } from "@/api-client";
 import { CONTRACT_STATUS } from "@/constants";
 
@@ -20,14 +24,46 @@ interface MessageMetadata {
     startDate?: Date;
     endDate?: Date;
   };
+  recurrence?: MessageRecurrenceFormData;
 }
 
 interface MessageMetadataFormProps {
   data: MessageMetadata;
   onChange: (data: MessageMetadata) => void;
+  /** Próximas datas devolvidas pelo `preview-occurrences` da API. */
+  recurrencePreview?: Date[];
+  recurrencePreviewError?: string | null;
+  /**
+   * Falso na tela de EDIÇÃO. Editar uma mensagem existente é editar aquela
+   * mensagem; transformá-la numa regra recorrente no mesmo formulário deixaria
+   * ambíguo o que acontece com a linha que já está publicada e já foi lida.
+   * Tornar recorrente é criar um agendamento.
+   */
+  allowRecurrence?: boolean;
 }
 
-export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps) => {
+/**
+ * Padrão de um comunicado recorrente recém-ligado: toda segunda-feira, visível
+ * por 7 dias, publicado às 8h. É a forma mais pedida, e sai configurada de
+ * primeira em vez de deixar o autor diante de um formulário vazio.
+ */
+const DEFAULT_RECURRENCE: MessageRecurrenceFormData = {
+  enabled: true,
+  frequency: SCHEDULE_FREQUENCY.WEEKLY,
+  frequencyCount: 1,
+  weeklySchedule: { monday: true },
+  displayDurationDays: 7,
+  publishHour: 8,
+  maxOccurrences: null,
+};
+
+export const MessageMetadataForm = ({
+  data,
+  onChange,
+  recurrencePreview,
+  recurrencePreviewError,
+  allowRecurrence = true,
+}: MessageMetadataFormProps) => {
   const handleChange = (updates: Partial<MessageMetadata>) => {
     onChange({ ...data, ...updates });
   };
@@ -297,8 +333,45 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Recorrência: o interruptor que troca "uma mensagem" por "uma regra" */}
+          {allowRecurrence && (
+          <Card level={2}>
+            <CardContent className="flex items-start justify-between gap-4 p-4">
+              <div className="space-y-1">
+                <Label htmlFor="recurrence-toggle" className="cursor-pointer">
+                  Repetir esta mensagem
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Publica um comunicado novo a cada período (toda segunda, todo dia 5,
+                  primeira segunda do mês...). Cada publicação é lida e dispensada
+                  separadamente.
+                </p>
+              </div>
+              <Switch
+                id="recurrence-toggle"
+                checked={!!data.recurrence?.enabled}
+                onCheckedChange={(checked) =>
+                  handleChange({
+                    recurrence: checked
+                      ? { ...DEFAULT_RECURRENCE, ...data.recurrence, enabled: true }
+                      : { ...(data.recurrence ?? DEFAULT_RECURRENCE), enabled: false },
+                    // Ligar a recorrência muda o SENTIDO do intervalo de datas
+                    // (janela de exibição → vigência do agendamento), então o
+                    // valor anterior deixa de fazer sentido. Em branco = sem
+                    // limite, que é o padrão certo para um comunicado que se
+                    // repete.
+                    ...(checked ? { scheduling: {} } : {}),
+                  })
+                }
+              />
+            </CardContent>
+          </Card>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="date-range">Período de Exibição</Label>
+            <Label htmlFor="date-range">
+              {data.recurrence?.enabled ? "Vigência da Recorrência" : "Período de Exibição"}
+            </Label>
             <DateRangePicker
               dateRange={{
                 from: data.scheduling.startDate,
@@ -314,11 +387,21 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
               }
               placeholder="Selecione o período"
             />
+            <p className="text-xs text-muted-foreground">
+              {data.recurrence?.enabled
+                ? "Quando o agendamento começa e quando para de gerar publicações. Em branco = sem limite."
+                : "Deixe em branco para exibir indefinidamente"}
+            </p>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Deixe em branco para exibir indefinidamente
-          </p>
+          {data.recurrence?.enabled && (
+            <MessageRecurrenceForm
+              data={data.recurrence}
+              onChange={(recurrence) => handleChange({ recurrence })}
+              preview={recurrencePreview}
+              previewError={recurrencePreviewError}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

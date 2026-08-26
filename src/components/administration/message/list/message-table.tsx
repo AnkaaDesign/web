@@ -37,6 +37,7 @@ import {
   IconCheck,
   IconMessageCircle,
   IconAlertTriangle,
+  IconRepeat,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -216,9 +217,31 @@ export function MessageTable({
       sortable: true,
       className: "w-64",
       align: "left",
-      accessor: (message) => (
-        <div className="font-medium truncate">{message.title}</div>
-      ),
+      accessor: (message) => {
+        // Ocorrência de agendamento recorrente: sem a marca, a lista fica com N
+        // linhas de mesmo título e nada explica de onde vieram.
+        const schedule = (message as any).schedule as
+          | { id: string; name: string }
+          | null
+          | undefined;
+        return (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-medium">{message.title}</span>
+            {/* Marca de origem na MESMA linha do título: a coluna é estreita e
+                uma segunda linha por ocorrência dobrava a altura da tabela
+                inteira. `shrink-0` mantém o ícone visível mesmo com o título
+                truncado; o nome do agendamento vai no tooltip. */}
+            {schedule && (
+              <span
+                className="shrink-0 text-muted-foreground"
+                title={`Publicado pelo agendamento "${schedule.name}"`}
+              >
+                <IconRepeat className="h-3.5 w-3.5" />
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "status",

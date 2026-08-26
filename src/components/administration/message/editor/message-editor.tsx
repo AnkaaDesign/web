@@ -1,15 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormSteps } from "@/components/ui/form-steps";
 import { BlockEditorCanvas } from "./block-editor-canvas";
 import { MessageMetadataForm } from "./message-metadata-form";
-import type { MessageFormData, ContentBlock } from "./types";
+import type { MessageFormData, ContentBlock, MessageRecurrenceFormData } from "./types";
+import { useMessageSchedulePreview } from "@/hooks/administration/use-message-schedule";
+import { buildSchedulePayload, isRecurrenceComplete } from "@/utils/message-recurrence";
 
 interface MessageEditorProps {
   initialData?: Partial<MessageFormData>;
   onSubmit: (data: MessageFormData, isDraft: boolean) => void;
   onFormStateChange?: (state: { isValid: boolean; isDirty: boolean; canPreview: boolean }) => void;
   onStepChange?: (step: number, totalSteps: number, canGoNext: boolean, canGoPrev: boolean) => void;
+  /** Falso na edição — ver a nota em `MessageMetadataForm`. */
+  allowRecurrence?: boolean;
 }
 
 const STEPS = [
@@ -17,7 +21,7 @@ const STEPS = [
   { id: 2, name: "Conteúdo", description: "Editor de blocos da mensagem" },
 ];
 
-export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange }: MessageEditorProps) => {
+export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange, allowRecurrence = true }: MessageEditorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
   const [metadata, setMetadata] = useState<{
@@ -32,6 +36,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       startDate?: Date;
       endDate?: Date;
     };
+    recurrence?: MessageRecurrenceFormData;
   }>({
     title: initialData?.title || '',
     targeting: initialData?.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
@@ -41,6 +46,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       endDate.setDate(endDate.getDate() + 7);
       return { startDate: today, endDate };
     })(),
+    recurrence: initialData?.recurrence,
   });
 
   // Update state when initialData changes (for edit mode)
@@ -63,6 +69,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
           title: initialData.title || '',
           targeting: initialData.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
           scheduling: initialData.scheduling || {},
+          recurrence: initialData.recurrence,
         });
       }
     }
@@ -132,6 +139,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       blocks,
       targeting: metadata.targeting,
       scheduling: metadata.scheduling,
+      recurrence: metadata.recurrence,
       isDraft: true,
     };
 
@@ -150,6 +158,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       blocks,
       targeting: metadata.targeting,
       scheduling: metadata.scheduling,
+      recurrence: metadata.recurrence,
       isDraft: false,
     };
 
@@ -190,12 +199,35 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
         blocks,
         targeting: metadata.targeting,
         scheduling: metadata.scheduling,
+        recurrence: metadata.recurrence,
         isDraft: false,
       });
       editorElement.goToNextStep = handleNext;
       editorElement.goToPreviousStep = handlePrevious;
     }
   }, [blocks, metadata, currentStep]);
+
+  // Prévia das próximas datas. Só consulta quando a recorrência já está
+  // completa o bastante para produzir data — a API devolve 400 numa
+  // configuração pela metade, e um 400 por tecla digitada seria só ruído.
+  const previewPayload = useMemo(() => {
+    if (!metadata.recurrence?.enabled) return null;
+    if (!isRecurrenceComplete(metadata.recurrence)) return null;
+    return buildSchedulePayload({
+      title: metadata.title || 'Prévia',
+      blocks: blocks.length > 0 ? blocks : [{ id: 'preview', type: 'paragraph', content: '.' }],
+      targeting: metadata.targeting,
+      scheduling: metadata.scheduling,
+      recurrence: metadata.recurrence,
+      isDraft: false,
+    } as MessageFormData);
+  }, [metadata, blocks]);
+
+  const previewQuery = useMessageSchedulePreview(previewPayload, 5, !!previewPayload);
+  const recurrencePreview = useMemo(
+    () => (previewQuery.data?.data ?? []).map(iso => new Date(iso)),
+    [previewQuery.data],
+  );
 
   return (
     <div data-message-editor className="space-y-6">
@@ -209,6 +241,13 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
             <MessageMetadataForm
               data={metadata}
               onChange={setMetadata}
+              allowRecurrence={allowRecurrence}
+              recurrencePreview={recurrencePreview}
+              recurrencePreviewError={
+                previewQuery.isError
+                  ? 'Não foi possível calcular as próximas datas com esta configuração.'
+                  : null
+              }
             />
           )}
 

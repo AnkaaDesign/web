@@ -1,3 +1,5 @@
+import type { SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, MONTH_OCCURRENCE } from '../../../../constants';
+
 export type BlockType =
   | 'heading1'
   | 'heading2'
@@ -113,6 +115,44 @@ export interface CompanyAssetBlock extends BaseBlock {
 
 export type ContentBlock = TextBlock | ImageBlock | ButtonBlock | DividerBlock | SpacerBlock | ListBlock | IconBlock | RowBlock | DecoratorBlock | CompanyAssetBlock;
 
+/**
+ * Recorrência do comunicado. Mesma forma de dados que os agendamentos de
+ * pedido/EPI/manutenção usam (`ScheduleFormData` em `@/components/ui/schedule-form`),
+ * para que o payload da API seja o mesmo vocabulário em todo o sistema.
+ */
+export interface MessageRecurrenceFormData {
+  /** Desligado = mensagem avulsa, o caminho de sempre. */
+  enabled: boolean;
+  frequency: SCHEDULE_FREQUENCY;
+  frequencyCount?: number;
+  weeklySchedule?: {
+    monday?: boolean;
+    tuesday?: boolean;
+    wednesday?: boolean;
+    thursday?: boolean;
+    friday?: boolean;
+    saturday?: boolean;
+    sunday?: boolean;
+  };
+  monthlySchedule?: {
+    dayOfMonth?: number | null;
+    occurrence?: MONTH_OCCURRENCE | null;
+    dayOfWeek?: WEEK_DAY | null;
+  };
+  yearlySchedule?: {
+    month: MONTH;
+    dayOfMonth?: number | null;
+    occurrence?: MONTH_OCCURRENCE | null;
+    dayOfWeek?: WEEK_DAY | null;
+  };
+  /** Por quantos dias cada publicação fica no feed. */
+  displayDurationDays?: number;
+  /** Hora de Brasília em que a publicação entra no ar. */
+  publishHour?: number;
+  /** Encerra o agendamento após N publicações. */
+  maxOccurrences?: number | null;
+}
+
 export interface MessageFormData {
   title: string;
   blocks: ContentBlock[];
@@ -122,9 +162,16 @@ export interface MessageFormData {
     sectorIds?: string[];
     positionIds?: string[];
   };
+  /**
+   * Com recorrência DESLIGADA: a janela de exibição da mensagem avulsa.
+   * Com recorrência LIGADA: a VIGÊNCIA do agendamento (quando ele começa e
+   * quando para de gerar publicações) — a janela de cada publicação passa a
+   * ser `recurrence.displayDurationDays`.
+   */
   scheduling: {
     startDate?: Date;
     endDate?: Date;
   };
+  recurrence?: MessageRecurrenceFormData;
   isDraft: boolean;
 }

@@ -132,6 +132,35 @@ export function MessageFilters({
         />
       </div>
 
+      {/* Origem: avulso x recorrente */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Origem</Label>
+        <Combobox
+          value={
+            localFilters.onlyRecurring === true
+              ? "recurring"
+              : localFilters.onlyRecurring === false
+                ? "standalone"
+                : "all"
+          }
+          onValueChange={(v) =>
+            setLocalFilters({
+              ...localFilters,
+              onlyRecurring:
+                v === "recurring" ? true : v === "standalone" ? false : undefined,
+            })
+          }
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "recurring", label: "Somente recorrentes" },
+            { value: "standalone", label: "Somente avulsos" },
+          ]}
+          placeholder="Todos"
+          searchable={false}
+          clearable={false}
+        />
+      </div>
+
       {/* Recipients Filter */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">Destinatários</Label>

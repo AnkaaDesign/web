@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { MessageTable } from "@/components/administration/message/list/message-table";
 import { MessageFilters } from "@/components/administration/message/list/message-filters";
+import { MessageSchedulesSection } from "@/components/administration/message/list/message-schedules-section";
 import {
   IconPlus,
   IconFilter,
@@ -186,8 +187,12 @@ export const MessageListPage = () => {
           ]}
         />
 
-        <div className="flex-1 min-h-0 pb-6 flex flex-col mt-4">
-          <Card className={cn("flex flex-col shadow-sm border border-border h-full")}>
+        <div className="flex-1 min-h-0 pb-6 flex flex-col mt-4 gap-4">
+          {/* Regras de recorrência. Some quando não há nenhuma — quem nunca usou
+              recorrência vê a página exatamente como antes. */}
+          <MessageSchedulesSection />
+
+          <Card className={cn("flex flex-col shadow-sm border border-border h-full min-h-0")}>
             <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
               {/* Search and Filter Controls */}
               <div className="flex flex-col gap-3 sm:flex-row">

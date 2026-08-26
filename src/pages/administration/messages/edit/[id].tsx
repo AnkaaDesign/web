@@ -227,6 +227,7 @@ export const EditMessagePage = () => {
           <MessageEditor
             initialData={initialData}
             onSubmit={handleSubmit}
+            allowRecurrence={false}
             onFormStateChange={handleFormStateChange}
             onStepChange={handleStepChange}
           />

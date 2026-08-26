@@ -15,6 +15,14 @@ export interface MessageGetManyFormData {
   recipientIds?: string[];
   senderIds?: string[];
   sectorIds?: string[];
+  /** Ocorrências de UM agendamento recorrente. */
+  scheduleId?: string;
+  /**
+   * true = só comunicados gerados por agendamento; false = só avulsos.
+   * Omitido devolve TUDO — o default do servidor não mudou, de modo que a tela
+   * administrativa do app continua enxergando o mesmo conjunto de sempre.
+   */
+  onlyRecurring?: boolean;
   createdAt?: {
     gte?: Date | string;
     lte?: Date | string;
