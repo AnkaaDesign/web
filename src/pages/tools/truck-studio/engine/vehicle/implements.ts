@@ -25,13 +25,13 @@
    web (ver `core/paths.ts`). Um implemento novo assado num sábado entra
    copiando dois arquivos e editando o JSON ao lado deles.
 
-   ⚠️ E POR QUE EXISTE UM PADRÃO EM CÓDIGO MESMO ASSIM: a árvore servida hoje
-   NÃO tem `implements.json`, e `--delete` é proibido nela. Enquanto o deploy
-   não sobe o arquivo, `implementsOf(null)` devolve o semirreboque de sempre,
-   apontando para `trailer.glb` — que é o nome ANTIGO, ainda servido. Sem esse
-   padrão, o primeiro deploy do web sem o deploy da árvore deixaria o estúdio
-   sem implemento nenhum, com um 404 mudo (é o modo de falhar que
-   `core/paths.ts` descreve por extenso).
+   ⚠️ E POR QUE EXISTE UM PADRÃO EM CÓDIGO MESMO ASSIM: a árvore servida pode
+   não ter `implements.json` ainda, e `--delete` é proibido nela. Enquanto o
+   deploy não sobe o arquivo, `implementsOf(null)` devolve o semirreboque de
+   sempre, apontando para `trailer_v2.glb` — o nome que a árvore servida tem
+   HOJE. Sem esse padrão, o primeiro deploy do web sem o deploy da árvore
+   deixaria o estúdio sem implemento nenhum, com um 404 mudo (é o modo de falhar
+   que `core/paths.ts` descreve por extenso).
 
    A CONVENÇÃO DE NOME DE ARQUIVO tem três eixos e está no README da bancada:
    `<semirreboque|sobrechassi>_<frigorifico|carga_seca>_<gancheiro|paleteiro>.glb`. */
@@ -219,15 +219,28 @@ export interface ImplementDef {
  * O padrão de código — ver o ⚠️ do cabeçalho.
  * ------------------------------------------------------------------ */
 
-/** O implemento que já estava no ar, com o NOME ANTIGO do arquivo.
- *  Renomear o asset é passo de deploy; o padrão daqui é a rede de segurança
- *  para o intervalo entre os dois deploys, e por isso ele aponta para o nome
- *  que a árvore servida tem HOJE. */
+/** O implemento que já estava no ar, com o nome de arquivo que a árvore servida
+ *  tem HOJE — e é por isso que ele não segue a convenção de nome do catálogo.
+ *
+ *  ⚠️ `trailer_v2.glb` E NÃO `trailer.glb`, e a diferença NÃO é cosmética: o
+ *  bake `_v2` (2026-08-19) tirou as 46 cintas de rebite que atravessavam a
+ *  chapa do teto — de cima elas liam como CORTES —, tirou o kit interno do
+ *  frigorífico e fechou o rasgo do evaporador. Ver a nota de `TRAILER_ASSET` em
+ *  `models.ts`. Este padrão nasceu apontando para `trailer.glb` porque na época
+ *  era esse o nome servido; deixá-lo assim faria o catálogo DESFAZER a correção
+ *  do teto toda vez que o manifesto não carregasse.
+ *
+ *  ⚠️ E POR QUE O NOME DE CONVENÇÃO (`semirreboque_frigorifico_paleteiro.glb`)
+ *  NÃO É USADO AQUI: `/studio-assets/v1/` responde `immutable`, `--delete` é
+ *  proibido nessa árvore (ver `api/docs/DEPLOYMENT-studio-assets.md`) e os
+ *  bytes do `_v2` já estão publicados. Republicá-los sob um terceiro nome
+ *  gravaria mais 21 MB que nunca poderiam ser podados, para não entregar nada
+ *  de novo a ninguém. A convenção vale do PRÓXIMO bake em diante. */
 export const LEGACY_IMPLEMENT: ImplementDef = {
   id: 'semirreboque-frigorifico-paleteiro',
   label: 'Semirreboque frigorífico paleteiro',
   short: 'Paleteiro',
-  file: 'trailer.glb',
+  file: 'trailer_v2.glb',
   meta: 'trailer_meta.json',
   kind: 'semirreboque',
   has: { wheels: true, landingGear: true, kingpin: true, plate: true, thermoKing: true },

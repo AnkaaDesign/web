@@ -6,10 +6,10 @@
       "id": "semirreboque-frigorifico-paleteiro",
       "label": "Semirreboque frigorífico paleteiro",
       "short": "Paleteiro",
-      "file": "semirreboque_frigorifico_paleteiro.glb",
-      "meta": "semirreboque_frigorifico_paleteiro_meta.json",
+      "file": "trailer_v2.glb",
+      "meta": "trailer_meta.json",
       "kind": "semirreboque",
-      "_note": "É o `trailer.glb` de sempre, renomeado. O arquivo antigo CONTINUA na árvore servida — ela sai com Cache-Control immutable e `--delete` é proibido nela."
+      "_note": "É o bake `_v2` (2026-08-19), que tirou as 46 cintas de rebite que atravessavam a chapa do teto — de cima liam como CORTES —, tirou o kit interno do frigorífico e fechou o rasgo do evaporador. NÃO segue a convenção de nome de arquivo, e é deliberado: /studio-assets/v1/ responde Cache-Control immutable, `--delete` é proibido nessa árvore (api/docs/DEPLOYMENT-studio-assets.md) e estes bytes JÁ estão publicados como trailer_v2.glb. Republicá-los sob o nome de convenção gravaria mais 21 MB impodáveis sem entregar nada novo. A convenção vale do PRÓXIMO bake em diante. `trailer.glb`, o bake anterior, continua na árvore servida e está queimado por um ano em todo navegador que abriu o estúdio desde 15/08."
     },
     {
       "id": "sobrechassi-frigorifico-gancheiro",

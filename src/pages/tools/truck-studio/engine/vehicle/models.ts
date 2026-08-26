@@ -4734,46 +4734,21 @@ export function resetTrailerDims(): TrailerDims | null {
 
 /* ---------------- trailer ---------------- */
 
-/** `_v2` E NÃO `trailer.glb`, pela MESMA regra de `WHEEL_ASSET` — e desta vez
- *  aplicada ANTES de queimar o URL, não depois.
- *
- *  O que mudou no bake (2026-08-19, a pedido do Kennedy): saíram as 46 cintas
- *  de rebite que atravessavam a chapa do teto — de cima elas liam como CORTES,
- *  e o teto agora é uma superfície contínua —, saiu o kit interno do
- *  frigorífico (a lona fria, os 6 trilhos que a prendem e a pá de entrada de ar
- *  IBIPORÃ) e entrou uma chapa `platico-branco` fechando o rasgo do evaporador
- *  na parede da frente, que a pá tapava pela metade e ficaria escancarado sem
- *  ela. Nada mais foi tocado: 2 157 → 2 104 malhas, mesmas 38 materiais, mesma
- *  caixa exceto o topo (4,187 → 4,174 m, que era a altura das cintas).
- *
- *  `trailer.glb` está QUEIMADO como `wheel_fh16.glb`: `/studio-assets/v1/` sai
- *  da API com `max-age=31536000, immutable`, então todo navegador que abriu o
- *  estúdio desde 15/08 tem os bytes antigos colados naquele URL por um ano.
- *  Sobrescrever no lugar não entregaria nada a eles. Próxima bake, próximo
- *  sufixo. */
-const TRAILER_ASSET = 'trailer_v2.glb';
+/* ⚰️ `TRAILER_ASSET` MORREU AQUI EM 2026-08-26, e a lápide fica porque o nome
+   do arquivo do semirreboque continua sendo uma decisão com consequência.
 
-/**
- * Começa a baixar o implemento e os dois acessórios dele, sem montar nada.
- *
- * O ÚNICO PREFETCH DO ENGINE QUE NÃO É ESPECULATIVO, e por isso o de maior
- * retorno: `runApply()` carrega o implemento em TODO boot (`if (first)
- * weights.trailer = 150`), então estes bytes vão ser pedidos daqui a alguns
- * segundos de qualquer forma. Chamado assim que os manifestos respondem — com o
- * usuário ainda no primeiro card do seletor —, os 31 MB descem POR BAIXO da
- * escolha inteira em vez de depois dela.
- *
- * MORA AQUI, e não em studio.ts, porque os três nomes de arquivo são deste
- * módulo. `TRAILER_ASSET` e `WHEEL_ASSET` em particular NÃO podem ser repetidos
- * em lugar nenhum: os dois `_v2` são correções documentadas e `trailer.glb` /
- * `wheel_fh16.glb` estão queimados (ver as notas deles). Um prefetch que
- * aquecesse o arquivo errado seria o dobro do download com zero acerto de
- * cache, e sem sintoma nenhum.
- *
- * Os dois `*_meta.json` e o `hitch.json` ficam de FORA de propósito: são
- * kilobytes, `loadManifests()` já os pediu, e a rota de manifesto responde
- * `no-cache` — enfileirá-los só tiraria uma vaga das duas de `MAX_IN_FLIGHT`.
- */
+   Ele nasceu em 2026-08-24 apontando para `trailer_v2.glb` — o bake que tirou
+   as 46 cintas de rebite que atravessavam a chapa do teto (de cima liam como
+   CORTES), tirou o kit interno do frigorífico e fechou o rasgo do evaporador.
+   Dois dias depois o implemento virou CATÁLOGO (`vehicle/implements.ts`), e o
+   nome do arquivo deixou de ser uma constante deste módulo: quem o diz é
+   `implements.json`, e o padrão em código é `LEGACY_IMPLEMENT`.
+
+   ⚠️ A REGRA QUE ELE CARREGAVA CONTINUA VALENDO, e agora mora lá: um asset
+   publicado sob `Cache-Control: immutable` NÃO se sobrescreve. Bake novo, nome
+   novo. `trailer.glb` está queimado por um ano em todo navegador que abriu o
+   estúdio desde 15/08, e foi por isso que o `_v2` existiu. */
+
 /**
  * O KIT DA PORTA, compartilhado por todos os implementos.
  *
@@ -4827,6 +4802,27 @@ function loadSideGuardKit(): Promise<THREE.Object3D | null> {
   return guardKitReq;
 }
 
+/**
+ * Começa a baixar o implemento e os dois acessórios dele, sem montar nada.
+ *
+ * O ÚNICO PREFETCH DO ENGINE QUE NÃO É ESPECULATIVO, e por isso o de maior
+ * retorno: `runApply()` carrega o implemento em TODO boot (`if (first)
+ * weights.trailer = 150`), então estes bytes vão ser pedidos daqui a alguns
+ * segundos de qualquer forma. Chamado assim que os manifestos respondem — com o
+ * usuário ainda no primeiro card do seletor —, os 31 MB descem POR BAIXO da
+ * escolha inteira em vez de depois dela.
+ *
+ * MORA AQUI, e não em studio.ts, porque os nomes de arquivo dos ACESSÓRIOS são
+ * deste módulo — o do implemento vem do catálogo (`impl.file`), que é a única
+ * fonte desde 2026-08-18. `WHEEL_ASSET` em particular NÃO pode ser repetido em
+ * lugar nenhum: o `_v2` é uma correção documentada e `wheel_fh16.glb` está
+ * queimado (ver a nota dele). Um prefetch que aquecesse o arquivo errado seria
+ * o dobro do download com zero acerto de cache, e sem sintoma nenhum.
+ *
+ * Os dois `*_meta.json` e o `hitch.json` ficam de FORA de propósito: são
+ * kilobytes, `loadManifests()` já os pediu, e a rota de manifesto responde
+ * `no-cache` — enfileirá-los só tiraria uma vaga das duas de `MAX_IN_FLIGHT`.
+ */
 export function prefetchTrailerAssets(): void {
   const impl = getCurrentImplement();
   /* Só o que este implemento TEM. Especular a rodagem de um baú que não tem

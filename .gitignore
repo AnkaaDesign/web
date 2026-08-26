@@ -57,7 +57,14 @@ tools/iveco-bake/ultimo-bake.log.txt
 # acima de 100 MB, então o push inteiro falharia por causa dele. O arquivo
 # continua no disco e é gerado por window.__exportTrailer() no viewer; a cópia
 # de distribuição é o .zip em Downloads.
-public/models/vehicles/trailer.glb
+#
+# O PADRÃO É `trailer*.glb` E NÃO O NOME EXATO desde 2026-08-26: o bake do
+# semirreboque ganhou sufixo (`trailer_v2.glb`, 21,1 MB) porque
+# `/studio-assets/v1/` sai da API com `immutable` e sobrescrever no lugar não
+# entregaria nada a quem já abriu o estúdio. Nome exato deixaria o bake
+# seguinte entrar no repositório em silêncio — que é justamente o que estas
+# linhas existem para impedir.
+public/models/vehicles/trailer*.glb
 
 # E OS IMPLEMENTOS SEGUINTES, pela mesma regra e pela mesma rota de entrega.
 # Desde 2026-08-18 o implemento deixou de ser um só: `implements.json` (que É
