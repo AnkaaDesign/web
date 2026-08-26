@@ -1,6 +1,6 @@
 /* FOTOS DO ESTÚDIO — as poses das queixas de 2026-08-16.
    ===========================================================================
-   Companheiro de `checks-diag-0816.mjs`, que MEDE; este OLHA. Cada pose vira um
+   Companheiro de `diag/checks-diag-0816.mjs`, que MEDE; este OLHA. Cada pose vira um
    PNG em `shots/`, e o par antes/depois é o que fecha um pedido de aparência —
    as três queixas daquele dia eram todas de leitura, não de fato.
 

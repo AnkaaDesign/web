@@ -10,7 +10,7 @@
 
    Três enquadramentos: 3/4 dianteiro fechado no TK, testeira de frente, e
    perfil rasante no canto. A leitura é SÍNCRONA pelo mesmo motivo de
-   `checks-diag-0816.mjs`: sem `preserveDrawingBuffer`, um `await` entre o
+   `diag/checks-diag-0816.mjs`: sem `preserveDrawingBuffer`, um `await` entre o
    desenho e o `toDataURL()` devolve o buffer limpo.
 
        node tools/studio-bench/bench.mjs --gpu --checks checks-tkfoto-0820.mjs */

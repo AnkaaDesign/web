@@ -223,7 +223,7 @@ const TABELA: { arquivo: RegExp; itens: CabFix[] }[] = [
           + 'baixa que o arco cru (que é o que a queixa de 20/08 pedia) e as pernas '
           + '44 mm mais perto do pneu que a descida deixava. O para-barro sobe de 122 '
           + 'para 264 mm do solo, dentro do que a lei pede. Ver as capturas de '
-          + '`checks-diag-paralama-scania-0823.mjs`.',
+          + '`diag/checks-diag-paralama-scania-0823.mjs`.',
       },
       {
         alvo: /\[sc_logo_0_mat_0000_brushed_metal_104\]/,

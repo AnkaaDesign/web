@@ -61,8 +61,42 @@ const FOLGA_LATERAL = GRADE_DENTRO + 0.010;              // 145 mm
 const BALANCO_MAX = 0.60;
 /** Folga mínima entre o teto do equipamento e o limiar de amputação. */
 const MARGEM_MIN = 0.010;
-/** O corrido total, MEDIDO em 2026-08-24 (soma dos vãos de barra, por lado). */
-const REGUA = {};
+/**
+ * O corrido total por configuração, em metros — soma dos vãos de barra, por
+ * lado, MEDIDA em 2026-08-26 com ★ A/B/C/E verdes nas dez.
+ *
+ * ⚠️ ELA ESTAVA VAZIA, e ★ D nunca rodou. Isso é o defeito de §45.1 outra vez,
+ * pelo avesso: *"um portão que só conta sobreposição não sabe dizer que a peça
+ * sumiu"*. Um portão que só conta BALANÇO também não — encurtar o corrido até
+ * ele caber entre dois apoios deixa ★ E verde e a grade curta, e foi
+ * exatamente o que a apara de §50 passou a poder fazer. As duas estrelas se
+ * seguram: ★ E proíbe barra sem apoio, ★ D proíbe encolher a barra para
+ * conseguir isso.
+ *
+ * ⚠️ SÃO OS COMPRIMENTOS **INTEIROS**, e não os aparados. A versão intermediária
+ * de §50 aparava o VW em 850…1 125 mm para fechar ★ E, e foi ABANDONADA porque
+ * o preço era 52 mm de tampa dentro da aba do flanco. Com a apara desistindo em
+ * vez de penetrar, nenhuma das dez configurações encolhe — e a régua é a de
+ * antes, com dois números 25 mm maiores no Scania 6x2/6x4 (a apara os havia
+ * encurtado; agora não encurta).
+ *
+ * ⚠️⚠️ **NÃO ABAIXE ESTES NÚMEROS PARA FECHAR ★ E.** É a armadilha inteira desta
+ * seção: encurtar a grade até ela caber entre dois apoios deixa ★ E verde e o
+ * caminhão sem para-ciclista, e é exatamente o §45.1 outra vez. ★ E reprovando
+ * no VW é a pendência aberta, com número, e é assim que ela tem de aparecer.
+ */
+const REGUA = {
+  'scania-p/8x2r': 4.907,
+  'scania-p/6x2r': 5.113,
+  'scania-p/4x2r': 5.469,
+  'scania-p/6x4r': 5.113,
+  'volvo-vm-2015/8x2r': 4.780,
+  'volvo-vm-2015/6x2r': 5.410,
+  'volvo-vm-2015/4x2r': 5.703,
+  'vw-constellation/8x2-tl': 4.351,
+  'vw-constellation/6x2-tl': 4.408,
+  'vw-constellation/4x2-tl': 4.622,
+};
 
 /* Os rígidos do catálogo. */
 const alvos = [];

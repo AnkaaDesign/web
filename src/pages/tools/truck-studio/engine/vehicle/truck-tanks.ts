@@ -93,7 +93,7 @@ export const TANK_SWAP_RE = /scania_p_[468]x[24]r\.glb$/i;
  * Teto do |x| da face EXTERNA do equipamento de flanco.
  *
  * ⚠️ MEDIDO NA GRADE, e não arbitrado — foi 1 150 e estava 30 mm DENTRO dela.
- * `protecao_lateral_v1.glb` ocupa de 0 a 135 mm para dentro da própria face
+ * `protecao_lateral_v2.glb` ocupa de 0 a 135 mm para dentro da própria face
  * (o mais fundo é `ESTACAO__metal-preto`), e a face vive em |x| 1 275 — ver o
  * ⚠️⚠️ de `GRADE_FACE`: a face MEDIDA é 1 251, e baixar a constante para ela
  * empurra o tanque do VM para dentro da longarina. Logo o conjunto da grade É

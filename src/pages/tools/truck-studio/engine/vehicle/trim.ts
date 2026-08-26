@@ -478,7 +478,7 @@ function warnHidden(key: TrimKey) {
  * material mas não está na lista. Só ela junta as duas coisas — e é essa
  * interseção que a torna o único acabamento que não sobrevive a um F5.
  *
- * A SEQUÊNCIA, medida na bancada (`checks-diag-tkcor2-0825.mjs`):
+ * A SEQUÊNCIA, medida na bancada (`diag/checks-diag-tkcor2-0825.mjs`):
  *
  *   1. `runApply()` restaura o ALVO DA TINTA primeiro —
  *      `livery.setImplementPainted(choice.paintTarget === 'both')`;

@@ -28,8 +28,8 @@
     "height": 600
   },
   "counts": {
-    "combinacoes": 50,
-    "imagens": 715
+    "combinacoes": 54,
+    "imagens": 719
   },
   "have": {
     "daf/daf-xd/4x2-sl": [
@@ -841,10 +841,22 @@
       "f606b305-f224-4b87-8385-bd0f5040516c",
       "f9205168-22af-42b7-a774-1353eee326cc"
     ],
+    "volvo/volvo-vm-2015/4x2r": [
+      "neutro"
+    ],
     "volvo/volvo-vm-2015/6x2r": [
       "neutro"
     ],
+    "volvo/volvo-vm-2015/8x2r": [
+      "neutro"
+    ],
+    "vw/vw-constellation/4x2-tl": [
+      "neutro"
+    ],
     "vw/vw-constellation/6x2-tl": [
+      "neutro"
+    ],
+    "vw/vw-constellation/8x2-tl": [
       "neutro"
     ]
   }

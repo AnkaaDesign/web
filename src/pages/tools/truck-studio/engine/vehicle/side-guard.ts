@@ -59,7 +59,7 @@ import * as THREE from 'three';
  */
 export const SIDE_GUARD_ASSET = 'protecao_lateral_v2.glb';
 
-/** Comprimento do corrido de origem, de `protecao_lateral_v1_meta.json`. */
+/** Comprimento do corrido de origem, de `protecao_lateral_v2_meta.json`. */
 const COMPRIMENTO_ORIGEM = 3.380;
 /** Passo MÁXIMO entre estações, medido no implemento (menor vão entre suportes).
  *
@@ -107,6 +107,9 @@ const ESTACOES_MAX = 2;
 const BALANCO = 0.30;
 /** Passo da busca quando uma estação precisa sair de cima de um obstáculo. */
 const DESVIO_PASSO = 0.025;
+/** Abaixo disto a apara não moveu nada — é ruído de ponto flutuante, não apara.
+ *  Ver o uso, e o que custou não ter isto. */
+const APARA_MIN = 1e-6;
 /**
  * Quanto a face externa da grade fica para DENTRO da pele do flanco.
  *
@@ -165,7 +168,7 @@ const FOLGA_RODA = 0.62;
  * ⚠️ 155 mm, e o número agora é MEDIDO NO ASSET em vez de arbitrado. Ele já
  * foi 120 (chute: "a espessura do suporte mais respiro") e 95 (pior chute:
  * baixei para deixar o tanque do VM passar). Medido em
- * `protecao_lateral_v1.glb`, com x = 0 na face externa:
+ * `protecao_lateral_v2.glb`, com x = 0 na face externa:
  *
  *     PONTA__plastico-preto                0 … 100 mm
  *     BARRA__metal-galvanizado-mantido    13 …  45 mm
@@ -621,7 +624,7 @@ const BRACO_ENCOSTO = 0.025;
 /** Folga em z em torno do que bloqueia o braço. */
 const BRACO_FOLGA_Z = 0.09;
 
-/* Cotas MEDIDAS no asset (`protecao_lateral_v1_meta.json`), e por isso fixas:
+/* Cotas MEDIDAS no asset (`protecao_lateral_v2_meta.json`), e por isso fixas:
    o `_v1` é imutável por contrato de cache. A barra não começa no datum — ela
    começa 77 mm à frente dele — e a tampa de ponta fica 44 mm ALÉM do fim da
    barra, encavalada nela, que é como a peça real fecha o perfil. */
@@ -1027,7 +1030,26 @@ function estacoes(t: { z0: number; z1: number }, o: SideGuardOpts): number[] {
   const n = util <= 0 ? 1
     : Math.min(ESTACOES_MAX, Math.ceil(util / PASSO - 1e-9) + 1);
   const passo = n > 1 ? util / (n - 1) : 0;
-  const limite = PASSO / 2;
+  /* ⚠️ A BUSCA VAI ATÉ A PONTA DO CORRIDO, e não a meio passo — 2026-08-26.
+     ------------------------------------------------------------------------
+     Ela parava em `PASSO / 2` (625 mm) e a estação que não coubesse ali era
+     APAGADA, com o argumento de que "o vão é do caminhão e a barra atravessa
+     sem apoio, como no caminhão de verdade". O argumento vale para um vão de
+     meio metro; não vale para o que o VW faz.
+
+     Medido no VW 4x2 (`checks-grade-flanco-0824.mjs`, 2026-08-26): o corrido
+     dianteiro é −27…2 733 e `obstaculosEstacao` traz −1 448…252 · 252…1 052 ·
+     1 652…2 152 · 2 652…6 252 — o alvo dianteiro cai em 273, e os 625 mm de
+     busca morrem em 898, ainda dentro do mesmo obstáculo. A estação sumia. A
+     janela LIVRE de 1 052…1 652 estava ali, a 779 mm, e ninguém olhava: sobrava
+     **um apoio só para 2,76 m de perfil, com 2 583 mm pendurados na ponta.**
+
+     O teto de meio passo não media nada — `PASSO` é o vão máximo ENTRE apoios,
+     não o quanto um apoio pode andar. O que limita de verdade é o próprio
+     corrido, e é ele que passa a limitar. A busca continua saindo do alvo para
+     fora, então quem cabe no lugar ideal não anda um milímetro: nas dez
+     configurações, só o VW muda. */
+  const limite = t.z1 - t.z0;
   const out: number[] = [];
   for (let i = 0; i < n; i++) {
     const alvo = n > 1 ? t.z0 + BALANCO + i * passo : (t.z0 + t.z1) / 2;
@@ -1872,6 +1894,128 @@ export function attachSideGuard(
     return out2;
   };
 
+  /* ▶▶▶ O CORRIDO NÃO PASSA DO QUE OS APOIOS SEGURAM — 2026-08-26.
+     ------------------------------------------------------------------------
+     `BALANCO` é uma PROMESSA: 300 mm de barra além do apoio mais externo, que é
+     o que a foto de referência mostra e o que mantém a ponta rígida. Até aqui
+     ela era cumprida só quando a estação nascia no lugar ideal — e quando o
+     obstáculo empurrava a estação para dentro, ninguém puxava a barra atrás
+     dela. O corrido ficava do comprimento que `trechos()` calculou e o apoio,
+     onde `estacoes()` conseguiu pôr: *"a grade está muito longa, o suporte dela
+     fica flutuando"*, que é a mesma queixa que `PASSO` já registra, agora pela
+     outra ponta.
+
+     Isto é o CONTRAPESO da busca larga logo acima, e os dois juntos são a
+     regra inteira: **primeiro procura-se apoio no corrido todo; o que sobrar
+     sem apoio é aparado.** Sozinha, a busca larga deixaria o VW com 1 077 mm de
+     balanço dianteiro; sozinha, a apara cortaria 2,1 m de grade que tinha onde
+     se prender.
+
+     ⚠️ QUEM JÁ PASSA NÃO ANDA. Num corrido sem obstáculo a estação nasce
+     exatamente em `z0 + BALANCO`, então `primeira − BALANCO` é `z0` e a apara é
+     de zero. Medido: as sete configurações do Scania e do VM saem idênticas.
+
+     ⚠️ E UM TRECHO SEM NENHUM APOIO DEIXA DE EXISTIR. Não é o mesmo caso de
+     `TRECHO_MIN` (curto demais para valer a pena): é barra que não tem em que
+     se prender em ponto nenhum do próprio vão. Montá-la seria desenhar uma peça
+     que a oficina não conseguiria instalar. */
+  const casasDe = new Map<{ z0: number; z1: number }, number[]>();
+  const montaveis = lista.filter((t) => {
+    const casas = estacoes(t, o);
+    if (!casas.length) return false;
+    const z0Antes = t.z0, z1Antes = t.z1;
+    t.z0 = Math.max(t.z0, casas[0] - BALANCO);
+    t.z1 = Math.min(t.z1, casas[casas.length - 1] + BALANCO);
+    /* ⚠️ E A PONTA APARADA TEM DE CAIR NUM LUGAR LIVRE. A tampa fica
+       `recuoTampa` ALÉM do fim da barra (é ela que faz o balanço medido ser 417
+       e não 300), então quem precisa estar fora de obstáculo é
+       `t.z1 + recuoTampa` — e foi por ignorar isso que a 1ª versão da apara pôs
+       a tampa do VW 6x2 **14 mm dentro de `truck_p5`**, em |x| 1 233.
+
+       ⚠️⚠️ **E A CORREÇÃO É UMA VARREDURA LIMITADA, NÃO O RECUO EM CADEIA DE
+       `trechos()`.** Reusar aquele laço aqui foi TENTADO E REVERTIDO: lá ele
+       parte de uma ponta já validada e anda no máximo `RECUO_BARATO`; aqui ele
+       parte de uma ponta nova, e no VW — onde as faixas são densas — cascateava
+       até comer o corrido inteiro. Medido: a varredura geral foi de 13 falhas
+       para **16**, com o VW 6x2 reprovando "a grade cobre pelo menos 2 000 mm".
+
+       O que se faz é procurar, do alvo da apara PARA DENTRO, a primeira posição
+       em que a tampa fica livre — e o piso da busca é a própria estação, que é
+       o ponto que a barra existe para alcançar. Não achou nada livre até lá: o
+       trecho fica com a apara crua, que é o pior caso ANTERIOR e não um novo. */
+    /* ⚠️ O TESTE É LITERALMENTE O DE `trechos()`, e tem de ser: um critério só
+       parecido rejeita pontas que `trechos()` aprovou, e aí a varredura anda
+       para dentro sem motivo. Foi o que a 1ª versão desta busca fez — pôs
+       `FOLGA_PONTA` também no limite de cima e encurtou o corrido do VM abaixo
+       da régua de ★ D, com ★ C perdendo cobertura. Duas coisas, exatas:
+
+         · o ponto julgado é o da TAMPA (`t.z1 + recuoTampa`), porque é ele que
+           `trechos()` valida — ela recua `bruto.z1` e SÓ DEPOIS aplica o recuo
+           da tampa, então o z aprovado lá é onde a tampa acaba;
+         · a folga é de UM lado só, e de qual depende da direção. */
+    /* ⚠️⚠️ E A LISTA É A CRUA, NÃO A RECORTADA PELAS BAIAS — e esta foi a última
+       coisa a cair. `perto` tira das faixas o que cai dentro de uma baia de
+       roda, e existe por um motivo bom: a BARRA tem de poder entrar na baia (é
+       o *"além disso a barra terá que extender"* de §44). Mas quem está sendo
+       posicionado aqui é a TAMPA, e uma tampa dentro da aba do flanco é uma
+       peça dentro de outra, baia ou não.
+
+       Medido: a apara levou o corrido traseiro do VW 6x2 350 mm para dentro e a
+       tampa foi parar **52 mm dentro da aba de `truck_p4`** — em |x| 1 173, no
+       flanco, onde a varredura geral tem estrela própria e onde o baseline não
+       tinha achado nenhum. `busca` não podia evitar: a aba mora dentro da baia
+       do eixo de apoio e `perto` a tinha apagado. */
+    const cruas = o.obstaculosEstacao ?? o.obstaculos ?? [];
+    const pontaLivre = (z: number, sinal: 1 | -1) => {
+      const ponta = z + sinal * recuoTampa;
+      return !cruas.some((h) => (sinal > 0
+        ? ponta > h.z0 - FOLGA_PONTA && ponta < h.z1
+        : ponta < h.z1 + FOLGA_PONTA && ponta > h.z0));
+    };
+    /* ⚠️ E QUANDO NÃO HÁ POSIÇÃO LIVRE, A APARA DESISTE — devolve a ponta que
+       `trechos()` tinha entregado, em vez de deixar a aparada em cima de uma
+       peça. Aparar é uma melhoria; ela não pode custar uma penetração nova.
+       O preço é ★ E poder reprovar naquele trecho, que é o estado ANTERIOR e
+       está medido — não um estado novo e desconhecido. */
+    const busca = (alvo: number, piso: number, original: number, sinal: 1 | -1) => {
+      if (pontaLivre(alvo, sinal)) return alvo;
+      for (let z = alvo - sinal * DESVIO_PASSO;
+        sinal > 0 ? z >= piso : z <= piso; z -= sinal * DESVIO_PASSO) {
+        if (pontaLivre(z, sinal)) return z;
+      }
+      return original;
+    };
+    /* ⚠️ SÓ ONDE A APARA MEXEU. Uma ponta que a apara não moveu é a ponta que
+       `trechos()` entregou, e ela pode estar DENTRO de uma faixa de propósito:
+       os laços de lá desistem quando recuar custaria mais que `RECUO_BARATO` —
+       "o vão é do caminhão e a barra atravessa", que é a mesma doutrina de
+       `estacoes()`. Sem esta guarda a busca herdava essas pontas, andava para
+       dentro e encurtava corrido que ninguém tinha pedido para encurtar:
+       medido, o VM 6x2 e o 4x2 caíam abaixo da régua de ★ D e perdiam a
+       cobertura de ★ C. A apara responde pelo que a apara fez, e por nada mais.
+
+       ⚠️ E A COMPARAÇÃO PRECISA DE FOLGA — `!==` cru NÃO serve. Num corrido sem
+       obstáculo a estação nasce em `z0 + BALANCO`, e `casas[0] − BALANCO` volta
+       ao mesmo ponto com UM ULP de diferença: `Math.max` fica com o maior, o
+       teste diz "mexeu", e a busca sai andando de verdade. Medido — o corrido
+       dianteiro do VM 6x2 recuou **275 mm por causa de um erro de 10⁻¹⁶ m**, e
+       ★ C e ★ D reprovaram. `APARA_MIN` fecha isso sem esconder apara nenhuma
+       real: a menor que interessa é o passo da busca, 25 mm. */
+    if (t.z1 < z1Antes - APARA_MIN) t.z1 = busca(t.z1, casas[casas.length - 1], z1Antes, 1);
+    if (t.z0 > z0Antes + APARA_MIN) t.z0 = busca(t.z0, casas[0], z0Antes, -1);
+    if (t.z1 - t.z0 < TRECHO_MIN) return false;
+    /* Recuar pode ter deixado um apoio fora da barra. Os que sobram continuam
+       segurando o que restou; se não sobrar nenhum, o trecho não é montável. */
+    const dentroDaBarra = casas.filter((z) => z >= t.z0 - 1e-6 && z <= t.z1 + 1e-6);
+    if (!dentroDaBarra.length) return false;
+    casas.length = 0;
+    casas.push(...dentroDaBarra);
+    casasDe.set(t, casas);
+    return true;
+  });
+  lista.length = 0;
+  lista.push(...montaveis);
+
   const porTrecho: number[] = [];
   let comBraco = 0, semBraco = 0;
   let topoAlto = 0, topoCurto = 0;
@@ -1881,7 +2025,9 @@ export function attachSideGuard(
        grade e valem para os dois flancos (tanque de um lado, ARLA do outro, e o
        envelope é o mesmo). Calcular por lado daria duas fileiras de suporte em
        z diferentes, que é o tipo de assimetria que só aparece na foto de cima. */
-    const casasZ = estacoes(t, o);
+    /* Já calculadas na apara acima — recalcular aqui daria o mesmo resultado
+       e dobraria a varredura de obstáculos por trecho. */
+    const casasZ = casasDe.get(t) ?? estacoes(t, o);
     porTrecho.push(casasZ.length);
     for (const lado of [1, -1]) {
       const g = new THREE.Group();
@@ -2049,5 +2195,14 @@ export function attachSideGuard(
   `baias de roda (z ± meio-vão): ${baias || 'nenhuma'}`,
   `obstáculos no x da grade: ${(o.obstaculos ?? []).length
     ? (o.obstaculos ?? []).map((h) => `${mm(h.z0)}…${mm(h.z1)}`).join(' · ') : 'nenhum'}`
-  + ` · baú ${mm(o.z0)}…${mm(o.z1)}`];
+  + ` · baú ${mm(o.z0)}…${mm(o.z1)}`,
+  /* ⚠️ A SEGUNDA LISTA TAMBÉM SAI AQUI, e a falta dela custou uma frente
+     inteira. A linha acima é `obstaculos` — a que AMPUTA o corrido. Quem decide
+     onde cabe um APOIO é `obstaculosEstacao`, que é outra faixa de altura e
+     outra folga, e ela não aparecia em lugar nenhum: com o corrido do
+     comprimento certo e um suporte só no meio dele, o resumo dizia "2 trecho(s)
+     · estações 1/2" e não havia como saber POR QUE era 1. Ver §50. */
+  `obstáculos no x da ESTAÇÃO: ${(o.obstaculosEstacao ?? []).length
+    ? (o.obstaculosEstacao ?? []).map((h) => `${mm(h.z0)}…${mm(h.z1)}`).join(' · ')
+    : 'nenhum (cai na lista do corrido)'}`];
 }

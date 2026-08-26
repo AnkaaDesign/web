@@ -893,7 +893,7 @@ export function attachBrandPlate(
              §38.11  metal-estrutura-principal-padrao m1 · r1,00   fosco
              §38.11  metal-galvanizado-mantido        m1 · r0,62   satinado
 
-         O EXPERIMENTO QUE FECHOU (`checks-scania6-0822.mjs`) separou material
+         O EXPERIMENTO QUE FECHOU (`diag/checks-scania6-0822.mjs`) separou material
          de geometria com quatro renders do mesmo quadro:
 
              (a) como está …………………………………… cinza fosco
@@ -1592,7 +1592,7 @@ export function dressTopRail(root: THREE.Object3D, roofYMundo: number): number {
        APLIQUE POR CIMA dela, não uma abertura nela.
 
        E aplique coplanar é Z-FIGHTING. Foi por isso que o difuso puro do
-       experimento não mostrou tracinho nenhum (`checks-scania6-0822.mjs`,
+       experimento não mostrou tracinho nenhum (`diag/checks-scania6-0822.mjs`,
        q6-a3): sem o espelho, as duas superfícies em briga têm a MESMA cor e a
        briga fica invisível. Com `metalness 1` e `rugosidade 0,30` cada pixel
        ganho pelo aplique reflete de um ângulo levemente diferente, e o que se
@@ -1873,7 +1873,7 @@ export function dressTopRail(root: THREE.Object3D, roofYMundo: number): number {
        céu/chão isso é a diferença entre um pixel claro e um escuro. `> 0,9`
        deixava passar até 25°.
 
-       O EXPERIMENTO QUE FECHOU (2026-08-22, `checks-scania6-0822.mjs`): com as
+       O EXPERIMENTO QUE FECHOU (2026-08-22, `diag/checks-scania6-0822.mjs`): com as
        mesmas peças pintadas de DIFUSO PURO (metalicidade 0, rugosidade 1) os
        tracinhos SOMEM; com `MeshBasicMaterial` também. Geometria e profundidade
        já estavam certas — um pico só, a 6,0 mm — e o que restava era shading.
@@ -1926,7 +1926,7 @@ export function dressTopRail(root: THREE.Object3D, roofYMundo: number): number {
                        o que prova que ele é FURO e o fundo o preenche
 
      E O QUE A BANCADA JÁ ELIMINOU, cada um com o quadro guardado em
-     `tools/studio-bench/shots/` (`checks-scania6/7/8/9-0822.mjs`):
+     `tools/studio-bench/shots/` (`diag/checks-scania6/7/8/9-0822.mjs`):
 
          q9-2  fusão SOLTA + as 6 peças escondidas ....... faixa LIMPA
          q9-1  fusão SOLTA, tudo visível ................. tracinho

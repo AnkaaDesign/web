@@ -108,9 +108,22 @@ Três eixos, nesta ordem, separados por `_`:
 ```
 
 - `sobrechassi_frigorifico_gancheiro.glb` — o desta rodada
-- `semirreboque_frigorifico_paleteiro.glb` — o `trailer.glb` de hoje, quando for
-  renomeado (o arquivo velho **fica no servidor**: a árvore sai com
-  `Cache-Control: immutable` e `--delete` é proibido nela)
+- `semirreboque_frigorifico_paleteiro.glb` — o nome que o paleteiro terá **no
+  próximo bake**. O arquivo velho fica no servidor de qualquer forma: a árvore
+  sai com `Cache-Control: immutable` e `--delete` é proibido nela.
+
+> ⚠️ **O `semirreboque_frigorifico_paleteiro.glb` QUE EXISTE NO DISCO NÃO É O
+> IMPLEMENTO SERVIDO** — 2026-08-26. Ele é cópia byte a byte do `trailer.glb`
+> PRÉ-`_v2`, e é nele que estas bancadas medem: `graft-materials.mjs` o usa como
+> doador de material e `tools/chassis-bake/bake-protecao-lateral.cjs` extrai a
+> grade dele. Continua servindo para as duas coisas — o bake `_v2` mexeu no
+> TETO (46 cintas de rebite), no kit interno e no rasgo do evaporador, e em mais
+> nada: mesmos 38 materiais, mesma caixa fora o topo.
+>
+> **O que o app carrega é `trailer_v2.glb`**, e quem manda nisso é
+> `models/vehicles/implements.json`. Se um dia estas bancadas passarem a medir
+> teto ou interior, troque o doador — e aí o nome de convenção deixa de ser uma
+> promessa e vira o bake de verdade.
 
 ## Verificação
 

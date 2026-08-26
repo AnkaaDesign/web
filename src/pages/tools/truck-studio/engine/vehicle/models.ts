@@ -4784,7 +4784,7 @@ let guardKit: THREE.Object3D | null = null;
 let guardKitReq: Promise<THREE.Object3D | null> | null = null;
 
 /**
- * A PROTEÇÃO LATERAL, extraída do semirreboque para `protecao_lateral_v1.glb`.
+ * A PROTEÇÃO LATERAL, extraída do semirreboque para `protecao_lateral_v2.glb`.
  *
  * Mesma forma de `loadDoorKit()`: um asset compartilhado, pedido uma vez por
  * sessão, e a falta dele NÃO derruba o implemento — o baú carrega sem grade e

@@ -193,7 +193,7 @@ export interface ImplementDef {
    */
   subframe?: boolean;
   /**
-   * Este implemento RECEBE a proteção lateral de `protecao_lateral_v1.glb`.
+   * Este implemento RECEBE a proteção lateral de `protecao_lateral_v2.glb`.
    *
    * Padrão pelo `kind`, e o padrão é o inverso do que parece: o SEMIRREBOQUE
    * NÃO recebe — ele já TEM a peça assada, e foi dele que ela foi extraída;

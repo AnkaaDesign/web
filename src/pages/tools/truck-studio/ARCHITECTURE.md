@@ -4968,8 +4968,8 @@ mudou o boot dos dois implementos): 10 de 10 conjuntos repetidos com instância,
 630 rebites de emenda, e o trilho liso dele **sem** rebite gerado.
 
 As sondas da investigação, que é o que fica: `checks-scania-0822.mjs` (o censo
-de onze frentes), `checks-scania2-0822.mjs` (a fita segmento a segmento e a
-porta) e `checks-scania3-0822.mjs` (as tripas do `TrailerAssembly` — foi ela que
+de onze frentes), `diag/checks-scania2-0822.mjs` (a fita segmento a segmento e a
+porta) e `diag/checks-scania3-0822.mjs` (as tripas do `TrailerAssembly` — foi ela que
 mostrou `fam.count = 1` e fechou §38.1).
 
 ### 38.13 Em aberto
@@ -5034,7 +5034,7 @@ sobrevive, e escurecer peça aprovada sem consertar o defeito é troca ruim.
 ### 39.2 A CHAPA DA ANKAA — o material, provado por quatro renders
 
 *"ainda está fosca / cinza"*, terceira vez. O experimento
-(`checks-scania6-0822.mjs`) separou material de geometria:
+(`diag/checks-scania6-0822.mjs`) separou material de geometria:
 
 ```
 (a) como está ................................. cinza fosco
@@ -6873,7 +6873,7 @@ Medindo `alta` OUTRA VEZ no fim da corrida ela também dá **214**. O eixo não 
 NÍVEL, é a ORDEM: `alta` é o primeiro da lista e, com a sessão já em `alta`, não
 passa cortina nenhuma — ele mede a PRIMEIRA CARGA; os outros dois medem uma cena
 RECONSTRUÍDA. E o diagnóstico nominal
-(`checks-diag-censo-primeira-carga-0824.mjs`) fecha a conta:
+(`diag/checks-diag-censo-primeira-carga-0824.mjs`) fecha a conta:
 
 ```
 APARECERAM depois da cortina   FUSAO__Faixa-3M__b0 · FUSAO__borracha-preta__b0 ·
@@ -6918,7 +6918,7 @@ dívida antiga que só agora tem nome e reprodução.
 
 ```
 node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-ceu-0824.mjs
-node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-diag-censo-primeira-carga-0824.mjs
+node tools/studio-bench/bench.mjs --gpu --geometry --checks diag/checks-diag-censo-primeira-carga-0824.mjs
 python tools/env-build/hdri_stats.py public/environments/distrito-industrial/sky*.hdr
 ```
 
@@ -6930,7 +6930,7 @@ nunca no campo do perfil.
 E há um terceiro, que não é portão e sim OLHO:
 
 ```
-node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-diag-ceu-fotos-0824.mjs
+node tools/studio-bench/bench.mjs --gpu --geometry --checks diag/checks-diag-ceu-fotos-0824.mjs
 ```
 
 Ele fotografa o céu às 17:45, 18:15, 18:30, 19:00, 19:30, 21:00 e 23:00 com um
@@ -7063,13 +7063,22 @@ carregamento da CABINE, quando o implemento ainda não existe e não há o que
 medir. Se entrar um implemento mais estreito que o sobrechassi, ela tem de
 descer junto — e é ★ A que avisa.
 
-### 48.6 O que ficou pendente
+### 48.6 O que ficou pendente — encurtado pela metade em §50, ainda aberto
 
 O **VW continua com 1 283 e 1 503 mm de balanço** na ponta traseira do corrido
 dianteiro. Não é o tanque (o dele está em |x| 1 000, folgado): é o rip, que é
 UMA malha só (`truck_p4`) e cuja lista de obstáculos cobre o chassi quase todo —
 o mesmo problema que §45.1 registra. Fica para uma frente própria; mexer nele
 pela foto é exatamente o erro de método do §43.10.
+
+> ⚠️ **E FOI PIOR ANTES DE MELHORAR.** §49 esticou o caminhão, e com o flanco
+> avançado esses 1 283/1 503 mm viraram **1 894, 2 260 e 2 583 mm** nas três
+> configurações do VW. §50 **corta isso quase pela metade** — 1 273 · 1 198 ·
+> 1 223 mm — pondo o segundo apoio que faltava, sem tirar um milímetro de grade
+> e sem criar contato nenhum. **Não fecha**, e §50.3 explica por que a versão
+> que fechava foi recusada: ela punha 52 mm de tampa dentro da aba do flanco.
+> O que falta é o mesmo isolamento por componente conexo (§41) que esta seção já
+> apontava.
 
 ## 48-B. O SUPORTE, na régua do modelo do dono
 
@@ -7133,8 +7142,8 @@ chapa. É o que o implementador faz.
 ```
 node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-grade-flanco-0824.mjs
 node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-varredura-0823.mjs
-node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-diag-grade-apoio-0824.mjs
-node tools/studio-bench/bench.mjs --gpu --geometry --checks checks-diag-suporte-0824.mjs
+node tools/studio-bench/bench.mjs --gpu --geometry --checks diag/checks-diag-grade-apoio-0824.mjs
+node tools/studio-bench/bench.mjs --gpu --geometry --checks diag/checks-diag-suporte-0824.mjs
 ```
 
 O primeiro é o portão; o segundo é o baseline de sobreposição (cinco falhas
@@ -7231,3 +7240,271 @@ teto — o baú de fábrica deste implemento tem 8,66 m e o bitruck pede 9,50, o
 seja o corpo CRESCE. Aplica-se uma vez por (chassi × implemento), antes do teto
 legal, e a regra de mão dupla da CONTRAN passou a devolver o baú até ESTE número
 em vez do comprimento do asset — senão o padrão se desfazia no quadro seguinte.
+
+## 50. 2026-08-26 — o VW não tinha onde se prender, e a arrumação da bancada
+
+Duas coisas, e a segunda é o que torna a primeira encontrável da próxima vez.
+
+### 50.1 O portão de §48 rodou pela primeira vez — e reprovou o VW nas três
+
+`checks-grade-flanco-0824.mjs` foi escrito no fim de §48 e ficou sem rodar até
+o verde. Rodado agora, nas dez configurações:
+
+    ★ A · ★ A2 · ★ B · ★ C — verdes nas dez
+    ★ E — FALHA nas TRÊS do VW
+
+| | corrido dianteiro | estações | balanço na ponta |
+|---|---|---|---|
+| VW 8x2 | 5 502…7 812 | **1** | **1 894 mm** |
+| VW 6x2 | 4 353…7 030 | **1** | **2 260 mm** |
+| VW 4x2 | 4 353…7 352 | **1** | **2 583 mm** |
+
+Não é o mesmo defeito de §48 (a grade não morre cedo: ela vai até onde deve).
+É o **apoio** que não existe: 2,7 m de perfil com um montante só, e o resto
+pendurado. É a queixa que `PASSO` já registra — *"a grade está muito longa, o
+suporte dela fica flutuando"* — pela outra ponta.
+
+### 50.2 A causa: um limite que não media nada
+
+`estacoes()` põe os apoios partindo das pontas para dentro e, quando o alvo cai
+num obstáculo, faz o que a implementadora faz — anda para o vão mais próximo.
+Só que a busca parava em **`PASSO / 2` = 625 mm**, e a estação que não coubesse
+ali era **apagada**.
+
+⚠️ **`PASSO` é o vão máximo ENTRE apoios; ele não diz nada sobre o quanto UM
+apoio pode andar.** Usar metade dele como raio de busca é um número que não
+mede o que promete medir — a terceira vez nesta ferramenta (as outras duas
+estão em §43.9 e §43.3, as duas por medir uma PEÇA em vez do ESPAÇO).
+
+Medido no VW 4x2 — e o que tornou isto legível foi a linha nova do resumo
+(§50.4):
+
+    corrido dianteiro          −27 … 2 733
+    obstáculos da ESTAÇÃO      −1 448…252 · 252…1 052 · 1 652…2 152 · 2 652…6 252
+    alvo dianteiro             273  (dentro de 252…1 052)
+    busca ±625                 morre em 898, ainda dentro do MESMO obstáculo
+    janela livre mais próxima  1 052…1 652  ← a 779 mm, e ninguém olhava
+
+⚠️ **E OS OBSTÁCULOS SÃO REAIS — a suspeita de §45.1 não se confirmou aqui.**
+`truck_p4` ser uma malha só é verdade e atrapalha em outros lugares, mas a
+sonda de região (`tools/chassis-bake/probe-regiao.cjs`) sobre
+`vw_titan_4x2_tl.glb`, na faixa |x| ≥ 1 130 · y 500…1 100, devolve **a CASCA DA
+CABINE** (`clima_p2`, |x| até 1 234) e o **pneu dianteiro** (|x| 1 250). O
+corrido dianteiro do VW corre ao lado da cabine e da roda, e ali não desce
+montante nenhum — nem no caminhão de verdade.
+
+### 50.3 O conserto tem TRÊS partes, e nenhuma serve sozinha
+
+1. **A busca vai até a ponta do corrido** (`limite = t.z1 − t.z0`). Continua
+   saindo do alvo para fora, então **quem cabe no lugar ideal não anda um
+   milímetro** — nas dez configurações, só o VW muda.
+2. **O corrido é APARADO ao que os apoios seguram**: `z0 = max(z0, primeira −
+   BALANCO)` e `z1 = min(z1, última + BALANCO)`. `BALANCO` era uma promessa
+   cumprida só quando a estação nascia no lugar ideal; agora é cumprida sempre.
+   Trecho que não aceita apoio NENHUM deixa de existir — é barra que a oficina
+   não teria como instalar.
+
+Sozinha, (1) deixaria o VW com 1 077 mm de balanço; sozinha, (2) cortaria 2,1 m
+de grade que tinha onde se prender.
+
+E a apara tem uma terceira parte, que só apareceu quando a varredura geral
+mediu: **a ponta aparada tem de cair num lugar livre.** A tampa fica
+`recuoTampa` ALÉM do fim da barra — é ela que faz o balanço medido ser 417 e não
+300 —, e uma ponta que a apara moveu é uma ponta que `trechos()` nunca validou.
+Sem isso, a tampa do VW 6x2 foi parar 14 mm dentro de `truck_p5`.
+
+⚠️⚠️ **DUAS TENTATIVAS FORAM REVERTIDAS ANTES DA QUE FICOU, e as duas erraram do
+mesmo jeito — mexeram em quem já estava certo:**
+
+| tentativa | o que fez | varredura | grade-flanco |
+|---|---|---|---|
+| apara crua | trim e mais nada | 13 (baseline 12) | tudo certo |
+| reusar o recuo em cadeia de `trechos()` | o laço de lá, aplicado à ponta nova | **16** | — |
+| `FOLGA_PONTA` dos dois lados | critério "parecido" com o de `trechos()` | — | **4 falhas** (VM abaixo de ★ D, sem ★ C) |
+| `!==` cru em vez de `APARA_MIN` | um ULP virou 275 mm de recuo no VM | — | **4 falhas** |
+| busca contra `perto` (recortado pelas baias) | a tampa foi para dentro da aba do VW | **13** | tudo certo |
+| **busca contra a lista CRUA, desistindo quando não há lugar** | ↓ | **12 = baseline** | ★ E aberto no VW, com o balanço pela metade |
+
+⚠️ **A PENÚLTIMA LINHA É A TENTAÇÃO, e ela foi recusada de propósito.** "Tudo
+certo" no portão da grade custava 52 mm de tampa dentro da aba do flanco do VW,
+em |x| 1 173 — um portão verde e uma foto pior, que é o §45.1 outra vez. Entre um
+balanço medido e documentado e uma peça dentro de outra, fica o balanço.
+
+O que a versão final faz, e cada cláusula existe por uma dessas linhas:
+
+- **varredura LIMITADA**, do alvo da apara para dentro, com piso na própria
+  estação — e não recuo em cadeia. O laço de `trechos()` parte de uma ponta já
+  validada e desiste depois de `RECUO_BARATO`; herdado aqui, ele cascateava até
+  comer o corrido (o VW 6x2 reprovou "a grade cobre pelo menos 2 000 mm").
+- **critério LITERALMENTE o de `trechos()`** — o ponto julgado é o da TAMPA
+  (`t.z1 + recuoTampa`, que é o z que `trechos()` aprova antes de aplicar o
+  recuo) e a folga é de UM lado só. Um critério "parecido" — `FOLGA_PONTA` nos
+  dois limites — rejeita pontas que `trechos()` aprovou, e o corrido do VM
+  encolheu abaixo da régua.
+- **só onde a apara MEXEU**, com folga de `APARA_MIN`. Uma ponta que a apara não
+  moveu pode estar dentro de uma faixa **de propósito** (é `trechos()`
+  desistindo por `RECUO_BARATO`), e herdá-la faz a busca andar sem motivo.
+  ⚠️ E a folga não é preciosismo: num corrido sem obstáculo a estação nasce em
+  `z0 + BALANCO` e `casas[0] − BALANCO` volta ao mesmo ponto **com um ULP de
+  diferença**. Com `!==` cru, o corrido dianteiro do VM 6x2 recuou **275 mm por
+  causa de um erro de 10⁻¹⁶ m**.
+
+⚠️⚠️ **E A ÚLTIMA A CAIR FOI A LISTA CONTRA A QUAL A BUSCA MEDE.** `trechos()`
+recua as pontas contra `perto` — os obstáculos da estação **recortados pelas
+baias de roda** —, e o recorte existe por um motivo bom: a BARRA tem de poder
+entrar na baia (é o *"além disso a barra terá que extender"* de §44). Herdar
+essa lista aqui parecia o mais consistente possível, e estava errado: quem a
+apara posiciona é a **TAMPA**, e tampa dentro da aba do flanco é peça dentro de
+peça, baia ou não. Medido — a apara levou o corrido traseiro do VW 6x2 350 mm
+para dentro e a tampa foi parar **52 mm dentro da aba de `truck_p4`, em |x|
+1 173**, no flanco, onde a varredura tem estrela própria e onde o baseline não
+tinha achado NENHUM. A aba mora dentro da baia do eixo de apoio, e `perto` a
+tinha apagado.
+
+A busca passa a medir contra a lista CRUA (`obstaculosEstacao`), e **quando não
+há posição livre até a estação, a apara desiste** e devolve a ponta que
+`trechos()` tinha entregado. Aparar é uma melhoria: ela não pode custar uma
+penetração nova. O preço é ★ E poder reprovar naquele trecho — que é o estado
+ANTERIOR, medido e conhecido, e não um estado novo.
+
+**Resultado:** a varredura geral volta a **12 falhas, idêntica ao baseline** — os
+contatos da tampa do VW 6x2 caem para 20 e 10 mm (contra os 52 da tentativa
+anterior), os dois dentro do teto que a lista de encaixes já assume, e o contato
+com `truck_p5` deixa de existir. ⚠️ A entrada que eu tinha acrescentado à lista
+de encaixes para absorver aquele contato **foi RETIRADA**: assumir um encaixe
+que não acontece mais é deixar armada a peneira que vai engolir o próximo.
+
+⚠️⚠️ **E O PREÇO ESTÁ COBRADO: ★ E CONTINUA REPROVANDO NO VW, e é assim que tem
+de ser.** Com a apara desistindo em vez de penetrar, o VW não encurta — e a
+grade dele não fecha os 600 mm. O que o conserto entrega ali é a OUTRA metade,
+e ela é a maior:
+
+| VW, corrido dianteiro | antes | agora |
+|---|---|---|
+| estações | **1** | **2** |
+| balanço na ponta (8x2 / 6x2 / 4x2) | 1 894 · 2 260 · **2 583 mm** | 1 273 · 1 198 · **1 223 mm** |
+| comprimento do corrido | 4 351 · 4 408 · 4 622 | **os mesmos** |
+
+**A busca larga sozinha corta o pendurado quase pela metade**, sem tirar um
+milímetro de grade e sem criar contato nenhum. O que falta para os 600 mm não
+está no motor: é que o flanco do VW, entre a cabine e a roda dianteira, não tem
+onde um montante desça — medido em §50.2, com a casca da cabine em |x| 1 234 e o
+pneu em 1 250. Fechar isso é o mesmo caminho que §48.6 já apontava e que as duas
+entradas de encaixe da aba esperam: **isolar as peças do VW por componente conexo
+(§41), porque `truck_p4` e `truck_p5` são duas malhas com o caminhão inteiro
+dentro.** Não é conserto de foto; é uma frente própria.
+
+⚠️ **E A RÉGUA DE ★ D FOI FIXADA NOS COMPRIMENTOS INTEIROS**, não nos aparados —
+senão a próxima pessoa fecha ★ E encurtando a grade, que é §45.1 pela quarta vez
+nesta ferramenta.
+
+⚠️ **QUEM JÁ PASSAVA NÃO ANDOU.** Num corrido sem obstáculo a estação nasce
+exatamente em `z0 + BALANCO`, então a apara é de zero. Medido, antes × depois:
+
+| | antes | depois |
+|---|---|---|
+| VM 8x2 / 6x2 / 4x2 | 4 780 · 5 410 · 5 703 | **idênticos** |
+| Scania 4x2 | 5 469 | **idêntico** |
+| Scania 6x2 / 6x4 | 5 113 | 5 088 (−25 mm: um apoio estava 25 mm fora do lugar e a barra o seguiu) |
+| **VW 8x2 / 6x2 / 4x2** | 4 351 · 4 408 · 4 622 | **3 501 · 3 283 · 3 747** |
+
+O VW perde 850…1 125 mm — e são exatamente os que não tinham apoio. ★ C
+continua verde: nada que precisava ser coberto ficou descoberto.
+
+**`checks-grade-flanco-0824.mjs`: ★ A · ★ A2 · ★ B · ★ C · ★ D verdes nas dez;
+★ E aberto nas três do VW, com o balanço reduzido à metade e a causa medida.**
+
+### 50.4 As duas coisas que faltavam para isto ser encontrável
+
+⚠️ **A régua de COMPRIMENTO (★ D) estava VAZIA e nunca rodou.** É §45.1 pelo
+avesso: um portão que só conta balanço também não sabe dizer que a peça
+encolheu, e a apara de §50.3 é justamente uma forma de encurtar a grade até o
+balanço fechar. `REGUA` passa a trazer as dez medidas. **As duas estrelas se
+seguram: ★ E proíbe barra sem apoio, ★ D proíbe encolher a barra para consegui-lo.**
+
+⚠️ **E O RESUMO REPORTAVA A LISTA ERRADA.** A linha `[grade] obstáculos no x da
+grade` é `obstaculos` — a que AMPUTA o corrido. Quem decide onde cabe um APOIO
+é `obstaculosEstacao`, outra faixa de altura e outra folga, e ela não aparecia
+em lugar nenhum. Com o corrido do comprimento certo e um apoio só no meio dele,
+o resumo dizia `2 trecho(s) · estações 1/2` e não havia **como saber por quê**.
+A segunda lista entra no resumo, e foi ela que fechou §50.2 em uma leitura.
+
+### 50.5 A arrumação — `tools/studio-bench/diag/`
+
+`tools/studio-bench/` tinha **204 `checks-*.mjs` num nível só**, e 85 eram sonda
+de uma pergunta específica. Misturados com os portões, escondiam o que alguém
+procura ao chegar: qual é o teste que tem de ficar verde.
+
+| | mora em | pergunta |
+|---|---|---|
+| **portão** | `tools/studio-bench/` | *isto continua verdadeiro?* — falha é regressão |
+| **diagnóstico** | `tools/studio-bench/diag/` | *quanto é isto, hoje?* — respondeu, virou constante |
+
+**Não foram apagados**, e a razão é a mesma que sustenta este documento: eles
+são a PROCEDÊNCIA dos números. `cab-bake-fixes.ts` cita
+`diag/checks-diag-paralama-scania-0823.mjs` como origem de uma cota; cinco
+seções daqui citam outros. Apagar o arquivo transforma a cota em número mágico.
+Regra em `tools/studio-bench/diag/README.md`.
+
+Saíram junto, esses sim, três assets mortos:
+
+- `protecao_lateral_v1.glb` + `_meta.json` — o corrido sem a ferragem, vencido
+  pela v2 em §44. A v2 é superconjunto exato da v1 (mesmas peças, mais `BRACO`,
+  `MAO` e os dois `GRAMPO`), então as cotas citadas da v1 valem sem mudar de
+  valor e passaram a citar a v2.
+- `semirreboque_frigorifico_paleteiro_meta.json` — cópia byte a byte de
+  `trailer_meta.json` que nada mais lia depois de o catálogo apontar para
+  `trailer_v2.glb`.
+
+### 50.5-b Os quatro cartões que faltavam, e quem os achou
+
+O portão de pré-publicação do runbook (`tools/verify-manifests/catalog-resolves`)
+reprovou em `chassi sem render neutro`: **`volvo-vm-2015/{8x2r,4x2r}` e
+`vw-constellation/{8x2-tl,4x2-tl}` estavam em `brands.json` sem cartão nenhum.**
+Publicar teria posto quatro silhuetas de placeholder no seletor, ao lado dos seis
+que têm foto.
+
+Gerados com `tools/studio-render/shoot.mjs --neutral` — e a nota que faltava no
+runbook é que ele quer uma raiz que CONTENHA `v1/`, não a raiz de assets:
+
+```bash
+mkdir -p /tmp/ar && ln -sfn "$PWD/public" /tmp/ar/v1
+STUDIO_ASSETS_ROOT=/tmp/ar node tools/studio-render/shoot.mjs --neutral
+```
+
+O portão passa a dar **5 passed · 7 marcas · 22 modelos · 52 chassis · 52
+arquivos**. O runbook prometia `4 passed · 24 modelos · 60 chassis · 53
+arquivos`, que nunca correspondeu a árvore nenhuma — corrigido lá.
+
+### 50.6 ⚠️ O catálogo apontava para o bake ANTERIOR do semirreboque
+
+Achado ao juntar o trabalho local com o `main`, e ele não dá conflito de texto:
+`main` trocou o implemento para `trailer_v2.glb` (o bake que tirou as 46 cintas
+de rebite atravessando a chapa do teto), e `implements.json` — escrito antes —
+apontava para o nome de convenção, que carrega os bytes ANTERIORES. Os dois
+lados mexem em linhas diferentes, o git juntou os dois, o resultado compilava e
+carregava, **e os rebites voltariam ao teto**.
+
+`implements.json` e `LEGACY_IMPLEMENT` passam a apontar para `trailer_v2.glb`.
+O nome de convenção fica para o PRÓXIMO bake: os bytes do `_v2` já estão
+publicados, `/studio-assets/v1/` responde `immutable` e `--delete` é proibido
+naquela árvore — republicá-los sob um terceiro nome gravaria mais 21 MB
+impodáveis sem entregar nada novo.
+
+⚠️ **A LIÇÃO É SOBRE MERGE, e vale além deste arquivo:** conflito de texto é o
+caso FÁCIL. O caso caro é o que junta limpo porque cada lado tocou uma linha
+diferente do mesmo contrato — aqui, "qual arquivo é o implemento". Quem procura
+`<<<<<<<` não acha esse.
+
+### 50.7 Como reproduzir
+
+```bash
+node tools/studio-bench/bench.mjs --gpu --geometry \
+     --checks checks-grade-flanco-0824.mjs        # ★ A A2 B C D E, dez configurações
+node tools/studio-bench/bench.mjs --gpu --geometry \
+     --checks checks-varredura-0823.mjs           # a varredura geral, sem regressão
+
+# e a sonda que respondeu "o que há no flanco do VW", sem abrir o Blender:
+node tools/chassis-bake/probe-regiao.cjs public/models/trucks/vw_titan_4x2_tl.glb \
+     --caixa 1.130 3.0 0.500 1.100 -12 12 --norm -0.0036 --abs-x --top 60
+```
