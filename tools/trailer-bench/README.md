@@ -139,3 +139,85 @@ reposicioná-la.
 Não sobe o estúdio — sem cenário, sem HUD, sem seletor, sem engate. É luz de
 sala (`RoomEnvironment`) mais uma direcional. Serve para **geometria e
 material**; para julgar iluminação de cenário, é o app.
+
+## `implprobe.ts` / `shoot-impl.mjs` — o IMPLEMENTO NOVO
+
+```bash
+node tools/trailer-bench/shoot-impl.mjs                                   # o sobrechassi
+node tools/trailer-bench/shoot-impl.mjs semirreboque_frigorifico_paleteiro.glb
+SS=3 node tools/trailer-bench/shoot-impl.mjs                              # superamostrado
+```
+
+As outras duas bancadas medem UM implemento conhecido. Esta responde a pergunta
+que só aparece quando chega um bake novo: **`TrailerBody` sabe ler este baú?**
+
+Ela existe porque `TrailerBody` é dirigido por MEDIDA e não por nome de peça —
+decompõe o branco em cascas conexas e classifica cada uma. Isso é o que o torna
+portável entre bakes, e é também o que faz a falha ser **silenciosa** quando ele
+não é: um baú em que nenhuma casca vira `RIBBED` não lança erro (o
+`buildTrailerRig()` engole a exceção de propósito) e o usuário descobre no
+primeiro arrasto do controle de altura.
+
+O `sillMaterial` sai do próprio `models/vehicles/implements.json` — a bancada
+julga o que o app vai montar, não uma variante escrita à mão.
+
+**Foi ela que achou os quatro defeitos da rodada de 2026-08-18** (todos em
+`ARCHITECTURE.md` §24), e nenhum deles aparecia num diff:
+
+1. `0 cascas frisadas` no sobrechassi — a lateral dele são 17 folhas de 1 m e
+   nenhuma atravessa 90 % do vão sozinha.
+2. A folha da PORTA entrando na união da parede e matando o friso **de um lado
+   só** (os frisos dela estão em outra fase).
+3. `batente_mm: 8` — `measureSill()` casava `metal-galvanizado-mantido`, que
+   este bake não tem, e a porta nascia dentro da cantoneira.
+4. O par `rasante` × `rasante-cru`: o A/B com o corpo paramétrico escondido
+   provou que a cintilação era do BAKE. E o `?ss=3` separou o que era empate de
+   z-buffer (a costura coplanar do remonte) do que era **aliasing** de malha
+   sub-pixel — que some com mais pixel e não se conserta com profundidade.
+
+## `medir-0820.ts` / `medir-0820.mjs` — a MEDIDA, sem canvas e sem chassi
+
+```bash
+node tools/trailer-bench/medir-0820.mjs                    # os DOIS implementos
+node tools/trailer-bench/medir-0820.mjs <arquivo.glb>      # um só
+FOTO=1 ALVO='^metal-preto$' COTA='17,45,110' \
+  node tools/trailer-bench/medir-0820.mjs                  # + fotos, com a família em magenta
+```
+
+Irmã do `shoot-impl.mjs`, com outra pergunta. Aquele responde **"o baú
+paramétrico sabe ler este bake?"**; este responde **"esta peça está no mesmo
+lugar nos dois implementos?"**, que é a pergunta de toda rodada em que o
+semirreboque é o padrão ouro.
+
+Ela sobe só o implemento, aplica as correções de bake **na ordem do app** e
+grava um JSON por implemento em `medidas-0820/` (ignorado pelo git). ~20 s por
+implemento, contra os ~7 min da bancada com `--geometry`.
+
+O que sai:
+
+| chave | responde |
+| --- | --- |
+| `A_engate` / `A_depois` | componentes conexas de cada ferragem fundida, e os grupos de índice depois da divisão |
+| `B_perfil` | o perfil do friso DOBRA A DOBRA, dobrado pelo passo — e a fase da crista |
+| `C_baixo` / `C_polidos_na_faixa` / `C_esbeltos_restantes` | o que mora na linha do piso, por família e nominalmente |
+| `D_trilho` | a face do trilho contra a da pele, POR FLANCO, **antes e depois** da correção |
+| `E_antes` / `E_fitas` | toda fita vertical com o delta para o montante dela, antes e depois |
+| `varredura_da_faixa` | raycast da elevação do flanco: qual malha aparece em cada coluna de pixel |
+
+**Três armadilhas que ela existe para não cair** (as três custaram meia sessão
+em 2026-08-20; ver `ARCHITECTURE.md` §29):
+
+1. **MUNDO contra RAIZ.** `TrailerBody.profile` mede em mundo e as caixas de
+   malha saem no espaço da raiz. A sonda mede TUDO em mundo. Misturar os dois
+   põe o montante de canto 717 mm abaixo do piso do baú, sem erro nenhum.
+2. **A pele é uma EXTRUSÃO.** Ela não tem vértice entre os dois planos de corte
+   — 55 038 vértices no flanco e ZERO na janela central de z. Quem separa o
+   flanco da testeira é a NORMAL, não uma janela em z.
+3. **`markShared()` antes de tudo.** Sem ela a correção de vértice roda duas
+   vezes na geometria compartilhada.
+
+E `FOTO=1` fotografa nos enquadramentos DAS FOTOS DO DONO (`friso`,
+`canto-frente`, `canto-traseiro`, `engate-femea`, `banda-*`), em dois passes —
+como está e com a família alvo em magenta. É a prova visual antes de remover
+peça: foi ela que absolveu as lanternas laterais de chassi e condenou os sete
+tubos embutidos.

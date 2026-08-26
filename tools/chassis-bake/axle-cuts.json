@@ -1,0 +1,112 @@
+{
+  "schema": "axle-cuts@1",
+  "_comment": [
+    "REGRAS DE CORTE POR EIXO, para gerar configuracoes a partir de um rip.",
+    "",
+    "NAO e uma lista de indices: indice de componente muda a cada re-bake e a",
+    "cada versao do decodificador Draco. Sao REGRAS GEOMETRICAS, aplicadas sobre",
+    "a decomposicao em componentes conexos que tools/trailer-bench/axleprobe.cjs",
+    "produz. O mesmo arquivo serve ao script de bake e a conferencia.",
+    "",
+    "MEDIDO em 2026-08-20 por axleprobe.cjs sobre scania_p_8x2r.glb: 256",
+    "primitivas -> 8 526 componentes conexos, 4 eixos achados pelo ARO em",
+    "z = +1640,2 / -574,6 / -4931,8 / -6288,0 mm (o manifesto diz +1640,3 /",
+    "-574,5 / -4933,5 / -6289,8 — fecha em 1,8 mm).",
+    "",
+    "A REGRA FOI CONFERIDA PELO QUE ELA DEIXA PARA TRAS, e nao pelo que ela",
+    "leva: na zona do 2o direcional sobram 10 componentes e as 10 sao quadro —",
+    "uma travessa de 851x183x298 mm entre as almas (y 763…945), quatro reforcos",
+    "longitudinais de 1 754 a 1 851 mm em |x| 394, um perfil de 877 mm em",
+    "|x| 575 e quatro parafusos no topo do trilho. Nenhuma peca de eixo ficou."
+  ],
+  "source": "models/trucks/scania_p_8x2r.glb",
+  "measuredBy": "tools/trailer-bench/axleprobe.cjs@1",
+  "measuredAt": "2026-08-20",
+  "axles": [
+    {
+      "role": "direcional",
+      "z": 1.6402
+    },
+    {
+      "role": "direcional",
+      "z": -0.5746
+    },
+    {
+      "role": "trativo",
+      "z": -4.9318
+    },
+    {
+      "role": "auxiliar",
+      "z": -6.288
+    }
+  ],
+  "cuts": {
+    "remove-2o-direcional": {
+      "_note": [
+        "O 2o eixo direcional do bitruck. E o corte LIMPO do arquivo: 259",
+        "componentes, 231 602 triangulos, e nenhuma componente atravessa a zona",
+        "do eixo vizinho (axleprobe imprime esse veredito).",
+        "",
+        "Serve aos DOIS destinos: truck 6x2 (so este corte) e toco 4x2 (este mais",
+        "o do tandem, que ainda NAO e um corte — ver `_pendencias`)."
+      ],
+      "nodes": [
+        {
+          "match": "^wheel_f_2_0_",
+          "_why": "rodagem direita do 2o direcional"
+        },
+        {
+          "match": "^wheel_f_3_0_",
+          "_why": "rodagem esquerda do 2o direcional"
+        },
+        {
+          "match": "^t_paralama_0_p[0-3]$",
+          "_why": "os para-lamas do 2o direcional. ⚠️ O NOME ENGANA: parecem traseiros e medem z -1 249…+107. 68 componentes, 36 160 tri. Um deles e `t_paralama_0_mat_0001_pintura_75`, que esta em paintMaterials do Scania em brands.json — tirar o eixo tira 1 dos 2 nomes pintaveis daquele bake, e a lista tem de ser revista junto."
+        }
+      ],
+      "components": [
+        {
+          "node": "chassis_p14",
+          "zc": [
+            -0.9,
+            -0.55
+          ],
+          "_why": "os rebites das DUAS maos-de-mola, em z -845 e -587 mm (par separado por 257,5 mm, na alma em |x| 411…437). Sao 24 componentes de 503 tri. Deixa-los faria a fileira de rebites sobreviver a um eixo que sumiu."
+        },
+        {
+          "node": "chassis_p12",
+          "zc": [
+            -0.9,
+            -0.35
+          ],
+          "dzMax": 0.4,
+          "notCrossmember": {
+            "y0Min": 0.7,
+            "dxMin": 0.6
+          },
+          "_why": "a viga do eixo (3 128 tri, 1 803x266x179 mm, centrada, y 255…521) mais feixe, grampo, amortecedor e suportes. As duas excecoes sao MEDIDAS: `dzMax` tira os reforcos longitudinais da longarina (1 754…1 851 mm) e `notCrossmember` tira a travessa do quadro, que mora na mesma faixa de z."
+        }
+      ]
+    }
+  },
+  "_pendencias": [
+    "TOCO 4x2 NAO E 'APAGAR O EIXO AUXILIAR'. Medido: das 260 componentes do",
+    "auxiliar, 216 tem gemeo exato no trativo (676 478 de 688 412 tri) — ou",
+    "seja, os dois eixos sao a mesma peca duplicada e separam-se bem. Mas as 44",
+    "orfas sao a SUSPENSAO COMPARTILHADA do tandem: o balancim de 1 322 tri em",
+    "|x| 519, y 359…1 014, z -5 716 (entre os dois eixos) e um membro de",
+    "1 084 mm em |x| 447. Tirar o auxiliar deixa o trativo pendurado em meia",
+    "suspensao. Um 4x2 de verdade tem outra suspensao traseira — isto e",
+    "MODELAGEM, nao recorte.",
+    "",
+    "TRACADO 6x4 EXIGE ACRESCENTAR, nao tirar. O auxiliar ja tem rodagem dupla;",
+    "o que falta e o diferencial e as trombetas. O doador esta ali: as pecas",
+    "centrais do trativo em `chassis_p34` (3 682 tri em z -4 531 e -4 575,",
+    "1 491 tri em z -4 893), clonadas e transladadas -1 356 mm (o vao do",
+    "tandem). Vale a pena, mas e enxerto e precisa de foto.",
+    "",
+    "NENHUM DESTES CORTES FOI VERIFICADO EM FOTO. A doutrina da casa e que uma",
+    "medida que nao vira imagem nao prova aparencia, e o modo de falhar aqui e",
+    "exatamente visual: uma mao-de-mola orfa flutuando, ou um furo no quadro."
+  ]
+}
