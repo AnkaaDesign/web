@@ -23,6 +23,9 @@ interface BonusRow {
   tasksCompleted: number;
   averageTasks: number;
   totalWeightedTasks: number;
+  windowWeightedTasks?: number;
+  windowDivisor?: number;
+  periodAverageTasks?: number;
   totalCollaborators?: number;
   eligibilityWeight: number;
   eligibleDays?: number | null;
@@ -104,7 +107,9 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   {
     id: "totalWeightedTasks",
     label: "Tarefas Ponderadas",
-    getValue: (row: BonusRow) => (row.totalWeightedTasks ?? 0).toFixed(1)
+    // JANELA desta pessoa — mesma fonte da coluna da tela. Exportar o total do
+    // período aqui fazia o arquivo discordar da tela linha a linha.
+    getValue: (row: BonusRow) => (row.windowWeightedTasks ?? 0).toFixed(1)
   },
   {
     id: "totalCollaborators",
@@ -113,7 +118,8 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
     // planilha: 16,5 ÷ 18 = 0,92 contra a média exportada de 1,09.
     label: "Colaboradores",
     getValue: (row: BonusRow) => {
-      const divisor = row.periodDivisor ?? row.totalCollaborators ?? 0;
+      // JANELA desta pessoa — mesmo número da tela.
+      const divisor = row.windowDivisor ?? row.periodDivisor ?? row.totalCollaborators ?? 0;
       return Number.isInteger(divisor)
         ? divisor.toString()
         : divisor.toFixed(2).replace(".", ",");
@@ -229,10 +235,20 @@ export function BonusExport({
     const eligibleUsers = data.filter(row => row.performanceLevel > 0);
 
     // Get weighted tasks from first eligible user (they share the same pool)
-    const totalWeightedTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.totalWeightedTasks || 0 : 0;
-    const avgTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.averageTasks || 0 : 0;
+    // Números da EQUIPE para o cabeçalho do PDF.
+    //
+    // `eligibleUsers[0]` é a primeira linha na ORDENAÇÃO da tela. Para as
+    // ponderadas isso funcionava por acidente (era campo do período, igual em
+    // toda linha), mas `averageTasks` virou por pessoa na v5 — e o PDF passou a
+    // imprimir a média de quem trabalhou 1 dia (0,00) ou de quem entrou na
+    // semana cheia (5,75) como número da equipe, conforme a ordenação. Este é o
+    // arquivo que circula FORA do sistema.
+    const totalWeightedTasks =
+      eligibleUsers.find(u => u?.totalWeightedTasks != null)?.totalWeightedTasks ?? 0;
+    const avgTasks =
+      eligibleUsers.find(u => u?.periodAverageTasks != null)?.periodAverageTasks ?? 0;
     // Divisor B1 do período — fracionário e igual para todas as linhas.
-    const periodDivisor = eligibleUsers.length > 0 ? eligibleUsers[0]?.periodDivisor ?? 0 : 0;
+    const periodDivisor = eligibleUsers.find(u => u?.periodDivisor != null)?.periodDivisor ?? 0;
 
     return {
       totalBaseBonus,

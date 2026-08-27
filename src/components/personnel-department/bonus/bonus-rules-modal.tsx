@@ -132,16 +132,19 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               highlighted={highlighted === "proporcionalidade"}
             >
               <p>
-                Quem trabalha o <strong className="text-foreground">período inteiro</strong> (do dia 26 ao dia 25) conta como <strong className="text-foreground">1 colaborador</strong> no cálculo e recebe <strong className="text-foreground">100% do bônus</strong>.
+                A média de cada pessoa é medida na <strong className="text-foreground">janela em que ela esteve na empresa</strong> dentro do período (do dia 26 ao dia 25), e só nela:
               </p>
               <p>
-                Quem é <strong className="text-foreground">desligado</strong> ou <strong className="text-foreground">efetivado no meio do período</strong> conta apenas a <strong className="text-foreground">fração de dias úteis trabalhados</strong> e recebe <strong className="text-foreground">essa mesma fração</strong> do bônus. Exemplo: quem esteve na empresa em 19 dos 20 dias úteis do período conta 0,95 e recebe 95%.
+                <strong className="text-foreground">tarefas ponderadas concluídas na janela</strong> ÷ <strong className="text-foreground">colaboradores ativos naquela janela</strong> = <strong className="text-foreground">média</strong>
               </p>
               <p>
-                A <strong className="text-foreground">média por colaborador</strong> usa a <strong className="text-foreground">soma dessas frações</strong> — por isso ela costuma ser um número quebrado, e não a contagem de pessoas.
+                Quem trabalha o período inteiro é medido no período inteiro. Quem é <strong className="text-foreground">desligado</strong> ou <strong className="text-foreground">efetivado no meio</strong> conta apenas as tarefas concluídas enquanto esteve, divididas pelo quadro daquele trecho — que costuma ser diferente do quadro médio do mês, porque quem pegou só o começo conviveu com a equipe cheia e quem pegou só o fim com a equipe reduzida.
+              </p>
+              <p>
+                O número de <strong className="text-foreground">colaboradores</strong> é a média diária do quadro na janela, por isso costuma ser quebrado — e não a contagem de pessoas.
               </p>
               <p className="text-xs italic">
-                O desligamento não apaga o bônus: quem saiu no meio do período continua com o valor proporcional aos dias em que trabalhou.
+                Os dias trabalhados não são descontados uma segunda vez: eles já estão dentro das tarefas da janela. O desligamento não apaga o bônus — quem saiu no meio continua com o valor da produtividade que viveu.
               </p>
             </Section>
           </div>

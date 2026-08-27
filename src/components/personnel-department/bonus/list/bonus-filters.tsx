@@ -1,7 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { IconFilter, IconBuilding, IconBriefcase, IconUserCheck } from "@tabler/icons-react";
+import {
+  IconFilter,
+  IconBuilding,
+  IconBriefcase,
+  IconUserCheck,
+  IconCalendarMonth,
+  IconUserOff,
+} from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -210,7 +217,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
     >
           {/* Year and Month Selection */}
           <div>
-            <Label className="text-sm font-medium mb-3 block">Ano e Mês</Label>
+            <Label className="text-sm font-medium mb-3 block flex items-center gap-2">
+              <IconCalendarMonth size={16} />
+              Ano e Mês
+            </Label>
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-1">
                 <Combobox
@@ -366,6 +376,34 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                 : ''
               }
             </p>
+          </div>
+          {/* Recorte por vínculo. Por último no painel: é o de menor uso, e o
+              padrão ("apenas ativos") já cobre a leitura do dia a dia. */}
+          <div>
+            <Label className="text-sm font-medium mb-3 block flex items-center gap-2">
+              <IconUserOff size={16} />
+              Vínculo no período
+            </Label>
+            <Combobox
+              value={localFilters.employmentScope ?? "ativos"}
+              onValueChange={(value) => {
+                const scope = (Array.isArray(value) ? value[0] : value) as
+                  | "ativos"
+                  | "desligados"
+                  | "ambos";
+                setLocalFilters({ ...localFilters, employmentScope: scope || "ativos" });
+              }}
+              options={[
+                // "Ativos" inclui quem foi EFETIVADO no meio do período — quem
+                // entrou está ativo, só entrou depois.
+                { value: "ativos", label: "Apenas ativos" },
+                { value: "desligados", label: "Desligados no período" },
+                { value: "ambos", label: "Ambos" },
+              ]}
+              placeholder="Apenas ativos"
+              searchable={false}
+              clearable={false}
+            />
           </div>
     </FilterDrawer>
   );

@@ -24,6 +24,8 @@ interface BonusItem {
   weightedTasks?: number | { toNumber: () => number };
   // Average tasks per user (same for all users in a period)
   averageTasks?: number;
+  /** B1 agregado do período. É ESTE o número da equipe desde a v4. */
+  periodAverageTasks?: number;
   // Divisor B1 do período (soma dos pesos de elegibilidade) — igual para todos
   // os usuários do período e FRACIONÁRIO por construção.
   periodDivisor?: number | { toNumber: () => number } | null;
@@ -99,7 +101,16 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
           const weightedTasks = bonus.totalWeightedTasks !== undefined
             ? toNumber(bonus.totalWeightedTasks)
             : toNumber(bonus.weightedTasks);
-          const average = bonus.averageTasks ?? 0;
+          // `averageTasks` virou o B1 DESTA pessoa na v4. Este bloco pega UMA
+          // linha por mês (a primeira que aparece) para ler os valores do
+          // período — continuar lendo `averageTasks` aqui faria o KPI da
+          // equipe exibir a média de um colaborador sorteado pela ordenação.
+          // SEMPRE o número da EQUIPE. Este bloco pega UMA linha por mês (a
+          // primeira que aparece), então ler `averageTasks` aqui exibiria a
+          // média de um colaborador sorteado pela ordenação — foi assim que o
+          // KPI do topo chegou a mostrar 0,00 (a média de quem trabalhou 1 dia)
+          // como número da equipe.
+          const average = bonus.periodAverageTasks ?? 0;
           const divisor = toNumber(bonus.periodDivisor ?? undefined);
           perMonth.set(monthKey, { weightedTasks, average, divisor });
         }
