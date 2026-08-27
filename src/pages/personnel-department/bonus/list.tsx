@@ -53,16 +53,32 @@ import { FilterIndicators } from "@/components/personnel-department/bonus/list/f
 import { extractActiveFilters, createFilterRemover } from "@/components/personnel-department/bonus/list/filter-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useBonusList, useSectors, usePositions, useUsers } from "../../../hooks";
-import { calculatePonderedTasks } from "../../../utils/bonus";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
 // Extended filters interface with bonus-specific fields
+/**
+ * Recorte por vínculo dentro do período.
+ *
+ * `ativos` é o padrão e inclui QUEM FOI EFETIVADO NO MEIO — quem entrou está
+ * ativo, só entrou depois. O que ele exclui é quem foi desligado dentro do
+ * período: essas linhas existem, são legítimas (bônus proporcional pago na
+ * rescisão) e continuam somando no rodapé, mas poluem a leitura do mês corrente.
+ */
+export type BonusEmploymentScope = 'ativos' | 'desligados' | 'ambos';
+
+const EMPLOYMENT_SCOPE_LABELS: Record<BonusEmploymentScope, string> = {
+  ativos: 'Apenas ativos',
+  desligados: 'Desligados no período',
+  ambos: 'Ambos',
+};
+
 interface BonusFiltersData {
   year?: number;
   months?: string[];
   sectorIds?: string[];
   positionIds?: string[];
   userIds?: string[];
+  employmentScope?: BonusEmploymentScope;
 }
 
 // Helper to parse filters from URL
@@ -73,6 +89,11 @@ function parseFiltersFromUrl(searchParams: URLSearchParams): BonusFiltersData {
   if (yearParam) {
     const year = parseInt(yearParam, 10);
     if (!isNaN(year)) filters.year = year;
+  }
+
+  const scopeParam = searchParams.get('employmentScope');
+  if (scopeParam === 'ativos' || scopeParam === 'desligados' || scopeParam === 'ambos') {
+    filters.employmentScope = scopeParam;
   }
 
   const monthsParam = searchParams.get('months');
@@ -159,6 +180,13 @@ function updateFiltersInUrl(
   }
 
   // User IDs
+  // Só vai para a URL quando NÃO é o padrão — link limpo no caso comum.
+  if (filters.employmentScope && filters.employmentScope !== 'ativos') {
+    searchParams.set('employmentScope', filters.employmentScope);
+  } else {
+    searchParams.delete('employmentScope');
+  }
+
   if (filters.userIds && filters.userIds.length > 0) {
     searchParams.set('userIds', JSON.stringify(filters.userIds));
   } else {
@@ -184,7 +212,18 @@ interface BonusRow {
   bonusAmount: number;      // Net bonus (after discounts) - used for summary calculations
   baseBonus?: number;       // Base bonus (before discounts) - for reference
   tasksCompleted: number;
+  /**
+   * OS TRÊS NÚMEROS DESTA PESSOA, medidos na janela dela:
+   *   `windowWeightedTasks ÷ windowDivisor == averageTasks`, exato.
+   * `windowTaskCount` é a contagem bruta das mesmas tarefas.
+   */
   averageTasks: number;
+  windowWeightedTasks: number;
+  windowDivisor: number;
+  windowTaskCount: number;
+  windowBusinessDays: number;
+  /** Número da EQUIPE — só para o resumo do topo, nunca numa célula da linha. */
+  periodAverageTasks: number;
   totalWeightedTasks: number;
 
   // Period statistics (same for all rows in the period)
@@ -201,6 +240,7 @@ interface BonusRow {
   periodBusinessDays?: number | null; // dias úteis do período
   periodDivisor?: number | null;    // divisor B1 do período (fracionário)
   terminatedAt?: string | null;     // desligamento DENTRO do período
+  effectedAt?: string | null;       // efetivação DENTRO do período (espelho)
   currentlyEmployed: boolean;       // false = desligada hoje
   hasSecullumId: boolean;           // false = sem apuração de ponto
 
@@ -306,6 +346,15 @@ function BonusTableComponent({
           <span className="truncate">{row.userName}</span>
           {/* Desligamento DENTRO do período → data; desligamento posterior →
               badge discreto, porque o bônus do período continua válido. */}
+          {/* Efetivação DENTRO do período — o outro lado do desligamento. Sem
+              ela, quem entrou no meio aparecia com peso parcial e sem nenhuma
+              explicação ao lado do nome. Badge, não coluna: a tabela já é larga
+              e as duas datas são mutuamente raras. */}
+          {row.effectedAt && (
+            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+              Efetivado em {formatShortDate(row.effectedAt)}
+            </Badge>
+          )}
           {row.terminatedAt ? (
             <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
               Desligado em {formatShortDate(row.terminatedAt)}
@@ -366,71 +415,42 @@ function BonusTableComponent({
       align: "left" as const,
     },
     {
+      // Contagem BRUTA das tarefas da janela desta pessoa. Contexto para as
+      // ponderadas ao lado — nunca o total do período, que é outro escopo.
       key: "tasksCompleted",
       header: "Tarefas",
-      accessor: (row: BonusRow) => row.tasksCompleted,
+      accessor: (row: BonusRow) => row.windowTaskCount,
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
       align: "left" as const,
     },
     {
+      // O NUMERADOR. Junto com "Colaboradores" e "Média" forma o trio que fecha
+      // na divisão: ponderadas ÷ colaboradores = média, exato, em toda linha.
       key: "totalWeightedTasks",
       header: "Tarefas Ponderadas",
-      accessor: (row: BonusRow) => row.totalWeightedTasks.toFixed(1),
+      accessor: (row: BonusRow) => row.windowWeightedTasks.toFixed(1),
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
       align: "left" as const,
     },
     {
+      // O DENOMINADOR: colaboradores ativos durante a janela desta pessoa,
+      // fracionário. Varia muito por grupo — quem pegou só o começo do período
+      // conviveu com o quadro cheio, quem pegou só o fim com o reduzido.
       key: "totalCollaborators",
       header: "Colaboradores",
-      // Mostra o headcount MÉDIO do período — fracionário — porque é ele que
-      // divide as tarefas ponderadas. Exibir a contagem de linhas fazia a conta
-      // não fechar na tela: 16,5 ÷ 18 = 0,92, mas a média era 1,09, porque o
-      // divisor real era 15,14. Quem entrou ou saiu no meio conta a fração de
-      // dias úteis que trabalhou.
-      accessor: (row: BonusRow) => {
-        const headcount = row.totalCollaborators || 0;
-        const divisor = row.periodDivisor ?? headcount;
-        const isFractional = Math.abs(divisor - headcount) > 0.005;
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="whitespace-nowrap">{formatDivisor(divisor)}</span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              {isFractional
-                ? `${headcount} pessoas no período, mas quem entrou ou saiu no meio conta só a fração de dias úteis que trabalhou — a soma dos pesos dá ${formatDivisor(divisor)}, e é esse o número que divide as tarefas.`
-                : `${headcount} pessoas, todas o período inteiro.`}
-            </TooltipContent>
-          </Tooltip>
-        );
-      },
+      accessor: (row: BonusRow) => formatDivisor(row.windowDivisor),
       sortable: true,
       className: "text-sm w-28 font-medium truncate",
       align: "left" as const,
     },
     {
+      // O RESULTADO. Sem tooltip de fórmula: o cabeçalho das três colunas lido
+      // em voz alta já é a conta.
       key: "averageTasks",
       header: "Média",
-      // Duas casas é o que o cálculo usa de fato (a API arredonda B1 antes de
-      // alimentar o polinômio), mas a conta só fica legível ao lado do divisor
-      // fracionário — daí o tooltip com a divisão explícita.
-      accessor: (row: BonusRow) => {
-        const divisor = row.periodDivisor ?? row.totalCollaborators ?? 0;
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="whitespace-nowrap">{row.averageTasks.toFixed(2)}</span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              {divisor > 0
-                ? `${row.totalWeightedTasks.toFixed(1)} tarefas ponderadas ÷ ${formatDivisor(divisor)} = ${(row.totalWeightedTasks / divisor).toFixed(4)}, arredondado para ${row.averageTasks.toFixed(2)}`
-                : "Sem divisor no período."}
-            </TooltipContent>
-          </Tooltip>
-        );
-      },
+      accessor: (row: BonusRow) => row.averageTasks.toFixed(2),
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
       align: "left" as const,
@@ -595,7 +615,7 @@ export default function BonusListPage() {
 
   const defaultFilters = useMemo(() => getDefaultFilters(), []);
   const urlFilters = useMemo(() => parseFiltersFromUrl(searchParams), [searchParams]);
-  const initialFilters = useMemo(() => {
+  const rawInitialFilters = useMemo(() => {
     const hasUrlFilters = searchParams.has('year') || searchParams.has('months');
     return hasUrlFilters ? { ...defaultFilters, ...urlFilters } : defaultFilters;
   }, [defaultFilters, urlFilters, searchParams]);
@@ -638,6 +658,12 @@ export default function BonusListPage() {
   }, [sectorsData?.data]);
 
   const filtersWithDefaults = useMemo(() => {
+    // `employmentScope` tem padrão SEMPRE, inclusive quando a URL traz outros
+    // filtros — é recorte de leitura, não de busca, e o padrão é "apenas ativos".
+    const initialFilters = {
+      employmentScope: 'ativos' as BonusEmploymentScope,
+      ...rawInitialFilters,
+    };
     // Don't apply default sector filter if user has selected specific users or positions
     // This allows filtering by user/position without being restricted by default sectors
     if (initialFilters.sectorIds && initialFilters.sectorIds.length > 0) {
@@ -650,7 +676,7 @@ export default function BonusListPage() {
       return initialFilters;
     }
     return { ...initialFilters, sectorIds: defaultSectorIds };
-  }, [initialFilters, defaultSectorIds]);
+  }, [rawInitialFilters, defaultSectorIds]);
 
   const [filters, setFilters] = useState<BonusFiltersData>(filtersWithDefaults);
   const hasInitializedSectorsRef = React.useRef(false);
@@ -747,11 +773,20 @@ export default function BonusListPage() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
 
+    // Padrão: apenas ativos. Quem foi EFETIVADO no meio do período continua
+    // aparecendo — está ativo, só entrou depois; o que `terminatedAt` marca é
+    // saída, e é só isso que este recorte esconde.
+    const scope: BonusEmploymentScope = filters.employmentScope ?? 'ativos';
+
     bonuses.forEach((bonus: any) => {
       if (!bonus) return;
 
       const user = bonus.user;
       if (!user) return;
+
+      const saiuNoPeriodo = bonus.terminatedAt != null;
+      if (scope === 'ativos' && saiuNoPeriodo) return;
+      if (scope === 'desligados' && !saiuNoPeriodo) return;
 
       // Client-side name search (accent-insensitive)
       if (normalizedSearch) {
@@ -787,11 +822,7 @@ export default function BonusListPage() {
       const monthLabel = `${cleanMonthName.charAt(0).toUpperCase() + cleanMonthName.slice(1)} - ${bonus.year}`;
 
       // Get bonus amount
-      const bonusAmount = bonus.baseBonus
-        ? (typeof bonus.baseBonus === 'object' && bonus.baseBonus?.toNumber
-          ? bonus.baseBonus.toNumber()
-          : Number(bonus.baseBonus) || 0)
-        : 0;
+      const bonusAmount = bonus.baseBonus != null ? toNumber(bonus.baseBonus) : 0;
 
       // Get net bonus directly from the database field
       const netBonusAmount = bonus.netBonus !== undefined && bonus.netBonus !== null
@@ -810,11 +841,9 @@ export default function BonusListPage() {
 
       // Get period-level weighted tasks (total weighted tasks - same for all users)
       // bonus.weightedTasks is the TOTAL weighted tasks for the period
-      const totalWeightedTasks = bonus.weightedTasks
-        ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
-          ? bonus.weightedTasks.toNumber()
-          : Number(bonus.weightedTasks) || 0)
-        : calculatePonderedTasks(bonus.tasks || []);
+      const totalWeightedTasks = bonus.weightedTasks != null
+        ? toNumber(bonus.weightedTasks)
+        : 0;
 
       // Get total collaborators from the users array (all bonifiable users)
       // bonus.users contains all eligible users for bonus calculation
@@ -824,19 +853,28 @@ export default function BonusListPage() {
       // proporcionalidade) não trazem os campos: assumem período inteiro.
       const eligibilityWeight = toNumber(bonus.eligibilityWeight, 1);
       const periodDivisor = bonus.periodDivisor != null ? toNumber(bonus.periodDivisor) : null;
+      const effectedAt = bonus.effectedAt
+        ? (typeof bonus.effectedAt === 'string'
+          ? bonus.effectedAt
+          : new Date(bonus.effectedAt).toISOString())
+        : null;
       const terminatedAt = bonus.terminatedAt
         ? (typeof bonus.terminatedAt === 'string'
           ? bonus.terminatedAt
           : new Date(bonus.terminatedAt).toISOString())
         : null;
 
-      // Get average tasks per user directly from API (pre-calculated correctly)
-      // This is: totalWeightedTasks / totalEligibleUsers
-      const averageTasks = bonus.averageTaskPerUser
-        ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
-          ? bonus.averageTaskPerUser.toNumber()
-          : Number(bonus.averageTaskPerUser) || 0)
-        : (totalCollaborators > 0 ? totalWeightedTasks / totalCollaborators : 0);
+      // `!= null`, NUNCA truthiness: `0` é falsy em JS, e a v4 produz média 0
+      // legítima — quem esteve só em dias sem nenhuma tarefa concluída. Com o
+      // teste de verdade a linha caía no fallback e a tela inventava
+      // `49 ÷ 18 = 2,72` para quem o banco dizia 0,00.
+      //
+      // O fallback em si também morreu: `ponderadas do período ÷ contagem de
+      // linhas` não é a média de ninguém desde a v4 — a média é por pessoa e
+      // vem pronta da API.
+      const averageTasks = bonus.averageTaskPerUser != null
+        ? toNumber(bonus.averageTaskPerUser)
+        : 0;
 
       const row: BonusRow = {
         id: bonus.id,
@@ -864,7 +902,14 @@ export default function BonusListPage() {
         bonusAmount: netBonusAmount,              // Net bonus (after discounts) for summary calculations
         baseBonus: bonusAmount,                   // Base bonus (before discounts) for reference
         tasksCompleted: totalTasksInPeriod,       // Total raw task count for the period
-        averageTasks: averageTasks,               // Pre-calculated average from API
+        averageTasks: averageTasks,               // B1 DESTA pessoa (v4)
+        // `!= null` em todos: 0 é valor legítimo (quem esteve só em dias sem
+        // tarefa concluída), e truthiness o derrubaria no fallback.
+        windowWeightedTasks: bonus.windowWeightedTasks != null ? toNumber(bonus.windowWeightedTasks) : 0,
+        windowDivisor: bonus.windowDivisor != null ? toNumber(bonus.windowDivisor) : 0,
+        windowTaskCount: bonus.windowTaskCount != null ? toNumber(bonus.windowTaskCount) : 0,
+        windowBusinessDays: bonus.windowBusinessDays != null ? toNumber(bonus.windowBusinessDays) : 0,
+        periodAverageTasks: bonus.periodAverageTasks != null ? toNumber(bonus.periodAverageTasks) : 0,
         totalWeightedTasks: totalWeightedTasks,   // Total weighted tasks for the period
 
         totalCollaborators: totalCollaborators,   // Total bonifiable users
@@ -877,6 +922,7 @@ export default function BonusListPage() {
         periodBusinessDays: bonus.periodBusinessDays ?? null,
         periodDivisor,
         terminatedAt,
+        effectedAt,
         currentlyEmployed: bonus.currentlyEmployed ?? true,
         hasSecullumId: bonus.hasSecullumId ?? true,
 
@@ -947,7 +993,7 @@ export default function BonusListPage() {
       }
       return 0;
     });
-  }, [bonusData, sortConfigs, filters, searchTerm]);
+  }, [bonusData, sortConfigs, filters, searchTerm, filters.employmentScope]);
 
   const handleApplyFilters = async (newFilters: BonusFiltersData) => {
     setIsRefreshing(true);
@@ -979,7 +1025,7 @@ export default function BonusListPage() {
 
   // Extract active filters for badge display
   const activeFilterBadges = useMemo(() => {
-    return extractActiveFilters(
+    const badges = extractActiveFilters(
       filters,
       defaultFilters,
       onRemoveFilter,
@@ -989,7 +1035,19 @@ export default function BonusListPage() {
         users: usersData?.data || [],
       }
     );
-  }, [filters, defaultFilters, onRemoveFilter, sectorsData?.data, positionsData?.data, usersData?.data]);
+    // O recorte por vínculo só vira badge quando NÃO é o padrão: "apenas
+    // ativos" é o estado normal e não deve poluir a barra de filtros ativos.
+    const scope = filters.employmentScope ?? 'ativos';
+    if (scope !== 'ativos') {
+      badges.push({
+        key: 'employmentScope',
+        label: 'Vínculo',
+        value: EMPLOYMENT_SCOPE_LABELS[scope],
+        onRemove: () => handleApplyFilters({ ...filters, employmentScope: 'ativos' }),
+      } as (typeof badges)[number]);
+    }
+    return badges;
+  }, [filters, defaultFilters, onRemoveFilter, handleApplyFilters, sectorsData?.data, positionsData?.data, usersData?.data]);
 
   // Clear all filters
   const clearAllFilters = useCallback(() => {
@@ -1004,6 +1062,7 @@ export default function BonusListPage() {
     if (filters.userIds && filters.userIds.length > 0) count++;
     if (filters.sectorIds && filters.sectorIds.length > 0) count++;
     if (filters.positionIds && filters.positionIds.length > 0) count++;
+    if (filters.employmentScope && filters.employmentScope !== 'ativos') count++;
     return count;
   }, [filters]);
 

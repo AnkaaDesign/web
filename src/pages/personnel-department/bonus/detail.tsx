@@ -282,64 +282,57 @@ export default function BonusDetailPage() {
     return toNum(bonus.baseBonus);
   }, [bonus]);
 
-  // Get task statistics - prefer full bonus data, otherwise use cheap periodStats.
+  // OS TRÊS NÚMEROS DESTA PESSOA (v5) — e os da EQUIPE, sempre separados.
+  //
+  //     windowWeightedTasks ÷ windowDivisor == averageTaskPerUser
+  //
+  // fecha exato em qualquer linha. É por isso que a tela não precisa de fórmula
+  // nenhuma: o rótulo lido em voz alta já é a conta.
+  //
+  // `!= null` em todo lugar, NUNCA truthiness: `0` é falsy em JS e é valor
+  // legítimo em todos estes campos — quem esteve só em dias sem tarefa
+  // concluída tem ponderadas 0 e média 0. Com o teste de verdade a tela caía
+  // num fallback e inventava número que o banco não tem.
   const taskStats = useMemo(() => {
     const tasks = bonus?.tasks || [];
-    const users = bonus?.users || [];
+    const num = (v: any, fallback = 0) => (v != null ? toNum(v) : fallback);
 
-    const totalRawTasksFromBonus = tasks.length;
-    const totalRawTasks = bonus
-      ? totalRawTasksFromBonus
-      // `getPeriodTaskStats` devolve `totalRawTaskCount` — nem `totalRawTasks`
-      // nem `totalTasks` existem na resposta, então este fallback era 0 fixo.
-      : (periodStats?.totalRawTaskCount ?? periodStats?.totalRawTasks ?? periodStats?.totalTasks ?? 0);
+    // JANELA desta pessoa. `tasks` já vem recortado pela API.
+    const windowTaskCount = num(bonus?.windowTaskCount, tasks.length);
+    const windowWeightedTasks = num(bonus?.windowWeightedTasks);
+    const windowDivisor = num(bonus?.windowDivisor);
+    const averageTasksPerUser = num(bonus?.averageTaskPerUser);
+    const windowBusinessDays = num(bonus?.windowBusinessDays);
 
-    const totalPonderedTasksFromBonus = bonus?.weightedTasks
-      ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
-        ? bonus.weightedTasks.toNumber()
-        : Number(bonus.weightedTasks) || 0)
-      : 0;
-    const totalPonderedTasks = bonus
-      ? totalPonderedTasksFromBonus
-      // idem: o campo da API é `totalWeightedTasks`.
-      : (periodStats?.totalWeightedTasks ?? periodStats?.weightedTasks ?? periodStats?.totalPonderedTasks ?? 0);
+    // PERÍODO (equipe). Nunca exibir junto dos de cima sem rótulo próprio: uma
+    // ponderada de 49,0 ao lado de um total de 33 é impossível por construção.
+    const periodTaskCount = num(
+      periodStats?.totalRawTaskCount ?? periodStats?.totalTasks,
+      windowTaskCount,
+    );
+    const periodWeightedTasks = num(bonus?.weightedTasks, num(periodStats?.totalWeightedTasks));
+    const periodDivisor = num(bonus?.periodDivisor, num(periodStats?.periodDivisor));
+    const periodAverageTasks = num(
+      bonus?.periodAverageTasks,
+      num(periodStats?.averageTasksPerEmployee),
+    );
+    const periodBusinessDays = num(bonus?.periodBusinessDays);
 
-    // Saved bonus.users may include stale entries (users connected before the
-    // perf>0 filter was added to the save path). The list endpoint already
-    // returns a fresh eligible-only list, but getById returns the raw relation.
-    // Filter to perf>0 here so detail count matches the list table.
-    const eligibleUsersFromBonus = users.filter(
-      (u: any) => (u?.performanceLevel ?? 0) > 0,
-    ).length;
-    const totalCollaborators = bonus
-      ? (eligibleUsersFromBonus || users.length)
-      // idem: a API expõe a contagem inteira como `eligibleHeadcount`.
-      : (periodStats?.eligibleHeadcount ?? periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
-
-    // O que essa contagem NÃO é mais: o divisor. B1 usa `periodDivisor` — a soma
-    // dos pesos de elegibilidade, FRACIONÁRIA — e vem pronto da API. Contar
-    // usuários devolvia um inteiro que não bate com averageTaskPerUser, porque
-    // quem entrou ou saiu no meio do período conta fração de dia útil.
-    const periodDivisor = bonus
-      ? toNum(bonus?.periodDivisor)
-      : toNum(periodStats?.periodDivisor ?? periodStats?.eligibleUsers);
-
-    const averageTasksPerUserFromBonus = bonus?.averageTaskPerUser
-      ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
-        ? bonus.averageTaskPerUser.toNumber()
-        : Number(bonus.averageTaskPerUser) || 0)
-      : 0;
-    const averageTasksPerUser = bonus
-      ? averageTasksPerUserFromBonus
-      // idem: o campo da API é `averageTasksPerEmployee`.
-      : (periodStats?.averageTasksPerEmployee ?? periodStats?.averageTasksPerUser ?? periodStats?.averageTaskPerUser ?? 0);
+    const isPartialWindow =
+      windowBusinessDays > 0 && periodBusinessDays > 0 && windowBusinessDays !== periodBusinessDays;
 
     return {
-      totalRawTasks,
-      totalPonderedTasks,
-      totalCollaborators,
-      periodDivisor,
+      windowTaskCount,
+      windowWeightedTasks,
+      windowDivisor,
       averageTasksPerUser,
+      windowBusinessDays,
+      periodTaskCount,
+      periodWeightedTasks,
+      periodDivisor,
+      periodAverageTasks,
+      periodBusinessDays,
+      isPartialWindow,
       tasks,
     };
   }, [bonus, periodStats]);
@@ -354,6 +347,7 @@ export default function BonusDetailPage() {
       eligibleDays: activeBonus?.eligibleDays ?? null,
       periodBusinessDays: activeBonus?.periodBusinessDays ?? null,
       terminatedAt: activeBonus?.terminatedAt ?? null,
+      effectedAt: activeBonus?.effectedAt ?? null,
       currentlyEmployed: activeBonus?.currentlyEmployed ?? true,
       hasSecullumId: activeBonus?.hasSecullumId ?? true,
     };
@@ -580,29 +574,48 @@ export default function BonusDetailPage() {
               financialSkeleton
             ) : (
               <CardContent className="space-y-2">
+                {/* Os três números da JANELA desta pessoa andam juntos e são
+                    rotulados como tais. Antes da v4 a tela mostrava os do
+                    período em todas as linhas: quem saiu no dia 17 aparecia com
+                    as 52 tarefas e os 12,50 colaboradores do ciclo inteiro. */}
+                {/* OS TRÊS NÚMEROS, nesta ordem, e nada entre eles.
+                    `Tarefas Ponderadas ÷ Colaboradores = Média` fecha exato —
+                    por isso a tela não traz fórmula, derivação nem asterisco.
+                    Antes daqui havia quatro números de tarefa e dois conjuntos
+                    de ponderadas/colaboradores misturando janela e período. */}
                 <div className="flex justify-between py-1">
-                  <span className="text-sm text-muted-foreground">Total de Tarefas</span>
-                  <span className="text-sm font-medium">{taskStats.totalRawTasks}</span>
+                  <span className="text-sm text-muted-foreground">Tarefas</span>
+                  <span className="text-sm font-medium">{taskStats.windowTaskCount}</span>
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-sm text-muted-foreground">Tarefas Ponderadas</span>
-                  <span className="text-sm font-medium">{formatDecimal(taskStats.totalPonderedTasks)}</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-sm text-muted-foreground">Colaboradores</span>
-                  {/* Headcount MÉDIO do período, fracionário — é ele que divide
-                      as tarefas ponderadas. A contagem de linhas não fecha a
-                      conta quando alguém entra ou sai no meio do período. */}
                   <span className="text-sm font-medium">
-                    {formatDecimal(taskStats.periodDivisor || taskStats.totalCollaborators)}
+                    {formatDecimal(taskStats.windowWeightedTasks)}
                   </span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-sm text-muted-foreground">Média por Colaborador</span>
+                  <span className="text-sm text-muted-foreground">Colaboradores</span>
+                  <span className="text-sm font-medium">
+                    {formatDecimal(taskStats.windowDivisor)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Média</span>
                   <span className="text-sm font-medium">
                     {formatDecimal(taskStats.averageTasksPerUser)}
                   </span>
                 </div>
+                {/* Metadado da janela, sem operador nenhum — explica POR QUE os
+                    números desta pessoa diferem dos da equipe, sem virar conta. */}
+                {taskStats.isPartialWindow && (
+                  <p className="text-xs text-muted-foreground">
+                    Medido nos {taskStats.windowBusinessDays} de{" "}
+                    {taskStats.periodBusinessDays} dias úteis em que esteve na empresa.
+                    No período inteiro a equipe fez{" "}
+                    {formatDecimal(taskStats.periodWeightedTasks)} ponderadas com{" "}
+                    {formatDecimal(taskStats.periodDivisor)} colaboradores.
+                  </p>
+                )}
                 {eligibility.isPartial && (
                   <div className="flex justify-between py-1">
                     <span className="text-sm text-muted-foreground">Proporção no período</span>
@@ -613,6 +626,14 @@ export default function BonusDetailPage() {
                           {" "}({eligibility.eligibleDays} de {eligibility.periodBusinessDays} dias úteis)
                         </span>
                       )}
+                    </span>
+                  </div>
+                )}
+                {eligibility.effectedAt && (
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Efetivação</span>
+                    <span className="text-sm font-medium">
+                      {formatDate(new Date(eligibility.effectedAt))}
                     </span>
                   </div>
                 )}

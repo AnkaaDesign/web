@@ -741,8 +741,9 @@ export default function PayrollListPage() {
       //
       // A contagem continua servindo de fallback para linha antiga, gravada
       // antes da proporcionalidade, que não tem o campo.
-      const divisorForAverage = periodDivisorFromApi ?? eligibleUsersCount;
-      const averageTasksPerUser = divisorForAverage > 0 ? totalTasksForPeriod / divisorForAverage : 0;
+      // Número da EQUIPE, para o resumo do topo. NÃO é o B1 de ninguém desde a
+      // v5 — nem de quem trabalhou o período inteiro, cuja média é a da janela
+      // dele. Cada linha lê o próprio `averageTaskPerUser`.
 
       // Second pass: create payroll rows with period-wide statistics
       payrollsArray.forEach((payroll: any) => {
@@ -800,23 +801,34 @@ export default function PayrollListPage() {
         // Determine bonus eligibility using proper business logic
         const isEligibleForBonus = isUserEligibleForBonus(user);
 
-        // Use period-wide statistics (like old working implementation)
-        // All eligible users show the SAME task count and average
+        // CADA LINHA LÊ OS PRÓPRIOS NÚMEROS.
+        //
+        // A premissa do comentário que estava aqui — "All eligible users show
+        // the SAME task count and average" — morreu na v5: B1 passou a ser
+        // medido na janela de cada pessoa. Atribuir o par (total do período,
+        // média do período) a toda linha fazia a folha exibir 49,0 e 3,92 ao
+        // lado de bônus que variam, inclusive na linha de quem foi desligado no
+        // dia 17 e não pegou 18 daquelas tarefas.
+        //
+        // `!= null`, não truthiness: 0 é média legítima.
         let tasksCompleted = 0;
         let averageTasks = 0;
 
         if (isEligibleForBonus && hasValidBonusData) {
-          // Show total tasks for the period (same for all users)
-          tasksCompleted = totalTasksForPeriod;
-          // Show average tasks per user (same for all users)
-          averageTasks = averageTasksPerUser;
+          tasksCompleted =
+            bonus?.windowWeightedTasks != null ? Number(bonus.windowWeightedTasks) : 0;
+          averageTasks =
+            bonus?.averageTaskPerUser != null ? Number(bonus.averageTaskPerUser) : 0;
         }
 
         // Calculate net salary components with proper null handling and bonus eligibility
         const baseRemuneration = Number(payroll.baseRemuneration) || 0;
 
         // Only include bonus for eligible users
-        const bonusAmount = isEligibleForBonus && bonus?.baseBonus
+        // `!= null`, não truthiness — R$ 0,00 é bônus legítimo desde a v5 (quem
+        // esteve só em dias sem tarefa concluída), e o truthy o mandava para o
+        // fallback.
+        const bonusAmount = isEligibleForBonus && bonus?.baseBonus != null
           ? Number(bonus.baseBonus) || 0
           : 0;
 
