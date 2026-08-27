@@ -54,6 +54,9 @@ interface AuthContextType {
   recoverPassword: (contact: string) => Promise<void>;
   verifyCode: (contact: string, code: string) => Promise<void>;
   resendCode: (contact: string) => Promise<void>;
+  requestFirstAccess: (contact: string) => Promise<void>;
+  verifyFirstAccess: (contact: string, code: string) => Promise<{ setupToken: string; name: string }>;
+  completeFirstAccess: (setupToken: string, password: string, confirmPassword: string) => Promise<{ success: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -215,6 +218,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [navigate]);
 
+  /**
+   * Takes a freshly minted session and makes the whole app believe it — storage,
+   * axios, React state, cache. Shared by login and by first access, which ends
+   * with the employee already signed in; the two must not drift, because
+   * anything missed here shows up as "logged in but every request is a 401".
+   */
+  const adoptSession = (token: string, refreshToken: string | undefined, user: AuthUser) => {
+    setLocalStorage("token", token);
+
+    // Persist the long-lived refresh token so the axios interceptor can
+    // silently renew the access token on future 401s.
+    if (refreshToken) {
+      setRefreshToken(refreshToken);
+    }
+
+    setUserData(user); // Cache user data
+
+    // CRITICAL: Set token on axios IMMEDIATELY using ALL methods
+    setAuthToken(token);
+
+    // Force token refresh to ensure it's on all instances
+    forceTokenRefresh(token);
+
+    // Also update the default headers to ensure it's always included
+    if (apiClient && apiClient.defaults) {
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+
+    setUser(user);
+
+    // Mark that we just logged in to handle race conditions
+    setJustLoggedIn();
+
+    // Force update the token provider to ensure it picks up the new token
+    // CRITICAL: Create a new function to ensure fresh reads from localStorage
+    const updatedTokenProvider = () => {
+      const currentToken = getLocalStorage("token");
+      return currentToken;
+    };
+    setTokenProvider(updatedTokenProvider);
+
+    // The login token payload omits the avatar relation, so the nav avatar
+    // would render initials until the next reload. Enrich the cached user
+    // with the full /auth/me profile (avatar + relations) in the background
+    // — fire-and-forget so we don't block navigation.
+    void refreshUser();
+  };
+
   const login = async (contact: string, password: string) => {
     try {
       const response = await authService.login({ contact, password });
@@ -230,45 +281,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           throw new Error("Conta não verificada. Por favor, verifique seu email ou telefone.");
         }
 
-        setLocalStorage("token", token);
-
-        // Persist the long-lived refresh token so the axios interceptor can
-        // silently renew the access token on future 401s.
-        if (refreshToken) {
-          setRefreshToken(refreshToken);
-        }
-
-        setUserData(user); // Cache user data
-
-        // CRITICAL: Set token on axios IMMEDIATELY using ALL methods
-        setAuthToken(token);
-
-        // Force token refresh to ensure it's on all instances
-        forceTokenRefresh(token);
-
-        // Also update the default headers to ensure it's always included
-        if (apiClient && apiClient.defaults) {
-          apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        }
-
-        setUser(user);
-
-        // Mark that we just logged in to handle race conditions
-        setJustLoggedIn();
-
-        // Force update the token provider to ensure it picks up the new token
-        // CRITICAL: Create a new function to ensure fresh reads from localStorage
-        const updatedTokenProvider = () => {
-          const currentToken = getLocalStorage("token");
-          return currentToken;
-        };
-        setTokenProvider(updatedTokenProvider);
-
-        // The login token payload omits the avatar relation, so the nav avatar
-        // would render initials until the next reload. Enrich the cached user
-        // with the full /auth/me profile (avatar + relations) in the background
-        // — fire-and-forget so we don't block navigation.
-        void refreshUser();
+        adoptSession(token, refreshToken, user);
 
         // Return success to let the Login component know login succeeded
         return { success: true } as const;
@@ -367,6 +380,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // =====================
+  // First access — activating an account the HR created
+  // =====================
+
+  const requestFirstAccess = async (contact: string) => {
+    await authService.requestFirstAccess({ contact });
+  };
+
+  const verifyFirstAccess = async (contact: string, code: string) => {
+    const response = await authService.verifyFirstAccess({ contact, code });
+    return response.data;
+  };
+
+  const completeFirstAccess = async (setupToken: string, password: string, confirmPassword: string) => {
+    const response = await authService.completeFirstAccess({ setupToken, password, confirmPassword });
+
+    if (!response?.success || !response?.data?.token || !response?.data?.user) {
+      throw new Error("Não foi possível ativar sua conta. Tente novamente.");
+    }
+
+    const { token, refreshToken, user } = response.data;
+    adoptSession(token, refreshToken, user);
+    return { success: true } as const;
+  };
+
   const verifyCode = async (contact: string, code: string) => {
     try {
       await authService.verifyCode({ contact, code });
@@ -443,6 +481,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     recoverPassword,
     verifyCode,
     resendCode,
+    requestFirstAccess,
+    verifyFirstAccess,
+    completeFirstAccess,
   };
 
   // Block the app only when we genuinely have nothing to show yet (not

@@ -14,6 +14,9 @@ import type {
   AdminToggleUserStatusFormData,
   AdminResetUserPasswordFormData,
   AdminLogoutUserFormData,
+  FirstAccessRequestFormData,
+  FirstAccessVerifyFormData,
+  FirstAccessCompleteFormData,
 } from "../schemas";
 import type { User, AuthTokenResponse, AuthMessageResponse, AuthUserResponse } from "../types";
 
@@ -65,6 +68,21 @@ export const authService = {
 
   // Reset password with 6-digit code
   resetPasswordWithCode: (data: PasswordResetFormData) => apiClient.post<AuthMessageResponse>("/auth/password-reset", data).then((res) => res.data),
+
+  // =====================
+  // First Access (activation of an HR-created account)
+  // =====================
+
+  // Step 1 — ask for the 6-digit activation code
+  requestFirstAccess: (data: FirstAccessRequestFormData) => apiClient.post<AuthMessageResponse>("/auth/first-access/request", data).then((res) => res.data),
+
+  // Step 2 — spend the code, receive the short-lived setup token
+  verifyFirstAccess: (data: FirstAccessVerifyFormData) =>
+    apiClient.post<{ success: boolean; message: string; data: { setupToken: string; name: string } }>("/auth/first-access/verify", data).then((res) => res.data),
+
+  // Step 3 — set the password against that token. Answers like a login, so the
+  // employee lands inside the app instead of on the login screen.
+  completeFirstAccess: (data: FirstAccessCompleteFormData) => apiClient.post<AuthTokenResponse>("/auth/first-access/complete", data).then((res) => res.data),
 
   // =====================
   // Admin Operations

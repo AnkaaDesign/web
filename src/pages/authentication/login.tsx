@@ -174,7 +174,10 @@ export function LoginPage() {
                 )}
               />
 
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-between">
+                <Link to={routes.authentication.firstAccess} className={styles.link}>
+                  Meu primeiro acesso
+                </Link>
                 <Link to={routes.authentication.recoverPassword} className={styles.link}>
                   Esqueceu sua senha?
                 </Link>

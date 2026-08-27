@@ -1665,6 +1665,7 @@ export enum VERIFICATION_TYPE {
   EMAIL = "EMAIL",
   PHONE = "PHONE",
   PASSWORD_RESET = "PASSWORD_RESET",
+  FIRST_ACCESS = "FIRST_ACCESS",
 }
 
 // =====================
