@@ -174,10 +174,13 @@ export function LoginPage() {
                 )}
               />
 
-              <div className="flex items-center justify-between">
+              {/* Par centrado, não um em cada canto: os dois são o mesmo tipo de
+                  atalho e ficavam lidos como opções distantes uma da outra. */}
+              <div className="flex items-center justify-center gap-2">
                 <Link to={routes.authentication.firstAccess} className={styles.link}>
-                  Meu primeiro acesso
+                  Primeiro acesso
                 </Link>
+                <span className="text-muted-foreground select-none">·</span>
                 <Link to={routes.authentication.recoverPassword} className={styles.link}>
                   Esqueceu sua senha?
                 </Link>
