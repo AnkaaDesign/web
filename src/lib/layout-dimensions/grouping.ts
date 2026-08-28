@@ -125,6 +125,64 @@ export interface GroupingParams {
    */
   alignEdges: boolean;
   /**
+   * Alcance da solda AO LONGO da linha, em múltiplos da altura do texto.
+   *
+   * A folga entre letras não é constante: na assinatura do FRUTAMINA ela vai de
+   * 10,8 a 16,1 cm (mediana 13,8) para uma altura de x de 22 cm, porque a linha
+   * é espaçada de propósito. O motor alcançava 14 cm fixos e cortava a palavra
+   * em `Fru|ta|é|Vita|m|in|a|P|ura`. No acervo, 11,9% das folgas DENTRO de um
+   * run passam de 14 cm.
+   */
+  lineGapFactor: number;
+  /** teto do alcance ao longo da linha (cm reais) */
+  maxLineGapCm: number;
+  /**
+   * Alcance da solda ENTRE linhas — muito menor, e é esse o ponto.
+   *
+   * A folga era a mesma nas duas direções, então a palavra soldava com a linha
+   * de baixo antes de existir o conceito de linha. Separando os dois alcances,
+   * o texto vira LINHA primeiro e só depois as linhas se juntam num conjunto,
+   * onde a regra de largura pode falar.
+   */
+  lineStackFactor: number;
+  /** teto do alcance entre linhas (cm reais) */
+  maxLineStackCm: number;
+  /**
+   * Razão de alturas para duas caixas contarem como da MESMA linha.
+   *
+   * É o que autoriza o alcance largo: ele vale entre glifos de um mesmo texto,
+   * não entre um glifo e o desenho ao lado.
+   */
+  weldHeightRatio: number;
+  /**
+   * Cobertura de largura para duas linhas EMPILHADAS formarem um adesivo só.
+   *
+   * Regra do dono, textual: "raramente colamos 1 adesivo onde o componente
+   * abaixo não cubra a mesma largura". Medido nos casos que ele mostrou:
+   * GRUPO/ALVORADA 100% (junta, e junta certo), amigão/SUPERMERCADOS 64%,
+   * Carajás/FRIGORÍFICO 53%, clebin/distribuidora 60% — os três últimos são
+   * peças separadas. O limiar cai limpo entre 64% e 100%.
+   */
+  stackWidthCoverFrac: number;
+  /**
+   * Marca multicor: razão de ÁREAS para duas formas serem a mesma peça.
+   *
+   * Razão de DIAGONAIS não serve de porteiro — o "FRIGORÍFICO" do Carajás passa
+   * por 0,507 num limiar de 0,5, e a regra que devia separá-lo o aprova por um
+   * triz. Por área ele é reprovado com folga: 0,08.
+   */
+  overlapMergeAreaRatio: number;
+  /**
+   * Distância entre contornos para a marca multicor.
+   *
+   * O degradê desses arquivos é feito de formas chapadas de cores diferentes, e
+   * elas NÃO se sobrepõem: ou se encostam (o coração do Amigão dá 0,00 cm) ou
+   * correm com um filete branco (a foice da FRICARNE, 5,28 cm). Um teste de
+   * área sobreposta não pega nenhum dos dois — o critério é proximidade de
+   * contorno com porte comparável.
+   */
+  overlapMergeGapCm: number;
+  /**
    * Quanto duas caixas precisam se ALINHAR para a solda valer.
    *
    * Proximidade sozinha solda o que não é uma peça só. No TRANSGENIO três
@@ -265,6 +323,14 @@ export const DEFAULT_GROUPING: GroupingParams = {
   alignmentMinRetractFrac: 0.08,
   alignEdges: true,
   splitPlainPaths: true,
+  lineGapFactor: 1,
+  maxLineGapCm: 30,
+  lineStackFactor: 0.25,
+  maxLineStackCm: 8,
+  weldHeightRatio: 0.5,
+  stackWidthCoverFrac: 0.8,
+  overlapMergeAreaRatio: 0.4,
+  overlapMergeGapCm: 8,
   weldAlignFrac: 0.4,
   lockupGapCm: 14,
   minAreaCm2: 90,
@@ -505,6 +571,66 @@ function isDimensionInk(obj: VectorObject, params: GroupingParams): boolean {
   if (colorDistance(color, params.dimensionInkColor) > params.dimensionInkTolerance) return false;
   if (obj.stroke && obj.lineWidth <= params.dimensionInkMaxStrokePt) return true;
   return !!obj.fill && rectArea(obj.bbox) <= params.dimensionInkMaxArrowPt2;
+}
+
+const rectW = (r: Rect) => r.x1 - r.x0;
+const rectH = (r: Rect) => r.y1 - r.y0;
+
+/** Folga livre entre duas caixas em cada eixo (zero quando se sobrepõem). */
+function gapsBetween(a: Rect, b: Rect): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1)),
+    y: Math.max(0, Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1)),
+  };
+}
+
+/** As duas caixas são glifos da MESMA linha de texto? */
+function onSameLine(a: Rect, b: Rect, params: GroupingParams): boolean {
+  const ha = rectH(a);
+  const hb = rectH(b);
+  if (ha <= 0 || hb <= 0) return false;
+  if (Math.min(ha, hb) / Math.max(ha, hb) < params.weldHeightRatio) return false;
+  return gapsBetween(a, b).y <= 0;
+}
+
+/**
+ * Quanto a mais estreita cobre da mais larga, para duas caixas EMPILHADAS.
+ *
+ * É a régua da regra do dono: "raramente colamos 1 adesivo onde o componente
+ * abaixo não cubra a mesma largura".
+ */
+function stackWidthCover(a: Rect, b: Rect): number {
+  const overlap = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0));
+  const widest = Math.max(rectW(a), rectW(b));
+  return widest > 0 ? overlap / widest : 0;
+}
+
+/**
+ * As duas formas são a MESMA PEÇA multicor?
+ *
+ * O degradê destes arquivos é feito de formas chapadas de cores diferentes que
+ * não se sobrepõem: ou se encostam (o coração do Amigão dá 0,00 cm entre
+ * contornos) ou correm com um filete branco (a foice da FRICARNE, 5,28 cm).
+ * O que as identifica é proximidade de contorno com PORTE comparável — e o
+ * porte se mede por área, não por diagonal, senão o "FRIGORÍFICO" do Carajás
+ * passa por 0,507 num limiar de 0,5.
+ *
+ * É por causa do porte que texto sobre faixa continua separado: 20 cm de texto
+ * dentro de uma faixa de 800 cm dá razão de áreas 0,03.
+ */
+function isSamePieceMulticolour(
+  a: { outline: Pt[][]; bbox: Rect },
+  b: { outline: Pt[][]; bbox: Rect },
+  params: GroupingParams,
+  ptPerCm: number,
+): boolean {
+  const areaA = rectArea(a.bbox);
+  const areaB = rectArea(b.bbox);
+  if (areaA <= 0 || areaB <= 0) return false;
+  if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < params.overlapMergeAreaRatio) return false;
+  if (!a.outline.length || !b.outline.length) return false;
+  const reach = params.overlapMergeGapCm * ptPerCm;
+  return contourDistance(a.outline, b.outline, reach) <= reach;
 }
 
 /**
@@ -1042,35 +1168,54 @@ export function buildItems(
     if (o.op !== "image" || !options.trimToInk) return o.bbox;
     return options.trimToInk(o.bbox) ?? o.bbox;
   });
-  // a folga de solda entre glifos acompanha a altura de cada um
-  const partGap = (i: number) =>
-    Math.min(
-      params.maxPartGapCm * scale.ptPerCm,
-      Math.max(
-        params.partGapCm * scale.ptPerCm,
-        params.textGapFactor * (boxes[i].y1 - boxes[i].y0),
-      ),
-    );
   const objColors = elements.map((o) => o.fill ?? o.stroke ?? null);
   const touchTol = params.partGapCm * scale.ptPerCm;
+  const lineReach = params.maxLineGapCm * scale.ptPerCm;
 
   /**
-   * Duas peças de cores diferentes ainda são o mesmo item?
+   * A solda é ANISOTRÓPICA, e é essa a correção que faltava.
    *
-   * Vinil é cortado por cor, então o padrão é NÃO. Há duas exceções, e as duas
-   * são medidas: o logotipo multicor, em que uma peça vive DENTRO da outra e
-   * encosta nela (o "Ki" branco no círculo verde), e o ornamento composto, em
-   * que as peças correm lado a lado com folga constante (a onda do TRANSGENIO).
+   * A folga era a mesma para o lado e para cima. Pior: o teto da folga
+   * adaptativa (12 cm) era MENOR que a folga do conjunto (14 cm) que roda
+   * depois, então a folga que acompanha a altura nunca decidia nada e o alcance
+   * efetivo do motor era 14 cm FIXOS — exatamente o que a doutrina §10 proíbe,
+   * e o motivo de `Fruta é Vitamina Pura` sair como `Fru|ta|é|Vita|m|in|a|P|ura`.
    *
-   * A versão antiga exigia o aninhamento como pré-requisito das duas, e por
-   * isso a segunda nunca acontecia: duas peças que correm em paralelo têm
-   * aninhamento de caixa ~0,63, e o teste morria antes de olhar as formas.
+   * Agora são dois alcances. AO LONGO da linha ele é largo (uma altura de
+   * texto, teto de 30 cm), porque entreletra espaçada é comum e não separa
+   * nada. ENTRE linhas ele é curto (um quarto da altura, teto de 8 cm), porque
+   * duas linhas só viram um adesivo quando o conjunto manda — e quem decide
+   * isso é a regra de largura, no estágio seguinte.
    */
-  const compatible = (a: number, b: number): boolean => {
-    if (!alignedEnough(boxes[a], boxes[b], params.weldAlignFrac)) return false;
-    if (colorDistance(objColors[a], objColors[b]) <= params.colorMergeDelta) return true;
+  const weldable = (a: number, b: number): boolean => {
+    const ra = boxes[a];
+    const rb = boxes[b];
+    const gap = gapsBetween(ra, rb);
+    const sameColour = colorDistance(objColors[a], objColors[b]) <= params.colorMergeDelta;
+
+    // marca multicor: formas de cores diferentes que se encostam e têm porte
+    // comparável são a mesma peça, impressa de uma vez
+    if (!sameColour && isSamePieceMulticolour(elements[a], elements[b], params, scale.ptPerCm)) {
+      return true;
+    }
+
+    if (onSameLine(ra, rb, params)) {
+      const height = Math.max(rectH(ra), rectH(rb));
+      const reach = Math.min(lineReach, params.lineGapFactor * height);
+      if (gap.x > reach) return false;
+    } else {
+      // empilhadas ou soltas: alcance curto, e nada de soldar aqui o que é
+      // conjunto — isso é trabalho do estágio de baixo
+      const height = Math.max(rectH(ra), rectH(rb));
+      const reach = Math.min(params.maxLineStackCm * scale.ptPerCm, params.lineStackFactor * height);
+      if (gap.x > reach || gap.y > reach) return false;
+      if (!alignedEnough(ra, rb, params.weldAlignFrac)) return false;
+    }
+
+    if (sameColour) return true;
+    // logotipo multicor com uma peça DENTRO da outra, encostando (o caso "Ki")
     if (
-      nestedFraction(boxes[a], boxes[b]) >= params.nestedMergeFrac &&
+      nestedFraction(ra, rb) >= params.nestedMergeFrac &&
       contourDistance(elements[a].outline, elements[b].outline, touchTol) <= touchTol
     ) {
       return true;
@@ -1078,7 +1223,7 @@ export function buildItems(
     return isCompanionPiece(elements[a], elements[b], params, scale.ptPerCm);
   };
 
-  const partClusters = cluster(boxes, partGap, compatible);
+  const partClusters = cluster(boxes, lineReach, weldable);
   const parts: Rect[] = partClusters.map((idx) =>
     idx.map((i) => boxes[i]).reduce((a, b) => union(a, b)),
   );
@@ -1088,18 +1233,46 @@ export function buildItems(
   const partColors = partClusters.map((idx) => dominantColor(idx.map((i) => elements[i])));
   const partOutlines = partClusters.map((idx) => idx.flatMap((i) => elements[i].outline));
   const partAxes = partClusters.map((idx) => unionAxes(idx.map((i) => pool[i].bleedAxes)));
+  /**
+   * Segundo estágio: as LINHAS viram conjunto — e aqui vale a regra da largura.
+   *
+   * "Raramente colamos 1 adesivo onde o componente abaixo não cubra a mesma
+   * largura." Medido nos casos reais: GRUPO sobre ALVORADA cobre 100% e é um
+   * adesivo só; `clebin` sobre `distribuidora` cobre 60%, `amigão` sobre
+   * `SUPERMERCADOS` 64% e `Carajás` sobre `FRIGORÍFICO` 53% — os três são peças
+   * separadas, coladas uma de cada vez. O Carajás só saía certo por acaso,
+   * porque as cores diferem; com a regra, sai certo por mérito.
+   *
+   * A escapatória é o contato: peças que se ENCOSTAM são um logotipo só,
+   * tenham a largura que tiverem.
+   */
   const lockups = cluster(parts, params.lockupGapCm * scale.ptPerCm, (a, b) => {
-    if (!alignedEnough(parts[a], parts[b], params.weldAlignFrac)) return false;
+    const ra = parts[a];
+    const rb = parts[b];
+    const touching =
+      contourDistance(partOutlines[a], partOutlines[b], touchTol) <= touchTol;
+    if (
+      gapsBetween(ra, rb).y > 0 &&
+      !touching &&
+      stackWidthCover(ra, rb) < params.stackWidthCoverFrac
+    ) {
+      return false;
+    }
     if (colorDistance(partColors[a], partColors[b]) <= params.colorMergeDelta) return true;
     if (
-      nestedFraction(parts[a], parts[b]) >= params.nestedMergeFrac &&
-      contourDistance(partOutlines[a], partOutlines[b], touchTol) <= touchTol
+      isSamePieceMulticolour(
+        { outline: partOutlines[a], bbox: ra },
+        { outline: partOutlines[b], bbox: rb },
+        params,
+        scale.ptPerCm,
+      )
     ) {
       return true;
     }
+    if (nestedFraction(ra, rb) >= params.nestedMergeFrac && touching) return true;
     return isCompanionPiece(
-      { outline: partOutlines[a], bbox: parts[a] },
-      { outline: partOutlines[b], bbox: parts[b] },
+      { outline: partOutlines[a], bbox: ra },
+      { outline: partOutlines[b], bbox: rb },
       params,
       scale.ptPerCm,
     );
@@ -1117,8 +1290,16 @@ export function buildItems(
     const bleedAxes = unionAxes(ordered.map((i) => partAxes[i]));
     const covers = rectArea(bbox) / panelAreaPt;
     // Envelopamento é quem sangra pelos DOIS eixos, ou quem cobre a face quase
-    // inteira. Sangrando por um só, sobra uma posição — e ela se cota.
-    const isWrap = (bleedAxes.horizontal && bleedAxes.vertical) || covers >= params.bleedAreaFrac;
+    // inteira SANGRANDO. Sangrando por um eixo só, sobra uma posição a cotar.
+    //
+    // A cláusula de área exige encostar em alguma aresta, e a razão está na
+    // FRICARNE: o logotipo mede 463 × 176 cm e a caixa dele cobre 40% da face,
+    // acima do piso de 35% — sem essa exigência ele era declarado envelopamento
+    // sem encostar em aresta nenhuma. Envelopamento é o que SANGRA; um logotipo
+    // grande no meio da face é só um logotipo grande.
+    const isWrap =
+      (bleedAxes.horizontal && bleedAxes.vertical) ||
+      (covers >= params.bleedAreaFrac && bleedAxes.edges.length > 0);
     if (!isWrap && rectArea(bbox) < minAreaPt) continue;
     const edgesCm = ordered.map((i) => edgesToCm(partEdges[i], scale));
     const alignedBoxCm = isWrap

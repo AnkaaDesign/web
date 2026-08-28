@@ -293,6 +293,7 @@ function stickerDims(
   // jogava as duas fora junto — e eram 88,3% dos envelopamentos do acervo.
   const axes = s.bleedAxes;
 
+
   // vertical: mede até a linha em que a forma se apoia, não até o descendente
   // O canto de referência do item: a vertical mede do teto ou do piso, a
   // horizontal mede da esquerda ou da direita. As duas linhas moram nesse canto.
