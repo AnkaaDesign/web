@@ -100,6 +100,21 @@ export interface StudioProject {
    * confere isso antes de aplicar. Ver `importTimeline()`.
    */
   timeline?: TimelineKeyData[];
+  /**
+   * O filtro de cor em cena (`scene/look.ts`), pelo id.
+   *
+   * OPCIONAL e ausente quando não há filtro: um documento gravado antes desta
+   * versão não tem o campo e `applyProject()` cai no padrão, sem que a versão do
+   * formato precise subir — a mesma regra do `timeline` acima.
+   *
+   * ⚠️ VAI NO ARQUIVO PORQUE ELE MUDA O PRODUTO, e não a máquina. A preferência
+   * da MÁQUINA mora no `localStorage` de `look.ts`; o que está aqui é a escolha
+   * que aquele projeto fez, e ela tem de abrir igual na mesa de quem receber o
+   * arquivo — senão o orçamento aprovado com "Cinema" reabre em "Nenhum" e a
+   * peça que o cliente viu não existe mais. É a mesma razão de `paint` ser
+   * gravado RESOLVIDO em vez de por id de catálogo.
+   */
+  look?: string;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> =>

@@ -78,6 +78,7 @@ import {
 } from '../scene/scene';
 import { applyEnvironmentLighting, getCurrentEnvironment } from '../scene/environment';
 import * as timeline from '../scene/timeline';
+import * as look from '../scene/look';
 import * as models from '../vehicle/models';
 import * as paint from '../vehicle/paint';
 import { exportLivery, importLivery, clearLivery } from '../vehicle/livery-doc';
@@ -238,6 +239,9 @@ export function captureProject(name?: string): StudioProject {
        existe e um campo vazio dizem a mesma coisa, e o que não existe não ocupa
        espaço num arquivo que vai por e-mail. */
     ...(timeline.timelineCount() ? { timeline: timeline.exportTimeline() } : {}),
+    /* Mesma regra do percurso: ausente quando é "Nenhum", que é o padrão. Um
+       campo que repete o padrão só engorda o arquivo. */
+    ...(look.isLookActive() ? { look: look.currentLook().id } : {}),
   };
 }
 
@@ -479,6 +483,13 @@ export async function applyProject(doc: StudioProject, opts: ApplyOptions = {}) 
     if (!applyCamera(doc.camera)) frameAll([models.state.cabGroup, models.state.trailerGroup]);
 
     applyTimeline(doc);
+    /* O FILTRO, e `persist: false` é o ponto: abrir um arquivo aplica a escolha
+       DAQUELE arquivo à cena, e não pode reescrever a preferência da máquina de
+       quem abriu — a mesma disciplina que `restoreSceneState()` documenta no
+       `persist` dela, invertida porque aqui a preferência é de quem está na mesa
+       e não do documento. Um id desconhecido (um filtro que saiu do catálogo)
+       cai em "Nenhum" por `lookById()`, sem quebrar a abertura. */
+    look.setLook(doc.look ?? 'nenhum', { persist: false });
   } finally {
     /* A cortina desce AQUI, com tudo no lugar — que é a coisa que o relato
        pediu. E desce mesmo se algo acima lançou: ver a nota do `try`. */
@@ -584,6 +595,11 @@ export async function newProject(opts: { onWiped?: () => void } = {}) {
         seria um zero pela metade. */
   step('plotagem', clearLivery);
   step('percurso de câmera', timeline.clearTimeline);
+  /* E O FILTRO PELO MESMO ARGUMENTO: ele é decisão autoral, e um "Novo" que
+     deixasse a cena âmbar teria zerado o desenho por baixo de um tratamento que
+     ninguém pediu. `persist: false` — "Novo" é uma cena nova, não uma troca de
+     preferência da máquina. */
+  step('filtro', () => look.setLook('nenhum', { persist: false }));
 
   /* 2. OS ACABAMENTOS, e a escolha gravada perde o campo junto. Sem tirá-lo da
         escolha, o próximo `saveChoice()` o traria de volta do localStorage. */

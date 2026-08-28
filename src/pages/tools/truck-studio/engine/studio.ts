@@ -64,6 +64,7 @@ import type { FinishDef } from './catalog/catalog';
 import { applyEnvironment, getCurrentEnvironment, disposeEnvironments } from './scene/environment';
 import { disposeReflectionProbe } from './scene/probe';
 import { stopRecording, recordScene, canRecord, isRecording } from './scene/record';
+import { disposeLook } from './scene/look';
 import * as trim from './vehicle/trim';
 import { loadLiveryArt } from './vehicle/livery-art';
 import {
@@ -2469,6 +2470,15 @@ export function unmountStudio() {
      vendo, e trabalho de GPU pago por nada. */
   cancelPendingColdApply();
   stopLoop();
+  /* DEPOIS do `stopLoop()`, e só o que é BUFFER. O filtro em si (qual está
+     escolhido) é estado e sobrevive à troca de rota como todo o resto do engine
+     singleton; o que sai são a cópia do quadro e o alvo do passe, que juntos são
+     do tamanho do canvas — ~14 MB a 1440p parados na GPU enquanto o usuário está
+     noutra rota, para nada, já que ninguém mais desenha. Os dois renascem no
+     primeiro quadro da próxima visita: `look.ts` os realoca por comparação de
+     tamanho, que é o mesmo caminho que a mudança de resolução da gravação já
+     usa. */
+  disposeLook();
   /* ANTES de soltar o `root`. O navegador sai de tela cheia sozinho quando o
      elemento em tela cheia deixa o documento, mas o quadro entre uma coisa e
      outra é a rota nova desenhada atrás de uma tela que ainda é da ferramenta

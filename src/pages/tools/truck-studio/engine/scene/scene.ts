@@ -877,6 +877,30 @@ export function onDrawFrame(fn: (dt: number) => void) { drawHooks.push(fn); }
    sem ela — e o usuário não teria como saber qual caminho a máquina dele pegou. */
 const overlayHooks: ((dt: number) => void)[] = [];
 export function onOverlay(fn: (dt: number) => void) { overlayHooks.push(fn); }
+
+/* ---------------- ganchos de GRADUAÇÃO ----------------
+   A QUARTA lista, e ela é uma lista separada de `onOverlay` por causa da ORDEM,
+   não da natureza — as duas escrevem no buffer já composto.
+
+     `onGrade`    REESCREVE o quadro inteiro. É a imagem.
+     `onOverlay`  CARIMBA por cima do que a graduação já decidiu. É o que vem
+                  depois da imagem.
+
+   ⚠️ E A SEPARAÇÃO É O QUE PROTEGE A MARCA. O único assinante de `onOverlay` é a
+   vinheta de encerramento, cujo verde não é uma escolha estética — `outro.ts` já
+   desliga o ACES por isso (`toneMapped: false`). Se o filtro entrasse nesta
+   mesma lista, a ordem passaria a depender da ordem de IMPORT dos dois módulos,
+   e um filtro âmbar entregaria um logo bege no dia em que alguém reordenasse um
+   `import`. Com duas listas a regra é lida em vez de sorteada.
+
+   Chamado nos DOIS sítios de desenho, pela mesma razão que `onOverlay`: o
+   caminho offline desenha à mão e a reserva em tempo real lê o canvas do laço.
+   Um filtro que só existisse num deles sairia em alguns vídeos e não em outros.
+
+   ⚠️ QUEM ENTRA AQUI É RESPONSÁVEL PELO `autoClear`, idem `onOverlay`. */
+const gradeHooks: ((dt: number) => void)[] = [];
+export function onGrade(fn: (dt: number) => void) { gradeHooks.push(fn); }
+
 export function onRig(fn: (rig: Rig) => void) {
   rigHooks.push(fn);
   /* Fired immediately so a late subscriber is not one preset change behind —
@@ -5249,7 +5273,9 @@ export function renderOfflineFrame(dt: number) {
   }
   for (const fn of drawHooks) fn(dt);
   renderer.render(scene, camera);
-  /* DEPOIS do render, e é o ponto: ver `onOverlay`. */
+  /* DEPOIS do render, e é o ponto: ver `onGrade` e `onOverlay`. A graduação
+     primeiro — ela é a imagem; o carimbo cai sobre o que ela decidiu. */
+  for (const fn of gradeHooks) fn(dt);
   for (const fn of overlayHooks) fn(dt);
 }
 
@@ -5433,7 +5459,9 @@ export function startLoop() {
     /* DENTRO da janela medida, e de propósito: uma sobreposição é submissão como
        qualquer outra, e `info.autoReset` é `false` neste renderizador (ver o
        bloco lá em cima), então a chamada dela SOMA ao contador em vez de zerá-lo.
-       O diagnóstico continua dizendo tudo que o quadro submeteu. */
+       O diagnóstico continua dizendo tudo que o quadro submeteu. Vale igual para
+       a graduação, que é um quadrilátero de tela cheia a mais. */
+    for (const fn of gradeHooks) fn(dt);
     for (const fn of overlayHooks) fn(dt);
     const t1 = performance.now();
     /* ---- AS DUAS AMOSTRAS QUE DÃO O SPLIT PRINCIPAL × SOMBRA ----
