@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { IconCheck, IconClock, IconHourglass, IconNote, IconUser } from "@tabler/icons-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { enumBadge, enumTriggerClass } from "@/components/ui/detailpage";
@@ -9,7 +19,7 @@ import { useServiceOrderMutations } from "@/hooks/production/use-service-order";
 import { canCancelServiceOrder, canEditServiceOrder } from "@/utils/permissions/service-order-permissions";
 import { formatActiveTime, getServiceOrderTotalActiveTimeSeconds } from "@/utils/serviceOrder";
 import { formatDateTime } from "@/utils/date";
-import { SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE } from "@/constants";
+import { SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE, TASK_QUOTE_STATUS } from "@/constants";
 import type { Task } from "@/types";
 
 type ServiceOrderRow = NonNullable<Task["serviceOrders"]>[number];
@@ -91,10 +101,31 @@ function getStatusOptions(so: ServiceOrderRow, type: SERVICE_ORDER_TYPE, role: s
   return options;
 }
 
+/**
+ * Cancelar a ÚLTIMA ordem de serviço COMMERCIAL ativa não cancela só essa OS: a
+ * API cascateia e derruba a TAREFA inteira, o orçamento e todas as demais ordens
+ * de serviço. Sem esse aviso, um clique num combobox destrói a tarefa em silêncio
+ * (caso Fricarne, 28/08/2026).
+ */
+function getCancelCascade(task: Task, so: ServiceOrderRow) {
+  const all = task.serviceOrders ?? [];
+  if (so.type !== SERVICE_ORDER_TYPE.COMMERCIAL) return null;
+
+  const otherActiveCommercial = all.filter(
+    (o) => o.id !== so.id && o.type === SERVICE_ORDER_TYPE.COMMERCIAL && o.status !== SERVICE_ORDER_STATUS.CANCELLED,
+  );
+  if (otherActiveCommercial.length > 0) return null;
+
+  const otherActive = all.filter((o) => o.id !== so.id && o.status !== SERVICE_ORDER_STATUS.CANCELLED);
+  const quoteWillCancel = !!task.quote && task.quote.status !== TASK_QUOTE_STATUS.CANCELLED;
+  return { otherActiveCount: otherActive.length, quoteWillCancel };
+}
+
 /** Status shows as a colored badge (like the task-status field); DOUBLE-click to edit → combobox. */
-function SoStatusControl({ so, editable, options }: { so: ServiceOrderRow; editable: boolean; options: ComboboxOption[] }) {
+function SoStatusControl({ task, so, editable, options }: { task: Task; so: ServiceOrderRow; editable: boolean; options: ComboboxOption[] }) {
   const { updateAsync } = useServiceOrderMutations();
   const [editing, setEditing] = useState(false);
+  const [pendingCancel, setPendingCancel] = useState<Record<string, unknown> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -108,12 +139,68 @@ function SoStatusControl({ so, editable, options }: { so: ServiceOrderRow; edita
     return () => document.removeEventListener("mousedown", handler, true);
   }, [editing]);
 
+  const applyStatus = async (data: Record<string, unknown>) => {
+    try {
+      // The api client surfaces success/error notifications itself.
+      await updateAsync({ id: so.id, data: data as never });
+    } catch {
+      // already surfaced by the api client.
+    }
+  };
+
+  const cascade = pendingCancel ? getCancelCascade(task, so) : null;
+  const cancelDialog = (
+    <AlertDialog open={!!pendingCancel} onOpenChange={(open) => !open && setPendingCancel(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{cascade ? "Cancelar a tarefa inteira?" : "Cancelar ordem de serviço?"}</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                {so.description || "Ordem de serviço"} será cancelada. O cancelamento é definitivo para esta ordem de serviço.
+              </p>
+              {cascade && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-destructive">
+                  <p className="font-semibold">Esta é a última ordem de serviço comercial ativa.</p>
+                  <p>
+                    Cancelá-la vai cancelar <strong>a tarefa inteira</strong>
+                    {cascade.quoteWillCancel && <>, <strong>o orçamento</strong></>}
+                    {cascade.otherActiveCount > 0 && (
+                      <>
+                        {" "}e as outras <strong>{cascade.otherActiveCount}</strong> ordens de serviço (arte, produção e logística)
+                      </>
+                    )}
+                    .
+                  </p>
+                </div>
+              )}
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Voltar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={async () => {
+              const data = pendingCancel;
+              setPendingCancel(null);
+              if (data) await applyStatus(data);
+            }}
+          >
+            {cascade ? "Cancelar tarefa e orçamento" : "Cancelar ordem de serviço"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (!editable) return <>{enumBadge(so.status, SO_ENUM)}</>;
 
   if (!editing) {
     return (
       <div onDoubleClick={() => setEditing(true)} className="cursor-pointer select-none" title="Duplo clique para alterar o status">
         {enumBadge(so.status, SO_ENUM)}
+        {cancelDialog}
       </div>
     );
   }
@@ -150,14 +237,15 @@ function SoStatusControl({ so, editable, options }: { so: ServiceOrderRow; edita
             data.finishedAt = new Date();
           }
           setEditing(false);
-          try {
-            // The api client surfaces success/error notifications itself.
-            await updateAsync({ id: so.id, data: data as never });
-          } catch {
-            // already surfaced by the api client.
+          // Cancelar sempre confirma: é terminal e, na OS comercial, cascateia.
+          if (v === SERVICE_ORDER_STATUS.CANCELLED) {
+            setPendingCancel(data);
+            return;
           }
+          await applyStatus(data);
         }}
       />
+      {cancelDialog}
     </div>
   );
 }
@@ -245,7 +333,7 @@ export function TaskServiceOrderGroup({ task, type, role, currentUserId }: { tas
               )}
             </div>
             <div className="shrink-0">
-              <SoStatusControl so={so} editable={editable} options={getStatusOptions(so, type, role)} />
+              <SoStatusControl task={task} so={so} editable={editable} options={getStatusOptions(so, type, role)} />
             </div>
           </div>
         );
