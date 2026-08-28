@@ -3,6 +3,30 @@ import { pdfjs } from "react-pdf";
 import { IconLoader2, IconAlertTriangle, IconDownload } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  buildLayoutFaces,
+  createPageInkTrimmer,
+  detectScaleFrom,
+  readPageGeometry,
+  type LayoutDimensionsResult,
+  type PageGeometry,
+  type Panel,
+  type ScaleDetection,
+} from "@/lib/layout-dimensions";
+import {
+  PdfMeasureOverlay,
+  type CommittedMeasurement,
+  type PlannedDimensionEntry,
+} from "./pdf-measure-overlay";
+
+/**
+ * Ferramentas do desenho.
+ *
+ * `cotas` é o cotador: o arquivo abre pronto e um clique num adesivo mostra as
+ * medidas dele. `regua` é a medição livre, dois cliques entre duas retas. São
+ * coisas diferentes e por isso não dividem o mesmo nome.
+ */
+export type LayoutTool = "off" | "cotas" | "regua";
 
 import { VENDOR_ASSETS } from '@/config/assets';
 // Configure PDF.js worker
@@ -27,6 +51,22 @@ export interface InlinePdfViewerProps {
   onPageChange?: (page: number) => void;
   // Callback when fit scale is calculated - provides the optimal scale to fit the PDF in the viewport
   onFitScaleCalculated?: (fitScale: number, pageWidth: number, pageHeight: number) => void;
+  measurements?: CommittedMeasurement[];
+  onMeasurementCommit?: (measurement: CommittedMeasurement) => void;
+  /** Escala descoberta no arquivo (ou o padrão da casa, quando ele não traz cota). */
+  onScaleDetected?: (detection: ScaleDetection) => void;
+  /**
+   * Medidas do implemento, uma por face. Quando vêm, o cotador roda sozinho
+   * assim que o arquivo carrega — não há botão a apertar.
+   */
+  layoutPanels?: Panel[];
+  /** Ferramenta ativa sobre o desenho. */
+  layoutTool?: LayoutTool;
+  /** Resultado do cotador, para a tela que hospeda o visualizador. */
+  onLayoutResult?: (result: LayoutDimensionsResult | null) => void;
+  /** Item cujas cotas estão à mostra; `null` mostra só os contornos. */
+  selectedItemIndex?: number | null;
+  onSelectItem?: (index: number | null) => void;
 }
 
 export interface InlinePdfViewerRef {
@@ -58,6 +98,14 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       pageNumber: externalPageNumber,
       onPageChange,
       onFitScaleCalculated,
+      measurements,
+      onMeasurementCommit,
+      onScaleDetected,
+      layoutPanels,
+      layoutTool = "off",
+      onLayoutResult,
+      selectedItemIndex = null,
+      onSelectItem,
     },
     ref
   ) => {
@@ -67,6 +115,12 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     const [internalRotation, setInternalRotation] = React.useState<number>(0);
     const [loading, setLoading] = React.useState<boolean>(true);
     const [error, setError] = React.useState<string | null>(null);
+    const [geometry, setGeometry] = React.useState<PageGeometry | null>(null);
+    const [detection, setDetection] = React.useState<ScaleDetection | null>(null);
+    const [layout, setLayout] = React.useState<LayoutDimensionsResult | null>(null);
+    const [layoutBusy, setLayoutBusy] = React.useState(false);
+    const onLayoutResultRef = React.useRef(onLayoutResult);
+    onLayoutResultRef.current = onLayoutResult;
 
     // Use external values if provided, otherwise use internal state
     const scale = externalScale ?? internalScale;
@@ -74,6 +128,8 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     const pageNumber = externalPageNumber ?? internalPageNumber;
 
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const measureModeRef = React.useRef(layoutTool !== "off");
+    measureModeRef.current = layoutTool !== "off";
     const containerRef = React.useRef<HTMLDivElement>(null);
     const pdfDocRef = React.useRef<PDFDocumentProxy | null>(null);
     const renderTaskRef = React.useRef<RenderTask | null>(null);
@@ -143,6 +199,33 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     // The page lives in a native scroll container, so panning is just
     // scroll manipulation — that keeps scrollbars, wheel and keyboard in sync.
     const panRef = React.useRef<{ id: number; startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+    /**
+     * Zoom ancorado no cursor.
+     *
+     * A página vive num contêiner de rolagem, então aumentar a escala sozinha
+     * mantém fixo o canto superior esquerdo — quem estava olhando o rodapé de um
+     * caminhão de 15 m ia parar no teto. Guardando onde o ponteiro está e
+     * corrigindo a rolagem na proporção do zoom, o ponto sob o cursor continua
+     * sob o cursor, que é o que todo visualizador de mapa faz.
+     */
+    const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
+    const prevScaleRef = React.useRef(scale);
+    React.useLayoutEffect(() => {
+      const el = containerRef.current;
+      const previous = prevScaleRef.current;
+      prevScaleRef.current = scale;
+      if (!el || previous === scale || !previous) return;
+      const rect = el.getBoundingClientRect();
+      const anchor = pointerRef.current;
+      // sem ponteiro sobre a página (atalho de teclado, botão da barra), o
+      // âncora é o centro do que está à vista
+      const ax = anchor ? anchor.x - rect.left : rect.width / 2;
+      const ay = anchor ? anchor.y - rect.top : rect.height / 2;
+      const ratio = scale / previous;
+      el.scrollLeft = (el.scrollLeft + ax) * ratio - ax;
+      el.scrollTop = (el.scrollTop + ay) * ratio - ay;
+    }, [scale]);
     const [isPanning, setIsPanning] = React.useState(false);
     const [canPan, setCanPan] = React.useState(false);
 
@@ -163,6 +246,8 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       // Touch keeps native momentum scrolling.
       if (e.pointerType === "touch") return;
       if (e.button !== 0) return;
+      // Medindo, o arrasto é do ímã: puxar a página tiraria a mira do lugar.
+      if (measureModeRef.current) return;
 
       const el = containerRef.current;
       if (!el) return;
@@ -280,6 +365,84 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       };
     }, [url]); // Removed onFitScaleCalculated from dependencies to prevent unnecessary reloads
 
+    /**
+     * Geometria vetorial e cotagem, assim que o arquivo carrega.
+     *
+     * Só roda quando o chamador entrega as medidas do implemento — num boleto
+     * ou numa nota fiscal não há face para achar, e varrer o vetor à toa custa
+     * caro num arquivo de 15 metros.
+     */
+    React.useEffect(() => {
+      if (loading || layoutTool === "off") return;
+      let cancelled = false;
+      const run = async () => {
+        const pdfDoc = pdfDocRef.current;
+        if (!pdfDoc) return;
+        setLayoutBusy(true);
+        try {
+          const page = await pdfDoc.getPage(pageNumber);
+          if (layoutPanels?.length) {
+            const trimToInk = await createPageInkTrimmer(page as never, 0.5, rotation);
+            if (cancelled) return;
+            const result = await buildLayoutFaces(page, layoutPanels, { rotation, trimToInk });
+            if (cancelled) return;
+            setGeometry(result.geometry);
+            setDetection(result.detectedScale);
+            setLayout(result);
+            onScaleDetected?.(result.detectedScale);
+            onLayoutResultRef.current?.(result);
+            return;
+          }
+          // sem medidas, só a régua: basta a geometria e a escala do arquivo
+          const geo = await readPageGeometry(page, { rotation });
+          if (cancelled) return;
+          const text = await page.getTextContent();
+          if (cancelled) return;
+          const found = detectScaleFrom(geo, text.items);
+          setGeometry(geo);
+          setDetection(found);
+          setLayout(null);
+          onScaleDetected?.(found);
+          onLayoutResultRef.current?.(null);
+        } catch (err) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("[InlinePdfViewer] Não foi possível ler a geometria:", err);
+          }
+        } finally {
+          if (!cancelled) setLayoutBusy(false);
+        }
+      };
+      run();
+      return () => {
+        cancelled = true;
+      };
+    }, [layoutPanels, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
+
+    /** As cotas do item escolhido, cada uma com a face de onde veio. */
+    const plannedEntries = React.useMemo<PlannedDimensionEntry[]>(() => {
+      if (!layout || selectedItemIndex === null) return [];
+      return layout.dimensions
+        .filter((d) => d.targetIndex === selectedItemIndex)
+        .map((dimension) => {
+          const item = layout.items[dimension.targetIndex ?? -1];
+          const face = layout.faces[item?.faceIndex ?? 0];
+          return face ? { dimension, panel: face.panel, scale: face.scale } : null;
+        })
+        .filter((e): e is PlannedDimensionEntry => e !== null);
+    }, [layout, selectedItemIndex]);
+
+    const selectable = React.useMemo(
+      () =>
+        layout?.items.map((item) => ({
+          index: item.index,
+          // o clique cai na tinta; o quadro desenhado é o que a COTA referencia
+          bbox: item.bbox,
+          drawBox: item.alignedBoxPt,
+          outline: item.outlinePt,
+        })) ?? [],
+      [layout],
+    );
+
     // Render current page
     React.useEffect(() => {
       let cancelled = false;
@@ -356,7 +519,13 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           className={cn("relative overflow-auto rounded-lg w-full h-full", canPan && (isPanning ? "cursor-grabbing" : "cursor-grab"))}
           style={{ maxHeight }}
           onPointerDown={handlePanPointerDown}
-          onPointerMove={handlePanPointerMove}
+          onPointerMove={(event) => {
+            pointerRef.current = { x: event.clientX, y: event.clientY };
+            handlePanPointerMove(event);
+          }}
+          onPointerLeave={() => {
+            pointerRef.current = null;
+          }}
           onPointerUp={handlePanPointerEnd}
           onPointerCancel={handlePanPointerEnd}
         >
@@ -405,7 +574,38 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
                 width: "max-content",
               }}
             >
-              <canvas ref={canvasRef} className="shadow-2xl rounded-lg block select-none" style={{ background: "white" }} draggable={false} />
+              {/*
+                Sem margem reservada. A cota do quadro externo mora 10 cm além
+                da face, e a face já fica bem dentro da página — a margem branca
+                do PDF vale ~90 cm de face, então o anel cabe no papel e o SVG
+                simplesmente transborda por cima dela. Reservar espaço aqui
+                engordava o item, estourava a altura do contêiner e o
+                `safe center` caía para o topo: a página descia 61 px ao ligar
+                as Medidas, e voltava ao centro ao desligar.
+              */}
+              <div className="relative">
+                <canvas ref={canvasRef} className="shadow-2xl rounded-lg block select-none" style={{ background: "white" }} draggable={false} />
+                {layoutTool !== "off" && geometry && detection && (
+                  <PdfMeasureOverlay
+                    geometry={geometry}
+                    zoom={scale}
+                    ptPerCm={detection.ptPerCm}
+                    faceScales={layout?.faces.map((f) => f.scale)}
+                    measurements={measurements ?? []}
+                    onCommit={(m) => onMeasurementCommit?.(m)}
+                    plan={plannedEntries}
+                    selectable={layoutTool === "cotas" ? selectable : undefined}
+                    selectedIndex={selectedItemIndex}
+                    onSelect={onSelectItem}
+                    mode={layoutTool === "cotas" ? "select" : "measure"}
+                  />
+                )}
+                {layoutBusy && (
+                  <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
+                    lendo o desenho…
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

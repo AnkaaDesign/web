@@ -1,4 +1,6 @@
 import * as React from "react";
+
+import type { Panel } from "@/lib/layout-dimensions";
 import type { File as AnkaaFile } from "../../../types";
 import { fileViewerService } from "../../../utils/file-viewer";
 import type { FileViewerConfig } from "../../../utils/file-viewer";
@@ -18,6 +20,12 @@ import { toast } from "@/components/ui/sonner";
 export interface FileViewerOptions {
   /** fileId → LAYOUT_STATUS. `REPROVED` desenha a faixa vermelha sobre o preview. */
   layoutStatusByFileId?: Record<string, string | null | undefined>;
+  /**
+   * Medidas do implemento, uma por face, na ordem em que as faces aparecem no
+   * arquivo (de cima para baixo). Quando vêm, o visualizador cota o layout
+   * sozinho e o clique num adesivo mostra as medidas dele.
+   */
+  layoutPanels?: Panel[];
 }
 
 export interface FileViewerState {
@@ -32,6 +40,8 @@ export interface FileViewerState {
   currentPdfUrl: string | null;
   /** Status de layout dos arquivos abertos agora (ver `FileViewerOptions`). */
   layoutStatusByFileId?: Record<string, string | null | undefined>;
+  /** Medidas do implemento da tarefa aberta agora (ver `FileViewerOptions`). */
+  layoutPanels?: Panel[];
 }
 
 export interface FileViewerProps {
@@ -92,6 +102,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
       currentFiles: files,
       currentFileIndex: initialIndex,
       layoutStatusByFileId: options?.layoutStatusByFileId,
+      layoutPanels: options?.layoutPanels,
     }));
   }, []);
 
@@ -104,6 +115,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
       // Zerado junto com a lista: o mapa é da ABERTURA, não do provider. Mantê-lo
       // faria a próxima galeria (recibos, notas) herdar a faixa da anterior.
       layoutStatusByFileId: undefined,
+      layoutPanels: undefined,
     }));
   }, []);
 
@@ -259,6 +271,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
           }}
           baseUrl={viewerConfig.baseUrl}
           layoutStatusByFileId={state.layoutStatusByFileId}
+          layoutPanels={state.layoutPanels}
         />
       )}
 

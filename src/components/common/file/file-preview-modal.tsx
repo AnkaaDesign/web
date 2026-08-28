@@ -11,6 +11,8 @@ import {
   IconExternalLink,
   IconVectorBezier,
   IconRotateClockwise,
+  IconPointer,
+  IconRuler2,
   IconRotate2,
   IconMaximize,
   IconColorPicker,
@@ -25,7 +27,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
 import { isImageFile, isVideoFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl, rewriteCdnUrl } from "../../../utils/file";
-import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
+import { InlinePdfViewer, type InlinePdfViewerRef, type LayoutTool } from "./inline-pdf-viewer";
+import type { CommittedMeasurement } from "./pdf-measure-overlay";
+import type { LayoutDimensionsResult, Panel } from "@/lib/layout-dimensions";
 import { VideoPlayer } from "./video-player";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
@@ -66,6 +70,8 @@ const isPreviewableFile = (file: AnkaaFile): boolean => {
   return isImageFile(file) || isVideoFile(file) || isPdf || (isEpsFile(file) && !!file.thumbnailUrl);
 };
 
+/** Como a cota se lê em português, para o painel de leitura. */
+
 export interface FilePreviewModalProps {
   files: AnkaaFile[];
   initialFileIndex?: number;
@@ -83,6 +89,11 @@ export interface FilePreviewModalProps {
    * `Layout`, então tem de chegar por fora. `REPROVED` carimba a faixa vermelha.
    */
   layoutStatusByFileId?: Record<string, string | null | undefined>;
+  /**
+   * Medidas do implemento, uma por face. Quando vêm, o PDF abre já cotado: um
+   * clique num adesivo mostra as medidas dele, sem botão nenhum a apertar.
+   */
+  layoutPanels?: Panel[];
 }
 
 export function FilePreviewModal({
@@ -97,6 +108,7 @@ export function FilePreviewModal({
   showThumbnailStrip = true,
   showImageCounter = true,
   layoutStatusByFileId,
+  layoutPanels,
 }: FilePreviewModalProps) {
   // State management
   const [currentIndex, setCurrentIndex] = React.useState(initialFileIndex);
@@ -144,6 +156,31 @@ export function FilePreviewModal({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const modalRef = React.useRef<HTMLDivElement>(null);
   const pdfViewerRef = React.useRef<InlinePdfViewerRef>(null);
+
+  // --- Cotador de layout -------------------------------------------------
+  // Só existe quando o chamador entrega as medidas do implemento: num boleto ou
+  // numa nota fiscal não há face para achar, e varrer o vetor à toa custa caro.
+  const canDimension = Boolean(layoutPanels?.length);
+  const [layoutTool, setLayoutTool] = React.useState<LayoutTool>("off");
+  const [selectedItem, setSelectedItem] = React.useState<number | null>(null);
+  const [measurements, setMeasurements] = React.useState<CommittedMeasurement[]>([]);
+  /**
+   * O que o motor tem a dizer quando algo não fecha.
+   *
+   * Sem isto o cotador falha calado: se nenhuma face é reconhecida, ou se a
+   * proporção do desenho diverge da medida informada do caminhão, a tela fica
+   * simplesmente vazia e o operador conclui que não há nada a medir. Um número
+   * errado é ruim; um silêncio que parece um acerto é pior.
+   */
+  const [layoutResult, setLayoutResult] = React.useState<LayoutDimensionsResult | null>(null);
+
+  React.useEffect(() => {
+    setLayoutTool(canDimension ? "cotas" : "off");
+    setLayoutResult(null);
+    setSelectedItem(null);
+    setMeasurements([]);
+  }, [canDimension, currentIndex]);
+
 
   // Filter previewable files and maintain mapping to original indices
   const previewableFiles = React.useMemo(() => files.map((file, index) => ({ file, originalIndex: index })).filter(({ file }) => isPreviewableFile(file)), [files]);
@@ -942,6 +979,37 @@ export function FilePreviewModal({
                   >
                     <IconRotateClockwise className="h-4 w-4" />
                   </Button>
+                  {canDimension && (
+                    <>
+                      <div className="w-px h-6 bg-white/20 mx-1" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-9 px-3 text-white hover:bg-white/20 transition-colors",
+                          layoutTool === "cotas" && "bg-white/25",
+                        )}
+                        onClick={() => setLayoutTool((t) => (t === "cotas" ? "off" : "cotas"))}
+                        title="Clique num adesivo para ver as medidas dele"
+                      >
+                        <IconPointer className="h-4 w-4 mr-1.5" />
+                        Medidas
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-9 px-3 text-white hover:bg-white/20 transition-colors",
+                          layoutTool === "regua" && "bg-white/25",
+                        )}
+                        onClick={() => setLayoutTool((t) => (t === "regua" ? "off" : "regua"))}
+                        title="Clique numa linha e depois na outra"
+                      >
+                        <IconRuler2 className="h-4 w-4 mr-1.5" />
+                        Régua
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1094,7 +1162,37 @@ export function FilePreviewModal({
                   </div>
                 ) : (
                   // Custom PDF Viewer using pdfjs-dist for better styling
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {/*
+                      O cartão sobrou só para a Régua, que precisa dizer como se
+                      usa e mostrar o último valor. No modo Medidas as cotas
+                      estão desenhadas sobre o adesivo — repetir os números num
+                      canto da tela era ruído.
+                    */}
+                    {canDimension && layoutTool !== "off" && layoutResult?.warnings.length ? (
+                      <div className="pointer-events-none absolute left-4 bottom-4 z-10 max-w-md rounded-xl border border-amber-400/40 bg-amber-950/85 px-3 py-2 text-xs text-amber-100 shadow-2xl backdrop-blur-xl">
+                        {layoutResult.warnings.map((w) => (
+                          <p key={w}>{w}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                    {canDimension && layoutTool === "regua" && (
+                      <div className="pointer-events-none absolute left-4 top-4 z-10 max-w-64 rounded-xl border border-white/20 bg-black/85 p-3 text-white shadow-2xl backdrop-blur-xl">
+                        {layoutTool === "regua" ? (
+                          <p className="text-xs text-white/70">
+                            Clique numa linha do desenho e depois na outra.
+                            {measurements.length > 0 && (
+                              <span className="mt-1 block font-mono text-sm text-white">
+                                {measurements[measurements.length - 1].valueCm.toFixed(
+                                  measurements[measurements.length - 1].valueCm >= 100 ? 0 : 1,
+                                )}{" "}
+                                cm
+                              </span>
+                            )}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
                     <InlinePdfViewer
                       ref={pdfViewerRef}
                       url={getFileUrl(currentFile, baseUrl)}
@@ -1106,6 +1204,13 @@ export function FilePreviewModal({
                       scale={pdfScale}
                       pageNumber={pdfPageNumber}
                       maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
+                      layoutPanels={layoutPanels}
+                      layoutTool={layoutTool}
+                      onLayoutResult={setLayoutResult}
+                      selectedItemIndex={selectedItem}
+                      onSelectItem={setSelectedItem}
+                      measurements={measurements}
+                      onMeasurementCommit={(m) => setMeasurements((list) => [...list, m])}
                     />
                   </div>
                 )
