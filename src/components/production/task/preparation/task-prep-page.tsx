@@ -454,7 +454,7 @@ export function TaskPreparationPage() {
               label: showAwaitingLogistics ? "Ocultar aguardando logística" : "Mostrar aguardando logística",
               icon: IconTruck,
               onClick: () => setShowAwaitingLogistics((v) => !v),
-              variant: (showAwaitingLogistics ? "secondary" : "outline") as const,
+              variant: (showAwaitingLogistics ? "secondary" : "outline") as "secondary" | "outline",
             },
           ]
         : []),

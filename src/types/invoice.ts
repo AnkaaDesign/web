@@ -195,6 +195,12 @@ export interface TaskNfseHistoryItem {
   cancelSubstituteNfseNumber: number | null;
   cancelRequestedAt: string | null;
   cancelResolvedAt: string | null;
+  // Substituição: o endpoint seleciona estes três junto do resto do NfseDocument —
+  // `supersededByNfseNumber` é o que a tela usa para pré-preencher a nota substituta
+  // no reenvio do cancelamento.
+  supersededByNfseDocumentId: string | null;
+  supersededByNfseNumber: number | null;
+  supersededAt: string | null;
   createdAt: string;
   updatedAt: string;
   isOrphan: boolean;

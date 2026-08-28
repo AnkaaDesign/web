@@ -1219,7 +1219,7 @@ export default function BonusListPage() {
                   value={searchTerm}
                   onChange={setSearchTerm}
                   placeholder="Buscar colaborador..."
-                  className="w-full max-w-sm"
+                  className="w-full"
                 />
               </div>
 

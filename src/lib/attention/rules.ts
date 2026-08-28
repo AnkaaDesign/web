@@ -25,7 +25,6 @@ import {
   TASK_STATUS,
   ORDER_STATUS,
   PPE_DELIVERY_STATUS,
-  AIRBRUSHING_STATUS,
   TASK_QUOTE_STATUS,
 } from "@/constants";
 
