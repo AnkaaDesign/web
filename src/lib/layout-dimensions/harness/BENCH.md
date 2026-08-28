@@ -102,3 +102,22 @@ parâmetros usados), `metrics`, `breakdown` (cobertura, por que cada cota do
 projetista escapou, que tipo de cota sobrou) e `perFace` — uma linha por face,
 com cruzamentos e pontas no vazio. É por `perFace` que se descobre QUAL face
 regrediu, não só que o total piorou.
+
+---
+
+## O outro portão: AGRUPAMENTO
+
+Esta bancada mede COTAGEM. Os defeitos que o dono está vendo agora — palavra
+partida ao meio, ícone separado do texto, faixa picada em três — são de
+AGRUPAMENTO, e aqui eles quase não aparecem: uma cota pode bater com o
+projetista enquanto o item que ela mede está picado em nove pedaços.
+
+`grouping-bench.mjs` é o portão desses defeitos, com referência própria em
+`grouping.baseline.json`. Leia `GROUPING.md`.
+
+```sh
+node src/lib/layout-dimensions/harness/grouping-bench.mjs ~/layouts
+```
+
+**Rode os dois.** Apertar a solda melhora o agrupamento e pode piorar a
+cotagem; só as duas referências juntas mostram a troca.

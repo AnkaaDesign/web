@@ -623,6 +623,11 @@ export function classify(
     if (obj.op === "clip") continue;
     if (isDimensionInk(obj, params)) continue;
     const b = obj.bbox;
+    // Caminho corrompido não é arte. No `bergamini 840-268` há um objeto de
+    // 150.358 × 41.574 cm com dez pontos de contorno: ele toma a primeira vaga
+    // do orçamento de itens, não gera cota nenhuma e desenha fora da tela.
+    // São 11 objetos em 171.042, todos deste tipo.
+    if (b.x1 - b.x0 > geometry.width * 1.5 || b.y1 - b.y0 > geometry.height * 1.5) continue;
     const inside =
       b.x1 > scale.panelPt.x0 + 1 &&
       b.x0 < scale.panelPt.x1 - 1 &&
@@ -1133,7 +1138,22 @@ export function buildItems(
     };
     // O envelopamento aparece pelo CONTORNO real: a forma é côncava e o
     // retângulo cobre metade de vazio.
-    if (isWrap) item.outlinePt = ordered.flatMap((i) => partOutlines[i]);
+    /**
+     * O contorno acompanha todo item que ENCOSTA numa aresta, não só o
+     * envelopamento pleno.
+     *
+     * A foice de fundo do FRICARNE sangra pelo topo e pelo piso, cobre 23% da
+     * face e não é envelopamento pleno — então ficava sem contorno e a tela
+     * desenhava a CAIXA dela: 198 × 240 cm, a altura inteira do caminhão, para
+     * uma fita de trinta centímetros. Dois dos quatro lados caíam exatamente em
+     * cima do contorno que o próprio PDF já desenha, e o preenchimento é 8% de
+     * azul sobre arte escura. O quadro existia e era invisível.
+     *
+     * Fica restrito a quem sangra de propósito: um bloco de texto desenhado
+     * pelo contorno viraria o traçado de cada letra, que é ruído. Para ele a
+     * caixa é a figura certa.
+     */
+    if (bleedAxes.edges.length) item.outlinePt = ordered.flatMap((i) => partOutlines[i]);
     built.push({
       item,
       // A travessia da aresta se lê no CAMINHO, não na caixa. Guardar os

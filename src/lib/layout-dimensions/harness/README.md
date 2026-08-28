@@ -21,5 +21,6 @@ node src/lib/layout-dimensions/harness/run.mjs ~/layouts
 | `snaptest2.mjs <pasta> <mira_cm> <raio_cm>` | acerto do ímã da medição manual |
 | `demo.mjs <pdf> <saída> <lado> <altura> <seções> [título]` | gera uma face cotada |
 | `bench.mjs <pasta> [--save]` | portão de regressão: mede tudo, compara com `bench.baseline.json` e dá o veredito (ver `BENCH.md`) |
+| `grouping-bench.mjs <pasta> [--save]` | portão do AGRUPAMENTO: taxas de palavra partida, órfão, monstro, item mudo, sem contorno, peça picada, empilhado e marca multicor, mais o que as cotas do projetista dizem sobre item grande demais e picado (ver `GROUPING.md`) |
 
 `DUMP=<trecho do nome>` em `run.mjs` imprime o diff cota a cota de um arquivo.

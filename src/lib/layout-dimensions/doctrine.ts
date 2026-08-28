@@ -365,7 +365,7 @@ function crossingDims(
   p: DoctrineParams,
   targetIndex: number,
   label: string,
-): Routed[] {
+): { routed: Routed; boundary: "start" | "end" }[] {
   const vertical = c.edge === "left" || c.edge === "right";
   const lengthCm = vertical ? heightCm : widthCm;
   const kind = (
@@ -387,16 +387,19 @@ function crossingDims(
     span: vertical ? widthCm : heightCm,
   };
   const axis = vertical ? "V" : "H";
-  const out: Routed[] = [];
-  for (const boundary of [c.startCm, c.endCm]) {
+  const out: { routed: Routed; boundary: "start" | "end" }[] = [];
+  for (const side of ["start", "end"] as const) {
+    const boundary = side === "start" ? c.startCm : c.endCm;
     const fromStart = boundary;
     const fromEnd = lengthCm - boundary;
     if (Math.min(fromStart, fromEnd) < p.minValueCm) continue; // fronteira na quina
-    out.push(
-      fromStart <= fromEnd
-        ? dim(axis, 0, boundary, kind, perp, p, label, targetIndex, note)
-        : dim(axis, boundary, lengthCm, kind, perp, p, label, targetIndex, note),
-    );
+    out.push({
+      boundary: side,
+      routed:
+        fromStart <= fromEnd
+          ? dim(axis, 0, boundary, kind, perp, p, label, targetIndex, note)
+          : dim(axis, boundary, lengthCm, kind, perp, p, label, targetIndex, note),
+    });
   }
   return out;
 }
@@ -503,11 +506,17 @@ function pickCrossings(
 ): Routed[] {
   const best = new Map<string, { gap: number; edge: BorderCrossing["edge"]; routed: Routed }>();
   for (const c of crossings) {
-    for (const r of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex))) {
-      const key = `${c.wrapIndex}:${c.edge}:${r.dimension.aCm === 0 ? "start" : "end"}`;
+    for (const e of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex))) {
+      // A chave é a FRONTEIRA de onde a travessia veio, não a quina de onde ela
+      // foi medida. Chaveando pela quina, duas fronteiras distintas que por
+      // acaso ficam ambas mais perto da esquerda colidem e uma some — 322 de
+      // 1.002 travessias do acervo colidiam assim, e em 12 delas o número que
+      // o projetista escreveu era justamente o descartado. Na FRICARNE 840 o
+      // motor achava a fronteira certa (183) e guardava a outra (154).
+      const key = `${c.wrapIndex}:${c.edge}:${e.boundary}`;
       const current = best.get(key);
-      if (!current || r.dimension.valueCm < current.gap) {
-        best.set(key, { gap: r.dimension.valueCm, edge: c.edge, routed: r });
+      if (!current || e.routed.dimension.valueCm < current.gap) {
+        best.set(key, { gap: e.routed.dimension.valueCm, edge: c.edge, routed: e.routed });
       }
     }
   }
@@ -516,7 +525,6 @@ function pickCrossings(
   // nunca rodava — o teste era `chave.startsWith("top")`, e a chave começa pelo
   // índice do item, então dava falso em 100% dos casos. Agora a aresta vem do
   // próprio registro, não de adivinhar pelo texto da chave.
-  const rank = { top: 0, bottom: 1, left: 2, right: 3 };
   const byItem = new Map<number, { gap: number; edge: BorderCrossing["edge"]; routed: Routed }[]>();
   for (const [key, entry] of best) {
     const item = Number(key.split(":")[0]);
@@ -524,10 +532,23 @@ function pickCrossings(
     if (list) list.push(entry);
     else byItem.set(item, [entry]);
   }
+  // O orçamento é por ARESTA, não por item: um adereço que cruza o topo e o
+  // piso tem duas histórias a contar, e gastar as duas vagas numa aresta só
+  // deixa a outra muda.
   const out: Routed[] = [];
   for (const list of byItem.values()) {
-    list.sort((a, b) => rank[a.edge] - rank[b.edge] || a.gap - b.gap);
-    out.push(...list.slice(0, p.maxCrossings).map((e) => e.routed));
+    const perEdge = new Map<BorderCrossing["edge"], typeof list>();
+    for (const e of list) {
+      const bucket = perEdge.get(e.edge);
+      if (bucket) bucket.push(e);
+      else perEdge.set(e.edge, [e]);
+    }
+    for (const edge of ["top", "bottom", "left", "right"] as const) {
+      const bucket = perEdge.get(edge);
+      if (!bucket) continue;
+      bucket.sort((a, b) => a.gap - b.gap);
+      out.push(...bucket.slice(0, p.maxCrossings).map((e) => e.routed));
+    }
   }
   return out;
 }
