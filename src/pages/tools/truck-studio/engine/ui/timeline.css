@@ -205,6 +205,8 @@
 .truck-studio-root .ts-tl__add:focus-visible,
 .truck-studio-root .ts-tl__thumb:focus-visible,
 .truck-studio-root .ts-tl__kill:focus-visible,
+.truck-studio-root .ts-tl__save:focus-visible,
+.truck-studio-root .ts-tl__move:focus-visible,
 .truck-studio-root .ts-tl__ruler:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -507,6 +509,72 @@
 .truck-studio-root .ts-tl__kill:hover {
   background: rgba(232, 62, 62, 0.92);
   color: #fff;
+}
+
+/* O ⟳ DO CANTO OPOSTO — salvar o enquadramento atual neste ponto.
+   Espelho geométrico exato do ✕: mesmo tamanho, mesmo recuo, mesmo véu. É o que
+   faz os dois lerem como um PAR de ações sobre o cartão em vez de dois enfeites
+   que calharam de ficar em cima da foto.
+   O verde do hover é o MESMO do anel de seleção (`.ts-tl__key.is-on`), e a
+   escolha é semântica: nesta tira, verde é "este ponto", vermelho é "fora". */
+.truck-studio-root .ts-tl__save {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.truck-studio-root .ts-tl__save:hover {
+  background: rgba(34, 197, 94, 0.92);
+  color: #fff;
+}
+
+/* AS SETAS DE REORDENAR, nas bordas laterais e na altura do meio.
+   ⚠️ SEMPRE VISÍVEIS, e é a mesma regra que o ✕ já seguia: um alvo que só
+   aparece no hover NÃO EXISTE para quem usa toque. O que muda no hover é o
+   PESO, não a existência — 0,55 de opacidade em repouso é o suficiente para se
+   saber que estão lá sem competir com a foto, que é o que o cartão existe para
+   mostrar.
+   Altura do MEIO, e não um canto: os dois cantos de cima já têm dono, e uma
+   seta encostada num deles leria como um terceiro botão do mesmo grupo. */
+.truck-studio-root .ts-tl__move {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.72);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+.truck-studio-root .ts-tl__move--prev { left: 7px; }
+.truck-studio-root .ts-tl__move--next { right: 7px; }
+.truck-studio-root .ts-tl__key:hover .ts-tl__move,
+.truck-studio-root .ts-tl__move:focus-visible { opacity: 1; }
+.truck-studio-root .ts-tl__move:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.86);
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-tl__save,
+  .truck-studio-root .ts-tl__move { transition: none; }
 }
 
 /* ---- O SELECT DE SEGUNDOS ----

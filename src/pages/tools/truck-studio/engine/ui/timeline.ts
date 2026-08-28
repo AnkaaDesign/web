@@ -88,6 +88,7 @@
    está no cabeçalho de `ui/chrome.ts`. */
 import {
   addTimelineKey, removeTimelineKey, setTimelineTravel, clearTimeline,
+  updateTimelineKey, moveTimelineKey,
   timelineKeys, timelineCount, timelineTimes, timelineDuration, timelineHeadroom,
   onTimelineChange, onTimelineTick,
   playTimelinePreview, pauseTimelinePreview, seekTimelinePreview,
@@ -127,6 +128,17 @@ let open = false;
 let selectedId = 0;
 /** Ligado enquanto um campo numérico escreve: ver `onChange` lá embaixo. */
 let editing = false;
+/**
+ * Para onde o foco volta depois que a tira se reconstrói.
+ *
+ * ⚠️ ELE EXISTE PORQUE `renderStrip()` É DESTRUTIVO: toda mudança no modelo
+ * apaga a tira inteira (`strip.textContent = ''`) e a remonta. Sem isto, apertar
+ * a seta "para frente" moveria o cartão e mandaria o foco para o `<body>` — a
+ * segunda seta não teria onde ser apertada, e mover um ponto três casas viraria
+ * três viagens de Tab. É o preço de uma tira que se redesenha por inteiro, e é
+ * mais barato pagá-lo aqui do que tornar `renderStrip()` incremental.
+ */
+let refocus: { id: number; cls: string } | null = null;
 
 /* Nós que são reescritos muitas vezes por segundo ou a cada tecla — guardados
    em vez de reprocurados. O resto é reconstruído inteiro. */
@@ -172,6 +184,14 @@ const ICO_AIM = ico('<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 1
    140 px, e a 13 px uma lixeira vira uma mancha. */
 const ICO_DEL = ico('<path d="M6.6 6.6l10.8 10.8M17.4 6.6 6.6 17.4"/>', 13);
 const ICO_PLUS = ico('<path d="M12 5.5v13M5.5 12h13"/>', 16);
+/* ⟳ — a seta que fecha o círculo. Ela diz "de novo", que é exatamente o que
+   este botão faz com a pose: reescreve a que está guardada com a de agora. */
+const ICO_SAVE = ico('<path d="M19.6 12a7.6 7.6 0 1 1-2.2-5.4"/>'
+  + '<path d="M19.6 4.2v4.4h-4.4"/>', 13);
+/* As duas setas de reordenar. Traço mais fino que o resto porque elas moram
+   SOBRE a foto: um chevron de 1,8 px sobre um céu claro vira um borrão. */
+const ICO_PREV = ico('<path d="M14.6 5.6 8.2 12l6.4 6.4"/>', 14);
+const ICO_NEXT = ico('<path d="M9.4 5.6 15.8 12l-6.4 6.4"/>', 14);
 const ICO_CLOSE = ico('<path d="M6.4 6.4l11.2 11.2M17.6 6.4 6.4 17.6"/>', 15);
 const ICO_MIN = ico('<path d="M6 9.5 12 15.5 18 9.5"/>', 15);
 
@@ -445,28 +465,47 @@ function travelSelect(k: TimelineKey): HTMLElement {
   return wrap;
 }
 
-/* ---------------- O CARTÃO É SÓ A FOTO ----------------
-   Pedido da mesma rodada: *"não precisa das opções abaixo da foto do timestamp,
-   regravar, s, mover para trás e deletar, o deletar deve ser no top right do
-   card em si"*.
+/* ---------------- O CARTÃO É A FOTO, E O QUE FLUTUA SOBRE ELA ----------------
+   ⚠️ ESTA SEÇÃO JÁ FOI DEMOLIDA UMA VEZ, E VOLTOU DIFERENTE. LEIA ANTES DE
+   MEXER, senão ela é demolida de novo pelo mesmo motivo.
 
-   Saíram quatro controles, e cada um tinha uma resposta melhor já na tela:
+   Houve aqui uma fileira de quatro controles ABAIXO da foto — ⟳ regravar, "s",
+   ‹ › reordenar e 🗑 — e ela saiu a pedido: *"não precisa das opções abaixo da
+   foto do timestamp, regravar, s, mover para trás e deletar, o deletar deve ser
+   no top right do card em si"*. O diagnóstico por trás do pedido era de LARGURA,
+   não de função: eram alvos EM FLUXO num cartão de 152 px, e foi isso que
+   espremeu o campo de segundos até o número sumir.
 
-     ⟳ REGRAVAR — marcar de novo e apagar o velho faz o mesmo com os gestos que
-       já existem, e sem um botão cujo efeito é invisível até a próxima prévia.
+   O pedido seguinte devolveu duas das funções: *"preciso que crie as opções de
+   salvar posicionamento de camera na gravação, e tambem que seja possivel mover
+   os cards de passos para frente / tras"*. E os dois pedidos são compatíveis,
+   porque o que estava errado nunca foram os botões — era o FLUXO. Tudo que
+   voltou voltou POSICIONADO ABSOLUTO SOBRE A FOTO, do mesmo jeito que o ✕ já
+   tinha voltado:
+
+     ⟳ SALVAR POSIÇÃO   canto superior ESQUERDO, espelhando o ✕
+     ‹ ›  REORDENAR     nas bordas laterais, na altura do meio
+     ✕  REMOVER         canto superior direito, onde já estava
+
+   Custo de layout: ZERO. O cartão continua com a mesma altura e o campo de
+   segundos continua com o mesmo espaço — o que era o defeito real.
+
+   ⚠️ E TODOS SÃO IRMÃOS DO BOTÃO DA MINIATURA, NUNCA FILHOS. Um `<button>`
+   dentro de outro é HTML inválido e o navegador DESFAZ o aninhamento na análise:
+   o filho acabaria como irmão do cartão, fora do lugar e fora do CSS. A nota
+   original do ✕ dizia isto e vale para os quatro.
+
+   ⚠️ AS SETAS SÓ EXISTEM QUANDO HÁ PARA ONDE IR. O primeiro cartão não tem ‹ e o
+   último não tem ›, e elas são OMITIDAS em vez de desabilitadas: um alvo
+   desabilitado num cartão de 152 px é ruído que ocupa o mesmo espaço do que
+   funciona. Num percurso de três pontos isso são quatro setas em vez de seis.
+
+   E o que continua FORA, com o motivo intacto:
+
      "s" (a PAUSA) — virou um gesto: marcar o MESMO ponto duas vezes dá um trecho
-       chato, e a curva para nele sozinha. Ver o § A PARADA em
-       `scene/timeline.ts`.
-     ‹ › REORDENAR — dois alvos de 22 px para uma operação rara, num cartão que
-       não tinha largura para eles (foi o que espremeu o campo de segundos até o
-       número sumir).
-     🗑 no rodapé — subiu para o canto do cartão, que é onde a convenção põe o
-       "remover este item" desde sempre.
-
-   Sobra a MINIATURA, que é o alvo grande da ação frequente (ir até o ponto), o
-   número, o instante e o ✕. O cartão encolheu ~30 px de altura, e essa altura
-   voltou para a cena. */
-function keyCard(k: TimelineKey, index: number): HTMLElement {
+       parado, e a curva para nele sozinha. Ver o § A PARADA em
+       `scene/timeline.ts`. */
+function keyCard(k: TimelineKey, index: number, total: number): HTMLElement {
   const card = el('div', 'ts-tl__key' + (k.id === selectedId ? ' is-on' : ''));
   card.dataset.id = String(k.id);
   card.setAttribute('role', 'listitem');
@@ -519,6 +558,66 @@ function keyCard(k: TimelineKey, index: number): HTMLElement {
   const kill = iconButton('ts-tl__kill', ICO_DEL, `Remover o ponto ${index + 1}`);
   kill.addEventListener('click', () => removeTimelineKey(k.id));
   card.appendChild(kill);
+
+  /* ---- ⟳ SALVAR A POSIÇÃO DA CÂMERA NESTE PONTO ----
+     `updateTimelineKey()` existe em `scene/timeline.ts` desde sempre e nunca
+     teve chamador; ela reescreve pose E lente e DEIXA O TEMPO onde estava, que é
+     a razão de ela não ser "apagar e marcar de novo": refazer o ponto 3 por
+     remoção o joga para o fim da fila e leva junto os segundos de viagem dos
+     dois trechos vizinhos.
+
+     ⚠️ A PRÉVIA É PAUSADA ANTES, e não é zelo. Enquanto ela toca, quem escreve
+     na câmera é a curva — salvar ali guardaria a pose que a linha do tempo
+     acabou de inventar, e não a que a pessoa compôs. Pausar primeiro congela a
+     câmera e torna o que se salva o que se está vendo. É o mesmo gesto que o
+     clique na miniatura já faz.
+
+     ⚠️ E A MINIATURA É TIRADA JUNTO, no clique, pela razão do botão "Marcar
+     ponto": um cartão com a foto velha e a pose nova é a interface mentindo
+     sobre o que vai ser gravado — que é o único erro que este criador não pode
+     cometer. */
+  const save = iconButton('ts-tl__save', ICO_SAVE,
+    `Salvar o enquadramento atual no ponto ${index + 1}`);
+  save.addEventListener('click', () => {
+    if (isTimelinePreviewing()) { pauseTimelinePreview(); syncTransport(); }
+    selectedId = k.id;
+    refocus = { id: k.id, cls: 'ts-tl__save' };
+    /* ⚠️ DESARMAR QUANDO NADA ACONTECEU. Estas duas devolvem `false` quando não
+       houve mudança, e `false` quer dizer que `emit()` não correu — ou seja a
+       tira NÃO vai ser reconstruída, e o pedido de foco ficaria armado à espera
+       da próxima reconstrução, que pode ser um cartão sendo apagado três gestos
+       depois. Foco pulando sozinho para um cartão que ninguém tocou é o tipo de
+       defeito que se atribui ao navegador. */
+    if (!updateTimelineKey(k.id, poseThumbnail())) refocus = null;
+  });
+  card.appendChild(save);
+
+  /* ---- ‹ › REORDENAR ----
+     `moveTimelineKey()` troca as POSES e deixa a grade de tempos onde estava —
+     o argumento inteiro está no ⚠️ dela, e ele é o que faz reordenar não mudar a
+     duração do vídeo. Aqui só sobra o DOM.
+
+     `refocus` é o que mantém o teclado utilizável: a tira inteira é reconstruída
+     a cada mudança, então sem isto o foco cairia no `<body>` a cada seta e a
+     segunda pressionada não teria onde acontecer. */
+  const move = (dir: -1 | 1, svg: string, cls: string, label: string) => {
+    const b = iconButton('ts-tl__move ' + cls, svg, label);
+    b.addEventListener('click', () => {
+      selectedId = k.id;
+      refocus = { id: k.id, cls };
+      /* Desarmar quando não houve movimento — ver o ⚠️ do ⟳ acima. */
+      if (!moveTimelineKey(k.id, dir)) refocus = null;
+    });
+    card.appendChild(b);
+  };
+  if (index > 0) {
+    move(-1, ICO_PREV, 'ts-tl__move--prev',
+      `Mover o ponto ${index + 1} para trás`);
+  }
+  if (index < total - 1) {
+    move(1, ICO_NEXT, 'ts-tl__move--next',
+      `Mover o ponto ${index + 1} para frente`);
+  }
   return card;
 }
 
@@ -552,7 +651,7 @@ function renderStrip() {
 
   for (let i = 0; i < ks.length; i++) {
     if (i > 0) strip.appendChild(connector(ks[i]));
-    strip.appendChild(keyCard(ks[i], i));
+    strip.appendChild(keyCard(ks[i], i, ks.length));
   }
 
   const add = el('button', 'ts-tl__add');
@@ -572,6 +671,31 @@ function renderStrip() {
     requestAnimationFrame(() => { strip.scrollLeft = strip.scrollWidth; });
   });
   strip.appendChild(add);
+
+  /* ---- O FOCO VOLTA PARA ONDE ESTAVA, DEPOIS DE A TIRA EXISTIR ----
+     Aqui e não no manipulador do clique: quando ele roda, o botão que o disparou
+     já foi removido do documento pelo `renderStrip()` que ele mesmo provocou.
+
+     A RESERVA NÃO É DECORATIVA. Mover o penúltimo ponto para o fim apaga a seta
+     "para frente" dele (ver o ⚠️ das setas), então o alvo pedido pode
+     simplesmente não existir mais — e um `?.focus()` que não acha nada deixaria o
+     foco no `<body>` do mesmo jeito. A miniatura é a reserva porque ela existe em
+     TODO cartão, sempre.
+
+     E o cartão é trazido para a vista: num percurso de oito pontos ele pode ter
+     acabado de sair da janela de rolagem, e um foco invisível é o mesmo que
+     nenhum. */
+  if (refocus) {
+    const card = strip.querySelector<HTMLElement>(
+      `.ts-tl__key[data-id="${refocus.id}"]`);
+    const alvo = card?.querySelector<HTMLElement>('.' + refocus.cls)
+      ?? card?.querySelector<HTMLElement>('.ts-tl__thumb');
+    refocus = null;
+    if (alvo) {
+      alvo.focus();
+      card?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
 }
 
 /** Só o anel de seleção, sem reconstruir a tira. */
