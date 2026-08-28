@@ -1,55 +1,37 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Combobox } from "@/components/ui/combobox";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
 import {
   IconUsers,
-  IconCalculator,
-  IconChevronLeft,
-  IconChevronRight,
   IconFilter,
   IconBuilding,
   IconUserMinus,
   IconBriefcase,
   IconUserCheck,
-  IconArrowUp,
-  IconArrowDown,
-  IconSelector
+  IconRestore
 } from "@tabler/icons-react";
-import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
+import { formatCurrency, getCurrentPayrollPeriod } from "../../../utils";
 import { useUsers, useSectors, usePositions } from "../../../hooks";
 import { bonusService } from "../../../api-client";
-import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/personnel-department/use-bonus";
+import { useBonusSimulation } from "../../../hooks/personnel-department/use-bonus";
 import { cn } from "@/lib/utils";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
-import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
+import { DataTable } from "@/components/ui/datatable";
+import { usePricingVisible } from "@/contexts/pricing-context";
 import { usePersistedState } from "@/hooks/common/use-persisted-state";
 import { toast } from "@/components/ui/sonner";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
+import { createBonusSimulationColumns, type SimulatedUser, type RowOverride } from "./bonus-simulation-columns";
 
-import { BRAND_ASSETS } from '@/config/assets';
-// localStorage keys — persist filters/sort/task config so the user returns to
-// exactly where they left off after navigating away.
+// localStorage keys — persist filters/task config/row edits so the user returns to
+// exactly where they left off after navigating away. (Column layout + sort are
+// persisted server-side by the DataTable via its `tableId`.)
 const FILTERS_STORAGE_KEY = "bonus-simulation-filters";
-const SORT_STORAGE_KEY = "bonus-simulation-sort";
 const TASK_STORAGE_KEY = "bonus-simulation-task";
 const OVERRIDES_STORAGE_KEY = "bonus-simulation-row-overrides";
-
-// Per-row simulation edits (keyed by user id) persisted so the Cargo /
-// Performance changes survive navigation. Only touched fields are stored.
-type RowOverride = { position?: string; performanceLevel?: number };
 
 /**
  * Divisor do período (headcount médio) → texto pt-BR com 2 casas.
@@ -81,112 +63,6 @@ const POSITIONS = [
   "Pleno I", "Pleno II", "Pleno III", "Pleno IV",
   "Senior I", "Senior II", "Senior III", "Senior IV"
 ];
-
-// Export columns configuration
-const EXPORT_COLUMNS: ExportColumn<SimulatedUser>[] = [
-  { id: "payrollNumber", label: "Nº Folha", getValue: (user: SimulatedUser) => user.payrollNumber?.toString() || "-" },
-  { id: "name", label: "Nome", getValue: (user: SimulatedUser) => user.name },
-  { id: "sectorName", label: "Setor", getValue: (user: SimulatedUser) => user.sectorName || "-" },
-  { id: "position", label: "Cargo", getValue: (user: SimulatedUser) => user.position },
-  { id: "performanceLevel", label: "Performance", getValue: (user: SimulatedUser) => user.performanceLevel.toString() },
-  { id: "bonusAmount", label: "Bônus", getValue: (user: SimulatedUser) => formatCurrency(user.bonusAmount) },
-];
-
-// Default visible columns (all columns)
-const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "sectorName", "position", "performanceLevel", "bonusAmount"]);
-
-// Performance level selector with chevron buttons
-interface PerformanceLevelSelectorProps {
-  value: number;
-  onChange: (value: number) => void;
-  userId: string;
-  isModified?: boolean;
-  disabled?: boolean;
-  className?: string;
-}
-
-function PerformanceLevelSelector({
-  value,
-  onChange,
-  userId: _userId,
-  isModified,
-  disabled,
-  className,
-}: PerformanceLevelSelectorProps) {
-  const handleDecrease = () => {
-    const newValue = Math.max(0, value - 1);
-    if (newValue !== value) {
-      onChange(newValue);
-    }
-  };
-
-  const handleIncrease = () => {
-    const newValue = Math.min(5, value + 1);
-    if (newValue !== value) {
-      onChange(newValue);
-    }
-  };
-
-  return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={handleDecrease}
-        disabled={disabled || value <= 0}
-        className="h-7 w-7 p-0 hover:bg-muted"
-        title="Diminuir nível"
-      >
-        <IconChevronLeft className="h-4 w-4" />
-      </Button>
-      <div
-        className={cn(
-          "flex items-center justify-center w-8 h-7 font-semibold text-sm",
-          isModified ? "text-orange-600" : "text-foreground",
-          disabled && "opacity-50"
-        )}
-        title={`Nível de desempenho: ${value} (0-5)`}
-      >
-        {value}
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={handleIncrease}
-        disabled={disabled || value >= 5}
-        className="h-7 w-7 p-0 hover:bg-muted"
-        title="Aumentar nível"
-      >
-        <IconChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-interface SimulatedUser {
-  id: string;
-  name: string;
-  email: string;
-  payrollNumber: number | null;
-  originalPosition: string;
-  originalPerformanceLevel: number;
-  sectorId: string | null;
-  sectorName: string | null;
-  // Simulation fields
-  position: string;
-  performanceLevel: number;
-  bonusAmount: number;
-  /**
-   * Peso de elegibilidade do período (0–1), vindo do MESMO cadastro que a folha
-   * usa. 1 = período inteiro. Menor que 1 = entrou, saiu ou esteve afastado no
-   * meio do período — e o valor exibido já vem prorrateado por ele.
-   */
-  eligibilityWeight: number;
-  /** Rótulo do motivo do peso parcial, para a tela explicar o número. */
-  eligibilityReason: string;
-}
 
 /** Cadastro de elegibilidade do período, como o endpoint de stats devolve. */
 interface EligibilityRow {
@@ -224,6 +100,12 @@ interface BonusSimulationInteractiveTableProps {
 }
 
 export function BonusSimulationInteractiveTable({ className, embedded: _embedded = false }: BonusSimulationInteractiveTableProps) {
+  // Subscribe to the show/hide-values toggle: the header totals are formatted with
+  // formatCurrency() during THIS component's render, so without a subscription they
+  // keep the masked/unmasked string from the last render. (The table cells are
+  // covered by the DataTable's own subscription.)
+  usePricingVisible();
+
   // State
   // Quantidade de tarefas do período. `originalTaskQuantity` é SEMPRE o número
   // vivo vindo da API; `taskOverride` é o "e se" que o operador digitou —
@@ -273,8 +155,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
    * mostrar um recorte errado por um instante.
    */
   const [eligibility, setEligibility] = useState<Map<string, EligibilityRow> | null>(null);
-  const [fullyAbsent, setFullyAbsent] = useState<Array<{ userId: string; userName: string }>>([]);
-  const [absenceMeasured, setAbsenceMeasured] = useState(true);
 
   // Filter state - no default filters, show all eligible users (persisted)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -286,10 +166,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     showOnlyEligible: true // Default to showing only eligible users
   });
 
-  // Sorting state (persisted)
-  const [sortColumn, setSortColumn] = usePersistedState<'payrollNumber' | 'name' | 'sectorName' | 'position' | 'performanceLevel' | 'bonusAmount' | null>(`${SORT_STORAGE_KEY}-column`, null);
-  const [sortDirection, setSortDirection] = usePersistedState<'asc' | 'desc'>(`${SORT_STORAGE_KEY}-direction`, 'asc');
-
   // Per-row Cargo/Performance edits (persisted). Read via ref in the init
   // effect so applying them doesn't make every edit rebuild the whole table.
   const [rowOverrides, setRowOverrides] = usePersistedState<Record<string, RowOverride>>(OVERRIDES_STORAGE_KEY, {});
@@ -300,7 +176,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // Get current payroll period (26th-25th cycle) - centralized utility
   // If today is Sept 26th or later, this returns October
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
-  const currentPeriod = getBonusPeriod(periodYear, periodMonth);
   const periodKey = `${periodYear}-${periodMonth}`;
 
   // Override só vale para o período que o gravou. De outro período = inexistente.
@@ -309,15 +184,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const setTaskOverride = (value: number | null) =>
     setStoredOverride(value === null ? null : { period: periodKey, value });
   const taskQuantity = taskOverride ?? originalTaskQuantity;
-
-  // Saved period reajuste (the "Reajuste: +X%" badge value). The simulation
-  // applies it by sending the period (year/month) to /bonus/simulate; the API
-  // injects the saved period adjustment (SalaryAdjustment BONUS) so the simulated value
-  // matches the real, saved bonus. This hook is only for the display badge —
-  // the calculation reads the same source server-side.
-  const { data: periodAdjustmentData } = usePeriodAdjustment(periodYear, periodMonth);
-  const adjustmentPercent = periodAdjustmentData?.adjustment ?? 0;
-
 
   // Fetch sectors for filtering (Sector model has no status field)
   const { data: sectorsData } = useSectors({
@@ -381,8 +247,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         // Cadastro de elegibilidade — quem está no período e com que peso.
         const rows: EligibilityRow[] = Array.isArray(liveData.eligibility) ? liveData.eligibility : [];
         setEligibility(new Map(rows.map(r => [r.userId, { ...r, weight: Number(r.weight) || 0 }])));
-        setFullyAbsent(Array.isArray(liveData.fullyAbsent) ? liveData.fullyAbsent : []);
-        setAbsenceMeasured(liveData.absenceDataAvailable !== false);
 
         // O número do período é a BASE, sempre. `taskQuantity` deriva dele
         // enquanto `taskOverride` for null — não há mais seed condicional, que
@@ -520,53 +384,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     return filtered;
   }, [simulatedUsers, filters, usersData]);
 
-  // Apply sorting to filtered users
-  const sortedUsers = useMemo(() => {
-    if (!sortColumn) return filteredUsers;
-
-    const sorted = [...filteredUsers].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortColumn) {
-        case 'payrollNumber':
-          aValue = a.payrollNumber ?? -1;
-          bValue = b.payrollNumber ?? -1;
-          break;
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'sectorName':
-          aValue = (a.sectorName || '').toLowerCase();
-          bValue = (b.sectorName || '').toLowerCase();
-          break;
-        case 'position':
-          aValue = a.position.toLowerCase();
-          bValue = b.position.toLowerCase();
-          break;
-        case 'performanceLevel':
-          aValue = a.performanceLevel;
-          bValue = b.performanceLevel;
-          break;
-        case 'bonusAmount':
-          aValue = a.bonusAmount;
-          bValue = b.bonusAmount;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      // Stable tiebreaker by id so rows don't shuffle when bonus values
-      // are equal (common across users with the same position+perf level).
-      return a.id.localeCompare(b.id);
-    });
-
-    return sorted;
-  }, [filteredUsers, sortColumn, sortDirection]);
-
   // Calculate metrics
   const hasManualFilters =
     filters.sectorIds.length > 0 ||
@@ -663,8 +480,8 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   }, [simulation, bonusByUserId]);
 
   const totalBonusAmount = useMemo(() =>
-    sortedUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
-    [sortedUsers]
+    filteredUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
+    [filteredUsers]
   );
 
   // Effect 0: mantém o texto do campo "Tarefas" colado em `taskQuantity`.
@@ -803,41 +620,32 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     });
   };
 
-  const handleSort = (column: typeof sortColumn) => {
-    if (sortColumn === column) {
-      // Toggle direction if clicking same column
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new column and default to ascending
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-
-  const getSortIcon = (column: typeof sortColumn) => {
-    if (sortColumn !== column) {
-      return <IconSelector className="h-4 w-4 opacity-50" />;
-    }
-    return sortDirection === 'asc'
-      ? <IconArrowUp className="h-4 w-4" />
-      : <IconArrowDown className="h-4 w-4" />;
-  };
-
   // Position / performance changes only update the input fields. The bonus
   // value is recomputed by the /bonus/simulate hook + sync effect above.
-  const handlePositionChange = (userId: string, newPosition: string) => {
-    setSimulatedUsers(prev =>
-      prev.map(user => (user.id === userId ? { ...user, position: newPosition } : user)),
-    );
-    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], position: newPosition } }));
-  };
+  const handlePositionChange = useCallback(
+    (userId: string, newPosition: string) => {
+      setSimulatedUsers(prev =>
+        prev.map(user => (user.id === userId ? { ...user, position: newPosition } : user)),
+      );
+      setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], position: newPosition } }));
+    },
+    [setRowOverrides],
+  );
 
-  const handlePerformanceLevelChange = (userId: string, newLevel: number) => {
-    setSimulatedUsers(prev =>
-      prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
-    );
-    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], performanceLevel: newLevel } }));
-  };
+  const handlePerformanceLevelChange = useCallback(
+    (userId: string, newLevel: number) => {
+      setSimulatedUsers(prev =>
+        prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
+      );
+      setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], performanceLevel: newLevel } }));
+    },
+    [setRowOverrides],
+  );
+
+  const columns = useMemo(
+    () => createBonusSimulationColumns({ positionOptions, onPositionChange: handlePositionChange, onPerformanceLevelChange: handlePerformanceLevelChange }),
+    [positionOptions, handlePositionChange, handlePerformanceLevelChange],
+  );
 
   const hasActiveFilters =
     hasManualFilters ||
@@ -959,336 +767,53 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     );
   };
 
-  // Export handlers
-  const handleExport = async (format: ExportFormat, users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
-    // Add total row to users for export
-    const usersWithTotal = [...users];
-
-    switch (format) {
-      case "csv":
-        await exportToCSV(usersWithTotal, columns);
-        break;
-      case "excel":
-        await exportToExcel(usersWithTotal, columns);
-        break;
-      case "pdf":
-        await exportToPDF(usersWithTotal, columns);
-        break;
-    }
-
-    toast.success(`Exportação ${format.toUpperCase()} concluída com sucesso!`);
-  };
-
-  const exportToCSV = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
-    // CSV headers from columns
-    const headers = columns.map((col) => col.label);
-
-    // Convert users to CSV rows
-    const rows = users.map((user) => columns.map((col) => col.getValue(user)));
-
-    // Add total row
-    const totalRow = columns.map((col) => {
-      if (col.id === "name") return "TOTAL";
-      if (col.id === "bonusAmount") return formatCurrency(totalBonusAmount);
-      return "";
-    });
-    rows.push(totalRow);
-
-    // Create CSV content
-    const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
-
-    // Download CSV
-    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `simulacao-bonus-${formatDate(new Date()).replace(/\//g, "-")}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportToExcel = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
-    // Headers from columns
-    const headers = columns.map((col) => col.label);
-
-    // Convert users to rows
-    const rows = users.map((user) => columns.map((col) => col.getValue(user)));
-
-    // Add total row
-    const totalRow = columns.map((col) => {
-      if (col.id === "name") return "TOTAL";
-      if (col.id === "bonusAmount") return formatCurrency(totalBonusAmount);
-      return "";
-    });
-    rows.push(totalRow);
-
-    // Create tab-separated values for Excel
-    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
-
-    // Download as .xls file
-    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `simulacao-bonus-${formatDate(new Date()).replace(/\//g, "-")}.xls`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportToPDF = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
-    // Calculate responsive font sizes
-    const fontSize = "12px";
-    const headerFontSize = "11px";
-    const cellPadding = "8px 6px";
-    const headerPadding = "10px 6px";
-
-    // A4 optimized PDF with proper formatting matching task history
-    const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Simulação de Bônus - ${formatDate(new Date())}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          html, body {
-            height: 100vh;
-            width: 100vw;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: white;
-            font-size: ${fontSize};
-            line-height: 1.2;
-          }
-
-          body {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: 100vh;
-            padding: 0;
-          }
-
-          .header {
-            margin-bottom: 12px;
-            flex-shrink: 0;
-          }
-
-          .logo {
-            width: 140px;
-            height: auto;
-            margin-bottom: 8px;
-          }
-
-          .header-info {
-          }
-
-          .header-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1f2937;
-            margin-bottom: 4px;
-          }
-
-          .info {
-            color: #6b7280;
-            font-size: 10px;
-          }
-
-          .info p {
-            margin: 1px 0;
-          }
-
-          .content-wrapper {
-            flex: 1;
-            overflow: auto;
-            min-height: 0;
-            padding-bottom: 35px;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: ${fontSize};
-          }
-
-          th {
-            background-color: #f9fafb;
-            font-weight: 600;
-            color: #374151;
-            padding: ${headerPadding};
-            border: 1px solid #e5e7eb;
-            border-bottom: 1px solid #d1d5db;
-            font-size: ${headerFontSize};
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          td {
-            padding: ${cellPadding};
-            border-left: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            border-bottom: 1px solid #e5e7eb;
-            border-top: none;
-            vertical-align: middle;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          tbody tr:nth-child(even) {
-            background-color: #fafafa;
-          }
-
-          tbody tr:last-child {
-            font-weight: 700;
-            background-color: #f0fdf4;
-          }
-
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-
-          .font-medium { font-weight: 500; }
-          .font-semibold { font-weight: 600; }
-
-          .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 10px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 9px;
-            flex-shrink: 0;
-            background: white;
-          }
-
-          .footer-left {
-            flex: 1;
-          }
-
-          .footer-right {
-            text-align: right;
-          }
-
-          @media print {
-            @page {
-              size: A4;
-              margin: 8mm;
-            }
-
-            .footer {
-              position: fixed;
-              bottom: 6mm;
-              left: 6mm;
-              right: 6mm;
-              background: white;
-              font-size: 7px;
-            }
-
-            .content-wrapper {
-              padding-bottom: 50px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
-          <h1 class="header-title">Simulação de Bônus</h1>
-          <div class="header-info">
-            <div class="info">
-              <p><strong>Data:</strong> ${formatDate(new Date())}</p>
-              <p><strong>Total de tarefas:</strong> ${taskQuantity.toFixed(1)}</p>
-              <p><strong>Total de colaboradores:</strong> ${users.length}</p>
-              <p><strong>Média por colaborador:</strong> ${averageTasksPerUser.toFixed(1)}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-wrapper">
-          <table>
-            <thead>
-              <tr>
-                ${columns.map((col) => `<th class="text-left">${col.label}</th>`).join("")}
-              </tr>
-            </thead>
-            <tbody>
-              ${users.map((user) => `
-                <tr>
-                  ${columns.map((col) => `<td class="text-left">${col.getValue(user)}</td>`).join("")}
-                </tr>
-              `).join("")}
-              <tr>
-                ${columns.map((col) => {
-                  if (col.id === "name") return `<td class="text-left">TOTAL</td>`;
-                  if (col.id === "bonusAmount") return `<td class="text-left">${formatCurrency(totalBonusAmount)}</td>`;
-                  return `<td></td>`;
-                }).join("")}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="footer">
-          <div class="footer-left">
-            <p>Simulação de Bônus - Sistema Ankaa</p>
-          </div>
-          <div class="footer-right">
-            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString('pt-BR')}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(pdfContent);
-      printWindow.document.close();
-      printWindow.focus();
-
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
-      };
-    }
-  };
-
   // Ter override é o que importa, não o valor coincidir. Digitar exatamente as
   // 43,0 de agora fixava o número e escondia o botão "Restaurar" — e na tarefa
   // seguinte a simulação ficava congelada em 43 sem nada na tela dizendo isso.
   const isTaskQuantityModified = taskOverride !== null;
-  const taskQuantityDiffersFromPeriod =
-    isTaskQuantityModified && Math.abs(taskQuantity - originalTaskQuantity) > 0.005;
+
+  // Linhas com cargo ou desempenho diferentes do cadastro — o mesmo critério
+  // que pinta o valor de laranja na tabela, para o botão e a tela contarem a
+  // mesma história.
+  const modifiedRowCount = useMemo(
+    () =>
+      simulatedUsers.filter(
+        u => u.position !== u.originalPosition || u.performanceLevel !== u.originalPerformanceLevel,
+      ).length,
+    [simulatedUsers],
+  );
+
+  const hasSimulationChanges = isTaskQuantityModified || modifiedRowCount > 0;
+
+  /**
+   * Desfaz TUDO que foi mexido para testar: a base de tarefas volta a seguir o
+   * período e cada linha volta ao cargo e ao nível do cadastro. Os overrides
+   * são persistidos, então limpar o estado sem limpar `rowOverrides` traria as
+   * edições de volta no próximo carregamento da lista.
+   */
+  const resetSimulation = () => {
+    restoreCurrentPeriodTasks();
+    setRowOverrides({});
+    setSimulatedUsers(prev =>
+      prev.map(u =>
+        u.position === u.originalPosition && u.performanceLevel === u.originalPerformanceLevel
+          ? u
+          : { ...u, position: u.originalPosition, performanceLevel: u.originalPerformanceLevel },
+      ),
+    );
+    toast.success("Simulação restaurada aos valores originais");
+  };
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      {/* Header with Task Input and Summary */}
+      {/* Header: base do cálculo + total. Mesmo desenho da Simulação de
+          Promoções — campos de igual largura à esquerda, ação à direita, e
+          busca/colunas/exportação dentro da barra da tabela. */}
       <div className="p-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-4 justify-between">
-          {/* Left side - Inputs */}
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Task Quantity Input */}
-            <div className="flex flex-col" style={{ width: '7.5rem' }}>
+          {/* Left side - base do cálculo + total */}
+          <div className="flex flex-row flex-wrap gap-4">
+            <div className="flex flex-col" style={{ width: "7rem" }}>
               <Label htmlFor="taskQuantity" className="text-sm font-medium mb-1.5">
                 Tarefas
               </Label>
@@ -1303,22 +828,18 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               />
             </div>
 
-            {/* Eligible Users Count - All filtered/selected users */}
-            <div className="flex flex-col" style={{ width: '7.5rem' }}>
-              <Label className="text-sm font-medium mb-1.5">
-                Colaboradores
-              </Label>
+            <div className="flex flex-col" style={{ width: "7rem" }}>
+              <Label className="text-sm font-medium mb-1.5">Elegíveis</Label>
               <Input
                 type="text"
-                value={eligibleUserCount > 0 ? formatDivisor(eligibleUserCount) : '—'}
+                value={eligibleUserCount > 0 ? formatDivisor(eligibleUserCount) : "—"}
                 readOnly
                 className="h-10 text-center font-semibold bg-transparent cursor-default"
                 title={`Divisor do período: ${formatDivisor(eligibleUserCount)}. É a soma dos PESOS de elegibilidade — quem entrou, saiu ou esteve afastado no meio do período conta só a fração de dias úteis que trabalhou, por isso o número é quebrado.`}
               />
             </div>
 
-            {/* Average Tasks per User - Editable for Reverse Calculation */}
-            <div className="flex flex-col" style={{ width: '7.5rem' }}>
+            <div className="flex flex-col" style={{ width: "7rem" }}>
               <Label htmlFor="averagePerUser" className="text-sm font-medium mb-1.5">
                 Média
               </Label>
@@ -1330,15 +851,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                 onChange={(value) => handleAveragePerUserChange(String(value))}
                 className="h-10 text-center font-semibold bg-transparent"
                 placeholder="0,00"
-                title="Digite a média desejada por usuário para calcular tarefas totais"
+                title="Digite a média desejada por colaborador elegível para calcular as tarefas totais"
               />
             </div>
 
-            {/* Total Bonus */}
-            <div className="flex flex-col" style={{ width: '10rem' }}>
-              <Label className="text-sm font-medium mb-1.5">
-                Total
-              </Label>
+            <div className="flex flex-col" style={{ width: "9rem" }}>
+              <Label className="text-sm font-medium mb-1.5">Bônus Total</Label>
               <Input
                 type="text"
                 value={formatCurrency(totalBonusAmount)}
@@ -1348,303 +866,71 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             </div>
           </div>
 
-          {/* Right side - Action Buttons */}
-          <div className="flex flex-col">
-            <Label className="text-sm font-medium mb-1.5 opacity-0">
-              Ações
-            </Label>
-            <div className="flex gap-2 h-10">
-              {isTaskQuantityModified && (
+          {/* Right side - Restaurar (Filtros + colunas + exportação vivem na barra da tabela) */}
+          {hasSimulationChanges && (
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium mb-1.5 opacity-0">Ações</Label>
+              <div className="flex gap-2 h-10">
                 <Button
                   type="button"
                   variant="outline"
                   size="default"
-                  onClick={restoreCurrentPeriodTasks}
-                  className="h-10"
-                  title="Restaurar quantidade de tarefas do período atual"
+                  onClick={resetSimulation}
+                  className="h-10 gap-2 border-orange-500/50 text-orange-600 hover:text-orange-600"
+                  title={
+                    modifiedRowCount > 0
+                      ? `Restaurar a simulação: tarefas do período e ${modifiedRowCount} ${modifiedRowCount === 1 ? 'linha alterada' : 'linhas alteradas'}`
+                      : "Restaurar quantidade de tarefas do período atual"
+                  }
                 >
-                  <IconCalculator className="h-4 w-4 mr-2" />
+                  <IconRestore className="h-4 w-4" />
                   Restaurar
+                  {modifiedRowCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 bg-orange-500/15 text-orange-600">
+                      {modifiedRowCount}
+                    </Badge>
+                  )}
                 </Button>
-              )}
-              <Button
-                variant={hasActiveFilters ? "default" : "outline"}
-                onClick={() => setShowFiltersModal(true)}
-                className="h-10 gap-2"
-              >
-                <IconFilter className="h-4 w-4" />
-                Filtrar
-                {hasActiveFilters && (
-                  <Badge variant="secondary" className="ml-1 bg-background/20 text-white">
-                    {activeFilters.length}
-                  </Badge>
-                )}
-              </Button>
-              <BaseExportPopover<SimulatedUser>
-                className="h-10"
-                currentItems={sortedUsers}
-                totalRecords={sortedUsers.length}
-                visibleColumns={DEFAULT_VISIBLE_COLUMNS}
-                exportColumns={EXPORT_COLUMNS}
-                defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
-                onExport={handleExport}
-                entityName="colaborador"
-                entityNamePlural="colaboradores"
-              />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Active Filter Indicators */}
         {activeFilters.length > 0 && (
-          <FilterIndicators
-            filters={activeFilters}
-            onClearAll={clearAllFilters}
-            className="px-1 py-1"
-          />
-        )}
-
-        {/* Números REAIS do período. Ficavam escondidos justamente quando a
-            simulação estava fora do período (`!isTaskQuantityModified`) — ou
-            seja, o painel que denunciaria a divergência sumia exatamente no
-            caso em que ele era necessário. Agora aparece sempre. */}
-        {liveTaskInfo && liveTaskInfo.weightedCount > 0 && (
-          <div className="mt-4 p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/30">
-            <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
-              <IconCalculator className="h-4 w-4" />
-              <span className="font-medium">
-                Período atual ({currentPeriod.startDate.toLocaleDateString('pt-BR')} a {currentPeriod.endDate.toLocaleDateString('pt-BR')}):
-              </span>
-              <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
-                {liveTaskInfo.weightedCount.toFixed(1)} tarefas ponderadas
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                ({liveTaskInfo.rawCount} total{liveTaskInfo.suspendedCount > 0 ? `, ${liveTaskInfo.suspendedCount} suspensa${liveTaskInfo.suspendedCount !== 1 ? 's' : ''}` : ''})
-              </span>
-              {adjustmentPercent !== 0 && (
-                <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
-                  Reajuste: {adjustmentPercent > 0 ? '+' : ''}{adjustmentPercent}%
-                </Badge>
-              )}
-            </div>
-            {/* Simulação rodando fora do número do período precisa DIZER isso —
-                senão o operador compara com a página de Bônus e conclui que uma
-                das duas está errada. */}
-            {taskQuantityDiffersFromPeriod && (
-              <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                Simulação com {formatTaskInput(taskQuantity)} tarefas — diferente das{' '}
-                {formatTaskInput(originalTaskQuantity)} do período. Os valores abaixo NÃO são
-                os da página de Bônus. Use "Restaurar" para voltar ao período.
-              </div>
-            )}
-            {/* Suspensa entra 1,0 no BRUTO e 0,0 no líquido: a simulação usa a
-                contagem ponderada, então bate com o bruto da página de Bônus só
-                quando não há suspensa. */}
-            {liveTaskInfo.suspendedCount > 0 && (
-              <div className="mt-2 text-xs text-blue-700/80 dark:text-blue-300/80">
-                A simulação usa as tarefas PONDERADAS, então o valor abaixo já é líquido de
-                suspensão — o "Bônus Bruto" da página de Bônus, que conta a suspensa como
-                inteira, sai maior; a diferença é a linha "Tarefas Suspensas".
-              </div>
-            )}
-            {/* Exclusão por afastamento precisa ser DITA. Sumir com a pessoa da
-                lista sem explicação foi o que fez a Simulação parecer errada. */}
-            {fullyAbsent.length > 0 && (
-              <div className="mt-2 text-xs text-blue-700/80 dark:text-blue-300/80">
-                Fora do cálculo por afastamento médico integral:{' '}
-                {fullyAbsent.map(p => p.userName).join(', ')}.
-              </div>
-            )}
-            {!absenceMeasured && (
-              <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                Afastamento médico não pôde ser medido (Secullum indisponível) — todos estão
-                com fator 1. Os valores podem cair quando a medição voltar.
-              </div>
-            )}
-          </div>
+          <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />
         )}
       </div>
 
-
-      {/* Interactive Table with padding */}
-      <div className="flex-1 min-h-0 p-4">
-        <div className="h-full flex flex-col overflow-hidden rounded-lg border border-border">
-          {isLoading ? (
-            <div className="p-4">
-              <div className="space-y-4">
-                {[...Array(8)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            </div>
-          ) : simulatedUsers.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              Nenhum usuário elegível encontrado
-            </div>
-          ) : sortedUsers.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <IconFilter className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-              <p className="text-lg font-medium mb-2">Nenhum usuário encontrado</p>
-              <p className="text-sm">Ajuste os filtros para ver os usuários elegíveis.</p>
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={clearAllFilters}>
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Fixed Header Table */}
-              <div className="border-b border-border overflow-hidden">
-                <Table className="w-full table-fixed">
-                  <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
-                    <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-32 p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('payrollNumber')}
-                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                        >
-                          <span className="truncate">Nº FOLHA</span>
-                          {getSortIcon('payrollNumber')}
-                        </button>
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('name')}
-                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                        >
-                          <span className="truncate">NOME</span>
-                          {getSortIcon('name')}
-                        </button>
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-48 p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('sectorName')}
-                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                        >
-                          <span className="truncate">SETOR</span>
-                          {getSortIcon('sectorName')}
-                        </button>
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-48 p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('position')}
-                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                        >
-                          <span className="truncate">CARGO</span>
-                          {getSortIcon('position')}
-                        </button>
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-44 p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('performanceLevel')}
-                          className="flex items-center justify-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent"
-                        >
-                          <span className="truncate">PERFORMANCE</span>
-                          {getSortIcon('performanceLevel')}
-                        </button>
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-36 p-0 !border-r-0">
-                        <button
-                          onClick={() => handleSort('bonusAmount')}
-                          className="flex items-center justify-end gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent"
-                        >
-                          <span className="truncate">BÔNUS</span>
-                          {getSortIcon('bonusAmount')}
-                        </button>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                </Table>
-              </div>
-
-            {/* Scrollable Body Table */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <Table className="w-full table-fixed">
-                <TableBody>
-                  {sortedUsers.map((user, index) => (
-                    <TableRow
-                      key={user.id}
-                      className={cn(
-                        "transition-colors border-b border-border h-10",
-                        index % 2 === 1 && "bg-muted/10",
-                        "hover:bg-muted/20"
-                      )}
-                    >
-                      <TableCell className="w-32 p-0">
-                        <div className="px-4 py-2 text-sm text-muted-foreground font-medium truncate">
-                          {user.payrollNumber || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-0">
-                        <div className="px-4 py-2 font-medium truncate">
-                          {user.name}
-                          {/* Peso parcial precisa aparecer: sem isto, um valor
-                              prorrateado parece erro de cálculo. */}
-                          {user.eligibilityWeight < 1 && (
-                            <span
-                              className="ml-2 text-xs font-normal text-muted-foreground"
-                              title={user.eligibilityReason}
-                            >
-                              ({Math.round(user.eligibilityWeight * 100)}% do período)
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="w-48 p-0">
-                        <div className="px-4 py-2 text-sm text-muted-foreground truncate">
-                          {user.sectorName || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="w-48 p-0">
-                        <div className="px-3 py-1">
-                          <Combobox
-                            mode="single"
-                            value={user.position}
-                            onValueChange={(value) => {
-                              if (value && typeof value === 'string') {
-                                handlePositionChange(user.id, value);
-                              }
-                            }}
-                            options={positionOptions.map(pos => ({
-                              value: pos,
-                              label: pos
-                            }))}
-                            placeholder={user.position || "Selecione o cargo"}
-                            emptyText="Nenhum cargo encontrado"
-                            className="w-full"
-                            renderValue={() => user.position || "Selecione o cargo"}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="w-44 p-0">
-                        <div className="px-3 py-1 flex items-center justify-center">
-                          <PerformanceLevelSelector
-                            value={user.performanceLevel}
-                            onChange={(newLevel) => handlePerformanceLevelChange(user.id, newLevel)}
-                            userId={user.id}
-                            isModified={user.performanceLevel !== user.originalPerformanceLevel}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="w-36 p-0">
-                        <div className="px-4 py-2 text-right">
-                          <span className={cn(
-                            "font-bold",
-                            user.bonusAmount > 0 ? 'text-green-600' : 'text-muted-foreground'
-                          )}>
-                            {formatCurrency(user.bonusAmount)}
-                          </span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-          )}
-        </div>
+      {/* Interactive table (busca / ordenação / layout de colunas / exportação vêm do DataTable) */}
+      <div className="flex-1 min-h-0 flex flex-col px-4 pb-4">
+        <DataTable<SimulatedUser>
+          tableId="bonus-simulation"
+          bare
+          data={filteredUsers}
+          columns={columns}
+          getRowId={(u) => u.id}
+          isLoading={isLoading}
+          enableSelection={false}
+          enablePagination={false}
+          defaultSorting={[{ id: "name", desc: false }]}
+          estimateRowHeight={52}
+          searchPlaceholder="Buscar colaborador..."
+          emptyMessage="Nenhum colaborador elegível encontrado. Ajuste os filtros para ver os colaboradores."
+          exportTitle="Simulação de Bônus"
+          exportFilename="simulacao-bonus"
+          toolbarActions={
+            <Button variant={hasActiveFilters ? "default" : "outline"} onClick={() => setShowFiltersModal(true)} className="gap-2">
+              <IconFilter className="h-4 w-4" />
+              Filtros
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 min-w-0 px-1.5">
+                  {activeFilters.length}
+                </Badge>
+              )}
+            </Button>
+          }
+        />
       </div>
 
       {/* Filters Modal */}

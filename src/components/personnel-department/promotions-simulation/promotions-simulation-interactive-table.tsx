@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IconUsers, IconCalculator, IconFilter, IconBuilding, IconUserMinus, IconBriefcase, IconUserCheck } from "@tabler/icons-react";
+import { IconUsers, IconFilter, IconBuilding, IconUserMinus, IconBriefcase, IconUserCheck, IconRestore } from "@tabler/icons-react";
 import { formatCurrency, getCurrentPayrollPeriod } from "../../../utils";
 import { useUsers, useSectors, usePositions } from "../../../hooks";
 import { bonusService } from "../../../api-client";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { usePersistedState } from "@/hooks/common/use-persisted-state";
+import { toast } from "@/components/ui/sonner";
 import { usePricingVisible } from "@/contexts/pricing-context";
 import { DataTable } from "@/components/ui/datatable";
 import { PromotionsSimulationFilters } from "./promotions-simulation-filters";
@@ -30,6 +31,20 @@ import {
 const FILTERS_STORAGE_KEY = "promotions-simulation-filters";
 const TASK_STORAGE_KEY = "promotions-simulation-task";
 const OVERRIDES_STORAGE_KEY = "promotions-simulation-row-overrides";
+
+/**
+ * Contagem de elegíveis → texto pt-BR com no máximo 2 casas.
+ *
+ * O número vem do backend como SOMA DE PESOS: quem entrou, saiu ou esteve
+ * afastado no meio do período conta a fração de dias úteis que trabalhou. O
+ * campo imprimia o `number` cru e mostrava "12.50002" — ponto decimal e cinco
+ * casas. Mesma regra do divisor na Simulação de Bônus, para os dois baterem à
+ * vista.
+ */
+const formatEligibleCount = (value: number): string =>
+  Number.isInteger(value)
+    ? value.toLocaleString("pt-BR")
+    : value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface PromotionsSimulationInteractiveTableProps {
   className?: string;
@@ -398,6 +413,41 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
   };
   const isTaskQuantityModified = taskQuantity !== originalTaskQuantity && originalTaskQuantity > 0;
 
+  // Linhas com cargo ou desempenho diferentes do cadastro — o mesmo critério
+  // que pinta a célula de laranja na tabela, para o botão e a tela contarem a
+  // mesma história.
+  const modifiedRowCount = useMemo(
+    () => simulatedUsers.filter((u) => u.positionId !== u.originalPositionId || u.performanceLevel !== u.originalPerformanceLevel).length,
+    [simulatedUsers],
+  );
+
+  const hasSimulationChanges = isTaskQuantityModified || modifiedRowCount > 0;
+
+  /**
+   * Desfaz TUDO que foi mexido para testar: a base de tarefas volta ao número do
+   * período e cada linha volta ao cargo, à remuneração e ao nível do cadastro.
+   * Os overrides são persistidos, então limpar o estado sem limpar
+   * `rowOverrides` traria as edições de volta no próximo carregamento da lista.
+   */
+  const resetSimulation = () => {
+    restoreCurrentPeriodTasks();
+    setRowOverrides({});
+    setSimulatedUsers((prev) =>
+      prev.map((u) =>
+        u.positionId === u.originalPositionId && u.performanceLevel === u.originalPerformanceLevel
+          ? u
+          : {
+              ...u,
+              positionId: u.originalPositionId,
+              positionName: u.originalPositionName,
+              expectedRemuneration: u.originalRemuneration,
+              performanceLevel: u.originalPerformanceLevel,
+            },
+      ),
+    );
+    toast.success("Simulação restaurada aos valores originais");
+  };
+
   const handleFiltersApply = (newFilters: typeof filters) => setFilters(newFilters);
   const handleFiltersReset = () => setFilters({ sectorIds: [], positionIds: [], includeUserIds: [], excludeUserIds: [], showOnlyEligible: false });
 
@@ -529,7 +579,7 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
               <Label className="text-sm font-medium mb-1.5">Elegíveis</Label>
               <Input
                 type="text"
-                value={eligibleUserCount}
+                value={eligibleUserCount > 0 ? formatEligibleCount(eligibleUserCount) : "—"}
                 readOnly
                 className="h-10 text-center font-semibold bg-transparent cursor-default"
                 title="Colaboradores elegíveis a bônus (base do cálculo da média — exclui não bonificáveis)"
@@ -583,13 +633,29 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
           </div>
 
           {/* Right side - Restaurar only (Filtros + column layout + export live in the table toolbar) */}
-          {isTaskQuantityModified && (
+          {hasSimulationChanges && (
             <div className="flex flex-col">
               <Label className="text-sm font-medium mb-1.5 opacity-0">Ações</Label>
               <div className="flex gap-2 h-10">
-                <Button type="button" variant="outline" size="default" onClick={restoreCurrentPeriodTasks} className="h-10" title="Restaurar quantidade de tarefas do período atual">
-                  <IconCalculator className="h-4 w-4 mr-2" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  onClick={resetSimulation}
+                  className="h-10 gap-2 border-orange-500/50 text-orange-600 hover:text-orange-600"
+                  title={
+                    modifiedRowCount > 0
+                      ? `Restaurar a simulação: tarefas do período e ${modifiedRowCount} ${modifiedRowCount === 1 ? "linha alterada" : "linhas alteradas"}`
+                      : "Restaurar quantidade de tarefas do período atual"
+                  }
+                >
+                  <IconRestore className="h-4 w-4" />
                   Restaurar
+                  {modifiedRowCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 bg-orange-500/15 text-orange-600">
+                      {modifiedRowCount}
+                    </Badge>
+                  )}
                 </Button>
               </div>
             </div>
