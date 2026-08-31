@@ -14,7 +14,7 @@ import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-t
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconFilter } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { CONTRACT_STATUS } from "../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
 import type { User } from "../../../types";
 
@@ -93,6 +93,11 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
       limit: DEFAULT_PAGE_SIZE,
       where: {
         currentContractStatus: CONTRACT_STATUS.ACTIVE,  // Only efetivado/ativo users (replaces EFFECTED modality check)
+        // Só CLT. A bonificação real só existe para quem tem vínculo CLT — o
+        // universo de `resolvePeriodEligibility` na API é `contracts.some({
+        // employeeType: CLT })`. Sem este filtro a tela listava o PJ (Claudemir,
+        // folha 2), que nunca entra no divisor nem na folha de bonificação.
+        currentEmployeeType: EMPLOYEE_TYPE.CLT,
         position: {
           is: {
             bonifiable: true  // Only users with bonifiable positions

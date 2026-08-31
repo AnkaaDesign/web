@@ -195,10 +195,18 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
   // Bonus values come from the API's /bonus/simulate endpoint — the web
   // frontend never recomputes the formula locally.
+  //
+  // `year`/`month` NÃO são decorativos: sem eles a API cai no `adjustment`
+  // default (0) e a coluna sai 30% abaixo do que a folha grava — o reajuste
+  // BONUS de +30% vigente desde 01/05/2026 nunca entrava. Com o período, a
+  // API injeta o reajuste salvo e a base bate à vírgula com `Bonus.baseBonus`
+  // (Célio ago/26: 1.646,17 sem reajuste × 1,30 = 2.140,02 gravado).
   const simulationInput = useMemo(() => {
     if (users.length === 0) return null;
     return {
       averageTasksPerUser,
+      year: currentYear,
+      month: currentMonth,
       users: users
         .filter(u => u.position?.bonifiable === true)
         .map(u => {
@@ -215,7 +223,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
           };
         }),
     };
-  }, [users, averageTasksPerUser, pendingChanges, userPerformanceLevels]);
+  }, [users, averageTasksPerUser, currentYear, currentMonth, pendingChanges, userPerformanceLevels]);
 
   const { data: simulation } = useBonusSimulation(simulationInput, {
     enabled: simulationInput !== null && simulationInput.users.length > 0,
