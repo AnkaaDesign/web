@@ -7,8 +7,10 @@ import { QuoteStatusBadge } from "@/components/production/task/quote/quote-statu
 import type { DataTableColumnDef, PersistedTableConfig } from "@/components/ui/datatable";
 import {
   SECTOR_PRIVILEGES,
+  SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
+  TASK_QUOTE_STATUS_LABELS,
   BONIFICATION_STATUS_LABELS,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
@@ -20,7 +22,7 @@ import { canViewServiceOrderType } from "@/utils/permissions/service-order-permi
 import { IconCalendarEvent } from "@tabler/icons-react";
 import { formatCurrency } from "@/utils/number";
 import { formatDate, formatDateTime, getDurationBetweenDates } from "@/utils/date";
-import { formatChassis } from "@/utils/formatters";
+import { formatChassis, formatPlate } from "@/utils/formatters";
 import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
 import type { Task } from "@/types";
 import type { ClusteredTask } from "./cluster-tasks";
@@ -189,7 +191,19 @@ function progressColumn(
     enableSorting: true,
     size,
     minSize: 90,
-    meta: { headerLabel: SERVICE_ORDER_TYPE_LABELS[type], requiredPrivilege: soTypeViewers(type) },
+    meta: {
+      headerLabel: SERVICE_ORDER_TYPE_LABELS[type],
+      requiredPrivilege: soTypeViewers(type),
+      // The bar's own "concluídas/total" text. Aggregated over `__group` (the COLLAPSED reading)
+      // because an export has no expansion state; an expanded cluster exports the parent's
+      // aggregate plus each child's own, exactly as the screen shows them.
+      exportValue: (row) => {
+        const orders = (row.__group ?? [row]).flatMap((t) => t.serviceOrders?.filter((so) => so.type === type && so.status) ?? []);
+        if (!orders.length) return "";
+        const completed = orders.filter((so) => so.status === SERVICE_ORDER_STATUS.COMPLETED).length;
+        return `${completed}/${orders.length}`;
+      },
+    },
     cell: ({ row }) => <TaskProgressCell tasks={cellTasks(row)} type={type} currentUserId={currentUserId} />,
   };
 }
@@ -219,6 +233,22 @@ function mutedDate(v: Date | string | null | undefined) {
  */
 function dateSortValue(v: Date | string | null | undefined): number | undefined {
   return v ? new Date(v).getTime() : undefined;
+}
+
+/**
+ * Export/search value for a date column. The column's `accessorFn` is epoch ms (sort-only) and
+ * `rawColumnValue` (data-table-utils) reads ONLY `meta.exportValue` or `accessorKey` — so an
+ * accessorFn-only date column exported a BLANK cell to the PDF/XLSX and was unsearchable.
+ *
+ * Format is "dd/mm/aa - hh:mm" (2-digit year), the compact form the Previsão cell already renders —
+ * a date column is 90pt wide in the PDF and the 4-digit year is the first thing to wrap.
+ */
+function dateExportValue(v: Date | string | null | undefined): string {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)} - ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export interface TaskPreparationColumnContext {
@@ -309,7 +339,9 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       header: "Identificador",
       accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
       size: 150,
-      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || row.truck?.plate || "" },
+      // A plate exports with the canonical display mask (`ABC-1234`, Mercosul unhyphenated); a
+      // serial number is free-form and goes out as stored.
+      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || (row.truck?.plate ? formatPlate(row.truck.plate) : "") },
       cell: ({ getValue }) => {
         const v = getValue() as string;
         return v ? <span className="truncate">{v}</span> : <span className="text-muted-foreground">-</span>;
@@ -331,7 +363,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 150,
-      meta: { headerLabel: "Previsão", requiredPrivilege: RESTRICTED_VIEWERS },
+      meta: { headerLabel: "Previsão", requiredPrivilege: RESTRICTED_VIEWERS, exportValue: (row) => dateExportValue(row.forecastDate) },
       cell: ({ row }) => <ForecastDateCell task={row.original} />,
     },
     {
@@ -341,7 +373,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 140,
-      meta: { defaultVisible: false, headerLabel: "Prazo" },
+      meta: { defaultVisible: false, headerLabel: "Prazo", exportValue: (row) => dateExportValue(row.term) },
       cell: ({ row }) => mutedDate(row.original.term),
     },
     {
@@ -355,7 +387,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         defaultVisible: false,
         headerLabel: "Valor Total",
         requiredPrivilege: FINANCIAL_SECTORS,
-        exportValue: (r) => r.quote?.total ?? 0,
+        exportValue: (r) => (r.quote?.total != null ? formatCurrency(r.quote.total) : ""),
       },
       cell: ({ row }) =>
         row.original.quote?.total != null ? (
@@ -381,7 +413,12 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       accessorFn: (row) => row.quote?.status ?? "",
       enableSorting: true,
       size: 160,
-      meta: { defaultVisible: false, headerLabel: "Status Faturamento", requiredPrivilege: FINANCIAL_SECTORS },
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Status Faturamento",
+        requiredPrivilege: FINANCIAL_SECTORS,
+        exportValue: (row) => (row.quote?.status ? TASK_QUOTE_STATUS_LABELS[row.quote.status] ?? row.quote.status : ""),
+      },
       cell: ({ row }) =>
         row.original.quote?.status ? (
           <QuoteStatusBadge status={row.original.quote.status} />
@@ -394,7 +431,12 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       header: "Bonificação",
       accessorKey: "bonification",
       size: 160,
-      meta: { defaultVisible: false, headerLabel: "Bonificação", requiredPrivilege: BONIFICATION_VIEWERS },
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Bonificação",
+        requiredPrivilege: BONIFICATION_VIEWERS,
+        exportValue: (row) => (row.bonification ? BONIFICATION_STATUS_LABELS[row.bonification] ?? row.bonification : ""),
+      },
       cell: ({ getValue }) => {
         const v = getValue() as keyof typeof BONIFICATION_STATUS_LABELS | null;
         return v ? (
@@ -511,7 +553,11 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       header: "Nº Chassi",
       accessorFn: (row) => row.truck?.chassisNumber || "",
       size: 150,
-      meta: { defaultVisible: false, headerLabel: "Nº Chassi", exportValue: (row) => row.truck?.chassisNumber || "" },
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Nº Chassi",
+        exportValue: (row) => (row.truck?.chassisNumber ? formatChassis(row.truck.chassisNumber) : ""),
+      },
       cell: ({ row }) =>
         row.original.truck?.chassisNumber ? (
           <span className="truncate">{formatChassis(row.original.truck.chassisNumber)}</span>
@@ -527,7 +573,16 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       accessorFn: (row) => calculateTaskMeasures(row) ?? 0,
       enableSorting: true,
       size: 110,
-      meta: { defaultVisible: false, headerLabel: "Medidas", exportValue: (row) => formatTaskMeasures(row) },
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Medidas",
+        // formatTaskMeasures() returns "-" for a truck with no dimensions — an empty cell reads
+        // better in a spreadsheet than a literal dash.
+        exportValue: (row) => {
+          const m = formatTaskMeasures(row);
+          return m && m !== "-" ? m : "";
+        },
+      },
       cell: ({ row }) => {
         const m = formatTaskMeasures(row.original);
         return m && m !== "-" ? <span className="tabular-nums">{m}</span> : <span className="text-muted-foreground">-</span>;
@@ -540,7 +595,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 140,
-      meta: { defaultVisible: false, headerLabel: "Entrada" },
+      meta: { defaultVisible: false, headerLabel: "Entrada", exportValue: (row) => dateExportValue(row.entryDate) },
       cell: ({ row }) => mutedDate(row.original.entryDate),
     },
     {
@@ -550,7 +605,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 140,
-      meta: { defaultVisible: false, headerLabel: "Iniciado" },
+      meta: { defaultVisible: false, headerLabel: "Iniciado", exportValue: (row) => dateExportValue(row.startedAt) },
       cell: ({ row }) => mutedDate(row.original.startedAt),
     },
     {
@@ -560,7 +615,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 140,
-      meta: { defaultVisible: false, headerLabel: "Finalizado" },
+      meta: { defaultVisible: false, headerLabel: "Finalizado", exportValue: (row) => dateExportValue(row.finishedAt) },
       cell: ({ row }) => mutedDate(row.original.finishedAt),
     },
     {
@@ -570,7 +625,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 140,
-      meta: { defaultVisible: false, headerLabel: "Criado em" },
+      meta: { defaultVisible: false, headerLabel: "Criado em", exportValue: (row) => dateExportValue(row.createdAt) },
       cell: ({ row }) => mutedDate(row.original.createdAt),
     },
     {
@@ -582,7 +637,11 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       sortUndefined: 1,
       enableSorting: true,
       size: 130,
-      meta: { defaultVisible: false, headerLabel: "Duração" },
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Duração",
+        exportValue: (row) => (row.startedAt && row.finishedAt ? getDurationBetweenDates(row.startedAt, row.finishedAt) : ""),
+      },
       cell: ({ row }) =>
         row.original.startedAt && row.original.finishedAt ? (
           <span>{getDurationBetweenDates(row.original.startedAt, row.original.finishedAt)}</span>
