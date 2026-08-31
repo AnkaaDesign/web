@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { IconRepeat, IconExternalLink, IconAlertTriangle } from "@tabler/icons-react";
+import { IconRepeat, IconExternalLink, IconAlertTriangle, IconEdit } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { MessageCanvas } from "@/components/messaging/MessageCanvas";
 import { transformBlocksForDisplay } from "@/utils/message-transformer";
 import { useMessageSchedule } from "@/hooks/administration/use-message-schedule";
@@ -119,6 +120,24 @@ export function MessageScheduleDetailDialog({
               ) : (
                 <Badge variant="secondary">Pausado</Badge>
               ))}
+
+            {/* Quem abre o detalhe e vê um erro na regra quer corrigi-lo dali
+                mesmo; obrigar a fechar e procurar o clique direito é atrito
+                gratuito. `mr-8` deixa o X do diálogo respirar. */}
+            {schedule && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto mr-8"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate(routes.administration.messages.schedules.edit(schedule.id));
+                }}
+              >
+                <IconEdit className="mr-2 h-4 w-4" />
+                Editar
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 

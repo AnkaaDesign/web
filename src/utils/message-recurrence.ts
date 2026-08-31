@@ -12,7 +12,11 @@
 
 import { SCHEDULE_FREQUENCY } from "@/constants";
 import type { MessageFormData, MessageRecurrenceFormData } from "@/components/administration/message/editor/types";
-import type { MessageScheduleCreateFormData, MessageTargetType } from "@/schemas/message-schedule";
+import type {
+  MessageSchedule,
+  MessageScheduleCreateFormData,
+  MessageTargetType,
+} from "@/schemas/message-schedule";
 import { startsAtISO, endsAtISO } from "./message-scheduling";
 
 const WEEKLY_FAMILY: string[] = [SCHEDULE_FREQUENCY.WEEKLY, SCHEDULE_FREQUENCY.BIWEEKLY];
@@ -31,6 +35,14 @@ const TARGET_TYPE_MAP: Record<MessageFormData["targeting"]["type"], MessageTarge
   specific: "SPECIFIC",
   sector: "SECTOR",
   position: "POSITION",
+};
+
+/** O caminho inverso, para reabrir um agendamento gravado no compositor. */
+const TARGET_TYPE_REVERSE: Record<MessageTargetType, MessageFormData["targeting"]["type"]> = {
+  ALL: "all",
+  SPECIFIC: "specific",
+  SECTOR: "sector",
+  POSITION: "position",
 };
 
 /**
@@ -141,5 +153,87 @@ export function buildSchedulePayload(data: MessageFormData): MessageScheduleCrea
     // Rascunho vira agendamento PAUSADO: a regra fica gravada e não publica nada
     // até alguém retomar.
     isActive: !data.isDraft,
+  };
+}
+
+/**
+ * O caminho de VOLTA: um agendamento gravado no vocabulário do compositor.
+ *
+ * Existe porque editar um comunicado recorrente é editar a MESMA coisa que se
+ * criou — título, blocos, público e cadência —, e a única forma honesta de fazer
+ * isso é reabrir o mesmo formulário com os valores dentro. Sem este mapeamento a
+ * alternativa seria um segundo formulário só para agendamento, que divergiria do
+ * compositor no primeiro campo novo.
+ *
+ * O que NÃO volta: o público é uma REGRA (`targetType` + ids), e é assim que ele
+ * é devolvido — sem resolver para uma lista de usuários. Resolver aqui
+ * congelaria a lista no dia da edição, que é exatamente o que o agendamento
+ * existe para evitar.
+ */
+export function scheduleToFormData(schedule: MessageSchedule): Partial<MessageFormData> {
+  // `content` chega como `{ blocks: [...] }` — mesmo envelope de `Message.content`
+  // —, mas às vezes como STRING JSON. Mesma desembrulhada do diálogo de detalhe.
+  let raw: any = schedule.content;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = null;
+    }
+  }
+  if (raw?.blocks) raw = raw.blocks;
+  const blocks = Array.isArray(raw) ? raw : [];
+
+  const targetingType = TARGET_TYPE_REVERSE[schedule.targetType] ?? "all";
+
+  return {
+    title: schedule.title,
+    blocks,
+    targeting: {
+      type: targetingType,
+      userIds: schedule.targetUserIds ?? [],
+      sectorIds: schedule.targetSectorIds ?? [],
+      positionIds: schedule.targetPositionIds ?? [],
+    },
+    // Com recorrência ligada o intervalo de datas é a VIGÊNCIA do agendamento,
+    // não a janela de exibição de cada publicação.
+    scheduling: {
+      startDate: schedule.startsOn ? new Date(schedule.startsOn) : undefined,
+      endDate: schedule.endsOn ? new Date(schedule.endsOn) : undefined,
+    },
+    recurrence: {
+      enabled: true,
+      frequency: schedule.frequency,
+      frequencyCount: schedule.frequencyCount ?? 1,
+      weeklySchedule: schedule.weeklyConfig
+        ? {
+            monday: !!schedule.weeklyConfig.monday,
+            tuesday: !!schedule.weeklyConfig.tuesday,
+            wednesday: !!schedule.weeklyConfig.wednesday,
+            thursday: !!schedule.weeklyConfig.thursday,
+            friday: !!schedule.weeklyConfig.friday,
+            saturday: !!schedule.weeklyConfig.saturday,
+            sunday: !!schedule.weeklyConfig.sunday,
+          }
+        : undefined,
+      monthlySchedule: schedule.monthlyConfig
+        ? {
+            dayOfMonth: schedule.monthlyConfig.dayOfMonth ?? null,
+            occurrence: schedule.monthlyConfig.occurrence ?? null,
+            dayOfWeek: schedule.monthlyConfig.dayOfWeek ?? null,
+          }
+        : undefined,
+      yearlySchedule: schedule.yearlyConfig
+        ? {
+            month: schedule.yearlyConfig.month,
+            dayOfMonth: schedule.yearlyConfig.dayOfMonth ?? null,
+            occurrence: schedule.yearlyConfig.occurrence ?? null,
+            dayOfWeek: schedule.yearlyConfig.dayOfWeek ?? null,
+          }
+        : undefined,
+      displayDurationDays: schedule.displayDurationDays,
+      publishHour: schedule.publishHour,
+      maxOccurrences: schedule.maxOccurrences ?? null,
+    },
   };
 }

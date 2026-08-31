@@ -34,12 +34,19 @@ interface MessageMetadataFormProps {
   recurrencePreview?: Date[];
   recurrencePreviewError?: string | null;
   /**
-   * Falso na tela de EDIÇÃO. Editar uma mensagem existente é editar aquela
-   * mensagem; transformá-la numa regra recorrente no mesmo formulário deixaria
-   * ambíguo o que acontece com a linha que já está publicada e já foi lida.
-   * Tornar recorrente é criar um agendamento.
+   * Falso na tela de EDIÇÃO de uma mensagem. Editar uma mensagem existente é
+   * editar aquela mensagem; transformá-la numa regra recorrente no mesmo
+   * formulário deixaria ambíguo o que acontece com a linha que já está
+   * publicada e já foi lida. Tornar recorrente é criar um agendamento.
    */
   allowRecurrence?: boolean;
+  /**
+   * Verdadeiro na tela de edição de um AGENDAMENTO: ali a recorrência não é uma
+   * opção, é a natureza do registro. O interruptor some — desligá-lo não teria
+   * como significar "vire uma mensagem avulsa" sem decidir, por baixo do pano, o
+   * que fazer com as ocorrências já publicadas.
+   */
+  lockRecurrence?: boolean;
 }
 
 /**
@@ -63,6 +70,7 @@ export const MessageMetadataForm = ({
   recurrencePreview,
   recurrencePreviewError,
   allowRecurrence = true,
+  lockRecurrence = false,
 }: MessageMetadataFormProps) => {
   const handleChange = (updates: Partial<MessageMetadata>) => {
     onChange({ ...data, ...updates });
@@ -334,7 +342,7 @@ export const MessageMetadataForm = ({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Recorrência: o interruptor que troca "uma mensagem" por "uma regra" */}
-          {allowRecurrence && (
+          {allowRecurrence && !lockRecurrence && (
           <Card level={2}>
             <CardContent className="flex items-start justify-between gap-4 p-4">
               <div className="space-y-1">
@@ -370,7 +378,9 @@ export const MessageMetadataForm = ({
 
           <div className="space-y-2">
             <Label htmlFor="date-range">
-              {data.recurrence?.enabled ? "Vigência da Recorrência" : "Período de Exibição"}
+              {data.recurrence?.enabled || lockRecurrence
+                ? "Vigência da Recorrência"
+                : "Período de Exibição"}
             </Label>
             <DateRangePicker
               dateRange={{
@@ -388,13 +398,13 @@ export const MessageMetadataForm = ({
               placeholder="Selecione o período"
             />
             <p className="text-xs text-muted-foreground">
-              {data.recurrence?.enabled
+              {data.recurrence?.enabled || lockRecurrence
                 ? "Quando o agendamento começa e quando para de gerar publicações. Em branco = sem limite."
                 : "Deixe em branco para exibir indefinidamente"}
             </p>
           </div>
 
-          {data.recurrence?.enabled && (
+          {(data.recurrence?.enabled || lockRecurrence) && data.recurrence && (
             <MessageRecurrenceForm
               data={data.recurrence}
               onChange={(recurrence) => handleChange({ recurrence })}

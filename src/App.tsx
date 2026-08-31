@@ -198,6 +198,7 @@ const AdministrationMessages = lazy(() => import("@/pages/administration/message
 const AdministrationMessagesCreate = lazy(() => import("@/pages/administration/messages/create").then((module) => ({ default: module.CreateMessagePage })));
 const AdministrationMessagesDetails = lazy(() => import("@/pages/administration/messages/details/[id]").then((module) => ({ default: module.MessageDetailsPage })));
 const AdministrationMessagesEdit = lazy(() => import("@/pages/administration/messages/edit/[id]").then((module) => ({ default: module.EditMessagePage })));
+const AdministrationMessageScheduleEdit = lazy(() => import("@/pages/administration/messages/schedules/edit/[id]").then((module) => ({ default: module.EditMessageSchedulePage })));
 
 const AdministrationChangeLogs = lazy(() => import("@/pages/administration/change-logs/list").then((module) => ({ default: module.default })));
 const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administration/change-logs/details/[id]").then((module) => ({ default: module.ChangeLogDetails })));
@@ -1528,6 +1529,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationMessagesCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.messages.schedules.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationMessageScheduleEdit />
                     </Suspense>
                   }
                 />

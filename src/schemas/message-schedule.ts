@@ -72,9 +72,17 @@ export interface MessageScheduleCreateFormData {
 
 export type MessageScheduleUpdateFormData = Partial<MessageScheduleCreateFormData>;
 
+/**
+ * A situação como a lista a mostra. Não é o `isActive` cru: ENCERRADO (fim da
+ * vigência ou limite de publicações atingido) também tem `isActive = false`, e o
+ * que separa os dois é `finishedAt`. Quem resolve isso é o servidor.
+ */
+export type MessageScheduleStatus = "active" | "paused" | "finished";
+
 export interface MessageScheduleGetManyFormData {
   searchingFor?: string;
   isActive?: boolean;
+  status?: MessageScheduleStatus[];
   frequency?: SCHEDULE_FREQUENCY[];
   targetType?: MessageTargetType[];
   page?: number;

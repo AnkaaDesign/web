@@ -12,8 +12,10 @@ interface MessageEditorProps {
   onSubmit: (data: MessageFormData, isDraft: boolean) => void;
   onFormStateChange?: (state: { isValid: boolean; isDirty: boolean; canPreview: boolean }) => void;
   onStepChange?: (step: number, totalSteps: number, canGoNext: boolean, canGoPrev: boolean) => void;
-  /** Falso na edição — ver a nota em `MessageMetadataForm`. */
+  /** Falso na edição de uma mensagem — ver a nota em `MessageMetadataForm`. */
   allowRecurrence?: boolean;
+  /** Verdadeiro na edição de um AGENDAMENTO — ver a nota em `MessageMetadataForm`. */
+  lockRecurrence?: boolean;
 }
 
 const STEPS = [
@@ -21,7 +23,7 @@ const STEPS = [
   { id: 2, name: "Conteúdo", description: "Editor de blocos da mensagem" },
 ];
 
-export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange, allowRecurrence = true }: MessageEditorProps) => {
+export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange, allowRecurrence = true, lockRecurrence = false }: MessageEditorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
   const [metadata, setMetadata] = useState<{
@@ -242,6 +244,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
               data={metadata}
               onChange={setMetadata}
               allowRecurrence={allowRecurrence}
+              lockRecurrence={lockRecurrence}
               recurrencePreview={recurrencePreview}
               recurrencePreviewError={
                 previewQuery.isError

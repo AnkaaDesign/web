@@ -34,6 +34,14 @@ export const routes = {
       details: (id: string) => `/administracao/mensagens/${id}`,
       edit: (id: string) => `/administracao/mensagens/${id}/editar`,
       root: "/administracao/mensagens",
+      /**
+       * Comunicado recorrente. O prefixo estático "agendamentos" vem ANTES do
+       * id de propósito: `details` é `/administracao/mensagens/:id`, e um
+       * caminho de dois segmentos com id na frente seria indistinguível dele.
+       */
+      schedules: {
+        edit: (id: string) => `/administracao/mensagens/agendamentos/${id}/editar`,
+      },
     },
     root: "/administracao",
     sectors: {

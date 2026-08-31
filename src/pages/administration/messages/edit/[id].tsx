@@ -12,6 +12,7 @@ import { resolveTargetingToUserIds } from "@/utils/message-targeting";
 import { startsAtISO, endsAtISO } from "@/utils/message-scheduling";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 export const EditMessagePage = () => {
@@ -211,6 +212,16 @@ export const EditMessagePage = () => {
     }] : []),
   ];
 
+  // Ocorrência de um comunicado recorrente. Sem este aviso, esticar aqui o
+  // "Período de Exibição" parece mexer na regra — e não mexe: o agendamento
+  // continua publicando com a duração dele, e só ESTA linha fica fora do padrão.
+  // Foi assim que duas publicações de uma rotina de 3 dias no ar acabaram
+  // marcadas para sair do feed só em 31/12.
+  const schedule = (response.data as any).schedule as
+    | { id: string; name: string; displayDurationDays: number }
+    | null
+    | undefined;
+
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <div className="container mx-auto max-w-6xl flex-shrink-0">
@@ -223,7 +234,30 @@ export const EditMessagePage = () => {
         />
       </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="container mx-auto max-w-6xl">
+        <div className="container mx-auto max-w-6xl space-y-4">
+          {schedule && (
+            <Alert>
+              <AlertDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>
+                  Esta mensagem foi publicada pelo agendamento{" "}
+                  <strong>{schedule.name}</strong> ({schedule.displayDurationDays} dia(s) no ar).
+                  O que você mudar aqui vale <strong>só para esta publicação</strong> — a regra
+                  segue como está.
+                </span>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onClick={() =>
+                    navigate(routes.administration.messages.schedules.edit(schedule.id))
+                  }
+                >
+                  Editar o agendamento
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <MessageEditor
             initialData={initialData}
             onSubmit={handleSubmit}
