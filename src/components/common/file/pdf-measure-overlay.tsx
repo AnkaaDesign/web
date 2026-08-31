@@ -67,6 +67,7 @@ export const DIMENSION_COLOR = `rgb(${Math.round(DIM_COLOR.r * 255)} ${Math.roun
 const COLOR = DIMENSION_COLOR;
 const SNAP_COLOR = "#16A34A";
 const SELECTED_FILL = "rgb(51 116 169 / 0.08)";
+const SELECTED_FILL_OPACITY = 0.08;
 const SNAP_RADIUS_PX = 22;
 const ARROW = 9;
 const ARROWS_OUTSIDE_BELOW_CM = STYLE_CM.arrowsOutsideBelowCm;
@@ -95,18 +96,30 @@ function formatCm(value: number): string {
  * que varre a face — e metade da caixa dele é vazio. Clicar nesse vazio
  * selecionava a onda em vez do adesivo que está por baixo.
  */
-function pointInPolys(polys: Pt[][], p: Pt): boolean {
+function pointInPoly(poly: Pt[], p: Pt): boolean {
   let inside = false;
-  for (const poly of polys) {
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
-      const a = poly[i];
-      const b = poly[j];
-      if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
-        inside = !inside;
-      }
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[i];
+    const b = poly[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
     }
   }
   return inside;
+}
+
+/**
+ * Um item é a UNIÃO das formas dele, não a alternância entre elas.
+ *
+ * A paridade corria num contador só para todos os polígonos, e formas
+ * EMPILHADAS se cancelavam: a onda do DiCasa é uma sombra cinza com a onda
+ * vermelha por cima, quase coincidentes — o dedo caía dentro das duas, a
+ * paridade voltava a par, e clicar no meio da faixa mais visível da face não
+ * selecionava nada. Par-ímpar só faz sentido DENTRO de uma forma, para vazar o
+ * miolo de um "o"; entre formas diferentes, quem vale é o "dentro de alguma".
+ */
+function pointInPolys(polys: Pt[][], p: Pt): boolean {
+  return polys.some((poly) => pointInPoly(poly, p));
 }
 
 /** Distância do ponto ao contorno — dá a tolerância de dedo em forma fina. */
@@ -124,6 +137,15 @@ function distanceToPolys(polys: Pt[][], p: Pt): number {
     }
   }
   return best;
+}
+
+/** Um polígono da silhueta como caminho SVG fechado, já em pixels de tela. */
+function polyPath(poly: Pt[], zoom: number): string {
+  return (
+    poly
+      .map((p, i) => `${i ? "L" : "M"} ${(p.x * zoom).toFixed(1)} ${(p.y * zoom).toFixed(1)}`)
+      .join(" ") + " Z"
+  );
 }
 
 /** Seta cheia apontando para (x, y) na direção `angle`. */
@@ -467,22 +489,27 @@ export function PdfMeasureOverlay({
           return (
             <g key={`sel-${s.index}`}>
               {s.outline?.length ? (
-                <path
-                  d={s.outline
-                    .map((poly) =>
-                      poly
-                        .map(
-                          (p, i) =>
-                            `${i ? "L" : "M"} ${(p.x * zoom).toFixed(1)} ${(p.y * zoom).toFixed(1)}`,
-                        )
-                        .join(" ") + " Z",
-                    )
-                    .join(" ")}
-                  fill={SELECTED_FILL}
-                  fillRule="evenodd"
-                  stroke={COLOR}
-                  strokeWidth={1.4}
-                />
+                <>
+                  {/*
+                    O preenchimento é a UNIÃO das formas, pela mesma razão que o
+                    clique: em par-ímpar a sombra e a onda que ela acompanha se
+                    anulavam e o realce virava um filete. Cada forma é pintada
+                    cheia dentro de um grupo transparente — a opacidade é do
+                    grupo, então a sobreposição não escurece duas vezes. O traço
+                    sai à parte, opaco, senão sumiria junto.
+                  */}
+                  <g opacity={SELECTED_FILL_OPACITY}>
+                    {s.outline.map((poly, k) => (
+                      <path key={k} d={polyPath(poly, zoom)} fill={COLOR} />
+                    ))}
+                  </g>
+                  <path
+                    d={s.outline.map((poly) => polyPath(poly, zoom)).join(" ")}
+                    fill="none"
+                    stroke={COLOR}
+                    strokeWidth={1.4}
+                  />
+                </>
               ) : (
                 <rect
                   x={draw.x0 * zoom}

@@ -1318,10 +1318,28 @@ export function buildItems(
    * An image's outline is its transparent-pixel bounding RECTANGLE, not ink:
    * the frame "touches" art that sits a metre from any visible pixel, and at
    * contour precision that phantom contact welds neighbours into the image's
-   * group. Where the ink trimmer is available the evidence frame shrinks to
-   * real ink; without it, a bleed-sized image contributes NO contour evidence
-   * at all — its box still exists, so every bbox-based rule is untouched, but
+   * group. So a bleed-sized image contributes NO contour evidence at all — its
+   * box still exists, so every bbox-based rule is untouched, but
    * touch/companion/multicolour tests stop seeing a frame that is mostly air.
+   *
+   * APARAR NA TINTA NÃO SALVA A MOLDURA, e essa era a brecha: o recorte
+   * encolhe o retângulo até a primeira linha de tinta, mas o que sobra ainda é
+   * um RETÂNGULO, e o de uma onda que atravessa a face continua sendo quase
+   * todo vazio. No DiCasa a onda vermelha vem como bitmap: aparada, a moldura
+   * ia de 0 a 263 cm e a aresta direita dela cruzava o logotipo, que começa em
+   * 203. Contato de contorno ZERO, porte parecido (razão de áreas 0,42) — e a
+   * regra da marca multicor soldava o envelopamento ao logotipo. A face saía
+   * com DOIS itens, um deles de 407 × 199 cm, e clicar na marca não devolvia
+   * marca nenhuma.
+   *
+   * Pior: só acontecia no NAVEGADOR. O recortador de tinta é do DOM, e a
+   * bancada roda em Node sem ele — então o motor medido e o motor entregue
+   * discordavam justamente neste ponto.
+   *
+   * O recorte continua valendo para a MEDIDA (é ele que tira a folga
+   * transparente de onde a cota ancora); o que ele não pode é virar prova de
+   * toque. Quem decide se a moldura é grande demais para servir de contorno é
+   * a caixa APARADA, que é a extensão real da arte.
    */
   const rectOutline = (r: Rect): Pt[][] => [
     [
@@ -1339,10 +1357,14 @@ export function buildItems(
     const o = p.obj;
     if (o.op !== "image") return o;
     const trimmed = trimmedRects[i];
-    if (trimmed) return { ...o, outline: rectOutline(trimmed) };
+    const frame = trimmed ?? o.bbox;
+    const axes = bleedAxesOf(frame, scale.panelPt, params.bleedTouchCm * scale.ptPerCm);
     const bleedSized =
-      p.coversFrac >= params.bleedAreaFrac || p.bleedAxes.horizontal || p.bleedAxes.vertical;
-    return bleedSized ? { ...o, outline: [] } : o;
+      rectArea(frame) / rectArea(scale.panelPt) >= params.bleedAreaFrac ||
+      axes.horizontal ||
+      axes.vertical;
+    if (bleedSized) return { ...o, outline: [] };
+    return trimmed ? { ...o, outline: rectOutline(trimmed) } : o;
   });
   const boxes = pool.map((p, i) => trimmedRects[i] ?? p.obj.bbox);
   const objColors = elements.map((o) => o.fill ?? o.stroke ?? null);
@@ -1491,13 +1513,41 @@ export function buildItems(
       if (!alignedEnough(ra, rb, params.weldAlignFrac)) return false;
     }
 
-    if (sameColour) return true;
+    /**
+     * O FUNDO NÃO ENGOLE A ARTE IMPRESSA SOBRE ELE — agora também no estágio
+     * de peça, e não só no dos conjuntos.
+     *
+     * Lá embaixo isto é uma invariante, dita de uma vez; aqui, onde a faixa
+     * ainda está sendo montada, a recusa é por RAMO. No Ki Distribuidora a
+     * chapa verde sangra três arestas e a assinatura verde ("O melhor do
+     * mercado") é desenhada em cima dela: as caixas se sobrepõem, a cor é a
+     * mesma a menos de 1,7 e o ramo de
+     * mesma cor soldava as duas sem mais pergunta. A assinatura entrava na
+     * chapa, esticava a caixa do fundo de 553 para 631 cm, e o vão até o
+     * logotipo caía de 103 para 21 cm — dentro do alcance de palavra. O ponto
+     * fixo então fundia fundo e logotipo, e a face inteira virava UM item: o
+     * aplicador clicava na marca e recebia 1538 × 246 cm.
+     *
+     * Cor igual entre fundo e arte é coincidência de paleta, não prova de que
+     * saiu do mesmo recorte — a chapa e a assinatura são dois vinis. E o toque
+     * também não prova nada aqui: a borda de um fundo varre a face e cruza
+     * tudo que passa por cima dela (a chapa esquerda termina em 553 cm, no
+     * meio da assinatura, dando distância de contorno ZERO). Por isso os dois
+     * ramos que decidem por cor ou por toque ficam fechados quando um lado é
+     * fundo e o outro não; multicor, acompanhamento e continência de tinta
+     * continuam votando, porque carregam prova de porte e de percurso.
+     */
+    const oneSideIsBackdrop = backdropPiece(a) !== backdropPiece(b);
+    if (sameColour && !oneSideIsBackdrop) return true;
     // logotipo multicor com uma peça DENTRO da outra, encostando (o caso "Ki")
     if (
       nestedFraction(ra, rb) >= params.nestedMergeFrac &&
       contourDistance(elements[a].outline, elements[b].outline, touchTol) <= touchTol
     ) {
-      return true;
+      // ... a menos que a de fora seja o fundo: estar DENTRO de uma faixa que
+      // sangra é prova de soterramento, não de pertencer à peça.
+      const outerIsBackdrop = backdropPiece(rectArea(ra) >= rectArea(rb) ? a : b);
+      if (!(oneSideIsBackdrop && outerIsBackdrop)) return true;
     }
     return isCompanionPiece(elements[a], elements[b], params, scale.ptPerCm);
   };
@@ -1682,6 +1732,29 @@ export function buildItems(
     ) {
       return true;
     }
+    /**
+     * FUNDO COM FUNDO, ARTE COM ARTE — a invariante, dita uma vez só.
+     *
+     * Todas as regras abaixo já vinham tentando dizer isto cada uma do seu
+     * jeito, e cada remendo deixava uma fresta: a continência de tinta recusava
+     * o hospedeiro que sangra, a guarda de continência recusava a faixa que
+     * engole a caixa, a marca multicor confiava na razão de áreas. Bastava
+     * fechar uma para o par cair na seguinte e passar — no Ki era o ramo de
+     * mesma cor, no TRANSGENIO a marca multicor, e o remendo de uma quebrava
+     * a outra.
+     *
+     * O que separa envelopamento de adesivo não é cor, nem porte, nem toque: é
+     * que o envelopamento SANGRA e o adesivo tem posição. Duas naturezas
+     * diferentes não são a mesma peça de vinil, e nenhuma evidência de
+     * vizinhança deveria poder dizer que são — a borda de um fundo varre a
+     * face e encosta em tudo que passa por cima dele.
+     *
+     * Vale só na granularidade de CONJUNTO. No estágio de PEÇA a faixa ainda
+     * está sendo montada, e um pedaço dela pode não sangrar sozinho (o brilho
+     * branco da onda do DiCasa, que o projetista endossa dentro do
+     * envelopamento) — lá as guardas continuam por ramo.
+     */
+    if (wrapLikeAgg(a) !== wrapLikeAgg(b)) return false;
     const touching =
       Math.hypot(boxGap.x, boxGap.y) <= touchTol &&
       contourDistance(a.outline, b.outline, touchTol) <= touchTol;
@@ -1691,22 +1764,7 @@ export function buildItems(
     // physically connected art is one piece regardless — so it only vetoes
     // non-touching aggregate unions.
     if (guarded && !touching && monsterUnion(union(a.bbox, b.bbox))) return false;
-    // Wrap-host guard, FIXPOINT rounds only: "background never swallows the
-    // art drawn over it" was wired only into inkContained. Once one side is a
-    // bleeding band whose bbox engulfs the other, boxGap is (0,0), reach is
-    // trivially satisfied and monsterUnion is inert (the union bleeds) — so
-    // the same-colour branch and the nested-touch branch would merge on zero
-    // evidence (FRUTAMINA: the wrap, colour dist 1.4 from its contact block,
-    // ate five designer-dimmed items; one touching door stroke bridged a whole
-    // aggregate). Refuse those two paths; multicolour and companion keep their
-    // vote — they carry real size/accompaniment evidence.
-    const wrapHostBuries = ((): boolean => {
-      if (!guarded) return false;
-      if (nestedFraction(a.bbox, b.bbox) < params.nestedMergeFrac) return false;
-      const [inner, outer] = rectArea(a.bbox) <= rectArea(b.bbox) ? [a, b] : [b, a];
-      return wrapLikeAgg(outer) && !wrapLikeAgg(inner);
-    })();
-    if (!wrapHostBuries && colorDistance(a.color, b.color) <= params.colorMergeDelta) {
+    if (colorDistance(a.color, b.color) <= params.colorMergeDelta) {
       if (
         boxGap.y > 0 &&
         !touching &&
@@ -1759,7 +1817,7 @@ export function buildItems(
       }
     }
     if (nestedFraction(a.bbox, b.bbox) >= params.nestedMergeFrac) {
-      if (touching && !wrapHostBuries) return true;
+      if (touching) return true;
       if (inkContained(a, b)) return true;
     }
     if (iconSatellite(a, b)) return true;

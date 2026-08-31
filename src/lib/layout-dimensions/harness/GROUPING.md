@@ -12,6 +12,12 @@ npx esbuild src/lib/layout-dimensions/index.ts \
 node src/lib/layout-dimensions/harness/grouping-bench.mjs ~/layouts
 ```
 
+⚠️ **A bancada roda SEM o recorte de tinta.** `createPageInkTrimmer` é do DOM, e
+aqui é Node: `trimToInk` fica `undefined` e o motor medido não é o motor
+entregue. Um defeito pode existir só no navegador — a onda em bitmap do DiCasa
+engolia o logotipo lá e não aqui. Para medir o modo real, rasterize com
+`@napi-rs/canvas` e monte o `makeInkTrimmer` na mão.
+
 Leva **100 a 125 s** nas 466 faces dos 260 arquivos (contra 23 s do `bench.mjs`: aqui
 cada par de itens candidato paga um teste de contorno, que é o preço de não
 decidir nada pela caixa). É determinístico — duas passadas no mesmo bundle dão o
@@ -66,7 +72,7 @@ máquina.
 | **monstro** | item que não encosta em aresta nenhuma e mesmo assim varre mais de 55% de um eixo da face; ou item que junta mais de três cores cujas formas não se encostam |
 | **item mudo** | item que não recebe cota nenhuma. O operador clica e não vê número |
 | **sem contorno** | item que ENCOSTA numa aresta da face e não traz `outlinePt`. Sai como retângulo, e a caixa mente sobre a silhueta. Denominador: só os itens que encostam em aresta |
-| **peça picada** | dois itens cujos CONTORNOS se encostam (≤ 1,5 cm) e que mesmo assim saíram separados |
+| **peça picada** | dois itens cujos CONTORNOS se encostam (≤ 1,5 cm) e que mesmo assim saíram separados. Conta como defeito o par fundo/arte que a doutrina §10 manda separar — a arte é impressa SOBRE o fundo, então os contornos sempre se encostam. Subiu de 10,6% para 17,6% quando a invariante "fundo com fundo, arte com arte" entrou, e isso não é regressão |
 | **empilhado** | item cujos GLIFOS formam duas fileiras horizontais sem sobreposição vertical, e a fileira estreita cobre menos de 70% da larga. Regra do dono: "raramente colamos 1 adesivo onde o componente abaixo não cubra a mesma largura" |
 | **marca multicor** | dois itens de porte comparável e cores dominantes diferentes que se sobrepõem em ÁREA, ou ficam a menos da folga de solda da doutrina um do outro |
 

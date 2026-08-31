@@ -164,9 +164,26 @@ para menos: item grande demais engole o vizinho e a cota fica sem dono.
   descartá-lo deixava a lataria do SÓ MINAS com 4 itens triviais onde há ~15
   peças. O shading entra recortado pelo clip vigente, com recusa de fundo
   (clip retangular de 250 × 100 cm para cima é lataria, não adesivo).
-- **Imagem tem moldura, não contorno.** Metade dos logotipos entra como raster,
-  e a caixa declarada é a do arquivo, com a folga transparente em volta. Sem
-  recortar a tinta por pixel, a cota ancora no vazio.
+- **FUNDO COM FUNDO, ARTE COM ARTE.** Envelopamento e adesivo são naturezas
+  diferentes — um SANGRA, o outro tem posição — e nenhuma evidência de
+  vizinhança faz dos dois a mesma peça. Não vale a cor (a chapa verde do Ki
+  está a 1,7 da assinatura verde impressa sobre ela), não vale o toque (a borda
+  de um fundo varre a face e cruza tudo que passa por cima: a chapa esquerda do
+  Ki termina em 553 cm, no meio da assinatura), não vale o porte (a onda preta
+  do TRANSGENIO tem só 53 cm de largura e área parecida com a do bloco de
+  contato que ela quase engoliu). No estágio de CONJUNTO isto é uma invariante
+  que recusa antes de qualquer regra; fechar ramo a ramo não funciona, porque o
+  par cai na regra seguinte e passa. Sem ela a face do Ki saía como UM item de
+  1538 × 246 cm: o operador clicava na marca e recebia a carreta inteira.
+- **Imagem tem moldura, não contorno** — e APARAR NA TINTA NÃO SALVA A MOLDURA.
+  Metade dos logotipos entra como raster, e a caixa declarada é a do arquivo,
+  com a folga transparente em volta; sem recortar a tinta por pixel, a cota
+  ancora no vazio. Mas o recorte devolve outro RETÂNGULO, e o de uma onda que
+  atravessa a face continua quase todo vazio: a onda do DiCasa, aparada, ia de
+  0 a 263 cm e a aresta direita cruzava o logotipo que começa em 203 — contato
+  zero, porte 0,42, e a marca multicor soldou os dois. Imagem de
+  tamanho-sangria não entra nos testes de contorno, com ou sem recorte; o
+  recorte segue valendo para a MEDIDA.
 - **Caminho com subformas distantes vira vários itens.** O CorelDRAW exporta uma
   marca d'água de dois blocos como UM caminho de 24 subformas.
 
