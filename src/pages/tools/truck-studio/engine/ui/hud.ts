@@ -48,10 +48,6 @@ import {
      este módulo já importa meia dúzia de coisas de `scene/scene.ts`. */
   renderer,
 } from '../scene/scene';
-/* O filtro tem módulo próprio (`scene/look.ts`) porque ele é um PASSE, não um
-   parâmetro de cena — e o painel só precisa do catálogo e do interruptor. */
-import { LOOKS, setLook, currentLook, onLookChange } from '../scene/look';
-import type { Look } from '../scene/look';
 /* ⚠️ DE `cyclorama.ts` E NÃO DE `scene.ts`, E ISSO É UMA EXCEÇÃO CONSCIENTE À
    REGRA DESTE ARQUIVO.
    ---------------------------------------------------------------------------
@@ -341,8 +337,6 @@ let weatherRow!: HTMLElement;
 let backdropRow!: HTMLElement;
 let backdropTiles!: HTMLElement;
 let backdropVal!: HTMLElement;
-let lookTiles!: HTMLElement;
-let lookVal!: HTMLElement;
 let fillRow!: HTMLElement;
 let fillInput!: HTMLInputElement;
 let fillVal!: HTMLElement;
@@ -620,117 +614,6 @@ function buildBackdropRow() {
   }
   row.appendChild(backdropTiles);
   return row;
-}
-
-/* ---------------- O FILTRO ----------------
-   POR QUE ELE MORA NUM PAINEL CHAMADO "ILUMINAÇÃO", e a pergunta é justa.
-
-   Não é luz. Mas a regra desta base não é "agrupe pelo mecanismo", é *cada coisa
-   tem UMA casa, escolhida pelo que ela é* — e o que um filtro é, é uma decisão
-   AUTORAL que muda a imagem AO VIVO. É a mesma natureza da hora do dia, do clima
-   e do fundo, e é a natureza oposta da qualidade, que é decisão de máquina e por
-   isso mudou-se para `ui/trim-panel.ts`. "Fundo" já abriu esse precedente aqui:
-   ele também não é uma luz, é uma decisão de aparência que se vê na hora.
-
-   A alternativa era o painel da câmera (`ui/chrome.ts`), e ela foi recusada por
-   um motivo concreto: lá as opções são POR CAPTURA (o recorte transparente, a
-   qualidade daquele arquivo), e o filtro não é por captura — ele está na tela
-   enquanto se compõe, e sai igual na foto e no vídeo. Um controle de estado
-   permanente numa gaveta de opções pontuais é como se acaba com duas superfícies
-   discordando sobre quem manda. */
-
-/* A pastilha do filtro é uma AMOSTRA DE DUAS PARADAS: o desvio que ele dá nas
-   sombras à esquerda, o das altas luzes à direita. É LEGENDA, não simulação — o
-   desvio real é de centésimos e some num quadrado de 26 px, então ele é
-   amplificado para poder ser comparado de relance. Quem quer o resultado
-   verdadeiro olha o render, que está bem ali atrás do vidro. */
-function lookIcon(l: Look) {
-  /* ⚠️ O GANHO ENTRA NA AMOSTRA, e sem ele ela mentiria justamente nos filtros
-     frios: o que os faz lerem como frios é o balanço de branco (ver o ⚠️ de
-     `gain` em look.ts), e uma amostra que só mostrasse o tingimento por faixa
-     tonal pintaria "Aço" quase igual a "Padrão". O ganho multiplica; o desvio
-     soma, amplificado — a mesma conta do shader, na ordem dele. */
-  const hex = (base: number, d: readonly number[]) => '#' + [0, 1, 2]
-    .map((i) => Math.round(clamp(base * l.gain[i] + d[i] * 5, 0, 1) * 255)
-      .toString(16).padStart(2, '0'))
-    .join('');
-  const span = el('span', 'ts-hud-tile__ico ts-hud-tile__ico--badge');
-  span.setAttribute('aria-hidden', 'true');
-  const gid = 'ts-look-' + l.id;
-  span.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26"'
-    + ' stroke="currentColor" stroke-width="1.4" focusable="false" aria-hidden="true">'
-    + `<defs><linearGradient id="${gid}" x1="0" y1="1" x2="1" y2="0">`
-    + `<stop offset="0" stop-color="${hex(0.16, l.shadow)}"/>`
-    + `<stop offset="1" stop-color="${hex(0.88, l.high)}"/>`
-    + '</linearGradient></defs>'
-    + `<rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5" fill="url(#${gid})"/></svg>`;
-  return span;
-}
-
-const LOOK_TEMP_LABEL: Record<string, string> = {
-  neutro: 'neutro', quente: 'quente', frio: 'frio',
-};
-
-function buildLookRow() {
-  const row = el('div', 'ts-hud-row ts-hud-row--look');
-
-  const top = el('div', 'ts-hud-row__top');
-  top.appendChild(el('span', 'ts-hud-row__label', 'Filtro'));
-  lookVal = el('span', 'ts-hud-row__val');
-  top.appendChild(lookVal);
-  row.appendChild(top);
-
-  lookTiles = el('div', 'ts-hud-tiles');
-  lookTiles.setAttribute('role', 'radiogroup');
-  lookTiles.setAttribute('aria-label', 'Filtro de cor da imagem');
-  for (const l of LOOKS) {
-    const tile = el('button', 'ts-hud-tile');
-    tile.type = 'button';
-    tile.dataset.look = l.id;
-    tile.setAttribute('role', 'radio');
-    tile.setAttribute('aria-checked', 'false');
-    tile.title = l.hint;
-    tile.setAttribute('aria-label', `${l.name} — ${l.hint}`);
-    tile.appendChild(lookIcon(l));
-    tile.appendChild(el('span', 'ts-hud-tile__name', l.name));
-    /* SEM animação, e é a diferença para as pastilhas de clima e de fundo: as
-       duas dissolvem porque o que muda nelas é a CENA (albedo, rig), e uma
-       rampa é o que separa "trocou o fundo" de "a tela piscou". O filtro não
-       muda cena nenhuma — é uma escrita de uniforme sobre o quadro seguinte, e o
-       que se quer dele é justamente comparar oito opções de relance. Uma rampa
-       aqui seria meio segundo entre cada comparação. */
-    tile.addEventListener('click', () => setLook(l.id));
-    lookTiles.appendChild(tile);
-  }
-  row.appendChild(lookTiles);
-
-  /* ⚠️ A PASTILHA MARCADA VEM DA ASSINATURA, NUNCA DO CLIQUE — e é a diferença
-     entre a interface refletir o estado e a interface ADIVINHAR o estado.
-
-     O clique não é a única coisa que troca o filtro: abrir um PROJETO o aplica
-     (`applyProject()`), e "Novo" o zera. `syncHud()` não cobre esses dois — ele
-     só roda quando o CENÁRIO muda (studio.ts:1621), e um projeto que usa o mesmo
-     cenário do que está aberto não muda cenário nenhum. Um `paintLook()` pendurado
-     no clique deixaria a pastilha "Cinema" apagada num projeto que abriu em
-     Cinema, com o render já filtrado atrás do vidro.
-
-     Sem `off()`: este painel vive tanto quanto o engine singleton, que
-     `unmountStudio()` não descarta. */
-  onLookChange(paintLook);
-  paintLook();
-  return row;
-}
-
-function paintLook() {
-  const cur = currentLook();
-  lookVal.textContent = cur.id === 'nenhum'
-    ? 'Nenhum'
-    : `${cur.name} · ${LOOK_TEMP_LABEL[cur.temp] ?? cur.temp}`;
-  for (const tile of lookTiles.querySelectorAll<HTMLElement>('.ts-hud-tile')) {
-    const on = tile.dataset.look === cur.id;
-    tile.classList.toggle('is-on', on);
-    tile.setAttribute('aria-checked', on ? 'true' : 'false');
-  }
 }
 
 /* Os três multiplicadores. Um só construtor porque são a MESMA coisa três
@@ -2074,13 +1957,6 @@ function build() {
   backdropRow = buildBackdropRow();
   bodyEl.appendChild(backdropRow);
 
-  /* POR ÚLTIMO, E FORA DE `applyFace()`. As duas faces do painel trocam clima
-     por fundo conforme o cenário; o filtro vale para as duas — ele é a última
-     coisa que acontece com o quadro, venha ele de um pátio ou de um ciclorama.
-     Uma fileira que nunca se esconde tem de ficar depois das que se escondem, ou
-     ela salta de posição a cada troca de cenário. */
-  bodyEl.appendChild(buildLookRow());
-
   hudRoot.appendChild(bodyEl);
 
   /* A QUALIDADE SAIU DAQUI. Ela era a última fileira deste corpo, entre o clima e
@@ -2420,11 +2296,6 @@ export function syncHud() {
      resumo do cabeçalho, que depende das duas coisas. */
   applyFace();
   paintStudio();
-  /* O FILTRO NÃO É REPINTADO AQUI, e a ausência é deliberada: ele não sai de
-     `sceneState`, tem estado próprio, e quem o mantém honesto é a assinatura de
-     `onLookChange` em `buildLookRow()` — que cobre também os dois caminhos que
-     `syncHud()` não vê (abrir um projeto e "Novo" no mesmo cenário). Repintar
-     aqui também seria um segundo dono do mesmo pixel. */
   /* A seção de Configurações não lê nada da cena, mas `syncHud()` é o único ponto
      que o orquestrador promete chamar depois de uma troca de cenário — e uma
      troca de cenário realoca o buffer de reflexo e mexe nos contadores do

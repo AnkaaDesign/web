@@ -34,6 +34,9 @@ import type {
   RecordMode, RecordResolution, RecordPhase, RecordProgress, RecordResult,
 } from '../scene/record';
 import { hasWebCodecs } from '../scene/record-encoder';
+/* O terceiro parâmetro da gravação, ao lado do modo e do tamanho. O ESTADO é de
+   `scene/look.ts` — este painel só pergunta e manda trocar. */
+import { LOOKS, setLook, currentLook } from '../scene/look';
 import { timelineCount, timelineDuration } from '../scene/timeline';
 import {
   initTimeline, openTimeline, isTimelineOpen, timelineRecordingState,
@@ -1212,6 +1215,78 @@ function paintRecordMenu(panel: HTMLElement): HTMLButtonElement[] {
     panel.appendChild(el('span', 'ts-recnote',
       'A cena fica com tarja enquanto o vídeo é feito — o vídeo sai inteiro.'));
   }
+
+  /* ---- O FILTRO, O TERCEIRO PARÂMETRO DA GRAVAÇÃO ----
+     ⚠️ ELE MOROU NO HUD DE ILUMINAÇÃO POR UM DIA, e a mudança de casa veio junto
+     com a mudança de significado: *"a ideia do filtro era aplicar apenas ao
+     vídeo, não no geral"*. Enquanto ele tingia a cena inteira, o painel de luz
+     era defensável — era uma decisão autoral que se via na hora, como o fundo e
+     a hora do dia. Sendo só do vídeo, ele é irmão de Modo e Tamanho e de mais
+     nada: os três respondem "como este arquivo vai sair", e os três são lidos na
+     mesma passada, por quem está com o dedo no botão de gravar.
+
+     O ESTADO NÃO MORA AQUI, ao contrário do modo e do tamanho. `scene/look.ts` é
+     o dono — ele guarda a chave no `localStorage` e é ele que o projeto lê e
+     escreve. Este painel só pergunta e manda trocar. Duas superfícies escrevendo
+     o mesmo estado é como uma interface acaba discordando de si mesma, e a regra
+     é do estúdio inteiro (ver o cabeçalho deste arquivo). */
+  const lookHead = el('div', 'ts-shotmenu__head', 'Filtro');
+  lookHead.setAttribute('aria-hidden', 'true');
+  panel.appendChild(lookHead);
+
+  const lookGroup = el('div', 'ts-shotmenu__radios');
+  lookGroup.setAttribute('role', 'radiogroup');
+  lookGroup.setAttribute('aria-label', 'Filtro de cor do vídeo');
+  panel.appendChild(lookGroup);
+
+  const lookNow = currentLook();
+  for (const l of LOOKS) {
+    const on = l.id === lookNow.id;
+    const item = el('button', 'ts-shotmenu__item' + (on ? ' is-on' : ''));
+    item.type = 'button';
+    item.dataset.look = l.id;
+    /* RÁDIO e não `menuitem`: esta linha ESCOLHE, não age — a mesma doutrina do
+       menu de qualidade e da lista de modos acima. Quem age é o botão do fim. */
+    item.setAttribute('role', 'radio');
+    item.setAttribute('aria-checked', on ? 'true' : 'false');
+
+    const row = el('span', 'ts-shotmenu__row');
+    row.appendChild(el('span', 'ts-shotmenu__name', l.name));
+    /* A TEMPERATURA À DIREITA, no lugar em que o modo põe a duração e a qualidade
+       põe a resolução: é o número/rótulo que faz escolher. "Nenhum" não recebe —
+       ele não tem temperatura, ele é a ausência de filtro, e um selo "neutro"
+       ali o faria parecer mais uma opção de tratamento em vez do desligado.
+       ⚠️ SEM PASTILHA DE COR. Ela existiu na versão do HUD e não sobrevive à
+       mudança: aqui as linhas são de texto e um quadradinho de 16 px no meio
+       delas seria o único gráfico do painel inteiro. A amostra dizia menos que o
+       nome mais a frase, que é o que ficou. */
+    if (l.id !== 'nenhum') row.appendChild(el('span', 'ts-shotmenu__dim', l.temp));
+    item.appendChild(row);
+    item.setAttribute('aria-label', `${l.name}. ${l.hint}`);
+
+    /* Repinta o painel INTEIRO — a nota abaixo descreve o filtro escolhido, e uma
+       lista que mudasse sozinha a deixaria falando do outro. Mesma regra do modo,
+       e pelo mesmo motivo o painel NÃO fecha: escolher filtro é comparar. */
+    item.addEventListener('click', () => {
+      setLook(l.id);
+      recPop?.repaint();
+      panel.querySelector<HTMLButtonElement>(
+        `.ts-shotmenu__item[data-look="${l.id}"]`)?.focus();
+    });
+    lookGroup.appendChild(item);
+  }
+
+  /* A frase do filtro escolhido, e depois dela a única coisa que o usuário
+     precisa saber sobre onde ele age: em lugar nenhum além do vídeo. Dito aqui,
+     é uma garantia; descoberto numa foto de aprovação tingida, seria um defeito.
+     ⚠️ A PRÉVIA É CITADA DE PROPÓSITO. Ela é o único jeito de ver o filtro antes
+     de pagar um render de minutos, e sem esta linha o usuário teria de deduzir
+     que a prévia o mostra — a cena ao vivo não mostra. */
+  panel.appendChild(el('span', 'ts-recnote',
+    lookNow.id === 'nenhum'
+      ? 'Sem tratamento: o vídeo sai com a cor da cena.'
+      : `${lookNow.hint} Vale só para o vídeo — a cena e as fotos continuam com a `
+        + 'cor verdadeira. A prévia do percurso mostra o filtro.'));
 
   /* ---- A ESPERA É DITA ANTES, E NÃO SÓ QUANDO ELA CHEGA ----
      O gravador desenha os quadros um a um em vez de capturar a tela ao vivo: é

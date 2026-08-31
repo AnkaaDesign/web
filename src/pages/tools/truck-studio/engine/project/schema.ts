@@ -101,18 +101,18 @@ export interface StudioProject {
    */
   timeline?: TimelineKeyData[];
   /**
-   * O filtro de cor em cena (`scene/look.ts`), pelo id.
+   * O filtro de cor DO VÍDEO (`scene/look.ts`), pelo id.
    *
    * OPCIONAL e ausente quando não há filtro: um documento gravado antes desta
    * versão não tem o campo e `applyProject()` cai no padrão, sem que a versão do
    * formato precise subir — a mesma regra do `timeline` acima.
    *
-   * ⚠️ VAI NO ARQUIVO PORQUE ELE MUDA O PRODUTO, e não a máquina. A preferência
-   * da MÁQUINA mora no `localStorage` de `look.ts`; o que está aqui é a escolha
-   * que aquele projeto fez, e ela tem de abrir igual na mesa de quem receber o
-   * arquivo — senão o orçamento aprovado com "Cinema" reabre em "Nenhum" e a
-   * peça que o cliente viu não existe mais. É a mesma razão de `paint` ser
-   * gravado RESOLVIDO em vez de por id de catálogo.
+   * ⚠️ ELE VIAJA NO ARQUIVO PELA MESMA RAZÃO QUE O `timeline` VIAJA, e não pela
+   * razão dos outros parâmetros de gravação. Modo e tamanho ficam só no
+   * `localStorage` porque são preferência de MÁQUINA — quem abre o projeto grava
+   * no tamanho que couber na dele. O filtro não: ele é autoria, do mesmo tipo que
+   * o percurso de câmera logo acima. Um vídeo aprovado em "Cinema" que reabre em
+   * "Nenhum" na mesa de quem recebeu o arquivo perdeu a peça que o cliente viu.
    */
   look?: string;
 }

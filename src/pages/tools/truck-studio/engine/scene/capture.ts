@@ -143,7 +143,6 @@ import {
   renderer, scene, camera, holder, getKeyLight, startLoop, stopLoop, invalidateShadows,
 } from './scene';
 import { renderCycloramaReflection } from './cyclorama';
-import { gradeTile } from './look';
 import { root } from '../core/dom';
 import { ceilingProfile, ceilingShadowMapSize, renderScale } from '../core/quality';
 import { setPaintPixelScale, paintPixelScale } from '../vehicle/paint';
@@ -736,23 +735,16 @@ async function renderMosaic(
            amostra que `readRenderTargetPixels` lê (WebGLRenderer.js:16528). Ler
            com o alvo ainda ligado devolveria o buffer não resolvido. */
         renderer.setRenderTarget(null);
-        /* O FILTRO, ENTRE O RENDER E A LEITURA — e depois do desligamento acima,
-           que é o que lhe entrega uma textura resolvida para amostrar.
-           ⚠️ O RECORTE VAI JUNTO, e é ele que faz a vinheta da foto de 16
-           ladrilhos ser a MESMA da foto de um só: `scene/look.ts` mede vinheta e
-           grão na coordenada do QUADRO INTEIRO, não na do ladrilho. O `1 - …` do
-           terceiro termo é a virada de eixo — `setViewOffset` conta de cima para
-           baixo, o uv da textura conta de baixo para cima.
-           Sem filtro ativo isto devolve o próprio `rt` e não aloca nada. */
-        const read = gradeTile(
-          rt, tileW, tileH,
-          [tileW / fullW, tileH / fullH,
-            (tx * tileW) / fullW, 1 - ((ty + 1) * tileH) / fullH],
-          fullW / fullH,
-          /* No recorte transparente a moldura não existe — ver `draw()` lá. */
-          !transparent,
-        );
-        renderer.readRenderTargetPixels(read, 0, 0, tileW, tileH, src);
+        /* ⚠️ O FILTRO DE VÍDEO NÃO PASSA POR AQUI, E A AUSÊNCIA É A REGRA.
+           Ele já morou nestas duas linhas, e saiu a pedido: *"a ideia do filtro
+           era aplicar apenas ao vídeo, não no geral"*. O argumento está no
+           cabeçalho de `scene/look.ts` e vale a pena não re-derivá-lo errado: a
+           FOTO é prova de cor — vai para orçamento e para aprovação de arte, e
+           ali a pergunta é "é esta a tinta?". Um tratamento âmbar assado numa
+           foto de aprovação responde outra pergunta, com confiança. O vídeo é
+           peça de apresentação e aceita tratamento; a foto, não.
+           Este arquivo não conhece `look.ts`, e é assim que fica. */
+        renderer.readRenderTargetPixels(rt, 0, 0, tileW, tileH, src);
         flipInto(src, dst, tileW, tileH, !transparent);
         ctx.putImageData(new ImageData(dst, tileW, tileH), tx * tileW, ty * tileH);
         done++;
@@ -1008,12 +1000,14 @@ export function poseThumbnail(edge = THUMB_EDGE): string | null {
     /* Desligar o alvo é o que RESOLVE o multiamostrado para a textura de uma
        amostra — a mesma armadilha do mosaico, algumas centenas de linhas acima. */
     renderer.setRenderTarget(null);
-    /* A MINIATURA SAI FILTRADA, e é o certo: a tira de cartões é um storyboard
-       do que o vídeo vai ser, não do que o renderizador entrega cru. São 224 px
-       de aresta — o passe custa menos que a codificação WebP logo abaixo. */
-    const graded = gradeTile(rt, w, h);
+    /* ⚠️ A MINIATURA SAI CRUA, e chegou a sair filtrada por um dia. O storyboard
+       identifica O PONTO — "qual é o ponto 3?" —, e para isso o que serve é o
+       enquadramento, não a graduação. Filtrada ela ainda ganharia um segundo
+       defeito: trocar de filtro não regrava miniatura nenhuma, então a tira
+       passaria a mostrar uma mistura de tratamentos antigos, cada cartão preso
+       ao filtro que estava em cena no instante em que foi marcado. */
     const src = new Uint8Array(w * h * 4);
-    renderer.readRenderTargetPixels(graded, 0, 0, w, h, src);
+    renderer.readRenderTargetPixels(rt, 0, 0, w, h, src);
     const dst = new Uint8ClampedArray(w * h * 4);
     flipInto(src, dst, w, h, true);
     const out = document.createElement('canvas');

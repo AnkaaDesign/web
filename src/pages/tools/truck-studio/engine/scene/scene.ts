@@ -895,11 +895,21 @@ export function onOverlay(fn: (dt: number) => void) { overlayHooks.push(fn); }
 
    Chamado nos DOIS sítios de desenho, pela mesma razão que `onOverlay`: o
    caminho offline desenha à mão e a reserva em tempo real lê o canvas do laço.
-   Um filtro que só existisse num deles sairia em alguns vídeos e não em outros.
+
+   ⚠️ E O ARGUMENTO `offline` É O QUE DISTINGUE OS DOIS, porque para o único
+   assinante de hoje eles NÃO são equivalentes. `renderOfflineFrame()` existe
+   unicamente para a gravação — `scene/record.ts` é o seu único chamador —, então
+   ali todo quadro é quadro de VÍDEO. No laço vivo não: ele desenha o estúdio que
+   a pessoa está usando, e o filtro de vídeo (`scene/look.ts`) não pertence a ele
+   — *"a ideia do filtro era aplicar apenas ao vídeo, não no geral"*. Sem esta
+   bandeira o assinante teria de adivinhar em qual dos dois sítios está, e a
+   única forma de adivinhar seria por efeito colateral.
 
    ⚠️ QUEM ENTRA AQUI É RESPONSÁVEL PELO `autoClear`, idem `onOverlay`. */
-const gradeHooks: ((dt: number) => void)[] = [];
-export function onGrade(fn: (dt: number) => void) { gradeHooks.push(fn); }
+const gradeHooks: ((dt: number, offline: boolean) => void)[] = [];
+export function onGrade(fn: (dt: number, offline: boolean) => void) {
+  gradeHooks.push(fn);
+}
 
 export function onRig(fn: (rig: Rig) => void) {
   rigHooks.push(fn);
@@ -5274,8 +5284,9 @@ export function renderOfflineFrame(dt: number) {
   for (const fn of drawHooks) fn(dt);
   renderer.render(scene, camera);
   /* DEPOIS do render, e é o ponto: ver `onGrade` e `onOverlay`. A graduação
-     primeiro — ela é a imagem; o carimbo cai sobre o que ela decidiu. */
-  for (const fn of gradeHooks) fn(dt);
+     primeiro — ela é a imagem; o carimbo cai sobre o que ela decidiu.
+     `true`: TODO quadro que passa por aqui é quadro de vídeo. */
+  for (const fn of gradeHooks) fn(dt, true);
   for (const fn of overlayHooks) fn(dt);
 }
 
@@ -5460,8 +5471,11 @@ export function startLoop() {
        qualquer outra, e `info.autoReset` é `false` neste renderizador (ver o
        bloco lá em cima), então a chamada dela SOMA ao contador em vez de zerá-lo.
        O diagnóstico continua dizendo tudo que o quadro submeteu. Vale igual para
-       a graduação, que é um quadrilátero de tela cheia a mais. */
-    for (const fn of gradeHooks) fn(dt);
+       a graduação, que é um quadrilátero de tela cheia a mais.
+       `false`: aqui o quadro é o ESTÚDIO. Quem quiser agir só quando ele estiver
+       indo para um vídeo — a reserva em tempo real, a prévia do percurso —
+       decide sozinho, e é o que `scene/look.ts` faz. */
+    for (const fn of gradeHooks) fn(dt, false);
     for (const fn of overlayHooks) fn(dt);
     const t1 = performance.now();
     /* ---- AS DUAS AMOSTRAS QUE DÃO O SPLIT PRINCIPAL × SOMBRA ----
