@@ -83,6 +83,31 @@ export interface InlinePdfViewerRef {
   prevPage: () => void;
 }
 
+/**
+ * Contorno enxuto para desenhar e clicar.
+ *
+ * Um envelopamento que engoliu a face inteira chega com ~25 mil pontos
+ * (MAR & RIO: 299 polígonos), e desenhar esse caminho SVG a cada repintura
+ * congelava a aba — era o "trava tudo" do operador. Acima do orçamento, os
+ * polígonos perdem pontos em passo constante; a tolerância de dedo do clique
+ * (MIN_HIT_PX no overlay) cobre a folga que a dizimação introduz.
+ */
+function decimateOutline(
+  polys: { x: number; y: number }[][],
+  budget = 3000,
+): { x: number; y: number }[][] {
+  const total = polys.reduce((n, p) => n + p.length, 0);
+  if (total <= budget) return polys;
+  const stride = Math.ceil(total / budget);
+  return polys.map((poly) => {
+    if (poly.length <= 8) return poly;
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i < poly.length; i += stride) out.push(poly[i]);
+    if (out[out.length - 1] !== poly[poly.length - 1]) out.push(poly[poly.length - 1]);
+    return out;
+  });
+}
+
 export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfViewerProps>(
   (
     {
@@ -381,6 +406,18 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
         setLayoutBusy(true);
         try {
           const page = await pdfDoc.getPage(pageNumber);
+          // A régua só precisa da geometria e da escala — e fica DE PÉ mesmo
+          // que o cotador engasgue numa face patológica (MAR & RIO: 156 peças
+          // fundidas num envelopamento só). Ler primeiro, cotar depois: se o
+          // agrupamento falhar, o operador ainda mede na mão.
+          const geo = await readPageGeometry(page, { rotation });
+          if (cancelled) return;
+          const text = await page.getTextContent();
+          if (cancelled) return;
+          const found = detectScaleFrom(geo, text.items);
+          setGeometry(geo);
+          setDetection(found);
+          onScaleDetected?.(found);
           if (layoutPanels?.length) {
             const trimToInk = await createPageInkTrimmer(page as never, 0.5, rotation);
             if (cancelled) return;
@@ -393,16 +430,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
             onLayoutResultRef.current?.(result);
             return;
           }
-          // sem medidas, só a régua: basta a geometria e a escala do arquivo
-          const geo = await readPageGeometry(page, { rotation });
-          if (cancelled) return;
-          const text = await page.getTextContent();
-          if (cancelled) return;
-          const found = detectScaleFrom(geo, text.items);
-          setGeometry(geo);
-          setDetection(found);
           setLayout(null);
-          onScaleDetected?.(found);
           onLayoutResultRef.current?.(null);
         } catch (err) {
           if (process.env.NODE_ENV !== "production") {
@@ -418,10 +446,38 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       };
     }, [layoutPanels, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
 
+    /**
+     * Clicar de novo no item já escolhido alterna o plano de cotas: o padrão
+     * mede da borda mais próxima; o alternativo, da outra (o fim do adesivo
+     * contra o fim do baú → o começo contra o começo). O ciclo é interno ao
+     * visualizador — o pai só conhece QUAL item está escolhido.
+     */
+    const [dimVariant, setDimVariant] = React.useState(0);
+    React.useEffect(() => {
+      // arquivo ou página novos: o ciclo recomeça do plano padrão
+      setDimVariant(0);
+    }, [layout]);
+    const handleSelectItem = React.useCallback(
+      (index: number | null) => {
+        if (index !== null && index === selectedItemIndex) {
+          setDimVariant((v) => v + 1);
+          return;
+        }
+        setDimVariant(0);
+        onSelectItem?.(index);
+      },
+      [onSelectItem, selectedItemIndex],
+    );
+
     /** As cotas do item escolhido, cada uma com a face de onde veio. */
     const plannedEntries = React.useMemo<PlannedDimensionEntry[]>(() => {
       if (!layout || selectedItemIndex === null) return [];
-      return layout.dimensions
+      // sem alternativa (eixos suprimidos pelo envelopamento), o clique
+      // repetido não tem o que alternar e o plano padrão permanece
+      const hasAlt = layout.altDimensions.some((d) => d.targetIndex === selectedItemIndex);
+      const source =
+        hasAlt && dimVariant % 2 === 1 ? layout.altDimensions : layout.dimensions;
+      return source
         .filter((d) => d.targetIndex === selectedItemIndex)
         .map((dimension) => {
           const item = layout.items[dimension.targetIndex ?? -1];
@@ -429,7 +485,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           return face ? { dimension, panel: face.panel, scale: face.scale } : null;
         })
         .filter((e): e is PlannedDimensionEntry => e !== null);
-    }, [layout, selectedItemIndex]);
+    }, [layout, selectedItemIndex, dimVariant]);
 
     const selectable = React.useMemo(
       () =>
@@ -438,7 +494,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           // o clique cai na tinta; o quadro desenhado é o que a COTA referencia
           bbox: item.bbox,
           drawBox: item.alignedBoxPt,
-          outline: item.outlinePt,
+          outline: item.outlinePt ? decimateOutline(item.outlinePt) : undefined,
         })) ?? [],
       [layout],
     );
@@ -596,7 +652,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
                     plan={plannedEntries}
                     selectable={layoutTool === "cotas" ? selectable : undefined}
                     selectedIndex={selectedItemIndex}
-                    onSelect={onSelectItem}
+                    onSelect={handleSelectItem}
                     mode={layoutTool === "cotas" ? "select" : "measure"}
                   />
                 )}

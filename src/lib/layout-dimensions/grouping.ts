@@ -681,6 +681,7 @@ function isSamePieceMulticolour(
   b: { outline: Pt[][]; bbox: Rect },
   params: GroupingParams,
   ptPerCm: number,
+  wrapLikeHost?: (piece: { outline: Pt[][]; bbox: Rect }) => boolean,
 ): boolean {
   const areaA = rectArea(a.bbox);
   const areaB = rectArea(b.bbox);
@@ -715,7 +716,10 @@ function isSamePieceMulticolour(
   // A comparable-size core living entirely INSIDE the other outline (a
   // gradient centre ring) has zero boundary companionship by construction —
   // containment is its own proof (RIBEIRANIA: insideFrac 1.0, runFrac 0).
-  if (profile.insideFrac >= 0.9) return true;
+  // EXCEPT when the host is wrap-like — mirroring inkContained's own rule:
+  // sitting inside a BLEEDING band proves burial, not membership (DiCasa:
+  // the outer grey swoosh bleeds top and bottom, insideFrac 1.0).
+  if (profile.insideFrac >= 0.9 && !(wrapLikeHost && wrapLikeHost(outer))) return true;
   return profile.runFrac >= params.overlapMergeShareFrac;
 }
 
@@ -831,6 +835,59 @@ export function classify(
   const pieces: ClassifiedPiece[] = [];
   const candidates: VectorObject[] = [];
   const plain: VectorObject[] = [];
+
+  /**
+   * Template strokes are drawing FURNITURE, not sticker art. The truck
+   * template draws the face frame and its doors with the same hairline pen
+   * (a 5-point rectangle, stroke only); a door rectangle that survives into
+   * the pool becomes phantom touch evidence — it spans the full face height,
+   * so it "touches" every piece it crosses and welds them into the wrap.
+   * The face frame itself is already skipped below (covers > 0.97, 4 edges);
+   * this catches its siblings: the door rects drawn with the same pen, and
+   * the frame of a NEIGHBOURING face leaking into this panel's bounds.
+   */
+  const nearRectPoly = (obj: VectorObject): boolean => {
+    if (obj.outline.length !== 1) return false;
+    const poly = obj.outline[0];
+    if (poly.length < 4 || poly.length > 6) return false;
+    const b = obj.bbox;
+    const tol = Math.max(0.02 * Math.hypot(b.x1 - b.x0, b.y1 - b.y0), 1);
+    const corners = [
+      { x: b.x0, y: b.y0 },
+      { x: b.x1, y: b.y0 },
+      { x: b.x1, y: b.y1 },
+      { x: b.x0, y: b.y1 },
+    ];
+    return poly.every((p) => corners.some((c) => Math.hypot(p.x - c.x, p.y - c.y) <= tol));
+  };
+  const framePens: { stroke: RGB; lineWidth: number }[] = [];
+  for (const obj of geometry.objects) {
+    if (obj.op === "clip" || obj.op === "image" || obj.fromShading) continue;
+    if (obj.fill !== null || !obj.stroke) continue;
+    if (rectArea(obj.bbox) / panelAreaPt <= 0.97) continue;
+    if (bleedAxesOf(obj.bbox, scale.panelPt, tolPt).edges.length !== 4) continue;
+    if (!nearRectPoly(obj)) continue;
+    framePens.push({ stroke: obj.stroke, lineWidth: obj.lineWidth });
+  }
+  const panelHPt = scale.panelPt.y1 - scale.panelPt.y0;
+  const isTemplateStroke = (obj: VectorObject): boolean => {
+    if (obj.op === "image" || obj.fromShading) return false;
+    if (obj.fill !== null || !obj.stroke) return false;
+    if (!nearRectPoly(obj)) return false;
+    const h = obj.bbox.y1 - obj.bbox.y0;
+    const penMatch = framePens.some(
+      (pen) =>
+        colorDistance(pen.stroke, obj.stroke) <= 8 &&
+        Math.abs(pen.lineWidth - obj.lineWidth) <= 0.25,
+    );
+    // A door shares the frame's pen and spans at least half the face height.
+    if (penMatch && h >= 0.5 * panelHPt) return true;
+    // Frame pen unreadable (the panel border came from a fill rect): a
+    // stroke-only hairline rectangle spanning the face height is still the
+    // template — at truck scale a 1 pt line is under a millimetre of print.
+    return obj.lineWidth <= 1 && h >= 0.8 * panelHPt;
+  };
+
   for (const obj of geometry.objects) {
     if (obj.op === "clip") continue;
     if (isDimensionInk(obj, params)) continue;
@@ -846,6 +903,7 @@ export function classify(
       b.y1 > scale.panelPt.y0 + 1 &&
       b.y0 < scale.panelPt.y1 - 1;
     if (!inside) continue;
+    if (isTemplateStroke(obj)) continue;
     const covers = rectArea(b) / panelAreaPt;
     const axes = bleedAxesOf(b, scale.panelPt, tolPt);
     // o próprio contorno da face
@@ -1256,11 +1314,37 @@ export function buildItems(
   params: GroupingParams,
   options: GroupingOptions = {},
 ): BuiltItems {
-  const elements = pool.map((p) => p.obj);
-  const boxes = elements.map((o) => {
-    if (o.op !== "image" || !options.trimToInk) return o.bbox;
-    return options.trimToInk(o.bbox) ?? o.bbox;
+  /**
+   * An image's outline is its transparent-pixel bounding RECTANGLE, not ink:
+   * the frame "touches" art that sits a metre from any visible pixel, and at
+   * contour precision that phantom contact welds neighbours into the image's
+   * group. Where the ink trimmer is available the evidence frame shrinks to
+   * real ink; without it, a bleed-sized image contributes NO contour evidence
+   * at all — its box still exists, so every bbox-based rule is untouched, but
+   * touch/companion/multicolour tests stop seeing a frame that is mostly air.
+   */
+  const rectOutline = (r: Rect): Pt[][] => [
+    [
+      { x: r.x0, y: r.y0 },
+      { x: r.x1, y: r.y0 },
+      { x: r.x1, y: r.y1 },
+      { x: r.x0, y: r.y1 },
+      { x: r.x0, y: r.y0 },
+    ],
+  ];
+  const trimmedRects = pool.map((p) =>
+    p.obj.op === "image" && options.trimToInk ? options.trimToInk(p.obj.bbox) : null,
+  );
+  const elements = pool.map((p, i) => {
+    const o = p.obj;
+    if (o.op !== "image") return o;
+    const trimmed = trimmedRects[i];
+    if (trimmed) return { ...o, outline: rectOutline(trimmed) };
+    const bleedSized =
+      p.coversFrac >= params.bleedAreaFrac || p.bleedAxes.horizontal || p.bleedAxes.vertical;
+    return bleedSized ? { ...o, outline: [] } : o;
   });
+  const boxes = pool.map((p, i) => trimmedRects[i] ?? p.obj.bbox);
   const objColors = elements.map((o) => o.fill ?? o.stroke ?? null);
   const touchTol = params.partGapCm * scale.ptPerCm;
   const lineReach = params.maxLineGapCm * scale.ptPerCm;
@@ -1293,10 +1377,36 @@ export function buildItems(
    * duas linhas só viram um adesivo quando o conjunto manda — e quem decide
    * isso é a regra de largura, no estágio seguinte.
    */
+  /**
+   * A piece that itself sweeps a face axis (or covers wrap-sized area) is
+   * BACKGROUND, not positionable art.
+   */
+  const backdropPiece = (i: number): boolean =>
+    pool[i].bleedAxes.horizontal ||
+    pool[i].bleedAxes.vertical ||
+    pool[i].coversFrac >= params.bleedAreaFrac;
+
   const weldable = (a: number, b: number): boolean => {
     const ra = boxes[a];
     const rb = boxes[b];
     const gap = gapsBetween(ra, rb);
+
+    // An evidence-less image (bleed-sized, frame withheld from contour tests)
+    // still merges with OVERLAPPING background art: backdrop-to-backdrop is
+    // the one weld the raw frame used to do correctly — the swoosh bitmap and
+    // the vector band it sits on are printed as one wrap. Positionable art
+    // (text, logos, phones) is never backdrop, so it stays free.
+    const evidencelessImage = (i: number): boolean =>
+      elements[i].op === "image" && elements[i].outline.length === 0;
+    if (
+      gap.x === 0 &&
+      gap.y === 0 &&
+      (evidencelessImage(a) || evidencelessImage(b)) &&
+      backdropPiece(a) &&
+      backdropPiece(b)
+    ) {
+      return true;
+    }
     // A gradient's color is a guess (average of its stops). Between two
     // gradients the guess is consistent — the letters of a gradient word share
     // the same stops and weld like normal text. The dangerous pair is the
@@ -1324,10 +1434,45 @@ export function buildItems(
             (params.textGapFactor * Math.min(rectH(ra), rectH(rb))) / scale.ptPerCm,
           ),
         ) * scale.ptPerCm;
+      // Wrap-likeness for the containment bypass, from the raw box: a piece
+      // that bleeds an axis or covers the panel is a background host.
+      const wrapLikeBox = (p: { bbox: Rect }): boolean => {
+        const ax = bleedAxesOf(p.bbox, scale.panelPt, params.bleedTouchCm * scale.ptPerCm);
+        return (
+          ax.horizontal ||
+          ax.vertical ||
+          rectArea(p.bbox) / rectArea(scale.panelPt) >= params.bleedAreaFrac
+        );
+      };
       if (
         gap.x <= loosePt &&
         gap.y <= loosePt &&
-        isSamePieceMulticolour(elements[a], elements[b], params, scale.ptPerCm)
+        isSamePieceMulticolour(elements[a], elements[b], params, scale.ptPerCm, wrapLikeBox)
+      ) {
+        return true;
+      }
+      // EXP-C(3) — same-line SMALL-gap weld: glyph runs of different colours on
+      // one text line ("www." beside its own domain at 1.2-2.2 cm, the
+      // FRUTAMINA site line) are one printed piece even when the multicolour
+      // rule's area-ratio gate strands them. Ink must confirm the bbox gap.
+      // Designer separations on the corpus start at p10 = 8 cm, so 3.5 cm keeps
+      // a >2x margin (the PITAIA/BATATA false bridges sit at 5-9 cm). Guards:
+      // the gap must be REAL (gap.x > 0 — overlapping-bbox pairs have their own
+      // rules, and art overlapping a backdrop always has contour distance 0)
+      // and neither side may be wrap-like (DA NATA / RKO: the lockup was
+      // swallowed by the wrap through this clause unguarded).
+      const smallGapPt = 3.5 * scale.ptPerCm;
+      const wrapishPart = (i: number): boolean =>
+        pool[i].bleedAxes.horizontal ||
+        pool[i].bleedAxes.vertical ||
+        rectArea(boxes[i]) / rectArea(scale.panelPt) >= params.bleedAreaFrac;
+      if (
+        gap.x > 0 &&
+        gap.x <= smallGapPt &&
+        onSameLine(ra, rb, params) &&
+        !wrapishPart(a) &&
+        !wrapishPart(b) &&
+        contourDistance(elements[a].outline, elements[b].outline, smallGapPt) <= smallGapPt
       ) {
         return true;
       }
@@ -1371,6 +1516,10 @@ export function buildItems(
   const partColors = partClusters.map((idx) => dominantColor(idx.map((i) => elements[i])));
   const partOutlines = partClusters.map((idx) => idx.flatMap((i) => elements[i].outline));
   const partAxes = partClusters.map((idx) => unionAxes(idx.map((i) => pool[i].bleedAxes)));
+  /** Part made ONLY of evidence-less background images (see `elements` above). */
+  const partImageBackdrop = partClusters.map((idx) =>
+    idx.every((i) => elements[i].op === "image" && elements[i].outline.length === 0),
+  );
   /**
    * Segundo estágio: as LINHAS viram conjunto — e aqui vale a regra da largura.
    *
@@ -1395,6 +1544,8 @@ export function buildItems(
     outline: Pt[][];
     color: RGB | null;
     axes: BleedAxes;
+    /** Aggregate made only of evidence-less background images. */
+    imageBackdrop: boolean;
   }
 
   /** Background/wrap-like hosts never swallow the art drawn over them. */
@@ -1471,6 +1622,43 @@ export function buildItems(
   };
 
   /**
+   * EXP-C(2) — icon satellite: an icon-sized mark (often a raster image with
+   * no colour at all, so colorDistance is Infinity) sitting ON the text line it
+   * belongs to. Every different-colour rule demands comparable size, so a small
+   * icon beside a text run can never merge; this is the orphan class the
+   * grouping bench counts (Norte Minas: apple icon 5.58 cm from its text line,
+   * designer's H=107 anchors the piece at the ICON edge). Gates: satellite
+   * icon-sized in absolute cm AND relative to the line height; host is a
+   * text-line-like run (height-capped, wide, multi-subform); same line (band
+   * overlap); gap within the doctrine weld reach computed from the HOST line
+   * height. Colour is deliberately NOT consulted.
+   */
+  const iconSatellite = (a: LockupAgg, b: LockupAgg): boolean => {
+    const [s, h] = rectArea(a.bbox) <= rectArea(b.bbox) ? [a, b] : [b, a];
+    // Same-colour pairs already have the word/line weld — this rule exists only
+    // for the pairs the colour doctrine locks out (icons, raster marks).
+    if (colorDistance(s.color, h.color) <= params.colorMergeDelta) return false;
+    if (s.axes.edges.length || h.axes.edges.length) return false;
+    if (wrapLikeAgg(h) || wrapLikeAgg(s)) return false;
+    if (rectArea(s.bbox) > 0.3 * rectArea(h.bbox)) return false;
+    const cm = scale.ptPerCm;
+    const sDiag = Math.hypot(rectW(s.bbox), rectH(s.bbox)) / cm;
+    const hH = rectH(h.bbox) / cm;
+    const hW = rectW(h.bbox) / cm;
+    if (sDiag > 60 || sDiag > 1.5 * hH) return false;
+    if (hH > 50 || hW < 2 * hH) return false;
+    if (h.outline.length < 6) return false;
+    const bandOv =
+      Math.max(0, Math.min(s.bbox.y1, h.bbox.y1) - Math.max(s.bbox.y0, h.bbox.y0)) /
+      Math.max(1e-6, rectH(s.bbox));
+    if (bandOv < 0.8) return false;
+    const g = gapsBetween(s.bbox, h.bbox);
+    const reachPt =
+      Math.min(params.maxPartGapCm, Math.max(params.partGapCm, params.textGapFactor * hH)) * cm;
+    return Math.max(g.x, g.y) <= reachPt;
+  };
+
+  /**
    * The ONE lockup-granularity predicate, used both for the initial part
    * clustering and for the aggregate fixpoint rounds. Ordering matters: the
    * stack-width veto lives INSIDE the same-colour branch, so a different-colour
@@ -1482,6 +1670,18 @@ export function buildItems(
     // The bbox gap is a lower bound on contour distance: only pay the O(n*m)
     // contour test when the boxes are already within the touch tolerance.
     const boxGap = gapsBetween(a.bbox, b.bbox);
+    // Backdrop-to-backdrop, aggregate edition: an aggregate that is ONLY an
+    // evidence-less background image merges into an OVERLAPPING wrap-like
+    // aggregate — the bitmap and the vector background it sits on print as
+    // one wrap. It never gets to swallow positionable art: the other side
+    // must itself be wrap-like.
+    if (
+      boxGap.x === 0 &&
+      boxGap.y === 0 &&
+      ((a.imageBackdrop && wrapLikeAgg(b)) || (b.imageBackdrop && wrapLikeAgg(a)))
+    ) {
+      return true;
+    }
     const touching =
       Math.hypot(boxGap.x, boxGap.y) <= touchTol &&
       contourDistance(a.outline, b.outline, touchTol) <= touchTol;
@@ -1491,11 +1691,40 @@ export function buildItems(
     // physically connected art is one piece regardless — so it only vetoes
     // non-touching aggregate unions.
     if (guarded && !touching && monsterUnion(union(a.bbox, b.bbox))) return false;
-    if (colorDistance(a.color, b.color) <= params.colorMergeDelta) {
+    // Wrap-host guard, FIXPOINT rounds only: "background never swallows the
+    // art drawn over it" was wired only into inkContained. Once one side is a
+    // bleeding band whose bbox engulfs the other, boxGap is (0,0), reach is
+    // trivially satisfied and monsterUnion is inert (the union bleeds) — so
+    // the same-colour branch and the nested-touch branch would merge on zero
+    // evidence (FRUTAMINA: the wrap, colour dist 1.4 from its contact block,
+    // ate five designer-dimmed items; one touching door stroke bridged a whole
+    // aggregate). Refuse those two paths; multicolour and companion keep their
+    // vote — they carry real size/accompaniment evidence.
+    const wrapHostBuries = ((): boolean => {
+      if (!guarded) return false;
+      if (nestedFraction(a.bbox, b.bbox) < params.nestedMergeFrac) return false;
+      const [inner, outer] = rectArea(a.bbox) <= rectArea(b.bbox) ? [a, b] : [b, a];
+      return wrapLikeAgg(outer) && !wrapLikeAgg(inner);
+    })();
+    if (!wrapHostBuries && colorDistance(a.color, b.color) <= params.colorMergeDelta) {
       if (
         boxGap.y > 0 &&
         !touching &&
         stackWidthCover(a.bbox, b.bbox) < params.stackWidthCoverFrac
+      ) {
+        return false;
+      }
+      // EXP-C(1) — ink-distance gate: the bbox gap is only a LOWER bound on ink
+      // distance. A pair whose boxes overlap on empty corner space (FRICARNE
+      // 840: the phone block tucked into the lockup bbox corner, real ink
+      // 78 cm away) sails through withinLockupReach with gap (0,0). Demand the
+      // INK be within the same reach the bbox test granted.
+      if (
+        !touching &&
+        boxGap.x === 0 &&
+        boxGap.y === 0 &&
+        Math.min(rectArea(a.bbox), rectArea(b.bbox)) >= minAreaPt &&
+        contourDistance(a.outline, b.outline, lockupGapPt) > lockupGapPt
       ) {
         return false;
       }
@@ -1507,14 +1736,33 @@ export function buildItems(
         { outline: b.outline, bbox: b.bbox },
         params,
         scale.ptPerCm,
+        (p) => wrapLikeAgg(p.bbox === a.bbox ? a : b),
       )
     ) {
       return true;
     }
+    // EXP-C(3) mirror — same-line SMALL-gap weld at lockup granularity, so the
+    // fixpoint cannot strand a fragment its own part-level weld would take.
+    // Same guards as the part-level clause: a REAL gap (boxGap.x > 0) and no
+    // wrap-like side, or the wrap swallows the lockup drawn over it.
+    {
+      const smallGapPt = 3.5 * scale.ptPerCm;
+      if (
+        boxGap.x > 0 &&
+        boxGap.x <= smallGapPt &&
+        onSameLine(a.bbox, b.bbox, params) &&
+        !wrapLikeAgg(a) &&
+        !wrapLikeAgg(b) &&
+        contourDistance(a.outline, b.outline, smallGapPt) <= smallGapPt
+      ) {
+        return true;
+      }
+    }
     if (nestedFraction(a.bbox, b.bbox) >= params.nestedMergeFrac) {
-      if (touching) return true;
+      if (touching && !wrapHostBuries) return true;
       if (inkContained(a, b)) return true;
     }
+    if (iconSatellite(a, b)) return true;
     return isCompanionPiece(
       { outline: a.outline, bbox: a.bbox },
       { outline: b.outline, bbox: b.bbox },
@@ -1528,6 +1776,7 @@ export function buildItems(
     outline: partOutlines[i],
     color: partColors[i],
     axes: partAxes[i],
+    imageBackdrop: partImageBackdrop[i],
   }));
   let lockups = cluster(
     parts,
@@ -1559,6 +1808,7 @@ export function buildItems(
         outline: idx.flatMap((i) => partOutlines[i]),
         color,
         axes: unionAxes(idx.map((i) => partAxes[i])),
+        imageBackdrop: idx.every((i) => partImageBackdrop[i]),
       };
     });
     const merged = cluster(
@@ -1624,7 +1874,13 @@ export function buildItems(
      * pelo contorno viraria o traçado de cada letra, que é ruído. Para ele a
      * caixa é a figura certa.
      */
-    if (bleedAxes.edges.length) item.outlinePt = ordered.flatMap((i) => partOutlines[i]);
+    // Um wrap feito só de imagem sem evidência tem partOutlines vazio — sem
+    // contorno real, a caixa alinhada continua sendo a figura certa (deixar
+    // outlinePt = [] apagaria o quadro inteiro).
+    if (bleedAxes.edges.length) {
+      const outlinePt = ordered.flatMap((i) => partOutlines[i]);
+      if (outlinePt.length) item.outlinePt = outlinePt;
+    }
     built.push({
       item,
       // A travessia da aresta se lê no CAMINHO, não na caixa. Guardar os

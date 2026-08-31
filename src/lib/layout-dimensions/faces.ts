@@ -82,6 +82,13 @@ export interface LayoutDimensionsResult {
   items: LayoutItem[];
   /** todas as cotas, com `targetIndex` apontando para `items` */
   dimensions: Dimension[];
+  /**
+   * O plano ALTERNATIVO de cada item: as mesmas cotas com as âncoras
+   * espelhadas (vertical pela outra borda, horizontal pela outra lateral,
+   * travessia pela outra quina). O visualizador mostra estas no segundo
+   * clique sobre o item já escolhido. As bancadas não leem este canal.
+   */
+  altDimensions: Dimension[];
   warnings: string[];
 }
 
@@ -221,6 +228,7 @@ export async function buildLayoutFaces(
   const faces: LayoutFaceResult[] = [];
   const items: LayoutItem[] = [];
   const dimensions: Dimension[] = [];
+  const altDimensions: Dimension[] = [];
   const warnings: string[] = [];
 
   matches.forEach(({ rect, panel }, faceIndex) => {
@@ -233,6 +241,7 @@ export async function buildLayoutFaces(
     const built = buildItems(pieces, scale, grouping, { trimToInk: options.trimToInk });
     const crossings = borderCrossings(built.objects, panel, scale, grouping);
     const faceDims = planDimensions(panel, built.items, crossings, doctrine);
+    const faceAlts = planDimensions(panel, built.items, crossings, doctrine, true);
     const { stickers, wraps } = built;
 
     const base = items.length;
@@ -288,6 +297,13 @@ export async function buildLayoutFaces(
         targetIndex: d.targetIndex === undefined ? undefined : base + d.targetIndex,
       });
     }
+    for (const d of faceAlts) {
+      altDimensions.push({
+        ...d,
+        id: `f${faceIndex}-${d.id}`,
+        targetIndex: d.targetIndex === undefined ? undefined : base + d.targetIndex,
+      });
+    }
 
     if (aspectErrorPct > 4) {
       warnings.push(
@@ -317,5 +333,5 @@ export async function buildLayoutFaces(
     );
   }
 
-  return { geometry, detectedScale, faces, items, dimensions, warnings };
+  return { geometry, detectedScale, faces, items, dimensions, altDimensions, warnings };
 }

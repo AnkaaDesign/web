@@ -271,6 +271,14 @@ function stickerDims(
   p: DoctrineParams,
   label: string,
   index: number,
+  /**
+   * Espelha as âncoras: a vertical mede da OUTRA borda da face e a horizontal
+   * da OUTRA lateral. É a "segunda medida possível" do clique repetido no
+   * visualizador — a doutrina escolhe a borda mais próxima por padrão, mas o
+   * aplicador às vezes quer justamente a outra (medir do começo do baú em vez
+   * do fim). Nada do plano padrão passa por aqui com `flip` ligado.
+   */
+  flip = false,
 ): Routed[] {
   const b = s.boxCm;
   const out: Routed[] = [];
@@ -284,6 +292,11 @@ function stickerDims(
   // assenta, então a cota vai até a base dela mesmo vindo do teto.
   const shortPiece = b.y1 - b.y0 < p.bottomAnchorMaxHeightCm;
   const onLeft = centerX(b) <= p.lateralMidFrac * widthCm;
+  // com `flip`, as duas escolhas de borda invertem juntas: as cotas da
+  // variante falam do canto OPOSTO ao do plano padrão, e continuam se
+  // encontrando num canto só (ver `preferSide` em `dim`)
+  const useTop = flip ? !inTopBand : inTopBand;
+  const useLeft = flip ? !onLeft : onLeft;
 
   // Cota-se o eixo que SOBRA.
   //
@@ -297,17 +310,17 @@ function stickerDims(
   // vertical: mede até a linha em que a forma se apoia, não até o descendente
   // O canto de referência do item: a vertical mede do teto ou do piso, a
   // horizontal mede da esquerda ou da direita. As duas linhas moram nesse canto.
-  const vSide: "min" | "max" = onLeft ? "min" : "max";
-  const hSide: "min" | "max" = inTopBand ? "min" : "max";
+  const vSide: "min" | "max" = useLeft ? "min" : "max";
+  const hSide: "min" | "max" = useTop ? "min" : "max";
 
   if (!axes.vertical) {
-  const v = owningEdge(s, inTopBand && !shortPiece ? "top" : "bottom");
+  const v = owningEdge(s, useTop && !shortPiece ? "top" : "bottom");
   const perpV: Perp = {
     lo: v.from, hi: v.to, boxLo: b.x0, boxHi: b.x1,
     at: (v.from + v.to) / 2, span: widthCm,
   };
   out.push(
-    inTopBand
+    useTop
       ? dim("V", 0, v.at, "EDGE_TOP", perpV, p, label, index, undefined, vSide)
       : dim("V", v.at, heightCm, "EDGE_BOTTOM", perpV, p, label, index, undefined, vSide),
   );
@@ -341,7 +354,7 @@ function stickerDims(
       pushH("left");
       pushH("right");
     } else {
-      pushH(onLeft ? "left" : "right");
+      pushH(useLeft ? "left" : "right");
     }
   }
   return out;
@@ -366,6 +379,8 @@ function crossingDims(
   p: DoctrineParams,
   targetIndex: number,
   label: string,
+  /** mede a fronteira da OUTRA quina — a variante do clique repetido */
+  flip = false,
 ): { routed: Routed; boundary: "start" | "end" }[] {
   const vertical = c.edge === "left" || c.edge === "right";
   const lengthCm = vertical ? heightCm : widthCm;
@@ -397,7 +412,7 @@ function crossingDims(
     out.push({
       boundary: side,
       routed:
-        fromStart <= fromEnd
+        (fromStart <= fromEnd) !== flip
           ? dim(axis, 0, boundary, kind, perp, p, label, targetIndex, note)
           : dim(axis, boundary, lengthCm, kind, perp, p, label, targetIndex, note),
     });
@@ -504,10 +519,11 @@ function pickCrossings(
   heightCm: number,
   p: DoctrineParams,
   label: (itemIndex: number) => string,
+  flip = false,
 ): Routed[] {
   const best = new Map<string, { gap: number; edge: BorderCrossing["edge"]; routed: Routed }>();
   for (const c of crossings) {
-    for (const e of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex))) {
+    for (const e of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex), flip)) {
       // A chave é a FRONTEIRA de onde a travessia veio, não a quina de onde ela
       // foi medida. Chaveando pela quina, duas fronteiras distintas que por
       // acaso ficam ambas mais perto da esquerda colidem e uma some — 322 de
@@ -599,6 +615,13 @@ export function planDimensions(
   items: Sticker[],
   crossings: BorderCrossing[],
   params: DoctrineParams = DEFAULT_DOCTRINE,
+  /**
+   * Plano ALTERNATIVO: as mesmas cotas com as âncoras espelhadas (a vertical
+   * pela outra borda da face, a horizontal pela outra lateral, a travessia
+   * pela outra quina). É o que o segundo clique num item mostra no
+   * visualizador. As cotas relativas não têm espelho e saem iguais.
+   */
+  flip = false,
 ): Dimension[] {
   const widthCm = panelWidthCm(panel);
   const heightCm = panel.heightCm;
@@ -607,7 +630,7 @@ export function planDimensions(
   let routed: Routed[] = [];
   main.forEach((item, i) => {
     const label = nameOf(i);
-    routed.push(...stickerDims(item, widthCm, heightCm, params, label, i));
+    routed.push(...stickerDims(item, widthCm, heightCm, params, label, i, flip));
     if (params.relativeDims && !item.bleeds) {
       routed.push(...relativeDims(item, params, label, i));
     }
@@ -619,6 +642,7 @@ export function planDimensions(
       heightCm,
       params,
       nameOf,
+      flip,
     ),
   );
 
