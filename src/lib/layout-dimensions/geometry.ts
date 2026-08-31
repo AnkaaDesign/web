@@ -31,6 +31,9 @@ const OP = {
   eoClip: 30,
   setStrokeRGBColor: 58,
   setFillRGBColor: 59,
+  setStrokeColorN: 54,
+  setFillColorN: 55,
+  shadingFill: 62,
   setLineWidth: 2,
   paintImageXObject: 85,
   paintInlineImageXObject: 86,
@@ -198,6 +201,50 @@ interface PageLike {
     transform: number[];
   };
   getOperatorList(): Promise<{ fnArray: number[]; argsArray: unknown[][] }>;
+  /** pdf.js object stores — where shading pattern IRs live after getOperatorList. */
+  objs?: { get(id: string): unknown };
+  commonObjs?: { get(id: string): unknown };
+}
+
+/** pdf.js shading IR: ["RadialAxial", "axial"|"radial", bbox, colorStops, p0, p1, r0, r1]. */
+type ShadingIR = [string, string, unknown, [number, string][], [number, number], [number, number], number | null, number | null];
+
+/** Average of the shading's color stops — one representative flat color. */
+function averageStopColor(stops: [number, string][]): RGB | null {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  for (const stop of stops ?? []) {
+    const rgb = toRGB(stop?.[1]);
+    if (rgb) {
+      r += rgb[0];
+      g += rgb[1];
+      b += rgb[2];
+      n += 1;
+    }
+  }
+  return n > 0 ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : null;
+}
+
+/**
+ * Keep the part of a polygon where `f(p) >= 0` (Sutherland–Hodgman against one
+ * half-plane). The polygon is treated as closed.
+ */
+function clipPolyHalfPlane(poly: Pt[], f: (p: Pt) => number): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < poly.length; i += 1) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const fa = f(a);
+    const fb = f(b);
+    if (fa >= 0) out.push(a);
+    if (fa >= 0 !== fb >= 0) {
+      const t = fa / (fa - fb);
+      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+    }
+  }
+  return out;
 }
 
 /**
@@ -214,12 +261,29 @@ export async function readPageGeometry(
   const list = await page.getOperatorList();
 
   const objects: VectorObject[] = [];
-  const stack: { ctm: Matrix; fill: RGB | null; stroke: RGB | null; lineWidth: number }[] = [];
+  const stack: {
+    ctm: Matrix;
+    fill: RGB | null;
+    stroke: RGB | null;
+    lineWidth: number;
+    activeClip: Pt[][] | null;
+  }[] = [];
   let ctm: Matrix = base;
   let fill: RGB | null = null;
   let stroke: RGB | null = null;
   let lineWidth = 1;
   let pending: { polys: Pt[][]; paint: number } | null = null;
+  /** Last clip path installed at this graphics-state level, in page pt. */
+  let activeClip: Pt[][] | null = null;
+  /**
+   * A standalone clip/eoClip op in a pdf.js operator list applies to the path
+   * of the FOLLOWING constructPath (the evaluator emits `W`/`W*` before the
+   * merged path+`n` op, and canvas.js consumes the pending clip when that path
+   * ends). Binding the PREVIOUS path instead leaks a path across q/Q — on the
+   * fountain-fill corpus that bound backdrop-sized paths and minted giant
+   * shading objects.
+   */
+  let pendingClip = false;
 
   const emit = (paint: number) => {
     if (!pending) return;
@@ -259,11 +323,11 @@ export async function readPageGeometry(
     const args = list.argsArray[i] as unknown[];
     switch (fn) {
       case OP.save:
-        stack.push({ ctm, fill, stroke, lineWidth });
+        stack.push({ ctm, fill, stroke, lineWidth, activeClip });
         break;
       case OP.restore: {
         const prev = stack.pop();
-        if (prev) ({ ctm, fill, stroke, lineWidth } = prev);
+        if (prev) ({ ctm, fill, stroke, lineWidth, activeClip } = prev);
         break;
       }
       case OP.transform:
@@ -275,14 +339,141 @@ export async function readPageGeometry(
       case OP.setStrokeRGBColor:
         stroke = toRGB(args.length === 1 ? args[0] : args);
         break;
+      case OP.setFillColorN:
+        // Pattern fill (gradient/tiling): the flat color is now stale — a path
+        // painted after this must not inherit the previous solid color.
+        fill = null;
+        break;
+      case OP.setStrokeColorN:
+        stroke = null;
+        break;
       case OP.setLineWidth:
         lineWidth = Number(args[0]) || 0;
+        break;
+      case OP.clip:
+      case OP.eoClip:
+        pendingClip = true;
         break;
       case OP.constructPath: {
         const paint = Number(args[0]);
         const segments = (args[1] as ArrayLike<number>[]) ?? [];
-        pending = { polys: decodePath(segments, ctm), paint };
+        const polys = decodePath(segments, ctm);
+        if (pendingClip || paint === OP.clip || paint === OP.eoClip) {
+          if (polys.length > 0) activeClip = polys;
+          pendingClip = false;
+        }
+        pending = { polys, paint };
         emit(paint);
+        break;
+      }
+      case OP.shadingFill: {
+        // CorelDRAW fountain fill: 'save > constructPath > eoClip > shadingFill
+        // > restore'. The painted shape is the active clip; the color comes from
+        // the shading's stops. Without this case the mark vanishes entirely.
+        if (!activeClip || objects.length >= maxObjects) break;
+        let ir: unknown = args[0];
+        if (typeof ir === "string") {
+          const name = ir;
+          ir = undefined;
+          try {
+            ir = page.objs?.get(name);
+          } catch {
+            /* not in page.objs */
+          }
+          if (ir === undefined) {
+            try {
+              ir = page.commonObjs?.get(name);
+            } catch {
+              /* not resolvable */
+            }
+          }
+        }
+        if (!Array.isArray(ir) || ir[0] !== "RadialAxial") break;
+        const shading = ir as ShadingIR;
+        const stops = shading[3];
+        const p0 = apply(ctm, shading[4][0], shading[4][1]);
+        const p1 = apply(ctm, shading[5][0], shading[5][1]);
+        const scale = matrixScale(ctm);
+        // Extent guard: intersect the clip with the shading's own reach so a
+        // page-wide clip doesn't mint a giant object. Axial: a slab between the
+        // two endpoint lines (extend bakes into the stops, so allow a margin).
+        // Radial: the bbox around both circles.
+        let clipped: Pt[][];
+        if (shading[1] === "axial") {
+          const dx = p1.x - p0.x;
+          const dy = p1.y - p0.y;
+          const len = Math.hypot(dx, dy);
+          if (len < 1e-6) {
+            clipped = activeClip;
+          } else {
+            const ux = dx / len;
+            const uy = dy / len;
+            // 25% extent margin: PDF `Extend` paints past the endpoints, and
+            // the stops already bake that in — a quarter of the axis length
+            // keeps that painted overrun without readmitting the whole clip.
+            const margin = 0.25 * len;
+            clipped = activeClip
+              .map((poly) =>
+                clipPolyHalfPlane(
+                  clipPolyHalfPlane(poly, (p) => (p.x - p0.x) * ux + (p.y - p0.y) * uy + margin),
+                  (p) => len + margin - ((p.x - p0.x) * ux + (p.y - p0.y) * uy),
+                ),
+              )
+              .filter((poly) => poly.length > 2);
+          }
+        } else {
+          const r0 = (Number(shading[6]) || 0) * scale;
+          const r1 = (Number(shading[7]) || 0) * scale;
+          const x0 = Math.min(p0.x - r0, p1.x - r1);
+          const x1 = Math.max(p0.x + r0, p1.x + r1);
+          const y0 = Math.min(p0.y - r0, p1.y - r1);
+          const y1 = Math.max(p0.y + r0, p1.y + r1);
+          // Same 25% extent margin as the axial case, sized on the circles' bbox.
+          const margin = 0.25 * Math.max(x1 - x0, y1 - y0);
+          clipped = activeClip
+            .map((poly) =>
+              [
+                (p: Pt) => p.x - (x0 - margin),
+                (p: Pt) => x1 + margin - p.x,
+                (p: Pt) => p.y - (y0 - margin),
+                (p: Pt) => y1 + margin - p.y,
+              ].reduce((acc, f) => clipPolyHalfPlane(acc, f), poly),
+            )
+            .filter((poly) => poly.length > 2);
+        }
+        if (clipped.length === 0) break;
+        const bbox = emptyRect();
+        for (const poly of clipped) for (const p of poly) growRect(bbox, p);
+        if (!isRectValid(bbox)) break;
+        // A backdrop-sized rectangular gradient is background art, not a
+        // sticker: downstream it is indistinguishable from the panel frame
+        // (face detection keys on big lone rectangles) and swallows faces.
+        // At 1:10 a rectangle-like clip beyond 250x100 real cm is a backdrop.
+        if (clipped.length === 1) {
+          const poly = clipped[0];
+          let cross = 0;
+          for (let k = 0; k < poly.length; k += 1) {
+            const p = poly[k];
+            const q = poly[(k + 1) % poly.length];
+            cross += p.x * q.y - q.x * p.y;
+          }
+          const polyArea = Math.abs(cross) / 2;
+          const ptPerCm = 72 / 2.54 / 10;
+          const rectLike = polyArea >= 0.9 * rectArea(bbox);
+          if (rectLike && rectWidth(bbox) >= 250 * ptPerCm && rectHeight(bbox) >= 100 * ptPerCm) break;
+        }
+        objects.push({
+          index: objects.length,
+          op: "fill",
+          bbox,
+          outline: clipped,
+          // A representative flat color for detectors and neighbours; welding
+          // treats it as a guess — see the fromShading gates in grouping.ts.
+          fill: averageStopColor(stops),
+          stroke: null,
+          lineWidth: 0,
+          fromShading: true,
+        });
         break;
       }
       case OP.paintImageXObject:

@@ -36,6 +36,12 @@ export interface VectorObject {
   lineWidth: number;
   text?: string;
   fontSize?: number;
+  /**
+   * Object reconstructed from a shadingFill (gradient) — its outline is the
+   * active clip path. Real art for grouping, but NOT a face-frame candidate:
+   * a rectangular gradient clip is soft art, never the panel border.
+   */
+  fromShading?: boolean;
 }
 
 export interface PageGeometry {

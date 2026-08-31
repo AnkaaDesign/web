@@ -183,6 +183,17 @@ export interface GroupingParams {
    */
   overlapMergeGapCm: number;
   /**
+   * Boundary-share gate for the multicolour rule: minimum fraction of the
+   * SMALLER shape's contour that must run within reach of the other shape.
+   *
+   * Applies only to the reach EXTENSION band (past overlapMergeGapCm): within
+   * the classic reach any proximity merges, as before. Calibrated on the band
+   * pairs of the corpus: true gradient halves 8-12 cm apart score 0.022-0.084
+   * (ADRI FRUTAS 0.022, ROBARIO 0.033); the one merge the designer's own dims
+   * reject (Marins Frutas, +7 deep tips) scores 0.000-0.011.
+   */
+  overlapMergeShareFrac: number;
+  /**
    * Quanto duas caixas precisam se ALINHAR para a solda valer.
    *
    * Proximidade sozinha solda o que não é uma peça só. No TRANSGENIO três
@@ -203,6 +214,27 @@ export interface GroupingParams {
   splitPlainPaths: boolean;
   /** folga que solda peças de um mesmo conjunto (cm reais) */
   lockupGapCm: number;
+  /**
+   * Cannot-link span for the lockup fixpoint: a candidate union that touches
+   * no face edge yet sweeps more than this fraction of a panel axis is refused
+   * before any merge rule votes. 0.55 is the monster detector's own threshold
+   * — the guard and the metric it protects agree by construction.
+   */
+  monsterSpanFrac: number;
+  /**
+   * Ink-containment threshold for nested different-colour pairs: the fraction
+   * of the smaller piece's sampled outline points that must sit INSIDE the
+   * larger's filled outline. 0.9 keeps an emblem floating in a seal disc while
+   * a C-shaped host (text in a concavity) scores near 0 and stays separate.
+   */
+  inkContainInsideFrac: number;
+  /**
+   * Sampling cap for the ink-containment test: at most this many outline
+   * points are point-in-polygon tested per pair, so a dense aggregate outline
+   * cannot turn the fixpoint quadratic. 200 keeps the estimate stable to a few
+   * percent — far finer than the 0.9 threshold needs.
+   */
+  inkContainSampleCap: number;
   /** adesivo menor que isto não recebe cota */
   minAreaCm2: number;
   /**
@@ -331,8 +363,12 @@ export const DEFAULT_GROUPING: GroupingParams = {
   stackWidthCoverFrac: 0.8,
   overlapMergeAreaRatio: 0.4,
   overlapMergeGapCm: 8,
+  overlapMergeShareFrac: 0.02,
   weldAlignFrac: 0.4,
   lockupGapCm: 14,
+  monsterSpanFrac: 0.55,
+  inkContainInsideFrac: 0.9,
+  inkContainSampleCap: 200,
   minAreaCm2: 90,
   minObjectCm2: 1.5,
   bleedAreaFrac: 0.35,
@@ -467,13 +503,35 @@ function pointToSegment(px: number, py: number, a: Pt, b: Pt): number {
  */
 function contourDistance(a: Pt[][], b: Pt[][], limitPt: number): number {
   let best = Infinity;
+  // Orientation sign of the triangle (p, q, r) — the brick of the segment
+  // crossing test. Two segments properly cross when each straddles the line
+  // of the other; between sparse Bézier samples the old vertex-only test read
+  // such a pair as tens of cm apart (true distance: zero).
+  const orient = (px: number, py: number, qx: number, qy: number, rx: number, ry: number) =>
+    Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
   for (const pa of a) {
     for (let i = 0; i + 1 < pa.length; i += 1) {
+      const p1 = pa[i];
+      const p2 = pa[i + 1];
       for (const pb of b) {
         for (let j = 0; j + 1 < pb.length; j += 1) {
+          const q1 = pb[j];
+          const q2 = pb[j + 1];
+          const o1 = orient(p1.x, p1.y, p2.x, p2.y, q1.x, q1.y);
+          const o2 = orient(p1.x, p1.y, p2.x, p2.y, q2.x, q2.y);
+          if (o1 !== o2) {
+            const o3 = orient(q1.x, q1.y, q2.x, q2.y, p1.x, p1.y);
+            const o4 = orient(q1.x, q1.y, q2.x, q2.y, p2.x, p2.y);
+            if (o3 !== o4) return 0;
+          }
+          // Full segment-to-segment distance for non-crossing segments: all
+          // four endpoints against the opposite segment, so a polyline's final
+          // vertex participates too (the old loop never tested it as a point).
           const d = Math.min(
-            pointToSegment(pa[i].x, pa[i].y, pb[j], pb[j + 1]),
-            pointToSegment(pb[j].x, pb[j].y, pa[i], pa[i + 1]),
+            pointToSegment(p1.x, p1.y, q1, q2),
+            pointToSegment(p2.x, p2.y, q1, q2),
+            pointToSegment(q1.x, q1.y, p1, p2),
+            pointToSegment(q2.x, q2.y, p1, p2),
           );
           if (d < best) best = d;
           if (best <= limitPt) return best;
@@ -629,8 +687,36 @@ function isSamePieceMulticolour(
   if (areaA <= 0 || areaB <= 0) return false;
   if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < params.overlapMergeAreaRatio) return false;
   if (!a.outline.length || !b.outline.length) return false;
-  const reach = params.overlapMergeGapCm * ptPerCm;
-  return contourDistance(a.outline, b.outline, reach) <= reach;
+  // Doctrine-adaptive reach: the flat 8 cm reach stays as the floor (shrinking
+  // it below 8 broke merges corpus-wide), but tall shapes earn the doctrine
+  // weld — textGapFactor × the smaller height, capped at maxPartGapCm. The old
+  // flat reach missed gradient halves sitting in the (8, 12] band (ADRI FRUTAS
+  // missed by 0.14 cm).
+  const hA = rectH(a.bbox) / ptPerCm;
+  const hB = rectH(b.bbox) / ptPerCm;
+  const reachCm = Math.min(
+    params.maxPartGapCm,
+    Math.max(params.overlapMergeGapCm, params.textGapFactor * Math.min(hA, hB)),
+  );
+  const flatReach = params.overlapMergeGapCm * ptPerCm;
+  const reach = reachCm * ptPerCm;
+  // Within the classic reach the old rule stands: any contour proximity merges.
+  // Gating these pairs — at ANY share threshold — broke legitimate merges
+  // corpus-wide (gradient 2.3 -> 8.8pct at a 0.1 gate).
+  const d = contourDistance(a.outline, b.outline, flatReach);
+  if (d <= flatReach) return true;
+  if (d > reach) return false;
+  // The extended (flat, doctrine] band is earned, not free: a meaningful
+  // fraction of the SMALLER shape's boundary must run within reach of the
+  // other. Gradient halves run parallel for their whole length; a mark that
+  // merely drifts near a distant stripe does not.
+  const [inner, outer] = areaA <= areaB ? [a, b] : [b, a];
+  const profile = companionProfile(inner.outline, outer.outline, reach);
+  // A comparable-size core living entirely INSIDE the other outline (a
+  // gradient centre ring) has zero boundary companionship by construction —
+  // containment is its own proof (RIBEIRANIA: insideFrac 1.0, runFrac 0).
+  if (profile.insideFrac >= 0.9) return true;
+  return profile.runFrac >= params.overlapMergeShareFrac;
 }
 
 /**
@@ -1108,10 +1194,17 @@ function cmToRect(scale: Scale, r: Rect): Rect {
   };
 }
 
-/** Cor dominante da peça: a do maior objeto que tem cor. Imagem não tem. */
+/**
+ * Cor dominante da peça: a do maior objeto que tem cor. Imagem não tem.
+ *
+ * A gradient does not count either: its color is the AVERAGE of the stops — a
+ * guess. Letting the guess become the cluster's identity color-welded pieces
+ * 13 cm apart (SANTA CLARA: the gradient word swallowed the logo).
+ */
 function dominantColor(objects: VectorObject[]): RGB | null {
   let best: { area: number; color: RGB } | null = null;
   for (const o of objects) {
+    if (o.fromShading) continue;
     const color = o.fill ?? o.stroke;
     if (!color) continue;
     const area = rectArea(o.bbox);
@@ -1173,6 +1266,19 @@ export function buildItems(
   const lineReach = params.maxLineGapCm * scale.ptPerCm;
 
   /**
+   * Word gaps scale with glyph height while every reach above is capped in
+   * absolute cm: measured on the corpus, true word gaps stay at or below
+   * 0.31 x height while false bridges start at 0.50 x height (PITAIA 0.50,
+   * BATATA 0.55). A 0.35 x height floor on the same-line reach lets giant
+   * lettering (TRANS DALDEGAN, gap 45.5 cm at h 169-214; DA NATA, 35 cm at
+   * h 114) keep its word gaps. The floor is capped at 50 cm so Norte Minas'
+   * designer-separated 60.8 cm word gap (h 190-252) does NOT weld.
+   */
+  const wordGapFloorPt = (h: number): number => Math.min(0.35 * h, 50 * scale.ptPerCm);
+  const sameLineReachPt = (h: number): number =>
+    Math.max(Math.min(lineReach, params.lineGapFactor * h), wordGapFloorPt(h));
+
+  /**
    * A solda é ANISOTRÓPICA, e é essa a correção que faltava.
    *
    * A folga era a mesma para o lado e para cima. Pior: o teto da folga
@@ -1191,17 +1297,45 @@ export function buildItems(
     const ra = boxes[a];
     const rb = boxes[b];
     const gap = gapsBetween(ra, rb);
-    const sameColour = colorDistance(objColors[a], objColors[b]) <= params.colorMergeDelta;
+    // A gradient's color is a guess (average of its stops). Between two
+    // gradients the guess is consistent — the letters of a gradient word share
+    // the same stops and weld like normal text. The dangerous pair is the
+    // MIXED one, guess against real color: that welds only when the contours
+    // actually TOUCH, never across a gap (SANTA CLARA: the gradient word
+    // swallowed the green logo 13 cm away).
+    const guessedColor = !!elements[a].fromShading !== !!elements[b].fromShading;
+    const sameColour =
+      colorDistance(objColors[a], objColors[b]) <= params.colorMergeDelta &&
+      (!guessedColor ||
+        contourDistance(elements[a].outline, elements[b].outline, touchTol) <= touchTol);
 
     // marca multicor: formas de cores diferentes que se encostam e têm porte
-    // comparável são a mesma peça, impressa de uma vez
-    if (!sameColour && isSamePieceMulticolour(elements[a], elements[b], params, scale.ptPerCm)) {
-      return true;
+    // comparável são a mesma peça, impressa de uma vez. The bypass sits behind
+    // a loose proximity sanity gate (bbox gap is a lower bound on contour
+    // distance) sized to the ADAPTIVE multicolour reach — the same formula
+    // isSamePieceMulticolour itself uses — so far-apart pairs never pay the
+    // contour test, yet the earned (8, 12] band is not cut off at the flat 8 cm.
+    if (!sameColour) {
+      const loosePt =
+        Math.min(
+          params.maxPartGapCm,
+          Math.max(
+            params.overlapMergeGapCm,
+            (params.textGapFactor * Math.min(rectH(ra), rectH(rb))) / scale.ptPerCm,
+          ),
+        ) * scale.ptPerCm;
+      if (
+        gap.x <= loosePt &&
+        gap.y <= loosePt &&
+        isSamePieceMulticolour(elements[a], elements[b], params, scale.ptPerCm)
+      ) {
+        return true;
+      }
     }
 
     if (onSameLine(ra, rb, params)) {
       const height = Math.max(rectH(ra), rectH(rb));
-      const reach = Math.min(lineReach, params.lineGapFactor * height);
+      const reach = sameLineReachPt(height);
       if (gap.x > reach) return false;
     } else {
       // empilhadas ou soltas: alcance curto, e nada de soldar aqui o que é
@@ -1223,7 +1357,11 @@ export function buildItems(
     return isCompanionPiece(elements[a], elements[b], params, scale.ptPerCm);
   };
 
-  const partClusters = cluster(boxes, lineReach, weldable);
+  const partClusters = cluster(
+    boxes,
+    (i) => Math.max(lineReach, wordGapFloorPt(rectH(boxes[i]))),
+    weldable,
+  );
   const parts: Rect[] = partClusters.map((idx) =>
     idx.map((i) => boxes[i]).reduce((a, b) => union(a, b)),
   );
@@ -1246,39 +1384,191 @@ export function buildItems(
    * A escapatória é o contato: peças que se ENCOSTAM são um logotipo só,
    * tenham a largura que tiverem.
    */
-  const lockups = cluster(parts, params.lockupGapCm * scale.ptPerCm, (a, b) => {
-    const ra = parts[a];
-    const rb = parts[b];
-    const touching =
-      contourDistance(partOutlines[a], partOutlines[b], touchTol) <= touchTol;
-    if (
-      gapsBetween(ra, rb).y > 0 &&
-      !touching &&
-      stackWidthCover(ra, rb) < params.stackWidthCoverFrac
-    ) {
+  const minAreaPt = params.minAreaCm2 * scale.ptPerCm * scale.ptPerCm;
+  const panelAreaPt = rectArea(scale.panelPt);
+  const edgeTolPt = params.bleedTouchCm * scale.ptPerCm;
+  const lockupGapPt = params.lockupGapCm * scale.ptPerCm;
+
+  /** One candidate group at lockup granularity, frozen for a predicate call. */
+  interface LockupAgg {
+    bbox: Rect;
+    outline: Pt[][];
+    color: RGB | null;
+    axes: BleedAxes;
+  }
+
+  /** Background/wrap-like hosts never swallow the art drawn over them. */
+  const wrapLikeAgg = (g: LockupAgg): boolean =>
+    g.axes.horizontal ||
+    g.axes.vertical ||
+    rectArea(g.bbox) / panelAreaPt >= params.bleedAreaFrac;
+
+  /**
+   * Cannot-link guard: the monster detector's own rule. A union that touches no
+   * face edge yet sweeps more than `monsterSpanFrac` of an axis is not one
+   * sticker — refuse before any merge rule gets a vote, so the fixpoint cannot
+   * drift there.
+   */
+  const monsterUnion = (r: Rect): boolean => {
+    const ax = bleedAxesOf(r, scale.panelPt, edgeTolPt);
+    if (ax.edges.length) return false;
+    return (
+      rectW(r) / rectW(scale.panelPt) > params.monsterSpanFrac ||
+      rectH(r) / rectH(scale.panelPt) > params.monsterSpanFrac
+    );
+  };
+
+  /**
+   * Ink-containment for nested different-colour pairs: the bbox nests, the
+   * contours never touch (emblem floating inside a seal disc), but the smaller
+   * piece's outline points actually sit INSIDE the larger's filled outline.
+   * A C-shaped host (the apple around "HORTIFRUTI") fails this test because the
+   * text lives in the concavity — outside the filled region.
+   */
+  const inkContained = (a: LockupAgg, b: LockupAgg): boolean => {
+    const areaA = rectArea(a.bbox);
+    const areaB = rectArea(b.bbox);
+    if (areaA <= 0 || areaB <= 0) return false;
+    if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < params.overlapMergeAreaRatio) {
       return false;
     }
-    if (colorDistance(partColors[a], partColors[b]) <= params.colorMergeDelta) return true;
+    const [inner, outer] = areaA <= areaB ? [a, b] : [b, a];
+    if (wrapLikeAgg(outer)) return false;
+    if (!inner.outline.length || !outer.outline.length) return false;
+    const samples: Pt[] = [];
+    const total = inner.outline.reduce((n, poly) => n + poly.length, 0);
+    const stride = Math.max(1, Math.ceil(total / params.inkContainSampleCap));
+    for (const poly of inner.outline) {
+      for (let i = 0; i < poly.length; i += stride) samples.push(poly[i]);
+    }
+    if (!samples.length) return false;
+    let inside = 0;
+    for (const p of samples) if (pointInsidePolys(outer.outline, p)) inside += 1;
+    return inside / samples.length >= params.inkContainInsideFrac;
+  };
+
+  /**
+   * Word-gap rejoin gate: beyond the classic lockup reach only the
+   * height-proportional WORD weld may bridge, and only along the line. The
+   * wider pretest radius below exists to rejoin what splitDisjoint separated
+   * (TRANS DALDEGAN: 45.5 cm word gap at h ~200), not to let same-colour
+   * pieces far apart in any direction become one monster. Applied inside the
+   * predicate so it holds at EVERY granularity, aggregate fixpoint included.
+   */
+  const withinLockupReach = (ra: Rect, rb: Rect): boolean => {
+    const g = gapsBetween(ra, rb);
+    if (g.x <= lockupGapPt && g.y <= lockupGapPt) return true;
+    return (
+      onSameLine(ra, rb, params) &&
+      g.x <= Math.max(lockupGapPt, sameLineReachPt(Math.max(rectH(ra), rectH(rb))))
+    );
+  };
+
+  /** Pretest cluster radius, widened to keep splitDisjoint parts rejoinable. */
+  const lockupRadius = (r: Rect): number => {
+    const h = rectH(r);
+    return Math.max(lockupGapPt, Math.min(0.35 * h, sameLineReachPt(h)));
+  };
+
+  /**
+   * The ONE lockup-granularity predicate, used both for the initial part
+   * clustering and for the aggregate fixpoint rounds. Ordering matters: the
+   * stack-width veto lives INSIDE the same-colour branch, so a different-colour
+   * pair the veto used to pre-empt still gets the multicolour / nested /
+   * companion rules consulted.
+   */
+  const lockupCompatible = (a: LockupAgg, b: LockupAgg, guarded: boolean): boolean => {
+    if (!withinLockupReach(a.bbox, b.bbox)) return false;
+    // The bbox gap is a lower bound on contour distance: only pay the O(n*m)
+    // contour test when the boxes are already within the touch tolerance.
+    const boxGap = gapsBetween(a.bbox, b.bbox);
+    const touching =
+      Math.hypot(boxGap.x, boxGap.y) <= touchTol &&
+      contourDistance(a.outline, b.outline, touchTol) <= touchTol;
+    // Cannot-link guard, FIXPOINT rounds only: the aggregate re-testing is the
+    // new loosening, and this holds it. In the initial pass it would dismember
+    // linkage the engine already had (splitting one monster into two), and
+    // physically connected art is one piece regardless — so it only vetoes
+    // non-touching aggregate unions.
+    if (guarded && !touching && monsterUnion(union(a.bbox, b.bbox))) return false;
+    if (colorDistance(a.color, b.color) <= params.colorMergeDelta) {
+      if (
+        boxGap.y > 0 &&
+        !touching &&
+        stackWidthCover(a.bbox, b.bbox) < params.stackWidthCoverFrac
+      ) {
+        return false;
+      }
+      return true;
+    }
     if (
       isSamePieceMulticolour(
-        { outline: partOutlines[a], bbox: ra },
-        { outline: partOutlines[b], bbox: rb },
+        { outline: a.outline, bbox: a.bbox },
+        { outline: b.outline, bbox: b.bbox },
         params,
         scale.ptPerCm,
       )
     ) {
       return true;
     }
-    if (nestedFraction(ra, rb) >= params.nestedMergeFrac && touching) return true;
+    if (nestedFraction(a.bbox, b.bbox) >= params.nestedMergeFrac) {
+      if (touching) return true;
+      if (inkContained(a, b)) return true;
+    }
     return isCompanionPiece(
-      { outline: partOutlines[a], bbox: ra },
-      { outline: partOutlines[b], bbox: rb },
+      { outline: a.outline, bbox: a.bbox },
+      { outline: b.outline, bbox: b.bbox },
       params,
       scale.ptPerCm,
     );
-  });
-  const minAreaPt = params.minAreaCm2 * scale.ptPerCm * scale.ptPerCm;
-  const panelAreaPt = rectArea(scale.panelPt);
+  };
+
+  const partAggs: LockupAgg[] = partClusters.map((_, i) => ({
+    bbox: parts[i],
+    outline: partOutlines[i],
+    color: partColors[i],
+    axes: partAxes[i],
+  }));
+  let lockups = cluster(
+    parts,
+    (i) => lockupRadius(parts[i]),
+    (a, b) => lockupCompatible(partAggs[a], partAggs[b], false),
+  );
+
+  /**
+   * Merge to FIXPOINT at lockup granularity. Every rule above only ever ran on
+   * frozen part boxes; a pair that fails part-vs-part can pass once each side
+   * is the aggregate the rule was written about (the Norte Minas seal passes
+   * the multicolour gates at aggregate level while every pairwise test fails).
+   * Merging is monotone, so this converges — 2-3 rounds in practice.
+   */
+  for (let round = 0; round < 5 && lockups.length > 1; round += 1) {
+    const aggs: LockupAgg[] = lockups.map((idx) => {
+      const bbox = idx.map((i) => parts[i]).reduce((p, q) => union(p, q));
+      let color: RGB | null = null;
+      let bestArea = -1;
+      for (const i of idx) {
+        const area = rectArea(parts[i]);
+        if (partColors[i] && area > bestArea) {
+          bestArea = area;
+          color = partColors[i];
+        }
+      }
+      return {
+        bbox,
+        outline: idx.flatMap((i) => partOutlines[i]),
+        color,
+        axes: unionAxes(idx.map((i) => partAxes[i])),
+      };
+    });
+    const merged = cluster(
+      aggs.map((g) => g.bbox),
+      (i) => lockupRadius(aggs[i].bbox),
+      (a, b) => lockupCompatible(aggs[a], aggs[b], true),
+    );
+    if (merged.length === lockups.length) break;
+    lockups = merged.map((gi) => gi.flatMap((g) => lockups[g]));
+  }
 
   const built: { item: Sticker; objects: VectorObject[] }[] = [];
   for (const group of lockups) {

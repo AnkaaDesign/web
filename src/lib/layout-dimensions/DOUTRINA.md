@@ -138,15 +138,32 @@ horizontal existe mas é rara (11 âncoras) e está desligada por padrão
 O agrupamento decide o que o operador clica, e errar para mais é pior que errar
 para menos: item grande demais engole o vizinho e a cota fica sem dono.
 
-- **Peça** — glifos soldados por uma folga que ACOMPANHA a altura deles
-  (0,6 × altura, no mínimo 1,5 cm e no máximo 12 cm). Folga fixa ou parte a
-  palavra num logotipo de 1 m ou solda duas linhas de um bloco de 11 cm.
+- **Peça** — glifos soldados por uma folga que ACOMPANHA a altura deles, e é
+  anisotrópica: na mesma linha o alcance é 1,0 × altura com teto de 30 cm e
+  piso de 0,35 × altura (teto 50 cm) — o vão real de palavra chega a
+  0,31 × altura ("Trans Daldegan": 45,5 cm com glifo de 2 m), a ponte falsa
+  começa em 0,50 ("Você!" e o "C" da CONFIANÇA, 38 cm com glifo de 77) —;
+  entre linhas, 0,25 × altura com teto de 8 cm. Folga fixa parte a palavra no
+  letreiro de 1 m ou solda duas linhas de um bloco de 11 cm.
 - **Cor separa.** Vinil é cortado por cor: "GRESPAN" vermelho e "Pães
   congelados" preto são duas peças, mesmo coladas uma na outra no desenho.
 - **Cores diferentes só se juntam quando as FORMAS se encostam.** A caixa não
   decide: "HORTIFRUTI" cai 99% dentro da caixa da maçã sem tocar nela — a maçã
   é um traço em C e o texto vive no vão. Já o "Ki" branco encosta no círculo
-  verde, e aí é um logotipo só.
+  verde, e aí é um logotipo só. O encostar é medido no CONTORNO com teste de
+  cruzamento — dois contornos que se cruzam entre vértices distam ZERO, não os
+  39 cm que a distância vértice-a-segmento inventava (tiles do RKO) — e o
+  alcance da junção multicolor acompanha a peça: 0,6 × altura menor, entre
+  8 e 12 cm; na faixa (8, 12] só junta quem compartilha fronteira de verdade.
+- **A fusão roda até PONTO FIXO no conjunto.** Par a par não fecha cadeia: o
+  predicado que falha entre dois cacos passa entre os conjuntos já fundidos.
+  As guardas anti-monstro (varrer mais de 55% do eixo sem encostar em aresta;
+  continência de tinta 0,9) seguram a fusão de fugir.
+- **Degradê é geometria de verdade.** O fountain fill do Corel sai como
+  shading (1.476 operadores em 103 dos 260 arquivos), não como faixas chapadas;
+  descartá-lo deixava a lataria do SÓ MINAS com 4 itens triviais onde há ~15
+  peças. O shading entra recortado pelo clip vigente, com recusa de fundo
+  (clip retangular de 250 × 100 cm para cima é lataria, não adesivo).
 - **Imagem tem moldura, não contorno.** Metade dos logotipos entra como raster,
   e a caixa declarada é a do arquivo, com a folga transparente em volta. Sem
   recortar a tinta por pixel, a cota ancora no vazio.

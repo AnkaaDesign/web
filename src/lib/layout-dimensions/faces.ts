@@ -129,7 +129,7 @@ function isAxisRectangle(outline: { x: number; y: number }[][], tolerance = 1.5)
 export function findPanelRects(geometry: PageGeometry, minWidthFrac = 0.15): Rect[] {
   const candidates: Rect[] = [];
   for (const obj of geometry.objects) {
-    if (obj.op === "clip" || obj.op === "image") continue;
+    if (obj.op === "clip" || obj.op === "image" || obj.fromShading) continue;
     if (!isAxisRectangle(obj.outline)) continue;
     const w = rectWidth(obj.bbox);
     const h = rectHeight(obj.bbox);
