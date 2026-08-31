@@ -525,6 +525,7 @@ export function BudgetStepReview({
               const configDiscountAmount = Math.max(0, configSubtotal - configTotal);
               const configPaymentText = generatePaymentText({
                 customPaymentText: config.customPaymentText,
+                paymentConfig: config.paymentConfig,
                 paymentCondition: config.paymentCondition,
                 total: configTotal,
               });
@@ -635,6 +636,7 @@ export function BudgetStepReview({
           const configTotal = typeof config.total === "number" ? config.total : Number(config.total) || 0;
           const paymentText = generatePaymentText({
             customPaymentText: config.customPaymentText,
+            paymentConfig: config.paymentConfig,
             paymentCondition: config.paymentCondition,
             total: configTotal,
           });

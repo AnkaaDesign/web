@@ -686,8 +686,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             const configTotal = Number(config.total) || 0;
             const paymentText = generatePaymentText({
               customPaymentText: config.customPaymentText,
+              paymentConfig: config.paymentConfig,
               paymentCondition: config.paymentCondition,
-
               total: configTotal,
             });
 

@@ -130,17 +130,23 @@ interface PaymentTextData {
 
 /**
  * Generate payment terms text.
- * Priority: customPaymentText → paymentConfig (new) → paymentCondition (legacy)
+ * Priority: paymentConfig (new) → customPaymentText (só quando é a condição escolhida) →
+ * paymentCondition (legacy).
+ *
+ * O texto livre é a cláusula APENAS quando foi ele que se escolheu: `paymentCondition === 'CUSTOM'`
+ * (o faturamento exige o texto nesse caso) ou quando não existe config estruturado. Havendo
+ * `paymentConfig.type`, ele é a fonte que a tela edita — o texto livre é resíduo de orçamento
+ * CLONADO, já que nenhuma tela de hoje escreve nem apaga `customPaymentText`, e ele sequestrava a
+ * cláusula do PDF (caso Confiança/JAD Zogheib, orçamento 952: tela "À Vista - Boleto, 10/09/2026",
+ * PDF "À COMBINAR"). Espelha `api/.../signature/document/quote-text.ts`.
  */
 export function generatePaymentText(quote: PaymentTextData): string {
-  // Custom free-text always wins — it's the user's own wording, verbatim.
-  if (quote.customPaymentText) {
+  const structured = quote.paymentConfig?.type ? quote.paymentConfig : null;
+  if (quote.customPaymentText && (!structured || quote.paymentCondition === 'CUSTOM')) {
     return quote.customPaymentText;
   }
 
-  const config = quote.paymentConfig?.type
-    ? quote.paymentConfig
-    : conditionToConfig(quote.paymentCondition);
+  const config = structured ?? conditionToConfig(quote.paymentCondition);
   if (!config) return '';
 
   // Anything that isn't explicitly Pix settles as boleto — mirrors the API's

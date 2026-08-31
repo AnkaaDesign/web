@@ -376,8 +376,8 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                 }
                 const configPaymentText = generatePaymentText({
                   customPaymentText: config.customPaymentText,
+                  paymentConfig: (config as any).paymentConfig,
                   paymentCondition: config.paymentCondition,
-
                   total: configTotal,
                 });
 
@@ -577,8 +577,8 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           const configTotal = typeof config.total === "number" ? config.total : Number(config.total) || 0;
           const paymentText = generatePaymentText({
             customPaymentText: config.customPaymentText,
+            paymentConfig: (config as any).paymentConfig,
             paymentCondition: config.paymentCondition,
-
             total: configTotal,
           });
           const hasContent = paymentText || config.orderNumber;
