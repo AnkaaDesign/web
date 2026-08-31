@@ -7,7 +7,7 @@ import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { projectInstallments } from "@/utils/installment-projection";
 import { dossierArchiveFilename, dossierPdfFilename } from "@/utils/document-filename";
-import { filenameFromDisposition } from "@/api-client/signature";
+import { filenameFromDisposition, signatureService } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,7 +16,7 @@ import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, I
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
-import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
+import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 
 import { BRAND_ASSETS } from '@/config/assets';
 const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
@@ -42,6 +42,54 @@ export function PublicServiceReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  /**
+   * Paginação do documento, para a tela se paginar como ele.
+   *
+   * `undefined` = ainda carregando; `null` = sem envelope. A folha própria de
+   * assinaturas só existe quando o PDF CONGELADO as tem fora da primeira folha
+   * (`signaturesPage > 0`). Quando o orçamento inteiro cabe numa folha — o caso
+   * normal, com 2 signatários — elas ficam na primeira, aqui e lá. Nenhuma regra
+   * local acertaria: a paginação de um envelope congelado é fato gravado nas
+   * âncoras, não algo que se recalcule do orçamento de hoje.
+   */
+  const [sigSummary, setSigSummary] = useState<Summary | null | undefined>(undefined);
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    signatureService
+      .getQuoteSummary(id)
+      .then((res: any) => {
+        if (!alive) return;
+        setSigSummary(res?.data?.data ?? res?.data ?? null);
+      })
+      .catch(() => alive && setSigSummary(null));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  /**
+   * Folha própria para as assinaturas?
+   *
+   * COM envelope, a verdade é o documento congelado: `signaturesPage` sai das
+   * âncoras gravadas e não se recalcula do orçamento de hoje, que pode ter mudado.
+   *
+   * SEM envelope não há documento congelado — o PDF é renderizado na hora, e o
+   * arranjo é determinístico: havendo arte, ela e as assinaturas dividem a última
+   * folha; não havendo, tudo fecha numa folha só. É a mesma regra do
+   * `quote-renderer.service` (`if (!hasLayout) tryFusedRender`), aplicada aqui
+   * sobre `layoutFiles` — a lista CRUA do orçamento, não as URLs já validadas, que
+   * chegam depois e fariam o bloco pular de folha ao carregar.
+   *
+   * Resta um caso impreciso: sem envelope, sem layout e com orçamento longo demais
+   * para uma folha (12+ serviços, ~3% deles), o documento pagina e a tela ainda diz
+   * "folha 1". Sem re-renderizar o PDF não há como saber, e o envelope — que é
+   * quando o documento passa a existir de verdade — resolve.
+   */
+  const signaturesOnOwnSheet = sigSummary?.hasEnvelope
+    ? (sigSummary.signaturesPage ?? 0) > 0
+    : (quote?.layoutFiles?.length ?? 0) > 0;
+
   // Validated layout image URLs (the layoutFiles array, those that load OK)
   const [layoutImageUrls, setLayoutImageUrls] = useState<string[]>([]);
 
@@ -137,6 +185,27 @@ export function PublicServiceReportPage() {
   const contactName = activeConfig?.responsible?.name || ownerResponsible?.name || quote.task?.responsibles?.[0]?.name || "";
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
+
+  /**
+   * Bloco "Layout", posicionado conforme o documento: quando a arte existe, ela
+   * divide a ÚLTIMA folha com as assinaturas (o caminho de 2 partes do
+   * renderizador); quando não existe, não há bloco e o contrato fecha numa folha
+   * só, com as assinaturas nela.
+   */
+  const layoutBlock =
+    layoutImageUrls.length > 0 ? (
+      <div className="mb-8">
+        <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
+          Layout
+        </h3>
+        <div className="flex w-full flex-col items-center gap-4">
+          {layoutImageUrls.map((url, i) => (
+            <img key={i} src={url} alt="Layout" className="max-w-full h-auto object-contain" style={{ maxHeight: 397 }} />
+          ))}
+        </div>
+      </div>
+    ) : null;
+
 
   const allConfigs = quote.customerConfigs || [];
   const relevantConfigs = selectedCustomerId ? [activeConfig].filter(Boolean) : allConfigs;
@@ -477,11 +546,17 @@ export function PublicServiceReportPage() {
                 {/* Mesmo cabeçalho do documento assinado: número em VERDE da
                     marca, datas em cinza com rótulo em negrito escuro. */}
                 <div className="text-right">
+                  {/* "Orçamento Nº", não "Dossiê Nº": este card É o documento do
+                      orçamento reproduzido na tela — o mesmo que entra no dossiê como
+                      primeiro componente e que imprime "Orçamento Nº" no cabeçalho
+                      (`.budget-number` em quote-html.builder). "Dossiê Nº" fica para as
+                      folhas que o PDF do dossiê realmente rotula assim: as do dossiê
+                      fotográfico. */}
                   <h1
                     className="text-xl md:text-2xl font-bold"
                     style={{ color: COMPANY.primaryGreen }}
                   >
-                    Dossiê Nº {budgetNumber}
+                    Orçamento Nº {budgetNumber}
                   </h1>
                   <p className="text-sm mt-1 leading-relaxed" style={{ color: COMPANY.textGray }}>
                     <span className="font-semibold" style={{ color: COMPANY.textDark }}>Emissão:</span>{' '}
@@ -496,7 +571,7 @@ export function PublicServiceReportPage() {
 
             {/* Title */}
             <h2 className="text-xl font-bold underline underline-offset-4 mb-6" style={{ color: COMPANY.primaryGreen }}>
-              DOSSIÊ
+              ORÇAMENTO
             </h2>
 
             {/* Customer + Vehicle Info */}
@@ -652,6 +727,37 @@ export function PublicServiceReportPage() {
               )}
             </div>
 
+            {/* Prazo de entrega — faltava SÓ aqui. O primeiro componente do dossiê é o
+                PDF do orçamento, que traz esta cláusula; a página do orçamento
+                (`/cliente/orcamento/:id`) também. O cliente lia o dossiê na tela e
+                encontrava no PDF uma seção que a tela nunca mostrou. Frase LITERAL do
+                documento assinado, incluindo a de produção simultânea. */}
+            {quote.customForecastDays ? (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                  Prazo de entrega
+                </h3>
+                <p className="text-gray-700 text-justify">
+                  O prazo de entrega é de {quote.customForecastDays} dias úteis a partir da data de liberação.
+                  {quote.simultaneousTasks && quote.simultaneousTasks > 1 && (
+                    <> Neste período, {quote.simultaneousTasks} tarefas poderão ser produzidas simultaneamente.</>
+                  )}
+                </p>
+              </div>
+            ) : quote.task?.term ? (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                  Prazo de entrega
+                </h3>
+                {/* Ramo que o PDF não tem: `task.term` não entra no snapshot do orçamento.
+                    Mantido em paridade com a página do orçamento, que já o exibe. */}
+                <p className="text-gray-700 text-justify">
+                  O prazo de entrega é de {formatDate(quote.task.term)}, desde que o implemento esteja nas
+                  condições previamente informada e não haja alterações nos serviços descritos.
+                </p>
+              </div>
+            ) : null}
+
             {/* Payment conditions — the same prose the budget page shows (custom
                 text → structured config → legacy condition), with the settlement
                 method woven in. One block per customer in Completo. No
@@ -698,40 +804,18 @@ export function PublicServiceReportPage() {
               </div>
             )}
 
-            {/* Layout Image(s) — the layoutFiles array. Título "Layout" e
-                imagens sem moldura, como `.layout-section` no PDF (105 mm de
-                altura máxima ≈ 397 px). */}
-            {layoutImageUrls.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
-                  Layout
-                </h3>
-                <div className="flex w-full flex-col items-center gap-4">
-                  {layoutImageUrls.map((url, i) => (
-                    <img
-                      key={i}
-                      src={url}
-                      alt="Layout"
-                      className="max-w-full h-auto object-contain"
-                      style={{ maxHeight: 397 }}
-                    />
-                  ))}
-                </div>
-              </div>
+            {/* Sem layout o documento fecha numa folha só: a arte não existe e as
+                assinaturas ficam AQUI. Havendo layout, os dois vão juntos para a
+                folha seguinte — é lá que o bloco é montado. Só depois que o resumo
+                chega, senão ele apareceria aqui e pularia de folha ao carregar. */}
+            {sigSummary !== undefined && !signaturesOnOwnSheet && layoutBlock}
+            {sigSummary !== undefined && !signaturesOnOwnSheet && (
+              <BudgetSignaturePanel
+                quoteId={quote.id}
+                customerName={invoiceCustomers[0]?.name || undefined}
+                preloaded={sigSummary}
+              />
             )}
-
-            {/* Assinaturas — a seção que faltava.
-                O dossiê embute, como primeiro componente, o PDF do orçamento,
-                que SEMPRE traz a folha de assinaturas (com selo quando houve
-                coleta e com as linhas em branco quando não houve). Esta página
-                era o único lugar do fluxo que a omitia: o cliente lia o dossiê
-                na tela, baixava o PDF e encontrava uma seção que a tela nunca
-                mostrou. É o mesmo componente da página do orçamento porque, nos
-                dois casos, o documento por baixo é o mesmo. */}
-            <BudgetSignaturePanel
-              quoteId={quote.id}
-              customerName={invoiceCustomers[0]?.name || undefined}
-            />
 
             {/* Rodapé: régua de 2 px verde maciço, espelhando a do cabeçalho. */}
             <div
@@ -755,7 +839,59 @@ export function PublicServiceReportPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════════
-            PAGE 2+: Dossiê Fotográfico
+            Assinaturas — FOLHA PRÓPRIA
+            ───────────────────────────────────────────────────────────
+            O bloco existia, mas dentro do card do orçamento: na tela as
+            assinaturas caíam na primeira página e no PDF vinham na segunda.
+            Não é escolha de layout — no documento assinado a folha de
+            assinaturas só se funde à do conteúdo quando o orçamento inteiro
+            cabe numa folha só (`tryFusedRender`, api quote-renderer.service),
+            e em produção isso é raro: das 24 âncoras gravadas, 22 estão na
+            página 2. E o dossiê embute o PDF CONGELADO, cuja paginação não se
+            remonta — quem tem de acompanhar é a página.
+           ═══════════════════════════════════════════════════════════ */}
+        {signaturesOnOwnSheet && (
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden mt-8 print-page-break dossie-card">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+              <img src={BRAND_ASSETS.logo} alt={COMPANY.name} className="h-16 md:h-20" />
+              <div className="text-right">
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Orçamento Nº {budgetNumber}</h1>
+                <p className="text-sm text-gray-600 mt-1"><span className="font-semibold">Emissão:</span> {formatDate(new Date())}</p>
+              </div>
+            </div>
+            <div className="mb-8" style={{ height: 2, backgroundColor: COMPANY.primaryGreen }} />
+
+            {/* Havendo layout, a arte divide esta folha com as assinaturas — é o
+                arranjo do documento (caminho de 2 partes do renderizador). */}
+            {layoutBlock}
+
+            <BudgetSignaturePanel
+              quoteId={quote.id}
+              customerName={invoiceCustomers[0]?.name || undefined}
+              preloaded={sigSummary}
+            />
+
+            <div className="pt-4 mt-8" style={{ borderTop: `2px solid ${COMPANY.primaryGreen}` }}>
+              <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>{COMPANY.name}</p>
+              <p className="text-sm text-gray-600">{COMPANY.address}</p>
+              <p className="text-sm">
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
+                  {COMPANY.phone.startsWith('(') ? COMPANY.phone : COMPANY.phone.replace(/^(\d{2})\s/, '($1) ')}
+                </a>
+              </p>
+              <p className="text-sm">
+                <a href={COMPANY.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
+                  {COMPANY.websiteUrl}
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            Dossiê Fotográfico
            ═══════════════════════════════════════════════════════════ */}
         {serviceOrders.length > 0 && (
           <div className="bg-white shadow-lg rounded-lg overflow-hidden mt-8 print-page-break dossie-card">

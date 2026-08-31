@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
-import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
+import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
@@ -58,6 +58,51 @@ export function PublicBudgetPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  /**
+   * Paginação do documento, para a tela se paginar como ele. `undefined` = ainda
+   * carregando; `null` = sem envelope. A folha própria de assinaturas só existe
+   * quando o PDF CONGELADO as tem fora da primeira folha (`signaturesPage > 0`);
+   * cabendo tudo numa folha — o caso normal, com 2 signatários — elas ficam na
+   * primeira, aqui e lá.
+   */
+  const [sigSummary, setSigSummary] = useState<Summary | null | undefined>(undefined);
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    signatureService
+      .getQuoteSummary(id)
+      .then((res: any) => {
+        if (!alive) return;
+        setSigSummary(res?.data?.data ?? res?.data ?? null);
+      })
+      .catch(() => alive && setSigSummary(null));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  /**
+   * Folha própria para as assinaturas?
+   *
+   * COM envelope, a verdade é o documento congelado: `signaturesPage` sai das
+   * âncoras gravadas e não se recalcula do orçamento de hoje, que pode ter mudado.
+   *
+   * SEM envelope não há documento congelado — o PDF é renderizado na hora, e o
+   * arranjo é determinístico: havendo arte, ela e as assinaturas dividem a última
+   * folha; não havendo, tudo fecha numa folha só. É a mesma regra do
+   * `quote-renderer.service` (`if (!hasLayout) tryFusedRender`), aplicada aqui
+   * sobre `layoutFiles` — a lista CRUA do orçamento, não as URLs já validadas, que
+   * chegam depois e fariam o bloco pular de folha ao carregar.
+   *
+   * Resta um caso impreciso: sem envelope, sem layout e com orçamento longo demais
+   * para uma folha (12+ serviços, ~3% deles), o documento pagina e a tela ainda diz
+   * "folha 1". Sem re-renderizar o PDF não há como saber, e o envelope — que é
+   * quando o documento passa a existir de verdade — resolve.
+   */
+  const signaturesOnOwnSheet = sigSummary?.hasEnvelope
+    ? (sigSummary.signaturesPage ?? 0) > 0
+    : (quote?.layoutFiles?.length ?? 0) > 0;
+
   /** Código do envelope, reportado pelo painel de assinaturas (ver onEnvelope). */
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
   // useCallback: o painel tem `onEnvelope` nas dependências do efeito que busca o
@@ -232,10 +277,32 @@ export function PublicBudgetPage() {
   const guaranteeText = generateGuaranteeText(quote);
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
+
   // Use serve endpoint for full quality images (layoutFiles array, up to 2)
   const layoutImageUrls: string[] = (quote.layoutFiles || [])
     .filter((f: any) => f?.id)
     .map((f: any) => getFileServeUrl(f));
+  
+  /**
+   * Bloco "Layout", posicionado conforme o documento: quando a arte existe, ela
+   * divide a ÚLTIMA folha com as assinaturas (o caminho de 2 partes do
+   * renderizador); quando não existe, não há bloco e o contrato fecha numa folha
+   * só, com as assinaturas nela.
+   */
+  const layoutBlock =
+    layoutImageUrls.length > 0 ? (
+      <div className="mb-8">
+        <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
+          Layout
+        </h3>
+        <div className="flex w-full flex-col items-center gap-4">
+          {layoutImageUrls.map((url, i) => (
+            <img key={i} src={url} alt="Layout" className="max-w-full h-auto object-contain" style={{ maxHeight: 397 }} />
+          ))}
+        </div>
+      </div>
+    ) : null;
+
   // Use serve endpoint for signature to preserve PNG transparency
 
   // Recalculate discount and total based on active filter
@@ -292,10 +359,22 @@ export function PublicBudgetPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-100 py-8 px-4 print:bg-white print:py-0 print:px-0">
+      {/* Print styles — os mesmos da página do dossiê, para que a folha de
+          assinaturas imprima como folha, e não emendada no fim do orçamento. */}
+      <style>{`
+        @media print {
+          body { background: white !important; margin: 0; }
+          .no-print { display: none !important; }
+          .print-page-break { break-before: page; }
+          .budget-card { box-shadow: none !important; border-radius: 0 !important; margin-top: 0 !important; }
+          .budget-card + .budget-card { margin-top: 0 !important; }
+        }
+      `}</style>
+
+      <div className="max-w-4xl mx-auto print:max-w-none">
         {/* Single Page Budget */}
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden relative">
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden relative budget-card">
           <div className="p-6 md:p-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
@@ -658,41 +737,19 @@ export function PublicBudgetPage() {
               </div>
             )}
 
-            {/* Layout Image(s) - Full Width (layoutFiles array) */}
-            {/* Título "Layout" e imagens SEM moldura — `.layout-section` do PDF
-                não arredonda nem sombreia nada, e chamava a seção de "Layout".
-                As imagens são centralizadas e limitadas em altura (105 mm no
-                PDF ≈ 397 px), em vez de esticadas na largura da folha. */}
-            {layoutImageUrls.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
-                  Layout
-                </h3>
-                <div className="flex w-full flex-col items-center gap-4">
-                  {layoutImageUrls.map((url, i) => (
-                    <img
-                      key={i}
-                      src={url}
-                      alt="Layout"
-                      className="max-w-full h-auto object-contain"
-                      style={{ maxHeight: 397 }}
-                    />
-                  ))}
-                </div>
-              </div>
+            {/* Sem layout o documento fecha numa folha só: a arte não existe e as
+                assinaturas ficam AQUI. Havendo layout, os dois vão juntos para a
+                folha seguinte. Montado só depois que o resumo chega, senão o bloco
+                apareceria aqui e pularia de folha ao carregar. */}
+            {sigSummary !== undefined && !signaturesOnOwnSheet && layoutBlock}
+            {sigSummary !== undefined && !signaturesOnOwnSheet && (
+              <BudgetSignaturePanel
+                quoteId={id!}
+                customerName={invoiceName || undefined}
+                onEnvelope={handleEnvelope}
+                preloaded={sigSummary}
+              />
             )}
-
-            {/* Assinaturas — estado real da coleta eletrônica.
-                O upload de imagem que existia aqui foi removido: aceitava um PNG
-                qualquer, não registrava quem assinou, IP, hora, consentimento nem
-                hash, e não alterava o status do orçamento — apesar de a tela
-                afirmar que "o orçamento foi confirmado". Quem assina agora é o
-                signatário, pelo link pessoal que recebe por WhatsApp. */}
-            <BudgetSignaturePanel
-              quoteId={id!}
-              customerName={invoiceName || undefined}
-              onEnvelope={handleEnvelope}
-            />
 
             {/* Rodapé: régua de 2 px VERDE MACIÇO, espelhando a do cabeçalho —
                 exatamente o que `.footer` faz no PDF. */}
@@ -729,6 +786,62 @@ export function PublicBudgetPage() {
             </div>
           </div>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════
+            FOLHA DE ASSINATURAS
+            ───────────────────────────────────────────────────────────
+            Estado real da coleta eletrônica. O upload de imagem que existia
+            aqui foi removido: aceitava um PNG qualquer, não registrava quem
+            assinou, IP, hora, consentimento nem hash, e não alterava o status
+            do orçamento — apesar de a tela afirmar que "o orçamento foi
+            confirmado". Quem assina agora é o signatário, pelo link pessoal
+            que recebe por WhatsApp.
+
+            Em FOLHA PRÓPRIA porque é assim que o documento assinado se pagina:
+            a fusão numa folha só é tentada e quase nunca cabe (`tryFusedRender`,
+            api quote-renderer.service — 22 das 24 âncoras gravadas estão na
+            página 2). A tela mostrava as assinaturas na primeira página e o PDF
+            na segunda.
+           ═══════════════════════════════════════════════════════════ */}
+        {signaturesOnOwnSheet && (
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden mt-8 print-page-break budget-card">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+              <img src={BRAND_ASSETS.logo} alt="Ankaa Design" className="h-16 md:h-20" />
+              <div className="text-right">
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Orçamento Nº {budgetNumber}</h1>
+              </div>
+            </div>
+            <div className="mb-8" style={{ height: 2, backgroundColor: COMPANY.primaryGreen }} />
+
+            {/* Havendo layout, a arte divide esta folha com as assinaturas — é o
+                arranjo do documento (caminho de 2 partes do renderizador). */}
+            {layoutBlock}
+
+            <BudgetSignaturePanel
+              quoteId={id!}
+              customerName={invoiceName || undefined}
+              onEnvelope={handleEnvelope}
+              preloaded={sigSummary}
+            />
+
+            <div className="pt-4 mt-8" style={{ borderTop: `2px solid ${COMPANY.primaryGreen}` }}>
+              <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>{COMPANY.name}</p>
+              <p className="text-sm text-gray-600">{COMPANY.address}</p>
+              <p className="text-sm">
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
+                  {COMPANY.phone.startsWith('(') ? COMPANY.phone : COMPANY.phone.replace(/^(\d{2})\s/, '($1) ')}
+                </a>
+              </p>
+              <p className="text-sm">
+                <a href={COMPANY.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
+                  {COMPANY.websiteUrl}
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+        )}
       </div>
     </div>
   );

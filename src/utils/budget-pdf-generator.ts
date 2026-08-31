@@ -592,9 +592,11 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     .map(
       (url) => `
       <section class="layout-section">
-        <h2 class="section-title-green">Layout referência</h2>
+        <!-- "Layout", não "Layout referência": é como o documento assinado
+             (api quote-html.builder) e as duas páginas públicas chamam a seção. -->
+        <h2 class="section-title-green">Layout</h2>
         <div class="layout-image-container">
-          <img src="${url}" alt="Layout referência" class="layout-image" />
+          <img src="${url}" alt="Layout" class="layout-image" />
         </div>
       </section>
     `,

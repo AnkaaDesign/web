@@ -38,9 +38,15 @@ import { IconAlertTriangle, IconCircleCheck, IconClock, IconShieldCheck, IconX }
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { QuoteChangeList, type QuoteChange } from "@/components/signature/quote-change-list";
 
-interface Summary {
+export interface Summary {
   hasEnvelope: boolean;
   status?: string;
+  /**
+   * Folha (0-based) em que as assinaturas estão no documento CONGELADO. A página
+   * usa isto para se paginar como o PDF — ver `signaturesOnOwnSheet` nas páginas
+   * públicas. `null` quando o envelope não gravou âncoras.
+   */
+  signaturesPage?: number | null;
   verificationCode?: string;
   deadlineAt?: string | null;
   completedAt?: string | null;
@@ -139,8 +145,16 @@ export function BudgetSignaturePanel({
   quoteId,
   customerName,
   onEnvelope,
+  preloaded,
 }: {
   quoteId: string;
+  /**
+   * Resumo já carregado pela página. A página precisa dele ANTES de decidir ONDE
+   * montar este bloco (mesma folha do orçamento ou folha própria), então quem
+   * busca é ela; passar o resultado evita uma segunda requisição ao mesmo
+   * endpoint `no-store`. `undefined` = ninguém pré-carregou, busque você mesmo.
+   */
+  preloaded?: Summary | null;
   /**
    * Reporta o resumo à página, que é quem tem o menu ⋮. Sem isto o código de
    * verificação ficaria preso aqui dentro e o item de menu não teria para onde
@@ -155,23 +169,28 @@ export function BudgetSignaturePanel({
    */
   customerName?: string;
 }) {
-  const [data, setData] = useState<Summary | null>(null);
+  const [fetched, setFetched] = useState<Summary | null>(null);
+  const data = preloaded !== undefined ? preloaded : fetched;
 
   useEffect(() => {
+    if (preloaded !== undefined) {
+      if (preloaded?.hasEnvelope) onEnvelope?.(preloaded);
+      return;
+    }
     let alive = true;
     signatureService
       .getQuoteSummary(quoteId)
       .then((res: any) => {
         if (!alive) return;
         const summary = res?.data?.data ?? res?.data ?? null;
-        setData(summary);
+        setFetched(summary);
         if (summary?.hasEnvelope) onEnvelope?.(summary);
       })
-      .catch(() => alive && setData({ hasEnvelope: false }));
+      .catch(() => alive && setFetched({ hasEnvelope: false }));
     return () => {
       alive = false;
     };
-  }, [quoteId, onEnvelope]);
+  }, [quoteId, onEnvelope, preloaded]);
 
   const hasEnvelope = !!data?.hasEnvelope;
   const completed = data?.status === "COMPLETED";
