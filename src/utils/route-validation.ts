@@ -25,7 +25,6 @@ function getAllRoutes(items: any[]): string[] {
 const VALID_ROUTES = [
   // Auth routes
   routes.authentication.login,
-  routes.authentication.register,
   routes.authentication.recoverPassword,
   routes.authentication.verifyCode,
   routes.authentication.verifyPasswordReset,

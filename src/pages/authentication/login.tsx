@@ -197,13 +197,6 @@ export function LoginPage() {
                   </span>
                 )}
               </Button>
-
-              <div className="text-sm text-center text-muted-foreground">
-                Não tem uma conta?{" "}
-                <Link to={routes.authentication.register} className={styles.link}>
-                  Cadastre-se
-                </Link>
-              </div>
             </CardFooter>
           </form>
         </Form>

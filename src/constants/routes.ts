@@ -141,7 +141,6 @@ export const routes = {
     login: "/autenticacao/entrar", // fazer login
     firstAccess: "/autenticacao/primeiro-acesso", // ativar conta criada pelo RH
     recoverPassword: "/autenticacao/recuperar-senha", // recuperar senha
-    register: "/autenticacao/registrar", // registrar-se
     resetPassword: (token: string) => `/autenticacao/redefinir-senha/${token}`, // redefinir senha com token
     verifyCode: "/autenticacao/verificar-codigo", // código de verificação (unificado)
     verifyPasswordReset: "/autenticacao/verificar-redefinicao-senha", // verificação de redefinição de senha

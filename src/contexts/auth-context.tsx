@@ -37,8 +37,6 @@ const clearInvalidStoredRoutes = () => {
 import * as apiClientModule from "../api-client";
 const { authService, setAuthToken, setTokenProvider, setAuthErrorHandler, removeAuthErrorHandler, setJustLoggedIn, apiClient, forceTokenRefresh } = apiClientModule;
 import type { AuthUser } from "../types";
-import type { SignUpFormData } from "../schemas";
-import { detectContactMethod } from "../utils";
 import { routes } from "../constants";
 import { getLocalStorage, setLocalStorage, removeLocalStorage, getUserData, setUserData, removeUserData, getRefreshToken, setRefreshToken, removeRefreshToken } from "@/lib/storage";
 
@@ -50,7 +48,6 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (user: AuthUser) => void;
   refreshUser: () => Promise<void>;
-  register: (data: { name: string; contact: string; password: string }) => Promise<{ requiresVerification: boolean; phone?: string; userId?: string }>;
   recoverPassword: (contact: string) => Promise<void>;
   verifyCode: (contact: string, code: string) => Promise<void>;
   resendCode: (contact: string) => Promise<void>;
@@ -307,71 +304,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (data: { name: string; contact: string; password: string }) => {
-    try {
-      // Detect contact method type
-      const contactType = detectContactMethod(data.contact);
-
-      // Transform contact to separate email and phone fields
-      const isEmail = contactType === "email";
-      const transformedData: SignUpFormData = {
-        name: data.name,
-        password: data.password,
-        ...(isEmail ? { email: data.contact } : { phone: data.contact }),
-      };
-
-      const response = await authService.register(transformedData);
-
-      if (response?.success && response?.data?.token && response?.data?.user) {
-        const { token, refreshToken, user } = response.data;
-
-        // Check if user needs verification
-        if (user.verified === false) {
-          // For phone numbers, redirect to phone verification
-          if (contactType === "phone") {
-            return {
-              requiresVerification: true,
-              phone: data.contact,
-              userId: user.id,
-            };
-          }
-
-          // For emails, redirect to general verification (if needed)
-          return {
-            requiresVerification: true,
-            userId: user.id,
-          };
-        }
-
-        // Auto-login after registration if already verified
-        setLocalStorage("token", token);
-        // Persist the refresh token when the API issues one on register auto-login.
-        if (refreshToken) {
-          setRefreshToken(refreshToken);
-        }
-        setUserData(user); // Cache user data
-        setAuthToken(token);
-        setUser(user);
-
-        // Navigate based on user's privilege level
-        // Don't navigate here - let the Register component handle navigation
-        // This prevents race conditions between auth-context and Register component navigation
-
-        return {
-          requiresVerification: false,
-        };
-      }
-
-      // If no token/user in response, assume verification is required
-      return {
-        requiresVerification: true,
-        phone: contactType === "phone" ? data.contact : undefined,
-      };
-    } catch (error) {
-      throw error;
-    }
-  };
-
   const recoverPassword = async (contact: string) => {
     try {
       await authService.requestPasswordReset({ contact });
@@ -477,7 +409,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     updateUser,
     refreshUser,
-    register,
     recoverPassword,
     verifyCode,
     resendCode,

@@ -44,7 +44,6 @@ const PageLoader = () => (
 // Auth pages (loaded immediately)
 import { NotFound } from "@/pages/not-found";
 import { LoginPage } from "@/pages/authentication/login";
-import { RegisterPage } from "@/pages/authentication/register";
 import { RecoverPasswordPage } from "@/pages/authentication/recover-password";
 import { FirstAccessPage } from "@/pages/authentication/first-access";
 import { VerifyCodePage } from "@/pages/authentication/verify-code";
@@ -684,7 +683,6 @@ function App() {
                             {/* Auth routes */}
                             <Route element={<AuthLayout />}>
                               <Route path={routes.authentication.login} element={<LoginPage />} />
-                              <Route path={routes.authentication.register} element={<RegisterPage />} />
                               <Route path={routes.authentication.firstAccess} element={<FirstAccessPage />} />
                               <Route path={routes.authentication.recoverPassword} element={<RecoverPasswordPage />} />
                               <Route path={routes.authentication.verifyCode} element={<VerifyCodePage />} />
