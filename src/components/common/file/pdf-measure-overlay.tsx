@@ -74,6 +74,21 @@ const SNAP_COLOR = "#16A34A";
 const SELECTED_FILL = "rgb(51 116 169 / 0.08)";
 const SELECTED_FILL_OPACITY = 0.08;
 const SNAP_RADIUS_PX = 22;
+
+/**
+ * LABELS_ARE_UPRIGHT — o número de uma cota vertical NÃO gira.
+ *
+ * O desenho do projetista gira o texto (é a convenção do CorelDRAW e do papel),
+ * mas aqui a cota é lida na TELA, quase sempre num celular na mão: um "147"
+ * deitado obriga a virar o aparelho, que é o gesto que a ferramenta existe para
+ * evitar. Decisão do dono, e vale nos dois lados — mesmo número, mesma posição,
+ * na web e no celular.
+ *
+ * O preço é o espaço horizontal: o número de uma cota vertical passa a ocupar
+ * largura em vez de altura, e por isso ele é ancorado pela ponta que encosta na
+ * linha (`start` à direita dela, `end` à esquerda) e sai INTEIRO para fora, em
+ * vez de ficar centrado em cima da linha.
+ */
 const ARROW = 9;
 const ARROWS_OUTSIDE_BELOW_CM = STYLE_CM.arrowsOutsideBelowCm;
 
@@ -179,23 +194,23 @@ function MeasurementMark({ m, zoom }: { m: Measurement; zoom: number }) {
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={COLOR} strokeWidth={1.25} />
       <path d={arrowPath(x1, y1, angle + Math.PI)} fill={COLOR} />
       <path d={arrowPath(x2, y2, angle)} fill={COLOR} />
-      <g transform={`translate(${mx} ${my})${vertical ? " rotate(-90)" : ""}`}>
-        <text
-          x={0}
-          y={-8}
-          textAnchor="middle"
-          fontSize={12}
-          fontWeight={700}
-          fill={COLOR}
-          stroke="white"
-          strokeWidth={3.2}
-          strokeLinejoin="round"
-          paintOrder="stroke"
-          style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
-        >
-          {label}
-        </text>
-      </g>
+      {/* O número NUNCA gira: ver LABELS_ARE_UPRIGHT. */}
+      <text
+        x={vertical ? mx + 6 : mx}
+        y={vertical ? my : my - 8}
+        textAnchor={vertical ? "start" : "middle"}
+        dominantBaseline={vertical ? "central" : undefined}
+        fontSize={12}
+        fontWeight={700}
+        fill={COLOR}
+        stroke="white"
+        strokeWidth={3.2}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+        style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+      >
+        {label}
+      </text>
     </g>
   );
 }
@@ -307,10 +322,15 @@ function PlannedDimension({
     // para a outra pelo lado errado.
     <path key="a1" d={arrowPath(xl, ya, insideV ? -Math.PI / 2 : Math.PI / 2)} fill={COLOR} />,
     <path key="a2" d={arrowPath(xl, yb, insideV ? Math.PI / 2 : -Math.PI / 2)} fill={COLOR} />,
+    // O número NUNCA gira: ver LABELS_ARE_UPRIGHT. Ele sai INTEIRO para o lado
+    // de fora da linha, ancorado pela ponta que encosta nela, para não invadir
+    // o vão que a cota mede.
     <text
       key="t"
-      transform={`translate(${xl + (outward > 0 ? 13 : -5)} ${(ya + yb) / 2}) rotate(-90)`}
-      textAnchor="middle"
+      x={xl + (outward > 0 ? 6 : -6)}
+      y={(ya + yb) / 2}
+      textAnchor={outward > 0 ? "start" : "end"}
+      dominantBaseline="central"
       fontSize={12}
       fontWeight={700}
       fill={COLOR}

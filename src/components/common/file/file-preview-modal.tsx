@@ -11,8 +11,7 @@ import {
   IconExternalLink,
   IconVectorBezier,
   IconRotateClockwise,
-  IconPointer,
-  IconRuler2,
+  IconRulerMeasure,
   IconRotate2,
   IconMaximize,
   IconColorPicker,
@@ -979,6 +978,16 @@ export function FilePreviewModal({
                   >
                     <IconRotateClockwise className="h-4 w-4" />
                   </Button>
+                  {/*
+                    UM botão só. As cotas do adesivo não têm botão porque não
+                    são um modo: clicar na peça e ver as medidas dela é o
+                    REPOUSO do visualizador — é a pergunta que quem abre um
+                    layout veio fazer —, e cobrar um botão antes de respondê-la
+                    punha uma porta na frente da sala. A régua é o desvio, e é
+                    ela que precisa de interruptor porque, ligada, ela ESCONDE
+                    as cotas: dois conjuntos de número azul sobre o mesmo
+                    desenho não se distinguem um do outro.
+                  */}
                   {canDimension && (
                     <>
                       <div className="w-px h-6 bg-white/20 mx-1" />
@@ -987,25 +996,22 @@ export function FilePreviewModal({
                         size="sm"
                         className={cn(
                           "h-9 px-3 text-white hover:bg-white/20 transition-colors",
-                          layoutTool === "cotas" && "bg-white/25",
-                        )}
-                        onClick={() => setLayoutTool((t) => (t === "cotas" ? "off" : "cotas"))}
-                        title="Clique num adesivo para ver as medidas dele"
-                      >
-                        <IconPointer className="h-4 w-4 mr-1.5" />
-                        Medidas
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-9 px-3 text-white hover:bg-white/20 transition-colors",
                           layoutTool === "regua" && "bg-white/25",
                         )}
-                        onClick={() => setLayoutTool((t) => (t === "regua" ? "off" : "regua"))}
-                        title="Clique numa linha e depois na outra"
+                        onClick={() =>
+                          setLayoutTool((t) => {
+                            if (t === "regua") return "cotas";
+                            setSelectedItem(null);
+                            return "regua";
+                          })
+                        }
+                        title={
+                          layoutTool === "regua"
+                            ? "Fechar a régua"
+                            : "Régua: clique numa linha e depois na outra"
+                        }
                       >
-                        <IconRuler2 className="h-4 w-4 mr-1.5" />
+                        <IconRulerMeasure className="h-4 w-4 mr-1.5" />
                         Régua
                       </Button>
                     </>
@@ -1210,7 +1216,11 @@ export function FilePreviewModal({
                       onLayoutResult={setLayoutResult}
                       selectedItemIndex={selectedItem}
                       onSelectItem={setSelectedItem}
-                      measurements={measurements}
+                      // As medidas tiradas à mão são da RÉGUA: fora dela elas
+                      // somem, do mesmo jeito que as cotas somem dentro dela.
+                      // Somem, não morrem — voltar à régua traz o que já se
+                      // mediu.
+                      measurements={layoutTool === "regua" ? measurements : []}
                       onMeasurementCommit={(m) => setMeasurements((list) => [...list, m])}
                     />
                   </div>
