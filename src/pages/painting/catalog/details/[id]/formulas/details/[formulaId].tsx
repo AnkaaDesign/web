@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { IconRefresh } from "@tabler/icons-react";
 
@@ -11,11 +12,15 @@ import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { PageHeader } from "@/components/ui/page-header";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { usePrinter } from "@/components/common/printer";
 
 export default function FormulaDetailsPage() {
   const { id: paintId, formulaId } = useParams<{ id: string; formulaId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openPrintDialog } = usePrinter();
+  const [showPrintConfirm, setShowPrintConfirm] = useState(false);
 
   // Only COMMERCIAL, ADMIN, FINANCIAL can see prices (WAREHOUSE excluded)
   const userPrivilege = user?.sector?.privileges;
@@ -31,7 +36,7 @@ export default function FormulaDetailsPage() {
     refetch,
   } = usePaintFormula(formulaId!, {
     include: {
-      paint: true,
+      paint: { include: { paintType: true } },
       components: {
         include: {
           item: true,
@@ -44,7 +49,7 @@ export default function FormulaDetailsPage() {
   // Paint production mutations
   const { create: createProduction } = usePaintProductionMutations({
     onCreateSuccess: () => {
-      navigate(routes.painting.catalog.root);
+      setShowPrintConfirm(true);
     },
   });
 
@@ -61,6 +66,20 @@ export default function FormulaDetailsPage() {
     };
 
     await createProduction(productionData);
+  };
+
+  const handleSkipPrint = () => {
+    setShowPrintConfirm(false);
+    navigate(routes.painting.catalog.root);
+  };
+
+  const handleConfirmPrint = () => {
+    setShowPrintConfirm(false);
+    if (paint) {
+      openPrintDialog(paint, { onClose: () => navigate(routes.painting.catalog.root) });
+    } else {
+      navigate(routes.painting.catalog.root);
+    }
   };
 
   if (isLoading) {
@@ -122,6 +141,19 @@ export default function FormulaDetailsPage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={showPrintConfirm} onOpenChange={(open) => !open && handleSkipPrint()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Produção registrada</AlertDialogTitle>
+            <AlertDialogDescription>Deseja imprimir a etiqueta da tinta agora?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Agora não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPrint}>Imprimir etiqueta</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

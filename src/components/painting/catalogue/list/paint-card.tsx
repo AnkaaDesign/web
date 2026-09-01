@@ -8,10 +8,11 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/compone
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
 import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH, SECTOR_PRIVILEGES } from "../../../../constants";
-import { IconFlask, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconClipboardList } from "@tabler/icons-react";
+import { IconFlask, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconClipboardList, IconPrinter } from "@tabler/icons-react";
 import { usePaintMutations } from "../../../../hooks";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { usePaintSelection } from "./paint-selection-context";
+import { usePrinter } from "@/components/common/printer";
 import { useAuth } from "../../../../contexts/auth-context";
 import { cn } from "@/lib/utils";
 import { canEditPaints, canDeletePaints } from "../../../../utils/permissions/entity-permissions";
@@ -43,6 +44,7 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   const { user } = useAuth();
   const { delete: deletePaint } = usePaintMutations();
   const { isSelected, toggleSelection, selectedCount } = usePaintSelection();
+  const { openPrintDialog } = usePrinter();
   const backgroundColor = formatHexColor(paint.hex);
   const textColor = getContrastingTextColor(paint.hex);
   const selected = isSelected(paint.id);
@@ -201,6 +203,13 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
     if (onMerge) {
       onMerge();
     }
+    setContextMenu(null);
+  };
+
+  // Handle print label
+  const handlePrintLabel = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    openPrintDialog(paint);
     setContextMenu(null);
   };
 
@@ -391,6 +400,11 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
               Editar
             </DropdownMenuItem>
           )}
+
+          <DropdownMenuItem onClick={handlePrintLabel}>
+            <IconPrinter className="mr-2 h-4 w-4" />
+            Imprimir Etiqueta
+          </DropdownMenuItem>
 
           {canDelete && (
             <>

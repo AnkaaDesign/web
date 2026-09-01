@@ -12,7 +12,8 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { IconFilter, IconFlask, IconExternalLink, IconChevronDown, IconChevronUp, IconSelector, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
+import { IconFilter, IconFlask, IconExternalLink, IconChevronDown, IconChevronUp, IconSelector, IconTrash, IconAlertTriangle, IconPrinter } from "@tabler/icons-react";
+import { usePrinter } from "@/components/common/printer";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -256,9 +257,16 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
+  const { openPrintDialog } = usePrinter();
+
   // Navigate to production details
   const handleViewDetails = (production: PaintProduction) => {
     navigate(routes.painting.productions.details(production.id));
+  };
+
+  const handlePrintLabel = (production: PaintProduction) => {
+    const paint = production.formula?.paint;
+    if (paint) openPrintDialog(paint);
   };
 
   // Context menu handlers
@@ -639,6 +647,10 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
           <DropdownMenuItem onClick={() => contextMenu && handleViewDetails(contextMenu.production)}>
             <IconExternalLink className="mr-2 h-4 w-4" />
             Ver Detalhes
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => contextMenu && handlePrintLabel(contextMenu.production)}>
+            <IconPrinter className="mr-2 h-4 w-4" />
+            Imprimir Etiqueta
           </DropdownMenuItem>
           {canDelete && (
             <>

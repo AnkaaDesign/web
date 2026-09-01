@@ -14,6 +14,7 @@ import { FavoritesProvider } from "@/contexts/favorites-context";
 import { AttentionProvider } from "@/lib/attention";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
+import { PrinterProvider } from "@/components/common/printer";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { DeepLinkRedirect } from "@/components/navigation/deep-link-redirect";
 import { MobileUsageGuard } from "@/components/navigation/mobile-usage-guard";
@@ -677,6 +678,7 @@ function App() {
                     <FavoritesProvider>
                       <FileViewerProvider>
                         <MessageModalProvider>
+                        <PrinterProvider>
                           <Toaster />
                           <SpotlightSearch />
                           <PushNotificationSetup />
@@ -3753,6 +3755,7 @@ function App() {
                             {/* 404 Not Found route */}
                             <Route path="*" element={<NotFound />} />
                           </Routes>
+                        </PrinterProvider>
                         </MessageModalProvider>
                       </FileViewerProvider>
                     </FavoritesProvider>
