@@ -427,7 +427,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               </Button>
             )}
             {currentStatus === "SETTLED" && task?.quoteId && (
-              <ReceiptDownloadButton quoteId={task.quoteId} />
+              <ReceiptDownloadButton quoteId={task.quoteId} task={task} />
             )}
             {canChangeStatus ? (
               <Combobox
@@ -1557,11 +1557,32 @@ function NfsePdfButtons({ elotechNfseId }: { elotechNfseId: number }) {
   );
 }
 
+/** Mesma regra do servidor (task-quote-receipt.service.ts) — mantém os dois em sincronia. */
+function sanitizeFilenamePart(value: string): string {
+  return value.replace(/["/\\\r\n\t]/g, "").trim();
+}
+
+/**
+ * "Recibo - {razão social} - {série ou placa}.pdf", calculado no cliente com
+ * dados que a página já carregou. Não dá para confiar no header
+ * Content-Disposition da resposta aqui: o nginx da produção tem sua própria
+ * lista de Access-Control-Expose-Headers (não inclui content-disposition) e
+ * descarta o header antes do navegador — sem relação com o que o app Node
+ * envia. Calcular local é a saída que não depende do nginx.
+ */
+function buildReceiptFilename(task: any): string {
+  const corporateName = task?.customer?.corporateName ?? task?.customer?.fantasyName ?? "Cliente";
+  const serialOrPlate = task?.serialNumber ?? task?.truck?.plate ?? "";
+  const parts = ["Recibo", sanitizeFilenamePart(corporateName)];
+  if (serialOrPlate) parts.push(sanitizeFilenamePart(String(serialOrPlate)));
+  return `${parts.join(" - ")}.pdf`;
+}
+
 /**
  * Recibo de quitação (PDF) para enviar ao cliente — só aparece quando o
  * orçamento está SETTLED (o servidor recusa a geração antes disso).
  */
-function ReceiptDownloadButton({ quoteId }: { quoteId: string }) {
+function ReceiptDownloadButton({ quoteId, task }: { quoteId: string; task: any }) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = async () => {
@@ -1570,8 +1591,7 @@ function ReceiptDownloadButton({ quoteId }: { quoteId: string }) {
       const res = await taskQuoteService.getReceiptPdf(quoteId);
       const blob =
         res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const disposition = res.headers?.["content-disposition"] as string | undefined;
-      const filename = disposition?.match(/filename="([^"]+)"/)?.[1] ?? "recibo.pdf";
+      const filename = buildReceiptFilename(task);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
