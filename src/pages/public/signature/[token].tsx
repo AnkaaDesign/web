@@ -69,7 +69,6 @@ import {
   IconDeviceMobileMessage,
   IconMail,
   IconExternalLink,
-  IconFileText,
   IconFileTypePdf,
   IconLoader2,
   IconShieldCheck,
@@ -185,7 +184,26 @@ export default function PublicSignaturePage() {
   // origens distintas. Buscar os bytes e criar um blob: URL resolve — blob é
   // same-origin em relação à página — e continua valendo em produção, onde os
   // domínios também diferem.
-  const documentUrl = useMemo(() => signatureService.documentUrl(token), [token]);
+  /**
+   * A URL do PDF, versionada pelo ESTADO DA COLETA.
+   *
+   * O documento é remontado a cada pedido (os selos de quem já assinou são
+   * carimbados na hora), mas a URL era constante — e o `<Document>` do react-pdf
+   * só refaz a busca quando o `file` muda. Resultado medido: o signatário digitava
+   * o código, a assinatura era registrada, e a folha continuava mostrando a linha
+   * em branco até um F5 manual. Amarrar a URL ao próprio ato faz o documento se
+   * refazer no instante em que ele acontece.
+   */
+  const documentUrl = useMemo(
+    () =>
+      signatureService.documentUrl(
+        token,
+        [state?.signer.status, state?.signer.signedAt ?? "", state?.envelope.status]
+          .filter(Boolean)
+          .join("-") || null,
+      ),
+    [token, state?.signer.status, state?.signer.signedAt, state?.envelope.status],
+  );
 
   /**
    * Largura do PDF medida no container.
@@ -432,7 +450,6 @@ export default function PublicSignaturePage() {
    * anterior ao campo, onde o documento era sempre o inteiro.
    */
   const document = state.document ?? null;
-  const isPartial = document ? !document.isFull : false;
 
   /**
    * O total só aparece quando o documento à frente da pessoa o exibe.
@@ -531,17 +548,16 @@ export default function PublicSignaturePage() {
               <p className="font-medium text-foreground">
                 Você foi indicado por {COMPANY_INFO.name} para revisar e assinar
                 eletronicamente
+                {/* O valor só entra quando o documento à frente da pessoa o
+                    exibe — imprimi-lo aqui desfaria a decisão de não mandá-lo.
+                    Sem ele a frase apenas para no número do orçamento: enumerar
+                    as seções do recorte é ruído para quem já está lendo o
+                    documento, e o teor exato do que ela declara está logo abaixo,
+                    na declaração, que é onde ele tem peso. */}
                 {totalText ? (
                   <> o orçamento nº {envelope.budgetNumber}, no valor de {totalText}.</>
                 ) : (
-                  // Sem o valor, a frase precisa dizer que o documento é um
-                  // RECORTE — senão ela afirma que a pessoa vai assinar "o
-                  // orçamento", e ela está assinando uma parte dele.
-                  <>
-                    {" "}
-                    as seções do orçamento nº {envelope.budgetNumber} pertinentes à sua
-                    função ({document?.label?.toLowerCase() ?? "recorte"}).
-                  </>
+                  <> o orçamento nº {envelope.budgetNumber}.</>
                 )}
               </p>
               <p className="text-muted-foreground">{envelope.acceptanceClause}</p>
@@ -860,28 +876,6 @@ export default function PublicSignaturePage() {
                     "A contra-assinatura da Ankaa é feita dentro do sistema, na tela do orçamento. Entre com sua conta e conclua por lá."}
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ---- Aviso de RECORTE ----
-            Dito em voz alta porque a declaração que a pessoa aceita afirma ter
-            revisado "as seções pertinentes à minha função". Ela não pode declarar
-            isso sobre um documento que a plataforma apresentou como se fosse o
-            orçamento inteiro. */}
-        {isPartial && state.canSign && (
-          <Card className="border-border bg-muted/40">
-            <CardContent className="flex items-start gap-3 py-3.5">
-              <IconFileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Este documento reproduz{" "}
-                <strong className="text-foreground">
-                  {document?.label?.toLowerCase()}
-                </strong>{" "}
-                do orçamento nº {envelope.budgetNumber} — as seções pertinentes à sua
-                função. O orçamento completo é assinado integralmente pela{" "}
-                {COMPANY_INFO.name} e pelos demais responsáveis indicados.
-              </p>
             </CardContent>
           </Card>
         )}

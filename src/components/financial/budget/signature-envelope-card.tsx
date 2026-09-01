@@ -226,19 +226,32 @@ function ChangePanel({ envelope }: { envelope: Envelope }) {
 
   const invalidated = envelope.status === "INVALIDATED";
   const afterSigning = !invalidated && envelope.status === "COMPLETED" && materialCount > 0;
+  /**
+   * Coleta CONCLUÍDA em que nada de material mudou.
+   *
+   * Ganhou texto próprio porque a alternativa dizia "a coleta em andamento segue
+   * válida" sobre um envelope selado — e antes disso, quando acrescentar um
+   * responsável ainda contava como material, ela abria um alarme âmbar sobre uma
+   * alteração que não podia tocar em documento nenhum.
+   */
+  const settled = !invalidated && envelope.status === "COMPLETED" && materialCount === 0;
   const alarming = invalidated || afterSigning;
 
   const title = invalidated
     ? "As assinaturas foram invalidadas porque o orçamento mudou"
     : afterSigning
       ? "O orçamento mudou depois de assinado"
-      : "O orçamento mudou desde o envio";
+      : settled
+        ? "O cadastro mudou depois da assinatura"
+        : "O orçamento mudou desde o envio";
 
   const explanation = invalidated
     ? "Os signatários foram avisados por e-mail. Reenvie para colher as assinaturas novamente."
     : afterSigning
       ? "O documento assinado é imutável e continua valendo pelo que diz — mas ele não reflete mais o orçamento atual."
-      : "Nada aqui altera as condições comerciais, então a coleta em andamento segue válida.";
+      : settled
+        ? "Nada disto muda o documento assinado, que continua valendo por inteiro. Fica registrado para quem for conferir o cadastro depois."
+        : "Nada aqui altera as condições comerciais, então a coleta em andamento segue válida.";
 
   return (
     <div
@@ -517,9 +530,23 @@ export function SignatureEnvelopeCard({
 
       {current && (
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => openPdf(current.id)}>
+          {/* Sem `recorte` na URL, a rota devolve TODOS os recortes num arquivo
+              só — é a pergunta que se faz ao apertar este botão ("está tudo
+              assinado?"), e servir só o completo respondia sobre um subconjunto
+              das pessoas. Com um recorte só, os dois caminhos coincidem. */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            title={
+              (current.documents?.length ?? 0) > 1
+                ? `Abrir os ${current.documents!.length} documentos desta coleta num arquivo só`
+                : "Abrir o documento desta coleta"
+            }
+            onClick={() => openPdf(current.id)}
+          >
             <IconFileTypePdf className="h-3.5 w-3.5" />
-            PDF
+            {(current.documents?.length ?? 0) > 1 ? "PDF (todos)" : "PDF"}
           </Button>
           {canManage && current.status === "RUNNING" && (
             <Button
@@ -878,6 +905,11 @@ export function SignatureEnvelopeCard({
           <div className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Documentos gerados
+            </p>
+            <p className="pb-0.5 text-[11px] text-muted-foreground">
+              Cada um é assinado por quem o recebeu, e todos pela Ankaa. O botão
+              "PDF (todos)" acima abre os {current.documents!.length} num arquivo só,
+              com cada assinado anexado.
             </p>
             {(current.documents ?? []).map(d => (
               <div

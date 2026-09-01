@@ -27,10 +27,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   signatureService,
+  describeSections,
+  effectiveSections,
   DELIVERY_CHANNEL_LABELS,
-  QUOTE_SECTION_LABELS,
+  LOCAL_SECTION_CATALOG,
+  QUOTE_SECTIONS,
   type DeliveryChannel,
   type DeliveryPreflight,
+  type PreflightRecipient,
   type QuoteSection,
 } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
@@ -146,10 +150,32 @@ export function SignatureSendDialog({
     }
   }, [open]);
 
-  /** O recorte EFETIVO de cada contato: o editado, ou o padrão do preflight. */
+  /**
+   * As seções que a tela desenha.
+   *
+   * Vem do servidor porque é ele quem decide quais existem; cai no catálogo
+   * local quando a api ainda não foi atualizada — sem isso a tela desenharia
+   * zero caixas e nenhuma coleta seria possível.
+   */
+  const catalog = preflight?.sectionCatalog?.length
+    ? preflight.sectionCatalog
+    : LOCAL_SECTION_CATALOG;
+
+  /**
+   * O recorte EFETIVO de um contato: o editado, ou o padrão do preflight.
+   *
+   * AUSENTE não é o mesmo que VAZIO. Vazio é o servidor dizendo "este contato
+   * não assina"; ausente é um servidor que ainda não conhece recortes, e ali o
+   * certo é o documento inteiro — que é exatamente o que aquela api entrega.
+   * Sem essa distinção a tela quebrava lendo `.length` de `undefined`.
+   */
   const sectionsOf = useCallback(
-    (r: { id: string; sections: QuoteSection[] }): QuoteSection[] =>
-      overrides[r.id] ?? r.sections,
+    (r: Pick<PreflightRecipient, "id" | "sections">): QuoteSection[] =>
+      // `effectiveSections` aplica as MESMAS duas regras do servidor: a
+      // obrigatória entra em quem assina, e quem decide se assina são as
+      // recortáveis. Sem isso a tela e a emissão discordariam sobre quem entra
+      // na coleta — e a tela é onde a decisão é tomada.
+      effectiveSections(overrides[r.id] ?? r.sections ?? [...QUOTE_SECTIONS]),
     [overrides],
   );
 
@@ -160,9 +186,10 @@ export function SignatureSendDialog({
         // duas ordens diferentes do mesmo conjunto virariam dois PDFs iguais.
         // O servidor também canoniza, mas divergir aqui faria o rótulo da tela
         // discordar do que foi enviado.
-        (preflight?.sectionCatalog ?? [])
-          .map(c => c.key)
-          .filter(k => k === section || current.includes(k));
+        // A ordem canônica sai de `QUOTE_SECTIONS`, não do catálogo: o catálogo
+        // só traz as recortáveis, e reconstruir a lista a partir dele DESCARTARIA
+        // as obrigatórias (a identificação do veículo) a cada clique.
+        QUOTE_SECTIONS.filter(k => k === section || current.includes(k));
     setOverrides(prev => ({ ...prev, [responsibleId]: next }));
   };
 
@@ -174,7 +201,7 @@ export function SignatureSendDialog({
       if (sections.length) keys.add(sections.join("+"));
     }
     // O recorte COMPLETO existe sempre — é o que a Ankaa contra-assina.
-    keys.add((preflight?.sectionCatalog ?? []).map(c => c.key).join("+"));
+    keys.add(QUOTE_SECTIONS.join("+"));
     return keys.size;
   }, [preflight, sectionsOf]);
 
@@ -395,7 +422,7 @@ export function SignatureSendDialog({
                     const signs = sections.length > 0;
                     const isOpen = expanded === r.id;
                     const edited = overrides[r.id] !== undefined;
-                    const full = sections.length === preflight.sectionCatalog.length;
+                    const full = sections.length === QUOTE_SECTIONS.length;
 
                     return (
                       <div
@@ -428,10 +455,13 @@ export function SignatureSendDialog({
                             </span>
                             <span className="block truncate text-[11px] text-muted-foreground">
                               {r.rolesLabel || "sem função"} ·{" "}
+                              {/* `describeSections` e não a lista crua: a
+                                  identificação do veículo entra em todo recorte
+                                  e repeti-la em cada linha não distingue nada. */}
                               {signs
                                 ? full
                                   ? "recebe tudo"
-                                  : sections.map(x => QUOTE_SECTION_LABELS[x]).join(", ")
+                                  : describeSections(sections)
                                 : "não assina"}
                             </span>
                           </span>
@@ -463,7 +493,7 @@ export function SignatureSendDialog({
 
                         {isOpen && (
                           <div className="space-y-1 border-t border-border px-3 py-2.5">
-                            {preflight.sectionCatalog.map(sec => {
+                            {catalog.map(sec => {
                               const on = sections.includes(sec.key);
                               return (
                                 <label
@@ -490,8 +520,9 @@ export function SignatureSendDialog({
                             })}
                             <div className="flex items-center justify-between pt-1">
                               <span className="text-[11px] text-muted-foreground">
-                                Sem nenhuma seção marcada, este contato não recebe o
-                                orçamento para assinar.
+                                A identificação do veículo (série, placa e chassi) entra
+                                em todos. Sem nenhuma seção marcada, este contato não
+                                recebe o orçamento para assinar.
                               </span>
                               {edited && (
                                 <button
@@ -532,7 +563,7 @@ export function SignatureSendDialog({
                       A contra-assinatura da Ankaa ({preflight.ankaa.name}) é feita
                       aqui no sistema, com um botão, depois que todos os responsáveis
                       assinarem — ela recebe sempre o documento completo.
-                      {!preflight.ankaa.reachable &&
+                      {preflight.ankaa.reachable === false &&
                         " Ela está sem e-mail e sem telefone no cadastro, então não receberá o aviso; a ação continua disponível nesta tela."}
                     </p>
                   )}

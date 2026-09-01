@@ -43,6 +43,47 @@ export const QUOTE_SECTIONS = [
 
 export type QuoteSection = (typeof QUOTE_SECTIONS)[number];
 
+/**
+ * Seções que TODO recorte carrega, marcadas ou não — o servidor as injeta em
+ * qualquer recorte que assine. A tela NÃO as oferece como caixa: oferecer
+ * convidaria a desmarcá-las, e o servidor as reporia em silêncio.
+ */
+export const ALWAYS_SECTIONS: readonly QuoteSection[] = ["VEHICLE"];
+
+/** As que o operador de fato marca e desmarca. */
+export const TOGGLEABLE_SECTIONS: readonly QuoteSection[] = QUOTE_SECTIONS.filter(
+  s => !ALWAYS_SECTIONS.includes(s),
+);
+
+/**
+ * O rótulo de um recorte — espelho de `describeSections` na api.
+ *
+ * As obrigatórias saem do texto: elas estão em todo recorte e não distinguem
+ * nada, então nomeá-las faria o recorte do marketing se chamar "Identificação do
+ * veículo, Layout" quando o que ele é, é "Layout".
+ */
+/**
+ * O recorte EFETIVO — espelho de `withAlwaysSections` na api.
+ *
+ * Duas regras numa: a identificação do veículo entra em todo recorte que
+ * assina, e quem decide se ele assina são as seções RECORTÁVEIS. Sem a segunda,
+ * desmarcar tudo deixaria a obrigatória sozinha na lista e a tela mostraria
+ * "assina" para um contato que o servidor tiraria da coleta.
+ */
+export function effectiveSections(sections: readonly QuoteSection[]): QuoteSection[] {
+  const distinctive = sections.filter(s => !ALWAYS_SECTIONS.includes(s));
+  return distinctive.length
+    ? QUOTE_SECTIONS.filter(s => ALWAYS_SECTIONS.includes(s) || distinctive.includes(s))
+    : [];
+}
+
+export function describeSections(sections: readonly QuoteSection[]): string {
+  if (sections.length === QUOTE_SECTIONS.length) return "Documento completo";
+  const distinctive = sections.filter(s => !ALWAYS_SECTIONS.includes(s));
+  if (distinctive.length === 0) return "Somente texto básico";
+  return distinctive.map(s => QUOTE_SECTION_LABELS[s]).join(", ");
+}
+
 export const QUOTE_SECTION_LABELS: Record<QuoteSection, string> = {
   VEHICLE: "Identificação do veículo",
   SERVICES: "Lista de serviços",
@@ -52,6 +93,34 @@ export const QUOTE_SECTION_LABELS: Record<QuoteSection, string> = {
   GUARANTEE: "Garantias",
   LAYOUT: "Layout",
 };
+
+export const QUOTE_SECTION_DESCRIPTIONS: Record<QuoteSection, string> = {
+  VEHICLE: "Série, placa, chassi, categoria e tipo de implemento.",
+  SERVICES: "A relação numerada dos serviços, com as observações de cada um.",
+  PRICING: "Valor de cada serviço, subtotal, desconto e total.",
+  DELIVERY: "Prazo em dias úteis e quantas tarefas correm simultaneamente.",
+  PAYMENT: "Forma de pagamento, parcelas e vencimentos.",
+  GUARANTEE: "Prazo e termos da garantia.",
+  LAYOUT: "As imagens do layout aprovado.",
+};
+
+/**
+ * O catálogo local, para quando o servidor não manda o dele.
+ *
+ * O `sectionCatalog` vem da api porque é ela quem decide quais seções o
+ * documento tem — uma seção nova aparece na tela sem publicar front. Mas um
+ * servidor ainda não atualizado responde sem o campo, e sem este recuo a tela
+ * desenharia zero caixas: nenhuma seção marcável, nenhuma coleta possível.
+ */
+export const LOCAL_SECTION_CATALOG: Array<{
+  key: QuoteSection;
+  label: string;
+  description: string;
+}> = TOGGLEABLE_SECTIONS.map(key => ({
+  key,
+  label: QUOTE_SECTION_LABELS[key],
+  description: QUOTE_SECTION_DESCRIPTIONS[key],
+}));
 
 /** Quem recebe o convite, por onde é possível alcançá-lo, e o que ele recebe. */
 export interface PreflightRecipient {
@@ -67,9 +136,14 @@ export interface PreflightRecipient {
   /**
    * O recorte PADRÃO deste contato. Vazio = ele não entra na coleta, que é o
    * estado inicial do gestor de frota e do motorista.
+   *
+   * OPCIONAL na tipagem porque um servidor ainda não atualizado responde sem o
+   * campo — e ausente NÃO é o mesmo que vazio: vazio é "este contato não
+   * assina", ausente é "este servidor não conhece recortes", e ali o certo é
+   * cair no documento inteiro, que é o que aquela api de fato entrega.
    */
-  sections: QuoteSection[];
-  sectionsLabel: string;
+  sections?: QuoteSection[];
+  sectionsLabel?: string;
 }
 
 export interface PreflightChannelStatus {
@@ -91,8 +165,11 @@ export interface DeliveryPreflight extends DeliverySettings {
   /** Impedem qualquer canal (coleta em andamento, orçamento vencido, sem responsável). */
   blockers: string[];
   recipients: PreflightRecipient[];
-  /** Catálogo das seções, com rótulo e descrição — a tela desenha as caixas daqui. */
-  sectionCatalog: Array<{ key: QuoteSection; label: string; description: string }>;
+  /**
+   * Catálogo das seções, com rótulo e descrição — a tela desenha as caixas daqui.
+   * Ausente num servidor não atualizado; ver `LOCAL_SECTION_CATALOG`.
+   */
+  sectionCatalog?: Array<{ key: QuoteSection; label: string; description: string }>;
   ankaa: {
     name: string;
     hasPhone: boolean;
@@ -101,8 +178,10 @@ export interface DeliveryPreflight extends DeliverySettings {
      * A Ankaa contra-assina DENTRO do sistema, em sessão autenticada. O contato
      * serve só para o aviso de que o cliente terminou — por isso a falta dele
      * deixou de impedir a emissão e virou apenas um aviso na tela.
+     *
+     * Ausente num servidor não atualizado: ali a tela não afirma nada.
      */
-    reachable: boolean;
+    reachable?: boolean;
   } | null;
   channelStatus: Record<DeliveryChannel, PreflightChannelStatus>;
   /**
@@ -214,8 +293,19 @@ export const signatureService = {
   // ---- público (token do signatário) ----
   getPublicState: (token: string) => apiClient.get(`/assinatura/publico/${token}`),
 
-  documentUrl: (token: string) =>
-    `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/${token}/document.pdf`,
+  /**
+   * O PDF da coleta, por token.
+   *
+   * `version` é CACHE-BUSTING, e não um parâmetro do servidor (que o ignora).
+   * Este documento é remontado a cada pedido — os selos de quem já assinou são
+   * carimbados na hora —, mas a URL era constante, então o `<Document>` do
+   * react-pdf nunca refazia a busca: depois de assinar, a página continuava
+   * mostrando o documento SEM a assinatura até um F5 manual. Amarrar a URL ao
+   * estado do signatário faz a folha se refazer no instante em que ele assina.
+   */
+  documentUrl: (token: string, version?: string | null) =>
+    `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/${token}/document.pdf` +
+    (version ? `?v=${encodeURIComponent(version)}` : ""),
 
   requestCode: (
     token: string,
