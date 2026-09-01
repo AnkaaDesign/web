@@ -497,8 +497,14 @@ export function BoletoActions({
   // Mesma ideia: alterar o vencimento de uma parcela que já foi quitada não muda nada na
   // parcela — se o boleto seguiu vivo no banco, o que se faz com ele é CANCELAR, não
   // reagendar. (Cancelar continua disponível abaixo.)
+  // Parcelas de config com generateBankSlip=false (ex.: acerto entre empresas fora do
+  // boleto/NFS-e) nunca têm BankSlip — mas ainda são recebíveis reais e precisam poder
+  // reagendar o vencimento como qualquer outra. `!bankSlip` cobre esse caso.
   const canChangeDueDate =
-    canManage && bankSlip && !isPaid && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
+    canManage &&
+    !isPaid &&
+    installmentStatus !== 'CANCELLED' &&
+    (!bankSlip || bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
   // Allow mark-as-paid whenever the installment is not already paid: PENDING, ACTIVE,
   // OVERDUE — or CANCELLED. PENDING is the generateBankSlip=false flow (PIX/transfer, no
   // bank slip). CANCELLED is included so a cancelled installment can be revived straight
@@ -965,9 +971,11 @@ export function BoletoActions({
       <Dialog open={showDueDateDialog} onOpenChange={setShowDueDateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Alterar Vencimento do Boleto</DialogTitle>
+            <DialogTitle>{bankSlip ? 'Alterar Vencimento do Boleto' : 'Alterar Vencimento da Parcela'}</DialogTitle>
             <DialogDescription>
-              Selecione a nova data de vencimento para este boleto. A data deve ser igual ou posterior a hoje.
+              {bankSlip
+                ? 'Selecione a nova data de vencimento para este boleto. A data deve ser igual ou posterior a hoje.'
+                : 'Selecione a nova data de vencimento para esta parcela. A data deve ser igual ou posterior a hoje.'}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
