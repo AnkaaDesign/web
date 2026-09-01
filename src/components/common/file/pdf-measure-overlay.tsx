@@ -9,7 +9,6 @@ import {
   type Dimension,
   type Measurement,
   type PageGeometry,
-  type Panel,
   type Pt,
   type Rect,
   type Scale,
@@ -19,7 +18,13 @@ import {
 /** Uma cota do plano, com a face de onde ela veio. */
 export interface PlannedDimensionEntry {
   dimension: Dimension;
-  panel: Panel;
+  /**
+   * A ponte pt ↔ cm da face a que a cota pertence.
+   *
+   * Só isto. A face inteira já viajou por aqui como `Panel`, e nunca foi lida:
+   * a cota chega da API em centímetro da FACE, e para pôr o número na tela
+   * basta a origem do retângulo e a razão de conversão.
+   */
   scale: Scale;
 }
 

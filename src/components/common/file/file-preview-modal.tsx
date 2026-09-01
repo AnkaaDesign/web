@@ -29,7 +29,7 @@ import type { File as AnkaaFile } from "../../../types";
 import { isImageFile, isVideoFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl, rewriteCdnUrl } from "../../../utils/file";
 import { InlinePdfViewer, type InlinePdfViewerRef, type LayoutTool } from "./inline-pdf-viewer";
 import type { CommittedMeasurement } from "./pdf-measure-overlay";
-import type { LayoutDimensionsResult, Panel } from "@/lib/layout-dimensions";
+import type { LayoutPlan } from "@/api-client/layoutDimensions";
 import { VideoPlayer } from "./video-player";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
@@ -93,7 +93,7 @@ export interface FilePreviewModalProps {
    * Medidas do implemento, uma por face. Quando vêm, o PDF abre já cotado: um
    * clique num adesivo mostra as medidas dele, sem botão nenhum a apertar.
    */
-  layoutPanels?: Panel[];
+  layoutTruckId?: string;
 }
 
 export function FilePreviewModal({
@@ -108,7 +108,7 @@ export function FilePreviewModal({
   showThumbnailStrip = true,
   showImageCounter = true,
   layoutStatusByFileId,
-  layoutPanels,
+  layoutTruckId,
 }: FilePreviewModalProps) {
   // State management
   const [currentIndex, setCurrentIndex] = React.useState(initialFileIndex);
@@ -160,7 +160,7 @@ export function FilePreviewModal({
   // --- Cotador de layout -------------------------------------------------
   // Só existe quando o chamador entrega as medidas do implemento: num boleto ou
   // numa nota fiscal não há face para achar, e varrer o vetor à toa custa caro.
-  const canDimension = Boolean(layoutPanels?.length);
+  const canDimension = Boolean(layoutTruckId);
   const [layoutTool, setLayoutTool] = React.useState<LayoutTool>("off");
   const [selectedItem, setSelectedItem] = React.useState<number | null>(null);
   const [measurements, setMeasurements] = React.useState<CommittedMeasurement[]>([]);
@@ -172,7 +172,7 @@ export function FilePreviewModal({
    * simplesmente vazia e o operador conclui que não há nada a medir. Um número
    * errado é ruim; um silêncio que parece um acerto é pior.
    */
-  const [layoutResult, setLayoutResult] = React.useState<LayoutDimensionsResult | null>(null);
+  const [layoutResult, setLayoutResult] = React.useState<LayoutPlan | null>(null);
 
   React.useEffect(() => {
     setLayoutTool(canDimension ? "cotas" : "off");
@@ -1204,7 +1204,8 @@ export function FilePreviewModal({
                       scale={pdfScale}
                       pageNumber={pdfPageNumber}
                       maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
-                      layoutPanels={layoutPanels}
+                      layoutTruckId={layoutTruckId}
+                      fileId={currentFile.id}
                       layoutTool={layoutTool}
                       onLayoutResult={setLayoutResult}
                       selectedItemIndex={selectedItem}

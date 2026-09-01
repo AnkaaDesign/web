@@ -1,10 +1,8 @@
 import React, { useCallback, useMemo } from "react";
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
-import { useImplementMeasuresByTruck } from "@/hooks/administration/use-implement-measure";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Panel } from "@/lib/layout-dimensions";
 import type { File, Task } from "@/types";
 import { getApiBaseUrl } from "@/utils/file";
 
@@ -51,50 +49,16 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
   // Only layouts that carry file data AND are visible to this user (privileged, or APPROVED).
   const filteredLayouts = useMemo<LayoutLike[]>(() => getVisibleLayouts(task, canViewBadges), [task, canViewBadges]);
 
-  // As medidas do implemento não viajam no `task` (lá vem só o `truck` raso);
-  // esta é a mesma consulta que a página de detalhe faz, e o react-query
-  // devolve do cache.
-  const { data: implementMeasures } = useImplementMeasuresByTruck(task.truck?.id || "", {
-    enabled: Boolean(task.truck?.id),
-  });
-
   /**
-   * As medidas do implemento que o visualizador usa para cotar o layout.
+   * Quem cota é a API, e ela resolve as medidas pelo CAMINHÃO.
    *
-   * A ordem é a das faces na página, de cima para baixo: motorista, sapo,
-   * traseira. As duas laterais têm o mesmo tamanho em 92% dos arquivos, então
-   * é a ordem — não a geometria — que diz qual é qual.
-   *
-   * `ImplementMeasure` guarda METRO; o cotador trabalha em centímetro. A
-   * conversão é aqui, uma vez só.
+   * Este arquivo já montou os painéis à mão — e com eles a conversão de metro
+   * para centímetro que `ImplementMeasure` obriga. Duas telas fazendo essa
+   * conversão é uma a mais do que o necessário para errá-la; a partir daqui só
+   * o `truckId` viaja, e a conversão mora num lugar só, no servidor.
    */
-  const layoutPanels = useMemo<Panel[]>(() => {
-    type SideMeasure = {
-      height: number;
-      sections?: { width: number; isDoor?: boolean; doorHeight?: number | null }[];
-    };
-    const sides = implementMeasures as
-      | { leftSideMeasure?: SideMeasure; rightSideMeasure?: SideMeasure; backSideMeasure?: SideMeasure }
-      | undefined;
-    if (!sides) return [];
-    const toPanel = (side: Panel["side"], measure: SideMeasure | undefined): Panel | null => {
-      if (!measure?.sections?.length || !measure.height) return null;
-      return {
-        side,
-        heightCm: measure.height * 100,
-        sections: measure.sections.map((s) => ({
-          widthCm: s.width * 100,
-          isDoor: Boolean(s.isDoor),
-          doorHeightCm: s.doorHeight ? s.doorHeight * 100 : null,
-        })),
-      };
-    };
-    return [
-      toPanel("MOTORISTA", sides.leftSideMeasure),
-      toPanel("SAPO", sides.rightSideMeasure),
-      toPanel("TRASEIRA", sides.backSideMeasure),
-    ].filter((p): p is Panel => p !== null);
-  }, [implementMeasures]);
+  const layoutTruckId = task.truck?.id;
+
 
   /**
    * Preview abre a coleção de artes no visualizador da aplicação, no índice clicado.
@@ -119,10 +83,10 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
       const index = layouts.findIndex((f) => f.id === file.id);
       fileViewer.actions.viewFiles(layouts, index >= 0 ? index : 0, {
         layoutStatusByFileId,
-        layoutPanels,
+        layoutTruckId,
       });
     },
-    [filteredLayouts, fileViewer, layoutPanels],
+    [filteredLayouts, fileViewer, layoutTruckId],
   );
 
   const handleDownload = useCallback(

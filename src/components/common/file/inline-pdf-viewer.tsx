@@ -4,15 +4,15 @@ import { IconLoader2, IconAlertTriangle, IconDownload } from "@tabler/icons-reac
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  buildLayoutFaces,
-  createPageInkTrimmer,
   detectScaleFrom,
   readPageGeometry,
-  type LayoutDimensionsResult,
   type PageGeometry,
-  type Panel,
   type ScaleDetection,
 } from "@/lib/layout-dimensions";
+import {
+  layoutDimensionsService,
+  type LayoutPlan,
+} from "@/api-client/layoutDimensions";
 import {
   PdfMeasureOverlay,
   type CommittedMeasurement,
@@ -56,14 +56,20 @@ export interface InlinePdfViewerProps {
   /** Escala descoberta no arquivo (ou o padrão da casa, quando ele não traz cota). */
   onScaleDetected?: (detection: ScaleDetection) => void;
   /**
-   * Medidas do implemento, uma por face. Quando vêm, o cotador roda sozinho
-   * assim que o arquivo carrega — não há botão a apertar.
+   * O caminhão da tarefa. Quando vem, o cotador roda sozinho assim que o
+   * arquivo carrega — não há botão a apertar.
+   *
+   * É o caminhão e não os painéis porque quem resolve as medidas é a API: o
+   * `ImplementMeasure` guarda METRO e o cotador trabalha em centímetro, e essa
+   * conversão passou a existir num lugar só.
    */
-  layoutPanels?: Panel[];
+  layoutTruckId?: string;
+  /** Id do arquivo aberto — a API cota pelo arquivo, não pela URL. */
+  fileId?: string;
   /** Ferramenta ativa sobre o desenho. */
   layoutTool?: LayoutTool;
   /** Resultado do cotador, para a tela que hospeda o visualizador. */
-  onLayoutResult?: (result: LayoutDimensionsResult | null) => void;
+  onLayoutResult?: (result: LayoutPlan | null) => void;
   /** Item cujas cotas estão à mostra; `null` mostra só os contornos. */
   selectedItemIndex?: number | null;
   onSelectItem?: (index: number | null) => void;
@@ -81,31 +87,6 @@ export interface InlinePdfViewerRef {
   goToPage: (page: number) => void;
   nextPage: () => void;
   prevPage: () => void;
-}
-
-/**
- * Contorno enxuto para desenhar e clicar.
- *
- * Um envelopamento que engoliu a face inteira chega com ~25 mil pontos
- * (MAR & RIO: 299 polígonos), e desenhar esse caminho SVG a cada repintura
- * congelava a aba — era o "trava tudo" do operador. Acima do orçamento, os
- * polígonos perdem pontos em passo constante; a tolerância de dedo do clique
- * (MIN_HIT_PX no overlay) cobre a folga que a dizimação introduz.
- */
-function decimateOutline(
-  polys: { x: number; y: number }[][],
-  budget = 3000,
-): { x: number; y: number }[][] {
-  const total = polys.reduce((n, p) => n + p.length, 0);
-  if (total <= budget) return polys;
-  const stride = Math.ceil(total / budget);
-  return polys.map((poly) => {
-    if (poly.length <= 8) return poly;
-    const out: { x: number; y: number }[] = [];
-    for (let i = 0; i < poly.length; i += stride) out.push(poly[i]);
-    if (out[out.length - 1] !== poly[poly.length - 1]) out.push(poly[poly.length - 1]);
-    return out;
-  });
 }
 
 export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfViewerProps>(
@@ -126,7 +107,8 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       measurements,
       onMeasurementCommit,
       onScaleDetected,
-      layoutPanels,
+      layoutTruckId,
+      fileId,
       layoutTool = "off",
       onLayoutResult,
       selectedItemIndex = null,
@@ -142,7 +124,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     const [error, setError] = React.useState<string | null>(null);
     const [geometry, setGeometry] = React.useState<PageGeometry | null>(null);
     const [detection, setDetection] = React.useState<ScaleDetection | null>(null);
-    const [layout, setLayout] = React.useState<LayoutDimensionsResult | null>(null);
+    const [layout, setLayout] = React.useState<LayoutPlan | null>(null);
     const [layoutBusy, setLayoutBusy] = React.useState(false);
     const onLayoutResultRef = React.useRef(onLayoutResult);
     onLayoutResultRef.current = onLayoutResult;
@@ -391,11 +373,24 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     }, [url]); // Removed onFitScaleCalculated from dependencies to prevent unnecessary reloads
 
     /**
-     * Geometria vetorial e cotagem, assim que o arquivo carrega.
+     * A geometria é lida aqui; as COTAS vêm da API.
      *
-     * Só roda quando o chamador entrega as medidas do implemento — num boleto
-     * ou numa nota fiscal não há face para achar, e varrer o vetor à toa custa
-     * caro num arquivo de 15 metros.
+     * As duas coisas moravam neste efeito, e a doutrina inteira — o que é um
+     * adesivo, de que borda se mede, onde a linha de cota assenta — rodava no
+     * navegador. Portar isso para o celular criaria uma segunda cópia em Dart,
+     * com os ~40 limiares calibrados de novo no braço e sem bancada de
+     * regressão; e duas cópias divergem. A divergência apareceria do pior jeito
+     * possível: dois números diferentes para o mesmo adesivo, um no celular do
+     * aplicador e outro na tela do projetista.
+     *
+     * Agora o servidor calcula e os dois clientes desenham. Provado no acervo
+     * inteiro: 231 de 231 arquivos com itens, cotas e avisos idênticos byte a
+     * byte ao que este arquivo produzia sozinho.
+     *
+     * A geometria continua sendo lida aqui porque a RÉGUA é interativa e o
+     * pdf.js já está carregado — o ímã precisa responder ao dedo, não à rede. É
+     * o mesmo leitor que a API usa; ela o serve em `/layout-dimensions/:id/snap`
+     * para o celular, que não tem pdf.js nenhum.
      */
     React.useEffect(() => {
       if (loading || layoutTool === "off") return;
@@ -406,10 +401,10 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
         setLayoutBusy(true);
         try {
           const page = await pdfDoc.getPage(pageNumber);
-          // A régua só precisa da geometria e da escala — e fica DE PÉ mesmo
-          // que o cotador engasgue numa face patológica (MAR & RIO: 156 peças
-          // fundidas num envelopamento só). Ler primeiro, cotar depois: se o
-          // agrupamento falhar, o operador ainda mede na mão.
+          // A régua fica DE PÉ mesmo que o cotador engasgue numa face
+          // patológica (MAR & RIO: 156 peças fundidas num envelopamento só).
+          // Ler primeiro, cotar depois: se a cotagem falhar — ou se a rede cair
+          // —, o operador ainda mede na mão.
           const geo = await readPageGeometry(page, { rotation });
           if (cancelled) return;
           const text = await page.getTextContent();
@@ -418,23 +413,29 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           setGeometry(geo);
           setDetection(found);
           onScaleDetected?.(found);
-          if (layoutPanels?.length) {
-            const trimToInk = await createPageInkTrimmer(page as never, 0.5, rotation);
-            if (cancelled) return;
-            const result = await buildLayoutFaces(page, layoutPanels, { rotation, trimToInk });
-            if (cancelled) return;
-            setGeometry(result.geometry);
-            setDetection(result.detectedScale);
-            setLayout(result);
-            onScaleDetected?.(result.detectedScale);
-            onLayoutResultRef.current?.(result);
+          if (!layoutTruckId || !fileId) {
+            setLayout(null);
+            onLayoutResultRef.current?.(null);
             return;
           }
-          setLayout(null);
-          onLayoutResultRef.current?.(null);
+          const dto = await layoutDimensionsService.get(fileId, {
+            truckId: layoutTruckId,
+            page: pageNumber,
+            rotation,
+          });
+          if (cancelled) return;
+          const plan: LayoutPlan = { ...dto, geometry: geo };
+          setDetection(plan.detectedScale);
+          setLayout(plan);
+          onScaleDetected?.(plan.detectedScale);
+          onLayoutResultRef.current?.(plan);
         } catch (err) {
           if (process.env.NODE_ENV !== "production") {
-            console.warn("[InlinePdfViewer] Não foi possível ler a geometria:", err);
+            console.warn("[InlinePdfViewer] Não foi possível cotar o layout:", err);
+          }
+          if (!cancelled) {
+            setLayout(null);
+            onLayoutResultRef.current?.(null);
           }
         } finally {
           if (!cancelled) setLayoutBusy(false);
@@ -444,7 +445,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       return () => {
         cancelled = true;
       };
-    }, [layoutPanels, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
+    }, [layoutTruckId, fileId, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
 
     /**
      * Um item, um plano de cotas.
@@ -475,7 +476,9 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
         .map((dimension) => {
           const item = layout.items[dimension.targetIndex ?? -1];
           const face = layout.faces[item?.faceIndex ?? 0];
-          return face ? { dimension, panel: face.panel, scale: face.scale } : null;
+          return face
+            ? { dimension, scale: { ptPerCm: face.ptPerCm, panelPt: face.panelPt } }
+            : null;
         })
         .filter((e): e is PlannedDimensionEntry => e !== null);
     }, [layout, selectedItemIndex]);
@@ -487,7 +490,11 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           // o clique cai na tinta; o quadro desenhado é o que a COTA referencia
           bbox: item.bbox,
           drawBox: item.alignedBoxPt,
-          outline: item.outlinePt ? decimateOutline(item.outlinePt) : undefined,
+          // O contorno já vem enxuto: um envelopamento cru tem ~25 mil pontos
+          // (MAR & RIO: 299 polígonos) e desenhar esse caminho SVG a cada
+          // repintura congelava a aba. Quem apara agora é o servidor, no mesmo
+          // orçamento de 3 mil pontos — e o celular ganha de graça.
+          outline: item.outlinePt,
         })) ?? [],
       [layout],
     );
@@ -639,7 +646,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
                     geometry={geometry}
                     zoom={scale}
                     ptPerCm={detection.ptPerCm}
-                    faceScales={layout?.faces.map((f) => f.scale)}
+                    faceScales={layout?.faces.map((f) => ({ ptPerCm: f.ptPerCm, panelPt: f.panelPt }))}
                     measurements={measurements ?? []}
                     onCommit={(m) => onMeasurementCommit?.(m)}
                     plan={plannedEntries}
