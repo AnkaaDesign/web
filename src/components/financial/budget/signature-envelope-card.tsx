@@ -126,6 +126,22 @@ interface Envelope {
    * a tela decide sozinha se vale desenhar a lista.
    */
   documents?: EnvelopeDocument[];
+  /**
+   * Lacunas do cadastro do veículo ainda VAZIAS, numa coleta em andamento.
+   *
+   * A contra-assinatura sela o documento no mesmo segundo; o que aqui estiver
+   * vazio vai dizer "a registrar" no assinado para sempre.
+   */
+  pendingLateSlots?: Array<{ key: string; label: string }>;
+  /**
+   * O ADITIVO de identificação do veículo, quando já emitido.
+   *
+   * Documento à parte, selado com o mesmo certificado, que declara o chassi e a
+   * placa que só existiram depois da assinatura — porque o caminhão só vem para
+   * a empresa depois de o orçamento ser aprovado, e a aprovação É esta
+   * assinatura.
+   */
+  addendum?: { sha256: string | null; sealedAt: string | null; padesLevel: string | null } | null;
 }
 
 type Tone = "ok" | "warn" | "bad" | "muted";
@@ -498,6 +514,9 @@ export function SignatureEnvelopeCard({
    * assinaram e aguardam você" — desenhar o botão antes disso convidaria a um
    * clique que o servidor recusa com "aguarde os responsáveis do cliente".
    */
+  /** Lacunas do veículo ainda vazias — a última chance de preenchê-las. */
+  const pendingSlots = current?.pendingLateSlots ?? [];
+
   const canCountersign =
     canManage &&
     !!current &&
@@ -630,6 +649,20 @@ export function SignatureEnvelopeCard({
                 Falta a contra-assinatura da Ankaa ({ankaaSigner!.name}). Ao confirmar, o
                 documento final é emitido e o orçamento é aprovado.
               </p>
+              {/* INFORMA, não bloqueia. O chassi só se lê com o caminhão no
+                  pátio, e o caminhão só vem depois de o orçamento ser aprovado —
+                  ou seja, depois desta assinatura. A lacuna em branco é o estado
+                  NORMAL de um implemento 0 km, não um descuido a corrigir. */}
+              {pendingSlots.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {pendingSlots.length === 1
+                    ? `O ${pendingSlots[0].label} do veículo`
+                    : `${pendingSlots.map(p => p.label).join(" e ")} do veículo`}{" "}
+                  {pendingSlots.length === 1 ? "ainda não foi cadastrado" : "ainda não foram cadastrados"} e
+                  o documento reservou o espaço com "a registrar". O que chegar depois do
+                  selo fica na trilha de auditoria, não no corpo do documento.
+                </p>
+              )}
             </div>
             <Button
               size="sm"
@@ -896,6 +929,62 @@ export function SignatureEnvelopeCard({
             </button>
           </div>
         </div>
+
+        {/* ---- Aditivo de identificação do veículo ----
+            O orçamento de um implemento 0 km é assinado antes de o caminhão
+            chegar, e diz "a registrar" no lugar do chassi. Esta folha, selada à
+            parte, é onde a identificação de fato aparece. */}
+        {/* Entre o selo e a entrega o painel ficava mudo: o documento diz
+            "a registrar", o aditivo ainda não saiu, e nada dizia que ele sairia.
+            Esta linha é o que conta ao operador que o sistema resolve sozinho. */}
+        {!current.addendum &&
+          current.status === "COMPLETED" &&
+          pendingSlots.length > 0 && (
+            <p className="rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
+              O documento assinado reservou o espaço {pendingSlots.length === 1 ? "do" : "de"}{" "}
+              <strong className="text-foreground">
+                {pendingSlots.map(p => p.label).join(" e ")}
+              </strong>{" "}
+              com "a registrar", porque o caminhão só chega depois da aprovação. Assim que o
+              serviço for finalizado, o sistema emite um aditivo selado declarando{" "}
+              {pendingSlots.length === 1 ? "esse dado" : "esses dados"}.
+            </p>
+          )}
+
+        {current.addendum && (
+          <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-2.5">
+                <IconFileTypePdf className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    Aditivo de identificação do veículo
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Declara a placa e o chassi que só existiram depois da assinatura
+                    {current.addendum.padesLevel
+                      ? ` · PAdES ${current.addendum.padesLevel}`
+                      : ""}
+                    {current.addendum.sealedAt
+                      ? ` · ${fmtDateTime(current.addendum.sealedAt)}`
+                      : ""}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1.5"
+                  onClick={async () => {
+                    try {
+                      await signatureService.openAddendum(current.id);
+                    } catch {
+                      toast.error("Não foi possível abrir o aditivo.");
+                    }
+                  }}
+                >
+                  <IconFileTypePdf className="h-3.5 w-3.5" />
+                  Abrir
+                </Button>
+          </div>
+        )}
 
         {/* ---- Os documentos congelados ----
             Só quando há mais de um. Com um só, a lista repetiria o que o botão

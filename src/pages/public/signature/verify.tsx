@@ -60,6 +60,18 @@ interface VerificationData {
    * um documento é verdadeiro. Ausente em envelopes servidos por uma API
    * anterior ao recurso.
    */
+  /**
+   * O ADITIVO de identificação do veículo, quando existe.
+   *
+   * Entra no portal porque ele É parte do instrumento: quem confere o orçamento
+   * assinado de um implemento 0 km encontra "a registrar" no lugar do chassi, e
+   * precisa saber que existe uma folha selada declarando qual é.
+   */
+  addendum?: {
+    sha256: string | null;
+    sealedAt: string | null;
+    padesLevel: string | null;
+  } | null;
   documents?: Array<{
     label: string;
     isFull: boolean;
@@ -310,6 +322,30 @@ export default function PublicSignatureVerifyPage() {
                     )}
                   </dl>
                 </Section>
+
+                {/* ── Aditivo ───────────────────────────────────────────────
+                    O orçamento de um implemento 0 km é assinado antes de o
+                    veículo existir e diz "a registrar" no lugar do chassi. Sem
+                    esta seção, quem confere o documento conclui que a
+                    identificação nunca foi feita. */}
+                {data.addendum && (
+                  <Section title="Aditivo de identificação do veículo">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      O orçamento foi assinado antes de o veículo chegar à empresa, e
+                      reservou o espaço da placa e do chassi com a marcação "a registrar".
+                      A identificação foi declarada depois, nesta folha, selada com o
+                      mesmo certificado.
+                    </p>
+                    <dl className="space-y-2">
+                      {data.addendum.sha256 && (
+                        <Row label="SHA-256 do aditivo" value={data.addendum.sha256} mono />
+                      )}
+                      {data.addendum.padesLevel && (
+                        <Row label="Selo" value={`PAdES ${data.addendum.padesLevel}`} />
+                      )}
+                    </dl>
+                  </Section>
+                )}
 
                 {/* ── Recortes ───────────────────────────────────────────────
                     Só quando há mais de um. Com um só, esta seção repetiria os

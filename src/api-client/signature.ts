@@ -415,6 +415,36 @@ export const signatureService = {
 
   listForQuote: (quoteId: string) => apiClient.get(`/signature-envelopes/quote/${quoteId}`),
 
+  /**
+   * Emite o ADITIVO de identificação do veículo agora, sem esperar a varredura.
+   *
+   * O caminho normal é automático, na finalização do serviço. Esta chamada existe
+   * para quem precisa da folha na mão no momento de montar o dossiê de entrega, e
+   * é idempotente — chamar de novo não emite um segundo aditivo.
+   */
+  issueAddendum: (quoteId: string) =>
+    apiClient.post(`/signature-envelopes/quote/${quoteId}/aditivo`),
+
+  /** Abre o aditivo selado numa nova aba. Mesma mecânica do PDF interno. */
+  openAddendum: async (envelopeId: string): Promise<void> => {
+    const res: any = await apiClient.get(`/signature-envelopes/${envelopeId}/aditivo.pdf`, {
+      responseType: "blob",
+      metadata: { suppressToast: true },
+    } as any);
+    const blob =
+      res?.data instanceof Blob ? res.data : new Blob([res?.data], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "noopener");
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        filenameFromDisposition(res?.headers?.["content-disposition"]) ?? "Aditivo.pdf";
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
   auditTrail: (envelopeId: string) => apiClient.get(`/signature-envelopes/${envelopeId}/audit-trail`),
 
   cancel: (envelopeId: string) => apiClient.post(`/signature-envelopes/${envelopeId}/cancel`),
