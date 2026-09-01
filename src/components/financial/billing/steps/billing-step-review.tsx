@@ -426,6 +426,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 Ver Tarefa
               </Button>
             )}
+            {currentStatus === "SETTLED" && task?.quoteId && (
+              <ReceiptDownloadButton quoteId={task.quoteId} />
+            )}
             {canChangeStatus ? (
               <Combobox
                 value={currentStatus}
@@ -1551,6 +1554,54 @@ function NfsePdfButtons({ elotechNfseId }: { elotechNfseId: number }) {
         )}
       </Button>
     </>
+  );
+}
+
+/**
+ * Recibo de quitação (PDF) para enviar ao cliente — só aparece quando o
+ * orçamento está SETTLED (o servidor recusa a geração antes disso).
+ */
+function ReceiptDownloadButton({ quoteId }: { quoteId: string }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const res = await taskQuoteService.getReceiptPdf(quoteId);
+      const blob =
+        res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const disposition = res.headers?.["content-disposition"] as string | undefined;
+      const filename = disposition?.match(/filename="([^"]+)"/)?.[1] ?? "recibo.pdf";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Não foi possível baixar o recibo");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="default"
+      onClick={handleDownload}
+      disabled={isDownloading}
+      className="gap-1.5 h-9"
+    >
+      {isDownloading ? (
+        <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <IconReceipt className="h-3.5 w-3.5" />
+      )}
+      Baixar Recibo
+    </Button>
   );
 }
 

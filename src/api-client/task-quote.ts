@@ -50,6 +50,10 @@ export const taskQuoteService = {
   updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
     apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
 
+  // Recibo de quitação (PDF) — só existe depois que o orçamento chega a SETTLED
+  getReceiptPdf: (id: string) =>
+    apiClient.get(`/task-quotes/${id}/receipt`, { responseType: 'blob' }),
+
   // Delete
   delete: (id: string) => apiClient.delete(`/task-quotes/${id}`),
 
