@@ -155,12 +155,23 @@ export const responsibleGetManySchema = z.object({
     .uuid('ID da empresa inválido')
     .optional(),
   // Any-of: the API maps this to Prisma `hasSome`. A bare scalar is wrapped so
-  // `?roles=OWNER` and saved single-value filters both keep working.
+  // `?roles=DRIVER` and saved single-value filters both keep working.
+  //
+  // UNKNOWN VALUES ARE DROPPED, matching the api. `OWNER` left the enum on
+  // 2026-09-01, and saved table filters live in localStorage: a persisted layout
+  // still carrying it would fail validation on every page load, with nothing on
+  // screen explaining why.
   roles: z
-    .preprocess(
-      value => (value === undefined || Array.isArray(value) ? value : [value]),
-      z.array(z.nativeEnum(ResponsibleRole)),
-    )
+    .preprocess(value => {
+      const list = value === undefined || Array.isArray(value) ? value : [value];
+      if (!Array.isArray(list)) return list;
+      const known = list.filter(v =>
+        Object.values(ResponsibleRole).includes(v as ResponsibleRole),
+      );
+      // Toda a lista era desconhecida: some com o filtro em vez de mandar `[]`,
+      // que a API leria como "hasSome de nada" e zeraria a listagem.
+      return known.length ? known : undefined;
+    }, z.array(z.nativeEnum(ResponsibleRole)))
     .optional(),
   isActive: z
     .boolean()

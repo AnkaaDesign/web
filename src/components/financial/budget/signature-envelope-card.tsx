@@ -71,6 +71,29 @@ interface EnvelopeSigner {
   signingUrl: string;
   /** INVITATION_SENT | INVITATION_FAILED | null (ainda não tentado). */
   inviteState: string | null;
+  /**
+   * Como esta pessoa assina. `INTERNAL` é o lado da Ankaa, que contra-assina
+   * aqui, com a sessão — não por link e não com código. Ausente em envelopes
+   * lidos de uma API anterior a este recurso; o fallback deriva do `side`.
+   */
+  ceremony?: "OTP" | "INTERNAL";
+  /** O recorte que este signatário recebeu. */
+  documentId?: string | null;
+  sections?: string[];
+}
+
+/** Um dos PDFs congelados pela coleta. */
+interface EnvelopeDocument {
+  id: string;
+  variantKey: string;
+  sections: string[];
+  label: string;
+  isFull: boolean;
+  originalSha256: string;
+  finalSha256: string | null;
+  padesLevel: string | null;
+  sealedAt: string | null;
+  signers: string[];
 }
 
 interface Envelope {
@@ -98,6 +121,11 @@ interface Envelope {
   padesLevel: string | null;
   sealedAt: string | null;
   signers: EnvelopeSigner[];
+  /**
+   * Um por recorte congelado. Sempre presente na API atual, mesmo com um só —
+   * a tela decide sozinha se vale desenhar a lista.
+   */
+  documents?: EnvelopeDocument[];
 }
 
 type Tone = "ok" | "warn" | "bad" | "muted";
@@ -426,9 +454,9 @@ export function SignatureEnvelopeCard({
     );
   };
 
-  const openPdf = async (id: string) => {
+  const openPdf = async (id: string, documentId?: string | null) => {
     try {
-      await signatureService.openInternalDocument(id);
+      await signatureService.openInternalDocument(id, documentId ?? null);
     } catch {
       toast.error("Não foi possível abrir o PDF.");
     }
@@ -440,6 +468,31 @@ export function SignatureEnvelopeCard({
   const history = envelopes.slice(1);
   const signed = current?.signers.filter(s => s.status === "SIGNED").length ?? 0;
   const total = current?.signers.length ?? 0;
+
+  /**
+   * O signatário da Ankaa — o que contra-assina aqui, com a sessão.
+   *
+   * Fallback por `side` para envelopes lidos de uma API anterior ao campo
+   * `ceremony`; ali o botão não aparece de qualquer forma, porque a resposta do
+   * servidor recusa a contra-assinatura de coletas emitidas antes do recurso.
+   */
+  const ankaaSigner = current?.signers.find(s => (s.ceremony ?? (s.side === "ANKAA" ? "INTERNAL" : "OTP")) === "INTERNAL") ?? null;
+  const customerPending =
+    current?.signers.filter(s => s.side === "CUSTOMER" && s.status !== "SIGNED").length ?? 0;
+  /**
+   * Só aparece quando de fato falta a nossa: coleta viva, todo o lado do cliente
+   * assinado, e a Ankaa ainda não. É a condição exata do aviso "todos já
+   * assinaram e aguardam você" — desenhar o botão antes disso convidaria a um
+   * clique que o servidor recusa com "aguarde os responsáveis do cliente".
+   */
+  const canCountersign =
+    canManage &&
+    !!current &&
+    current.status === "RUNNING" &&
+    !!ankaaSigner &&
+    ankaaSigner.status !== "SIGNED" &&
+    ankaaSigner.ceremony === "INTERNAL" &&
+    customerPending === 0;
   const label = current ? ENVELOPE_LABEL[current.status] ?? { text: current.status, tone: "muted" as Tone } : null;
 
   const titleInner = (
@@ -532,6 +585,46 @@ export function SignatureEnvelopeCard({
       <div className="space-y-3">
         <ChangePanel envelope={current} />
 
+        {/* ---- Contra-assinatura da Ankaa ----
+            Um botão. Sem CPF, sem cargo e sem código: quem chega aqui já está
+            autenticado numa sessão que o próprio servidor emitiu, e o servidor
+            confere que é ELE o signatário designado. O que a cerimônia elaborada
+            protege é o outro lado — é o cliente que pode alegar que não assinou. */}
+        {canCountersign && (
+          <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3.5 sm:flex-row sm:items-center">
+            <div className="min-w-0 space-y-1">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <IconCircleCheck className="h-4 w-4 shrink-0 text-green-600" />
+                {current.signers.filter(s => s.side === "CUSTOMER").length === 1
+                  ? "O responsável do cliente já assinou."
+                  : "Todos os responsáveis do cliente já assinaram."}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Falta a contra-assinatura da Ankaa ({ankaaSigner!.name}). Ao confirmar, o
+                documento final é emitido e o orçamento é aprovado.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0 gap-1.5"
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () => signatureService.countersign(current.id),
+                  "Orçamento contra-assinado.",
+                )
+              }
+            >
+              {busy ? (
+                <IconLoader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <IconSignature className="h-4 w-4" />
+              )}
+              Contra-assinar
+            </Button>
+          </div>
+        )}
+
         {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
             <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
@@ -576,6 +669,14 @@ export function SignatureEnvelopeCard({
         <div className="space-y-1.5">
           {current.signers.map(s => {
             const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
+            const ceremony = s.ceremony ?? (s.side === "ANKAA" ? "INTERNAL" : "OTP");
+            // O recorte deste signatário, quando a coleta congelou mais de um.
+            // Com um só não há o que distinguir, e o rótulo "Documento completo"
+            // repetido em toda linha só faria ruído.
+            const variant =
+              (current.documents?.length ?? 0) > 1
+                ? (current.documents ?? []).find(d => d.id === s.documentId) ?? null
+                : null;
             // `cargoList` vem pronto do servidor. O fallback para `cargo` cobre
             // envelopes lidos antes desta versão da API, sem quebrar a linha.
             const roleList = s.cargoList?.length ? s.cargoList : s.cargo ? [s.cargo] : [];
@@ -602,6 +703,25 @@ export function SignatureEnvelopeCard({
                       <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass.bad}`}>
                         CPF diverge
                       </Badge>
+                    )}
+                    {variant && (
+                      // O que ESTA pessoa recebeu. Sem isto o painel dizia
+                      // "3 de 4 assinaram" sem dizer o que cada um assinou — e
+                      // numa coleta diversificada essa é a pergunta.
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className={`h-5 cursor-default px-1.5 text-[10px] ${variant.isFull ? toneClass.muted : toneClass.warn}`}
+                          >
+                            {variant.label}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[260px]">
+                          Recebeu um PDF com {variant.isFull ? "todas as seções" : "apenas essas seções"} do
+                          orçamento.
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                   {/* Um contato pode acumular nove funções ("Comercial,
@@ -660,7 +780,11 @@ export function SignatureEnvelopeCard({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  {canManage && s.status !== "SIGNED" && s.status !== "REFUSED" && (
+                  {/* O lado da Ankaa não tem link para copiar nem convite para
+                      reenviar: ele não assina por link. O ato dele é o botão do
+                      painel acima, e oferecer aqui as três ações do cliente
+                      convidaria a distribuir uma capability que já não existe. */}
+                  {canManage && ceremony === "OTP" && s.status !== "SIGNED" && s.status !== "REFUSED" && (
                     <>
                       <Button
                         variant="ghost"
@@ -746,6 +870,46 @@ export function SignatureEnvelopeCard({
           </div>
         </div>
 
+        {/* ---- Os documentos congelados ----
+            Só quando há mais de um. Com um só, a lista repetiria o que o botão
+            "PDF" do cabeçalho já entrega, e chamaria de recorte o documento que
+            sempre foi o orçamento inteiro. */}
+        {(current.documents?.length ?? 0) > 1 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Documentos gerados
+            </p>
+            {(current.documents ?? []).map(d => (
+              <div
+                key={d.id}
+                className="flex items-center gap-2.5 rounded-lg bg-muted/50 px-4 py-2"
+              >
+                <IconFileTypePdf className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{d.label}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {d.signers.length > 0
+                      ? d.signers.join(", ")
+                      : // O recorte completo existe mesmo sem nenhum contato do
+                        // cliente nele: é o instrumento, e é o que a Ankaa assina.
+                        "somente a contra-assinatura da Ankaa"}
+                    {d.padesLevel ? ` · PAdES ${d.padesLevel}` : ""}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1.5"
+                  onClick={() => openPdf(current.id, d.id)}
+                >
+                  <IconFileTypePdf className="h-3.5 w-3.5" />
+                  Abrir
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {history.length > 0 && (
           <div className="pt-1">
             <button
@@ -821,10 +985,10 @@ export function SignatureEnvelopeCard({
           quoteId={quoteId}
           mode={sendDialog ?? "create"}
           busy={busy}
-          onSend={async ch => {
+          onSend={async (ch, signers) => {
             setSendDialog(null);
             await run(
-              () => signatureService.createEnvelope(quoteId, { channel: ch }),
+              () => signatureService.createEnvelope(quoteId, { channel: ch, signers }),
               sendDialog === "reissue"
                 ? "Reenviado para assinatura."
                 : "Enviado para assinatura.",
@@ -847,10 +1011,10 @@ export function SignatureEnvelopeCard({
           quoteId={quoteId}
           mode={sendDialog ?? "create"}
           busy={busy}
-          onSend={async ch => {
+          onSend={async (ch, signers) => {
             setSendDialog(null);
             await run(
-              () => signatureService.createEnvelope(quoteId, { channel: ch }),
+              () => signatureService.createEnvelope(quoteId, { channel: ch, signers }),
               sendDialog === "reissue"
                 ? "Reenviado para assinatura."
                 : "Enviado para assinatura.",

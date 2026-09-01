@@ -69,6 +69,7 @@ import {
   IconDeviceMobileMessage,
   IconMail,
   IconExternalLink,
+  IconFileText,
   IconFileTypePdf,
   IconLoader2,
   IconShieldCheck,
@@ -427,6 +428,22 @@ export default function PublicSignaturePage() {
   const identityVisible = state.canSign && (step === "review" || step === "code");
 
   /**
+   * O RECORTE deste signatário. `?? null` cobre um envelope servido por uma API
+   * anterior ao campo, onde o documento era sempre o inteiro.
+   */
+  const document = state.document ?? null;
+  const isPartial = document ? !document.isFull : false;
+
+  /**
+   * O total só aparece quando o documento à frente da pessoa o exibe.
+   *
+   * Ele vem `null` do servidor no recorte sem preço, e imprimi-lo aqui — no
+   * cabeçalho, no diálogo e no termo — desfaria em três lugares a decisão de não
+   * mandá-lo. Onde a frase precisa do valor para fazer sentido, a frase muda.
+   */
+  const totalText = envelope.total;
+
+  /**
    * Canal DESTA coleta, como o servidor a emitiu — não uma preferência da
    * página. Toda a cópia desta tela depende dele: pedir na caixa de spam um
    * código que chegou pelo WhatsApp manda o signatário procurar no lugar errado
@@ -460,8 +477,25 @@ export default function PublicSignaturePage() {
               </p>
             </div>
             <div className="border-t border-dashed border-border pt-3 sm:border-0 sm:pt-0 sm:text-right">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Valor total</p>
-              <p className="text-xl font-bold">{envelope.total}</p>
+              {totalText ? (
+                <>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Valor total
+                  </p>
+                  <p className="text-xl font-bold">{totalText}</p>
+                </>
+              ) : (
+                <>
+                  {/* Sem preço, o cabeçalho diz O QUE este documento é em vez de
+                      deixar um espaço vazio onde o valor estaria. Silêncio ali
+                      faria a pessoa procurar o número e concluir que a página
+                      quebrou. */}
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Este documento
+                  </p>
+                  <p className="text-base font-semibold">{document?.label ?? "Orçamento"}</p>
+                </>
+              )}
               <p className="flex items-center gap-1 text-xs text-muted-foreground sm:justify-end">
                 <IconClock className="h-3.5 w-3.5" />
                 Válido até {new Date(envelope.deadlineAt).toLocaleDateString("pt-BR")}
@@ -488,15 +522,27 @@ export default function PublicSignaturePage() {
                 {refusing ? "Recusar assinatura" : "Confirmar assinatura"}
               </DialogTitle>
               <DialogDescription>
-                Orçamento nº {envelope.budgetNumber} · {envelope.total} · {company.name}
+                Orçamento nº {envelope.budgetNumber}
+                {totalText ? ` · ${totalText}` : ""} · {company.name}
               </DialogDescription>
             </DialogHeader>
 
             <div className="max-h-[38vh] space-y-3 overflow-y-auto rounded-lg border border-border bg-muted/50 p-4 text-sm leading-relaxed">
               <p className="font-medium text-foreground">
                 Você foi indicado por {COMPANY_INFO.name} para revisar e assinar
-                eletronicamente o orçamento nº {envelope.budgetNumber}, no valor de{" "}
-                {envelope.total}.
+                eletronicamente
+                {totalText ? (
+                  <> o orçamento nº {envelope.budgetNumber}, no valor de {totalText}.</>
+                ) : (
+                  // Sem o valor, a frase precisa dizer que o documento é um
+                  // RECORTE — senão ela afirma que a pessoa vai assinar "o
+                  // orçamento", e ela está assinando uma parte dele.
+                  <>
+                    {" "}
+                    as seções do orçamento nº {envelope.budgetNumber} pertinentes à sua
+                    função ({document?.label?.toLowerCase() ?? "recorte"}).
+                  </>
+                )}
               </p>
               <p className="text-muted-foreground">{envelope.acceptanceClause}</p>
 
@@ -796,7 +842,51 @@ export default function PublicSignaturePage() {
             empurrava este aviso para ~2900px, três telas e meia abaixo no
             celular. Quem abre um link morto precisa saber disso antes de ler o
             documento inteiro, não depois. */}
-        {!state.canSign && step !== "done" && step !== "refused" && (
+        {/* ---- Lado da Ankaa: aqui só se CONFERE o documento ----
+            O ato dele acontece no painel do orçamento, atrás do login. Esta tela
+            existe para ele abrir o PDF e revisar; oferecer CPF, cargo e código
+            seria desenhar um formulário que o servidor recusa. Ver
+            `assertOtpCeremony` na api. */}
+        {signer.ceremony === "INTERNAL" && signer.status !== "SIGNED" && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="flex items-start gap-3 py-4">
+              <IconShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Contra-assinatura da {COMPANY_INFO.name}
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {state.internalNotice ??
+                    "A contra-assinatura da Ankaa é feita dentro do sistema, na tela do orçamento. Entre com sua conta e conclua por lá."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ---- Aviso de RECORTE ----
+            Dito em voz alta porque a declaração que a pessoa aceita afirma ter
+            revisado "as seções pertinentes à minha função". Ela não pode declarar
+            isso sobre um documento que a plataforma apresentou como se fosse o
+            orçamento inteiro. */}
+        {isPartial && state.canSign && (
+          <Card className="border-border bg-muted/40">
+            <CardContent className="flex items-start gap-3 py-3.5">
+              <IconFileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Este documento reproduz{" "}
+                <strong className="text-foreground">
+                  {document?.label?.toLowerCase()}
+                </strong>{" "}
+                do orçamento nº {envelope.budgetNumber} — as seções pertinentes à sua
+                função. O orçamento completo é assinado integralmente pela{" "}
+                {COMPANY_INFO.name} e pelos demais responsáveis indicados.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!state.canSign && signer.ceremony !== "INTERNAL" && step !== "done" && step !== "refused" && (
           <Card className="border-amber-500/30 bg-amber-500/10">
             <CardContent className="space-y-3 py-4">
               <div className="flex items-start gap-3">

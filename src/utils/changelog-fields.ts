@@ -1332,7 +1332,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         if (value.length > 0 && typeof value[0] === "object" && value[0].name) {
           const ROLE_LABELS: Record<string, string> = {
             COMMERCIAL: "Comercial",
-            OWNER: "Proprietário",
+            PURCHASING: "Compras",
             SELLER: "Vendedor",
             REPRESENTATIVE: "Representante",
             MARKETING: "Marketing",

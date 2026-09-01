@@ -16,9 +16,10 @@ interface ResponsibleRoleBadgesProps {
 /**
  * The single place a contact's roles are rendered as badges.
  *
- * A responsible can hold several roles at once (e.g. OWNER + FINANCIAL) so that
- * colleagues can tell which areas that contact actually handles before reaching
- * out. Keeping one component means the table cell, the detail card and the task
+ * A responsible can hold several roles at once (e.g. COMMERCIAL + FINANCIAL) so
+ * that colleagues can tell which areas that contact actually handles before
+ * reaching out. Keeping one component means the table cell, the detail card and
+ * the task
  * sections cannot drift in colour or ordering.
  */
 export function ResponsibleRoleBadges({ roles, maxVisible, className }: ResponsibleRoleBadgesProps) {

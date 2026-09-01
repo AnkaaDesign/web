@@ -408,6 +408,11 @@ export function ResponsibleForm({
                             if (value) {
                               resetCnpjState();
                             }
+                            // Combobox não dispara onBlur, então em mode:'onBlur'
+                            // o RHF nunca revalida o form a partir daqui — sem
+                            // isso, escolher a empresa por último trava o botão
+                            // "Cadastrar" desabilitado mesmo com tudo preenchido.
+                            form.trigger();
                           }}
                           placeholder="Selecione uma empresa"
                           emptyText={isLookingUp ? "Buscando CNPJ..." : "Nenhuma empresa encontrada"}
@@ -468,7 +473,12 @@ export function ResponsibleForm({
                           mode="multiple"
                           options={roleOptions}
                           value={field.value}
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Mesmo motivo do campo Empresa: sem isso, escolher
+                            // a função por último deixa "Cadastrar" desabilitado.
+                            form.trigger();
+                          }}
                           placeholder="Selecione as funções"
                           searchPlaceholder="Buscar função..."
                           emptyText="Nenhuma função encontrada"

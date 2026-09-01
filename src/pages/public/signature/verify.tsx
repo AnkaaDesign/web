@@ -51,6 +51,23 @@ interface VerificationData {
   padesLevel: string | null;
   certSerialNumber: string | null;
   auditChain: { valid: boolean; events: number; reason: string | null };
+  /**
+   * Os RECORTES desta coleta — um PDF cada, com hash próprio.
+   *
+   * Sem esta lista o portal só conhecia o hash do documento completo e diria
+   * "não confere" para o artefato legítimo de um signatário que recebeu um
+   * recorte — o pior resultado possível numa página cuja única função é dizer se
+   * um documento é verdadeiro. Ausente em envelopes servidos por uma API
+   * anterior ao recurso.
+   */
+  documents?: Array<{
+    label: string;
+    isFull: boolean;
+    originalSha256: string;
+    finalSha256: string | null;
+    padesLevel: string | null;
+    sealedAt: string | null;
+  }>;
   signers: Array<{
     name: string;
     cargo: string | null;
@@ -293,6 +310,48 @@ export default function PublicSignatureVerifyPage() {
                     )}
                   </dl>
                 </Section>
+
+                {/* ── Recortes ───────────────────────────────────────────────
+                    Só quando há mais de um. Com um só, esta seção repetiria os
+                    hashes já listados acima e chamaria de recorte o documento
+                    que sempre foi o orçamento inteiro. */}
+                {(data.documents?.length ?? 0) > 1 && (
+                  <Section title="Documentos desta assinatura">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Cada responsável recebeu as seções pertinentes à função dele, num
+                      arquivo próprio e com selo próprio. Confira o hash do arquivo que
+                      você tem em mãos contra a lista abaixo — todos pertencem a esta
+                      mesma cerimônia.
+                    </p>
+                    <ul className="divide-y divide-border/70">
+                      {(data.documents ?? []).map(d => (
+                        <li key={d.originalSha256} className="py-3">
+                          <p className="text-sm font-medium text-foreground">
+                            {d.label}
+                            {d.isFull && (
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                (o instrumento)
+                              </span>
+                            )}
+                          </p>
+                          <dl className="mt-2 space-y-2">
+                            <Row label="SHA-256 do original" value={d.originalSha256} mono />
+                            {d.finalSha256 && (
+                              <Row
+                                label="SHA-256 do assinado"
+                                value={d.finalSha256}
+                                mono
+                              />
+                            )}
+                            {d.padesLevel && (
+                              <Row label="Selo" value={`PAdES ${d.padesLevel}`} />
+                            )}
+                          </dl>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
 
                 {/* ── Roster ─────────────────────────────────────────────── */}
                 <Section title="Signatários">

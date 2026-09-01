@@ -27,7 +27,33 @@ export const DELIVERY_CHANNEL_LABELS: Record<DeliveryChannel, string> = {
   EMAIL: "E-mail",
 };
 
-/** Quem recebe o convite, e por onde é possível alcançá-lo. */
+/**
+ * As seções recortáveis do orçamento. Espelha `QUOTE_SECTIONS` na api — a ORDEM
+ * é canônica e define a chave de deduplicação do recorte lá.
+ */
+export const QUOTE_SECTIONS = [
+  "VEHICLE",
+  "SERVICES",
+  "PRICING",
+  "DELIVERY",
+  "PAYMENT",
+  "GUARANTEE",
+  "LAYOUT",
+] as const;
+
+export type QuoteSection = (typeof QUOTE_SECTIONS)[number];
+
+export const QUOTE_SECTION_LABELS: Record<QuoteSection, string> = {
+  VEHICLE: "Identificação do veículo",
+  SERVICES: "Lista de serviços",
+  PRICING: "Valores e desconto",
+  DELIVERY: "Prazo de entrega",
+  PAYMENT: "Condições de pagamento",
+  GUARANTEE: "Garantias",
+  LAYOUT: "Layout",
+};
+
+/** Quem recebe o convite, por onde é possível alcançá-lo, e o que ele recebe. */
 export interface PreflightRecipient {
   id: string;
   name: string;
@@ -35,6 +61,15 @@ export interface PreflightRecipient {
   emailMasked: string;
   hasPhone: boolean;
   hasEmail: boolean;
+  /** Funções do cadastro — é delas que sai o recorte padrão. */
+  roles: string[];
+  rolesLabel: string;
+  /**
+   * O recorte PADRÃO deste contato. Vazio = ele não entra na coleta, que é o
+   * estado inicial do gestor de frota e do motorista.
+   */
+  sections: QuoteSection[];
+  sectionsLabel: string;
 }
 
 export interface PreflightChannelStatus {
@@ -56,7 +91,19 @@ export interface DeliveryPreflight extends DeliverySettings {
   /** Impedem qualquer canal (coleta em andamento, orçamento vencido, sem responsável). */
   blockers: string[];
   recipients: PreflightRecipient[];
-  ankaa: { name: string; hasPhone: boolean; hasEmail: boolean } | null;
+  /** Catálogo das seções, com rótulo e descrição — a tela desenha as caixas daqui. */
+  sectionCatalog: Array<{ key: QuoteSection; label: string; description: string }>;
+  ankaa: {
+    name: string;
+    hasPhone: boolean;
+    hasEmail: boolean;
+    /**
+     * A Ankaa contra-assina DENTRO do sistema, em sessão autenticada. O contato
+     * serve só para o aviso de que o cliente terminou — por isso a falta dele
+     * deixou de impedir a emissão e virou apenas um aviso na tela.
+     */
+    reachable: boolean;
+  } | null;
   channelStatus: Record<DeliveryChannel, PreflightChannelStatus>;
   /**
    * Identificação do veículo no momento do envio. Aviso, nunca bloqueio.
@@ -73,7 +120,13 @@ export interface PublicSignerState {
     id: string;
     status: string;
     budgetNumber: number;
-    total: string;
+    /**
+     * `null` quando o recorte deste signatário NÃO exibe valores.
+     *
+     * A página imprimia este total no cabeçalho, e mostrá-lo a quem recebeu um
+     * documento sem preço desfaria a decisão inteira de não lhe mostrar o valor.
+     */
+    total: string | null;
     deadlineAt: string;
     verificationCode: string;
     acceptanceClause: string;
@@ -87,9 +140,23 @@ export interface PublicSignerState {
      */
     changes?: QuoteChange[];
   };
+  /** O recorte que ESTE signatário recebeu. */
+  document: {
+    sections: QuoteSection[];
+    /** "Documento completo", "Layout", "Somente texto básico"… */
+    label: string;
+    isFull: boolean;
+    sha256: string;
+  };
   signer: {
     id: string;
     name: string;
+    /**
+     * `INTERNAL` é o lado da Ankaa, que contra-assina no painel do orçamento com
+     * a sessão autenticada — sem CPF, sem cargo e sem código. A página pública
+     * dele serve só para conferir o documento.
+     */
+    ceremony: "OTP" | "INTERNAL";
     /** @deprecated Use `contactMasked` — vale só quando `channel === "EMAIL"`. */
     emailMasked: string;
     /** @deprecated Use `contactParts` — vale só quando `channel === "EMAIL"`. */
@@ -124,6 +191,23 @@ export interface PublicSignerState {
   company: { name: string; cnpj: string | null };
   declarations: Array<{ key: string; text: string }>;
   canSign: boolean;
+  /** Só em `ceremony === "INTERNAL"`: diz onde o ato de fato acontece. */
+  internalNotice?: string;
+}
+
+/** Um dos PDFs congelados por uma coleta. */
+export interface EnvelopeDocumentSummary {
+  id: string;
+  variantKey: string;
+  sections: QuoteSection[];
+  label: string;
+  isFull: boolean;
+  originalSha256: string;
+  finalSha256: string | null;
+  padesLevel: string | null;
+  sealedAt: string | null;
+  /** Nomes dos signatários amarrados a este recorte. */
+  signers: string[];
 }
 
 export const signatureService = {
@@ -213,8 +297,31 @@ export const signatureService = {
    * Emite a coleta. `channel` só é honrado quando o servidor está em `both`;
    * nos modos fixos ele é ignorado e o canal configurado prevalece.
    */
-  createEnvelope: (quoteId: string, data?: { channel?: DeliveryChannel | null }) =>
-    apiClient.post(`/signature-envelopes/quote/${quoteId}`, data ?? {}),
+  /**
+   * Emite a coleta. `channel` só é honrado quando o servidor está em `both`;
+   * nos modos fixos ele é ignorado e o canal configurado prevalece.
+   *
+   * `signers` é MAPA DE EXCEÇÕES, não roster: mandar só os contatos cujo recorte
+   * o operador mexeu. Quem não vier cai no padrão das funções — e é isso que
+   * impede uma tela aberta antes de alguém acrescentar um responsável de emitir
+   * a coleta sem ele.
+   */
+  createEnvelope: (
+    quoteId: string,
+    data?: {
+      channel?: DeliveryChannel | null;
+      signers?: Array<{ responsibleId: string; sections: QuoteSection[] }>;
+    },
+  ) => apiClient.post(`/signature-envelopes/quote/${quoteId}`, data ?? {}),
+
+  /**
+   * Contra-assinatura da Ankaa — um POST, sem código.
+   *
+   * A autenticação é a sessão do próprio sistema; o servidor confere que quem
+   * chama é O signatário designado do envelope.
+   */
+  countersign: (envelopeId: string) =>
+    apiClient.post(`/signature-envelopes/${envelopeId}/contra-assinar`),
 
   listForQuote: (quoteId: string) => apiClient.get(`/signature-envelopes/quote/${quoteId}`),
 
@@ -235,10 +342,16 @@ export const signatureService = {
    * token) e abrir um object URL resolve, e de quebra o PDF nunca trafega numa
    * URL que possa vazar em histórico ou referer.
    */
-  openInternalDocument: async (envelopeId: string): Promise<void> => {
+  openInternalDocument: async (envelopeId: string, documentId?: string | null): Promise<void> => {
     const res: any = await apiClient.get(
       `/signature-envelopes/${envelopeId}/document.pdf`,
-      { responseType: "blob", metadata: { suppressToast: true } } as any,
+      {
+        responseType: "blob",
+        metadata: { suppressToast: true },
+        // `?recorte=` serve UM dos PDFs congelados. Sem ele vem o completo, que
+        // é o instrumento e o que o operador quer ver por padrão.
+        ...(documentId ? { params: { recorte: documentId } } : {}),
+      } as any,
     );
     const blob = res?.data instanceof Blob ? res.data : new Blob([res?.data], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);

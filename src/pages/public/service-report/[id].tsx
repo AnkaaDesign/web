@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { pickPrimaryResponsible } from "@/types/responsible";
 import { useParams } from "react-router-dom";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
@@ -181,8 +182,11 @@ export function PublicServiceReportPage() {
   // Derived data
   const activeConfig = quote.customerConfigs?.find((c: any) => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
   const budgetNumber = quote.budgetNumber ? String(quote.budgetNumber).padStart(4, "0") : "0000";
-  const ownerResponsible = quote.task?.responsibles?.find((r: any) => r.roles?.includes('OWNER'));
-  const contactName = activeConfig?.responsible?.name || ownerResponsible?.name || quote.task?.responsibles?.[0]?.name || "";
+  // O principal segue a ordem de preferência de funções (COMERCIAL primeiro): a
+  // função PROPRIETÁRIO, que era o critério aqui, deixou de existir. Ver
+  // `pickPrimaryResponsible`.
+  const primaryResponsible = pickPrimaryResponsible<any>(quote.task?.responsibles);
+  const contactName = activeConfig?.responsible?.name || primaryResponsible?.name || "";
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
 

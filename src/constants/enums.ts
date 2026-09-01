@@ -2789,12 +2789,24 @@ export enum DISCOUNT_TYPE {
   FIXED_VALUE = "FIXED_VALUE",
 }
 
+/**
+ * Funções de um contato do cliente.
+ *
+ * A ORDEM É A DO ENUM DO BANCO e é significativa: a API ordena `roles` por ela
+ * para manter estável o diff do changelog, e ela agrupa as funções pela FATIA do
+ * orçamento que cada uma recebe na assinatura eletrônica — primeiro as que
+ * recebem tudo, depois as que recebem um recorte, por último as que por padrão
+ * não assinam.
+ *
+ * `OWNER` foi removida em 2026-09-01. Os contatos que a tinham receberam
+ * COMMERCIAL + MARKETING + FINANCIAL + FLEET_MANAGER na migração.
+ */
 export enum RESPONSIBLE_ROLE {
   COMMERCIAL = "COMMERCIAL",
-  OWNER = "OWNER",
   SELLER = "SELLER",
   REPRESENTATIVE = "REPRESENTATIVE",
   COORDINATOR = "COORDINATOR",
+  PURCHASING = "PURCHASING",
   MARKETING = "MARKETING",
   FINANCIAL = "FINANCIAL",
   FLEET_MANAGER = "FLEET_MANAGER",
