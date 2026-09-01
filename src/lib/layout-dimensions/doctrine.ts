@@ -271,14 +271,6 @@ function stickerDims(
   p: DoctrineParams,
   label: string,
   index: number,
-  /**
-   * Espelha as âncoras: a vertical mede da OUTRA borda da face e a horizontal
-   * da OUTRA lateral. É a "segunda medida possível" do clique repetido no
-   * visualizador — a doutrina escolhe a borda mais próxima por padrão, mas o
-   * aplicador às vezes quer justamente a outra (medir do começo do baú em vez
-   * do fim). Nada do plano padrão passa por aqui com `flip` ligado.
-   */
-  flip = false,
 ): Routed[] {
   const b = s.boxCm;
   const out: Routed[] = [];
@@ -292,11 +284,6 @@ function stickerDims(
   // assenta, então a cota vai até a base dela mesmo vindo do teto.
   const shortPiece = b.y1 - b.y0 < p.bottomAnchorMaxHeightCm;
   const onLeft = centerX(b) <= p.lateralMidFrac * widthCm;
-  // com `flip`, as duas escolhas de borda invertem juntas: as cotas da
-  // variante falam do canto OPOSTO ao do plano padrão, e continuam se
-  // encontrando num canto só (ver `preferSide` em `dim`)
-  const useTop = flip ? !inTopBand : inTopBand;
-  const useLeft = flip ? !onLeft : onLeft;
 
   // Cota-se o eixo que SOBRA.
   //
@@ -306,37 +293,82 @@ function stickerDims(
   // jogava as duas fora junto — e eram 88,3% dos envelopamentos do acervo.
   const axes = s.bleedAxes;
 
+  /**
+   * QUANDO A BORDA MAIS PRÓXIMA NÃO DÁ NÚMERO, QUEM POSICIONA É A OUTRA.
+   *
+   * A doutrina escolhe a borda pela posição da peça na face (§1 e §3), e é ela
+   * que vale em quase todo caso. Mas há a peça que está COLADA na borda
+   * escolhida — o QR a 1 cm da lateral, o letreiro que encosta no teto —, e aí
+   * a borda preferida devolve 1, 0, ou um número negativo quando a arte
+   * transborda o quadro. Isso não é uma medida: é o aviso de que ali não há
+   * distância a marcar, e a distância que existe é a do outro lado.
+   *
+   * Medido no acervo em modo navegador: 159 de 2.710 itens (5,9%) perdiam uma
+   * das duas cotas exatamente assim — 131 a horizontal e 28 a vertical, todas
+   * com a borda escolhida a 0 ou 1 cm. O aplicador clicava e via meia posição.
+   *
+   * A âncora é presa dentro da face antes da conta, senão a arte que sangra
+   * para fora do quadro produz cota negativa.
+   */
+  const clamp = (at: number, span: number) => Math.min(Math.max(at, 0), span);
+  const valueFrom = (at: number, span: number, fromStart: boolean) =>
+    Math.round(fromStart ? clamp(at, span) : span - clamp(at, span));
 
-  // vertical: mede até a linha em que a forma se apoia, não até o descendente
+  const vFrom = (fromTop: boolean) => {
+    const e = owningEdge(s, fromTop && !shortPiece ? "top" : "bottom");
+    return { edge: e, value: valueFrom(e.at, heightCm, fromTop) };
+  };
+  const hFrom = (fromLeft: boolean) => {
+    const e = owningEdge(s, fromLeft ? "left" : "right");
+    return { edge: e, value: valueFrom(e.at, widthCm, fromLeft) };
+  };
+  /** A borda preferida, ou a oposta quando a preferida não tem o que dizer. */
+  const settle = <T extends { value: number }>(prefer: boolean, of: (v: boolean) => T) => {
+    const first = of(prefer);
+    if (first.value >= p.minValueCm) return { use: prefer, pick: first };
+    const second = of(!prefer);
+    return second.value >= p.minValueCm
+      ? { use: !prefer, pick: second }
+      : { use: prefer, pick: first };
+  };
+
+  const vChoice = settle(inTopBand, vFrom);
+  const hChoice = settle(onLeft, hFrom);
+  const useTop = vChoice.use;
+  const useLeft = hChoice.use;
+
   // O canto de referência do item: a vertical mede do teto ou do piso, a
   // horizontal mede da esquerda ou da direita. As duas linhas moram nesse canto.
   const vSide: "min" | "max" = useLeft ? "min" : "max";
   const hSide: "min" | "max" = useTop ? "min" : "max";
 
+  // vertical: mede até a linha em que a forma se apoia, não até o descendente
   if (!axes.vertical) {
-  const v = owningEdge(s, useTop && !shortPiece ? "top" : "bottom");
-  const perpV: Perp = {
-    lo: v.from, hi: v.to, boxLo: b.x0, boxHi: b.x1,
-    at: (v.from + v.to) / 2, span: widthCm,
-  };
-  out.push(
-    useTop
-      ? dim("V", 0, v.at, "EDGE_TOP", perpV, p, label, index, undefined, vSide)
-      : dim("V", v.at, heightCm, "EDGE_BOTTOM", perpV, p, label, index, undefined, vSide),
-  );
+    const v = vChoice.pick.edge;
+    const at = clamp(v.at, heightCm);
+    const perpV: Perp = {
+      lo: v.from, hi: v.to, boxLo: b.x0, boxHi: b.x1,
+      at: (v.from + v.to) / 2, span: widthCm,
+    };
+    out.push(
+      useTop
+        ? dim("V", 0, at, "EDGE_TOP", perpV, p, label, index, undefined, vSide)
+        : dim("V", at, heightCm, "EDGE_BOTTOM", perpV, p, label, index, undefined, vSide),
+    );
   }
 
   // horizontal: idem, pelo lado da peça que manda
   const pushH = (edge: "left" | "right") => {
     const h = owningEdge(s, edge);
+    const at = clamp(h.at, widthCm);
     const perpH: Perp = {
       lo: h.from, hi: h.to, boxLo: b.y0, boxHi: b.y1,
       at: (h.from + h.to) / 2, span: heightCm,
     };
     out.push(
       edge === "left"
-        ? dim("H", 0, h.at, "EDGE_LEFT", perpH, p, label, index, undefined, hSide)
-        : dim("H", h.at, widthCm, "EDGE_RIGHT", perpH, p, label, index, undefined, hSide),
+        ? dim("H", 0, at, "EDGE_LEFT", perpH, p, label, index, undefined, hSide)
+        : dim("H", at, widthCm, "EDGE_RIGHT", perpH, p, label, index, undefined, hSide),
     );
   };
   // SEMPRE uma só, pela borda mais próxima.
@@ -379,8 +411,6 @@ function crossingDims(
   p: DoctrineParams,
   targetIndex: number,
   label: string,
-  /** mede a fronteira da OUTRA quina — a variante do clique repetido */
-  flip = false,
 ): { routed: Routed; boundary: "start" | "end" }[] {
   const vertical = c.edge === "left" || c.edge === "right";
   const lengthCm = vertical ? heightCm : widthCm;
@@ -412,7 +442,7 @@ function crossingDims(
     out.push({
       boundary: side,
       routed:
-        (fromStart <= fromEnd) !== flip
+        fromStart <= fromEnd
           ? dim(axis, 0, boundary, kind, perp, p, label, targetIndex, note)
           : dim(axis, boundary, lengthCm, kind, perp, p, label, targetIndex, note),
     });
@@ -519,11 +549,10 @@ function pickCrossings(
   heightCm: number,
   p: DoctrineParams,
   label: (itemIndex: number) => string,
-  flip = false,
 ): Routed[] {
   const best = new Map<string, { gap: number; edge: BorderCrossing["edge"]; routed: Routed }>();
   for (const c of crossings) {
-    for (const e of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex), flip)) {
+    for (const e of crossingDims(c, widthCm, heightCm, p, c.wrapIndex, label(c.wrapIndex))) {
       // A chave é a FRONTEIRA de onde a travessia veio, não a quina de onde ela
       // foi medida. Chaveando pela quina, duas fronteiras distintas que por
       // acaso ficam ambas mais perto da esquerda colidem e uma some — 322 de
@@ -585,27 +614,51 @@ const PRIORITY: Record<Dimension["kind"], number> = {
 };
 
 /**
- * Duas cotas que dizem a mesma coisa viram uma.
+ * Duas cotas que dizem a mesma coisa viram uma — mas a que fica HERDA o dono da
+ * que saiu.
  *
  * A comparação é por (eixo, natureza): sem isso uma cota de travessia de
  * envelopamento apagava a cota de borda de um adesivo que por acaso começava no
  * mesmo lugar — e são coisas diferentes, uma diz onde a faixa cruza a quina e a
  * outra onde o logotipo assenta.
+ *
+ * A herança é o que faltava. Duas peças na mesma altura pedem a mesma cota
+ * vertical, e desenhar as duas põe número em cima de número; só que o
+ * visualizador mostra as cotas DO ITEM CLICADO, e a sobrevivente pertence à
+ * outra peça. O operador clicava em "Saúde" e via só a distância lateral — a
+ * altura existia, medida, desenhada, e registrada no vizinho. Agora a cota que
+ * fica sabe todos os itens que ela explica.
+ *
+ * E "a mesma coisa" inclui o NÚMERO. As pontas a menos de 2 cm uma da outra não
+ * bastam: com essa folga sozinha, o "149" da assinatura do MACHADÃO era
+ * absorvido pelo "147" da faixa que passa atrás, e quem clicava na assinatura
+ * recebia a posição do vizinho. Medido no acervo, 289 das 543 cotas herdadas
+ * traziam um valor diferente do que a peça herdeira mediria sozinha. Duas cotas
+ * com números diferentes não dizem a mesma coisa — dizem duas, e as duas são
+ * verdade sobre peças diferentes.
  */
 function dedupe(routed: Routed[], tol = 2): Routed[] {
   const out: Routed[] = [];
   for (const r of routed) {
     const d = r.dimension;
-    const same = out.some((o) => {
+    const host = out.find((o) => {
       const e = o.dimension;
       return (
         e.axis === d.axis &&
         PRIORITY[e.kind] === PRIORITY[d.kind] &&
+        e.valueCm === d.valueCm &&
         Math.abs(e.aCm - d.aCm) < tol &&
         Math.abs(e.bCm - d.bCm) < tol
       );
     });
-    if (!same) out.push(r);
+    if (!host) {
+      out.push(r);
+      continue;
+    }
+    const owner = d.targetIndex;
+    if (owner === undefined || owner === host.dimension.targetIndex) continue;
+    const also = host.dimension.alsoTargets ?? [];
+    if (!also.includes(owner)) host.dimension.alsoTargets = [...also, owner];
   }
   return out;
 }
@@ -615,45 +668,63 @@ export function planDimensions(
   items: Sticker[],
   crossings: BorderCrossing[],
   params: DoctrineParams = DEFAULT_DOCTRINE,
-  /**
-   * Plano ALTERNATIVO: as mesmas cotas com as âncoras espelhadas (a vertical
-   * pela outra borda da face, a horizontal pela outra lateral, a travessia
-   * pela outra quina). É o que o segundo clique num item mostra no
-   * visualizador. As cotas relativas não têm espelho e saem iguais.
-   */
-  flip = false,
 ): Dimension[] {
   const widthCm = panelWidthCm(panel);
   const heightCm = panel.heightCm;
   const main = items.slice(0, params.maxStickers);
   const nameOf = (i: number) => (items[i]?.bleeds ? `envelopamento ${i + 1}` : `adesivo ${i + 1}`);
-  let routed: Routed[] = [];
+  /**
+   * A cota de POSIÇÃO do adesivo é intocável; o resto é acessório.
+   *
+   * Cada peça sai daqui com uma altura e uma distância, e são elas que o
+   * aplicador usa para colar. As outras — o vão interno do conjunto, a
+   * travessia do envelopamento — explicam o desenho, mas não posicionam nada
+   * sozinhas. Misturar as duas classes num filtro só fazia a peça perder
+   * justamente a medida que importa: um logotipo a 2 cm da lateral saía sem
+   * distância nenhuma porque 2 é menor que o piso de 3, e o piso existe para
+   * não desenhar cota de vão, não para apagar a posição de um adesivo.
+   */
+  const essential: Routed[] = [];
+  const extra: Routed[] = [];
   main.forEach((item, i) => {
     const label = nameOf(i);
-    routed.push(...stickerDims(item, widthCm, heightCm, params, label, i, flip));
+    essential.push(...stickerDims(item, widthCm, heightCm, params, label, i));
     if (params.relativeDims && !item.bleeds) {
-      routed.push(...relativeDims(item, params, label, i));
+      extra.push(...relativeDims(item, params, label, i));
     }
   });
-  routed.push(
+  extra.push(
     ...pickCrossings(
       crossings.filter((c) => c.wrapIndex < main.length),
       widthCm,
       heightCm,
       params,
       nameOf,
-      flip,
     ),
   );
 
-  routed = routed.filter((r) => r.dimension.valueCm >= params.minValueCm);
-  routed = dedupe(routed);
+  const keep = extra.filter((r) => r.dimension.valueCm >= params.minValueCm);
+  keep.sort(
+    (a, b) =>
+      PRIORITY[a.dimension.kind] - PRIORITY[b.dimension.kind] ||
+      b.dimension.valueCm - a.dimension.valueCm,
+  );
+  let routed = dedupe([...essential, ...keep]);
+  // o teto corta o acessório, nunca a posição
+  if (routed.length > params.maxDims) {
+    const essentials = new Set(essential.map((r) => r.dimension));
+    const kept = routed.filter((r) => essentials.has(r.dimension));
+    for (const r of routed) {
+      if (kept.length >= params.maxDims) break;
+      if (!essentials.has(r.dimension)) kept.push(r);
+    }
+    routed = kept;
+  }
   routed.sort(
     (a, b) =>
       PRIORITY[a.dimension.kind] - PRIORITY[b.dimension.kind] ||
       b.dimension.valueCm - a.dimension.valueCm,
   );
-  routed = routed.slice(0, params.maxDims);
 
   // Só agora, com o conjunto fechado, cada cota descobre onde as outras estão.
   // O envelopamento é fundo e não estorva — obstáculo é adesivo.

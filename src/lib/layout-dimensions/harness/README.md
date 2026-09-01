@@ -22,5 +22,6 @@ node src/lib/layout-dimensions/harness/run.mjs ~/layouts
 | `demo.mjs <pdf> <saída> <lado> <altura> <seções> [título]` | gera uma face cotada |
 | `bench.mjs <pasta> [--save]` | portão de regressão: mede tudo, compara com `bench.baseline.json` e dá o veredito (ver `BENCH.md`) |
 | `grouping-bench.mjs <pasta> [--save]` | portão do AGRUPAMENTO: taxas de palavra partida, órfão, monstro, item mudo, sem contorno, peça picada, empilhado e marca multicor, mais o que as cotas do projetista dizem sobre item grande demais e picado (ver `GROUPING.md`) |
+| `prodsweep.mjs <pasta> [--out arq]` | o MOTOR ENTREGUE: rasteriza com `@napi-rs/canvas` e monta o `trimToInk` que só existe no DOM, então mede o que a tela faz — custo por arquivo, faces que devolvem a face inteira num clique, faces declaradas inutilizáveis |
 
 `DUMP=<trecho do nome>` em `run.mjs` imprime o diff cota a cota de um arquivo.

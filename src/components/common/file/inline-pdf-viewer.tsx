@@ -447,45 +447,38 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     }, [layoutPanels, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
 
     /**
-     * Clicar de novo no item já escolhido alterna o plano de cotas: o padrão
-     * mede da borda mais próxima; o alternativo, da outra (o fim do adesivo
-     * contra o fim do baú → o começo contra o começo). O ciclo é interno ao
-     * visualizador — o pai só conhece QUAL item está escolhido.
+     * Um item, um plano de cotas.
+     *
+     * O clique repetido já alternou entre o plano da doutrina e um espelhado —
+     * e a alternância era o defeito, não o recurso: o mesmo adesivo dava dois
+     * pares de números conforme quantas vezes se clicasse nele, e o aplicador
+     * não tinha como saber qual dos dois colar. A borda de referência é a que a
+     * doutrina escolhe, sempre; quando ela não tem número a dar (a peça está
+     * colada nela), o próprio plano já mede pela borda oposta.
      */
-    const [dimVariant, setDimVariant] = React.useState(0);
-    React.useEffect(() => {
-      // arquivo ou página novos: o ciclo recomeça do plano padrão
-      setDimVariant(0);
-    }, [layout]);
     const handleSelectItem = React.useCallback(
       (index: number | null) => {
-        if (index !== null && index === selectedItemIndex) {
-          setDimVariant((v) => v + 1);
-          return;
-        }
-        setDimVariant(0);
         onSelectItem?.(index);
       },
-      [onSelectItem, selectedItemIndex],
+      [onSelectItem],
     );
 
     /** As cotas do item escolhido, cada uma com a face de onde veio. */
     const plannedEntries = React.useMemo<PlannedDimensionEntry[]>(() => {
       if (!layout || selectedItemIndex === null) return [];
-      // sem alternativa (eixos suprimidos pelo envelopamento), o clique
-      // repetido não tem o que alternar e o plano padrão permanece
-      const hasAlt = layout.altDimensions.some((d) => d.targetIndex === selectedItemIndex);
-      const source =
-        hasAlt && dimVariant % 2 === 1 ? layout.altDimensions : layout.dimensions;
-      return source
-        .filter((d) => d.targetIndex === selectedItemIndex)
+      // uma cota deduplicada explica mais de um item: "Alimentando" e "Saúde"
+      // assentam na mesma altura e dividem a mesma cota vertical
+      const mine = (d: (typeof layout.dimensions)[number]) =>
+        d.targetIndex === selectedItemIndex || !!d.alsoTargets?.includes(selectedItemIndex);
+      return layout.dimensions
+        .filter(mine)
         .map((dimension) => {
           const item = layout.items[dimension.targetIndex ?? -1];
           const face = layout.faces[item?.faceIndex ?? 0];
           return face ? { dimension, panel: face.panel, scale: face.scale } : null;
         })
         .filter((e): e is PlannedDimensionEntry => e !== null);
-    }, [layout, selectedItemIndex, dimVariant]);
+    }, [layout, selectedItemIndex]);
 
     const selectable = React.useMemo(
       () =>

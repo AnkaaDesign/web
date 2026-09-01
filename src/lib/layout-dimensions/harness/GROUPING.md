@@ -15,14 +15,16 @@ node src/lib/layout-dimensions/harness/grouping-bench.mjs ~/layouts
 ⚠️ **A bancada roda SEM o recorte de tinta.** `createPageInkTrimmer` é do DOM, e
 aqui é Node: `trimToInk` fica `undefined` e o motor medido não é o motor
 entregue. Um defeito pode existir só no navegador — a onda em bitmap do DiCasa
-engolia o logotipo lá e não aqui. Para medir o modo real, rasterize com
-`@napi-rs/canvas` e monte o `makeInkTrimmer` na mão.
+engolia o logotipo lá e não aqui. Para medir o modo real rode
+**`prodsweep.mjs`**, que rasteriza com `@napi-rs/canvas` e monta o
+`makeInkTrimmer` na mão.
 
-Leva **100 a 125 s** nas 466 faces dos 260 arquivos (contra 23 s do `bench.mjs`: aqui
-cada par de itens candidato paga um teste de contorno, que é o preço de não
-decidir nada pela caixa). É determinístico — duas passadas no mesmo bundle dão o
-mesmo número até a última casa (verificado: `metrics` e `perFace` idênticos byte a byte em duas passadas). **Reempacote antes de rodar**, senão você mede o
-bundle velho.
+Leva **~29 s** nas 467 faces dos 260 arquivos (eram 100 a 125 s antes de o teste
+de contorno prunar por caixa de trecho; o preço de não decidir nada pela caixa
+do item continua sendo um teste de contorno por par candidato). É determinístico
+— duas passadas no mesmo bundle dão o mesmo número até a última casa
+(verificado: `metrics` e `perFace` idênticos byte a byte em duas passadas).
+**Reempacote antes de rodar**, senão você mede o bundle velho.
 
 | flag | efeito |
 |---|---|

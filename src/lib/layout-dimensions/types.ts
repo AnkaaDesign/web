@@ -119,6 +119,17 @@ export interface Dimension {
   target?: string;
   /** Índice do adesivo medido, para filtrar as cotas de um item só. */
   targetIndex?: number;
+  /**
+   * Os outros itens que esta cota também mede.
+   *
+   * Duas peças que assentam na mesma altura geram a MESMA cota vertical, e o
+   * desenho só pode trazer uma — desenhar as duas põe número em cima de número.
+   * Mas o visualizador filtra as cotas pelo item escolhido, e a que sobrou
+   * pertence à outra peça: clicar em "Saúde" mostrava só a distância lateral,
+   * porque a altura ficou registrada em "Alimentando". Aqui a cota sobrevivente
+   * carrega consigo quem mais ela explica.
+   */
+  alsoTargets?: number[];
   note?: string;
 }
 

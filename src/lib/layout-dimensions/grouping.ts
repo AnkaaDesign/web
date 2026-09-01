@@ -134,6 +134,23 @@ export interface GroupingParams {
    * run passam de 14 cm.
    */
   lineGapFactor: number;
+  /**
+   * Alcance ao longo de uma LINHA DE BASE compartilhada, em alturas de texto.
+   *
+   * Um vão maior que a altura da letra não separa palavras quando as duas
+   * assentam na mesma reta: em "Alimentando  Saúde" o projetista pôs espaço
+   * duplo — 23 cm para 21 de altura, 1,12 × —, e o alcance de uma altura
+   * cortava a frase no meio. Quem não divide a base não ganha nada disto, e o
+   * teto de `maxLineGapCm` continua valendo, então só o texto MIÚDO (abaixo de
+   * 20 cm de altura) sente a diferença — que é onde a entreletra larga mora.
+   */
+  textLineGapFactor: number;
+  /**
+   * Quanto duas bases podem divergir e ainda serem a mesma reta, em fração da
+   * altura da menor. A base do "S" redondo transborda a do "a" um fio, pelo
+   * mesmo arredondamento óptico que a linha de alinhamento já conhece.
+   */
+  textBaselineTolFrac: number;
   /** teto do alcance ao longo da linha (cm reais) */
   maxLineGapCm: number;
   /**
@@ -324,6 +341,33 @@ export interface GroupingParams {
   /** área máxima (pt²) de uma forma cheia azul para valer como seta de cota */
   dimensionInkMaxArrowPt2: number;
   /**
+   * Quantas alturas de linha pode ter o lado maior de um ícone satélite.
+   *
+   * Um selo redondo abraça a linha por fora: ele é mais alto que a maiúscula
+   * porque tem de caber ascendente, descendente e a folga do círculo. Duas
+   * alturas cobrem o selo do WhatsApp de 26 cm ao lado de uma linha de 15 e
+   * ainda recusam a régua deitada, que é o que essa porta existe para barrar.
+   */
+  iconSatelliteSizeRatio: number;
+  /**
+   * Teto de trabalho de contorno por face, em pares de segmento.
+   *
+   * Nenhum limiar do motor é este: é o freio de mão. Um desenho pode ser
+   * arbitrariamente pesado — o fundo d'água do MAR & RIO chega com 25 mil
+   * pontos em 299 polígonos — e o teste de contorno é O(n·m) por PAR de itens.
+   * Quando isso escapa, não escapa devagar: a aba trava, e trava junto a régua
+   * manual, que corre na mesma thread e é o que o operador usaria para
+   * contornar o problema. Cotar mal é um defeito; impedir de medir é outro, e
+   * bem pior.
+   *
+   * Medido no acervo em modo navegador (641 faces): mediana 0,05 M, p99
+   * 3,0 M, e o pior caso — a face de emoticons, 358 peças — 4,2 M. Sessenta
+   * milhões é catorze vezes o pior arquivo que existe aqui: quem estourar não
+   * é uma arte difícil, é uma arte que este motor não sabe ler, e aí a resposta
+   * certa é dizer isso e sair da frente. Zero desliga o freio.
+   */
+  contourWorkBudget: number;
+  /**
    * Distância de cor (RGB) abaixo da qual duas peças ainda são o mesmo adesivo.
    *
    * Vinil é cortado por cor: "GRESPAN" vermelho e "Pães congelados" preto são
@@ -356,6 +400,8 @@ export const DEFAULT_GROUPING: GroupingParams = {
   alignEdges: true,
   splitPlainPaths: true,
   lineGapFactor: 1,
+  textLineGapFactor: 1.5,
+  textBaselineTolFrac: 0.15,
   maxLineGapCm: 30,
   lineStackFactor: 0.25,
   maxLineStackCm: 8,
@@ -386,6 +432,8 @@ export const DEFAULT_GROUPING: GroupingParams = {
   dimensionInkMaxStrokePt: 1,
   dimensionInkMaxArrowPt2: 300,
   colorMergeDelta: 60,
+  iconSatelliteSizeRatio: 2,
+  contourWorkBudget: 60_000_000,
 };
 
 function inflate(r: Rect, by: number): Rect {
@@ -495,28 +543,130 @@ function pointToSegment(px: number, py: number, a: Pt, b: Pt): number {
 }
 
 /**
- * Menor distância entre dois CONTORNOS, segmento contra segmento.
+ * Caixa de cada polilinha, guardada pelo próprio vetor de pontos.
  *
- * Substitui a comparação vértice a vértice, que dava falso negativo quando dois
- * contornos se cruzam entre dois vértices amostrados. `limitPt` corta a busca
- * assim que o resultado deixa de importar — o teste é O(n·m) e roda por par.
+ * Os polígonos são os MESMOS objetos a cada rodada — o que muda é o array que
+ * os reúne — então a caixa se calcula uma vez por polígono no arquivo inteiro.
  */
+const polyBoxes = new WeakMap<Pt[], Rect>();
+
+function polyBox(poly: Pt[]): Rect {
+  const hit = polyBoxes.get(poly);
+  if (hit) return hit;
+  const box: Rect = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+  for (const p of poly) {
+    if (p.x < box.x0) box.x0 = p.x;
+    if (p.y < box.y0) box.y0 = p.y;
+    if (p.x > box.x1) box.x1 = p.x;
+    if (p.y > box.y1) box.y1 = p.y;
+  }
+  polyBoxes.set(poly, box);
+  return box;
+}
+
+/** Um trecho de polilinha com a caixa dele: o tijolo da poda. */
+interface SegmentChunk {
+  poly: Pt[];
+  /** primeiro e último VÉRTICE do trecho; os segmentos são [i0, i1) */
+  i0: number;
+  i1: number;
+  box: Rect;
+}
+
+/** Quantos segmentos cabem num trecho antes de a caixa deixar de podar. */
+const CHUNK_SEGMENTS = 32;
+
+const chunkCache = new WeakMap<Pt[], SegmentChunk[]>();
+
+function chunksOf(polys: Pt[][]): SegmentChunk[] {
+  const out: SegmentChunk[] = [];
+  for (const poly of polys) {
+    if (poly.length < 2) continue;
+    const cached = chunkCache.get(poly);
+    if (cached) {
+      for (const c of cached) out.push(c);
+      continue;
+    }
+    const own: SegmentChunk[] = [];
+    for (let i = 0; i + 1 < poly.length; i += CHUNK_SEGMENTS) {
+      const i1 = Math.min(i + CHUNK_SEGMENTS, poly.length - 1);
+      const box: Rect = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      for (let k = i; k <= i1; k += 1) {
+        const p = poly[k];
+        if (p.x < box.x0) box.x0 = p.x;
+        if (p.y < box.y0) box.y0 = p.y;
+        if (p.x > box.x1) box.x1 = p.x;
+        if (p.y > box.y1) box.y1 = p.y;
+      }
+      own.push({ poly, i0: i, i1, box });
+    }
+    chunkCache.set(poly, own);
+    for (const c of own) out.push(c);
+  }
+  return out;
+}
+
+/** Distância entre duas caixas: piso da distância entre o que há dentro delas. */
+function boxGap(a: Rect, b: Rect): number {
+  const dx = Math.max(0, Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1));
+  const dy = Math.max(0, Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1));
+  return dx === 0 ? dy : dy === 0 ? dx : Math.hypot(dx, dy);
+}
+
+/**
+ * Os dois CONTORNOS se aproximam a menos de `limitPt`?
+ *
+ * O valor devolvido é a distância REAL quando ela cabe em `limitPt`; acima
+ * disso é só um número maior que o limite, e nenhum chamador pode lê-lo como
+ * medida. Todos perguntam a mesma coisa — "encosta?" —, e é essa promessa mais
+ * fraca que torna a poda possível.
+ *
+ * A poda é o que separa o motor de travar. O teste é segmento contra segmento,
+ * O(n·m), e roda por PAR de itens: no MAR & RIO, onde o fundo d'água e o
+ * logotipo somam 18 mil pontos, eram 193 milhões de pares de segmentos e SEIS
+ * SEGUNDOS de aba congelada — com a régua manual junto, porque tudo isso corre
+ * na mesma thread. Agora cada contorno vira trechos de 32 segmentos com a caixa
+ * de cada um; dois trechos cujas caixas estão mais longe que o limite não têm
+ * como ter segmentos mais perto que ele, e o par inteiro cai fora por UMA
+ * comparação de retângulo em vez de mil de segmento.
+ *
+ * A comparação vértice a vértice, que veio antes, dava falso negativo quando
+ * dois contornos se cruzam ENTRE dois vértices amostrados — por isso o teste de
+ * cruzamento continua aqui, dentro do trecho.
+ */
+/**
+ * Quanto trabalho de contorno já se gastou, em pares de segmento.
+ *
+ * É o relógio HONESTO do agrupamento: cresce com o que custa de verdade e não
+ * com o que o processador da vez é capaz de fazer por segundo, então a mesma
+ * arte gasta o mesmo orçamento na máquina do escritório e na do aplicador — e
+ * o resultado não muda conforme a máquina, que é o que um relógio de parede
+ * faria. `buildItems` zera a leitura no começo de cada face.
+ */
+let contourWork = 0;
+
 function contourDistance(a: Pt[][], b: Pt[][], limitPt: number): number {
-  let best = Infinity;
+  if (!a.length || !b.length) return Infinity;
   // Orientation sign of the triangle (p, q, r) — the brick of the segment
   // crossing test. Two segments properly cross when each straddles the line
   // of the other; between sparse Bézier samples the old vertex-only test read
   // such a pair as tens of cm apart (true distance: zero).
   const orient = (px: number, py: number, qx: number, qy: number, rx: number, ry: number) =>
     Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
-  for (const pa of a) {
-    for (let i = 0; i + 1 < pa.length; i += 1) {
-      const p1 = pa[i];
-      const p2 = pa[i + 1];
-      for (const pb of b) {
-        for (let j = 0; j + 1 < pb.length; j += 1) {
-          const q1 = pb[j];
-          const q2 = pb[j + 1];
+  const ca = chunksOf(a);
+  const cb = chunksOf(b);
+  let best = Infinity;
+  contourWork += ca.length * cb.length;
+  for (const ka of ca) {
+    for (const kb of cb) {
+      if (boxGap(ka.box, kb.box) > limitPt) continue;
+      contourWork += (ka.i1 - ka.i0) * (kb.i1 - kb.i0);
+      for (let i = ka.i0; i < ka.i1; i += 1) {
+        const p1 = ka.poly[i];
+        const p2 = ka.poly[i + 1];
+        for (let j = kb.i0; j < kb.i1; j += 1) {
+          const q1 = kb.poly[j];
+          const q2 = kb.poly[j + 1];
           const o1 = orient(p1.x, p1.y, p2.x, p2.y, q1.x, q1.y);
           const o2 = orient(p1.x, p1.y, p2.x, p2.y, q2.x, q2.y);
           if (o1 !== o2) {
@@ -562,11 +712,19 @@ function companionProfile(
   if (!samples.length) return { runFrac: 0, insideFrac: 0 };
   let near = 0;
   let inside = 0;
+  const chunks = chunksOf(outer);
   for (const p of samples) {
     let best = Infinity;
-    for (const poly of outer) {
-      for (let i = 0; i + 1 < poly.length; i += 1) {
-        const d = pointToSegment(p.x, p.y, poly[i], poly[i + 1]);
+    for (const k of chunks) {
+      // a caixa do trecho é o piso da distância até os segmentos dele
+      if (
+        Math.max(0, Math.max(k.box.x0 - p.x, p.x - k.box.x1)) > gapPt ||
+        Math.max(0, Math.max(k.box.y0 - p.y, p.y - k.box.y1)) > gapPt
+      ) {
+        continue;
+      }
+      for (let i = k.i0; i < k.i1; i += 1) {
+        const d = pointToSegment(p.x, p.y, k.poly[i], k.poly[i + 1]);
         if (d < best) best = d;
         if (best <= gapPt) break;
       }
@@ -578,10 +736,21 @@ function companionProfile(
   return { runFrac: near / samples.length, insideFrac: inside / samples.length };
 }
 
-/** Regra par-ímpar: o ponto está dentro do contorno? */
+/**
+ * Regra par-ímpar: o ponto está dentro do contorno?
+ *
+ * O polígono só é percorrido quando pode contribuir. Não cruza a horizontal do
+ * ponto (a caixa não alcança `p.y`), nenhuma aresta troca de lado e a paridade
+ * fica igual; termina à ESQUERDA do ponto, e o raio vai para a direita, então
+ * também não conta. São 299 polígonos no MAR & RIO, e quase todos caem por um
+ * destes dois testes.
+ */
 function pointInsidePolys(polys: Pt[][], p: Pt): boolean {
   let inside = false;
   for (const poly of polys) {
+    if (poly.length < 2) continue;
+    const box = polyBox(poly);
+    if (p.y < box.y0 || p.y > box.y1 || box.x1 <= p.x) continue;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
       const a = poly[i];
       const b = poly[j];
@@ -704,9 +873,12 @@ function isSamePieceMulticolour(
   // Within the classic reach the old rule stands: any contour proximity merges.
   // Gating these pairs — at ANY share threshold — broke legitimate merges
   // corpus-wide (gradient 2.3 -> 8.8pct at a 0.1 gate).
-  const d = contourDistance(a.outline, b.outline, flatReach);
-  if (d <= flatReach) return true;
-  if (d > reach) return false;
+  // Duas perguntas, duas chamadas: `contourDistance` só promete a distância
+  // REAL até o limite que recebe, então a faixa estendida precisa perguntar
+  // por ela mesma em vez de reler um número medido contra o alcance curto.
+  if (contourDistance(a.outline, b.outline, flatReach) <= flatReach) return true;
+  if (reach <= flatReach) return false;
+  if (contourDistance(a.outline, b.outline, reach) > reach) return false;
   // The extended (flat, doctrine] band is earned, not free: a meaningful
   // fraction of the SMALLER shape's boundary must run within reach of the
   // other. Gradient halves run parallel for their whole length; a mark that
@@ -1298,6 +1470,18 @@ export interface BuiltItems {
   objects: VectorObject[][];
   stickers: Sticker[];
   wraps: Sticker[];
+  /**
+   * A face estourou o orçamento de trabalho e o agrupamento parou no meio.
+   *
+   * O que sai daqui não é para mostrar: metade das soldas aconteceu e a outra
+   * metade não, então os "itens" são um retrato de meio caminho. Serve para
+   * quem chamou dizer ao operador que naquela face não dá para escolher peça, e
+   * mandá-lo para a régua — que é o que ele faria de qualquer jeito, e agora
+   * sem esperar a aba descongelar.
+   */
+  truncated: boolean;
+  /** pares de segmento gastos nos testes de contorno desta face */
+  contourWork: number;
 }
 
 /**
@@ -1370,6 +1554,40 @@ export function buildItems(
   const objColors = elements.map((o) => o.fill ?? o.stroke ?? null);
   const touchTol = params.partGapCm * scale.ptPerCm;
   const lineReach = params.maxLineGapCm * scale.ptPerCm;
+  const workAtStart = contourWork;
+  /**
+   * Acabou o orçamento desta face.
+   *
+   * Consultado nos dois predicados de solda: estourado, todo par passa a ser
+   * incompatível e as rodadas do ponto fixo se esgotam sem mais trabalho. Não
+   * é para salvar o resultado — ele já não presta — é para a aba voltar.
+   */
+  const overBudget = (): boolean =>
+    params.contourWorkBudget > 0 && contourWork - workAtStart > params.contourWorkBudget;
+  const panelAreaPt = rectArea(scale.panelPt);
+  const edgeTolPt = params.bleedTouchCm * scale.ptPerCm;
+
+  /**
+   * FUNDO É O QUE SANGRA — e a ÁREA sozinha não prova sangria.
+   *
+   * A pergunta "isto é fundo?" era feita em quatro lugares com a mesma conta
+   * (varre um eixo OU cobre 35% da face) e respondida no fim, em `isWrap`, com
+   * outra: lá a cláusula de área EXIGE encostar numa aresta, pela razão que a
+   * FRICARNE ensinou — um logotipo de 463 × 176 cm cobre 40% da face e não é
+   * envelopamento nenhum, é só um logotipo grande.
+   *
+   * A divergência custava a face inteira. No MAR & RIO o estágio de peça solda
+   * o letreiro branco ao logotipo e sai uma peça de 447 × 163 cm: 39% da face,
+   * nenhuma aresta encostada. Pela conta antiga ela virava "fundo", a
+   * invariante `fundo com fundo, arte com arte` já não separava nada, e o fundo
+   * d'água a engolia por continência — 156 peças num item só, a face inteira
+   * devolvida a cada clique. Com a mesma régua de `isWrap` a arte continua
+   * arte, por maior que seja, e só o que encosta na borda pode ser fundo.
+   */
+  const wrapLikeRect = (r: Rect, axes: BleedAxes): boolean =>
+    axes.horizontal ||
+    axes.vertical ||
+    (rectArea(r) / panelAreaPt >= params.bleedAreaFrac && axes.edges.length > 0);
 
   /**
    * Word gaps scale with glyph height while every reach above is capped in
@@ -1383,6 +1601,47 @@ export function buildItems(
   const wordGapFloorPt = (h: number): number => Math.min(0.35 * h, 50 * scale.ptPerCm);
   const sameLineReachPt = (h: number): number =>
     Math.max(Math.min(lineReach, params.lineGapFactor * h), wordGapFloorPt(h));
+
+  /**
+   * Duas caixas assentam na MESMA LINHA DE BASE?
+   *
+   * É o que uma pessoa vê antes de qualquer medida: "Alimentando" e "Saúde" são
+   * uma frase só porque pousam na mesma reta. Nenhuma outra prova serve — a cor
+   * é a mesma da faixa que passa atrás, a altura é a mesma de meia dúzia de
+   * blocos, e o VÃO não separa nada (medido no acervo: o vão interno de uma
+   * linha e a separação intencional entre peças se sobrepõem, mediana 8 contra
+   * 23 cm). A base compartilhada, não.
+   *
+   * A tolerância é fração da altura porque a base do "S" com serifa arredondada
+   * ultrapassa a do "a" um fio — o mesmo transbordo óptico que a linha de
+   * alinhamento já conhece.
+   */
+  const sharesBaseline = (ra: Rect, rb: Rect): boolean =>
+    Math.abs(ra.y1 - rb.y1) <= params.textBaselineTolFrac * Math.min(rectH(ra), rectH(rb));
+
+  /**
+   * O alcance da solda AO LONGO da linha, para um PAR — e não para a caixa mais
+   * alta do par, que era o erro.
+   *
+   * O piso proporcional (0,35 × altura) existe para o letreiro gigante, onde a
+   * entreletra vale meio metro. Tomando-o da caixa MAIOR ele vazava para fora
+   * do letreiro: no MAR & RIO o logotipo tem 134 cm de altura e emprestava 47 cm
+   * de alcance ao bloco de texto que está a 40 cm dele — o letreiro branco
+   * soldava no logotipo, a peça resultante cobria 39% da face e a partir daí a
+   * face inteira virava um item só. O piso é da MENOR: quem espaça as letras é
+   * o texto, e é a altura DELE que diz quanto.
+   *
+   * Quando as duas assentam na mesma base, o alcance sobe para uma altura e
+   * meia. É o que reúne "Alimentando  Saúde" (vão de 23 cm para 21 de altura,
+   * espaço duplo de propósito) sem tocar em nada que não divida a base.
+   */
+  const sameLineReachPairPt = (ra: Rect, rb: Rect): number => {
+    const hi = Math.max(rectH(ra), rectH(rb));
+    const lo = Math.min(rectH(ra), rectH(rb));
+    const base = Math.max(Math.min(lineReach, params.lineGapFactor * hi), wordGapFloorPt(lo));
+    if (!sharesBaseline(ra, rb)) return base;
+    return Math.max(base, Math.min(lineReach, params.textLineGapFactor * hi));
+  };
 
   /**
    * A solda é ANISOTRÓPICA, e é essa a correção que faltava.
@@ -1400,15 +1659,14 @@ export function buildItems(
    * isso é a regra de largura, no estágio seguinte.
    */
   /**
-   * A piece that itself sweeps a face axis (or covers wrap-sized area) is
-   * BACKGROUND, not positionable art.
+   * A piece that itself sweeps a face axis (or covers wrap-sized area while
+   * touching an edge) is BACKGROUND, not positionable art.
    */
   const backdropPiece = (i: number): boolean =>
-    pool[i].bleedAxes.horizontal ||
-    pool[i].bleedAxes.vertical ||
-    pool[i].coversFrac >= params.bleedAreaFrac;
+    wrapLikeRect(pool[i].obj.bbox, pool[i].bleedAxes);
 
   const weldable = (a: number, b: number): boolean => {
+    if (overBudget()) return false;
     const ra = boxes[a];
     const rb = boxes[b];
     const gap = gapsBetween(ra, rb);
@@ -1457,15 +1715,10 @@ export function buildItems(
           ),
         ) * scale.ptPerCm;
       // Wrap-likeness for the containment bypass, from the raw box: a piece
-      // that bleeds an axis or covers the panel is a background host.
-      const wrapLikeBox = (p: { bbox: Rect }): boolean => {
-        const ax = bleedAxesOf(p.bbox, scale.panelPt, params.bleedTouchCm * scale.ptPerCm);
-        return (
-          ax.horizontal ||
-          ax.vertical ||
-          rectArea(p.bbox) / rectArea(scale.panelPt) >= params.bleedAreaFrac
-        );
-      };
+      // that bleeds an axis, or covers the panel WHILE touching an edge, is a
+      // background host (see `wrapLikeRect`).
+      const wrapLikeBox = (p: { bbox: Rect }): boolean =>
+        wrapLikeRect(p.bbox, bleedAxesOf(p.bbox, scale.panelPt, edgeTolPt));
       if (
         gap.x <= loosePt &&
         gap.y <= loosePt &&
@@ -1484,10 +1737,7 @@ export function buildItems(
       // and neither side may be wrap-like (DA NATA / RKO: the lockup was
       // swallowed by the wrap through this clause unguarded).
       const smallGapPt = 3.5 * scale.ptPerCm;
-      const wrapishPart = (i: number): boolean =>
-        pool[i].bleedAxes.horizontal ||
-        pool[i].bleedAxes.vertical ||
-        rectArea(boxes[i]) / rectArea(scale.panelPt) >= params.bleedAreaFrac;
+      const wrapishPart = (i: number): boolean => wrapLikeRect(boxes[i], pool[i].bleedAxes);
       if (
         gap.x > 0 &&
         gap.x <= smallGapPt &&
@@ -1501,9 +1751,7 @@ export function buildItems(
     }
 
     if (onSameLine(ra, rb, params)) {
-      const height = Math.max(rectH(ra), rectH(rb));
-      const reach = sameLineReachPt(height);
-      if (gap.x > reach) return false;
+      if (gap.x > sameLineReachPairPt(ra, rb)) return false;
     } else {
       // empilhadas ou soltas: alcance curto, e nada de soldar aqui o que é
       // conjunto — isso é trabalho do estágio de baixo
@@ -1584,8 +1832,6 @@ export function buildItems(
    * tenham a largura que tiverem.
    */
   const minAreaPt = params.minAreaCm2 * scale.ptPerCm * scale.ptPerCm;
-  const panelAreaPt = rectArea(scale.panelPt);
-  const edgeTolPt = params.bleedTouchCm * scale.ptPerCm;
   const lockupGapPt = params.lockupGapCm * scale.ptPerCm;
 
   /** One candidate group at lockup granularity, frozen for a predicate call. */
@@ -1599,10 +1845,7 @@ export function buildItems(
   }
 
   /** Background/wrap-like hosts never swallow the art drawn over them. */
-  const wrapLikeAgg = (g: LockupAgg): boolean =>
-    g.axes.horizontal ||
-    g.axes.vertical ||
-    rectArea(g.bbox) / panelAreaPt >= params.bleedAreaFrac;
+  const wrapLikeAgg = (g: LockupAgg): boolean => wrapLikeRect(g.bbox, g.axes);
 
   /**
    * Cannot-link guard: the monster detector's own rule. A union that touches no
@@ -1659,10 +1902,7 @@ export function buildItems(
   const withinLockupReach = (ra: Rect, rb: Rect): boolean => {
     const g = gapsBetween(ra, rb);
     if (g.x <= lockupGapPt && g.y <= lockupGapPt) return true;
-    return (
-      onSameLine(ra, rb, params) &&
-      g.x <= Math.max(lockupGapPt, sameLineReachPt(Math.max(rectH(ra), rectH(rb))))
-    );
+    return onSameLine(ra, rb, params) && g.x <= Math.max(lockupGapPt, sameLineReachPairPt(ra, rb));
   };
 
   /** Pretest cluster radius, widened to keep splitDisjoint parts rejoinable. */
@@ -1692,15 +1932,42 @@ export function buildItems(
     if (wrapLikeAgg(h) || wrapLikeAgg(s)) return false;
     if (rectArea(s.bbox) > 0.3 * rectArea(h.bbox)) return false;
     const cm = scale.ptPerCm;
-    const sDiag = Math.hypot(rectW(s.bbox), rectH(s.bbox)) / cm;
+    const sW = rectW(s.bbox) / cm;
+    const sH = rectH(s.bbox) / cm;
     const hH = rectH(h.bbox) / cm;
     const hW = rectW(h.bbox) / cm;
-    if (sDiag > 60 || sDiag > 1.5 * hH) return false;
+    /**
+     * O SELO É MAIS ALTO QUE A LETRA, e medi-lo pela altura da linha era pedir
+     * o impossível.
+     *
+     * A caixa de uma linha de texto é a altura de MAIÚSCULA — 15 cm no bloco de
+     * contato do Adel Coco. O selo redondo do WhatsApp ao lado dela tem 26 cm,
+     * porque um selo abraça a linha inteira, ascendente e descendente, e ainda
+     * sobra. Pela diagonal contra uma altura e meia (22,5 cm) ele era grande
+     * demais e o ícone ficava órfão: 62 pares do acervo, o padrão isolado mais
+     * comum de falha desta regra. No Norte Minas o mesmo desenho junta, e junta
+     * só porque ali o ícone é menor que a linha — a diferença entre "junta" e
+     * "não junta" era o desenho do selo, não a relação entre as duas peças.
+     *
+     * O limite passa a ser por LADO, não pela diagonal: nenhum dos dois lados
+     * do selo pode passar de duas alturas da linha. Bloqueia a régua deitada de
+     * 60 × 5 cm, que a diagonal deixava passar, e aceita o selo quadrado.
+     */
+    if (Math.max(sW, sH) > 60 || Math.max(sW, sH) > params.iconSatelliteSizeRatio * hH) {
+      return false;
+    }
     if (hH > 50 || hW < 2 * hH) return false;
     if (h.outline.length < 6) return false;
+    /**
+     * "Está na linha" mede-se pela MENOR das duas alturas. Contra a altura do
+     * satélite, um selo que abraça a linha por fora se reprovava sozinho — a
+     * sobreposição é a linha inteira (15 de 15), mas dividida pelos 26 cm do
+     * selo dava 0,58. Pela menor, um selo que engole a linha dá 1,0 e um ícone
+     * numa fileira acima ou abaixo continua dando 0.
+     */
     const bandOv =
       Math.max(0, Math.min(s.bbox.y1, h.bbox.y1) - Math.max(s.bbox.y0, h.bbox.y0)) /
-      Math.max(1e-6, rectH(s.bbox));
+      Math.max(1e-6, Math.min(rectH(s.bbox), rectH(h.bbox)));
     if (bandOv < 0.8) return false;
     const g = gapsBetween(s.bbox, h.bbox);
     const reachPt =
@@ -1716,6 +1983,7 @@ export function buildItems(
    * companion rules consulted.
    */
   const lockupCompatible = (a: LockupAgg, b: LockupAgg, guarded: boolean): boolean => {
+    if (overBudget()) return false;
     if (!withinLockupReach(a.bbox, b.bbox)) return false;
     // The bbox gap is a lower bound on contour distance: only pay the O(n*m)
     // contour test when the boxes are already within the touch tolerance.
@@ -1952,6 +2220,8 @@ export function buildItems(
     objects: built.map((b) => b.objects),
     stickers: built.filter((b) => !b.item.bleeds).map((b) => b.item),
     wraps: built.filter((b) => b.item.bleeds).map((b) => b.item),
+    truncated: overBudget(),
+    contourWork: contourWork - workAtStart,
   };
 }
 

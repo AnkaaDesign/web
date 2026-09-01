@@ -73,6 +73,18 @@ export interface LayoutFaceResult {
   stickers: Sticker[];
   wraps: Sticker[];
   crossings: BorderCrossing[];
+  /**
+   * Por que esta face não entrega peça para clicar — quando não entrega.
+   *
+   * O cotador não acerta tudo, e há desenho que ele não sabe ler: fundo que
+   * sangra encostando em cada elemento, contorno de dezenas de milhares de
+   * pontos, arte que chega como uma imagem só. Nesses casos o certo não é
+   * devolver uma seleção que engole a face inteira e cobrar do operador o
+   * tempo de descobrir isso — é dizer que ali não dá, e deixar a régua manual
+   * livre, que é a ferramenta que resolve. A face segue desenhada e medível;
+   * só não tem peça a escolher.
+   */
+  unusable?: string;
 }
 
 export interface LayoutDimensionsResult {
@@ -80,15 +92,16 @@ export interface LayoutDimensionsResult {
   detectedScale: ScaleDetection;
   faces: LayoutFaceResult[];
   items: LayoutItem[];
-  /** todas as cotas, com `targetIndex` apontando para `items` */
-  dimensions: Dimension[];
   /**
-   * O plano ALTERNATIVO de cada item: as mesmas cotas com as âncoras
-   * espelhadas (vertical pela outra borda, horizontal pela outra lateral,
-   * travessia pela outra quina). O visualizador mostra estas no segundo
-   * clique sobre o item já escolhido. As bancadas não leem este canal.
+   * Todas as cotas, com `targetIndex` apontando para `items`.
+   *
+   * Há UM plano, e é o da doutrina. Existiu por um tempo um segundo, espelhado,
+   * que o clique repetido alternava — e a alternância era o próprio defeito:
+   * duas respostas para a mesma pergunta, e o operador sem saber qual colar.
+   * A borda de referência é a que a doutrina escolhe; quando ela não tem
+   * número a dar, `stickerDims` já vai buscar o da borda oposta.
    */
-  altDimensions: Dimension[];
+  dimensions: Dimension[];
   warnings: string[];
 }
 
@@ -121,6 +134,56 @@ function isAxisRectangle(outline: { x: number; y: number }[][], tolerance = 1.5)
   return true;
 }
 
+/** A caneta que desenhou o retângulo: mesma cor, mesmo traço, mesmo molde. */
+function penOf(obj: PageGeometry["objects"][number]): string {
+  const rgb = (c: number[] | null) => (c ? c.join(",") : "-");
+  return `${obj.op}|${rgb(obj.stroke)}|${rgb(obj.fill)}|${obj.lineWidth.toFixed(2)}`;
+}
+
+/**
+ * A FACE DESENHADA EM SEÇÕES volta a ser uma face.
+ *
+ * Nem todo molde desenha a lateral como um retângulo só. O do MACHADÃO desenha
+ * as SEÇÕES do baú encostadas uma na outra — 192 + 107 + 492 cm no lado do
+ * motorista, 253 + 106 + 325 + 106 no do sapo —, todas com a mesma caneta e a
+ * mesma altura, dividindo as arestas verticais. Cada uma virava uma "face"
+ * candidata, e nenhuma casava com a proporção de 790 × 252 que o caminhão tem:
+ * o arquivo abria com a TRASEIRA reconhecida e as duas laterais fora, que é
+ * justamente onde está a arte.
+ *
+ * Colam-se apenas retângulos que dividem o topo E a base, foram desenhados com
+ * a MESMA caneta e se encostam pela lateral. Duas faces diferentes na página
+ * não passam por esse crivo: a traseira tem outra altura, e o que está dentro
+ * de outra face é aninhado, não vizinho.
+ */
+function glueSectionRow(pieces: { rect: Rect; pen: string }[], tolerance = 2): Rect[] {
+  const rows = new Map<string, { rect: Rect; pen: string }[]>();
+  for (const p of pieces) {
+    const key = `${p.pen}|${Math.round(p.rect.y0 / tolerance)}|${Math.round(p.rect.y1 / tolerance)}`;
+    const list = rows.get(key);
+    if (list) list.push(p);
+    else rows.set(key, [p]);
+  }
+  const out: Rect[] = [];
+  for (const list of rows.values()) {
+    list.sort((a, b) => a.rect.x0 - b.rect.x0);
+    let run = list[0].rect;
+    for (let i = 1; i < list.length; i += 1) {
+      const next = list[i].rect;
+      // encostam (ou se sobrepõem um fio): a seção seguinte continua a mesma face
+      if (next.x0 - run.x1 <= tolerance && next.x1 > run.x1) {
+        run = { x0: run.x0, y0: Math.min(run.y0, next.y0), x1: next.x1, y1: Math.max(run.y1, next.y1) };
+        continue;
+      }
+      if (next.x0 - run.x1 <= tolerance) continue; // seção contida na anterior
+      out.push(run);
+      run = next;
+    }
+    out.push(run);
+  }
+  return out;
+}
+
 /**
  * Todos os retângulos da página que podem ser uma face, em ordem de leitura.
  *
@@ -132,18 +195,24 @@ function isAxisRectangle(outline: { x: number; y: number }[][], tolerance = 1.5)
  * projetista desenha a arte da porta EM VETOR por cima do retrato, e no
  * TRANSGENIO há doze objetos vetoriais dentro dela, que são o logotipo, o
  * rastro e a assinatura. Descartá-la apaga a traseira inteira.
+ *
+ * O piso de largura vale sobre a face JÁ COLADA (ver `glueSectionRow`): uma
+ * seção de 107 cm é estreita demais para ser face sozinha, mas é parte de uma.
  */
 export function findPanelRects(geometry: PageGeometry, minWidthFrac = 0.15): Rect[] {
-  const candidates: Rect[] = [];
+  const pieces: { rect: Rect; pen: string }[] = [];
   for (const obj of geometry.objects) {
     if (obj.op === "clip" || obj.op === "image" || obj.fromShading) continue;
     if (!isAxisRectangle(obj.outline)) continue;
     const w = rectWidth(obj.bbox);
     const h = rectHeight(obj.bbox);
-    if (w < minWidthFrac * geometry.width || h < 8) continue;
+    if (h < 8) continue;
     if (w > geometry.width * 0.995 && h > geometry.height * 0.995) continue;
-    candidates.push(obj.bbox);
+    pieces.push({ rect: obj.bbox, pen: penOf(obj) });
   }
+  const candidates = glueSectionRow(pieces).filter(
+    (r) => rectWidth(r) >= minWidthFrac * geometry.width,
+  );
   candidates.sort((a, b) => rectArea(b) - rectArea(a));
   const keep: Rect[] = [];
   for (const r of candidates) {
@@ -228,7 +297,6 @@ export async function buildLayoutFaces(
   const faces: LayoutFaceResult[] = [];
   const items: LayoutItem[] = [];
   const dimensions: Dimension[] = [];
-  const altDimensions: Dimension[] = [];
   const warnings: string[] = [];
 
   matches.forEach(({ rect, panel }, faceIndex) => {
@@ -239,13 +307,38 @@ export async function buildLayoutFaces(
 
     const { pieces } = classify(geometry, scale, grouping);
     const built = buildItems(pieces, scale, grouping, { trimToInk: options.trimToInk });
-    const crossings = borderCrossings(built.objects, panel, scale, grouping);
-    const faceDims = planDimensions(panel, built.items, crossings, doctrine);
-    const faceAlts = planDimensions(panel, built.items, crossings, doctrine, true);
+    const crossings = built.truncated ? [] : borderCrossings(built.objects, panel, scale, grouping);
+    const faceDims = built.truncated ? [] : planDimensions(panel, built.items, crossings, doctrine);
     const { stickers, wraps } = built;
 
     const base = items.length;
-    built.items.slice(0, doctrine.maxStickers).forEach((item, i) => {
+    const found = built.truncated ? [] : built.items.slice(0, doctrine.maxStickers);
+
+    /**
+     * A face dá ou não dá para escolher peça — e quando não dá, quem avisa é o
+     * motor, não o operador depois de tentar.
+     *
+     * Três formas de não dar, e nenhuma delas é culpa de quem está usando:
+     * o orçamento de contorno estourou (o desenho é pesado demais, e os itens
+     * de meio caminho não valem nada); não sobrou item nenhum; ou sobrou UM
+     * que cobre a face inteira, que é o caso do fundo que sangra e encosta em
+     * tudo — clicar em qualquer lugar devolve o caminhão todo. Nos três a
+     * resposta útil é a mesma: diga, não ofereça a seleção, e deixe a régua
+     * livre. Medir à mão sempre foi possível; o que não podia era o cotador
+     * tomar a thread e impedir isso também.
+     */
+    const unusable = built.truncated
+      ? "o desenho é pesado demais para reconhecer as peças"
+      : !found.length
+        ? "nenhuma peça foi reconhecida no desenho"
+        : found.length === 1 && rectArea(found[0].bbox) / rectArea(rect) >= 0.9
+          ? "o fundo cobre a face inteira e engole as peças"
+          : undefined;
+    if (unusable) {
+      warnings.push(`Face ${panel.side.toLowerCase()}: ${unusable}. Use a régua para medir à mão.`);
+    }
+    const clickable = unusable ? [] : found;
+    clickable.forEach((item, i) => {
       /**
        * O quadro do item encosta EXATAMENTE onde as cotas dele encostam.
        *
@@ -257,7 +350,10 @@ export async function buildLayoutFaces(
        * mutilar a caixa para nada, e desenhar a tinta crua fazia a caixa
        * discordar do número.
        */
-      const own = faceDims.filter((d) => d.targetIndex === i && d.kind.startsWith("EDGE_"));
+      const own = faceDims.filter(
+        (d) =>
+          (d.targetIndex === i || d.alsoTargets?.includes(i)) && d.kind.startsWith("EDGE_"),
+      );
       const ink = item.boxCm;
       const drawCm: Rect = { ...ink };
       for (const d of own) {
@@ -290,19 +386,14 @@ export async function buildLayoutFaces(
         heightCm: item.boxCm.y1 - item.boxCm.y0,
       });
     });
-    for (const d of faceDims) {
-      dimensions.push({
-        ...d,
-        id: `f${faceIndex}-${d.id}`,
-        targetIndex: d.targetIndex === undefined ? undefined : base + d.targetIndex,
-      });
-    }
-    for (const d of faceAlts) {
-      altDimensions.push({
-        ...d,
-        id: `f${faceIndex}-${d.id}`,
-        targetIndex: d.targetIndex === undefined ? undefined : base + d.targetIndex,
-      });
+    const toGlobal = (d: Dimension): Dimension => ({
+      ...d,
+      id: `f${faceIndex}-${d.id}`,
+      targetIndex: d.targetIndex === undefined ? undefined : base + d.targetIndex,
+      alsoTargets: d.alsoTargets?.map((t) => base + t),
+    });
+    if (!unusable) {
+      for (const d of faceDims) dimensions.push(toGlobal(d));
     }
 
     if (aspectErrorPct > 4) {
@@ -320,6 +411,7 @@ export async function buildLayoutFaces(
       stickers,
       wraps,
       crossings,
+      unusable,
     });
   });
 
@@ -333,5 +425,5 @@ export async function buildLayoutFaces(
     );
   }
 
-  return { geometry, detectedScale, faces, items, dimensions, altDimensions, warnings };
+  return { geometry, detectedScale, faces, items, dimensions, warnings };
 }

@@ -45,6 +45,37 @@ desenho — porta, dobradiça e lanterna não cabem num retângulo.
 
 `borda de cima → topo do adesivo` 129 × `borda de cima → base do adesivo` 15.
 
+### 3-bis. Um plano só, e ele sempre tem altura E distância
+
+Não há variante. Houve por um tempo um segundo plano, espelhado, que o clique
+repetido alternava — e a alternância era o defeito, não o recurso: o mesmo
+adesivo dava dois pares de números conforme quantas vezes se clicasse nele, e
+quem vai colar não tem como saber qual dos dois vale. A borda de referência é a
+que §1 e §3 escolhem, sempre.
+
+Com uma consequência que precisa estar escrita: **quando a borda escolhida não
+tem número a dar, quem posiciona é a oposta.** A peça colada na borda preferida
+— o QR a 1 cm da lateral, o letreiro que encosta no teto, a arte que transborda
+o quadro e dá distância negativa — devolvia um valor abaixo do piso de 3 cm e a
+cota era simplesmente descartada: o operador clicava e via meia posição. Medido
+em modo navegador: **159 de 2.710 itens (5,9%)** perdiam uma das duas assim,
+131 a horizontal e 28 a vertical, todas com a borda escolhida a 0 ou 1 cm. A
+âncora é presa dentro da face antes da conta, senão a arte que sangra produz
+número negativo.
+
+A cota de POSIÇÃO do adesivo também deixou de disputar espaço com as
+acessórias: o piso de valor e o teto por face (`maxDims`) cortam o vão interno
+do conjunto e a travessia do envelopamento, nunca a altura e a distância de uma
+peça.
+
+E duas cotas só viram uma quando dizem a mesma coisa — **o NÚMERO incluído**.
+Pontas a menos de 2 cm uma da outra não bastavam: com essa folga sozinha, o
+"149" da assinatura do MACHADÃO era absorvido pelo "147" da faixa que passa
+atrás dela, e quem clicava na assinatura recebia a posição do vizinho. Medido:
+289 das 543 cotas herdadas traziam um valor diferente do que a peça herdeira
+mediria sozinha. Números diferentes são duas medidas, e as duas são verdade
+sobre peças diferentes.
+
 ### 3. Horizontal: sempre da borda lateral MAIS PRÓXIMA
 
 - `borda esquerda → esquerda do adesivo`: 109
@@ -145,6 +176,30 @@ para menos: item grande demais engole o vizinho e a cota fica sem dono.
   começa em 0,50 ("Você!" e o "C" da CONFIANÇA, 38 cm com glifo de 77) —;
   entre linhas, 0,25 × altura com teto de 8 cm. Folga fixa parte a palavra no
   letreiro de 1 m ou solda duas linhas de um bloco de 11 cm.
+  **O piso proporcional é da caixa MENOR do par**, e não da maior: tomado da
+  maior, ele vaza para fora do letreiro — o logotipo de 134 cm do MAR & RIO
+  emprestava 47 cm de alcance ao bloco de texto que está a 40 cm dele, os dois
+  soldavam, a peça resultante cobria 39% da face e daí a face inteira virava
+  um item só. Quem espaça as letras é o texto; é a altura DELE que diz quanto.
+- **A LINHA DE BASE é o que reúne uma frase.** Duas caixas que assentam na
+  mesma reta (bases a menos de 0,15 × altura menor) ganham alcance de
+  1,5 × altura, sempre sob o teto de 30 cm. É o que junta
+  "Alimentando  Saúde" do Perboni, onde o projetista pôs espaço duplo — 23 cm
+  de vão para 21 de altura, 1,12 × — e o alcance de uma altura cortava a frase
+  no meio. Nenhuma outra prova serve para esse par: a cor é a mesma da faixa
+  que passa atrás, a altura é a de meia dúzia de blocos, e o VÃO PURO não
+  separa nada (o vão interno de uma linha, mediana 8 cm, e a separação
+  intencional entre peças, mediana 23 cm, se sobrepõem). Só o texto miúdo
+  sente: acima de 20 cm de altura o teto de 30 já mandava.
+- **Ícone é satélite do TEXTO, e o selo é mais alto que a letra.** A caixa de
+  uma linha é a altura de maiúscula; o selo redondo do WhatsApp ao lado dela
+  abraça ascendente e descendente e ainda sobra — 26 cm contra 15. Medindo o
+  ícone pela diagonal contra uma altura e meia da linha, ele era "grande
+  demais" e ficava órfão em 62 pares do acervo, enquanto o mesmo desenho
+  juntava no Norte Minas só porque lá o selo é menor. O limite é por LADO
+  (nenhum lado acima de 2 × a altura da linha, e nunca acima de 60 cm), e a
+  prova de que está NA linha usa a MENOR das duas alturas — um selo que engole
+  a linha dá 1,0, um ícone numa fileira acima continua dando 0.
 - **Cor separa.** Vinil é cortado por cor: "GRESPAN" vermelho e "Pães
   congelados" preto são duas peças, mesmo coladas uma na outra no desenho.
 - **Cores diferentes só se juntam quando as FORMAS se encostam.** A caixa não
@@ -164,6 +219,16 @@ para menos: item grande demais engole o vizinho e a cota fica sem dono.
   descartá-lo deixava a lataria do SÓ MINAS com 4 itens triviais onde há ~15
   peças. O shading entra recortado pelo clip vigente, com recusa de fundo
   (clip retangular de 250 × 100 cm para cima é lataria, não adesivo).
+- **Fundo é o que SANGRA — a área sozinha não prova sangria.** A pergunta "isto
+  é fundo?" era feita em quatro lugares do agrupamento com uma conta (varre um
+  eixo OU cobre 35% da face) e respondida no fim, na hora de declarar o
+  envelopamento, com outra: lá a cláusula de área exige encostar em alguma
+  aresta, porque o logotipo da FRICARNE mede 463 × 176 cm, cobre 40% da face e
+  não é envelopamento nenhum. A divergência custava a face inteira do MAR & RIO:
+  a peça de 447 × 163 cm que o estágio anterior montou não encosta em aresta
+  nenhuma, mas cobria 39% — virava "fundo", a invariante abaixo já não separava
+  nada, e o fundo d'água a engolia por continência. Agora a régua é a mesma nos
+  dois lugares.
 - **FUNDO COM FUNDO, ARTE COM ARTE.** Envelopamento e adesivo são naturezas
   diferentes — um SANGRA, o outro tem posição — e nenhuma evidência de
   vizinhança faz dos dois a mesma peça. Não vale a cor (a chapa verde do Ki
@@ -235,6 +300,64 @@ Cada limiar que resolvia um caso estragava outro, e o quadro do item passou a
 cortar letra que devia estar dentro. O padrão voltou ao **extremo real da tinta**
 — que é, afinal, o que o adesivo recortado tem. Ligar de novo é `alignEdges: true`,
 e o que falta para valer é um discriminador melhor entre reta e curvatura.
+
+### 13. A face pode vir desenhada em SEÇÕES
+
+Nem todo molde desenha a lateral como um retângulo só. O do MACHADÃO desenha as
+seções do baú encostadas uma na outra — 192 + 107 + 492 cm no motorista,
+253 + 106 + 325 + 106 no sapo — com a mesma caneta, a mesma altura e as arestas
+verticais compartilhadas. Cada seção virava uma "face" candidata, nenhuma casava
+com a proporção de 790 × 252 que o caminhão tem, e o arquivo abria só com a
+**traseira** reconhecida: as duas laterais, que são onde a arte está, ficavam
+de fora.
+
+Colam-se retângulos que dividem o topo E a base, foram desenhados com a MESMA
+caneta e se encostam pela lateral (folga ≤ 2 pt). Duas faces diferentes não
+passam nesse crivo — a traseira tem outra altura, e o que está dentro de outra
+face é aninhado, não vizinho. O piso de largura (15% da página) passou a valer
+sobre a face JÁ COLADA: uma seção de 107 cm é estreita demais para ser face
+sozinha, mas é parte de uma.
+
+Nas 260 pastas do acervo isso muda **16 arquivos, e os 16 para melhor**:
+MACHADÃO (2), bergamini (3), GRESPAN (3), DiCasa, FRUTAS FOLLY, FRUTAS METZ,
+LOUSADA, Marquespan 566, PNAE, SEMPRE VIVA — em todos a segunda lateral vinha
+como um pedaço (542 de 839, 448 de 839, 547 de 939) ou duplicada. Faces
+reconhecidas em modo navegador: 629 → 606, faces sem cota nenhuma 5,7% → 4,6%,
+faces com um item só 13,4% → 11,7%.
+
+### 14. Não saber cotar é um defeito; impedir de medir é outro, e pior
+
+O cotador e a régua manual correm na MESMA thread do navegador. Enquanto o
+agrupamento trabalha, o operador não mede nada — nem à mão, que é justamente o
+que ele faria para contornar uma face que o motor não entende. O MAR & RIO
+custava **seis segundos** de aba congelada por arquivo, e o operador só via um
+visualizador travado.
+
+Três coisas, nesta ordem:
+
+1. **O teste de contorno pruna antes de contar.** Ele é O(n·m) por PAR de
+   itens, e o fundo d'água do MAR & RIO chega com 25 mil pontos em 299
+   polígonos: eram 193 milhões de pares de segmento. Cada contorno vira trechos
+   de 32 segmentos com a caixa de cada um, e dois trechos cujas caixas estão
+   mais longe que o limite caem fora por uma comparação de retângulo. Todos os
+   chamadores perguntam a mesma coisa — "encosta?" —, então a função só promete
+   a distância REAL até o limite recebido, e é essa promessa mais fraca que
+   torna a poda possível. Medido: 164,8 s → 28,9 s na bancada inteira, com
+   `metrics` e `perFace` idênticos byte a byte; o pior arquivo do acervo, em
+   modo navegador, caiu de 6,1 s para 0,42 s.
+2. **Há um freio de mão.** Um teto de trabalho de contorno por face
+   (`contourWorkBudget`, 60 M unidades — catorze vezes o pior caso do acervo,
+   que gasta 4,2 M). Estourou, o agrupamento para de soldar e a face é
+   declarada inutilizável. O relógio é de TRABALHO, não de parede: a mesma arte
+   gasta o mesmo orçamento em qualquer máquina, e o resultado não muda conforme
+   o processador.
+3. **A face diz quando não dá.** `LayoutFaceResult.unusable` marca três formas
+   de não dar — orçamento estourado, nenhum item reconhecido, ou UM item
+   cobrindo 90% da face (o fundo que engoliu tudo). Nesses casos a face não
+   publica item nem cota, o visualizador não oferece seleção, e um aviso diz
+   para usar a régua. Nas 629 faces do acervo isso pega 36 (5,7%), e as 5 que
+   não estavam simplesmente vazias são retângulos espúrios de 54 × 7 a
+   252 × 11 cm — nenhuma face real é perdida.
 
 ## O que a bancada mede
 
