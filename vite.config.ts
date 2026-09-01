@@ -103,7 +103,18 @@ export default defineConfig(({ mode }) => {
       copyPublicDir: true,
       commonjsOptions: {
         transformMixedEsModules: true,
-        strictRequires: false,
+        // Global default stays non-strict (perf) — but @mmote/niimbluelib's compiled
+        // CJS has real circular requires (packets/abstraction.js <-> print_tasks <->
+        // printer_models.js) that only resolve correctly under Node's lazy require()
+        // order. Rollup's default (non-strict) commonjs interop reorders/hoists module
+        // evaluation and can execute printer_models.js's top-level `LabelType.Perforated`
+        // access before packets/payloads.js has populated the LabelType enum, throwing
+        // "Cannot read properties of undefined (reading 'Perforated')" at runtime in the
+        // production bundle (this doesn't happen in `pnpm dev`, which pre-bundles deps
+        // via esbuild instead of Rollup). Scoping strictRequires to just this package
+        // forces call-order-preserving require semantics for it, without touching the
+        // non-strict default for the rest of the app's CJS deps.
+        strictRequires: [/@mmote\/niimbluelib/],
         include: [/node_modules/],
       },
       rollupOptions: {
