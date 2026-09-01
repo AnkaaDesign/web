@@ -168,7 +168,7 @@ function closestOnSegment(p: Pt, a: Pt, b: Pt): { point: Pt; distance: number } 
 }
 
 export interface Measurement {
-  axis: "H" | "V" | "free";
+  axis: "H" | "V";
   /** em pt da página */
   distancePt: number;
   /** em cm reais do implemento */
@@ -178,16 +178,37 @@ export interface Measurement {
 }
 
 /**
- * Distância entre dois alvos. Duas retas paralelas medem a distância
- * perpendicular — é essa a medida que o aplicador quer, e é ela que o clique
- * numa linha e depois na outra deve dar, não a distância entre os dois cliques.
+ * Em que eixo a medida sai. "V" = as RETAS são verticais, logo a medida corre
+ * na horizontal; "H" = o contrário.
+ *
+ * Duas paralelas mandam. Fora delas — uma ponta que não grudou em nada, ou uma
+ * reta vertical contra uma horizontal — manda o MAIOR deslocamento, que é o
+ * que o gesto diz: quem arrasta quase na horizontal está medindo uma largura.
+ */
+export function measurementAxis(first: SnapTarget, second: SnapTarget): "H" | "V" {
+  if (first.orientation !== null && first.orientation === second.orientation) {
+    return first.orientation;
+  }
+  return Math.abs(second.point.x - first.point.x) >= Math.abs(second.point.y - first.point.y)
+    ? "V"
+    : "H";
+}
+
+/**
+ * Distância entre dois alvos — e ela SAI SEMPRE NUM EIXO.
+ *
+ * Não existe cota diagonal neste ofício: o aplicador mede quanto o adesivo
+ * dista da borda (horizontal) ou do teto (vertical), e cola com a fita
+ * esticada num eixo. Um número na diagonal não corresponde a nada que se possa
+ * medir na chapa. Havia um terceiro caso, "free", que devolvia a distância
+ * direta entre os dois cliques; ele foi embora.
+ *
+ * Duas retas paralelas medem a distância PERPENDICULAR — é essa a medida que o
+ * aplicador quer, e é ela que o clique numa linha e depois na outra deve dar,
+ * não a distância entre os dois cliques.
  */
 export function measureBetween(first: SnapTarget, second: SnapTarget, scale: Scale): Measurement {
-  const sameAxis =
-    first.orientation !== null && first.orientation === second.orientation
-      ? first.orientation
-      : null;
-  if (sameAxis === "V") {
+  if (measurementAxis(first, second) === "V") {
     const distancePt = Math.abs(second.point.x - first.point.x);
     const y = (first.point.y + second.point.y) / 2;
     return {
@@ -198,24 +219,14 @@ export function measureBetween(first: SnapTarget, second: SnapTarget, scale: Sca
       to: { x: second.point.x, y },
     };
   }
-  if (sameAxis === "H") {
-    const distancePt = Math.abs(second.point.y - first.point.y);
-    const x = (first.point.x + second.point.x) / 2;
-    return {
-      axis: "V",
-      distancePt,
-      valueCm: distancePt / scale.ptPerCm,
-      from: { x, y: first.point.y },
-      to: { x, y: second.point.y },
-    };
-  }
-  const distancePt = dist(first.point, second.point);
+  const distancePt = Math.abs(second.point.y - first.point.y);
+  const x = (first.point.x + second.point.x) / 2;
   return {
-    axis: "free",
+    axis: "V",
     distancePt,
     valueCm: distancePt / scale.ptPerCm,
-    from: first.point,
-    to: second.point,
+    from: { x, y: first.point.y },
+    to: { x, y: second.point.y },
   };
 }
 
