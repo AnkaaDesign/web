@@ -594,7 +594,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onResetOrder
           {/* Paint display with smooth transitions */}
           <div ref={scrollContainerRef} className="flex-1 min-h-0 relative overflow-auto w-full">
             {isMinimized ? (
-              <PaintGrid key={gridResetKey} paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} onOrderChange={handleOrderChange} />
+              <PaintGrid key={gridResetKey} paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} onOrderChange={handleOrderChange} onMerge={handleMerge} />
             ) : (
               <PaintCardGridVirtualized paints={sortedPaints} isLoading={isLoading} onFilterChange={handleFilterChange} currentFilters={filters} onMerge={handleMerge} />
             )}

@@ -4,28 +4,13 @@ import type { Paint } from "../../../../types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
-import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH, SECTOR_PRIVILEGES } from "../../../../constants";
-import { IconFlask, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconClipboardList, IconPrinter } from "@tabler/icons-react";
-import { usePaintMutations } from "../../../../hooks";
+import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH } from "../../../../constants";
+import { IconFlask, IconClipboardList } from "@tabler/icons-react";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { usePaintSelection } from "./paint-selection-context";
-import { usePrinter } from "@/components/common/printer";
-import { useAuth } from "../../../../contexts/auth-context";
 import { cn } from "@/lib/utils";
-import { canEditPaints, canDeletePaints } from "../../../../utils/permissions/entity-permissions";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { PaintContextMenu, usePaintContextMenu, useCanViewPaintDetails } from "./paint-context-menu";
 
 // Badge style - unified neutral, more subtle (for type, brand, finish, manufacturer)
 const BADGE_STYLE = "border-0 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:border-0 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300";
@@ -41,39 +26,13 @@ interface PaintCardProps {
 
 export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: PaintCardProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { delete: deletePaint } = usePaintMutations();
   const { isSelected, toggleSelection, selectedCount } = usePaintSelection();
-  const { openPrintDialog } = usePrinter();
   const backgroundColor = formatHexColor(paint.hex);
   const textColor = getContrastingTextColor(paint.hex);
   const selected = isSelected(paint.id);
+  const canViewPaintDetails = useCanViewPaintDetails();
 
-  // Check if user can navigate to paint catalogue detail page
-  // Allowed roles: ADMIN, LOGISTIC, COMMERCIAL, FINANCIAL, WAREHOUSE, DESIGNER, and PRODUCTION team leaders
-  const isTeamLeader = Boolean(user?.ledSector?.id);
-  const userPrivilege = user?.sector?.privileges;
-  const canViewPaintDetails = userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
-    userPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
-    userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
-    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
-    userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
-    userPrivilege === SECTOR_PRIVILEGES.DESIGNER ||
-    (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader);
-
-  // Check if user can edit/delete paints (only WAREHOUSE and ADMIN)
-  const canEdit = canEditPaints(user);
-  const canDelete = canDeletePaints(user);
-
-  // Context menu state
-  const [contextMenu, setContextMenu] = React.useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-
-  // Delete dialog state
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const { position: contextMenu, openAt: handleContextMenu, close: closeContextMenu } = usePaintContextMenu();
 
   // Get labels
   const paintTypeLabel = paint.paintType?.name || "";
@@ -99,33 +58,6 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   // Formula and task counts - use _count for performance (avoids fetching full data)
   const formulaCount = paint._count?.formulas || 0;
   const taskCount = (paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0);
-
-  // Handle edit action
-  const handleEdit = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    navigate(routes.painting.catalog.edit(paint.id));
-    setContextMenu(null);
-  };
-
-  // Handle delete action - open dialog
-  const handleDeleteClick = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setContextMenu(null);
-    setShowDeleteDialog(true);
-  };
-
-  // Confirm delete action
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      await deletePaint(paint.id);
-    } catch (error) {
-      // Error is handled by the API client
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteDialog(false);
-    }
-  };
 
   // Handle finish filter
   const handleFinishFilter = (e: React.MouseEvent) => {
@@ -180,56 +112,6 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
     e.stopPropagation();
     navigate(`${routes.painting.catalog.root}?search=${encodeURIComponent(tag)}`);
   };
-
-  // Handle selection toggle
-  const handleSelect = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    toggleSelection(paint.id);
-    setContextMenu(null);
-  };
-
-  // Handle view details
-  const handleViewDetails = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (canViewPaintDetails) {
-      navigate(routes.painting.catalog.details(paint.id));
-    }
-    setContextMenu(null);
-  };
-
-  // Handle merge
-  const handleMerge = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (onMerge) {
-      onMerge();
-    }
-    setContextMenu(null);
-  };
-
-  // Handle print label
-  const handlePrintLabel = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    openPrintDialog(paint);
-    setContextMenu(null);
-  };
-
-  // Handle context menu (right-click)
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-    });
-  };
-
-  // Close context menu when clicking outside
-  React.useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, []);
 
   return (
     <>
@@ -367,79 +249,8 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
         </div>
       </Card>
 
-      {/* Context Menu */}
-      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <PositionedDropdownMenuContent
-        position={contextMenu}
-        isOpen={!!contextMenu}
-        className="w-56 ![position:fixed]"
-        onClick={(e) => e.stopPropagation()}
-        >
-          {selectedCount >= 2 && selected && (
-            <DropdownMenuItem onClick={handleMerge}>
-              <IconGitMerge className="mr-2 h-4 w-4" />
-              Mesclar Tintas
-            </DropdownMenuItem>
-          )}
+      <PaintContextMenu paint={paint} position={contextMenu} onClose={closeContextMenu} onMerge={onMerge} />
 
-          <DropdownMenuItem onClick={handleSelect}>
-            {selected ? <IconX className="mr-2 h-4 w-4" /> : <IconCheck className="mr-2 h-4 w-4" />}
-            {selected ? "Desselecionar" : "Selecionar"}
-          </DropdownMenuItem>
-
-          {canViewPaintDetails && (
-            <DropdownMenuItem onClick={handleViewDetails}>
-              <IconEye className="mr-2 h-4 w-4" />
-              Detalhes
-            </DropdownMenuItem>
-          )}
-
-          {canEdit && (
-            <DropdownMenuItem onClick={handleEdit}>
-              <IconEdit className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-          )}
-
-          <DropdownMenuItem onClick={handlePrintLabel}>
-            <IconPrinter className="mr-2 h-4 w-4" />
-            Imprimir Etiqueta
-          </DropdownMenuItem>
-
-          {canDelete && (
-            <>
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
-                <IconTrash className="mr-2 h-4 w-4" />
-                Excluir
-              </DropdownMenuItem>
-            </>
-          )}
-        </PositionedDropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Tinta</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir a tinta "{paint.name}"? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Excluindo..." : "Excluir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

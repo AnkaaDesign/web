@@ -5,18 +5,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { PAINT_FINISH_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PaintContextMenu, usePaintContextMenu } from "./paint-context-menu";
+import { usePaintSelection } from "./paint-selection-context";
 
 interface PaintGridProps {
   paints: Paint[];
   isLoading: boolean;
   onPaintClick: (paint: Paint) => void;
   onOrderChange?: (paints: Paint[]) => void;
+  onMerge?: () => void;
 }
 
 const SQUARE_SIZE = 64; // Fixed size in pixels
 const GAP = 8; // Gap between squares
 
-export function PaintGrid({ paints, isLoading, onPaintClick, onOrderChange }: PaintGridProps) {
+export function PaintGrid({ paints, isLoading, onPaintClick, onOrderChange, onMerge }: PaintGridProps) {
   // Local state for drag-and-drop reordering
   const [orderedPaints, setOrderedPaints] = useState<Paint[]>(paints);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -103,6 +106,7 @@ export function PaintGrid({ paints, isLoading, onPaintClick, onOrderChange }: Pa
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             isDragging={draggedIndex === index}
+            onMerge={onMerge}
           />
         ))}
       </div>
@@ -118,15 +122,23 @@ interface PaintSquareProps {
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragEnd: () => void;
   isDragging: boolean;
+  onMerge?: () => void;
 }
 
-function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd, isDragging }: PaintSquareProps) {
+function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd, isDragging, onMerge }: PaintSquareProps) {
   const backgroundColor = formatHexColor(paint.hex);
   const paintFinish = paint.finish as PAINT_FINISH;
+  const { isSelected } = usePaintSelection();
+  const selected = isSelected(paint.id);
+
+  // Same right-click menu as the full card in the maximized view — the swatch
+  // is just a denser representation of the same paint, not a read-only one.
+  const { position: contextMenu, openAt: handleContextMenu, close: closeContextMenu } = usePaintContextMenu();
 
   const button = (
     <button
       onClick={onClick}
+      onContextMenu={handleContextMenu}
       draggable
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => onDragOver(e, index)}
@@ -137,6 +149,7 @@ function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
         "group cursor-move overflow-hidden relative block",
         isDragging && "opacity-50 scale-95",
+        selected && "ring-2 ring-primary ring-offset-2 z-10",
       )}
       style={{
         width: SQUARE_SIZE,
@@ -173,6 +186,8 @@ function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd
           </div>
         </TooltipContent>
       </Tooltip>
+
+      <PaintContextMenu paint={paint} position={contextMenu} onClose={closeContextMenu} onMerge={onMerge} />
     </TooltipProvider>
   );
 }
