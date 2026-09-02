@@ -7,10 +7,22 @@ import { ReconnectableNiimbotSerialClient } from "@/lib/printer/niimbot-reconnec
 import { drawDuplaLabel, drawComboLabel, NIIMBOT_PRINT_DIRECTION } from "@/lib/printer/label-canvas";
 import { LAST_LABEL_FORMAT_STORAGE_KEY, LAST_PRINTER_PORT_STORAGE_KEY } from "@/lib/printer/label-format";
 import type { LabelFormat, StoredPrinterPort } from "@/lib/printer/label-format";
+import { getFormatForBarcode, rememberBarcodeFormat } from "@/lib/printer/label-roll-memory";
 
 export interface PrintablePaint {
   name: string;
   paintType?: { name: string } | null;
+}
+
+/** What the RFID tag of the currently loaded roll reports, plus the format we've learned for it. */
+export interface LoadedLabelRoll {
+  barCode: string;
+  serialNumber: string;
+  /** Labels left on the roll, or null when the printer doesn't report a total. */
+  remaining: number | null;
+  total: number | null;
+  /** Format previously printed on a roll with this barcode — null the first time this SKU is seen. */
+  detectedFormat: LabelFormat | null;
 }
 
 /** All state and logic for the Niimbot printer connection — the provider just wires this to context + renders the dialog. */
@@ -25,6 +37,8 @@ export function usePrinterClient() {
   const [connected, setConnected] = useState(false);
   const [printerName, setPrinterName] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [labelRoll, setLabelRoll] = useState<LoadedLabelRoll | null>(null);
+  const [isReadingRoll, setIsReadingRoll] = useState(false);
   const isSerialSupported = typeof navigator !== "undefined" && "serial" in navigator;
 
   useEffect(() => {
@@ -35,6 +49,7 @@ export function usePrinterClient() {
     const onDisconnect = () => {
       setConnected(false);
       setPrinterName(null);
+      setLabelRoll(null);
     };
     client.on("connect", onConnect);
     client.on("disconnect", onDisconnect);
@@ -95,6 +110,39 @@ export function usePrinterClient() {
     }
   }, [client]);
 
+  /**
+   * Reads the RFID tag of the loaded roll to identify which consumable is in
+   * the printer. Never throws: a roll without a tag, a printer that doesn't
+   * answer the command, or an open lid are all normal states that simply mean
+   * "unknown roll" and fall back to the manual format picker.
+   */
+  const readLabelRoll = useCallback(async (): Promise<LoadedLabelRoll | null> => {
+    if (!connected) return null;
+    setIsReadingRoll(true);
+    try {
+      const info = await client.abstraction.rfidInfo();
+      if (!info.tagPresent || !info.barCode) {
+        setLabelRoll(null);
+        return null;
+      }
+      const roll: LoadedLabelRoll = {
+        barCode: info.barCode,
+        serialNumber: info.serialNumber,
+        total: info.allPaper >= 0 ? info.allPaper : null,
+        remaining: info.allPaper >= 0 && info.usedPaper >= 0 ? Math.max(info.allPaper - info.usedPaper, 0) : null,
+        detectedFormat: getFormatForBarcode(info.barCode),
+      };
+      setLabelRoll(roll);
+      return roll;
+    } catch (error) {
+      console.warn("[printer] não foi possível ler a etiqueta RFID do rolo", error);
+      setLabelRoll(null);
+      return null;
+    } finally {
+      setIsReadingRoll(false);
+    }
+  }, [client, connected]);
+
   const printLabel = useCallback(
     async (format: LabelFormat, paint: PrintablePaint) => {
       if (!connected) throw new Error("Impressora não conectada");
@@ -124,6 +172,9 @@ export function usePrinterClient() {
         canvas: { width: canvas.width, height: canvas.height },
         paintName: paint.name,
         paintTypeName,
+        // Logged so the barcode↔format pairings can be read server-side and
+        // seeded for other machines, instead of each browser learning alone.
+        roll: labelRoll,
       };
 
       try {
@@ -143,6 +194,12 @@ export function usePrinterClient() {
         }
 
         setLocalStorage(LAST_LABEL_FORMAT_STORAGE_KEY, format);
+        // A print that went through is the ground truth for "this roll is this
+        // size", so it's what teaches the barcode→format map.
+        if (labelRoll) {
+          rememberBarcodeFormat(labelRoll.barCode, format);
+          setLabelRoll({ ...labelRoll, detectedFormat: format });
+        }
         // Success: just the summary, not the full packet trace — keeps routine prints lightweight.
         void apiClient.post("/printer-log", { ...baseLog, success: true }).catch(() => {});
       } catch (error) {
@@ -161,8 +218,8 @@ export function usePrinterClient() {
         client.off("packetreceived", onPacketReceived);
       }
     },
-    [client, connected, printerName],
+    [client, connected, printerName, labelRoll],
   );
 
-  return { connected, printerName, isConnecting, isSerialSupported, connectManually, printLabel };
+  return { connected, printerName, isConnecting, isSerialSupported, connectManually, printLabel, labelRoll, isReadingRoll, readLabelRoll };
 }

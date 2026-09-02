@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { IconLoader, IconPrinter, IconUsb, IconAlertTriangle } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
+import { IconLoader, IconPrinter, IconUsb, IconAlertTriangle, IconTag } from "@tabler/icons-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
@@ -23,6 +23,23 @@ interface PrintLabelDialogProps {
 export function PrintLabelDialog({ target, client, onOpenChange }: PrintLabelDialogProps) {
   const [printingFormat, setPrintingFormat] = useState<LabelFormat | null>(null);
   const lastFormat = getLocalStorage(LAST_LABEL_FORMAT_STORAGE_KEY) as LabelFormat | null;
+
+  const { connected, readLabelRoll, labelRoll, isReadingRoll } = client;
+  const isOpen = !!target;
+  const detectedFormat = labelRoll?.detectedFormat ?? null;
+
+  // Read the roll's RFID tag every time the dialog opens on a connected
+  // printer — the roll may well have been swapped since the last print.
+  useEffect(() => {
+    if (!isOpen || !connected) return;
+    void readLabelRoll();
+  }, [isOpen, connected, readLabelRoll]);
+
+  // The detected format goes first, so the roll actually in the printer is the
+  // one under the cursor.
+  const formats = (Object.entries(LABEL_FORMATS) as [LabelFormat, (typeof LABEL_FORMATS)[LabelFormat]][]).sort(
+    ([a], [b]) => Number(b === detectedFormat) - Number(a === detectedFormat),
+  );
 
   const handlePrint = async (format: LabelFormat) => {
     if (!target) return;
@@ -56,7 +73,9 @@ export function PrintLabelDialog({ target, client, onOpenChange }: PrintLabelDia
               ? "Este navegador não suporta impressão via USB. Use o Chrome ou o Edge."
               : !client.connected
                 ? "Conecte a impressora Niimbot B1 pela porta USB do computador."
-                : "Escolha o formato da etiqueta."}
+                : detectedFormat
+                  ? "Formato reconhecido pelo rolo que está na impressora."
+                  : "Escolha o formato da etiqueta."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -84,30 +103,61 @@ export function PrintLabelDialog({ target, client, onOpenChange }: PrintLabelDia
         )}
 
         {client.connected && (
-          <div className="grid grid-cols-1 gap-3">
-            {(Object.entries(LABEL_FORMATS) as [LabelFormat, (typeof LABEL_FORMATS)[LabelFormat]][]).map(([format, spec]) => (
-              <button
-                key={format}
-                type="button"
-                disabled={printingFormat !== null}
-                onClick={() => handlePrint(format)}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50 disabled:opacity-50 disabled:cursor-default",
-                  "cursor-pointer",
+          <>
+            {(isReadingRoll || labelRoll) && (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {isReadingRoll ? (
+                  <>
+                    <IconLoader className="h-4 w-4 shrink-0 animate-spin" />
+                    Lendo o rolo na impressora...
+                  </>
+                ) : (
+                  labelRoll && (
+                    <>
+                      <IconTag className="h-4 w-4 shrink-0" />
+                      <span>
+                        {detectedFormat ? `Rolo de ${LABEL_FORMATS[detectedFormat].title}` : "Rolo ainda não identificado — escolha o formato uma vez"}
+                        {labelRoll.remaining !== null && ` · restam ${labelRoll.remaining} etiquetas`}
+                      </span>
+                    </>
+                  )
                 )}
-              >
-                <div>
-                  <div className="flex items-center gap-2 font-medium">
-                    <IconPrinter className="h-4 w-4" />
-                    {spec.title}
-                    {lastFormat === format && <span className="text-xs font-normal text-muted-foreground">(padrão)</span>}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{spec.description}</p>
-                </div>
-                {printingFormat === format && <IconLoader className="h-4 w-4 animate-spin shrink-0" />}
-              </button>
-            ))}
-          </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3">
+              {formats.map(([format, spec]) => {
+                const isDetected = detectedFormat === format;
+                return (
+                  <button
+                    key={format}
+                    type="button"
+                    disabled={printingFormat !== null}
+                    onClick={() => handlePrint(format)}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 disabled:opacity-50 disabled:cursor-default",
+                      "cursor-pointer",
+                      isDetected ? "border-primary bg-primary/5" : "border-border bg-card",
+                    )}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <IconPrinter className="h-4 w-4" />
+                        {spec.title}
+                        {isDetected ? (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-normal text-primary">na impressora</span>
+                        ) : (
+                          !detectedFormat && lastFormat === format && <span className="text-xs font-normal text-muted-foreground">(padrão)</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-0.5">{spec.description}</p>
+                    </div>
+                    {printingFormat === format && <IconLoader className="h-4 w-4 animate-spin shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <AlertDialogFooter>
