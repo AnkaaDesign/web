@@ -220,6 +220,16 @@ export const FinancialBudgetCreatePage = () => {
       customForecastDays: null as number | null,
       layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
+      /**
+       * Junto ou separado — só faz diferença quando o orçamento cobre mais de um
+       * veículo, e é por isso que o seletor só aparece nesse caso.
+       *
+       * `JOINT` (padrão): uma fatura para os N veículos, um plano de parcelas,
+       * uma NFS-e. `PER_TASK`: uma fatura por veículo, e o financeiro aprova
+       * veículo a veículo — o que os sessenta caminhões do Marquespan pedem, já
+       * que não terminam no mesmo dia.
+       */
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK",
       customerConfigs: [] as any[],
       services: [
         {
@@ -770,10 +780,11 @@ export const FinancialBudgetCreatePage = () => {
         combinations.push({});
       }
 
-      // 8. Create task(s) and quote for each
+      // 8. Cria as TAREFAS. O orçamento — um só, para todas — vem depois do laço.
       let successCount = 0;
       let firstCreatedTaskId: string | undefined;
       let firstCreatedRepIds: string[] | undefined;
+      const createdTaskIds: string[] = [];
 
       for (let i = 0; i < combinations.length; i++) {
         const { plate, serialNumber } = combinations[i];
@@ -851,26 +862,9 @@ export const FinancialBudgetCreatePage = () => {
               }
             }
 
-            // 10. Create quote for this task
-            const quoteData: any = {
-              taskId: createdTaskId,
-              expiresAt: data.expiresAt,
-              status: "PENDING",
-              subtotal: data.subtotal || 0,
-              total: data.total || 0,
-              guaranteeYears: data.guaranteeYears || null,
-              customGuaranteeText: data.customGuaranteeText || null,
-              customForecastDays: data.customForecastDays || null,
-              layoutFileIds,
-              simultaneousTasks: data.simultaneousTasks || null,
-              customerConfigs: data.customerConfigs || [],
-              services: validServices.map((item: any) => ({
-                ...item,
-                amount: item.amount ?? 0,
-              })),
-            };
-
-            await createQuoteMutation.mutateAsync(quoteData);
+            // A tarefa entra na lista do orçamento ÚNICO — ver o bloco 10 logo
+            // abaixo do laço. O orçamento não é mais criado aqui.
+            createdTaskIds.push(createdTaskId);
 
             // Create the task's airbrushings (non-blocking; layouts have no status, and the
             // API resolves the customer from taskId).
@@ -888,9 +882,64 @@ export const FinancialBudgetCreatePage = () => {
         }
       }
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // 10. UM ORÇAMENTO PARA TODAS AS TAREFAS
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Antes o orçamento era criado DENTRO do laço, um por tarefa. Duas placas e
+      // dois números de série produziam quatro tarefas e QUATRO orçamentos, com
+      // quatro números, quatro PDFs e quatro cerimônias de assinatura para o
+      // mesmo trabalho. O Marquespan de 02/09 saiu assim: orçamentos 642 a 701,
+      // sessenta números para sessenta caminhões idênticos.
+      //
+      // Agora é um só, cobrindo os N veículos. O preço dos serviços é POR
+      // VEÍCULO e o documento imprime o "× N" e o total geral; a API multiplica
+      // (ver `computeQuoteMoney`).
+      let quoteCreated = false;
+      if (createdTaskIds.length > 0) {
+        const quoteData: any = {
+          taskIds: createdTaskIds,
+          billingSplit: data.billingSplit ?? "JOINT",
+          expiresAt: data.expiresAt,
+          status: "PENDING",
+          subtotal: data.subtotal || 0,
+          total: data.total || 0,
+          guaranteeYears: data.guaranteeYears || null,
+          customGuaranteeText: data.customGuaranteeText || null,
+          customForecastDays: data.customForecastDays || null,
+          layoutFileIds,
+          simultaneousTasks: data.simultaneousTasks || null,
+          customerConfigs: data.customerConfigs || [],
+          services: validServices.map((item: any) => ({
+            ...item,
+            amount: item.amount ?? 0,
+          })),
+        };
+
+        try {
+          await createQuoteMutation.mutateAsync(quoteData);
+          quoteCreated = true;
+        } catch (error: any) {
+          // O toast do erro sai pelo interceptor do axios. As TAREFAS já foram
+          // criadas, e é isso que a mensagem precisa dizer: navegar em silêncio
+          // para a tarefa deixaria o operador achando que o orçamento existe.
+          console.error("Error creating quote:", error);
+          toast.error(
+            createdTaskIds.length === 1
+              ? "A tarefa foi criada, mas o orçamento não. Abra a tarefa e crie o orçamento por ela."
+              : `As ${createdTaskIds.length} tarefas foram criadas, mas o orçamento não. Abra uma delas e crie o orçamento por ela.`,
+          );
+        }
+      }
+
       if (successCount > 0) {
         queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
         allowNavigation();
+        if (quoteCreated && createdTaskIds.length > 1) {
+          toast.success(
+            `Orçamento criado para ${createdTaskIds.length} veículos.`,
+          );
+        }
         navigate(firstCreatedTaskId
           ? routes.production.preparation.details(firstCreatedTaskId)
           : routes.financial.budget.root

@@ -383,23 +383,40 @@ export function SignatureSendDialog({
                 </div>
               )}
 
-              {/* ---- Identificação do veículo ---- */}
-              {preflight?.vehicle && preflight.vehicle.missing.length > 0 && !blocked && (
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
-                  <IconTruck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-foreground">
-                    <strong>
-                      Este orçamento está sem {preflight.vehicle.missing.join(" e ")} do
-                      veículo.
-                    </strong>{" "}
-                    O documento é congelado como está — {preflight.vehicle.missing.length === 1
-                      ? "esse dado"
-                      : "esses dados"}{" "}
-                    não vão constar do documento assinado, mesmo que sejam preenchidos
-                    depois. Se já souber, preencha antes de enviar.
-                  </span>
-                </div>
-              )}
+              {/* ---- Identificação do veículo ----
+                   Com um veículo, a frase de sempre. Com N, o aviso diz em
+                   QUANTOS falta: um orçamento de sessenta caminhões em que só o
+                   de nº 40 está sem placa não pode ser anunciado como "este
+                   orçamento está sem placa do veículo" — nem o inverso, um em
+                   que faltam cinquenta e nove como se fosse um.
+
+                   `vehicles` é a fonte; `vehicle` (o primeiro) é o recuo para
+                   uma API anterior a esta feature. */}
+              {(() => {
+                const vehicles = preflight?.vehicles ?? [];
+                const withGaps = vehicles.filter((v) => v.missing.length > 0);
+                const legacyMissing = preflight?.vehicle?.missing ?? [];
+                if (blocked) return null;
+                if (withGaps.length === 0 && legacyMissing.length === 0) return null;
+                const multi = vehicles.length > 1;
+                return (
+                  <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
+                    <IconTruck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="text-foreground">
+                      <strong>
+                        {multi
+                          ? withGaps.length === vehicles.length
+                            ? `Os ${vehicles.length} veículos deste orçamento estão com dados de identificação em branco.`
+                            : `${withGaps.length} de ${vehicles.length} veículos estão com dados de identificação em branco.`
+                          : `Este orçamento está sem ${(withGaps[0]?.missing ?? legacyMissing).join(" e ")} do veículo.`}
+                      </strong>{" "}
+                      {multi
+                        ? 'O documento é congelado como está. Os campos em branco saem como "a registrar" e não serão preenchidos no documento assinado — o aditivo de identificação, emitido na entrega, é que os declara. Se já souber, preencha antes de enviar.'
+                        : "O documento é congelado como está — esses dados não vão constar do documento assinado, mesmo que sejam preenchidos depois. Se já souber, preencha antes de enviar."}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* ---- Quem recebe o quê ---- */}
               {preflight && preflight.recipients.length > 0 && !blocked && (

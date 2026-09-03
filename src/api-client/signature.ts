@@ -89,7 +89,7 @@ export const QUOTE_SECTION_LABELS: Record<QuoteSection, string> = {
   SERVICES: "Lista de serviços",
   PRICING: "Valores e desconto",
   DELIVERY: "Prazo de entrega",
-  PAYMENT: "Condições de pagamento",
+  PAYMENT: "Faturamento",
   GUARANTEE: "Garantias",
   LAYOUT: "Layout",
 };
@@ -99,7 +99,7 @@ export const QUOTE_SECTION_DESCRIPTIONS: Record<QuoteSection, string> = {
   SERVICES: "A relação numerada dos serviços, com as observações de cada um.",
   PRICING: "Valor de cada serviço, subtotal, desconto e total.",
   DELIVERY: "Prazo em dias úteis e quantas tarefas correm simultaneamente.",
-  PAYMENT: "Forma de pagamento, parcelas e vencimentos.",
+  PAYMENT: "Dados do tomador para a nota fiscal, forma de pagamento, parcelas e vencimentos.",
   GUARANTEE: "Prazo e termos da garantia.",
   LAYOUT: "As imagens do layout aprovado.",
 };
@@ -191,7 +191,26 @@ export interface DeliveryPreflight extends DeliverySettings {
    * depois não entram nele — nem podem, é o documento que foi assinado. É o caso
    * comum do implemento 0 km, orçado antes de emplacar.
    */
+  /**
+   * @deprecated Descreve só o PRIMEIRO veículo. Use `vehicles`.
+   *
+   * Mantido porque a API ainda o envia (o app instalado nos aparelhos depende
+   * dele) e porque remover aqui não removeria de lá.
+   */
   vehicle: { plate: string | null; chassisNumber: string | null; missing: string[] } | null;
+  /**
+   * Um por veículo do orçamento, na ordem do documento.
+   *
+   * Um orçamento pode cobrir sessenta caminhões, e a lacuna de cadastro existe
+   * em graus diferentes por caminhão: alguns já chegaram emplacados, outros não.
+   */
+  vehicles?: Array<{
+    taskId: string;
+    serialNumber: string | null;
+    plate: string | null;
+    chassisNumber: string | null;
+    missing: string[];
+  }>;
 }
 
 export interface PublicSignerState {
