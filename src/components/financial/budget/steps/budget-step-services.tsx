@@ -12,6 +12,7 @@ import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants";
+import { quoteTasks } from "@/utils/quote-tasks";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
 import { useTaskQuoteSuggestion } from "@/hooks/production/use-task-quote";
 import {
@@ -85,6 +86,15 @@ export function BudgetStepServices({
 
   // Hook unwraps axios .data, so suggestionApiResponse = { success, data, message }
   const suggestion = suggestionApiResponse?.data || null;
+
+  // A tarefa que o atalho "Orçamento de <data>" abre.
+  //
+  // A sugestão passou a vir com `tasks` (lista) — um orçamento cobre N veículos.
+  // Lendo `suggestion.task`, o botão sumia em silêncio: sem erro e sem log, só
+  // um link de referência que deixou de aparecer. Qualquer veículo serve, porque
+  // isto é um atalho para abrir o orçamento anterior, não uma afirmação sobre a
+  // frota — é exatamente o caso de `primaryTask`.
+  const suggestionTaskId: string | undefined = quoteTasks<any>(suggestion)[0]?.id;
 
   // Detect if user manually typed in any real service row → dismiss ghost
   const userHasManualServices = useMemo(() => {
@@ -360,7 +370,7 @@ export function BudgetStepServices({
                     <IconBulb className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="text-sm font-medium">Sugestão</span>
                   </div>
-                  {suggestion.task?.id ? (
+                  {suggestionTaskId ? (
                     <Button
                       type="button"
                       variant="default"
@@ -369,7 +379,7 @@ export function BudgetStepServices({
                       asChild
                     >
                       <a
-                        href={routes.production.history.details(suggestion.task.id)}
+                        href={routes.production.history.details(suggestionTaskId)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
