@@ -33,6 +33,16 @@ const isPersistedFileId = (id?: string | null): id is string =>
 
 interface BudgetStepInfoProps {
   disabled?: boolean;
+  /**
+   * Quantos veículos o orçamento JÁ cobre, quando ele existe.
+   *
+   * Na criação a contagem sai de placas × números de série do passo 1 — é o
+   * mesmo produto cartesiano que vira `taskIds`. Na edição esse cálculo não
+   * serve: o formulário carrega os campos de UMA tarefa, daria 1, e o seletor
+   * de faturamento sumiria de um orçamento de sessenta caminhões — sem jeito
+   * de trocar `JOINT` por `PER_TASK` depois que o erro aparece no faturamento.
+   */
+  existingVehicleCount?: number;
   layoutFiles: FileWithPreview[];
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
   layouts?: LayoutOption[];
@@ -62,6 +72,7 @@ const GUARANTEE_OPTIONS = [
 
 export function BudgetStepInfo({
   disabled,
+  existingVehicleCount,
   layoutFiles,
   onLayoutFilesChange,
   layouts,
@@ -94,11 +105,13 @@ export function BudgetStepInfo({
   const serialNumbersWatch =
     (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
   const vehicleCount = useMemo(() => {
+    // O orçamento já existe: quem manda é a contagem de tarefas dele.
+    if (existingVehicleCount && existingVehicleCount > 0) return existingVehicleCount;
     if (platesWatch.length > 0 && serialNumbersWatch.length > 0) {
       return platesWatch.length * serialNumbersWatch.length;
     }
     return Math.max(1, platesWatch.length, serialNumbersWatch.length);
-  }, [platesWatch, serialNumbersWatch]);
+  }, [existingVehicleCount, platesWatch, serialNumbersWatch]);
 
   // Sync validity period whenever expiresAt changes (including after form.reset() populates saved data)
   useEffect(() => {

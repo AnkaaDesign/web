@@ -43,6 +43,7 @@ import {
   missingBillingCustomerKeys,
   missingBillingCustomerLabels,
 } from "@/lib/billing-customer-data";
+import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -98,6 +99,25 @@ export function BudgetStepReview({
   const totalValue = useWatch({ control, name: "total" });
   const expiresAt = useWatch({ control, name: "expiresAt" });
   const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
+
+  // QUANTOS VEÍCULOS — a mesma conta do passo 1 e do seletor de faturamento.
+  //
+  // O preço dos serviços é POR VEÍCULO (ver `utils/quote-money.ts`). Sem o "× N"
+  // e o total geral, esta tela mostra R$ 12.170,40 como TOTAL de um orçamento de
+  // sessenta caminhões que vale R$ 730.224,00 — e é ESTA a tela em que o
+  // operador confere antes de mandar criar. O documento assinado já imprime as
+  // duas linhas; a conferência tem de ver o mesmo número que o cliente verá.
+  const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
+  const serialNumbersWatch =
+    (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
+  const vehicleCount = useMemo(() => {
+    const existingCount = (existingQuote as any)?.tasks?.length;
+    if (existingCount && existingCount > 0) return existingCount as number;
+    if (platesWatch.length > 0 && serialNumbersWatch.length > 0) {
+      return platesWatch.length * serialNumbersWatch.length;
+    }
+    return Math.max(1, platesWatch.length, serialNumbersWatch.length);
+  }, [existingQuote, platesWatch, serialNumbersWatch]);
 
   // Attention on the quote's `orderNumber`. `attentionOrderNumberFor` narrows the quote-wide
   // signal to the one customer config it is actually about, and returns "" for every other config
@@ -473,30 +493,70 @@ export function BudgetStepReview({
           })()}
 
           {/* Pricing Summary */}
-          <div className="bg-muted/20 border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(displaySubtotal)}
-              </span>
-            </div>
+          {(() => {
+            // O "× N" só entra na visão GERAL (sem filtro de cliente): ali
+            // `displayTotal` é o total por veículo, vindo do formulário. Filtrado
+            // por cliente, o número vem da configuração daquele cliente, que em
+            // `JOINT` já é o valor geral — multiplicar de novo cobraria sessenta
+            // vezes o que já está contado sessenta vezes.
+            const showPerVehicle = customerFilter === "all" && vehicleCount > 1;
+            // `round2(total × N)`, a MESMA conta do PDF e da fatura — nunca o
+            // desconto recalculado sobre a soma. Ver `utils/quote-money.ts`.
+            const grandTotal = round2(displayTotal * vehicleCount);
+            return (
+              <div className="bg-muted/20 border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Subtotal{showPerVehicle ? " por veículo" : ""}
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(displaySubtotal)}
+                  </span>
+                </div>
 
-            {discountAmount > 0 && (
-              <div className="flex items-center justify-between text-sm text-destructive">
-                <span>Desconto</span>
-                <span className="font-medium">
-                  - {formatCurrency(discountAmount)}
-                </span>
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm text-destructive">
+                    <span>Desconto{showPerVehicle ? " por veículo" : ""}</span>
+                    <span className="font-medium">
+                      - {formatCurrency(discountAmount)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
+                  <span className="text-base font-bold text-foreground">
+                    {showPerVehicle ? "TOTAL POR VEÍCULO" : "TOTAL"}
+                  </span>
+                  <span
+                    className={
+                      showPerVehicle
+                        ? "text-base font-bold text-foreground"
+                        : "text-xl font-bold text-primary"
+                    }
+                  >
+                    {formatCurrency(displayTotal)}
+                  </span>
+                </div>
+
+                {showPerVehicle && (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Veículos</span>
+                      <span className="font-medium">&times; {vehicleCount}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
+                      <span className="text-base font-bold text-foreground">
+                        TOTAL GERAL
+                      </span>
+                      <span className="text-xl font-bold text-primary">
+                        {formatCurrency(grandTotal)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-
-            <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
-              <span className="text-base font-bold text-foreground">TOTAL</span>
-              <span className="text-xl font-bold text-primary">
-                {formatCurrency(displayTotal)}
-              </span>
-            </div>
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

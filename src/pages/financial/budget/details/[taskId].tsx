@@ -253,6 +253,13 @@ const FinancialBudgetDetailPageInner = () => {
       customForecastDays: null as number | null,
       layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
+      /**
+       * Junto ou separado. Editável DEPOIS da criação porque a escolha errada
+       * só se revela quando o faturamento chega: um orçamento de sessenta
+       * caminhões criado como `JOINT` que precisa fechar veículo a veículo
+       * ficaria travado para sempre se este campo só existisse na criação.
+       */
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK",
       customerConfigs: [] as any[],
       services: [
         {
@@ -379,6 +386,7 @@ const FinancialBudgetDetailPageInner = () => {
         customForecastDays: null,
         layoutFileIds: [],
         simultaneousTasks: null,
+        billingSplit: "JOINT",
         customerConfigs: [],
         services: [
           {
@@ -407,6 +415,8 @@ const FinancialBudgetDetailPageInner = () => {
       customForecastDays: existingQuote.customForecastDays || null,
       layoutFileIds: (existingQuote.layoutFiles || []).map((f: any) => f.id),
       simultaneousTasks: existingQuote.simultaneousTasks || null,
+      billingSplit:
+        ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK") || "JOINT",
       customerConfigs:
         existingQuote.customerConfigs?.map((c: any) => ({
           customerId: c.customerId || c.id,
@@ -1310,6 +1320,7 @@ const FinancialBudgetDetailPageInner = () => {
         customForecastDays: data.customForecastDays || null,
         layoutFileIds: resolvedLayoutIds,
         simultaneousTasks: data.simultaneousTasks || null,
+        billingSplit: data.billingSplit || "JOINT",
         customerConfigs: data.customerConfigs || [],
         services: validServices.map((item: any) => ({
           ...item,
@@ -1355,6 +1366,7 @@ const FinancialBudgetDetailPageInner = () => {
               dirty.customForecastDays ||
               dirty.layoutFileIds ||
               dirty.simultaneousTasks ||
+              dirty.billingSplit ||
               dirty.customerConfigs ||
               dirty.services,
           );
@@ -1646,6 +1658,11 @@ const FinancialBudgetDetailPageInner = () => {
           <div style={{ display: currentStep === 2 ? undefined : "none" }}>
             <BudgetStepInfo
               disabled={isSubmitting || !canEdit}
+              // Em edição a contagem NÃO sai de placas × séries: o formulário
+              // carrega os campos de UMA tarefa, e a conta daria 1 mesmo num
+              // orçamento de sessenta — escondendo o seletor de faturamento
+              // justamente de quem precisa dele.
+              existingVehicleCount={(existingQuote as any)?.tasks?.length}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               layouts={layoutImageOptions}

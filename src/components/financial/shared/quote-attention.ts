@@ -1,3 +1,4 @@
+import { TASK_STATUS } from "@/constants";
 import type { Task } from "@/types";
 import type { TaskQuote } from "@/types/task-quote";
 
@@ -15,17 +16,43 @@ import type { TaskQuote } from "@/types/task-quote";
  */
 export type AttentionQuoteEntity = TaskQuote & { task: { id: string; status: string } };
 
-/** Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped. */
+/**
+ * Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped.
+ *
+ * UM ORÇAMENTO, UMA ENTRADA — mesmo quando ele aparece em sessenta linhas.
+ *
+ * Desde o orçamento multitarefa, N tarefas dividem o MESMO `quote.id`. Como a
+ * entidade registrada é o orçamento, empurrar uma entrada por linha registraria
+ * o mesmo id N vezes e a última venceria: o alerta do orçamento passaria a
+ * depender de qual veículo o `map` visitou por último — o mesmo orçamento
+ * piscaria ou não conforme a ordenação da tabela.
+ *
+ * O desempate espelha o `tasks: { some: { status: COMPLETED } }` que a regra usa
+ * na API: entre as tarefas do orçamento, vence uma que já esteja COMPLETED, se
+ * houver. A regra pergunta "algum veículo já ficou pronto?" — porque num
+ * orçamento de sessenta caminhões o dinheiro já está parado quando o primeiro
+ * sai —, e o avaliador do cliente lê `task.status`, um campo só. Escolher aqui a
+ * tarefa que satisfaz a regra é o que faz os dois avaliadores concordarem.
+ */
 export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQuoteEntity[] {
-  const out: AttentionQuoteEntity[] = [];
+  const byQuoteId = new Map<string, AttentionQuoteEntity>();
   for (const task of tasks) {
     const quote = task.quote;
     // `setEntities` drops anything without an id, so a quote fetched without `id: true` in the
     // select would register nothing at all — silently, which is why the include comment says so.
     if (!quote?.id) continue;
-    out.push({ ...(quote as TaskQuote), task: { id: task.id, status: task.status } });
+    const existing = byQuoteId.get(quote.id);
+    // Primeira linha do orçamento, ou a que troca um veículo não-concluído por
+    // um concluído. Nunca o contrário: uma vez que o `some` está satisfeito,
+    // nenhuma linha seguinte pode desfazê-lo.
+    if (existing && existing.task.status === TASK_STATUS.COMPLETED) continue;
+    if (existing && task.status !== TASK_STATUS.COMPLETED) continue;
+    byQuoteId.set(quote.id, {
+      ...(quote as TaskQuote),
+      task: { id: task.id, status: task.status },
+    });
   }
-  return out;
+  return [...byQuoteId.values()];
 }
 
 /** Same shape for a single task on a detail page. */
