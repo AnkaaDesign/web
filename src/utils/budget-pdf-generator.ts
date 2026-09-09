@@ -442,7 +442,17 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
       municipalRegistration: (task.customer as any)?.municipalRegistration || null,
       addressLine: formatBillingStreetLine(task.customer as any),
       addressLocality: formatBillingLocalityLine(task.customer as any),
-      orderNumber: (firstConfig as any)?.orderNumber || null,
+      // O pedido de compra é do VEÍCULO (`Task.customerOrderNumber`): numa nota
+      // conjunta o documento cita os números dos caminhões que ela cobre, sem
+      // repetir os iguais.
+      orderNumber:
+        [
+          ...new Set(
+            (pdfVehicles ?? [])
+              .map((v: any) => (v?.customerOrderNumber ?? '').trim())
+              .filter(Boolean),
+          ),
+        ].join(', ') || null,
     },
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,

@@ -218,7 +218,9 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   const andBranches: Record<string, unknown>[] = [];
 
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
-  if (orderNumberWhere) andBranches.push({ quote: { is: orderNumberWhere } });
+  // No nível da TAREFA: o número do pedido é dela agora (ver
+  // `orderNumberPresenceWhere`), e não do orçamento.
+  if (orderNumberWhere) andBranches.push(orderNumberWhere);
 
   const dueDate = toPrismaDateRange(filters.dueDateRange);
   if (dueDate) {

@@ -198,7 +198,9 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
 
   const where: Record<string, unknown> = { quote: { is: quoteWhere } };
-  if (orderNumberWhere) where.AND = [{ quote: { is: orderNumberWhere } }];
+  // No nível da TAREFA: o número do pedido é dela agora (ver
+  // `orderNumberPresenceWhere`), e não do orçamento.
+  if (orderNumberWhere) where.AND = [orderNumberWhere];
   q.where = where;
 
   const taskStatuses = Array.isArray(filters.taskStatuses) ? filters.taskStatuses.filter((s): s is string => typeof s === "string") : [];

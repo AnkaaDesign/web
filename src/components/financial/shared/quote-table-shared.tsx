@@ -166,13 +166,11 @@ export function taskCustomerName(task: Task): string {
  * (the attention rule is what points at a MISSING one, on the field itself).
  */
 export function quoteOrderNumbers(task: Task): string[] {
-  const configs = taskBillingConfigs(task);
-  if (configs.length === 0) return [];
-  // Deduplicado: o pedido é do CLIENTE e a API o grava em todas as fatias dele
-  // (`updateCustomerConfigOrderNumber` é um `updateMany`), então sem isto a
-  // célula repetia o mesmo número uma vez por veículo.
-  const numbers = configs.map((c) => (c.orderNumber ?? "").trim()).filter(Boolean);
-  return [...new Set(numbers)];
+  // O pedido de compra é DESTE VEÍCULO. Morava na configuração de faturamento,
+  // por cliente, o que obrigava os N caminhões de um orçamento a citarem o mesmo
+  // número na nota e no boleto — e o pedido é por entrega.
+  const own = ((task as { customerOrderNumber?: string | null }).customerOrderNumber ?? "").trim();
+  return own ? [own] : [];
 }
 
 export function OrderNumbersCell({ task }: { task: Task }) {
@@ -420,15 +418,13 @@ export function orderNumberPresenceWhere(value: unknown): Record<string, unknown
   const has = value === true || value === "true";
   const lacks = value === false || value === "false";
   if (!has && !lacks) return undefined;
+  // O NÚMERO DO PEDIDO É DA TAREFA (`Task.customerOrderNumber`) desde que um
+  // orçamento passou a cobrir N caminhões — o pedido é por ENTREGA. Estas duas
+  // listas listam TAREFAS, então o filtro é do próprio registro da linha, e não
+  // mais um `some` sobre as configurações de faturamento do orçamento (a coluna
+  // antiga foi removida: mandá-la agora derruba a consulta inteira).
   return has
-    ? // AND of two `not`s rather than `NOT: [a, b]`, which Prisma reads as NOT(a AND b).
-      { customerConfigs: { some: { AND: [{ orderNumber: { not: null } }, { orderNumber: { not: "" } }] } } }
-    : {
-        // A quote with NO customer configs at all has no number either, and `some` alone is false
-        // for it — so it used to fall through BOTH filters and be reachable under neither.
-        OR: [
-          { customerConfigs: { some: { OR: [{ orderNumber: null }, { orderNumber: "" }] } } },
-          { customerConfigs: { none: {} } },
-        ],
-      };
+    ? // AND de dois `not` em vez de `NOT: [a, b]`, que o Prisma lê como NOT(a AND b).
+      { AND: [{ customerOrderNumber: { not: null } }, { customerOrderNumber: { not: "" } }] }
+    : { OR: [{ customerOrderNumber: null }, { customerOrderNumber: "" }] };
 }
