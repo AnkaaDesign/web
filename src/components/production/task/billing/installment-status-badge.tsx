@@ -12,6 +12,16 @@ interface InstallmentStatusBadgeProps {
   paidExternally?: boolean;
   /** Payment method used (PIX, CASH, TRANSFER, BANK_SLIP, etc.) */
   paymentMethod?: string | null;
+  /**
+   * Estado do BOLETO da parcela, quando existe.
+   *
+   * `paymentMethod` fica `BANK_SLIP` desde a geração do boleto, e a liquidação
+   * manual do orçamento CANCELA o boleto e marca a parcela paga. Sem este dado o
+   * selo dizia "Paga (Boleto)" ao lado de um "Boleto · Cancelado" — o dinheiro
+   * não entrou por boleto nenhum, e as duas afirmações se contradiziam na mesma
+   * linha.
+   */
+  bankSlipStatus?: string | null;
 }
 
 const statusVariantMap: Record<string, string> = {
@@ -22,13 +32,16 @@ const statusVariantMap: Record<string, string> = {
   CANCELLED: 'cancelled',
 };
 
-export function InstallmentStatusBadge({ status, className, size = 'default', paidExternally, paymentMethod }: InstallmentStatusBadgeProps) {
+export function InstallmentStatusBadge({ status, className, size = 'default', paidExternally, paymentMethod, bankSlipStatus }: InstallmentStatusBadgeProps) {
   if (!status) return null;
 
   const variant = (statusVariantMap[status] || 'default') as any;
   let label = INSTALLMENT_STATUS_LABELS[status as INSTALLMENT_STATUS] || status;
 
-  if (status === 'PAID' && paymentMethod) {
+  if (status === 'PAID' && bankSlipStatus === 'CANCELLED') {
+    // Boleto cancelado + parcela paga = baixa manual. Ver `bankSlipStatus`.
+    label = 'Paga (baixa manual)';
+  } else if (status === 'PAID' && paymentMethod) {
     // Normalize so raw "BOLETO" and enum "BANK_SLIP" render one consistent label.
     label = formatPaidInstallmentLabel(paymentMethod) ?? label;
   } else if (status === 'PAID' && paidExternally) {
