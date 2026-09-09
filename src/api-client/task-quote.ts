@@ -36,6 +36,20 @@ export const taskQuoteService = {
   // Budget Approve (alias)
   budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
+  /**
+   * Aprova o faturamento de UM VEÍCULO de um orçamento que cobra veículo a
+   * veículo (`billingSplit = PER_TASK`).
+   *
+   * A aprovação conjunta continua sendo `updateStatus(id, "BILLING_APPROVED")`,
+   * que o servidor roteia para `internalApprove` sem fatia — ele aprova TODAS as
+   * pendentes de uma vez. Os sessenta caminhões do Marquespan não terminam no
+   * mesmo dia: cada aprovação emite a fatura, a NFS-e e os boletos daquele
+   * veículo, com o vencimento contado dali, e o orçamento só grava
+   * `billingApprovedAt` quando a última fatia fecha.
+   */
+  internalApproveSlice: (id: string, taskId: string) =>
+    apiClient.put(`/task-quotes/${id}/internal-approve/${taskId}`),
+
   // Revert billing approval back to BUDGET_APPROVED (requires all bank slips + NFS-e cancelled)
   revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 

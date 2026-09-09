@@ -64,11 +64,24 @@ export const BILLING_LIST_INCLUDE = {
       statusOrder: true,
       expiresAt: true,
       billingApprovedAt: true,
+      // QUANTOS VEÍCULOS o orçamento cobre. `total` é o valor do CONTRATO
+      // (`por veículo × N`) e cada linha desta lista é UM veículo: sem o divisor
+      // a coluna Valor mostra o total dos sessenta em todas as sessenta linhas.
+      vehicleCount: true,
+      // Junto ou separado — decide se a fatia desta linha é a do veículo ou a
+      // conjunta, e o que o botão de aprovar faturamento faz.
+      billingSplit: true,
       customerConfigs: {
         select: {
           id: true,
           customerId: true,
           orderNumber: true,
+          // A TAREFA desta fatia (nulo = fatia conjunta) e QUANDO ela foi
+          // faturada. Sem as duas, a linha do caminhão 12 mostrava as sessenta
+          // fatias do orçamento e lia a aprovação do orçamento inteiro — que só
+          // é gravada quando a última fecha.
+          taskId: true,
+          billingApprovedAt: true,
           // "Forma de Pagamento" column. `paymentConfig` is the current shape, `paymentCondition`
           // the legacy string the same helper converts — a record saved before the redesign has to
           // read the same as one saved after it.

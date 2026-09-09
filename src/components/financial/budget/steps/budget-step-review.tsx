@@ -45,6 +45,8 @@ import {
 } from "@/lib/billing-customer-data";
 import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
+import { Badge } from "@/components/ui/badge";
+import { sortQuoteTasks } from "@/utils/quote-tasks";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -110,14 +112,38 @@ export function BudgetStepReview({
   const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
   const serialNumbersWatch =
     (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
-  const vehicleCount = useMemo(() => {
-    const existingCount = (existingQuote as any)?.tasks?.length;
-    if (existingCount && existingCount > 0) return existingCount as number;
-    if (platesWatch.length > 0 && serialNumbersWatch.length > 0) {
-      return platesWatch.length * serialNumbersWatch.length;
+  /**
+   * QUAIS veículos, e não só quantos.
+   *
+   * Na criação, é o mesmo produto cartesiano que a API vai receber (placas ×
+   * números de série); na edição, as tarefas que o orçamento já cobre. A
+   * conferência é a última tela antes de sessenta tarefas nascerem sob um número
+   * de orçamento só — ver "60 veículos" sem poder ler QUE sessenta é confiar no
+   * que se digitou em outro passo.
+   */
+  const vehicleLabels = useMemo(() => {
+    const existing = existingQuote?.tasks ?? [];
+    if (existing.length > 0) {
+      return sortQuoteTasks(existing).map(
+        (t) => t.serialNumber || (t as any).truck?.plate || "—",
+      );
     }
-    return Math.max(1, platesWatch.length, serialNumbersWatch.length);
+    const plates = platesWatch.filter(Boolean);
+    const serials = serialNumbersWatch.map((s) => String(s ?? "")).filter(Boolean);
+    if (plates.length > 0 && serials.length > 0) {
+      // A MESMA ordem do laço da criação: placa por placa, série por série.
+      return plates.flatMap((plate) => serials.map((sn) => `${sn} · ${plate}`));
+    }
+    if (plates.length > 0) return plates;
+    return serials;
   }, [existingQuote, platesWatch, serialNumbersWatch]);
+
+  const vehicleCount = useMemo(() => {
+    const existingCount = existingQuote?.tasks?.length;
+    if (existingCount && existingCount > 0) return existingCount;
+    if (vehicleLabels.length > 0) return vehicleLabels.length;
+    return 1;
+  }, [existingQuote, vehicleLabels]);
 
   // Attention on the quote's `orderNumber`. `attentionOrderNumberFor` narrows the quote-wide
   // signal to the one customer config it is actually about, and returns "" for every other config
@@ -544,6 +570,20 @@ export function BudgetStepReview({
                       <span className="text-muted-foreground">Veículos</span>
                       <span className="font-medium">&times; {vehicleCount}</span>
                     </div>
+                    {vehicleLabels.length > 1 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {vehicleLabels.slice(0, 12).map((label, i) => (
+                          <Badge key={`${label}-${i}`} variant="secondary" className="font-normal">
+                            {label}
+                          </Badge>
+                        ))}
+                        {vehicleLabels.length > 12 && (
+                          <Badge variant="outline" className="font-normal">
+                            +{vehicleLabels.length - 12}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
                       <span className="text-base font-bold text-foreground">
                         TOTAL GERAL

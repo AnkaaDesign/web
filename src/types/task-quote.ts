@@ -1,6 +1,7 @@
 import type { BaseEntity } from './common';
 import type { File } from './file';
 import type { Installment } from './invoice';
+import type { Task } from './task';
 
 export type TASK_QUOTE_STATUS = 'PENDING' | 'BUDGET_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
@@ -111,7 +112,18 @@ export interface TaskQuote extends BaseEntity {
    * passou a cobrir N veículos: dois números de série na criação produzem duas
    * tarefas e UM orçamento.
    */
-  tasks?: any[];
+  tasks?: Task[];
+
+  /**
+   * QUANTOS VEÍCULOS o orçamento cobre — coluna em `TaskQuote`, mantida pela API
+   * junto dos totais (`recalcQuoteTotals`).
+   *
+   * Existe porque `total` é o valor do CONTRATO (`por veículo × N`) e as LISTAS
+   * mostram uma linha por tarefa sem carregar a relação de veículos: sem este
+   * número elas não têm como dividir, e cada linha afirma o total dos sessenta.
+   * Leia por `quoteVehicleCount()` / `quotePerVehicleTotal()`.
+   */
+  vehicleCount?: number | null;
   /**
    * @deprecated Forma anterior ao orçamento multitarefa.
    *
@@ -120,7 +132,7 @@ export interface TaskQuote extends BaseEntity {
    * campo permanece declarado só para o código que ainda não migrou compilar;
    * leia por `quoteTasks()` / `primaryTask()` em `@/utils/quote-tasks`.
    */
-  task?: any;
+  task?: Task;
   services?: TaskQuoteService[];
   customerConfigs?: TaskQuoteCustomerConfig[];
 }

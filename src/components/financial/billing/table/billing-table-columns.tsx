@@ -2,6 +2,7 @@ import type { DataTableColumnDef } from "@/components/ui/datatable";
 import type { Task } from "@/types";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { TASK_QUOTE_STATUS_LABELS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
@@ -19,6 +20,11 @@ import {
   renderDateCell,
   taskCustomerName,
   taskIdentifier,
+  isMultiVehicleQuote,
+  taskBillingApprovedAt,
+  taskQuoteSubtotal,
+  taskQuoteTotal,
+  taskQuoteVehicleCount,
 } from "@/components/financial/shared/quote-table-shared";
 
 /**
@@ -108,6 +114,40 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
       },
     },
     {
+      // QUANTOS VEÍCULOS este orçamento cobre.
+      //
+      // A linha é uma tarefa, e um orçamento multitarefa aparece em N linhas com
+      // o mesmo número: sem esta coluna, sessenta linhas idênticas do Marquespan
+      // pareciam sessenta orçamentos, e a coluna Valor — que agora mostra o valor
+      // de UM veículo — não tinha como se explicar. Visível por padrão apenas
+      // onde a decisão de faturar acontece; nas duas tabelas ela sai no export.
+      id: "vehicleCount",
+      header: "Veículos",
+      accessorFn: (t) => taskQuoteVehicleCount(t),
+      // O escalar existe (`TaskQuote.vehicleCount`), mas ordenar a lista de
+      // TAREFAS por ele agruparia veículos do mesmo orçamento sem dizer nada
+      // sobre a linha. Fica como leitura.
+      enableSorting: false,
+      size: 100,
+      minSize: 80,
+      meta: {
+        align: "center",
+        headerLabel: "Veículos",
+        exportHeader: "Veículos no orçamento",
+        exportValue: (t) => taskQuoteVehicleCount(t),
+      },
+      cell: ({ row }) => {
+        const n = taskQuoteVehicleCount(row.original);
+        return n > 1 ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {n}
+          </Badge>
+        ) : (
+          <MutedDash />
+        );
+      },
+    },
+    {
       // The task's OWN customer — who the work was for, which is not always who is invoiced.
       id: "customer",
       header: "Cliente",
@@ -155,7 +195,7 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
     {
       id: "quoteSubtotal",
       header: "Subtotal",
-      accessorFn: (t) => money(t.quote?.subtotal),
+      accessorFn: (t) => taskQuoteSubtotal(t),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -165,14 +205,19 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Subtotal",
         exportHeader: "Subtotal",
-        exportValue: (t) => moneyExport(t.quote?.subtotal),
+        exportValue: (t) => moneyExport(taskQuoteSubtotal(t)),
       },
       cell: ({ getValue }) => moneyCell(getValue() as number | null),
     },
     {
       id: "quoteTotal",
       header: "Valor",
-      accessorFn: (t) => money(t.quote?.total),
+      // A FATIA DESTE VEÍCULO. `quote.total` é o valor do CONTRATO
+      // (`por veículo × N`) e a linha é um veículo: num orçamento de sessenta
+      // caminhões a coluna afirmava R$ 730.224,00 sessenta vezes. A soma das
+      // fatias reconstrói o contrato, e num orçamento de um veículo — a maioria —
+      // o número não muda.
+      accessorFn: (t) => taskQuoteTotal(t),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -183,9 +228,26 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Valor",
         exportHeader: "Valor",
-        exportValue: (t) => moneyExport(t.quote?.total),
+        exportValue: (t) => moneyExport(taskQuoteTotal(t)),
       },
-      cell: ({ getValue }) => moneyCell(getValue() as number | null),
+      cell: ({ getValue, row }) => {
+        const value = getValue() as number | null;
+        const task = row.original;
+        if (!isMultiVehicleQuote(task)) return moneyCell(value);
+        // O valor é o de UM veículo; o contrato inteiro fica no hover, porque é o
+        // número que o cliente assinou e o que a fatura conjunta cobra.
+        const count = taskQuoteVehicleCount(task);
+        const grand = money(task.quote?.total);
+        return (
+          <span
+            className="inline-flex items-center gap-1 justify-end w-full"
+            title={grand ? `Total geral ${formatCurrency(grand)} — ${count} veículos` : undefined}
+          >
+            {moneyCell(value)}
+            <span className="text-muted-foreground text-xs shrink-0 tabular-nums">/veíc.</span>
+          </span>
+        );
+      },
     },
     {
       // Collections progress at a glance: how many parcelas are settled out of how many exist,
@@ -243,7 +305,10 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
     {
       id: "billingApprovedAt",
       header: "Faturado em",
-      accessorFn: (t) => t.quote?.billingApprovedAt ?? null,
+      // A aprovação é por FATIA: com `PER_TASK` o caminhão 12 pode estar faturado
+      // enquanto o 13 não está, e `TaskQuote.billingApprovedAt` só é gravado
+      // quando a última fecha — cinquenta e nove veículos faturados liam "-".
+      accessorFn: (t) => taskBillingApprovedAt(t),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -251,7 +316,7 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
         defaultVisible: false,
         headerLabel: "Faturado em",
         exportHeader: "Faturado em",
-        exportValue: (t) => dateExportValue(t.quote?.billingApprovedAt),
+        exportValue: (t) => dateExportValue(taskBillingApprovedAt(t)),
       },
       cell: ({ getValue }) => renderDateCell(getValue() as Date | null),
     },

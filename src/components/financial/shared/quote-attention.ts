@@ -14,7 +14,14 @@ import type { TaskQuote } from "@/types/task-quote";
  * quote → task include, so the predicate path is `task.status` — byte-identical to the
  * `where: { task: { status } }` the API mirror uses. One rule, one path, two evaluators.
  */
-export type AttentionQuoteEntity = TaskQuote & { task: { id: string; status: string } };
+// `Omit<…, "task">`: `TaskQuote.task` é a TAREFA inteira (e está `@deprecated`
+// desde o multitarefa). O que a regra de atenção avalia é um par mínimo — id e
+// status —, e uma interseção com o tipo completo exigiria montar uma Task de
+// verdade aqui só para satisfazer o compilador, ou voltar a `any`, que foi como
+// o defeito do "mesmo `quote.id` registrado N vezes" passou sem ser visto.
+export type AttentionQuoteEntity = Omit<TaskQuote, "task"> & {
+  task: { id: string; status: string };
+};
 
 /**
  * Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped.

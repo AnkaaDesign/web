@@ -115,6 +115,9 @@ const LIST_INCLUDE = {
     select: {
       id: true,
       total: true,
+      // O divisor do valor: `total` é o contrato (`por veículo × N`) e o cartão é
+      // de UMA tarefa. Ver `perVehicleAmount`.
+      vehicleCount: true,
       status: true,
       // FINANCIAL "Faturar Para" column — the quote's billing customers (cheap nested select).
       customerConfigs: { select: { customer: { select: { corporateName: true, fantasyName: true } } } },

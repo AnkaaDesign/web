@@ -22,6 +22,7 @@ import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
+import { quoteVehicleCount } from "@/utils/quote-tasks";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { readReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "@/components/ui/sonner";
@@ -152,6 +153,17 @@ const BillingDetailPageInner = () => {
 
   const task = taskResponse?.data;
   const quote = task?.quote;
+
+  // ─── FATURAR ESTE VEÍCULO OU O ORÇAMENTO INTEIRO ─────────────────────────────
+  //
+  // Um orçamento pode cobrir sessenta caminhões, e esta tela é aberta pela TAREFA
+  // — ou seja, por UM deles. Com `billingSplit = PER_TASK` a decisão é veículo a
+  // veículo ("os sessenta não terminam no mesmo dia"): a aprovação daqui fatura
+  // só este, pela rota dedicada, e o orçamento fecha quando a última fatia sai.
+  // Com `JOINT` é uma fatura para todos, e aprovar aqui aprova o conjunto — como
+  // sempre foi.
+  const quoteVehicles = quoteVehicleCount(quote);
+  const isPerVehicleBilling = quote?.billingSplit === "PER_TASK" && quoteVehicles > 1;
 
   // Attention: register this quote so its rules evaluate and honour their ack policy — the same
   // entity the Faturamento list registers, in the same shape, so a record behaves identically
@@ -861,6 +873,16 @@ const BillingDetailPageInner = () => {
         }
         const reason = (formData as any).statusReason?.trim() || undefined;
         for (const step of path) {
+          // A aprovação de faturamento de um orçamento POR VEÍCULO é um ato
+          // daquele veículo, e tem rota própria: `updateStatus` roteia para a
+          // aprovação SEM fatia, que fatura os sessenta de uma vez. As duas
+          // exigem FINANCEIRO/ADMIN e chegam ao log como linhas distintas —
+          // "faturei o orçamento inteiro" e "faturei o caminhão 37" não são o
+          // mesmo ato.
+          if (step === "BILLING_APPROVED" && isPerVehicleBilling && task?.id) {
+            await taskQuoteService.internalApproveSlice(quote.id, task.id);
+            continue;
+          }
           await taskQuoteService.updateStatus(
             quote.id,
             step as TASK_QUOTE_STATUS,
@@ -880,10 +902,15 @@ const BillingDetailPageInner = () => {
         targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
       if (isBillingApproval) {
         setIsGenerating(true);
-        toast.success("Faturamento aprovado! Gerando faturas, boletos e NFS-e...", {
-          description: "Aguarde a geração ser concluída.",
-          duration: 6000,
-        });
+        toast.success(
+          isPerVehicleBilling
+            ? "Faturamento deste veículo aprovado! Gerando fatura, boleto e NFS-e..."
+            : "Faturamento aprovado! Gerando faturas, boletos e NFS-e...",
+          {
+            description: "Aguarde a geração ser concluída.",
+            duration: 6000,
+          },
+        );
       } else {
         // The save just succeeded, so the form is no longer worth guarding — without this the
         // guard would prompt on the way out of a successful save.
@@ -898,6 +925,10 @@ const BillingDetailPageInner = () => {
   }, [
     quote?.id,
     quote?.status,
+    // A aprovação de UMA fatia depende do recorte de faturamento e do veículo
+    // aberto: sem os dois na lista, um `executeSave` memorizado faturaria o
+    // orçamento inteiro depois de o operador trocar de veículo pelo paginador.
+    isPerVehicleBilling,
     task?.id,
     form,
     queryClient,
@@ -1175,7 +1206,9 @@ const BillingDetailPageInner = () => {
                 <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
               </div>
               <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
-                Faturamento Aprovado - Ação Irreversível
+                {isPerVehicleBilling
+                  ? "Faturar Este Veículo - Ação Irreversível"
+                  : "Faturamento Aprovado - Ação Irreversível"}
               </AlertDialogTitle>
             </div>
           </AlertDialogHeader>
@@ -1185,6 +1218,17 @@ const BillingDetailPageInner = () => {
             <p className="mb-2 text-sm font-medium text-foreground">
               Confira os documentos que serão gerados automaticamente:
             </p>
+            {isPerVehicleBilling && (
+              // O orçamento cobra veículo a veículo: o que sai daqui é a fatura
+              // DESTE caminhão. Sem dizê-lo, quem aprova acha que está fechando
+              // os sessenta — e o contrário também assusta.
+              <p className="mb-2 text-sm font-semibold text-red-700 dark:text-red-400">
+                Este orçamento cobra veículo a veículo ({quoteVehicles} veículos). Serão gerados
+                apenas os documentos de{" "}
+                {form.watch("serialNumber") || form.watch("plate") || "deste veículo"} — os demais
+                continuam aguardando a própria aprovação.
+              </p>
+            )}
             <BillingDocumentPreviews
               customerConfigs={form.watch("customerConfigs")}
               services={form.watch("services")}
@@ -1206,7 +1250,10 @@ const BillingDetailPageInner = () => {
             <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 font-bold">1.</span>
-                <span><strong>Faturas</strong> serão geradas para cada cliente vinculado ao orçamento</span>
+                <span>
+                  <strong>Faturas</strong> serão geradas para cada cliente vinculado ao
+                  {isPerVehicleBilling ? " veículo" : " orçamento"}
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 font-bold">2.</span>
@@ -1245,7 +1292,11 @@ const BillingDetailPageInner = () => {
                 await executeSave();
               }}
             >
-              {isSaving ? "Processando..." : "Confirmar Faturamento Aprovado"}
+              {isSaving
+                ? "Processando..."
+                : isPerVehicleBilling
+                  ? "Confirmar Faturamento Deste Veículo"
+                  : "Confirmar Faturamento Aprovado"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

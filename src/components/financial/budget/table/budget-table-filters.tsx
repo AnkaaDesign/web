@@ -50,11 +50,18 @@ export const BUDGET_LIST_INCLUDE = {
       statusOrder: true,
       expiresAt: true,
       guaranteeYears: true,
+      // O divisor do valor: `total` é o contrato (`por veículo × N`) e a linha é
+      // um veículo. Ver `taskQuoteTotal` em `quote-table-shared`.
+      vehicleCount: true,
+      billingSplit: true,
       customerConfigs: {
         select: {
           id: true,
           customerId: true,
           orderNumber: true,
+          // A tarefa desta fatia: com `PER_TASK` são sessenta configurações do
+          // mesmo cliente, e a linha só fala pela dela.
+          taskId: true,
           // See BILLING_LIST_INCLUDE — the attention rules read both of these.
           generateInvoice: true,
           customer: { select: { id: true, ...ATTENTION_CUSTOMER_SELECT } },

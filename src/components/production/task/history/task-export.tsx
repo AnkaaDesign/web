@@ -8,6 +8,7 @@ import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CAT
 import { taskService } from "../../../../api-client";
 
 import { BRAND_ASSETS } from '@/config/assets';
+import { quotePerVehicleTotal } from "@/utils/quote-tasks";
 // Format date as dd/mm/yy for PDF export
 const formatShortDate = (date: Date | string | null | undefined): string => {
   if (!date) return "-";
@@ -156,7 +157,17 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
       return "";
     },
   },
-  { id: "price", label: "Valor Total", getValue: (task: Task) => (task.quote?.total ? formatCurrency(task.quote.total) : "") },
+  {
+    id: "price",
+    label: "Valor Total",
+    // A fatia DESTE veículo: `quote.total` é o valor do contrato inteiro desde o
+    // orçamento multitarefa, e cada linha exportada é uma tarefa. Sem dividir, uma
+    // exportação de sessenta caminhões somava sessenta vezes o mesmo contrato.
+    getValue: (task: Task) => {
+      const value = quotePerVehicleTotal(task.quote);
+      return value != null ? formatCurrency(value) : "";
+    },
+  },
   {
     id: "paymentStatus",
     label: "Status Faturamento",

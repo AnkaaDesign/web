@@ -210,6 +210,9 @@ export function TaskHistoryTable({
         select: {
           id: true,
           total: true,
+          // O divisor: `total` é o contrato (`por veículo × N`) e a linha é uma
+          // tarefa. Ver `quotePerVehicleTotal`.
+          vehicleCount: true,
           status: true,
           customerConfigs: {
             include: {

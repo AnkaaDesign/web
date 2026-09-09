@@ -203,18 +203,11 @@ export const taskQuoteCreateNestedSchema = z
     }
   });
 
-export const taskQuoteSchema = z.object({
-  id: z.string().uuid().optional(),
-  subtotal: moneySchema,
-  total: moneySchema,
-  expiresAt: z.coerce.date(),
-  status: taskQuoteStatusSchema,
-  taskId: z.string().uuid(),
-  services: z.array(taskQuoteServiceSchema).min(1, 'Pelo menos um serviço é obrigatório'),
-  customerConfigs: z.array(taskQuoteCustomerConfigSchema).min(1, 'Pelo menos uma configuração de cliente é obrigatória'),
-});
-
-export type TaskQuoteFormData = z.infer<typeof taskQuoteSchema>;
+// `taskQuoteSchema` foi REMOVIDO. Não tinha nenhum consumidor (o wizard de
+// criação e o de edição validam à mão) e continuava exigindo `taskId` como campo
+// obrigatório de UMA tarefa — a premissa que o orçamento multitarefa desfez. Um
+// schema morto com a forma antiga é uma armadilha para quem for mexer aqui
+// amanhã: o que a API aceita hoje é `taskIds[]` + `billingSplit`.
 export type TaskQuoteServiceFormData = z.infer<typeof taskQuoteServiceSchema>;
 export type TaskQuoteCustomerConfigFormData = z.infer<typeof taskQuoteCustomerConfigSchema>;
 export type TaskQuoteCreateNestedFormData = z.infer<typeof taskQuoteCreateNestedSchema>;

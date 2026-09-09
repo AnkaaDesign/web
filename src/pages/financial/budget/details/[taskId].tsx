@@ -58,6 +58,7 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
+import { quoteVehicleCount } from "@/utils/quote-tasks";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -1662,7 +1663,7 @@ const FinancialBudgetDetailPageInner = () => {
               // carrega os campos de UMA tarefa, e a conta daria 1 mesmo num
               // orçamento de sessenta — escondendo o seletor de faturamento
               // justamente de quem precisa dele.
-              existingVehicleCount={(existingQuote as any)?.tasks?.length}
+              existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               layouts={layoutImageOptions}

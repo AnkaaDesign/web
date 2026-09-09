@@ -18,6 +18,10 @@ import {
   renderDateCell,
   taskCustomerName,
   taskIdentifier,
+  isMultiVehicleQuote,
+  taskQuoteSubtotal,
+  taskQuoteTotal,
+  taskQuoteVehicleCount,
 } from "@/components/financial/shared/quote-table-shared";
 
 /**
@@ -86,6 +90,41 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       cell: ({ getValue }) => {
         const value = getValue() as string;
         return value ? <span className="text-sm truncate">{value}</span> : <MutedDash />;
+      },
+    },
+    {
+      // QUANTOS VEÍCULOS este orçamento cobre.
+      //
+      // A linha é uma tarefa, e um orçamento multitarefa aparece em N linhas com
+      // o mesmo número: sem esta coluna, sessenta linhas idênticas do Marquespan
+      // pareciam sessenta orçamentos, e a coluna Valor — que agora mostra o valor
+      // de UM veículo — não tinha como se explicar. Visível por padrão apenas
+      // onde a decisão de faturar acontece; nas duas tabelas ela sai no export.
+      id: "vehicleCount",
+      header: "Veículos",
+      accessorFn: (t) => taskQuoteVehicleCount(t),
+      // O escalar existe (`TaskQuote.vehicleCount`), mas ordenar a lista de
+      // TAREFAS por ele agruparia veículos do mesmo orçamento sem dizer nada
+      // sobre a linha. Fica como leitura.
+      enableSorting: false,
+      size: 100,
+      minSize: 80,
+      meta: {
+        defaultVisible: false,
+        align: "center",
+        headerLabel: "Veículos",
+        exportHeader: "Veículos no orçamento",
+        exportValue: (t) => taskQuoteVehicleCount(t),
+      },
+      cell: ({ row }) => {
+        const n = taskQuoteVehicleCount(row.original);
+        return n > 1 ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {n}
+          </Badge>
+        ) : (
+          <MutedDash />
+        );
       },
     },
     {
@@ -197,7 +236,7 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
     {
       id: "quoteSubtotal",
       header: "Subtotal",
-      accessorFn: (t) => money(t.quote?.subtotal),
+      accessorFn: (t) => taskQuoteSubtotal(t),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -207,7 +246,7 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Subtotal",
         exportHeader: "Subtotal",
-        exportValue: (t) => moneyExport(t.quote?.subtotal),
+        exportValue: (t) => moneyExport(taskQuoteSubtotal(t)),
       },
       cell: ({ getValue }) => moneyCell(getValue() as number | null),
     },
@@ -215,7 +254,12 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       id: "quoteTotal",
       header: "Valor",
       // Coerce defensively: the API maps Decimal → number, but a raw string must not break the cell.
-      accessorFn: (t) => money(t.quote?.total),
+      // A FATIA DESTE VEÍCULO. `quote.total` é o valor do CONTRATO
+      // (`por veículo × N`) e a linha é um veículo: num orçamento de sessenta
+      // caminhões a coluna afirmava R$ 730.224,00 sessenta vezes. A soma das
+      // fatias reconstrói o contrato, e num orçamento de um veículo — a maioria —
+      // o número não muda.
+      accessorFn: (t) => taskQuoteTotal(t),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -226,9 +270,26 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Valor",
         exportHeader: "Valor",
-        exportValue: (t) => moneyExport(t.quote?.total),
+        exportValue: (t) => moneyExport(taskQuoteTotal(t)),
       },
-      cell: ({ getValue }) => moneyCell(getValue() as number | null),
+      cell: ({ getValue, row }) => {
+        const value = getValue() as number | null;
+        const task = row.original;
+        if (!isMultiVehicleQuote(task)) return moneyCell(value);
+        // O valor é o de UM veículo; o contrato inteiro fica no hover, porque é o
+        // número que o cliente assinou e o que a fatura conjunta cobra.
+        const count = taskQuoteVehicleCount(task);
+        const grand = money(task.quote?.total);
+        return (
+          <span
+            className="inline-flex items-center gap-1 justify-end w-full"
+            title={grand ? `Total geral ${formatCurrency(grand)} — ${count} veículos` : undefined}
+          >
+            {moneyCell(value)}
+            <span className="text-muted-foreground text-xs shrink-0 tabular-nums">/veíc.</span>
+          </span>
+        );
+      },
     },
     {
       id: "guaranteeYears",

@@ -49,6 +49,7 @@ import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import type { Task } from "@/types";
 import type { Invoice } from "@/types/invoice";
 import type { File as CustomFile } from "@/types/file";
+import { configsForTask, perVehicleAmount, quoteVehicleCount } from "@/utils/quote-tasks";
 
 /**
  * Bare render body for the "Orçamento / Faturamento Detalhado" detail section
@@ -87,8 +88,28 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   // cancelar e reenviar a coleta de assinaturas (ADMIN | FINANCIAL | COMMERCIAL).
   const canManageSignature = canEditQuote(currentUser?.sector?.privileges || "");
 
-  const quote = task.quote;
-  if (!quote) return null;
+  const rawQuote = task.quote;
+  if (!rawQuote) return null;
+
+  // ─── AS FATIAS DESTE VEÍCULO ─────────────────────────────────────────────────
+  //
+  // Um orçamento pode cobrir sessenta caminhões, e esta seção mostra o orçamento
+  // de UM deles (a tela é a da tarefa). Com `billingSplit = PER_TASK` existe uma
+  // configuração de faturamento POR VEÍCULO, todas do mesmo cliente: sem filtrar,
+  // o caminhão 12 exibia os sessenta blocos de parcelas, o seletor listava
+  // "Cliente" sessenta vezes com o mesmo nome, e o primeiro bloco — que é o do
+  // caminhão 1 — era lido como se fosse o dele. Com `JOINT` a fatia tem `taskId`
+  // nulo e cobre todos, então a lista continua inteira, como sempre foi.
+  const quote = {
+    ...rawQuote,
+    customerConfigs: configsForTask(rawQuote.customerConfigs, task.id),
+  };
+  const vehicleCount = quoteVehicleCount(rawQuote);
+  const isMultiVehicle = vehicleCount > 1;
+  // Em `PER_TASK` a fatia já carrega o valor de um veículo; em `JOINT` ela carrega
+  // o do contrato. O par abaixo mostra os DOIS números quando são diferentes, para
+  // ninguém confundir "o que este caminhão custa" com "o que o cliente assinou".
+  const isPerVehicleBilling = rawQuote.billingSplit === "PER_TASK";
   const services = quote.services ?? [];
 
   return (
@@ -317,9 +338,10 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             }
           }
         } else {
-          // No configs: fallback to global quote aggregates (no per-config discount)
-          displaySubtotal = typeof quote.subtotal === "number" ? quote.subtotal : Number(quote.subtotal) || 0;
-          displayTotal = typeof quote.total === "number" ? quote.total : Number(quote.total) || 0;
+          // Sem configuração de faturamento: os agregados do orçamento, divididos
+          // pelos veículos — o card é de UM caminhão, e `quote.total` é o contrato.
+          displaySubtotal = perVehicleAmount(quote.subtotal, vehicleCount);
+          displayTotal = perVehicleAmount(quote.total, vehicleCount);
         }
 
         return (
@@ -343,6 +365,27 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
               <span className="text-base font-bold text-foreground">TOTAL</span>
               <span className="text-xl font-bold text-primary">{formatCurrency(displayTotal)}</span>
             </div>
+
+            {/* O OUTRO número, quando o orçamento cobre mais de um veículo: o valor
+                acima é o de um caminhão (`PER_TASK`) ou o do contrato (`JOINT`), e
+                quem lê a tela de um veículo precisa dos dois para não confundi-los. */}
+            {isMultiVehicle && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                {isPerVehicleBilling ? (
+                  <>
+                    <span>Total do orçamento ({vehicleCount} veículos)</span>
+                    <span className="tabular-nums">{formatCurrency(Number(quote.total) || 0)}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Por veículo ({vehicleCount} no orçamento)</span>
+                    <span className="tabular-nums">
+                      {formatCurrency(perVehicleAmount(quote.total, vehicleCount))}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}

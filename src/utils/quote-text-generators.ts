@@ -196,7 +196,12 @@ export function generatePaymentText(quote: PaymentTextData): string {
 /**
  * Generate guarantee terms text based on quote data
  */
-export function generateGuaranteeText(quote: TaskQuote): string {
+export function generateGuaranteeText(
+  // Só os dois campos da garantia. Era `TaskQuote` inteiro, e isso obrigava quem
+  // tem um RECORTE do orçamento — a página pública, que recebe um veículo
+  // estreito por tarefa — a mentir para o compilador com um `as`.
+  quote: Pick<TaskQuote, 'guaranteeYears' | 'customGuaranteeText'>,
+): string {
   if (quote.customGuaranteeText) {
     return quote.customGuaranteeText;
   }

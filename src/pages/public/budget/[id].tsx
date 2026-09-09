@@ -34,25 +34,42 @@ const getFileServeUrl = (file: { id: string } | null | undefined): string => {
   return `${apiBaseUrl}/files/serve/${file.id}`;
 };
 
-interface QuoteData extends TaskQuote {
-  task?: {
+/**
+ * O VEÍCULO como a página pública o recebe.
+ *
+ * `GET /task-quotes/public/:id` devolve um recorte estreito de cada tarefa — o
+ * que o documento imprime e nada mais: ninguém que abre um link de orçamento
+ * precisa (nem deve receber) a tarefa inteira com status, setor e datas de
+ * produção.
+ */
+interface PublicQuoteVehicle {
+  id: string;
+  name?: string;
+  serialNumber?: string;
+  term?: Date;
+  createdAt?: Date | string;
+  responsibles?: { id: string; name?: string; role?: string }[];
+  customer?: {
     id: string;
-    name?: string;
-    serialNumber?: string;
-    term?: Date;
-    responsibles?: { id: string; name?: string; role?: string }[];
-    customer?: {
-      id: string;
-      corporateName?: string;
-      fantasyName?: string;
-    };
-    truck?: {
-      plate?: string;
-      chassisNumber?: string;
-      category?: string | null;
-      implementType?: string | null;
-    };
+    corporateName?: string;
+    fantasyName?: string;
   };
+  truck?: {
+    plate?: string;
+    chassisNumber?: string;
+    category?: string | null;
+    implementType?: string | null;
+  };
+}
+
+// `Omit<…, "task" | "tasks">`: as duas relações são `Task` no tipo do sistema, e
+// aqui elas chegam no recorte público acima. Sem o `Omit` o `extends` não fecha —
+// era isso que o `tasks?: any[]` de antes escondia.
+interface QuoteData extends Omit<TaskQuote, "task" | "tasks"> {
+  /** @deprecated Forma anterior ao multitarefa — a API ainda a emite para clientes antigos. */
+  task?: PublicQuoteVehicle;
+  /** OS VEÍCULOS do orçamento, na ordem do documento. */
+  tasks?: PublicQuoteVehicle[];
 }
 
 export function PublicBudgetPage() {

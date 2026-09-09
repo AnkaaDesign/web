@@ -54,6 +54,7 @@ import { exportTaskDossiePdf } from "@/components/production/task/detail/section
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
+import { quoteVehicleCount } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
 // on the same transition, and disagreeing meant this dialog waved through a status the page then
@@ -118,6 +119,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
+  // `PER_TASK` com mais de um veículo: a aprovação de faturamento desta tela é do
+  // veículo aberto, não do orçamento. Ver `internalApproveSlice`.
+  const isPerVehicleBilling =
+    task?.quote?.billingSplit === "PER_TASK" && quoteVehicleCount(task?.quote) > 1;
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
@@ -496,9 +501,15 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     const isAutomatic = AUTOMATIC_STATUSES.includes(v);
                     const isAllowed = isCurrent || allowedNextStatuses.includes(v as TASK_QUOTE_STATUS);
                     // Selectable options use the verb label; the current status uses its state name.
+                    // Num orçamento que cobra veículo a veículo, aprovar aqui
+                    // fatura SÓ este caminhão — o rótulo tem de dizer isso, ou o
+                    // operador lê "Aprovar Faturamento" e acha que fechou os
+                    // sessenta.
                     const label = isCurrent
                       ? (STATUS_LABELS[v] || v)
-                      : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
+                      : v === "BILLING_APPROVED" && isPerVehicleBilling
+                        ? "Aprovar Faturamento (este veículo)"
+                        : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
                     opts.push({ value: v, label, disabled: isCurrent || isAutomatic || !isAllowed });
                   }
                   return opts;

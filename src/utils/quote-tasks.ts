@@ -118,3 +118,97 @@ export function describeQuoteVehicles(
   }
   return `${tasks.length} veículos`;
 }
+
+/**
+ * QUANTOS VEÍCULOS o orçamento cobre, aceitando os dois caminhos.
+ *
+ * `vehicleCount` é coluna em `TaskQuote` (a API a mantém em `recalcQuoteTotals`)
+ * e é o ÚNICO caminho quando a tela não carregou as tarefas — o que é a regra nas
+ * listas: a de Orçamentos e a de Faturamento pedem um punhado de escalares do
+ * orçamento, nunca a relação de veículos. `tasks.length` continua valendo onde
+ * elas vieram (o detalhe, o documento, a página pública), e é ele quem responde
+ * primeiro por ser o dado bruto: uma tela que TEM os veículos não deve depender
+ * de uma contagem desnormalizada.
+ */
+export function quoteVehicleCount(
+  quote:
+    | (QuoteWithTasksLike<QuoteTaskLike> & { vehicleCount?: number | null })
+    | null
+    | undefined,
+): number {
+  const loaded = quoteTasks(quote).length;
+  if (loaded > 0) return loaded;
+  const denormalized = Math.trunc(Number(quote?.vehicleCount ?? 0));
+  return denormalized > 0 ? denormalized : 1;
+}
+
+/**
+ * O valor de UM VEÍCULO a partir do total do orçamento.
+ *
+ * ESPELHA `perVehicleAmount` de `api/src/utils/quote-tasks.ts`.
+ *
+ * `quote.total` é o valor do CONTRATO: `preço por veículo × N`. Toda tela que
+ * mostra uma linha por TAREFA — Orçamentos, Faturamento, Preparação, Histórico,
+ * exportações — quer o valor DAQUELE veículo e lia o total dos sessenta. A soma
+ * das N fatias reconstrói o contrato, então nenhum total de tela muda no
+ * orçamento de um veículo, que é a esmagadora maioria.
+ *
+ * Onde o número que interessa é o do CONTRATO (o documento, o cabeçalho do
+ * orçamento, a fatura conjunta), leia `quote.total` direto — não passe por aqui.
+ */
+export function perVehicleAmount(
+  total: unknown,
+  vehicleCount?: number | null,
+): number {
+  const grand = Number(total ?? 0);
+  if (!Number.isFinite(grand)) return 0;
+  const count = Math.max(1, Math.trunc(Number(vehicleCount ?? 1)) || 1);
+  return Math.round((grand / count) * 100) / 100;
+}
+
+/**
+ * O valor de UM VEÍCULO de um orçamento já carregado — o atalho das tabelas.
+ *
+ * Devolve `null` quando não há orçamento ou não há total, para a célula poder
+ * mostrar o travessão em vez de "R$ 0,00".
+ */
+export function quotePerVehicleTotal(
+  quote:
+    | (QuoteWithTasksLike<QuoteTaskLike> & {
+        total?: unknown;
+        vehicleCount?: number | null;
+      })
+    | null
+    | undefined,
+): number | null {
+  if (!quote) return null;
+  const grand = Number(quote.total ?? 0);
+  if (!Number.isFinite(grand) || grand === 0) return null;
+  return perVehicleAmount(grand, quoteVehicleCount(quote));
+}
+
+/**
+ * A FATIA de faturamento que descreve UMA tarefa.
+ *
+ * ESPELHA `sliceTask` da API, do outro lado: aqui a pergunta é "das N
+ * configurações deste orçamento, quais dizem respeito a ESTE veículo?".
+ *
+ * Com `billingSplit = JOINT` existe uma configuração por CLIENTE, com `taskId`
+ * nulo, e ela cobre todos os veículos — a resposta é a lista inteira, como
+ * sempre foi. Com `PER_TASK` existe uma POR VEÍCULO: mostrar todas na tela de um
+ * caminhão faz sessenta blocos de parcelas aparecerem na tarefa de cada um, com
+ * o cliente repetido sessenta vezes no seletor — e o primeiro bloco, que é o do
+ * caminhão 1, sendo lido como se fosse o daquele.
+ */
+export function configsForTask<
+  T extends { taskId?: string | null },
+>(configs: readonly T[] | null | undefined, taskId: string | null | undefined): T[] {
+  const all = configs ?? [];
+  if (!taskId) return [...all];
+  const own = all.filter((c) => c.taskId === taskId);
+  // Fatias existem mas nenhuma é deste veículo (orçamento `PER_TASK` de outro
+  // veículo, ou tarefa recém-vinculada antes da reconciliação): as conjuntas
+  // (`taskId` nulo) continuam valendo para ele.
+  const joint = all.filter((c) => !c.taskId);
+  return own.length > 0 ? [...own, ...joint] : [...joint];
+}

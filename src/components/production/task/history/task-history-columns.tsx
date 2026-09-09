@@ -24,6 +24,7 @@ import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-no
 import { ServiceOrderCell } from "./service-order-cell";
 import { IconCalendarEvent } from "@tabler/icons-react";
 import { QuoteStatusBadge } from "../quote/quote-status-badge";
+import { quotePerVehicleTotal } from "@/utils/quote-tasks";
 
 // Helper function to render date in single-line format: dd/mm/yy hh:mm
 const renderDate = (date: Date | null) => {
@@ -585,7 +586,9 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "price",
     header: "VALOR TOTAL",
-    accessorFn: (row) => row.quote?.total ?? null,
+    // A fatia DESTE veículo — `quote.total` é o valor do contrato desde o
+    // orçamento multitarefa, e a linha é uma tarefa.
+    accessorFn: (row) => quotePerVehicleTotal(row.quote),
     sortable: true,
     filterable: true,
     defaultVisible: false,
