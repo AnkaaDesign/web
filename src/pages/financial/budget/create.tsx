@@ -15,11 +15,7 @@ import {
   SERVICE_ORDER_TYPE,
   FAVORITE_PAGES,
 } from "@/constants";
-import { useTaskMutations } from "@/hooks";
-import {
-  useCreateTaskQuote,
-  taskQuoteKeys,
-} from "@/hooks/production/use-task-quote";
+import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import {
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
@@ -37,7 +33,6 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import type { FileWithPreview } from "@/components/common/file";
-import type { TaskCreateFormData } from "@/schemas";
 import type { ResponsibleRowData } from "@/types/responsible";
 
 // Step components
@@ -46,6 +41,7 @@ import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-
 import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
+import { batchCreateTasksWithQuote } from "@/api-client/task";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -79,8 +75,6 @@ export const FinancialBudgetCreatePage = () => {
   usePageTracker({ title: "Orçamento - Cadastrar", icon: "file-invoice" });
 
   // Mutations
-  const { createAsync: createTaskAsync } = useTaskMutations();
-  const createQuoteMutation = useCreateTaskQuote();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -780,11 +774,22 @@ export const FinancialBudgetCreatePage = () => {
         combinations.push({});
       }
 
-      // 8. Cria as TAREFAS. O orçamento — um só, para todas — vem depois do laço.
+      // ═══════════════════════════════════════════════════════════════════════
+      // 8. OS PAYLOADS DAS TAREFAS — nenhuma é criada aqui
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Antes este laço fazia uma requisição por combinação (com um aviso verde
+      // na tela para cada uma) e o orçamento vinha numa última. Quando a última
+      // falhava, as N tarefas já estavam gravadas: onze avisos de sucesso, um de
+      // erro, e a saída oferecida — "abra uma delas e crie o orçamento por ela" —
+      // criaria um orçamento de UM veículo, deixando os outros dez de fora.
+      //
+      // Agora o laço só MONTA; quem grava é `POST /tasks/batch-with-quote`, numa
+      // transação só: ou as N tarefas e o orçamento nascem juntos, ou nada nasce.
       let successCount = 0;
       let firstCreatedTaskId: string | undefined;
-      let firstCreatedRepIds: string[] | undefined;
       const createdTaskIds: string[] = [];
+      const taskPayloads: any[] = [];
 
       for (let i = 0; i < combinations.length; i++) {
         const { plate, serialNumber } = combinations[i];
@@ -815,75 +820,50 @@ export const FinancialBudgetCreatePage = () => {
           ...truckData,
         };
 
-        // First task gets newResponsibles, subsequent get created IDs
+        // Os responsáveis NOVOS viajam uma vez só. O servidor os cria uma vez
+        // para o lote (deduplicados por nome + telefone) e liga o id em TODAS as
+        // tarefas — antes isso era feito aqui, mandando-os na primeira
+        // requisição e reaproveitando os ids nas seguintes, uma dança que só
+        // existia porque as tarefas nasciam uma a uma.
         if (i === 0 && newResponsibles.length > 0) {
           taskData.newResponsibles = newResponsibles;
-        } else if (i > 0 && firstCreatedRepIds && firstCreatedRepIds.length > 0) {
-          const existing = taskData.responsibleIds || [];
-          taskData.responsibleIds = [...existing, ...firstCreatedRepIds];
         }
 
-        try {
-          const result = await createTaskAsync(taskData as TaskCreateFormData);
-          if (result?.success && result.data) {
-            successCount++;
-            const createdTaskId = result.data.id;
-            if (!firstCreatedTaskId) firstCreatedTaskId = createdTaskId;
+        taskPayloads.push(taskData);
+      }
 
-            // Extract responsible IDs from first task
-            if (i === 0 && newResponsibles.length > 0 && result.data.responsibles) {
-              firstCreatedRepIds = result.data.responsibles
-                .filter((r: any) => newResponsibles.some(nr => nr.name === r.name && nr.phone === r.phone))
-                .map((r: any) => r.id);
-            }
-
-            // 9. Update customer data
-            for (const config of data.customerConfigs || []) {
-              if (config.customerData && config.customerId) {
-                try {
-                  await customerService.updateCustomer(config.customerId, {
-                    corporateName: config.customerData.corporateName || undefined,
-                    cnpj: config.customerData.cnpj || undefined,
-                    cpf: config.customerData.cpf || undefined,
-                    address: config.customerData.address || undefined,
-                    addressNumber: config.customerData.addressNumber || undefined,
-                    addressComplement: config.customerData.addressComplement || undefined,
-                    neighborhood: config.customerData.neighborhood || undefined,
-                    city: config.customerData.city || undefined,
-                    state: config.customerData.state || undefined,
-                    zipCode: config.customerData.zipCode || undefined,
-                    stateRegistration: config.customerData.stateRegistration || undefined,
-                    municipalRegistration: config.customerData.municipalRegistration || undefined,
-                    streetType: config.customerData.streetType || undefined,
-                  });
-                } catch {
-                  // Error toast is emitted by the axios error interceptor.
-                }
-              }
-            }
-
-            // A tarefa entra na lista do orçamento ÚNICO — ver o bloco 10 logo
-            // abaixo do laço. O orçamento não é mais criado aqui.
-            createdTaskIds.push(createdTaskId);
-
-            // Create the task's airbrushings (non-blocking; layouts have no status, and the
-            // API resolves the customer from taskId).
-            if ((data.airbrushings?.length ?? 0) > 0) {
-              try {
-                await createAirbrushingsForTask(createdTaskId, data.airbrushings);
-              } catch {
-                toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
-              }
-            }
+      // ═══════════════════════════════════════════════════════════════════════
+      // 9. O CADASTRO DO CLIENTE (uma vez, não uma por veículo)
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Os dados fiscais são do CLIENTE, não da tarefa: gravá-los dentro do laço
+      // repetia a mesma escrita uma vez por caminhão.
+      for (const config of data.customerConfigs || []) {
+        if (config.customerData && config.customerId) {
+          try {
+            await customerService.updateCustomer(config.customerId, {
+              corporateName: config.customerData.corporateName || undefined,
+              cnpj: config.customerData.cnpj || undefined,
+              cpf: config.customerData.cpf || undefined,
+              address: config.customerData.address || undefined,
+              addressNumber: config.customerData.addressNumber || undefined,
+              addressComplement: config.customerData.addressComplement || undefined,
+              neighborhood: config.customerData.neighborhood || undefined,
+              city: config.customerData.city || undefined,
+              state: config.customerData.state || undefined,
+              zipCode: config.customerData.zipCode || undefined,
+              stateRegistration: config.customerData.stateRegistration || undefined,
+              municipalRegistration: config.customerData.municipalRegistration || undefined,
+              streetType: config.customerData.streetType || undefined,
+            });
+          } catch {
+            // Error toast is emitted by the axios error interceptor.
           }
-        } catch (error: any) {
-          // Error toast is emitted by the axios error interceptor.
-          console.error("Error creating task/quote:", error);
         }
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // 10. UM ORÇAMENTO PARA TODAS AS TAREFAS
+      // 10. AS TAREFAS E O ORÇAMENTO — UM COMMIT SÓ
       // ═══════════════════════════════════════════════════════════════════════
       //
       // Antes o orçamento era criado DENTRO do laço, um por tarefa. Duas placas e
@@ -892,54 +872,61 @@ export const FinancialBudgetCreatePage = () => {
       // mesmo trabalho. O Marquespan de 02/09 saiu assim: orçamentos 642 a 701,
       // sessenta números para sessenta caminhões idênticos.
       //
-      // Agora é um só, cobrindo os N veículos. O preço dos serviços é POR
-      // VEÍCULO e o documento imprime o "× N" e o total geral; a API multiplica
-      // (ver `computeQuoteMoney`).
-      let quoteCreated = false;
-      if (createdTaskIds.length > 0) {
-        const quoteData: any = {
-          taskIds: createdTaskIds,
-          billingSplit: data.billingSplit ?? "JOINT",
-          expiresAt: data.expiresAt,
-          status: "PENDING",
-          subtotal: data.subtotal || 0,
-          total: data.total || 0,
-          guaranteeYears: data.guaranteeYears || null,
-          customGuaranteeText: data.customGuaranteeText || null,
-          customForecastDays: data.customForecastDays || null,
-          layoutFileIds,
-          simultaneousTasks: data.simultaneousTasks || null,
-          customerConfigs: data.customerConfigs || [],
-          services: validServices.map((item: any) => ({
-            ...item,
-            amount: item.amount ?? 0,
-          })),
-        };
+      // Depois virou um só — mas em N+1 requisições, e a falha da última deixava
+      // as N tarefas órfãs. Agora é uma requisição: `POST /tasks/batch-with-quote`
+      // grava as tarefas e o orçamento na MESMA transação. Ou tudo, ou nada.
+      //
+      // O preço dos serviços é POR VEÍCULO e o documento imprime o "× N" e o
+      // total geral; a API multiplica (ver `computeQuoteMoney`).
+      const quoteData: any = {
+        billingSplit: data.billingSplit ?? "JOINT",
+        expiresAt: data.expiresAt,
+        status: "PENDING",
+        subtotal: data.subtotal || 0,
+        total: data.total || 0,
+        guaranteeYears: data.guaranteeYears || null,
+        customGuaranteeText: data.customGuaranteeText || null,
+        customForecastDays: data.customForecastDays || null,
+        layoutFileIds,
+        simultaneousTasks: data.simultaneousTasks || null,
+        customerConfigs: data.customerConfigs || [],
+        services: validServices.map((item: any) => ({
+          ...item,
+          amount: item.amount ?? 0,
+        })),
+      };
 
-        try {
-          await createQuoteMutation.mutateAsync(quoteData);
-          quoteCreated = true;
-        } catch (error: any) {
-          // O toast do erro sai pelo interceptor do axios. As TAREFAS já foram
-          // criadas, e é isso que a mensagem precisa dizer: navegar em silêncio
-          // para a tarefa deixaria o operador achando que o orçamento existe.
-          console.error("Error creating quote:", error);
-          toast.error(
-            createdTaskIds.length === 1
-              ? "A tarefa foi criada, mas o orçamento não. Abra a tarefa e crie o orçamento por ela."
-              : `As ${createdTaskIds.length} tarefas foram criadas, mas o orçamento não. Abra uma delas e crie o orçamento por ela.`,
-          );
+      try {
+        const created = await batchCreateTasksWithQuote({ tasks: taskPayloads, quote: quoteData });
+        const createdTasks = created?.data?.tasks ?? [];
+        for (const t of createdTasks) {
+          createdTaskIds.push(t.id);
+          if (!firstCreatedTaskId) firstCreatedTaskId = t.id;
         }
+        successCount = createdTasks.length;
+
+        // As aerografias vêm DEPOIS e são não-bloqueantes: são entidades
+        // próprias, com o seu ciclo de pagamento, e uma falha ali não pode
+        // desfazer o orçamento (a tarefa e o contrato já existem).
+        if ((data.airbrushings?.length ?? 0) > 0) {
+          for (const taskId of createdTaskIds) {
+            try {
+              await createAirbrushingsForTask(taskId, data.airbrushings);
+            } catch {
+              toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
+            }
+          }
+        }
+      } catch (error: any) {
+        // A mensagem da API já sai pelo interceptor do axios — e agora ela nomeia
+        // a causa quando é traduzível. Nada foi gravado: não há tarefa órfã para
+        // avisar, nem instrução de recuperação a dar.
+        console.error("Error creating tasks + quote:", error);
       }
 
       if (successCount > 0) {
         queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
         allowNavigation();
-        if (quoteCreated && createdTaskIds.length > 1) {
-          toast.success(
-            `Orçamento criado para ${createdTaskIds.length} veículos.`,
-          );
-        }
         navigate(firstCreatedTaskId
           ? routes.production.preparation.details(firstCreatedTaskId)
           : routes.financial.budget.root
@@ -963,8 +950,6 @@ export const FinancialBudgetCreatePage = () => {
     baseFileIds,
     layoutFiles,
     queryClient,
-    createTaskAsync,
-    createQuoteMutation,
     navigate,
     allowNavigation,
   ]);
