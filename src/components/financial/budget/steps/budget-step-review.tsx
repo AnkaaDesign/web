@@ -45,7 +45,7 @@ import {
 } from "@/lib/billing-customer-data";
 import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
-import { orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
+import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -299,8 +299,10 @@ export function BudgetStepReview({
     [services],
   );
 
-  const hasMultipleCustomers =
-    Array.isArray(customerConfigs) && customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias: sem isto um orçamento `PER_TASK` de
+  // quatro caminhões para um cliente abria um filtro "Completo / Cliente 1 /
+  // Cliente 2 / Cliente 3 / Cliente 4" com o MESMO cliente quatro vezes.
+  const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
 
   // Customer filter options for multi-customer
   const customerFilterOptions = useMemo(() => {
@@ -769,7 +771,7 @@ export function BudgetStepReview({
       {Array.isArray(customerConfigs) && customerConfigs.length > 0 && (() => {
         const configs = customerFilter !== "all"
           ? (customerConfigs || []).filter((c: any) => c.customerId === customerFilter)
-          : customerConfigs.length >= 2 ? customerConfigs : [];
+          : hasMultipleCustomers ? customerConfigs : [];
         if (configs.length === 0 && customerFilter === "all") return null;
 
         // Single customer payment (when only 1 config and filter is "all")
@@ -879,8 +881,12 @@ export function BudgetStepReview({
           dois pedidos diferentes. */}
 
       {/* Single customer: payment conditions */}
+      {/* Um cliente só — inclusive quando ele tem N fatias (`PER_TASK`).
+          `length === 1` escondia as condições de pagamento de TODO orçamento
+          multitarefa faturado veículo a veículo. */}
       {Array.isArray(customerConfigs) &&
-        customerConfigs.length === 1 &&
+        !hasMultipleCustomers &&
+        customerConfigs.length > 0 &&
         customerFilter === "all" &&
         (() => {
           const config = customerConfigs[0];

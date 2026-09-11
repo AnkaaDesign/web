@@ -16,6 +16,7 @@ import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle, Ico
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { hasMultipleCustomers as hasMultipleCustomersOf } from "@/utils/quote-tasks";
 
 interface BillingStepServicesProps {
   disabled?: boolean;
@@ -26,7 +27,8 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
   const { fields, append, remove, replace } = useFieldArray({ control, name: "services" });
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
-  const hasMultipleCustomers = customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias — `PER_TASK` tem uma fatia por veículo.
+  const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
 
   // Observation modal state
   const [observationModal, setObservationModal] = useState<{ index: number; value: string } | null>(null);

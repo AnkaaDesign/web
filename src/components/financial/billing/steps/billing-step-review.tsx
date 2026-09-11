@@ -54,7 +54,7 @@ import { exportTaskDossiePdf } from "@/components/production/task/detail/section
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
-import { orderNumberLabel, quoteVehicleCount, sortQuoteTasks } from "@/utils/quote-tasks";
+import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, quoteVehicleCount, sortQuoteTasks } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
 // on the same transition, and disagreeing meant this dialog waved through a status the page then
@@ -281,7 +281,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const total = totalFromConfigs || subtotal;
   const discountAmount = Math.max(0, subtotal - total);
 
-  const hasMultipleCustomers = !filterCustomerId && customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias. Ver a nota em `quote-tasks.ts`.
+  const hasMultipleCustomers = !filterCustomerId && hasMultipleCustomersOf(customerConfigs);
 
   // Group services by customer for multi-customer view
   const customerGroups = useMemo(() => {
@@ -419,7 +420,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     }
 
     // Multi-customer: all services must have invoiceToCustomerId
-    if (customerConfigs.length >= 2) {
+    //
+    // ⚠️ Contando FATIAS, esta guarda recusava o orçamento `PER_TASK` inteiro
+    // com "Serviços sem cliente atribuído" — e era impossível obedecer: o
+    // seletor "Faturar Para" só aparece com mais de um CLIENTE, então não havia
+    // onde atribuir coisa alguma. Salvar ficava travado sem saída.
+    if (hasMultipleCustomersOf(customerConfigs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
         toast.error("Serviços sem cliente atribuído", {

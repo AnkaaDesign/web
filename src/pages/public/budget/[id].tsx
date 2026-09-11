@@ -15,7 +15,7 @@ import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask, taskCount } from "@/utils/quote-tasks";
+import { quoteTasks, primaryTask, taskCount, hasMultipleCustomers } from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -202,7 +202,12 @@ export function PublicBudgetPage() {
   const filteredServices = useMemo(() => {
     if (!quote?.services) return [];
     if (!selectedCustomerId) return quote.services;
-    const isMultiCustomerQuote = (quote?.customerConfigs?.length ?? 0) >= 2;
+    // ⚠️ CLIENTES DISTINTOS, não fatias. Num orçamento `PER_TASK` de quatro
+    // caminhões para UM cliente há quatro fatias — e contá-las fazia todo
+    // serviço sem `invoiceToCustomerId` (que são todos, num orçamento de um
+    // cliente só) ser filtrado para fora. O cliente abria a página em que
+    // ASSINA e via "Serviços" vazio e "Total geral R$ 0,00".
+    const isMultiCustomerQuote = hasMultipleCustomers(quote?.customerConfigs);
     return quote.services.filter((service) => {
       const svcCustomer = serviceCustomerId(service);
       if (svcCustomer) return svcCustomer === selectedCustomerId;
@@ -568,7 +573,9 @@ export function PublicBudgetPage() {
 
             {/* Services */}
             {(() => {
-              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+              // Mesma correção do filtro de serviços: a coluna "faturar para"
+              // só faz sentido com mais de um CLIENTE.
+              const isCompleteView = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
               return (
               <div className="mb-6">
               <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
@@ -794,7 +801,9 @@ export function PublicBudgetPage() {
                 que garantia, e só então como se paga. Espelha
                 `quote-html.builder.ts` e `budget-pdf-generator.ts`. */}
             {(() => {
-              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+              // Mesma correção do filtro de serviços: a coluna "faturar para"
+              // só faz sentido com mais de um CLIENTE.
+              const isCompleteView = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
               if (isCompleteView) {
                 // Show per-customer payment conditions
                 return (

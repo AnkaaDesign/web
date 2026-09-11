@@ -12,7 +12,7 @@ import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants";
-import { quoteTasks } from "@/utils/quote-tasks";
+import { quoteTasks, hasMultipleCustomers as hasMultipleCustomersOf } from "@/utils/quote-tasks";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
 import { useTaskQuoteSuggestion } from "@/hooks/production/use-task-quote";
 import {
@@ -56,7 +56,8 @@ export function BudgetStepServices({
   const { fields, append, remove, replace } = useFieldArray({ control, name: "services" });
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
-  const hasMultipleCustomers = customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias — ver a nota em `quote-tasks.ts`.
+  const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
   const [syncedOnMount, setSyncedOnMount] = useState(false);
 
   // Suggestion state

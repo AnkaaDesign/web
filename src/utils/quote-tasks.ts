@@ -214,6 +214,86 @@ export function configsForTask<
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// QUANTOS CLIENTES — e por que NUNCA se conta `customerConfigs.length`
+//
+// Antes do orçamento multitarefa havia exatamente UMA configuração por cliente,
+// e `customerConfigs.length >= 2` era uma forma correta (por acidente) de
+// perguntar "este orçamento tem mais de um cliente?".
+//
+// Com `billingSplit = PER_TASK` existe uma fatia POR VEÍCULO. Um orçamento de
+// quatro caminhões para UM cliente tem QUATRO configurações — e toda leitura que
+// contava fatias passou a afirmar que havia quatro clientes. O estrago medido no
+// orçamento nº 0976 (4 veículos, 1 cliente, `PER_TASK`):
+//
+//   • Página pública: os 5 serviços eram filtrados para FORA da lista (nenhum
+//     tem `invoiceToCustomerId`, e "sem cliente atribuído" só é legítimo num
+//     orçamento de um cliente só). O cliente via a seção "Serviços" VAZIA e
+//     "Total geral R$ 0,00" — na tela em que ele ASSINA.
+//   • Revisão do faturamento: a validação de salvar exigia `invoiceToCustomerId`
+//     em todo serviço e RECUSAVA o orçamento inteiro com "Serviços sem cliente
+//     atribuído" — um erro impossível de corrigir, porque o seletor "Faturar
+//     Para" nem aparece com um cliente só.
+//   • Revisão do orçamento: aparecia um filtro "Completo / Cliente 1 / Cliente 2
+//     / Cliente 3 / Cliente 4" para o MESMO cliente quatro vezes, e o bloco de
+//     condições de pagamento (que exige `length === 1`) sumia.
+//
+// A pergunta certa é sobre CLIENTES DISTINTOS. É a mesma correção que o servidor
+// já fez em `reconcileQuoteCustomerConfigs` ("a troca de cliente é detectada por
+// CLIENTE, não por fatia") e o app em "Faturar Para".
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ConfigWithCustomer {
+  customerId?: string | null;
+  customer?: { id?: string | null } | null;
+  /**
+   * Declarado só para que uma fatia real seja atribuível a este tipo sem
+   * disparar a checagem de propriedade excedente do TypeScript. Não é lido aqui
+   * de propósito: é exatamente o campo cuja existência criou o defeito, e usá-lo
+   * para contar clientes seria voltar a contar fatias.
+   */
+  taskId?: string | null;
+}
+
+/** O id do cliente de uma fatia, venha ele da FK ou da relação incluída. */
+function customerIdOf(config: ConfigWithCustomer): string | null {
+  return config.customerId ?? config.customer?.id ?? null;
+}
+
+/** Os clientes distintos cobertos pelas fatias, na ordem em que aparecem. */
+export function distinctCustomerIds(
+  configs: readonly ConfigWithCustomer[] | null | undefined,
+): string[] {
+  const seen = new Set<string>();
+  for (const config of configs ?? []) {
+    const id = customerIdOf(config);
+    // Fatia sem cliente é registro pela metade (criação em andamento). Contá-la
+    // como "outro cliente" é o mesmo erro de contar fatias, de outro jeito.
+    if (id) seen.add(id);
+  }
+  return [...seen];
+}
+
+/** Quantos CLIENTES distintos este orçamento fatura. */
+export function customerCount(
+  configs: readonly ConfigWithCustomer[] | null | undefined,
+): number {
+  return distinctCustomerIds(configs).length;
+}
+
+/**
+ * O orçamento é faturado para mais de um cliente?
+ *
+ * ⚠️ Use SEMPRE isto no lugar de `customerConfigs.length >= 2`. Ver o bloco
+ * acima: as duas expressões coincidiam antes do multitarefa e divergem em todo
+ * orçamento `PER_TASK`.
+ */
+export function hasMultipleCustomers(
+  configs: readonly ConfigWithCustomer[] | null | undefined,
+): boolean {
+  return customerCount(configs) >= 2;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE
 //
 // ESPELHA `orderNumbersOfTasks` / `orderNumberLabel` de
