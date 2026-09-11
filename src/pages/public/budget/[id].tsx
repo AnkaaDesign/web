@@ -15,7 +15,7 @@ import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask, taskCount, orderNumberLabel } from "@/utils/quote-tasks";
+import { quoteTasks, primaryTask, taskCount } from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -352,20 +352,6 @@ export function PublicBudgetPage() {
   // boleto digam o mesmo número.
   const vehicleCount = Math.max(1, taskCount(quote));
 
-  /**
-   * O PEDIDO DE COMPRA que ESTE quadro do tomador deve citar.
-   *
-   * Mora na TAREFA (`Task.customerOrderNumber`) — o pedido é por ENTREGA. Uma
-   * fatia `PER_TASK` é de UM veículo e cita o pedido dele; uma `JOINT` cobre os N
-   * e cita todos, como `orderNumberLabel` monta na nota fiscal. É a página em que
-   * o cliente APROVA: o número pelo qual ele reconhece a compra tem de estar aqui.
-   */
-  const orderNumberForConfig = (config: any): string | null =>
-    orderNumberLabel(
-      config?.taskId
-        ? quoteTasks<any>(quote).filter((t: any) => t.id === config.taskId)
-        : quoteTasks<any>(quote),
-    );
   const money = computeQuoteMoney({
     serviceAmounts: filteredServices.map((sv: any) =>
       typeof sv.amount === 'number' ? sv.amount : Number(sv.amount) || 0,
@@ -785,7 +771,28 @@ export function PublicBudgetPage() {
               </div>
             ) : null}
 
-            {/* Payment Terms */}
+            {/* Guarantee */}
+            {guaranteeText && (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                  Garantias
+                </h3>
+                <p
+                  className="text-gray-700"
+                  dangerouslySetInnerHTML={{
+                    __html: guaranteeText.replace(
+                      /(\d+)\s*(anos?)/gi,
+                      "<strong>$1 $2</strong>"
+                    ),
+                  }}
+                />
+              </div>
+            )}
+
+            {/* FATURAMENTO — depois das Garantias, não entre o prazo e elas.
+                A ordem do documento é: o que se entrega (serviços, prazo), sob
+                que garantia, e só então como se paga. Espelha
+                `quote-html.builder.ts` e `budget-pdf-generator.ts`. */}
             {(() => {
               const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
               if (isCompleteView) {
@@ -811,10 +818,7 @@ export function PublicBudgetPage() {
                         return (
                           <div key={config.id}>
                             <p className="text-sm font-semibold text-gray-800 mb-1">{customerName}</p>
-                            <QuoteBillingBox
-                              customer={config.customer}
-                              orderNumber={orderNumberForConfig(config)}
-                            />
+                            <QuoteBillingBox customer={config.customer} />
                             {configPaymentText && (
                               <p
                                 className="text-gray-700 pt-2"
@@ -842,10 +846,7 @@ export function PublicBudgetPage() {
                   <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                     Faturamento
                   </h3>
-                  <QuoteBillingBox
-                    customer={billCustomer}
-                    orderNumber={orderNumberForConfig(activeConfig)}
-                  />
+                  <QuoteBillingBox customer={billCustomer} />
                   {paymentText && (
                     <p
                       className="text-gray-700 pt-2"
@@ -857,24 +858,6 @@ export function PublicBudgetPage() {
                 </div>
               );
             })()}
-
-            {/* Guarantee */}
-            {guaranteeText && (
-              <div className="mb-6">
-                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                  Garantias
-                </h3>
-                <p
-                  className="text-gray-700"
-                  dangerouslySetInnerHTML={{
-                    __html: guaranteeText.replace(
-                      /(\d+)\s*(anos?)/gi,
-                      "<strong>$1 $2</strong>"
-                    ),
-                  }}
-                />
-              </div>
-            )}
 
             {/* Sem layout o documento fecha numa folha só: a arte não existe e as
                 assinaturas ficam AQUI. Havendo layout, os dois vão juntos para a

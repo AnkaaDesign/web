@@ -582,25 +582,35 @@ export function BudgetStepCustomerPayment({
                 <Label className="text-sm font-medium">
                   Faturamento dos {vehicleCount} veículos
                 </Label>
-                <Combobox
-                  value={billingSplit ?? "JOINT"}
-                  onValueChange={(value) =>
-                    setFormValue("billingSplit", value || "JOINT", { shouldDirty: true })
+                {/* A explicação era um PARÁGRAFO abaixo do campo e empurrava a
+                    fileira inteira: os comboboxes vizinhos desalinhavam e a
+                    altura da linha mudava conforme a escolha. Vira `title` do
+                    invólucro — a informação continua a um toque, sem custar
+                    layout, e os rótulos das opções já dizem o essencial
+                    ("Fatura única para os 4 veículos" / "Uma fatura por
+                    veículo"). */}
+                <div
+                  title={
+                    billingSplit === "PER_TASK"
+                      ? `${vehicleCount} faturas, ${vehicleCount} notas fiscais e um plano de parcelas por veículo. O financeiro aprova veículo a veículo, conforme cada um é entregue.`
+                      : `Uma fatura com o total dos ${vehicleCount} veículos, um plano de parcelas e uma nota fiscal citando todos.`
                   }
-                  disabled={disabled}
-                  options={[
-                    { value: "JOINT", label: `Fatura única para os ${vehicleCount} veículos` },
-                    { value: "PER_TASK", label: "Uma fatura por veículo" },
-                  ]}
-                  placeholder="Fatura única"
-                  searchable={false}
-                  emptyText="Nenhuma opção"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {billingSplit === "PER_TASK"
-                    ? `${vehicleCount} faturas, ${vehicleCount} notas fiscais e um plano de parcelas por veículo. O financeiro aprova veículo a veículo, conforme cada um é entregue.`
-                    : `Uma fatura com o total dos ${vehicleCount} veículos, um plano de parcelas e uma nota fiscal citando todos.`}
-                </p>
+                >
+                  <Combobox
+                    value={billingSplit ?? "JOINT"}
+                    onValueChange={(value) =>
+                      setFormValue("billingSplit", value || "JOINT", { shouldDirty: true })
+                    }
+                    disabled={disabled}
+                    options={[
+                      { value: "JOINT", label: `Fatura única para os ${vehicleCount} veículos` },
+                      { value: "PER_TASK", label: "Uma fatura por veículo" },
+                    ]}
+                    placeholder="Fatura única"
+                    searchable={false}
+                    emptyText="Nenhuma opção"
+                  />
+                </div>
               </div>
             )}
             {/* ── Condição de Pagamento (type) ── */}

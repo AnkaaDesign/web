@@ -62,10 +62,17 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   // para ele. Categoria e implemento só ganham coluna se ALGUM veículo os tiver:
   // são classificação, não identidade, e uma coluna inteira de travessões não
   // informa nada.
+  // O PEDIDO DE COMPRA segue a mesma regra: só ganha coluna se ALGUM veículo o
+  // tiver. Ele identifica a ENTREGA — dois caminhões do mesmo orçamento podem ter
+  // vindo em pedidos diferentes —, e é por isso que deixou de ser uma linha do
+  // quadro do tomador, onde só cabia um número.
+  const anyOrderNumber = tasks.some((t) => !!(t?.customerOrderNumber ?? "").trim());
+
   const columns: Array<{ key: string; label: string }> = [
     { key: "serialNumber", label: "Nº de série" },
     { key: "plate", label: "Placa" },
     { key: "chassis", label: "Chassi" },
+    ...(anyOrderNumber ? [{ key: "orderNumber", label: "Nº do pedido" }] : []),
     ...(anyCategory ? [{ key: "category", label: "Categoria" }] : []),
     ...(anyImplement ? [{ key: "implement", label: "Implemento" }] : []),
   ];
@@ -86,6 +93,10 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
         ) : (
           <ARegistrar />
         );
+      case "orderNumber": {
+        const value = (task?.customerOrderNumber ?? "").trim();
+        return value ? <strong>{value}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;
+      }
       case "category": {
         const label = labelOf(TRUCK_CATEGORY_LABELS as any, task?.truck?.category);
         return label ? <strong>{label}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;

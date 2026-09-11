@@ -45,8 +45,8 @@ import {
 } from "@/lib/billing-customer-data";
 import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
-import { Badge } from "@/components/ui/badge";
 import { orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
+import { vehicleCombinations } from "@/utils/vehicle-combinations";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -145,6 +145,53 @@ export function BudgetStepReview({
     return 1;
   }, [existingQuote, vehicleLabels]);
 
+  // O que está no CAMPO é o do veículo aberto (ou, na criação, o de todos os que
+  // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
+  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
+  const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
+
+  /**
+   * OS VEÍCULOS EM TABELA — as MESMAS colunas do documento e da página pública.
+   *
+   * Eram etiquetas ("48888 48889 48890 48891"): cabem quatro, não cabem
+   * sessenta, e não dizem placa, chassi nem pedido de compra. A conferência que
+   * este passo existe para permitir é a mesma que o cliente vai fazer na página
+   * pública — então mostra o mesmo quadro.
+   *
+   * Na CRIAÇÃO as tarefas ainda não existem: as linhas vêm do produto cartesiano
+   * do passo 1 (a mesma função que o submit usa) e o pedido de compra é o valor
+   * único do campo, que vale para todas. Na EDIÇÃO vêm do registro, com o valor
+   * do formulário no lugar do veículo aberto — é o que acabou de ser digitado.
+   */
+  const vehicleRows = useMemo(() => {
+    const existing = existingQuote?.tasks ?? [];
+    if (existing.length > 0) {
+      return sortQuoteTasks(existing as any[]).map((t: any) => ({
+        key: t.id,
+        serialNumber: t.serialNumber ?? null,
+        plate: t.truck?.plate ?? null,
+        chassis: t.truck?.chassisNumber ?? null,
+        orderNumber:
+          t.id === openTaskId
+            ? ((formOrderNumber ?? "").trim() || null)
+            : ((t.customerOrderNumber ?? "").trim() || null),
+      }));
+    }
+    const typed = (formOrderNumber ?? "").trim() || null;
+    return vehicleCombinations(platesWatch, serialNumbersWatch as (string | number)[]).map(
+      (combo, i) => ({
+        key: `${combo.plate ?? ""}|${combo.serialNumber ?? ""}|${i}`,
+        serialNumber: combo.serialNumber ?? null,
+        plate: combo.plate ?? null,
+        chassis: null as string | null,
+        orderNumber: typed,
+      }),
+    );
+  }, [existingQuote, platesWatch, serialNumbersWatch, formOrderNumber, openTaskId]);
+
+  const anyVehicleOrderNumber = vehicleRows.some((v) => !!v.orderNumber);
+  const anyVehicleChassis = vehicleRows.some((v) => !!v.chassis);
+
   // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
   //
   // Uma linha para o orçamento, não uma por cliente: o pedido mora em
@@ -154,10 +201,6 @@ export function BudgetStepReview({
   // A linha é renderizada VAZIA ("Pendente") quando uma regra a está cobrando:
   // um valor que falta e não tem nó no DOM é um sinal sem para onde apontar.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
-  // O que está no CAMPO é o do veículo aberto (ou, na criação, o de todos os que
-  // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
-  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
-  const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
   const orderNumberText = useMemo(() => {
     const siblings = ((existingQuote?.tasks ?? []) as Array<{ id: string; customerOrderNumber?: string | null }>)
       .filter((t) => t.id !== openTaskId);
@@ -604,18 +647,43 @@ export function BudgetStepReview({
                       <span className="text-muted-foreground">Veículos</span>
                       <span className="font-medium">&times; {vehicleCount}</span>
                     </div>
-                    {vehicleLabels.length > 1 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {vehicleLabels.slice(0, 12).map((label, i) => (
-                          <Badge key={`${label}-${i}`} variant="secondary" className="font-normal">
-                            {label}
-                          </Badge>
-                        ))}
-                        {vehicleLabels.length > 12 && (
-                          <Badge variant="outline" className="font-normal">
-                            +{vehicleLabels.length - 12}
-                          </Badge>
-                        )}
+                    {/* A RELAÇÃO DE VEÍCULOS, nas mesmas colunas do documento e
+                        da página pública. Eram etiquetas: cabem quatro, não cabem
+                        sessenta, e não diziam placa, chassi nem pedido de compra
+                        — que é justamente o que se confere aqui antes de mandar
+                        para o cliente. */}
+                    {vehicleRows.length > 1 && (
+                      <div className="pt-2 overflow-x-auto">
+                        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr className="text-muted-foreground">
+                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-2 w-8">#</th>
+                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Nº de série</th>
+                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Placa</th>
+                              {anyVehicleChassis && (
+                                <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Chassi</th>
+                              )}
+                              {anyVehicleOrderNumber && (
+                                <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1">Nº do pedido</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vehicleRows.map((v, i) => (
+                              <tr key={v.key} className="border-t border-border/40">
+                                <td className="py-1 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                                <td className="py-1 pr-3 font-medium">{v.serialNumber || <span className="text-muted-foreground italic">a registrar</span>}</td>
+                                <td className="py-1 pr-3 font-medium">{v.plate || <span className="text-muted-foreground italic">a registrar</span>}</td>
+                                {anyVehicleChassis && (
+                                  <td className="py-1 pr-3 font-medium">{v.chassis || <span className="text-muted-foreground italic">a registrar</span>}</td>
+                                )}
+                                {anyVehicleOrderNumber && (
+                                  <td className="py-1 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                     <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
@@ -746,7 +814,6 @@ export function BudgetStepReview({
           (`Task.customerOrderNumber`), não do cliente. Num orçamento de dois
           clientes ele aparecia duas vezes, com o mesmo valor, como se fossem
           dois pedidos diferentes. */}
-      {purchaseOrderLine}
 
       {/* Single customer: payment conditions */}
       {Array.isArray(customerConfigs) &&
@@ -779,8 +846,12 @@ export function BudgetStepReview({
           );
         })()}
 
-      {/* O pedido de compra — uma linha para o orçamento inteiro. Ver acima. */}
-      {Array.isArray(customerConfigs) && customerConfigs.length === 1 && customerFilter === "all" && purchaseOrderLine}
+      {/* O PEDIDO DE COMPRA — UMA linha para o orçamento inteiro.
+          Saía duas vezes: um bloco solto depois dos cartões de cliente e outro
+          no caso de cliente único, e com um cliente os dois renderizavam. Com a
+          coluna na tabela de veículos acima, esta linha só faz sentido como
+          resumo — e some quando a tabela já a mostra veículo a veículo. */}
+      {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderLine}
 
       {/* Delivery Deadline */}
       {(customForecastDays || (simultaneousTasks && simultaneousTasks > 1)) && (

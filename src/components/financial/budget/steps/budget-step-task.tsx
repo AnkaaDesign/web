@@ -221,7 +221,11 @@ export function BudgetStepTask({
 
                 {/* Plates + Serial Numbers */}
                 {isEditMode ? (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  /* CINCO colunas: série, placa, nº do pedido, chassi e plaqueta
+                     são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
+                     fileira. Com quatro colunas a plaqueta caía sozinha numa
+                     linha inteira, parecendo uma seção própria. */
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <FormField
                       control={control}
                       name="serialNumber"

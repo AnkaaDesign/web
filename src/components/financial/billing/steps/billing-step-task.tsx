@@ -158,8 +158,10 @@ export function BillingStepTask({
             />
           </div>
 
-          {/* Serial Number + Plate + Chassi + Plaqueta */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Serial Number + Plate + Nº do Pedido + Chassi + Plaqueta — CINCO
+              colunas: são a identificação do mesmo veículo e pertencem à mesma
+              fileira. Com quatro, a plaqueta caía sozinha numa linha inteira. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <FormField
               control={control}
               name="serialNumber"

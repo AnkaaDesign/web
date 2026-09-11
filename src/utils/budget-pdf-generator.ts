@@ -513,6 +513,12 @@ export interface BudgetHtmlData {
     serialNumber?: string | null;
     plate?: string | null;
     chassisNumber?: string | null;
+    /**
+     * O pedido de compra DESTE veículo (`Task.customerOrderNumber`) — vira
+     * coluna da tabela. Era linha do quadro do tomador, onde só cabia um número:
+     * quatro caminhões comprados em pedidos diferentes não cabiam ali.
+     */
+    customerOrderNumber?: string | null;
     truckCategory?: string | null;
     truckImplementType?: string | null;
   }> | null;
@@ -671,6 +677,9 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
             serialNumber: data.serialNumber,
             plate: data.plate,
             chassisNumber: data.chassisNumber,
+            // O caminho legado (um veículo, campos singulares) não conhece o
+            // pedido de compra: quem o traz é `vehicles`.
+            customerOrderNumber: null as string | null,
             truckCategory: data.truckCategory,
             truckImplementType: data.truckImplementType,
           },
@@ -736,10 +745,16 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   // coluna o olho desce, em prosa ele varre.
   const anyVehicleCategory = vehicleRows.some(v => !!v.truckCategory);
   const anyVehicleImplement = vehicleRows.some(v => !!v.truckImplementType);
+  // O PEDIDO DE COMPRA segue a mesma regra da categoria: só ganha coluna se ALGUM
+  // veículo o tiver. Ele identifica a ENTREGA — dois caminhões do mesmo orçamento
+  // podem ter vindo em pedidos diferentes —, e é por isso que deixou de ser uma
+  // linha do quadro do tomador, onde só cabia um número.
+  const anyVehicleOrderNumber = vehicleRows.some(v => !!(v.customerOrderNumber ?? '').trim());
   const vehicleColumns: Array<{ key: string; label: string }> = [
     { key: 'serialNumber', label: 'Nº de série' },
     { key: 'plate', label: 'Placa' },
     { key: 'chassis', label: 'Chassi' },
+    ...(anyVehicleOrderNumber ? [{ key: 'orderNumber', label: 'Nº do pedido' }] : []),
     ...(anyVehicleCategory ? [{ key: 'category', label: 'Categoria' }] : []),
     ...(anyVehicleImplement ? [{ key: 'implement', label: 'Implemento' }] : []),
   ];
@@ -754,6 +769,10 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         return v.plate ? `<strong>${escapeHtml(v.plate)}</strong>` : aRegistrar;
       case 'chassis':
         return v.chassisNumber ? `<strong>${escapeHtml(v.chassisNumber)}</strong>` : aRegistrar;
+      case 'orderNumber':
+        return (v.customerOrderNumber ?? '').trim()
+          ? `<strong>${escapeHtml(v.customerOrderNumber!.trim())}</strong>`
+          : '<span class="vehicle-empty">&mdash;</span>';
       case 'category':
         return v.truckCategory
           ? `<strong>${escapeHtml(v.truckCategory)}</strong>`
@@ -788,25 +807,33 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   // ═════════════════════════════════════════════════════════════════════════
   // O QUADRO DO TOMADOR (seção "Faturamento")
   // ═════════════════════════════════════════════════════════════════════════
-  const billingRows: Array<[string, string | null]> = data.billing
+  //
+  // CADA LINHA PODE TER DOIS PARES: as duas inscrições são curtas e ficavam com
+  // dois terços da folha em branco à direita de cada uma. O NÚMERO DO PEDIDO saiu
+  // daqui e virou coluna da tabela de veículos — ele identifica a entrega, e
+  // quatro caminhões podem ter quatro pedidos, que numa linha só não cabem.
+  const billingRows: Array<Array<[string, string | null]>> = data.billing
     ? [
-        ['Razão social', data.billing.corporateName ?? null],
-        ['CNPJ / CPF', data.billing.documentFormatted ?? null],
-        ['Inscrição estadual', data.billing.stateRegistration ?? null],
-        ['Inscrição municipal', data.billing.municipalRegistration ?? null],
-        ['Endereço', data.billing.addressLine ?? null],
-        ['Município', data.billing.addressLocality ?? null],
-        ...(data.billing.orderNumber
-          ? ([['Nº do pedido', data.billing.orderNumber]] as Array<[string, string | null]>)
-          : []),
+        [['Razão social', data.billing.corporateName ?? null]],
+        [['CNPJ / CPF', data.billing.documentFormatted ?? null]],
+        [
+          ['Inscrição estadual', data.billing.stateRegistration ?? null],
+          ['Inscrição municipal', data.billing.municipalRegistration ?? null],
+        ],
+        [['Endereço', data.billing.addressLine ?? null]],
+        [['Município', data.billing.addressLocality ?? null]],
       ]
     : [];
   const billingRowsHtml = billingRows
     .map(
-      ([label, value]) => `<tr>
-        <th>${escapeHtml(label)}</th>
-        <td>${value ? escapeHtml(value) : '<span class="billing-empty">&mdash;</span>'}</td>
-      </tr>`,
+      pairs => `<tr>${pairs
+        .map(
+          ([label, value], i) => `<th${i > 0 ? ' class="billing-th-second"' : ''}>${escapeHtml(label)}</th>
+        <td${pairs.length === 1 ? ' colspan="3"' : ''}>${
+          value ? escapeHtml(value) : '<span class="billing-empty">&mdash;</span>'
+        }</td>`,
+        )
+        .join('')}</tr>`,
     )
     .join('');
 
@@ -1055,9 +1082,12 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     }
     .billing-table th {
       text-align: left; font-weight: 600; color: #666;
-      width: 34mm; padding: .8mm 3mm .8mm 0; vertical-align: baseline;
+      width: 32mm; padding: .8mm 3mm .8mm 0; vertical-align: baseline;
       white-space: nowrap;
     }
+    /* O SEGUNDO par de uma linha ganha respiro a esquerda: sem ele o valor da
+       inscricao estadual encosta no rotulo da municipal. */
+    .billing-table th.billing-th-second { padding-left: 6mm; }
     .billing-table td { padding: .8mm 0; vertical-align: baseline; }
     .billing-empty { color: #666; }
     .terms-content-after-table { border-top: .5px solid #ddd; padding-top: 2mm; }
@@ -1350,22 +1380,27 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       </section>
       ` : ""}
 
-      <!-- Faturamento: o quadro do tomador + a cláusula de pagamento -->
-      ${data.paymentText || billingRowsHtml ? `
-      <div class="page-content-gap"></div>
-      <section class="terms-section">
-        <h2 class="terms-title">Faturamento</h2>
-        ${billingRowsHtml ? `<table class="billing-table">${billingRowsHtml}</table>` : ''}
-        ${data.paymentText ? `<p class="terms-content${billingRowsHtml ? ' terms-content-after-table' : ''}">${escapeHtml(data.paymentText)}</p>` : ''}
-      </section>
-      ` : ""}
-
       <!-- Guarantee -->
       ${data.guaranteeText ? `
       <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Garantias</h2>
         <p class="terms-content">${formatGuaranteeHtml(data.guaranteeText)}</p>
+      </section>
+      ` : ""}
+
+      <!-- FATURAMENTO - depois das Garantias, nao entre o prazo e elas: a ordem
+           do documento e o que se entrega, sob que garantia, e so entao como se
+           paga. Espelha quote-html.builder.ts e a pagina publica.
+           (SEM CRASE: este comentario vive dentro de um template literal, e uma
+           crase aqui encerra a string e quebra o arquivo centenas de linhas
+           adiante.) -->
+      ${data.paymentText || billingRowsHtml ? `
+      <div class="page-content-gap"></div>
+      <section class="terms-section">
+        <h2 class="terms-title">Faturamento</h2>
+        ${billingRowsHtml ? `<table class="billing-table">${billingRowsHtml}</table>` : ''}
+        ${data.paymentText ? `<p class="terms-content${billingRowsHtml ? ' terms-content-after-table' : ''}">${escapeHtml(data.paymentText)}</p>` : ''}
       </section>
       ` : ""}
 

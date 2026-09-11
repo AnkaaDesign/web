@@ -1,5 +1,6 @@
 // `BRAND_COLORS` e não um token de tema: as páginas públicas rodam em
 // `force-light`, e um token aqui renderiza branco sobre branco.
+import { Fragment } from "react";
 import { BRAND_COLORS } from "@/config/company";
 import { formatCNPJ, formatCPF } from "@/utils/formatters";
 import {
@@ -53,12 +54,10 @@ interface QuoteBillingBoxProps {
       }
     | null
     | undefined;
-  /** Número do pedido do cliente. Só sai quando existe — ver abaixo. */
-  orderNumber?: string | null;
   className?: string;
 }
 
-export function QuoteBillingBox({ customer, orderNumber, className }: QuoteBillingBoxProps) {
+export function QuoteBillingBox({ customer, className }: QuoteBillingBoxProps) {
   if (!customer) return null;
 
   const document = customer.cnpj
@@ -67,34 +66,54 @@ export function QuoteBillingBox({ customer, orderNumber, className }: QuoteBilli
       ? formatCPF(customer.cpf)
       : null;
 
-  const rows: Array<[string, string | null]> = [
-    ["Razão social", customer.corporateName || customer.fantasyName || null],
-    ["CNPJ / CPF", document],
-    ["Inscrição estadual", customer.stateRegistration || null],
-    ["Inscrição municipal", customer.municipalRegistration || null],
-    ["Endereço", formatBillingStreetLine(customer)],
-    ["Município", formatBillingLocalityLine(customer)],
-    // Só sai quando existe: o número do pedido é exigência de alguns clientes e
-    // não de todos, e uma linha "Nº do pedido —" num orçamento que não usa
-    // pedido leria como pendência.
-    ...(orderNumber ? ([["Nº do pedido", orderNumber]] as Array<[string, string | null]>) : []),
+  // CADA LINHA PODE TER DOIS PARES. Razão social, endereço e município são
+  // longos e ocupam a largura; as duas inscrições são curtas e ficavam com dois
+  // terços da folha em branco à direita de cada uma — duas linhas onde cabia uma.
+  //
+  // O NÚMERO DO PEDIDO saiu daqui: virou COLUNA da tabela de veículos, porque ele
+  // identifica a ENTREGA e um orçamento de quatro caminhões pode ter quatro
+  // pedidos diferentes, que numa linha só não cabem.
+  const rows: Array<Array<[string, string | null]>> = [
+    [["Razão social", customer.corporateName || customer.fantasyName || null]],
+    [["CNPJ / CPF", document]],
+    [
+      ["Inscrição estadual", customer.stateRegistration || null],
+      ["Inscrição municipal", customer.municipalRegistration || null],
+    ],
+    [["Endereço", formatBillingStreetLine(customer)]],
+    [["Município", formatBillingLocalityLine(customer)]],
   ];
 
   return (
     <div className={`overflow-x-auto mb-3 ${className ?? ""}`}>
       <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
         <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label}>
-              <th
-                className="text-left font-semibold align-baseline whitespace-nowrap"
-                style={{ color: BRAND_COLORS.textGray, width: "9.5rem", padding: "0.2rem 0.75rem 0.2rem 0" }}
-              >
-                {label}
-              </th>
-              <td className="align-baseline" style={{ color: BRAND_COLORS.textDark, padding: "0.2rem 0" }}>
-                {value ?? <span style={{ color: BRAND_COLORS.textGray }}>—</span>}
-              </td>
+          {rows.map((pairs) => (
+            <tr key={pairs.map(([label]) => label).join("|")}>
+              {pairs.map(([label, value], i) => (
+                <Fragment key={label}>
+                  <th
+                    className="text-left font-semibold align-baseline whitespace-nowrap"
+                    style={{
+                      color: BRAND_COLORS.textGray,
+                      width: "9.5rem",
+                      // O SEGUNDO par ganha respiro à esquerda: sem ele o valor
+                      // da inscrição estadual encosta no rótulo da municipal e
+                      // os dois leem como um texto só.
+                      padding: `0.2rem 0.75rem 0.2rem ${i > 0 ? "1.5rem" : "0"}`,
+                    }}
+                  >
+                    {label}
+                  </th>
+                  <td
+                    className="align-baseline"
+                    style={{ color: BRAND_COLORS.textDark, padding: "0.2rem 0" }}
+                    colSpan={pairs.length === 1 ? 3 : 1}
+                  >
+                    {value ?? <span style={{ color: BRAND_COLORS.textGray }}>—</span>}
+                  </td>
+                </Fragment>
+              ))}
             </tr>
           ))}
         </tbody>
