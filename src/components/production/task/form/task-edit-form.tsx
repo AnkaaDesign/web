@@ -753,6 +753,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     "truck.category": "basic-information",
     "truck.implementType": "basic-information",
     serialNumber: "basic-information",
+    customerOrderNumber: "basic-information",
     "truck.plate": "basic-information",
     "truck.chassisNumber": "basic-information",
     "truck.vinPlateId": "basic-information",
@@ -1073,6 +1074,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       name: taskData.name || "",
       status: taskData.status || TASK_STATUS.PREPARATION,
       serialNumber: taskData.serialNumber || null,
+      customerOrderNumber: taskData.customerOrderNumber || null,
       details: taskData.details || null,
       bonification: taskData.bonification || null,
       entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
@@ -1712,6 +1714,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'sectorId',
             'paintId',
             'serialNumber',
+            // O pedido de compra do cliente, DESTE veículo. Livre e não único:
+            // os N caminhões de um orçamento podem vir num pedido só ou em
+            // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
+            // deixar o número antigo de pé — daí entrar nesta lista.
+            'customerOrderNumber',
             'details',
             'bonification',
             'observation',
@@ -2112,6 +2119,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'sectorId',
             'paintId',
             'serialNumber',
+            // O pedido de compra do cliente, DESTE veículo. Livre e não único:
+            // os N caminhões de um orçamento podem vir num pedido só ou em
+            // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
+            // deixar o número antigo de pé — daí entrar nesta lista.
+            'customerOrderNumber',
             'details',
             'bonification',
             'observation',
@@ -3435,6 +3447,37 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         </FormControl>
                         <FormMessage />
                       </FormItem>
+
+                      {/* N° do Pedido — o pedido de compra do cliente, DESTE
+                          veículo. Morava na configuração de faturamento do
+                          orçamento, por CLIENTE, e isso obrigava os N caminhões de
+                          um mesmo orçamento a citarem o mesmo número na nota e no
+                          boleto. O pedido é por ENTREGA: aqui é onde se corrige um
+                          caminhão sem mexer nos irmãos. */}
+                      <FormField
+                        control={form.control}
+                        name="customerOrderNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconHash className="h-4 w-4" />
+                              N° do Pedido
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                placeholder="Ex: 12345"
+                                maxLength={100}
+                                className="bg-transparent"
+                                onChange={(value: string | number | null) => field.onChange(value === null || value === "" ? null : String(value))}
+                                onBlur={field.onBlur}
+                                disabled={isSubmitting || !canEditIdentity}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     {/* Sector, Status and Bonification in a row */}
