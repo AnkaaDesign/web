@@ -65,6 +65,17 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   const { data: currentUser } = useCurrentUser();
   const [quoteCustomerFilter, setQuoteCustomerFilter] = useState<string | null>(null);
 
+  /**
+   * O PEDIDO DE COMPRA DESTE VEÍCULO.
+   *
+   * Morava na configuração de faturamento, por CLIENTE, e a coluna já não existe:
+   * o pedido é da ENTREGA (`Task.customerOrderNumber`). Aqui a resposta é simples
+   * porque a tela é de UM caminhão — o número dele, não o dos irmãos. É também a
+   * diferença que a tela precisava mostrar: dois veículos do mesmo orçamento
+   * podem ter vindo em pedidos diferentes.
+   */
+  const taskOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
+
   // Fetch invoice data for inline boleto/NFS-e display in the quote section.
   const { data: invoicesData } = useInvoicesByTask(task.id);
   const invoices: Invoice[] = useMemo(() => {
@@ -477,9 +488,9 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                       </div>
                     )}
 
-                    {config.orderNumber && (
+                    {taskOrderNumber && (
                       <div className="text-sm text-muted-foreground">
-                        N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                        N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
                       </div>
                     )}
 
@@ -624,7 +635,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             paymentCondition: config.paymentCondition,
             total: configTotal,
           });
-          const hasContent = paymentText || config.orderNumber;
+          const hasContent = paymentText || taskOrderNumber;
           return hasContent ? (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
               {paymentText && (
@@ -636,9 +647,9 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {config.orderNumber && (
+              {taskOrderNumber && (
                 <div className="text-sm text-muted-foreground">
-                  N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                  N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
                 </div>
               )}
             </div>

@@ -42,6 +42,12 @@ import { BudgetStepServices } from "@/components/financial/budget/steps/budget-s
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
 import { batchCreateTasksWithQuote } from "@/api-client/task";
+import {
+  vehicleCombinations,
+  vehicleCombinationKey,
+  vehicleCombinationLabel,
+  type PurchaseOrderVehicle,
+} from "@/components/financial/shared/purchase-order-vehicles";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -224,6 +230,15 @@ export const FinancialBudgetCreatePage = () => {
        * que não terminam no mesmo dia.
        */
       billingSplit: "JOINT" as "JOINT" | "PER_TASK",
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, por VEÍCULO — `chave do veículo → número`.
+       *
+       * Aqui as tarefas ainda NÃO existem, então a chave é a combinação
+       * `placa|série`, a mesma que o laço do submit reconstrói. Índice não serve:
+       * acrescentar uma placa no passo 1 reordena o produto cartesiano e o pedido
+       * digitado para o caminhão 3 passaria a valer para o 7.
+       */
+      taskOrderNumbers: {} as Record<string, string | null>,
       customerConfigs: [] as any[],
       services: [
         {
@@ -243,6 +258,25 @@ export const FinancialBudgetCreatePage = () => {
     isDirty: form.formState.isDirty,
     isSubmitting,
   });
+
+  /**
+   * OS VEÍCULOS QUE VÃO NASCER — a lista que o pedido de compra endereça.
+   *
+   * As tarefas ainda não existem: o que existe são as placas e os números de
+   * série do passo 1, e o produto cartesiano deles é exatamente o que o submit
+   * vai gravar. Por isso a tabela é montada da MESMA função (`vehicleCombinations`)
+   * e endereçada pela MESMA chave.
+   */
+  const watchedPlates = form.watch("plates");
+  const watchedSerialNumbers = form.watch("serialNumbers");
+  const purchaseOrderVehicles: PurchaseOrderVehicle[] = useMemo(
+    () =>
+      vehicleCombinations(watchedPlates, watchedSerialNumbers).map((combo, i) => ({
+        key: vehicleCombinationKey(combo.plate, combo.serialNumber),
+        label: vehicleCombinationLabel(combo, i),
+      })),
+    [watchedPlates, watchedSerialNumbers],
+  );
 
   // Auto-populate billing customer from task customer
   const watchedCustomerId = form.watch("customerId");
@@ -269,7 +303,6 @@ export const FinancialBudgetCreatePage = () => {
         customPaymentText: null,
         generateInvoice: true,
         generateBankSlip: true,
-        orderNumber: null,
         responsibleId: null,
         customerData: {
           corporateName: customerData?.corporateName || "",
@@ -754,25 +787,13 @@ export const FinancialBudgetCreatePage = () => {
       };
 
       // 7. Build plate/serial number combinations
-      const serialNumbers = data.serialNumbers || [];
-      const combinations: { plate?: string; serialNumber?: string }[] = [];
-      if (plates.length > 0 && serialNumbers.length > 0) {
-        for (const plate of plates) {
-          for (const sn of serialNumbers) {
-            combinations.push({ plate, serialNumber: sn.toString() });
-          }
-        }
-      } else if (plates.length > 0) {
-        for (const plate of plates) {
-          combinations.push({ plate });
-        }
-      } else if (serialNumbers.length > 0) {
-        for (const sn of serialNumbers) {
-          combinations.push({ serialNumber: sn.toString() });
-        }
-      } else {
-        combinations.push({});
-      }
+      //
+      // A MESMA função que o passo de faturamento usou para montar a tabela de
+      // pedidos de compra (`vehicleCombinations`). Duas cópias da regra
+      // deslizariam no primeiro ajuste, e o sintoma — o pedido de um caminhão
+      // gravado noutro — só apareceria na nota fiscal.
+      const combinations = vehicleCombinations(plates, data.serialNumbers);
+      const taskOrderNumbers = (data.taskOrderNumbers ?? {}) as Record<string, string | null>;
 
       // ═══════════════════════════════════════════════════════════════════════
       // 8. OS PAYLOADS DAS TAREFAS — nenhuma é criada aqui
@@ -819,6 +840,12 @@ export const FinancialBudgetCreatePage = () => {
           ...(serialNumber && { serialNumber }),
           ...truckData,
         };
+
+        // O PEDIDO DE COMPRA É DO VEÍCULO (`Task.customerOrderNumber`). A chave
+        // é a mesma que a tabela do passo de faturamento usou para endereçar a
+        // linha — ver `vehicleCombinationKey`.
+        const orderNumber = (taskOrderNumbers[vehicleCombinationKey(plate, serialNumber)] ?? "").trim();
+        if (orderNumber) taskData.customerOrderNumber = orderNumber;
 
         // Os responsáveis NOVOS viajam uma vez só. O servidor os cria uma vez
         // para o lote (deduplicados por nome + telefone) e liga o id em TODAS as
@@ -1084,6 +1111,7 @@ export const FinancialBudgetCreatePage = () => {
                   configIndex={configIndex}
                   customer={customer}
                   disabled={isSubmitting}
+                  vehicles={purchaseOrderVehicles}
                 />
               </div>
             );

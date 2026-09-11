@@ -212,3 +212,86 @@ export function configsForTask<
   const joint = all.filter((c) => !c.taskId);
   return own.length > 0 ? [...own, ...joint] : [...joint];
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE
+//
+// ESPELHA `orderNumbersOfTasks` / `orderNumberLabel` de
+// `api/src/utils/quote-tasks.ts`. Mora em `Task.customerOrderNumber` — por
+// VEÍCULO — desde que um orçamento passou a cobrir N caminhões. Antes era campo
+// da configuração de faturamento, por CLIENTE, e os sessenta veículos eram
+// obrigados a citar o mesmo pedido na nota e no boleto.
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface TaskWithOrderNumber {
+  customerOrderNumber?: string | null;
+}
+
+/** Os números de pedido dos veículos indicados, sem brancos e sem repetição. */
+export function orderNumbersOfTasks(
+  tasks: readonly TaskWithOrderNumber[] | null | undefined,
+): string[] {
+  const seen = new Set<string>();
+  for (const t of tasks ?? []) {
+    const value = (t?.customerOrderNumber ?? "").trim();
+    if (value) seen.add(value);
+  }
+  return [...seen];
+}
+
+/**
+ * UMA LINHA para a nota, o boleto e o documento.
+ *
+ * Um número quando é um só — o caso comum, inclusive num orçamento de sessenta
+ * caminhões comprados no mesmo pedido. Vários, separados por vírgula, quando
+ * diferem: a nota conjunta cobre todos, e omitir os outros faria o cliente
+ * receber uma nota que não bate com nenhum pedido dele.
+ */
+export function orderNumberLabel(
+  tasks: readonly TaskWithOrderNumber[] | null | undefined,
+  maxLength?: number,
+): string | null {
+  const numbers = orderNumbersOfTasks(tasks);
+  if (numbers.length === 0) return null;
+  const full = numbers.join(", ");
+  if (!maxLength || full.length <= maxLength) return full;
+
+  const kept: string[] = [];
+  for (const n of numbers) {
+    const candidate = [...kept, n].join(", ");
+    // `+ 5` reserva o " (+N)" que fecha a linha.
+    if (candidate.length + 5 > maxLength) break;
+    kept.push(n);
+  }
+  if (kept.length === 0) return numbers[0].slice(0, maxLength);
+  const rest = numbers.length - kept.length;
+  return rest > 0 ? `${kept.join(", ")} (+${rest})` : kept.join(", ");
+}
+
+/**
+ * COMO CHAMAR UM VEÍCULO numa linha de formulário.
+ *
+ * A tabela de pedidos de compra precisa identificar o caminhão para quem digita
+ * — e num orçamento de sessenta a coluna é a única coisa que distingue uma linha
+ * da seguinte. Série e placa são o que o operador tem na mão (a nota de entrada,
+ * o documento do veículo); o nome da tarefa é o recuo quando nenhum dos dois foi
+ * preenchido, e o índice é o último recurso para que a linha nunca fique anônima.
+ */
+export function vehicleRowLabel(
+  task: {
+    serialNumber?: string | null;
+    name?: string | null;
+    truck?: { plate?: string | null } | null;
+  } | null
+  | undefined,
+  index: number,
+): string {
+  const parts: string[] = [];
+  const serial = (task?.serialNumber ?? "").trim();
+  const plate = (task?.truck?.plate ?? "").trim();
+  if (serial) parts.push(`#${serial}`);
+  if (plate) parts.push(plate.toUpperCase());
+  if (parts.length > 0) return parts.join(" · ");
+  const name = (task?.name ?? "").trim();
+  return name || `Veículo ${index + 1}`;
+}

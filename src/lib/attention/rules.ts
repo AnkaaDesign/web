@@ -383,6 +383,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
       nodes: [
         { op: "eq", field: "task.status", value: TASK_STATUS.COMPLETED },
         notYetInvoiced(),
+        // DUAS CONDIÇÕES IRMÃS, como no espelho do servidor: existe fatia da
+        // Ibiporã que emite nota, E existe veículo sem número de pedido.
+        //
+        // A fatia de faturamento diz DE QUEM é a cobrança; o número do pedido
+        // mora na TAREFA (`Task.customerOrderNumber`) desde que um orçamento
+        // passou a cobrir N caminhões — o pedido é por ENTREGA. Enquanto esta
+        // condição perguntava `isNull orderNumber` DENTRO da fatia, perguntava
+        // por uma coluna que já não existe: a guarda do `notNull id` logo abaixo
+        // fazia a regra ler "caminho ausente" e nunca acender.
         {
           op: "some",
           field: "customerConfigs",
@@ -391,17 +400,20 @@ export const ATTENTION_RULES: AttentionRule[] = [
             nodes: [
               // Mesmo papel do `notNull customer.id` da R7 e pela mesma razão: `isNull` não
               // distingue "coluna vazia" de "caminho ausente no objeto", então um config trazido
-              // por um select sem `orderNumber` leria como SEM número e a regra acenderia a lista
+              // por um select incompleto leria como vazio e a regra acenderia a lista
               // inteira. O id do config está em todos os includes que alimentam o engine.
               { op: "notNull", field: "id" },
               { op: "eq", field: "customerId", value: PINNED_CUSTOMERS.IBIPORA },
               // Sem nota não há onde imprimir o pedido de compra. Um config com
               // `generateInvoice: false` é justamente o caso "essa parte não vai ter NF".
               { op: "isTrue", field: "generateInvoice" },
-              { op: "isNull", field: "orderNumber" },
             ],
           },
         },
+        // `anyVehicleMissingOrderNumber` é derivado em `quote-attention.ts`, onde
+        // as linhas do orçamento ainda estão todas à mão — ver o comentário lá
+        // sobre lista paginada.
+        { op: "isTrue", field: "anyVehicleMissingOrderNumber" },
       ],
     },
     target: { level: "field", field: "orderNumber" },

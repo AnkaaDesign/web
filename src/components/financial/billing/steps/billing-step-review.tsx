@@ -54,7 +54,7 @@ import { exportTaskDossiePdf } from "@/components/production/task/detail/section
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
-import { quoteVehicleCount } from "@/utils/quote-tasks";
+import { orderNumberLabel, quoteVehicleCount, sortQuoteTasks } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
 // on the same transition, and disagreeing meant this dialog waved through a status the page then
@@ -162,9 +162,35 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       .sort((a, b) => (b.nfseNumber ?? -1) - (a.nfseNumber ?? -1));
   }, [taskNfseHistory, invoices]);
 
+  // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
+  //
+  // Mora em `Task.customerOrderNumber`. Uma FATIA de faturamento pode ser de um
+  // veículo (`PER_TASK`, `config.taskId` preenchido) ou dos N (`JOINT`), e a
+  // linha responde pelo que a fatia cobre: o número daquele caminhão, ou a lista
+  // dos que a nota conjunta vai citar.
+  //
+  // Os valores vêm do FORMULÁRIO (`taskOrderNumbers`), não do registro salvo, para
+  // que o Resumo mostre o que acabou de ser digitado no passo do cliente — é a
+  // tela em que se confere antes de aprovar o faturamento.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "orderNumber");
+  const formOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? {}) as Record<string, string | null>;
+  const quoteVehicleIds = useMemo(
+    () => sortQuoteTasks(((task?.quote as any)?.tasks ?? []) as Array<{ id: string; createdAt?: any }>).map((t) => t.id),
+    [task],
+  );
+  const orderNumberForConfig = (config: any): string | null => {
+    const ids = config?.taskId
+      ? [config.taskId]
+      : quoteVehicleIds.length > 0
+        ? quoteVehicleIds
+        : Object.keys(formOrderNumbers);
+    return orderNumberLabel(ids.map((id) => ({ customerOrderNumber: formOrderNumbers[id] ?? null })));
+  };
   const attentionOrderNumberFor = (config: any): string =>
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+    orderNumberAttention?.active &&
+    config?.customerId === PINNED_CUSTOMERS.IBIPORA &&
+    config?.generateInvoice !== false &&
+    !orderNumberForConfig(config)
       ? attentionFieldClass(orderNumberAttention)
       : "";
 
@@ -813,15 +839,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       // rendered EMPTY and highlighted — a missing value with no DOM node is a
                       // signal with nothing to point at.
                       const attnCls = attentionOrderNumberFor(config);
-                      if (!config.orderNumber && !attnCls) return null;
+                      const orderNumberText = orderNumberForConfig(config);
+                      if (!orderNumberText && !attnCls) return null;
                       return (
                         <div
                           className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attnCls)}
                           title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
                         >
                           <span className="text-sm text-muted-foreground">N° do Pedido</span>
-                          <span className={cn("text-sm font-medium", !config.orderNumber && "text-muted-foreground")}>
-                            {config.orderNumber || "Pendente"}
+                          <span className={cn("text-sm font-medium", !orderNumberText && "text-muted-foreground")}>
+                            {orderNumberText || "Pendente"}
                           </span>
                         </div>
                       );

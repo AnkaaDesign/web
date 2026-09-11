@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
+import { useTaskDetail, useCurrentUser, useTaskMutations, useBatchUpdateTasks, taskKeys } from "@/hooks";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
@@ -22,7 +22,8 @@ import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
-import { quoteVehicleCount } from "@/utils/quote-tasks";
+import { quoteTasks, quoteVehicleCount, vehicleRowLabel } from "@/utils/quote-tasks";
+import type { PurchaseOrderVehicle } from "@/components/financial/shared/purchase-order-vehicles";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { readReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "@/components/ui/sonner";
@@ -117,6 +118,8 @@ const BillingDetailPageInner = () => {
 
   // Mutations
   const { updateAsync: updateTaskAsync } = useTaskMutations();
+  // `PUT /tasks/batch` — o pedido de compra de cada veículo do orçamento.
+  const { mutateAsync: batchUpdateTasksAsync } = useBatchUpdateTasks();
 
   // Fetch task with billing-related includes
   const { data: taskResponse, isLoading: isTaskLoading } = useTaskDetail(id!, {
@@ -139,6 +142,20 @@ const BillingDetailPageInner = () => {
         include: {
           services: true,
           layoutFiles: true,
+          // OS VEÍCULOS DO ORÇAMENTO. A tela é aberta por UM deles, mas o pedido
+          // de compra é de cada um (`Task.customerOrderNumber`) e a nota conjunta
+          // cita todos — sem esta lista o campo teria um único endereço possível,
+          // que é o defeito que a coluna por cliente tinha.
+          tasks: {
+            select: {
+              id: true,
+              name: true,
+              serialNumber: true,
+              createdAt: true,
+              customerOrderNumber: true,
+              truck: { select: { id: true, plate: true } },
+            },
+          },
           customerConfigs: {
             include: {
               customer: { include: { logo: true } },
@@ -163,6 +180,39 @@ const BillingDetailPageInner = () => {
   // Com `JOINT` é uma fatura para todos, e aprovar aqui aprova o conjunto — como
   // sempre foi.
   const quoteVehicles = quoteVehicleCount(quote);
+
+  /**
+   * OS VEÍCULOS do orçamento — a lista que o pedido de compra endereça.
+   *
+   * Recai na tarefa aberta quando o orçamento veio sem a relação: um orçamento de
+   * um veículo continua com um campo só, e nenhuma tela fica sem endereço.
+   */
+  const quoteVehicleRows = useMemo(() => {
+    const fromQuote = quoteTasks(quote as any) as Array<{
+      id: string;
+      name?: string | null;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null } | null;
+    }>;
+    if (fromQuote.length > 0) return fromQuote;
+    return task
+      ? [
+          {
+            id: task.id,
+            name: task.name,
+            serialNumber: task.serialNumber,
+            customerOrderNumber: task.customerOrderNumber ?? null,
+            truck: task.truck ? { plate: task.truck.plate } : null,
+          },
+        ]
+      : [];
+  }, [quote, task]);
+
+  const purchaseOrderVehicles: PurchaseOrderVehicle[] = useMemo(
+    () => quoteVehicleRows.map((t, i) => ({ key: t.id, label: vehicleRowLabel(t, i) })),
+    [quoteVehicleRows],
+  );
   const isPerVehicleBilling = quote?.billingSplit === "PER_TASK" && quoteVehicles > 1;
 
   // Attention: register this quote so its rules evaluate and honour their ack policy — the same
@@ -245,6 +295,11 @@ const BillingDetailPageInner = () => {
       total: 0,
       services: [] as any[],
       customerConfigs: [] as any[],
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, por VEÍCULO: `id da tarefa → número`.
+       * Ver `budget/details/[taskId].tsx` — o pedido é da ENTREGA, não do cliente.
+       */
+      taskOrderNumbers: {} as Record<string, string | null>,
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
@@ -328,6 +383,7 @@ const BillingDetailPageInner = () => {
         total: 0,
         services: [],
         customerConfigs: [],
+        taskOrderNumbers: {},
         guaranteeYears: null,
         customGuaranteeText: null,
         customForecastDays: null,
@@ -354,6 +410,10 @@ const BillingDetailPageInner = () => {
       customForecastDays: quote.customForecastDays ?? null,
       simultaneousTasks: quote.simultaneousTasks ?? null,
       layoutFileIds: (quote.layoutFiles || []).map((f: any) => f.id),
+      // Um por VEÍCULO — a tela é aberta por um caminhão e edita o orçamento dos N.
+      taskOrderNumbers: Object.fromEntries(
+        quoteVehicleRows.map((t) => [t.id, t.customerOrderNumber ?? null]),
+      ),
       // Sort by `position` explicitly: this page's custom `quote.include` replaces the
       // repository default that carried `orderBy: { position: "asc" }`, so the rows would
       // otherwise arrive in arbitrary DB order and defeat the drag-to-reorder step.
@@ -380,7 +440,6 @@ const BillingDetailPageInner = () => {
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
         generateBankSlip: config.generateBankSlip !== false,
-        orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
         // Contato do responsável escolhido para ESTE faturamento — é o que a emissão usa
         // quando o cadastro do cliente não tem telefone/e-mail, então o Resumo e a
@@ -808,7 +867,6 @@ const BillingDetailPageInner = () => {
               customPaymentText: c.customPaymentText || null,
               generateInvoice: c.generateInvoice !== false,
               generateBankSlip: c.generateBankSlip !== false,
-              orderNumber: c.orderNumber || null,
               responsibleId: c.responsibleId || null,
             })),
           };
@@ -833,22 +891,30 @@ const BillingDetailPageInner = () => {
 
       await taskQuoteService.update(quote.id, quotePayload);
 
-      // For locked quotes, orderNumber is stripped from the main payload to avoid the
-      // financial obligation guard. Update it separately via the dedicated endpoint.
-      if (isQuoteLocked) {
-        const originalConfigs: any[] = (quote as any).customerConfigs || [];
-        for (const config of formData.customerConfigs as any[]) {
-          const original = originalConfigs.find((c: any) => c.customerId === config.customerId);
-          const originalOrderNumber = original?.orderNumber ?? null;
-          const newOrderNumber = config.orderNumber || null;
-          if (originalOrderNumber !== newOrderNumber) {
-            await taskQuoteService.updateCustomerConfigOrderNumber(
-              quote.id,
-              config.customerId,
-              newOrderNumber,
-            );
-          }
-        }
+      // ═══════════════════════════════════════════════════════════════════════
+      // O PEDIDO DE COMPRA — ESCRITO NO VEÍCULO
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // `Task.customerOrderNumber`, um por caminhão. Por fora do orçamento de
+      // propósito: aqui o orçamento costuma estar TRAVADO (`BILLING_APPROVED` em
+      // diante) e a guarda de obrigação financeira recusa o corpo inteiro — mas o
+      // número do pedido é justamente o que ainda chega depois, quando o cliente
+      // manda o pedido de compra e a nota já está para sair.
+      //
+      // Só os veículos que MUDARAM viajam, e num `PUT /tasks/batch`: sessenta
+      // requisições soltas deixariam metade dos caminhões citando um pedido e
+      // metade outro, na mesma nota.
+      const orderNumbersForm = (formData.taskOrderNumbers ?? {}) as Record<string, string | null>;
+      const orderNumberUpdates = quoteVehicleRows
+        .map((vehicle) => {
+          const next = (orderNumbersForm[vehicle.id] ?? "").trim() || null;
+          const current = (vehicle.customerOrderNumber ?? "").trim() || null;
+          return next === current ? null : { id: vehicle.id, data: { customerOrderNumber: next } };
+        })
+        .filter((u): u is { id: string; data: { customerOrderNumber: string | null } } => u !== null);
+
+      if (orderNumberUpdates.length > 0) {
+        await batchUpdateTasksAsync({ tasks: orderNumberUpdates });
       }
 
       if (statusChanged) {
@@ -1157,6 +1223,7 @@ const BillingDetailPageInner = () => {
                         customer={cachedCustomer}
                         disabled={!canEdit}
                         quoteId={quote?.id}
+                        vehicles={purchaseOrderVehicles}
                       />
                     </div>
                   );
@@ -1233,6 +1300,8 @@ const BillingDetailPageInner = () => {
               customerConfigs={form.watch("customerConfigs")}
               services={form.watch("services")}
               nextNfseNumber={nextNfse?.nextNumber ?? null}
+              orderNumbersByTask={form.watch("taskOrderNumbers")}
+              quoteTaskIds={quoteVehicleRows.map((t) => t.id)}
               task={{
                 plate: form.watch("plate"),
                 serialNumber: form.watch("serialNumber"),

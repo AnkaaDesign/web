@@ -46,7 +46,7 @@ import {
 import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 import { Badge } from "@/components/ui/badge";
-import { sortQuoteTasks } from "@/utils/quote-tasks";
+import { orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -145,14 +145,44 @@ export function BudgetStepReview({
     return 1;
   }, [existingQuote, vehicleLabels]);
 
-  // Attention on the quote's `orderNumber`. `attentionOrderNumberFor` narrows the quote-wide
-  // signal to the one customer config it is actually about, and returns "" for every other config
-  // so nothing else on this screen changes.
+  // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
+  //
+  // Uma linha para o orçamento, não uma por cliente: o pedido mora em
+  // `Task.customerOrderNumber` e é da ENTREGA. Quando os N veículos citam o
+  // mesmo número — o caso comum — sai um número; quando diferem, sai a lista.
+  //
+  // A linha é renderizada VAZIA ("Pendente") quando uma regra a está cobrando:
+  // um valor que falta e não tem nó no DOM é um sinal sem para onde apontar.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
-  const attentionOrderNumberFor = (config: any): string =>
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+  const taskOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? {}) as Record<string, string | null>;
+  const orderNumberText = useMemo(
+    () => orderNumberLabel(Object.values(taskOrderNumbers).map((customerOrderNumber) => ({ customerOrderNumber }))),
+    [taskOrderNumbers],
+  );
+  const billsIbipora = (customerConfigs ?? []).some(
+    (c: any) => c?.customerId === PINNED_CUSTOMERS.IBIPORA && c?.generateInvoice !== false,
+  );
+  const orderNumberAttentionClass =
+    orderNumberAttention?.active && billsIbipora && !orderNumberText
       ? attentionFieldClass(orderNumberAttention)
       : "";
+  const purchaseOrderLine =
+    orderNumberText || orderNumberAttentionClass ? (
+      <div className="bg-muted/30 rounded-lg p-4">
+        <div
+          // O recuo é INCONDICIONAL: fazê-lo depender da classe de atenção movia a
+          // linha 8px para a direita no instante em que o anel aparecia, e de volta
+          // no instante em que o número era digitado.
+          className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", orderNumberAttentionClass)}
+          title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+        >
+          N° do Pedido:{" "}
+          <span className={cn("font-medium", orderNumberText ? "text-foreground" : "text-muted-foreground")}>
+            {orderNumberText || "Pendente"}
+          </span>
+        </div>
+      </div>
+    ) : null;
 
   // The cadastro half of the same story. The Faturamento Resumo has had this since the rule
   // landed; the Orçamento one did not — which is backwards, because
@@ -700,32 +730,19 @@ export function BudgetStepReview({
                     </div>
                   )}
 
-                  {(() => {
-                    // Normally shown only when filled. When a rule is asking for it, the line is
-                    // rendered EMPTY and highlighted — a missing value with no DOM node is a
-                    // signal with nothing to point at.
-                    const attnCls = attentionOrderNumberFor(config);
-                    if (!config.orderNumber && !attnCls) return null;
-                    return (
-                      <div
-                        // Padding is UNCONDITIONAL: making it depend on `attnCls` shifted the line 8px right the
-                        // moment the ring appeared, and back again the moment the number was typed.
-                        className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
-                        title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
-                      >
-                        N° do Pedido:{" "}
-                        <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
-                          {config.orderNumber || "Pendente"}
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
               );
             })}
           </div>
         );
       })()}
+
+      {/* ── O PEDIDO DE COMPRA, POR VEÍCULO ─────────────────────────────────────
+          Fora dos cartões de cliente de propósito: o pedido é da ENTREGA
+          (`Task.customerOrderNumber`), não do cliente. Num orçamento de dois
+          clientes ele aparecia duas vezes, com o mesmo valor, como se fossem
+          dois pedidos diferentes. */}
+      {purchaseOrderLine}
 
       {/* Single customer: payment conditions */}
       {Array.isArray(customerConfigs) &&
@@ -742,8 +759,7 @@ export function BudgetStepReview({
           });
           // `attentionOrderNumberFor` keeps the block alive when a rule is pointing at the missing
           // pedido — otherwise the whole card would be skipped and there would be nothing to blink.
-          const hasContent = paymentText || config.orderNumber || attentionOrderNumberFor(config);
-          if (!hasContent) return null;
+          if (!paymentText) return null;
           return (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
               {paymentText && (
@@ -755,24 +771,12 @@ export function BudgetStepReview({
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {(() => {
-                const attnCls = attentionOrderNumberFor(config);
-                if (!config.orderNumber && !attnCls) return null;
-                return (
-                  <div
-                    className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
-                    title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
-                  >
-                    N° do Pedido:{" "}
-                    <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
-                      {config.orderNumber || "Pendente"}
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
           );
         })()}
+
+      {/* O pedido de compra — uma linha para o orçamento inteiro. Ver acima. */}
+      {Array.isArray(customerConfigs) && customerConfigs.length === 1 && customerFilter === "all" && purchaseOrderLine}
 
       {/* Delivery Deadline */}
       {(customForecastDays || (simultaneousTasks && simultaneousTasks > 1)) && (

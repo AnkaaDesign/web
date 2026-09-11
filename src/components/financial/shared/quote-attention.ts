@@ -21,7 +21,29 @@ import type { TaskQuote } from "@/types/task-quote";
 // o defeito do "mesmo `quote.id` registrado N vezes" passou sem ser visto.
 export type AttentionQuoteEntity = Omit<TaskQuote, "task"> & {
   task: { id: string; status: string };
+  /**
+   * ALGUM VEÍCULO deste orçamento está sem número de pedido de compra.
+   *
+   * Derivado, e não um caminho de predicado dentro de `tasks`: o pedido mora em
+   * `Task.customerOrderNumber` — por VEÍCULO — e o espelho no servidor pergunta
+   * `tasks: { some: { customerOrderNumber: null } }`. Do lado do cliente as
+   * tarefas do orçamento chegam como LINHAS da lista, não como relação do
+   * orçamento, então a conjunção é feita aqui, uma vez, onde as linhas ainda
+   * estão todas à mão.
+   *
+   * ⚠️ Numa lista paginada as linhas podem ser um SUBCONJUNTO dos sessenta
+   * veículos. Um branco visível acende; um branco fora da página não — e é a
+   * contagem do servidor (que vê todos) que sustenta o número no menu. Antes
+   * disto a regra lia `customerConfigs[].orderNumber`, uma coluna que já não
+   * existe, e portanto NUNCA acendia.
+   */
+  anyVehicleMissingOrderNumber: boolean;
 };
+
+/** `Task.customerOrderNumber` em branco — nulo e string vazia são a mesma coisa. */
+function missingOrderNumber(task: { customerOrderNumber?: string | null }): boolean {
+  return !(task.customerOrderNumber ?? "").trim();
+}
 
 /**
  * Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped.
@@ -52,11 +74,18 @@ export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQ
     // Primeira linha do orçamento, ou a que troca um veículo não-concluído por
     // um concluído. Nunca o contrário: uma vez que o `some` está satisfeito,
     // nenhuma linha seguinte pode desfazê-lo.
+    // O pedido de compra é do VEÍCULO: a falta é de QUALQUER linha do orçamento,
+    // não só da que ganhou o desempate acima. Acumula antes do `continue`, senão
+    // um orçamento cujo veículo concluído TEM pedido esconderia os cinquenta e
+    // nove em branco.
+    const missing = (existing?.anyVehicleMissingOrderNumber ?? false) || missingOrderNumber(task);
+    if (existing) existing.anyVehicleMissingOrderNumber = missing;
     if (existing && existing.task.status === TASK_STATUS.COMPLETED) continue;
     if (existing && task.status !== TASK_STATUS.COMPLETED) continue;
     byQuoteId.set(quote.id, {
       ...(quote as TaskQuote),
       task: { id: task.id, status: task.status },
+      anyVehicleMissingOrderNumber: missing,
     });
   }
   return [...byQuoteId.values()];
@@ -65,7 +94,15 @@ export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQ
 /** Same shape for a single task on a detail page. */
 export function toAttentionQuoteEntity(task: Task | null | undefined): AttentionQuoteEntity | null {
   if (!task?.quote?.id) return null;
-  return { ...(task.quote as TaskQuote), task: { id: task.id, status: task.status } };
+  // Com a relação carregada, a pergunta é sobre os N veículos; sem ela, sobre o
+  // que a tela tem — a tarefa aberta.
+  const vehicles = ((task.quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  return {
+    ...(task.quote as TaskQuote),
+    task: { id: task.id, status: task.status },
+    anyVehicleMissingOrderNumber:
+      vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
+  };
 }
 
 /**
@@ -74,8 +111,16 @@ export function toAttentionQuoteEntity(task: Task | null | undefined): Attention
  */
 export function toAttentionQuoteEntityFromParts(
   quote: { id?: string } | null | undefined,
-  task: { id: string; status: string } | null | undefined,
+  task: { id: string; status: string; customerOrderNumber?: string | null } | null | undefined,
 ): AttentionQuoteEntity | null {
   if (!quote?.id || !task?.id) return null;
-  return { ...(quote as TaskQuote), task: { id: task.id, status: task.status } };
+  // O orçamento desta página vem com `tasks` (a lista de veículos); a tarefa
+  // aberta é o recuo quando ele ainda não existe.
+  const vehicles = ((quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  return {
+    ...(quote as TaskQuote),
+    task: { id: task.id, status: task.status },
+    anyVehicleMissingOrderNumber:
+      vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
+  };
 }

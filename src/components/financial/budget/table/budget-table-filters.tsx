@@ -34,8 +34,10 @@ const TASK_STATUS_OPTIONS = (Object.values(TASK_STATUS) as TASK_STATUS[]).map((v
  * Only what the columns render. Kept as a top-level `include` (not a bare `select`) so the API's
  * Decimal → number mapping runs and `quote.total` arrives as a number.
  *
- * `quote.id` + `customerConfigs.customerId/orderNumber` are here for the attention engine, not for
- * a column: registering the quotes is what lets a rule blink the row (see `rules.ts`).
+ * `quote.id` + `customerConfigs.customerId` are here for the attention engine, not for a column:
+ * registering the quotes is what lets a rule blink the row (see `rules.ts`). O número do pedido
+ * NÃO está aqui: ele é da TAREFA (`Task.customerOrderNumber`), e o `include` de topo já traz todo
+ * escalar da tarefa.
  */
 export const BUDGET_LIST_INCLUDE = {
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
@@ -58,7 +60,6 @@ export const BUDGET_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          orderNumber: true,
           // A tarefa desta fatia: com `PER_TASK` são sessenta configurações do
           // mesmo cliente, e a linha só fala pela dela.
           taskId: true,

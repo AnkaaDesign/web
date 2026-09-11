@@ -9,7 +9,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
-import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
+import { useTaskDetail, useTaskMutations, useBatchUpdateTasks, taskKeys } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -58,7 +58,8 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { quoteVehicleCount } from "@/utils/quote-tasks";
+import { quoteTasks, quoteVehicleCount, vehicleRowLabel } from "@/utils/quote-tasks";
+import type { PurchaseOrderVehicle } from "@/components/financial/shared/purchase-order-vehicles";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -129,10 +130,47 @@ const FinancialBudgetDetailPageInner = () => {
   const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
   const existingQuote = rawQuote?.id ? rawQuote : null;
 
+  /**
+   * OS VEÍCULOS DO ORÇAMENTO — a lista que o pedido de compra endereça.
+   *
+   * `quoteTasks` ordena pela mesma regra do `orderBy` da API (`createdAt`, `id`
+   * como desempate), então a tabela da tela e a do documento listam os caminhões
+   * na mesma ordem. Sem orçamento ainda (a tela abre para CRIAR um) a lista é a
+   * tarefa aberta: um veículo, um campo, como sempre foi.
+   */
+  const quoteVehicleRows = useMemo(() => {
+    const fromQuote = quoteTasks(existingQuote as any) as Array<{
+      id: string;
+      name?: string | null;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null } | null;
+    }>;
+    if (fromQuote.length > 0) return fromQuote;
+    return task
+      ? [
+          {
+            id: task.id,
+            name: task.name,
+            serialNumber: task.serialNumber,
+            customerOrderNumber: task.customerOrderNumber ?? null,
+            truck: task.truck ? { plate: task.truck.plate } : null,
+          },
+        ]
+      : [];
+  }, [existingQuote, task]);
+
+  const purchaseOrderVehicles: PurchaseOrderVehicle[] = useMemo(
+    () => quoteVehicleRows.map((t, i) => ({ key: t.id, label: vehicleRowLabel(t, i) })),
+    [quoteVehicleRows],
+  );
+
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
   const updateQuoteMutation = useUpdateTaskQuote();
   const { updateAsync: updateTaskAsync } = useTaskMutations();
+  // `PUT /tasks/batch` — os pedidos de compra dos OUTROS veículos do orçamento.
+  const { mutateAsync: batchUpdateTasksAsync } = useBatchUpdateTasks();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -261,6 +299,16 @@ const FinancialBudgetDetailPageInner = () => {
        * ficaria travado para sempre se este campo só existisse na criação.
        */
       billingSplit: "JOINT" as "JOINT" | "PER_TASK",
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, por VEÍCULO: `id da tarefa → número`.
+       *
+       * Morava em `customerConfigs[].orderNumber`, por CLIENTE, e a coluna já não
+       * existe — o pedido é por ENTREGA (`Task.customerOrderNumber`). Fica ao
+       * lado de `customerConfigs` e não dentro: um orçamento de dois clientes tem
+       * DUAS configurações e os mesmos N veículos, e aninhar faria a segunda
+       * cópia sobrescrever a primeira.
+       */
+      taskOrderNumbers: {} as Record<string, string | null>,
       customerConfigs: [] as any[],
       services: [
         {
@@ -322,7 +370,11 @@ const FinancialBudgetDetailPageInner = () => {
   // whether it was loaded here or there. Task and quote arrive from two separate queries on this
   // page, hence the "from parts" builder.
   const quoteAttentionEntity = useMemo(
-    () => toAttentionQuoteEntityFromParts(existingQuote, task ? { id: task.id, status: task.status } : null),
+    () =>
+      toAttentionQuoteEntityFromParts(
+        existingQuote,
+        task ? { id: task.id, status: task.status, customerOrderNumber: task.customerOrderNumber } : null,
+      ),
     [existingQuote, task],
   );
   // Deliberately gated on BOTH queries having landed. Task and quote load independently here, and
@@ -388,6 +440,9 @@ const FinancialBudgetDetailPageInner = () => {
         layoutFileIds: [],
         simultaneousTasks: null,
         billingSplit: "JOINT",
+        taskOrderNumbers: task.customerOrderNumber
+          ? { [task.id]: task.customerOrderNumber }
+          : {},
         customerConfigs: [],
         services: [
           {
@@ -418,6 +473,12 @@ const FinancialBudgetDetailPageInner = () => {
       simultaneousTasks: existingQuote.simultaneousTasks || null,
       billingSplit:
         ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK") || "JOINT",
+      // Um por VEÍCULO. `quoteTasks` recai na tarefa aberta quando o orçamento
+      // veio sem a relação — sem isso, abrir o detalhe de um orçamento de um
+      // veículo só mostraria o campo vazio e gravaria por cima do que existe.
+      taskOrderNumbers: Object.fromEntries(
+        quoteVehicleRows.map((t) => [t.id, t.customerOrderNumber ?? null]),
+      ),
       customerConfigs:
         existingQuote.customerConfigs?.map((c: any) => ({
           customerId: c.customerId || c.id,
@@ -433,7 +494,6 @@ const FinancialBudgetDetailPageInner = () => {
             c.generateInvoice !== undefined ? c.generateInvoice : true,
           generateBankSlip:
             c.generateBankSlip !== undefined ? c.generateBankSlip : true,
-          orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
           customerData: {
             corporateName: c.customer?.corporateName || "",
@@ -1232,11 +1292,50 @@ const FinancialBudgetDetailPageInner = () => {
         taskUpdateData.responsibleIds = existingRepIds;
       }
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // O PEDIDO DE COMPRA — ESCRITO NO VEÍCULO
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // `Task.customerOrderNumber`, um por caminhão. Só os que MUDARAM viajam:
+      // um orçamento de sessenta veículos salvo sem tocar no pedido não deve
+      // reescrever sessenta linhas (e encher sessenta históricos de alteração).
+      //
+      // Vai num `PUT /tasks/batch`, não numa requisição por veículo: sessenta
+      // requisições paralelas é o que fazia a criação deixar tarefas órfãs, e a
+      // metade que falha aqui deixaria metade dos caminhões citando um pedido e
+      // metade outro — na mesma nota.
+      const orderNumbersForm = (data.taskOrderNumbers ?? {}) as Record<string, string | null>;
+      const orderNumberUpdates = quoteVehicleRows
+        .map((vehicle) => {
+          const next = (orderNumbersForm[vehicle.id] ?? "").trim() || null;
+          const current = (vehicle.customerOrderNumber ?? "").trim() || null;
+          return next === current ? null : { id: vehicle.id, data: { customerOrderNumber: next } };
+        })
+        .filter((u): u is { id: string; data: { customerOrderNumber: string | null } } => u !== null);
+
+      // O veículo ABERTO entra na mesma escrita da tarefa, que já está de saída —
+      // evita uma segunda requisição no caso de um orçamento de um veículo só.
+      const openTaskOrderNumber = orderNumberUpdates.find((u) => u.id === taskId);
+      if (openTaskOrderNumber) {
+        taskUpdateData.customerOrderNumber = openTaskOrderNumber.data.customerOrderNumber;
+      }
+      const siblingOrderNumberUpdates = orderNumberUpdates.filter((u) => u.id !== taskId);
+
       // Only hit the task endpoint when something task-owned actually changed.
       // Skips a no-op write when the user only edited the quote half.
       if (Object.keys(taskUpdateData).length > 0) {
         try {
           await updateTaskAsync({ id: taskId, data: taskUpdateData });
+        } catch {
+          // Error toast is emitted by the axios error interceptor.
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      if (siblingOrderNumberUpdates.length > 0) {
+        try {
+          await batchUpdateTasksAsync({ tasks: siblingOrderNumberUpdates });
         } catch {
           // Error toast is emitted by the axios error interceptor.
           setIsSubmitting(false);
@@ -1701,6 +1800,7 @@ const FinancialBudgetDetailPageInner = () => {
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
                   quoteId={existingQuote?.id}
+                  vehicles={purchaseOrderVehicles}
                 />
               </div>
             );

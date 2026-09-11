@@ -48,7 +48,7 @@ const TASK_STATUS_SCOPE_OPTIONS = [
  * Only what the columns render. Top-level `include` (not a bare `select`) so the API's
  * Decimal → number mapping runs and `quote.total` arrives as a number.
  *
- * `quote.id` and `customerConfigs.customerId/orderNumber` are here for the attention engine rather
+ * `quote.id` and `customerConfigs.customerId` are here for the attention engine rather
  * than for a column: the list registers each quote so a rule can blink its row (see `rules.ts`).
  */
 export const BILLING_LIST_INCLUDE = {
@@ -75,7 +75,6 @@ export const BILLING_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          orderNumber: true,
           // A TAREFA desta fatia (nulo = fatia conjunta) e QUANDO ela foi
           // faturada. Sem as duas, a linha do caminhão 12 mostrava as sessenta
           // fatias do orçamento e lia a aprovação do orçamento inteiro — que só

@@ -3,6 +3,7 @@ import { TASK_OBSERVATION_TYPE_LABELS, TASK_STATUS_LABELS } from "../constants";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
+import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
 
 /**
  * Resolve where to send a user when they "edit" a task's quote (commercial
@@ -186,12 +187,16 @@ export function formatTaskSummary(task: Task): string {
 }
 
 /**
- * Calculate task price from quote total (only BUDGET_APPROVED or later quote)
+ * Calculate task price from quote total (only BUDGET_APPROVED or later quote).
+ *
+ * A FATIA DESTE VEÍCULO. `TaskQuote.total` é o valor do CONTRATO (`preço por
+ * veículo × N`) desde que um orçamento passou a cobrir N caminhões — devolver o
+ * total aqui daria o valor dos sessenta para cada um deles.
  */
 export function calculateTaskPrice(task: Task): number {
   if (!task.quote) return 0;
   if (task.quote.status === 'PENDING') return 0;
-  return task.quote.total || 0;
+  return perVehicleAmount(task.quote.total, quoteVehicleCount(task.quote));
 }
 
 /**

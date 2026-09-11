@@ -19,6 +19,7 @@ import {
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
+import { PurchaseOrderVehicles, type PurchaseOrderVehicle } from "@/components/financial/shared/purchase-order-vehicles";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { cn } from "@/lib/utils";
@@ -60,9 +61,14 @@ interface BillingStepCustomerProps {
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
   quoteId?: string;
+  /**
+   * Os VEÍCULOS do orçamento, para o pedido de compra — que é do veículo
+   * (`Task.customerOrderNumber`), não do cliente. Ver `purchase-order-vehicles`.
+   */
+  vehicles?: PurchaseOrderVehicle[];
 }
 
-export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }: BillingStepCustomerProps) {
+export function BillingStepCustomer({ configIndex, customer, disabled, quoteId, vehicles = [] }: BillingStepCustomerProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
   // useWatch returns undefined on the very first render (before subscription fires);
   // fall back to getValues() which reads the form store synchronously.
@@ -100,13 +106,26 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
+  // ── O PEDIDO DE COMPRA, POR VEÍCULO ────────────────────────────────────────
+  // Ver `budget-step-customer-payment.tsx`: mapa irmão de `customerConfigs`, e o
+  // bloco só no primeiro cliente porque o pedido é da entrega, não do cliente.
+  const taskOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? getValues("taskOrderNumbers") ?? {}) as Record<string, string | null>;
+  const setTaskOrderNumber = useCallback(
+    (key: string, value: string | null) => {
+      const current = (getValues("taskOrderNumbers") ?? {}) as Record<string, string | null>;
+      setFormValue("taskOrderNumbers", { ...current, [key]: value }, { shouldDirty: true });
+    },
+    [getValues, setFormValue],
+  );
+  const showPurchaseOrders = configIndex === 0 && vehicles.length > 0;
+
   // Attention: `task-quote.ibipora-missing-order-number` targets the field `orderNumber` on the
   // QUOTE, so a multi-customer quote shares one address across all of its customer steps. Narrow
   // it to the config the rule is actually about — otherwise the other customer's N° do Pedido,
   // which nobody is waiting on, would blink too.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", quoteId, "orderNumber");
   const orderNumberAttentionClass =
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA
       ? attentionFieldClass(orderNumberAttention)
       : "";
 
@@ -500,18 +519,16 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
                 <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
-            <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm font-medium">N° do Pedido</Label>
-              <Input
-                type="natural"
-                value={config?.orderNumber ? (parseInt(config.orderNumber.replace(/\D/g, ''), 10) || undefined) : undefined}
-                onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
-                placeholder="Ex: 12345"
+            {showPurchaseOrders && (
+              <PurchaseOrderVehicles
+                vehicles={vehicles}
+                values={taskOrderNumbers}
+                onChange={setTaskOrderNumber}
                 disabled={disabled}
-                className={orderNumberAttentionClass}
-                title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+                attentionClass={orderNumberAttentionClass}
+                attentionTitle={orderNumberAttention?.match.rule.name}
               />
-            </div>
+            )}
             {/* ── Condição de Pagamento (type) ── */}
             <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">

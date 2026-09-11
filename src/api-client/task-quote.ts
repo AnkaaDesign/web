@@ -61,6 +61,11 @@ export const taskQuoteService = {
   cancel: (id: string) => apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING' }),
 
   // Update just the orderNumber on a customerConfig — safe to call on locked quotes
+  /**
+   * @deprecated O número do pedido é do VEÍCULO (`Task.customerOrderNumber`).
+   * Esta rota grava o mesmo número em TODAS as tarefas do orçamento. Para editar
+   * o pedido de um caminhão use `PUT /tasks/:id` (ou `PUT /tasks/batch`).
+   */
   updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
     apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
 

@@ -484,6 +484,12 @@ describe("resolution", () => {
 // Regression cover for `task-quote.ibipora-missing-order-number` — the first rule that requires
 // a COMPLETED task (so it must NOT go through `whileInFlight`) and the first that quantifies over
 // a to-many relation (`some` over customerConfigs).
+//
+// O PEDIDO DE COMPRA É DO VEÍCULO (`Task.customerOrderNumber`) desde que um
+// orçamento passou a cobrir N caminhões. A regra virou duas condições irmãs —
+// existe fatia da Ibiporã que emite nota, E existe veículo sem pedido —, e a
+// segunda chega ao motor como `anyVehicleMissingOrderNumber`, derivado em
+// `quote-attention.ts` a partir das linhas do orçamento.
 describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
   const OTHER_CUSTOMER = "11111111-1111-1111-1111-111111111111";
 
@@ -494,9 +500,10 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     // narrowing is what removed eleven long-settled Ibiporã quotes from the Faturamento list.
     status: TASK_QUOTE_STATUS.BUDGET_APPROVED,
     task: { id: "task-9", status: TASK_STATUS.COMPLETED },
+    anyVehicleMissingOrderNumber: true,
     customerConfigs: [
-      { id: "cfg-other", customerId: OTHER_CUSTOMER, orderNumber: null, generateInvoice: true },
-      { id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: null, generateInvoice: true },
+      { id: "cfg-other", customerId: OTHER_CUSTOMER, generateInvoice: true },
+      { id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, generateInvoice: true },
     ],
     ...over,
   });
@@ -513,33 +520,43 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
-  it("treats an empty-string order number as missing", async () => {
-    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: "", generateInvoice: true }] })]);
+  it("stops the moment every vehicle has a number", async () => {
+    setEntities("TASK_QUOTE", [quote({ anyVehicleMissingOrderNumber: false })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  // Um orçamento de sessenta caminhões: o veículo concluído TEM pedido e os
+  // outros cinquenta e nove estão em branco. A nota de cada um sai sem o pedido
+  // que a Ibiporã exige, então a regra acende.
+  it("fires when only some of the vehicles have a number", async () => {
+    setEntities("TASK_QUOTE", [quote({ anyVehicleMissingOrderNumber: true })]);
     await settle();
     expect(field("TASK_QUOTE", "quote-1", "orderNumber")).toEqual(ARMED);
   });
 
-  it("stops the moment the number is filled in", async () => {
-    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: "12345", generateInvoice: true }] })]);
-    await settle();
-    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
-  });
-
   it("ignores another customer's missing order number", async () => {
-    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-other", customerId: OTHER_CUSTOMER, orderNumber: null, generateInvoice: true }] })]);
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-other", customerId: OTHER_CUSTOMER, generateInvoice: true }] })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
-  it("does not fire when the config was selected without orderNumber", async () => {
-    // The `notNull id` guard inside the `some`. `isNull` cannot tell "the column is empty" from
-    // "this key was never selected", so without the guard a select that forgot `orderNumber` would
-    // light up EVERY finished Ibiporã quote. A config with no `id` is by definition one the query
-    // did not select properly, so it must count as no evidence rather than as a missing number.
+  it("does not fire when the config was selected without an id", async () => {
+    // The `notNull id` guard inside the `some`. A config with no `id` is by definition one the
+    // query did not select properly, so it must count as no evidence rather than as a hit.
     setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ customerId: PINNED_CUSTOMERS.IBIPORA, generateInvoice: true }] })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
     expect(field("TASK_QUOTE", "quote-1", "orderNumber")).toBeNull();
+  });
+
+  // `anyVehicleMissingOrderNumber` ausente é "ninguém perguntou", não "está tudo
+  // preenchido" — e `isTrue` responde falso, que é a direção segura: a contagem
+  // do servidor, que vê os sessenta veículos, continua sustentando o menu.
+  it("does not fire when the flag was not derived", async () => {
+    setEntities("TASK_QUOTE", [quote({ anyVehicleMissingOrderNumber: undefined })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
   it("does not fire when customerConfigs was left out of the include", async () => {
@@ -573,7 +590,7 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
   it("stays silent when Ibiporã's config will not produce a nota", async () => {
     // No invoice means nowhere to print the pedido de compra.
     setEntities("TASK_QUOTE", [
-      quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: null, generateInvoice: false }] }),
+      quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, generateInvoice: false }] }),
     ]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
