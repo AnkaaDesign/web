@@ -9,7 +9,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
-import { useTaskDetail, useTaskMutations, useBatchUpdateTasks, taskKeys } from "@/hooks";
+import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -58,8 +58,7 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { quoteTasks, quoteVehicleCount, vehicleRowLabel } from "@/utils/quote-tasks";
-import type { PurchaseOrderVehicle } from "@/components/financial/shared/purchase-order-vehicles";
+import { quoteVehicleCount } from "@/utils/quote-tasks";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -130,47 +129,10 @@ const FinancialBudgetDetailPageInner = () => {
   const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
   const existingQuote = rawQuote?.id ? rawQuote : null;
 
-  /**
-   * OS VEÍCULOS DO ORÇAMENTO — a lista que o pedido de compra endereça.
-   *
-   * `quoteTasks` ordena pela mesma regra do `orderBy` da API (`createdAt`, `id`
-   * como desempate), então a tabela da tela e a do documento listam os caminhões
-   * na mesma ordem. Sem orçamento ainda (a tela abre para CRIAR um) a lista é a
-   * tarefa aberta: um veículo, um campo, como sempre foi.
-   */
-  const quoteVehicleRows = useMemo(() => {
-    const fromQuote = quoteTasks(existingQuote as any) as Array<{
-      id: string;
-      name?: string | null;
-      serialNumber?: string | null;
-      customerOrderNumber?: string | null;
-      truck?: { plate?: string | null } | null;
-    }>;
-    if (fromQuote.length > 0) return fromQuote;
-    return task
-      ? [
-          {
-            id: task.id,
-            name: task.name,
-            serialNumber: task.serialNumber,
-            customerOrderNumber: task.customerOrderNumber ?? null,
-            truck: task.truck ? { plate: task.truck.plate } : null,
-          },
-        ]
-      : [];
-  }, [existingQuote, task]);
-
-  const purchaseOrderVehicles: PurchaseOrderVehicle[] = useMemo(
-    () => quoteVehicleRows.map((t, i) => ({ key: t.id, label: vehicleRowLabel(t, i) })),
-    [quoteVehicleRows],
-  );
-
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
   const updateQuoteMutation = useUpdateTaskQuote();
   const { updateAsync: updateTaskAsync } = useTaskMutations();
-  // `PUT /tasks/batch` — os pedidos de compra dos OUTROS veículos do orçamento.
-  const { mutateAsync: batchUpdateTasksAsync } = useBatchUpdateTasks();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -264,6 +226,16 @@ const FinancialBudgetDetailPageInner = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, DESTE veículo
+       * (`Task.customerOrderNumber`).
+       *
+       * Irmão da placa e da série, e no mesmo passo que elas: o pedido
+       * identifica a ENTREGA. Aqui ele é só deste caminhão — é assim que se
+       * corrige um dos quatro sem tocar nos outros três. Na CRIAÇÃO o campo
+       * equivalente vale para todos os que nascerem de uma vez.
+       */
+      customerOrderNumber: null as string | null,
       // Foto da plaqueta (VIN). `null` é o valor EXPLÍCITO de "removida" — `undefined` faria a
       // API pular o campo e a foto antiga sobreviveria a uma remoção.
       vinPlateId: null as string | null,
@@ -299,16 +271,6 @@ const FinancialBudgetDetailPageInner = () => {
        * ficaria travado para sempre se este campo só existisse na criação.
        */
       billingSplit: "JOINT" as "JOINT" | "PER_TASK",
-      /**
-       * O PEDIDO DE COMPRA DO CLIENTE, por VEÍCULO: `id da tarefa → número`.
-       *
-       * Morava em `customerConfigs[].orderNumber`, por CLIENTE, e a coluna já não
-       * existe — o pedido é por ENTREGA (`Task.customerOrderNumber`). Fica ao
-       * lado de `customerConfigs` e não dentro: um orçamento de dois clientes tem
-       * DUAS configurações e os mesmos N veículos, e aninhar faria a segunda
-       * cópia sobrescrever a primeira.
-       */
-      taskOrderNumbers: {} as Record<string, string | null>,
       customerConfigs: [] as any[],
       services: [
         {
@@ -412,6 +374,8 @@ const FinancialBudgetDetailPageInner = () => {
       customerId: task.customerId || "",
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
+      // O pedido de compra DESTE veículo — ver os defaults do formulário.
+      customerOrderNumber: task.customerOrderNumber || null,
       chassisNumber: task.truck?.chassisNumber || "",
       vinPlateId: (task.truck as any)?.vinPlateId || null,
       category: task.truck?.category || "",
@@ -440,9 +404,6 @@ const FinancialBudgetDetailPageInner = () => {
         layoutFileIds: [],
         simultaneousTasks: null,
         billingSplit: "JOINT",
-        taskOrderNumbers: task.customerOrderNumber
-          ? { [task.id]: task.customerOrderNumber }
-          : {},
         customerConfigs: [],
         services: [
           {
@@ -473,12 +434,6 @@ const FinancialBudgetDetailPageInner = () => {
       simultaneousTasks: existingQuote.simultaneousTasks || null,
       billingSplit:
         ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK") || "JOINT",
-      // Um por VEÍCULO. `quoteTasks` recai na tarefa aberta quando o orçamento
-      // veio sem a relação — sem isso, abrir o detalhe de um orçamento de um
-      // veículo só mostraria o campo vazio e gravaria por cima do que existe.
-      taskOrderNumbers: Object.fromEntries(
-        quoteVehicleRows.map((t) => [t.id, t.customerOrderNumber ?? null]),
-      ),
       customerConfigs:
         existingQuote.customerConfigs?.map((c: any) => ({
           customerId: c.customerId || c.id,
@@ -1293,33 +1248,21 @@ const FinancialBudgetDetailPageInner = () => {
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // O PEDIDO DE COMPRA — ESCRITO NO VEÍCULO
+      // O PEDIDO DE COMPRA — DESTE VEÍCULO
       // ═══════════════════════════════════════════════════════════════════════
       //
-      // `Task.customerOrderNumber`, um por caminhão. Só os que MUDARAM viajam:
-      // um orçamento de sessenta veículos salvo sem tocar no pedido não deve
-      // reescrever sessenta linhas (e encher sessenta históricos de alteração).
+      // `Task.customerOrderNumber`, e só o do caminhão ABERTO: num orçamento de
+      // quatro veículos, quem entra pelo segundo corrige o segundo. Os irmãos se
+      // editam abrindo o orçamento (ou a tarefa) de cada um — foi na CRIAÇÃO que
+      // um número valeu para todos.
       //
-      // Vai num `PUT /tasks/batch`, não numa requisição por veículo: sessenta
-      // requisições paralelas é o que fazia a criação deixar tarefas órfãs, e a
-      // metade que falha aqui deixaria metade dos caminhões citando um pedido e
-      // metade outro — na mesma nota.
-      const orderNumbersForm = (data.taskOrderNumbers ?? {}) as Record<string, string | null>;
-      const orderNumberUpdates = quoteVehicleRows
-        .map((vehicle) => {
-          const next = (orderNumbersForm[vehicle.id] ?? "").trim() || null;
-          const current = (vehicle.customerOrderNumber ?? "").trim() || null;
-          return next === current ? null : { id: vehicle.id, data: { customerOrderNumber: next } };
-        })
-        .filter((u): u is { id: string; data: { customerOrderNumber: string | null } } => u !== null);
-
-      // O veículo ABERTO entra na mesma escrita da tarefa, que já está de saída —
-      // evita uma segunda requisição no caso de um orçamento de um veículo só.
-      const openTaskOrderNumber = orderNumberUpdates.find((u) => u.id === taskId);
-      if (openTaskOrderNumber) {
-        taskUpdateData.customerOrderNumber = openTaskOrderNumber.data.customerOrderNumber;
+      // Enviado sempre que MUDOU, inclusive vazio (`null`): limpar o campo tem de
+      // persistir, não deixar o número antigo de pé num pedido cancelado.
+      const nextOrderNumber = (data.customerOrderNumber ?? "").trim() || null;
+      const savedOrderNumber = (task?.customerOrderNumber ?? "").trim() || null;
+      if (nextOrderNumber !== savedOrderNumber) {
+        taskUpdateData.customerOrderNumber = nextOrderNumber;
       }
-      const siblingOrderNumberUpdates = orderNumberUpdates.filter((u) => u.id !== taskId);
 
       // Only hit the task endpoint when something task-owned actually changed.
       // Skips a no-op write when the user only edited the quote half.
@@ -1333,15 +1276,6 @@ const FinancialBudgetDetailPageInner = () => {
         }
       }
 
-      if (siblingOrderNumberUpdates.length > 0) {
-        try {
-          await batchUpdateTasksAsync({ tasks: siblingOrderNumberUpdates });
-        } catch {
-          // Error toast is emitted by the axios error interceptor.
-          setIsSubmitting(false);
-          return;
-        }
-      }
 
       // 5. Update customer data (address, CNPJ, etc.)
       for (const config of data.customerConfigs || []) {
@@ -1752,6 +1686,7 @@ const FinancialBudgetDetailPageInner = () => {
               onLayoutStatusChange={handleLayoutStatusChange}
               vinPlateFiles={vinPlateFiles}
               onVinPlateFilesChange={handleVinPlateFilesChange}
+              quoteVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : 1}
             />
           </div>
 
@@ -1800,7 +1735,6 @@ const FinancialBudgetDetailPageInner = () => {
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
                   quoteId={existingQuote?.id}
-                  vehicles={purchaseOrderVehicles}
                 />
               </div>
             );

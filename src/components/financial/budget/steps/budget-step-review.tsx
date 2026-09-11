@@ -154,11 +154,15 @@ export function BudgetStepReview({
   // A linha é renderizada VAZIA ("Pendente") quando uma regra a está cobrando:
   // um valor que falta e não tem nó no DOM é um sinal sem para onde apontar.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
-  const taskOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? {}) as Record<string, string | null>;
-  const orderNumberText = useMemo(
-    () => orderNumberLabel(Object.values(taskOrderNumbers).map((customerOrderNumber) => ({ customerOrderNumber }))),
-    [taskOrderNumbers],
-  );
+  // O que está no CAMPO é o do veículo aberto (ou, na criação, o de todos os que
+  // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
+  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
+  const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
+  const orderNumberText = useMemo(() => {
+    const siblings = ((existingQuote?.tasks ?? []) as Array<{ id: string; customerOrderNumber?: string | null }>)
+      .filter((t) => t.id !== openTaskId);
+    return orderNumberLabel([{ customerOrderNumber: formOrderNumber ?? null }, ...siblings]);
+  }, [formOrderNumber, existingQuote, openTaskId]);
   const billsIbipora = (customerConfigs ?? []).some(
     (c: any) => c?.customerId === PINNED_CUSTOMERS.IBIPORA && c?.generateInvoice !== false,
   );

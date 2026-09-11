@@ -19,9 +19,7 @@ import {
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
-import { PurchaseOrderVehicles, type PurchaseOrderVehicle } from "@/components/financial/shared/purchase-order-vehicles";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
-import { PINNED_CUSTOMERS } from "@/config/company";
 import { cn } from "@/lib/utils";
 
 const STREET_TYPE_OPTIONS = [
@@ -61,15 +59,6 @@ interface BudgetStepCustomerPaymentProps {
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
   quoteId?: string;
-  /**
-   * Os VEÍCULOS do orçamento, para o pedido de compra.
-   *
-   * O pedido é do veículo (`Task.customerOrderNumber`), não do cliente — então o
-   * bloco aparece UMA vez, no primeiro cliente, e não uma por passo de cliente.
-   * Quem monta a lista é a página: no detalhe são as tarefas do orçamento, na
-   * criação é o produto cartesiano de placas × números de série.
-   */
-  vehicles?: PurchaseOrderVehicle[];
 }
 
 export function BudgetStepCustomerPayment({
@@ -77,9 +66,8 @@ export function BudgetStepCustomerPayment({
   customer,
   disabled,
   quoteId,
-  vehicles = [],
 }: BudgetStepCustomerPaymentProps) {
-  const { control, setValue: setFormValue, getValues: getFormValues } = useFormContext();
+  const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
   const customerData = config?.customerData || {};
 
@@ -128,33 +116,12 @@ export function BudgetStepCustomerPayment({
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
-  // ── O PEDIDO DE COMPRA, POR VEÍCULO ────────────────────────────────────────
-  //
-  // `taskOrderNumbers` é um mapa chave-do-veículo → número, irmão de
-  // `customerConfigs` no formulário. Não vive DENTRO da configuração de cliente
-  // porque o pedido não é do cliente: é da entrega. Por isso o bloco só aparece
-  // no primeiro cliente — em um orçamento de dois clientes ele apareceria duas
-  // vezes, com as mesmas sessenta linhas, e a segunda cópia sobrescreveria a
-  // primeira sem que ninguém notasse.
-  const taskOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? {}) as Record<string, string | null>;
-  const setTaskOrderNumber = useCallback(
-    (key: string, value: string | null) => {
-      const current = (getFormValues("taskOrderNumbers") ?? {}) as Record<string, string | null>;
-      setFormValue("taskOrderNumbers", { ...current, [key]: value }, { shouldDirty: true });
-    },
-    [getFormValues, setFormValue],
-  );
-  const showPurchaseOrders = configIndex === 0 && vehicles.length > 0;
-
-  // Attention: `task-quote.ibipora-missing-order-number` targets the field `orderNumber` on the
-  // QUOTE, so a multi-customer quote shares one address across all of its customer steps. Narrow
-  // it to the config the rule is actually about — otherwise the other customer's N° do Pedido,
-  // which nobody is waiting on, would blink too.
-  const orderNumberAttention = useAttentionField("TASK_QUOTE", quoteId, "orderNumber");
-  const orderNumberAttentionClass =
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA
-      ? attentionFieldClass(orderNumberAttention)
-      : "";
+  // O N° DO PEDIDO NÃO MORA MAIS AQUI. Ele é da ENTREGA
+  // (`Task.customerOrderNumber`), não do cliente, e vive no passo 1, ao lado da
+  // placa e do número de série: na criação um valor para os N veículos que vão
+  // nascer, e depois um por caminhão, editável abrindo a tarefa (ou o orçamento
+  // por ela). Aqui o campo aparecia uma vez POR CLIENTE, e num orçamento de dois
+  // clientes a segunda cópia sobrescrevia a primeira sem que ninguém notasse.
 
   // Attention: `task-quote.billing-customer-incomplete`. Identical narrowing to the Faturamento
   // step (see `billing-step-customer.tsx`) — one address for the whole cadastro, painted only on
@@ -567,16 +534,6 @@ export function BudgetStepCustomerPayment({
                 <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
-            {showPurchaseOrders && (
-              <PurchaseOrderVehicles
-                vehicles={vehicles}
-                values={taskOrderNumbers}
-                onChange={setTaskOrderNumber}
-                disabled={disabled}
-                attentionClass={orderNumberAttentionClass}
-                attentionTitle={orderNumberAttention?.match.rule.name}
-              />
-            )}
             {/* ── Condição de Pagamento (type) ── */}
             <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">Condição de Pagamento</Label>

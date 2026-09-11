@@ -42,6 +42,11 @@ interface BillingStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
+  /**
+   * Quantos veículos o orçamento cobre — ver `budget-step-task.tsx`: com N, o
+   * N° do Pedido deste passo é o DESTE caminhão, e a tela tem de dizer isso.
+   */
+  quoteVehicleCount?: number;
 }
 
 export function BillingStepTask({
@@ -50,6 +55,7 @@ export function BillingStepTask({
   initialCustomer,
   vinPlateFiles,
   onVinPlateFilesChange,
+  quoteVehicleCount = 1,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -193,6 +199,44 @@ export function BillingStepTask({
                       onChange={(value) => field.onChange(value ? String(value) : "")}
                       disabled={disabled}
                       className="uppercase bg-transparent"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* N° DO PEDIDO — o pedido de compra do cliente, DESTE veículo
+                (`Task.customerOrderNumber`). Junto da série e da placa porque é
+                disso que ele é irmão: identifica a ENTREGA. Morava na
+                configuração de faturamento, por CLIENTE, e isso obrigava os N
+                caminhões de um orçamento a citarem o mesmo número na nota e no
+                boleto. Aqui o campo é só deste caminhão — os irmãos se editam
+                abrindo cada um. */}
+            <FormField
+              control={control}
+              name="customerOrderNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconHash className="h-4 w-4" />
+                    N° do Pedido
+                    {quoteVehicleCount > 1 && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (somente este veículo)
+                      </span>
+                    )}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      value={field.value || ""}
+                      onChange={(value) =>
+                        field.onChange(value === null || value === "" ? null : String(value))
+                      }
+                      placeholder="Ex: 12345"
+                      maxLength={100}
+                      disabled={disabled}
+                      className="bg-transparent"
                     />
                   </FormControl>
                   <FormMessage />

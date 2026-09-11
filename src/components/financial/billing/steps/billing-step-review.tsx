@@ -169,22 +169,36 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // linha responde pelo que a fatia cobre: o número daquele caminhão, ou a lista
   // dos que a nota conjunta vai citar.
   //
-  // Os valores vêm do FORMULÁRIO (`taskOrderNumbers`), não do registro salvo, para
-  // que o Resumo mostre o que acabou de ser digitado no passo do cliente — é a
-  // tela em que se confere antes de aprovar o faturamento.
+  // O valor do veículo ABERTO vem do FORMULÁRIO — é o que acabou de ser digitado
+  // no passo Tarefa, e esta é a tela em que se confere antes de aprovar o
+  // faturamento. Os IRMÃOS vêm do registro: eles se editam abrindo cada um.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "orderNumber");
-  const formOrderNumbers = (useWatch({ control, name: "taskOrderNumbers" }) ?? {}) as Record<string, string | null>;
-  const quoteVehicleIds = useMemo(
-    () => sortQuoteTasks(((task?.quote as any)?.tasks ?? []) as Array<{ id: string; createdAt?: any }>).map((t) => t.id),
+  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
+  const quoteVehicles = useMemo(
+    () =>
+      sortQuoteTasks(
+        ((task?.quote as any)?.tasks ?? []) as Array<{
+          id: string;
+          createdAt?: any;
+          customerOrderNumber?: string | null;
+        }>,
+      ),
     [task],
   );
+  const orderNumberOf = (id: string | null | undefined): string | null => {
+    if (id && id === task?.id) return (formOrderNumber ?? "").trim() || null;
+    const found = quoteVehicles.find((t) => t.id === id);
+    return (found?.customerOrderNumber ?? "").trim() || null;
+  };
   const orderNumberForConfig = (config: any): string | null => {
-    const ids = config?.taskId
+    // Uma fatia `PER_TASK` cobre UM veículo e cita o pedido dele; uma `JOINT`
+    // cobre os N e cita todos, como a nota conjunta faz.
+    const ids: Array<string | null | undefined> = config?.taskId
       ? [config.taskId]
-      : quoteVehicleIds.length > 0
-        ? quoteVehicleIds
-        : Object.keys(formOrderNumbers);
-    return orderNumberLabel(ids.map((id) => ({ customerOrderNumber: formOrderNumbers[id] ?? null })));
+      : quoteVehicles.length > 0
+        ? quoteVehicles.map((t) => t.id)
+        : [task?.id];
+    return orderNumberLabel(ids.map((id) => ({ customerOrderNumber: orderNumberOf(id) })));
   };
   const attentionOrderNumberFor = (config: any): string =>
     orderNumberAttention?.active &&
