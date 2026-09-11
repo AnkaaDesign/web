@@ -1185,7 +1185,6 @@ const BillingDetailPageInner = () => {
                     initialCustomer={task?.customer}
                     vinPlateFiles={vinPlateFiles}
                     onVinPlateFilesChange={handleVinPlateFilesChange}
-                    quoteVehicleCount={quoteVehicles}
                   />
                 </div>
 

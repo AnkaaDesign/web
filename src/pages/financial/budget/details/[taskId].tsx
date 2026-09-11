@@ -1708,7 +1708,6 @@ const FinancialBudgetDetailPageInner = () => {
               onLayoutStatusChange={handleLayoutStatusChange}
               vinPlateFiles={vinPlateFiles}
               onVinPlateFilesChange={handleVinPlateFilesChange}
-              quoteVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : 1}
             />
           </div>
 

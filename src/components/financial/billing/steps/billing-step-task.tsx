@@ -42,11 +42,6 @@ interface BillingStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
-  /**
-   * Quantos veículos o orçamento cobre — ver `budget-step-task.tsx`: com N, o
-   * N° do Pedido deste passo é o DESTE caminhão, e a tela tem de dizer isso.
-   */
-  quoteVehicleCount?: number;
 }
 
 export function BillingStepTask({
@@ -55,7 +50,6 @@ export function BillingStepTask({
   initialCustomer,
   vinPlateFiles,
   onVinPlateFilesChange,
-  quoteVehicleCount = 1,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -227,11 +221,6 @@ export function BillingStepTask({
                   <FormLabel className="flex items-center gap-2">
                     <IconHash className="h-4 w-4" />
                     N° do Pedido
-                    {quoteVehicleCount > 1 && (
-                      <span className="text-xs font-normal text-muted-foreground">
-                        (somente este veículo)
-                      </span>
-                    )}
                   </FormLabel>
                   <FormControl>
                     <Input

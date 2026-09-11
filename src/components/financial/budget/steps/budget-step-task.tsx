@@ -58,15 +58,6 @@ interface BudgetStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. Edit mode only. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
-  /**
-   * Quantos veículos o orçamento ABERTO cobre (modo edição).
-   *
-   * Serve a um aviso só, e a um que evita um estrago: com N veículos, o N° do
-   * Pedido deste passo é o DESTE caminhão. Sem dizer isso, quem abre um
-   * orçamento de quatro pelo segundo digita o número achando que vale para os
-   * quatro — e descobre na nota fiscal dos outros três que não valeu.
-   */
-  quoteVehicleCount?: number;
 }
 
 export function BudgetStepTask({
@@ -83,7 +74,6 @@ export function BudgetStepTask({
   onPaintCreated,
   vinPlateFiles,
   onVinPlateFilesChange,
-  quoteVehicleCount = 1,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -292,11 +282,6 @@ export function BudgetStepTask({
                           <FormLabel className="flex items-center gap-2">
                             <IconHash className="h-4 w-4" />
                             N° do Pedido
-                            {quoteVehicleCount > 1 && (
-                              <span className="text-xs font-normal text-muted-foreground">
-                                (somente este veículo)
-                              </span>
-                            )}
                           </FormLabel>
                           <FormControl>
                             <Input
