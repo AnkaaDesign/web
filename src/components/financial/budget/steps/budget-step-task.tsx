@@ -42,10 +42,6 @@ import { LayoutFileUploadField } from "@/components/production/task/form/layout-
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
-import {
-  MultiVehicleIdentityTable,
-  type QuoteVehicleIdentity,
-} from "@/components/financial/shared/multi-vehicle-identity-table";
 
 interface BudgetStepTaskProps {
   disabled?: boolean;
@@ -71,17 +67,6 @@ interface BudgetStepTaskProps {
    * quatro — e descobre na nota fiscal dos outros três que não valeu.
    */
   quoteVehicleCount?: number;
-  /**
-   * OS VEÍCULOS do orçamento aberto, quando ele cobre mais de um.
-   *
-   * Com N veículos este passo deixa de ser "a tarefa": os campos de IDENTIDADE
-   * (série, placa, chassi, plaqueta, nº do pedido) são de UM caminhão, e
-   * mostrá-los aqui apresentava os dados do primeiro como se fossem os do
-   * orçamento. Viram uma tabela, e cada linha leva à tela daquele veículo, onde
-   * a edição é individual. O que continua editável aqui é o que é do CONTRATO —
-   * nome, cliente, datas, tinta, layouts — e vale para todos.
-   */
-  quoteVehicles?: QuoteVehicleIdentity[];
 }
 
 export function BudgetStepTask({
@@ -99,7 +84,6 @@ export function BudgetStepTask({
   vinPlateFiles,
   onVinPlateFilesChange,
   quoteVehicleCount = 1,
-  quoteVehicles = [],
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -120,10 +104,6 @@ export function BudgetStepTask({
   const plates = useWatch({ control, name: "plates" }) || [];
   const serialNumbers = useWatch({ control, name: "serialNumbers" }) || [];
   const customerIdValue = useWatch({ control, name: "customerId" });
-
-  // Com N veículos este passo fala pelo CONTRATO, não por uma tarefa: ver
-  // `quoteVehicles`.
-  const isMultiVehicleQuote = isEditMode && quoteVehicleCount > 1;
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
@@ -172,18 +152,6 @@ export function BudgetStepTask({
             </AccordionTrigger>
             <AccordionContent>
               <CardContent className="space-y-6 pt-0">
-                {isMultiVehicleQuote && (
-                  <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
-                    <IconInfoCircle className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-                    <p className="text-xs text-blue-800 dark:text-blue-200">
-                      Este orçamento cobre <strong>{quoteVehicleCount} veículos</strong>. O que se
-                      edita aqui vale para <strong>todos</strong> eles — nome, cliente, datas, tinta
-                      e layouts são do contrato. A identificação de cada caminhão (série, placa,
-                      chassi, plaqueta e nº do pedido) se edita na tela dele, na tabela abaixo.
-                    </p>
-                  </div>
-                )}
-
                 {/* Name */}
                 <TaskNameAutocomplete control={control} disabled={disabled} />
 
@@ -252,9 +220,7 @@ export function BudgetStepTask({
                 </div>
 
                 {/* Plates + Serial Numbers */}
-                {isEditMode && isMultiVehicleQuote ? (
-                  <MultiVehicleIdentityTable vehicles={quoteVehicles} />
-                ) : isEditMode ? (
+                {isEditMode ? (
                   /* CINCO colunas: série, placa, nº do pedido, chassi e plaqueta
                      são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
                      fileira. Com quatro colunas a plaqueta caía sozinha numa

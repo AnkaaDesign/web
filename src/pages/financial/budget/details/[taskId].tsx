@@ -9,7 +9,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
-import { useTaskDetail, useTaskMutations, useBatchUpdateTasks, taskKeys } from "@/hooks";
+import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -58,7 +58,7 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { quoteTasks, quoteVehicleCount } from "@/utils/quote-tasks";
+import { quoteVehicleCount } from "@/utils/quote-tasks";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -129,36 +129,10 @@ const FinancialBudgetDetailPageInner = () => {
   const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
   const existingQuote = rawQuote?.id ? rawQuote : null;
 
-  /**
-   * OS VEÍCULOS DO ORÇAMENTO — a relação que o passo 1 mostra quando são vários.
-   *
-   * Com N veículos este passo deixa de falar por uma tarefa: a identidade de
-   * cada caminhão se edita na tela dele. Recai na tarefa aberta quando o
-   * orçamento ainda não existe (a tela também CRIA um), que é o caso de um só.
-   */
-  const quoteVehicleRows = useMemo(() => {
-    const fromQuote = quoteTasks(existingQuote as any) as Array<{
-      id: string;
-      serialNumber?: string | null;
-      customerOrderNumber?: string | null;
-      truck?: { plate?: string | null; chassisNumber?: string | null } | null;
-    }>;
-    const rows = fromQuote.length > 0 ? fromQuote : task ? [task as any] : [];
-    return rows.map((t) => ({
-      id: t.id,
-      serialNumber: t.serialNumber ?? null,
-      plate: t.truck?.plate ?? null,
-      chassisNumber: t.truck?.chassisNumber ?? null,
-      customerOrderNumber: t.customerOrderNumber ?? null,
-    }));
-  }, [existingQuote, task]);
-
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
   const updateQuoteMutation = useUpdateTaskQuote();
   const { updateAsync: updateTaskAsync } = useTaskMutations();
-  // `PUT /tasks/batch` — o que é do CONTRATO alcança os outros veículos.
-  const { mutateAsync: batchUpdateTasksAsync } = useBatchUpdateTasks();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -777,18 +751,11 @@ const FinancialBudgetDetailPageInner = () => {
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
-  const multiVehicleQuote = quoteVehicleRows.length > 1;
   const steps = useMemo(() => {
     const base = [
-      // Com N veículos o passo não fala por uma tarefa: fala pelo contrato e
-      // lista os caminhões. Chamá-lo "Tarefa" ali prometia os dados de um.
-      {
-        id: 1,
-        name: multiVehicleQuote ? "Veículos" : "Tarefa",
-        description: multiVehicleQuote
-          ? `${quoteVehicleRows.length} veículos do orçamento`
-          : "Dados da tarefa",
-      },
+      // "Tarefa", sempre: este passo define a tarefa ABERTA, mesmo num orçamento
+      // de quatro. A relação dos veículos é conferida no Resumo.
+      { id: 1, name: "Tarefa", description: "Dados da tarefa" },
       { id: 2, name: "Informações", description: "Prazos e clientes" },
       { id: 3, name: "Serviços", description: "Serviços e preços" },
     ];
@@ -808,10 +775,7 @@ const FinancialBudgetDetailPageInner = () => {
       description: "Revisão final",
     });
     return base;
-    // `multiVehicleQuote`/`quoteVehicleRows` entram nas dependências: o rótulo do
-    // passo 1 depende deles, e sem isso ele ficaria "Tarefa" até o próximo
-    // rerender por outro motivo.
-  }, [customerConfigs, multiVehicleQuote, quoteVehicleRows.length]);
+  }, [customerConfigs]);
 
   const totalSteps = steps.length;
 
@@ -1303,28 +1267,23 @@ const FinancialBudgetDetailPageInner = () => {
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // O QUE É DO CONTRATO VAI PARA TODOS OS VEÍCULOS
+      // O PASSO 1 É DESTA TAREFA, E SÓ DELA
       // ═══════════════════════════════════════════════════════════════════════
       //
-      // Um orçamento cobre N caminhões, e esta tela é aberta por UM deles. Nome,
-      // cliente, datas, tinta, layouts, arquivos-base e responsáveis são do
-      // CONTRATO: editá-los aqui e gravar só no veículo aberto deixava os outros
-      // três com o nome antigo, o layout antigo e o prazo antigo — e nada na tela
-      // dizia que foi assim.
+      // A tela é aberta por UM veículo e o passo 1 define AQUELE caminhão: série,
+      // placa, chassi, plaqueta, nº do pedido, nome, datas, tinta, layouts. Nada
+      // do que se grava aqui alcança os irmãos.
       //
-      // A IDENTIDADE (série, placa, chassi, plaqueta, nº do pedido) é do veículo
-      // e nunca sai daqui para os irmãos: com N veículos o passo 1 nem a mostra —
-      // ela se edita na tela de cada caminhão (ver `MultiVehicleIdentityTable`).
-      const PER_VEHICLE_TASK_FIELDS = new Set([
-        'serialNumber',
-        'truck',
-        'vinPlateId',
-        'customerOrderNumber',
-      ]);
-      const siblingTaskIds = quoteVehicleRows.map((v) => v.id).filter((id) => id !== taskId);
-      const sharedTaskUpdate = Object.fromEntries(
-        Object.entries(taskUpdateData).filter(([key]) => !PER_VEHICLE_TASK_FIELDS.has(key)),
-      );
+      // Houve uma versão que propagava os campos "do contrato" para todos os
+      // veículos. Foi recusada, e a razão é boa: um orçamento de quatro caminhões
+      // tem quatro tarefas de produção, com prazos e artes que podem divergir de
+      // propósito. Quem edita a tarefa 2 está editando a tarefa 2 — e um salvamento
+      // que silenciosamente reescreve outras três é pior do que um que não
+      // reescreve nenhuma. O que é do ORÇAMENTO (serviços, preço, condições,
+      // garantia) mora nos outros passos, que são do orçamento inteiro.
+      //
+      // A RELAÇÃO de veículos vive no RESUMO, onde se confere o conjunto antes de
+      // mandar ao cliente.
 
       // Only hit the task endpoint when something task-owned actually changed.
       // Skips a no-op write when the user only edited the quote half.
@@ -1338,17 +1297,6 @@ const FinancialBudgetDetailPageInner = () => {
         }
       }
 
-      if (siblingTaskIds.length > 0 && Object.keys(sharedTaskUpdate).length > 0) {
-        try {
-          await batchUpdateTasksAsync({
-            tasks: siblingTaskIds.map((id) => ({ id, data: sharedTaskUpdate as any })),
-          });
-        } catch {
-          // Error toast is emitted by the axios error interceptor.
-          setIsSubmitting(false);
-          return;
-        }
-      }
 
 
       // 5. Update customer data (address, CNPJ, etc.)
@@ -1761,7 +1709,6 @@ const FinancialBudgetDetailPageInner = () => {
               vinPlateFiles={vinPlateFiles}
               onVinPlateFilesChange={handleVinPlateFilesChange}
               quoteVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : 1}
-              quoteVehicles={quoteVehicleRows}
             />
           </div>
 

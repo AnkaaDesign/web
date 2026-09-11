@@ -423,23 +423,78 @@ export function BudgetStepReview({
                 <span className="text-sm font-medium">{resolvedTask.customer.corporateName || resolvedTask.customer.fantasyName}</span>
               </div>
             )}
-            {resolvedTask?.truck?.plate && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Placa</span>
-                <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
+            {/* ═══════════════════════════════════════════════════════════════
+                A IDENTIFICAÇÃO — UMA LINHA OU A RELAÇÃO INTEIRA
+
+                Com um veículo, as linhas de sempre: placa, série, chassi.
+
+                Com N, elas dariam a identidade de UM caminhão no resumo de um
+                orçamento que cobre quatro — e o Resumo é exatamente a tela em
+                que se confere o conjunto antes de mandar ao cliente. Então vira
+                a MESMA tabela do documento e da página pública.
+
+                O passo 1 continua sendo o da tarefa ABERTA: é lá que se define
+                aquele caminhão, e nada do que se grava lá alcança os irmãos.
+                ═══════════════════════════════════════════════════════════ */}
+            {vehicleRows.length > 1 ? (
+              <div className="rounded-lg bg-muted/50 px-4 py-3">
+                <div className="mb-2 text-sm text-muted-foreground">
+                  Veículos <span className="font-medium text-foreground">({vehicleRows.length})</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="w-8 pb-1 pr-2 text-left text-[0.65rem] font-semibold uppercase tracking-wide">#</th>
+                        <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº de série</th>
+                        <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Placa</th>
+                        {anyVehicleChassis && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Chassi</th>
+                        )}
+                        {anyVehicleOrderNumber && (
+                          <th className="pb-1 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº do pedido</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleRows.map((v, i) => (
+                        <tr key={v.key} className="border-t border-border/40">
+                          <td className="py-1 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
+                          <td className="py-1 pr-3 font-medium">{v.serialNumber || <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          <td className="py-1 pr-3 font-medium">{v.plate || <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          {anyVehicleChassis && (
+                            <td className="py-1 pr-3 font-mono text-xs">{v.chassis ? formatChassis(v.chassis) : <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          )}
+                          {anyVehicleOrderNumber && (
+                            <td className="py-1 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
-            {resolvedTask?.serialNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Nº de Série</span>
-                <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
-              </div>
-            )}
-            {resolvedTask?.truck?.chassisNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Chassi</span>
-                <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
-              </div>
+            ) : (
+              <>
+                {resolvedTask?.truck?.plate && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Placa</span>
+                    <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
+                  </div>
+                )}
+                {resolvedTask?.serialNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Nº de Série</span>
+                    <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
+                  </div>
+                )}
+                {resolvedTask?.truck?.chassisNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Chassi</span>
+                    <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
+                  </div>
+                )}
+              </>
             )}
             {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
                 existe: no create ainda não há caminhão gravado. */}
@@ -647,45 +702,11 @@ export function BudgetStepReview({
                       <span className="text-muted-foreground">Veículos</span>
                       <span className="font-medium">&times; {vehicleCount}</span>
                     </div>
-                    {/* A RELAÇÃO DE VEÍCULOS, nas mesmas colunas do documento e
-                        da página pública. Eram etiquetas: cabem quatro, não cabem
-                        sessenta, e não diziam placa, chassi nem pedido de compra
-                        — que é justamente o que se confere aqui antes de mandar
-                        para o cliente. */}
-                    {vehicleRows.length > 1 && (
-                      <div className="pt-2 overflow-x-auto">
-                        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
-                          <thead>
-                            <tr className="text-muted-foreground">
-                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-2 w-8">#</th>
-                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Nº de série</th>
-                              <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Placa</th>
-                              {anyVehicleChassis && (
-                                <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1 pr-3">Chassi</th>
-                              )}
-                              {anyVehicleOrderNumber && (
-                                <th className="text-left font-semibold uppercase text-[0.65rem] tracking-wide pb-1">Nº do pedido</th>
-                              )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {vehicleRows.map((v, i) => (
-                              <tr key={v.key} className="border-t border-border/40">
-                                <td className="py-1 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                                <td className="py-1 pr-3 font-medium">{v.serialNumber || <span className="text-muted-foreground italic">a registrar</span>}</td>
-                                <td className="py-1 pr-3 font-medium">{v.plate || <span className="text-muted-foreground italic">a registrar</span>}</td>
-                                {anyVehicleChassis && (
-                                  <td className="py-1 pr-3 font-medium">{v.chassis || <span className="text-muted-foreground italic">a registrar</span>}</td>
-                                )}
-                                {anyVehicleOrderNumber && (
-                                  <td className="py-1 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
-                                )}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                    {/* A RELAÇÃO DOS VEÍCULOS não fica aqui: este bloco é de
+                        DINHEIRO, e o que ele precisa dizer é "× 4". A relação
+                        está no Resumo da Tarefa, acima, onde se confere o
+                        conjunto — duas tabelas iguais na mesma tela é o tipo de
+                        repetição que faz o leitor parar de ler as duas. */}
                     <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
                       <span className="text-base font-bold text-foreground">
                         TOTAL GERAL

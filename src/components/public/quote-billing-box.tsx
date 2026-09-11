@@ -57,6 +57,12 @@ interface QuoteBillingBoxProps {
   className?: string;
 }
 
+/** As duas metades do endereço numa linha, sem travessão solto quando falta uma. */
+function joinAddress(street: string | null, locality: string | null): string | null {
+  const parts = [street, locality].map(p => (p ?? "").trim()).filter(Boolean);
+  return parts.length > 0 ? parts.join(" — ") : null;
+}
+
 export function QuoteBillingBox({ customer, className }: QuoteBillingBoxProps) {
   if (!customer) return null;
 
@@ -80,8 +86,11 @@ export function QuoteBillingBox({ customer, className }: QuoteBillingBoxProps) {
       ["Inscrição estadual", customer.stateRegistration || null],
       ["Inscrição municipal", customer.municipalRegistration || null],
     ],
-    [["Endereço", formatBillingStreetLine(customer)]],
-    [["Município", formatBillingLocalityLine(customer)]],
+    // ENDEREÇO NUMA LINHA SÓ. Eram duas — logradouro e depois "Município" com
+    // bairro, cidade/UF e CEP —, e nenhuma das duas enchia a largura: o quadro
+    // gastava dois renques para dizer um endereço. Juntas, cabem de sobra e o
+    // olho lê o endereço como o endereço é lido, de uma vez.
+    [["Endereço", joinAddress(formatBillingStreetLine(customer), formatBillingLocalityLine(customer))]],
   ];
 
   return (

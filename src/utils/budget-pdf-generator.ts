@@ -812,6 +812,10 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   // dois terços da folha em branco à direita de cada uma. O NÚMERO DO PEDIDO saiu
   // daqui e virou coluna da tabela de veículos — ele identifica a entrega, e
   // quatro caminhões podem ter quatro pedidos, que numa linha só não cabem.
+  const joinBillingAddress = (a?: string | null, b?: string | null): string | null => {
+    const parts = [a, b].map(p => (p ?? '').trim()).filter(Boolean);
+    return parts.length > 0 ? parts.join(' — ') : null;
+  };
   const billingRows: Array<Array<[string, string | null]>> = data.billing
     ? [
         [['Razão social', data.billing.corporateName ?? null]],
@@ -820,8 +824,8 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
           ['Inscrição estadual', data.billing.stateRegistration ?? null],
           ['Inscrição municipal', data.billing.municipalRegistration ?? null],
         ],
-        [['Endereço', data.billing.addressLine ?? null]],
-        [['Município', data.billing.addressLocality ?? null]],
+        // ENDEREÇO NUMA LINHA SÓ: eram duas e nenhuma enchia a largura.
+        [['Endereço', joinBillingAddress(data.billing.addressLine, data.billing.addressLocality)]],
       ]
     : [];
   const billingRowsHtml = billingRows

@@ -509,16 +509,9 @@ const BillingDetailPageInner = () => {
 
   const steps = useMemo(() => {
     const base: Array<{ id: number; name: string; description: string }> = [
-      // Com N veículos o passo não fala por uma tarefa: fala pelo contrato e
-      // lista os caminhões. Chamá-lo "Tarefa" ali prometia os dados de um.
-      {
-        id: 1,
-        name: quoteVehicles > 1 ? "Veículos" : "Tarefa",
-        description:
-          quoteVehicles > 1
-            ? `${quoteVehicles} veículos do orçamento`
-            : "Dados da tarefa e faturamento",
-      },
+      // "Tarefa", sempre: este passo define a tarefa ABERTA. A relação dos
+      // veículos é conferida no Resumo.
+      { id: 1, name: "Tarefa", description: "Dados da tarefa e faturamento" },
     ];
     if (canSeeBudgetInfoStep) {
       base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
@@ -1193,13 +1186,6 @@ const BillingDetailPageInner = () => {
                     vinPlateFiles={vinPlateFiles}
                     onVinPlateFilesChange={handleVinPlateFilesChange}
                     quoteVehicleCount={quoteVehicles}
-                    quoteVehicles={quoteVehicleRows.map((t) => ({
-                      id: t.id,
-                      serialNumber: t.serialNumber ?? null,
-                      plate: t.truck?.plate ?? null,
-                      chassisNumber: (t as { truck?: { chassisNumber?: string | null } }).truck?.chassisNumber ?? null,
-                      customerOrderNumber: t.customerOrderNumber ?? null,
-                    }))}
                   />
                 </div>
 
