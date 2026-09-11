@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "@/components/ui/sonner";
 import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, IconFileTypePdf, IconDownload, IconChevronDown, IconShare } from "@tabler/icons-react";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask } from "@/utils/quote-tasks";
+import { quoteTasks, primaryTask, orderNumberLabel } from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
@@ -339,9 +339,17 @@ export function PublicServiceReportPage() {
           paymentMethod,
           firstDueDate,
         }),
-        // Customer's purchase-order number, shown with the payment terms
-        // exactly as the budget page does.
-        orderNumber: (config?.orderNumber as string | null) || null,
+        // O PEDIDO DE COMPRA DO CLIENTE, mostrado junto das condições de
+        // pagamento, exatamente como na página do orçamento.
+        //
+        // Mora na TAREFA (`Task.customerOrderNumber`): uma fatia `PER_TASK` é de
+        // UM veículo e cita o pedido dele; uma `JOINT` cobre os N e cita todos,
+        // como `orderNumberLabel` monta na nota.
+        orderNumber: orderNumberLabel(
+          config?.taskId
+            ? quoteTasks<any>(quote).filter((t: any) => t.id === config.taskId)
+            : quoteTasks<any>(quote),
+        ),
       };
     })
     .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);

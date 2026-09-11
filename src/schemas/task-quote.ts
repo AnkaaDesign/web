@@ -121,6 +121,11 @@ export const taskQuoteCustomerConfigSchema = z.object({
   customPaymentText: z.string().max(2000).optional().nullable(),
   generateInvoice: z.boolean().optional().default(true),
   generateBankSlip: z.boolean().optional().default(true),
+  /**
+   * @deprecated O número do pedido é do VEÍCULO (`Task.customerOrderNumber`).
+   * Continua aceito pela API — que o grava em TODAS as tarefas do orçamento —,
+   * mas nenhuma tela deste repositório o envia: ver `purchase-order-vehicles`.
+   */
   orderNumber: z.string().max(100).optional().nullable(),
   responsibleId: z.string().uuid().optional().nullable(),
   installments: z.array(z.object({

@@ -8,6 +8,7 @@ import {
   formatBillingLocalityLine,
 } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
+import { orderNumberLabel } from "./quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
@@ -374,6 +375,10 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const pdfVehicles = quoteTaskRows.map((t: any) => ({
     taskId: t?.id ?? null,
     serialNumber: t?.serialNumber || null,
+    // O pedido de compra é DESTE veículo. Sem esta linha o quadro do tomador
+    // saía sempre sem o número: o `map` que o montava lia `customerOrderNumber`
+    // de um objeto que nunca o teve, e `undefined` filtrado é silêncio.
+    customerOrderNumber: t?.customerOrderNumber || null,
     plate: t?.truck?.plate || null,
     chassisNumber: t?.truck?.chassisNumber || null,
     truckCategory: t?.truck?.category
@@ -445,14 +450,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
       // O pedido de compra é do VEÍCULO (`Task.customerOrderNumber`): numa nota
       // conjunta o documento cita os números dos caminhões que ela cobre, sem
       // repetir os iguais.
-      orderNumber:
-        [
-          ...new Set(
-            (pdfVehicles ?? [])
-              .map((v: any) => (v?.customerOrderNumber ?? '').trim())
-              .filter(Boolean),
-          ),
-        ].join(', ') || null,
+      orderNumber: orderNumberLabel(pdfVehicles ?? []),
     },
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,

@@ -15,7 +15,7 @@ import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask, taskCount } from "@/utils/quote-tasks";
+import { quoteTasks, primaryTask, taskCount, orderNumberLabel } from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -351,6 +351,21 @@ export function PublicBudgetPage() {
   // (`computeQuoteMoney`), que é o que garante que esta tela, o PDF assinado e o
   // boleto digam o mesmo número.
   const vehicleCount = Math.max(1, taskCount(quote));
+
+  /**
+   * O PEDIDO DE COMPRA que ESTE quadro do tomador deve citar.
+   *
+   * Mora na TAREFA (`Task.customerOrderNumber`) — o pedido é por ENTREGA. Uma
+   * fatia `PER_TASK` é de UM veículo e cita o pedido dele; uma `JOINT` cobre os N
+   * e cita todos, como `orderNumberLabel` monta na nota fiscal. É a página em que
+   * o cliente APROVA: o número pelo qual ele reconhece a compra tem de estar aqui.
+   */
+  const orderNumberForConfig = (config: any): string | null =>
+    orderNumberLabel(
+      config?.taskId
+        ? quoteTasks<any>(quote).filter((t: any) => t.id === config.taskId)
+        : quoteTasks<any>(quote),
+    );
   const money = computeQuoteMoney({
     serviceAmounts: filteredServices.map((sv: any) =>
       typeof sv.amount === 'number' ? sv.amount : Number(sv.amount) || 0,
@@ -798,7 +813,7 @@ export function PublicBudgetPage() {
                             <p className="text-sm font-semibold text-gray-800 mb-1">{customerName}</p>
                             <QuoteBillingBox
                               customer={config.customer}
-                              orderNumber={config.orderNumber ?? null}
+                              orderNumber={orderNumberForConfig(config)}
                             />
                             {configPaymentText && (
                               <p
@@ -829,7 +844,7 @@ export function PublicBudgetPage() {
                   </h3>
                   <QuoteBillingBox
                     customer={billCustomer}
-                    orderNumber={activeConfig?.orderNumber ?? null}
+                    orderNumber={orderNumberForConfig(activeConfig)}
                   />
                   {paymentText && (
                     <p
