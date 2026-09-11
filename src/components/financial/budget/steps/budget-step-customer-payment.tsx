@@ -21,6 +21,7 @@ import type { PaymentConfig } from "@/schemas/task-quote";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";
+import { vehicleCombinationCount } from "@/utils/vehicle-combinations";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -59,6 +60,16 @@ interface BudgetStepCustomerPaymentProps {
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
   quoteId?: string;
+  /**
+   * Quantos veículos o orçamento JÁ cobre, quando ele existe.
+   *
+   * Na criação a contagem sai de placas × números de série do passo 1 — é o
+   * mesmo produto cartesiano que vira `taskIds`. Na edição esse cálculo não
+   * serve: o formulário carrega os campos de UMA tarefa, daria 1, e o seletor
+   * de faturamento sumiria de um orçamento de sessenta caminhões — sem jeito de
+   * trocar `JOINT` por `PER_TASK` depois que o erro aparece no faturamento.
+   */
+  existingVehicleCount?: number;
 }
 
 export function BudgetStepCustomerPayment({
@@ -66,6 +77,7 @@ export function BudgetStepCustomerPayment({
   customer,
   disabled,
   quoteId,
+  existingVehicleCount,
 }: BudgetStepCustomerPaymentProps) {
   const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
@@ -115,6 +127,22 @@ export function BudgetStepCustomerPayment({
   const setConfigField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
+
+  // ── QUANTOS VEÍCULOS ──────────────────────────────────────────────────────
+  //
+  // A MESMA conta do passo 1 (`vehicleCombinations`) e a mesma que a criação usa
+  // para montar `taskIds`. Duas fontes de verdade sobre esta contagem
+  // produziriam um seletor oferecendo "uma fatura por veículo" para um número de
+  // veículos que não é o que será criado.
+  const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
+  const serialNumbersWatch =
+    (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
+  const billingSplit = useWatch({ control, name: "billingSplit" }) as string | undefined;
+  const vehicleCount = useMemo(() => {
+    // O orçamento já existe: quem manda é a contagem de tarefas dele.
+    if (existingVehicleCount && existingVehicleCount > 0) return existingVehicleCount;
+    return vehicleCombinationCount(platesWatch, serialNumbersWatch as (string | number)[]);
+  }, [existingVehicleCount, platesWatch, serialNumbersWatch]);
 
   // O N° DO PEDIDO NÃO MORA MAIS AQUI. Ele é da ENTREGA
   // (`Task.customerOrderNumber`), não do cliente, e vive no passo 1, ao lado da
@@ -534,6 +562,47 @@ export function BudgetStepCustomerPayment({
                 <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
+            {/* ═══════════════════════════════════════════════════════════════
+                JUNTO OU SEPARADO
+
+                Mora aqui, e não no passo Informações, porque a escolha É sobre
+                faturamento: quantas faturas, quantas notas fiscais e quantos
+                planos de parcelas este cliente vai receber. Fica na mesma linha
+                da condição de pagamento, que é a outra metade da mesma decisão.
+
+                Só aparece com mais de um veículo — com um só a pergunta não
+                existe, e um seletor dizendo "Fatura única" num orçamento de um
+                caminhão é ruído que o operador aprende a ignorar. E só no
+                primeiro cliente: a escolha é do ORÇAMENTO, não de cada cliente,
+                e repeti-la por passo faria a segunda cópia sobrescrever a
+                primeira sem que ninguém notasse.
+                ═════════════════════════════════════════════════════════════ */}
+            {configIndex === 0 && vehicleCount > 1 && (
+              <div className="space-y-1.5 flex-1 min-w-[220px]">
+                <Label className="text-sm font-medium">
+                  Faturamento dos {vehicleCount} veículos
+                </Label>
+                <Combobox
+                  value={billingSplit ?? "JOINT"}
+                  onValueChange={(value) =>
+                    setFormValue("billingSplit", value || "JOINT", { shouldDirty: true })
+                  }
+                  disabled={disabled}
+                  options={[
+                    { value: "JOINT", label: `Fatura única para os ${vehicleCount} veículos` },
+                    { value: "PER_TASK", label: "Uma fatura por veículo" },
+                  ]}
+                  placeholder="Fatura única"
+                  searchable={false}
+                  emptyText="Nenhuma opção"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {billingSplit === "PER_TASK"
+                    ? `${vehicleCount} faturas, ${vehicleCount} notas fiscais e um plano de parcelas por veículo. O financeiro aprova veículo a veículo, conforme cada um é entregue.`
+                    : `Uma fatura com o total dos ${vehicleCount} veículos, um plano de parcelas e uma nota fiscal citando todos.`}
+                </p>
+              </div>
+            )}
             {/* ── Condição de Pagamento (type) ── */}
             <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">Condição de Pagamento</Label>

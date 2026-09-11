@@ -1697,7 +1697,7 @@ const FinancialBudgetDetailPageInner = () => {
               // carrega os campos de UMA tarefa, e a conta daria 1 mesmo num
               // orçamento de sessenta — escondendo o seletor de faturamento
               // justamente de quem precisa dele.
-              existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
+
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               layouts={layoutImageOptions}
@@ -1735,6 +1735,7 @@ const FinancialBudgetDetailPageInner = () => {
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
                   quoteId={existingQuote?.id}
+                  existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
                 />
               </div>
             );

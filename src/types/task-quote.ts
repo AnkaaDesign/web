@@ -50,6 +50,15 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   customPaymentText: string | null;
   generateInvoice?: boolean;
   generateBankSlip?: boolean;
+  /**
+   * @deprecated A coluna saiu do banco na migração `20260909170000`: o número do
+   * pedido de compra é do VEÍCULO (`Task.customerOrderNumber`), porque um
+   * orçamento cobre N caminhões e o pedido é por ENTREGA.
+   *
+   * Nunca chega preenchido numa leitura. Segue declarado porque a API ainda
+   * ACEITA o campo na escrita (o app instalado o envia e o servidor o traduz
+   * para as tarefas) — nenhuma tela deste repositório o manda.
+   */
   orderNumber?: string | null;
   responsibleId?: string | null;
   paymentCondition?: string | null;

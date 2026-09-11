@@ -836,37 +836,7 @@ export const FinancialBudgetCreatePage = () => {
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // 9. O CADASTRO DO CLIENTE (uma vez, não uma por veículo)
-      // ═══════════════════════════════════════════════════════════════════════
-      //
-      // Os dados fiscais são do CLIENTE, não da tarefa: gravá-los dentro do laço
-      // repetia a mesma escrita uma vez por caminhão.
-      for (const config of data.customerConfigs || []) {
-        if (config.customerData && config.customerId) {
-          try {
-            await customerService.updateCustomer(config.customerId, {
-              corporateName: config.customerData.corporateName || undefined,
-              cnpj: config.customerData.cnpj || undefined,
-              cpf: config.customerData.cpf || undefined,
-              address: config.customerData.address || undefined,
-              addressNumber: config.customerData.addressNumber || undefined,
-              addressComplement: config.customerData.addressComplement || undefined,
-              neighborhood: config.customerData.neighborhood || undefined,
-              city: config.customerData.city || undefined,
-              state: config.customerData.state || undefined,
-              zipCode: config.customerData.zipCode || undefined,
-              stateRegistration: config.customerData.stateRegistration || undefined,
-              municipalRegistration: config.customerData.municipalRegistration || undefined,
-              streetType: config.customerData.streetType || undefined,
-            });
-          } catch {
-            // Error toast is emitted by the axios error interceptor.
-          }
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // 10. AS TAREFAS E O ORÇAMENTO — UM COMMIT SÓ
+      // 9. AS TAREFAS E O ORÇAMENTO — UM COMMIT SÓ
       // ═══════════════════════════════════════════════════════════════════════
       //
       // Antes o orçamento era criado DENTRO do laço, um por tarefa. Duas placas e
@@ -907,6 +877,43 @@ export const FinancialBudgetCreatePage = () => {
           if (!firstCreatedTaskId) firstCreatedTaskId = t.id;
         }
         successCount = createdTasks.length;
+
+        // ═══════════════════════════════════════════════════════════════════
+        // 10. O CADASTRO DO CLIENTE — DEPOIS, e só se o orçamento nasceu
+        // ═══════════════════════════════════════════════════════════════════
+        //
+        // Os dados fiscais são do CLIENTE, não da tarefa: gravá-los dentro do
+        // laço repetia a mesma escrita uma vez por caminhão.
+        //
+        // E vêm DEPOIS da criação de propósito. Enquanto vinham antes, uma falha
+        // na criação deixava o cadastro do cliente já alterado e a tela mostrava
+        // "Cliente atualizado com sucesso" seguido do erro — dois avisos verdes
+        // e um vermelho para uma operação em que nada do que o operador pediu
+        // foi criado. O orçamento é atômico; o que o acompanha só faz sentido
+        // depois que ele existe.
+        for (const config of data.customerConfigs || []) {
+          if (config.customerData && config.customerId) {
+            try {
+              await customerService.updateCustomer(config.customerId, {
+                corporateName: config.customerData.corporateName || undefined,
+                cnpj: config.customerData.cnpj || undefined,
+                cpf: config.customerData.cpf || undefined,
+                address: config.customerData.address || undefined,
+                addressNumber: config.customerData.addressNumber || undefined,
+                addressComplement: config.customerData.addressComplement || undefined,
+                neighborhood: config.customerData.neighborhood || undefined,
+                city: config.customerData.city || undefined,
+                state: config.customerData.state || undefined,
+                zipCode: config.customerData.zipCode || undefined,
+                stateRegistration: config.customerData.stateRegistration || undefined,
+                municipalRegistration: config.customerData.municipalRegistration || undefined,
+                streetType: config.customerData.streetType || undefined,
+              });
+            } catch {
+              // Error toast is emitted by the axios error interceptor.
+            }
+          }
+        }
 
         // As aerografias vêm DEPOIS e são não-bloqueantes: são entidades
         // próprias, com o seu ciclo de pagamento, e uma falha ali não pode
