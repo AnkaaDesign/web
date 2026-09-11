@@ -33,6 +33,10 @@ import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "@/components/production/task/form/customer-selector";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import {
+  MultiVehicleIdentityTable,
+  type QuoteVehicleIdentity,
+} from "@/components/financial/shared/multi-vehicle-identity-table";
 import { BillingStepInfo } from "./billing-step-info";
 
 interface BillingStepTaskProps {
@@ -47,6 +51,13 @@ interface BillingStepTaskProps {
    * N° do Pedido deste passo é o DESTE caminhão, e a tela tem de dizer isso.
    */
   quoteVehicleCount?: number;
+  /**
+   * OS VEÍCULOS do orçamento, quando ele cobre mais de um.
+   *
+   * Com N veículos este passo deixa de ser "a tarefa": a identidade de cada
+   * caminhão se edita na tela dele. Ver `budget-step-task.tsx`.
+   */
+  quoteVehicles?: QuoteVehicleIdentity[];
 }
 
 export function BillingStepTask({
@@ -56,6 +67,7 @@ export function BillingStepTask({
   vinPlateFiles,
   onVinPlateFilesChange,
   quoteVehicleCount = 1,
+  quoteVehicles = [],
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -160,7 +172,14 @@ export function BillingStepTask({
 
           {/* Serial Number + Plate + Nº do Pedido + Chassi + Plaqueta — CINCO
               colunas: são a identificação do mesmo veículo e pertencem à mesma
-              fileira. Com quatro, a plaqueta caía sozinha numa linha inteira. */}
+              fileira. Com quatro, a plaqueta caía sozinha numa linha inteira.
+
+              Com N veículos nada disto aparece: a identidade é de UM caminhão, e
+              mostrá-la aqui apresentava os dados do primeiro como se fossem os do
+              orçamento. Vira tabela, e cada linha abre a tela daquele veículo. */}
+          {quoteVehicleCount > 1 ? (
+            <MultiVehicleIdentityTable vehicles={quoteVehicles} />
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <FormField
               control={control}
@@ -298,6 +317,7 @@ export function BillingStepTask({
               </FormItem>
             )}
           </div>
+          )}
 
           {/* Finished At — read-only, never sent in update payload */}
           <FormField
