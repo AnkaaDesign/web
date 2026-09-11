@@ -9,7 +9,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
-import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
+import { useTaskDetail, useTaskMutations, useBatchUpdateTasks, taskKeys } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -58,7 +58,7 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { quoteVehicleCount } from "@/utils/quote-tasks";
+import { quoteTasks, quoteVehicleCount } from "@/utils/quote-tasks";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -129,10 +129,36 @@ const FinancialBudgetDetailPageInner = () => {
   const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
   const existingQuote = rawQuote?.id ? rawQuote : null;
 
+  /**
+   * OS VEÍCULOS DO ORÇAMENTO — a relação que o passo 1 mostra quando são vários.
+   *
+   * Com N veículos este passo deixa de falar por uma tarefa: a identidade de
+   * cada caminhão se edita na tela dele. Recai na tarefa aberta quando o
+   * orçamento ainda não existe (a tela também CRIA um), que é o caso de um só.
+   */
+  const quoteVehicleRows = useMemo(() => {
+    const fromQuote = quoteTasks(existingQuote as any) as Array<{
+      id: string;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null; chassisNumber?: string | null } | null;
+    }>;
+    const rows = fromQuote.length > 0 ? fromQuote : task ? [task as any] : [];
+    return rows.map((t) => ({
+      id: t.id,
+      serialNumber: t.serialNumber ?? null,
+      plate: t.truck?.plate ?? null,
+      chassisNumber: t.truck?.chassisNumber ?? null,
+      customerOrderNumber: t.customerOrderNumber ?? null,
+    }));
+  }, [existingQuote, task]);
+
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
   const updateQuoteMutation = useUpdateTaskQuote();
   const { updateAsync: updateTaskAsync } = useTaskMutations();
+  // `PUT /tasks/batch` — o que é do CONTRATO alcança os outros veículos.
+  const { mutateAsync: batchUpdateTasksAsync } = useBatchUpdateTasks();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -751,9 +777,18 @@ const FinancialBudgetDetailPageInner = () => {
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
+  const multiVehicleQuote = quoteVehicleRows.length > 1;
   const steps = useMemo(() => {
     const base = [
-      { id: 1, name: "Tarefa", description: "Dados da tarefa" },
+      // Com N veículos o passo não fala por uma tarefa: fala pelo contrato e
+      // lista os caminhões. Chamá-lo "Tarefa" ali prometia os dados de um.
+      {
+        id: 1,
+        name: multiVehicleQuote ? "Veículos" : "Tarefa",
+        description: multiVehicleQuote
+          ? `${quoteVehicleRows.length} veículos do orçamento`
+          : "Dados da tarefa",
+      },
       { id: 2, name: "Informações", description: "Prazos e clientes" },
       { id: 3, name: "Serviços", description: "Serviços e preços" },
     ];
@@ -773,7 +808,10 @@ const FinancialBudgetDetailPageInner = () => {
       description: "Revisão final",
     });
     return base;
-  }, [customerConfigs]);
+    // `multiVehicleQuote`/`quoteVehicleRows` entram nas dependências: o rótulo do
+    // passo 1 depende deles, e sem isso ele ficaria "Tarefa" até o próximo
+    // rerender por outro motivo.
+  }, [customerConfigs, multiVehicleQuote, quoteVehicleRows.length]);
 
   const totalSteps = steps.length;
 
@@ -1264,11 +1302,47 @@ const FinancialBudgetDetailPageInner = () => {
         taskUpdateData.customerOrderNumber = nextOrderNumber;
       }
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // O QUE É DO CONTRATO VAI PARA TODOS OS VEÍCULOS
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Um orçamento cobre N caminhões, e esta tela é aberta por UM deles. Nome,
+      // cliente, datas, tinta, layouts, arquivos-base e responsáveis são do
+      // CONTRATO: editá-los aqui e gravar só no veículo aberto deixava os outros
+      // três com o nome antigo, o layout antigo e o prazo antigo — e nada na tela
+      // dizia que foi assim.
+      //
+      // A IDENTIDADE (série, placa, chassi, plaqueta, nº do pedido) é do veículo
+      // e nunca sai daqui para os irmãos: com N veículos o passo 1 nem a mostra —
+      // ela se edita na tela de cada caminhão (ver `MultiVehicleIdentityTable`).
+      const PER_VEHICLE_TASK_FIELDS = new Set([
+        'serialNumber',
+        'truck',
+        'vinPlateId',
+        'customerOrderNumber',
+      ]);
+      const siblingTaskIds = quoteVehicleRows.map((v) => v.id).filter((id) => id !== taskId);
+      const sharedTaskUpdate = Object.fromEntries(
+        Object.entries(taskUpdateData).filter(([key]) => !PER_VEHICLE_TASK_FIELDS.has(key)),
+      );
+
       // Only hit the task endpoint when something task-owned actually changed.
       // Skips a no-op write when the user only edited the quote half.
       if (Object.keys(taskUpdateData).length > 0) {
         try {
           await updateTaskAsync({ id: taskId, data: taskUpdateData });
+        } catch {
+          // Error toast is emitted by the axios error interceptor.
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      if (siblingTaskIds.length > 0 && Object.keys(sharedTaskUpdate).length > 0) {
+        try {
+          await batchUpdateTasksAsync({
+            tasks: siblingTaskIds.map((id) => ({ id, data: sharedTaskUpdate as any })),
+          });
         } catch {
           // Error toast is emitted by the axios error interceptor.
           setIsSubmitting(false);
@@ -1687,6 +1761,7 @@ const FinancialBudgetDetailPageInner = () => {
               vinPlateFiles={vinPlateFiles}
               onVinPlateFilesChange={handleVinPlateFilesChange}
               quoteVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : 1}
+              quoteVehicles={quoteVehicleRows}
             />
           </div>
 
