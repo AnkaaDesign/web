@@ -895,9 +895,9 @@ const BillingDetailPageInner = () => {
       // Enviado só quando MUDOU, inclusive vazio (`null`): limpar tem de
       // persistir, não deixar de pé o número de um pedido cancelado.
       const nextOrderNumber = (formData.customerOrderNumber ?? "").trim() || null;
-      const savedOrderNumber = (task?.customerOrderNumber ?? "").trim() || null;
+      const savedOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
       if (nextOrderNumber !== savedOrderNumber) {
-        await updateTaskAsync({ id: task!.id, data: { customerOrderNumber: nextOrderNumber } });
+        await updateTaskAsync({ id: task.id, data: { customerOrderNumber: nextOrderNumber } });
       }
 
       if (statusChanged) {
