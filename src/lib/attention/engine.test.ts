@@ -587,6 +587,25 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
+  // Os dois estados que entraram em 11/09/2026, e que caem em lados opostos da
+  // mesma pergunta ("ainda dá para destravar a nota preenchendo este campo?").
+  it("continua avisando quando o cliente já assinou e a nota ainda não saiu", async () => {
+    // SIGNED é pré-faturamento: falta só a contra-assinatura da Ankaa, a nota
+    // vem logo atrás, e o pedido de compra em branco ainda trava tudo.
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.SIGNED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).not.toBeNull();
+  });
+
+  it("silencia no orçamento vencido: o que trava ali é o preço, não o pedido", async () => {
+    // EXPIRED voltou para a mesa do comercial reprecificar. Cobrar o número do
+    // pedido de compra é pedir um dado que talvez nem seja usado — e este
+    // alerta existe para nomear trabalho que destrava dinheiro HOJE.
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.EXPIRED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
   it("stays silent when Ibiporã's config will not produce a nota", async () => {
     // No invoice means nowhere to print the pedido de compra.
     setEntities("TASK_QUOTE", [

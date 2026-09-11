@@ -18,7 +18,21 @@ import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
  */
 export function getTaskQuoteEditRoute(task: Task): string {
   const status = task.quote?.status;
-  const isQuoteApproved = !!status && status !== TASK_QUOTE_STATUS.PENDING && status !== TASK_QUOTE_STATUS.CANCELLED;
+  // ⚠️ LISTA POSITIVA, e não "tudo que não é PENDING nem CANCELLED".
+  //
+  // A forma negativa mandava para o FATURAMENTO todo estado que nascesse depois
+  // dela. Com SIGNED e EXPIRED isso deixou de ser hipótese: um orçamento vencido
+  // — que existe justamente para o comercial reabrir e rever o preço — abria o
+  // assistente de faturar. E o comercial, que é quem clica neste botão, não tem
+  // o que fazer naquela tela.
+  const PRE_BILLING: Array<TASK_QUOTE_STATUS | undefined> = [
+    TASK_QUOTE_STATUS.PENDING,
+    TASK_QUOTE_STATUS.SIGNED,
+    TASK_QUOTE_STATUS.EXPIRED,
+    TASK_QUOTE_STATUS.CANCELLED,
+    undefined,
+  ];
+  const isQuoteApproved = !!status && !PRE_BILLING.includes(status as TASK_QUOTE_STATUS);
   return isQuoteApproved
     ? routes.financial.billing.details(task.id)
     : routes.financial.budget.details(task.id);

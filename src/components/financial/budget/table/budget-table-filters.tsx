@@ -19,7 +19,17 @@ import { buildBudgetOrderBy } from "./budget-table-columns";
 export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 
 /** The list is the BUDGET half of a quote's lifecycle — everything past approval belongs to Faturamento. */
-export const BUDGET_QUOTE_STATUSES = [TASK_QUOTE_STATUS.PENDING, TASK_QUOTE_STATUS.BUDGET_APPROVED];
+// Os estados que a lista de ORÇAMENTOS mostra — os anteriores ao faturamento.
+// SIGNED e EXPIRED precisam estar aqui: sem eles o comercial não consegue
+// filtrar "o que está esperando a nossa assinatura" nem "o que venceu e preciso
+// reprecificar", que são as duas perguntas que os dois estados existem para
+// responder.
+export const BUDGET_QUOTE_STATUSES = [
+  TASK_QUOTE_STATUS.PENDING,
+  TASK_QUOTE_STATUS.SIGNED,
+  TASK_QUOTE_STATUS.EXPIRED,
+  TASK_QUOTE_STATUS.BUDGET_APPROVED,
+];
 
 const BUDGET_QUOTE_STATUS_OPTIONS = BUDGET_QUOTE_STATUSES.map((value) => ({ value, label: TASK_QUOTE_STATUS_LABELS[value] }));
 

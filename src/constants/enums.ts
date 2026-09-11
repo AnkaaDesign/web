@@ -2855,6 +2855,17 @@ export enum PAYROLL_MONTH {
 
 export enum TASK_QUOTE_STATUS {
   PENDING = "PENDING",
+  /**
+   * Todos os responsáveis do CLIENTE assinaram; falta a contra-assinatura da
+   * Ankaa. Existe para que "o que depende de nós" seja visível numa lista.
+   */
+  SIGNED = "SIGNED",
+  /**
+   * Passou da validade sem todas as assinaturas; volta ao comercial para
+   * reanálise do valor. ⚠️ `DUE` já se chama "Vencido" na tela e é outra coisa
+   * (parcela em atraso) — o rótulo aqui é "Aguardando Reanálise".
+   */
+  EXPIRED = "EXPIRED",
   BUDGET_APPROVED = "BUDGET_APPROVED",
   BILLING_APPROVED = "BILLING_APPROVED",
   UPCOMING = "UPCOMING",

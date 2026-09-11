@@ -3,7 +3,7 @@ import type { File } from './file';
 import type { Installment } from './invoice';
 import type { Task } from './task';
 
-export type TASK_QUOTE_STATUS = 'PENDING' | 'BUDGET_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
+export type TASK_QUOTE_STATUS = 'PENDING' | 'SIGNED' | 'EXPIRED' | 'BUDGET_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
 export type QUOTE_BILLING_SPLIT = 'JOINT' | 'PER_TASK';
 

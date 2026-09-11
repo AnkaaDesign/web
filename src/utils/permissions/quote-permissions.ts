@@ -68,6 +68,18 @@ const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   // CANCELLED state. Once billing has started, cancellation is no longer a
   // direct quote transition (the billing flow must be unwound first).
   PENDING: ['BUDGET_APPROVED', 'CANCELLED'],
+  // SIGNED e EXPIRED são escritos pela CERIMÔNIA, nunca escolhidos num menu —
+  // por isso não são DESTINO de ninguém aqui. O que estas duas linhas declaram é
+  // como se SAI deles. Espelham `validateStatusTransition` na API: divergir faz
+  // a tela oferecer uma transição que o servidor devolve em 400.
+  //
+  // De SIGNED não se vai para EXPIRED: aceita a proposta dentro do prazo, o
+  // relógio para de correr contra o cliente — o que falta é nosso.
+  SIGNED: ['BUDGET_APPROVED', 'PENDING', 'CANCELLED'],
+  // De EXPIRED não se vai direto para BUDGET_APPROVED: aprovar sem assinatura é
+  // o que a cerimônia existe para impedir. Reformular o valor já devolve o
+  // orçamento a PENDING pelo auto-revert do servidor.
+  EXPIRED: ['PENDING', 'CANCELLED'],
   // SETTLED from BUDGET_APPROVED covers "direct" quotes (orçamento direto)
   // paid upfront with no billing/installment phase. The server's settleManually
   // handles this safely (no installments/boletos exist yet to clean up).

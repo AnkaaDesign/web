@@ -63,6 +63,14 @@ function notYetInvoiced(): PredicateNode {
     op: "or",
     nodes: [
       { op: "eq", field: "status", value: TASK_QUOTE_STATUS.PENDING },
+      // Espelha `NOT_YET_INVOICED` no servidor. Assinado pelo cliente é
+      // pré-faturamento: a nota vem a seguir, e faltar o número do pedido ainda
+      // trava. EXPIRED fica de fora dos dois lados — ali quem segura a nota é o
+      // PREÇO, que voltou para a mesa do comercial.
+      //
+      // ⚠️ Se os dois lados divergirem, a contagem do menu (que vem do servidor)
+      // e a linha piscando na tela deixam de concordar.
+      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.SIGNED },
       { op: "eq", field: "status", value: TASK_QUOTE_STATUS.BUDGET_APPROVED },
     ],
   };
