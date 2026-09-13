@@ -19,6 +19,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCircleCheck,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -95,7 +96,8 @@ export const RecurrentPayablesListPage = () => {
 
   const { data: monthly, isLoading: monthlyLoading } = useRecurrentPayableMonthly(competence);
   const { data: payables, isLoading: listLoading } = useRecurrentPayables();
-  const { update, delete: remove, pay, deleteMutation, payMutation } = useRecurrentPayableMutations();
+  const { update, delete: remove, pay, unpay, deleteMutation, payMutation, unpayMutation } =
+    useRecurrentPayableMutations();
 
   const [deleteTarget, setDeleteTarget] = useState<RecurrentPayable | null>(null);
   const [payTarget, setPayTarget] = useState<{ payable: RecurrentPayable; item: RecurrentPayableMonthlyItem } | null>(null);
@@ -192,6 +194,26 @@ export const RecurrentPayablesListPage = () => {
       }
     },
     [monthlyById, pay],
+  );
+
+  // Estorno. A bill whose month is fully settled never reached the breakdown
+  // dialog (it is gated on pendingCount), so a wrong baixa had no lever at all
+  // on this screen. Multi-occurrence months open the breakdown and estornam the
+  // specific charge; a single-occurrence month reverts straight away.
+  const startUnpay = useCallback(
+    (p: RecurrentPayable) => {
+      setContextMenu(null);
+      const item = monthlyById.get(p.id);
+      if (!item || item.paidCount === 0) return;
+      if (item.occurrenceCount > 1) {
+        setOccTarget(p);
+        return;
+      }
+      const occurrenceId =
+        item.occurrenceId ?? item.occurrences.find((o) => o.status === "PAID")?.occurrenceId ?? null;
+      if (occurrenceId) unpay(occurrenceId);
+    },
+    [monthlyById, unpay],
   );
 
   const columns: StandardizedColumn<RecurrentPayable>[] = [
@@ -413,6 +435,17 @@ export const RecurrentPayablesListPage = () => {
                   <DropdownMenuSeparator />
                 </>
               )}
+              {(monthlyById.get(contextMenu.item.id)?.paidCount ?? 0) > 0 && (
+                <>
+                  <DropdownMenuItem onClick={() => startUnpay(contextMenu.item)}>
+                    <IconArrowBackUp className="mr-2 h-4 w-4" />
+                    {(monthlyById.get(contextMenu.item.id)?.occurrenceCount ?? 1) > 1
+                      ? "Estornar ocorrências"
+                      : "Estornar pagamento"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => openEdit(contextMenu.item)}>
                 <IconEdit className="mr-2 h-4 w-4" />
                 Editar
@@ -455,11 +488,12 @@ export const RecurrentPayablesListPage = () => {
       <OccurrencesPayDialog
         payable={occTarget}
         item={occTarget ? monthlyById.get(occTarget.id) ?? null : null}
-        isPending={payMutation.isPending}
+        isPending={payMutation.isPending || unpayMutation.isPending}
         onClose={() => setOccTarget(null)}
         onPay={(occurrenceId, paidAmount) =>
           pay({ occurrenceId, body: paidAmount != null ? { paidAmount } : {} })
         }
+        onUnpay={(occurrenceId) => unpay(occurrenceId)}
       />
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -467,7 +501,11 @@ export const RecurrentPayablesListPage = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir conta recorrente</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget ? `"${deleteTarget.name}" será removida e deixará de gerar novas cobranças mensais.` : ""}
+              {deleteTarget
+                ? `"${deleteTarget.name}" será removida e deixará de gerar novas cobranças mensais. ` +
+                  `Se a conta já tiver parcelas pagas ou conciliadas com o extrato, o histórico não é apagado: ` +
+                  `ela é desativada e as cobranças futuras em aberto são canceladas.`
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -575,12 +613,14 @@ function OccurrencesPayDialog({
   isPending,
   onClose,
   onPay,
+  onUnpay,
 }: {
   payable: RecurrentPayable | null;
   item: RecurrentPayableMonthlyItem | null;
   isPending: boolean;
   onClose: () => void;
   onPay: (occurrenceId: string, paidAmount: number | null) => void;
+  onUnpay: (occurrenceId: string) => void;
 }) {
   // Typed amount per VARIABLE occurrence (seeded from the forecast on open).
   const [amounts, setAmounts] = useState<Record<string, number | undefined>>({});
@@ -598,9 +638,11 @@ function OccurrencesPayDialog({
     <Dialog open={payable !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Pagar ocorrências</DialogTitle>
+          <DialogTitle>Ocorrências do mês</DialogTitle>
           <DialogDescription>
-            {payable ? `Marque cada cobrança de "${payable.name}" neste mês como paga.` : ""}
+            {payable
+              ? `Marque cada cobrança de "${payable.name}" neste mês como paga — ou estorne uma baixa feita por engano.`
+              : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-2 overflow-auto">
@@ -648,18 +690,36 @@ function OccurrencesPayDialog({
                     <span className="text-sm text-muted-foreground tabular-nums">{formatCurrency(o.forecastAmount)}</span>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!canPay || isPending || (isVariable && !(o.occurrenceId && amounts[o.occurrenceId]))}
-                  onClick={() => {
-                    if (!o.occurrenceId) return;
-                    onPay(o.occurrenceId, isVariable ? amounts[o.occurrenceId] ?? null : null);
-                  }}
-                >
-                  {paid ? "Pago" : "Pagar"}
-                </Button>
+                {/* Uma baixa era mão única: a linha paga só exibia um botão
+                    morto escrito "Pago". O estorno devolve a ocorrência para em
+                    aberto e reverte a conciliação bancária que ela tivesse. */}
+                {paid ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    disabled={!o.occurrenceId || isPending}
+                    onClick={() => {
+                      if (o.occurrenceId) onUnpay(o.occurrenceId);
+                    }}
+                  >
+                    <IconArrowBackUp className="h-4 w-4 mr-1" /> Estornar
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canPay || isPending || (isVariable && !(o.occurrenceId && amounts[o.occurrenceId]))}
+                    onClick={() => {
+                      if (!o.occurrenceId) return;
+                      onPay(o.occurrenceId, isVariable ? amounts[o.occurrenceId] ?? null : null);
+                    }}
+                  >
+                    Pagar
+                  </Button>
+                )}
               </div>
             );
           })}

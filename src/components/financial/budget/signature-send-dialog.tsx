@@ -383,7 +383,7 @@ export function SignatureSendDialog({
                 </div>
               )}
 
-              {/* ---- Identificação do veículo ----
+{/* ---- Identificação do veículo ----
                    Com um veículo, a frase de sempre. Com N, o aviso diz em
                    QUANTOS falta: um orçamento de sessenta caminhões em que só o
                    de nº 40 está sem placa não pode ser anunciado como "este
@@ -391,7 +391,12 @@ export function SignatureSendDialog({
                    que faltam cinquenta e nove como se fosse um.
 
                    `vehicles` é a fonte; `vehicle` (o primeiro) é o recuo para
-                   uma API anterior a esta feature. */}
+                   uma API anterior a esta feature.
+
+                   O TEXTO deixou de anunciar uma perda: desde as lacunas de
+                   cadastro tardio, o dado é carimbado na lacuna quando chega,
+                   sem tocar nos bytes assinados, e o aditivo de identificação
+                   sai na conclusão selado com o mesmo certificado. */}
               {(() => {
                 const vehicles = preflight?.vehicles ?? [];
                 const withGaps = vehicles.filter((v) => v.missing.length > 0);
@@ -399,6 +404,8 @@ export function SignatureSendDialog({
                 if (blocked) return null;
                 if (withGaps.length === 0 && legacyMissing.length === 0) return null;
                 const multi = vehicles.length > 1;
+                const missing = withGaps[0]?.missing ?? legacyMissing;
+                const plural = multi || missing.length > 1;
                 return (
                   <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
                     <IconTruck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -408,11 +415,14 @@ export function SignatureSendDialog({
                           ? withGaps.length === vehicles.length
                             ? `Os ${vehicles.length} veículos deste orçamento estão com dados de identificação em branco.`
                             : `${withGaps.length} de ${vehicles.length} veículos estão com dados de identificação em branco.`
-                          : `Este orçamento está sem ${(withGaps[0]?.missing ?? legacyMissing).join(" e ")} do veículo.`}
+                          : `Este orçamento está sem ${missing.join(" e ")} do veículo.`}
                       </strong>{" "}
-                      {multi
-                        ? 'O documento é congelado como está. Os campos em branco saem como "a registrar" e não serão preenchidos no documento assinado — o aditivo de identificação, emitido na entrega, é que os declara. Se já souber, preencha antes de enviar.'
-                        : "O documento é congelado como está — esses dados não vão constar do documento assinado, mesmo que sejam preenchidos depois. Se já souber, preencha antes de enviar."}
+                      O documento reserva o espaço e imprime "a registrar":{" "}
+                      {plural ? "os dados são carimbados" : "o dado é carimbado"} na lacuna
+                      assim que {plural ? "forem cadastrados" : "for cadastrado"}, sem tocar
+                      nos bytes assinados, e na conclusão da tarefa sai um aditivo de
+                      identificação selado com o mesmo certificado. Preencher antes de
+                      enviar continua sendo o melhor caminho, se já souber.
                     </span>
                   </div>
                 );

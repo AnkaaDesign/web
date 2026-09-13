@@ -40,6 +40,9 @@ export function usePrinterClient() {
   const [labelRoll, setLabelRoll] = useState<LoadedLabelRoll | null>(null);
   const [isReadingRoll, setIsReadingRoll] = useState(false);
   const isSerialSupported = typeof navigator !== "undefined" && "serial" in navigator;
+  // Guards the visibility-driven auto-disconnect below from cutting off a print
+  // that's actually in flight if the operator alt-tabs mid-print.
+  const printingRef = useRef(false);
 
   useEffect(() => {
     const onConnect = (event: { info?: { deviceName?: string } }) => {
@@ -59,40 +62,58 @@ export function usePrinterClient() {
     };
   }, [client]);
 
+  // Silent reconnect to a port the browser already granted access to — used
+  // both on mount and whenever this tab regains focus (see below). Never pops
+  // the OS picker, so it's safe to fire without a user gesture.
+  const attemptSilentReconnect = useCallback(async () => {
+    if (!user || !isSerialSupported || client.isConnected()) return;
+    try {
+      const ports = await navigator.serial.getPorts();
+      if (ports.length === 0) return;
+
+      const stored = getLocalStorage(LAST_PRINTER_PORT_STORAGE_KEY);
+      const storedInfo: StoredPrinterPort | null = stored ? JSON.parse(stored) : null;
+
+      const match = storedInfo
+        ? ports.find((port) => {
+            const info = port.getInfo();
+            return info.usbVendorId === storedInfo.usbVendorId && info.usbProductId === storedInfo.usbProductId;
+          })
+        : ports.length === 1
+          ? ports[0]
+          : undefined;
+
+      if (!match) return;
+      await client.reconnectSilently(match);
+    } catch (error) {
+      console.warn("[printer] reconexão automática não disponível", error);
+    }
+  }, [client, user, isSerialSupported]);
+
   // Auto-reconnect once, silently, after the user is authenticated — a
   // disconnected/powered-off printer is a normal state here, never an error.
   useEffect(() => {
-    if (!user || !isSerialSupported) return;
-    let cancelled = false;
+    void attemptSilentReconnect();
+  }, [attemptSilentReconnect]);
 
-    (async () => {
-      try {
-        const ports = await navigator.serial.getPorts();
-        if (ports.length === 0 || cancelled) return;
-
-        const stored = getLocalStorage(LAST_PRINTER_PORT_STORAGE_KEY);
-        const storedInfo: StoredPrinterPort | null = stored ? JSON.parse(stored) : null;
-
-        const match = storedInfo
-          ? ports.find((port) => {
-              const info = port.getInfo();
-              return info.usbVendorId === storedInfo.usbVendorId && info.usbProductId === storedInfo.usbProductId;
-            })
-          : ports.length === 1
-            ? ports[0]
-            : undefined;
-
-        if (!match || cancelled) return;
-        await client.reconnectSilently(match);
-      } catch (error) {
-        console.warn("[printer] reconexão automática não disponível", error);
+  // Chrome only allows ONE open handle per physical serial port across the
+  // whole browser — an old background tab still holding it is exactly why a
+  // fresh tab's connect fails with "Failed to open serial port". So this tab
+  // releases the port the moment it's no longer the one in front, and quietly
+  // takes it back when it becomes the active tab again — the printer is only
+  // ever held by whichever tab the operator is actually looking at.
+  useEffect(() => {
+    if (!isSerialSupported) return;
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (client.isConnected() && !printingRef.current) void client.disconnect().catch(() => {});
+      } else {
+        void attemptSilentReconnect();
       }
-    })();
-
-    return () => {
-      cancelled = true;
     };
-  }, [client, user, isSerialSupported]);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [client, isSerialSupported, attemptSilentReconnect]);
 
   /** Must only ever be called from a real click handler — it triggers the OS device picker, which requires a user gesture. */
   const connectManually = useCallback(async () => {
@@ -147,6 +168,7 @@ export function usePrinterClient() {
     async (format: LabelFormat, paint: PrintablePaint) => {
       if (!connected) throw new Error("Impressora não conectada");
 
+      printingRef.current = true;
       const paintTypeName = paint.paintType?.name || "—";
 
       // Diagnostic trail for this one print attempt only — attached right
@@ -214,6 +236,7 @@ export function usePrinterClient() {
           .catch(() => {});
         throw error;
       } finally {
+        printingRef.current = false;
         client.off("packetsent", onPacketSent);
         client.off("packetreceived", onPacketReceived);
       }

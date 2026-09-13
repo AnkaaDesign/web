@@ -251,6 +251,22 @@ export function useCancelNfse() {
   });
 }
 
+// Reenvia a NFS-e ao ADN. Devolve o estado depois do reenvio — `hasError` continua true
+// quando o ambiente nacional segue fora, então quem chama precisa olhar o resultado, e não
+// só o sucesso da mutation, antes de dizer ao usuário que resolveu.
+export function useResendNfseToAdn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (nfseDocumentId: string) =>
+      nfseService.resendToAdn(nfseDocumentId).then((r) => r.data),
+    onSuccess: () => {
+      invalidateAllBillingCaches(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['nfse'] });
+    },
+  });
+}
+
 // Cancel NFS-e by its local document id — works for ANY note (incl. invoice-less orphans).
 // Uses the document-scoped endpoint PUT /nfse/document/:id/cancel. Returns the CancelNfseResult.
 export function useCancelNfseByDocument() {
