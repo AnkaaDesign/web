@@ -334,6 +334,26 @@ export class TaskService {
     return response.data;
   }
 
+  /**
+   * AS TAREFAS E O ORÇAMENTO, NUMA TRANSAÇÃO SÓ.
+   *
+   * A criação de orçamento fazia N+1 requisições — uma por veículo, com um aviso
+   * de sucesso para cada, e uma última para o orçamento. Quando a última falhava,
+   * as N tarefas ficavam gravadas sem orçamento. Aqui é tudo ou nada: o servidor
+   * grava as tarefas e o orçamento no mesmo commit e responde uma vez.
+   */
+  async batchCreateTasksWithQuote(
+    data: { tasks: any[]; quote: any },
+    query?: TaskQueryFormData,
+  ): Promise<{ success: boolean; message: string; data: { tasks: Task[]; quote: any } }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      message: string;
+      data: { tasks: Task[]; quote: any };
+    }>(`${this.basePath}/batch-with-quote`, data, { params: query });
+    return response.data;
+  }
+
   async batchUpdateTasks(data: TaskBatchUpdateFormData | FormData, query?: TaskQueryFormData): Promise<TaskBatchUpdateResponse<Task>> {
     // Don't set Content-Type for FormData - let axios handle it automatically
     const headers = data instanceof FormData ? {} : {};
@@ -474,6 +494,7 @@ export const deleteTask = (id: string) => taskService.deleteTask(id);
 
 // Batch Operations
 export const batchCreateTasks = (data: TaskBatchCreateFormData, query?: TaskQueryFormData) => taskService.batchCreateTasks(data, query);
+export const batchCreateTasksWithQuote = (data: { tasks: any[]; quote: any }, query?: TaskQueryFormData) => taskService.batchCreateTasksWithQuote(data, query);
 export const batchUpdateTasks = (data: TaskBatchUpdateFormData | FormData, query?: TaskQueryFormData) => taskService.batchUpdateTasks(data, query);
 export const batchDeleteTasks = (data: TaskBatchDeleteFormData, query?: TaskQueryFormData) => taskService.batchDeleteTasks(data, query);
 

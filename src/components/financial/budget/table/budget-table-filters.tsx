@@ -19,7 +19,17 @@ import { buildBudgetOrderBy } from "./budget-table-columns";
 export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 
 /** The list is the BUDGET half of a quote's lifecycle — everything past approval belongs to Faturamento. */
-export const BUDGET_QUOTE_STATUSES = [TASK_QUOTE_STATUS.PENDING, TASK_QUOTE_STATUS.BUDGET_APPROVED];
+// Os estados que a lista de ORÇAMENTOS mostra — os anteriores ao faturamento.
+// SIGNED e EXPIRED precisam estar aqui: sem eles o comercial não consegue
+// filtrar "o que está esperando a nossa assinatura" nem "o que venceu e preciso
+// reprecificar", que são as duas perguntas que os dois estados existem para
+// responder.
+export const BUDGET_QUOTE_STATUSES = [
+  TASK_QUOTE_STATUS.PENDING,
+  TASK_QUOTE_STATUS.SIGNED,
+  TASK_QUOTE_STATUS.EXPIRED,
+  TASK_QUOTE_STATUS.BUDGET_APPROVED,
+];
 
 const BUDGET_QUOTE_STATUS_OPTIONS = BUDGET_QUOTE_STATUSES.map((value) => ({ value, label: TASK_QUOTE_STATUS_LABELS[value] }));
 
@@ -34,8 +44,10 @@ const TASK_STATUS_OPTIONS = (Object.values(TASK_STATUS) as TASK_STATUS[]).map((v
  * Only what the columns render. Kept as a top-level `include` (not a bare `select`) so the API's
  * Decimal → number mapping runs and `quote.total` arrives as a number.
  *
- * `quote.id` + `customerConfigs.customerId/orderNumber` are here for the attention engine, not for
- * a column: registering the quotes is what lets a rule blink the row (see `rules.ts`).
+ * `quote.id` + `customerConfigs.customerId` are here for the attention engine, not for a column:
+ * registering the quotes is what lets a rule blink the row (see `rules.ts`). O número do pedido
+ * NÃO está aqui: ele é da TAREFA (`Task.customerOrderNumber`), e o `include` de topo já traz todo
+ * escalar da tarefa.
  */
 export const BUDGET_LIST_INCLUDE = {
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
@@ -50,11 +62,17 @@ export const BUDGET_LIST_INCLUDE = {
       statusOrder: true,
       expiresAt: true,
       guaranteeYears: true,
+      // O divisor do valor: `total` é o contrato (`por veículo × N`) e a linha é
+      // um veículo. Ver `taskQuoteTotal` em `quote-table-shared`.
+      vehicleCount: true,
+      billingSplit: true,
       customerConfigs: {
         select: {
           id: true,
           customerId: true,
-          orderNumber: true,
+          // A tarefa desta fatia: com `PER_TASK` são sessenta configurações do
+          // mesmo cliente, e a linha só fala pela dela.
+          taskId: true,
           // See BILLING_LIST_INCLUDE — the attention rules read both of these.
           generateInvoice: true,
           customer: { select: { id: true, ...ATTENTION_CUSTOMER_SELECT } },
@@ -191,7 +209,9 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
 
   const where: Record<string, unknown> = { quote: { is: quoteWhere } };
-  if (orderNumberWhere) where.AND = [{ quote: { is: orderNumberWhere } }];
+  // No nível da TAREFA: o número do pedido é dela agora (ver
+  // `orderNumberPresenceWhere`), e não do orçamento.
+  if (orderNumberWhere) where.AND = [orderNumberWhere];
   q.where = where;
 
   const taskStatuses = Array.isArray(filters.taskStatuses) ? filters.taskStatuses.filter((s): s is string => typeof s === "string") : [];

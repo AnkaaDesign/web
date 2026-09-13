@@ -18,6 +18,22 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
       label: 'Pendente',
       variant: 'secondary',
     },
+    // Cor PRÓPRIA, e não o verde de `approved`/`completed`: verde nesta tabela
+    // quer dizer "terminou", e aqui falta a contra-assinatura da Ankaa. Também
+    // não é o azul de BUDGET_APPROVED e PARTIAL, que já se repetem entre si —
+    // quem varre a lista atrás do que está parado do nosso lado precisa achar
+    // esta linha sem ler o rótulo.
+    SIGNED: {
+      label: 'Assinado',
+      variant: 'teal',
+    },
+    // ⚠️ NÃO é o vermelho de `destructive`, que é o do DUE logo abaixo (parcela
+    // vencida — dinheiro atrasado, e só o cliente pagando resolve). Vencido sem
+    // assinatura não é perda: é trabalho voltando para a mesa do comercial.
+    EXPIRED: {
+      label: 'Aguardando Reanálise',
+      variant: 'expired',
+    },
     BUDGET_APPROVED: {
       label: 'Orçamento Aprovado',
       variant: 'processing',

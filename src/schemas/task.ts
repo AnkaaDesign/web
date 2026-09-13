@@ -274,6 +274,7 @@ export const taskOrderBySchema = z
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
       serialNumber: orderByDirectionSchema.optional(),
+      customerOrderNumber: orderByDirectionSchema.optional(),
       bonificationOrder: orderByDirectionSchema.optional(),
       entryDate: orderByDirectionSchema.optional(),
       term: orderByDirectionSchema.optional(),
@@ -290,6 +291,7 @@ export const taskOrderBySchema = z
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
         serialNumber: orderByDirectionSchema.optional(),
+        customerOrderNumber: orderByDirectionSchema.optional(),
         bonificationOrder: orderByDirectionSchema.optional(),
         entryDate: orderByDirectionSchema.optional(),
         term: orderByDirectionSchema.optional(),
@@ -318,6 +320,20 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       status: z.union([z.nativeEnum(TASK_STATUS), z.object({ in: z.array(z.nativeEnum(TASK_STATUS)).optional() })]).optional(),
       statusOrder: z.union([z.number(), z.object({ gte: z.number().optional(), lte: z.number().optional() })]).optional(),
       serialNumber: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
+      // Pedido de compra do cliente, por VEÍCULO — o filtro "sem pedido" da lista
+      // de Faturamento pergunta por ele (`null` OU string vazia).
+      customerOrderNumber: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            contains: z.string().optional(),
+            equals: z.string().nullable().optional(),
+            not: z.union([z.string(), z.null()]).optional(),
+            in: z.array(z.string()).optional(),
+          }),
+        ])
+        .optional(),
       details: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
       bonification: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
       entryDate: z.object({ gte: z.coerce.date().optional(), lte: z.coerce.date().optional() }).optional(),
@@ -1181,6 +1197,19 @@ export const taskCreateSchema = z
       .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
         message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
       }),
+    /**
+     * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
+     *
+     * Livre e não único: os N caminhões de um orçamento podem vir num pedido só,
+     * em pedidos diferentes ou em blocos. Morava na configuração de faturamento
+     * (por cliente), o que obrigava todos a citarem o mesmo número.
+     */
+    customerOrderNumber: z
+      .string()
+      .max(100, "Máximo de 100 caracteres")
+      .optional()
+      .nullable()
+      .transform((val) => (val === "" ? null : val)),
     serialNumberFrom: z.number().int().positive("Número de série inicial deve ser positivo").optional(),
     serialNumberTo: z.number().int().positive("Número de série final deve ser positivo").optional(),
     details: createDescriptionSchema(1, 1000, false).nullable().optional(),
@@ -1317,6 +1346,19 @@ export const taskUpdateSchema = z
       .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
         message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
       }),
+    /**
+     * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
+     *
+     * Livre e não único: os N caminhões de um orçamento podem vir num pedido só,
+     * em pedidos diferentes ou em blocos. Morava na configuração de faturamento
+     * (por cliente), o que obrigava todos a citarem o mesmo número.
+     */
+    customerOrderNumber: z
+      .string()
+      .max(100, "Máximo de 100 caracteres")
+      .optional()
+      .nullable()
+      .transform((val) => (val === "" ? null : val)),
     details: z.string().max(1000, "Detalhes muito longos (máximo 1000 caracteres)").nullable().optional(),
     entryDate: nullableDate.optional(),
     term: nullableDate.optional(),
@@ -1506,6 +1548,7 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   status: task.status,
   statusOrder: task.statusOrder || undefined,
   serialNumber: task.serialNumber,
+  customerOrderNumber: task.customerOrderNumber,
   details: task.details,
   entryDate: task.entryDate,
   term: task.term,

@@ -14,8 +14,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
 import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, IconFileTypePdf, IconDownload, IconChevronDown, IconShare } from "@tabler/icons-react";
+import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
+import {
+  quoteTasks,
+  primaryTask,
+  orderNumberLabel,
+  hasMultipleCustomers,
+  coveredTaskIds,
+} from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 
@@ -185,7 +192,9 @@ export function PublicServiceReportPage() {
   // O principal segue a ordem de preferência de funções (COMERCIAL primeiro): a
   // função PROPRIETÁRIO, que era o critério aqui, deixou de existir. Ver
   // `pickPrimaryResponsible`.
-  const primaryResponsible = pickPrimaryResponsible<any>(quote.task?.responsibles);
+  const primaryResponsible = pickPrimaryResponsible<any>(
+    quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? []),
+  );
   const contactName = activeConfig?.responsible?.name || primaryResponsible?.name || "";
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
@@ -227,7 +236,10 @@ export function PublicServiceReportPage() {
   // Total below doesn't include — it stays out of the filtered view and is
   // reunited with the rest in Completo.
   const serviceCustomerId = (svc: any): string | undefined => svc?.invoiceToCustomerId || svc?.invoiceToCustomer?.id;
-  const isMultiCustomerQuote = (quote.customerConfigs?.length ?? 0) >= 2;
+  // CLIENTES DISTINTOS, nunca faturas — ver a nota gêmea na página pública do
+  // orçamento. Um orçamento de quatro caminhões de um cliente só tem quatro
+  // faturas e UM cliente.
+  const isMultiCustomerQuote = hasMultipleCustomers(quote.customerConfigs);
   const services = (quote.services || []).filter((s: any) => {
     if (!selectedCustomerId) return true;
     const svcCustomer = serviceCustomerId(s);
@@ -243,8 +255,8 @@ export function PublicServiceReportPage() {
   const invoiceCustomers = (relevantConfigs.length > 0
     ? relevantConfigs.map((c: any) => ({ name: configName(c), doc: customerDoc(c?.customer) }))
     : [{
-        name: quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "",
-        doc: customerDoc(quote.task?.customer),
+        name: primaryTask<any>(quote)?.customer?.corporateName || primaryTask<any>(quote)?.customer?.fantasyName || "",
+        doc: customerDoc(primaryTask<any>(quote)?.customer),
       }]
   ).filter((c: { name: string }) => !!c.name);
   const servicesSum = services.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
@@ -312,12 +324,12 @@ export function PublicServiceReportPage() {
       const configTotal = config?.total ?? quote.total;
       const firstDueDate: Date | string | null =
         configInstallments[0]?.dueDate
-        ?? (quote.task?.finishedAt && hasStructuredPaymentConfig
+        ?? (primaryTask<any>(quote)?.finishedAt && hasStructuredPaymentConfig
           ? projectInstallments(
               configTotal,
               config?.paymentConfig,
               config?.paymentCondition,
-              new Date(quote.task.finishedAt),
+              new Date(primaryTask<any>(quote)!.finishedAt),
             )[0]?.dueDate ?? null
           : null);
 
@@ -336,9 +348,20 @@ export function PublicServiceReportPage() {
           paymentMethod,
           firstDueDate,
         }),
-        // Customer's purchase-order number, shown with the payment terms
-        // exactly as the budget page does.
-        orderNumber: (config?.orderNumber as string | null) || null,
+        // O PEDIDO DE COMPRA DO CLIENTE, mostrado junto das condições de
+        // pagamento, exatamente como na página do orçamento.
+        //
+        // Mora na TAREFA (`Task.customerOrderNumber`) e responde pela COBERTURA
+        // desta fatura: o pedido do caminhão quando ela cobra um, os do lote
+        // quando cobra vinte, os N quando é conjunta — como `orderNumberLabel`
+        // monta na nota. Era `config.taskId`, coluna removida em
+        // `20260913120000_billing_coverage`.
+        orderNumber: (() => {
+          const covered = new Set(coveredTaskIds(config));
+          const all = quoteTasks<any>(quote);
+          const own = covered.size > 0 ? all.filter((t: any) => covered.has(t.id)) : [];
+          return orderNumberLabel(own.length > 0 ? own : all);
+        })(),
       };
     })
     .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);
@@ -358,9 +381,35 @@ export function PublicServiceReportPage() {
     .flatMap((c: any) => c.invoice?.nfseDocuments || [])
     .filter((doc: any) => doc.status === "AUTHORIZED" && doc.elotechNfseId);
 
-  const serviceOrders = (quote.task?.serviceOrders || [])
-    .filter((so: any) => so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
-    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+  // AS ORDENS DE SERVIÇO DE TODOS OS VEÍCULOS.
+  //
+  // Era só as da primeira tarefa. Num orçamento de sessenta caminhões isso
+  // mostraria as fotos de um e omitiria as dos outros cinquenta e nove — um
+  // dossiê que parece completo e não é, que é o pior formato possível para uma
+  // peça que existe para provar o que foi feito.
+  //
+  // Cada ordem carrega o veículo a que pertence (`_vehicle`), porque com sessenta
+  // caminhões há sessenta blocos "Logomarca Laterais" e o número de série é a
+  // única coisa que os distingue. Agrupado por VEÍCULO antes de por posição: o
+  // dossiê fotográfico se lê caminhão a caminhão.
+  const quoteTaskRows = quoteTasks<any>(quote);
+  const multiVehicleDossier = quoteTaskRows.length > 1;
+  const serviceOrders = quoteTaskRows.flatMap((task: any) =>
+    (task?.serviceOrders || [])
+      .filter((so: any) => so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+      .map((so: any) => ({
+        ...so,
+        _vehicle: multiVehicleDossier
+          ? [
+              task?.serialNumber ? `nº ${task.serialNumber}` : null,
+              task?.truck?.plate ?? null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null
+          : null,
+      })),
+  );
 
   const handleCopyLink = async () => {
     try { await navigator.clipboard.writeText(window.location.href); toast.success("Link copiado!"); }
@@ -407,7 +456,7 @@ export function PublicServiceReportPage() {
       // diferentes). O .zip logo abaixo leva o MESMO nome, só com outra extensão.
       a.download =
         filenameFromDisposition(res.headers.get("content-disposition")) ??
-        dossierPdfFilename(quote.task?.customer, quote.budgetNumber);
+        dossierPdfFilename(primaryTask<any>(quote)?.customer, quote.budgetNumber);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -483,7 +532,7 @@ export function PublicServiceReportPage() {
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = dossierArchiveFilename(quote.task?.customer, quote.budgetNumber);
+      a.download = dossierArchiveFilename(primaryTask<any>(quote)?.customer, quote.budgetNumber);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -601,30 +650,17 @@ export function PublicServiceReportPage() {
                     ))}
                   </>
                 )}
-                {(() => {
-                  const truckCategoryLabel = quote.task?.truck?.category
-                    ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category)
-                    : null;
-                  const truckImplementLabel = quote.task?.truck?.implementType
-                    ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType)
-                    : null;
-                  const parts: React.ReactNode[] = [];
-                  if (quote.task?.serialNumber) parts.push(<> nº de série: <strong>{quote.task.serialNumber}</strong></>);
-                  if (quote.task?.truck?.plate) parts.push(<> placa: <strong>{quote.task.truck.plate}</strong></>);
-                  if (quote.task?.truck?.chassisNumber) parts.push(<> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>);
-                  if (truckCategoryLabel) parts.push(<> categoria: <strong>{truckCategoryLabel}</strong></>);
-                  if (truckImplementLabel) parts.push(<> implemento: <strong>{truckImplementLabel}</strong></>);
-                  if (!parts.length) return null;
-                  return (
-                    <>
-                      {" "}no veículo
-                      {parts.map((p, i) => (
-                        <span key={i}>{i > 0 && ","}{p}</span>
-                      ))}
-                    </>
-                  );
-                })()}.
+                {quoteTasks(quote).length > 0 && (
+                  <>
+                    {" "}
+                    {quoteTasks(quote).length > 1 ? "nos veículos" : "no veículo"}
+                  </>
+                )}
+                {quoteTasks(quote).length > 0 ? ":" : "."}
               </p>
+              {/* A IDENTIFICAÇÃO EM TABELA. A frase acima só a anuncia — quem
+                  identifica é ela. Espelha `.vehicle-table` do PDF assinado. */}
+              <QuoteVehicleTable quote={quote} />
             </div>
 
             {/* Services */}
@@ -748,7 +784,7 @@ export function PublicServiceReportPage() {
                   )}
                 </p>
               </div>
-            ) : quote.task?.term ? (
+            ) : primaryTask<any>(quote)?.term ? (
               <div className="mb-6">
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Prazo de entrega
@@ -756,7 +792,7 @@ export function PublicServiceReportPage() {
                 {/* Ramo que o PDF não tem: `task.term` não entra no snapshot do orçamento.
                     Mantido em paridade com a página do orçamento, que já o exibe. */}
                 <p className="text-gray-700 text-justify">
-                  O prazo de entrega é de {formatDate(quote.task.term)}, desde que o implemento esteja nas
+                  O prazo de entrega é de {formatDate(primaryTask<any>(quote)!.term)}, desde que o implemento esteja nas
                   condições previamente informada e não haja alterações nos serviços descritos.
                 </p>
               </div>
@@ -926,6 +962,15 @@ export function PublicServiceReportPage() {
                         {desc || "Serviço"}
                         {so.observation && so.description !== "Outros" && (
                           <span className="ml-2 font-normal text-xs opacity-80">{so.observation}</span>
+                        )}
+                        {/* DE QUE VEÍCULO É ESTE BLOCO. Só sai quando o orçamento
+                            cobre mais de um: com sessenta caminhões há sessenta
+                            blocos "Logomarca Laterais", e o número de série é a
+                            única coisa que os distingue. */}
+                        {so._vehicle && (
+                          <span className="ml-2 font-normal text-xs opacity-90">
+                            · {so._vehicle}
+                          </span>
                         )}
                       </div>
                       <div className="p-3 space-y-3">

@@ -13,7 +13,7 @@ import {
 } from '@tabler/icons-react';
 import { formatCurrency, formatDate } from '@/utils';
 import { formatInstallmentPaymentForm } from '@/utils/installment-payment-method';
-import { useInvoicesByTask } from '@/hooks/production/use-invoice';
+import { useTaskBillingInvoices } from '@/hooks/production/use-invoice';
 import { InvoiceStatusBadge } from './invoice-status-badge';
 import { InstallmentStatusBadge } from './installment-status-badge';
 import { BankSlipStatusBadge } from './bank-slip-status-badge';
@@ -30,10 +30,14 @@ import type { File as CustomFile } from '@/types/file';
 
 interface InvoiceListCardProps {
   taskId: string;
+  /** O orçamento da tarefa, quando existe — ver a nota no hook abaixo. */
+  quoteId?: string;
 }
 
-export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
-  const { data: response, isLoading } = useInvoicesByTask(taskId);
+export function InvoiceListCard({ taskId, quoteId }: InvoiceListCardProps) {
+  // Pela rota do ORÇAMENTO quando ele existe, filtradas pela cobertura: numa
+  // fatura conjunta `Invoice.taskId` é nulo e a rota por tarefa devolve vazio.
+  const { data: response, isLoading } = useTaskBillingInvoices(taskId, quoteId);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 

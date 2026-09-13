@@ -58,6 +58,13 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
+import {
+  quoteVehicleCount,
+  quoteTasks,
+  dedupeConfigsByCustomer,
+  hasMultipleCustomers,
+} from "@/utils/quote-tasks";
+import { expandConfigsIntoLots } from "@/components/financial/shared/billing-split-field";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -225,6 +232,16 @@ const FinancialBudgetDetailPageInner = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, DESTE veículo
+       * (`Task.customerOrderNumber`).
+       *
+       * Irmão da placa e da série, e no mesmo passo que elas: o pedido
+       * identifica a ENTREGA. Aqui ele é só deste caminhão — é assim que se
+       * corrige um dos quatro sem tocar nos outros três. Na CRIAÇÃO o campo
+       * equivalente vale para todos os que nascerem de uma vez.
+       */
+      customerOrderNumber: null as string | null,
       // Foto da plaqueta (VIN). `null` é o valor EXPLÍCITO de "removida" — `undefined` faria a
       // API pular o campo e a foto antiga sobreviveria a uma remoção.
       vinPlateId: null as string | null,
@@ -253,6 +270,21 @@ const FinancialBudgetDetailPageInner = () => {
       customForecastDays: null as number | null,
       layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
+      /**
+       * Junto ou separado. Editável DEPOIS da criação porque a escolha errada
+       * só se revela quando o faturamento chega: um orçamento de sessenta
+       * caminhões criado como `JOINT` que precisa fechar veículo a veículo
+       * ficaria travado para sempre se este campo só existisse na criação.
+       */
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
+      /**
+       * A PARTIÇÃO dos veículos entre as faturas — só relevante em lotes.
+       *
+       * Campo do ORÇAMENTO e não de cada cliente: a mesma repartição vale para
+       * todos (um lote é uma unidade de cobrança, não um negócio diferente), e
+       * é o save que a transforma em `customerConfigs[].taskIds`.
+       */
+      billingGroups: [] as string[][],
       customerConfigs: [] as any[],
       services: [
         {
@@ -294,6 +326,32 @@ const FinancialBudgetDetailPageInner = () => {
   // Ordered sibling ids + the prev/next widget. Routed through `guardedNavigate` so paging away
   // from a dirty wizard prompts (the guard's pushState patch would catch a bare navigate too, but
   // it replays only the URL and would drop the id list).
+  /**
+   * OS VEÍCULOS deste orçamento, na forma que o controle de faturamento precisa.
+   *
+   * Série, placa e pedido de compra: é assim que quem opera identifica um
+   * implemento, e é o que precisa aparecer ao lado do lote para a escolha não
+   * virar adivinhação.
+   */
+  const budgetSplitVehicles = useMemo(
+    () =>
+      quoteTasks(existingQuote as any).map((t: any) => ({
+        id: t.id,
+        name: t.name ?? null,
+        serialNumber: t.serialNumber ?? null,
+        plate: t.truck?.plate ?? null,
+        customerOrderNumber: t.customerOrderNumber ?? null,
+      })),
+    [existingQuote],
+  );
+
+  /** Quantas faturas já foram aprovadas — com uma que seja, a divisão congela. */
+  const approvedBillingCount = useMemo(
+    () =>
+      ((existingQuote?.customerConfigs ?? []) as any[]).filter((c) => c?.billingApprovedAt).length,
+    [existingQuote],
+  );
+
   const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
   const recordNav = useRecordNavigation({
     ids: siblingIds,
@@ -314,7 +372,11 @@ const FinancialBudgetDetailPageInner = () => {
   // whether it was loaded here or there. Task and quote arrive from two separate queries on this
   // page, hence the "from parts" builder.
   const quoteAttentionEntity = useMemo(
-    () => toAttentionQuoteEntityFromParts(existingQuote, task ? { id: task.id, status: task.status } : null),
+    () =>
+      toAttentionQuoteEntityFromParts(
+        existingQuote,
+        task ? { id: task.id, status: task.status, customerOrderNumber: task.customerOrderNumber } : null,
+      ),
     [existingQuote, task],
   );
   // Deliberately gated on BOTH queries having landed. Task and quote load independently here, and
@@ -352,6 +414,8 @@ const FinancialBudgetDetailPageInner = () => {
       customerId: task.customerId || "",
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
+      // O pedido de compra DESTE veículo — ver os defaults do formulário.
+      customerOrderNumber: task.customerOrderNumber || null,
       chassisNumber: task.truck?.chassisNumber || "",
       vinPlateId: (task.truck as any)?.vinPlateId || null,
       category: task.truck?.category || "",
@@ -379,6 +443,8 @@ const FinancialBudgetDetailPageInner = () => {
         customForecastDays: null,
         layoutFileIds: [],
         simultaneousTasks: null,
+        billingSplit: "JOINT",
+        billingGroups: [],
         customerConfigs: [],
         services: [
           {
@@ -407,8 +473,22 @@ const FinancialBudgetDetailPageInner = () => {
       customForecastDays: existingQuote.customForecastDays || null,
       layoutFileIds: (existingQuote.layoutFiles || []).map((f: any) => f.id),
       simultaneousTasks: existingQuote.simultaneousTasks || null,
+      billingSplit:
+        ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK" | "CUSTOM") || "JOINT",
+      // Os LOTES como estão gravados — a cobertura de cada fatura, na ordem em
+      // que elas existem. Sem hidratar, abrir e salvar um orçamento em lotes o
+      // devolveria ao modo declarado e os lotes sumiriam sem ninguém pedir.
+      billingGroups: dedupeConfigsByCustomer(existingQuote.customerConfigs ?? [])
+        .coverageGroups,
+      // ⚠️ UM PASSO POR CLIENTE, não por FATURA. Num orçamento cobrado veículo a
+      // veículo há uma fatura por caminhão, todas do mesmo cliente: mapear 1:1
+      // produzia "Cliente 1..4" com o mesmo nome quatro vezes, e o save
+      // reenviava os quatro objetos — o último gravando por cima dos outros
+      // três, levando desconto e condição de pagamento junto. A repartição dos
+      // veículos vive em `billingGroups`, acima.
       customerConfigs:
-        existingQuote.customerConfigs?.map((c: any) => ({
+        dedupeConfigsByCustomer(existingQuote.customerConfigs ?? []).configs.map((c: any) => ({
+          id: c.id,
           customerId: c.customerId || c.id,
           subtotal: c.subtotal ?? 0,
           total: c.total ?? 0,
@@ -422,7 +502,6 @@ const FinancialBudgetDetailPageInner = () => {
             c.generateInvoice !== undefined ? c.generateInvoice : true,
           generateBankSlip:
             c.generateBankSlip !== undefined ? c.generateBankSlip : true,
-          orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
           customerData: {
             corporateName: c.customer?.corporateName || "",
@@ -727,6 +806,8 @@ const FinancialBudgetDetailPageInner = () => {
   const customerConfigs = form.watch("customerConfigs");
   const steps = useMemo(() => {
     const base = [
+      // "Tarefa", sempre: este passo define a tarefa ABERTA, mesmo num orçamento
+      // de quatro. A relação dos veículos é conferida no Resumo.
       { id: 1, name: "Tarefa", description: "Dados da tarefa" },
       { id: 2, name: "Informações", description: "Prazos e clientes" },
       { id: 3, name: "Serviços", description: "Serviços e preços" },
@@ -1221,6 +1302,42 @@ const FinancialBudgetDetailPageInner = () => {
         taskUpdateData.responsibleIds = existingRepIds;
       }
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // O PEDIDO DE COMPRA — DESTE VEÍCULO
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // `Task.customerOrderNumber`, e só o do caminhão ABERTO: num orçamento de
+      // quatro veículos, quem entra pelo segundo corrige o segundo. Os irmãos se
+      // editam abrindo o orçamento (ou a tarefa) de cada um — foi na CRIAÇÃO que
+      // um número valeu para todos.
+      //
+      // Enviado sempre que MUDOU, inclusive vazio (`null`): limpar o campo tem de
+      // persistir, não deixar o número antigo de pé num pedido cancelado.
+      const nextOrderNumber = (data.customerOrderNumber ?? "").trim() || null;
+      const savedOrderNumber = (task?.customerOrderNumber ?? "").trim() || null;
+      if (nextOrderNumber !== savedOrderNumber) {
+        taskUpdateData.customerOrderNumber = nextOrderNumber;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // O PASSO 1 É DESTA TAREFA, E SÓ DELA
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // A tela é aberta por UM veículo e o passo 1 define AQUELE caminhão: série,
+      // placa, chassi, plaqueta, nº do pedido, nome, datas, tinta, layouts. Nada
+      // do que se grava aqui alcança os irmãos.
+      //
+      // Houve uma versão que propagava os campos "do contrato" para todos os
+      // veículos. Foi recusada, e a razão é boa: um orçamento de quatro caminhões
+      // tem quatro tarefas de produção, com prazos e artes que podem divergir de
+      // propósito. Quem edita a tarefa 2 está editando a tarefa 2 — e um salvamento
+      // que silenciosamente reescreve outras três é pior do que um que não
+      // reescreve nenhuma. O que é do ORÇAMENTO (serviços, preço, condições,
+      // garantia) mora nos outros passos, que são do orçamento inteiro.
+      //
+      // A RELAÇÃO de veículos vive no RESUMO, onde se confere o conjunto antes de
+      // mandar ao cliente.
+
       // Only hit the task endpoint when something task-owned actually changed.
       // Skips a no-op write when the user only edited the quote half.
       if (Object.keys(taskUpdateData).length > 0) {
@@ -1232,6 +1349,8 @@ const FinancialBudgetDetailPageInner = () => {
           return;
         }
       }
+
+
 
       // 5. Update customer data (address, CNPJ, etc.)
       for (const config of data.customerConfigs || []) {
@@ -1283,8 +1402,14 @@ const FinancialBudgetDetailPageInner = () => {
       // unassigned service is excluded from every per-customer total, so its
       // amount would silently vanish from the budget (and the API's billing-
       // approval guard blocks approval anyway). Block the save here.
+      //
+      // ⚠️ CLIENTES DISTINTOS, nunca faturas. A lista do formulário já vem
+      // deduplicada por cliente (ver a hidratação), mas contar `length` aqui
+      // voltaria a ser errado no dia em que ela deixar de vir — e o erro seria
+      // uma recusa impossível de obedecer, porque o seletor "Faturar Para" só
+      // aparece com mais de um cliente.
       if (
-        (data.customerConfigs || []).length >= 2 &&
+        hasMultipleCustomers(data.customerConfigs || []) &&
         validServices.some((item: any) => !item.invoiceToCustomerId)
       ) {
         toast.error(
@@ -1310,7 +1435,20 @@ const FinancialBudgetDetailPageInner = () => {
         customForecastDays: data.customForecastDays || null,
         layoutFileIds: resolvedLayoutIds,
         simultaneousTasks: data.simultaneousTasks || null,
-        customerConfigs: data.customerConfigs || [],
+        billingSplit: data.billingSplit || "JOINT",
+        // ─── OS LOTES VIRAM COBERTURA ────────────────────────────────────────
+        //
+        // O formulário guarda UMA fatura por cliente e a repartição num campo
+        // só. A API recebe uma fatura por (cliente × lote), cada uma com a
+        // cobertura explícita. A expansão acontece aqui, no save, e só quando há
+        // lotes: nos outros modos a cobertura é derivável e mandá-la seria
+        // payload inútil — e uma segunda fonte de verdade sobre quem cobra quem.
+        customerConfigs: expandConfigsIntoLots(
+          data.customerConfigs || [],
+          (data.billingSplit || "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
+          quoteTasks(existingQuote as any).map((t: any) => t.id),
+          data.billingGroups,
+        ),
         services: validServices.map((item: any) => ({
           ...item,
           amount: item.amount ?? 0,
@@ -1355,6 +1493,7 @@ const FinancialBudgetDetailPageInner = () => {
               dirty.customForecastDays ||
               dirty.layoutFileIds ||
               dirty.simultaneousTasks ||
+              dirty.billingSplit ||
               dirty.customerConfigs ||
               dirty.services,
           );
@@ -1646,6 +1785,11 @@ const FinancialBudgetDetailPageInner = () => {
           <div style={{ display: currentStep === 2 ? undefined : "none" }}>
             <BudgetStepInfo
               disabled={isSubmitting || !canEdit}
+              // Em edição a contagem NÃO sai de placas × séries: o formulário
+              // carrega os campos de UMA tarefa, e a conta daria 1 mesmo num
+              // orçamento de sessenta — escondendo o seletor de faturamento
+              // justamente de quem precisa dele.
+
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               layouts={layoutImageOptions}
@@ -1683,6 +1827,12 @@ const FinancialBudgetDetailPageInner = () => {
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
                   quoteId={existingQuote?.id}
+                  existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
+                  // OS VEÍCULOS, com id — é o que permite compor lotes. Só
+                  // existem na edição; na criação a lista é vazia e o controle
+                  // oferece apenas junto/separado.
+                  existingVehicles={budgetSplitVehicles}
+                  approvedBillingCount={approvedBillingCount}
                 />
               </div>
             );

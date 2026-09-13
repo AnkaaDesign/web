@@ -54,6 +54,16 @@ import { exportTaskDossiePdf } from "@/components/production/task/detail/section
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
+import {
+  hasMultipleCustomers as hasMultipleCustomersOf,
+  orderNumberLabel,
+  quoteVehicleCount,
+  sortQuoteTasks,
+  quoteTasks,
+  coverageSummary,
+  coveredTaskCount,
+  coveredTaskIds,
+} from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
 // on the same transition, and disagreeing meant this dialog waved through a status the page then
@@ -118,8 +128,33 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
+  // FATURAMENTO FATIADO: alguma fatura cobre MENOS que todos os veículos. É a
+  // pergunta sobre a COBERTURA, não sobre o modo, e cobre com a mesma conta a
+  // cobrança veículo a veículo e o lote — num orçamento em lotes, `billingSplit
+  // === "PER_TASK"` responderia "não" e aprovar um caminhão emitiria os três
+  // lotes de uma vez. Quando é fatiado, a aprovação desta tela fecha só o que
+  // cobre o veículo aberto. Ver `internalApproveSlice`.
+  const isPerVehicleBilling = (() => {
+    const total = quoteVehicleCount(task?.quote);
+    if (total <= 1) return false;
+    return ((task?.quote?.customerConfigs ?? []) as any[]).some((c) => {
+      const covered = (c?.coveredTasks ?? []).length;
+      return covered > 0 && covered < total;
+    });
+  })();
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  /** Os veículos do orçamento, para nomear a cobertura de cada fatura. */
+  const reviewVehicles = useMemo(
+    () =>
+      quoteTasks(task?.quote as any).map((t: any) => ({
+        id: t.id,
+        name: t.name ?? null,
+        serialNumber: t.serialNumber ?? null,
+        truck: t.truck ? { plate: t.truck.plate } : null,
+      })),
+    [task?.quote],
+  );
 
   // Attention on the quote's `orderNumber`. The Resumo is where this page usually OPENS (it jumps
   // here whenever invoices already exist), while the editable field lives on a customer step that
@@ -157,9 +192,51 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       .sort((a, b) => (b.nfseNumber ?? -1) - (a.nfseNumber ?? -1));
   }, [taskNfseHistory, invoices]);
 
+  // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
+  //
+  // Mora em `Task.customerOrderNumber`. Uma FATIA de faturamento cobre um
+  // veículo, um lote ou os N, e a linha responde pelo que ela COBRE: o número
+  // daquele caminhão, os do lote, ou a lista que a nota conjunta vai citar.
+  //
+  // O valor do veículo ABERTO vem do FORMULÁRIO — é o que acabou de ser digitado
+  // no passo Tarefa, e esta é a tela em que se confere antes de aprovar o
+  // faturamento. Os IRMÃOS vêm do registro: eles se editam abrindo cada um.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "orderNumber");
+  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
+  const quoteVehicles = useMemo(
+    () =>
+      sortQuoteTasks(
+        ((task?.quote as any)?.tasks ?? []) as Array<{
+          id: string;
+          createdAt?: any;
+          customerOrderNumber?: string | null;
+        }>,
+      ),
+    [task],
+  );
+  const orderNumberOf = (id: string | null | undefined): string | null => {
+    if (id && id === task?.id) return (formOrderNumber ?? "").trim() || null;
+    const found = quoteVehicles.find((t) => t.id === id);
+    return (found?.customerOrderNumber ?? "").trim() || null;
+  };
+  const orderNumberForConfig = (config: any): string | null => {
+    // Os veículos que ESTA fatura cobre. Era `config.taskId` — coluna removida
+    // em `20260913120000_billing_coverage` —, e sem a cobertura toda fatia
+    // passava a citar os pedidos do orçamento inteiro, inclusive a de um lote.
+    const covered = coveredTaskIds(config);
+    const ids: Array<string | null | undefined> =
+      covered.length > 0
+        ? covered
+        : quoteVehicles.length > 0
+          ? quoteVehicles.map((t) => t.id)
+          : [task?.id];
+    return orderNumberLabel(ids.map((id) => ({ customerOrderNumber: orderNumberOf(id) })));
+  };
   const attentionOrderNumberFor = (config: any): string =>
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+    orderNumberAttention?.active &&
+    config?.customerId === PINNED_CUSTOMERS.IBIPORA &&
+    config?.generateInvoice !== false &&
+    !orderNumberForConfig(config)
       ? attentionFieldClass(orderNumberAttention)
       : "";
 
@@ -236,7 +313,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const total = totalFromConfigs || subtotal;
   const discountAmount = Math.max(0, subtotal - total);
 
-  const hasMultipleCustomers = !filterCustomerId && customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias. Ver a nota em `quote-tasks.ts`.
+  const hasMultipleCustomers = !filterCustomerId && hasMultipleCustomersOf(customerConfigs);
 
   // Group services by customer for multi-customer view
   const customerGroups = useMemo(() => {
@@ -374,7 +452,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     }
 
     // Multi-customer: all services must have invoiceToCustomerId
-    if (customerConfigs.length >= 2) {
+    //
+    // ⚠️ Contando FATIAS, esta guarda recusava o orçamento `PER_TASK` inteiro
+    // com "Serviços sem cliente atribuído" — e era impossível obedecer: o
+    // seletor "Faturar Para" só aparece com mais de um CLIENTE, então não havia
+    // onde atribuir coisa alguma. Salvar ficava travado sem saída.
+    if (hasMultipleCustomersOf(customerConfigs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
         toast.error("Serviços sem cliente atribuído", {
@@ -496,9 +579,15 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     const isAutomatic = AUTOMATIC_STATUSES.includes(v);
                     const isAllowed = isCurrent || allowedNextStatuses.includes(v as TASK_QUOTE_STATUS);
                     // Selectable options use the verb label; the current status uses its state name.
+                    // Num orçamento que cobra veículo a veículo, aprovar aqui
+                    // fatura SÓ este caminhão — o rótulo tem de dizer isso, ou o
+                    // operador lê "Aprovar Faturamento" e acha que fechou os
+                    // sessenta.
                     const label = isCurrent
                       ? (STATUS_LABELS[v] || v)
-                      : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
+                      : v === "BILLING_APPROVED" && isPerVehicleBilling
+                        ? "Aprovar Faturamento (este veículo)"
+                        : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
                     opts.push({ value: v, label, disabled: isCurrent || isAutomatic || !isAllowed });
                   }
                   return opts;
@@ -692,6 +781,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               paymentConfig: config.paymentConfig,
               paymentCondition: config.paymentCondition,
               total: configTotal,
+              vehicleCount: reviewVehicles.length,
+              // A cláusula descreve o que ESTA fatura cobra: um caminhão, um
+              // lote, ou os N. Sem a cobertura, um orçamento em lotes imprimiria
+              // a frase da fatura conjunta sobre o valor de vinte.
+              coveredVehicleCount: coveredTaskCount(config) || undefined,
             });
 
             // Validate NFS-e data — the SHARED requirement list, so this badge, the "Faturar Para"
@@ -713,12 +807,29 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             // da emissão, senão o Resumo diria "sem telefone" numa nota que sai com um.
             const tomadorContact = resolveTomadorContact(data, (config as any).responsible);
 
+            // ─── DE QUAIS VEÍCULOS É ESTA FATURA ─────────────────────────
+            //
+            // O cartão se chamava só pelo nome do cliente. Num orçamento cobrado
+            // veículo a veículo, os quatro cartões tinham o MESMO título e o
+            // conferente não tinha como saber qual era qual caminhão — nem por
+            // que os valores diferiam.
+            const coverage = coverageSummary(config, reviewVehicles.length, reviewVehicles);
+            const showCoverage = reviewVehicles.length > 1 && coveredTaskCount(config) > 0;
+
             return (
-              <Card key={config.customerId}>
+              // A chave não pode ser o cliente: as N faturas de uma cobrança
+              // veículo a veículo são do MESMO cliente, e a chave repetida faz o
+              // React reaproveitar o nó da primeira para todas.
+              <Card key={config.id || `${config.customerId}-${_i}`}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <IconBuilding className="h-4 w-4 text-muted-foreground" />
                     {name}
+                    {showCoverage && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {coverage}
+                      </Badge>
+                    )}
                     {!isComplete && (
                       <Badge variant="destructive" className="text-xs" title={missingCustomerLabels.join(", ")}>
                         Dados incompletos
@@ -802,15 +913,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       // rendered EMPTY and highlighted — a missing value with no DOM node is a
                       // signal with nothing to point at.
                       const attnCls = attentionOrderNumberFor(config);
-                      if (!config.orderNumber && !attnCls) return null;
+                      const orderNumberText = orderNumberForConfig(config);
+                      if (!orderNumberText && !attnCls) return null;
                       return (
                         <div
                           className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attnCls)}
                           title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
                         >
                           <span className="text-sm text-muted-foreground">N° do Pedido</span>
-                          <span className={cn("text-sm font-medium", !config.orderNumber && "text-muted-foreground")}>
-                            {config.orderNumber || "Pendente"}
+                          <span className={cn("text-sm font-medium", !orderNumberText && "text-muted-foreground")}>
+                            {orderNumberText || "Pendente"}
                           </span>
                         </div>
                       );

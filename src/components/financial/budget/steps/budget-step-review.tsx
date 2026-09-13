@@ -43,7 +43,14 @@ import {
   missingBillingCustomerKeys,
   missingBillingCustomerLabels,
 } from "@/lib/billing-customer-data";
+import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
+import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
+import { vehicleCombinations } from "@/utils/vehicle-combinations";
+import {
+  groupsForSplit,
+  type BillingSplitValue,
+} from "@/components/financial/shared/billing-split-field";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -99,14 +106,184 @@ export function BudgetStepReview({
   const expiresAt = useWatch({ control, name: "expiresAt" });
   const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
 
-  // Attention on the quote's `orderNumber`. `attentionOrderNumberFor` narrows the quote-wide
-  // signal to the one customer config it is actually about, and returns "" for every other config
-  // so nothing else on this screen changes.
+  // QUANTOS VEÍCULOS — a mesma conta do passo 1 e do seletor de faturamento.
+  //
+  // O preço dos serviços é POR VEÍCULO (ver `utils/quote-money.ts`). Sem o "× N"
+  // e o total geral, esta tela mostra R$ 12.170,40 como TOTAL de um orçamento de
+  // sessenta caminhões que vale R$ 730.224,00 — e é ESTA a tela em que o
+  // operador confere antes de mandar criar. O documento assinado já imprime as
+  // duas linhas; a conferência tem de ver o mesmo número que o cliente verá.
+  const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
+  // Na criação, categoria e implemento são UM par para todos os veículos que vão
+  // nascer — o passo 1 os pede uma vez só.
+  const formCategory = useWatch({ control, name: "category" }) as string | undefined;
+  const formImplementType = useWatch({ control, name: "implementType" }) as string | undefined;
+  const serialNumbersWatch =
+    (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
+  /**
+   * QUAIS veículos, e não só quantos.
+   *
+   * Na criação, é o mesmo produto cartesiano que a API vai receber (placas ×
+   * números de série); na edição, as tarefas que o orçamento já cobre. A
+   * conferência é a última tela antes de sessenta tarefas nascerem sob um número
+   * de orçamento só — ver "60 veículos" sem poder ler QUE sessenta é confiar no
+   * que se digitou em outro passo.
+   */
+  const vehicleLabels = useMemo(() => {
+    const existing = existingQuote?.tasks ?? [];
+    if (existing.length > 0) {
+      return sortQuoteTasks(existing).map(
+        (t) => t.serialNumber || (t as any).truck?.plate || "—",
+      );
+    }
+    const plates = platesWatch.filter(Boolean);
+    const serials = serialNumbersWatch.map((s) => String(s ?? "")).filter(Boolean);
+    if (plates.length > 0 && serials.length > 0) {
+      // A MESMA ordem do laço da criação: placa por placa, série por série.
+      return plates.flatMap((plate) => serials.map((sn) => `${sn} · ${plate}`));
+    }
+    if (plates.length > 0) return plates;
+    return serials;
+  }, [existingQuote, platesWatch, serialNumbersWatch]);
+
+  const vehicleCount = useMemo(() => {
+    const existingCount = existingQuote?.tasks?.length;
+    if (existingCount && existingCount > 0) return existingCount;
+    if (vehicleLabels.length > 0) return vehicleLabels.length;
+    return 1;
+  }, [existingQuote, vehicleLabels]);
+
+  // O que está no CAMPO é o do veículo aberto (ou, na criação, o de todos os que
+  // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
+  const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
+  const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
+
+  /**
+   * OS VEÍCULOS EM TABELA — as MESMAS colunas do documento e da página pública.
+   *
+   * Eram etiquetas ("48888 48889 48890 48891"): cabem quatro, não cabem
+   * sessenta, e não dizem placa, chassi nem pedido de compra. A conferência que
+   * este passo existe para permitir é a mesma que o cliente vai fazer na página
+   * pública — então mostra o mesmo quadro.
+   *
+   * Na CRIAÇÃO as tarefas ainda não existem: as linhas vêm do produto cartesiano
+   * do passo 1 (a mesma função que o submit usa) e o pedido de compra é o valor
+   * único do campo, que vale para todas. Na EDIÇÃO vêm do registro, com o valor
+   * do formulário no lugar do veículo aberto — é o que acabou de ser digitado.
+   */
+  const vehicleRows = useMemo(() => {
+    const label = (map: Record<string, string>, value?: string | null) =>
+      value ? (map[value as keyof typeof map] ?? value) : null;
+    const existing = existingQuote?.tasks ?? [];
+    if (existing.length > 0) {
+      return sortQuoteTasks(existing as any[]).map((t: any) => ({
+        key: t.id,
+        serialNumber: t.serialNumber ?? null,
+        plate: t.truck?.plate ?? null,
+        chassis: t.truck?.chassisNumber ?? null,
+        orderNumber:
+          t.id === openTaskId
+            ? ((formOrderNumber ?? "").trim() || null)
+            : ((t.customerOrderNumber ?? "").trim() || null),
+        category: label(TRUCK_CATEGORY_LABELS as any, t.truck?.category),
+        implement: label(IMPLEMENT_TYPE_LABELS as any, t.truck?.implementType),
+      }));
+    }
+    // Na CRIAÇÃO os caminhões ainda não existem: categoria e implemento são os
+    // do formulário e valem para todos os que vão nascer, como o nº do pedido.
+    const typed = (formOrderNumber ?? "").trim() || null;
+    const category = label(TRUCK_CATEGORY_LABELS as any, formCategory);
+    const implement = label(IMPLEMENT_TYPE_LABELS as any, formImplementType);
+    return vehicleCombinations(platesWatch, serialNumbersWatch as (string | number)[]).map(
+      (combo, i) => ({
+        key: `${combo.plate ?? ""}|${combo.serialNumber ?? ""}|${i}`,
+        serialNumber: combo.serialNumber ?? null,
+        plate: combo.plate ?? null,
+        chassis: null as string | null,
+        orderNumber: typed,
+        category,
+        implement,
+      }),
+    );
+  }, [
+    existingQuote,
+    platesWatch,
+    serialNumbersWatch,
+    formOrderNumber,
+    openTaskId,
+    formCategory,
+    formImplementType,
+  ]);
+
+  // Cada coluna só existe se ALGUM veículo a tiver — a mesma regra do documento
+  // e da página pública: uma coluna inteira de travessões não informa nada.
+  // ═══════════════════════════════════════════════════════════════════════
+  // QUAL FATURA COBRA CADA VEÍCULO
+  //
+  // A coluna que respondia a pergunta que a tela não respondia. Ela só aparece
+  // quando o faturamento é FATIADO — numa fatura conjunta todos os veículos
+  // estão nela, e uma coluna com "Fatura 1" repetida sessenta vezes não informa
+  // nada.
+  // ═══════════════════════════════════════════════════════════════════════
+  const billingSplitWatch = useWatch({ control, name: "billingSplit" }) as string | undefined;
+  const billingGroupsWatch =
+    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
+  const lotOfVehicle = useMemo(() => {
+    const ids = vehicleRows.map((v) => v.key);
+    const groups = groupsForSplit(
+      (billingSplitWatch ?? "JOINT") as BillingSplitValue,
+      ids,
+      billingGroupsWatch,
+    );
+    if (groups.length <= 1) return null;
+    const map = new Map<string, number>();
+    groups.forEach((g, i) => g.forEach((id) => map.set(id, i + 1)));
+    return map;
+  }, [vehicleRows, billingSplitWatch, billingGroupsWatch]);
+
+  const anyVehicleOrderNumber = vehicleRows.some((v) => !!v.orderNumber);
+  const anyVehicleChassis = vehicleRows.some((v) => !!v.chassis);
+  const anyVehicleCategory = vehicleRows.some((v) => !!v.category);
+  const anyVehicleImplement = vehicleRows.some((v) => !!v.implement);
+
+  // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
+  //
+  // Uma linha para o orçamento, não uma por cliente: o pedido mora em
+  // `Task.customerOrderNumber` e é da ENTREGA. Quando os N veículos citam o
+  // mesmo número — o caso comum — sai um número; quando diferem, sai a lista.
+  //
+  // A linha é renderizada VAZIA ("Pendente") quando uma regra a está cobrando:
+  // um valor que falta e não tem nó no DOM é um sinal sem para onde apontar.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
-  const attentionOrderNumberFor = (config: any): string =>
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+  const orderNumberText = useMemo(() => {
+    const siblings = ((existingQuote?.tasks ?? []) as Array<{ id: string; customerOrderNumber?: string | null }>)
+      .filter((t) => t.id !== openTaskId);
+    return orderNumberLabel([{ customerOrderNumber: formOrderNumber ?? null }, ...siblings]);
+  }, [formOrderNumber, existingQuote, openTaskId]);
+  const billsIbipora = (customerConfigs ?? []).some(
+    (c: any) => c?.customerId === PINNED_CUSTOMERS.IBIPORA && c?.generateInvoice !== false,
+  );
+  const orderNumberAttentionClass =
+    orderNumberAttention?.active && billsIbipora && !orderNumberText
       ? attentionFieldClass(orderNumberAttention)
       : "";
+  const purchaseOrderLine =
+    orderNumberText || orderNumberAttentionClass ? (
+      <div className="bg-muted/30 rounded-lg p-4">
+        <div
+          // O recuo é INCONDICIONAL: fazê-lo depender da classe de atenção movia a
+          // linha 8px para a direita no instante em que o anel aparecia, e de volta
+          // no instante em que o número era digitado.
+          className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", orderNumberAttentionClass)}
+          title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+        >
+          N° do Pedido:{" "}
+          <span className={cn("font-medium", orderNumberText ? "text-foreground" : "text-muted-foreground")}>
+            {orderNumberText || "Pendente"}
+          </span>
+        </div>
+      </div>
+    ) : null;
 
   // The cadastro half of the same story. The Faturamento Resumo has had this since the rule
   // landed; the Orçamento one did not — which is backwards, because
@@ -150,8 +327,10 @@ export function BudgetStepReview({
     [services],
   );
 
-  const hasMultipleCustomers =
-    Array.isArray(customerConfigs) && customerConfigs.length >= 2;
+  // ⚠️ CLIENTES distintos, não fatias: sem isto um orçamento `PER_TASK` de
+  // quatro caminhões para um cliente abria um filtro "Completo / Cliente 1 /
+  // Cliente 2 / Cliente 3 / Cliente 4" com o MESMO cliente quatro vezes.
+  const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
 
   // Customer filter options for multi-customer
   const customerFilterOptions = useMemo(() => {
@@ -300,23 +479,98 @@ export function BudgetStepReview({
                 <span className="text-sm font-medium">{resolvedTask.customer.corporateName || resolvedTask.customer.fantasyName}</span>
               </div>
             )}
-            {resolvedTask?.truck?.plate && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Placa</span>
-                <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
+            {/* ═══════════════════════════════════════════════════════════════
+                A IDENTIFICAÇÃO — UMA LINHA OU A RELAÇÃO INTEIRA
+
+                Com um veículo, as linhas de sempre: placa, série, chassi.
+
+                Com N, elas dariam a identidade de UM caminhão no resumo de um
+                orçamento que cobre quatro — e o Resumo é exatamente a tela em
+                que se confere o conjunto antes de mandar ao cliente. Então vira
+                a MESMA tabela do documento e da página pública.
+
+                O passo 1 continua sendo o da tarefa ABERTA: é lá que se define
+                aquele caminhão, e nada do que se grava lá alcança os irmãos.
+                ═══════════════════════════════════════════════════════════ */}
+            {vehicleRows.length > 1 ? (
+              <div className="rounded-lg bg-muted/50 px-4 py-3">
+                <div className="mb-2 text-sm text-muted-foreground">
+                  Veículos <span className="font-medium text-foreground">({vehicleRows.length})</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="w-8 pb-1 pr-2 text-left text-[0.65rem] font-semibold uppercase tracking-wide">#</th>
+                        <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº de série</th>
+                        <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Placa</th>
+                        {anyVehicleChassis && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Chassi</th>
+                        )}
+                        {anyVehicleOrderNumber && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº do pedido</th>
+                        )}
+                        {lotOfVehicle && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Fatura</th>
+                        )}
+                        {anyVehicleCategory && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Categoria</th>
+                        )}
+                        {anyVehicleImplement && (
+                          <th className="pb-1 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Implemento</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleRows.map((v, i) => (
+                        <tr key={v.key} className="border-t border-border/40">
+                          <td className="py-1 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
+                          <td className="py-1 pr-3 font-medium">{v.serialNumber || <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          <td className="py-1 pr-3 font-medium">{v.plate || <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          {anyVehicleChassis && (
+                            <td className="py-1 pr-3 font-mono text-xs">{v.chassis ? formatChassis(v.chassis) : <span className="italic text-muted-foreground">a registrar</span>}</td>
+                          )}
+                          {anyVehicleOrderNumber && (
+                            <td className="py-1 pr-3 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                          {lotOfVehicle && (
+                            <td className="py-1 pr-3 font-medium tabular-nums">
+                              {lotOfVehicle.get(v.key) ?? <span className="text-muted-foreground">—</span>}
+                            </td>
+                          )}
+                          {anyVehicleCategory && (
+                            <td className="py-1 pr-3 font-medium">{v.category || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                          {anyVehicleImplement && (
+                            <td className="py-1 font-medium">{v.implement || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
-            {resolvedTask?.serialNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Nº de Série</span>
-                <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
-              </div>
-            )}
-            {resolvedTask?.truck?.chassisNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Chassi</span>
-                <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
-              </div>
+            ) : (
+              <>
+                {resolvedTask?.truck?.plate && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Placa</span>
+                    <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
+                  </div>
+                )}
+                {resolvedTask?.serialNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Nº de Série</span>
+                    <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
+                  </div>
+                )}
+                {resolvedTask?.truck?.chassisNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Chassi</span>
+                    <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
+                  </div>
+                )}
+              </>
             )}
             {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
                 existe: no create ainda não há caminhão gravado. */}
@@ -326,13 +580,17 @@ export function BudgetStepReview({
                 <FileThumbnail file={resolvedTask.truck.vinPlate} size="sm" onClick={() => fileViewer?.actions?.viewFiles?.([resolvedTask.truck!.vinPlate!] as never, 0)} />
               </div>
             )}
-            {resolvedTask?.truck?.category && (
+            {/* Categoria e implemento: linha própria com UM veículo, COLUNA da
+                tabela com vários — repetir "Toco / Refrigerado" abaixo de uma
+                tabela que já traz as duas em cada linha é dizer a mesma coisa
+                duas vezes na mesma tela. */}
+            {vehicleRows.length <= 1 && resolvedTask?.truck?.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>
                 <span className="text-sm font-medium">{TRUCK_CATEGORY_LABELS[resolvedTask.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || resolvedTask.truck.category}</span>
               </div>
             )}
-            {resolvedTask?.truck?.implementType && (
+            {vehicleRows.length <= 1 && resolvedTask?.truck?.implementType && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Implemento</span>
                 <span className="text-sm font-medium">{IMPLEMENT_TYPE_LABELS[resolvedTask.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || resolvedTask.truck.implementType}</span>
@@ -473,30 +731,75 @@ export function BudgetStepReview({
           })()}
 
           {/* Pricing Summary */}
-          <div className="bg-muted/20 border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(displaySubtotal)}
-              </span>
-            </div>
+          {(() => {
+            // O "× N" só entra na visão GERAL (sem filtro de cliente): ali
+            // `displayTotal` é o total por veículo, vindo do formulário. Filtrado
+            // por cliente, o número vem da configuração daquele cliente, que em
+            // `JOINT` já é o valor geral — multiplicar de novo cobraria sessenta
+            // vezes o que já está contado sessenta vezes.
+            const showPerVehicle = customerFilter === "all" && vehicleCount > 1;
+            // `round2(total × N)`, a MESMA conta do PDF e da fatura — nunca o
+            // desconto recalculado sobre a soma. Ver `utils/quote-money.ts`.
+            const grandTotal = round2(displayTotal * vehicleCount);
+            return (
+              <div className="bg-muted/20 border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Subtotal{showPerVehicle ? " por veículo" : ""}
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(displaySubtotal)}
+                  </span>
+                </div>
 
-            {discountAmount > 0 && (
-              <div className="flex items-center justify-between text-sm text-destructive">
-                <span>Desconto</span>
-                <span className="font-medium">
-                  - {formatCurrency(discountAmount)}
-                </span>
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm text-destructive">
+                    <span>Desconto{showPerVehicle ? " por veículo" : ""}</span>
+                    <span className="font-medium">
+                      - {formatCurrency(discountAmount)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
+                  <span className="text-base font-bold text-foreground">
+                    {showPerVehicle ? "TOTAL POR VEÍCULO" : "TOTAL"}
+                  </span>
+                  <span
+                    className={
+                      showPerVehicle
+                        ? "text-base font-bold text-foreground"
+                        : "text-xl font-bold text-primary"
+                    }
+                  >
+                    {formatCurrency(displayTotal)}
+                  </span>
+                </div>
+
+                {showPerVehicle && (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Veículos</span>
+                      <span className="font-medium">&times; {vehicleCount}</span>
+                    </div>
+                    {/* A RELAÇÃO DOS VEÍCULOS não fica aqui: este bloco é de
+                        DINHEIRO, e o que ele precisa dizer é "× 4". A relação
+                        está no Resumo da Tarefa, acima, onde se confere o
+                        conjunto — duas tabelas iguais na mesma tela é o tipo de
+                        repetição que faz o leitor parar de ler as duas. */}
+                    <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
+                      <span className="text-base font-bold text-foreground">
+                        TOTAL GERAL
+                      </span>
+                      <span className="text-xl font-bold text-primary">
+                        {formatCurrency(grandTotal)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-
-            <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
-              <span className="text-base font-bold text-foreground">TOTAL</span>
-              <span className="text-xl font-bold text-primary">
-                {formatCurrency(displayTotal)}
-              </span>
-            </div>
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -504,7 +807,7 @@ export function BudgetStepReview({
       {Array.isArray(customerConfigs) && customerConfigs.length > 0 && (() => {
         const configs = customerFilter !== "all"
           ? (customerConfigs || []).filter((c: any) => c.customerId === customerFilter)
-          : customerConfigs.length >= 2 ? customerConfigs : [];
+          : hasMultipleCustomers ? customerConfigs : [];
         if (configs.length === 0 && customerFilter === "all") return null;
 
         // Single customer payment (when only 1 config and filter is "all")
@@ -600,26 +903,6 @@ export function BudgetStepReview({
                     </div>
                   )}
 
-                  {(() => {
-                    // Normally shown only when filled. When a rule is asking for it, the line is
-                    // rendered EMPTY and highlighted — a missing value with no DOM node is a
-                    // signal with nothing to point at.
-                    const attnCls = attentionOrderNumberFor(config);
-                    if (!config.orderNumber && !attnCls) return null;
-                    return (
-                      <div
-                        // Padding is UNCONDITIONAL: making it depend on `attnCls` shifted the line 8px right the
-                        // moment the ring appeared, and back again the moment the number was typed.
-                        className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
-                        title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
-                      >
-                        N° do Pedido:{" "}
-                        <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
-                          {config.orderNumber || "Pendente"}
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
               );
             })}
@@ -627,9 +910,19 @@ export function BudgetStepReview({
         );
       })()}
 
+      {/* ── O PEDIDO DE COMPRA, POR VEÍCULO ─────────────────────────────────────
+          Fora dos cartões de cliente de propósito: o pedido é da ENTREGA
+          (`Task.customerOrderNumber`), não do cliente. Num orçamento de dois
+          clientes ele aparecia duas vezes, com o mesmo valor, como se fossem
+          dois pedidos diferentes. */}
+
       {/* Single customer: payment conditions */}
+      {/* Um cliente só — inclusive quando ele tem N fatias (`PER_TASK`).
+          `length === 1` escondia as condições de pagamento de TODO orçamento
+          multitarefa faturado veículo a veículo. */}
       {Array.isArray(customerConfigs) &&
-        customerConfigs.length === 1 &&
+        !hasMultipleCustomers &&
+        customerConfigs.length > 0 &&
         customerFilter === "all" &&
         (() => {
           const config = customerConfigs[0];
@@ -642,8 +935,7 @@ export function BudgetStepReview({
           });
           // `attentionOrderNumberFor` keeps the block alive when a rule is pointing at the missing
           // pedido — otherwise the whole card would be skipped and there would be nothing to blink.
-          const hasContent = paymentText || config.orderNumber || attentionOrderNumberFor(config);
-          if (!hasContent) return null;
+          if (!paymentText) return null;
           return (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
               {paymentText && (
@@ -655,24 +947,16 @@ export function BudgetStepReview({
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {(() => {
-                const attnCls = attentionOrderNumberFor(config);
-                if (!config.orderNumber && !attnCls) return null;
-                return (
-                  <div
-                    className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
-                    title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
-                  >
-                    N° do Pedido:{" "}
-                    <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
-                      {config.orderNumber || "Pendente"}
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
           );
         })()}
+
+      {/* O PEDIDO DE COMPRA — UMA linha para o orçamento inteiro.
+          Saía duas vezes: um bloco solto depois dos cartões de cliente e outro
+          no caso de cliente único, e com um cliente os dois renderizavam. Com a
+          coluna na tabela de veículos acima, esta linha só faz sentido como
+          resumo — e some quando a tabela já a mostra veículo a veículo. */}
+      {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderLine}
 
       {/* Delivery Deadline */}
       {(customForecastDays || (simultaneousTasks && simultaneousTasks > 1)) && (

@@ -77,17 +77,42 @@ function generatePaymentTextFromConfig(
   total: number,
   methodPhrase: string,
   firstDueDate: Date | null,
+  vehicleCount: number,
+  coveredCount: number,
 ): string {
   // A known vencimento always beats the relative "a partir da finalização do
   // serviço" wording — on a dossiê the service IS finished, so the customer
   // should read the actual date, not a countdown from an event in the past.
   const dueDate = firstDueDate ?? parseSpecificDate(pc.specificDate);
 
+  // O ESCOPO da cláusula. Num orçamento de um veículo não existe. Com sessenta,
+  // "quatro parcelas de R$ 3.042,60" é ambíguo, e o que desfaz a ambiguidade é
+  // QUANTOS VEÍCULOS CADA FATURA COBRE:
+  //
+  //   cobre os 60 → uma fatura, quatro de R$ 182.556,00. Sem prefixo.
+  //   cobre 1     → sessenta faturas, quatro de R$ 3.042,60 CADA.
+  //   cobre 20    → três faturas, quatro de R$ 60.852,00 por lote.
+  //
+  // Espelha `paymentScope` em `api/.../signature/document/quote-text.ts`.
+  const scope =
+    vehicleCount <= 1 || coveredCount >= vehicleCount
+      ? ''
+      : coveredCount <= 1
+        ? `, para cada um dos ${vehicleCount} veículos,`
+        : `, para cada grupo de ${coveredCount} veículos,`;
+  // Quantas FATURAS este cliente recebe — `veículos ÷ cobertos`, para cima
+  // porque um lote menor no fim ainda é uma fatura.
+  const invoiceCount =
+    coveredCount > 0 && coveredCount < vehicleCount ? Math.ceil(vehicleCount / coveredCount) : 1;
+  const chargeNote = (perCharge: number): string =>
+    invoiceCount > 1 ? ` Serão ${perCharge * invoiceCount} cobranças no total.` : '';
+
   if (pc.type === 'CASH') {
-    const head = `Pagamento à vista no valor de ${formatCurrency(total)}${methodPhrase}`;
-    return dueDate
-      ? `${head}, com vencimento em ${formatDate(dueDate)}.`
-      : `${head}, para ${formatDays(pc.cashDays ?? 5)} a partir da finalização do serviço.`;
+    const head = `Pagamento à vista${scope} no valor de ${formatCurrency(total)}${methodPhrase}`;
+    const tail = dueDate
+      ? `, com vencimento em ${formatDate(dueDate)}.`
+      : `, para ${formatDays(pc.cashDays ?? 5)} a partir da finalização do serviço.`;
+    return `${head}${tail}${chargeNote(1)}`;
   }
 
   if (pc.type === 'INSTALLMENTS') {
@@ -100,7 +125,7 @@ function generatePaymentTextFromConfig(
       ? `com entrada em ${formatDate(dueDate)}`
       : `com entrada para ${formatDays(entryDays)} a partir da finalização do serviço`;
 
-    return `Fica acertado o pagamento em ${count} (${word}) parcelas de ${formatCurrency(installmentValue)}${methodPhrase}, ${entryText} e as demais a cada ${formatDays(step)}.`;
+    return `Fica acertado o pagamento${scope} em ${count} (${word}) parcelas de ${formatCurrency(installmentValue)}${methodPhrase}, ${entryText} e as demais a cada ${formatDays(step)}.${chargeNote(count)}`;
   }
 
   return '';
@@ -126,6 +151,24 @@ interface PaymentTextData {
    * from the task's finishedAt). Replaces the relative days-based wording.
    */
   firstDueDate?: Date | string | null;
+  /**
+   * Quantos veículos o orçamento cobre. 1 (ou omitido) produz exatamente o texto
+   * de sempre, e é por isso que a esmagadora maioria dos orçamentos não muda uma
+   * vírgula.
+   */
+  vehicleCount?: number | null;
+  /**
+   * QUANTOS VEÍCULOS A FATURA DESTA CLÁUSULA COBRE.
+   *
+   * É o que decide se `total` é o valor de um caminhão, de um lote ou do
+   * orçamento inteiro. Omitido = cobre todos (fatura conjunta), que é o padrão e
+   * o comportamento de sempre.
+   */
+  coveredVehicleCount?: number | null;
+  /**
+   * @deprecated Use `coveredVehicleCount`. Equivale a `coveredVehicleCount: 1`.
+   */
+  perVehicleBilling?: boolean | null;
 }
 
 /**
@@ -159,13 +202,32 @@ export function generatePaymentText(quote: PaymentTextData): string {
   const parsedDue = quote.firstDueDate ? new Date(quote.firstDueDate) : null;
   const firstDueDate = parsedDue && !isNaN(parsedDue.getTime()) ? parsedDue : null;
 
-  return generatePaymentTextFromConfig(config, quote.total, methodPhrase, firstDueDate);
+  return generatePaymentTextFromConfig(
+    config,
+    quote.total,
+    methodPhrase,
+    firstDueDate,
+    Math.max(1, Math.trunc(quote.vehicleCount ?? 1) || 1),
+    // A cobertura, com o booleano antigo como reserva e "cobre tudo" como
+    // padrão: nesta ordem, um chamador não migrado produz exatamente o texto que
+    // produzia antes.
+    quote.coveredVehicleCount != null
+      ? Math.max(1, Math.trunc(quote.coveredVehicleCount) || 1)
+      : quote.perVehicleBilling === true
+        ? 1
+        : Math.max(1, Math.trunc(quote.vehicleCount ?? 1) || 1),
+  );
 }
 
 /**
  * Generate guarantee terms text based on quote data
  */
-export function generateGuaranteeText(quote: TaskQuote): string {
+export function generateGuaranteeText(
+  // Só os dois campos da garantia. Era `TaskQuote` inteiro, e isso obrigava quem
+  // tem um RECORTE do orçamento — a página pública, que recebe um veículo
+  // estreito por tarefa — a mentir para o compilador com um `as`.
+  quote: Pick<TaskQuote, 'guaranteeYears' | 'customGuaranteeText'>,
+): string {
   if (quote.customGuaranteeText) {
     return quote.customGuaranteeText;
   }
@@ -173,4 +235,88 @@ export function generateGuaranteeText(quote: TaskQuote): string {
     return '';
   }
   return `A Garantia para o serviço de pintura é de ${quote.guaranteeYears} anos desde que seja atendido as condições de uso e cuidado do implemento.`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// O ENDEREÇO DO TOMADOR
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// ESPELHO de `api/src/modules/common/signature/document/quote-text.ts`. A página
+// pública e o PDF assinado mostram o MESMO quadro, e é ele que o cliente
+// confere antes de a NFS-e ser emitida.
+
+/**
+ * Tipos de logradouro em português.
+ *
+ * O enum é em inglês (`STREET`, `AVENUE`) e o documento é em português. Espelha
+ * `street-type-select.tsx`, que é onde o operador escolhe o valor — divergir
+ * faria o cadastro dizer "Rodovia" na tela e "HIGHWAY" no documento assinado.
+ */
+const STREET_TYPE_LABELS_PT: Record<string, string> = {
+  STREET: "Rua",
+  AVENUE: "Avenida",
+  ALLEY: "Alameda",
+  CROSSING: "Travessa",
+  SQUARE: "Praça",
+  HIGHWAY: "Rodovia",
+  ROAD: "Estrada",
+  WAY: "Via",
+  PLAZA: "Largo",
+  LANE: "Viela",
+  DEADEND: "Beco",
+  SMALL_STREET: "Ruela",
+  PATH: "Caminho",
+  PASSAGE: "Passagem",
+  GARDEN: "Jardim",
+  BLOCK: "Quadra",
+  LOT: "Lote",
+  SITE: "Sítio",
+  PARK: "Parque",
+  FARM: "Fazenda",
+  RANCH: "Chácara",
+  CONDOMINIUM: "Condomínio",
+  COMPLEX: "Conjunto",
+  RESIDENTIAL: "Residencial",
+};
+
+export interface BillingAddressParts {
+  streetType?: string | null;
+  address?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+}
+
+/** `86200-000`. Deixa passar o que não tem oito dígitos: um CEP malformado no
+ *  documento é informação (o cadastro está errado), e mascarar esconderia. */
+export function formatZipCode(value: string | null | undefined): string | null {
+  const digits = (value ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.length !== 8) return value?.trim() || null;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+/** `Rodovia BR-369, 1200, Galpão B` — a primeira linha do endereço. */
+export function formatBillingStreetLine(c: BillingAddressParts): string | null {
+  if (!c?.address?.trim()) return null;
+  // `OTHER` não vira rótulo: "Outro Rua das Palmeiras" é pior que "Rua das
+  // Palmeiras", e quem escolhe OTHER normalmente já escreveu o tipo no campo.
+  const prefix = c.streetType ? (STREET_TYPE_LABELS_PT[c.streetType] ?? null) : null;
+  const street = prefix ? `${prefix} ${c.address.trim()}` : c.address.trim();
+  return [street, c.addressNumber?.trim() || null, c.addressComplement?.trim() || null]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/** `Distrito Industrial — Ibiporã/PR — CEP 86200-000` — a segunda linha. */
+export function formatBillingLocalityLine(c: BillingAddressParts): string | null {
+  const cityState = [c?.city?.trim() || null, c?.state?.trim() || null].filter(Boolean).join("/");
+  const zip = formatZipCode(c?.zipCode);
+  const parts = [c?.neighborhood?.trim() || null, cityState || null, zip ? `CEP ${zip}` : null].filter(
+    Boolean,
+  );
+  return parts.length ? parts.join(" — ") : null;
 }

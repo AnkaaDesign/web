@@ -728,6 +728,7 @@ function makeColumns(): Record<ColumnKey, ColumnDef> {
         <InstallmentStatusBadge
           status={r.installmentStatus}
           paymentMethod={r.paymentMethod}
+          bankSlipStatus={r.bankSlipStatus}
           size="sm"
         />
       ),

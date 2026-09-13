@@ -19,6 +19,7 @@ import {
   getBadgeVariant,
 } from "@/constants";
 import { canViewServiceOrderType } from "@/utils/permissions/service-order-permissions";
+import { quotePerVehicleTotal } from "@/utils/quote-tasks";
 import {
   formatCurrency,
   formatDateTime,
@@ -392,11 +393,10 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "price",
       header: "Valor Total",
-      // Coerce defensively: the API mapper returns a number, but a raw Decimal/string must not break the cell.
-      accessorFn: (t) => {
-        const n = Number(t.quote?.total);
-        return Number.isFinite(n) ? n : null;
-      },
+      // A fatia DESTE veículo: `quote.total` é o valor do CONTRATO
+      // (`por veículo × N`) e a linha é uma tarefa. `quotePerVehicleTotal` já
+      // coage o Decimal/string com que a API pode responder.
+      accessorFn: (t) => quotePerVehicleTotal(t.quote),
       enableSorting: false,
       size: 140,
       meta: {
@@ -406,13 +406,13 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
         headerLabel: "Valor Total",
         exportHeader: "Valor Total",
         exportValue: (t) => {
-          const n = Number(t.quote?.total);
-          return Number.isFinite(n) && n > 0 ? formatCurrency(n) : "";
+          const n = quotePerVehicleTotal(t.quote);
+          return n != null && n > 0 ? formatCurrency(n) : "";
         },
       },
       cell: ({ row }) => {
-        const n = Number(row.original.quote?.total);
-        return Number.isFinite(n) && n > 0 ? <span className="font-medium tabular-nums">{formatCurrency(n)}</span> : <MutedDash />;
+        const n = quotePerVehicleTotal(row.original.quote);
+        return n != null && n > 0 ? <span className="font-medium tabular-nums">{formatCurrency(n)}</span> : <MutedDash />;
       },
     },
     {

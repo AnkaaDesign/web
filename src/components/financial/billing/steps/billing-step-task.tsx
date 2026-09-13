@@ -42,6 +42,14 @@ interface BillingStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
+  /** OS VEÍCULOS do orçamento — repassados ao bloco de responsáveis para nomear
+   *  cada fatura pelo caminhão que ela cobra. */
+  vehicles?: Array<{
+    id: string;
+    name?: string | null;
+    serialNumber?: string | null;
+    truck?: { plate?: string | null } | null;
+  }>;
 }
 
 export function BillingStepTask({
@@ -50,6 +58,7 @@ export function BillingStepTask({
   initialCustomer,
   vinPlateFiles,
   onVinPlateFilesChange,
+  vehicles,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -152,8 +161,14 @@ export function BillingStepTask({
             />
           </div>
 
-          {/* Serial Number + Plate + Chassi + Plaqueta */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Serial Number + Plate + Nº do Pedido + Chassi + Plaqueta — CINCO
+              colunas: são a identificação do mesmo veículo e pertencem à mesma
+              fileira. Com quatro, a plaqueta caía sozinha numa linha inteira.
+
+              Este passo é da TAREFA ABERTA, mesmo num orçamento de quatro: é
+              aqui que se define aquele caminhão, e nada do que se grava alcança
+              os irmãos. A relação dos veículos é conferida no Resumo. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <FormField
               control={control}
               name="serialNumber"
@@ -193,6 +208,39 @@ export function BillingStepTask({
                       onChange={(value) => field.onChange(value ? String(value) : "")}
                       disabled={disabled}
                       className="uppercase bg-transparent"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* N° DO PEDIDO — o pedido de compra do cliente, DESTE veículo
+                (`Task.customerOrderNumber`). Junto da série e da placa porque é
+                disso que ele é irmão: identifica a ENTREGA. Morava na
+                configuração de faturamento, por CLIENTE, e isso obrigava os N
+                caminhões de um orçamento a citarem o mesmo número na nota e no
+                boleto. Aqui o campo é só deste caminhão — os irmãos se editam
+                abrindo cada um. */}
+            <FormField
+              control={control}
+              name="customerOrderNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconHash className="h-4 w-4" />
+                    N° do Pedido
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      value={field.value || ""}
+                      onChange={(value) =>
+                        field.onChange(value === null || value === "" ? null : String(value))
+                      }
+                      placeholder="Ex: 12345"
+                      maxLength={100}
+                      disabled={disabled}
+                      className="bg-transparent"
                     />
                   </FormControl>
                   <FormMessage />
@@ -304,7 +352,7 @@ export function BillingStepTask({
       </Card>
 
       {/* Faturar Para — customer selector for invoicing */}
-      <BillingStepInfo disabled={disabled} customersCache={customersCache} />
+      <BillingStepInfo disabled={disabled} customersCache={customersCache} vehicles={vehicles} />
     </div>
   );
 }

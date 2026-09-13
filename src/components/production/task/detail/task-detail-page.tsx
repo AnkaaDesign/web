@@ -627,6 +627,27 @@ function TaskDetailContent() {
             edit: canEdit ? { get: (t) => t.serialNumber, onCommit: (v) => setTaskField({ serialNumber: (v as string) || null }) } : undefined,
           },
           {
+            /**
+             * O PEDIDO DE COMPRA DO CLIENTE, deste veículo.
+             *
+             * Morava em `TaskQuoteCustomerConfig.orderNumber`, por CLIENTE, e os N
+             * caminhões de um orçamento eram obrigados a citar o mesmo número na
+             * nota e no boleto. O pedido é por ENTREGA — e é aqui, na tela do
+             * caminhão, que se corrige UM sem mexer nos irmãos.
+             */
+            id: "customerOrderNumber",
+            label: "N° do Pedido",
+            editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
+            accessor: (t) => t.customerOrderNumber,
+            edit: canEdit
+              ? {
+                  get: (t) => t.customerOrderNumber,
+                  onCommit: (v) => setTaskField({ customerOrderNumber: (String(v ?? "").trim() || null) }),
+                }
+              : undefined,
+          },
+          {
             id: "plate",
             label: "Placa",
             // `dataType: "plate"` faz a edição inline herdar a máscara posicional do Input

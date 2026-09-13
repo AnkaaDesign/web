@@ -9,6 +9,7 @@ import { useCustomers } from "@/hooks";
 import { NFSE_DOCUMENT_FIELDS, NFSE_REQUIRED_CUSTOMER_FIELDS } from "@/lib/billing-customer-data";
 import { PAYMENT_TYPE_OPTIONS, configToTypeValue, legacyToConfig } from "@/components/financial/payment-config-field";
 import { formatDate } from "@/utils";
+import { configsForTask, perVehicleAmount, quotePerVehicleTotal, quoteVehicleCount } from "@/utils/quote-tasks";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import type { Task } from "@/types";
 import type { Customer } from "@/types";
@@ -42,6 +43,70 @@ export const ATTENTION_CUSTOMER_SELECT = {
 
 export const MutedDash = () => <span className="text-muted-foreground">-</span>;
 
+// ---------------------------------------------------------------------------
+// A LINHA É UM VEÍCULO, O ORÇAMENTO PODE SER DE SESSENTA
+//
+// As duas tabelas listam TAREFAS (`useTasks`), uma linha por veículo, e um
+// orçamento multitarefa aparece em N linhas com o mesmo número. Duas coisas
+// mudam de significado nesse mundo, e as duas passam por aqui:
+//
+//   · o VALOR — `quote.total` é o contrato (`por veículo × N`), e a linha quer a
+//     fatia dela (a soma das N fatias volta a dar o contrato);
+//   · as FATIAS DE FATURAMENTO — com `PER_TASK` há uma configuração por veículo,
+//     todas do mesmo cliente, e a linha quer a DELA. Sem filtrar, a célula
+//     "Faturar Para" de um orçamento de sessenta caminhões lia
+//     "Marquespan / Marquespan +58" e a de pedido repetia o mesmo número
+//     sessenta vezes.
+// ---------------------------------------------------------------------------
+
+/** Quantos veículos o orçamento desta linha cobre. 1 quando não há orçamento. */
+export const taskQuoteVehicleCount = (task: Task): number =>
+  task.quote ? quoteVehicleCount(task.quote) : 1;
+
+/** `true` quando a linha é um dos N veículos de um orçamento — o caso que muda a leitura. */
+export const isMultiVehicleQuote = (task: Task): boolean => taskQuoteVehicleCount(task) > 1;
+
+/**
+ * O valor DESTE veículo — `quote.total ÷ nº de veículos`.
+ *
+ * Nulo quando não há orçamento ou o total é zero, para a célula mostrar o
+ * travessão em vez de "R$ 0,00" (o comportamento que as duas tabelas já tinham).
+ */
+export const taskQuoteTotal = (task: Task): number | null => quotePerVehicleTotal(task.quote);
+
+/** O subtotal DESTE veículo, pela mesma divisão do total. */
+export const taskQuoteSubtotal = (task: Task): number | null => {
+  const grand = Number(task.quote?.subtotal ?? 0);
+  if (!task.quote || !Number.isFinite(grand) || grand === 0) return null;
+  return perVehicleAmount(grand, quoteVehicleCount(task.quote));
+};
+
+/**
+ * As configurações de faturamento que dizem respeito a ESTA linha.
+ *
+ * `JOINT` → todas (uma por cliente, `taskId` nulo, cobrindo os N veículos).
+ * `PER_TASK` → a do veículo desta linha.
+ */
+export const taskBillingConfigs = (task: Task) =>
+  configsForTask(task.quote?.customerConfigs, task.id);
+
+/**
+ * Quando o faturamento DESTA linha foi aprovado.
+ *
+ * A aprovação é por FATIA desde o orçamento multitarefa: `TaskQuote.billingApprovedAt`
+ * só é gravado quando a ÚLTIMA fecha, então lê-lo aqui mostrava cinquenta e nove
+ * caminhões faturados como não faturados até o sexagésimo sair. A fatia responde
+ * primeiro; o campo do orçamento é a compatibilidade com o registro antigo, que
+ * não tem marca em fatia nenhuma.
+ */
+export const taskBillingApprovedAt = (task: Task): Date | string | null => {
+  const stamped = taskBillingConfigs(task).find((c) => c.billingApprovedAt)?.billingApprovedAt;
+  // Nenhuma fatia desta linha aprovada: cai no campo do ORÇAMENTO, que é a marca
+  // do registro ANTIGO (gravado antes de as fatias terem a sua própria) e vale
+  // para todos os veículos dele.
+  return stamped ?? task.quote?.billingApprovedAt ?? null;
+};
+
 /** Date cell used by every date column here — dash when absent, never wrapped. */
 export const renderDateCell = (date: Date | string | null | undefined) =>
   date ? <span className="whitespace-nowrap tabular-nums">{formatDate(date)}</span> : <MutedDash />;
@@ -55,11 +120,21 @@ export const dateExportValue = (date: Date | string | null | undefined) => (date
  */
 export const taskIdentifier = (task: Task): string => task.serialNumber || task.truck?.plate || "";
 
-/** Invoice-to customers of a task's quote, in config order, blanks dropped. */
+/**
+ * Invoice-to customers of a task's quote, in config order, blanks dropped.
+ *
+ * Deduplicado e restrito às fatias DESTA linha: num orçamento `PER_TASK` de
+ * sessenta caminhões há sessenta configurações do MESMO cliente, e a lista crua
+ * fazia a célula anunciar "Marquespan / Marquespan +58" — um único tomador lido
+ * como sessenta.
+ */
 export function invoiceToCustomerNames(task: Task): string[] {
-  const configs = task.quote?.customerConfigs;
-  if (!configs || configs.length === 0) return [];
-  return configs.map((c) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean);
+  const configs = taskBillingConfigs(task);
+  if (configs.length === 0) return [];
+  const names = configs
+    .map((c) => c.customer?.corporateName || c.customer?.fantasyName || "")
+    .filter(Boolean);
+  return [...new Set(names)];
 }
 
 /**
@@ -91,9 +166,11 @@ export function taskCustomerName(task: Task): string {
  * (the attention rule is what points at a MISSING one, on the field itself).
  */
 export function quoteOrderNumbers(task: Task): string[] {
-  const configs = task.quote?.customerConfigs;
-  if (!configs || configs.length === 0) return [];
-  return configs.map((c) => (c.orderNumber ?? "").trim()).filter(Boolean);
+  // O pedido de compra é DESTE VEÍCULO. Morava na configuração de faturamento,
+  // por cliente, o que obrigava os N caminhões de um orçamento a citarem o mesmo
+  // número na nota e no boleto — e o pedido é por entrega.
+  const own = ((task as { customerOrderNumber?: string | null }).customerOrderNumber ?? "").trim();
+  return own ? [own] : [];
 }
 
 export function OrderNumbersCell({ task }: { task: Task }) {
@@ -113,7 +190,7 @@ export function OrderNumbersCell({ task }: { task: Task }) {
  */
 export function paymentMethodLabels(task: Task): string[] {
   const seen = new Set<string>();
-  for (const config of task.quote?.customerConfigs ?? []) {
+  for (const config of taskBillingConfigs(task)) {
     const cfg = (config as { paymentConfig?: PaymentConfig | null }).paymentConfig ?? legacyToConfig((config as { paymentCondition?: string | null }).paymentCondition);
     const label = PAYMENT_TYPE_OPTIONS.find((o) => o.value === configToTypeValue(cfg))?.label;
     if (label) {
@@ -143,11 +220,16 @@ export function PaymentMethodCell({ task }: { task: Task }) {
   return <TruncatedTextWithTooltip text={labels.join(", ")} className="text-sm" />;
 }
 
-/** Paid / total installments across every customer config — the collections progress at a glance. */
+/**
+ * Paid / total installments across every customer config — the collections progress at a glance.
+ *
+ * Das fatias DESTA linha: com `PER_TASK` cada veículo tem o seu plano de
+ * parcelas, e somar os sessenta faria a linha do caminhão 12 anunciar "3/180".
+ */
 export function installmentProgress(task: Task): { paid: number; total: number } {
   let paid = 0;
   let total = 0;
-  for (const config of task.quote?.customerConfigs ?? []) {
+  for (const config of taskBillingConfigs(task)) {
     for (const installment of config.installments ?? []) {
       total += 1;
       if (installment.status === "PAID") paid += 1;
@@ -336,15 +418,13 @@ export function orderNumberPresenceWhere(value: unknown): Record<string, unknown
   const has = value === true || value === "true";
   const lacks = value === false || value === "false";
   if (!has && !lacks) return undefined;
+  // O NÚMERO DO PEDIDO É DA TAREFA (`Task.customerOrderNumber`) desde que um
+  // orçamento passou a cobrir N caminhões — o pedido é por ENTREGA. Estas duas
+  // listas listam TAREFAS, então o filtro é do próprio registro da linha, e não
+  // mais um `some` sobre as configurações de faturamento do orçamento (a coluna
+  // antiga foi removida: mandá-la agora derruba a consulta inteira).
   return has
-    ? // AND of two `not`s rather than `NOT: [a, b]`, which Prisma reads as NOT(a AND b).
-      { customerConfigs: { some: { AND: [{ orderNumber: { not: null } }, { orderNumber: { not: "" } }] } } }
-    : {
-        // A quote with NO customer configs at all has no number either, and `some` alone is false
-        // for it — so it used to fall through BOTH filters and be reachable under neither.
-        OR: [
-          { customerConfigs: { some: { OR: [{ orderNumber: null }, { orderNumber: "" }] } } },
-          { customerConfigs: { none: {} } },
-        ],
-      };
+    ? // AND de dois `not` em vez de `NOT: [a, b]`, que o Prisma lê como NOT(a AND b).
+      { AND: [{ customerOrderNumber: { not: null } }, { customerOrderNumber: { not: "" } }] }
+    : { OR: [{ customerOrderNumber: null }, { customerOrderNumber: "" }] };
 }

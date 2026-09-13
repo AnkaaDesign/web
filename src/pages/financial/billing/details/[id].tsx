@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
-import { useInvoicesByTask } from "@/hooks/production/use-invoice";
+import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
@@ -22,6 +22,19 @@ import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
+import {
+  quoteTasks,
+  quoteVehicleCount,
+  coverageSummary,
+  coveredTaskCount,
+  hasMultipleCustomers as hasMultipleCustomersOf,
+  dedupeConfigsByCustomer,
+} from "@/utils/quote-tasks";
+import {
+  expandConfigsIntoLots,
+  groupsForSplit,
+  type BillingSplitValue,
+} from "@/components/financial/shared/billing-split-field";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { readReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "@/components/ui/sonner";
@@ -138,6 +151,23 @@ const BillingDetailPageInner = () => {
         include: {
           services: true,
           layoutFiles: true,
+          // OS VEÍCULOS DO ORÇAMENTO. A tela é aberta por UM deles, mas o pedido
+          // de compra é de cada um (`Task.customerOrderNumber`) e a nota conjunta
+          // cita todos — sem esta lista o campo teria um único endereço possível,
+          // que é o defeito que a coluna por cliente tinha.
+          tasks: {
+            select: {
+              id: true,
+              name: true,
+              serialNumber: true,
+              createdAt: true,
+              customerOrderNumber: true,
+              // Chassi junto: a tabela de veículos do passo 1 mostra as mesmas
+              // colunas do documento, e um chassi ausente ali leria como "a
+              // registrar" num caminhão que já o tem.
+              truck: { select: { id: true, plate: true, chassisNumber: true } },
+            },
+          },
           customerConfigs: {
             include: {
               customer: { include: { logo: true } },
@@ -152,6 +182,98 @@ const BillingDetailPageInner = () => {
 
   const task = taskResponse?.data;
   const quote = task?.quote;
+
+  // ─── FATURAR ESTE VEÍCULO OU O ORÇAMENTO INTEIRO ─────────────────────────────
+  //
+  // Um orçamento pode cobrir sessenta caminhões, e esta tela é aberta pela TAREFA
+  // — ou seja, por UM deles. Com `billingSplit = PER_TASK` a decisão é veículo a
+  // veículo ("os sessenta não terminam no mesmo dia"): a aprovação daqui fatura
+  // só este, pela rota dedicada, e o orçamento fecha quando a última fatia sai.
+  // Com `JOINT` é uma fatura para todos, e aprovar aqui aprova o conjunto — como
+  // sempre foi.
+  const quoteVehicles = quoteVehicleCount(quote);
+
+  /**
+   * OS VEÍCULOS do orçamento — a lista que o pedido de compra endereça.
+   *
+   * Recai na tarefa aberta quando o orçamento veio sem a relação: um orçamento de
+   * um veículo continua com um campo só, e nenhuma tela fica sem endereço.
+   */
+  const quoteVehicleRows = useMemo(() => {
+    const fromQuote = quoteTasks(quote as any) as Array<{
+      id: string;
+      name?: string | null;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null } | null;
+    }>;
+    if (fromQuote.length > 0) return fromQuote;
+    return task
+      ? [
+          {
+            id: task.id,
+            name: task.name,
+            serialNumber: task.serialNumber,
+            customerOrderNumber: task.customerOrderNumber ?? null,
+            truck: task.truck ? { plate: task.truck.plate } : null,
+          },
+        ]
+      : [];
+  }, [quote, task]);
+
+  /**
+   * O FATURAMENTO DESTE ORÇAMENTO É FATIADO?
+   *
+   * "Fatiado" é: alguma fatura cobre MENOS que todos os veículos. Cobre a
+   * cobrança veículo a veículo e o lote com a mesma conta, porque a pergunta é
+   * sobre a cobertura e não sobre o modo — e é ela que decide se a aprovação
+   * desta tela fecha só o que cobre o caminhão aberto (rota da fatia) ou o
+   * orçamento inteiro.
+   *
+   * Antes era `billingSplit === "PER_TASK"`: num orçamento em lotes a resposta
+   * seria "não", e aprovar um caminhão emitiria os três lotes de uma vez.
+   */
+  const isPerVehicleBilling = useMemo(() => {
+    if (quoteVehicles <= 1) return false;
+    return ((quote?.customerConfigs ?? []) as any[]).some((c) => {
+      const covered = (c?.coveredTasks ?? []).length;
+      return covered > 0 && covered < quoteVehicles;
+    });
+  }, [quote, quoteVehicles]);
+
+  /** Os veículos na forma que o controle de divisão precisa (série, placa, pedido). */
+  const billingSplitVehicles = useMemo(
+    () =>
+      quoteVehicleRows.map((v: any) => ({
+        id: v.id,
+        name: v.name ?? null,
+        serialNumber: v.serialNumber ?? null,
+        plate: v.truck?.plate ?? null,
+        customerOrderNumber: v.customerOrderNumber ?? null,
+      })),
+    [quoteVehicleRows],
+  );
+
+  /**
+   * Quantas faturas deste orçamento JÁ foram aprovadas.
+   *
+   * Com uma que seja, a divisão congela: a cobertura de uma fatura aprovada
+   * sustenta nota fiscal autorizada e boletos registrados, e mudá-la alteraria
+   * retroativamente de quais caminhões é um documento fiscal que já saiu.
+   */
+  const approvedBillingCount = useMemo(
+    () => ((quote?.customerConfigs ?? []) as any[]).filter((c) => c?.billingApprovedAt).length,
+    [quote],
+  );
+
+  /** Há coleta de assinaturas em andamento? Refatiar a derruba — a tela avisa antes. */
+  const hasRunningSignature = useMemo(
+    () =>
+      ((quote as any)?.signatureEnvelopes ?? []).some((e: any) =>
+        ["PENDING", "SENT", "PARTIALLY_SIGNED", "RUNNING"].includes(String(e?.status ?? "")),
+      ),
+    [quote],
+  );
 
   // Attention: register this quote so its rules evaluate and honour their ack policy — the same
   // entity the Faturamento list registers, in the same shape, so a record behaves identically
@@ -183,7 +305,11 @@ const BillingDetailPageInner = () => {
   }, [task]);
 
   // Fetch invoices — polls every 3s during generation
-  const { data: invoicesData } = useInvoicesByTask(id!, {
+  // AS FATURAS QUE COBRAM ESTE VEÍCULO — pela rota do ORÇAMENTO, filtradas pela
+  // cobertura. A rota por tarefa devolvia VAZIO numa fatura conjunta (ali
+  // `Invoice.taskId` é nulo), e era ela que alimentava o "pular para o Resumo
+  // quando já há fatura" e toda a exibição de boleto e NFS-e desta tela.
+  const { data: invoicesData } = useTaskBillingInvoices(id, task?.quoteId ?? undefined, {
     refetchInterval: isGenerating ? 3000 : false,
   });
   const invoices = invoicesData?.data || [];
@@ -216,6 +342,12 @@ const BillingDetailPageInner = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      /**
+       * O PEDIDO DE COMPRA DO CLIENTE, DESTE veículo
+       * (`Task.customerOrderNumber`). Irmão da placa e da série, no mesmo passo
+       * que elas — os outros veículos do orçamento se editam abrindo cada um.
+       */
+      customerOrderNumber: null as string | null,
       // Foto da plaqueta (VIN). `null` é o valor EXPLÍCITO de "removida" — `undefined` faria a
       // API pular o campo e a foto antiga sobreviveria a uma remoção.
       vinPlateId: null as string | null,
@@ -238,6 +370,16 @@ const BillingDetailPageInner = () => {
       customForecastDays: null as number | null,
       simultaneousTasks: null as number | null,
       layoutFileIds: [] as string[],
+      /**
+       * JUNTO, SEPARADO OU EM LOTES — e a repartição dos veículos.
+       *
+       * A escolha existia só no assistente de Orçamento, e esta tela não mandava
+       * o campo: o FINANCEIRO, que é quem fatura, não tinha como separar sem
+       * voltar ao Comercial. Agora ela vive aqui também, com o mesmo controle no
+       * mesmo lugar.
+       */
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
+      billingGroups: [] as string[][],
     },
   });
 
@@ -299,6 +441,8 @@ const BillingDetailPageInner = () => {
       customerId: task.customerId || "",
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
+      // O pedido de compra DESTE veículo — ver os defaults do formulário.
+      customerOrderNumber: task.customerOrderNumber || null,
       chassisNumber: task.truck?.chassisNumber || "",
       vinPlateId: task.truck?.vinPlateId || null,
       category: task.truck?.category || "",
@@ -342,6 +486,12 @@ const BillingDetailPageInner = () => {
       customForecastDays: quote.customForecastDays ?? null,
       simultaneousTasks: quote.simultaneousTasks ?? null,
       layoutFileIds: (quote.layoutFiles || []).map((f: any) => f.id),
+      billingSplit: ((quote as any).billingSplit ?? "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
+      // Os LOTES como estão gravados. Lidos das faturas do PRIMEIRO cliente: a
+      // repartição é a mesma para todos (cada um cobra os mesmos veículos, pelos
+      // serviços dele), e unir as coberturas de dois clientes daria cada veículo
+      // duas vezes.
+      billingGroups: dedupeConfigsByCustomer(quote.customerConfigs ?? []).coverageGroups,
       // Sort by `position` explicitly: this page's custom `quote.include` replaces the
       // repository default that carried `orderBy: { position: "asc" }`, so the rows would
       // otherwise arrive in arbitrary DB order and defeat the drag-to-reorder step.
@@ -355,8 +505,22 @@ const BillingDetailPageInner = () => {
           invoiceToCustomerId: s.invoiceToCustomerId || null,
         })),
       customerConfigs: (quote.customerConfigs || []).map((config: any) => ({
+        // A IDENTIDADE DA FATURA. Já era lida aqui, mas o schema da API não
+        // declarava a chave e o zod a APAGAVA do payload — quatro faturas do
+        // mesmo cliente chegavam indistinguíveis ao servidor e a última gravava
+        // por cima das outras três. Agora ela viaja e é a primeira tentativa de
+        // casamento.
         id: config.id,
         customerId: config.customerId,
+        // A COBERTURA — de quais veículos esta fatura é. É o que faz o passo
+        // saber que é "do caminhão 37" em vez de "Cliente 2", e é o que impede a
+        // gravação de refatiar sem querer: mandando a cobertura de volta, o
+        // servidor não reexpande pelo modo.
+        taskIds: ((config.coveredTasks ?? []) as Array<{ taskId: string }>).map((r) => r.taskId),
+        coveredTasks: config.coveredTasks ?? [],
+        // Quando ESTA fatura foi aprovada. Fatura aprovada tem a cobertura
+        // congelada e não se refatia — a tela precisa saber para não oferecer.
+        billingApprovedAt: config.billingApprovedAt ?? null,
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
         discountType: config.discountType || "NONE",
@@ -368,7 +532,6 @@ const BillingDetailPageInner = () => {
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
         generateBankSlip: config.generateBankSlip !== false,
-        orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
         // Contato do responsável escolhido para ESTE faturamento — é o que a emissão usa
         // quando o cadastro do cliente não tem telefone/e-mail, então o Resumo e a
@@ -444,12 +607,29 @@ const BillingDetailPageInner = () => {
 
   const steps = useMemo(() => {
     const base: Array<{ id: number; name: string; description: string }> = [
+      // "Tarefa", sempre: este passo define a tarefa ABERTA. A relação dos
+      // veículos é conferida no Resumo.
       { id: 1, name: "Tarefa", description: "Dados da tarefa e faturamento" },
     ];
     if (canSeeBudgetInfoStep) {
       base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
     }
     base.push({ id: base.length + 1, name: "Serviços", description: "Serviços e preços" });
+    // ═══════════════════════════════════════════════════════════════════════
+    // UM PASSO POR FATURA — e cada passo diz de QUAL VEÍCULO ele é
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Os passos se chamavam "Cliente 1", "Cliente 2", "Cliente 3", "Cliente 4",
+    // os quatro com o MESMO nome de cliente na descrição, porque num orçamento
+    // cobrado veículo a veículo há uma fatura por caminhão e todas são do mesmo
+    // cliente. Nada na tela dizia qual passo era qual caminhão: o operador
+    // editava o segundo achando que era o segundo veículo, e a gravação —
+    // reenviando as quatro sem cobertura — aplicava o último a todos.
+    //
+    // Agora o rótulo é o VEÍCULO quando há mais de uma fatura, e continua sendo
+    // o CLIENTE quando há mais de um cliente. Num orçamento de um veículo e um
+    // cliente nada muda: "Cliente 1" era e continua sendo o rótulo certo.
+    const configsHaveSplit = customerConfigs.length > 1 && !hasMultipleCustomersOf(customerConfigs);
     customerConfigs.forEach((config: any, i: number) => {
       const cached = customersCache.current.get(config.customerId);
       const name =
@@ -457,11 +637,18 @@ const BillingDetailPageInner = () => {
         config.customerData?.corporateName ||
         cached?.fantasyName ||
         "Cliente";
-      base.push({ id: base.length + 1, name: `Cliente ${i + 1}`, description: name });
+      const coverage = coverageSummary(config, quoteVehicles, quoteVehicleRows as any);
+      base.push({
+        id: base.length + 1,
+        name: configsHaveSplit ? `Fatura ${i + 1}` : `Cliente ${i + 1}`,
+        // A descrição é o que o operador lê para se situar: com fatias, o
+        // veículo (ou o lote); sem fatias, o cliente, como sempre foi.
+        description: configsHaveSplit ? coverage : name,
+      });
     });
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
-  }, [customerConfigs, canSeeBudgetInfoStep]);
+  }, [customerConfigs, canSeeBudgetInfoStep, quoteVehicles, quoteVehicleRows]);
 
   const totalSteps = steps.length;
   // Step layout: 1=Tarefa, 2=Proposta (if visible), then Serviços, customers, Resumo
@@ -555,7 +742,13 @@ const BillingDetailPageInner = () => {
       }
     }
 
-    if (configs.length >= 2) {
+    // ⚠️ CLIENTES DISTINTOS, nunca FATURAS. Num orçamento cobrado veículo a
+    // veículo há uma fatura por caminhão, TODAS do mesmo cliente: contar faturas
+    // fazia esta guarda exigir `invoiceToCustomerId` em todo serviço e RECUSAR a
+    // aprovação com um erro impossível de obedecer — o seletor "Faturar Para" só
+    // aparece quando há mais de um cliente. Era o bloqueio que impedia faturar um
+    // orçamento de quatro veículos de um cliente só.
+    if (hasMultipleCustomersOf(configs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
         setCurrentStep(servicesStepIdx);
@@ -585,13 +778,20 @@ const BillingDetailPageInner = () => {
       if (errors.length > 0) {
         setCurrentStep(firstCustomerStepIdx + i);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
-        toast.error(`${name} - campos obrigatórios`, { description: errors.join(", ") });
+        // Com mais de uma fatura o nome do cliente se repete, e a mensagem
+        // mandava o operador para "um passo do mesmo cliente" sem dizer qual.
+        // O veículo desempata.
+        const where =
+          configs.length > 1 && coveredTaskCount(config) > 0
+            ? `${name} (${coverageSummary(config, quoteVehicles, quoteVehicleRows as any)})`
+            : name;
+        toast.error(`${where} - campos obrigatórios`, { description: errors.join(", ") });
         return false;
       }
     }
 
     return true;
-  }, [form, servicesStepIdx, firstCustomerStepIdx]);
+  }, [form, servicesStepIdx, firstCustomerStepIdx, quoteVehicles, quoteVehicleRows]);
 
   const nextStep = useCallback(() => {
     if (validateCurrentStep()) {
@@ -756,6 +956,68 @@ const BillingDetailPageInner = () => {
       const BILLING_LOCKED_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
       const isQuoteLocked = quote.status && BILLING_LOCKED_STATUSES.includes(quote.status);
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // A DIVISÃO DO FATURAMENTO MUDOU?
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Duas gravações diferentes, e confundi-las é o defeito:
+      //
+      //   NÃO MUDOU → cada fatura volta como veio, com o seu `id` e a sua
+      //     cobertura. É o que torna a gravação idempotente: sem a cobertura, o
+      //     servidor entende "decida pelo modo" e reexpande — e os termos da
+      //     ÚLTIMA fatura vão parar em todas as outras.
+      //
+      //   MUDOU → o que vai é UMA linha por cliente, sem `id` e sem cobertura
+      //     (ou com o lote, quando é lote), mais o modo. O servidor refatia: as
+      //     faturas que sobram são apagadas, as novas herdam as condições da
+      //     primeira do mesmo cliente.
+      const persistedSplit = ((quote as any).billingSplit ?? "JOINT") as BillingSplitValue;
+      const nextBillingSplit = ((formData as any).billingSplit ??
+        persistedSplit) as BillingSplitValue;
+      const quoteTaskIds = quoteVehicleRows.map((v) => v.id);
+      const groupsKey = (groups: string[][]) =>
+        groups
+          .map((g) => [...g].sort().join("|"))
+          .sort()
+          .join("//");
+      const persistedGroups = dedupeConfigsByCustomer(quote.customerConfigs ?? []).coverageGroups;
+      const formGroups = groupsForSplit(
+        nextBillingSplit,
+        quoteTaskIds,
+        (formData as any).billingGroups,
+      );
+      const billingSplitChanged =
+        nextBillingSplit !== persistedSplit ||
+        (quoteTaskIds.length > 1 && groupsKey(formGroups) !== groupsKey(persistedGroups));
+
+      const configTerms = (c: any) => ({
+        customerId: c.customerId,
+        subtotal: Number(c.subtotal) || 0,
+        total: Number(c.total) || 0,
+        discountType: c.discountType || "NONE",
+        discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+        discountReference: c.discountReference || null,
+        paymentCondition: c.paymentCondition || null,
+        paymentConfig: c.paymentConfig ?? null,
+        customPaymentText: c.customPaymentText || null,
+        generateInvoice: c.generateInvoice !== false,
+        generateBankSlip: c.generateBankSlip !== false,
+        responsibleId: c.responsibleId || null,
+      });
+
+      const billingConfigsPayload = billingSplitChanged
+        ? expandConfigsIntoLots(
+            dedupeConfigsByCustomer(formData.customerConfigs as any).configs.map(configTerms),
+            nextBillingSplit,
+            quoteTaskIds,
+            (formData as any).billingGroups,
+          )
+        : formData.customerConfigs.map((c: any) => ({
+            ...(c.id && { id: c.id }),
+            ...configTerms(c),
+            ...(Array.isArray(c.taskIds) && c.taskIds.length > 0 ? { taskIds: c.taskIds } : {}),
+          }));
+
       const quotePayload: any = isQuoteLocked
         ? {
             expiresAt: formData.expiresAt,
@@ -783,22 +1045,8 @@ const BillingDetailPageInner = () => {
                 amount: Number(s.amount) || 0,
                 invoiceToCustomerId: s.invoiceToCustomerId || null,
               })),
-            customerConfigs: formData.customerConfigs.map((c: any) => ({
-              ...(c.id && { id: c.id }),
-              customerId: c.customerId,
-              subtotal: Number(c.subtotal) || 0,
-              total: Number(c.total) || 0,
-              discountType: c.discountType || "NONE",
-              discountValue: c.discountValue != null ? Number(c.discountValue) : null,
-              discountReference: c.discountReference || null,
-              paymentCondition: c.paymentCondition || null,
-              paymentConfig: c.paymentConfig ?? null,
-              customPaymentText: c.customPaymentText || null,
-              generateInvoice: c.generateInvoice !== false,
-              generateBankSlip: c.generateBankSlip !== false,
-              orderNumber: c.orderNumber || null,
-              responsibleId: c.responsibleId || null,
-            })),
+            ...(billingSplitChanged ? { billingSplit: nextBillingSplit } : {}),
+            customerConfigs: billingConfigsPayload,
           };
 
       // Status handling — two phases, deterministic:
@@ -821,22 +1069,22 @@ const BillingDetailPageInner = () => {
 
       await taskQuoteService.update(quote.id, quotePayload);
 
-      // For locked quotes, orderNumber is stripped from the main payload to avoid the
-      // financial obligation guard. Update it separately via the dedicated endpoint.
-      if (isQuoteLocked) {
-        const originalConfigs: any[] = (quote as any).customerConfigs || [];
-        for (const config of formData.customerConfigs as any[]) {
-          const original = originalConfigs.find((c: any) => c.customerId === config.customerId);
-          const originalOrderNumber = original?.orderNumber ?? null;
-          const newOrderNumber = config.orderNumber || null;
-          if (originalOrderNumber !== newOrderNumber) {
-            await taskQuoteService.updateCustomerConfigOrderNumber(
-              quote.id,
-              config.customerId,
-              newOrderNumber,
-            );
-          }
-        }
+      // ═══════════════════════════════════════════════════════════════════════
+      // O PEDIDO DE COMPRA — DESTE VEÍCULO
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // `Task.customerOrderNumber`, e só o do caminhão ABERTO. Escrito por fora
+      // do orçamento de propósito: aqui ele costuma estar TRAVADO
+      // (`BILLING_APPROVED` em diante) e a guarda de obrigação financeira recusa
+      // o corpo inteiro — mas o número do pedido é justamente o que ainda chega
+      // depois, quando o cliente o manda e a nota já está para sair.
+      //
+      // Enviado só quando MUDOU, inclusive vazio (`null`): limpar tem de
+      // persistir, não deixar de pé o número de um pedido cancelado.
+      const nextOrderNumber = (formData.customerOrderNumber ?? "").trim() || null;
+      const savedOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
+      if (nextOrderNumber !== savedOrderNumber) {
+        await updateTaskAsync({ id: task.id, data: { customerOrderNumber: nextOrderNumber } });
       }
 
       if (statusChanged) {
@@ -861,6 +1109,16 @@ const BillingDetailPageInner = () => {
         }
         const reason = (formData as any).statusReason?.trim() || undefined;
         for (const step of path) {
+          // A aprovação de faturamento de um orçamento POR VEÍCULO é um ato
+          // daquele veículo, e tem rota própria: `updateStatus` roteia para a
+          // aprovação SEM fatia, que fatura os sessenta de uma vez. As duas
+          // exigem FINANCEIRO/ADMIN e chegam ao log como linhas distintas —
+          // "faturei o orçamento inteiro" e "faturei o caminhão 37" não são o
+          // mesmo ato.
+          if (step === "BILLING_APPROVED" && isPerVehicleBilling && task?.id) {
+            await taskQuoteService.internalApproveSlice(quote.id, task.id);
+            continue;
+          }
           await taskQuoteService.updateStatus(
             quote.id,
             step as TASK_QUOTE_STATUS,
@@ -880,10 +1138,15 @@ const BillingDetailPageInner = () => {
         targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
       if (isBillingApproval) {
         setIsGenerating(true);
-        toast.success("Faturamento aprovado! Gerando faturas, boletos e NFS-e...", {
-          description: "Aguarde a geração ser concluída.",
-          duration: 6000,
-        });
+        toast.success(
+          isPerVehicleBilling
+            ? "Faturamento deste veículo aprovado! Gerando fatura, boleto e NFS-e..."
+            : "Faturamento aprovado! Gerando faturas, boletos e NFS-e...",
+          {
+            description: "Aguarde a geração ser concluída.",
+            duration: 6000,
+          },
+        );
       } else {
         // The save just succeeded, so the form is no longer worth guarding — without this the
         // guard would prompt on the way out of a successful save.
@@ -898,6 +1161,10 @@ const BillingDetailPageInner = () => {
   }, [
     quote?.id,
     quote?.status,
+    // A aprovação de UMA fatia depende do recorte de faturamento e do veículo
+    // aberto: sem os dois na lista, um `executeSave` memorizado faturaria o
+    // orçamento inteiro depois de o operador trocar de veículo pelo paginador.
+    isPerVehicleBilling,
     task?.id,
     form,
     queryClient,
@@ -1039,20 +1306,28 @@ const BillingDetailPageInner = () => {
               <RecordPager nav={recordNav} keyboard={false} />
               {quote?.id && customerConfigs.length > 0 && (
                 <>
-                  {customerConfigs.length > 1 && (
+                  {/* ⚠️ CLIENTES DISTINTOS, nunca faturas. O dossiê é recortado
+                      por CLIENTE; listar faturas fazia um orçamento de quatro
+                      veículos de um cliente só mostrar "Cliente 1..4" com o
+                      mesmo nome quatro vezes — e com o MESMO `value`, que num
+                      combobox é o mesmo item repetido. */}
+                  {hasMultipleCustomersOf(customerConfigs) && (
                     <Combobox
                       value={dossieCustomerId}
                       onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
                       options={[
                         { value: "all", label: "Completo" },
-                        ...customerConfigs.map((config: any, i: number) => {
-                          const cached = customersCache.current.get(config.customerId);
-                          const name =
-                            cached?.fantasyName ||
-                            cached?.corporateName ||
-                            `Cliente ${i + 1}`;
-                          return { value: config.customerId, label: name };
-                        }),
+                        ...dedupeConfigsByCustomer(customerConfigs).configs.map(
+                          (config: any, i: number) => {
+                            const cached = customersCache.current.get(config.customerId);
+                            const name =
+                              cached?.fantasyName ||
+                              cached?.corporateName ||
+                              config.customerData?.fantasyName ||
+                              `Cliente ${i + 1}`;
+                            return { value: config.customerId, label: name };
+                          },
+                        ),
                       ]}
                       searchable={false}
                       clearable={false}
@@ -1100,6 +1375,7 @@ const BillingDetailPageInner = () => {
                     initialCustomer={task?.customer}
                     vinPlateFiles={vinPlateFiles}
                     onVinPlateFilesChange={handleVinPlateFilesChange}
+                    vehicles={quoteVehicleRows as any}
                   />
                 </div>
 
@@ -1120,12 +1396,25 @@ const BillingDetailPageInner = () => {
                 {customerConfigs.map((config: any, i: number) => {
                   const cachedCustomer = customersCache.current.get(config.customerId);
                   return (
-                    <div key={config.customerId || i} style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}>
+                    // ⚠️ A CHAVE NÃO PODE SER O CLIENTE. Num orçamento cobrado
+                    // veículo a veículo as N faturas são do MESMO cliente, e
+                    // `key={customerId}` repetiria a chave nas N: o React
+                    // reaproveita o nó da primeira para todas, e os campos de uma
+                    // fatura aparecem na tela de outra. O id da fatura é único; o
+                    // índice cobre a fatura ainda não gravada.
+                    <div
+                      key={config.id || `${config.customerId}-${i}`}
+                      style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}
+                    >
                       <BillingStepCustomer
                         configIndex={i}
                         customer={cachedCustomer}
                         disabled={!canEdit}
                         quoteId={quote?.id}
+                        vehicles={billingSplitVehicles}
+                        coverage={(config?.taskIds as string[] | undefined) ?? []}
+                        approvedBillingCount={approvedBillingCount}
+                        hasRunningSignature={hasRunningSignature}
                       />
                     </div>
                   );
@@ -1175,7 +1464,9 @@ const BillingDetailPageInner = () => {
                 <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
               </div>
               <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
-                Faturamento Aprovado - Ação Irreversível
+                {isPerVehicleBilling
+                  ? "Faturar Este Veículo - Ação Irreversível"
+                  : "Faturamento Aprovado - Ação Irreversível"}
               </AlertDialogTitle>
             </div>
           </AlertDialogHeader>
@@ -1185,10 +1476,28 @@ const BillingDetailPageInner = () => {
             <p className="mb-2 text-sm font-medium text-foreground">
               Confira os documentos que serão gerados automaticamente:
             </p>
+            {isPerVehicleBilling && (
+              // O orçamento cobra veículo a veículo: o que sai daqui é a fatura
+              // DESTE caminhão. Sem dizê-lo, quem aprova acha que está fechando
+              // os sessenta — e o contrário também assusta.
+              <p className="mb-2 text-sm font-semibold text-red-700 dark:text-red-400">
+                Este orçamento cobra veículo a veículo ({quoteVehicles} veículos). Serão gerados
+                apenas os documentos de{" "}
+                {form.watch("serialNumber") || form.watch("plate") || "deste veículo"} — os demais
+                continuam aguardando a própria aprovação.
+              </p>
+            )}
             <BillingDocumentPreviews
               customerConfigs={form.watch("customerConfigs")}
               services={form.watch("services")}
               nextNfseNumber={nextNfse?.nextNumber ?? null}
+              orderNumbersByTask={{
+                ...Object.fromEntries(
+                  quoteVehicleRows.map((t) => [t.id, t.customerOrderNumber ?? null]),
+                ),
+                ...(task ? { [task.id]: form.watch("customerOrderNumber") ?? null } : {}),
+              }}
+              quoteTaskIds={quoteVehicleRows.map((t) => t.id)}
               task={{
                 plate: form.watch("plate"),
                 serialNumber: form.watch("serialNumber"),
@@ -1206,7 +1515,10 @@ const BillingDetailPageInner = () => {
             <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 font-bold">1.</span>
-                <span><strong>Faturas</strong> serão geradas para cada cliente vinculado ao orçamento</span>
+                <span>
+                  <strong>Faturas</strong> serão geradas para cada cliente vinculado ao
+                  {isPerVehicleBilling ? " veículo" : " orçamento"}
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 font-bold">2.</span>
@@ -1245,7 +1557,11 @@ const BillingDetailPageInner = () => {
                 await executeSave();
               }}
             >
-              {isSaving ? "Processando..." : "Confirmar Faturamento Aprovado"}
+              {isSaving
+                ? "Processando..."
+                : isPerVehicleBilling
+                  ? "Confirmar Faturamento Deste Veículo"
+                  : "Confirmar Faturamento Aprovado"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -31,6 +31,14 @@ export interface Task extends BaseEntity {
   bonification: BONIFICATION_STATUS | null;
   bonificationOrder: number;
   serialNumber: string | null;
+  /**
+   * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
+   *
+   * Morava em `TaskQuoteCustomerConfig.orderNumber` — por CLIENTE — e isso
+   * obrigava os N caminhões de um mesmo orçamento a citarem o mesmo número na
+   * nota e no boleto. O pedido é por ENTREGA: cada veículo tem o seu.
+   */
+  customerOrderNumber: string | null;
   details: string | null;
   entryDate: Date | null;
   term: Date | null;

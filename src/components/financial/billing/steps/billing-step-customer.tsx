@@ -20,8 +20,13 @@ import {
 import type { PaymentConfig } from "@/schemas/task-quote";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
-import { PINNED_CUSTOMERS } from "@/config/company";
 import { cn } from "@/lib/utils";
+import {
+  BillingSplitField,
+  vehicleLabel,
+  type BillingSplitValue,
+  type BillingSplitVehicle,
+} from "@/components/financial/shared/billing-split-field";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -60,9 +65,29 @@ interface BillingStepCustomerProps {
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
   quoteId?: string;
+  /**
+   * OS VEÍCULOS do orçamento, com id — para o controle de divisão e para o
+   * cabeçalho que diz de qual caminhão é ESTA fatura.
+   */
+  vehicles?: BillingSplitVehicle[];
+  /** Os veículos que ESTA fatura cobra, resolvidos pela página. */
+  coverage?: string[];
+  /** Quantas faturas deste orçamento já foram aprovadas — trava o refatiamento. */
+  approvedBillingCount?: number;
+  /** `true` quando há coleta de assinaturas em andamento (refatiar a derruba). */
+  hasRunningSignature?: boolean;
 }
 
-export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }: BillingStepCustomerProps) {
+export function BillingStepCustomer({
+  configIndex,
+  customer,
+  disabled,
+  quoteId,
+  vehicles,
+  coverage,
+  approvedBillingCount = 0,
+  hasRunningSignature,
+}: BillingStepCustomerProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
   // useWatch returns undefined on the very first render (before subscription fires);
   // fall back to getValues() which reads the form store synchronously.
@@ -100,15 +125,30 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
-  // Attention: `task-quote.ibipora-missing-order-number` targets the field `orderNumber` on the
-  // QUOTE, so a multi-customer quote shares one address across all of its customer steps. Narrow
-  // it to the config the rule is actually about — otherwise the other customer's N° do Pedido,
-  // which nobody is waiting on, would blink too.
-  const orderNumberAttention = useAttentionField("TASK_QUOTE", quoteId, "orderNumber");
-  const orderNumberAttentionClass =
-    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
-      ? attentionFieldClass(orderNumberAttention)
-      : "";
+  // A DIVISÃO do faturamento — do ORÇAMENTO, não desta fatura. Mora no primeiro
+  // passo de cliente, como no assistente de Orçamento, para que o controle
+  // esteja no mesmo lugar nas duas telas.
+  const billingSplit = useWatch({ control, name: "billingSplit" }) as string | undefined;
+  const billingGroups =
+    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
+
+  /**
+   * DE QUAL VEÍCULO É ESTA FATURA.
+   *
+   * A pergunta que a tela não respondia. Num orçamento cobrado veículo a veículo
+   * os passos se chamavam "Cliente 1..4", os quatro com o mesmo nome de cliente,
+   * e nada dizia qual era qual caminhão — o operador editava o segundo achando
+   * que era o segundo veículo, e a gravação aplicava o último a todos.
+   */
+  const coveredVehicles = useMemo(() => {
+    const ids = new Set(coverage ?? []);
+    return (vehicles ?? []).filter((v) => ids.has(v.id));
+  }, [vehicles, coverage]);
+  const showCoverage = (vehicles?.length ?? 0) > 1 && coveredVehicles.length > 0;
+
+  // O N° DO PEDIDO NÃO MORA MAIS AQUI: é da ENTREGA
+  // (`Task.customerOrderNumber`), não do cliente, e vive no passo TAREFA, ao lado
+  // da placa e do número de série. Ver `billing-step-task.tsx`.
 
   // Attention: `task-quote.billing-customer-incomplete` addresses the whole cadastro under one
   // field id (`customerData`), so every customer step of a multi-customer quote reads the same
@@ -462,7 +502,18 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
             <IconCreditCard className="h-5 w-5 text-muted-foreground" />
             Faturamento e Pagamento
           </CardTitle>
-          <CardDescription>Condições de pagamento e faturamento</CardDescription>
+          <CardDescription>
+            {showCoverage
+              ? // O QUE ESTA FATURA COBRA, escrito. Com um veículo a frase não
+                // existe (a fatura é o orçamento inteiro) e o cabeçalho segue o
+                // de sempre.
+                `Esta fatura cobra ${
+                  coveredVehicles.length === 1
+                    ? "o veículo"
+                    : `${coveredVehicles.length} veículos`
+                }: ${coveredVehicles.map(vehicleLabel).join(", ")}`
+              : "Condições de pagamento e faturamento"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
@@ -500,18 +551,27 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
                 <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
-            <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm font-medium">N° do Pedido</Label>
-              <Input
-                type="natural"
-                value={config?.orderNumber ? (parseInt(config.orderNumber.replace(/\D/g, ''), 10) || undefined) : undefined}
-                onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
-                placeholder="Ex: 12345"
-                disabled={disabled}
-                className={orderNumberAttentionClass}
-                title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
-              />
-            </div>
+            {/* ─── JUNTO, SEPARADO OU EM LOTES ────────────────────────────
+                Só no PRIMEIRO passo de cliente: a escolha é do ORÇAMENTO, e
+                repeti-la por passo faria a segunda cópia sobrescrever a primeira
+                sem que ninguém notasse. Com um veículo o componente não
+                renderiza nada — a pergunta não existe. */}
+            {configIndex === 0 && (
+              <div className="flex-1 min-w-[260px]">
+                <BillingSplitField
+                  vehicles={vehicles ?? []}
+                  value={(billingSplit ?? "JOINT") as BillingSplitValue}
+                  groups={billingGroups}
+                  disabled={disabled}
+                  approvedCount={approvedBillingCount}
+                  warnSignature={hasRunningSignature}
+                  onChange={({ billingSplit: nextSplit, billingGroups: nextGroups }) => {
+                    setFormValue("billingSplit", nextSplit, { shouldDirty: true });
+                    setFormValue("billingGroups", nextGroups, { shouldDirty: true });
+                  }}
+                />
+              </div>
+            )}
             {/* ── Condição de Pagamento (type) ── */}
             <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">

@@ -8,7 +8,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconListNumbers } from "@tabler/icons-react";
+import { IconListNumbers, IconCopy } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -44,6 +44,11 @@ const taskBatchEditSchema = z.object({
             .regex(/^[A-Z0-9-]*$/, "Número de série deve conter apenas letras maiúsculas, números e hífens")
             .nullable()
             .optional(),
+          // O pedido de compra do cliente, por VEÍCULO (`Task.customerOrderNumber`).
+          // Livre: os N caminhões de um orçamento podem vir num pedido só, em
+          // pedidos diferentes ou em blocos — e esta tela é justamente onde se
+          // resolve "estes doze são do pedido 4471".
+          customerOrderNumber: z.string().max(100, "Máximo de 100 caracteres").nullable().optional(),
           // Regra canônica: normaliza antes de validar (ver schemas/truck.ts).
           plate: optionalPlateSchema,
           chassisNumber: optionalChassisSchema,
@@ -101,6 +106,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 name: task.name || "",
                 status: task.status,
                 serialNumber: task.serialNumber || "",
+                customerOrderNumber: task.customerOrderNumber || "",
                 plate: task.truck?.plate || "",
                 chassisNumber: task.truck?.chassisNumber || "",
                 details: task.details || "",
@@ -132,6 +138,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           name: task.name || "",
           status: task.status,
           serialNumber: task.serialNumber || "",
+          customerOrderNumber: task.customerOrderNumber || "",
           plate: task.truck?.plate || "",
           chassisNumber: task.truck?.chassisNumber || "",
           details: task.details || "",
@@ -182,6 +189,27 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
     }
   };
 
+  /**
+   * REPETE O Nº DO PEDIDO da primeira linha nas demais.
+   *
+   * Irmão de `handleFillSerialNumbers`, e deliberadamente SEM a sequência: um
+   * número de série é uma contagem, um pedido de compra é um documento — doze
+   * caminhões do pedido 4471 citam todos o 4471, e incrementar daria 4472 ao
+   * segundo, que é um pedido que existe e é de outra coisa.
+   */
+  const handleFillOrderNumbers = () => {
+    const rows = form.getValues("tasks");
+    if (!rows || rows.length < 2) return;
+    const first = (rows[0]?.data?.customerOrderNumber || "").trim();
+    if (!first) {
+      alert("Informe o N° do Pedido na primeira linha antes de repetir.");
+      return;
+    }
+    for (let i = 1; i < rows.length; i++) {
+      form.setValue(`tasks.${i}.data.customerOrderNumber`, first, { shouldDirty: true, shouldValidate: true });
+    }
+  };
+
   const handleSubmit = async (data: TaskBatchEditFormData) => {
     try {
       setIsSubmitting(true);
@@ -193,6 +221,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           task.data.name !== originalTask.name ||
           task.data.status !== originalTask.status ||
           task.data.serialNumber !== originalTask.serialNumber ||
+          (task.data.customerOrderNumber || "") !== (originalTask.customerOrderNumber || "") ||
           task.data.plate !== originalTask.truck?.plate ||
           task.data.chassisNumber !== originalTask.truck?.chassisNumber ||
           task.data.customerId !== originalTask.customerId ||
@@ -273,6 +302,16 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                     <IconListNumbers className="mr-2 h-4 w-4" />
                     Preencher Nº de Série
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFillOrderNumbers}
+                    title="Repete o N° do Pedido da primeira linha em todas as demais"
+                  >
+                    <IconCopy className="mr-2 h-4 w-4" />
+                    Repetir Nº do Pedido
+                  </Button>
                 </div>
               )}
             </div>
@@ -299,6 +338,9 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-24">
                     <div className="px-3 py-2">Nº Série</div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-28">
+                    <div className="px-3 py-2">Nº Pedido</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-24">
                     <div className="px-3 py-2">Placa</div>
@@ -370,6 +412,11 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
                             <FormInput name={`tasks.${index}.data.serialNumber`} placeholder="Nº Série" className="uppercase" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-28 p-0 !border-r-0">
+                          <div className="px-3 py-2">
+                            <FormInput name={`tasks.${index}.data.customerOrderNumber`} placeholder="Nº Pedido" />
                           </div>
                         </TableCell>
                         <TableCell className="w-24 p-0 !border-r-0">

@@ -1,8 +1,14 @@
 // Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
 import { formatCurrencyUnmasked as formatCurrency, formatDate, toTitleCase, formatCNPJ } from "./index";
 import type { Task } from "../types/task";
-import { generatePaymentText, generateGuaranteeText } from "./quote-text-generators";
+import {
+  generatePaymentText,
+  generateGuaranteeText,
+  formatBillingStreetLine,
+  formatBillingLocalityLine,
+} from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
+import { coveredTaskCount, orderNumberLabel } from "./quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
@@ -358,11 +364,40 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     : task.serialNumber || "0000";
 
   // Generate payment and guarantee text (customPaymentText, paymentCondition now live on config)
+  // OS VEÍCULOS deste orçamento. `exportBudgetPdf` é chamado da tela da TAREFA,
+  // então parte do `task.quote.tasks` quando ele veio no grafo e cai na própria
+  // tarefa quando não — o que mantém o comportamento de sempre nos chamadores
+  // que não pedem a relação.
+  const quoteTaskRows: any[] =
+    ((task.quote as any)?.tasks as any[] | undefined)?.length
+      ? ((task.quote as any).tasks as any[])
+      : [task];
+  const pdfVehicles = quoteTaskRows.map((t: any) => ({
+    taskId: t?.id ?? null,
+    serialNumber: t?.serialNumber || null,
+    // O pedido de compra é DESTE veículo. Sem esta linha o quadro do tomador
+    // saía sempre sem o número: o `map` que o montava lia `customerOrderNumber`
+    // de um objeto que nunca o teve, e `undefined` filtrado é silêncio.
+    customerOrderNumber: t?.customerOrderNumber || null,
+    plate: t?.truck?.plate || null,
+    chassisNumber: t?.truck?.chassisNumber || null,
+    truckCategory: t?.truck?.category
+      ? (TRUCK_CATEGORY_LABELS[t.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || t.truck.category)
+      : null,
+    truckImplementType: t?.truck?.implementType
+      ? (IMPLEMENT_TYPE_LABELS[t.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || t.truck.implementType)
+      : null,
+  }));
+
   const paymentText = generatePaymentText({
     customPaymentText: firstConfig?.customPaymentText || null,
     paymentConfig: (firstConfig as any)?.paymentConfig || null,
     paymentCondition: firstConfig?.paymentCondition,
     total: firstConfig?.total ?? task.quote.total,
+    vehicleCount: Math.max(1, pdfVehicles.length),
+    // QUANTOS VEÍCULOS ESTA FATURA COBRE. Sai da cobertura, não do modo — com
+    // lotes, o modo não sabe o tamanho, e é o tamanho que a cláusula imprime.
+    coveredVehicleCount: coveredTaskCount(firstConfig as any) || undefined,
   });
   const guaranteeText = generateGuaranteeText(task.quote);
 
@@ -389,7 +424,14 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     budgetNumber,
     items: task.quote.services,
     subtotal: task.quote.subtotal,
-    total: task.quote.total,
+    // `total` é o valor de UM veículo: o gerador multiplica pelos veículos e
+    // imprime o "× N" e o total geral. `task.quote.total` é o total do CONTRATO,
+    // então com N veículos ele já vem multiplicado — dividir aqui reintroduziria
+    // um arredondamento próprio. Ver `computeQuoteMoney`.
+    total:
+      pdfVehicles.length > 1
+        ? Math.round((Number(task.quote.total) / pdfVehicles.length) * 100) / 100
+        : task.quote.total,
     termDate,
     customDeliveryDays,
     paymentText,
@@ -397,6 +439,21 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     layoutImageUrls,
     customerSignatureUrl: signatureImageUrl,
     // Vehicle identification
+    vehicles: pdfVehicles,
+    // O quadro do tomador da seção "Faturamento" — o cadastro que a prefeitura
+    // exige na NFS-e, posto no documento para o cliente conferir na aprovação.
+    billing: {
+      corporateName: task.customer?.corporateName || task.customer?.fantasyName || null,
+      documentFormatted: customerDocument,
+      stateRegistration: (task.customer as any)?.stateRegistration || null,
+      municipalRegistration: (task.customer as any)?.municipalRegistration || null,
+      addressLine: formatBillingStreetLine(task.customer as any),
+      addressLocality: formatBillingLocalityLine(task.customer as any),
+      // O pedido de compra é do VEÍCULO (`Task.customerOrderNumber`): numa nota
+      // conjunta o documento cita os números dos caminhões que ela cobre, sem
+      // repetir os iguais.
+      orderNumber: orderNumberLabel(pdfVehicles ?? []),
+    },
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
@@ -447,12 +504,52 @@ export interface BudgetHtmlData {
   guaranteeText: string;
   layoutImageUrls: string[];
   customerSignatureUrl: string | null;
-  // Vehicle identification
+  // ── IDENTIFICAÇÃO DOS VEÍCULOS ──────────────────────────────────────────
+  //
+  // `vehicles` é a forma atual: uma linha de tabela por veículo, espelhando
+  // `.vehicle-table` do PDF assinado. Os campos singulares abaixo continuam
+  // ACEITOS e viram o único veículo quando `vehicles` não vem — este gerador é
+  // chamado de três telas, e uma delas ainda passa o formato antigo.
+  vehicles?: Array<{
+    taskId?: string | null;
+    serialNumber?: string | null;
+    plate?: string | null;
+    chassisNumber?: string | null;
+    /**
+     * O pedido de compra DESTE veículo (`Task.customerOrderNumber`) — vira
+     * coluna da tabela. Era linha do quadro do tomador, onde só cabia um número:
+     * quatro caminhões comprados em pedidos diferentes não cabiam ali.
+     */
+    customerOrderNumber?: string | null;
+    truckCategory?: string | null;
+    truckImplementType?: string | null;
+  }> | null;
+  /** @deprecated Use `vehicles`. Mantido para os chamadores não migrados. */
   serialNumber: string | null;
+  /** @deprecated Use `vehicles`. */
   plate: string | null;
+  /** @deprecated Use `vehicles`. */
   chassisNumber: string | null;
+  /** @deprecated Use `vehicles`. */
   truckCategory?: string | null;
+  /** @deprecated Use `vehicles`. */
   truckImplementType?: string | null;
+  /**
+   * O QUADRO DO TOMADOR — o cadastro que a prefeitura exige na NFS-e.
+   *
+   * A seção "Condições de pagamento" passou a se chamar "Faturamento" e abre com
+   * este quadro; a frase das parcelas continua logo abaixo. Nulo faz a seção cair
+   * para só a frase, como antes.
+   */
+  billing?: {
+    corporateName?: string | null;
+    documentFormatted?: string | null;
+    stateRegistration?: string | null;
+    municipalRegistration?: string | null;
+    addressLine?: string | null;
+    addressLocality?: string | null;
+    orderNumber?: string | null;
+  } | null;
   simultaneousTasks?: number | null;
   customerFilter?: string | null; // Customer ID to filter services by
   // Global customer discount (from CustomerConfig)
@@ -561,30 +658,190 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     ? Math.max(0, displaySubtotal - discountAmount)
     : data.total;
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // TOTAIS — o valor unitário, o "× N" e o total geral
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Os preços da lista de serviços são POR VEÍCULO, e `data.total` é o valor do
+  // CONTRATO. Com um veículo os dois coincidem e o bloco sai exatamente como
+  // saía — que é o caso da esmagadora maioria dos orçamentos. A partir de dois,
+  // a multiplicação entra explícita: sem ela a lista não fecha com o total, e
+  // num orçamento de sessenta caminhões erra por um fator de sessenta.
+  //
+  // O total geral é `total por veículo × N` e não um desconto recalculado sobre
+  // a soma — a mesma conta que a fatura e o boleto fazem (`computeQuoteMoney`).
+  const vehicleRows =
+    data.vehicles && data.vehicles.length > 0
+      ? data.vehicles
+      : [
+          {
+            taskId: null,
+            serialNumber: data.serialNumber,
+            plate: data.plate,
+            chassisNumber: data.chassisNumber,
+            // O caminho legado (um veículo, campos singulares) não conhece o
+            // pedido de compra: quem o traz é `vehicles`.
+            customerOrderNumber: null as string | null,
+            truckCategory: data.truckCategory,
+            truckImplementType: data.truckImplementType,
+          },
+        ].filter(
+          v =>
+            v.serialNumber ||
+            v.plate ||
+            v.chassisNumber ||
+            v.truckCategory ||
+            v.truckImplementType,
+        );
+  const vehicleCount = Math.max(1, vehicleRows.length);
+  const isMultiVehicle = vehicleCount > 1;
+  const perVehicleTotal = displayTotal;
+  const grandTotalValue = Math.round(perVehicleTotal * vehicleCount * 100) / 100;
+
+  const unitLabelSuffix = isMultiVehicle ? ' por veículo' : '';
+  const multiplierRows = isMultiVehicle
+    ? `
+      <div class="total-row multiplier-row">
+        <span class="total-label">Veículos</span>
+        <span class="total-value">&times; ${vehicleCount}</span>
+      </div>
+      <div class="total-row final-total-row">
+        <span class="total-label">Total geral</span>
+        <span class="total-value total-final">${formatCurrency(grandTotalValue)}</span>
+      </div>`
+    : '';
+
   // Always show total, only show subtotal/discount rows when there's a discount
   const totalsHtml = hasDiscount ? `
     <div class="totals-section">
       <div class="total-row subtotal-row">
-        <span class="total-label">Subtotal</span>
+        <span class="total-label">Subtotal${unitLabelSuffix}</span>
         <span class="total-value">${formatCurrency(displaySubtotal)}</span>
       </div>
       <div class="total-row discount-row">
         <span class="total-label">${discountLabel}</span>
         <span class="total-value discount-value">- ${formatCurrency(discountAmount)}</span>
       </div>
-      <div class="total-row final-total-row">
-        <span class="total-label">Total</span>
-        <span class="total-value total-final">${formatCurrency(displayTotal)}</span>
-      </div>
+      <div class="total-row ${isMultiVehicle ? 'unit-total-row' : 'final-total-row'}">
+        <span class="total-label">Total${unitLabelSuffix}</span>
+        <span class="total-value ${isMultiVehicle ? '' : 'total-final'}">${formatCurrency(perVehicleTotal)}</span>
+      </div>${multiplierRows}
     </div>
   ` : `
     <div class="totals-section">
-      <div class="total-row final-total-row">
-        <span class="total-label">Total</span>
-        <span class="total-value total-final">${formatCurrency(displayTotal)}</span>
-      </div>
+      <div class="total-row ${isMultiVehicle ? 'unit-total-row' : 'final-total-row'}">
+        <span class="total-label">Total${unitLabelSuffix}</span>
+        <span class="total-value ${isMultiVehicle ? '' : 'total-final'}">${formatCurrency(perVehicleTotal)}</span>
+      </div>${multiplierRows}
     </div>
   `;
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // A TABELA DE IDENTIFICAÇÃO DOS VEÍCULOS
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Espelha `.vehicle-table` do PDF assinado. Substituiu a enumeração em prosa
+  // dentro do parágrafo de abertura, por duas razões que se somam: um orçamento
+  // pode cobrir sessenta veículos, e mesmo com um só o que o leitor FAZ com
+  // esses campos é conferi-los um a um contra o documento do caminhão — em
+  // coluna o olho desce, em prosa ele varre.
+  const anyVehicleCategory = vehicleRows.some(v => !!v.truckCategory);
+  const anyVehicleImplement = vehicleRows.some(v => !!v.truckImplementType);
+  // O PEDIDO DE COMPRA segue a mesma regra da categoria: só ganha coluna se ALGUM
+  // veículo o tiver. Ele identifica a ENTREGA — dois caminhões do mesmo orçamento
+  // podem ter vindo em pedidos diferentes —, e é por isso que deixou de ser uma
+  // linha do quadro do tomador, onde só cabia um número.
+  const anyVehicleOrderNumber = vehicleRows.some(v => !!(v.customerOrderNumber ?? '').trim());
+  const vehicleColumns: Array<{ key: string; label: string }> = [
+    { key: 'serialNumber', label: 'Nº de série' },
+    { key: 'plate', label: 'Placa' },
+    { key: 'chassis', label: 'Chassi' },
+    ...(anyVehicleOrderNumber ? [{ key: 'orderNumber', label: 'Nº do pedido' }] : []),
+    ...(anyVehicleCategory ? [{ key: 'category', label: 'Categoria' }] : []),
+    ...(anyVehicleImplement ? [{ key: 'implement', label: 'Implemento' }] : []),
+  ];
+  // O marcador de cadastro tardio é VISÍVEL de propósito: quem lê vê que ali
+  // falta um dado, do mesmo modo que vê uma linha de assinatura em branco.
+  const aRegistrar = '<span class="vehicle-empty" style="font-style:italic">a registrar</span>';
+  const vehicleCell = (v: (typeof vehicleRows)[number], column: string): string => {
+    switch (column) {
+      case 'serialNumber':
+        return v.serialNumber ? `<strong>${escapeHtml(v.serialNumber)}</strong>` : aRegistrar;
+      case 'plate':
+        return v.plate ? `<strong>${escapeHtml(v.plate)}</strong>` : aRegistrar;
+      case 'chassis':
+        return v.chassisNumber ? `<strong>${escapeHtml(v.chassisNumber)}</strong>` : aRegistrar;
+      case 'orderNumber':
+        return (v.customerOrderNumber ?? '').trim()
+          ? `<strong>${escapeHtml(v.customerOrderNumber!.trim())}</strong>`
+          : '<span class="vehicle-empty">&mdash;</span>';
+      case 'category':
+        return v.truckCategory
+          ? `<strong>${escapeHtml(v.truckCategory)}</strong>`
+          : '<span class="vehicle-empty">&mdash;</span>';
+      case 'implement':
+        return v.truckImplementType
+          ? `<strong>${escapeHtml(v.truckImplementType)}</strong>`
+          : '<span class="vehicle-empty">&mdash;</span>';
+      default:
+        return '';
+    }
+  };
+  const vehicleTableHtml = vehicleRows.length
+    ? `<table class="vehicle-table">
+         <thead><tr>
+           ${isMultiVehicle ? '<th class="vehicle-idx">#</th>' : ''}
+           ${vehicleColumns.map(c => `<th>${escapeHtml(c.label)}</th>`).join('')}
+         </tr></thead>
+         <tbody>
+           ${vehicleRows
+             .map(
+               (v, i) => `<tr>
+             ${isMultiVehicle ? `<td class="vehicle-idx">${i + 1}</td>` : ''}
+             ${vehicleColumns.map(c => `<td>${vehicleCell(v, c.key)}</td>`).join('')}
+           </tr>`,
+             )
+             .join('')}
+         </tbody>
+       </table>`
+    : '';
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // O QUADRO DO TOMADOR (seção "Faturamento")
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // CADA LINHA PODE TER DOIS PARES: as duas inscrições são curtas e ficavam com
+  // dois terços da folha em branco à direita de cada uma. O NÚMERO DO PEDIDO saiu
+  // daqui e virou coluna da tabela de veículos — ele identifica a entrega, e
+  // quatro caminhões podem ter quatro pedidos, que numa linha só não cabem.
+  const joinBillingAddress = (a?: string | null, b?: string | null): string | null => {
+    const parts = [a, b].map(p => (p ?? '').trim()).filter(Boolean);
+    return parts.length > 0 ? parts.join(' — ') : null;
+  };
+  const billingRows: Array<Array<[string, string | null]>> = data.billing
+    ? [
+        [['Razão social', data.billing.corporateName ?? null]],
+        [['CNPJ / CPF', data.billing.documentFormatted ?? null]],
+        [
+          ['Inscrição estadual', data.billing.stateRegistration ?? null],
+          ['Inscrição municipal', data.billing.municipalRegistration ?? null],
+        ],
+        // ENDEREÇO NUMA LINHA SÓ: eram duas e nenhuma enchia a largura.
+        [['Endereço', joinBillingAddress(data.billing.addressLine, data.billing.addressLocality)]],
+      ]
+    : [];
+  const billingRowsHtml = billingRows
+    .map(
+      pairs => `<tr>${pairs
+        .map(
+          ([label, value], i) => `<th${i > 0 ? ' class="billing-th-second"' : ''}>${escapeHtml(label)}</th>
+        <td${pairs.length === 1 ? ' colspan="3"' : ''}>${
+          value ? escapeHtml(value) : '<span class="billing-empty">&mdash;</span>'
+        }</td>`,
+        )
+        .join('')}</tr>`,
+    )
+    .join('');
 
   // Layout section for page 2 (one section per layout image)
   const layoutHtml = (data.layoutImageUrls || [])
@@ -792,6 +1049,65 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       margin-top: ${L.totalsMarginTop}mm;
       padding-left: 4mm;
       flex-shrink: 0;
+    }
+
+    /* ── TABELA DE IDENTIFICACAO DOS VEICULOS ─────────────────────────────
+       Espelha .vehicle-table do PDF assinado (quote-html.builder.ts).
+
+       ATENCAO: este bloco de estilo mora DENTRO de um template literal. Crase
+       aqui encerra a string e quebra o arquivo com um erro de sintaxe a
+       centenas de linhas de distancia. Sem crase em comentario de CSS. */
+    .vehicle-table {
+      width: 100%; border-collapse: collapse; margin-top: 2.5mm;
+      font-size: 8.5pt; line-height: 1.35;
+    }
+    .vehicle-table th, .vehicle-table td {
+      text-align: left; padding: 1.1mm 2mm 1.1mm 0; vertical-align: baseline;
+    }
+    .vehicle-table thead th {
+      font-size: 7pt; font-weight: 700; color: #0a5c1e;
+      text-transform: uppercase; letter-spacing: .04em;
+      border-bottom: 1px solid #0a5c1e; padding-bottom: 1mm;
+    }
+    .vehicle-table tbody tr { border-bottom: .5px dotted #ccc; }
+    .vehicle-table tbody tr:last-child { border-bottom: none; }
+    .vehicle-table .vehicle-idx {
+      width: 7mm; color: #666; font-variant-numeric: tabular-nums; padding-right: 1mm;
+    }
+    .vehicle-empty { color: #666; }
+    /* Uma linha de veiculo nunca se parte entre folhas: metade do chassi no pe
+       de uma pagina e metade no topo da outra e ilegivel justamente no campo
+       que o leitor esta conferindo caractere a caractere. */
+    .vehicle-table tr { break-inside: avoid; }
+    .vehicle-table thead { display: table-header-group; }
+
+    /* ── QUADRO DO TOMADOR (secao Faturamento) ────────────────────────────── */
+    .billing-table {
+      width: 100%; border-collapse: collapse; font-size: 8.5pt; line-height: 1.4;
+      margin-bottom: 2.5mm;
+    }
+    .billing-table th {
+      text-align: left; font-weight: 600; color: #666;
+      width: 32mm; padding: .8mm 3mm .8mm 0; vertical-align: baseline;
+      white-space: nowrap;
+    }
+    /* O SEGUNDO par de uma linha ganha respiro a esquerda: sem ele o valor da
+       inscricao estadual encosta no rotulo da municipal. */
+    .billing-table th.billing-th-second { padding-left: 6mm; }
+    .billing-table td { padding: .8mm 0; vertical-align: baseline; }
+    .billing-empty { color: #666; }
+    .terms-content-after-table { border-top: .5px solid #ddd; padding-top: 2mm; }
+
+    /* Com mais de um veiculo o "Total por veiculo" e um degrau, nao o desfecho:
+       filete cinza fino e peso 600, contra o verde grosso e 700 do total geral.
+       Sem essa hierarquia os dois numeros liam como concorrentes. */
+    .unit-total-row {
+      border-top: .8px solid #bbb; margin-top: 1mm; padding-top: 1.5mm;
+      font-weight: 600;
+    }
+    /* O multiplicador nao e dinheiro e nao deve parecer dinheiro. */
+    .multiplier-row .total-label, .multiplier-row .total-value {
+      color: #666; font-variant-numeric: tabular-nums;
     }
 
     .total-row {
@@ -1034,15 +1350,14 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
           data.corporateName && data.corporateName !== 'Cliente'
             ? ` para a <strong style="font-weight: 600;">${escapeHtml(data.corporateName)}</strong>${data.customerDocument ? ` (${escapeHtml(data.customerDocument)})` : ''},`
             : ''
-        } para execução dos serviços abaixo descriminados${(() => {
-          const parts: string[] = [];
-          if (data.serialNumber) parts.push(` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>`);
-          if (data.plate) parts.push(` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>`);
-          if (data.chassisNumber) parts.push(` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>`);
-          if (data.truckCategory) parts.push(` categoria: <strong style="font-weight: 600;">${escapeHtml(data.truckCategory)}</strong>`);
-          if (data.truckImplementType) parts.push(` implemento: <strong style="font-weight: 600;">${escapeHtml(data.truckImplementType)}</strong>`);
-          return parts.length ? ` no veículo${parts.join(',')}` : '';
-        })()}.</p>
+        } para execução dos serviços abaixo descriminados${
+          vehicleRows.length
+            ? isMultiVehicle
+              ? ' nos veículos abaixo relacionados:'
+              : ' no veículo abaixo identificado:'
+            : '.'
+        }</p>
+        ${vehicleTableHtml}
       </div>
 
       <div class="page-content-gap"></div>
@@ -1071,21 +1386,27 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       </section>
       ` : ""}
 
-      <!-- Payment Terms -->
-      ${data.paymentText ? `
-      <div class="page-content-gap"></div>
-      <section class="terms-section">
-        <h2 class="terms-title">Condições de pagamento</h2>
-        <p class="terms-content">${escapeHtml(data.paymentText)}</p>
-      </section>
-      ` : ""}
-
       <!-- Guarantee -->
       ${data.guaranteeText ? `
       <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Garantias</h2>
         <p class="terms-content">${formatGuaranteeHtml(data.guaranteeText)}</p>
+      </section>
+      ` : ""}
+
+      <!-- FATURAMENTO - depois das Garantias, nao entre o prazo e elas: a ordem
+           do documento e o que se entrega, sob que garantia, e so entao como se
+           paga. Espelha quote-html.builder.ts e a pagina publica.
+           (SEM CRASE: este comentario vive dentro de um template literal, e uma
+           crase aqui encerra a string e quebra o arquivo centenas de linhas
+           adiante.) -->
+      ${data.paymentText || billingRowsHtml ? `
+      <div class="page-content-gap"></div>
+      <section class="terms-section">
+        <h2 class="terms-title">Faturamento</h2>
+        ${billingRowsHtml ? `<table class="billing-table">${billingRowsHtml}</table>` : ''}
+        ${data.paymentText ? `<p class="terms-content${billingRowsHtml ? ' terms-content-after-table' : ''}">${escapeHtml(data.paymentText)}</p>` : ''}
       </section>
       ` : ""}
 

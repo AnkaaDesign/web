@@ -318,6 +318,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     status: "Status",
     statusOrder: "Ordem do Status",
     serialNumber: "Número de Série",
+    customerOrderNumber: "N° do Pedido",
     chassisNumber: "Número do Chassi",
     vinPlateId: "Foto da Plaqueta",
     plate: "Placa",
@@ -822,6 +823,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     status: "Status",
     paymentCondition: "Condição de Pagamento",
     customPaymentText: "Texto Personalizado de Pagamento",
+    /** @deprecated Histórico anterior à mudança para `Task.customerOrderNumber`. */
     orderNumber: "N° do Pedido",
     guaranteeYears: "Anos de Garantia",
     customGuaranteeText: "Texto Personalizado de Garantia",

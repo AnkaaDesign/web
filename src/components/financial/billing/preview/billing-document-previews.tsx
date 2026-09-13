@@ -5,6 +5,11 @@ import { projectInstallments } from "@/utils/installment-projection";
 import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-preview";
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
+import {
+  coveredTaskIds,
+  orderNumberLabel,
+  hasMultipleCustomers as hasMultipleCustomersOf,
+} from "@/utils/quote-tasks";
 
 /**
  * Computes — entirely client-side, from the billing form data — the NFS-e and
@@ -56,6 +61,18 @@ interface BillingDocumentPreviewsProps {
   task: TaskVehicle;
   /** Predicted next NFS-e number (last emitted + 1); null if unknown. */
   nextNfseNumber?: number | null;
+  /**
+   * O NÚMERO DO PEDIDO DE COMPRA de cada veículo do orçamento (`id → número`),
+   * do FORMULÁRIO — a pré-visualização tem de mostrar o que acabou de ser
+   * digitado, não o que está gravado.
+   *
+   * Mora na TAREFA (`Task.customerOrderNumber`) e já não na configuração de
+   * faturamento: uma nota conjunta cobre os N veículos e cita os pedidos de
+   * todos, exatamente como `orderNumberLabel` monta no servidor.
+   */
+  orderNumbersByTask?: Record<string, string | null>;
+  /** Os veículos do orçamento, na ordem do documento. */
+  quoteTaskIds?: string[];
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -182,6 +199,7 @@ function buildCustomerDoc(
   configServices: any[],
   task: TaskVehicle,
   predictedNfseNumber: number | null,
+  orderNumber: string | null,
 ): CustomerDoc {
   const cd = config.customerData || {};
   const customerName = cd.corporateName || cd.fantasyName || "Cliente";
@@ -223,7 +241,7 @@ function buildCustomerDoc(
   const valorIss = round2((baseCalculoIss * 2) / 100);
 
   // NFS-e discriminação — order number IS cleaned here ("PEDIDO NR 123" → "123")
-  const cleanOrderNumber = (config.orderNumber || "").replace(/^PEDIDO\s+NR\s+/i, "").trim();
+  const cleanOrderNumber = (orderNumber || "").replace(/^PEDIDO\s+NR\s+/i, "").trim();
   const vehicleRef = buildVehicleRef(task);
   const discLines: string[] = [];
   if (cleanOrderNumber) discLines.push(`Pedido: ${cleanOrderNumber}`);
@@ -270,7 +288,7 @@ function buildCustomerDoc(
   // Boleto informativos — order number RAW; NF part uses the predicted número.
   const nfPart =
     nfseNumberForThisDoc != null ? `NF ${nfseNumberForThisDoc}` : generateInvoice ? "NF ‹nº NFS-e›" : null;
-  const informativos = buildBoletoInformativos(config.orderNumber || null, nfPart, task, serviceDescs);
+  const informativos = buildBoletoInformativos(orderNumber || null, nfPart, task, serviceDescs);
 
   const total = Number(config.total) || baseCalculoIss;
   const projected = config.generateBankSlip !== false
@@ -320,11 +338,24 @@ function renderDoc(entry: DocEntry) {
   );
 }
 
-export function BillingDocumentPreviews({ customerConfigs, services, task, nextNfseNumber }: BillingDocumentPreviewsProps) {
+export function BillingDocumentPreviews({
+  customerConfigs,
+  services,
+  task,
+  nextNfseNumber,
+  orderNumbersByTask,
+  quoteTaskIds,
+}: BillingDocumentPreviewsProps) {
   const docs = useMemo<DocEntry[]>(() => {
     const configs = customerConfigs || [];
     if (configs.length === 0) return [];
-    const single = configs.length <= 1;
+    // ⚠️ UM CLIENTE, não UMA FATURA. Num orçamento cobrado veículo a veículo há
+    // uma fatura por caminhão, todas do mesmo cliente: contar faturas fazia o
+    // filtro por `invoiceToCustomerId` rodar, e como ninguém preenche esse campo
+    // num orçamento de um cliente só, as faturas 2..N saíam com ZERO serviços —
+    // a pré-visualização da nota fiscal e do boleto mostrando um documento vazio
+    // logo antes de emitir.
+    const single = !hasMultipleCustomersOf(configs);
     const entries: DocEntry[] = [];
     let nfseSeq = 0; // sequential offset per generated NFS-e
     configs.forEach((config, idx) => {
@@ -335,7 +366,22 @@ export function BillingDocumentPreviews({ customerConfigs, services, task, nextN
       const predicted = willEmit && nextNfseNumber != null ? nextNfseNumber + nfseSeq : null;
       if (willEmit) nfseSeq += 1;
 
-      const doc = buildCustomerDoc(config, configServices, task, predicted);
+      // O PEDIDO DE COMPRA que ESTE documento vai citar — o dos veículos que ESTA
+      // fatura cobre: o de um caminhão quando ela cobra um, os do lote quando
+      // cobra vinte. É a mesma leitura que `orderNumberLabel` recebe no servidor.
+      //
+      // Era `config.taskId`, coluna removida em `20260913120000_billing_coverage`:
+      // a prévia passou a citar os pedidos do ORÇAMENTO INTEIRO em toda fatia,
+      // que é o campo em que a Elotech procura o empenho.
+      const numbers = orderNumbersByTask ?? {};
+      const covered = coveredTaskIds(config as any);
+      const idsForDoc =
+        covered.length > 0 ? covered : (quoteTaskIds ?? Object.keys(numbers));
+      const orderNumber = orderNumberLabel(
+        idsForDoc.map((id) => ({ customerOrderNumber: numbers[id] ?? null })),
+      );
+
+      const doc = buildCustomerDoc(config, configServices, task, predicted, orderNumber);
       if (doc.nfse) {
         entries.push({ key: `nfse-${doc.customerId}`, kind: "nfse", label: "NFS-e", sublabel: doc.customerName, data: doc.nfse });
       }
@@ -350,7 +396,7 @@ export function BillingDocumentPreviews({ customerConfigs, services, task, nextN
       });
     });
     return entries;
-  }, [customerConfigs, services, task, nextNfseNumber]);
+  }, [customerConfigs, services, task, nextNfseNumber, orderNumbersByTask, quoteTaskIds]);
 
   const nfseCount = docs.filter((d) => d.kind === "nfse").length;
   const boletoCount = docs.filter((d) => d.kind === "boleto").length;

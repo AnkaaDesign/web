@@ -27,6 +27,7 @@ import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures
 import type { Task } from "@/types";
 import type { ClusteredTask } from "./cluster-tasks";
 import { TaskProgressCell } from "./task-progress-cell";
+import { quotePerVehicleTotal } from "@/utils/quote-tasks";
 
 /** Tasks aggregated by a cell: the whole cluster when collapsed, otherwise just this task. */
 function cellTasks(row: Row<ClusteredTask>): Task[] {
@@ -379,7 +380,9 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "total",
       header: "Valor Total",
-      accessorFn: (row) => row.quote?.total ?? 0,
+      // A fatia DESTE veículo: `quote.total` é o valor do contrato
+      // (`por veículo × N`) desde o orçamento multitarefa, e a linha é uma tarefa.
+      accessorFn: (row) => quotePerVehicleTotal(row.quote) ?? 0,
       enableSorting: true,
       size: 140,
       meta: {
@@ -387,14 +390,19 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         defaultVisible: false,
         headerLabel: "Valor Total",
         requiredPrivilege: FINANCIAL_SECTORS,
-        exportValue: (r) => (r.quote?.total != null ? formatCurrency(r.quote.total) : ""),
+        exportValue: (r) => {
+          const v = quotePerVehicleTotal(r.quote);
+          return v != null ? formatCurrency(v) : "";
+        },
       },
-      cell: ({ row }) =>
-        row.original.quote?.total != null ? (
-          <span className="font-medium tabular-nums">{formatCurrency(row.original.quote.total)}</span>
+      cell: ({ row }) => {
+        const value = quotePerVehicleTotal(row.original.quote);
+        return value != null ? (
+          <span className="font-medium tabular-nums">{formatCurrency(value)}</span>
         ) : (
           <span className="text-muted-foreground">-</span>
-        ),
+        );
+      },
     },
     {
       id: "invoiceToCustomers",

@@ -48,7 +48,7 @@ const TASK_STATUS_SCOPE_OPTIONS = [
  * Only what the columns render. Top-level `include` (not a bare `select`) so the API's
  * Decimal → number mapping runs and `quote.total` arrives as a number.
  *
- * `quote.id` and `customerConfigs.customerId/orderNumber` are here for the attention engine rather
+ * `quote.id` and `customerConfigs.customerId` are here for the attention engine rather
  * than for a column: the list registers each quote so a rule can blink its row (see `rules.ts`).
  */
 export const BILLING_LIST_INCLUDE = {
@@ -64,11 +64,23 @@ export const BILLING_LIST_INCLUDE = {
       statusOrder: true,
       expiresAt: true,
       billingApprovedAt: true,
+      // QUANTOS VEÍCULOS o orçamento cobre. `total` é o valor do CONTRATO
+      // (`por veículo × N`) e cada linha desta lista é UM veículo: sem o divisor
+      // a coluna Valor mostra o total dos sessenta em todas as sessenta linhas.
+      vehicleCount: true,
+      // Junto ou separado — decide se a fatia desta linha é a do veículo ou a
+      // conjunta, e o que o botão de aprovar faturamento faz.
+      billingSplit: true,
       customerConfigs: {
         select: {
           id: true,
           customerId: true,
-          orderNumber: true,
+          // A TAREFA desta fatia (nulo = fatia conjunta) e QUANDO ela foi
+          // faturada. Sem as duas, a linha do caminhão 12 mostrava as sessenta
+          // fatias do orçamento e lia a aprovação do orçamento inteiro — que só
+          // é gravada quando a última fecha.
+          taskId: true,
+          billingApprovedAt: true,
           // "Forma de Pagamento" column. `paymentConfig` is the current shape, `paymentCondition`
           // the legacy string the same helper converts — a record saved before the redesign has to
           // read the same as one saved after it.
@@ -205,7 +217,9 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   const andBranches: Record<string, unknown>[] = [];
 
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
-  if (orderNumberWhere) andBranches.push({ quote: { is: orderNumberWhere } });
+  // No nível da TAREFA: o número do pedido é dela agora (ver
+  // `orderNumberPresenceWhere`), e não do orçamento.
+  if (orderNumberWhere) andBranches.push(orderNumberWhere);
 
   const dueDate = toPrismaDateRange(filters.dueDateRange);
   if (dueDate) {

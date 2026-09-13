@@ -32,7 +32,7 @@ import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enri
 import { FileItem, useFileViewer } from "@/components/common/file";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 
-import { useInvoicesByTask } from "@/hooks/production/use-invoice";
+import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
@@ -49,6 +49,12 @@ import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import type { Task } from "@/types";
 import type { Invoice } from "@/types/invoice";
 import type { File as CustomFile } from "@/types/file";
+import {
+  configsForTask,
+  perVehicleAmount,
+  quoteVehicleCount,
+  coveredTaskCount,
+} from "@/utils/quote-tasks";
 
 /**
  * Bare render body for the "Orçamento / Faturamento Detalhado" detail section
@@ -64,8 +70,21 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   const { data: currentUser } = useCurrentUser();
   const [quoteCustomerFilter, setQuoteCustomerFilter] = useState<string | null>(null);
 
+  /**
+   * O PEDIDO DE COMPRA DESTE VEÍCULO.
+   *
+   * Morava na configuração de faturamento, por CLIENTE, e a coluna já não existe:
+   * o pedido é da ENTREGA (`Task.customerOrderNumber`). Aqui a resposta é simples
+   * porque a tela é de UM caminhão — o número dele, não o dos irmãos. É também a
+   * diferença que a tela precisava mostrar: dois veículos do mesmo orçamento
+   * podem ter vindo em pedidos diferentes.
+   */
+  const taskOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
+
   // Fetch invoice data for inline boleto/NFS-e display in the quote section.
-  const { data: invoicesData } = useInvoicesByTask(task.id);
+  // Pela rota do ORÇAMENTO, filtradas pela cobertura: a rota por tarefa não
+  // enxerga a fatura conjunta (`Invoice.taskId` nulo).
+  const { data: invoicesData } = useTaskBillingInvoices(task.id, task.quoteId ?? undefined);
   const invoices: Invoice[] = useMemo(() => {
     const data = invoicesData?.data;
     return Array.isArray(data) ? data : data ? [data] : [];
@@ -87,8 +106,33 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   // cancelar e reenviar a coleta de assinaturas (ADMIN | FINANCIAL | COMMERCIAL).
   const canManageSignature = canEditQuote(currentUser?.sector?.privileges || "");
 
-  const quote = task.quote;
-  if (!quote) return null;
+  const rawQuote = task.quote;
+  if (!rawQuote) return null;
+
+  // ─── AS FATURAS DESTE VEÍCULO ────────────────────────────────────────────────
+  //
+  // Um orçamento pode cobrir sessenta caminhões, e esta seção mostra o orçamento
+  // de UM deles (a tela é a da tarefa). Numa cobrança veículo a veículo existe
+  // uma fatura POR CAMINHÃO, todas do mesmo cliente: sem filtrar, o caminhão 12
+  // exibia os sessenta blocos de parcelas, o seletor listava "Cliente" sessenta
+  // vezes com o mesmo nome, e o primeiro bloco — que é o do caminhão 1 — era lido
+  // como se fosse o dele. Numa fatura conjunta a cobertura inclui este veículo e
+  // a lista continua inteira, como sempre foi.
+  const quote = {
+    ...rawQuote,
+    customerConfigs: configsForTask(rawQuote.customerConfigs, task.id),
+  };
+  const vehicleCount = quoteVehicleCount(rawQuote);
+  const isMultiVehicle = vehicleCount > 1;
+  // A FATURA DESTE VEÍCULO COBRA SÓ ELE?
+  //
+  // Pela COBERTURA, não pelo modo: um lote de vinte cobra vinte, e dizer "por
+  // veículo" ali afirmaria que o número na tela é o de um caminhão quando é o de
+  // vinte. O par de números abaixo mostra os DOIS quando diferem, para ninguém
+  // confundir "o que este caminhão custa" com "o que o cliente assinou".
+  const thisVehicleConfig = quote.customerConfigs?.[0];
+  const coveredHere = coveredTaskCount(thisVehicleConfig as any);
+  const isPerVehicleBilling = coveredHere > 0 && coveredHere < vehicleCount;
   const services = quote.services ?? [];
 
   return (
@@ -317,9 +361,10 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             }
           }
         } else {
-          // No configs: fallback to global quote aggregates (no per-config discount)
-          displaySubtotal = typeof quote.subtotal === "number" ? quote.subtotal : Number(quote.subtotal) || 0;
-          displayTotal = typeof quote.total === "number" ? quote.total : Number(quote.total) || 0;
+          // Sem configuração de faturamento: os agregados do orçamento, divididos
+          // pelos veículos — o card é de UM caminhão, e `quote.total` é o contrato.
+          displaySubtotal = perVehicleAmount(quote.subtotal, vehicleCount);
+          displayTotal = perVehicleAmount(quote.total, vehicleCount);
         }
 
         return (
@@ -343,6 +388,32 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
               <span className="text-base font-bold text-foreground">TOTAL</span>
               <span className="text-xl font-bold text-primary">{formatCurrency(displayTotal)}</span>
             </div>
+
+            {/* O OUTRO número, quando o orçamento cobre mais de um veículo: o valor
+                acima é o desta FATURA (um caminhão, ou um lote), e quem lê a tela
+                de um veículo precisa do total do orçamento ao lado para não
+                confundir os dois. */}
+            {isMultiVehicle && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                {isPerVehicleBilling ? (
+                  <>
+                    <span>
+                      {coveredHere > 1
+                        ? `Esta fatura cobra ${coveredHere} veículos · total do orçamento (${vehicleCount})`
+                        : `Total do orçamento (${vehicleCount} veículos)`}
+                    </span>
+                    <span className="tabular-nums">{formatCurrency(Number(quote.total) || 0)}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Por veículo ({vehicleCount} no orçamento)</span>
+                    <span className="tabular-nums">
+                      {formatCurrency(perVehicleAmount(quote.total, vehicleCount))}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -434,9 +505,9 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                       </div>
                     )}
 
-                    {config.orderNumber && (
+                    {taskOrderNumber && (
                       <div className="text-sm text-muted-foreground">
-                        N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                        N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
                       </div>
                     )}
 
@@ -581,7 +652,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             paymentCondition: config.paymentCondition,
             total: configTotal,
           });
-          const hasContent = paymentText || config.orderNumber;
+          const hasContent = paymentText || taskOrderNumber;
           return hasContent ? (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
               {paymentText && (
@@ -593,9 +664,9 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {config.orderNumber && (
+              {taskOrderNumber && (
                 <div className="text-sm text-muted-foreground">
-                  N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                  N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
                 </div>
               )}
             </div>

@@ -211,7 +211,11 @@ export function BudgetStepTask({
 
                 {/* Plates + Serial Numbers */}
                 {isEditMode ? (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  /* CINCO colunas: série, placa, nº do pedido, chassi e plaqueta
+                     são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
+                     fileira. Com quatro colunas a plaqueta caía sozinha numa
+                     linha inteira, parecendo uma seção própria. */
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <FormField
                       control={control}
                       name="serialNumber"
@@ -254,6 +258,41 @@ export function BudgetStepTask({
                               onChange={(value) => field.onChange(value ? String(value) : "")}
                               disabled={disabled}
                               className="uppercase bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {/* N° DO PEDIDO — o pedido de compra do cliente, DESTE veículo.
+                        Aqui, no passo da identificação, e não no de faturamento:
+                        o pedido identifica a ENTREGA, como a série e a placa, e é
+                        por isso que ele mora em `Task.customerOrderNumber` e não
+                        na configuração de faturamento (onde os N caminhões de um
+                        orçamento eram obrigados a citar o mesmo número).
+
+                        Em EDIÇÃO o campo é só deste caminhão: é assim que se
+                        corrige um dos quatro sem tocar nos outros três. Na
+                        criação (abaixo) ele vale para todos os que nascerem. */}
+                    <FormField
+                      control={control}
+                      name="customerOrderNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconHash className="h-4 w-4" />
+                            N° do Pedido
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={(value) =>
+                                field.onChange(value === null || value === "" ? null : String(value))
+                              }
+                              placeholder="Ex: 12345"
+                              maxLength={100}
+                              disabled={disabled}
+                              className="bg-transparent"
                             />
                           </FormControl>
                           <FormMessage />
@@ -314,7 +353,7 @@ export function BudgetStepTask({
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <SerialNumberRangeInput
                       control={control}
                       disabled={disabled || plates.length > 1}
@@ -322,6 +361,42 @@ export function BudgetStepTask({
                     <PlateTagsInput
                       control={control}
                       disabled={disabled || serialNumbers.length > 1}
+                    />
+                    {/* N° DO PEDIDO — UM campo para os N veículos que vão nascer.
+                        O caso comum é o cliente comprar os quatro caminhões num
+                        pedido só, e pedir quatro vezes o mesmo número seria o
+                        tipo de trabalho que faz o operador deixar tudo em branco.
+                        Quando os pedidos diferem, cada tarefa se corrige depois,
+                        na tela dela (ou reabrindo o orçamento por ela). */}
+                    <FormField
+                      control={control}
+                      name="customerOrderNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconHash className="h-4 w-4" />
+                            N° do Pedido
+                            {taskCount > 1 && (
+                              <span className="text-xs font-normal text-muted-foreground">
+                                (aplicado aos {taskCount} veículos)
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={(value) =>
+                                field.onChange(value === null || value === "" ? null : String(value))
+                              }
+                              placeholder="Ex: 12345"
+                              maxLength={100}
+                              disabled={disabled}
+                              className="bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
                 )}

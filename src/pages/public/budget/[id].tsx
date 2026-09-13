@@ -14,8 +14,18 @@ import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-s
 import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
+import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
+import {
+  quoteTasks,
+  primaryTask,
+  taskCount,
+  hasMultipleCustomers,
+  coveredTaskCount,
+  coverageSummary,
+} from "@/utils/quote-tasks";
+import { computeQuoteMoney } from "@/utils/quote-money";
+import { QuoteBillingBox } from "@/components/public/quote-billing-box";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
 import { BRAND_ASSETS } from '@/config/assets';
 // Company constants assembled from centralized config
@@ -31,25 +41,42 @@ const getFileServeUrl = (file: { id: string } | null | undefined): string => {
   return `${apiBaseUrl}/files/serve/${file.id}`;
 };
 
-interface QuoteData extends TaskQuote {
-  task?: {
+/**
+ * O VEÍCULO como a página pública o recebe.
+ *
+ * `GET /task-quotes/public/:id` devolve um recorte estreito de cada tarefa — o
+ * que o documento imprime e nada mais: ninguém que abre um link de orçamento
+ * precisa (nem deve receber) a tarefa inteira com status, setor e datas de
+ * produção.
+ */
+interface PublicQuoteVehicle {
+  id: string;
+  name?: string;
+  serialNumber?: string;
+  term?: Date;
+  createdAt?: Date | string;
+  responsibles?: { id: string; name?: string; role?: string }[];
+  customer?: {
     id: string;
-    name?: string;
-    serialNumber?: string;
-    term?: Date;
-    responsibles?: { id: string; name?: string; role?: string }[];
-    customer?: {
-      id: string;
-      corporateName?: string;
-      fantasyName?: string;
-    };
-    truck?: {
-      plate?: string;
-      chassisNumber?: string;
-      category?: string | null;
-      implementType?: string | null;
-    };
+    corporateName?: string;
+    fantasyName?: string;
   };
+  truck?: {
+    plate?: string;
+    chassisNumber?: string;
+    category?: string | null;
+    implementType?: string | null;
+  };
+}
+
+// `Omit<…, "task" | "tasks">`: as duas relações são `Task` no tipo do sistema, e
+// aqui elas chegam no recorte público acima. Sem o `Omit` o `extends` não fecha —
+// era isso que o `tasks?: any[]` de antes escondia.
+interface QuoteData extends Omit<TaskQuote, "task" | "tasks"> {
+  /** @deprecated Forma anterior ao multitarefa — a API ainda a emite para clientes antigos. */
+  task?: PublicQuoteVehicle;
+  /** OS VEÍCULOS do orçamento, na ordem do documento. */
+  tasks?: PublicQuoteVehicle[];
 }
 
 export function PublicBudgetPage() {
@@ -182,7 +209,12 @@ export function PublicBudgetPage() {
   const filteredServices = useMemo(() => {
     if (!quote?.services) return [];
     if (!selectedCustomerId) return quote.services;
-    const isMultiCustomerQuote = (quote?.customerConfigs?.length ?? 0) >= 2;
+    // ⚠️ CLIENTES DISTINTOS, não fatias. Num orçamento `PER_TASK` de quatro
+    // caminhões para UM cliente há quatro fatias — e contá-las fazia todo
+    // serviço sem `invoiceToCustomerId` (que são todos, num orçamento de um
+    // cliente só) ser filtrado para fora. O cliente abria a página em que
+    // ASSINA e via "Serviços" vazio e "Total geral R$ 0,00".
+    const isMultiCustomerQuote = hasMultipleCustomers(quote?.customerConfigs);
     return quote.services.filter((service) => {
       const svcCustomer = serviceCustomerId(service);
       if (svcCustomer) return svcCustomer === selectedCustomerId;
@@ -241,10 +273,13 @@ export function PublicBudgetPage() {
   const activeConfig = quote.customerConfigs?.find(c => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
   // The budget's contact is ALWAYS the task's first responsible — the quote no longer
   // carries its own (which went stale after duplicating a task + changing its responsible).
-  const contactName = quote.task?.responsibles?.[0]?.name || "";
+  // O responsável PRINCIPAL sai da união das tarefas — o mesmo conjunto que
+  // assina o documento.
+  const contactName =
+    quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? [])[0]?.name || "";
   // Invoice-to customer (woven into the intro): corporate/fantasy name + CNPJ or CPF
   // when present. Prefer the active config's customer, fall back to the task's.
-  const billCustomer: any = activeConfig?.customer || quote.task?.customer;
+  const billCustomer: any = activeConfig?.customer || primaryTask<any>(quote)?.customer;
   const invoiceName: string = billCustomer?.corporateName || billCustomer?.fantasyName || "";
   const invoiceDoc: string = billCustomer?.cnpj
     ? `CNPJ ${formatCNPJ(billCustomer.cnpj)}`
@@ -254,7 +289,7 @@ export function PublicBudgetPage() {
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = quote.budgetNumber
     ? String(quote.budgetNumber).padStart(4, '0')
-    : quote.task?.serialNumber || "0000";
+    : primaryTask<any>(quote)?.serialNumber || "0000";
   /**
    * Validade como DATA ABSOLUTA, igual ao documento assinado.
    *
@@ -265,15 +300,90 @@ export function PublicBudgetPage() {
    * decisão 2 no cabeçalho de `api/.../document/quote-html.builder.ts`.
    */
   const validUntil = quote.expiresAt ? formatDate(quote.expiresAt) : "";
-  const termDate = quote.task?.term ? formatDate(quote.task.term) : "";
+  const termDate = primaryTask<any>(quote)?.term
+    ? formatDate(primaryTask<any>(quote)!.term)
+    : "";
   // Custom delivery days (production time) - used when no term date is set
   const customDeliveryDays = quote.customForecastDays || null;
-  const paymentText = generatePaymentText({
-    customPaymentText: activeConfig?.customPaymentText || null,
-    paymentConfig: (activeConfig as any)?.paymentConfig || null,
-    paymentCondition: activeConfig?.paymentCondition,
-    total: activeConfig?.total ?? quote.total,
-  });
+  // ── A CLÁUSULA DE PAGAMENTO ──────────────────────────────────────────────
+  //
+  // ESPELHO de `signature-envelope.service.ts`: uma frase por PLANO, não por
+  // fatura. A página é por CLIENTE e, com lotes, um cliente tem K faturamentos
+  // no mesmo orçamento — cada um com a sua cobertura, o seu total e o seu plano
+  // de parcelas.
+  //
+  // Agrupar por TERMOS + TAMANHO DA COBERTURA é o que mantém `PER_TASK` numa
+  // frase só (sessenta faturas iguais não viram sessenta parágrafos) e, ao mesmo
+  // tempo, impede que lotes DESIGUAIS — vinte e quarenta — sejam descritos pelo
+  // primeiro, com a página calando sobre os outros quarenta caminhões.
+  const vehicleTotal = Math.max(1, taskCount(quote));
+  const clauseFor = (config: any, groupVehicleCount: number): string =>
+    generatePaymentText({
+      customPaymentText: config?.customPaymentText || null,
+      paymentConfig: (config as any)?.paymentConfig || null,
+      paymentCondition: config?.paymentCondition,
+      // `config.total` é o que a FATURA cobra — o total geral em `JOINT`, o de um
+      // veículo em `PER_TASK`, o do lote num lote —, e é isso que a cláusula
+      // precisa descrever. O unitário exibido na lista de serviços é outra coisa.
+      total: config?.total ?? quote.total,
+      // Sobre quantos veículos esta frase fala: o orçamento inteiro quando ela é
+      // a única, só os do grupo quando há mais de uma.
+      vehicleCount: groupVehicleCount,
+      // QUANTOS VEÍCULOS ESTA FATURA COBRE — o que decide se a cláusula diz
+      // "R$ 730.224,00", "para cada um dos 60 veículos" ou "para cada grupo de
+      // 20". Sai da cobertura, não do modo: com lotes, o modo não sabe o tamanho.
+      coveredVehicleCount: coveredTaskCount(config as any) || undefined,
+    });
+
+  const activeSlices = (quote.customerConfigs ?? []).filter(
+    (c: any) => configCustomerId(c) === configCustomerId(activeConfig),
+  );
+  const clauseGroups: any[][] = [];
+  const clauseGroupByKey = new Map<string, any[]>();
+  for (const c of activeSlices) {
+    const key = JSON.stringify([
+      c.discountType ?? "NONE",
+      c.discountValue != null ? Number(c.discountValue) : null,
+      c.paymentCondition ?? null,
+      c.customPaymentText ?? null,
+      (c as any).paymentConfig ?? null,
+      coveredTaskCount(c as any),
+    ]);
+    let group = clauseGroupByKey.get(key);
+    if (!group) {
+      group = [];
+      clauseGroupByKey.set(key, group);
+      clauseGroups.push(group);
+    }
+    group.push(c);
+  }
+
+  const paymentClauses = clauseGroups
+    .map((group) => {
+      const head = group[0];
+      const alone = clauseGroups.length === 1;
+      const groupVehicleCount = alone
+        ? vehicleTotal
+        : Math.max(
+            1,
+            group.reduce((sum: number, c: any) => sum + coveredTaskCount(c as any), 0),
+          );
+      return {
+        key: head?.id ?? String(clauseGroups.indexOf(group)),
+        // Grupo único (o acervo inteiro, `JOINT`, `PER_TASK` e lotes iguais):
+        // sem rótulo, e a página fica idêntica à de antes.
+        label: alone
+          ? null
+          : coverageSummary(
+              { coveredTasks: group.flatMap((c: any) => c.coveredTasks ?? []) } as any,
+              vehicleTotal,
+              quoteTasks<any>(quote),
+            ),
+        text: clauseFor(head, groupVehicleCount),
+      };
+    })
+    .filter((c: { text: string }) => Boolean(c.text));
+  const paymentText = paymentClauses[0]?.text ?? "";
   const guaranteeText = generateGuaranteeText(quote);
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
@@ -306,15 +416,60 @@ export function PublicBudgetPage() {
   // Use serve endpoint for signature to preserve PNG transparency
 
   // Recalculate discount and total based on active filter
-  const isCompleteViewGlobal = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
-  const displaySubtotal = selectedCustomerId
-    ? (typeof activeConfig?.subtotal === 'number' ? activeConfig.subtotal : Number(activeConfig?.subtotal) || filteredSubtotal)
-    : quote.subtotal;
-  const displayTotal = selectedCustomerId
-    ? (typeof activeConfig?.total === 'number' ? activeConfig.total : Number(activeConfig?.total) || 0)
-    : isCompleteViewGlobal
-      ? quote.customerConfigs!.reduce((sum: number, c: any) => sum + (typeof c.total === 'number' ? c.total : Number(c.total) || 0), 0)
-      : quote.total;
+  // ⚠️ CLIENTES DISTINTOS, nunca faturas. Num orçamento cobrado veículo a
+  // veículo há uma fatura por caminhão, todas do mesmo cliente: contar faturas
+  // fazia esta tela — a que o cliente ASSINA — entrar no modo "completo" e
+  // filtrar os serviços para fora da lista, anunciando "Serviços" vazio e
+  // "Total geral R$ 0,00".
+  const isCompleteViewGlobal = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DINHEIRO: O VALOR UNITÁRIO, O "× N" E O TOTAL GERAL
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // A lista de serviços acima mostra o preço de UM veículo, e
+  // `activeConfig.total` é o que a FATURA cobra — que em `JOINT` já vem
+  // multiplicado. Exibir os dois lado a lado sem a linha de multiplicação faria
+  // a lista não fechar com o total: num orçamento de sessenta caminhões, por um
+  // fator de sessenta.
+  //
+  // A conta é refeita a partir dos serviços com a MESMA fórmula da API
+  // (`computeQuoteMoney`), que é o que garante que esta tela, o PDF assinado e o
+  // boleto digam o mesmo número.
+  // O mesmo `vehicleTotal` que a cláusula de pagamento usa lá em cima, com o
+  // nome que o resto desta tela já usava.
+  const vehicleCount = vehicleTotal;
+
+  const money = computeQuoteMoney({
+    serviceAmounts: filteredServices.map((sv: any) =>
+      typeof sv.amount === 'number' ? sv.amount : Number(sv.amount) || 0,
+    ),
+    discountType: activeConfigForDiscount?.discountType,
+    discountValue:
+      activeConfigForDiscount?.discountValue != null
+        ? Number(activeConfigForDiscount.discountValue)
+        : null,
+    taskCount: vehicleCount,
+    coveredTaskCount: coveredTaskCount(activeConfigForDiscount as any) || undefined,
+  });
+  const isMultiVehicle = vehicleCount > 1;
+
+  // Com um veículo os valores exibidos são os de sempre (e vêm da configuração,
+  // que é a fonte que o faturamento usa). Com N, a tela mostra o UNITÁRIO na
+  // linha de subtotal/total e o geral no fecho.
+  const displaySubtotal = isMultiVehicle
+    ? money.perVehicleSubtotal
+    : selectedCustomerId
+      ? (typeof activeConfig?.subtotal === 'number' ? activeConfig.subtotal : Number(activeConfig?.subtotal) || filteredSubtotal)
+      : quote.subtotal;
+  const displayTotal = isMultiVehicle
+    ? money.perVehicleTotal
+    : selectedCustomerId
+      ? (typeof activeConfig?.total === 'number' ? activeConfig.total : Number(activeConfig?.total) || 0)
+      : isCompleteViewGlobal
+        ? quote.customerConfigs!.reduce((sum: number, c: any) => sum + (typeof c.total === 'number' ? c.total : Number(c.total) || 0), 0)
+        : quote.total;
+  /** O valor do CONTRATO — `total por veículo × N`. */
+  const displayGrandTotal = money.grandTotal;
 
   // Copy URL to clipboard
   const handleCopyLink = async () => {
@@ -350,7 +505,7 @@ export function PublicBudgetPage() {
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
-      a.download = budgetPdfFilename(quote?.task?.customer, quote?.budgetNumber);
+      a.download = budgetPdfFilename(primaryTask<any>(quote)?.customer, quote?.budgetNumber);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
@@ -483,35 +638,26 @@ export function PublicBudgetPage() {
                   </>
                 ) : null}
                 {" "}para execução dos serviços abaixo descriminados
-                {(() => {
-                  const truckCategoryLabel = quote.task?.truck?.category
-                    ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category)
-                    : null;
-                  const truckImplementLabel = quote.task?.truck?.implementType
-                    ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType)
-                    : null;
-                  const parts: React.ReactNode[] = [];
-                  if (quote.task?.serialNumber) parts.push(<> nº série: <strong>{quote.task.serialNumber}</strong></>);
-                  if (quote.task?.truck?.plate) parts.push(<> placa: <strong>{quote.task.truck.plate}</strong></>);
-                  if (quote.task?.truck?.chassisNumber) parts.push(<> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>);
-                  if (truckCategoryLabel) parts.push(<> categoria: <strong>{truckCategoryLabel}</strong></>);
-                  if (truckImplementLabel) parts.push(<> implemento: <strong>{truckImplementLabel}</strong></>);
-                  if (!parts.length) return null;
-                  return (
-                    <>
-                      {" "}no veículo
-                      {parts.map((p, i) => (
-                        <span key={i}>{i > 0 && ","}{p}</span>
-                      ))}
-                    </>
-                  );
-                })()}.
+                {quoteTasks(quote).length > 0 && (
+                  <>
+                    {" "}
+                    {quoteTasks(quote).length > 1
+                      ? "nos veículos abaixo relacionados"
+                      : "no veículo abaixo identificado"}
+                  </>
+                )}
+                {quoteTasks(quote).length > 0 ? ":" : "."}
               </p>
+              {/* A IDENTIFICAÇÃO EM TABELA — espelha `.vehicle-table` do PDF
+                  assinado. A frase acima só a anuncia. */}
+              <QuoteVehicleTable quote={quote} />
             </div>
 
             {/* Services */}
             {(() => {
-              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+              // Mesma correção do filtro de serviços: a coluna "faturar para"
+              // só faz sentido com mais de um CLIENTE.
+              const isCompleteView = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
               return (
               <div className="mb-6">
               <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
@@ -593,7 +739,9 @@ export function PublicBudgetPage() {
                   {hasDiscount && (
                     <>
                       <div className="flex justify-between items-baseline">
-                        <span className="text-gray-700">Subtotal</span>
+                        <span className="text-gray-700">
+                          Subtotal{isMultiVehicle ? " por veículo" : ""}
+                        </span>
                         <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
                       </div>
                       {/* Rótulo em cor NORMAL e só o valor em vermelho — é o que
@@ -613,16 +761,65 @@ export function PublicBudgetPage() {
                       </div>
                     </>
                   )}
-                  {/* Régua VERDE sobre o Total, como `.total-row-final` no PDF. */}
+                  {/* ═══════════════════════════════════════════════════════
+                      COM UM VEÍCULO: régua VERDE sobre o Total, como
+                      `.total-row-final` no PDF, e nada mais — os orçamentos de
+                      um veículo, que são a esmagadora maioria, saem idênticos.
+
+                      COM N: "Total por veículo" é um DEGRAU (filete cinza fino,
+                      peso 600), depois a multiplicação, e o fecho verde é o
+                      TOTAL GERAL. Sem essa hierarquia os dois números liam como
+                      concorrentes e o cliente conferia o errado.
+
+                      Espelha `.total-row-unit` / `.total-row-multiplier` /
+                      `.total-row-final` do PDF assinado.
+                      ═══════════════════════════════════════════════════════ */}
                   <div
                     className="flex justify-between items-baseline pt-2"
-                    style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                    style={
+                      isMultiVehicle
+                        ? { borderTop: "0.8px solid #bbb" }
+                        : { borderTop: `1.5px solid ${COMPANY.primaryGreen}` }
+                    }
                   >
-                    <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>Total</span>
-                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                    <span
+                      className={isMultiVehicle ? "font-semibold" : "font-bold"}
+                      style={isMultiVehicle ? { color: COMPANY.textDark } : { color: COMPANY.primaryGreen }}
+                    >
+                      Total{isMultiVehicle ? " por veículo" : ""}
+                    </span>
+                    <span
+                      className={isMultiVehicle ? "font-semibold" : "font-bold text-lg"}
+                      style={isMultiVehicle ? { color: COMPANY.textDark } : { color: COMPANY.primaryGreen }}
+                    >
                       {formatCurrency(displayTotal)}
                     </span>
                   </div>
+                  {isMultiVehicle && (
+                    <>
+                      {/* O multiplicador NÃO é dinheiro e não deve parecer: cinza,
+                          sem destaque, e sem "R$" — o que também o mantém visível
+                          quando o operador esconde valores (a redação é por regex
+                          sobre "R$"). */}
+                      <div className="flex justify-between items-baseline">
+                        <span style={{ color: COMPANY.textGray }}>Veículos</span>
+                        <span className="tabular-nums" style={{ color: COMPANY.textGray }}>
+                          &times; {vehicleCount}
+                        </span>
+                      </div>
+                      <div
+                        className="flex justify-between items-baseline pt-2"
+                        style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                      >
+                        <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>
+                          Total geral
+                        </span>
+                        <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                          {formatCurrency(displayGrandTotal)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               </div>
@@ -663,62 +860,6 @@ export function PublicBudgetPage() {
               </div>
             ) : null}
 
-            {/* Payment Terms */}
-            {(() => {
-              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
-              if (isCompleteView) {
-                // Show per-customer payment conditions
-                return (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                      Condições de pagamento
-                    </h3>
-                    <div className="space-y-3">
-                      {quote.customerConfigs!.map((config: any) => {
-                        const configPaymentText = generatePaymentText({
-                          customPaymentText: config.customPaymentText || null,
-                          paymentConfig: config.paymentConfig || null,
-                          paymentCondition: config.paymentCondition,
-                          total: config.total ?? 0,
-                        });
-                        if (!configPaymentText && !config.orderNumber) return null;
-                        const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
-                        return (
-                          <div key={config.id}>
-                            <p className="text-sm font-semibold text-gray-800">{customerName}</p>
-                            {configPaymentText && <p className="text-gray-700">{configPaymentText}</p>}
-                            {config.orderNumber && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                <span className="font-semibold">N° do Pedido:</span> {config.orderNumber}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              }
-              if (!paymentText && !activeConfig?.orderNumber) return null;
-              return (
-                <div className="mb-6">
-                  {paymentText && (
-                    <>
-                      <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                        Condições de pagamento
-                      </h3>
-                      <p className="text-gray-700">{paymentText}</p>
-                    </>
-                  )}
-                  {activeConfig?.orderNumber && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      <span className="font-semibold">N° do Pedido:</span> {activeConfig.orderNumber}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-
             {/* Guarantee */}
             {guaranteeText && (
               <div className="mb-6">
@@ -736,6 +877,107 @@ export function PublicBudgetPage() {
                 />
               </div>
             )}
+
+            {/* FATURAMENTO — depois das Garantias, não entre o prazo e elas.
+                A ordem do documento é: o que se entrega (serviços, prazo), sob
+                que garantia, e só então como se paga. Espelha
+                `quote-html.builder.ts` e `budget-pdf-generator.ts`. */}
+            {(() => {
+              // Mesma correção do filtro de serviços: a coluna "faturar para"
+              // só faz sentido com mais de um CLIENTE.
+              const isCompleteView = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
+              if (isCompleteView) {
+                // Show per-customer payment conditions
+                return (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                      Faturamento
+                    </h3>
+                    <div className="space-y-5">
+                      {quote.customerConfigs!.map((config: any) => {
+                        const configPaymentText = generatePaymentText({
+                          customPaymentText: config.customPaymentText || null,
+                          paymentConfig: config.paymentConfig || null,
+                          paymentCondition: config.paymentCondition,
+                          total: config.total ?? 0,
+                          vehicleCount,
+                          // QUANTOS VEÍCULOS ESTA FATURA COBRE — a mesma leitura
+                          // do recorte de um cliente só, logo abaixo. Era
+                          // `perVehicleBilling: billingSplit === 'PER_TASK'`, que
+                          // só sabe responder "um" ou "todos": num lote de vinte
+                          // a cláusula prometia parcelas do contrato inteiro.
+                          coveredVehicleCount: coveredTaskCount(config) || undefined,
+                        });
+                        if (!configPaymentText && !config.customer) return null;
+                        const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
+                        // DE QUAIS CAMINHÕES É ESTA FATURA. Com lotes o mesmo
+                        // cliente aparece K vezes aqui, e sem isto os blocos
+                        // ficam indistinguíveis — o cliente lê duas condições de
+                        // pagamento sob o mesmo nome, sem saber a qual veículo
+                        // cada uma se refere. Omitido quando a fatura cobre o
+                        // orçamento inteiro: ali não há o que distinguir.
+                        const coverage =
+                          vehicleCount > 1 && coveredTaskCount(config) > 0 &&
+                          coveredTaskCount(config) < vehicleCount
+                            ? coverageSummary(config, vehicleCount, quoteTasks<any>(quote))
+                            : null;
+                        return (
+                          <div key={config.id}>
+                            <p className="text-sm font-semibold text-gray-800 mb-1">
+                              {customerName}
+                              {coverage && (
+                                <span className="font-normal text-gray-500"> — {coverage}</span>
+                              )}
+                            </p>
+                            <QuoteBillingBox customer={config.customer} />
+                            {configPaymentText && (
+                              <p
+                                className="text-gray-700 pt-2"
+                                style={{ borderTop: "0.5px solid #ddd" }}
+                              >
+                                {configPaymentText}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              if (!paymentText && !billCustomer) return null;
+              return (
+                <div className="mb-6">
+                  {/* A seção passou a se chamar FATURAMENTO e abre com o quadro
+                      do tomador; a frase das parcelas vem logo abaixo, separada
+                      por um filete. A frase NÃO saiu — ela é o acordo de
+                      pagamento, e um instrumento sem ela deixa de dizer quanto e
+                      quando se paga. Espelha a seção `PAYMENT` do PDF assinado.
+                      O nº do pedido entrou no quadro, onde a Elotech o procura. */}
+                  <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                    Faturamento
+                  </h3>
+                  <QuoteBillingBox customer={billCustomer} />
+                  {/* UMA CLÁUSULA POR FATURA. Com uma fatia — o acervo inteiro,
+                      `JOINT` e `PER_TASK` — é um parágrafo só, sem rótulo,
+                      exatamente como antes. Com lotes são K, cada um dizendo de
+                      quais caminhões fala: duas condições de pagamento
+                      diferentes uma sob a outra, sem distinção, seriam lidas
+                      como se a primeira valesse por todos. Espelha o
+                      `quote-html.builder.ts`. */}
+                  {paymentClauses.map((clause: { key: string; label: string | null; text: string }, i: number) => (
+                    <p
+                      key={clause.key}
+                      className={`text-gray-700 ${i === 0 ? "pt-2" : "pt-1"}`}
+                      style={i === 0 ? { borderTop: "0.5px solid #ddd" } : undefined}
+                    >
+                      {clause.label && <span className="font-semibold">{clause.label}: </span>}
+                      {clause.text}
+                    </p>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Sem layout o documento fecha numa folha só: a arte não existe e as
                 assinaturas ficam AQUI. Havendo layout, os dois vão juntos para a

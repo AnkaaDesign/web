@@ -29,6 +29,30 @@ export const invoiceService = {
       },
     }),
 
+  /**
+   * AS FATURAS DE UM ORÇAMENTO — todas, de todos os veículos.
+   *
+   * `Invoice.taskId` só existe quando a fatura é de UM veículo. Numa fatura
+   * conjunta ele é NULO, e perguntar pela rota `/task/:taskId` devolve lista
+   * VAZIA — que é o que acontecia num orçamento de sessenta caminhões faturado
+   * junto: a tela de Faturamento, o cartão de faturas e a seção da tarefa
+   * mostravam "nenhuma fatura" sobre uma cobrança de R$ 730.224,00 emitida.
+   */
+  getByQuoteId: (quoteId: string) =>
+    apiClient.get(`/invoices/quote/${quoteId}`, {
+      params: {
+        include: {
+          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFiles: true } },
+          nfseDocuments: true,
+          customer: true,
+          // A COBERTURA vem junto (a API a injeta em `customerConfig`): é ela
+          // que permite à tela de UM caminhão filtrar, das faturas do orçamento,
+          // as que o cobram.
+          customerConfig: true,
+        },
+      },
+    }),
+
   // Get invoices by customer ID
   getByCustomerId: (customerId: string) =>
     apiClient.get(`/invoices/customer/${customerId}`),

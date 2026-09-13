@@ -26,6 +26,12 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 
 export const taskQuoteStatusSchema = z.enum([
   'PENDING',
+  // Os dois estados que a API acrescentou em `20260911160000` e que este schema
+  // não conhecia: o zod de `taskQuoteCreateNestedSchema` valida `status`, e um
+  // valor fora do enum é ERRO de validação — o formulário recusava um orçamento
+  // assinado ou vencido por não saber que o estado existe.
+  'SIGNED',
+  'EXPIRED',
   'BUDGET_APPROVED',
   'BILLING_APPROVED',
   'UPCOMING',
@@ -103,7 +109,23 @@ const taskQuoteServicesArraySchema = z.preprocess(
 
 // Customer config schema for per-customer billing
 export const taskQuoteCustomerConfigSchema = z.object({
+  /**
+   * O ID DESTA FATURA, quando o formulário edita uma que já existe.
+   *
+   * É a identidade estável do faturamento, e é por ela que o servidor casa o que
+   * chegou com o que está gravado. Sem ela, quatro faturas do mesmo cliente
+   * chegam indistinguíveis e a última grava por cima das outras três.
+   */
+  id: z.string().uuid().optional(),
   customerId: z.string().uuid('Cliente inválido'),
+  /**
+   * A COBERTURA — os veículos que esta fatura cobra.
+   *
+   * Ausente = "decida pelo modo de faturamento", que é o que os assistentes
+   * mandam quando não estão compondo lotes. Presente = a tela está dizendo
+   * exatamente quem cobra quem.
+   */
+  taskIds: z.array(z.string().uuid('Tarefa inválida')).optional(),
   subtotal: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
   total: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
   // Global customer discount
@@ -121,6 +143,11 @@ export const taskQuoteCustomerConfigSchema = z.object({
   customPaymentText: z.string().max(2000).optional().nullable(),
   generateInvoice: z.boolean().optional().default(true),
   generateBankSlip: z.boolean().optional().default(true),
+  /**
+   * @deprecated O número do pedido é do VEÍCULO (`Task.customerOrderNumber`).
+   * Continua aceito pela API — que o grava em TODAS as tarefas do orçamento —,
+   * mas nenhuma tela deste repositório o envia: ver `purchase-order-vehicles`.
+   */
   orderNumber: z.string().max(100).optional().nullable(),
   responsibleId: z.string().uuid().optional().nullable(),
   installments: z.array(z.object({
@@ -203,18 +230,11 @@ export const taskQuoteCreateNestedSchema = z
     }
   });
 
-export const taskQuoteSchema = z.object({
-  id: z.string().uuid().optional(),
-  subtotal: moneySchema,
-  total: moneySchema,
-  expiresAt: z.coerce.date(),
-  status: taskQuoteStatusSchema,
-  taskId: z.string().uuid(),
-  services: z.array(taskQuoteServiceSchema).min(1, 'Pelo menos um serviço é obrigatório'),
-  customerConfigs: z.array(taskQuoteCustomerConfigSchema).min(1, 'Pelo menos uma configuração de cliente é obrigatória'),
-});
-
-export type TaskQuoteFormData = z.infer<typeof taskQuoteSchema>;
+// `taskQuoteSchema` foi REMOVIDO. Não tinha nenhum consumidor (o wizard de
+// criação e o de edição validam à mão) e continuava exigindo `taskId` como campo
+// obrigatório de UMA tarefa — a premissa que o orçamento multitarefa desfez. Um
+// schema morto com a forma antiga é uma armadilha para quem for mexer aqui
+// amanhã: o que a API aceita hoje é `taskIds[]` + `billingSplit`.
 export type TaskQuoteServiceFormData = z.infer<typeof taskQuoteServiceSchema>;
 export type TaskQuoteCustomerConfigFormData = z.infer<typeof taskQuoteCustomerConfigSchema>;
 export type TaskQuoteCreateNestedFormData = z.infer<typeof taskQuoteCreateNestedSchema>;

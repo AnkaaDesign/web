@@ -1,3 +1,4 @@
+import { TASK_STATUS } from "@/constants";
 import type { Task } from "@/types";
 import type { TaskQuote } from "@/types/task-quote";
 
@@ -13,25 +14,95 @@ import type { TaskQuote } from "@/types/task-quote";
  * quote → task include, so the predicate path is `task.status` — byte-identical to the
  * `where: { task: { status } }` the API mirror uses. One rule, one path, two evaluators.
  */
-export type AttentionQuoteEntity = TaskQuote & { task: { id: string; status: string } };
+// `Omit<…, "task">`: `TaskQuote.task` é a TAREFA inteira (e está `@deprecated`
+// desde o multitarefa). O que a regra de atenção avalia é um par mínimo — id e
+// status —, e uma interseção com o tipo completo exigiria montar uma Task de
+// verdade aqui só para satisfazer o compilador, ou voltar a `any`, que foi como
+// o defeito do "mesmo `quote.id` registrado N vezes" passou sem ser visto.
+export type AttentionQuoteEntity = Omit<TaskQuote, "task"> & {
+  task: { id: string; status: string };
+  /**
+   * ALGUM VEÍCULO deste orçamento está sem número de pedido de compra.
+   *
+   * Derivado, e não um caminho de predicado dentro de `tasks`: o pedido mora em
+   * `Task.customerOrderNumber` — por VEÍCULO — e o espelho no servidor pergunta
+   * `tasks: { some: { customerOrderNumber: null } }`. Do lado do cliente as
+   * tarefas do orçamento chegam como LINHAS da lista, não como relação do
+   * orçamento, então a conjunção é feita aqui, uma vez, onde as linhas ainda
+   * estão todas à mão.
+   *
+   * ⚠️ Numa lista paginada as linhas podem ser um SUBCONJUNTO dos sessenta
+   * veículos. Um branco visível acende; um branco fora da página não — e é a
+   * contagem do servidor (que vê todos) que sustenta o número no menu. Antes
+   * disto a regra lia `customerConfigs[].orderNumber`, uma coluna que já não
+   * existe, e portanto NUNCA acendia.
+   */
+  anyVehicleMissingOrderNumber: boolean;
+};
 
-/** Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped. */
+/** `Task.customerOrderNumber` em branco — nulo e string vazia são a mesma coisa. */
+function missingOrderNumber(task: { customerOrderNumber?: string | null }): boolean {
+  return !(task.customerOrderNumber ?? "").trim();
+}
+
+/**
+ * Quotes of the loaded tasks, ready to register. Tasks without a quote are skipped.
+ *
+ * UM ORÇAMENTO, UMA ENTRADA — mesmo quando ele aparece em sessenta linhas.
+ *
+ * Desde o orçamento multitarefa, N tarefas dividem o MESMO `quote.id`. Como a
+ * entidade registrada é o orçamento, empurrar uma entrada por linha registraria
+ * o mesmo id N vezes e a última venceria: o alerta do orçamento passaria a
+ * depender de qual veículo o `map` visitou por último — o mesmo orçamento
+ * piscaria ou não conforme a ordenação da tabela.
+ *
+ * O desempate espelha o `tasks: { some: { status: COMPLETED } }` que a regra usa
+ * na API: entre as tarefas do orçamento, vence uma que já esteja COMPLETED, se
+ * houver. A regra pergunta "algum veículo já ficou pronto?" — porque num
+ * orçamento de sessenta caminhões o dinheiro já está parado quando o primeiro
+ * sai —, e o avaliador do cliente lê `task.status`, um campo só. Escolher aqui a
+ * tarefa que satisfaz a regra é o que faz os dois avaliadores concordarem.
+ */
 export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQuoteEntity[] {
-  const out: AttentionQuoteEntity[] = [];
+  const byQuoteId = new Map<string, AttentionQuoteEntity>();
   for (const task of tasks) {
     const quote = task.quote;
     // `setEntities` drops anything without an id, so a quote fetched without `id: true` in the
     // select would register nothing at all — silently, which is why the include comment says so.
     if (!quote?.id) continue;
-    out.push({ ...(quote as TaskQuote), task: { id: task.id, status: task.status } });
+    const existing = byQuoteId.get(quote.id);
+    // Primeira linha do orçamento, ou a que troca um veículo não-concluído por
+    // um concluído. Nunca o contrário: uma vez que o `some` está satisfeito,
+    // nenhuma linha seguinte pode desfazê-lo.
+    // O pedido de compra é do VEÍCULO: a falta é de QUALQUER linha do orçamento,
+    // não só da que ganhou o desempate acima. Acumula antes do `continue`, senão
+    // um orçamento cujo veículo concluído TEM pedido esconderia os cinquenta e
+    // nove em branco.
+    const missing = (existing?.anyVehicleMissingOrderNumber ?? false) || missingOrderNumber(task);
+    if (existing) existing.anyVehicleMissingOrderNumber = missing;
+    if (existing && existing.task.status === TASK_STATUS.COMPLETED) continue;
+    if (existing && task.status !== TASK_STATUS.COMPLETED) continue;
+    byQuoteId.set(quote.id, {
+      ...(quote as TaskQuote),
+      task: { id: task.id, status: task.status },
+      anyVehicleMissingOrderNumber: missing,
+    });
   }
-  return out;
+  return [...byQuoteId.values()];
 }
 
 /** Same shape for a single task on a detail page. */
 export function toAttentionQuoteEntity(task: Task | null | undefined): AttentionQuoteEntity | null {
   if (!task?.quote?.id) return null;
-  return { ...(task.quote as TaskQuote), task: { id: task.id, status: task.status } };
+  // Com a relação carregada, a pergunta é sobre os N veículos; sem ela, sobre o
+  // que a tela tem — a tarefa aberta.
+  const vehicles = ((task.quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  return {
+    ...(task.quote as TaskQuote),
+    task: { id: task.id, status: task.status },
+    anyVehicleMissingOrderNumber:
+      vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
+  };
 }
 
 /**
@@ -40,8 +111,16 @@ export function toAttentionQuoteEntity(task: Task | null | undefined): Attention
  */
 export function toAttentionQuoteEntityFromParts(
   quote: { id?: string } | null | undefined,
-  task: { id: string; status: string } | null | undefined,
+  task: { id: string; status: string; customerOrderNumber?: string | null } | null | undefined,
 ): AttentionQuoteEntity | null {
   if (!quote?.id || !task?.id) return null;
-  return { ...(quote as TaskQuote), task: { id: task.id, status: task.status } };
+  // O orçamento desta página vem com `tasks` (a lista de veículos); a tarefa
+  // aberta é o recuo quando ele ainda não existe.
+  const vehicles = ((quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  return {
+    ...(quote as TaskQuote),
+    task: { id: task.id, status: task.status },
+    anyVehicleMissingOrderNumber:
+      vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
+  };
 }

@@ -36,6 +36,20 @@ export const taskQuoteService = {
   // Budget Approve (alias)
   budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
+  /**
+   * Aprova o faturamento de UM VEÍCULO de um orçamento que cobra veículo a
+   * veículo (`billingSplit = PER_TASK`).
+   *
+   * A aprovação conjunta continua sendo `updateStatus(id, "BILLING_APPROVED")`,
+   * que o servidor roteia para `internalApprove` sem fatia — ele aprova TODAS as
+   * pendentes de uma vez. Os sessenta caminhões do Marquespan não terminam no
+   * mesmo dia: cada aprovação emite a fatura, a NFS-e e os boletos daquele
+   * veículo, com o vencimento contado dali, e o orçamento só grava
+   * `billingApprovedAt` quando a última fatia fecha.
+   */
+  internalApproveSlice: (id: string, taskId: string) =>
+    apiClient.put(`/task-quotes/${id}/internal-approve/${taskId}`),
+
   // Revert billing approval back to BUDGET_APPROVED (requires all bank slips + NFS-e cancelled)
   revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 
@@ -47,6 +61,11 @@ export const taskQuoteService = {
   cancel: (id: string) => apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING' }),
 
   // Update just the orderNumber on a customerConfig — safe to call on locked quotes
+  /**
+   * @deprecated O número do pedido é do VEÍCULO (`Task.customerOrderNumber`).
+   * Esta rota grava o mesmo número em TODAS as tarefas do orçamento. Para editar
+   * o pedido de um caminhão use `PUT /tasks/:id` (ou `PUT /tasks/batch`).
+   */
   updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
     apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
 

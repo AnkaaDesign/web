@@ -83,6 +83,9 @@ export function BudgetStepInfo({
   const customGuaranteeText = useWatch({ control, name: "customGuaranteeText" });
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
+  // QUANTOS VEÍCULOS este orçamento vai cobrir.
+  //
+
   // Sync validity period whenever expiresAt changes (including after form.reset() populates saved data)
   useEffect(() => {
     if (!quoteExpiresAt) return;
@@ -513,6 +516,11 @@ export function BudgetStepInfo({
               )}
             />
           </div>
+
+          {/* JUNTO OU SEPARADO mudou de passo: a escolha é sobre FATURAMENTO —
+              quantas faturas, quantas notas, quantos planos de parcelas — e
+              agora mora junto das condições de pagamento, no passo do cliente.
+              Ver `budget-step-customer-payment.tsx`. */}
 
           {showCustomGuarantee && (
             <FormField

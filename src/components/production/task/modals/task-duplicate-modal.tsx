@@ -12,6 +12,12 @@ import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
 import type { Task } from "../../../../types";
 import { taskDuplicateCopySchema } from "../../../../schemas";
+import {
+  perVehicleAmount,
+  quoteVehicleCount,
+  coveredTaskCount,
+  dedupeConfigsByCustomer,
+} from "@/utils/quote-tasks";
 
 // Full include config for refetching the task with ALL relations needed for duplication
 const DUPLICATE_TASK_INCLUDE = {
@@ -76,6 +82,24 @@ interface TaskDuplicateModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
+
+/**
+ * UMA configuração de faturamento por CLIENTE.
+ *
+ * Num orçamento `PER_TASK` existe uma POR VEÍCULO, todas do mesmo cliente e com
+ * as mesmas condições. A duplicata tem um veículo: mandar as sessenta criaria
+ * sessenta fatias conjuntas do mesmo cliente, e a segunda já violaria o índice
+ * que garante uma só — 500 na criação da tarefa.
+ */
+/**
+ * A PRIMEIRA fatura de cada cliente. Cópia local de `dedupeConfigsByCustomer` de
+ * `@/utils/quote-tasks`, com a forma que a duplicação usa (devolve `undefined`
+ * quando não há configuração, para o campo sumir do payload).
+ */
+const firstConfigPerCustomer = (configs: any[] | null | undefined): any[] | undefined => {
+  if (!configs) return undefined;
+  return dedupeConfigsByCustomer(configs).configs;
+};
 
 export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: TaskDuplicateModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,6 +171,20 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     if (!sourceTask) return null;
 
     const truckData = sourceTask.truck;
+
+    // A DUPLICATA É DE UM VEÍCULO, a origem pode ser de sessenta.
+    //
+    // `quote.total` é o valor do CONTRATO desde o orçamento multitarefa. Copiado
+    // cru, a cópia de um caminhão nasceria cobrando pelos sessenta.
+    //
+    // O divisor de CADA FATURA é a COBERTURA dela, não o modo: uma fatura de um
+    // veículo divide por 1, uma de lote por k, a conjunta por N. Ler
+    // `billingSplit === "PER_TASK"` dava 1 para tudo que não fosse "separado" —
+    // e num orçamento em lotes isso copiaria o valor de vinte caminhões para uma
+    // tarefa só.
+    const sourceVehicleCount = quoteVehicleCount(sourceTask.quote);
+    const configVehicleCount = (config: any) =>
+      coveredTaskCount(config) || sourceVehicleCount;
 
     return {
       // Basic fields
@@ -227,18 +265,28 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 amount: Number(item.amount) || 0,
                 observation: item.observation || null,
               })),
-              subtotal: Number(sourceTask.quote.subtotal) || 0,
-              total: Number(sourceTask.quote.total) || 0,
+              // O VALOR DE UM VEÍCULO. A duplicata é de uma tarefa só, e desde o
+              // orçamento multitarefa `quote.total` é o valor do CONTRATO
+              // (`por veículo × N`): copiá-lo cru fazia a cópia de um caminhão
+              // nascer cobrando pelos sessenta. (A API recalcula ao gravar, mas o
+              // que sai daqui é o que o operador confere na tela.)
+              subtotal: perVehicleAmount(sourceTask.quote.subtotal, sourceVehicleCount),
+              total: perVehicleAmount(sourceTask.quote.total, sourceVehicleCount),
               expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
               guaranteeYears: sourceTask.quote.guaranteeYears != null ? Number(sourceTask.quote.guaranteeYears) : null,
               customGuaranteeText: sourceTask.quote.customGuaranteeText,
               customForecastDays: sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
               simultaneousTasks: sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
               layoutFileIds: (sourceTask.quote.layoutFiles || []).map((f: any) => f.id),
-              customerConfigs: sourceTask.quote.customerConfigs?.map((config: any) => ({
+              // UMA configuração por CLIENTE. Num orçamento `PER_TASK` há uma por
+              // VEÍCULO, todas do mesmo cliente: mandá-las todas para uma tarefa
+              // só criaria sessenta fatias conjuntas do mesmo cliente, e a segunda
+              // já violaria o índice parcial que garante uma fatia conjunta por
+              // cliente — 500 na criação.
+              customerConfigs: firstConfigPerCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
                 customerId: config.customerId,
-                subtotal: Number(config.subtotal) || 0,
-                total: Number(config.total) || 0,
+                subtotal: perVehicleAmount(config.subtotal, configVehicleCount(config)),
+                total: perVehicleAmount(config.total, configVehicleCount(config)),
                 discountType: config.discountType || 'NONE',
                 discountValue: config.discountValue != null ? Number(config.discountValue) : null,
                 discountReference: config.discountReference || null,
