@@ -57,6 +57,32 @@ const drawCenteredLine = (ctx: CanvasRenderingContext2D, text: string, centerX: 
 };
 
 /**
+ * niimbluelib's encoder treats ANY pixel that isn't pure white as printable
+ * black (`isPixelNonWhite`: `data[idx] !== 255`) — there is no midpoint
+ * threshold. Canvas text/shape rendering is anti-aliased, leaving a band of
+ * gray edge pixels around every glyph. On ordinary black-on-white text that
+ * just fattens the glyph a little and stays legible, but on the badge's
+ * inverted white-on-black text those gray edge pixels get counted as "black"
+ * too, eating into the thin white letter strokes from every side — that's
+ * what printed as blurred/broken letters. Re-deciding black-vs-white
+ * ourselves with a real 50% luminance threshold, right before handing the
+ * canvas to the encoder, means every pixel it sees is already pure black or
+ * pure white, so its own `!== 255` check can no longer misfire either way.
+ */
+const binarize = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const luminance = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = luminance < 128 ? 0 : 255;
+    d[i] = v;
+    d[i + 1] = v;
+    d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+};
+
+/**
  * DUPLA (50x15mm): ONE physical label, divided into a left half (paint type)
  * and a right half (paint name) with a thin divider — not two separate
  * printPage calls. An earlier version printed the type and the name as two
@@ -84,23 +110,24 @@ export function drawDuplaLabel(paintTypeName: string, paintName: string): HTMLCa
   ctx.lineTo(half, canvas.height * 0.88);
   ctx.stroke();
 
+  binarize(ctx, canvas);
   return canvas;
 }
 
 /**
- * COMBO (50x30mm): one physical label with both the paint name (prominent,
- * top) and the paint type (secondary badge, bottom).
+ * COMBO (50x30mm): one physical label with both the paint type (badge, on
+ * top — read first when grabbing a can off the shelf) and the paint name
+ * (prominent, below).
  */
 export function drawComboLabel(paintName: string, paintTypeName: string): HTMLCanvasElement {
   const { heightMm } = LABEL_FORMATS.COMBO;
   const { canvas, ctx } = createLabelCanvas(heightMm);
 
-  // Paint name: upper ~60%, bold, auto-shrunk.
-  drawCenteredLine(ctx, paintName, canvas.width / 2, canvas.height * 0.38, canvas.width * 0.92, Math.round(canvas.height * 0.26), Math.round(canvas.height * 0.11));
-
-  // Paint type: filled badge in the lower third. Thermal printers are 1-bit
-  // (no gray/tint), so a solid black pill with white text is the legible
-  // substitute for a soft "chip" style.
+  // Paint type: filled badge. Thermal printers are 1-bit (no gray/tint), so a
+  // solid black pill with white text is the legible substitute for a soft
+  // "chip" style. Given a 12% top margin — the old 2.8% bottom margin sat
+  // right where feed/registration slip clips the printable area, on top of
+  // being the inverted-text case `binarize()` above exists for.
   const badgeText = paintTypeName.toUpperCase();
   const badgeFontPx = fitFontSize(ctx, badgeText, canvas.width * 0.7, Math.round(canvas.height * 0.14), Math.round(canvas.height * 0.09), "bold");
   ctx.font = `bold ${badgeFontPx}px sans-serif`;
@@ -109,7 +136,7 @@ export function drawComboLabel(paintName: string, paintTypeName: string): HTMLCa
   const badgeWidth = textWidth + paddingX * 2;
   const badgeHeight = badgeFontPx * 1.8;
   const badgeX = (canvas.width - badgeWidth) / 2;
-  const badgeY = canvas.height * 0.72;
+  const badgeY = canvas.height * 0.12;
   const radius = badgeHeight / 2;
 
   ctx.fillStyle = "black";
@@ -127,5 +154,13 @@ export function drawComboLabel(paintName: string, paintTypeName: string): HTMLCa
   ctx.textBaseline = "middle";
   ctx.fillText(badgeText, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2);
 
+  // Paint name: fills the remaining space below the badge, down to a matching
+  // ~10% bottom margin, bold and auto-shrunk.
+  ctx.fillStyle = "black";
+  const contentBottom = canvas.height * 0.9;
+  const nameCenterY = badgeY + badgeHeight + (contentBottom - (badgeY + badgeHeight)) / 2;
+  drawCenteredLine(ctx, paintName, canvas.width / 2, nameCenterY, canvas.width * 0.92, Math.round(canvas.height * 0.26), Math.round(canvas.height * 0.11));
+
+  binarize(ctx, canvas);
   return canvas;
 }
