@@ -61,8 +61,10 @@ import { usePrivileges } from "@/hooks/common/use-privileges";
 import { canEditUsers, canDeleteUsers } from "@/utils/permissions/entity-permissions";
 import {
   formatBrazilianPhone,
+  formatDate,
   formatDateTime,
   formatRelativeTime,
+  getAge,
   maskCNPJ,
   getCollaboratorStatus,
 } from "@/utils";
@@ -315,6 +317,8 @@ function UserDetailContent() {
             dataType: "date",
             editablePrivilege: HR_ACC_ADMIN,
             accessor: (u) => u.birth,
+            // render only affects the read-only display — edit mode still uses `edit` below untouched.
+            render: (u) => (u.birth ? `${formatDate(u.birth)} (${getAge(u.birth)} anos)` : undefined),
             edit: { get: (u) => u.birth, onCommit: (v) => setUserField({ birth: (v as Date) ?? null }) },
           },
           {

@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { formatCPF, formatBrazilianPhone } from "@/utils/formatters";
-import { formatDate, formatDateTime } from "@/utils/date";
+import { formatDate, formatDateTime, getAge } from "@/utils/date";
 import { getCollaboratorStatus } from "@/utils/user";
 import {
   SECTOR_PRIVILEGES,
@@ -292,8 +292,13 @@ export function createUserColumns({ uppercaseName = false }: CreateUserColumnsOp
       accessorFn: (u) => (u.birth ? new Date(u.birth).getTime() : 0),
       enableSorting: true,
       size: 170,
-      meta: { defaultVisible: false, headerLabel: "Data de Nascimento", exportValue: (u) => (u.birth ? new Date(u.birth) : null) },
-      cell: ({ row }) => muted(row.original.birth ? formatDate(new Date(row.original.birth)) : null),
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Data de Nascimento",
+        exportValue: (u) => (u.birth ? `${formatDate(new Date(u.birth))} (${getAge(u.birth)} anos)` : ""),
+      },
+      cell: ({ row }) =>
+        muted(row.original.birth ? `${formatDate(new Date(row.original.birth))} (${getAge(row.original.birth)} anos)` : null),
     },
     // NEW: Data de Admissão (from the current EmploymentContract).
     {
