@@ -392,11 +392,15 @@ export function SignatureSendDialog({
                       Este orçamento está sem {preflight.vehicle.missing.join(" e ")} do
                       veículo.
                     </strong>{" "}
-                    O documento é congelado como está — {preflight.vehicle.missing.length === 1
-                      ? "esse dado"
-                      : "esses dados"}{" "}
-                    não vão constar do documento assinado, mesmo que sejam preenchidos
-                    depois. Se já souber, preencha antes de enviar.
+                    O documento reserva o espaço e imprime "a registrar":{" "}
+                    {preflight.vehicle.missing.length === 1
+                      ? "o dado é carimbado"
+                      : "os dados são carimbados"}{" "}
+                    na lacuna assim que{" "}
+                    {preflight.vehicle.missing.length === 1 ? "for cadastrado" : "forem cadastrados"}
+                    , sem tocar nos bytes assinados, e na conclusão da tarefa sai um aditivo
+                    de identificação selado com o mesmo certificado. Preencher antes de
+                    enviar continua sendo o melhor caminho, se já souber.
                   </span>
                 </div>
               )}
