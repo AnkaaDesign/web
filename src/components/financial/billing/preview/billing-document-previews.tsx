@@ -6,6 +6,7 @@ import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 import {
+  coveredTaskIds,
   orderNumberLabel,
   hasMultipleCustomers as hasMultipleCustomersOf,
 } from "@/utils/quote-tasks";
@@ -365,11 +366,17 @@ export function BillingDocumentPreviews({
       const predicted = willEmit && nextNfseNumber != null ? nextNfseNumber + nfseSeq : null;
       if (willEmit) nfseSeq += 1;
 
-      // O PEDIDO DE COMPRA que ESTE documento vai citar. Uma fatia `PER_TASK` é
-      // de um veículo e cita o pedido dele; uma `JOINT` cobre os N e cita todos,
-      // como `orderNumberLabel` monta no servidor.
+      // O PEDIDO DE COMPRA que ESTE documento vai citar — o dos veículos que ESTA
+      // fatura cobre: o de um caminhão quando ela cobra um, os do lote quando
+      // cobra vinte. É a mesma leitura que `orderNumberLabel` recebe no servidor.
+      //
+      // Era `config.taskId`, coluna removida em `20260913120000_billing_coverage`:
+      // a prévia passou a citar os pedidos do ORÇAMENTO INTEIRO em toda fatia,
+      // que é o campo em que a Elotech procura o empenho.
       const numbers = orderNumbersByTask ?? {};
-      const idsForDoc = config.taskId ? [config.taskId] : (quoteTaskIds ?? Object.keys(numbers));
+      const covered = coveredTaskIds(config as any);
+      const idsForDoc =
+        covered.length > 0 ? covered : (quoteTaskIds ?? Object.keys(numbers));
       const orderNumber = orderNumberLabel(
         idsForDoc.map((id) => ({ customerOrderNumber: numbers[id] ?? null })),
       );

@@ -62,6 +62,7 @@ import {
   quoteTasks,
   coverageSummary,
   coveredTaskCount,
+  coveredTaskIds,
 } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
@@ -193,10 +194,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   // ── O PEDIDO DE COMPRA, POR VEÍCULO ──────────────────────────────────────
   //
-  // Mora em `Task.customerOrderNumber`. Uma FATIA de faturamento pode ser de um
-  // veículo (`PER_TASK`, `config.taskId` preenchido) ou dos N (`JOINT`), e a
-  // linha responde pelo que a fatia cobre: o número daquele caminhão, ou a lista
-  // dos que a nota conjunta vai citar.
+  // Mora em `Task.customerOrderNumber`. Uma FATIA de faturamento cobre um
+  // veículo, um lote ou os N, e a linha responde pelo que ela COBRE: o número
+  // daquele caminhão, os do lote, ou a lista que a nota conjunta vai citar.
   //
   // O valor do veículo ABERTO vem do FORMULÁRIO — é o que acabou de ser digitado
   // no passo Tarefa, e esta é a tela em que se confere antes de aprovar o
@@ -220,13 +220,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return (found?.customerOrderNumber ?? "").trim() || null;
   };
   const orderNumberForConfig = (config: any): string | null => {
-    // Uma fatia `PER_TASK` cobre UM veículo e cita o pedido dele; uma `JOINT`
-    // cobre os N e cita todos, como a nota conjunta faz.
-    const ids: Array<string | null | undefined> = config?.taskId
-      ? [config.taskId]
-      : quoteVehicles.length > 0
-        ? quoteVehicles.map((t) => t.id)
-        : [task?.id];
+    // Os veículos que ESTA fatura cobre. Era `config.taskId` — coluna removida
+    // em `20260913120000_billing_coverage` —, e sem a cobertura toda fatia
+    // passava a citar os pedidos do orçamento inteiro, inclusive a de um lote.
+    const covered = coveredTaskIds(config);
+    const ids: Array<string | null | undefined> =
+      covered.length > 0
+        ? covered
+        : quoteVehicles.length > 0
+          ? quoteVehicles.map((t) => t.id)
+          : [task?.id];
     return orderNumberLabel(ids.map((id) => ({ customerOrderNumber: orderNumberOf(id) })));
   };
   const attentionOrderNumberFor = (config: any): string =>

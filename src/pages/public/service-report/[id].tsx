@@ -20,6 +20,7 @@ import {
   primaryTask,
   orderNumberLabel,
   hasMultipleCustomers,
+  coveredTaskIds,
 } from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
@@ -350,14 +351,17 @@ export function PublicServiceReportPage() {
         // O PEDIDO DE COMPRA DO CLIENTE, mostrado junto das condições de
         // pagamento, exatamente como na página do orçamento.
         //
-        // Mora na TAREFA (`Task.customerOrderNumber`): uma fatia `PER_TASK` é de
-        // UM veículo e cita o pedido dele; uma `JOINT` cobre os N e cita todos,
-        // como `orderNumberLabel` monta na nota.
-        orderNumber: orderNumberLabel(
-          config?.taskId
-            ? quoteTasks<any>(quote).filter((t: any) => t.id === config.taskId)
-            : quoteTasks<any>(quote),
-        ),
+        // Mora na TAREFA (`Task.customerOrderNumber`) e responde pela COBERTURA
+        // desta fatura: o pedido do caminhão quando ela cobra um, os do lote
+        // quando cobra vinte, os N quando é conjunta — como `orderNumberLabel`
+        // monta na nota. Era `config.taskId`, coluna removida em
+        // `20260913120000_billing_coverage`.
+        orderNumber: (() => {
+          const covered = new Set(coveredTaskIds(config));
+          const all = quoteTasks<any>(quote);
+          const own = covered.size > 0 ? all.filter((t: any) => covered.has(t.id)) : [];
+          return orderNumberLabel(own.length > 0 ? own : all);
+        })(),
       };
     })
     .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);

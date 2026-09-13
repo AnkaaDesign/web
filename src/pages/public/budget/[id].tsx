@@ -21,6 +21,7 @@ import {
   taskCount,
   hasMultipleCustomers,
   coveredTaskCount,
+  coverageSummary,
 } from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
@@ -833,14 +834,34 @@ export function PublicBudgetPage() {
                           paymentCondition: config.paymentCondition,
                           total: config.total ?? 0,
                           vehicleCount,
-                          perVehicleBilling:
-                            ((quote as any).billingSplit ?? 'JOINT') === 'PER_TASK',
+                          // QUANTOS VEÍCULOS ESTA FATURA COBRE — a mesma leitura
+                          // do recorte de um cliente só, logo abaixo. Era
+                          // `perVehicleBilling: billingSplit === 'PER_TASK'`, que
+                          // só sabe responder "um" ou "todos": num lote de vinte
+                          // a cláusula prometia parcelas do contrato inteiro.
+                          coveredVehicleCount: coveredTaskCount(config) || undefined,
                         });
                         if (!configPaymentText && !config.customer) return null;
                         const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
+                        // DE QUAIS CAMINHÕES É ESTA FATURA. Com lotes o mesmo
+                        // cliente aparece K vezes aqui, e sem isto os blocos
+                        // ficam indistinguíveis — o cliente lê duas condições de
+                        // pagamento sob o mesmo nome, sem saber a qual veículo
+                        // cada uma se refere. Omitido quando a fatura cobre o
+                        // orçamento inteiro: ali não há o que distinguir.
+                        const coverage =
+                          vehicleCount > 1 && coveredTaskCount(config) > 0 &&
+                          coveredTaskCount(config) < vehicleCount
+                            ? coverageSummary(config, vehicleCount, quoteTasks<any>(quote))
+                            : null;
                         return (
                           <div key={config.id}>
-                            <p className="text-sm font-semibold text-gray-800 mb-1">{customerName}</p>
+                            <p className="text-sm font-semibold text-gray-800 mb-1">
+                              {customerName}
+                              {coverage && (
+                                <span className="font-normal text-gray-500"> — {coverage}</span>
+                              )}
+                            </p>
                             <QuoteBillingBox customer={config.customer} />
                             {configPaymentText && (
                               <p
