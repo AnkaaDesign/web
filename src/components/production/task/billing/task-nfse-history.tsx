@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/utils";
-import { useTaskNfseHistory } from "@/hooks/production/use-invoice";
+import { useTaskNfseHistory, useResendNfseToAdn } from "@/hooks/production/use-invoice";
+import { toast } from "@/components/ui/sonner";
 import { NfseStatusBadge } from "./nfse-status-badge";
 import { NfseCancelDialog } from "@/components/financial/nfse/nfse-cancel-dialog";
 import type { TaskNfseHistory, TaskNfseHistoryItem } from "@/types/invoice";
 import { routes } from "@/constants";
-import { IconFileInvoice, IconLoader2, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconFileInvoice, IconLoader2, IconRefresh, IconX } from "@tabler/icons-react";
 
 interface TaskNfseHistoryProps {
   taskId: string;
@@ -33,6 +34,8 @@ export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
   // resolves CANCEL_REQUESTED → CANCELLED/CANCEL_REJECTED asynchronously.
   const [pollInterval, setPollInterval] = useState<number | false>(false);
   const { data: response, isLoading } = useTaskNfseHistory(taskId, { refetchInterval: pollInterval });
+  const resendToAdn = useResendNfseToAdn();
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const history: TaskNfseHistory | undefined = response?.data;
   // Latest first (highest NF number on top; not-yet-emitted notes last).
@@ -48,6 +51,23 @@ export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
 
   // Hide the card entirely when there is nothing to show (keeps the review page clean).
   if (!isLoading && nfses.length === 0) return null;
+
+  const handleResendToAdn = (nfse: TaskNfseHistoryItem) => {
+    setResendingId(nfse.id);
+    resendToAdn.mutate(nfse.id, {
+      // A mutation dá sucesso mesmo quando o ADN continua fora — quem decide é o estado
+      // devolvido, não o status HTTP.
+      onSuccess: (result) => {
+        if (result?.hasError) toast.error(result.message);
+        else toast.success(result?.message ?? "NFS-e compartilhada com o ADN.");
+      },
+      onError: (error: any) =>
+        toast.error(
+          error?.response?.data?.message ?? "Falha ao reenviar a NFS-e ao ADN.",
+        ),
+      onSettled: () => setResendingId(null),
+    });
+  };
 
   return (
     <Card>
@@ -135,6 +155,45 @@ export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
                       </p>
                     </div>
                   </div>
+
+                  {/* Nota válida no município mas ausente do ADN: é o estado em que o
+                      DANFSe sai com marca d'água de erro e o cancelamento é recusado
+                      (E1831). O reenvio é a saída, e precisa vir ANTES de qualquer evento. */}
+                  {nfse.adnError && (
+                    <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2">
+                      <div className="flex items-start gap-2">
+                        <IconAlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-500">
+                            Não compartilhada com o Ambiente Nacional (ADN)
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            A nota é válida na prefeitura, mas o envio ao ADN falhou. O PDF sai com
+                            marca d'água de erro e o cancelamento é recusado até o reenvio.
+                          </p>
+                          {nfse.adnCanResend && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1.5 mt-2"
+                              disabled={resendingId === nfse.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResendToAdn(nfse);
+                              }}
+                            >
+                              {resendingId === nfse.id ? (
+                                <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <IconRefresh className="h-3.5 w-3.5" />
+                              )}
+                              Reenviar ao ADN
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Error / rejection details */}
                   {nfse.errorMessage && (

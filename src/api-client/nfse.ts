@@ -28,6 +28,16 @@ export const nfseService = {
   getCancellationStatus: (elotechNfseId: number) =>
     apiClient.get(`/nfse/${elotechNfseId}/cancellation`),
 
+  // Reenvia a nota ao Ambiente de Dados Nacional quando o compartilhamento inicial falhou.
+  // Reparador: não altera nem reemite a nota, só refaz o envio que ficou pendurado.
+  resendToAdn: (nfseDocumentId: string) =>
+    apiClient.post<{
+      message: string;
+      hasError: boolean;
+      errorMessage: string | null;
+      canResend: boolean;
+    }>(`/nfse/document/${nfseDocumentId}/reenviar-adn`),
+
   // Cancel an NFS-e by its local document id — works for ANY note (incl. invoice-less orphans).
   // Registers an async cancellation request at the prefeitura (AGUARDANDO_FISCAL).
   cancelByDocument: (

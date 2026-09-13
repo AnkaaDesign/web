@@ -210,6 +210,11 @@ export interface TaskNfseHistoryItem {
   valorISS: number | null;
   tomadorRazaoNome: string | null;
   cancelada: boolean;
+  // Compartilhamento com o Ambiente de Dados Nacional. Preenchido = a nota está válida na
+  // prefeitura mas ausente do ADN: o DANFSe sai com marca d'água de erro e os eventos
+  // (cancelamento) são recusados até o reenvio.
+  adnError: string | null;
+  adnCanResend: boolean;
 }
 
 // Response of GET /invoices/task/:taskId/nfse-history
