@@ -305,20 +305,85 @@ export function PublicBudgetPage() {
     : "";
   // Custom delivery days (production time) - used when no term date is set
   const customDeliveryDays = quote.customForecastDays || null;
-  const paymentText = generatePaymentText({
-    customPaymentText: activeConfig?.customPaymentText || null,
-    paymentConfig: (activeConfig as any)?.paymentConfig || null,
-    paymentCondition: activeConfig?.paymentCondition,
-    // `config.total` é o que a FATURA cobra — o total geral em `JOINT`, o de um
-    // veículo em `PER_TASK` —, e é isso que a cláusula precisa descrever. O
-    // unitário exibido na lista de serviços é outra coisa.
-    total: activeConfig?.total ?? quote.total,
-    vehicleCount: Math.max(1, taskCount(quote)),
-    // QUANTOS VEÍCULOS ESTA FATURA COBRE — o que decide se a cláusula diz
-    // "R$ 730.224,00", "para cada um dos 60 veículos" ou "para cada grupo de
-    // 20". Sai da cobertura, não do modo: com lotes, o modo não sabe o tamanho.
-    coveredVehicleCount: coveredTaskCount(activeConfig as any) || undefined,
-  });
+  // ── A CLÁUSULA DE PAGAMENTO ──────────────────────────────────────────────
+  //
+  // ESPELHO de `signature-envelope.service.ts`: uma frase por PLANO, não por
+  // fatura. A página é por CLIENTE e, com lotes, um cliente tem K faturamentos
+  // no mesmo orçamento — cada um com a sua cobertura, o seu total e o seu plano
+  // de parcelas.
+  //
+  // Agrupar por TERMOS + TAMANHO DA COBERTURA é o que mantém `PER_TASK` numa
+  // frase só (sessenta faturas iguais não viram sessenta parágrafos) e, ao mesmo
+  // tempo, impede que lotes DESIGUAIS — vinte e quarenta — sejam descritos pelo
+  // primeiro, com a página calando sobre os outros quarenta caminhões.
+  const vehicleTotal = Math.max(1, taskCount(quote));
+  const clauseFor = (config: any, groupVehicleCount: number): string =>
+    generatePaymentText({
+      customPaymentText: config?.customPaymentText || null,
+      paymentConfig: (config as any)?.paymentConfig || null,
+      paymentCondition: config?.paymentCondition,
+      // `config.total` é o que a FATURA cobra — o total geral em `JOINT`, o de um
+      // veículo em `PER_TASK`, o do lote num lote —, e é isso que a cláusula
+      // precisa descrever. O unitário exibido na lista de serviços é outra coisa.
+      total: config?.total ?? quote.total,
+      // Sobre quantos veículos esta frase fala: o orçamento inteiro quando ela é
+      // a única, só os do grupo quando há mais de uma.
+      vehicleCount: groupVehicleCount,
+      // QUANTOS VEÍCULOS ESTA FATURA COBRE — o que decide se a cláusula diz
+      // "R$ 730.224,00", "para cada um dos 60 veículos" ou "para cada grupo de
+      // 20". Sai da cobertura, não do modo: com lotes, o modo não sabe o tamanho.
+      coveredVehicleCount: coveredTaskCount(config as any) || undefined,
+    });
+
+  const activeSlices = (quote.customerConfigs ?? []).filter(
+    (c: any) => configCustomerId(c) === configCustomerId(activeConfig),
+  );
+  const clauseGroups: any[][] = [];
+  const clauseGroupByKey = new Map<string, any[]>();
+  for (const c of activeSlices) {
+    const key = JSON.stringify([
+      c.discountType ?? "NONE",
+      c.discountValue != null ? Number(c.discountValue) : null,
+      c.paymentCondition ?? null,
+      c.customPaymentText ?? null,
+      (c as any).paymentConfig ?? null,
+      coveredTaskCount(c as any),
+    ]);
+    let group = clauseGroupByKey.get(key);
+    if (!group) {
+      group = [];
+      clauseGroupByKey.set(key, group);
+      clauseGroups.push(group);
+    }
+    group.push(c);
+  }
+
+  const paymentClauses = clauseGroups
+    .map((group) => {
+      const head = group[0];
+      const alone = clauseGroups.length === 1;
+      const groupVehicleCount = alone
+        ? vehicleTotal
+        : Math.max(
+            1,
+            group.reduce((sum: number, c: any) => sum + coveredTaskCount(c as any), 0),
+          );
+      return {
+        key: head?.id ?? String(clauseGroups.indexOf(group)),
+        // Grupo único (o acervo inteiro, `JOINT`, `PER_TASK` e lotes iguais):
+        // sem rótulo, e a página fica idêntica à de antes.
+        label: alone
+          ? null
+          : coverageSummary(
+              { coveredTasks: group.flatMap((c: any) => c.coveredTasks ?? []) } as any,
+              vehicleTotal,
+              quoteTasks<any>(quote),
+            ),
+        text: clauseFor(head, groupVehicleCount),
+      };
+    })
+    .filter((c: { text: string }) => Boolean(c.text));
+  const paymentText = paymentClauses[0]?.text ?? "";
   const guaranteeText = generateGuaranteeText(quote);
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
@@ -370,7 +435,9 @@ export function PublicBudgetPage() {
   // A conta é refeita a partir dos serviços com a MESMA fórmula da API
   // (`computeQuoteMoney`), que é o que garante que esta tela, o PDF assinado e o
   // boleto digam o mesmo número.
-  const vehicleCount = Math.max(1, taskCount(quote));
+  // O mesmo `vehicleTotal` que a cláusula de pagamento usa lá em cima, com o
+  // nome que o resto desta tela já usava.
+  const vehicleCount = vehicleTotal;
 
   const money = computeQuoteMoney({
     serviceAmounts: filteredServices.map((sv: any) =>
@@ -891,14 +958,23 @@ export function PublicBudgetPage() {
                     Faturamento
                   </h3>
                   <QuoteBillingBox customer={billCustomer} />
-                  {paymentText && (
+                  {/* UMA CLÁUSULA POR FATURA. Com uma fatia — o acervo inteiro,
+                      `JOINT` e `PER_TASK` — é um parágrafo só, sem rótulo,
+                      exatamente como antes. Com lotes são K, cada um dizendo de
+                      quais caminhões fala: duas condições de pagamento
+                      diferentes uma sob a outra, sem distinção, seriam lidas
+                      como se a primeira valesse por todos. Espelha o
+                      `quote-html.builder.ts`. */}
+                  {paymentClauses.map((clause: { key: string; label: string | null; text: string }, i: number) => (
                     <p
-                      className="text-gray-700 pt-2"
-                      style={{ borderTop: "0.5px solid #ddd" }}
+                      key={clause.key}
+                      className={`text-gray-700 ${i === 0 ? "pt-2" : "pt-1"}`}
+                      style={i === 0 ? { borderTop: "0.5px solid #ddd" } : undefined}
                     >
-                      {paymentText}
+                      {clause.label && <span className="font-semibold">{clause.label}: </span>}
+                      {clause.text}
                     </p>
-                  )}
+                  ))}
                 </div>
               );
             })()}
