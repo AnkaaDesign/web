@@ -5,7 +5,10 @@ import { projectInstallments } from "@/utils/installment-projection";
 import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-preview";
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
-import { orderNumberLabel } from "@/utils/quote-tasks";
+import {
+  orderNumberLabel,
+  hasMultipleCustomers as hasMultipleCustomersOf,
+} from "@/utils/quote-tasks";
 
 /**
  * Computes — entirely client-side, from the billing form data — the NFS-e and
@@ -345,7 +348,13 @@ export function BillingDocumentPreviews({
   const docs = useMemo<DocEntry[]>(() => {
     const configs = customerConfigs || [];
     if (configs.length === 0) return [];
-    const single = configs.length <= 1;
+    // ⚠️ UM CLIENTE, não UMA FATURA. Num orçamento cobrado veículo a veículo há
+    // uma fatura por caminhão, todas do mesmo cliente: contar faturas fazia o
+    // filtro por `invoiceToCustomerId` rodar, e como ninguém preenche esse campo
+    // num orçamento de um cliente só, as faturas 2..N saíam com ZERO serviços —
+    // a pré-visualização da nota fiscal e do boleto mostrando um documento vazio
+    // logo antes de emitir.
+    const single = !hasMultipleCustomersOf(configs);
     const entries: DocEntry[] = [];
     let nfseSeq = 0; // sequential offset per generated NFS-e
     configs.forEach((config, idx) => {

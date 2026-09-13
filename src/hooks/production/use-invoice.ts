@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoiceService } from '@/api-client/invoice';
 import { nfseService } from '@/api-client/nfse';
@@ -12,6 +13,7 @@ export const invoiceKeys = {
   details: () => [...invoiceKeys.all, 'detail'] as const,
   detail: (id: string) => [...invoiceKeys.details(), id] as const,
   byTask: (taskId: string) => [...invoiceKeys.all, 'byTask', taskId] as const,
+  byQuote: (quoteId: string) => [...invoiceKeys.all, 'byQuote', quoteId] as const,
   byCustomer: (customerId: string) => [...invoiceKeys.all, 'byCustomer', customerId] as const,
   nfseHistory: (taskId: string) => [...invoiceKeys.all, 'nfseHistory', taskId] as const,
 };
@@ -51,6 +53,70 @@ export function useInvoicesByTask(taskId: string, options?: { refetchInterval?: 
     enabled: !!taskId,
     refetchInterval: options?.refetchInterval,
   });
+}
+
+/**
+ * AS FATURAS DE UM ORÇAMENTO — a rota que enxerga a fatura conjunta.
+ *
+ * `useInvoicesByTask` pergunta por `Invoice.taskId`, que é NULO quando a fatura
+ * cobre mais de um veículo: num orçamento faturado junto ela devolve vazio. Esta
+ * pergunta vai pelo FATURAMENTO, que sempre existe.
+ *
+ * Continua havendo a por tarefa: numa cobrança veículo a veículo ela é mais
+ * específica e é o que a tela de um caminhão quer.
+ */
+export function useInvoicesByQuote(
+  quoteId: string | undefined,
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
+  return useQuery({
+    queryKey: invoiceKeys.byQuote(quoteId ?? ''),
+    queryFn: () => invoiceService.getByQuoteId(quoteId!),
+    enabled: !!quoteId && options?.enabled !== false,
+    refetchInterval: options?.refetchInterval,
+  });
+}
+
+/**
+ * AS FATURAS QUE COBRAM ESTE VEÍCULO.
+ *
+ * É a pergunta que toda tela de tarefa faz, e a resposta mudou de rota:
+ *
+ *   · `Invoice.taskId` só existe quando a fatura é de UM veículo. Numa fatura
+ *     conjunta ele é NULO, então `/invoices/task/:id` devolvia VAZIO — o
+ *     orçamento de sessenta caminhões faturado junto mostrava "nenhuma fatura"
+ *     sobre uma cobrança de R$ 730.224,00 já emitida, em três telas.
+ *   · A rota por ORÇAMENTO enxerga todas, e a COBERTURA diz quais cobram este
+ *     caminhão. É a única leitura que acerta nos três modos.
+ *
+ * Sem `quoteId` (tarefa sem orçamento) cai na rota por tarefa, que é o que
+ * existia e continua certo ali.
+ */
+export function useTaskBillingInvoices(
+  taskId: string | undefined,
+  quoteId: string | undefined,
+  options?: { refetchInterval?: number | false },
+) {
+  const byQuote = useInvoicesByQuote(quoteId, { refetchInterval: options?.refetchInterval });
+  const byTask = useInvoicesByTask(quoteId ? '' : (taskId ?? ''), {
+    refetchInterval: options?.refetchInterval,
+  });
+
+  const source = quoteId ? byQuote : byTask;
+  const data = useMemo(() => {
+    const all = ((source.data as any)?.data ?? []) as any[];
+    if (!quoteId || !taskId) return source.data;
+    const covering = all.filter((inv) => {
+      const covered = (inv?.customerConfig?.coveredTasks ?? []) as Array<{ taskId: string }>;
+      // Sem cobertura declarada a fatura é do orçamento inteiro — a leitura que
+      // a ausência sempre teve, e a que mantém as faturas antigas visíveis.
+      if (covered.length === 0) return inv?.taskId == null || inv?.taskId === taskId;
+      return covered.some((row) => row.taskId === taskId);
+    });
+    return { ...(source.data as any), data: covering };
+  }, [source.data, quoteId, taskId]);
+
+  return { ...source, data } as typeof source;
 }
 
 // Get invoices by customer ID

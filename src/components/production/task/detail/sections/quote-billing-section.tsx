@@ -32,7 +32,7 @@ import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enri
 import { FileItem, useFileViewer } from "@/components/common/file";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 
-import { useInvoicesByTask } from "@/hooks/production/use-invoice";
+import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
@@ -77,7 +77,9 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   const taskOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
 
   // Fetch invoice data for inline boleto/NFS-e display in the quote section.
-  const { data: invoicesData } = useInvoicesByTask(task.id);
+  // Pela rota do ORÇAMENTO, filtradas pela cobertura: a rota por tarefa não
+  // enxerga a fatura conjunta (`Invoice.taskId` nulo).
+  const { data: invoicesData } = useTaskBillingInvoices(task.id, task.quoteId ?? undefined);
   const invoices: Invoice[] = useMemo(() => {
     const data = invoicesData?.data;
     return Array.isArray(data) ? data : data ? [data] : [];

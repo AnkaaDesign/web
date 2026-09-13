@@ -119,10 +119,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
-  // `PER_TASK` com mais de um veículo: a aprovação de faturamento desta tela é do
-  // veículo aberto, não do orçamento. Ver `internalApproveSlice`.
-  const isPerVehicleBilling =
-    task?.quote?.billingSplit === "PER_TASK" && quoteVehicleCount(task?.quote) > 1;
+  // FATURAMENTO FATIADO: alguma fatura cobre MENOS que todos os veículos. É a
+  // pergunta sobre a COBERTURA, não sobre o modo, e cobre com a mesma conta a
+  // cobrança veículo a veículo e o lote — num orçamento em lotes, `billingSplit
+  // === "PER_TASK"` responderia "não" e aprovar um caminhão emitiria os três
+  // lotes de uma vez. Quando é fatiado, a aprovação desta tela fecha só o que
+  // cobre o veículo aberto. Ver `internalApproveSlice`.
+  const isPerVehicleBilling = (() => {
+    const total = quoteVehicleCount(task?.quote);
+    if (total <= 1) return false;
+    return ((task?.quote?.customerConfigs ?? []) as any[]).some((c) => {
+      const covered = (c?.coveredTasks ?? []).length;
+      return covered > 0 && covered < total;
+    });
+  })();
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 

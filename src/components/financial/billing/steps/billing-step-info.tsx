@@ -13,14 +13,31 @@ import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useResponsibles } from "@/hooks/administration/use-responsible";
 import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/task-quote-calculations";
+import {
+  coverageSummary,
+  hasMultipleCustomers as hasMultipleCustomersOf,
+} from "@/utils/quote-tasks";
 
 interface BillingStepInfoProps {
   task?: any;
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
+  /**
+   * OS VEÍCULOS do orçamento — só para NOMEAR a fatura.
+   *
+   * O rótulo de cada responsável era o nome do cliente; num orçamento cobrado
+   * veículo a veículo ele se repete N vezes e não identifica nada. O veículo
+   * desempata.
+   */
+  vehicles?: Array<{
+    id: string;
+    name?: string | null;
+    serialNumber?: string | null;
+    truck?: { plate?: string | null } | null;
+  }>;
 }
 
-export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoProps) {
+export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingStepInfoProps) {
   const { control, setValue, getValues } = useFormContext();
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
@@ -295,10 +312,19 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
               const selectedResp = allResponsibles.find((r: any) => r.id === config.responsibleId);
 
               return (
-                <div key={config.customerId} className="space-y-4">
+                // A chave não pode ser o cliente: num orçamento cobrado veículo
+                // a veículo as N faturas são do MESMO cliente, e a chave repetida
+                // faz o React reaproveitar o nó da primeira para todas.
+                <div key={config.id || `${config.customerId}-${i}`} className="space-y-4">
                   <div className="space-y-2">
                     {customerConfigs.length > 1 && (
-                      <Label className="text-xs text-muted-foreground">{customerName}</Label>
+                      // Com fatias do mesmo cliente o nome se repete e não
+                      // identifica nada: o que desempata é o VEÍCULO coberto.
+                      <Label className="text-xs text-muted-foreground">
+                        {hasMultipleCustomersOf(customerConfigs)
+                          ? customerName
+                          : `${customerName} — ${coverageSummary(config, vehicles?.length ?? 0, vehicles as any)}`}
+                      </Label>
                     )}
                     <Combobox
                       value={config.responsibleId || ""}
