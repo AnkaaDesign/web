@@ -110,6 +110,20 @@ export function paymentStatusText(row: PayableRow): string {
   return row.paymentState === "PAID" ? "Pago" : PAYABLE_STATE_LABELS[row.paymentState];
 }
 
+// Urgency rank behind the "Pagamento" column's sort — mirrors the page's own
+// default row order (payableRank in accounts-payable-list.tsx) so clicking the
+// header sorts by how urgent a row is, not alphabetically by label text. A plain
+// text sort put "Vencido" after "Previsto" (V > P), landing overdue rows dead
+// last once a user's column sort got persisted — the opposite of what "Vencido"
+// should mean.
+function paymentSortRank(row: PayableRow): number {
+  if (row.ignored) return 4;
+  if (isOverdueRow(row)) return 0;
+  if (row.paymentState === "PAID") return 3;
+  if (row.paymentState === "EXPECTED") return 2;
+  return 1; // AWAITING_PAYMENT / PARTIALLY_PAID
+}
+
 function PayablePaymentCell({ row }: { row: PayableRow }) {
   if (row.ignored) {
     return (
@@ -235,6 +249,7 @@ export function buildPayableColumns({ onCopy }: PayableColumnsOptions): DataTabl
       header: "Pagamento",
       size: 200,
       accessorFn: paymentStatusText,
+      sortingFn: (rowA, rowB) => paymentSortRank(rowA.original) - paymentSortRank(rowB.original),
       meta: { align: "left", headerLabel: "Pagamento", exportValue: paymentStatusText },
       cell: ({ row }) => <PayablePaymentCell row={row.original} />,
     },

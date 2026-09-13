@@ -53,6 +53,15 @@ export const recurrentPayableService = {
       body,
     ),
 
+  // Estorno: take a paid occurrence back to an open obligation. Also reverses
+  // the bank reconciliation the baixa had, so the debit returns to the extrato
+  // as unreconciled instead of staying allocated to a bill nobody paid.
+  unpayRecurrentOccurrence: (occurrenceId: string) =>
+    apiClient.post<PayRecurrentOccurrenceResponse>(
+      `${basePath}/occurrences/${occurrenceId}/unpay`,
+      {},
+    ),
+
   // Ignore a single occurrence for its month (won't be paid — e.g. diarista
   // faltou). Kept on record so it's out of totals but revertible.
   ignoreRecurrentOccurrence: (occurrenceId: string) =>

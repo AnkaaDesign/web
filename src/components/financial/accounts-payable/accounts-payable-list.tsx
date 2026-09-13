@@ -293,6 +293,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const {
     payAsync: payRecurrentAsync,
     payMutation: payRecurrentMutation,
+    unpayAsync: unpayRecurrentAsync,
     ignoreAsync: ignoreRecurrentAsync,
     unignoreAsync: unignoreRecurrentAsync,
   } = useRecurrentPayableMutations();
@@ -513,6 +514,24 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         onClick: (rows) => {
           const r = one(rows);
           if (r) runAction(() => unignoreRecurrentAsync(r.id));
+        },
+      },
+      {
+        // Contrapartida do "Marcar como pago" das recorrentes. Diferente das
+        // outras fontes, uma baixa de recorrente pode carregar uma perna
+        // bancária: a API reverte o ReconciliationMatch junto, então o débito
+        // volta ao Extrato como não conciliado em vez de continuar alocado a uma
+        // conta que ninguém mais diz ter pago.
+        key: "recurrent-undo-paid",
+        label: "Desfazer pagamento",
+        icon: <IconProgressCheck className="h-4 w-4" />,
+        hidden: (rows) => {
+          const r = one(rows);
+          return !r || r.source !== "RECURRENT_PAYABLE" || r.paymentState !== "PAID";
+        },
+        onClick: (rows) => {
+          const r = one(rows);
+          if (r) runAction(() => unpayRecurrentAsync(r.id));
         },
       },
       {

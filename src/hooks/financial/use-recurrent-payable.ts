@@ -130,6 +130,20 @@ export function useRecurrentPayableMutations() {
     },
   });
 
+  // Estorno of a baixa. Invalidates the reconciliation namespace too: reverting
+  // a payment reverses its ReconciliationMatch, so the bank line it had cleared
+  // goes back to unreconciled on the Extrato.
+  const unpayMutation = useMutation({
+    mutationFn: (occurrenceId: string) =>
+      recurrentPayableService
+        .unpayRecurrentOccurrence(occurrenceId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+
   // Ignore / revert an occurrence for its month (diarista faltou, etc.). Both
   // flip the Contas a Pagar row in place (payables live under orderKeys.all).
   const ignoreMutation = useMutation({
@@ -165,6 +179,8 @@ export function useRecurrentPayableMutations() {
     deleteAsync: deleteMutation.mutateAsync,
     pay: payMutation.mutate,
     payAsync: payMutation.mutateAsync,
+    unpay: unpayMutation.mutate,
+    unpayAsync: unpayMutation.mutateAsync,
     ignore: ignoreMutation.mutate,
     ignoreAsync: ignoreMutation.mutateAsync,
     unignore: unignoreMutation.mutate,
@@ -175,6 +191,7 @@ export function useRecurrentPayableMutations() {
       updateMutation.isPending ||
       deleteMutation.isPending ||
       payMutation.isPending ||
+      unpayMutation.isPending ||
       ignoreMutation.isPending ||
       unignoreMutation.isPending,
     error:
@@ -182,6 +199,7 @@ export function useRecurrentPayableMutations() {
       updateMutation.error ||
       deleteMutation.error ||
       payMutation.error ||
+      unpayMutation.error ||
       ignoreMutation.error ||
       unignoreMutation.error,
     // Individual mutation states
@@ -190,6 +208,7 @@ export function useRecurrentPayableMutations() {
     updateMutation,
     deleteMutation,
     payMutation,
+    unpayMutation,
     ignoreMutation,
     unignoreMutation,
   };
