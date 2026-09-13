@@ -8,7 +8,7 @@ import {
   formatBillingLocalityLine,
 } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
-import { orderNumberLabel } from "./quote-tasks";
+import { coveredTaskCount, orderNumberLabel } from "./quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
@@ -395,7 +395,9 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     paymentCondition: firstConfig?.paymentCondition,
     total: firstConfig?.total ?? task.quote.total,
     vehicleCount: Math.max(1, pdfVehicles.length),
-    perVehicleBilling: ((task.quote as any)?.billingSplit ?? 'JOINT') === 'PER_TASK',
+    // QUANTOS VEÍCULOS ESTA FATURA COBRE. Sai da cobertura, não do modo — com
+    // lotes, o modo não sabe o tamanho, e é o tamanho que a cláusula imprime.
+    coveredVehicleCount: coveredTaskCount(firstConfig as any) || undefined,
   });
   const guaranteeText = generateGuaranteeText(task.quote);
 

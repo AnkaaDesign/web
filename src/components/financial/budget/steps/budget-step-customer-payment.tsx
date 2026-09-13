@@ -18,6 +18,11 @@ import {
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/task-quote";
+import {
+  BillingSplitField,
+  type BillingSplitValue,
+  type BillingSplitVehicle,
+} from "@/components/financial/shared/billing-split-field";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";
@@ -70,6 +75,17 @@ interface BudgetStepCustomerPaymentProps {
    * trocar `JOINT` por `PER_TASK` depois que o erro aparece no faturamento.
    */
   existingVehicleCount?: number;
+  /**
+   * OS VEÍCULOS do orçamento existente, com id.
+   *
+   * Só existem na EDIÇÃO. É o que permite compor lotes — "os vinte primeiros
+   * numa fatura, os quarenta noutra" —, porque um lote é uma lista de ids. Na
+   * criação a lista é vazia e o controle oferece só junto/separado: agrupar
+   * veículos que ainda não existem exigiria identidades provisórias.
+   */
+  existingVehicles?: BillingSplitVehicle[];
+  /** Quantas faturas deste orçamento já foram aprovadas — trava o refatiamento. */
+  approvedBillingCount?: number;
 }
 
 export function BudgetStepCustomerPayment({
@@ -78,6 +94,8 @@ export function BudgetStepCustomerPayment({
   disabled,
   quoteId,
   existingVehicleCount,
+  existingVehicles,
+  approvedBillingCount = 0,
 }: BudgetStepCustomerPaymentProps) {
   const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
@@ -138,6 +156,11 @@ export function BudgetStepCustomerPayment({
   const serialNumbersWatch =
     (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
   const billingSplit = useWatch({ control, name: "billingSplit" }) as string | undefined;
+  // A PARTIÇÃO dos veículos, só relevante em lotes. Vive num campo do orçamento
+  // (e não espalhada por `customerConfigs`) porque é a MESMA para todos os
+  // clientes: quem a transforma em `taskIds` por fatura é o save.
+  const billingGroups =
+    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
   const vehicleCount = useMemo(() => {
     // O orçamento já existe: quem manda é a contagem de tarefas dele.
     if (existingVehicleCount && existingVehicleCount > 0) return existingVehicleCount;
@@ -563,54 +586,33 @@ export function BudgetStepCustomerPayment({
               </div>
             </div>
             {/* ═══════════════════════════════════════════════════════════════
-                JUNTO OU SEPARADO
+                JUNTO, SEPARADO OU EM LOTES
 
                 Mora aqui, e não no passo Informações, porque a escolha É sobre
                 faturamento: quantas faturas, quantas notas fiscais e quantos
                 planos de parcelas este cliente vai receber. Fica na mesma linha
                 da condição de pagamento, que é a outra metade da mesma decisão.
 
-                Só aparece com mais de um veículo — com um só a pergunta não
-                existe, e um seletor dizendo "Fatura única" num orçamento de um
-                caminhão é ruído que o operador aprende a ignorar. E só no
-                primeiro cliente: a escolha é do ORÇAMENTO, não de cada cliente,
-                e repeti-la por passo faria a segunda cópia sobrescrever a
-                primeira sem que ninguém notasse.
+                Só no PRIMEIRO cliente: a escolha é do ORÇAMENTO, não de cada
+                cliente (um lote é uma unidade de cobrança, não um negócio
+                diferente), e repeti-la por passo faria a segunda cópia
+                sobrescrever a primeira sem que ninguém notasse. Com um veículo
+                só o componente não renderiza nada — a pergunta não existe.
                 ═════════════════════════════════════════════════════════════ */}
-            {configIndex === 0 && vehicleCount > 1 && (
-              <div className="space-y-1.5 flex-1 min-w-[220px]">
-                <Label className="text-sm font-medium">
-                  Faturamento dos {vehicleCount} veículos
-                </Label>
-                {/* A explicação era um PARÁGRAFO abaixo do campo e empurrava a
-                    fileira inteira: os comboboxes vizinhos desalinhavam e a
-                    altura da linha mudava conforme a escolha. Vira `title` do
-                    invólucro — a informação continua a um toque, sem custar
-                    layout, e os rótulos das opções já dizem o essencial
-                    ("Fatura única para os 4 veículos" / "Uma fatura por
-                    veículo"). */}
-                <div
-                  title={
-                    billingSplit === "PER_TASK"
-                      ? `${vehicleCount} faturas, ${vehicleCount} notas fiscais e um plano de parcelas por veículo. O financeiro aprova veículo a veículo, conforme cada um é entregue.`
-                      : `Uma fatura com o total dos ${vehicleCount} veículos, um plano de parcelas e uma nota fiscal citando todos.`
-                  }
-                >
-                  <Combobox
-                    value={billingSplit ?? "JOINT"}
-                    onValueChange={(value) =>
-                      setFormValue("billingSplit", value || "JOINT", { shouldDirty: true })
-                    }
-                    disabled={disabled}
-                    options={[
-                      { value: "JOINT", label: `Fatura única para os ${vehicleCount} veículos` },
-                      { value: "PER_TASK", label: "Uma fatura por veículo" },
-                    ]}
-                    placeholder="Fatura única"
-                    searchable={false}
-                    emptyText="Nenhuma opção"
-                  />
-                </div>
+            {configIndex === 0 && (
+              <div className="flex-1 min-w-[260px]">
+                <BillingSplitField
+                  vehicles={existingVehicles ?? []}
+                  vehicleCount={vehicleCount}
+                  value={(billingSplit ?? "JOINT") as BillingSplitValue}
+                  groups={billingGroups}
+                  disabled={disabled}
+                  approvedCount={approvedBillingCount}
+                  onChange={({ billingSplit: nextSplit, billingGroups: nextGroups }) => {
+                    setFormValue("billingSplit", nextSplit, { shouldDirty: true });
+                    setFormValue("billingGroups", nextGroups, { shouldDirty: true });
+                  }}
+                />
               </div>
             )}
             {/* ── Condição de Pagamento (type) ── */}

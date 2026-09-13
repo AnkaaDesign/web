@@ -187,30 +187,132 @@ export function quotePerVehicleTotal(
   return perVehicleAmount(grand, quoteVehicleCount(quote));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// A COBERTURA DE UM FATURAMENTO — quais veículos ele cobra
+//
+// ESPELHA a seção gêmea de `api/src/utils/quote-tasks.ts`.
+//
+// Era `TaskQuoteCustomerConfig.taskId`, com NULO querendo dizer "todos". Virou
+// relação (`coveredTasks`) porque uma fatura pode cobrir um LOTE — vinte dos
+// sessenta — e nesse caso não existe coluna que responda.
+//
+// ⚠️ A relação só vem quando a consulta a pede. A API injeta `coveredTasks` em
+// todo caminho que devolve `customerConfigs` (ver `withCoverageInclude` lá), mas
+// uma resposta vinda de cache antigo ou de uma rota pública enxuta pode chegar
+// sem ela — e cobertura vazia numa conta de dinheiro é R$ 0,00 numa fatura que
+// tem valor. Por isso toda função aqui trata "vazio" como "cobre tudo", nunca
+// como "cobre zero".
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Uma fatia de faturamento como as respostas a trazem. */
+export interface BillingConfigLike {
+  id?: string;
+  customerId?: string | null;
+  coveredTasks?: ReadonlyArray<{
+    taskId: string;
+    task?: {
+      id?: string;
+      name?: string | null;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null } | null;
+    } | null;
+  }> | null;
+}
+
+/** Os ids dos veículos que este faturamento cobra. */
+export function coveredTaskIds(config: BillingConfigLike | null | undefined): string[] {
+  const rows = config?.coveredTasks;
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => r.taskId);
+}
+
+/** Quantos veículos este faturamento cobra. É o multiplicador do valor da fatura. */
+export function coveredTaskCount(config: BillingConfigLike | null | undefined): number {
+  return coveredTaskIds(config).length;
+}
+
+/** Este faturamento cobra ESTE veículo? */
+export function coversTask(
+  config: BillingConfigLike | null | undefined,
+  taskId: string | null | undefined,
+): boolean {
+  if (!taskId) return false;
+  return coveredTaskIds(config).includes(taskId);
+}
+
 /**
- * A FATIA de faturamento que descreve UMA tarefa.
+ * COMO NOMEAR os veículos de um faturamento, na tela.
  *
- * ESPELHA `sliceTask` da API, do outro lado: aqui a pergunta é "das N
- * configurações deste orçamento, quais dizem respeito a ESTE veículo?".
+ * É a resposta à pergunta que faltava: o assistente mostrava "Cliente 1",
+ * "Cliente 2", "Cliente 3", "Cliente 4" — o MESMO cliente quatro vezes, sem
+ * dizer de qual caminhão era cada passo. O operador editava o segundo achando
+ * que era o segundo veículo.
  *
- * Com `billingSplit = JOINT` existe uma configuração por CLIENTE, com `taskId`
- * nulo, e ela cobre todos os veículos — a resposta é a lista inteira, como
- * sempre foi. Com `PER_TASK` existe uma POR VEÍCULO: mostrar todas na tela de um
- * caminhão faz sessenta blocos de parcelas aparecerem na tarefa de cada um, com
- * o cliente repetido sessenta vezes no seletor — e o primeiro bloco, que é o do
- * caminhão 1, sendo lido como se fosse o daquele.
+ * Devolve a lista de rótulos curtos, na ordem da cobertura: série quando existe,
+ * senão placa, senão o nome da tarefa, senão o começo do id — nessa ordem porque
+ * é assim que quem opera identifica um implemento.
  */
-export function configsForTask<
-  T extends { taskId?: string | null },
->(configs: readonly T[] | null | undefined, taskId: string | null | undefined): T[] {
+export function coverageLabels(
+  config: BillingConfigLike | null | undefined,
+  tasks?: ReadonlyArray<QuoteTaskLike & { truck?: { plate?: string | null } | null }> | null,
+): string[] {
+  const byId = new Map((tasks ?? []).map((t) => [t.id, t]));
+  return (config?.coveredTasks ?? []).map((row) => {
+    const t = (row.task ?? byId.get(row.taskId) ?? null) as
+      | (QuoteTaskLike & { truck?: { plate?: string | null } | null })
+      | null;
+    return (
+      (t?.serialNumber || undefined) ??
+      (t?.truck?.plate || undefined) ??
+      (t?.name || undefined) ??
+      row.taskId.slice(0, 8)
+    );
+  });
+}
+
+/**
+ * O rótulo de UM faturamento, em uma linha.
+ *
+ * `total` = quantos veículos o orçamento tem. Cobrir todos não vira lista: num
+ * orçamento de sessenta caminhões, "Todos os 60 veículos" é a informação, e
+ * imprimir as sessenta séries é ruído que ninguém lê.
+ */
+export function coverageSummary(
+  config: BillingConfigLike | null | undefined,
+  total: number,
+  tasks?: ReadonlyArray<QuoteTaskLike & { truck?: { plate?: string | null } | null }> | null,
+): string {
+  const labels = coverageLabels(config, tasks);
+  if (labels.length === 0) return total > 1 ? `Todos os ${total} veículos` : "Veículo único";
+  if (total > 1 && labels.length === total) return `Todos os ${total} veículos`;
+  if (labels.length === 1) return labels[0];
+  if (labels.length <= 3) return labels.join(", ");
+  return `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
+}
+
+/**
+ * As FATURAS que dizem respeito a ESTE veículo.
+ *
+ * Aqui a pergunta é "das N faturas deste orçamento, quais cobram ESTE
+ * caminhão?". Mostrar todas na tela de um veículo faz sessenta blocos de
+ * parcelas aparecerem na tarefa de cada um, com o cliente repetido sessenta
+ * vezes no seletor — e o primeiro bloco, que é o do caminhão 1, sendo lido como
+ * se fosse o daquele.
+ */
+export function configsForTask<T extends BillingConfigLike>(
+  configs: readonly T[] | null | undefined,
+  taskId: string | null | undefined,
+): T[] {
   const all = configs ?? [];
   if (!taskId) return [...all];
-  const own = all.filter((c) => c.taskId === taskId);
-  // Fatias existem mas nenhuma é deste veículo (orçamento `PER_TASK` de outro
-  // veículo, ou tarefa recém-vinculada antes da reconciliação): as conjuntas
-  // (`taskId` nulo) continuam valendo para ele.
-  const joint = all.filter((c) => !c.taskId);
-  return own.length > 0 ? [...own, ...joint] : [...joint];
+  const own = all.filter((c) => coversTask(c, taskId));
+  if (own.length > 0) return own;
+  // Nenhuma fatura reivindica este veículo. Acontece em dois casos legítimos —
+  // a tarefa acabou de ser vinculada e a cobertura ainda não foi reconciliada,
+  // ou a consulta não trouxe a relação —, e nos dois a resposta útil são as
+  // faturas SEM cobertura declarada, que é como a ausência sempre se leu.
+  return all.filter((c) => coveredTaskCount(c) === 0);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -374,4 +476,64 @@ export function vehicleRowLabel(
   if (parts.length > 0) return parts.join(" · ");
   const name = (task?.name ?? "").trim();
   return name || `Veículo ${index + 1}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AS FATURAS × OS CLIENTES — duas leituras da mesma lista
+//
+// `customerConfigs` é a lista de FATURAS. Os assistentes de orçamento, porém,
+// têm um passo por CLIENTE: as condições comerciais (desconto, prazo, gerar
+// NF/boleto) são do negócio, e o negócio é com o cliente — não com cada fatura.
+//
+// Enquanto havia uma fatura por cliente as duas listas coincidiam, e os
+// assistentes mapeavam 1:1. Deixaram de coincidir no primeiro orçamento cobrado
+// veículo a veículo: quatro caminhões de UM cliente viraram quatro passos
+// "Cliente 1..4", todos com o mesmo nome, e o save reenviava os quatro — o
+// último gravando por cima dos outros três.
+//
+// A separação certa é esta: um passo por CLIENTE, e a repartição dos veículos
+// num campo só do orçamento.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DedupedConfigs<T> {
+  /** Uma fatura por CLIENTE — a primeira dele, que carrega as condições. */
+  configs: T[];
+  /**
+   * A PARTIÇÃO dos veículos, lida das faturas do PRIMEIRO cliente.
+   *
+   * Do primeiro e não da união: a repartição é a mesma para todos os clientes
+   * (cada um cobra os mesmos veículos, só que pelos serviços dele), e unir as
+   * coberturas de dois clientes produziria cada veículo duas vezes.
+   */
+  coverageGroups: string[][];
+}
+
+/**
+ * Agrupa as faturas por cliente e extrai a repartição dos veículos.
+ *
+ * Preserva a ordem de chegada — a ordem em que as faturas foram criadas, que é
+ * a ordem em que a tela as lista e a ordem dos lotes no documento.
+ */
+export function dedupeConfigsByCustomer<T extends BillingConfigLike>(
+  configs: readonly T[] | null | undefined,
+): DedupedConfigs<T> {
+  const byCustomer = new Map<string, T[]>();
+  const order: string[] = [];
+  for (const config of configs ?? []) {
+    const id = config.customerId ?? "";
+    if (!byCustomer.has(id)) {
+      byCustomer.set(id, []);
+      order.push(id);
+    }
+    byCustomer.get(id)!.push(config);
+  }
+
+  const first = order.length > 0 ? (byCustomer.get(order[0]) ?? []) : [];
+  return {
+    configs: order.map((id) => byCustomer.get(id)![0]),
+    // Fatura sem cobertura declarada não vira lote: ela é o registro que nasceu
+    // antes do vínculo com a tarefa, e transformá-la num lote vazio faria o
+    // controle mostrar "Lote 1: 0 veículos".
+    coverageGroups: first.map((c) => coveredTaskIds(c)).filter((g) => g.length > 0),
+  };
 }

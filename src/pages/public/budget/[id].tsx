@@ -15,7 +15,13 @@ import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask, taskCount, hasMultipleCustomers } from "@/utils/quote-tasks";
+import {
+  quoteTasks,
+  primaryTask,
+  taskCount,
+  hasMultipleCustomers,
+  coveredTaskCount,
+} from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -307,7 +313,10 @@ export function PublicBudgetPage() {
     // unitário exibido na lista de serviços é outra coisa.
     total: activeConfig?.total ?? quote.total,
     vehicleCount: Math.max(1, taskCount(quote)),
-    perVehicleBilling: ((quote as any).billingSplit ?? 'JOINT') === 'PER_TASK',
+    // QUANTOS VEÍCULOS ESTA FATURA COBRE — o que decide se a cláusula diz
+    // "R$ 730.224,00", "para cada um dos 60 veículos" ou "para cada grupo de
+    // 20". Sai da cobertura, não do modo: com lotes, o modo não sabe o tamanho.
+    coveredVehicleCount: coveredTaskCount(activeConfig as any) || undefined,
   });
   const guaranteeText = generateGuaranteeText(quote);
 
@@ -367,7 +376,7 @@ export function PublicBudgetPage() {
         ? Number(activeConfigForDiscount.discountValue)
         : null,
     taskCount: vehicleCount,
-    billingSplit: (quote as any).billingSplit ?? 'JOINT',
+    coveredTaskCount: coveredTaskCount(activeConfigForDiscount as any) || undefined,
   });
   const isMultiVehicle = vehicleCount > 1;
 

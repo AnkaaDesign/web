@@ -26,6 +26,12 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 
 export const taskQuoteStatusSchema = z.enum([
   'PENDING',
+  // Os dois estados que a API acrescentou em `20260911160000` e que este schema
+  // não conhecia: o zod de `taskQuoteCreateNestedSchema` valida `status`, e um
+  // valor fora do enum é ERRO de validação — o formulário recusava um orçamento
+  // assinado ou vencido por não saber que o estado existe.
+  'SIGNED',
+  'EXPIRED',
   'BUDGET_APPROVED',
   'BILLING_APPROVED',
   'UPCOMING',
@@ -103,7 +109,23 @@ const taskQuoteServicesArraySchema = z.preprocess(
 
 // Customer config schema for per-customer billing
 export const taskQuoteCustomerConfigSchema = z.object({
+  /**
+   * O ID DESTA FATURA, quando o formulário edita uma que já existe.
+   *
+   * É a identidade estável do faturamento, e é por ela que o servidor casa o que
+   * chegou com o que está gravado. Sem ela, quatro faturas do mesmo cliente
+   * chegam indistinguíveis e a última grava por cima das outras três.
+   */
+  id: z.string().uuid().optional(),
   customerId: z.string().uuid('Cliente inválido'),
+  /**
+   * A COBERTURA — os veículos que esta fatura cobra.
+   *
+   * Ausente = "decida pelo modo de faturamento", que é o que os assistentes
+   * mandam quando não estão compondo lotes. Presente = a tela está dizendo
+   * exatamente quem cobra quem.
+   */
+  taskIds: z.array(z.string().uuid('Tarefa inválida')).optional(),
   subtotal: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
   total: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
   // Global customer discount

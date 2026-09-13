@@ -22,7 +22,13 @@ import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
-import { quoteTasks, quoteVehicleCount } from "@/utils/quote-tasks";
+import {
+  quoteTasks,
+  quoteVehicleCount,
+  coverageSummary,
+  coveredTaskCount,
+  hasMultipleCustomers as hasMultipleCustomersOf,
+} from "@/utils/quote-tasks";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { readReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "@/components/ui/sonner";
@@ -421,8 +427,22 @@ const BillingDetailPageInner = () => {
           invoiceToCustomerId: s.invoiceToCustomerId || null,
         })),
       customerConfigs: (quote.customerConfigs || []).map((config: any) => ({
+        // A IDENTIDADE DA FATURA. Já era lida aqui, mas o schema da API não
+        // declarava a chave e o zod a APAGAVA do payload — quatro faturas do
+        // mesmo cliente chegavam indistinguíveis ao servidor e a última gravava
+        // por cima das outras três. Agora ela viaja e é a primeira tentativa de
+        // casamento.
         id: config.id,
         customerId: config.customerId,
+        // A COBERTURA — de quais veículos esta fatura é. É o que faz o passo
+        // saber que é "do caminhão 37" em vez de "Cliente 2", e é o que impede a
+        // gravação de refatiar sem querer: mandando a cobertura de volta, o
+        // servidor não reexpande pelo modo.
+        taskIds: ((config.coveredTasks ?? []) as Array<{ taskId: string }>).map((r) => r.taskId),
+        coveredTasks: config.coveredTasks ?? [],
+        // Quando ESTA fatura foi aprovada. Fatura aprovada tem a cobertura
+        // congelada e não se refatia — a tela precisa saber para não oferecer.
+        billingApprovedAt: config.billingApprovedAt ?? null,
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
         discountType: config.discountType || "NONE",
@@ -517,6 +537,21 @@ const BillingDetailPageInner = () => {
       base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
     }
     base.push({ id: base.length + 1, name: "Serviços", description: "Serviços e preços" });
+    // ═══════════════════════════════════════════════════════════════════════
+    // UM PASSO POR FATURA — e cada passo diz de QUAL VEÍCULO ele é
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Os passos se chamavam "Cliente 1", "Cliente 2", "Cliente 3", "Cliente 4",
+    // os quatro com o MESMO nome de cliente na descrição, porque num orçamento
+    // cobrado veículo a veículo há uma fatura por caminhão e todas são do mesmo
+    // cliente. Nada na tela dizia qual passo era qual caminhão: o operador
+    // editava o segundo achando que era o segundo veículo, e a gravação —
+    // reenviando as quatro sem cobertura — aplicava o último a todos.
+    //
+    // Agora o rótulo é o VEÍCULO quando há mais de uma fatura, e continua sendo
+    // o CLIENTE quando há mais de um cliente. Num orçamento de um veículo e um
+    // cliente nada muda: "Cliente 1" era e continua sendo o rótulo certo.
+    const configsHaveSplit = customerConfigs.length > 1 && !hasMultipleCustomersOf(customerConfigs);
     customerConfigs.forEach((config: any, i: number) => {
       const cached = customersCache.current.get(config.customerId);
       const name =
@@ -524,11 +559,18 @@ const BillingDetailPageInner = () => {
         config.customerData?.corporateName ||
         cached?.fantasyName ||
         "Cliente";
-      base.push({ id: base.length + 1, name: `Cliente ${i + 1}`, description: name });
+      const coverage = coverageSummary(config, quoteVehicles, quoteVehicleRows as any);
+      base.push({
+        id: base.length + 1,
+        name: configsHaveSplit ? `Fatura ${i + 1}` : `Cliente ${i + 1}`,
+        // A descrição é o que o operador lê para se situar: com fatias, o
+        // veículo (ou o lote); sem fatias, o cliente, como sempre foi.
+        description: configsHaveSplit ? coverage : name,
+      });
     });
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
-  }, [customerConfigs, canSeeBudgetInfoStep]);
+  }, [customerConfigs, canSeeBudgetInfoStep, quoteVehicles, quoteVehicleRows]);
 
   const totalSteps = steps.length;
   // Step layout: 1=Tarefa, 2=Proposta (if visible), then Serviços, customers, Resumo
@@ -622,7 +664,13 @@ const BillingDetailPageInner = () => {
       }
     }
 
-    if (configs.length >= 2) {
+    // ⚠️ CLIENTES DISTINTOS, nunca FATURAS. Num orçamento cobrado veículo a
+    // veículo há uma fatura por caminhão, TODAS do mesmo cliente: contar faturas
+    // fazia esta guarda exigir `invoiceToCustomerId` em todo serviço e RECUSAR a
+    // aprovação com um erro impossível de obedecer — o seletor "Faturar Para" só
+    // aparece quando há mais de um cliente. Era o bloqueio que impedia faturar um
+    // orçamento de quatro veículos de um cliente só.
+    if (hasMultipleCustomersOf(configs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
         setCurrentStep(servicesStepIdx);
@@ -652,13 +700,20 @@ const BillingDetailPageInner = () => {
       if (errors.length > 0) {
         setCurrentStep(firstCustomerStepIdx + i);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
-        toast.error(`${name} - campos obrigatórios`, { description: errors.join(", ") });
+        // Com mais de uma fatura o nome do cliente se repete, e a mensagem
+        // mandava o operador para "um passo do mesmo cliente" sem dizer qual.
+        // O veículo desempata.
+        const where =
+          configs.length > 1 && coveredTaskCount(config) > 0
+            ? `${name} (${coverageSummary(config, quoteVehicles, quoteVehicleRows as any)})`
+            : name;
+        toast.error(`${where} - campos obrigatórios`, { description: errors.join(", ") });
         return false;
       }
     }
 
     return true;
-  }, [form, servicesStepIdx, firstCustomerStepIdx]);
+  }, [form, servicesStepIdx, firstCustomerStepIdx, quoteVehicles, quoteVehicleRows]);
 
   const nextStep = useCallback(() => {
     if (validateCurrentStep()) {
@@ -853,6 +908,13 @@ const BillingDetailPageInner = () => {
             customerConfigs: formData.customerConfigs.map((c: any) => ({
               ...(c.id && { id: c.id }),
               customerId: c.customerId,
+              // A COBERTURA volta como veio. Sem ela, o servidor entende
+              // "decida pelo modo" e reexpande — o que, num orçamento cobrado
+              // veículo a veículo, aplicava os termos da ÚLTIMA fatura a todas
+              // as outras. Enviar a cobertura é o que torna a gravação idempotente.
+              ...(Array.isArray(c.taskIds) && c.taskIds.length > 0
+                ? { taskIds: c.taskIds }
+                : {}),
               subtotal: Number(c.subtotal) || 0,
               total: Number(c.total) || 0,
               discountType: c.discountType || "NONE",

@@ -78,7 +78,7 @@ function generatePaymentTextFromConfig(
   methodPhrase: string,
   firstDueDate: Date | null,
   vehicleCount: number,
-  perVehicle: boolean,
+  coveredCount: number,
 ): string {
   // A known vencimento always beats the relative "a partir da finalização do
   // serviço" wording — on a dossiê the service IS finished, so the customer
@@ -86,14 +86,26 @@ function generatePaymentTextFromConfig(
   const dueDate = firstDueDate ?? parseSpecificDate(pc.specificDate);
 
   // O ESCOPO da cláusula. Num orçamento de um veículo não existe. Com sessenta,
-  // "quatro parcelas de R$ 3.042,60" é ambíguo: em `JOINT` o cliente paga UM
-  // plano sobre o total geral (quatro de R$ 182.556,00), em `PER_TASK` paga
-  // sessenta planos. Sem dizer qual, o número impresso não identifica a
-  // obrigação — e é justamente o número que ele confere antes de assinar.
+  // "quatro parcelas de R$ 3.042,60" é ambíguo, e o que desfaz a ambiguidade é
+  // QUANTOS VEÍCULOS CADA FATURA COBRE:
+  //
+  //   cobre os 60 → uma fatura, quatro de R$ 182.556,00. Sem prefixo.
+  //   cobre 1     → sessenta faturas, quatro de R$ 3.042,60 CADA.
+  //   cobre 20    → três faturas, quatro de R$ 60.852,00 por lote.
+  //
   // Espelha `paymentScope` em `api/.../signature/document/quote-text.ts`.
-  const scope = vehicleCount > 1 && perVehicle ? `, para cada um dos ${vehicleCount} veículos,` : '';
+  const scope =
+    vehicleCount <= 1 || coveredCount >= vehicleCount
+      ? ''
+      : coveredCount <= 1
+        ? `, para cada um dos ${vehicleCount} veículos,`
+        : `, para cada grupo de ${coveredCount} veículos,`;
+  // Quantas FATURAS este cliente recebe — `veículos ÷ cobertos`, para cima
+  // porque um lote menor no fim ainda é uma fatura.
+  const invoiceCount =
+    coveredCount > 0 && coveredCount < vehicleCount ? Math.ceil(vehicleCount / coveredCount) : 1;
   const chargeNote = (perCharge: number): string =>
-    vehicleCount > 1 && perVehicle ? ` Serão ${perCharge * vehicleCount} cobranças no total.` : '';
+    invoiceCount > 1 ? ` Serão ${perCharge * invoiceCount} cobranças no total.` : '';
 
   if (pc.type === 'CASH') {
     const head = `Pagamento à vista${scope} no valor de ${formatCurrency(total)}${methodPhrase}`;
@@ -146,8 +158,15 @@ interface PaymentTextData {
    */
   vehicleCount?: number | null;
   /**
-   * `true` quando cada veículo tem a própria fatura (`billingSplit = PER_TASK`).
-   * É o que decide se `total` é o valor de UM veículo ou o do orçamento inteiro.
+   * QUANTOS VEÍCULOS A FATURA DESTA CLÁUSULA COBRE.
+   *
+   * É o que decide se `total` é o valor de um caminhão, de um lote ou do
+   * orçamento inteiro. Omitido = cobre todos (fatura conjunta), que é o padrão e
+   * o comportamento de sempre.
+   */
+  coveredVehicleCount?: number | null;
+  /**
+   * @deprecated Use `coveredVehicleCount`. Equivale a `coveredVehicleCount: 1`.
    */
   perVehicleBilling?: boolean | null;
 }
@@ -189,7 +208,14 @@ export function generatePaymentText(quote: PaymentTextData): string {
     methodPhrase,
     firstDueDate,
     Math.max(1, Math.trunc(quote.vehicleCount ?? 1) || 1),
-    quote.perVehicleBilling === true,
+    // A cobertura, com o booleano antigo como reserva e "cobre tudo" como
+    // padrão: nesta ordem, um chamador não migrado produz exatamente o texto que
+    // produzia antes.
+    quote.coveredVehicleCount != null
+      ? Math.max(1, Math.trunc(quote.coveredVehicleCount) || 1)
+      : quote.perVehicleBilling === true
+        ? 1
+        : Math.max(1, Math.trunc(quote.vehicleCount ?? 1) || 1),
   );
 }
 

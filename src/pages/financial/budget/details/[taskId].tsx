@@ -58,7 +58,13 @@ import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { quoteVehicleCount } from "@/utils/quote-tasks";
+import {
+  quoteVehicleCount,
+  quoteTasks,
+  dedupeConfigsByCustomer,
+  hasMultipleCustomers,
+} from "@/utils/quote-tasks";
+import { expandConfigsIntoLots } from "@/components/financial/shared/billing-split-field";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -270,7 +276,15 @@ const FinancialBudgetDetailPageInner = () => {
        * caminhões criado como `JOINT` que precisa fechar veículo a veículo
        * ficaria travado para sempre se este campo só existisse na criação.
        */
-      billingSplit: "JOINT" as "JOINT" | "PER_TASK",
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
+      /**
+       * A PARTIÇÃO dos veículos entre as faturas — só relevante em lotes.
+       *
+       * Campo do ORÇAMENTO e não de cada cliente: a mesma repartição vale para
+       * todos (um lote é uma unidade de cobrança, não um negócio diferente), e
+       * é o save que a transforma em `customerConfigs[].taskIds`.
+       */
+      billingGroups: [] as string[][],
       customerConfigs: [] as any[],
       services: [
         {
@@ -312,6 +326,32 @@ const FinancialBudgetDetailPageInner = () => {
   // Ordered sibling ids + the prev/next widget. Routed through `guardedNavigate` so paging away
   // from a dirty wizard prompts (the guard's pushState patch would catch a bare navigate too, but
   // it replays only the URL and would drop the id list).
+  /**
+   * OS VEÍCULOS deste orçamento, na forma que o controle de faturamento precisa.
+   *
+   * Série, placa e pedido de compra: é assim que quem opera identifica um
+   * implemento, e é o que precisa aparecer ao lado do lote para a escolha não
+   * virar adivinhação.
+   */
+  const budgetSplitVehicles = useMemo(
+    () =>
+      quoteTasks(existingQuote as any).map((t: any) => ({
+        id: t.id,
+        name: t.name ?? null,
+        serialNumber: t.serialNumber ?? null,
+        plate: t.truck?.plate ?? null,
+        customerOrderNumber: t.customerOrderNumber ?? null,
+      })),
+    [existingQuote],
+  );
+
+  /** Quantas faturas já foram aprovadas — com uma que seja, a divisão congela. */
+  const approvedBillingCount = useMemo(
+    () =>
+      ((existingQuote?.customerConfigs ?? []) as any[]).filter((c) => c?.billingApprovedAt).length,
+    [existingQuote],
+  );
+
   const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
   const recordNav = useRecordNavigation({
     ids: siblingIds,
@@ -404,6 +444,7 @@ const FinancialBudgetDetailPageInner = () => {
         layoutFileIds: [],
         simultaneousTasks: null,
         billingSplit: "JOINT",
+        billingGroups: [],
         customerConfigs: [],
         services: [
           {
@@ -433,9 +474,21 @@ const FinancialBudgetDetailPageInner = () => {
       layoutFileIds: (existingQuote.layoutFiles || []).map((f: any) => f.id),
       simultaneousTasks: existingQuote.simultaneousTasks || null,
       billingSplit:
-        ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK") || "JOINT",
+        ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK" | "CUSTOM") || "JOINT",
+      // Os LOTES como estão gravados — a cobertura de cada fatura, na ordem em
+      // que elas existem. Sem hidratar, abrir e salvar um orçamento em lotes o
+      // devolveria ao modo declarado e os lotes sumiriam sem ninguém pedir.
+      billingGroups: dedupeConfigsByCustomer(existingQuote.customerConfigs ?? [])
+        .coverageGroups,
+      // ⚠️ UM PASSO POR CLIENTE, não por FATURA. Num orçamento cobrado veículo a
+      // veículo há uma fatura por caminhão, todas do mesmo cliente: mapear 1:1
+      // produzia "Cliente 1..4" com o mesmo nome quatro vezes, e o save
+      // reenviava os quatro objetos — o último gravando por cima dos outros
+      // três, levando desconto e condição de pagamento junto. A repartição dos
+      // veículos vive em `billingGroups`, acima.
       customerConfigs:
-        existingQuote.customerConfigs?.map((c: any) => ({
+        dedupeConfigsByCustomer(existingQuote.customerConfigs ?? []).configs.map((c: any) => ({
+          id: c.id,
           customerId: c.customerId || c.id,
           subtotal: c.subtotal ?? 0,
           total: c.total ?? 0,
@@ -1349,8 +1402,14 @@ const FinancialBudgetDetailPageInner = () => {
       // unassigned service is excluded from every per-customer total, so its
       // amount would silently vanish from the budget (and the API's billing-
       // approval guard blocks approval anyway). Block the save here.
+      //
+      // ⚠️ CLIENTES DISTINTOS, nunca faturas. A lista do formulário já vem
+      // deduplicada por cliente (ver a hidratação), mas contar `length` aqui
+      // voltaria a ser errado no dia em que ela deixar de vir — e o erro seria
+      // uma recusa impossível de obedecer, porque o seletor "Faturar Para" só
+      // aparece com mais de um cliente.
       if (
-        (data.customerConfigs || []).length >= 2 &&
+        hasMultipleCustomers(data.customerConfigs || []) &&
         validServices.some((item: any) => !item.invoiceToCustomerId)
       ) {
         toast.error(
@@ -1377,7 +1436,19 @@ const FinancialBudgetDetailPageInner = () => {
         layoutFileIds: resolvedLayoutIds,
         simultaneousTasks: data.simultaneousTasks || null,
         billingSplit: data.billingSplit || "JOINT",
-        customerConfigs: data.customerConfigs || [],
+        // ─── OS LOTES VIRAM COBERTURA ────────────────────────────────────────
+        //
+        // O formulário guarda UMA fatura por cliente e a repartição num campo
+        // só. A API recebe uma fatura por (cliente × lote), cada uma com a
+        // cobertura explícita. A expansão acontece aqui, no save, e só quando há
+        // lotes: nos outros modos a cobertura é derivável e mandá-la seria
+        // payload inútil — e uma segunda fonte de verdade sobre quem cobra quem.
+        customerConfigs: expandConfigsIntoLots(
+          data.customerConfigs || [],
+          (data.billingSplit || "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
+          quoteTasks(existingQuote as any).map((t: any) => t.id),
+          data.billingGroups,
+        ),
         services: validServices.map((item: any) => ({
           ...item,
           amount: item.amount ?? 0,
@@ -1757,6 +1828,11 @@ const FinancialBudgetDetailPageInner = () => {
                   disabled={isSubmitting || !canEdit}
                   quoteId={existingQuote?.id}
                   existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
+                  // OS VEÍCULOS, com id — é o que permite compor lotes. Só
+                  // existem na edição; na criação a lista é vazia e o controle
+                  // oferece apenas junto/separado.
+                  existingVehicles={budgetSplitVehicles}
+                  approvedBillingCount={approvedBillingCount}
                 />
               </div>
             );

@@ -234,7 +234,16 @@ export const FinancialBudgetCreatePage = () => {
        * veículo a veículo — o que os sessenta caminhões do Marquespan pedem, já
        * que não terminam no mesmo dia.
        */
-      billingSplit: "JOINT" as "JOINT" | "PER_TASK",
+      billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
+      /**
+       * A partição dos veículos entre as faturas.
+       *
+       * Sempre VAZIA na criação: as tarefas nascem no save (produto placas ×
+       * séries) e não há id para agrupar. O controle de faturamento sabe disso e
+       * não oferece lotes aqui — quem cria um orçamento de sessenta caminhões
+       * agrupa depois, quando sabe quais entregou.
+       */
+      billingGroups: [] as string[][],
       customerConfigs: [] as any[],
       services: [
         {

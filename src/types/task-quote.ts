@@ -5,7 +5,15 @@ import type { Task } from './task';
 
 export type TASK_QUOTE_STATUS = 'PENDING' | 'SIGNED' | 'EXPIRED' | 'BUDGET_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
-export type QUOTE_BILLING_SPLIT = 'JOINT' | 'PER_TASK';
+/**
+ * JUNTO, SEPARADO OU EM LOTES.
+ *
+ * `JOINT`: uma fatura, um plano de parcelas e uma NFS-e para os N veículos — o
+ * padrão, e o comportamento de sempre. `PER_TASK`: um faturamento por veículo,
+ * aprovado veículo a veículo. `CUSTOM`: lotes livres, e aí a cobertura vem das
+ * linhas de `coveredTasks`, não do modo.
+ */
+export type QUOTE_BILLING_SPLIT = 'JOINT' | 'PER_TASK' | 'CUSTOM';
 
 export interface PaymentConfig {
   type: 'CASH' | 'INSTALLMENTS';
@@ -32,14 +40,28 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   quoteId: string;
   customerId: string;
   /**
-   * A TAREFA que esta configuração fatura, ou `null` para "todas as do
-   * orçamento".
+   * A COBERTURA — de quais VEÍCULOS esta fatura é.
    *
-   * `null` é o caso `JOINT` — uma fatura por cliente para os N veículos, e o
-   * comportamento de sempre. Preenchido é `PER_TASK`: uma configuração por
-   * caminhão, cada uma com sua fatura, seu plano de parcelas e sua NFS-e.
+   * Era a coluna `taskId`, com nulo querendo dizer "todos". Virou registro
+   * (`QuoteBillingTask`) porque "quais dos sessenta?" pode ser "vinte", e porque
+   * uma fatura já emitida passava a cobrir um caminhão acrescentado depois sem
+   * deixar rastro.
+   *
+   * ⚠️ É relação: uma resposta que não a pediu chega sem ela. Leia por
+   * `coveredTaskIds()` / `coveredTaskCount()` de `@/utils/quote-tasks`, que
+   * tratam a ausência como "cobre tudo" — nunca como "cobre zero".
    */
-  taskId?: string | null;
+  coveredTasks?: Array<{
+    taskId: string;
+    customerId?: string;
+    task?: {
+      id?: string;
+      name?: string | null;
+      serialNumber?: string | null;
+      customerOrderNumber?: string | null;
+      truck?: { plate?: string | null } | null;
+    } | null;
+  }>;
   /** Quando ESTA fatia teve o faturamento aprovado. Ver `TaskQuote.billingSplit`. */
   billingApprovedAt?: Date | string | null;
   subtotal: number;
