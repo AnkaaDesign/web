@@ -350,7 +350,12 @@ export function PublicBudgetPage() {
   // Use serve endpoint for signature to preserve PNG transparency
 
   // Recalculate discount and total based on active filter
-  const isCompleteViewGlobal = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+  // ⚠️ CLIENTES DISTINTOS, nunca faturas. Num orçamento cobrado veículo a
+  // veículo há uma fatura por caminhão, todas do mesmo cliente: contar faturas
+  // fazia esta tela — a que o cliente ASSINA — entrar no modo "completo" e
+  // filtrar os serviços para fora da lista, anunciando "Serviços" vazio e
+  // "Total geral R$ 0,00".
+  const isCompleteViewGlobal = !selectedCustomerId && hasMultipleCustomers(quote?.customerConfigs);
   // ═══════════════════════════════════════════════════════════════════════════
   // DINHEIRO: O VALOR UNITÁRIO, O "× N" E O TOTAL GERAL
   // ═══════════════════════════════════════════════════════════════════════════

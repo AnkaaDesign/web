@@ -47,6 +47,10 @@ import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
+import {
+  groupsForSplit,
+  type BillingSplitValue,
+} from "@/components/financial/shared/billing-split-field";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -213,6 +217,30 @@ export function BudgetStepReview({
 
   // Cada coluna só existe se ALGUM veículo a tiver — a mesma regra do documento
   // e da página pública: uma coluna inteira de travessões não informa nada.
+  // ═══════════════════════════════════════════════════════════════════════
+  // QUAL FATURA COBRA CADA VEÍCULO
+  //
+  // A coluna que respondia a pergunta que a tela não respondia. Ela só aparece
+  // quando o faturamento é FATIADO — numa fatura conjunta todos os veículos
+  // estão nela, e uma coluna com "Fatura 1" repetida sessenta vezes não informa
+  // nada.
+  // ═══════════════════════════════════════════════════════════════════════
+  const billingSplitWatch = useWatch({ control, name: "billingSplit" }) as string | undefined;
+  const billingGroupsWatch =
+    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
+  const lotOfVehicle = useMemo(() => {
+    const ids = vehicleRows.map((v) => v.key);
+    const groups = groupsForSplit(
+      (billingSplitWatch ?? "JOINT") as BillingSplitValue,
+      ids,
+      billingGroupsWatch,
+    );
+    if (groups.length <= 1) return null;
+    const map = new Map<string, number>();
+    groups.forEach((g, i) => g.forEach((id) => map.set(id, i + 1)));
+    return map;
+  }, [vehicleRows, billingSplitWatch, billingGroupsWatch]);
+
   const anyVehicleOrderNumber = vehicleRows.some((v) => !!v.orderNumber);
   const anyVehicleChassis = vehicleRows.some((v) => !!v.chassis);
   const anyVehicleCategory = vehicleRows.some((v) => !!v.category);
@@ -482,6 +510,9 @@ export function BudgetStepReview({
                         {anyVehicleOrderNumber && (
                           <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº do pedido</th>
                         )}
+                        {lotOfVehicle && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Fatura</th>
+                        )}
                         {anyVehicleCategory && (
                           <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Categoria</th>
                         )}
@@ -501,6 +532,11 @@ export function BudgetStepReview({
                           )}
                           {anyVehicleOrderNumber && (
                             <td className="py-1 pr-3 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                          {lotOfVehicle && (
+                            <td className="py-1 pr-3 font-medium tabular-nums">
+                              {lotOfVehicle.get(v.key) ?? <span className="text-muted-foreground">—</span>}
+                            </td>
                           )}
                           {anyVehicleCategory && (
                             <td className="py-1 pr-3 font-medium">{v.category || <span className="text-muted-foreground">—</span>}</td>

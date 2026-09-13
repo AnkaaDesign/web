@@ -54,7 +54,15 @@ import { exportTaskDossiePdf } from "@/components/production/task/detail/section
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
-import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, quoteVehicleCount, sortQuoteTasks } from "@/utils/quote-tasks";
+import {
+  hasMultipleCustomers as hasMultipleCustomersOf,
+  orderNumberLabel,
+  quoteVehicleCount,
+  sortQuoteTasks,
+  quoteTasks,
+  coverageSummary,
+  coveredTaskCount,
+} from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
 // on the same transition, and disagreeing meant this dialog waved through a status the page then
@@ -135,6 +143,17 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   })();
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  /** Os veículos do orçamento, para nomear a cobertura de cada fatura. */
+  const reviewVehicles = useMemo(
+    () =>
+      quoteTasks(task?.quote as any).map((t: any) => ({
+        id: t.id,
+        name: t.name ?? null,
+        serialNumber: t.serialNumber ?? null,
+        truck: t.truck ? { plate: t.truck.plate } : null,
+      })),
+    [task?.quote],
+  );
 
   // Attention on the quote's `orderNumber`. The Resumo is where this page usually OPENS (it jumps
   // here whenever invoices already exist), while the editable field lives on a customer step that
@@ -759,6 +778,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               paymentConfig: config.paymentConfig,
               paymentCondition: config.paymentCondition,
               total: configTotal,
+              vehicleCount: reviewVehicles.length,
+              // A cláusula descreve o que ESTA fatura cobra: um caminhão, um
+              // lote, ou os N. Sem a cobertura, um orçamento em lotes imprimiria
+              // a frase da fatura conjunta sobre o valor de vinte.
+              coveredVehicleCount: coveredTaskCount(config) || undefined,
             });
 
             // Validate NFS-e data — the SHARED requirement list, so this badge, the "Faturar Para"
@@ -780,12 +804,29 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             // da emissão, senão o Resumo diria "sem telefone" numa nota que sai com um.
             const tomadorContact = resolveTomadorContact(data, (config as any).responsible);
 
+            // ─── DE QUAIS VEÍCULOS É ESTA FATURA ─────────────────────────
+            //
+            // O cartão se chamava só pelo nome do cliente. Num orçamento cobrado
+            // veículo a veículo, os quatro cartões tinham o MESMO título e o
+            // conferente não tinha como saber qual era qual caminhão — nem por
+            // que os valores diferiam.
+            const coverage = coverageSummary(config, reviewVehicles.length, reviewVehicles);
+            const showCoverage = reviewVehicles.length > 1 && coveredTaskCount(config) > 0;
+
             return (
-              <Card key={config.customerId}>
+              // A chave não pode ser o cliente: as N faturas de uma cobrança
+              // veículo a veículo são do MESMO cliente, e a chave repetida faz o
+              // React reaproveitar o nó da primeira para todas.
+              <Card key={config.id || `${config.customerId}-${_i}`}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <IconBuilding className="h-4 w-4 text-muted-foreground" />
                     {name}
+                    {showCoverage && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {coverage}
+                      </Badge>
+                    )}
                     {!isComplete && (
                       <Badge variant="destructive" className="text-xs" title={missingCustomerLabels.join(", ")}>
                         Dados incompletos

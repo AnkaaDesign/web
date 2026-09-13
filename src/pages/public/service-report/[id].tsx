@@ -15,7 +15,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "@/components/ui/sonner";
 import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, IconFileTypePdf, IconDownload, IconChevronDown, IconShare } from "@tabler/icons-react";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
-import { quoteTasks, primaryTask, orderNumberLabel } from "@/utils/quote-tasks";
+import {
+  quoteTasks,
+  primaryTask,
+  orderNumberLabel,
+  hasMultipleCustomers,
+} from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
@@ -230,7 +235,10 @@ export function PublicServiceReportPage() {
   // Total below doesn't include — it stays out of the filtered view and is
   // reunited with the rest in Completo.
   const serviceCustomerId = (svc: any): string | undefined => svc?.invoiceToCustomerId || svc?.invoiceToCustomer?.id;
-  const isMultiCustomerQuote = (quote.customerConfigs?.length ?? 0) >= 2;
+  // CLIENTES DISTINTOS, nunca faturas — ver a nota gêmea na página pública do
+  // orçamento. Um orçamento de quatro caminhões de um cliente só tem quatro
+  // faturas e UM cliente.
+  const isMultiCustomerQuote = hasMultipleCustomers(quote.customerConfigs);
   const services = (quote.services || []).filter((s: any) => {
     if (!selectedCustomerId) return true;
     const svcCustomer = serviceCustomerId(s);

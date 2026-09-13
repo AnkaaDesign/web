@@ -49,7 +49,12 @@ import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import type { Task } from "@/types";
 import type { Invoice } from "@/types/invoice";
 import type { File as CustomFile } from "@/types/file";
-import { configsForTask, perVehicleAmount, quoteVehicleCount } from "@/utils/quote-tasks";
+import {
+  configsForTask,
+  perVehicleAmount,
+  quoteVehicleCount,
+  coveredTaskCount,
+} from "@/utils/quote-tasks";
 
 /**
  * Bare render body for the "Orçamento / Faturamento Detalhado" detail section
@@ -104,25 +109,30 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
   const rawQuote = task.quote;
   if (!rawQuote) return null;
 
-  // ─── AS FATIAS DESTE VEÍCULO ─────────────────────────────────────────────────
+  // ─── AS FATURAS DESTE VEÍCULO ────────────────────────────────────────────────
   //
   // Um orçamento pode cobrir sessenta caminhões, e esta seção mostra o orçamento
-  // de UM deles (a tela é a da tarefa). Com `billingSplit = PER_TASK` existe uma
-  // configuração de faturamento POR VEÍCULO, todas do mesmo cliente: sem filtrar,
-  // o caminhão 12 exibia os sessenta blocos de parcelas, o seletor listava
-  // "Cliente" sessenta vezes com o mesmo nome, e o primeiro bloco — que é o do
-  // caminhão 1 — era lido como se fosse o dele. Com `JOINT` a fatia tem `taskId`
-  // nulo e cobre todos, então a lista continua inteira, como sempre foi.
+  // de UM deles (a tela é a da tarefa). Numa cobrança veículo a veículo existe
+  // uma fatura POR CAMINHÃO, todas do mesmo cliente: sem filtrar, o caminhão 12
+  // exibia os sessenta blocos de parcelas, o seletor listava "Cliente" sessenta
+  // vezes com o mesmo nome, e o primeiro bloco — que é o do caminhão 1 — era lido
+  // como se fosse o dele. Numa fatura conjunta a cobertura inclui este veículo e
+  // a lista continua inteira, como sempre foi.
   const quote = {
     ...rawQuote,
     customerConfigs: configsForTask(rawQuote.customerConfigs, task.id),
   };
   const vehicleCount = quoteVehicleCount(rawQuote);
   const isMultiVehicle = vehicleCount > 1;
-  // Em `PER_TASK` a fatia já carrega o valor de um veículo; em `JOINT` ela carrega
-  // o do contrato. O par abaixo mostra os DOIS números quando são diferentes, para
-  // ninguém confundir "o que este caminhão custa" com "o que o cliente assinou".
-  const isPerVehicleBilling = rawQuote.billingSplit === "PER_TASK";
+  // A FATURA DESTE VEÍCULO COBRA SÓ ELE?
+  //
+  // Pela COBERTURA, não pelo modo: um lote de vinte cobra vinte, e dizer "por
+  // veículo" ali afirmaria que o número na tela é o de um caminhão quando é o de
+  // vinte. O par de números abaixo mostra os DOIS quando diferem, para ninguém
+  // confundir "o que este caminhão custa" com "o que o cliente assinou".
+  const thisVehicleConfig = quote.customerConfigs?.[0];
+  const coveredHere = coveredTaskCount(thisVehicleConfig as any);
+  const isPerVehicleBilling = coveredHere > 0 && coveredHere < vehicleCount;
   const services = quote.services ?? [];
 
   return (
@@ -380,13 +390,18 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             </div>
 
             {/* O OUTRO número, quando o orçamento cobre mais de um veículo: o valor
-                acima é o de um caminhão (`PER_TASK`) ou o do contrato (`JOINT`), e
-                quem lê a tela de um veículo precisa dos dois para não confundi-los. */}
+                acima é o desta FATURA (um caminhão, ou um lote), e quem lê a tela
+                de um veículo precisa do total do orçamento ao lado para não
+                confundir os dois. */}
             {isMultiVehicle && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 {isPerVehicleBilling ? (
                   <>
-                    <span>Total do orçamento ({vehicleCount} veículos)</span>
+                    <span>
+                      {coveredHere > 1
+                        ? `Esta fatura cobra ${coveredHere} veículos · total do orçamento (${vehicleCount})`
+                        : `Total do orçamento (${vehicleCount} veículos)`}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(Number(quote.total) || 0)}</span>
                   </>
                 ) : (

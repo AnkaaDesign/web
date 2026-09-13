@@ -12,7 +12,12 @@ import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
 import type { Task } from "../../../../types";
 import { taskDuplicateCopySchema } from "../../../../schemas";
-import { perVehicleAmount, quoteVehicleCount } from "@/utils/quote-tasks";
+import {
+  perVehicleAmount,
+  quoteVehicleCount,
+  coveredTaskCount,
+  dedupeConfigsByCustomer,
+} from "@/utils/quote-tasks";
 
 // Full include config for refetching the task with ALL relations needed for duplication
 const DUPLICATE_TASK_INCLUDE = {
@@ -86,9 +91,14 @@ interface TaskDuplicateModalProps {
  * sessenta fatias conjuntas do mesmo cliente, e a segunda já violaria o índice
  * que garante uma só — 500 na criação da tarefa.
  */
-const dedupeConfigsByCustomer = (configs: any[] | null | undefined): any[] | undefined => {
+/**
+ * A PRIMEIRA fatura de cada cliente. Cópia local de `dedupeConfigsByCustomer` de
+ * `@/utils/quote-tasks`, com a forma que a duplicação usa (devolve `undefined`
+ * quando não há configuração, para o campo sumir do payload).
+ */
+const firstConfigPerCustomer = (configs: any[] | null | undefined): any[] | undefined => {
   if (!configs) return undefined;
-  return Array.from(new Map(configs.map((c) => [c.customerId, c])).values());
+  return dedupeConfigsByCustomer(configs).configs;
 };
 
 export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: TaskDuplicateModalProps) => {
@@ -164,13 +174,17 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
     // A DUPLICATA É DE UM VEÍCULO, a origem pode ser de sessenta.
     //
-    // `quote.total` (e o total de cada fatia em `JOINT`) é o valor do CONTRATO
-    // desde o orçamento multitarefa. Copiado cru, a cópia de um caminhão nasceria
-    // cobrando pelos sessenta. Em `PER_TASK` a fatia JÁ é de um veículo, então ali
-    // o divisor da configuração é 1.
+    // `quote.total` é o valor do CONTRATO desde o orçamento multitarefa. Copiado
+    // cru, a cópia de um caminhão nasceria cobrando pelos sessenta.
+    //
+    // O divisor de CADA FATURA é a COBERTURA dela, não o modo: uma fatura de um
+    // veículo divide por 1, uma de lote por k, a conjunta por N. Ler
+    // `billingSplit === "PER_TASK"` dava 1 para tudo que não fosse "separado" —
+    // e num orçamento em lotes isso copiaria o valor de vinte caminhões para uma
+    // tarefa só.
     const sourceVehicleCount = quoteVehicleCount(sourceTask.quote);
-    const sourceConfigVehicleCount =
-      sourceTask.quote?.billingSplit === "PER_TASK" ? 1 : sourceVehicleCount;
+    const configVehicleCount = (config: any) =>
+      coveredTaskCount(config) || sourceVehicleCount;
 
     return {
       // Basic fields
@@ -269,10 +283,10 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
               // só criaria sessenta fatias conjuntas do mesmo cliente, e a segunda
               // já violaria o índice parcial que garante uma fatia conjunta por
               // cliente — 500 na criação.
-              customerConfigs: dedupeConfigsByCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
+              customerConfigs: firstConfigPerCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
                 customerId: config.customerId,
-                subtotal: perVehicleAmount(config.subtotal, sourceConfigVehicleCount),
-                total: perVehicleAmount(config.total, sourceConfigVehicleCount),
+                subtotal: perVehicleAmount(config.subtotal, configVehicleCount(config)),
+                total: perVehicleAmount(config.total, configVehicleCount(config)),
                 discountType: config.discountType || 'NONE',
                 discountValue: config.discountValue != null ? Number(config.discountValue) : null,
                 discountReference: config.discountReference || null,

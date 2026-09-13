@@ -22,12 +22,12 @@ import { customerCount, distinctCustomerIds, hasMultipleCustomers } from "./quot
 const CLIENTE_A = "b593f440-9f00-4c85-93ef-54bf5a9eef37";
 const CLIENTE_B = "0f723f76-f3b6-41c9-ae1f-3c1209955f58";
 
-/** As quatro fatias do orçamento nº 0976: um cliente, um caminhão cada. */
+/** As quatro faturas do orçamento nº 0976: um cliente, um caminhão cada. */
 const perTaskUmCliente = [
-  { customerId: CLIENTE_A, taskId: "t1" },
-  { customerId: CLIENTE_A, taskId: "t2" },
-  { customerId: CLIENTE_A, taskId: "t3" },
-  { customerId: CLIENTE_A, taskId: "t4" },
+  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t1" }] },
+  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t2" }] },
+  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t3" }] },
+  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t4" }] },
 ];
 
 describe("quantos clientes um orçamento fatura", () => {
@@ -51,17 +51,17 @@ describe("quantos clientes um orçamento fatura", () => {
   it("PER_TASK com dois clientes e oito fatias ainda são dois", () => {
     const oito = [
       ...perTaskUmCliente,
-      { customerId: CLIENTE_B, taskId: "t5" },
-      { customerId: CLIENTE_B, taskId: "t6" },
-      { customerId: CLIENTE_B, taskId: "t7" },
-      { customerId: CLIENTE_B, taskId: "t8" },
+      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t1" }] },
+      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t2" }] },
+      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t3" }] },
+      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t4" }] },
     ];
     expect(customerCount(oito)).toBe(2);
     expect(hasMultipleCustomers(oito)).toBe(true);
   });
 
   it("o caso JOINT de sempre não muda", () => {
-    expect(hasMultipleCustomers([{ customerId: CLIENTE_A, taskId: null }])).toBe(false);
+    expect(hasMultipleCustomers([{ customerId: CLIENTE_A }])).toBe(false);
   });
 
   it("lê o cliente pela relação incluída quando a FK não veio no select", () => {
