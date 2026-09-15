@@ -497,6 +497,19 @@ export function SignatureEnvelopeCard({
   const history = envelopes.slice(1);
   const signed = current?.signers.filter(s => s.status === "SIGNED").length ?? 0;
   const total = current?.signers.length ?? 0;
+  /**
+   * QUEM RECUSOU E AINDA ESTÁ RECUSANDO — numa coleta VIVA.
+   *
+   * Desde que a recusa deixou de matar o envelope, ela deixou também de aparecer
+   * no estado dele: o selo continuava "Aguardando assinaturas" e o contador
+   * subia até "3 de 4", num envelope que não tem como chegar a 4 enquanto o
+   * recusante estiver fora. O motivo existia, mas só dentro da linha daquele
+   * contato — quem passava o olho no painel via uma coleta andando bem.
+   */
+  const refusedSigners =
+    current?.status === "RUNNING"
+      ? current.signers.filter(s => s.status === "REFUSED")
+      : [];
 
   /**
    * O signatário da Ankaa — o que contra-assina aqui, com a sessão.
@@ -717,11 +730,39 @@ export function SignatureEnvelopeCard({
           </div>
         )}
 
+        {/* ---- Coleta travada por recusa ----
+            A recusa não derruba mais o envelope nem as assinaturas já colhidas,
+            e é justamente por isso que ela precisa ser dita aqui: sem esta
+            faixa, o painel de uma coleta que não pode se concluir é idêntico ao
+            de uma que está só esperando. Diz também as duas saídas, porque a
+            errada — emitir uma coleta nova — destrói o que sobreviveu. */}
+        {refusedSigners.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              {refusedSigners.length === 1
+                ? `${refusedSigners[0].name} recusou — a coleta não se conclui assim.`
+                : `${refusedSigners.length} responsáveis recusaram — a coleta não se conclui assim.`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              As assinaturas já colhidas continuam valendo. Use{" "}
+              <span className="font-medium text-foreground">Pedir novamente</span> na linha de
+              quem recusou para reabrir — ou ajuste o orçamento, lembrando que o reajuste
+              invalida as assinaturas e exige uma coleta nova.
+            </p>
+          </div>
+        )}
+
         {/* Progresso */}
         <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
           <span className="text-sm text-muted-foreground">Progresso</span>
           <span className="text-sm font-semibold">
             {signed} de {total} assinaram
+            {refusedSigners.length > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                · {refusedSigners.length} recusou
+                {refusedSigners.length > 1 ? "ram" : ""}
+              </span>
+            )}
           </span>
         </div>
 
@@ -827,7 +868,18 @@ export function SignatureEnvelopeCard({
                   <p className="text-xs text-muted-foreground">
                     {s.signedAt
                       ? `Assinou em ${fmtDateTime(s.signedAt)}`
-                      : s.refusalReason
+                      : // O MOTIVO só enquanto a recusa É o estado.
+                        //
+                        // `refusalReason` é HISTÓRICO e fica gravado de
+                        // propósito — reabrir um recusante preserva o motivo,
+                        // que é o que permite ao comercial lembrar por que
+                        // pediu de novo. Mas a linha lia o histórico ANTES do
+                        // estado, então depois de "Pedir novamente" o contato
+                        // aparecia com o selo "Pendente" e a frase "Recusou:
+                        // …" ao mesmo tempo, e o operador deixava de ver se ele
+                        // chegou a abrir o convite novo — que é justamente a
+                        // pergunta que ele passa a ter.
+                        s.status === "REFUSED" && s.refusalReason
                         ? `Recusou: ${s.refusalReason}`
                         : s.timesViewed > 0
                           ? `Abriu o link ${s.timesViewed}× · último em ${fmtDateTime(s.lastViewedAt)}`
@@ -844,7 +896,11 @@ export function SignatureEnvelopeCard({
                       reenviar: ele não assina por link. O ato dele é o botão do
                       painel acima, e oferecer aqui as três ações do cliente
                       convidaria a distribuir uma capability que já não existe. */}
-                  {canManage && ceremony === "OTP" && s.status !== "SIGNED" && s.status !== "REFUSED" && (
+                  {/* REFUSED entra: recusar deixou de ser terminal. O reenvio a
+                      quem recusou é o gesto de PEDIR DE NOVO — o servidor
+                      reabre a vez dele (ver `resendInvitation`), e é por isso
+                      que o botão muda de rótulo abaixo em vez de sumir. */}
+                  {canManage && ceremony === "OTP" && s.status !== "SIGNED" && (
                     <>
                       <Button
                         variant="ghost"
@@ -877,10 +933,19 @@ export function SignatureEnvelopeCard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title={`Reenviar convite por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"}`}
+                        title={
+                          s.status === "REFUSED"
+                            ? `Pedir novamente por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"} — reabre a assinatura deste contato`
+                            : `Reenviar convite por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"}`
+                        }
                         disabled={busy}
                         onClick={() =>
-                          run(() => signatureService.resendInvitation(s.id), "Convite reenviado.")
+                          run(
+                            () => signatureService.resendInvitation(s.id),
+                            s.status === "REFUSED"
+                              ? "Pedido reenviado — a assinatura deste contato foi reaberta."
+                              : "Convite reenviado.",
+                          )
                         }
                       >
                         <IconSend className="h-3.5 w-3.5" />
