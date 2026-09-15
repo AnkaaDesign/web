@@ -316,6 +316,69 @@ export function configsForTask<T extends BillingConfigLike>(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// "FATURAR PARA" NUMA LINHA DE TAREFA
+//
+// Uma tarefa é UM VEÍCULO. A pergunta que a tela da tarefa faz não é "quais
+// clientes este orçamento fatura?" e sim "quem paga ESTE caminhão?".
+//
+// As duas coincidiam enquanto um orçamento tinha uma tarefa. Deixaram de
+// coincidir no primeiro orçamento cobrado veículo a veículo: quatro caminhões de
+// UM cliente têm quatro fatias, e listar todas imprimia
+//
+//     53.842.320 Kennedy de Campos Teixeira
+//     53.842.320 Kennedy de Campos Teixeira
+//     53.842.320 Kennedy de Campos Teixeira
+//     53.842.320 Kennedy de Campos Teixeira
+//
+// no detalhe de UM veículo — o mesmo nome quatro vezes, sugerindo quatro
+// tomadores onde há um, e sem dizer qual das quatro é a deste.
+//
+// Duas correções, e as duas são necessárias: RECORTAR pela cobertura (a fatia
+// deste veículo) e DEDUPLICAR por cliente (dois serviços do mesmo tomador não
+// são dois tomadores). Sobra mais de um nome só no caso real — o orçamento em
+// que dois clientes distintos dividem os serviços do MESMO veículo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ConfigWithCustomerName extends BillingConfigLike {
+  customer?: { id?: string | null; corporateName?: string | null; fantasyName?: string | null } | null;
+}
+
+/**
+ * Os CLIENTES que faturam ESTE veículo, sem repetição e na ordem das fatias.
+ *
+ * ⚠️ Só para telas de TAREFA. Nas telas do ORÇAMENTO (assistentes, documento,
+ * página pública) a pergunta é sobre o contrato inteiro, e ali listar todos os
+ * clientes é o certo.
+ *
+ * Cobertura ausente (consulta que não pediu a relação) cai no comportamento
+ * antigo por `configsForTask`: devolve as fatias sem cobertura declarada em vez
+ * de nenhuma — melhor um nome a mais do que a linha vazia.
+ */
+export function taskInvoiceCustomerNames(
+  configs: readonly ConfigWithCustomerName[] | null | undefined,
+  taskId: string | null | undefined,
+): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const config of configsForTask(configs, taskId)) {
+    const key = config.customerId ?? config.customer?.id ?? "";
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    const name = (config.customer?.corporateName || config.customer?.fantasyName || "").trim();
+    if (name) names.push(name);
+  }
+  return names;
+}
+
+/** O mesmo, numa linha só — o formato que as tabelas e exportações usam. */
+export function taskInvoiceCustomerLabel(
+  configs: readonly ConfigWithCustomerName[] | null | undefined,
+  taskId: string | null | undefined,
+): string {
+  return taskInvoiceCustomerNames(configs, taskId).join(", ");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // QUANTOS CLIENTES — e por que NUNCA se conta `customerConfigs.length`
 //
 // Antes do orçamento multitarefa havia exatamente UMA configuração por cliente,

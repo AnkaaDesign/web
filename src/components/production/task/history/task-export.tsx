@@ -8,7 +8,7 @@ import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CAT
 import { taskService } from "../../../../api-client";
 
 import { BRAND_ASSETS } from '@/config/assets';
-import { quotePerVehicleTotal } from "@/utils/quote-tasks";
+import { quotePerVehicleTotal, taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
 // Format date as dd/mm/yy for PDF export
 const formatShortDate = (date: Date | string | null | undefined): string => {
   if (!date) return "-";
@@ -179,11 +179,8 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   {
     id: "invoiceToCustomers",
     label: "Faturar Para",
-    getValue: (task: Task) => {
-      const configs = (task as any).quote?.customerConfigs;
-      if (!configs || configs.length === 0) return "";
-      return configs.map((c: any) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ");
-    },
+    // Uma linha por TAREFA: quem fatura este veículo, sem repetir o cliente.
+    getValue: (task: Task) => taskInvoiceCustomerLabel((task as any).quote?.customerConfigs, task.id),
   },
   { id: "bonification", label: "Bonificação", getValue: (task: Task) => task.bonification ? BONIFICATION_STATUS_LABELS[task.bonification] || task.bonification : "" },
   { id: "details", label: "Detalhes", getValue: (task: Task) => task.details || "" },

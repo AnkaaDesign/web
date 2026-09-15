@@ -19,7 +19,7 @@ import {
   getBadgeVariant,
 } from "@/constants";
 import { canViewServiceOrderType } from "@/utils/permissions/service-order-permissions";
-import { quotePerVehicleTotal } from "@/utils/quote-tasks";
+import { quotePerVehicleTotal, taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
 import {
   formatCurrency,
   formatDateTime,
@@ -474,8 +474,8 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "invoiceToCustomers",
       header: "Faturar Para",
-      accessorFn: (t) =>
-        t.quote?.customerConfigs?.map((c) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ") || "",
+      // A linha é UM veículo: recorta pela cobertura e deduplica por cliente.
+      accessorFn: (t) => taskInvoiceCustomerLabel(t.quote?.customerConfigs, t.id),
       enableSorting: false,
       size: 200,
       meta: {
@@ -483,8 +483,7 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: FINANCIAL_COLUMN_VIEWERS,
         headerLabel: "Faturar Para",
         exportHeader: "Faturar Para",
-        exportValue: (t) =>
-          t.quote?.customerConfigs?.map((c) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ") || "",
+        exportValue: (t) => taskInvoiceCustomerLabel(t.quote?.customerConfigs, t.id),
       },
       cell: ({ row }) => {
         const v =

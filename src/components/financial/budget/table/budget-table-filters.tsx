@@ -70,9 +70,10 @@ export const BUDGET_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          // A tarefa desta fatia: com `PER_TASK` são sessenta configurações do
-          // mesmo cliente, e a linha só fala pela dela.
-          taskId: true,
+          // Os veículos desta fatia chegam em `coveredTasks`, que a API injeta
+          // em todo `customerConfigs` (ver `withCoverageInclude`). NÃO pedir
+          // `taskId` aqui: a coluna saiu em `20260913120000_billing_coverage` e
+          // pedi-la derruba a lista inteira com um 500 do Prisma.
           // See BILLING_LIST_INCLUDE — the attention rules read both of these.
           generateInvoice: true,
           customer: { select: { id: true, ...ATTENTION_CUSTOMER_SELECT } },

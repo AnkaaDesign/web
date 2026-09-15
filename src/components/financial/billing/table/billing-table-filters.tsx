@@ -75,11 +75,11 @@ export const BILLING_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          // A TAREFA desta fatia (nulo = fatia conjunta) e QUANDO ela foi
-          // faturada. Sem as duas, a linha do caminhão 12 mostrava as sessenta
-          // fatias do orçamento e lia a aprovação do orçamento inteiro — que só
-          // é gravada quando a última fecha.
-          taskId: true,
+          // QUANDO esta fatia foi faturada. Sem ela, a linha do caminhão 12 lia
+          // a aprovação do ORÇAMENTO inteiro — que só é gravada quando a última
+          // fecha. Quais veículos a fatia cobre vem de `coveredTasks`, injetado
+          // pela API (`withCoverageInclude`); a coluna `taskId` saiu em
+          // `20260913120000_billing_coverage` e pedi-la é um 500 do Prisma.
           billingApprovedAt: true,
           // "Forma de Pagamento" column. `paymentConfig` is the current shape, `paymentCondition`
           // the legacy string the same helper converts — a record saved before the redesign has to
