@@ -122,6 +122,14 @@ const BillingDetailPageInner = () => {
   // Foto da plaqueta (VIN) — imagem única, espelhando o campo do formulário de Tarefa.
   const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
+  /**
+   * A confirmação aberta é a de uma FATIA (este veículo) e não a do orçamento?
+   *
+   * As fatias 2..N são aprovadas por uma ação do seletor que NÃO muda o status
+   * do orçamento, então `form.status` não tem como distinguir as duas — este
+   * sinalizador faz a confirmação e o `executeSave` falarem do mesmo ato.
+   */
+  const [approvingVehicleSlice, setApprovingVehicleSlice] = useState(false);
   // Predicted NFS-e número (last emitted + 1) — fetched only while the approval modal is open.
   const { data: nextNfse } = useNextNfseNumber(billingApprovalDialogOpen);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -165,7 +173,19 @@ const BillingDetailPageInner = () => {
               // Chassi junto: a tabela de veículos do passo 1 mostra as mesmas
               // colunas do documento, e um chassi ausente ali leria como "a
               // registrar" num caminhão que já o tem.
-              truck: { select: { id: true, plate: true, chassisNumber: true } },
+              truck: {
+                select: {
+                  id: true,
+                  plate: true,
+                  chassisNumber: true,
+                  // Categoria e implemento: é assim que a discriminação da NFS-e
+                  // nomeia o veículo ("Truck Refrigerado de n série: X"). Sem
+                  // eles a prévia descreveria um caminhão sem tipo, diferente da
+                  // nota que vai sair.
+                  category: true,
+                  implementType: true,
+                },
+              },
             },
           },
           customerConfigs: {
@@ -382,6 +402,59 @@ const BillingDetailPageInner = () => {
       billingGroups: [] as string[][],
     },
   });
+
+  /** As configurações do FORMULÁRIO — a prévia mostra o que acabou de ser digitado. */
+  const formConfigsForPreview = form.watch("customerConfigs") as any[];
+
+  /**
+   * AS FATURAS QUE ESTA APROVAÇÃO VAI GERAR — o que a confirmação pré-visualiza.
+   *
+   * Espelha `internalApprove.targetConfigs` no servidor: as fatias ainda não
+   * aprovadas e, quando a cobrança é fatiada, só as que cobrem o veículo ABERTO.
+   * Sem o filtro o diálogo dizia "serão gerados apenas os documentos deste
+   * veículo" logo acima das prévias das QUATRO notas e dos QUATRO boletos do
+   * orçamento inteiro — e depois de aprovar o primeiro caminhão ele ainda
+   * mostrava a nota dele, já emitida, como se fosse sair de novo.
+   */
+  const configsForApprovalPreview = useMemo(() => {
+    const configs = ((formConfigsForPreview ?? []) as any[]).filter((c) => !c?.billingApprovedAt);
+    if (!isPerVehicleBilling || !task?.id) return configs;
+    const covering = configs.filter((c) => {
+      const ids: string[] =
+        (Array.isArray(c?.taskIds) && c.taskIds.length > 0
+          ? c.taskIds
+          : ((c?.coveredTasks ?? []) as any[]).map((r) => r.taskId)) ?? [];
+      return ids.length === 0 || ids.includes(task.id);
+    });
+    return covering.length > 0 ? covering : configs;
+  }, [formConfigsForPreview, isPerVehicleBilling, task?.id]);
+
+  /**
+   * AS MESMAS FATURAS, COM O VALOR QUE ELAS COBRAM.
+   *
+   * O formulário guarda `subtotal`/`total` POR VEÍCULO — é o que
+   * `billing-step-services.recalculateTotals` escreve, e é a convenção que o
+   * assistente de Orçamento já usa. A pré-visualização, porém, desenha o BOLETO
+   * e a NOTA, que cobram `por veículo × veículos cobertos`: sem esta conversão o
+   * diálogo irreversível mostrava três boletos de R$ 366,81 logo antes de o
+   * banco registrar três de R$ 1.467,25.
+   *
+   * A conversão fica AQUI e não dentro da prévia de propósito: lá dentro
+   * `config.total` significa "o que esta fatura cobra", e é bom que continue
+   * significando só isso.
+   */
+  const configsForPreviewAtInvoiceScale = useMemo(
+    () =>
+      configsForApprovalPreview.map((c: any) => {
+        const covered =
+          (Array.isArray(c?.taskIds) && c.taskIds.length > 0
+            ? c.taskIds.length
+            : ((c?.coveredTasks ?? []) as any[]).length) || quoteVehicles || 1;
+        const escala = (v: unknown) => Math.round((Number(v) || 0) * covered * 100) / 100;
+        return { ...c, subtotal: escala(c?.subtotal), total: escala(c?.total) };
+      }),
+    [configsForApprovalPreview, quoteVehicles],
+  );
 
   // Unsaved changes guard — mirrors the Orçamento wizard. It was absent here, which was survivable
   // while leaving meant a deliberate Back press; with the record pager, discarding a half-edited
@@ -848,11 +921,25 @@ const BillingDetailPageInner = () => {
   );
 
   // Core save logic
-  const executeSave = useCallback(async () => {
+  const executeSave = useCallback(async (options?: { approveVehicleSlice?: boolean }) => {
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
     const targetStatus = formData.status;
+    /**
+     * ESTA GRAVAÇÃO APROVA A FATIA DO VEÍCULO ABERTO?
+     *
+     * Duas portas chegam aqui: a transição de status da PRIMEIRA aprovação
+     * (BUDGET_APPROVED → BILLING_APPROVED, com o rótulo "(este veículo)") e a
+     * ação sintética do seletor, que é como as fatias 2..N são faturadas — nelas
+     * o status do orçamento não muda, porque ele já está no ciclo de recebíveis.
+     */
+    const approveVehicleSlice =
+      !!options?.approveVehicleSlice ||
+      (targetStatus === "BILLING_APPROVED" &&
+        targetStatus !== quote.status &&
+        isPerVehicleBilling &&
+        !!task?.id);
 
     setIsSaving(true);
     try {
@@ -1087,7 +1174,20 @@ const BillingDetailPageInner = () => {
         await updateTaskAsync({ id: task.id, data: { customerOrderNumber: nextOrderNumber } });
       }
 
-      if (statusChanged) {
+      if (approveVehicleSlice) {
+        // A aprovação de faturamento de um orçamento fatiado é um ato DAQUELE
+        // veículo, e tem rota própria: `updateStatus` roteia para a aprovação SEM
+        // fatia, que fatura os sessenta de uma vez. As duas exigem
+        // FINANCEIRO/ADMIN e chegam ao log como linhas distintas — "faturei o
+        // orçamento inteiro" e "faturei o caminhão 37" não são o mesmo ato.
+        //
+        // Fora do caminho de transição de propósito: da segunda fatia em diante
+        // o orçamento já está em UPCOMING/DUE/PARTIAL e não há transição
+        // nenhuma a replicar. Passar por `getQuoteStatusPath` ali faria a tela
+        // mover o status do orçamento para trás só para poder aprovar uma fatia.
+        await taskQuoteService.internalApproveSlice(quote.id, task.id);
+        form.setValue("statusReason" as any, "");
+      } else if (statusChanged) {
         // The dropdown gates options by the FORM status, so the user can advance
         // several steps in one session. The server only accepts single legal
         // hops, so replay the whole path hop-by-hop. Guard: never auto-pass
@@ -1109,16 +1209,6 @@ const BillingDetailPageInner = () => {
         }
         const reason = (formData as any).statusReason?.trim() || undefined;
         for (const step of path) {
-          // A aprovação de faturamento de um orçamento POR VEÍCULO é um ato
-          // daquele veículo, e tem rota própria: `updateStatus` roteia para a
-          // aprovação SEM fatia, que fatura os sessenta de uma vez. As duas
-          // exigem FINANCEIRO/ADMIN e chegam ao log como linhas distintas —
-          // "faturei o orçamento inteiro" e "faturei o caminhão 37" não são o
-          // mesmo ato.
-          if (step === "BILLING_APPROVED" && isPerVehicleBilling && task?.id) {
-            await taskQuoteService.internalApproveSlice(quote.id, task.id);
-            continue;
-          }
           await taskQuoteService.updateStatus(
             quote.id,
             step as TASK_QUOTE_STATUS,
@@ -1135,7 +1225,8 @@ const BillingDetailPageInner = () => {
       queryClient.invalidateQueries({ queryKey: ["dashboards"] });
 
       const isBillingApproval =
-        targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
+        approveVehicleSlice ||
+        (targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status);
       if (isBillingApproval) {
         setIsGenerating(true);
         toast.success(
@@ -1431,6 +1522,10 @@ const BillingDetailPageInner = () => {
                   userPrivilege={userPrivilege}
                   disabled={!canEdit}
                   isGenerating={isGenerating}
+                  onApproveVehicleBilling={() => {
+                    setApprovingVehicleSlice(true);
+                    setBillingApprovalDialogOpen(true);
+                  }}
                   filterCustomerId={
                     dossieCustomerId !== "all" ? dossieCustomerId : undefined
                   }
@@ -1488,7 +1583,7 @@ const BillingDetailPageInner = () => {
               </p>
             )}
             <BillingDocumentPreviews
-              customerConfigs={form.watch("customerConfigs")}
+              customerConfigs={configsForPreviewAtInvoiceScale}
               services={form.watch("services")}
               nextNfseNumber={nextNfse?.nextNumber ?? null}
               orderNumbersByTask={{
@@ -1498,6 +1593,19 @@ const BillingDetailPageInner = () => {
                 ...(task ? { [task.id]: form.watch("customerOrderNumber") ?? null } : {}),
               }}
               quoteTaskIds={quoteVehicleRows.map((t) => t.id)}
+              vehiclesByTask={Object.fromEntries(
+                quoteVehicleRows.map((t: any) => [
+                  t.id,
+                  {
+                    serialNumber: t.serialNumber ?? null,
+                    plate: t.truck?.plate ?? null,
+                    chassisNumber: t.truck?.chassisNumber ?? null,
+                    category: t.truck?.category ?? null,
+                    implementType: t.truck?.implementType ?? null,
+                  },
+                ]),
+              )}
+              budgetNumber={quote?.budgetNumber ?? null}
               task={{
                 plate: form.watch("plate"),
                 serialNumber: form.watch("serialNumber"),
@@ -1548,13 +1656,17 @@ const BillingDetailPageInner = () => {
           </AlertDialogDescription>
 
           <AlertDialogFooter className="mt-2">
-            <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSaving} onClick={() => setApprovingVehicleSlice(false)}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={isSaving}
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={async () => {
                 setBillingApprovalDialogOpen(false);
-                await executeSave();
+                const sliceOnly = approvingVehicleSlice;
+                setApprovingVehicleSlice(false);
+                await executeSave(sliceOnly ? { approveVehicleSlice: true } : undefined);
               }}
             >
               {isSaving
