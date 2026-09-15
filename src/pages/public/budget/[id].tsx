@@ -637,7 +637,7 @@ export function PublicBudgetPage() {
                     {invoiceDoc ? <> ({invoiceDoc})</> : null},
                   </>
                 ) : null}
-                {" "}para execução dos serviços abaixo descriminados
+                {" "}para execução dos serviços abaixo discriminados
                 {quoteTasks(quote).length > 0 && (
                   <>
                     {" "}

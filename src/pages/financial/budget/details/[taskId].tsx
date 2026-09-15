@@ -61,6 +61,7 @@ import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
 import {
   quoteVehicleCount,
   quoteTasks,
+  perVehicleAmount,
   dedupeConfigsByCustomer,
   hasMultipleCustomers,
 } from "@/utils/quote-tasks";
@@ -466,8 +467,18 @@ const FinancialBudgetDetailPageInner = () => {
         ? new Date(existingQuote.expiresAt)
         : getDefaultExpiresAt(),
       status: existingQuote.status || "PENDING",
-      subtotal: existingQuote.subtotal || 0,
-      total: existingQuote.total || 0,
+      // POR VEÍCULO, não o contrato. `TaskQuote.subtotal/total` guardam o valor
+      // do CONTRATO (`por veículo × N`), mas o formulário — e o resumo que lê
+      // dele — trabalham em valor de UM veículo: o resumo aplica o "× N" ele
+      // mesmo. Semear com o contrato fazia o "× N" incidir sobre um número que
+      // já o continha, e um orçamento de 4 veículos a R$ 0,20 exibia
+      // "Total por veículo R$ 0,80 · × 4 · Total geral R$ 3,20" — quatro vezes
+      // o contrato, na tela em que o comercial confere o preço. O documento
+      // sempre esteve certo (R$ 0,20 · × 4 · R$ 0,80), então as duas telas
+      // discordavam. Não afeta a gravação: `recalcQuoteTotals` reescreve os dois
+      // campos a partir dos serviços, e o valor enviado é provisório por desenho.
+      subtotal: perVehicleAmount(existingQuote.subtotal, quoteVehicleCount(existingQuote)),
+      total: perVehicleAmount(existingQuote.total, quoteVehicleCount(existingQuote)),
       guaranteeYears: existingQuote.guaranteeYears || null,
       customGuaranteeText: existingQuote.customGuaranteeText || null,
       customForecastDays: existingQuote.customForecastDays || null,
@@ -1481,9 +1492,46 @@ const FinancialBudgetDetailPageInner = () => {
         const servicesReordered =
           currentServiceIds.length !== persistedServiceIds.length ||
           currentServiceIds.some((id: any, i: number) => id !== persistedServiceIds[i]);
+        // ─── A RECOMPOSIÇÃO DE LOTES ────────────────────────────────────────
+        //
+        // Comparação de CONTEÚDO, como `layoutChanged` logo acima, e não
+        // `dirty.billingGroups`: o campo é `string[][]`, e o dirty de um array
+        // aninhado no react-hook-form é uma estrutura que o `Boolean()` lê como
+        // verdadeira até quando nada mudou — o gate passaria a disparar uma
+        // gravação de orçamento em toda edição só da tarefa, que é exatamente o
+        // que ele existe para evitar.
+        //
+        // Sem esta linha o gate ignorava lote: mover veículos entre lotes num
+        // orçamento que JÁ é `CUSTOM` não toca em mais nenhum campo do
+        // orçamento, então `quoteFieldDirty` saía falso, o `PUT` inteiro era
+        // pulado e a tela ainda redirecionava como se tivesse gravado. Trocar o
+        // MODO continuava funcionando (`dirty.billingSplit`), o que escondia o
+        // defeito justamente na única operação que ajusta um lote existente.
+        //
+        // Normalizado dos dois lados — ordenado dentro do grupo e entre grupos —
+        // porque a identidade de um agrupamento é QUEM está com QUEM, não a
+        // ordem em que as faturas nasceram. É a mesma normalização que a v6 do
+        // recorte material aplica em `billingGroups`, e sem ela uma reordenação
+        // sem efeito nenhum para o cliente gravaria de novo e derrubaria as
+        // assinaturas já colhidas.
+        const normalizeGroups = (groups: unknown): string => {
+          const list = Array.isArray(groups) ? (groups as string[][]) : [];
+          return JSON.stringify(
+            list
+              .map((g) => [...(Array.isArray(g) ? g : [])].sort())
+              .filter((g) => g.length > 0)
+              .sort((a, b) => (a[0] ?? "").localeCompare(b[0] ?? "")),
+          );
+        };
+        const billingGroupsChanged =
+          normalizeGroups(data.billingGroups) !==
+          normalizeGroups(
+            dedupeConfigsByCustomer(existingQuote.customerConfigs ?? []).coverageGroups,
+          );
         const quoteFieldDirty =
           layoutChanged ||
           servicesReordered ||
+          billingGroupsChanged ||
           Boolean(
             dirty.expiresAt ||
               dirty.subtotal ||

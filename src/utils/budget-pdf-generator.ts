@@ -1350,7 +1350,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
           data.corporateName && data.corporateName !== 'Cliente'
             ? ` para a <strong style="font-weight: 600;">${escapeHtml(data.corporateName)}</strong>${data.customerDocument ? ` (${escapeHtml(data.customerDocument)})` : ''},`
             : ''
-        } para execução dos serviços abaixo descriminados${
+        } para execução dos serviços abaixo discriminados${
           vehicleRows.length
             ? isMultiVehicle
               ? ' nos veículos abaixo relacionados:'
