@@ -262,6 +262,54 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     }
   }, [async]);
 
+  // ─── initialOptions QUE CHEGAM DEPOIS ────────────────────────────────────
+  //
+  // O efeito acima roda uma vez e depende só de `async`, então ele só vê
+  // `initialOptions` que já existam no primeiro render. Quem preenche essa lista
+  // buscando o item SELECIONADO por id — o caso do seletor de cliente numa tela
+  // de edição — só a entrega quando a requisição volta, e aí não havia mais
+  // nenhum efeito para recebê-la: nem o cache nem `allAsyncOptions` eram
+  // atualizados, e o gatilho continuava mostrando o placeholder.
+  //
+  // O sintoma era caro e passava por perda de dado: todo cliente fora da
+  // primeira página da lista (ordenada por nome, 50 por vez) abria a edição do
+  // orçamento com "Selecione um cliente", como se o vínculo tivesse sumido —
+  // num cadastro de ~300 clientes, a maioria deles. O valor SEMPRE esteve no
+  // formulário; faltava o rótulo.
+  //
+  // Mexer no cache não bastaria: ele é um ref, e a resolução do rótulo é um
+  // `useMemo` que não observa refs. Por isso este efeito também escreve no
+  // estado — é o que faz o gatilho recalcular.
+  const initialOptionValues = (initialOptions || [])
+    .map(opt => {
+      try {
+        return String(getOptionValueRef.current(opt));
+      } catch {
+        return '';
+      }
+    })
+    .join('|');
+  useEffect(() => {
+    const currentInitialOptions = initialOptionsRef.current;
+    if (!async || !currentInitialOptions || currentInitialOptions.length === 0) return;
+    let added = false;
+    currentInitialOptions.forEach(opt => {
+      const itemValue = getOptionValueRef.current(opt);
+      if (!allItemsCacheRef.current.has(itemValue)) {
+        allItemsCacheRef.current.set(itemValue, opt);
+        added = true;
+      }
+    });
+    if (!added) return;
+    setAllAsyncOptions(prev => {
+      const known = new Set(prev.map(item => getOptionValueRef.current(item)));
+      const missing = currentInitialOptions.filter(
+        opt => !known.has(getOptionValueRef.current(opt)),
+      );
+      return missing.length > 0 ? [...missing, ...prev] : prev;
+    });
+  }, [async, initialOptionValues]);
+
   // Freshest `value` for the async option-merge effect below, which must not re-run on selection.
   const valueRef = useRef(value);
   valueRef.current = value;
