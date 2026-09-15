@@ -244,8 +244,17 @@ export function BudgetStepCustomerPayment({
     setShowDateInput(false);
   }, [patchPayment]);
 
+  // ─── O DINHEIRO DESTE PASSO É POR VEÍCULO ────────────────────────────────
+  //
+  // `services[].amount` é o preço de UM caminhão (ver `utils/quote-money.ts`) e
+  // o formulário guarda o total na mesma escala — é o que o Resumo depois
+  // apresenta como "TOTAL POR VEÍCULO · × N · TOTAL GERAL". Aqui os dois campos
+  // diziam só "Subtotal" e "Total", e num orçamento de quatro caminhões esse
+  // "Total" é um quarto do que o cliente vai pagar.
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
   const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
+  const showPerVehicleLabels = vehicleCount > 1;
+  const configGrandTotal = Math.round(configTotal * vehicleCount * 100) / 100;
 
   const setCustomerField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
@@ -552,11 +561,23 @@ export function BudgetStepCustomerPayment({
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm text-muted-foreground">Subtotal</Label>
+              <Label className="text-sm text-muted-foreground">
+                {showPerVehicleLabels ? "Subtotal por veículo" : "Subtotal"}
+              </Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
             </div>
+            {showPerVehicleLabels && (
+              <div className="space-y-1.5 flex-1 min-w-[110px]">
+                <Label className="text-sm text-muted-foreground">
+                  Total geral ({vehicleCount} veíc.)
+                </Label>
+                <Input value={formatCurrency(configGrandTotal)} disabled className="bg-muted" />
+              </div>
+            )}
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm font-bold">Total</Label>
+              <Label className="text-sm font-bold">
+                {showPerVehicleLabels ? "Total por veículo" : "Total"}
+              </Label>
               <Input
                 value={formatCurrency(configTotal)}
                 disabled

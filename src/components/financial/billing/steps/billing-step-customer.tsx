@@ -224,8 +224,18 @@ export function BillingStepCustomer({
     setShowDateInput(false);
   }, [patchPayment]);
 
+  // ─── O DINHEIRO DESTE PASSO É POR VEÍCULO ────────────────────────────────
+  //
+  // O formulário guarda o preço de UM caminhão (ver `billing-step-services`),
+  // enquanto a fatura cobra `por veículo × veículos cobertos`. Os dois campos
+  // abaixo mostravam o unitário com o rótulo "Total", e era esse número que o
+  // conferente levava para o diálogo de aprovação — onde o boleto sai pelo
+  // outro. Agora o rótulo diz qual dos dois é, e a fatura ganha linha própria.
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
-  const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
+  const configPerVehicleTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
+  const coveredHere = Math.max(1, (coverage?.length || vehicles?.length) ?? 1);
+  const showInvoiceTotal = (vehicles?.length ?? 1) > 1;
+  const configTotal = Math.round(configPerVehicleTotal * coveredHere * 100) / 100;
 
   const setCustomerField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
@@ -518,11 +528,21 @@ export function BillingStepCustomer({
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm text-muted-foreground">Subtotal</Label>
+              <Label className="text-sm text-muted-foreground">
+                {showInvoiceTotal ? "Subtotal por veículo" : "Subtotal"}
+              </Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
             </div>
+            {showInvoiceTotal && (
+              <div className="space-y-1.5 flex-1 min-w-[100px]">
+                <Label className="text-sm text-muted-foreground">Total por veículo</Label>
+                <Input value={formatCurrency(configPerVehicleTotal)} disabled className="bg-muted" />
+              </div>
+            )}
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm font-bold">Total</Label>
+              <Label className="text-sm font-bold">
+                {showInvoiceTotal ? `Total da fatura (${coveredHere} veíc.)` : "Total"}
+              </Label>
               <Input
                 value={formatCurrency(configTotal)}
                 disabled

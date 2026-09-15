@@ -30,6 +30,29 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
   // ⚠️ CLIENTES distintos, não fatias — `PER_TASK` tem uma fatia por veículo.
   const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
 
+  /**
+   * QUANTOS VEÍCULOS o orçamento cobre — a UNIÃO das coberturas de UM cliente.
+   *
+   * Cada veículo é cobrado por exatamente uma fatia daquele cliente (índice
+   * único `(taskId, customerId)`), então a união das fatias de um cliente é a
+   * frota inteira. Somar as coberturas de DOIS clientes contaria cada caminhão
+   * duas vezes, que é o mesmo erro de contar fatias como clientes.
+   */
+  const stepVehicleCount = useMemo(() => {
+    const lista = customerConfigs as any[];
+    const primeiro = lista[0];
+    if (!primeiro) return 1;
+    const ids = new Set<string>();
+    for (const c of lista) {
+      if (c?.customerId !== primeiro.customerId) continue;
+      const cobertos: string[] = Array.isArray(c?.taskIds)
+        ? c.taskIds
+        : ((c?.coveredTasks ?? []) as any[]).map((r) => r.taskId);
+      for (const id of cobertos) ids.add(id);
+    }
+    return Math.max(1, ids.size);
+  }, [customerConfigs]);
+
   // Observation modal state
   const [observationModal, setObservationModal] = useState<{ index: number; value: string } | null>(null);
 
@@ -235,7 +258,9 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
                   </span>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">
+                    {stepVehicleCount > 1 ? "Subtotal por veículo" : "Subtotal"}
+                  </span>
                   <span className="font-medium">{formatCurrency(configSubtotal)}</span>
                 </div>
 
@@ -290,14 +315,30 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
 
                 {discountAmount > 0 && (
                   <div className="flex items-center justify-between text-sm text-destructive">
-                    <span>Desconto</span>
+                    <span>Desconto{stepVehicleCount > 1 ? " por veículo" : ""}</span>
                     <span className="font-medium">- {formatCurrency(discountAmount)}</span>
                   </div>
                 )}
+                {/* ⚠️ O PREÇO AQUI É DE UM VEÍCULO. `recalculateTotals` escreve o
+                    unitário no formulário (mesma convenção do assistente de
+                    Orçamento), e a fatura cobra `unitário × veículos cobertos`.
+                    Sem o rótulo, este número era lido como o valor do boleto. */}
                 <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <span className="text-base font-bold">TOTAL</span>
+                  <span className="text-base font-bold">
+                    {stepVehicleCount > 1 ? "TOTAL POR VEÍCULO" : "TOTAL"}
+                  </span>
                   <span className="text-xl font-bold text-primary">{formatCurrency(configTotal)}</span>
                 </div>
+                {stepVehicleCount > 1 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Total geral ({stepVehicleCount} veículos)
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(Math.round(configTotal * stepVehicleCount * 100) / 100)}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
