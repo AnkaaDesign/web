@@ -34,8 +34,8 @@ const API_TRUCK_CATEGORY_LABELS: Record<string, string> = {
   TRUCK: "Truck",
   SEMI_TRAILER: "Semirreboque",
   SEMI_TRAILER_2_AXLES: "Semirreboque 2 Eixos",
-  B_DOUBLE_FRONT: "Bitrem Compartimento Frontal",
-  B_DOUBLE_REAR: "Bitrem Compartimento Traseiro",
+  B_DOUBLE_FRONT: "Bitrem Composição Dianteira",
+  B_DOUBLE_REAR: "Bitrem Composição Traseira",
   BITRUCK: "Bitruck",
 };
 const API_IMPLEMENT_TYPE_LABELS: Record<string, string> = {
