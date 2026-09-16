@@ -57,6 +57,51 @@ export function maskCpfCgu(value: string | null | undefined): string {
   return `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`;
 }
 
+/**
+ * `12345678901` → `123.***.***-01`
+ *
+ * A MÁSCARA DA TELA QUE FAZ A PERGUNTA — e por que ela não pode ser a do CGU.
+ *
+ * A conferência de identidade dá ao signatário as PONTAS do CPF (os 3 primeiros
+ * e os 2 verificadores, `cpfMaskParts`) e pede o MIOLO. A máscara do CGU esconde
+ * exatamente as pontas e imprime o miolo — as duas são complementares, e a mesma
+ * tela que pedia `456789` imprimia `***.456.789-**` logo acima do diálogo. O
+ * desafio não desafiava nada: bastava copiar.
+ *
+ * Então são duas máscaras porque são dois PROPÓSITOS:
+ *
+ *   · `maskCpfCgu` — para o que CIRCULA (selo, rodapé de página, portal público,
+ *     cartão do envelope). Segue a convenção com lastro normativo (LDO 2011 e
+ *     PARECER n. 00001/2021/CONJUR-CGU). Ali não há pergunta nenhuma sendo feita.
+ *   · `maskCpfChallenge` — para a tela que PÕE O DESAFIO. Mostra só as pontas,
+ *     que é o que o signatário já recebeu, e esconde o que ele tem de saber.
+ *
+ * A regra, em uma frase: **uma máscara exibida na tela que faz a pergunta tem de
+ * esconder a resposta.**
+ */
+export function maskCpfChallenge(value: string | null | undefined): string {
+  const d = onlyDigits(value);
+  if (d.length !== 11) return "***.***.***-**";
+  return `${d.slice(0, 3)}.***.***-${d.slice(9)}`;
+}
+
+/**
+ * A mesma máscara do desafio, montada a partir das ÂNCORAS que o servidor manda
+ * — sem nunca ter o CPF inteiro no cliente.
+ *
+ * É este o caminho normal da cerimônia: antes da conferência o navegador só
+ * conhece `cpfParts`, e derivar a exibição daí garante que o que aparece é
+ * exatamente o que foi entregue, nem um dígito a mais.
+ */
+export function maskCpfChallengeFromParts(
+  parts: SignatureMaskParts | null | undefined,
+): string | null {
+  const prefix = onlyDigits(parts?.prefix);
+  const suffix = onlyDigits(parts?.suffix);
+  if (prefix.length !== 3 || suffix.length !== 2) return null;
+  return `${prefix}.***.***-${suffix}`;
+}
+
 /** Monta o CPF completo a partir das âncoras do cadastro + o miolo digitado. */
 export function assembleCpf(parts: SignatureMaskParts, hiddenDigits: string): string {
   return `${onlyDigits(parts.prefix)}${onlyDigits(hiddenDigits)}${onlyDigits(parts.suffix)}`;
