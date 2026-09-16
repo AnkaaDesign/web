@@ -73,6 +73,16 @@ interface BillingDocumentPreviewsProps {
   orderNumbersByTask?: Record<string, string | null>;
   /** Os veículos do orçamento, na ordem do documento. */
   quoteTaskIds?: string[];
+  /**
+   * OS VEÍCULOS do orçamento por id — o que a discriminação da nota nomeia.
+   *
+   * Uma fatura cobre um caminhão, um lote ou os sessenta, e a nota fala dos que
+   * ELA cobre. Sem esta relação a prévia só conhecia o veículo ABERTO e
+   * mostrava, numa nota conjunta de quatro, a discriminação de um.
+   */
+  vehiclesByTask?: Record<string, TaskVehicle>;
+  /** Nº do orçamento — a discriminação o cita quando os veículos são muitos. */
+  budgetNumber?: number | null;
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -95,20 +105,45 @@ function formatPhone(phone?: string): string {
   return phone || "";
 }
 
-function buildVehicleRef(task: TaskVehicle): string {
+/** Um veículo por extenso — espelha `describeOneVehicle` da emissão. */
+function describeOneVehicle(v: TaskVehicle): string {
   const typeParts: string[] = [];
-  if (task.category) typeParts.push(API_TRUCK_CATEGORY_LABELS[task.category] ?? task.category);
-  if (task.implementType) typeParts.push(API_IMPLEMENT_TYPE_LABELS[task.implementType] ?? task.implementType);
+  if (v.category) typeParts.push(API_TRUCK_CATEGORY_LABELS[v.category] ?? v.category);
+  if (v.implementType) typeParts.push(API_IMPLEMENT_TYPE_LABELS[v.implementType] ?? v.implementType);
   const idParts: string[] = [];
-  if (task.serialNumber) idParts.push(`n série: ${task.serialNumber}`);
-  if (task.plate) idParts.push(`placa: ${task.plate}`);
-  if (task.chassisNumber) idParts.push(`chassi: ${task.chassisNumber}`);
+  if (v.serialNumber) idParts.push(`n série: ${v.serialNumber}`);
+  if (v.plate) idParts.push(`placa: ${v.plate}`);
+  if (v.chassisNumber) idParts.push(`chassi: ${v.chassisNumber}`);
   const typePart = typeParts.join(" ");
   const idPart = idParts.join(", ");
-  if (typePart && idPart) return `Referente aos serviços executados no veículo ${typePart} de ${idPart}.`;
-  if (typePart) return `Referente aos serviços executados no veículo ${typePart}.`;
-  if (idPart) return `Referente aos serviços executados no veículo de ${idPart}.`;
-  return "";
+  if (typePart && idPart) return `${typePart} de ${idPart}`;
+  return typePart || idPart;
+}
+
+/**
+ * A DISCRIMINAÇÃO dos veículos que ESTA nota cobre.
+ *
+ * Mesmas três faixas da emissão (`elotech-oxy-nfse.service.ts`): um por extenso,
+ * dois ou três por extenso, e de quatro em diante a CONTAGEM mais a faixa de
+ * séries — o teto de 11 linhas da discriminação não cabe sessenta caminhões, e
+ * o que o fiscal lê é a lista de serviços.
+ */
+function buildVehicleRef(vehicles: TaskVehicle[], budgetNumber?: number | null): string {
+  const described = vehicles.map(describeOneVehicle).filter(Boolean);
+  if (described.length === 0) return "";
+  if (described.length === 1) {
+    return `Referente aos serviços executados no veículo ${described[0]}.`;
+  }
+  if (described.length <= 3) {
+    return `Referente aos serviços executados nos veículos ${described.join("; ")}.`;
+  }
+  const serials = vehicles
+    .map((v) => v.serialNumber)
+    .filter((n): n is string => Boolean(n))
+    .sort();
+  const range = serials.length > 1 ? ` (séries ${serials[0]} a ${serials[serials.length - 1]})` : "";
+  const budgetRef = budgetNumber ? ` Orçamento nº ${budgetNumber}.` : "";
+  return `Referente aos serviços executados em ${vehicles.length} veículos${range}.` + budgetRef;
 }
 
 /** Greedy packer mirroring sicredi-boleto.scheduler.ts buildServiceLines. */
@@ -200,6 +235,9 @@ function buildCustomerDoc(
   task: TaskVehicle,
   predictedNfseNumber: number | null,
   orderNumber: string | null,
+  /** Os veículos que ESTA fatura cobre — a quantidade de cada linha e a discriminação. */
+  coveredVehicles: TaskVehicle[],
+  budgetNumber?: number | null,
 ): CustomerDoc {
   const cd = config.customerData || {};
   const customerName = cd.corporateName || cd.fantasyName || "Cliente";
@@ -211,27 +249,70 @@ function buildCustomerDoc(
   const serviceDescs = configServices.map((s) => resolveServiceDesc(s)).filter(Boolean);
   const nfseNumberForThisDoc = generateInvoice ? predictedNfseNumber : null;
 
-  const servicesSubtotal = configServices.reduce((s, svc) => s + (Number(svc.amount) || 0), 0);
-  let discountPct = 0;
-  if (config.discountType === "PERCENTAGE" && config.discountValue) {
-    discountPct = Number(config.discountValue);
-  } else if (config.discountType === "FIXED_VALUE" && config.discountValue && servicesSubtotal > 0) {
-    discountPct = round2((Number(config.discountValue) / servicesSubtotal) * 100);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // A QUANTIDADE DE CADA LINHA É O NÚMERO DE VEÍCULOS QUE ESTA FATURA COBRE
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // `svc.amount` é o preço de UM veículo (ver `utils/quote-money.ts`) e
+  // `config.total` já é `por veículo × cobertos` — é ele que o boleto ao lado
+  // mostra. Somar os unitários aqui punha, no MESMO diálogo de confirmação, uma
+  // NFS-e de R$ 1.200,00 encostada num boleto de R$ 2.400,00.
+  const quantidade = Math.max(1, coveredVehicles.length);
+  const lineTotals = configServices.map((svc) => round2((Number(svc.amount) || 0) * quantidade));
+  const servicesSubtotal = round2(lineTotals.reduce((s, v) => s + v, 0));
+
+  // O DESCONTO, pela mesma regra da emissão (`resolveGlobalDiscount`): a
+  // diferença entre o que as linhas somam e o que a fatura cobra É o desconto,
+  // seja como tiver sido digitado. O par declarado só entra quando não há linha
+  // para medir ou quando não há diferença — do contrário a nota e o boleto
+  // divergiriam pelos centavos do arredondamento.
+  const configTotal = Number(config.total) || 0;
+  const gap = round2(servicesSubtotal - configTotal);
+  let targetDiscount = 0;
+  if (servicesSubtotal > 0 && configTotal > 0 && gap > 0.005) {
+    targetDiscount = gap;
+  } else if (config.discountType === "PERCENTAGE" && config.discountValue) {
+    targetDiscount = round2((servicesSubtotal * Number(config.discountValue)) / 100);
+  } else if (config.discountType === "FIXED_VALUE" && config.discountValue) {
+    targetDiscount = Math.min(round2(Number(config.discountValue) * quantidade), servicesSubtotal);
+  }
+  targetDiscount = Math.min(targetDiscount, servicesSubtotal);
+
+  // Repartição por MAIOR RESTO — a mesma da emissão, para a soma das linhas
+  // bater no alvo até o centavo.
+  const lineDiscounts = new Array(lineTotals.length).fill(0) as number[];
+  if (targetDiscount > 0 && servicesSubtotal > 0) {
+    const targetCents = Math.round(targetDiscount * 100);
+    const subtotalCents = Math.round(servicesSubtotal * 100);
+    const raw = lineTotals.map((amt) => (Math.round(amt * 100) * targetCents) / subtotalCents);
+    const floored = raw.map((r) => Math.floor(r));
+    let leftover = targetCents - floored.reduce((a, b) => a + b, 0);
+    const order = raw
+      .map((r, i) => ({ i, frac: r - Math.floor(r) }))
+      .sort((a, b) => b.frac - a.frac);
+    let k = 0;
+    while (leftover > 0 && order.length > 0) {
+      floored[order[k % order.length].i] += 1;
+      leftover -= 1;
+      k += 1;
+    }
+    for (let i = 0; i < floored.length; i++) lineDiscounts[i] = floored[i] / 100;
   }
 
   let totalDescontos = 0;
-  const itens: NfsePreviewItem[] = configServices.map((svc) => {
-    const valor = Number(svc.amount) || 0;
-    const desconto = discountPct > 0 ? round2((valor * discountPct) / 100) : 0;
+  const itens: NfsePreviewItem[] = configServices.map((svc, i) => {
+    const unitario = Number(svc.amount) || 0;
+    const valorTotal = lineTotals[i] ?? 0;
+    const desconto = lineDiscounts[i] ?? 0;
     totalDescontos += desconto;
     return {
       descricao: resolveServiceDesc(svc) || "",
-      quantidade: 1,
-      valor,
+      quantidade,
+      valor: unitario,
       desconto,
       descontoCondicionado: 0,
-      valorServico: valor,
-      valorLiquido: Math.max(0, round2(valor - desconto)),
+      valorServico: valorTotal,
+      valorLiquido: Math.max(0, round2(valorTotal - desconto)),
     };
   });
   totalDescontos = round2(totalDescontos);
@@ -242,7 +323,10 @@ function buildCustomerDoc(
 
   // NFS-e discriminação — order number IS cleaned here ("PEDIDO NR 123" → "123")
   const cleanOrderNumber = (orderNumber || "").replace(/^PEDIDO\s+NR\s+/i, "").trim();
-  const vehicleRef = buildVehicleRef(task);
+  const vehicleRef = buildVehicleRef(
+    coveredVehicles.length > 0 ? coveredVehicles : [task],
+    budgetNumber,
+  );
   const discLines: string[] = [];
   if (cleanOrderNumber) discLines.push(`Pedido: ${cleanOrderNumber}`);
   if (vehicleRef) discLines.push(vehicleRef);
@@ -345,6 +429,8 @@ export function BillingDocumentPreviews({
   nextNfseNumber,
   orderNumbersByTask,
   quoteTaskIds,
+  vehiclesByTask,
+  budgetNumber,
 }: BillingDocumentPreviewsProps) {
   const docs = useMemo<DocEntry[]>(() => {
     const configs = customerConfigs || [];
@@ -381,7 +467,21 @@ export function BillingDocumentPreviews({
         idsForDoc.map((id) => ({ customerOrderNumber: numbers[id] ?? null })),
       );
 
-      const doc = buildCustomerDoc(config, configServices, task, predicted, orderNumber);
+      // OS VEÍCULOS QUE ESTA FATURA COBRE, na ordem do documento. Recai no
+      // veículo aberto quando a relação não veio — um orçamento de um veículo
+      // continua com a discriminação de sempre.
+      const coveredVehicles = idsForDoc
+        .map((tid) => (vehiclesByTask ?? {})[tid])
+        .filter((v): v is TaskVehicle => Boolean(v));
+      const doc = buildCustomerDoc(
+        config,
+        configServices,
+        task,
+        predicted,
+        orderNumber,
+        coveredVehicles.length > 0 ? coveredVehicles : [task],
+        budgetNumber,
+      );
       if (doc.nfse) {
         entries.push({ key: `nfse-${doc.customerId}`, kind: "nfse", label: "NFS-e", sublabel: doc.customerName, data: doc.nfse });
       }
@@ -396,7 +496,16 @@ export function BillingDocumentPreviews({
       });
     });
     return entries;
-  }, [customerConfigs, services, task, nextNfseNumber, orderNumbersByTask, quoteTaskIds]);
+  }, [
+    customerConfigs,
+    services,
+    task,
+    nextNfseNumber,
+    orderNumbersByTask,
+    quoteTaskIds,
+    vehiclesByTask,
+    budgetNumber,
+  ]);
 
   const nfseCount = docs.filter((d) => d.kind === "nfse").length;
   const boletoCount = docs.filter((d) => d.kind === "boleto").length;

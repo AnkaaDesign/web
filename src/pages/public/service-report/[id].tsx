@@ -21,6 +21,7 @@ import {
   orderNumberLabel,
   hasMultipleCustomers,
   coveredTaskIds,
+  quoteVehicleCount,
 } from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
@@ -347,6 +348,13 @@ export function PublicServiceReportPage() {
           total: configTotal,
           paymentMethod,
           firstDueDate,
+          // A COBERTURA, como na página do orçamento e no documento. O dossiê é
+          // peça que vai ao CLIENTE: sem ela, um orçamento cobrado veículo a
+          // veículo prometia "3 parcelas de R$ 583,33" sobre um contrato de
+          // R$ 7.000, sem dizer que são por caminhão nem quantas cobranças
+          // existem no total — a mesma ambiguidade que o PDF já desfazia.
+          vehicleCount: quoteVehicleCount(quote as any),
+          coveredVehicleCount: coveredTaskIds(config).length || undefined,
         }),
         // O PEDIDO DE COMPRA DO CLIENTE, mostrado junto das condições de
         // pagamento, exatamente como na página do orçamento.
@@ -378,7 +386,7 @@ export function PublicServiceReportPage() {
 
   // NFSe documents from relevant configs' invoices (only authorized ones)
   const nfseDocuments = relevantConfigs
-    .flatMap((c: any) => c.invoice?.nfseDocuments || [])
+    .flatMap((c: any) => c.invoices?.flatMap((i: any) => i?.nfseDocuments ?? []) ?? [])
     .filter((doc: any) => doc.status === "AUTHORIZED" && doc.elotechNfseId);
 
   // AS ORDENS DE SERVIÇO DE TODOS OS VEÍCULOS.

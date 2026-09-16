@@ -33,6 +33,7 @@ import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-l
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
+import { TASK_QUOTE_STATUS_LABELS } from "@/constants/enum-labels";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import { cn } from "@/lib/utils";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
@@ -47,20 +48,56 @@ import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
-import {
-  groupsForSplit,
-  type BillingSplitValue,
-} from "@/components/financial/shared/billing-split-field";
-
+/** Os destinos que ESTE passo oferece. Curados de propósito: o passo de
+ *  Orçamento move entre pendente e aprovado, e nada mais. */
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
   { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
 ];
 
+/**
+ * Os destinos curados MAIS o status atual, quando ele não é um deles.
+ *
+ * `SIGNED` e `EXPIRED` são escritos pela CERIMÔNIA, nunca escolhidos num menu —
+ * por isso não são destino em `VALID_TRANSITIONS` e nunca estiveram na lista
+ * acima. Só que o Combobox rotula o gatilho procurando o valor ATUAL entre as
+ * opções: assim que o cliente assinava, o orçamento ia para `SIGNED`, o valor
+ * sumia da lista e o badge virava o placeholder "Selecione uma opção" — sem
+ * rótulo e sem cor, justamente na tela onde se confere o que está faltando.
+ *
+ * O atual entra só para o gatilho ter o que mostrar, e sai desabilitado (ninguém
+ * transiciona para onde já está). Mesma forma de `billing-step-review`, que
+ * também cura os destinos por fase e apenas garante a presença do atual.
+ */
+const statusOptionsFor = (
+  current: string | null | undefined,
+): Array<{ value: string; label: string }> => {
+  if (!current || STATUS_OPTIONS.some((o) => o.value === current)) return STATUS_OPTIONS;
+  return [
+    {
+      value: current,
+      label: TASK_QUOTE_STATUS_LABELS[current as keyof typeof TASK_QUOTE_STATUS_LABELS] ?? current,
+    },
+    ...STATUS_OPTIONS,
+  ];
+};
+
+/**
+ * A cor do gatilho, nas MESMAS cores de `QuoteStatusBadge`.
+ *
+ * Divergir faria a mesma situação ter duas cores conforme o usuário pudesse ou
+ * não mudar o status — o seletor aparece para quem pode, o badge para quem não.
+ */
 const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
     PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
+    // Teal, a cor PRÓPRIA de "assinado pelo cliente, falta a nossa
+    // contra-assinatura" — ver o comentário em `quote-status-badge`.
+    SIGNED: "bg-teal-500 text-white hover:bg-teal-600 border-teal-600",
+    EXPIRED: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
     BUDGET_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
+    BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
+    CANCELLED: "bg-red-700 text-white hover:bg-red-800 border-red-800",
   };
   return map[status] || "";
 };
@@ -103,6 +140,19 @@ export function BudgetStepReview({
   const simultaneousTasks = useWatch({ control, name: "simultaneousTasks" });
   const subtotalValue = useWatch({ control, name: "subtotal" });
   const totalValue = useWatch({ control, name: "total" });
+  // O MODO e a REPARTIÇÃO do faturamento — o que decide sobre quantos veículos a
+  // cláusula de pagamento fala. Sem eles a cláusula deste resumo era montada
+  // como se o orçamento tivesse UM veículo, e o número que o comercial confere
+  // aqui, na última tela antes de salvar, saía dividido por N. Ver
+  // `paymentPlans` mais abaixo.
+  const billingSplitValue = useWatch({ control, name: "billingSplit" }) as
+    | "JOINT"
+    | "PER_TASK"
+    | "CUSTOM"
+    | undefined;
+  const billingGroupsValue = useWatch({ control, name: "billingGroups" }) as
+    | string[][]
+    | undefined;
   const expiresAt = useWatch({ control, name: "expiresAt" });
   const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
 
@@ -152,6 +202,68 @@ export function BudgetStepReview({
     if (vehicleLabels.length > 0) return vehicleLabels.length;
     return 1;
   }, [existingQuote, vehicleLabels]);
+
+  /**
+   * SOBRE QUANTOS VEÍCULOS CADA FATURA FALA — uma entrada por PLANO de cobrança.
+   *
+   * Espelha `paymentScope` do documento (`api/.../signature/document/quote-text.ts`)
+   * e a mesma leitura do assistente de Faturamento. As fatias são agrupadas por
+   * TAMANHO DA COBERTURA, não por fatura: num `PER_TASK` de sessenta veículos as
+   * sessenta faturas têm o mesmo plano e produzem UMA frase ("para cada um dos
+   * 60 veículos… 240 cobranças"), não sessenta parágrafos.
+   *
+   * `JOINT` cobre todos, `PER_TASK` cobre um, e em lotes cada grupo cobre o
+   * tamanho dele — com lotes desiguais saindo mais de uma frase, como no PDF.
+   */
+  const paymentPlans = useMemo<Array<{ covered: number; prefix: string | null }>>(() => {
+    const uniform = (covered: number) => [{ covered, prefix: null }];
+    if (vehicleCount <= 1) return uniform(1);
+    const split = billingSplitValue ?? "JOINT";
+    if (split === "PER_TASK") return uniform(1);
+    if (split !== "CUSTOM") return uniform(vehicleCount);
+
+    const groups = (billingGroupsValue ?? []).filter(
+      (g) => Array.isArray(g) && g.length > 0,
+    );
+    // Sem lotes compostos ainda, a intenção declarada é a fatura conjunta — que
+    // é também o que o save faz quando `billingGroups` chega vazio.
+    if (groups.length === 0) return uniform(vehicleCount);
+    const sizes = [...new Set(groups.map((g) => g.length))];
+    // LOTES IGUAIS são um plano só: sessenta faturas de um caminhão produzem
+    // UMA frase ("para cada um dos 60 veículos… 240 cobranças"), não sessenta
+    // parágrafos. É o que o documento faz, e o que mantém o acervo byte a byte
+    // igual ao de antes da feature.
+    if (sizes.length === 1) return uniform(sizes[0]);
+
+    // LOTES DESIGUAIS: uma frase por LOTE, prefixada pelos veículos dele e sem
+    // escopo nem contagem de cobranças — cada uma fala só dos SEUS. É como o
+    // documento escreve ("Veículos 8101, 8102, 8104: Fica acertado…"), e é a
+    // única forma honesta: "para cada grupo de 3" e "serão 6 cobranças" são
+    // extrapolações que só valem quando todos os lotes têm o mesmo tamanho.
+    const byId = new Map(
+      ((existingQuote?.tasks ?? []) as any[]).map((t: any) => [t.id, t]),
+    );
+    const labelOf = (taskId: string) => {
+      const t = byId.get(taskId);
+      return (
+        (t?.serialNumber || undefined) ??
+        (t?.truck?.plate || undefined) ??
+        (t?.name || undefined) ??
+        taskId.slice(0, 8)
+      );
+    };
+    return groups.map((g) => {
+      const labels = g.map(labelOf);
+      const shown =
+        labels.length <= 3
+          ? labels.join(", ")
+          : `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
+      return {
+        covered: g.length,
+        prefix: `${g.length === 1 ? "Veículo" : "Veículos"} ${shown}: `,
+      };
+    });
+  }, [vehicleCount, billingSplitValue, billingGroupsValue, existingQuote]);
 
   // O que está no CAMPO é o do veículo aberto (ou, na criação, o de todos os que
   // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
@@ -217,30 +329,6 @@ export function BudgetStepReview({
 
   // Cada coluna só existe se ALGUM veículo a tiver — a mesma regra do documento
   // e da página pública: uma coluna inteira de travessões não informa nada.
-  // ═══════════════════════════════════════════════════════════════════════
-  // QUAL FATURA COBRA CADA VEÍCULO
-  //
-  // A coluna que respondia a pergunta que a tela não respondia. Ela só aparece
-  // quando o faturamento é FATIADO — numa fatura conjunta todos os veículos
-  // estão nela, e uma coluna com "Fatura 1" repetida sessenta vezes não informa
-  // nada.
-  // ═══════════════════════════════════════════════════════════════════════
-  const billingSplitWatch = useWatch({ control, name: "billingSplit" }) as string | undefined;
-  const billingGroupsWatch =
-    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
-  const lotOfVehicle = useMemo(() => {
-    const ids = vehicleRows.map((v) => v.key);
-    const groups = groupsForSplit(
-      (billingSplitWatch ?? "JOINT") as BillingSplitValue,
-      ids,
-      billingGroupsWatch,
-    );
-    if (groups.length <= 1) return null;
-    const map = new Map<string, number>();
-    groups.forEach((g, i) => g.forEach((id) => map.set(id, i + 1)));
-    return map;
-  }, [vehicleRows, billingSplitWatch, billingGroupsWatch]);
-
   const anyVehicleOrderNumber = vehicleRows.some((v) => !!v.orderNumber);
   const anyVehicleChassis = vehicleRows.some((v) => !!v.chassis);
   const anyVehicleCategory = vehicleRows.some((v) => !!v.category);
@@ -444,7 +532,7 @@ export function BudgetStepReview({
                         onStatusChange?.(v);
                       }
                     }}
-                    options={STATUS_OPTIONS.map((s) => {
+                    options={statusOptionsFor(currentStatus).map((s) => {
                       const isCurrent = s.value === currentStatus;
                       const allowed = isCurrent || allowedNextStatuses.includes(s.value as TASK_QUOTE_STATUS);
                       return {
@@ -510,9 +598,6 @@ export function BudgetStepReview({
                         {anyVehicleOrderNumber && (
                           <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Nº do pedido</th>
                         )}
-                        {lotOfVehicle && (
-                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Fatura</th>
-                        )}
                         {anyVehicleCategory && (
                           <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Categoria</th>
                         )}
@@ -532,11 +617,6 @@ export function BudgetStepReview({
                           )}
                           {anyVehicleOrderNumber && (
                             <td className="py-1 pr-3 font-medium tabular-nums">{v.orderNumber || <span className="text-muted-foreground">—</span>}</td>
-                          )}
-                          {lotOfVehicle && (
-                            <td className="py-1 pr-3 font-medium tabular-nums">
-                              {lotOfVehicle.get(v.key) ?? <span className="text-muted-foreground">—</span>}
-                            </td>
                           )}
                           {anyVehicleCategory && (
                             <td className="py-1 pr-3 font-medium">{v.category || <span className="text-muted-foreground">—</span>}</td>
@@ -826,12 +906,23 @@ export function BudgetStepReview({
                   ? config.total
                   : Number(config.total) || 0;
               const configDiscountAmount = Math.max(0, configSubtotal - configTotal);
-              const configPaymentText = generatePaymentText({
-                customPaymentText: config.customPaymentText,
-                paymentConfig: config.paymentConfig,
-                paymentCondition: config.paymentCondition,
-                total: configTotal,
-              });
+              // Mesma leitura do cartão de cliente único logo abaixo: o valor do
+              // formulário é POR VEÍCULO, e a frase precisa falar do que a fatura
+              // daquele plano cobra. Sem `vehicleCount`/`coveredVehicleCount` a
+              // cláusula saía como se o orçamento fosse de um caminhão só.
+              const configPaymentTexts = paymentPlans
+                .map(({ covered, prefix }) => {
+                  const text = generatePaymentText({
+                    customPaymentText: config.customPaymentText,
+                    paymentConfig: config.paymentConfig,
+                    paymentCondition: config.paymentCondition,
+                    total: round2(configTotal * covered),
+                    vehicleCount: prefix ? 1 : vehicleCount,
+                    coveredVehicleCount: prefix ? 1 : covered,
+                  });
+                  return text ? `${prefix ?? ""}${text}` : "";
+                })
+                .filter(Boolean);
 
               // Find original index for consistent numbering
               const originalIndex = (customerConfigs || []).findIndex((c: any) => c.customerId === config.customerId);
@@ -893,13 +984,17 @@ export function BudgetStepReview({
                     <span className="text-base font-bold text-primary">{formatCurrency(configTotal)}</span>
                   </div>
 
-                  {configPaymentText && (
-                    <div className="pt-2">
+                  {configPaymentTexts.length > 0 && (
+                    <div className="pt-2 space-y-1">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1">
                         <IconCreditCard className="h-4 w-4 text-muted-foreground" />
                         Condições de Pagamento
                       </div>
-                      <p className="text-sm text-muted-foreground">{configPaymentText}</p>
+                      {configPaymentTexts.map((text, k) => (
+                        <p key={k} className="text-sm text-muted-foreground">
+                          {text}
+                        </p>
+                      ))}
                     </div>
                   )}
 
@@ -927,26 +1022,44 @@ export function BudgetStepReview({
         (() => {
           const config = customerConfigs[0];
           const configTotal = typeof config.total === "number" ? config.total : Number(config.total) || 0;
-          const paymentText = generatePaymentText({
-            customPaymentText: config.customPaymentText,
-            paymentConfig: config.paymentConfig,
-            paymentCondition: config.paymentCondition,
-            total: configTotal,
-          });
+          // UMA FRASE POR PLANO, sobre o valor que a fatura daquele plano cobra.
+          //
+          // `config.total` neste formulário é o valor de UM veículo (ver o
+          // `form.reset` da tela de detalhe, que semeia com `perVehicleAmount`),
+          // então o total da fatura é `por veículo × cobertos` — a mesma conta do
+          // documento. Sem isso a frase saía sobre o valor de um caminhão: um
+          // orçamento conjunto de 4 veículos a R$ 1.750 anunciava "3 parcelas de
+          // R$ 583,33" quando a fatura é de R$ 7.000 e a parcela, R$ 2.333,33.
+          const paymentTexts = paymentPlans
+            .map(({ covered, prefix }) => {
+              const text = generatePaymentText({
+                customPaymentText: config.customPaymentText,
+                paymentConfig: config.paymentConfig,
+                paymentCondition: config.paymentCondition,
+                total: round2(configTotal * covered),
+                // Com prefixo, a frase já diz de quem fala: mandar escopo junto
+                // produziria "Veículos 8101, 8102: … para cada grupo de 2
+                // veículos", que diz a mesma coisa duas vezes e erra na segunda.
+                vehicleCount: prefix ? 1 : vehicleCount,
+                coveredVehicleCount: prefix ? 1 : covered,
+              });
+              return text ? `${prefix ?? ""}${text}` : "";
+            })
+            .filter(Boolean);
           // `attentionOrderNumberFor` keeps the block alive when a rule is pointing at the missing
           // pedido — otherwise the whole card would be skipped and there would be nothing to blink.
-          if (!paymentText) return null;
+          if (paymentTexts.length === 0) return null;
           return (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
-              {paymentText && (
-                <>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <IconCreditCard className="h-4 w-4 text-muted-foreground" />
-                    Condições de Pagamento
-                  </div>
-                  <p className="text-sm text-muted-foreground">{paymentText}</p>
-                </>
-              )}
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                Condições de Pagamento
+              </div>
+              {paymentTexts.map((text, i) => (
+                <p key={i} className="text-sm text-muted-foreground">
+                  {text}
+                </p>
+              ))}
             </div>
           );
         })()}

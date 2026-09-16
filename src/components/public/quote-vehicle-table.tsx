@@ -62,17 +62,16 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   // para ele. Categoria e implemento só ganham coluna se ALGUM veículo os tiver:
   // são classificação, não identidade, e uma coluna inteira de travessões não
   // informa nada.
-  // O PEDIDO DE COMPRA segue a mesma regra: só ganha coluna se ALGUM veículo o
-  // tiver. Ele identifica a ENTREGA — dois caminhões do mesmo orçamento podem ter
-  // vindo em pedidos diferentes —, e é por isso que deixou de ser uma linha do
-  // quadro do tomador, onde só cabia um número.
-  const anyOrderNumber = tasks.some((t) => !!(t?.customerOrderNumber ?? "").trim());
-
+  // O PEDIDO DE COMPRA sai SEMPRE, com os de identidade. Ele é por VEÍCULO —
+  // dois caminhões do mesmo orçamento podem ter vindo em pedidos diferentes —, e
+  // é por isso que deixou de ser uma linha do quadro do tomador, onde só cabia um
+  // número. Sair só quando já está preenchido escondia justamente a coluna que o
+  // cliente precisa conferir: o número costuma chegar DEPOIS da emissão.
   const columns: Array<{ key: string; label: string }> = [
     { key: "serialNumber", label: "Nº de série" },
     { key: "plate", label: "Placa" },
     { key: "chassis", label: "Chassi" },
-    ...(anyOrderNumber ? [{ key: "orderNumber", label: "Nº do pedido" }] : []),
+    { key: "orderNumber", label: "Nº do pedido" },
     ...(anyCategory ? [{ key: "category", label: "Categoria" }] : []),
     ...(anyImplement ? [{ key: "implement", label: "Implemento" }] : []),
   ];
@@ -94,8 +93,11 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
           <ARegistrar />
         );
       case "orderNumber": {
+        // "a registrar" e não travessão — ver o mesmo `case` em
+        // `quote-html.builder.ts`: o número do pedido é identidade do veículo e
+        // costuma chegar depois da emissão, como o chassi.
         const value = (task?.customerOrderNumber ?? "").trim();
-        return value ? <strong>{value}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;
+        return value ? <strong>{value}</strong> : <ARegistrar />;
       }
       case "category": {
         const label = labelOf(TRUCK_CATEGORY_LABELS as any, task?.truck?.category);

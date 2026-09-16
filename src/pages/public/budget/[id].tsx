@@ -375,7 +375,7 @@ export function PublicBudgetPage() {
         label: alone
           ? null
           : coverageSummary(
-              { coveredTasks: group.flatMap((c: any) => c.coveredTasks ?? []) } as any,
+              { tasks: group.flatMap((c: any) => c.billing?.tasks ?? c.tasks ?? []) } as any,
               vehicleTotal,
               quoteTasks<any>(quote),
             ),
@@ -637,7 +637,7 @@ export function PublicBudgetPage() {
                     {invoiceDoc ? <> ({invoiceDoc})</> : null},
                   </>
                 ) : null}
-                {" "}para execução dos serviços abaixo descriminados
+                {" "}para execução dos serviços abaixo discriminados
                 {quoteTasks(quote).length > 0 && (
                   <>
                     {" "}

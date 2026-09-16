@@ -70,7 +70,27 @@ export function normalizeGroups(
     if (kept.length > 0) out.push(kept);
   }
   for (const id of vehicleIds) if (!seen.has(id)) out.push([id]);
-  return out;
+  // ─── A ORDEM DOS LOTES SAI DA LISTA DE VEÍCULOS ─────────────────────────
+  //
+  // O número do lote é posicional — "Lote 1" é só o primeiro da lista —, e antes
+  // ele herdava a ordem em que as FATURAS voltaram da API. O resultado era um
+  // painel que parecia embaralhado: trocar um orçamento `PER_TASK` de quatro
+  // caminhões para lotes abria com 8101 no Lote 4 e 8104 no Lote 1, de trás para
+  // frente, e cada mudança renumerava tudo de novo debaixo da mão do operador —
+  // ele escolhia "Lote 4" e a linha passava a exibir "Lote 3".
+  //
+  // Ancorando no PRIMEIRO veículo de cada lote, o número passa a derivar da
+  // mesma ordem que a tela já mostra: o lote do primeiro caminhão é sempre o
+  // Lote 1, e juntar dois veículos não mexe no rótulo de quem ficou de fora.
+  //
+  // Só rótulo e ordem de exibição: a identidade de um agrupamento é QUEM está
+  // com QUEM, e tanto o casamento de cobertura no servidor quanto o recorte
+  // material (que ordena `billingGroups` antes de gerar o hash) são
+  // indiferentes à ordem — reordenar aqui não derruba assinatura nenhuma.
+  const position = new Map(vehicleIds.map((id, i) => [id, i]));
+  const firstPos = (group: string[]) =>
+    Math.min(...group.map((id) => position.get(id) ?? Number.MAX_SAFE_INTEGER));
+  return out.sort((a, b) => firstPos(a) - firstPos(b));
 }
 
 /** A partição que um modo produz, para o assistente mandar no save. */
@@ -216,17 +236,6 @@ export function BillingSplitField({
         searchable={false}
         emptyText="Nenhuma opção"
       />
-
-      {/* O QUE A ESCOLHA CUSTA, em uma linha. O número surpreende: sessenta
-          caminhões em quatro parcelas são duzentos e quarenta boletos, e quem
-          decide precisa saber disso antes, não quando o malote chegar. */}
-      <p className="text-xs text-muted-foreground">
-        {value === "JOINT"
-          ? `Uma fatura com o total dos ${count} veículos, um plano de parcelas e uma nota fiscal citando todos.`
-          : value === "PER_TASK"
-            ? `${count} faturas, ${count} notas fiscais e um plano de parcelas por veículo. O financeiro aprova veículo a veículo, conforme cada um é entregue.`
-            : `${normalized.length} ${normalized.length === 1 ? "fatura" : "faturas"}: cada lote recebe a sua nota fiscal e o seu plano de parcelas.`}
-      </p>
 
       {approvedCount > 0 && (
         <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">

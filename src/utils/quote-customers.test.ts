@@ -24,10 +24,10 @@ const CLIENTE_B = "0f723f76-f3b6-41c9-ae1f-3c1209955f58";
 
 /** As quatro faturas do orçamento nº 0976: um cliente, um caminhão cada. */
 const perTaskUmCliente = [
-  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t1" }] },
-  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t2" }] },
-  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t3" }] },
-  { customerId: CLIENTE_A, coveredTasks: [{ taskId: "t4" }] },
+  { customerId: CLIENTE_A, tasks: [{ taskId: "t1" }] },
+  { customerId: CLIENTE_A, tasks: [{ taskId: "t2" }] },
+  { customerId: CLIENTE_A, tasks: [{ taskId: "t3" }] },
+  { customerId: CLIENTE_A, tasks: [{ taskId: "t4" }] },
 ];
 
 describe("quantos clientes um orçamento fatura", () => {
@@ -51,10 +51,10 @@ describe("quantos clientes um orçamento fatura", () => {
   it("PER_TASK com dois clientes e oito fatias ainda são dois", () => {
     const oito = [
       ...perTaskUmCliente,
-      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t1" }] },
-      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t2" }] },
-      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t3" }] },
-      { customerId: CLIENTE_B, coveredTasks: [{ taskId: "t4" }] },
+      { customerId: CLIENTE_B, tasks: [{ taskId: "t1" }] },
+      { customerId: CLIENTE_B, tasks: [{ taskId: "t2" }] },
+      { customerId: CLIENTE_B, tasks: [{ taskId: "t3" }] },
+      { customerId: CLIENTE_B, tasks: [{ taskId: "t4" }] },
     ];
     expect(customerCount(oito)).toBe(2);
     expect(hasMultipleCustomers(oito)).toBe(true);

@@ -15,7 +15,8 @@ import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseCancelDialog } from "@/components/financial/nfse/nfse-cancel-dialog";
 import { useTaskNfseHistory } from "@/hooks/production/use-invoice";
 import { useNfseDetail } from "@/hooks/financial/use-nfse";
-import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
+import { canApproveQuote, canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
+import { round2 } from "@/utils/quote-money";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import {
@@ -63,6 +64,7 @@ import {
   coverageSummary,
   coveredTaskCount,
   coveredTaskIds,
+  billingApprovedAtOf,
 } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
@@ -83,6 +85,25 @@ const STATUS_LABELS: Record<string, string> = {
 
 // Synthetic combobox option that triggers the revert-billing flow instead of a status change.
 const REVERT_OPTION_VALUE = "__REVERT_BILLING__";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// APROVAR O FATURAMENTO DESTE VEÍCULO — UM ATO DA FATIA, NÃO UMA TRANSIÇÃO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Com cobrança fatiada (veículo a veículo ou em lotes) a PRIMEIRA aprovação leva
+// o orçamento a BILLING_APPROVED e a cascata o move para UPCOMING/DUE/PARTIAL.
+// As fatias 2..N não mexem mais no status do orçamento — ele já está no ciclo de
+// recebíveis — e por isso não podem depender dele.
+//
+// Era o que acontecia: o seletor só oferecia "Aprovar Faturamento" enquanto o
+// status fosse PRÉ-faturamento, então depois do primeiro caminhão nenhum outro
+// tinha por onde ser faturado. Num orçamento de sessenta, cinquenta e nove
+// ficavam sem fatura, sem nota e sem boleto, e não havia outro caminho na tela.
+//
+// A opção agora é SINTÉTICA, como a de reverter: não é um status, é uma ação
+// sobre a fatia que cobre o veículo aberto. Aparece enquanto essa fatia não
+// tiver sido aprovada, em qualquer status do orçamento.
+const APPROVE_SLICE_OPTION_VALUE = "__APPROVE_BILLING_SLICE__";
 
 // Statuses meaning billing has already been approved (invoice/NF/boleto exist or are generating).
 // Pre-billing (e.g. BUDGET_APPROVED) → the forward action is to APPROVE faturamento, which
@@ -122,9 +143,25 @@ interface BillingStepReviewProps {
   isGenerating?: boolean;
   /** When set, filters to show only this customer's data */
   filterCustomerId?: string;
+  /**
+   * Os ÍNDICES das cobranças que esta página mostra. Ausente/vazio ⇒ todas.
+   *
+   * `filterCustomerId` não dava conta: num orçamento cobrado veículo a veículo as
+   * N cobranças são do MESMO CNPJ, então filtrar por cliente não cortava nada e o
+   * Resumo desenhava as três lado a lado — a tela de UMA cobrança exibindo as
+   * outras duas, que é o defeito que o dono apontou no print de 16/09.
+   */
+  visibleConfigIdx?: number[];
+  /**
+   * Aprovar o faturamento da FATIA que cobre o veículo aberto.
+   *
+   * Vive na página porque é ela que tem o diálogo de confirmação irreversível
+   * (com as prévias da nota e dos boletos) e a rota da fatia.
+   */
+  onApproveVehicleBilling?: () => void;
 }
 
-export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId }: BillingStepReviewProps) {
+export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, onApproveVehicleBilling }: BillingStepReviewProps) {
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
@@ -138,12 +175,57 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     const total = quoteVehicleCount(task?.quote);
     if (total <= 1) return false;
     return ((task?.quote?.customerConfigs ?? []) as any[]).some((c) => {
-      const covered = (c?.coveredTasks ?? []).length;
+      const covered = coveredTaskCount(c as any);
       return covered > 0 && covered < total;
     });
   })();
+  /**
+   * A FATIA QUE COBRE O VEÍCULO ABERTO ainda espera aprovação?
+   *
+   * Lê o orçamento GRAVADO (`task.quote.customerConfigs`), não o formulário: a
+   * pergunta é sobre o que o servidor já faturou, e o formulário não carrega
+   * `billingApprovedAt`. Uma fatia sem cobertura é o orçamento que nasceu antes
+   * do vínculo — ali não há veículo a distinguir, e ela conta como a fatia deste.
+   */
+  const vehicleSlicePending = useMemo(() => {
+    if (!task?.id) return false;
+    const configs = ((task?.quote?.customerConfigs ?? []) as any[]).filter(
+      (c) => !billingApprovedAtOf(c as any),
+    );
+    if (configs.length === 0) return false;
+    return configs.some((c) => {
+      const covered = coveredTaskIds(c as any);
+      return covered.length === 0 || covered.includes(task.id);
+    });
+  }, [task?.id, task?.quote]);
+
+  /**
+   * A ação "faturar este veículo" deve aparecer?
+   *
+   * Só com cobrança fatiada (do contrário aprovar é a transição de status de
+   * sempre), só enquanto a fatia deste caminhão estiver pendente, e só para quem
+   * pode aprovar faturamento — COMMERCIAL origina orçamento, não fatura.
+   */
+  const canOfferSliceApproval =
+    !!onApproveVehicleBilling &&
+    isPerVehicleBilling &&
+    vehicleSlicePending &&
+    canApproveQuote(userPrivilege);
+
   const services = useWatch({ control, name: "services" }) || [];
-  const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  const allCustomerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  // ESCOPO NA ORIGEM. Cortar aqui — e não em cada lugar que lê a lista — é o que
+  // faz os cartões, os totais, a cláusula de pagamento e as faturas exibidas
+  // falarem todos da MESMA cobrança. Filtrar só na hora de desenhar deixava os
+  // totais somando as irmãs.
+  const customerConfigs = useMemo(() => {
+    if (!visibleConfigIdx || visibleConfigIdx.length === 0) return allCustomerConfigs;
+    const keep = new Set(visibleConfigIdx);
+    const scoped = (allCustomerConfigs as any[]).filter((_: any, i: number) => keep.has(i));
+    // Recuo: escopo que não casa com nada (acervo sem cobertura gravada) mostra tudo,
+    // que é melhor do que uma tela vazia.
+    return scoped.length > 0 ? scoped : allCustomerConfigs;
+  }, [allCustomerConfigs, visibleConfigIdx]);
   /** Os veículos do orçamento, para nomear a cobertura de cada fatura. */
   const reviewVehicles = useMemo(
     () =>
@@ -308,10 +390,33 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return found?.id ?? null;
   }, [filteredCustomerConfigs, invoices]);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // O DINHEIRO DESTA TELA É POR VEÍCULO — e o total geral é `por veículo × N`
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // `services[].amount` e `customerConfigs[].total` do FORMULÁRIO são o preço de
+  // UM caminhão (é o que `billing-step-services.recalculateTotals` escreve, e o
+  // que o assistente de Orçamento já exibia com as três linhas). Este Resumo
+  // somava as fatias sem dizer o que estava somando, e o número mudava de
+  // significado com o modo: numa fatura única de 4 veículos ele mostrava
+  // R$ 1.100,44 (um caminhão) e num `PER_TASK` mostrava R$ 4.401,76 (o contrato)
+  // — a mesma linha, com o mesmo rótulo, dizendo duas coisas.
+  //
+  // UM VALOR POR CLIENTE: em `PER_TASK` há uma fatia por veículo e todas
+  // carregam o MESMO valor unitário; somá-las devolveria o contrato onde se quer
+  // o preço do caminhão.
   const subtotal = validServices.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
-  const totalFromConfigs = customerConfigs.reduce((sum: number, c: any) => sum + (Number(c?.total) || 0), 0);
-  const total = totalFromConfigs || subtotal;
-  const discountAmount = Math.max(0, subtotal - total);
+  const perCustomerTotals = new Map<string, number>();
+  for (const c of customerConfigs as any[]) {
+    if (!perCustomerTotals.has(c.customerId)) perCustomerTotals.set(c.customerId, Number(c?.total) || 0);
+  }
+  const perVehicleTotal =
+    round2([...perCustomerTotals.values()].reduce((a, b) => a + b, 0)) || subtotal;
+  const total = perVehicleTotal;
+  const discountAmount = Math.max(0, round2(subtotal - perVehicleTotal));
+  const reviewVehicleCount = Math.max(1, quoteVehicleCount(task?.quote));
+  const showPerVehicleTotals = reviewVehicleCount > 1;
+  const grandTotal = round2(perVehicleTotal * reviewVehicleCount);
 
   // ⚠️ CLIENTES distintos, não fatias. Ver a nota em `quote-tasks.ts`.
   const hasMultipleCustomers = !filterCustomerId && hasMultipleCustomersOf(customerConfigs);
@@ -524,6 +629,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       setRevertBillingDialogOpen(true);
                       return;
                     }
+                    // Ação da FATIA: não mexe no status do orçamento (ele já
+                    // está no ciclo de recebíveis), então não passa pelo
+                    // `setValue("status", …)` — abre direto a confirmação.
+                    if (v === APPROVE_SLICE_OPTION_VALUE) {
+                      onApproveVehicleBilling?.();
+                      return;
+                    }
                     if (!validateCustomerDataForStatus(v)) return;
                     // Reject/cancel: downgrading any non-PENDING status back to PENDING — collect reason
                     if (v === "PENDING" && currentStatus !== "PENDING") {
@@ -554,6 +666,19 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   // (post-billing + nothing paid + no NFS-e processing).
                   if (canRevertForBilling) {
                     opts.push({ value: REVERT_OPTION_VALUE, label: "Reverter Faturamento" });
+                  }
+
+                  // FATURAR ESTE VEÍCULO. Só entra aqui quando o orçamento já
+                  // saiu do pré-faturamento — antes disso a transição de status
+                  // BUDGET_APPROVED → BILLING_APPROVED é o caminho normal e já
+                  // carrega o rótulo "(este veículo)". A partir daí o status não
+                  // tem mais o que dizer sobre as fatias que faltam, e sem esta
+                  // opção elas não teriam por onde ser faturadas.
+                  if (canOfferSliceApproval && isPostBilling) {
+                    opts.push({
+                      value: APPROVE_SLICE_OPTION_VALUE,
+                      label: "Aprovar Faturamento (este veículo)",
+                    });
                   }
 
                   // Candidate statuses for this step, in display order:
@@ -742,7 +867,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           {/* Totals */}
           <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">
+                Subtotal{showPerVehicleTotals ? " por veículo" : ""}
+              </span>
               <span className="font-medium">{formatCurrency(subtotal)}</span>
             </div>
             {discountAmount > 0 && (() => {
@@ -756,15 +883,40 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               }
               return (
                 <div className="flex items-center justify-between text-sm text-destructive">
-                  <span>{label}</span>
+                  <span>{label}{showPerVehicleTotals ? " por veículo" : ""}</span>
                   <span className="font-medium">- {formatCurrency(discountAmount)}</span>
                 </div>
               );
             })()}
             <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-base font-bold">TOTAL</span>
-              <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
+              <span className="text-base font-bold">
+                {showPerVehicleTotals ? "TOTAL POR VEÍCULO" : "TOTAL"}
+              </span>
+              <span
+                className={
+                  showPerVehicleTotals
+                    ? "text-base font-bold text-foreground"
+                    : "text-xl font-bold text-primary"
+                }
+              >
+                {formatCurrency(total)}
+              </span>
             </div>
+            {/* As MESMAS três linhas do assistente de Orçamento. Sem elas, a tela
+                em que o faturamento é aprovado mostrava o preço de um caminhão
+                onde o boleto cobra o de quatro. */}
+            {showPerVehicleTotals && (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Veículos</span>
+                  <span className="font-medium">&times; {reviewVehicleCount}</span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-base font-bold">TOTAL GERAL</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -775,7 +927,15 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           {filteredCustomerConfigs.map((config: any, _i: number) => {
             const cached = customersCache.current.get(config.customerId);
             const name = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
-            const configTotal = Number(config.total) || 0;
+            // O QUE ESTA FATURA COBRA: `por veículo × veículos cobertos`. O
+            // formulário guarda o unitário (ver o bloco de totais acima), e
+            // imprimir o unitário aqui fazia o cartão da fatura de quatro
+            // caminhões mostrar o preço de um — e a cláusula de pagamento
+            // dividir esse preço pelas parcelas, prometendo ao cliente uma
+            // parcela de R$ 366,81 enquanto o boleto sai por R$ 1.467,25.
+            const configPerVehicleTotal = Number(config.total) || 0;
+            const configCovered = coveredTaskCount(config) || reviewVehicles.length || 1;
+            const configTotal = round2(configPerVehicleTotal * configCovered);
             const paymentText = generatePaymentText({
               customPaymentText: config.customPaymentText,
               paymentConfig: config.paymentConfig,

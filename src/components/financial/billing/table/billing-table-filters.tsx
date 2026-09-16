@@ -75,12 +75,16 @@ export const BILLING_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          // A TAREFA desta fatia (nulo = fatia conjunta) e QUANDO ela foi
-          // faturada. Sem as duas, a linha do caminhão 12 mostrava as sessenta
-          // fatias do orçamento e lia a aprovação do orçamento inteiro — que só
-          // é gravada quando a última fecha.
-          taskId: true,
-          billingApprovedAt: true,
+          // QUANDO esta cobrança foi faturada — e QUAIS veículos ela cobre —
+          // vêm do FATURAMENTO (`billing.approvedAt` / `billing.tasks`), que a
+          // API pendura sozinha aqui (`withCoverageInclude`). Não peça nada
+          // disso à mão: sem isso, a linha do caminhão 12 lia a aprovação do
+          // ORÇAMENTO inteiro, que só é gravada quando a última fecha.
+          //
+          // ⚠️ `billingApprovedAt` era pedido AQUI e a coluna saiu do pagador em
+          // `20260916180000_billing_owns_its_state`. Pedi-la é 500 do Prisma
+          // ("Unknown field ... for select statement"), e derrubava a LISTA
+          // inteira de faturamento — não uma coluna, a tela toda.
           // "Forma de Pagamento" column. `paymentConfig` is the current shape, `paymentCondition`
           // the legacy string the same helper converts — a record saved before the redesign has to
           // read the same as one saved after it.

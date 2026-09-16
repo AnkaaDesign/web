@@ -27,6 +27,8 @@ import {
   coveredTaskCount,
   coversTask,
   dedupeConfigsByCustomer,
+  taskInvoiceCustomerLabel,
+  taskInvoiceCustomerNames,
 } from "./quote-tasks";
 import { computeQuoteMoney, planCoverage } from "./quote-money";
 import {
@@ -49,31 +51,31 @@ const cov = (...ids: string[]) => ids.map((taskId) => ({ taskId }));
 
 describe("de quais veículos é esta fatura", () => {
   it("conta a cobertura", () => {
-    expect(coveredTaskCount({ coveredTasks: cov("t1", "t2") })).toBe(2);
-    expect(coveredTaskCount({ coveredTasks: [] })).toBe(0);
+    expect(coveredTaskCount({ tasks: cov("t1", "t2") })).toBe(2);
+    expect(coveredTaskCount({ tasks: [] })).toBe(0);
     expect(coveredTaskCount({})).toBe(0);
   });
 
   it("responde se cobra um veículo", () => {
-    const lote = { coveredTasks: cov("t1", "t2") };
+    const lote = { tasks: cov("t1", "t2") };
     expect(coversTask(lote, "t2")).toBe(true);
     expect(coversTask(lote, "t3")).toBe(false);
     expect(coversTask(lote, null)).toBe(false);
   });
 
   it("nomeia pelo que o operador lê: série, senão placa", () => {
-    expect(coverageLabels({ coveredTasks: cov("t1", "t3") }, VEICULOS)).toEqual(["16677", "16679"]);
+    expect(coverageLabels({ tasks: cov("t1", "t3") }, VEICULOS)).toEqual(["16677", "16679"]);
     // Sem série, a placa. Sem as duas, o começo do id — nunca vazio.
-    expect(coverageLabels({ coveredTasks: cov("x9") }, VEICULOS)).toEqual(["x9"]);
+    expect(coverageLabels({ tasks: cov("x9") }, VEICULOS)).toEqual(["x9"]);
   });
 
   it("resume sem virar ruído: cobrir todos não vira lista de sessenta séries", () => {
-    expect(coverageSummary({ coveredTasks: cov("t1", "t2", "t3", "t4") }, 4, VEICULOS)).toBe(
+    expect(coverageSummary({ tasks: cov("t1", "t2", "t3", "t4") }, 4, VEICULOS)).toBe(
       "Todos os 4 veículos",
     );
-    expect(coverageSummary({ coveredTasks: cov("t2") }, 4, VEICULOS)).toBe("16678");
-    expect(coverageSummary({ coveredTasks: cov("t1", "t2") }, 4, VEICULOS)).toBe("16677, 16678");
-    expect(coverageSummary({ coveredTasks: cov("t1", "t2", "t3") }, 4, VEICULOS)).toBe(
+    expect(coverageSummary({ tasks: cov("t2") }, 4, VEICULOS)).toBe("16678");
+    expect(coverageSummary({ tasks: cov("t1", "t2") }, 4, VEICULOS)).toBe("16677, 16678");
+    expect(coverageSummary({ tasks: cov("t1", "t2", "t3") }, 4, VEICULOS)).toBe(
       "16677, 16678, 16679",
     );
   });
@@ -81,10 +83,10 @@ describe("de quais veículos é esta fatura", () => {
 
 describe("as faturas que dizem respeito a ESTE veículo", () => {
   const perTask = [
-    { id: "c1", customerId: CLIENTE_A, coveredTasks: cov("t1") },
-    { id: "c2", customerId: CLIENTE_A, coveredTasks: cov("t2") },
-    { id: "c3", customerId: CLIENTE_A, coveredTasks: cov("t3") },
-    { id: "c4", customerId: CLIENTE_A, coveredTasks: cov("t4") },
+    { id: "c1", customerId: CLIENTE_A, tasks: cov("t1") },
+    { id: "c2", customerId: CLIENTE_A, tasks: cov("t2") },
+    { id: "c3", customerId: CLIENTE_A, tasks: cov("t3") },
+    { id: "c4", customerId: CLIENTE_A, tasks: cov("t4") },
   ];
 
   it("a tela do caminhão 2 mostra a fatura DELE, não as quatro", () => {
@@ -92,22 +94,22 @@ describe("as faturas que dizem respeito a ESTE veículo", () => {
   });
 
   it("numa fatura conjunta, a tela de qualquer caminhão mostra a fatura", () => {
-    const joint = [{ id: "c1", customerId: CLIENTE_A, coveredTasks: cov("t1", "t2", "t3", "t4") }];
+    const joint = [{ id: "c1", customerId: CLIENTE_A, tasks: cov("t1", "t2", "t3", "t4") }];
     expect(configsForTask(joint, "t3").map((c) => c.id)).toEqual(["c1"]);
   });
 
   it("em lotes, mostra o lote que cobra este veículo", () => {
     const lotes = [
-      { id: "c1", customerId: CLIENTE_A, coveredTasks: cov("t1", "t2") },
-      { id: "c2", customerId: CLIENTE_A, coveredTasks: cov("t3", "t4") },
+      { id: "c1", customerId: CLIENTE_A, tasks: cov("t1", "t2") },
+      { id: "c2", customerId: CLIENTE_A, tasks: cov("t3", "t4") },
     ];
     expect(configsForTask(lotes, "t4").map((c) => c.id)).toEqual(["c2"]);
   });
 
   it("com dois clientes conjuntos, mostra as duas faturas", () => {
     const dois = [
-      { id: "c1", customerId: CLIENTE_A, coveredTasks: cov("t1", "t2") },
-      { id: "c2", customerId: CLIENTE_B, coveredTasks: cov("t1", "t2") },
+      { id: "c1", customerId: CLIENTE_A, tasks: cov("t1", "t2") },
+      { id: "c2", customerId: CLIENTE_B, tasks: cov("t1", "t2") },
     ];
     expect(configsForTask(dois, "t1").map((c) => c.id)).toEqual(["c1", "c2"]);
   });
@@ -120,10 +122,10 @@ describe("as faturas que dizem respeito a ESTE veículo", () => {
 
 describe("um passo por CLIENTE, e a partição num campo só", () => {
   const quatroFaturas = [
-    { id: "c1", customerId: CLIENTE_A, coveredTasks: cov("t1") },
-    { id: "c2", customerId: CLIENTE_A, coveredTasks: cov("t2") },
-    { id: "c3", customerId: CLIENTE_A, coveredTasks: cov("t3") },
-    { id: "c4", customerId: CLIENTE_A, coveredTasks: cov("t4") },
+    { id: "c1", customerId: CLIENTE_A, tasks: cov("t1") },
+    { id: "c2", customerId: CLIENTE_A, tasks: cov("t2") },
+    { id: "c3", customerId: CLIENTE_A, tasks: cov("t3") },
+    { id: "c4", customerId: CLIENTE_A, tasks: cov("t4") },
   ];
 
   it("quatro faturas de um cliente viram UM passo", () => {
@@ -142,8 +144,8 @@ describe("um passo por CLIENTE, e a partição num campo só", () => {
 
   it("com dois clientes, a repartição sai do PRIMEIRO — unir os dois daria cada veículo duas vezes", () => {
     const dois = [
-      { id: "a1", customerId: CLIENTE_A, coveredTasks: cov("t1", "t2") },
-      { id: "b1", customerId: CLIENTE_B, coveredTasks: cov("t1", "t2") },
+      { id: "a1", customerId: CLIENTE_A, tasks: cov("t1", "t2") },
+      { id: "b1", customerId: CLIENTE_B, tasks: cov("t1", "t2") },
     ];
     const { configs, coverageGroups } = dedupeConfigsByCustomer(dois);
     expect(configs.map((c) => c.id)).toEqual(["a1", "b1"]);
@@ -235,5 +237,113 @@ describe("o dinheiro fecha nos três modos", () => {
   it("cobertura vazia cai no orçamento inteiro, nunca em R$ 0,00", () => {
     expect(money(0).configTotal).toBe(730224);
     expect(money(undefined).configTotal).toBe(730224);
+  });
+});
+
+describe('"Faturar Para" numa linha de TAREFA', () => {
+  const nomeA = "53.842.320 Kennedy de Campos Teixeira";
+  const nomeB = "Transportes Marquespan Ltda";
+  const clienteA = { id: CLIENTE_A, corporateName: nomeA };
+  const clienteB = { id: CLIENTE_B, corporateName: nomeB };
+
+  /** Quatro veículos de UM cliente, cobrados um a um — o caso do print. */
+  const porVeiculo = [
+    { id: "c1", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t1" }] },
+    { id: "c2", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t2" }] },
+    { id: "c3", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t3" }] },
+    { id: "c4", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t4" }] },
+  ];
+
+  it("o mesmo cliente NÃO se repete uma vez por veículo", () => {
+    // Era isto que a tela imprimia: o nome quatro vezes no detalhe de UM caminhão.
+    expect(taskInvoiceCustomerNames(porVeiculo, "t1")).toEqual([nomeA]);
+    expect(taskInvoiceCustomerLabel(porVeiculo, "t3")).toBe(nomeA);
+  });
+
+  it("fatura conjunta cobrindo todos responde o mesmo em qualquer veículo", () => {
+    const conjunta = [
+      { id: "c1", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t1" }, { taskId: "t2" }] },
+    ];
+    expect(taskInvoiceCustomerNames(conjunta, "t1")).toEqual([nomeA]);
+    expect(taskInvoiceCustomerNames(conjunta, "t2")).toEqual([nomeA]);
+  });
+
+  it("dois clientes dividindo os serviços do MESMO veículo aparecem os dois", () => {
+    // O caso real em que mais de um nome é a resposta certa.
+    const dois = [
+      { id: "c1", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t1" }] },
+      { id: "c2", customerId: CLIENTE_B, customer: clienteB, tasks: [{ taskId: "t1" }] },
+    ];
+    expect(taskInvoiceCustomerNames(dois, "t1")).toEqual([nomeA, nomeB]);
+  });
+
+  it("a fatia de OUTRO veículo não vaza para esta linha", () => {
+    const misto = [
+      { id: "c1", customerId: CLIENTE_A, customer: clienteA, tasks: [{ taskId: "t1" }] },
+      { id: "c2", customerId: CLIENTE_B, customer: clienteB, tasks: [{ taskId: "t2" }] },
+    ];
+    expect(taskInvoiceCustomerNames(misto, "t1")).toEqual([nomeA]);
+    expect(taskInvoiceCustomerNames(misto, "t2")).toEqual([nomeB]);
+  });
+
+  it("sem a cobertura na resposta, degrada para o cliente — nunca para linha vazia", () => {
+    // Consulta que não pediu a cobertura: melhor um nome a mais do que nenhum.
+    const semCobertura = [{ id: "c1", customerId: CLIENTE_A, customer: clienteA }];
+    expect(taskInvoiceCustomerLabel(semCobertura, "t1")).toBe(nomeA);
+  });
+
+  it("orçamento sem fatia nenhuma devolve string vazia", () => {
+    expect(taskInvoiceCustomerLabel([], "t1")).toBe("");
+    expect(taskInvoiceCustomerLabel(undefined, "t1")).toBe("");
+  });
+});
+
+/**
+ * O NÚMERO DO LOTE SAI DA LISTA DE VEÍCULOS, NÃO DA ORDEM DAS FATURAS.
+ *
+ * "Lote 1" é só a posição na lista, e ela herdava a ordem em que as faturas
+ * voltavam da API. O painel abria de trás para frente — o primeiro caminhão no
+ * Lote 4, o último no Lote 1 — e cada mudança renumerava tudo debaixo da mão do
+ * operador: ele escolhia "Lote 4" e a linha passava a exibir "Lote 3".
+ *
+ * Ancorado no PRIMEIRO veículo de cada grupo, o número passa a derivar da mesma
+ * ordem que a tela já mostra. Só rótulo: a identidade de um agrupamento é QUEM
+ * está com QUEM, e nem o casamento de cobertura no servidor nem o recorte
+ * material (que ordena `billingGroups` antes do hash) olham para a ordem.
+ */
+describe("a ordem dos lotes", () => {
+  const ids = VEICULOS.map((v) => v.id);
+
+  it("o lote do PRIMEIRO veículo é sempre o Lote 1, venha na ordem que vier", () => {
+    const deTrasParaFrente = [["t4"], ["t3"], ["t2"], ["t1"]];
+    expect(normalizeGroups(deTrasParaFrente, ids)).toEqual([
+      ["t1"],
+      ["t2"],
+      ["t3"],
+      ["t4"],
+    ]);
+  });
+
+  it("com lotes compostos, ordena pelo primeiro membro de cada um", () => {
+    expect(normalizeGroups([["t3", "t4"], ["t1", "t2"]], ids)).toEqual([
+      ["t1", "t2"],
+      ["t3", "t4"],
+    ]);
+  });
+
+  it("o veículo que nenhum lote reivindicou entra sozinho, na posição dele", () => {
+    // `t2` fora de qualquer grupo: vira um lote próprio, entre t1 e t3 — não no
+    // fim da lista, que é onde a ordem de chegada o colocava.
+    expect(normalizeGroups([["t1"], ["t3", "t4"]], ids)).toEqual([
+      ["t1"],
+      ["t2"],
+      ["t3", "t4"],
+    ]);
+  });
+
+  it("reordenar a entrada não muda a saída — é a mesma partição", () => {
+    const a = normalizeGroups([["t2", "t1"], ["t4", "t3"]], ids);
+    const b = normalizeGroups([["t4", "t3"], ["t2", "t1"]], ids);
+    expect(a).toEqual(b);
   });
 });

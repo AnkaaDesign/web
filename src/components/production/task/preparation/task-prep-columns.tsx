@@ -27,7 +27,7 @@ import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures
 import type { Task } from "@/types";
 import type { ClusteredTask } from "./cluster-tasks";
 import { TaskProgressCell } from "./task-progress-cell";
-import { quotePerVehicleTotal } from "@/utils/quote-tasks";
+import { quotePerVehicleTotal, taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
 
 /** Tasks aggregated by a cell: the whole cluster when collapsed, otherwise just this task. */
 function cellTasks(row: Row<ClusteredTask>): Task[] {
@@ -209,14 +209,9 @@ function progressColumn(
   };
 }
 
-/** The quote's "Faturar Para" customers (corporate/fantasy names joined) — used by the FINANCIAL view. */
+/** Quem fatura ESTE veículo — a linha é uma tarefa. Ver `taskInvoiceCustomerLabel`. */
 function invoiceCustomers(row: Task): string {
-  const configs = (row.quote as { customerConfigs?: { customer?: { corporateName?: string | null; fantasyName?: string | null } }[] } | undefined)?.customerConfigs;
-  if (!configs?.length) return "";
-  return configs
-    .map((c) => c.customer?.corporateName || c.customer?.fantasyName || "")
-    .filter(Boolean)
-    .join(", ");
+  return taskInvoiceCustomerLabel((row.quote as any)?.customerConfigs, row.id);
 }
 
 function mutedDate(v: Date | string | null | undefined) {

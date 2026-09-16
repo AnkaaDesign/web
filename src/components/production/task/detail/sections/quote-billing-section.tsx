@@ -54,7 +54,55 @@ import {
   perVehicleAmount,
   quoteVehicleCount,
   coveredTaskCount,
+  coverageLabels,
 } from "@/utils/quote-tasks";
+
+/**
+ * A CLÁUSULA DE UMA FATURA, com o mesmo critério do documento.
+ *
+ * `scope` ("para cada um dos 4 veículos", "para cada grupo de 2 veículos") e a
+ * contagem de cobranças só dizem a verdade quando TODAS as faturas cobrem a
+ * mesma quantidade de veículos — que é o caso do acervo inteiro: conjunta,
+ * veículo a veículo, ou lotes iguais. Com lotes DESIGUAIS a generalização
+ * mente nos dois números: um orçamento repartido em 3+1 anunciava "para cada
+ * grupo de 3 veículos… serão 6 cobranças" quando existe exatamente um grupo de
+ * três, um de um, e duas faturas.
+ *
+ * Nesse caso o documento abandona o escopo e prefixa cada frase com os veículos
+ * daquela fatura ("Veículos 8101, 8102, 8104: Fica acertado…"). Aqui é a mesma
+ * frase, para que a tela e o PDF não discordem.
+ */
+function quoteClauseArgs(
+  quote: any,
+  config: any,
+  /**
+   * TODAS as fatias do orçamento — `rawQuote.customerConfigs`, nunca as
+   * filtradas por veículo que esta tela usa para renderizar. A pergunta aqui é
+   * "os lotes deste orçamento têm todos o mesmo tamanho?", e a lista filtrada
+   * traz uma fatia só: ela responderia "sim" sempre, e o caso desigual — o
+   * único em que a generalização mente — nunca seria detectado.
+   */
+  allConfigs: readonly any[],
+): { prefix: string; vehicleCount: number; coveredVehicleCount: number | undefined } {
+  const vehicleCount = quoteVehicleCount(quote);
+  const covered = coveredTaskCount(config) || undefined;
+  const sizes = new Set(
+    (allConfigs ?? []).map((c) => coveredTaskCount(c)).filter((n) => n > 0),
+  );
+  if (sizes.size <= 1) return { prefix: "", vehicleCount, coveredVehicleCount: covered };
+  const labels = coverageLabels(config, quote?.tasks ?? []);
+  if (labels.length === 0) return { prefix: "", vehicleCount, coveredVehicleCount: covered };
+  const shown =
+    labels.length <= 3
+      ? labels.join(", ")
+      : `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
+  // Com prefixo, escopo e contagem saem: a frase já diz de quem fala.
+  return {
+    prefix: `${labels.length === 1 ? "Veículo" : "Veículos"} ${shown}: `,
+    vehicleCount: 1,
+    coveredVehicleCount: 1,
+  };
+}
 
 /**
  * Bare render body for the "Orçamento / Faturamento Detalhado" detail section
@@ -445,12 +493,24 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                 if (config.discountReference) {
                   configDiscountLabel += ` — ${config.discountReference}`;
                 }
-                const configPaymentText = generatePaymentText({
+                // SOBRE QUANTOS VEÍCULOS ESTA FATURA FALA. Sem a cobertura, a
+                // frase é montada como se o orçamento tivesse um veículo só: num
+                // `PER_TASK` de quatro caminhões ela anunciava "3 parcelas de
+                // R$ 583,33" sem dizer que são por veículo e que haverá doze
+                // cobranças — exatamente a ambiguidade que o escopo existe para
+                // desfazer. O documento já dizia certo; esta tela, não.
+                const clause = quoteClauseArgs(quote as any, config, rawQuote.customerConfigs ?? []);
+                const configPaymentBody = generatePaymentText({
                   customPaymentText: config.customPaymentText,
                   paymentConfig: (config as any).paymentConfig,
                   paymentCondition: config.paymentCondition,
                   total: configTotal,
+                  vehicleCount: clause.vehicleCount,
+                  coveredVehicleCount: clause.coveredVehicleCount,
                 });
+                const configPaymentText = configPaymentBody
+                  ? `${clause.prefix}${configPaymentBody}`
+                  : "";
 
                 return (
                   <div key={config.id} className="bg-muted/30 rounded-lg p-4 space-y-2 flex flex-col">
@@ -646,12 +706,17 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
         if (configs.length === 1) {
           const config = configs[0];
           const configTotal = typeof config.total === "number" ? config.total : Number(config.total) || 0;
-          const paymentText = generatePaymentText({
+          // Mesma leitura do cartão por cliente acima.
+          const clause = quoteClauseArgs(quote as any, config, rawQuote.customerConfigs ?? []);
+          const paymentBody = generatePaymentText({
             customPaymentText: config.customPaymentText,
             paymentConfig: (config as any).paymentConfig,
             paymentCondition: config.paymentCondition,
             total: configTotal,
+            vehicleCount: clause.vehicleCount,
+            coveredVehicleCount: clause.coveredVehicleCount,
           });
+          const paymentText = paymentBody ? `${clause.prefix}${paymentBody}` : "";
           const hasContent = paymentText || taskOrderNumber;
           return hasContent ? (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
@@ -673,10 +738,16 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           ) : null;
         }
         // Fallback to global quote (paymentCondition now lives on config level)
+        // Sem nenhuma fatia, `quote.total` é o CONTRATO inteiro — que é o que
+        // uma fatura conjunta cobraria. Declarar a cobertura como "todos" deixa
+        // isso explícito em vez de deixar o padrão responder por acidente.
+        const fallbackVehicleCount = quoteVehicleCount(quote as any);
         const paymentText = generatePaymentText({
           customPaymentText: null,
           paymentCondition: null,
           total: typeof quote.total === "number" ? quote.total : Number(quote.total) || 0,
+          vehicleCount: fallbackVehicleCount,
+          coveredVehicleCount: fallbackVehicleCount,
         });
         return paymentText ? (
           <div className="bg-muted/30 rounded-lg p-4">

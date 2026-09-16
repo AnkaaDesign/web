@@ -61,6 +61,9 @@ const DOC_TYPE_OPTIONS = [
 
 interface BillingStepCustomerProps {
   configIndex: number;
+  /** Este é o primeiro passo de cobrança VISÍVEL nesta página? Só ele mostra
+   *  o seletor de junto/separado/lotes. Ausente ⇒ recai no antigo `índice 0`. */
+  isFirstVisibleBilling?: boolean;
   customer: any;
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
@@ -80,6 +83,7 @@ interface BillingStepCustomerProps {
 
 export function BillingStepCustomer({
   configIndex,
+  isFirstVisibleBilling,
   customer,
   disabled,
   quoteId,
@@ -88,6 +92,9 @@ export function BillingStepCustomer({
   approvedBillingCount = 0,
   hasRunningSignature,
 }: BillingStepCustomerProps) {
+
+  // A página manda; sem a prop, recai no comportamento antigo (índice 0).
+  const showBillingSplit = isFirstVisibleBilling ?? configIndex === 0;
   const { control, setValue: setFormValue, getValues } = useFormContext();
   // useWatch returns undefined on the very first render (before subscription fires);
   // fall back to getValues() which reads the form store synchronously.
@@ -224,8 +231,18 @@ export function BillingStepCustomer({
     setShowDateInput(false);
   }, [patchPayment]);
 
+  // ─── O DINHEIRO DESTE PASSO É POR VEÍCULO ────────────────────────────────
+  //
+  // O formulário guarda o preço de UM caminhão (ver `billing-step-services`),
+  // enquanto a fatura cobra `por veículo × veículos cobertos`. Os dois campos
+  // abaixo mostravam o unitário com o rótulo "Total", e era esse número que o
+  // conferente levava para o diálogo de aprovação — onde o boleto sai pelo
+  // outro. Agora o rótulo diz qual dos dois é, e a fatura ganha linha própria.
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
-  const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
+  const configPerVehicleTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
+  const coveredHere = Math.max(1, (coverage?.length || vehicles?.length) ?? 1);
+  const showInvoiceTotal = (vehicles?.length ?? 1) > 1;
+  const configTotal = Math.round(configPerVehicleTotal * coveredHere * 100) / 100;
 
   const setCustomerField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
@@ -518,11 +535,21 @@ export function BillingStepCustomer({
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm text-muted-foreground">Subtotal</Label>
+              <Label className="text-sm text-muted-foreground">
+                {showInvoiceTotal ? "Subtotal por veículo" : "Subtotal"}
+              </Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
             </div>
+            {showInvoiceTotal && (
+              <div className="space-y-1.5 flex-1 min-w-[100px]">
+                <Label className="text-sm text-muted-foreground">Total por veículo</Label>
+                <Input value={formatCurrency(configPerVehicleTotal)} disabled className="bg-muted" />
+              </div>
+            )}
             <div className="space-y-1.5 flex-1 min-w-[100px]">
-              <Label className="text-sm font-bold">Total</Label>
+              <Label className="text-sm font-bold">
+                {showInvoiceTotal ? `Total da fatura (${coveredHere} veíc.)` : "Total"}
+              </Label>
               <Input
                 value={formatCurrency(configTotal)}
                 disabled
@@ -552,11 +579,17 @@ export function BillingStepCustomer({
               </div>
             </div>
             {/* ─── JUNTO, SEPARADO OU EM LOTES ────────────────────────────
-                Só no PRIMEIRO passo de cliente: a escolha é do ORÇAMENTO, e
-                repeti-la por passo faria a segunda cópia sobrescrever a primeira
-                sem que ninguém notasse. Com um veículo o componente não
-                renderiza nada — a pergunta não existe. */}
-            {configIndex === 0 && (
+                Só UMA VEZ por página: a escolha é do ORÇAMENTO, e repeti-la
+                por passo faria a segunda cópia sobrescrever a primeira sem que
+                ninguém notasse. Com um veículo o componente não renderiza nada —
+                a pergunta não existe.
+
+                Era `configIndex === 0`, e isso quebrou quando a página passou a
+                mostrar só as cobranças do veículo aberto: abrir o caminhão da
+                terceira fatia não montava o passo de índice 0, e o controle de
+                junto/separado/lotes SUMIA da tela. Agora quem decide é a página,
+                que sabe qual é o primeiro passo VISÍVEL. */}
+            {showBillingSplit && (
               <div className="flex-1 min-w-[260px]">
                 <BillingSplitField
                   vehicles={vehicles ?? []}

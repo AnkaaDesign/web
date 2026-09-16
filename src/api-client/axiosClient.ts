@@ -907,11 +907,25 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // silent: PUT /attention/ack fires ~1/min per armed entity, so an unmigrated or
         // briefly-down API would otherwise paint the screen red every couple of seconds.
         const isAttention = config?.url?.includes("/attention");
+        // RESOLVER UM FATURAMENTO É UMA PERGUNTA, NÃO UM PEDIDO.
+        //
+        // A tela de cobrança aceita tanto o id do faturamento quanto o de um
+        // veículo, e descobre qual é tentando o primeiro e caindo no segundo — um
+        // 404 ali é o caminho NORMAL, não uma falha. Pior: trocar "uma fatura
+        // para todos" por "uma por veículo" DESTRÓI o faturamento aberto e cria
+        // outros (é o que a entidade significa), então a URL em que o operador
+        // está deixa de existir no instante em que ele salva. A tela segue para o
+        // sucessor sozinha; pintar a esquina de vermelho no meio disso descreve
+        // como erro exatamente o que acabou de funcionar.
+        const isBillingLookup =
+          config?.method?.toLowerCase() === "get" &&
+          /\/billings\/[^/]+$/.test(config?.url ?? "") &&
+          errorInfo._statusCode === 404;
 
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && !isAttention && shouldShow) {
+        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && !isAttention && !isBillingLookup && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

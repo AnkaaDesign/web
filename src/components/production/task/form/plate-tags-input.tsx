@@ -30,8 +30,23 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
     name: "plates",
   });
 
-  const handleAddPlate = () => {
-    if (justCommittedRef.current) {
+  /**
+   * `origin` decide quem pode ser engolido pela trava.
+   *
+   * A trava existe para o BLUR que vem logo depois de um Enter: o Enter já
+   * gravou, e deixar o blur gravar de novo produziria a mesma placa duas vezes.
+   * Só que ela era consumida por QUEM CHEGASSE PRIMEIRO — e quem chega primeiro,
+   * em quem digita várias placas seguidas, é o Enter da placa SEGUINTE. O
+   * resultado era uma placa sim, uma não, sem erro e sem aviso: quatro placas
+   * digitadas viravam duas, e o operador só descobria contando os veículos
+   * depois de salvar.
+   *
+   * Agora o Enter NUNCA é engolido (ele é sempre um ato explícito) e a trava se
+   * desarma assim que o campo muda, porque aí existe texto novo que o blur
+   * precisa poder gravar.
+   */
+  const handleAddPlate = (origin: "enter" | "blur" = "blur") => {
+    if (origin === "blur" && justCommittedRef.current) {
       justCommittedRef.current = false;
       return;
     }
@@ -81,14 +96,17 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
                 onChange={(value) => {
                   // `type="plate"` já devolve o valor mascarado e limpo (ou null quando vazio).
                   setNewPlate(maskPlateInput(typeof value === "string" ? value : ""));
+                  // Texto novo no campo ⇒ a trava do blur não vale mais: o que
+                  // está aqui agora ainda não foi gravado por ninguém.
+                  justCommittedRef.current = false;
                 }}
                 onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    handleAddPlate();
+                    handleAddPlate("enter");
                   }
                 }}
-                onBlur={handleAddPlate}
+                onBlur={() => handleAddPlate("blur")}
                 placeholder={disabled ? "Desabilitado (remova números de série extras)" : "Digite uma placa e pressione Enter (ex: ABC-1234 ou ABC1D23)"}
                 disabled={disabled}
                 transparent={true}

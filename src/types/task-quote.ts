@@ -11,7 +11,7 @@ export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
  * `JOINT`: uma fatura, um plano de parcelas e uma NFS-e para os N veículos — o
  * padrão, e o comportamento de sempre. `PER_TASK`: um faturamento por veículo,
  * aprovado veículo a veículo. `CUSTOM`: lotes livres, e aí a cobertura vem das
- * linhas de `coveredTasks`, não do modo.
+ * linhas de `Billing.tasks`, não do modo.
  */
 export type QUOTE_BILLING_SPLIT = 'JOINT' | 'PER_TASK' | 'CUSTOM';
 
@@ -40,30 +40,40 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   quoteId: string;
   customerId: string;
   /**
-   * A COBERTURA — de quais VEÍCULOS esta fatura é.
+   * O FATURAMENTO a que este pagador pertence — e de onde vêm a COBERTURA (quais
+   * veículos) e o ESTADO (se já foi aprovado).
    *
-   * Era a coluna `taskId`, com nulo querendo dizer "todos". Virou registro
-   * (`QuoteBillingTask`) porque "quais dos sessenta?" pode ser "vinte", e porque
-   * uma fatura já emitida passava a cobrir um caminhão acrescentado depois sem
-   * deixar rastro.
+   * Nenhum dos dois mora mais aqui. Este registro é O PAGADOR: quem recebe a
+   * cobrança, com que desconto, em que condições. Dois pagadores do mesmo
+   * recorte são DOIS destes dentro de UM `Billing` — e era não saber disso que
+   * fazia a tela desenhar "Fatura 1 · 2 · 3 · 4" numa página só.
+   *
+   * `billing.id` é o ENDEREÇO da tela de cobrança: `/financeiro/faturamento/:id`.
    *
    * ⚠️ É relação: uma resposta que não a pediu chega sem ela. Leia por
-   * `coveredTaskIds()` / `coveredTaskCount()` de `@/utils/quote-tasks`, que
-   * tratam a ausência como "cobre tudo" — nunca como "cobre zero".
+   * `coveredTaskIds()` / `coveredTaskCount()` / `billingApprovedAtOf()` de
+   * `@/utils/quote-tasks`, que tratam a ausência como "cobre tudo" — nunca como
+   * "cobre zero".
    */
-  coveredTasks?: Array<{
-    taskId: string;
-    customerId?: string;
-    task?: {
-      id?: string;
-      name?: string | null;
-      serialNumber?: string | null;
-      customerOrderNumber?: string | null;
-      truck?: { plate?: string | null } | null;
-    } | null;
-  }>;
-  /** Quando ESTA fatia teve o faturamento aprovado. Ver `TaskQuote.billingSplit`. */
-  billingApprovedAt?: Date | string | null;
+  billingId?: string;
+  billing?: {
+    id: string;
+    quoteId?: string;
+    /** Quando ESTE faturamento foi aprovado. `TaskQuote.billingApprovedAt` é
+     *  quando o ÚLTIMO fechou — "o orçamento inteiro está faturado". */
+    approvedAt?: Date | string | null;
+    createdAt?: Date | string;
+    tasks?: Array<{
+      taskId: string;
+      task?: {
+        id?: string;
+        name?: string | null;
+        serialNumber?: string | null;
+        customerOrderNumber?: string | null;
+        truck?: { plate?: string | null; chassisNumber?: string | null } | null;
+      } | null;
+    }>;
+  } | null;
   subtotal: number;
   total: number;
   discountType: DISCOUNT_TYPE;

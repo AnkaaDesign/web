@@ -33,17 +33,34 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
     // Allow only numbers and spaces
     const sanitizedValue = value.replace(/[^\d\s]/g, "");
     setInputValue(sanitizedValue);
+    // Texto novo no campo ⇒ a trava do blur não vale mais: o que está aqui
+    // agora ainda não foi gravado por ninguém. Ver `handleGenerateRange`.
+    justCommittedRef.current = false;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleGenerateRange();
+      handleGenerateRange("enter");
     }
   };
 
-  const handleGenerateRange = () => {
-    if (justCommittedRef.current) {
+  /**
+   * `origin` decide quem pode ser engolido pela trava.
+   *
+   * A trava existe para o BLUR que vem logo depois de um Enter — o Enter já
+   * gravou, e o blur gravaria a mesma coisa de novo. Só que ela era consumida
+   * por QUEM CHEGASSE PRIMEIRO, e quem chega primeiro em quem digita vários
+   * números seguidos é o Enter do número SEGUINTE.
+   *
+   * O estrago não era só perder um número sim, outro não. Como o Enter engolido
+   * também não limpava o campo, o número seguinte era digitado GRUDADO no que
+   * ficou: 9001 ⏎ 9002 ⏎ 9003 ⏎ 9004 ⏎ produzia as tags `9001` e `90029003` —
+   * um veículo com número de série que nunca existiu, e que segue dali para o
+   * documento assinado e para a nota fiscal.
+   */
+  const handleGenerateRange = (origin: "enter" | "blur" = "blur") => {
+    if (origin === "blur" && justCommittedRef.current) {
       justCommittedRef.current = false;
       return;
     }
@@ -61,6 +78,10 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
     if (numbers.length === 0) return;
 
     let newNumbers: number[] = [];
+    // Um número digitado SOZINHO é um pedido explícito; um INTERVALO é uma
+    // conveniência que preenche o meio. A diferença decide quem obedece à lista
+    // do que já foi removido — ver logo abaixo.
+    const isRange = numbers.length > 1;
 
     if (numbers.length === 1) {
       // Single number case
@@ -75,9 +96,26 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
       }
     }
 
+    // ─── O QUE FOI REMOVIDO À MÃO ──────────────────────────────────────────
+    //
+    // `removedNumbersRef` existe para o INTERVALO: quem digita "1 10", tira o 5
+    // e digita "1 10" de novo não quer o 5 de volta — ele o removeu de
+    // propósito, e refazer o intervalo é gesto de conveniência, não um pedido
+    // pelo 5.
+    //
+    // Mas a lista valia para TUDO e nunca era esvaziada. Digitar o 5 sozinho,
+    // depois de removê-lo, não fazia nada: sem tag, sem mensagem, sem erro — e
+    // não havia como reavê-lo a não ser recarregando a tela. Corrigir um engano
+    // de clique ficava impossível na própria tela que o produziu.
+    //
+    // Agora o número digitado SOZINHO é sempre um pedido explícito: ele entra e
+    // sai da lista de removidos, para que um intervalo posterior também o
+    // respeite.
+    if (!isRange) removedNumbersRef.current.delete(newNumbers[0]);
+
     // Filter out numbers that already exist or were removed
     const numbersToAdd = newNumbers.filter(
-      num => !serialNumbers.includes(num) && !removedNumbersRef.current.has(num)
+      num => !serialNumbers.includes(num) && (!isRange || !removedNumbersRef.current.has(num))
     );
 
     // Add new numbers
@@ -125,7 +163,7 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
                     handleInputChange(newValue);
                   }}
                   onKeyDown={handleKeyDown}
-                  onBlur={handleGenerateRange}
+                  onBlur={() => handleGenerateRange("blur")}
                   placeholder={disabled ? "Desabilitado (remova placas extras)" : "Digite um número (ex: 5) ou intervalo (ex: 5 10) e pressione Enter"}
                   disabled={disabled}
                   transparent={true}

@@ -50,6 +50,7 @@ import { getSectors } from "@/api-client/sector";
 import { isValidTaskStatusTransition, getTaskQuoteEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
 import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCanViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
@@ -955,11 +956,10 @@ function TaskDetailContent() {
                   dataType: "relation" as const,
                   label: "Faturar Para",
                   requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
-                  accessor: (t: Task) =>
-                    (t.quote?.customerConfigs ?? [])
-                      .map((c) => c.customer?.corporateName || c.customer?.fantasyName || "")
-                      .filter(Boolean)
-                      .join(", ") || null,
+                  // ESTE veículo, não o orçamento inteiro: ver
+                  // `taskInvoiceCustomerLabel`. Listar todas as fatias repetia o
+                  // mesmo cliente uma vez por caminhão no detalhe de um só.
+                  accessor: (t: Task) => taskInvoiceCustomerLabel(t.quote?.customerConfigs, t.id) || null,
                   // Inline-editable ONLY for the single-customer (or unset) case: changing the customer
                   // reconciles the quote's lone customerConfig by upsert. Multi-customer billing splits
                   // stay display-only (changing one would lose the others' order numbers/installments).

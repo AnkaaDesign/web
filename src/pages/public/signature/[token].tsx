@@ -54,7 +54,8 @@ import {
   extractApiMessage,
   isExpiredLinkError,
   isTerminalSignatureError,
-  maskCpfCgu,
+  maskCpfChallenge,
+  maskCpfChallengeFromParts,
   parseCooldownSeconds,
 } from "@/components/public/signature/identity";
 import { QuoteChangeList } from "@/components/signature/quote-change-list";
@@ -949,14 +950,26 @@ export default function PublicSignaturePage() {
         {identityVisible && (
           <SignerIdentityCard
             name={signer.name}
-            /* §5.9: `***.456.789-**`.
+            /* `123.***.***-01` — a máscara DO DESAFIO, não a do CGU.
+               ────────────────────────────────────────────────────────────────
+               Esta tela PEDE o miolo do CPF (`cpfMaskParts` entrega as pontas e
+               pergunta os 6 do meio). A máscara do CGU esconde as pontas e
+               imprime o miolo: a linha aqui mostrava `***.456.789-**` enquanto o
+               diálogo, logo acima, pedia `456789`. Bastava copiar da tela — o
+               desafio de identidade não desafiava ninguém.
+               A regra: uma máscara exibida na tela que faz a pergunta tem de
+               esconder a resposta. `maskCpfCgu` continua valendo em tudo que
+               CIRCULA — selo, rodapé, portal público, cartão do envelope —, onde
+               pergunta nenhuma está sendo feita.
                Depois da conferência mostra o CPF que o próprio signatário
-               digitou; antes dela, o do CADASTRO — que o servidor manda já
-               mascarado. A linha exibia `***.***.***-**` mesmo para quem tem
-               CPF cadastrado desde a emissão, porque só olhava o confirmado, e
-               confirmado só existe depois de assinar. Sem CPF nenhum no
-               cadastro, aí sim cai na forma inteiramente oculta. */
-            cpfDisplay={confirmed?.cpf ? maskCpfCgu(confirmed.cpf) : (signer.cpfMasked ?? maskCpfCgu(null))}
+               digitou; antes dela, derivado das ÂNCORAS que o servidor mandou
+               (sem nunca ter o número inteiro no cliente). Sem CPF no cadastro,
+               cai na forma inteiramente oculta. */
+            cpfDisplay={
+              confirmed?.cpf
+                ? maskCpfChallenge(confirmed.cpf)
+                : (maskCpfChallengeFromParts(signer.cpfParts) ?? maskCpfChallenge(null))
+            }
             contactDisplay={signer.contactMasked ?? signer.emailMasked}
             channel={channel}
             cargo={effectiveCargo || null}
