@@ -61,6 +61,9 @@ const DOC_TYPE_OPTIONS = [
 
 interface BillingStepCustomerProps {
   configIndex: number;
+  /** Este é o primeiro passo de cobrança VISÍVEL nesta página? Só ele mostra
+   *  o seletor de junto/separado/lotes. Ausente ⇒ recai no antigo `índice 0`. */
+  isFirstVisibleBilling?: boolean;
   customer: any;
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
@@ -80,6 +83,7 @@ interface BillingStepCustomerProps {
 
 export function BillingStepCustomer({
   configIndex,
+  isFirstVisibleBilling,
   customer,
   disabled,
   quoteId,
@@ -88,6 +92,9 @@ export function BillingStepCustomer({
   approvedBillingCount = 0,
   hasRunningSignature,
 }: BillingStepCustomerProps) {
+
+  // A página manda; sem a prop, recai no comportamento antigo (índice 0).
+  const showBillingSplit = isFirstVisibleBilling ?? configIndex === 0;
   const { control, setValue: setFormValue, getValues } = useFormContext();
   // useWatch returns undefined on the very first render (before subscription fires);
   // fall back to getValues() which reads the form store synchronously.
@@ -572,11 +579,17 @@ export function BillingStepCustomer({
               </div>
             </div>
             {/* ─── JUNTO, SEPARADO OU EM LOTES ────────────────────────────
-                Só no PRIMEIRO passo de cliente: a escolha é do ORÇAMENTO, e
-                repeti-la por passo faria a segunda cópia sobrescrever a primeira
-                sem que ninguém notasse. Com um veículo o componente não
-                renderiza nada — a pergunta não existe. */}
-            {configIndex === 0 && (
+                Só UMA VEZ por página: a escolha é do ORÇAMENTO, e repeti-la
+                por passo faria a segunda cópia sobrescrever a primeira sem que
+                ninguém notasse. Com um veículo o componente não renderiza nada —
+                a pergunta não existe.
+
+                Era `configIndex === 0`, e isso quebrou quando a página passou a
+                mostrar só as cobranças do veículo aberto: abrir o caminhão da
+                terceira fatia não montava o passo de índice 0, e o controle de
+                junto/separado/lotes SUMIA da tela. Agora quem decide é a página,
+                que sabe qual é o primeiro passo VISÍVEL. */}
+            {showBillingSplit && (
               <div className="flex-1 min-w-[260px]">
                 <BillingSplitField
                   vehicles={vehicles ?? []}

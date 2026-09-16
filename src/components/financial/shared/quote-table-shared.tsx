@@ -9,7 +9,13 @@ import { useCustomers } from "@/hooks";
 import { NFSE_DOCUMENT_FIELDS, NFSE_REQUIRED_CUSTOMER_FIELDS } from "@/lib/billing-customer-data";
 import { PAYMENT_TYPE_OPTIONS, configToTypeValue, legacyToConfig } from "@/components/financial/payment-config-field";
 import { formatDate } from "@/utils";
-import { configsForTask, perVehicleAmount, quotePerVehicleTotal, quoteVehicleCount } from "@/utils/quote-tasks";
+import {
+  billingApprovedAtOf,
+  configsForTask,
+  perVehicleAmount,
+  quotePerVehicleTotal,
+  quoteVehicleCount,
+} from "@/utils/quote-tasks";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import type { Task } from "@/types";
 import type { Customer } from "@/types";
@@ -93,14 +99,16 @@ export const taskBillingConfigs = (task: Task) =>
 /**
  * Quando o faturamento DESTA linha foi aprovado.
  *
- * A aprovação é por FATIA desde o orçamento multitarefa: `TaskQuote.billingApprovedAt`
- * só é gravado quando a ÚLTIMA fecha, então lê-lo aqui mostrava cinquenta e nove
- * caminhões faturados como não faturados até o sexagésimo sair. A fatia responde
- * primeiro; o campo do orçamento é a compatibilidade com o registro antigo, que
- * não tem marca em fatia nenhuma.
+ * A aprovação é do FATURAMENTO que cobre este veículo, não do orçamento:
+ * `TaskQuote.billingApprovedAt` só é gravado quando o ÚLTIMO fecha, então lê-lo
+ * aqui mostrava cinquenta e nove caminhões faturados como não faturados até o
+ * sexagésimo sair. O faturamento responde primeiro; o campo do orçamento é a
+ * compatibilidade com o registro antigo, que não tem marca em faturamento nenhum.
  */
 export const taskBillingApprovedAt = (task: Task): Date | string | null => {
-  const stamped = taskBillingConfigs(task).find((c) => c.billingApprovedAt)?.billingApprovedAt;
+  const stamped = taskBillingConfigs(task)
+    .map((c) => billingApprovedAtOf(c as any))
+    .find(Boolean);
   // Nenhuma fatia desta linha aprovada: cai no campo do ORÇAMENTO, que é a marca
   // do registro ANTIGO (gravado antes de as fatias terem a sua própria) e vale
   // para todos os veículos dele.

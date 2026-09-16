@@ -4,6 +4,8 @@ import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
 import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
+import { BillingCoveredVehicles } from "@/components/financial/billing/steps/billing-covered-vehicles";
+import { useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
@@ -11,7 +13,7 @@ import { uploadSingleFile } from "@/api-client/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
-import { BillingStepTask } from "@/components/financial/billing/steps/billing-step-task";
+import { BillingStepInfo } from "@/components/financial/billing/steps/billing-step-info";
 import { BillingStepServices } from "@/components/financial/billing/steps/billing-step-services";
 import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
@@ -27,6 +29,8 @@ import {
   quoteVehicleCount,
   coverageSummary,
   coveredTaskCount,
+  coveredTaskIds,
+  billingApprovedAtOf,
   hasMultipleCustomers as hasMultipleCustomersOf,
   dedupeConfigsByCustomer,
 } from "@/utils/quote-tasks";
@@ -83,15 +87,155 @@ import { PINNED_CUSTOMERS } from "@/config/company";
  * to B's task and to B's customers. The wizard step and the "jump to Resumo" latch have the same
  * problem. A `key` reseeds all of it, which is what "a different record" means.
  */
-export const BillingDetailPage = () => {
-  const { id } = useParams<{ id: string }>();
-  return <BillingDetailPageInner key={id ?? "novo"} />;
-};
+/**
+ * DESEMBRULHA a resposta, seja qual for a camada que chegou.
+ *
+ * O cliente HTTP deste projeto às vezes entrega a `AxiosResponse` inteira e às
+ * vezes só o corpo, e o corpo é um envelope `{ success, message, data }`. Um
+ * `?.data` sozinho parava NO ENVELOPE — e um envelope é um objeto, então nada
+ * estourava: o id vinha `undefined` e o redirecionamento nunca disparava.
+ * O critério de "achei" é ter `id`, não ter vindo por um caminho específico.
+ */
+const unwrapBilling = (r: any): any | null =>
+  [r?.data?.data, r?.data, r].find(
+    (c) => c && typeof c === "object" && typeof c.id === "string",
+  ) ?? null;
 
-const BillingDetailPageInner = () => {
-  const { id } = useParams<{ id: string }>();
+export const BillingDetailPage = () => {
+  const { id: routeId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // O ENDEREÇO DESTA TELA É O FATURAMENTO — e é resolvido ANTES de montar nada
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Era o veículo, e não podia ser outra coisa: enquanto "faturamento" foi uma
+  // lista pendurada no orçamento, não havia id que significasse a cobrança. Num
+  // orçamento de quatro caminhões cobrados JUNTOS isso dava QUATRO endereços para
+  // UMA cobrança — quatro URLs, quatro favoritos, o mesmo conteúdo.
+  //
+  // A rota aceita os dois ids e CONVERGE. O que obriga a resolução a acontecer
+  // AQUI, no invólucro, e não lá dentro: o componente é remontado por `key`, e
+  // um redirecionamento disparado depois de a tela ficar interativa remonta o
+  // assistente no meio do uso — o operador (e o teste de tela) perde o passo em
+  // que estava. Enquanto o endereço não é o canônico, nada é montado.
+  // O VEÍCULO por onde se entrou (ou que se estava vendo), guardado no estado da
+  // navegação. É ele que dá o caminho de volta quando o faturamento da URL some.
+  const stateTaskId = (location.state as any)?.openTaskId as string | undefined;
+
+  const byId = useBilling(routeId);
+  // ── QUANDO A URL NÃO RESOLVE, DUAS COISAS PODEM TER ACONTECIDO ─────────────
+  //
+  //  1. A URL é de um VEÍCULO — todo link que existe hoje (notificação, app,
+  //     favorito, e-mail, a lista) endereça assim. Traduz e converge.
+  //  2. O FATURAMENTO DEIXOU DE EXISTIR. Não é erro: é o modelo. Trocar "uma
+  //     fatura para os quatro" por "uma por veículo" DESTRÓI a cobrança aberta e
+  //     cria quatro — entidade que morre, não campo que muda de valor. No
+  //     instante em que o operador salva, a URL em que ele está fica órfã.
+  //
+  // Nos dois casos a pergunta é a mesma: qual cobrança cobre ESTE veículo? No (1)
+  // o veículo é o próprio id da rota; no (2) é o que estava aberto. Tentar os
+  // dois, nessa ordem, resolve os dois sem a tela precisar saber qual era.
+  const byTask = useBillingByTask(routeId, { enabled: byId.isError });
+  const bySucessor = useBillingByTask(stateTaskId, {
+    enabled: byId.isError && byTask.isError && !!stateTaskId && stateTaskId !== routeId,
+  });
+  const billing =
+    unwrapBilling(byId.data) ?? unwrapBilling(byTask.data) ?? unwrapBilling(bySucessor.data);
+  const billingId: string | null = billing?.id ?? null;
+  const arrivedByTask = !!billingId && billingId !== routeId;
+
+  useEffect(() => {
+    if (!arrivedByTask || !billingId) return;
+    navigate(routes.financial.billing.details(billingId), {
+      replace: true,
+      state: { ...((location.state as any) ?? {}), openTaskId: routeId },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrivedByTask, billingId]);
+
+  const resolvendo =
+    arrivedByTask ||
+    (!billingId &&
+      (byId.isLoading ||
+        byTask.isLoading ||
+        byTask.isFetching ||
+        bySucessor.isLoading ||
+        bySucessor.isFetching));
+
+  // Esgotadas as três tentativas, a cobrança não existe mesmo — e aí a tela diz
+  // isso, em vez de ficar girando.
+  const naoExiste = !billingId && byId.isError && byTask.isError && !bySucessor.isFetching;
+
+  if (resolvendo) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (naoExiste) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <IconFileInvoice className="h-12 w-12" />
+        <p>Esta cobrança não existe mais.</p>
+        <Button variant="outline" onClick={() => navigate(routes.financial.billing.root)}>
+          Ir para a lista de faturamento
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <BillingDetailPageInner
+      key={billingId ?? routeId ?? "novo"}
+      billing={billing}
+      routeId={routeId}
+    />
+  );
+};
+
+const BillingDetailPageInner = ({
+  billing: resolvedBilling,
+  routeId,
+}: {
+  /** A COBRANÇA desta página, já resolvida pelo invólucro. */
+  billing: any | null;
+  /** O id que veio na URL — só para o recuo quando a cobrança não tem veículo. */
+  routeId?: string;
+}) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const resolvedBillingId: string | null = resolvedBilling?.id ?? null;
+
+  /**
+   * O VEÍCULO ABERTO — o pedido (quando se chegou por um), senão a âncora da
+   * cobertura.
+   *
+   * Qual caminhão está aberto é uma PREFERÊNCIA DE VISTA dentro da cobrança, não
+   * a identidade da coisa que se está vendo: por isso viaja em
+   * `location.state.openTaskId` e não na URL.
+   */
+  const openTaskId = useMemo<string | undefined>(() => {
+    const fromState = (location.state as any)?.openTaskId as string | undefined;
+    if (fromState) return fromState;
+    const covered = (resolvedBilling?.tasks ?? []) as Array<{ taskId: string }>;
+    if (covered[0]?.taskId) return covered[0].taskId;
+    // COBRANÇA SEM VEÍCULO — o orçamento que ainda não tem tarefa vinculada.
+    // Recuar para o id da rota mandaria o id do FATURAMENTO para a consulta de
+    // TAREFA, que responderia 404 e a tela mostraria "tarefa não encontrada"
+    // sobre uma cobrança que existe. O primeiro veículo do orçamento é a resposta
+    // honesta: a tela abre, e a grade mostra que esta cobrança não cobre nenhum.
+    const doOrcamento = (resolvedBilling?.quote?.tasks ?? []) as Array<{ id: string }>;
+    return doOrcamento[0]?.id ?? routeId;
+  }, [location.state, resolvedBilling, routeId]);
+
+  /** O id que as consultas de TAREFA usam. Nunca o da rota — a rota é do faturamento. */
+  const id = openTaskId;
+
   // Where to return after save — set by whoever sent the user here.
   const returnTo = readReturnTo(location.state);
   // Prev/next pager context. `ids` is a fast path (the list handed it over on row click); when it
@@ -195,6 +339,28 @@ const BillingDetailPageInner = () => {
               responsible: true,
             },
           },
+          // OS FATURAMENTOS — as entidades, não a lista de pagadores.
+          //
+          // Esta tela é aberta por um VEÍCULO e precisa saber de qual cobrança ele
+          // é. Antes isso era deduzido casando índices de `customerConfigs` com a
+          // cobertura; agora a resposta está no modelo: o `Billing` que tem este
+          // veículo em `tasks`. Os configs dele são os pagadores desta página, e
+          // os outros `Billing` do orçamento são as outras páginas.
+          //
+          // `select` e não `include`: `approvedAt` é ESCALAR, e o Prisma recusa
+          // escalar dentro de `include` ("Invalid scalar field `approvedAt` for
+          // include statement on model Billing"). Com `include` o servidor
+          // devolvia 500 em TODA abertura desta tela.
+          billings: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              approvedAt: true,
+              createdAt: true,
+              tasks: { select: { taskId: true } },
+              customerConfigs: { select: { id: true, customerId: true } },
+            },
+          },
         },
       },
     },
@@ -256,7 +422,7 @@ const BillingDetailPageInner = () => {
   const isPerVehicleBilling = useMemo(() => {
     if (quoteVehicles <= 1) return false;
     return ((quote?.customerConfigs ?? []) as any[]).some((c) => {
-      const covered = (c?.coveredTasks ?? []).length;
+      const covered = coveredTaskCount(c as any);
       return covered > 0 && covered < quoteVehicles;
     });
   }, [quote, quoteVehicles]);
@@ -282,7 +448,7 @@ const BillingDetailPageInner = () => {
    * retroativamente de quais caminhões é um documento fiscal que já saiu.
    */
   const approvedBillingCount = useMemo(
-    () => ((quote?.customerConfigs ?? []) as any[]).filter((c) => c?.billingApprovedAt).length,
+    () => ((quote as any)?.billings ?? []).filter((b: any) => b?.approvedAt).length,
     [quote],
   );
 
@@ -417,13 +583,15 @@ const BillingDetailPageInner = () => {
    * mostrava a nota dele, já emitida, como se fosse sair de novo.
    */
   const configsForApprovalPreview = useMemo(() => {
-    const configs = ((formConfigsForPreview ?? []) as any[]).filter((c) => !c?.billingApprovedAt);
+    const configs = ((formConfigsForPreview ?? []) as any[]).filter(
+      (c) => !billingApprovedAtOf(c as any),
+    );
     if (!isPerVehicleBilling || !task?.id) return configs;
     const covering = configs.filter((c) => {
       const ids: string[] =
         (Array.isArray(c?.taskIds) && c.taskIds.length > 0
           ? c.taskIds
-          : ((c?.coveredTasks ?? []) as any[]).map((r) => r.taskId)) ?? [];
+          : coveredTaskIds(c as any)) ?? [];
       return ids.length === 0 || ids.includes(task.id);
     });
     return covering.length > 0 ? covering : configs;
@@ -449,7 +617,7 @@ const BillingDetailPageInner = () => {
         const covered =
           (Array.isArray(c?.taskIds) && c.taskIds.length > 0
             ? c.taskIds.length
-            : ((c?.coveredTasks ?? []) as any[]).length) || quoteVehicles || 1;
+            : coveredTaskCount(c as any)) || quoteVehicles || 1;
         const escala = (v: unknown) => Math.round((Number(v) || 0) * covered * 100) / 100;
         return { ...c, subtotal: escala(c?.subtotal), total: escala(c?.total) };
       }),
@@ -589,11 +757,12 @@ const BillingDetailPageInner = () => {
         // saber que é "do caminhão 37" em vez de "Cliente 2", e é o que impede a
         // gravação de refatiar sem querer: mandando a cobertura de volta, o
         // servidor não reexpande pelo modo.
-        taskIds: ((config.coveredTasks ?? []) as Array<{ taskId: string }>).map((r) => r.taskId),
-        coveredTasks: config.coveredTasks ?? [],
+        taskIds: coveredTaskIds(config as any),
+        billingId: (config as any).billingId ?? (config as any).billing?.id ?? null,
+        billing: (config as any).billing ?? null,
         // Quando ESTA fatura foi aprovada. Fatura aprovada tem a cobertura
         // congelada e não se refatia — a tela precisa saber para não oferecer.
-        billingApprovedAt: config.billingApprovedAt ?? null,
+        billingApprovedAt: billingApprovedAtOf(config as any),
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
         discountType: config.discountType || "NONE",
@@ -664,30 +833,145 @@ const BillingDetailPageInner = () => {
   // Dynamic steps: Tarefa → Serviços → Cliente(s) → [Proposta] → Resumo
   const customerConfigs = form.watch("customerConfigs") || [];
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESTA PÁGINA É DE UMA COBRANÇA, NÃO DE TODAS
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // A rota é `/financeiro/faturamento/detalhes/:taskId` — um VEÍCULO. Mas a tela
+  // montava um passo para CADA fatia do orçamento: num orçamento de quatro
+  // caminhões cobrados um a um, o operador abria o caminhão 46990 e via
+  // "Fatura 1 · Fatura 2 · Fatura 3 · Fatura 4" na mesma página, com o passo
+  // "Tarefa" editando um veículo só. Quatro cobranças separadas, uma página,
+  // um veículo editável: as três coisas em desacordo.
+  //
+  // Agora a página mostra a(s) cobrança(s) que cobrem O VEÍCULO ABERTO. Com dois
+  // clientes de faturamento o mesmo veículo é cobrado duas vezes, e as duas
+  // aparecem — são as duas cobranças DELE. As demais continuam MONTADAS (o
+  // formulário as reenvia inteiras na gravação, e escondê-las do DOM as tiraria
+  // do payload e a reconciliação as apagaria); o que muda é que elas não ganham
+  // passo próprio aqui. Cada uma tem a sua página, e o navegador abaixo leva até ela.
+  //
+  // Recuo deliberado: fatia sem cobertura gravada (acervo anterior à migração de
+  // cobertura) não casa com veículo nenhum — nesse caso mostramos todas, como antes.
+  /** Os faturamentos do orçamento, como o servidor os entrega. */
+  const billings = useMemo<any[]>(() => ((quote as any)?.billings ?? []) as any[], [quote]);
+
+  /** O FATURAMENTO desta página: o que cobre o veículo aberto. */
+  const currentBilling = useMemo<any | null>(() => {
+    // O RESOLVIDO PELA ROTA manda. A rota endereça o faturamento, então ele é a
+    // resposta autoritativa — inclusive para uma cobrança SEM cobertura (o
+    // orçamento que ainda não tem veículo), que a busca por tarefa não acharia.
+    if (resolvedBillingId) {
+      return billings.find((b: any) => b.id === resolvedBillingId) ?? resolvedBilling;
+    }
+    if (!task?.id) return null;
+    return (
+      billings.find((b: any) =>
+        (b?.tasks ?? []).some((t: any) => t.taskId === task.id),
+      ) ?? null
+    );
+  }, [billings, task?.id, resolvedBillingId, resolvedBilling]);
+
+  /**
+   * OS VEÍCULOS QUE ESTA COBRANÇA COBRE — não os do orçamento.
+   *
+   * É o recorte do DOCUMENTO: placa, chassi e pedido destes saem na mesma nota
+   * fiscal. Sem cobertura gravada recai nos do orçamento, que é a leitura que a
+   * ausência sempre teve.
+   */
+  const coveredVehicleRows = useMemo(() => {
+    const ids = new Set(
+      ((currentBilling?.tasks ?? []) as Array<{ taskId: string }>).map((t) => t.taskId),
+    );
+    if (ids.size === 0) return quoteVehicleRows as any[];
+    return (quoteVehicleRows as any[]).filter((v: any) => ids.has(v.id));
+  }, [currentBilling, quoteVehicleRows]);
+
+  const visibleConfigIdx = useMemo<number[]>(() => {
+    const todos = customerConfigs.map((_: any, i: number) => i);
+    if (customerConfigs.length <= 1) return todos;
+
+    // CAMINHO NOVO: os pagadores DESTE faturamento, lidos da entidade.
+    if (currentBilling) {
+      const doBilling = new Set(
+        ((currentBilling.customerConfigs ?? []) as any[]).map((c: any) => c.id),
+      );
+      const idx = customerConfigs
+        .map((c: any, i: number) => ({ c, i }))
+        .filter(({ c }: any) => c?.id && doBilling.has(c.id))
+        .map(({ i }: any) => i);
+      if (idx.length > 0) return idx;
+    }
+
+    // RECUO: orçamento aberto antes de a entidade existir, ou fatia ainda não
+    // gravada (sem `id`). Cai no casamento por cobertura, que é o que a tela
+    // fazia antes — errado como modelo, certo como resposta.
+    if (!task?.id) return todos;
+    const covering = customerConfigs
+      .map((c: any, i: number) => ({ c, i }))
+      .filter(({ c }: any) => Array.isArray(c?.taskIds) && c.taskIds.includes(task.id))
+      .map(({ i }: any) => i);
+    return covering.length > 0 ? covering : todos;
+  }, [customerConfigs, task?.id, currentBilling]);
+
+  // ── AS COBRANÇAS IRMÃS NÃO APARECEM AQUI ────────────────────────────────
+  //
+  // Havia um aviso no topo — "o orçamento tem N faturamentos; os outros têm
+  // páginas próprias" — com um botão para cada. Saiu: esta página é de UMA
+  // cobrança, e ficar explicando as outras é a tela ainda falando pelo
+  // orçamento. As irmãs se alcançam pela lista de Faturamento e pelo navegador
+  // de registros do cabeçalho, como qualquer outro registro do sistema.
+
   // Skip to summary step when invoices already exist
   const hasInitializedStep = useRef(false);
   // No per-record reset needed here: the page is keyed by `:id` (see BillingDetailPage), so a
   // prev/next hop remounts and this ref starts false again.
-  useEffect(() => {
-    if (hasInitializedStep.current) return;
-    if (invoices.length > 0 && customerConfigs.length > 0) {
-      // 2 base steps + N customer steps + optional proposta step + 1 summary step
-      const summaryStep = 2 + customerConfigs.length + (canSeeBudgetInfoStep ? 1 : 0) + 1;
-      setCurrentStep(summaryStep);
-      hasInitializedStep.current = true;
-    }
-  }, [invoices, customerConfigs]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const steps = useMemo(() => {
+    // ═══════════════════════════════════════════════════════════════════════
+    // NÃO HÁ PASSO "TAREFA" AQUI — e é o ponto inteiro desta separação.
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Havia, e era um editor de TAREFA morando na tela de cobrança: nome,
+    // categoria, implemento, série, placa, chassi, pedido, plaqueta, data de
+    // conclusão, detalhes. Um caminhão só — o aberto —, enquanto a fatura cobra
+    // N. Depois que a grade "Veículos desta cobrança" passou a existir, o mesmo
+    // veículo tinha placa, chassi e número de pedido em DOIS lugares na MESMA
+    // tela, com o de cima escrevendo por cima do de baixo ao salvar.
+    //
+    // O que a nota fiscal precisa — placa, chassi, pedido — está na grade, no
+    // recorte certo: os veículos DESTA cobrança. O resto é produção, e mora lá.
+    //
+    // Sobrou: Veículos, Fatura/Cliente 1..N, e Resumo.
+    //
+    // "Veículos" NÃO é o passo antigo com outro nome: ali não há nada da tarefa.
+    // É a grade dos caminhões que ESTA cobrança cobre, com os três campos que a
+    // nota fiscal exige — placa, chassi e número do pedido —, um por linha, no
+    // recorte do documento.
     const base: Array<{ id: number; name: string; description: string }> = [
-      // "Tarefa", sempre: este passo define a tarefa ABERTA. A relação dos
-      // veículos é conferida no Resumo.
-      { id: 1, name: "Tarefa", description: "Dados da tarefa e faturamento" },
+      {
+        id: 1,
+        name: "Veículos",
+        description:
+          coveredVehicleRows.length === 1
+            ? "O veículo desta cobrança"
+            : `Os ${coveredVehicleRows.length} veículos desta cobrança`,
+      },
     ];
-    if (canSeeBudgetInfoStep) {
-      base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
-    }
-    base.push({ id: base.length + 1, name: "Serviços", description: "Serviços e preços" });
+    // ═══════════════════════════════════════════════════════════════════════
+    // "PROPOSTA" E "SERVIÇOS" NÃO SÃO DESTA TELA
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Validade, garantia, prazo, layout, lista de serviços e preço são o que foi
+    // VENDIDO — vivem no Orçamento, são o que o cliente assinou, e mudá-los
+    // depois de faturado é recusado de qualquer jeito. Tê-los aqui fazia a tela
+    // de cobrança parecer uma segunda tela de orçamento, com dois caminhos de
+    // escrita para o mesmo dado e nenhum aviso de qual vencia.
+    //
+    // Os dois componentes seguem MONTADOS e escondidos logo abaixo: o
+    // formulário é um só, o payload da gravação sai dele, e `BillingStepServices`
+    // ainda é quem recalcula `customerConfigs[].total` quando a cobertura muda.
+    // O que sai é a NAVEGAÇÃO — ninguém mais chega neles por aqui. Para mexer no
+    // que foi vendido há o botão "Ver Orçamento" no cabeçalho.
     // ═══════════════════════════════════════════════════════════════════════
     // UM PASSO POR FATURA — e cada passo diz de QUAL VEÍCULO ele é
     // ═══════════════════════════════════════════════════════════════════════
@@ -703,7 +987,9 @@ const BillingDetailPageInner = () => {
     // o CLIENTE quando há mais de um cliente. Num orçamento de um veículo e um
     // cliente nada muda: "Cliente 1" era e continua sendo o rótulo certo.
     const configsHaveSplit = customerConfigs.length > 1 && !hasMultipleCustomersOf(customerConfigs);
-    customerConfigs.forEach((config: any, i: number) => {
+    visibleConfigIdx.forEach((i: number) => {
+      const config: any = customerConfigs[i];
+      if (!config) return;
       const cached = customersCache.current.get(config.customerId);
       const name =
         config.customerData?.fantasyName ||
@@ -721,13 +1007,68 @@ const BillingDetailPageInner = () => {
     });
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
-  }, [customerConfigs, canSeeBudgetInfoStep, quoteVehicles, quoteVehicleRows]);
+  }, [customerConfigs, visibleConfigIdx, canSeeBudgetInfoStep, quoteVehicles, quoteVehicleRows, coveredVehicleRows]);
 
   const totalSteps = steps.length;
-  // Step layout: 1=Tarefa, 2=Proposta (if visible), then Serviços, customers, Resumo
-  const proposalStepIdx = canSeeBudgetInfoStep ? 2 : null;
-  const servicesStepIdx = canSeeBudgetInfoStep ? 3 : 2;
-  const firstCustomerStepIdx = servicesStepIdx + 1;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // JÁ FATURADO → ABRE NO RESUMO. E o Resumo é `steps.length`, nada além disso.
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Este salto era calculado por uma SOMA que reconstruía a lista de passos de
+  // cabeça: `2 + N + (proposta ? 1 : 0) + 1`. A soma envelheceu quando "Proposta"
+  // e "Serviços" saíram da navegação — passou a apontar DOIS passos além do
+  // último, e o corpo da tela, que só renderiza o passo corrente, ficava
+  // COMPLETAMENTE EM BRANCO. O cabeçalho e a trilha continuavam lá, então a tela
+  // parecia carregada: era o Resumo vazio, com o seletor de status junto.
+  //
+  // Só aparecia DEPOIS de haver fatura — que é exatamente quando a tela importa.
+  //
+  // Agora não há soma: quem sabe quantos passos existem é `steps`, que é quem os
+  // monta. Uma fonte, uma resposta.
+  //
+  // Roda aqui e não junto das outras inicializações porque depende de `steps`.
+  useEffect(() => {
+    if (hasInitializedStep.current) return;
+    if (invoices.length > 0 && customerConfigs.length > 0) {
+      setCurrentStep(totalSteps);
+      hasInitializedStep.current = true;
+    }
+  }, [invoices, customerConfigs, totalSteps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── CINTO DE SEGURANÇA: passo fora da faixa NUNCA vira tela em branco ──────
+  //
+  // O corpo desta tela renderiza só o passo corrente. Um `currentStep` maior que
+  // o número de passos — por aritmética errada, por uma cobrança que encolheu
+  // depois de uma recomposição, por um estado guardado de outra página — não
+  // mostra um erro: mostra NADA, com o cabeçalho e a trilha de passos intactos
+  // por cima. É a falha mais cara possível, porque parece uma tela carregada.
+  //
+  // Aconteceu duas vezes por caminhos diferentes. Uma correção que conserte só a
+  // conta deixa a terceira em aberto; esta impede a classe inteira.
+  useEffect(() => {
+    // ⚠️ SÓ DEPOIS DE HIDRATAR. `customerConfigs` é um `form.watch`: na primeira
+    // renderização ele é uma lista VAZIA, e aí `steps` tem só Tarefa e Resumo.
+    // Clampar nesse instante prendia quem estava no Resumo um passo atrás — e
+    // como o clamp escreve o estado, a lista crescer depois já não o soltava.
+    // O cinto virou tropeço, e o teste de tela (fase 5 C1) pegou na primeira
+    // corrida. Enquanto a tela carrega, não há faixa a respeitar.
+    if (isTaskLoading || customerConfigs.length === 0) return;
+    if (totalSteps > 0 && currentStep > totalSteps) setCurrentStep(totalSteps);
+    if (currentStep < 1) setCurrentStep(1);
+  }, [currentStep, totalSteps, isTaskLoading, customerConfigs.length]);
+
+  // A tela é: 1..N=Fatura(s) DESTA cobrança, N+1=Resumo. Não há passo de Tarefa,
+  // nem de Proposta, nem de Serviços — os três editam o que foi VENDIDO ou o que
+  // foi PRODUZIDO, e nenhum dos dois é assunto desta tela.
+  //
+  // `proposalStepIdx`/`servicesStepIdx` ficam nulos: os componentes seguem
+  // montados e escondidos (o formulário é um só e o payload da gravação sai
+  // dele; `BillingStepServices` ainda recalcula o total da fatia quando a
+  // cobertura muda), mas não têm posição na navegação.
+  const proposalStepIdx: number | null = null;
+  const servicesStepIdx: number | null = null;
+  const firstCustomerStepIdx = 2;
 
   // Attention: open on the customer step that a rule is asking about.
   //
@@ -762,7 +1103,13 @@ const BillingDetailPageInner = () => {
       return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
     });
     if (idx < 0) return;
-    setCurrentStep(firstCustomerStepIdx + idx);
+    // O passo é a posição entre as cobranças VISÍVEIS, não entre todas as do
+    // orçamento: esta página mostra as do veículo aberto. Apontar pelo índice
+    // global mandava para um passo que não existe — e o corpo da tela, que só
+    // renderiza o passo corrente, ficava em branco.
+    const pos = visibleConfigIdx.indexOf(idx);
+    if (pos < 0) return;
+    setCurrentStep(firstCustomerStepIdx + pos);
   }, [orderNumberAttentionActive, customerDataAttentionActive, invoices.length, customerConfigs, firstCustomerStepIdx]);
 
   const STATUSES_REQUIRING_COMPLETE_DATA = [
@@ -807,7 +1154,7 @@ const BillingDetailPageInner = () => {
         (s: any) => Number(s.amount) < 0,
       );
       if (negativeAmountServices.length > 0) {
-        setCurrentStep(servicesStepIdx);
+        if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
         toast.error("Serviços com valor negativo", {
           description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
         });
@@ -824,7 +1171,7 @@ const BillingDetailPageInner = () => {
     if (hasMultipleCustomersOf(configs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
-        setCurrentStep(servicesStepIdx);
+        if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
         toast.error("Serviços sem cliente atribuído", {
           description: "Todos os serviços devem ter um cliente selecionado em 'Faturar Para'",
         });
@@ -900,25 +1247,6 @@ const BillingDetailPageInner = () => {
     [currentStep, canEdit, validateStep, totalSteps],
   );
 
-  /**
-   * Foto da plaqueta — imagem única, só o ÚLTIMO arquivo vale (`maxFiles={1}` já limita a seleção,
-   * mas o estado é normalizado aqui de qualquer forma).
-   *
-   * Um arquivo JÁ ENVIADO viaja como `truck.vinPlateId`; um arquivo novo ainda não tem id, então
-   * `vinPlateId` fica `null` até `executeSave` fazer o upload e preencher. Limpar o campo manda
-   * `null` explícito — é assim que a foto é removida.
-   */
-  const handleVinPlateFilesChange = useCallback(
-    (files: FileWithPreview[]) => {
-      const picked = files.slice(-1);
-      setVinPlateFiles(picked);
-      const existing = picked.find((f) => f.uploaded);
-      form.setValue("vinPlateId", (existing?.uploadedFileId || existing?.id || null) as never, {
-        shouldDirty: true,
-      });
-    },
-    [form],
-  );
 
   // Core save logic
   const executeSave = useCallback(async (options?: { approveVehicleSlice?: boolean }) => {
@@ -943,43 +1271,18 @@ const BillingDetailPageInner = () => {
 
     setIsSaving(true);
     try {
-      // 0. Upload a newly picked Plaqueta photo, so step 1 can send its id. A failure here must
-      // NOT abort the save: the rest of the billing data is what the user came for, and the
-      // interceptor already toasted. `vinPlateId` then stays at whatever it was.
-      let vinPlateId: string | null = (formData as any).vinPlateId ?? null;
-      const pendingVinPlate = vinPlateFiles.find((f) => !f.uploaded);
-      if (pendingVinPlate) {
-        try {
-          const response = await uploadSingleFile(pendingVinPlate, { fileContext: "truckVinPlate" });
-          if (response.success && response.data) vinPlateId = response.data.id;
-        } catch (error: any) {
-          toast.error(`Erro ao enviar a foto da plaqueta: ${error.message}`);
-        }
-      }
-
-      // 1. Update billing-relevant task fields
-      const taskUpdateData: any = {
-        name: formData.name || undefined,
-        customerId: formData.customerId || undefined,
-        // Send null (not undefined/"") when cleared so the API actually clears it:
-        // the optional-description schema turns "" → undefined and the repo skips
-        // undefined, so anything but explicit null silently persists the old value.
-        details: formData.details?.trim() ? formData.details : null,
-        serialNumber: formData.serialNumber || null,
-        truck: {
-          // null explícito, nunca undefined — undefined é "não mexe", então
-          // apagar a placa ou o chassi mantinha o valor antigo.
-          plate: formData.plate || null,
-          chassisNumber: formData.chassisNumber || null,
-          // Explicit null, never undefined: undefined is how the repo is told "don't touch",
-          // so clearing the field would silently keep the old photo.
-          vinPlateId,
-          category: formData.category || undefined,
-          implementType: formData.implementType || undefined,
-        },
-      };
-
-      await updateTaskAsync({ id: task.id, data: taskUpdateData });
+      // 1. A TAREFA NÃO É GRAVADA DAQUI — e não é omissão, é o limite da tela.
+      //
+      // Havia um `PUT /tasks/:id` com nome, cliente, série, placa, chassi,
+      // categoria, implemento, plaqueta e detalhes, montado a partir do
+      // formulário do passo "Tarefa". O passo saiu: nada disso é assunto de
+      // cobrança. Manter a gravação seria pior que inútil — ela reenviaria os
+      // valores CARREGADOS e passaria por cima do que a grade "Veículos desta
+      // cobrança" acabou de escrever, campo a campo, em cada caminhão.
+      //
+      // O que a nota precisa (placa, chassi, número do pedido) a grade grava, uma
+      // linha por vez, no veículo certo. O resto é produção, e se edita em
+      // Produção.
 
       // 2. Update customer data for NFS-e
       for (const config of formData.customerConfigs) {
@@ -1157,22 +1460,19 @@ const BillingDetailPageInner = () => {
       await taskQuoteService.update(quote.id, quotePayload);
 
       // ═══════════════════════════════════════════════════════════════════════
-      // O PEDIDO DE COMPRA — DESTE VEÍCULO
+      // O PEDIDO DE COMPRA NÃO PASSA MAIS POR AQUI
       // ═══════════════════════════════════════════════════════════════════════
       //
-      // `Task.customerOrderNumber`, e só o do caminhão ABERTO. Escrito por fora
-      // do orçamento de propósito: aqui ele costuma estar TRAVADO
-      // (`BILLING_APPROVED` em diante) e a guarda de obrigação financeira recusa
-      // o corpo inteiro — mas o número do pedido é justamente o que ainda chega
-      // depois, quando o cliente o manda e a nota já está para sair.
+      // Era gravado neste ponto, do formulário, e só para o caminhão ABERTO —
+      // numa fatura que cobra quatro. A grade "Veículos desta cobrança" grava o
+      // de CADA UM, ao sair do campo, direto na tarefa daquele veículo. Manter as
+      // duas escritas era garantir que a de baixo perdesse para a de cima.
       //
-      // Enviado só quando MUDOU, inclusive vazio (`null`): limpar tem de
-      // persistir, não deixar de pé o número de um pedido cancelado.
-      const nextOrderNumber = (formData.customerOrderNumber ?? "").trim() || null;
-      const savedOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
-      if (nextOrderNumber !== savedOrderNumber) {
-        await updateTaskAsync({ id: task.id, data: { customerOrderNumber: nextOrderNumber } });
-      }
+      // O motivo de a gravação ser por fora do orçamento continua valendo e mora
+      // na grade: aqui o orçamento costuma estar TRAVADO (`BILLING_APPROVED` em
+      // diante) e a guarda de obrigação financeira recusaria o corpo inteiro —
+      // mas o número do pedido é justamente o que chega depois, quando o cliente
+      // o manda e a nota já está para sair.
 
       if (approveVehicleSlice) {
         // A aprovação de faturamento de um orçamento fatiado é um ato DAQUELE
@@ -1283,7 +1583,7 @@ const BillingDetailPageInner = () => {
     }
     const validServices = services.filter((s: any) => s.description?.trim());
     if (validServices.length === 0) {
-      setCurrentStep(servicesStepIdx);
+      if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
       toast.error("Adicione pelo menos um serviço");
       return;
     }
@@ -1358,7 +1658,7 @@ const BillingDetailPageInner = () => {
 
   // Step detection: 1=Tarefa, 2=Proposta (COMMERCIAL/ADMIN only), then Serviços, Cliente(s), Resumo
   const isProposalStep = proposalStepIdx !== null && currentStep === proposalStepIdx;
-  const isServicesStep = currentStep === servicesStepIdx;
+  const isServicesStep = servicesStepIdx !== null && currentStep === servicesStepIdx;
   const isReviewStep = currentStep === totalSteps;
 
   const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate]
@@ -1459,14 +1759,16 @@ const BillingDetailPageInner = () => {
             {/* Tarefa, Serviços, and customer steps stay mounted (hidden via CSS) to preserve useFieldArray state */}
             {!reviewOnly && (
               <>
+                {/* PASSO 1 — OS VEÍCULOS DESTA COBRANÇA.
+                    Nada de tarefa aqui: o editor de tarefa que morava neste
+                    passo (nome, categoria, implemento, série, plaqueta,
+                    conclusão, detalhes) foi embora — é produção, e mora em
+                    Produção. Ficaram os três campos que a NOTA exige, um por
+                    veículo, no recorte do documento. */}
                 <div style={{ display: currentStep === 1 ? undefined : "none" }}>
-                  <BillingStepTask
-                    disabled={!canEdit}
-                    customersCache={customersCache}
-                    initialCustomer={task?.customer}
-                    vinPlateFiles={vinPlateFiles}
-                    onVinPlateFilesChange={handleVinPlateFilesChange}
-                    vehicles={quoteVehicleRows as any}
+                  <BillingCoveredVehicles
+                    vehicles={coveredVehicleRows as any}
+                    disabled={!canEdit || !!currentBilling?.approvedAt}
                   />
                 </div>
 
@@ -1483,9 +1785,16 @@ const BillingDetailPageInner = () => {
                   <BillingStepServices disabled={!canEdit} />
                 </div>
 
-                {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation */}
+                {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation.
+                    TODAS ficam montadas, inclusive as que não são desta página: o payload da
+                    gravação é montado a partir do formulário, e desmontar uma fatia a tiraria
+                    do envio — a reconciliação leria "esta fatia saiu" e a APAGARIA. O que muda
+                    é que só as de `visibleConfigIdx` ganham posição de passo; as demais ficam
+                    permanentemente escondidas e são alcançadas pela página delas. */}
                 {customerConfigs.map((config: any, i: number) => {
                   const cachedCustomer = customersCache.current.get(config.customerId);
+                  const stepPos = visibleConfigIdx.indexOf(i);
+                  const isThisStep = stepPos >= 0 && currentStep === firstCustomerStepIdx + stepPos;
                   return (
                     // ⚠️ A CHAVE NÃO PODE SER O CLIENTE. Num orçamento cobrado
                     // veículo a veículo as N faturas são do MESMO cliente, e
@@ -1495,10 +1804,33 @@ const BillingDetailPageInner = () => {
                     // índice cobre a fatura ainda não gravada.
                     <div
                       key={config.id || `${config.customerId}-${i}`}
-                      style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}
+                      style={{ display: isThisStep ? undefined : "none" }}
                     >
+                      {/* "FATURAR PARA" e os RESPONSÁVEIS — uma vez por página,
+                          no primeiro passo de pagador. São da COBRANÇA inteira,
+                          não de um pagador: repeti-los em cada passo faria a
+                          mesma pergunta aparecer N vezes com N respostas
+                          possíveis para uma só. */}
+                      {stepPos === 0 && (
+                        <div className="mb-4">
+                          <BillingStepInfo
+                            disabled={!canEdit}
+                            customersCache={customersCache}
+                            vehicles={quoteVehicleRows as any}
+                            // O RECORTE: os pagadores desta cobrança, não os do
+                            // orçamento. Sem isto, três caminhões do mesmo
+                            // cliente apareciam como "3 selecionados" do mesmo
+                            // CNPJ numa página que cobra um.
+                            configIdx={visibleConfigIdx}
+                          />
+                        </div>
+                      )}
                       <BillingStepCustomer
                         configIndex={i}
+                        // O seletor junto/separado/lotes vive UMA vez por página,
+                        // no primeiro passo MOSTRADO — não no índice 0, que pode
+                        // não estar visível (ver `visibleConfigIdx`).
+                        isFirstVisibleBilling={stepPos === 0}
                         customer={cachedCustomer}
                         disabled={!canEdit}
                         quoteId={quote?.id}
@@ -1529,6 +1861,12 @@ const BillingDetailPageInner = () => {
                   filterCustomerId={
                     dossieCustomerId !== "all" ? dossieCustomerId : undefined
                   }
+                  // O ESCOPO DESTA PÁGINA. `filterCustomerId` não bastava: num
+                  // orçamento cobrado veículo a veículo as N cobranças são do
+                  // MESMO CNPJ, então filtrar por cliente não cortava nada e o
+                  // Resumo desenhava as três lado a lado — que é exatamente a
+                  // tela de uma cobrança mostrando as cobranças das outras.
+                  visibleConfigIdx={visibleConfigIdx}
                 />
 
                 {/* ASSINATURA — só leitura.

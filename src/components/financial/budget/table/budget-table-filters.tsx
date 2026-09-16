@@ -70,7 +70,7 @@ export const BUDGET_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          // Os veículos desta fatia chegam em `coveredTasks`, que a API injeta
+          // Os veículos desta fatia chegam em `billing.tasks`, que a API injeta
           // em todo `customerConfigs` (ver `withCoverageInclude`). NÃO pedir
           // `taskId` aqui: a coluna saiu em `20260913120000_billing_coverage` e
           // pedi-la derruba a lista inteira com um 500 do Prisma.

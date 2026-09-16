@@ -107,7 +107,7 @@ export function useTaskBillingInvoices(
     const all = ((source.data as any)?.data ?? []) as any[];
     if (!quoteId || !taskId) return source.data;
     const covering = all.filter((inv) => {
-      const covered = (inv?.customerConfig?.coveredTasks ?? []) as Array<{ taskId: string }>;
+      const covered = (inv?.customerConfig?.billing?.tasks ?? []) as Array<{ taskId: string }>;
       // Sem cobertura declarada a fatura é do orçamento inteiro — a leitura que
       // a ausência sempre teve, e a que mantém as faturas antigas visíveis.
       if (covered.length === 0) return inv?.taskId == null || inv?.taskId === taskId;

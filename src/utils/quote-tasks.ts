@@ -192,23 +192,29 @@ export function quotePerVehicleTotal(
 //
 // ESPELHA a seção gêmea de `api/src/utils/quote-tasks.ts`.
 //
-// Era `TaskQuoteCustomerConfig.taskId`, com NULO querendo dizer "todos". Virou
-// relação (`coveredTasks`) porque uma fatura pode cobrir um LOTE — vinte dos
-// sessenta — e nesse caso não existe coluna que responda.
+// TRÊS GERAÇÕES: a coluna `TaskQuoteCustomerConfig.taskId` (nulo = "todos");
+// depois uma relação gravada, mas pendurada no PAGADOR; hoje `Billing.tasks` —
+// a cobertura é do FATURAMENTO, que é uma entidade com id próprio e é o que a
+// rota `/financeiro/faturamento/:billingId` endereça.
 //
-// ⚠️ A relação só vem quando a consulta a pede. A API injeta `coveredTasks` em
-// todo caminho que devolve `customerConfigs` (ver `withCoverageInclude` lá), mas
-// uma resposta vinda de cache antigo ou de uma rota pública enxuta pode chegar
-// sem ela — e cobertura vazia numa conta de dinheiro é R$ 0,00 numa fatura que
-// tem valor. Por isso toda função aqui trata "vazio" como "cobre tudo", nunca
-// como "cobre zero".
+// Por que a terceira: com dois pagadores do mesmo recorte, a segunda geração
+// guardava a lista de veículos DUAS VEZES, e "quantos faturamentos tem este
+// orçamento?" se respondia contando pagadores — quatro num orçamento de quatro
+// veículos com um cliente só, dois num de um veículo com dois clientes. Duas
+// perguntas diferentes na mesma contagem, e era por isso que a tela desenhava
+// "Fatura 1 · 2 · 3 · 4" numa página só.
+//
+// ⚠️ A relação só vem quando a consulta a pede. A API a injeta em todo caminho
+// que devolve `customerConfigs` (ver `withCoverageInclude` lá), mas uma resposta
+// vinda de cache antigo ou de uma rota pública enxuta pode chegar sem ela — e
+// cobertura vazia numa conta de dinheiro é R$ 0,00 numa fatura que tem valor.
+// Por isso toda função aqui trata "vazio" como "cobre tudo", nunca como "cobre
+// zero".
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Uma fatia de faturamento como as respostas a trazem. */
-export interface BillingConfigLike {
-  id?: string;
-  customerId?: string | null;
-  coveredTasks?: ReadonlyArray<{
+/** A cobertura, como as respostas a trazem. */
+export interface BillingCoverageLike {
+  tasks?: ReadonlyArray<{
     taskId: string;
     task?: {
       id?: string;
@@ -220,11 +226,62 @@ export interface BillingConfigLike {
   }> | null;
 }
 
+/**
+ * Um FATURAMENTO, ou um PAGADOR que aponta para um.
+ *
+ * Aceita os dois porque a cobertura é uma só: o pagador não tem cobertura
+ * própria, ele herda a do faturamento a que pertence.
+ */
+export interface BillingConfigLike extends BillingCoverageLike {
+  id?: string;
+  customerId?: string | null;
+  billingId?: string | null;
+  billing?: (BillingCoverageLike & { id?: string; approvedAt?: Date | string | null }) | null;
+}
+
+/** As linhas de cobertura, venham do faturamento ou do pagador que aponta para ele. */
+function coverageRows(
+  config: BillingConfigLike | null | undefined,
+): ReadonlyArray<{ taskId: string; task?: any }> {
+  const own = config?.tasks;
+  if (Array.isArray(own)) return own;
+  const viaBilling = config?.billing?.tasks;
+  if (Array.isArray(viaBilling)) return viaBilling;
+  return [];
+}
+
 /** Os ids dos veículos que este faturamento cobra. */
 export function coveredTaskIds(config: BillingConfigLike | null | undefined): string[] {
-  const rows = config?.coveredTasks;
-  if (!Array.isArray(rows)) return [];
-  return rows.map((r) => r.taskId);
+  return coverageRows(config).map((r) => r.taskId);
+}
+
+/**
+ * O ID DO FATURAMENTO de um pagador — o endereço da tela de cobrança.
+ *
+ * Aceita o faturamento em si (devolve o próprio id) ou o pagador (devolve o do
+ * faturamento dele). É o que monta `/financeiro/faturamento/:billingId`.
+ */
+export function billingIdOf(config: BillingConfigLike | null | undefined): string | null {
+  return config?.billing?.id ?? config?.billingId ?? null;
+}
+
+/**
+ * ESTE FATURAMENTO JÁ FOI APROVADO? — pergunte ao faturamento, não ao pagador.
+ *
+ * Era `TaskQuoteCustomerConfig.billingApprovedAt`, uma data por pagador: dois
+ * pagadores do mesmo recorte tinham duas datas para um evento só.
+ */
+export function billingApprovedAtOf(
+  config: BillingConfigLike | null | undefined,
+): Date | string | null {
+  const own = (config as { approvedAt?: Date | string | null } | null | undefined)?.approvedAt;
+  if (own !== undefined) return own ?? null;
+  return config?.billing?.approvedAt ?? null;
+}
+
+/** Atalho legível: este faturamento já foi aprovado? */
+export function isBillingApproved(config: BillingConfigLike | null | undefined): boolean {
+  return billingApprovedAtOf(config) != null;
 }
 
 /** Quantos veículos este faturamento cobra. É o multiplicador do valor da fatura. */
@@ -258,7 +315,7 @@ export function coverageLabels(
   tasks?: ReadonlyArray<QuoteTaskLike & { truck?: { plate?: string | null } | null }> | null,
 ): string[] {
   const byId = new Map((tasks ?? []).map((t) => [t.id, t]));
-  return (config?.coveredTasks ?? []).map((row) => {
+  return coverageRows(config).map((row) => {
     const t = (row.task ?? byId.get(row.taskId) ?? null) as
       | (QuoteTaskLike & { truck?: { plate?: string | null } | null })
       | null;

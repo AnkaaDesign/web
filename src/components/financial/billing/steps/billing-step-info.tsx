@@ -35,11 +35,44 @@ interface BillingStepInfoProps {
     serialNumber?: string | null;
     truck?: { plate?: string | null } | null;
   }>;
+  /**
+   * As posições, na lista do ORÇAMENTO, dos pagadores DESTA cobrança.
+   * Ausente = a lista inteira — é a tela de orçamento, onde a pergunta é do
+   * contrato e não de uma cobrança.
+   */
+  configIdx?: number[];
 }
 
-export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingStepInfoProps) {
+export function BillingStepInfo({
+  disabled,
+  customersCache,
+  vehicles,
+  configIdx,
+}: BillingStepInfoProps) {
   const { control, setValue, getValues } = useFormContext();
-  const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  const todosConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OS PAGADORES DESTA COBRANÇA — não os do orçamento
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // `customerConfigs` é a lista do ORÇAMENTO INTEIRO. Numa cobrança por veículo,
+  // três caminhões do mesmo cliente são TRÊS pagadores — um por cobrança — e
+  // esta tela, que é de UMA delas, mostrava "3 selecionados" com o mesmo CNPJ
+  // repetido três vezes, e três blocos de responsável, um por veículo do
+  // orçamento. Nenhuma dessas três linhas é uma escolha desta página.
+  //
+  // O número de pagadores aqui é o número de CLIENTES que dividem ESTA cobrança:
+  // um, quase sempre; dois quando o recorte é cobrado a dois clientes. É essa
+  // distinção que a lista do orçamento não sabe fazer.
+  //
+  // `configIdx` são as posições, na lista do orçamento, que pertencem a esta
+  // cobrança. Ausente = a lista inteira (a tela de ORÇAMENTO, onde a pergunta é
+  // mesmo sobre o contrato).
+  const escopo: number[] = configIdx ?? todosConfigs.map((_: any, i: number) => i);
+  const customerConfigs = escopo.map((i) => todosConfigs[i]).filter(Boolean);
+  /** A posição REAL no formulário de um config deste recorte. */
+  const idxReal = (posNoEscopo: number) => escopo[posNoEscopo];
 
   // Stores the last single customer config before it was removed, so discount can be
   // carried over when the user does a remove-then-add instead of atomic replacement.
@@ -108,7 +141,11 @@ export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingS
   const handleCustomerChange = useCallback(
     (value: any) => {
       const selectedIds: string[] = Array.isArray(value) ? value : value ? [value] : [];
-      const currentConfigs = getValues("customerConfigs") || [];
+      const todas = getValues("customerConfigs") || [];
+      // Trocar o pagador DESTA cobrança não pode mexer nas irmãs: elas têm os
+      // seus clientes, os seus descontos e as suas faturas. O gesto é local, e a
+      // gravação recompõe a lista do orçamento pondo o resultado no lugar dele.
+      const currentConfigs = escopo.map((i: number) => todas[i]).filter(Boolean);
 
       // Mirror the CURRENT single-customer discount on every change — not only on
       // the 1→0 transition. "Faturar Para" is a multi-select, so every click is a
@@ -173,9 +210,13 @@ export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingS
         };
       });
 
-      setValue("customerConfigs", newConfigs, { shouldDirty: true });
+      // As posições deste recorte recebem o resultado, na ordem; o que sobrar
+      // entra no fim. Fora do recorte, nada é tocado.
+      const restantes = todas.filter((_: any, i: number) => !escopo.includes(i));
+      const recomposto = [...restantes, ...newConfigs];
+      setValue("customerConfigs", recomposto, { shouldDirty: true });
     },
-    [getValues, setValue, customersCache],
+    [getValues, setValue, customersCache, escopo],
   );
 
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
@@ -205,6 +246,11 @@ export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingS
             mode="multiple"
             placeholder="Selecione os clientes para faturamento"
             emptyText="Nenhum cliente encontrado"
+            // Sem os chips padrão: logo abaixo há um card por cliente, com
+            // logotipo, CNPJ, o estado do cadastro para a NFS-e e o botão de
+            // remover. O chip repetia o nome e dizia menos — dois lugares para a
+            // mesma informação, e o de baixo é o que responde "dá para emitir?".
+            hideDefaultBadges
             value={selectedCustomerIds}
             onValueChange={handleCustomerChange}
             async={true}
@@ -329,7 +375,9 @@ export function BillingStepInfo({ disabled, customersCache, vehicles }: BillingS
                     <Combobox
                       value={config.responsibleId || ""}
                       onValueChange={(v) =>
-                        setValue(`customerConfigs.${i}.responsibleId`, v || null, { shouldDirty: true })
+                        setValue(`customerConfigs.${idxReal(i)}.responsibleId`, v || null, {
+                          shouldDirty: true,
+                        })
                       }
                       options={responsibleOptions}
                       placeholder="Selecione o responsável..."

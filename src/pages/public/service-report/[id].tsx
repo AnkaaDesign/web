@@ -386,7 +386,7 @@ export function PublicServiceReportPage() {
 
   // NFSe documents from relevant configs' invoices (only authorized ones)
   const nfseDocuments = relevantConfigs
-    .flatMap((c: any) => c.invoice?.nfseDocuments || [])
+    .flatMap((c: any) => c.invoices?.flatMap((i: any) => i?.nfseDocuments ?? []) ?? [])
     .filter((doc: any) => doc.status === "AUTHORIZED" && doc.elotechNfseId);
 
   // AS ORDENS DE SERVIÇO DE TODOS OS VEÍCULOS.

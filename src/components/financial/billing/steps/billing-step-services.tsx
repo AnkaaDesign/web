@@ -16,7 +16,7 @@ import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle, Ico
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { hasMultipleCustomers as hasMultipleCustomersOf } from "@/utils/quote-tasks";
+import { coveredTaskIds, hasMultipleCustomers as hasMultipleCustomersOf } from "@/utils/quote-tasks";
 
 interface BillingStepServicesProps {
   disabled?: boolean;
@@ -47,7 +47,7 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
       if (c?.customerId !== primeiro.customerId) continue;
       const cobertos: string[] = Array.isArray(c?.taskIds)
         ? c.taskIds
-        : ((c?.coveredTasks ?? []) as any[]).map((r) => r.taskId);
+        : coveredTaskIds(c as any);
       for (const id of cobertos) ids.add(id);
     }
     return Math.max(1, ids.size);

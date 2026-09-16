@@ -64,6 +64,8 @@ import {
   perVehicleAmount,
   dedupeConfigsByCustomer,
   hasMultipleCustomers,
+  billingApprovedAtOf,
+  billingIdOf,
 } from "@/utils/quote-tasks";
 import { expandConfigsIntoLots } from "@/components/financial/shared/billing-split-field";
 
@@ -346,12 +348,27 @@ const FinancialBudgetDetailPageInner = () => {
     [existingQuote],
   );
 
-  /** Quantas faturas já foram aprovadas — com uma que seja, a divisão congela. */
-  const approvedBillingCount = useMemo(
-    () =>
-      ((existingQuote?.customerConfigs ?? []) as any[]).filter((c) => c?.billingApprovedAt).length,
-    [existingQuote],
-  );
+  /**
+   * Quantos FATURAMENTOS já foram aprovados — com um que seja, a divisão congela.
+   *
+   * A conta é por FATURAMENTO, não por pagador: dois pagadores do mesmo recorte
+   * são duas linhas de UMA cobrança, e contá-los diria "dois" sobre um.
+   *
+   * ⚠️ Lia `config.billingApprovedAt`, coluna que saiu do banco quando o estado
+   * passou para `Billing.approvedAt`. O resultado virou ZERO em todo orçamento —
+   * o seletor de junto/separado/lotes deixou de travar e a tela parou de avisar
+   * "há fatura aprovada". O servidor continuava recusando com 4xx, então nada de
+   * errado foi gravado; o que se perdeu foi o aviso ANTES do clique. A bateria
+   * (fase 6 M2 e fase 5 C3) pegou.
+   */
+  const approvedBillingCount = useMemo(() => {
+    const aprovados = new Set<string>();
+    for (const c of ((existingQuote?.customerConfigs ?? []) as any[])) {
+      if (!billingApprovedAtOf(c)) continue;
+      aprovados.add(billingIdOf(c) ?? c?.id ?? "");
+    }
+    return aprovados.size;
+  }, [existingQuote]);
 
   const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
   const recordNav = useRecordNavigation({

@@ -64,6 +64,7 @@ import {
   coverageSummary,
   coveredTaskCount,
   coveredTaskIds,
+  billingApprovedAtOf,
 } from "@/utils/quote-tasks";
 
 // Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
@@ -143,6 +144,15 @@ interface BillingStepReviewProps {
   /** When set, filters to show only this customer's data */
   filterCustomerId?: string;
   /**
+   * Os ÍNDICES das cobranças que esta página mostra. Ausente/vazio ⇒ todas.
+   *
+   * `filterCustomerId` não dava conta: num orçamento cobrado veículo a veículo as
+   * N cobranças são do MESMO CNPJ, então filtrar por cliente não cortava nada e o
+   * Resumo desenhava as três lado a lado — a tela de UMA cobrança exibindo as
+   * outras duas, que é o defeito que o dono apontou no print de 16/09.
+   */
+  visibleConfigIdx?: number[];
+  /**
    * Aprovar o faturamento da FATIA que cobre o veículo aberto.
    *
    * Vive na página porque é ela que tem o diálogo de confirmação irreversível
@@ -151,7 +161,7 @@ interface BillingStepReviewProps {
   onApproveVehicleBilling?: () => void;
 }
 
-export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, onApproveVehicleBilling }: BillingStepReviewProps) {
+export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, onApproveVehicleBilling }: BillingStepReviewProps) {
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
@@ -165,7 +175,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     const total = quoteVehicleCount(task?.quote);
     if (total <= 1) return false;
     return ((task?.quote?.customerConfigs ?? []) as any[]).some((c) => {
-      const covered = (c?.coveredTasks ?? []).length;
+      const covered = coveredTaskCount(c as any);
       return covered > 0 && covered < total;
     });
   })();
@@ -179,7 +189,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
    */
   const vehicleSlicePending = useMemo(() => {
     if (!task?.id) return false;
-    const configs = ((task?.quote?.customerConfigs ?? []) as any[]).filter((c) => !c?.billingApprovedAt);
+    const configs = ((task?.quote?.customerConfigs ?? []) as any[]).filter(
+      (c) => !billingApprovedAtOf(c as any),
+    );
     if (configs.length === 0) return false;
     return configs.some((c) => {
       const covered = coveredTaskIds(c as any);
@@ -201,7 +213,19 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     canApproveQuote(userPrivilege);
 
   const services = useWatch({ control, name: "services" }) || [];
-  const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  const allCustomerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+  // ESCOPO NA ORIGEM. Cortar aqui — e não em cada lugar que lê a lista — é o que
+  // faz os cartões, os totais, a cláusula de pagamento e as faturas exibidas
+  // falarem todos da MESMA cobrança. Filtrar só na hora de desenhar deixava os
+  // totais somando as irmãs.
+  const customerConfigs = useMemo(() => {
+    if (!visibleConfigIdx || visibleConfigIdx.length === 0) return allCustomerConfigs;
+    const keep = new Set(visibleConfigIdx);
+    const scoped = (allCustomerConfigs as any[]).filter((_: any, i: number) => keep.has(i));
+    // Recuo: escopo que não casa com nada (acervo sem cobertura gravada) mostra tudo,
+    // que é melhor do que uma tela vazia.
+    return scoped.length > 0 ? scoped : allCustomerConfigs;
+  }, [allCustomerConfigs, visibleConfigIdx]);
   /** Os veículos do orçamento, para nomear a cobertura de cada fatura. */
   const reviewVehicles = useMemo(
     () =>
