@@ -25,7 +25,10 @@ export interface CoveredVehicle {
 interface Props {
   /** Os veículos que ESTA cobrança cobre — não os do orçamento. */
   vehicles: CoveredVehicle[];
+  /** Trava DURA: quem abriu a tela não pode escrever em tarefa nenhuma. */
   disabled?: boolean;
+  /** A cobrança já foi aprovada — muda o AVISO, não o direito de escrever. */
+  approved?: boolean;
 }
 
 /**
@@ -42,15 +45,49 @@ interface Props {
  * módulo de produção e voltar.
  *
  * Então o recorte deste bloco é exatamente o recorte do documento: os veículos
- * desta cobrança, com os três campos que a NFS-e exige, editáveis até a
- * aprovação. Não é a frota do orçamento — é o que esta fatura vai dizer.
+ * desta cobrança, com os três campos que a NFS-e exige. Não é a frota do
+ * orçamento — é o que esta fatura vai dizer.
+ *
+ * ⚠️ NÃO SE TRAVA DEPOIS DA APROVAÇÃO, e isso é decisão, não esquecimento.
+ *
+ * Os três campos chegam TARDE por natureza. O número do pedido de compra é o caso
+ * puro: a API o deixou de fora de `enforceNestedQuoteGuards` justamente porque ele
+ * aparece depois de o orçamento fechar — travá-lo na tela desfaz de propósito o que
+ * o servidor abriu de propósito. Placa e chassi são a identidade do caminhão: um
+ * chassi digitado errado continua errado no cadastro depois da aprovação, e o
+ * conserto é aqui.
+ *
+ * O que a aprovação muda é o AVISO, não o direito: a nota autorizada e o boleto
+ * registrado não se reescrevem, e o cartão passa a dizer isso. Trocar o aviso por
+ * um `disabled` não protegia documento nenhum — só obrigava quem emite a sair da
+ * tela, abrir cada caminhão em Produção e voltar.
  *
  * GRAVA CAMPO A CAMPO, ao sair do campo. Não entra no formulário da página: o
  * `PUT /tasks/:id` da gravação principal é do veículo ABERTO, e pendurar os
  * irmãos ali faria um "Salvar" da cobrança 1 escrever em caminhões que ela nem
  * mostra. Uma linha, uma escrita, um alvo.
  */
-export function BillingCoveredVehicles({ vehicles, disabled }: Props) {
+/**
+ * ONDE CADA CAMPO MORA NO CORPO DO `PUT /tasks/:id` — e por que isso não é detalhe.
+ *
+ * `customerOrderNumber` é campo de PRIMEIRO NÍVEL da tarefa. `plate` e
+ * `chassisNumber` **não são**: pertencem ao caminhão, e o zod da API os declara
+ * dentro de `truck` (`api/src/schemas/task.ts`, `taskTruckSchema`).
+ *
+ * ⚠️ O defeito que isto conserta: a grade mandava os três no topo, com um `as any`
+ * calando o compilador. `taskUpdateSchema` não é `.strict()`, então o zod
+ * **descartava** placa e chassi em silêncio — a API respondia 200, o ✓ verde
+ * aparecia na célula, e nada era gravado. Quem corrigia a placa antes de aprovar
+ * via a confirmação, aprovava, e a NFS-e saía com a placa velha. Zod não-strict
+ * não recusa campo fora do lugar: ele APAGA.
+ */
+const payloadFor = (
+  field: "plate" | "chassisNumber" | "customerOrderNumber",
+  value: string | null,
+): Record<string, unknown> =>
+  field === "customerOrderNumber" ? { customerOrderNumber: value } : { truck: { [field]: value } };
+
+export function BillingCoveredVehicles({ vehicles, disabled, approved }: Props) {
   const { updateAsync } = useTaskMutations();
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -72,7 +109,7 @@ export function BillingCoveredVehicles({ vehicles, disabled }: Props) {
     const key = `${taskId}:${field}`;
     setSaving(key);
     try {
-      await updateAsync({ id: taskId, data: { [field]: next || null } as any });
+      await updateAsync({ id: taskId, data: payloadFor(field, next || null) });
       setSaved(key);
       setTimeout(() => setSaved((k) => (k === key ? null : k)), 2000);
     } catch {
@@ -120,9 +157,15 @@ export function BillingCoveredVehicles({ vehicles, disabled }: Props) {
           </Badge>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Placa, chassi e número do pedido de cada um saem na mesma nota fiscal. Corrija-os
-          aqui até a aprovação — depois dela o documento já está emitido.
+          Placa, chassi e número do pedido de cada um saem na mesma nota fiscal.
         </p>
+        {approved && (
+          <p className="text-xs text-amber-700 dark:text-amber-500">
+            Esta cobrança já foi aprovada: a nota fiscal e o boleto que já saíram continuam com os
+            dados antigos. Corrigir aqui acerta o cadastro do veículo — para o documento emitido é
+            preciso retificação.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

@@ -1764,9 +1764,16 @@ const BillingDetailPageInner = ({
                     Produção. Ficaram os três campos que a NOTA exige, um por
                     veículo, no recorte do documento. */}
                 <div style={{ display: currentStep === 1 ? undefined : "none" }}>
+                  {/* ⚠️ `approved` NÃO é `disabled`. A cobrança aprovada muda o aviso do
+                      cartão, não o direito de escrever: placa, chassi e nº do pedido
+                      chegam tarde por natureza — o pedido de compra em especial, que a
+                      API deixou de fora das guardas do orçamento exatamente por isso.
+                      Travar aqui desfazia na tela o que o servidor abriu de propósito e
+                      mandava quem emite a nota corrigir cada caminhão em Produção. */}
                   <BillingCoveredVehicles
                     vehicles={coveredVehicleRows as any}
-                    disabled={!canEdit || !!currentBilling?.approvedAt}
+                    disabled={!canEdit}
+                    approved={!!currentBilling?.approvedAt}
                   />
                 </div>
 

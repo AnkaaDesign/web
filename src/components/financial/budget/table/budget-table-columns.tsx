@@ -64,9 +64,34 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         exportHeader: "Nº Orçamento",
         exportValue: (t) => t.quote?.budgetNumber ?? "",
       },
-      cell: ({ getValue }) => {
+      // ⚠️ O NÚMERO SOZINHO MENTE quando o orçamento cobre mais de um veículo.
+      //
+      // A linha desta tabela é uma TAREFA, então um orçamento de quatro caminhões
+      // ocupa quatro linhas com o MESMO "984" — e foi exatamente assim que o dono
+      // leu quatro orçamentos iguais onde há um só. A marca "4 veíc." na célula do
+      // número diz, na coluna em que a repetição aparece, que a repetição é
+      // esperada: são quatro veículos DESTE orçamento, um por linha.
+      //
+      // Vai aqui e não só na coluna "Veículos" porque é o número que se repete, e
+      // é nele que o olho bate. As duas coisas juntas — marca + coluna — é o que
+      // torna a lista legível sem trocar a consulta.
+      cell: ({ row, getValue }) => {
         const n = getValue() as number | null;
-        return n ? <span className="text-sm font-medium tabular-nums">{n}</span> : <MutedDash />;
+        if (!n) return <MutedDash />;
+        const vehicles = taskQuoteVehicleCount(row.original);
+        return (
+          <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <span className="text-sm font-medium tabular-nums">{n}</span>
+            {vehicles > 1 && (
+              <span
+                className="rounded bg-muted px-1 text-[10px] font-medium leading-4 text-muted-foreground tabular-nums"
+                title={`Este orçamento cobre ${vehicles} veículos — um por linha desta lista.`}
+              >
+                {vehicles} veíc.
+              </span>
+            )}
+          </span>
+        );
       },
     },
     {
@@ -98,8 +123,12 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       // A linha é uma tarefa, e um orçamento multitarefa aparece em N linhas com
       // o mesmo número: sem esta coluna, sessenta linhas idênticas do Marquespan
       // pareciam sessenta orçamentos, e a coluna Valor — que agora mostra o valor
-      // de UM veículo — não tinha como se explicar. Visível por padrão apenas
-      // onde a decisão de faturar acontece; nas duas tabelas ela sai no export.
+      // de UM veículo — não tinha como se explicar.
+      //
+      // ⚠️ Era `defaultVisible: false` AQUI, visível só no Faturamento, e a lista
+      // de Orçamentos ficou sendo a única das duas sem a explicação de que
+      // precisava. O dono abriu a tela e leu quatro orçamentos onde há um. Agora
+      // nasce visível nas duas; nas duas ela também sai no export.
       id: "vehicleCount",
       header: "Veículos",
       accessorFn: (t) => taskQuoteVehicleCount(t),
@@ -110,7 +139,6 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       size: 100,
       minSize: 80,
       meta: {
-        defaultVisible: false,
         align: "center",
         headerLabel: "Veículos",
         exportHeader: "Veículos no orçamento",

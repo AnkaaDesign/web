@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
+import { QuoteStatusBadge, quoteStatusTriggerClass } from "@/components/production/task/quote/quote-status-badge";
 import {
   Dialog,
   DialogContent,
@@ -85,23 +85,14 @@ const statusOptionsFor = (
 };
 
 /**
- * A cor do gatilho, nas MESMAS cores de `QuoteStatusBadge`.
+ * A cor do gatilho vem de `quoteStatusTriggerClass`, a MESMA fonte do badge.
  *
- * Divergir faria a mesma situação ter duas cores conforme o usuário pudesse ou
- * não mudar o status — o seletor aparece para quem pode, o badge para quem não.
- */
-const getStatusTriggerClass = (status: string) => {
-  const map: Record<string, string> = {
-    PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
-    // Teal, a cor PRÓPRIA de "assinado pelo cliente, falta a nossa
-    // contra-assinatura" — ver o comentário em `quote-status-badge`.
-    SIGNED: "bg-teal-500 text-white hover:bg-teal-600 border-teal-600",
-    EXPIRED: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
-    APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
-    CANCELLED: "bg-red-700 text-white hover:bg-red-800 border-red-800",
-  };
-  return map[status] || "";
-};
+ * ⚠️ Era uma tabela própria aqui, e divergiu: "Assinado" saía verde-água neste
+ * combobox e verde no badge da tabela, e "Aprovado" saía verde aqui e azul lá.
+ * Como o seletor aparece para quem PODE editar e o badge para quem não pode, a
+ * mesma situação tinha duas cores conforme o usuário — que é exatamente o que a
+ * duplicação sempre produz. Não recriar o mapa: trocar a variante em
+ * `QUOTE_STATUS_CONFIG` troca as duas superfícies juntas.
 
 interface BudgetStepReviewProps {
   task?: any;
@@ -545,7 +536,7 @@ export function BudgetStepReview({
                     clearable={false}
                     disabled={disabled}
                     className="w-[220px]"
-                    triggerClassName={cn("font-medium h-9", getStatusTriggerClass(currentStatus))}
+                    triggerClassName={cn("font-medium h-9", quoteStatusTriggerClass(currentStatus))}
                   />
                 ) : (
                   <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />

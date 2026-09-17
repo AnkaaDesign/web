@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { QUOTE_STATUS_CONFIG } from "@/components/production/task/quote/quote-status-badge";
 import {
   IconClipboardList,
   IconCalendarEvent,
@@ -127,16 +128,18 @@ const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL];
 //   editor (`canEditTasks` excludes them). ADMIN is added downstream, so it isn't listed.
 const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.LOGISTIC];
 
-// Cores por estado DO ORÇAMENTO (TASK_QUOTE não está em ENTITY_BADGE_CONFIG, então o mapa mora
-// aqui — mesma paleta de `QuoteStatusBadge`). Os cinco, e só eles: o ciclo do pagamento saiu deste
-// enum em 16/09/2026 e é `BILLING_STATUS`, com badge e tela próprios.
-const QUOTE_STATUS_VARIANTS: Record<string, string> = {
-  EXPIRED: "expired",
-  SIGNED: "teal",
-  PENDING: "secondary",
-  APPROVED: "approved",
-  CANCELLED: "cancelled",
-};
+// Cores por estado DO ORÇAMENTO, DERIVADAS de `QUOTE_STATUS_CONFIG` — a mesma fonte do badge da
+// tabela. TASK_QUOTE não está em `ENTITY_BADGE_CONFIG`, então o mapa precisa existir aqui, mas ele
+// é montado a partir de lá, não escrito à mão.
+//
+// ⚠️ Escrito à mão, divergiu em QUATRO dos cinco estados: "Assinado" verde-água contra o verde da
+// tabela, "Aprovado" verde contra azul, "Pendente" cinza contra âmbar, "Aguardando Reanálise" âmbar
+// contra laranja. O comentário antigo jurava ser "a mesma paleta" — foi a promessa que sobreviveu à
+// decisão de 17/09, não a cor. Os cinco, e só eles: o ciclo do pagamento saiu deste enum em
+// 16/09/2026 e é `BILLING_STATUS`, com badge e tela próprios.
+const QUOTE_STATUS_VARIANTS: Record<string, string> = Object.fromEntries(
+  Object.entries(QUOTE_STATUS_CONFIG).map(([status, { variant }]) => [status, variant]),
+);
 
 /** A section title with the item-count badge directly after it (left side, next to the title text). */
 function titleWithCount(title: string, count: number) {
