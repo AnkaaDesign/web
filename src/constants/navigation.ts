@@ -690,10 +690,16 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "users",
         path: "/financeiro/clientes",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+        // ⚠️ ESTES PRIVILÉGIOS ESPELHAM `utils/route-privileges.ts`, e é o menu
+        // que estava errado — não a página. Cadastrar e Editar cliente pediam
+        // ADMIN aqui enquanto a rota, o `PrivilegeRoute` da página e o `@Roles`
+        // do `POST /customers` já aceitavam COMMERCIAL: o comercial tinha a
+        // permissão e não tinha como chegar à tela. Um menu mais restrito que a
+        // rota não protege nada — só esconde.
         children: [
-          { id: "clientes-financeiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/financeiro/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "clientes-financeiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/financeiro/clientes/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER] },
           { id: "clientes-financeiro-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/clientes/detalhes/:id", isDynamic: true },
-          { id: "clientes-financeiro-editar", title: "Editar", icon: "edit", path: "/financeiro/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "clientes-financeiro-editar", title: "Editar", icon: "edit", path: "/financeiro/clientes/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER] },
           { id: "responsaveis-financeiro", title: "Responsáveis", icon: "users", path: "/financeiro/clientes/responsaveis", requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL] },
         ],
       },
