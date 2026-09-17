@@ -880,6 +880,14 @@ export const routes = {
         páginas do PDF assinado. Fica fora de /cliente porque precisa ser curto e
         ditável — por isso o MobileUsageGuard também o allowlista. */
     signatureVerify: (code: string) => `/v/${code}`,
+    /** Ponte para o WhatsApp do comercial — o destino do botão "Falar com o
+        comercial" do template `orcamento_vencido`. A Meta recusa `wa.me` em
+        botão ("Direct links to WhatsApp aren't allowed for buttons"), então o
+        botão aponta para cá e o salto é nosso. Fica sob /cliente pela mesma
+        razão da assinatura: é no CELULAR que se toca esse botão, e o
+        MobileUsageGuard mandaria para /install qualquer rota móvel fora da
+        allowlist. */
+    commercial: "/cliente/comercial",
     root: "/cliente",
   },
 

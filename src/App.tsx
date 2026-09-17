@@ -211,6 +211,7 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
 const PublicSignaturePage = lazy(() => import("@/pages/public/signature/[token]"));
 const PublicSignatureVerifyPage = lazy(() => import("@/pages/public/signature/verify"));
+const CommercialContactPage = lazy(() => import("@/pages/public/commercial").then((module) => ({ default: module.CommercialContactPage })));
 
 // Public app-install landing page (no auth, no providers)
 const InstallPage = lazy(() => import("@/pages/install").then((module) => ({ default: module.InstallPage })));
@@ -585,6 +586,16 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicSignaturePage />
+                </Suspense>
+              }
+            />
+            {/* Ponte para o WhatsApp do comercial. É o destino do botão do template
+                `orcamento_vencido`, porque a Meta não aceita `wa.me` em botão. */}
+            <Route
+              path={routes.customer.commercial}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <CommercialContactPage />
                 </Suspense>
               }
             />
