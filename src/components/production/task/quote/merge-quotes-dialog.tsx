@@ -144,16 +144,12 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
                     com {verdict.vehicleCount} {verdict.vehicleCount === 1 ? "veículo" : "veículos"}.
                   </span>
                 </div>
-                {verdict.absorbed.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <span>Deixam de existir:</span>
-                    {verdict.absorbed.map((a) => (
-                      <span key={a.id} className="rounded bg-background px-1.5 py-0.5 tabular-nums">
-                        Nº {pad(a.budgetNumber)}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {/* Os números ABSORVIDOS não entram aqui. "Deixam de existir: Nº 0986"
+                    nomeia um documento que, para quem opera, já não é o assunto — a
+                    frase acima ("N orçamentos viram Nº X com K veículos") já diz o
+                    que acontece, e listar os que somem convida a procurá-los depois.
+                    O `verdict.absorbed` continua vindo do servidor: é ele que a
+                    confirmação envia. */}
               </div>
             )}
 
