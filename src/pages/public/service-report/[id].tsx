@@ -23,7 +23,7 @@ import {
   coveredTaskIds,
   quoteVehicleCount,
 } from "@/utils/quote-tasks";
-import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { COMPANY_INFO, BRAND_COLORS, BILLING_CONTACT, receivingAccountFor, whatsappLinkFor } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 
@@ -370,6 +370,30 @@ export function PublicServiceReportPage() {
           const own = covered.size > 0 ? all.filter((t: any) => covered.has(t.id)) : [];
           return orderNumberLabel(own.length > 0 ? own : all);
         })(),
+        // AS PARCELAS EMITIDAS, com data e valor — e a conta que as recebe.
+        //
+        // ⚠️ Esta página dizia explicitamente "No parcela-by-parcela table: the
+        // boletos themselves are appended further down and carry the real
+        // dates". O argumento vale para BOLETO e só para ele: quando o pagamento
+        // é Pix não há boleto anexado nenhum, e a página terminava na frase — o
+        // cliente que abria o link não tinha uma única data de vencimento nem
+        // para onde pagar. O PDF do dossiê passou a trazer os dois blocos; esta
+        // página é o MESMO documento noutro meio, e divergir dela é pior do que
+        // não ter nenhum dos dois.
+        //
+        // Nada é projetado: sai das parcelas que EXISTEM. Sem faturamento
+        // aprovado a tabela não aparece e a frase continua sozinha, como sempre.
+        installments: configInstallments.map((inst: any) => ({
+          number: inst.number,
+          dueDate: inst.dueDate,
+          amount: Number(inst.amount ?? 0),
+          paid: inst.status === "PAID",
+        })),
+        // A conta sai da forma REAL da parcela — a mesma fonte da frase logo
+        // acima (`paymentMethod`), para que o documento não se contradiga: o
+        // dossiê do nº 0915 chegou a dizer "via boleto" na frase e "Pagamento via
+        // Pix" três linhas abaixo, porque os dois liam fontes diferentes.
+        pix: receivingAccountFor(paymentMethod),
       };
     })
     .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);
@@ -808,16 +832,23 @@ export function PublicServiceReportPage() {
 
             {/* Payment conditions — the same prose the budget page shows (custom
                 text → structured config → legacy condition), with the settlement
-                method woven in. One block per customer in Completo. No
-                parcela-by-parcela table: the boletos themselves are appended
-                further down and carry the real dates. */}
+                method woven in. One block per customer in Completo.
+                A tabela de parcelas e a caixa do Pix vêm logo abaixo, em paridade
+                com o PDF do dossiê — ver o comentário em `paymentBlocks`. */}
             {paymentBlocks.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Condições de pagamento
                 </h3>
                 <div className="space-y-3">
-                  {paymentBlocks.map((block: { id?: string; customerName: string | null; paymentText: string; orderNumber: string | null }, i: number) => (
+                  {paymentBlocks.map((block: {
+                    id?: string;
+                    customerName: string | null;
+                    paymentText: string;
+                    orderNumber: string | null;
+                    installments: Array<{ number: number; dueDate: string | Date; amount: number; paid: boolean }>;
+                    pix: { key: string; keyKind: string; holder: string } | null;
+                  }, i: number) => (
                     <div key={block.id || i}>
                       {block.customerName && (
                         <p className="text-sm font-semibold text-gray-800">{block.customerName}</p>
@@ -827,6 +858,57 @@ export function PublicServiceReportPage() {
                         <p className="text-sm text-gray-600 mt-1">
                           <span className="font-semibold">N° do Pedido:</span> {block.orderNumber}
                         </p>
+                      )}
+
+                      {block.installments.length > 0 && (
+                        <table className="mt-3 w-full border-collapse text-sm">
+                          <tbody>
+                            {block.installments.map((inst) => (
+                              <tr key={inst.number} className="border-b border-dotted border-gray-300 last:border-0">
+                                <td className="py-1.5 pr-4 text-gray-700">
+                                  Parcela {inst.number}/{block.installments.length} – vencimento em{" "}
+                                  {formatDate(inst.dueDate)}
+                                  {inst.paid && (
+                                    <span className="ml-1.5 text-xs font-semibold" style={{ color: COMPANY.primaryGreen }}>
+                                      · paga
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 whitespace-nowrap text-right font-semibold tabular-nums text-gray-900">
+                                  {formatCurrency(inst.amount)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {block.pix && (
+                        <div className="mt-4 border-t border-gray-200 pt-3">
+                          <h4 className="mb-1.5 font-bold" style={{ color: COMPANY.primaryGreen }}>
+                            Pagamento via Pix
+                          </h4>
+                          <p className="text-gray-700">
+                            <span className="font-semibold">Chave Pix ({block.pix.keyKind}):</span>{" "}
+                            <span className="whitespace-nowrap">{block.pix.key}</span>
+                            <br />
+                            <span className="font-semibold">Favorecido:</span> {block.pix.holder}
+                          </p>
+                          <p className="mt-2 text-sm text-gray-600">
+                            Ao pagar, informe o orçamento Nº {String(quote.budgetNumber ?? "").padStart(4, "0")} na
+                            descrição e encaminhe o comprovante para o {BILLING_CONTACT.role} – {BILLING_CONTACT.name},{" "}
+                            <a
+                              href={whatsappLinkFor(BILLING_CONTACT.phoneClean)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold whitespace-nowrap hover:underline"
+                              style={{ color: COMPANY.primaryGreen }}
+                            >
+                              {BILLING_CONTACT.phone}
+                            </a>
+                            .
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}

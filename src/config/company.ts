@@ -8,6 +8,16 @@
  */
 export const COMPANY_INFO = {
   name: "Ankaa Design",
+  /**
+   * A razão social e o CNPJ — espelho de `api/src/config/company.ts`.
+   *
+   * Entraram quando a página pública passou a imprimir a chave Pix da empresa:
+   * o favorecido que o aplicativo do banco mostra na confirmação é a RAZÃO
+   * SOCIAL, não o nome fantasia, e conferir os dois é o que o pagador faz antes
+   * de concluir.
+   */
+  corporateName: "S. RODRIGUES & G. RODRIGUES LTDA",
+  cnpjFormatted: "13.636.938/0001-44",
   address: "Rua: Luis Carlos Zani, 2493 - Santa Paula, Ibipora-PR",
   phone: "43 9 8428-3228",
   phoneClean: "5543984283228",
@@ -130,6 +140,55 @@ export const COMPANY_FISCAL = {
  *
  * Espelhado em `api/src/config/company.ts`.
  */
+/**
+ * AS CONTAS QUE RECEBEM — espelho de `api/src/config/company.ts`.
+ *
+ * A duplicação entre os pacotes é a doutrina desta casa (os repositórios são
+ * independentes), e aqui ela tem um custo concreto que vale nomear: o dossiê em
+ * PDF é montado no SERVIDOR e a página pública é montada no NAVEGADOR. Enquanto
+ * só o servidor conhecia as contas, o PDF trazia "Pagamento via Pix" com chave e
+ * favorecido e a página pública do mesmo orçamento terminava na frase — o
+ * cliente que abria o link não tinha para onde pagar.
+ *
+ * Qualquer mudança aqui tem gêmea lá.
+ */
+export interface ReceivingAccount {
+  key: string;
+  /** A caixa é a do DOCUMENTO: sigla em maiúsculas, substantivo comum em minúsculas. */
+  keyKind: "CNPJ" | "CPF" | "telefone" | "e-mail" | "aleatória";
+  holder: string;
+}
+
+export const RECEIVING_ACCOUNTS: Record<string, ReceivingAccount> = {
+  PIX: { key: COMPANY_INFO.cnpjFormatted, keyKind: "CNPJ", holder: COMPANY_INFO.corporateName },
+  ACCOUNT_GENIVALDO: { key: "073.329.609-23", keyKind: "CPF", holder: "Genivaldo Rodrigues" },
+  ACCOUNT_SERGIO: { key: "43 98428-3228", keyKind: "telefone", holder: "Sergio Rodrigues" },
+};
+
+/** A conta desta forma de pagamento, ou nulo quando a forma não é Pix. */
+export function receivingAccountFor(method: string | null | undefined): ReceivingAccount | null {
+  if (!method) return null;
+  return RECEIVING_ACCOUNTS[method] ?? null;
+}
+
+/**
+ * QUEM RECEBE O COMPROVANTE. Espelho de `api/src/config/company.ts`.
+ *
+ * ⚠️ `phoneClean` tem o NONO DÍGITO. O número circula escrito com oito e o
+ * `wa.me` montado assim não abre conversa nenhuma.
+ */
+export const BILLING_CONTACT = {
+  name: "Grasiele",
+  role: "Faturamento",
+  phone: "+55 43 9 8834-9545",
+  phoneClean: "5543988349545",
+} as const;
+
+/** O link do WhatsApp de um número já limpo (só dígitos, com DDI). */
+export function whatsappLinkFor(phoneClean: string): string {
+  return `https://wa.me/${phoneClean.replace(/\D/g, "")}`;
+}
+
 export const PINNED_CUSTOMERS = {
   /**
    * Ibiporã Implementos Rodoviários — "Industria de Carrocerias Metalicas Ibipora LTDA",
