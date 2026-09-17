@@ -75,7 +75,6 @@ import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navig
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
 import { useAttentionEntity, useAttentionField } from "@/lib/attention";
 import { hasCompleteBillingCustomerData, missingBillingCustomerLabels } from "@/lib/billing-customer-data";
-import { PINNED_CUSTOMERS } from "@/config/company";
 
 /**
  * Remount the wizard whenever the record changes.
@@ -1097,9 +1096,25 @@ const BillingDetailPageInner = ({
     hasInitializedStep.current = true;
     // First config the active rule(s) actually name — a multi-customer quote must land on the
     // one with the gap, not on whichever customer happens to be first.
+    // ⚠️ A REGRA DO PEDIDO DE COMPRA NÃO APONTA MAIS PARA O PASSO DO CLIENTE.
+    //
+    // A condição era `!c?.orderNumber` numa FATIA, e `orderNumber` deixou de ser
+    // campo da fatia em `20260909170000` — o número do pedido é do VEÍCULO
+    // (`Task.customerOrderNumber`). `undefined` é sempre falsy, então a condição
+    // era sempre verdadeira: a regra levava ao passo do cliente, onde o campo não
+    // existe mais. Quem seguia a linha piscando chegava a um passo sem nada aceso
+    // — e sair da tela dá quatro horas de silêncio à regra.
+    //
+    // O passo 1 é onde o campo mora (a grade de veículos no faturamento, o passo
+    // Tarefa no orçamento), e é para lá que a regra manda agora. O passo do
+    // cliente continua sendo o destino da regra de CADASTRO do tomador, que é de
+    // fato da fatia.
+    if (orderNumberAttentionActive) {
+      setCurrentStep(1);
+      return;
+    }
     const idx = customerConfigs.findIndex((c: any) => {
       if (c?.generateInvoice === false) return false; // no nota, so neither rule applies to it
-      if (orderNumberAttentionActive && c?.customerId === PINNED_CUSTOMERS.IBIPORA && !c?.orderNumber) return true;
       return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
     });
     if (idx < 0) return;
