@@ -511,26 +511,41 @@ export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Reco
 };
 
 /**
- * Default sort, expressed twice on purpose: once as TanStack sorting state (so the header arrows
- * are right at cold mount, where nothing is written to the URL) and once as the `orderBy` fallback
- * in `buildBudgetOrderBy([])`. They must stay identical or the arrows describe a different order
- * than the one the server applied.
+ * A FILA — "primeiro os mais antigos pendentes, depois os mais novos aprovados".
  *
- * ⚠️ O critério secundário era `term`, e ele MORREU com a migração (prazo é da
- * tarefa, e são N por linha). `expiresAt` é o substituto certo, não um substituto
- * qualquer: a validade é o relógio que esta lista corre, e é escalar do próprio
- * orçamento. Devolver o prazo exigiria desnormalizar `Budget.earliestTerm`
- * junto de `recalcQuoteTotals` — outra mudança, com migration.
+ * As duas metades correm em DIREÇÕES OPOSTAS, e é isso que nenhuma ordenação de
+ * colunas com direção fixa consegue dizer. Um pendente antigo é uma proposta
+ * esquecida: o mais velho é o mais urgente. Um aprovado é trabalho resolvido: o
+ * que interessa é o que acabou de entrar.
+ *
+ * Quem carrega a inversão é `queueRank`, coluna GERADA pelo banco (migração
+ * `20260917210000_fila_do_orcamento`): o instante de criação em segundos, negado
+ * para APPROVED e CANCELLED. Por isso as duas chaves saem daqui `asc`.
+ *
+ * ⚠️ `queueRank` NÃO É COLUNA DA TABELA, e é de propósito. O estado de ordenação
+ * do TanStack desenha setas nos cabeçalhos; uma seta em "Criado em" apontando
+ * para cima seria MENTIRA na metade aprovada, que vem do mais novo. O padrão
+ * declara só o status — que é verdade — e o desempate viaja invisível, sem
+ * cabeçalho que o contradiga.
  */
-export const BUDGET_DEFAULT_SORTING: { id: string; desc: boolean }[] = [
-  { id: "quoteStatus", desc: false },
-  { id: "expiresAt", desc: false },
-];
+export const BUDGET_DEFAULT_SORTING: { id: string; desc: boolean }[] = [{ id: "quoteStatus", desc: false }];
 
+/**
+ * ⚠️ O desempate é acrescentado SEMPRE, inclusive sobre uma ordenação escolhida
+ * pelo usuário — e não só por causa da fila. Sem uma última chave única e
+ * estável, duas linhas de mesmo valor (dois orçamentos do mesmo dia, dois com o
+ * mesmo total) trocam de lugar entre uma página e outra, e a paginação passa a
+ * repetir uma linha na página 2 e sumir com outra. `queueRank` é derivado de
+ * `createdAt`, que é praticamente único aqui.
+ *
+ * Quem ordena explicitamente por "Criado em" já recebe o desempate redundante —
+ * inofensivo, porque nesse caso ele concorda com a chave anterior.
+ */
 export function buildBudgetOrderBy(sorting: { id: string; desc: boolean }[]): Record<string, unknown> | Record<string, unknown>[] {
   const entries = sorting
     .map((s) => BUDGET_SORT_FIELD_MAP[s.id]?.(s.desc ? "desc" : "asc"))
     .filter((e): e is Record<string, unknown> => !!e);
-  if (entries.length === 0) return [{ statusOrder: "asc" }, { expiresAt: "asc" }];
-  return entries.length === 1 ? entries[0] : entries;
+  if (entries.length === 0) return [{ statusOrder: "asc" }, { queueRank: "asc" }];
+  return [...entries, { queueRank: "asc" }];
 }
+
