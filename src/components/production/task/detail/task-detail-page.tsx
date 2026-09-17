@@ -53,7 +53,7 @@ import { getSectors } from "@/api-client/sector";
 import { isValidTaskStatusTransition, getBudgetEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
-import { taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
+import { taskInvoiceCustomerLabel, taskInvoiceCustomerNames } from "@/utils/quote-tasks";
 import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCanViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
@@ -1185,10 +1185,26 @@ function TaskDetailContent() {
                           },
                         }
                       : undefined,
+                  // ⚠️ `render` GANHA DO `accessor` — ver `inline-edit-field.tsx`.
+                  //
+                  // O `accessor` acima já usava `taskInvoiceCustomerLabel`, mas
+                  // ele só decide se o campo está VAZIO e alimenta o editor: quem
+                  // DESENHA é esta função. Ela lia `customerConfigs` cru, sem
+                  // filtrar por veículo e sem deduplicar, e imprimia um `<span>`
+                  // por fatia — num orçamento cobrado veículo a veículo, o mesmo
+                  // cliente quatro vezes, um embaixo do outro.
+                  //
+                  // MÚLTIPLOS FATURAMENTOS DE UM ORÇAMENTO NÃO SÃO MÚLTIPLOS
+                  // PAGADORES. Quatro faturas de um caminhão cada, todas do mesmo
+                  // cliente, são QUATRO `BudgetPayer` e UM pagador. A pergunta
+                  // desta linha é "para quem vai a nota DESTE veículo?", e a
+                  // resposta é um nome.
+                  //
+                  // Agora as duas leituras bebem da MESMA fonte, que é o ponto:
+                  // a divergência entre elas é que deixou o defeito de pé depois
+                  // de o `accessor` já ter sido corrigido.
                   render: (t: Task) => {
-                    const names = (t.quote?.customerConfigs ?? [])
-                      .map((c) => c.customer?.corporateName || c.customer?.fantasyName || "")
-                      .filter(Boolean);
+                    const names = taskInvoiceCustomerNames(t.quote?.customerConfigs, t.id);
                     if (!names.length) return <span className="text-muted-foreground">—</span>;
                     return (
                       <div className="flex flex-col items-end gap-0.5">
@@ -1200,7 +1216,7 @@ function TaskDetailContent() {
                       </div>
                     );
                   },
-                },,
+                },
                 {
                   /**
                    * O ESTADO DA COBRANÇA — outro ciclo, outro enum, outra tela.
@@ -1230,7 +1246,7 @@ function TaskDetailContent() {
                     if (!billing?.status) return <span className="text-muted-foreground">—</span>;
                     return <BillingStatusBadge status={billing.status as never} />;
                   },
-                },,
+                },
               ],
             } as DetailSectionDef<Task>,
           ]
