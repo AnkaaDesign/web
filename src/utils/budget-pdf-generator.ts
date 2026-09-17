@@ -610,12 +610,42 @@ export async function exportBudgetPdfFromData(data: BudgetHtmlData): Promise<voi
  */
 const STAMPED_STATUSES: Record<string, string> = {
   CANCELLED: "CANCELADO",
+  /**
+   * NÃO é "Aguardando Reanálise", que é como o sistema chama este estado.
+   *
+   * Aquele rótulo diz o que o COMERCIAL tem de fazer com o orçamento, e esta
+   * folha vai para o CLIENTE — a quem o nosso fluxo interno não diz nada. O que
+   * ele precisa saber é que a proposta não vale mais.
+   *
+   * E não é "VENCIDO", pelo motivo que o enum já registra: vencida é a PARCELA
+   * (`BILLING_STATUS.OVERDUE`), e esta mesma folha imprime parcelas nas
+   * condições de pagamento — as duas palavras lado a lado se confundiriam.
+   * "Fora de validade" amarra na VALIDADE, que é um campo que o documento já
+   * mostra, e não colide com nada.
+   */
+  EXPIRED: "FORA DE VALIDADE",
 };
 
 function budgetStamp(status: string | null | undefined): string {
   const label = status ? STAMPED_STATUSES[status] : undefined;
   if (!label) return "";
-  return `<div class="stamp" aria-hidden="true">${escapeHtml(label)}</div>`;
+
+  // O CORPO DA TARJA CABE NA FOLHA — a folha não se estica para ele.
+  //
+  // `.page` tem `overflow: hidden` (é o que a prende a uma folha só), então uma
+  // tarja larga demais não transborda: some, cortada. "CANCELADO" tem 9
+  // caracteres e "FORA DE VALIDADE" tem 16 — no mesmo corpo, a segunda passa de
+  // 350mm e a diagonal de uma A4 tem 364mm.
+  //
+  // Daí o corpo sair do COMPRIMENTO: ~760pt de largura útil divididos pelo
+  // número de caracteres, com teto de 84pt para o texto curto não virar cartaz.
+  // O espaçamento acompanha o corpo para a proporção não mudar com o rótulo.
+  const fontSize = Math.min(84, Math.round(760 / label.length));
+  const tracking = Math.round(fontSize * 0.07);
+  return (
+    `<div class="stamp" aria-hidden="true" ` +
+    `style="font-size:${fontSize}pt;letter-spacing:${tracking}pt">${escapeHtml(label)}</div>`
+  );
 }
 
 /**
@@ -971,9 +1001,9 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) rotate(-30deg);
-      font-size: 90pt;
+      /* corpo e espacamento vem inline, calculados pelo comprimento do rotulo
+         em budgetStamp -- ver la o porque */
       font-weight: 800;
-      letter-spacing: 6pt;
       color: rgba(200, 30, 30, 0.16);
       border: 6px solid rgba(200, 30, 30, 0.16);
       border-radius: 8mm;
