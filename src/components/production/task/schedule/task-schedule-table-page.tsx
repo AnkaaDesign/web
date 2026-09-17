@@ -61,6 +61,7 @@ import { SetStatusModal } from "./set-status-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetTermModal } from "./set-term-modal";
 import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
+import { MergeQuotesDialog } from "@/components/production/task/quote/merge-quotes-dialog";
 import { useConfirm } from "../detail/use-confirm";
 import { taskCancelConfirmOpts } from "../cancel-confirmation";
 import { CopyFromTaskModal } from "./copy-from-task-modal";
@@ -70,7 +71,7 @@ import { useTasks } from "@/hooks/production/use-task";
 import { createTaskScheduleColumns } from "./task-schedule-columns";
 import { getRowColorClass } from "./task-table-utils";
 import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
-import { IconBellPlus } from "@tabler/icons-react";
+import { IconArrowMerge, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 const ADVANCED_GROUP = { id: "advanced", label: "Avançados", icon: <IconSettings2 className="h-4 w-4" /> };
@@ -274,6 +275,7 @@ export function TaskScheduleTablePage() {
   const [statusModal, setStatusModal] = useState<TaskModalState>(CLOSED);
   const [quoteLayoutModal, setQuoteLayoutModal] = useState<TaskModalState>(CLOSED);
   const [duplicateModal, setDuplicateModal] = useState<TaskModalState>(CLOSED);
+  const [mergeModal, setMergeModal] = useState<TaskModalState>(CLOSED);
   const [deleteDialog, setDeleteDialog] = useState<TaskModalState>(CLOSED);
   const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
   const [advancedTaskIds, setAdvancedTaskIds] = useState<string[]>([]);
@@ -697,6 +699,23 @@ export function TaskScheduleTablePage() {
         onClick: (r) => handleStartCopyFromTask(r),
       },
       {
+        /**
+         * SIMPLIFICAR ORÇAMENTO — a MESMA ação da Agenda, aqui pela mesma razão:
+         * é neste par de telas que o comercial vê os irmãos lado a lado.
+         *
+         * O julgamento inteiro é do servidor (prévia): a linha desta tabela não
+         * carrega a lista de serviços, o desconto nem as condições de pagamento,
+         * que é o que decide se dá para unir.
+         */
+        key: "simplificar-orcamento",
+        label: "Simplificar Orçamento",
+        icon: <IconArrowMerge className="h-4 w-4" />,
+        separatorBefore: true,
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+        hidden: (r) => r.length < 2,
+        onClick: (r) => setMergeModal({ open: true, tasks: r }),
+      },
+      {
         key: "enviar-aviso",
         label: "Enviar aviso",
         icon: <IconBellPlus className="h-4 w-4" />,
@@ -848,6 +867,12 @@ export function TaskScheduleTablePage() {
       <SetSectorModal open={sectorModal.open} onOpenChange={(open) => setSectorModal((s) => ({ ...s, open }))} tasks={sectorModal.tasks} onConfirm={confirmSetSector} />
       <SetTermModal open={termModal.open} onOpenChange={(open) => setTermModal((s) => ({ ...s, open }))} tasks={termModal.tasks} onConfirm={confirmSetTerm} />
       <SetQuoteLayoutModal open={quoteLayoutModal.open} onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))} tasks={quoteLayoutModal.tasks} />
+      <MergeQuotesDialog
+        open={mergeModal.open}
+        onOpenChange={(open) => !open && setMergeModal(CLOSED)}
+        taskIds={mergeModal.tasks.map((t) => t.id)}
+        onMerged={() => setMergeModal(CLOSED)}
+      />
       <SetStatusModal
         open={statusModal.open}
         onOpenChange={(open) => setStatusModal((s) => ({ ...s, open }))}

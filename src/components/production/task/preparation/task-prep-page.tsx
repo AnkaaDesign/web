@@ -14,6 +14,7 @@ import {
   IconCheck,
   IconX,
   IconAlertTriangle,
+  IconArrowMerge,
   IconCopy,
   IconClipboardCopy,
   IconSettings2,
@@ -46,6 +47,7 @@ import { SetSectorModal } from "@/components/production/task/schedule/set-sector
 import { SetTermModal } from "@/components/production/task/schedule/set-term-modal";
 import { SetStatusModal } from "@/components/production/task/schedule/set-status-modal";
 import { SetQuoteLayoutModal } from "@/components/production/task/schedule/set-quote-layout-modal";
+import { MergeQuotesDialog } from "@/components/production/task/quote/merge-quotes-dialog";
 import { AdvancedBulkActionsHandler } from "@/components/production/task/bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "@/components/production/task/schedule/copy-from-task-modal";
 import { Button } from "@/components/ui/button";
@@ -548,6 +550,7 @@ export function TaskPreparationPage() {
   const [termModal, setTermModal] = useState<ModalState>(CLOSED_MODAL);
   const [statusModal, setStatusModal] = useState<ModalState>(CLOSED_MODAL);
   const [quoteLayoutModal, setQuoteLayoutModal] = useState<ModalState>(CLOSED_MODAL);
+  const [mergeModal, setMergeModal] = useState<ModalState>(CLOSED_MODAL);
   const [deleteModal, setDeleteModal] = useState<ModalState>(CLOSED_MODAL);
 
   // Ids currently held by an open "Avançados" bulk modal. Tracked in state (rather than
@@ -564,13 +567,13 @@ export function TaskPreparationPage() {
   // sector/term/status, quote layout, duplicate, copy-from, avançados) so other users see it.
   const editingActionIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const m of [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal]) {
+    for (const m of [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, mergeModal]) {
       if (m.open) m.taskIds.forEach((id) => ids.add(id));
     }
     if (copyFrom.step !== "idle") copyFrom.targetTasks.forEach((t) => ids.add(t.id));
     advancedTaskIds.forEach((id) => ids.add(id));
     return [...ids];
-  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, copyFrom, advancedTaskIds]);
+  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, mergeModal, copyFrom, advancedTaskIds]);
   useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
 
   // Resolve live Task objects for a set of ids: the schedule modals need `tasks` for their count and
@@ -741,6 +744,36 @@ export function TaskPreparationPage() {
         // Prazo de Entrega — COMMERCIAL + ADMIN only (the API `term` field domain).
         requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL],
         onClick: (rows) => setTermModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
+      },
+      {
+        /**
+         * SIMPLIFICAR ORÇAMENTO — N orçamentos de 1 veículo viram 1 de N.
+         *
+         * É onde a queixa nasce: o comercial vê quatro linhas na Agenda, sabe que
+         * são o mesmo negócio, e até aqui só tinha como abrir os quatro
+         * orçamentos um por um.
+         *
+         * ⚠️ `expandClusterTaskIds` é obrigatório, como em toda ação de lote
+         * desta tela: uma linha pode ser um CLUSTER, e agir sobre `rows[0].id`
+         * simplificaria um veículo de três (foi o defeito do "atualiza 1 de 3").
+         *
+         * ⚠️ NÃO deduplica por orçamento aqui, de propósito. Quem dedupe é o
+         * servidor, que tem o grafo — e é ele quem recusa quando sobra um
+         * orçamento só. Deduplicar no cliente exigiria o `quoteId` na linha e
+         * daria um segundo julgamento para divergir do primeiro.
+         *
+         * O julgamento inteiro (listas de serviço, desconto, dinheiro emitido,
+         * assinatura) é do servidor, pela prévia — a linha da Agenda não carrega
+         * nada disso.
+         */
+        key: "simplificar-orcamento",
+        label: "Simplificar Orçamento",
+        icon: <IconArrowMerge className="h-4 w-4" />,
+        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+        // Com um veículo só não há o que unir, e o diálogo diria isso — mas
+        // oferecer um item que só serve para explicar que não serve é ruído.
+        hidden: (rows) => expandClusterTaskIds(rows).length < 2,
+        onClick: (rows) => setMergeModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
       {
         key: "alterar-status",
@@ -1083,6 +1116,13 @@ export function TaskPreparationPage() {
         open={quoteLayoutModal.open}
         onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))}
         tasks={rowsFor(quoteLayoutModal.taskIds)}
+      />
+
+      <MergeQuotesDialog
+        open={mergeModal.open}
+        onOpenChange={(open) => !open && setMergeModal(CLOSED_MODAL)}
+        taskIds={mergeModal.taskIds}
+        onMerged={() => setMergeModal(CLOSED_MODAL)}
       />
 
       <AlertDialog open={deleteModal.open} onOpenChange={(open) => !open && setDeleteModal(CLOSED_MODAL)}>

@@ -93,6 +93,7 @@ const statusOptionsFor = (
  * mesma situação tinha duas cores conforme o usuário — que é exatamente o que a
  * duplicação sempre produz. Não recriar o mapa: trocar a variante em
  * `QUOTE_STATUS_CONFIG` troca as duas superfícies juntas.
+ */
 
 interface BudgetStepReviewProps {
   task?: any;

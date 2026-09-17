@@ -16,6 +16,28 @@ export const taskQuoteService = {
   // Update
   update: (id: string, data: any) => apiClient.put(`/task-quotes/${id}`, data),
 
+  /**
+   * SIMPLIFICAR ORÇAMENTO — N orçamentos de 1 veículo viram 1 de N.
+   *
+   * Manda TAREFAS, não orçamentos: é assim que a Agenda e o Cronograma
+   * selecionam. Deduplicar por orçamento é do servidor — marcar os quatro
+   * veículos de um orçamento de quatro é inofensivo.
+   *
+   * A PRÉVIA é obrigatória antes do botão e não escreve nada: a linha da Agenda
+   * traz o total e o cliente, não a lista de serviços, o desconto nem as
+   * condições de pagamento — que é o que decide se dá para unir. Toast suprimido
+   * porque quem fala é o diálogo, com a lista de impedimentos inteira.
+   */
+  mergePreview: (taskIds: string[]) =>
+    apiClient.post(
+      '/task-quotes/merge/preview',
+      { taskIds },
+      { metadata: { suppressToast: true } } as any,
+    ),
+
+  merge: (taskIds: string[], billingSplit?: 'JOINT' | 'PER_TASK') =>
+    apiClient.post('/task-quotes/merge', { taskIds, ...(billingSplit ? { billingSplit } : {}) }),
+
   // Update only the layout files — layoutFileIds is a safe-after-billing field, so
   // this works on locked quotes too. Toast suppressed so batch callers can emit one
   // summary. Sends the ordered File-id array (replaces the relation; [] clears).
