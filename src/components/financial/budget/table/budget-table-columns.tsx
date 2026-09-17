@@ -1,6 +1,5 @@
 import type { DataTableColumnDef } from "@/components/ui/datatable";
-import type { Task } from "@/types";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -8,24 +7,38 @@ import { TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, getBadgeVariant } from "@
 import type { TASK_STATUS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import { formatCurrency } from "@/utils";
+import { MutedDash, dateExportValue, renderDateCell } from "@/components/financial/shared/quote-table-shared";
 import {
-  InvoiceToCustomersCell,
-  MutedDash,
-  OrderNumbersCell,
-  dateExportValue,
-  invoiceToCustomerNames,
+  QuoteInvoiceToCustomersCell,
+  QuoteOrderNumbersCell,
+  earliestTaskDate,
+  quoteCustomerLabel,
+  quoteCustomerNames,
+  quoteIdentifierLabel,
+  quoteIdentifiers,
+  quoteInvoiceToCustomerNames,
+  quoteNameLabel,
+  quoteNames,
+  quoteOrderNumberLabel,
   quoteOrderNumbers,
-  renderDateCell,
-  taskCustomerName,
-  taskIdentifier,
-  isMultiVehicleQuote,
-  taskQuoteSubtotal,
-  taskQuoteTotal,
-  taskQuoteVehicleCount,
-} from "@/components/financial/shared/quote-table-shared";
+  quoteTaskStatus,
+  quoteVehiclesLoadedCount,
+  taskDateSpread,
+} from "./quote-row-shared";
 
 /**
  * Columns for the Orçamentos list.
+ *
+ * ⚠️ A LINHA É UM ORÇAMENTO — o contrato, não um veículo.
+ *
+ * Era uma tarefa: um orçamento de quatro caminhões ocupava quatro linhas com o
+ * MESMO número 984, o rodapé dizia "4 resultado(s)", e o dono leu quatro
+ * orçamentos onde há um. A lista passou a consultar `GET /task-quotes`, e com
+ * isso cai todo o andaime que existia só para EXPLICAR a repetição: a marca
+ * "N veíc." na célula do número, o sufixo "/veíc." no valor e as divisões
+ * `total ÷ N`. As colunas que perguntavam ao registro da linha (nome,
+ * identificador, cliente, previsão, prazo, entrada, status da tarefa) passam a
+ * AGREGAR os veículos — ver `quote-row-shared.tsx`, onde cada regra se explica.
  *
  * Column ids are deliberately dot-free — they become the `--col-<id>-size` CSS custom property
  * and the persistence key, so a nested sort target lives in BUDGET_SORT_FIELD_MAP instead of the
@@ -48,13 +61,44 @@ const moneyExport = (value: unknown) => {
   return n && n > 0 ? formatCurrency(n) : "";
 };
 
-export function createBudgetColumns(): DataTableColumnDef<Task>[] {
+/**
+ * O valor de UM veículo, só para o `title` do valor do contrato.
+ *
+ * A célula mostra o contrato porque é o número que o cliente assinou e o que a
+ * fatura conjunta cobra; a fatia fica no hover, que é onde alguém a procura
+ * quando precisa conferir a proposta veículo a veículo.
+ */
+const perVehicleHint = (quote: TaskQuote, total: number | null): string | undefined => {
+  const n = quoteVehiclesLoadedCount(quote);
+  if (!total || n <= 1) return undefined;
+  return `${formatCurrency(Math.round((total / n) * 100) / 100)} por veículo — ${n} veículos`;
+};
+
+/**
+ * Data agregada: o `title` diz que o número é um resumo dos N veículos.
+ *
+ * Sem ele a coluna afirma um prazo único num orçamento cujos quatro caminhões
+ * têm quatro prazos — e quem lê não tem como saber que está vendo o mais cedo.
+ */
+const renderEarliestDate = (quote: TaskQuote, field: "term" | "forecastDate" | "entryDate") => {
+  const date = earliestTaskDate(quote, field);
+  if (!date) return <MutedDash />;
+  const filled = taskDateSpread(quote, field);
+  if (filled <= 1) return renderDateCell(date);
+  return <span title={`o mais cedo de ${filled} veículos`}>{renderDateCell(date)}</span>;
+};
+
+export function createBudgetColumns(): DataTableColumnDef<TaskQuote>[] {
   return [
     {
       // The number people quote at each other on the phone — the fastest way to find a budget.
+      // Agora é a CHAVE NATURAL da linha: uma linha, um número, sem repetição
+      // para explicar (foi por isso que a marca "N veíc." saiu daqui — a coluna
+      // "Veículos" continua dizendo quantos são, como informação e não como
+      // desculpa).
       id: "budgetNumber",
       header: "Nº Orçamento",
-      accessorFn: (t) => t.quote?.budgetNumber ?? null,
+      accessorFn: (q) => q.budgetNumber ?? null,
       enableSorting: true,
       size: 120,
       minSize: 90,
@@ -62,90 +106,83 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         align: "right",
         headerLabel: "Nº Orçamento",
         exportHeader: "Nº Orçamento",
-        exportValue: (t) => t.quote?.budgetNumber ?? "",
+        exportValue: (q) => q.budgetNumber ?? "",
       },
-      // ⚠️ O NÚMERO SOZINHO MENTE quando o orçamento cobre mais de um veículo.
-      //
-      // A linha desta tabela é uma TAREFA, então um orçamento de quatro caminhões
-      // ocupa quatro linhas com o MESMO "984" — e foi exatamente assim que o dono
-      // leu quatro orçamentos iguais onde há um só. A marca "4 veíc." na célula do
-      // número diz, na coluna em que a repetição aparece, que a repetição é
-      // esperada: são quatro veículos DESTE orçamento, um por linha.
-      //
-      // Vai aqui e não só na coluna "Veículos" porque é o número que se repete, e
-      // é nele que o olho bate. As duas coisas juntas — marca + coluna — é o que
-      // torna a lista legível sem trocar a consulta.
-      cell: ({ row, getValue }) => {
+      cell: ({ getValue }) => {
         const n = getValue() as number | null;
         if (!n) return <MutedDash />;
-        const vehicles = taskQuoteVehicleCount(row.original);
-        return (
-          <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-            <span className="text-sm font-medium tabular-nums">{n}</span>
-            {vehicles > 1 && (
-              <span
-                className="rounded bg-muted px-1 text-[10px] font-medium leading-4 text-muted-foreground tabular-nums"
-                title={`Este orçamento cobre ${vehicles} veículos — um por linha desta lista.`}
-              >
-                {vehicles} veíc.
-              </span>
-            )}
-          </span>
-        );
+        return <span className="text-sm font-medium tabular-nums whitespace-nowrap">{n}</span>;
       },
     },
     {
       id: "name",
       header: "Logomarca",
-      accessorKey: "name",
-      enableSorting: true,
+      accessorFn: (q) => quoteNameLabel(q) ?? "",
+      // ❌ PERDE a ordenação: `name` é campo da TAREFA, e o Prisma não ordena o
+      // pai por campo de relação de LISTA. Mantê-la em BUDGET_SORT_FIELD_MAP
+      // desenharia a seta no cabeçalho para uma ordem que o servidor descarta em
+      // silêncio (o `orderBy` do `/task-quotes` não é `.strict()`).
+      enableSorting: false,
       size: 240,
       minSize: 160,
-      meta: { headerLabel: "Logomarca", exportHeader: "Logomarca", exportValue: (t) => t.name || "" },
-      cell: ({ row }) => <TruncatedTextWithTooltip text={row.original.name} className="text-sm font-medium" />,
+      meta: { headerLabel: "Logomarca", exportHeader: "Logomarca", exportValue: (q) => quoteNames(q).join(", ") },
+      cell: ({ row }) => {
+        const label = quoteNameLabel(row.original);
+        if (!label) return <MutedDash />;
+        return <TruncatedTextWithTooltip text={label} className="text-sm font-medium" />;
+      },
     },
     {
       id: "identificador",
       header: "Identificador",
-      accessorFn: (t) => taskIdentifier(t),
-      enableSorting: true,
-      size: 130,
-      minSize: 100,
-      meta: { headerLabel: "Identificador", exportHeader: "Identificador", exportValue: (t) => taskIdentifier(t) },
-      cell: ({ getValue }) => {
-        const value = getValue() as string;
-        return value ? <span className="text-sm truncate">{value}</span> : <MutedDash />;
+      accessorFn: (q) => quoteIdentifierLabel(q) ?? "",
+      enableSorting: false,
+      size: 160,
+      minSize: 110,
+      meta: {
+        headerLabel: "Identificador",
+        exportHeader: "Identificador",
+        // A planilha não tem hover: sai a lista INTEIRA, sem contração.
+        exportValue: (q) => quoteIdentifiers(q).join(", "),
+      },
+      cell: ({ row }) => {
+        const all = quoteIdentifiers(row.original);
+        if (all.length === 0) return <MutedDash />;
+        return (
+          <span className="text-sm truncate" title={all.length > 2 ? all.join(", ") : undefined}>
+            {quoteIdentifierLabel(row.original)}
+          </span>
+        );
       },
     },
     {
       // QUANTOS VEÍCULOS este orçamento cobre.
       //
-      // A linha é uma tarefa, e um orçamento multitarefa aparece em N linhas com
-      // o mesmo número: sem esta coluna, sessenta linhas idênticas do Marquespan
-      // pareciam sessenta orçamentos, e a coluna Valor — que agora mostra o valor
-      // de UM veículo — não tinha como se explicar.
-      //
-      // ⚠️ Era `defaultVisible: false` AQUI, visível só no Faturamento, e a lista
-      // de Orçamentos ficou sendo a única das duas sem a explicação de que
-      // precisava. O dono abriu a tela e leu quatro orçamentos onde há um. Agora
-      // nasce visível nas duas; nas duas ela também sai no export.
+      // Deixou de ser a explicação de um defeito (por que o número 984 aparece
+      // quatro vezes) e passou a ser informação sobre a linha: o tamanho do
+      // contrato. É a única coluna que GANHA com a migração.
       id: "vehicleCount",
       header: "Veículos",
-      accessorFn: (t) => taskQuoteVehicleCount(t),
-      // O escalar existe (`TaskQuote.vehicleCount`), mas ordenar a lista de
-      // TAREFAS por ele agruparia veículos do mesmo orçamento sem dizer nada
-      // sobre a linha. Fica como leitura.
-      enableSorting: false,
+      // ⚠️ Lê `tasks.length`, NUNCA `quoteVehicleCount`: existem orçamentos sem
+      // tarefa nenhuma, e o desnormalizado devolve 1 para eles (default da
+      // coluna no Prisma). A célula anunciaria "1 veículo" para um orçamento que
+      // não tem nenhum. Ver `quoteVehiclesLoadedCount`.
+      accessorFn: (q) => quoteVehiclesLoadedCount(q),
+      // ✚ GANHA ordenação: `vehicleCount` é escalar do próprio TaskQuote, e
+      // ordenar por ele agora responde a uma pergunta sobre a LINHA ("os
+      // contratos maiores primeiro") em vez de agrupar veículos.
+      enableSorting: true,
       size: 100,
       minSize: 80,
       meta: {
         align: "center",
         headerLabel: "Veículos",
         exportHeader: "Veículos no orçamento",
-        exportValue: (t) => taskQuoteVehicleCount(t),
+        exportValue: (q) => quoteVehiclesLoadedCount(q),
       },
       cell: ({ row }) => {
-        const n = taskQuoteVehicleCount(row.original);
+        const n = quoteVehiclesLoadedCount(row.original);
+        if (n === 0) return <span className="text-muted-foreground text-xs">sem veículo</span>;
         return n > 1 ? (
           <Badge variant="secondary" className="tabular-nums">
             {n}
@@ -156,37 +193,49 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       },
     },
     {
-      // The task's OWN customer — who the work is for. Often the same as the invoice-to customer,
+      // The tasks' OWN customer — who the work is for. Often the same as the invoice-to customer,
       // but not always, which is exactly why both are available.
       id: "customer",
       header: "Cliente",
-      accessorFn: (t) => taskCustomerName(t),
-      enableSorting: true,
+      accessorFn: (q) => quoteCustomerLabel(q) ?? "",
+      // ❌ PERDE a ordenação pelo mesmo motivo de "Logomarca": o cliente é da
+      // TAREFA, e são N por linha.
+      enableSorting: false,
       size: 240,
       minSize: 150,
-      meta: { defaultVisible: false, headerLabel: "Cliente", exportHeader: "Cliente", exportValue: (t) => taskCustomerName(t) },
-      cell: ({ getValue }) => {
-        const v = getValue() as string;
-        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : <MutedDash />;
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Cliente",
+        exportHeader: "Cliente",
+        exportValue: (q) => quoteCustomerNames(q).join(", "),
+      },
+      cell: ({ row }) => {
+        const names = quoteCustomerNames(row.original);
+        if (names.length === 0) return <MutedDash />;
+        return (
+          <span title={names.length > 1 ? names.join(", ") : undefined}>
+            <TruncatedTextWithTooltip text={quoteCustomerLabel(row.original) ?? ""} className="text-sm" />
+          </span>
+        );
       },
     },
     {
       id: "invoiceToCustomers",
       header: "Clientes",
-      // No scalar to order by (it lives across quote → customerConfigs → customer), so this column
+      // No scalar to order by (it lives across customerConfigs → customer), so this column
       // is display + export only, exactly as in the table it replaces.
       enableSorting: false,
       size: 320,
       minSize: 180,
-      meta: { headerLabel: "Clientes", exportHeader: "Clientes", exportValue: (t) => invoiceToCustomerNames(t) },
-      cell: ({ row }) => <InvoiceToCustomersCell task={row.original} />,
+      meta: { headerLabel: "Clientes", exportHeader: "Clientes", exportValue: (q) => quoteInvoiceToCustomerNames(q) },
+      cell: ({ row }) => <QuoteInvoiceToCustomersCell quote={row.original} />,
     },
     {
       // The field `task-quote.ibipora-missing-order-number` is about. Off by default here because
       // the pedido is a faturamento concern; Faturamento shows it by default.
       id: "orderNumber",
       header: "N° do Pedido",
-      accessorFn: (t) => quoteOrderNumbers(t).join(", "),
+      accessorFn: (q) => quoteOrderNumberLabel(q) ?? "",
       enableSorting: false,
       size: 140,
       minSize: 110,
@@ -194,77 +243,105 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         defaultVisible: false,
         headerLabel: "N° do Pedido",
         exportHeader: "N° do Pedido",
-        exportValue: (t) => quoteOrderNumbers(t),
+        exportValue: (q) => quoteOrderNumbers(q),
       },
-      cell: ({ row }) => <OrderNumbersCell task={row.original} />,
+      cell: ({ row }) => <QuoteOrderNumbersCell quote={row.original} />,
     },
     {
       id: "forecastDate",
       header: "Previsão",
-      accessorKey: "forecastDate",
-      enableSorting: true,
+      accessorFn: (q) => earliestTaskDate(q, "forecastDate"),
+      enableSorting: false,
       size: 130,
       minSize: 110,
-      meta: { headerLabel: "Previsão", exportHeader: "Previsão", exportValue: (t) => dateExportValue(t.forecastDate) },
-      cell: ({ row }) => renderDateCell(row.original.forecastDate),
+      meta: { headerLabel: "Previsão", exportHeader: "Previsão", exportValue: (q) => dateExportValue(earliestTaskDate(q, "forecastDate")) },
+      cell: ({ row }) => renderEarliestDate(row.original, "forecastDate"),
     },
     {
       id: "term",
       header: "Prazo",
-      accessorKey: "term",
-      enableSorting: true,
+      accessorFn: (q) => earliestTaskDate(q, "term"),
+      // ❌ PERDE a ordenação — e era o critério SECUNDÁRIO do sort padrão. Ver
+      // BUDGET_DEFAULT_SORTING, que passou a usar `expiresAt` no lugar.
+      enableSorting: false,
       size: 130,
       minSize: 110,
-      meta: { headerLabel: "Prazo", exportHeader: "Prazo", exportValue: (t) => dateExportValue(t.term) },
-      cell: ({ row }) => renderDateCell(row.original.term),
+      meta: { headerLabel: "Prazo", exportHeader: "Prazo", exportValue: (q) => dateExportValue(earliestTaskDate(q, "term")) },
+      cell: ({ row }) => renderEarliestDate(row.original, "term"),
     },
     {
       // The date the proposal stops being valid — the thing an Orçamento list is actually racing.
       // A rule used to blink off this field; it was removed for matching 147 rows, 74 of them
       // expired by more than 90 days. Reading the column is how you see this now.
+      //
+      // ✅ GANHA ordenação de verdade: é escalar do orçamento, não mais um salto
+      // por relação a partir da tarefa.
       id: "expiresAt",
       header: "Validade",
-      accessorFn: (t) => t.quote?.expiresAt ?? null,
+      accessorFn: (q) => q.expiresAt ?? null,
       enableSorting: true,
       size: 130,
       minSize: 110,
-      meta: { headerLabel: "Validade", exportHeader: "Validade", exportValue: (t) => dateExportValue(t.quote?.expiresAt) },
+      meta: { headerLabel: "Validade", exportHeader: "Validade", exportValue: (q) => dateExportValue(q.expiresAt) },
       cell: ({ getValue }) => renderDateCell(getValue() as Date | null),
     },
     {
       id: "entryDate",
       header: "Entrada",
-      accessorKey: "entryDate",
-      enableSorting: true,
+      accessorFn: (q) => earliestTaskDate(q, "entryDate"),
+      enableSorting: false,
       size: 130,
       minSize: 110,
-      meta: { defaultVisible: false, headerLabel: "Entrada", exportHeader: "Entrada", exportValue: (t) => dateExportValue(t.entryDate) },
-      cell: ({ row }) => renderDateCell(row.original.entryDate),
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Entrada",
+        exportHeader: "Entrada",
+        exportValue: (q) => dateExportValue(earliestTaskDate(q, "entryDate")),
+      },
+      cell: ({ row }) => renderEarliestDate(row.original, "entryDate"),
     },
     {
       id: "taskStatus",
       header: "Status da Tarefa",
-      // Renders the status, sorts by its numeric `statusOrder` mirror.
-      accessorFn: (t) => t.statusOrder ?? null,
-      enableSorting: true,
+      // O de MENOR `statusOrder` entre os veículos — ver `quoteTaskStatus`.
+      accessorFn: (q) => quoteTaskStatus(q)?.status ?? null,
+      // ❌ PERDE a ordenação: o `statusOrder` é da tarefa, e são N por linha.
+      enableSorting: false,
       size: 170,
       minSize: 130,
       meta: {
         defaultVisible: false,
         headerLabel: "Status da Tarefa",
         exportHeader: "Status da Tarefa",
-        exportValue: (t) => (t.status ? (TASK_STATUS_LABELS[t.status as TASK_STATUS] ?? t.status) : ""),
+        exportValue: (q) => {
+          const s = quoteTaskStatus(q)?.status;
+          return s ? (TASK_STATUS_LABELS[s as TASK_STATUS] ?? s) : "";
+        },
       },
       cell: ({ row }) => {
-        const status = row.original.status;
-        if (!status) return <MutedDash />;
-        return <Badge variant={getBadgeVariant(status, "TASK")}>{TASK_STATUS_LABELS[status as TASK_STATUS] ?? status}</Badge>;
+        const resolved = quoteTaskStatus(row.original);
+        if (!resolved) return <MutedDash />;
+        const label = TASK_STATUS_LABELS[resolved.status as TASK_STATUS] ?? resolved.status;
+        return (
+          <span
+            className="inline-flex items-center gap-1"
+            // O badge é o estado do veículo MAIS ATRASADO. Com estados
+            // divergentes, dizer só ele afirmaria que os N estão assim.
+            title={resolved.distinct > 1 ? `${resolved.distinct} estados diferentes entre os veículos` : undefined}
+          >
+            <Badge variant={getBadgeVariant(resolved.status, "TASK")}>{label}</Badge>
+            {resolved.distinct > 1 && <span className="text-muted-foreground text-xs">+{resolved.distinct - 1}</span>}
+          </span>
+        );
       },
     },
     {
+      // O SUBTOTAL DO CONTRATO. Era `subtotal ÷ N`, porque a linha era um
+      // veículo; com a linha valendo o orçamento, dividir inventaria um número
+      // que não está em documento nenhum.
       id: "quoteSubtotal",
       header: "Subtotal",
-      accessorFn: (t) => taskQuoteSubtotal(t),
+      accessorFn: (q) => money(q.subtotal),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -274,20 +351,25 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Subtotal",
         exportHeader: "Subtotal",
-        exportValue: (t) => moneyExport(taskQuoteSubtotal(t)),
+        exportValue: (q) => moneyExport(q.subtotal),
       },
-      cell: ({ getValue }) => moneyCell(getValue() as number | null),
+      cell: ({ getValue, row }) => {
+        const value = getValue() as number | null;
+        const hint = perVehicleHint(row.original, value);
+        return hint ? <span title={hint}>{moneyCell(value)}</span> : moneyCell(value);
+      },
     },
     {
       id: "quoteTotal",
       header: "Valor",
+      // O VALOR DO CONTRATO — o número que o cliente assinou.
+      //
       // Coerce defensively: the API maps Decimal → number, but a raw string must not break the cell.
-      // A FATIA DESTE VEÍCULO. `quote.total` é o valor do CONTRATO
-      // (`por veículo × N`) e a linha é um veículo: num orçamento de sessenta
-      // caminhões a coluna afirmava R$ 730.224,00 sessenta vezes. A soma das
-      // fatias reconstrói o contrato, e num orçamento de um veículo — a maioria —
-      // o número não muda.
-      accessorFn: (t) => taskQuoteTotal(t),
+      //
+      // ✅ Isto também conserta o filtro "Faixa de Valor", que sempre filtrou
+      // `quote.total` (o contrato) enquanto a coluna mostrava a fatia: buscar
+      // "até R$ 100.000" escondia um orçamento cuja célula dizia R$ 12.170.
+      accessorFn: (q) => money(q.total),
       enableSorting: true,
       size: 140,
       minSize: 110,
@@ -298,31 +380,18 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Valor",
         exportHeader: "Valor",
-        exportValue: (t) => moneyExport(taskQuoteTotal(t)),
+        exportValue: (q) => moneyExport(q.total),
       },
       cell: ({ getValue, row }) => {
         const value = getValue() as number | null;
-        const task = row.original;
-        if (!isMultiVehicleQuote(task)) return moneyCell(value);
-        // O valor é o de UM veículo; o contrato inteiro fica no hover, porque é o
-        // número que o cliente assinou e o que a fatura conjunta cobra.
-        const count = taskQuoteVehicleCount(task);
-        const grand = money(task.quote?.total);
-        return (
-          <span
-            className="inline-flex items-center gap-1 justify-end w-full"
-            title={grand ? `Total geral ${formatCurrency(grand)} — ${count} veículos` : undefined}
-          >
-            {moneyCell(value)}
-            <span className="text-muted-foreground text-xs shrink-0 tabular-nums">/veíc.</span>
-          </span>
-        );
+        const hint = perVehicleHint(row.original, value);
+        return hint ? <span title={hint}>{moneyCell(value)}</span> : moneyCell(value);
       },
     },
     {
       id: "guaranteeYears",
       header: "Garantia",
-      accessorFn: (t) => t.quote?.guaranteeYears ?? null,
+      accessorFn: (q) => q.guaranteeYears ?? null,
       enableSorting: false,
       size: 110,
       minSize: 90,
@@ -331,7 +400,7 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
         align: "center",
         headerLabel: "Garantia",
         exportHeader: "Garantia (anos)",
-        exportValue: (t) => t.quote?.guaranteeYears ?? "",
+        exportValue: (q) => q.guaranteeYears ?? "",
       },
       cell: ({ getValue }) => {
         const y = getValue() as number | null;
@@ -342,17 +411,17 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       id: "quoteStatus",
       header: "Status",
       // Renders the status, sorts by its numeric `statusOrder` mirror (see BUDGET_SORT_FIELD_MAP).
-      accessorFn: (t) => t.quote?.statusOrder ?? null,
+      accessorFn: (q) => q.statusOrder ?? null,
       enableSorting: true,
       size: 170,
       minSize: 130,
       meta: {
         headerLabel: "Status",
         exportHeader: "Status",
-        exportValue: (t) => QUOTE_STATUS_EXPORT[t.quote?.status as TASK_QUOTE_STATUS] ?? "",
+        exportValue: (q) => QUOTE_STATUS_EXPORT[q.status as TASK_QUOTE_STATUS] ?? "",
       },
       cell: ({ row }) => {
-        const status = row.original.quote?.status;
+        const status = row.original.status;
         // O escopo da lista é `BUDGET_QUOTE_STATUSES`, e a guarda tem de ser ELE — não uma cópia.
         // Enquanto era a dupla literal ["PENDING", "BUDGET_APPROVED"], todo orçamento ASSINADO ou
         // AGUARDANDO REANÁLISE caía no traço: o filtro sabia dos quatro estados, a coluna sabia de
@@ -364,14 +433,18 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       },
     },
     {
+      // ⚠️ MUDOU DE SIGNIFICADO: é quando o ORÇAMENTO foi emitido, não quando a
+      // tarefa nasceu. É a leitura certa para esta tela — o orçamento é o que a
+      // linha representa —, mas uma planilha antiga comparada com uma nova vai
+      // mostrar datas diferentes na mesma coluna, e o motivo é este.
       id: "createdAt",
       header: "Criado em",
-      accessorKey: "createdAt",
+      accessorFn: (q) => q.createdAt ?? null,
       enableSorting: true,
       size: 130,
       minSize: 110,
-      meta: { defaultVisible: false, headerLabel: "Criado em", exportHeader: "Criado em", exportValue: (t) => dateExportValue(t.createdAt) },
-      cell: ({ row }) => renderDateCell(row.original.createdAt),
+      meta: { defaultVisible: false, headerLabel: "Criado em", exportHeader: "Criado em", exportValue: (q) => dateExportValue(q.createdAt) },
+      cell: ({ getValue }) => renderDateCell(getValue() as Date | null),
     },
   ];
 }
@@ -413,23 +486,27 @@ const QUOTE_STATUS_EXPORT: Partial<Record<TASK_QUOTE_STATUS, string>> = Object.f
   BUDGET_QUOTE_STATUSES.map((s) => [s, TASK_QUOTE_STATUS_LABELS[s]]),
 ) as Partial<Record<TASK_QUOTE_STATUS, string>>;
 
-/** column id → API `orderBy` entry. Ids absent here are not server-sortable. */
+/**
+ * column id → API `orderBy` entry. Ids absent here are not server-sortable.
+ *
+ * ⚠️ TODO ALVO AQUI TEM DE ESTAR DECLARADO no `taskQuoteOrderBySchema` do
+ * servidor, que — ao contrário do `where` — NÃO é `.strict()`: uma chave não
+ * declarada é APAGADA em silêncio. A coluna pareceria ordenável, a seta apareceria
+ * no cabeçalho, o servidor devolveria a ordem anterior e nenhum erro seria
+ * emitido. É o modo de falha mais caro dos três, e é por isso que os sete alvos
+ * que a migração perdeu (`name`, `identificador`, `customer`, `forecastDate`,
+ * `term`, `entryDate`, `taskStatus`) foram REMOVIDOS daqui em vez de deixados
+ * apontando para campos da tarefa: o Prisma não ordena o pai por campo de relação
+ * de LISTA, e não há resposta certa a inventar (qual dos sessenta prazos ordena a
+ * linha?).
+ */
 export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Record<string, unknown>> = {
-  budgetNumber: (d) => ({ quote: { budgetNumber: d } }),
-  name: (d) => ({ name: d }),
-  // Computed column: only the serial is a scalar the API can order by, so plate-only rows sort last.
-  identificador: (d) => ({ serialNumber: { sort: d, nulls: "last" } }),
-  // Sorts by what the cell RENDERS (`corporateName || fantasyName`). Ordering by `fantasyName`
-  // while showing `corporateName` made the column read as unsorted — 275 of 325 rows differ.
-  customer: (d) => ({ customer: { corporateName: { sort: d, nulls: "last" } } }),
-  forecastDate: (d) => ({ forecastDate: { sort: d, nulls: "last" } }),
-  term: (d) => ({ term: d }),
-  expiresAt: (d) => ({ quote: { expiresAt: d } }),
-  entryDate: (d) => ({ entryDate: d }),
-  taskStatus: (d) => ({ statusOrder: d }),
-  quoteSubtotal: (d) => ({ quote: { subtotal: d } }),
-  quoteTotal: (d) => ({ quote: { total: d } }),
-  quoteStatus: (d) => ({ quote: { statusOrder: d } }),
+  budgetNumber: (d) => ({ budgetNumber: d }),
+  vehicleCount: (d) => ({ vehicleCount: d }),
+  expiresAt: (d) => ({ expiresAt: d }),
+  quoteSubtotal: (d) => ({ subtotal: d }),
+  quoteTotal: (d) => ({ total: d }),
+  quoteStatus: (d) => ({ statusOrder: d }),
   createdAt: (d) => ({ createdAt: d }),
 };
 
@@ -438,16 +515,22 @@ export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Reco
  * are right at cold mount, where nothing is written to the URL) and once as the `orderBy` fallback
  * in `buildBudgetOrderBy([])`. They must stay identical or the arrows describe a different order
  * than the one the server applied.
+ *
+ * ⚠️ O critério secundário era `term`, e ele MORREU com a migração (prazo é da
+ * tarefa, e são N por linha). `expiresAt` é o substituto certo, não um substituto
+ * qualquer: a validade é o relógio que esta lista corre, e é escalar do próprio
+ * orçamento. Devolver o prazo exigiria desnormalizar `TaskQuote.earliestTerm`
+ * junto de `recalcQuoteTotals` — outra mudança, com migration.
  */
 export const BUDGET_DEFAULT_SORTING: { id: string; desc: boolean }[] = [
   { id: "quoteStatus", desc: false },
-  { id: "term", desc: false },
+  { id: "expiresAt", desc: false },
 ];
 
 export function buildBudgetOrderBy(sorting: { id: string; desc: boolean }[]): Record<string, unknown> | Record<string, unknown>[] {
   const entries = sorting
     .map((s) => BUDGET_SORT_FIELD_MAP[s.id]?.(s.desc ? "desc" : "asc"))
     .filter((e): e is Record<string, unknown> => !!e);
-  if (entries.length === 0) return [{ quote: { statusOrder: "asc" } }, { term: "asc" }];
+  if (entries.length === 0) return [{ statusOrder: "asc" }, { expiresAt: "asc" }];
   return entries.length === 1 ? entries[0] : entries;
 }

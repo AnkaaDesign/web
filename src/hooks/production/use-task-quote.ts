@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { taskQuoteService } from '@/api-client/task-quote';
+import { getTaskQuotes, taskQuoteService } from '@/api-client/task-quote';
 import { taskKeys } from '../common/query-keys';
 
 export const taskQuoteKeys = {
@@ -13,12 +14,52 @@ export const taskQuoteKeys = {
     [...taskQuoteKeys.all, 'suggestion', params] as const,
 };
 
-// Get all quotes
-export function useTaskQuotes(params?: any) {
-  return useQuery({
-    queryKey: taskQuoteKeys.list(params),
-    queryFn: () => taskQuoteService.getAll(params),
+export interface UseTaskQuotesParams extends Record<string, unknown> {
+  enabled?: boolean;
+  refetchOnWindowFocus?: boolean | 'always';
+  /**
+   * Quanto tempo a lista é considerada fresca. Padrão 0 (sempre obsoleta), que
+   * é o comportamento histórico de `useTasks`; telas pesadas (o pager, que pede
+   * 1000 linhas) devem passar um valor de verdade.
+   */
+  staleTime?: number;
+}
+
+/**
+ * A LISTA DE ORÇAMENTOS, paginada no servidor.
+ *
+ * ⚠️ `enabled`, `staleTime` e `refetchOnWindowFocus` são EXTRAÍDOS antes de os
+ * params irem para a requisição — molde de `useTasks`. A versão anterior
+ * repassava `params` inteiro para `queryFn` e para a chave, o mesmo defeito
+ * documentado em `useSelectedCustomers`: as três chaves viravam query string
+ * (`?enabled=false` não desabilita nada no servidor), toda montagem disparava um
+ * GET e o `staleTime` era ignorado. A paginação, ao contrário, ENTRA na chave —
+ * cada página é uma entrada de cache própria.
+ */
+export function useTaskQuotes(params?: UseTaskQuotesParams) {
+  const queryClient = useQueryClient();
+  const { enabled = true, refetchOnWindowFocus, staleTime, ...restParams } = params ?? {};
+
+  const queryKey = useMemo(
+    () => taskQuoteKeys.list(restParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(restParams)],
+  );
+
+  const query = useQuery({
+    queryKey,
+    queryFn: () => getTaskQuotes(restParams),
+    enabled,
+    staleTime: staleTime ?? 0,
+    retry: 2,
+    refetchOnWindowFocus,
   });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+  };
+
+  return { ...query, refresh };
 }
 
 // Get quote by ID

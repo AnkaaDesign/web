@@ -1,8 +1,30 @@
 import { apiClient } from './axiosClient';
+import type { BaseGetManyResponse } from '../types/common';
+import type { TaskQuote } from '../types/task-quote';
+
+export type TaskQuoteGetManyResponse = BaseGetManyResponse<TaskQuote>;
+
+/**
+ * A LISTA DE ORÇAMENTOS — uma linha por CONTRATO, não por veículo.
+ *
+ * Devolve `response.data` (o envelope `{ success, data, meta }`), e não o
+ * `AxiosResponse` cru que `getAll` entrega: quem consome é uma tabela em modo
+ * servidor, que lê `meta.totalRecords` para o rodapé e para a paginação. Pelo
+ * caminho antigo o chamador teria de escrever `res.data.data` e `res.data.meta`,
+ * e foi por isso que a lista nasceu consultando `/tasks` — o único cliente que
+ * já tinha esta forma. Molde idêntico ao de `taskService.getTasks`.
+ */
+export async function getTaskQuotes(params: Record<string, unknown> = {}): Promise<TaskQuoteGetManyResponse> {
+  const response = await apiClient.get<TaskQuoteGetManyResponse>('/task-quotes', { params });
+  return response.data;
+}
 
 export const taskQuoteService = {
   // Get all quotes
   getAll: (params?: any) => apiClient.get('/task-quotes', { params }),
+
+  /** Ver `getTaskQuotes` — o envelope já desembrulhado, para listas paginadas. */
+  getMany: getTaskQuotes,
 
   // Get by ID
   getById: (id: string) => apiClient.get(`/task-quotes/${id}`),

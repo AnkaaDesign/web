@@ -91,6 +91,50 @@ export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQ
   return [...byQuoteId.values()];
 }
 
+/**
+ * Os orçamentos de uma lista cuja LINHA JÁ É O ORÇAMENTO.
+ *
+ * ✖ SEM o `Map` de dedupe. Ele existia porque a lista era de TAREFAS e N linhas
+ * dividiam o mesmo `quote.id`: registrar uma entrada por linha registrava o mesmo
+ * id N vezes e a última vencia, então o alerta passava a depender de qual veículo
+ * o `map` visitou por último. Com uma linha por orçamento a unicidade é por
+ * construção, e deduplicar seria resolver um problema que não existe mais.
+ *
+ * ✅ `anyVehicleMissingOrderNumber` FICA CORRETO. Pelo caminho antigo as linhas
+ * carregadas podiam ser um SUBCONJUNTO dos sessenta veículos (a lista é
+ * paginada), e um branco fora da página não acendia. Aqui os veículos chegam na
+ * relação `tasks`, então a resposta é sempre sobre os N.
+ *
+ * ⚠️ ÓRFÃO — existe orçamento sem tarefa nenhuma, e ele PASSA a aparecer nesta
+ * lista (consultando `TaskQuote` não há mais a junção que os escondia). Sem
+ * veículo não há `task.status`, e as duas regras que leem esse campo exigem
+ * COMPLETED, então nenhuma delas dispararia de qualquer forma — mas o registro
+ * tem de existir mesmo assim, com um par vazio, senão as OUTRAS regras do
+ * orçamento (cliente incompleto, por exemplo) deixam de ser avaliadas para ele.
+ */
+export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<TaskQuote>): AttentionQuoteEntity[] {
+  const entities: AttentionQuoteEntity[] = [];
+  for (const quote of quotes) {
+    // `setEntities` drops anything without an id, so a quote fetched without `id: true` in the
+    // select would register nothing at all — silently, which is why the include comment says so.
+    if (!quote?.id) continue;
+    const vehicles = (quote.tasks ?? []) as Array<{ id: string; status: string; customerOrderNumber?: string | null }>;
+    // O desempate espelha o `tasks: { some: { status: COMPLETED } }` que a regra
+    // usa na API: entre os veículos, vence um que já esteja COMPLETED, se houver.
+    // A regra pergunta "algum veículo já ficou pronto?" — porque num orçamento de
+    // sessenta caminhões o dinheiro já está parado quando o primeiro sai — e o
+    // avaliador do cliente lê `task.status`, um campo só. Escolher aqui o veículo
+    // que satisfaz a regra é o que faz os dois avaliadores concordarem.
+    const anchor = vehicles.find((t) => t.status === TASK_STATUS.COMPLETED) ?? vehicles[0] ?? null;
+    entities.push({
+      ...(quote as TaskQuote),
+      task: anchor ? { id: anchor.id, status: anchor.status } : { id: "", status: "" },
+      anyVehicleMissingOrderNumber: vehicles.some(missingOrderNumber),
+    });
+  }
+  return entities;
+}
+
 /** Same shape for a single task on a detail page. */
 export function toAttentionQuoteEntity(task: Task | null | undefined): AttentionQuoteEntity | null {
   if (!task?.quote?.id) return null;

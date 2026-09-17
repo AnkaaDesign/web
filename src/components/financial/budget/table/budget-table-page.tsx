@@ -3,29 +3,41 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconAlertTriangle, IconExternalLink, IconFileDescription, IconPlus } from "@tabler/icons-react";
 
 import { DataTablePage } from "@/components/ui/datatable";
-import type { DataTableFilterValues, DataTableRowAction, DataTableRowClickMeta } from "@/components/ui/datatable";
-import { useTasks } from "@/hooks";
-import { getTasks } from "@/api-client";
+import type { DataTableFilterValues, DataTableRowAction } from "@/components/ui/datatable";
+import { useTaskQuotes } from "@/hooks";
+import { getTaskQuotes } from "@/api-client/task-quote";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditQuote } from "@/utils/permissions/quote-permissions";
 import { FAVORITE_PAGES, routes } from "@/constants";
-import type { Task } from "@/types";
+import type { TaskQuote } from "@/types/task-quote";
+import { primaryTask } from "@/utils/quote-tasks";
 import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { useSelectedCustomers, customerIdsFromFilter, initialTableParams } from "@/components/financial/shared/quote-table-shared";
 import { buildQuoteSiblingState } from "@/components/financial/shared/quote-sibling-nav";
-import { toAttentionQuoteEntities } from "@/components/financial/shared/quote-attention";
+import { toAttentionQuoteEntitiesFromQuotes } from "@/components/financial/shared/quote-attention";
 import { BUDGET_DEFAULT_SORTING, buildBudgetOrderBy, createBudgetColumns } from "./budget-table-columns";
-import { BUDGET_DEFAULT_PAGE_SIZE, BUDGET_LIST_INCLUDE, buildBudgetQuery, createBudgetFilterDefs } from "./budget-table-filters";
-
-// Module-level so the identity never churns (a fresh literal would rebuild the row model).
-const getRowId = (t: Task) => t.id;
+import { BUDGET_DEFAULT_PAGE_SIZE, BUDGET_QUOTE_INCLUDE, buildBudgetQuery, createBudgetFilterDefs } from "./budget-table-filters";
 
 /**
- * The export pages through the full filtered set rather than asking for it in one shot. The tasks
- * endpoint caps `limit` at 1000; 200 keeps each response small enough to stay responsive while
- * still finishing a few-hundred-row export in two or three round trips.
+ * A LINHA É UM ORÇAMENTO.
+ *
+ * Era uma TAREFA (`useTasks` + `getRowId = t.id`), e um orçamento de quatro
+ * caminhões virava quatro linhas com o mesmo número 984, `meta.totalRecords = 4`
+ * e um rodapé anunciando "4 resultado(s)". O dono leu quatro orçamentos porque a
+ * tela desenhou quatro. A unidade da consulta mudou para `GET /task-quotes`, e
+ * com ela o rodapé, a seleção múltipla (marcar "tudo" deixou de marcar quatro
+ * coisas que são uma) e o piscar da atenção (quatro linhas compartilhando o
+ * mesmo `quote.id` piscavam em coro) se consertaram sozinhos.
+ */
+// Module-level so the identity never churns (a fresh literal would rebuild the row model).
+const getRowId = (q: TaskQuote) => q.id;
+
+/**
+ * The export pages through the full filtered set rather than asking for it in one shot. The
+ * task-quotes endpoint caps `limit` at 1000; 200 keeps each response small enough to stay
+ * responsive while still finishing a few-hundred-row export in two or three round trips.
  */
 const EXPORT_PAGE_SIZE = 200;
 
@@ -78,34 +90,32 @@ export function BudgetTablePage() {
       ...listQuery,
       page,
       limit: pageSize,
-      include: BUDGET_LIST_INCLUDE,
+      include: BUDGET_QUOTE_INCLUDE,
       // Budgets change under you while you look at them (someone approves one in another tab).
       refetchOnWindowFocus: "always" as const,
     }),
     [listQuery, page, pageSize],
   );
 
-  const { data: response, isLoading, error } = useTasks(query as never);
-  const tasks = useMemo(() => ((response as { data?: Task[] } | undefined)?.data ?? []) as Task[], [response]);
+  const { data: response, isLoading, error } = useTaskQuotes(query);
+  const quotes = useMemo(() => ((response as { data?: TaskQuote[] } | undefined)?.data ?? []) as TaskQuote[], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
 
-  // Attention: the rows are TASKS but the signal belongs to the TASK QUOTE. An APPROVED
-  // quote shows up on BOTH financial lists, so both register it — otherwise the same record would
-  // ring on Faturamento and sit silent here, which is exactly the kind of disagreement between
-  // surfaces this system exists to prevent.
-  const quoteEntities = useMemo(() => toAttentionQuoteEntities(tasks), [tasks]);
+  // Attention: a linha e a entidade registrada passaram a ser A MESMA COISA. Um orçamento APPROVED
+  // aparece nas DUAS listas financeiras, e as duas o registram — senão o mesmo registro tocaria no
+  // Faturamento e ficaria mudo aqui, que é exatamente a discordância entre telas que este sistema
+  // existe para evitar.
+  const quoteEntities = useMemo(() => toAttentionQuoteEntitiesFromQuotes(quotes), [quotes]);
   useRegisterAttentionEntities("TASK_QUOTE", quoteEntities);
   // The row class is computed imperatively per row, so the page must re-render on any flip.
   useAttentionVersion();
   usePresenceVersion();
 
-  const fetchAllForExport = useCallback(async (): Promise<Task[]> => {
-    const all: Task[] = [];
+  const fetchAllForExport = useCallback(async (): Promise<TaskQuote[]> => {
+    const all: TaskQuote[] = [];
     for (let p = 1; ; p++) {
-      const res = (await getTasks({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE, include: BUDGET_LIST_INCLUDE } as never)) as
-        | { data?: Task[]; meta?: { hasNextPage?: boolean } }
-        | undefined;
-      const rows = (res?.data ?? []) as Task[];
+      const res = await getTaskQuotes({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE, include: BUDGET_QUOTE_INCLUDE });
+      const rows = (res?.data ?? []) as TaskQuote[];
       all.push(...rows);
       if (res?.meta?.hasNextPage === false || rows.length < EXPORT_PAGE_SIZE) break;
       // Defensive backstop against an unbounded loop if `meta` ever goes missing.
@@ -124,28 +134,60 @@ export function BudgetTablePage() {
   const columns = useMemo(() => createBudgetColumns(), []);
   const filterDefs = useMemo(() => createBudgetFilterDefs({ invoiceCustomers, taskCustomers }), [invoiceCustomers, taskCustomers]);
 
+  /**
+   * As ÂNCORAS da página carregada, na ordem em que a tabela as desenhou.
+   *
+   * 🔴 `meta.orderedIds` é literalmente a lista de row ids, e com
+   * `getRowId = q => q.id` ela virou uma lista de ids de ORÇAMENTO. Entregá-la ao
+   * pager produziria `/financeiro/orcamento/detalhes/<quoteId>` — uma rota que
+   * existe, casa, e carrega uma página que não acha tarefa nenhuma. Nenhum erro,
+   * nenhuma pista. O pager só entende id de TAREFA, então é aqui que se traduz.
+   */
+  const anchorIds = useMemo(() => quotes.map((q) => primaryTask(q)?.id).filter((id): id is string => !!id), [quotes]);
+
   const onRowClick = useCallback(
-    (task: Task, meta: DataTableRowClickMeta) => {
-      navigate(routes.financial.budget.details(task.id), {
-        state: buildQuoteSiblingState({ returnTo, orderedIds: meta.orderedIds, totalRecords, listQuery }),
+    (quote: TaskQuote) => {
+      const anchor = primaryTask(quote)?.id;
+      // ÓRFÃO: existem orçamentos sem tarefa nenhuma, e eles passaram a aparecer
+      // (consultando `TaskQuote` não há mais a junção que os escondia — é um
+      // ganho: são registros com número, valor e validade que ninguém conseguia
+      // achar). Sem âncora não há para onde navegar, e `details(undefined)`
+      // levaria a `/detalhes/undefined`.
+      if (!anchor) return;
+      navigate(routes.financial.budget.details(anchor), {
+        state: buildQuoteSiblingState({
+          returnTo,
+          orderedIds: anchorIds,
+          totalRecords,
+          // A completude é sobre as LINHAS (`quotes`), não sobre as âncoras: um
+          // órfão é uma linha carregada que não contribui âncora, e comparar
+          // `anchorIds.length >= totalRecords` faria uma página completa parecer
+          // incompleta, congelando o pager numa busca que nunca melhora.
+          idsCompleteOverride: totalRecords > 0 && quotes.length >= totalRecords,
+          listQuery,
+        }),
       });
     },
-    [navigate, returnTo, totalRecords, listQuery],
+    [navigate, returnTo, totalRecords, listQuery, anchorIds, quotes.length],
   );
 
   const getRowClassName = useCallback(
-    (task: Task) => cn(attentionRowClassFor("TASK_QUOTE", task.quote?.id), presenceRowClassFor("TASK_QUOTE", task.quote?.id)),
+    (quote: TaskQuote) => cn(attentionRowClassFor("TASK_QUOTE", quote.id), presenceRowClassFor("TASK_QUOTE", quote.id)),
     [],
   );
 
-  const rowActions = useMemo<DataTableRowAction<Task>[]>(
+  const rowActions = useMemo<DataTableRowAction<TaskQuote>[]>(
     () => [
       {
         key: "open-new-tab",
         label: "Abrir em nova guia",
         icon: <IconExternalLink className="h-4 w-4" />,
-        hidden: (rows) => rows.length !== 1,
-        onClick: (rows) => rows[0] && window.open(routes.financial.budget.details(rows[0].id), "_blank"),
+        // Sem âncora a rota não existe — a ação some em vez de abrir uma guia vazia.
+        hidden: (rows) => rows.length !== 1 || !primaryTask(rows[0])?.id,
+        onClick: (rows) => {
+          const anchor = rows[0] && primaryTask(rows[0])?.id;
+          if (anchor) window.open(routes.financial.budget.details(anchor), "_blank");
+        },
       },
     ],
     [],
@@ -161,7 +203,7 @@ export function BudgetTablePage() {
       ) : null}
 
       <div className="min-h-0 flex-1">
-        <DataTablePage<Task>
+        <DataTablePage<TaskQuote>
           title="Orçamentos"
           icon={IconFileDescription}
           favoritePage={FAVORITE_PAGES.FINANCEIRO_ORCAMENTO}
@@ -185,7 +227,7 @@ export function BudgetTablePage() {
           }
           table={{
             tableId: "financial-budget-list",
-            data: tasks,
+            data: quotes,
             columns,
             filterDefs,
             rowActions,
@@ -204,7 +246,7 @@ export function BudgetTablePage() {
             // `defaultVisible` is what decides the starting view.
             estimateRowHeight: 44,
             searchPlaceholder: "Buscar por nome, número de série, placa, cliente...",
-            emptyMessage: "Nenhum orçamento pendente encontrado. Ajuste os filtros.",
+            emptyMessage: "Nenhum orçamento encontrado. Ajuste os filtros.",
             exportTitle: "Orçamentos",
             exportFilename: "orcamentos",
           }}

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
-import { useTasks } from "@/hooks";
+import { useTasks, useTaskQuotes } from "@/hooks";
+import { primaryTask } from "@/utils/quote-tasks";
 
 /**
  * Prev/next record paging for the Orçamento and Faturamento detail pages.
@@ -48,14 +49,25 @@ export function buildQuoteSiblingState(input: {
   orderedIds: string[];
   totalRecords: number;
   listQuery: Record<string, unknown>;
+  /**
+   * A completude, quando ela NÃO se lê de `orderedIds.length`.
+   *
+   * Aditivo, e existe por causa de uma lista só: a de Orçamentos, cuja linha é o
+   * ORÇAMENTO e cujos ids são traduzidos para TAREFAS ÂNCORA antes de chegar
+   * aqui. Um orçamento sem veículo é uma linha carregada que não contribui
+   * âncora, então `orderedIds.length >= totalRecords` diria "incompleto" numa
+   * página inteira — e o pager ficaria refazendo uma busca que nunca melhora. A
+   * pergunta certa é sobre as LINHAS, e só quem as tem pode respondê-la.
+   */
+  idsCompleteOverride?: boolean;
 }): QuoteSiblingState {
-  const { returnTo, orderedIds, totalRecords, listQuery } = input;
+  const { returnTo, orderedIds, totalRecords, listQuery, idsCompleteOverride } = input;
   return {
     returnTo,
     ids: orderedIds,
     // `totalRecords === 0` means the count never arrived; claiming completeness then would freeze
     // the pager to whatever happened to be loaded.
-    idsComplete: totalRecords > 0 && orderedIds.length >= totalRecords,
+    idsComplete: idsCompleteOverride ?? (totalRecords > 0 && orderedIds.length >= totalRecords),
     listQuery,
   };
 }
@@ -120,4 +132,61 @@ export function useQuoteSiblingIds(
     }
     return { ids: widened, complete: true };
   }, [hasFastPath, placeholderIds, data, currentId]);
+}
+
+/**
+ * O pager da lista de ORÇAMENTOS, que agora tem UMA LINHA POR ORÇAMENTO.
+ *
+ * ✅ O QUE ISTO CONSERTA: pelo caminho antigo o pager percorria TAREFAS, então num
+ * orçamento de quatro veículos apertar "próximo" quatro vezes seguidas mostrava
+ * QUATRO VEZES O MESMO ORÇAMENTO — a mesma tela, o mesmo número, quatro passos
+ * que não andavam. Percorrendo orçamentos, quatro viram um.
+ *
+ * ⚠️ Mas a ROTA continua sendo por TAREFA (`/financeiro/orcamento/detalhes/:taskId`),
+ * então os ids entregues ao pager têm de ser de TAREFA ÂNCORA — a primeira na
+ * ordem canônica, via `primaryTask`. Entregar ids de ORÇAMENTO produziria
+ * `/detalhes/<quoteId>`, que carrega uma página vazia sem emitir erro nenhum.
+ *
+ * ⚠️ Função NOVA em vez de um parâmetro em `useQuoteSiblingIds`: o Faturamento
+ * ainda lista tarefas e chama aquela com um `where` de Task. Mudar a assinatura
+ * de lá é o caminho mais curto para mandar um `where` de TaskQuote para `/tasks`,
+ * que é 400 na cara — ou, pior, filtro mudo.
+ */
+export function useBudgetSiblingIds(
+  fallbackQuery: Record<string, unknown>,
+  currentTaskId: string,
+  state: QuoteSiblingState,
+): { ids: string[] | undefined; complete: boolean } {
+  const placeholderIds = state.ids && state.ids.length > 0 ? state.ids : undefined;
+  const hasFastPath = !!state.idsComplete && !!placeholderIds;
+
+  const params = useMemo(
+    // `tasks: true` é o mínimo que responde "qual é a âncora?": `primaryTask`
+    // ordena por `createdAt` com o `id` como desempate, e os dois são escalares
+    // da tarefa. Sem o include não haveria id de tarefa nenhum na resposta.
+    () => ({ ...(state.listQuery ?? fallbackQuery), page: 1, limit: SIBLING_LIMIT, include: { tasks: true } }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(state.listQuery ?? fallbackQuery)],
+  );
+
+  const { data } = useTaskQuotes({
+    ...params,
+    enabled: !hasFastPath && !!currentTaskId,
+    // Sem isto o hook é staleTime 0 e cada salto refaria a busca de 1000 linhas.
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  return useMemo(() => {
+    if (hasFastPath) return { ids: placeholderIds, complete: true };
+    const list = (data as { data?: Array<{ id: string; tasks?: Array<{ id: string; createdAt?: Date | string | null }> }> } | undefined)?.data;
+    if (!list) return { ids: placeholderIds, complete: false };
+    // Órfãos (orçamento sem veículo) não contribuem âncora e simplesmente não
+    // entram no pager — não há tarefa para onde navegar.
+    const widened = list.map((q) => primaryTask(q)?.id).filter((id): id is string => !!id);
+    if (currentTaskId && !widened.includes(currentTaskId)) {
+      return placeholderIds ? { ids: placeholderIds, complete: false } : { ids: undefined, complete: false };
+    }
+    return { ids: widened, complete: true };
+  }, [hasFastPath, placeholderIds, data, currentTaskId]);
 }

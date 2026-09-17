@@ -51,7 +51,7 @@ import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-e
 // Imported from the filters module rather than the table barrel so the detail route does not pull
 // the whole list page into its bundle.
 import { BUDGET_FALLBACK_LIST_QUERY } from "@/components/financial/budget/table/budget-table-filters";
-import { readQuoteSiblingState, useQuoteSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
+import { readQuoteSiblingState, useBudgetSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
 import { toAttentionQuoteEntityFromParts } from "@/components/financial/shared/quote-attention";
 import { useAttentionEntity, useAttentionField } from "@/lib/attention";
 import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
@@ -369,7 +369,13 @@ const FinancialBudgetDetailPageInner = () => {
     return aprovados.size;
   }, [existingQuote]);
 
-  const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
+  // A lista de Orçamentos tem UMA LINHA POR ORÇAMENTO, então o recuo do pager
+  // (quando o usuário não veio da lista) também percorre ORÇAMENTOS e traduz
+  // cada um para a sua tarefa ÂNCORA — a rota continua sendo por tarefa. Pelo
+  // hook antigo, que percorre tarefas, "próximo" repetia o mesmo orçamento uma
+  // vez por veículo; e `BUDGET_FALLBACK_LIST_QUERY` agora é um `where` de
+  // TaskQuote, que `/tasks` recusaria com 400.
+  const { ids: siblingIds, complete: siblingIdsComplete } = useBudgetSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
   const recordNav = useRecordNavigation({
     ids: siblingIds,
     currentId: taskId ?? "",
