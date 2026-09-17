@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
 import { serializeCustomerFormToUrlParams, getDefaultCustomerFormValues, debounce } from "@/utils/url-form-state";
 import { createCustomerFormData } from "@/utils/form-data-helper";
+import { keepValidPhones } from "@/utils";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 import { createEconomicActivity } from "@/api-client/economic-activity";
 
@@ -135,8 +136,14 @@ export function CustomerForm(props: CustomerFormProps) {
 
       if (data.phones && data.phones.length > 0) {
         // Add all phones to the phones array, avoiding duplicates
+        //
+        // Só os VÁLIDOS. O cadastro da Receita devolve o telefone como a empresa
+        // o declarou — truncado, com ramal colado, às vezes lixo —, e a API
+        // recusa o cliente inteiro por causa de um deles. Quem está cadastrando
+        // não digitou esse número e não tem como consertá-lo: ele nem deve
+        // aparecer no formulário.
         const currentPhones = form.getValues("phones") || [];
-        const newPhones = data.phones.filter(phone => !currentPhones.includes(phone));
+        const newPhones = keepValidPhones(data.phones).filter(phone => !currentPhones.includes(phone));
         if (newPhones.length > 0) {
           form.setValue("phones", [...currentPhones, ...newPhones], { shouldDirty: true, shouldValidate: true });
         }

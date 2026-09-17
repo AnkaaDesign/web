@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useCnpjLookup } from "./use-cnpj-lookup";
-import { cleanCNPJ, formatCNPJ, isValidCNPJ } from "../../utils";
+import { cleanCNPJ, formatCNPJ, isValidCNPJ, keepValidPhones } from "../../utils";
 import type { CustomerQuickCreateFormData } from "@schemas";
 
 // Re-define CnpjData interface (matches the one from use-cnpj-lookup.ts)
@@ -173,7 +173,9 @@ export function useCnpjAutocomplete(options?: UseCnpjAutocompleteOptions) {
         city: state.cnpjData.city,
         state: state.cnpjData.state,
         zipCode: state.cnpjData.zipCode,
-        phones: state.cnpjData.phones || [],
+        // Filtrado na origem: um número que a API recusaria não chega a
+        // aparecer no formulário como se fosse aproveitável.
+        phones: keepValidPhones(state.cnpjData.phones),
         registrationStatus: state.cnpjData.registrationStatus,
       };
     }

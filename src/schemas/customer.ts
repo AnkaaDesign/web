@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, emailSchema } from "./common";
 import type { Customer } from '@types';
-import { isValidCPF, isValidCNPJ } from '@/utils';
+import { isValidCPF, isValidCNPJ, keepValidPhones } from '@/utils';
 
 // =====================
 // Include Schema Based on Prisma Schema
@@ -744,7 +744,10 @@ export const customerCreateSchema = z
     state: z.string().length(2, "Estado deve ter 2 caracteres").nullable().optional(),
     zipCode: z.string().nullable().optional(),
     site: z.string().url("URL inválida").nullable().optional(),
-    phones: z.array(z.string()).default([]),
+    // Um número inválido não derruba o cadastro: ele sai. Ver
+    // `keepValidPhones` — o que chega aqui costuma vir do autocompletar
+    // do CNPJ, e não de alguém que possa corrigi-lo.
+    phones: z.array(z.string()).default([]).transform(keepValidPhones),
     tags: z.array(z.string()).default([]),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
     logoFile: z.any().optional(), // File upload field - handled separately from JSON validation
@@ -791,7 +794,10 @@ export const customerQuickCreateSchema = z
     city: z.string().nullable().optional(),
     state: z.string().length(2, "Estado deve ter 2 caracteres").nullable().optional(),
     zipCode: z.string().nullable().optional(),
-    phones: z.array(z.string()).default([]),
+    // Um número inválido não derruba o cadastro: ele sai. Ver
+    // `keepValidPhones` — o que chega aqui costuma vir do autocompletar
+    // do CNPJ, e não de alguém que possa corrigi-lo.
+    phones: z.array(z.string()).default([]).transform(keepValidPhones),
     registrationStatus: z.enum(["ACTIVE", "SUSPENDED", "UNFIT", "ACTIVE_NOT_REGULAR", "DEREGISTERED"]).nullable().optional(),
   })
   .transform(toFormData);
@@ -825,7 +831,7 @@ export const customerUpdateSchema = z
     state: z.string().length(2, "Estado deve ter 2 caracteres").nullable().optional(),
     zipCode: z.string().nullable().optional(),
     site: z.string().url("URL inválida").nullable().optional(),
-    phones: z.array(z.string()).optional(),
+    phones: z.array(z.string()).optional().transform(v => (v === undefined ? undefined : keepValidPhones(v))),
     tags: z.array(z.string()).optional(),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
     logoFile: z.any().optional(), // File upload field - handled separately from JSON validation

@@ -72,6 +72,36 @@ export const isValidCNPJ = (cnpj: string): boolean => {
   return result === parseInt(digits.charAt(1));
 };
 
+/**
+ * OS TELEFONES QUE VALE A PENA MANDAR — os outros somem, e o cadastro entra.
+ *
+ * O cadastro da Receita devolve o telefone como a empresa o declarou, e isso
+ * inclui número truncado, ramal colado no fim e campo preenchido com lixo. A
+ * API recusa o CLIENTE INTEIRO por causa de um deles ("Telefone inválido na
+ * posição 2") — e quem está cadastrando não tem como consertar um dado que não
+ * digitou: ele veio do autocompletar do CNPJ.
+ *
+ * O telefone é opcional e é o campo menos essencial do formulário. Entre não
+ * cadastrar o cliente e cadastrá-lo sem um número que ninguém conferiu, a
+ * escolha não é difícil.
+ *
+ * Devolve os números LIMPOS (só dígitos, como o resto do sistema os guarda) e
+ * sem repetição — dois formatos do mesmo número viram um.
+ */
+export const keepValidPhones = (phones: readonly (string | null | undefined)[] | null | undefined): string[] => {
+  if (!Array.isArray(phones)) return [];
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const raw of phones) {
+    if (typeof raw !== "string") continue;
+    const cleaned = raw.replace(/\D/g, "");
+    if (!cleaned || !isValidPhone(cleaned) || seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    kept.push(cleaned);
+  }
+  return kept;
+};
+
 export const isValidPhone = (phone: string): boolean => {
   if (!phone || typeof phone !== "string") {
     return true; // Allow empty phones (they're optional)
