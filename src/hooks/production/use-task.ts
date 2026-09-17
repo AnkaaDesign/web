@@ -3,7 +3,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { notifyAttentionEntityChanged } from "@/lib/attention";
-import { getTasks, getTaskById, createTask, updateTask, deleteTask, batchCreateTasks, batchUpdateTasks, batchDeleteTasks, duplicateTask, rescheduleForecast, getForecastHistory } from "../../api-client";
+import { getTasks, getTaskById, createTask, updateTask, deleteTask, batchCreateTasks, batchUpdateTasks, batchDeleteTasks, duplicateTask, rescheduleForecast, getForecastHistory , batchCreateTasksWithQuote } from "../../api-client";
 import type {
   TaskGetManyFormData,
   TaskCreateFormData,
@@ -443,6 +443,50 @@ export function useTaskBatchMutations() {
     },
   });
 
+  // AS TAREFAS E O ORÇAMENTO, NUM COMMIT SÓ
+  //
+  // Mora AQUI, e não solto no componente, por causa do que vem DEPOIS de gravar:
+  // a invalidação. As telas que duplicam tarefa — agenda, cronograma, histórico,
+  // preparação, painel — não refazem a busca sozinhas; o `onSuccess` delas só
+  // fecha o modal, e o comentário de uma diz textualmente "a lista se atualiza
+  // pela invalidação do React Query". Chamar o api-client cru gravava as cópias
+  // e deixava a lista mostrando o mundo de antes: nenhum erro, nenhuma cópia à
+  // vista.
+  const batchCreateWithQuoteMutation = useMutation({
+    mutationFn: (data: { tasks: any[]; quote: any }) => batchCreateTasksWithQuote(data),
+    onSuccess: (response) => {
+      invalidateTasks();
+
+      const created = response?.data?.tasks ?? [];
+      if (created.length === 0) return;
+
+      const customerIds = new Set(created.map((task) => task.customerId).filter(Boolean));
+      const sectorIds = new Set(created.map((task) => task.sectorId).filter(Boolean));
+      const userIds = new Set(created.map((task) => task.createdBy?.id).filter(Boolean));
+      const paintIds = new Set(created.map((task) => task.paintId).filter(Boolean));
+
+      customerIds.forEach((customerId) => {
+        if (!customerId) return;
+        queryClient.invalidateQueries({ queryKey: taskKeys.byCustomer(customerId) });
+        queryClient.invalidateQueries({ queryKey: customerKeys.detail(customerId) });
+      });
+      sectorIds.forEach((sectorId) => {
+        if (!sectorId) return;
+        queryClient.invalidateQueries({ queryKey: taskKeys.bySector(sectorId) });
+        queryClient.invalidateQueries({ queryKey: sectorKeys.detail(sectorId) });
+      });
+      userIds.forEach((userId) => {
+        if (!userId) return;
+        queryClient.invalidateQueries({ queryKey: taskKeys.byUser(userId) });
+        queryClient.invalidateQueries({ queryKey: userKeys.detail(userId) });
+      });
+      paintIds.forEach((paintId) => {
+        if (!paintId) return;
+        queryClient.invalidateQueries({ queryKey: paintKeys.detail(paintId) });
+      });
+    },
+  });
+
   // BATCH UPDATE
   const batchUpdateMutation = useMutation({
     mutationFn: (data: TaskBatchUpdateFormData | FormData) => batchUpdateTasks(data),
@@ -544,12 +588,22 @@ export function useTaskBatchMutations() {
     },
   });
 
-  const isLoading = batchCreateMutation.isPending || batchUpdateMutation.isPending || batchDeleteMutation.isPending;
-  const error = batchCreateMutation.error || batchUpdateMutation.error || batchDeleteMutation.error;
+  const isLoading =
+    batchCreateMutation.isPending ||
+    batchCreateWithQuoteMutation.isPending ||
+    batchUpdateMutation.isPending ||
+    batchDeleteMutation.isPending;
+  const error =
+    batchCreateMutation.error ||
+    batchCreateWithQuoteMutation.error ||
+    batchUpdateMutation.error ||
+    batchDeleteMutation.error;
 
   return {
     batchCreate: batchCreateMutation.mutate,
     batchCreateAsync: batchCreateMutation.mutateAsync,
+    batchCreateWithQuote: batchCreateWithQuoteMutation.mutate,
+    batchCreateWithQuoteAsync: batchCreateWithQuoteMutation.mutateAsync,
     batchUpdate: batchUpdateMutation.mutate,
     batchUpdateAsync: batchUpdateMutation.mutateAsync,
     batchDelete: batchDeleteMutation.mutate,

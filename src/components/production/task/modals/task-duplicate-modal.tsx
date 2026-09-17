@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useTaskMutations, useTaskBatchMutations, useTaskDetail } from "../../../../hooks";
-import { batchCreateTasksWithQuote } from "@/api-client/task";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, PAYMENT_CONDITION } from "../../../../constants";
 import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
 import type { Task } from "../../../../types";
 import { taskDuplicateCopySchema } from "../../../../schemas";
 import {
@@ -107,7 +107,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   const [mode, setMode] = useState<'quantity' | 'detailed'>('quantity');
   const [quantity, setQuantity] = useState<number | ''>('');
   const { createAsync } = useTaskMutations();
-  const { batchCreateAsync } = useTaskBatchMutations();
+  const { batchCreateAsync, batchCreateWithQuoteAsync } = useTaskBatchMutations();
 
   // Refetch the full task with ALL relations when the modal opens
   const { data: fullTaskResponse, isLoading: isLoadingTask } = useTaskDetail(task?.id ?? '', {
@@ -330,8 +330,27 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         // TUDO OU NADA, E UM ORÇAMENTO SÓ. Antes o orçamento vinha embutido em
         // cada tarefa e o servidor criava um por cópia; agora as N cópias e o
         // orçamento que as cobre nascem na mesma transação.
-        const result = await batchCreateTasksWithQuote({ tasks: tasksToCreate, quote });
+        const result = await batchCreateWithQuoteAsync({ tasks: tasksToCreate, quote });
         success = result.success;
+        // O AVISO É DAQUI. O interceptador do axios pula o toast de sucesso de
+        // toda URL que contenha "/batch" — e `batch-with-quote` contém —,
+        // deixando-o "para o diálogo". Este é o diálogo, e ele estava calado:
+        // a operação dava certo e não dizia nada.
+        //
+        // O número do orçamento entra de propósito: é a prova, na tela, de que
+        // as N cópias ficaram debaixo de UM orçamento e não de N.
+        if (success) {
+          const n = tasksToCreate.length;
+          const numero = (result as any)?.data?.quote?.budgetNumber;
+          toast.success(
+            n === 1 ? "Cópia criada com sucesso." : `${n} cópias criadas com sucesso.`,
+            numero
+              ? {
+                  description: `Orçamento nº ${String(numero).padStart(4, "0")} — ${n} ${n === 1 ? "veículo" : "veículos"}.`,
+                }
+              : undefined,
+          );
+        }
       } else if (tasksToCreate.length === 1) {
         // A origem não tem orçamento — não há o que copiar, e a cópia nasce só.
         const result = await createAsync(tasksToCreate[0]);
@@ -339,6 +358,10 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       } else {
         const result = await batchCreateAsync({ tasks: tasksToCreate });
         success = result.success;
+        // Mesma razão do bloco acima: "/batch" não toasta sozinho.
+        if (success) {
+          toast.success(`${tasksToCreate.length} cópias criadas com sucesso.`);
+        }
       }
 
       if (success) {
