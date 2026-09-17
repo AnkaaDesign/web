@@ -930,17 +930,65 @@ function TaskDetailContent() {
               render: (t: Task) => <QuoteBillingBreakdown task={t} />,
               fields: [
                 {
+                  /**
+                   * O NÚMERO DO ORÇAMENTO — agora corrigível, e visível só para quem o corrige.
+                   *
+                   * Duas mudanças, pedidas pelo dono em 17/09/2026:
+                   *
+                   * 1. EDITÁVEL. A numeração já saiu torta, e o número é a referência que o
+                   *    cliente cita no e-mail, no pedido de compra e na descrição do Pix —
+                   *    não havia como acertá-lo por tela nenhuma. `PUT /task-quotes/:id`
+                   *    passou a aceitar `budgetNumber`; a rota é `@Roles(ADMIN, FINANCIAL,
+                   *    COMMERCIAL)`, que é exatamente este gate.
+                   * 2. GATEADO NA LEITURA. Antes o campo aparecia para todo mundo, inclusive
+                   *    produção e logística, que não têm o que fazer com ele.
+                   *
+                   * ⚠️ O NÚMERO DEIXOU DE SER UM LINK. A edição inline abre no duplo clique, e
+                   * um `<button>` que navega no primeiro clique torna o duplo impossível — os
+                   * dois não cabem no mesmo alvo. A navegação não se perdeu: o botão
+                   * "Visualizar" do cabeçalho desta seção leva ao mesmo lugar.
+                   *
+                   * ⚠️ Com cobrança aprovada o servidor RECUSA, e deve recusar: a NFS-e e o
+                   * boleto emitidos citam este número. O erro volta pelo interceptor e o campo
+                   * reverte sozinho.
+                   */
                   id: "quoteBudget",
                   label: "Orçamento Nº",
+                  dataType: "number" as const,
+                  requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
                   accessor: (t: Task) => (t.quote?.budgetNumber ? String(t.quote.budgetNumber).padStart(4, "0") : null),
                   render: (t: Task) =>
                     t.quote?.budgetNumber ? (
-                      <button type="button" className="font-medium hover:underline" onClick={() => navigate(getTaskQuoteEditRoute(t), { state: { returnTo } })}>
-                        {String(t.quote.budgetNumber).padStart(4, "0")}
-                      </button>
+                      <span className="font-medium tabular-nums">{String(t.quote.budgetNumber).padStart(4, "0")}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     ),
+                  // `canEditQuote`, não `canEdit`: este último é `canEditTasks` (produção
+                  // também passa). Quem renumera é quem a rota deixa entrar.
+                  edit: canEditQuote
+                    ? {
+                        get: (t: Task) => t.quote?.budgetNumber ?? null,
+                        min: 1,
+                        max: 999999,
+                        step: 1,
+                        placeholder: "0000",
+                        validate: (v: unknown) => {
+                          if (v === null || v === undefined || v === "") return "Informe o número do orçamento.";
+                          const n = Number(v);
+                          if (!Number.isInteger(n) || n <= 0) return "O número do orçamento é um inteiro positivo.";
+                          return null;
+                        },
+                        onCommit: async (v: unknown, t: Task) => {
+                          const quoteId = t.quote?.id;
+                          if (!quoteId) return;
+                          await taskQuoteService.update(quoteId, { budgetNumber: Number(v) } as any);
+                          await Promise.all([
+                            queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+                            queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+                          ]);
+                        },
+                      }
+                    : undefined,
                 },
                 {
                   id: "quoteValidade",
