@@ -54,6 +54,8 @@ import {
   perVehicleAmount,
   quoteVehicleCount,
   coveredTaskCount,
+  hasMultipleCustomers,
+  dedupeConfigsByCustomer,
 } from "@/utils/quote-tasks";
 
 /**
@@ -220,14 +222,20 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
     <div className="space-y-4">
       {/* The section TITLE + header "Visualizar" action (host-owned) open the quote. */}
       {/* Customer filter combobox - only show when 2+ invoiceTo customers (header chrome is host-owned) */}
-      {quote.customerConfigs && quote.customerConfigs.length >= 2 && (
+      {/* ⚠️ CLIENTES DISTINTOS, e não `customerConfigs.length`. Um faturamento
+          por veículo é UM PAGADOR REPETIDO, não vários clientes: contar fatias
+          punha um filtro "Completo / Cliente 1 / Cliente 2 / Cliente 3 / Cliente
+          4" com o MESMO nome quatro vezes num orçamento de um cliente só. É a
+          mesma distinção que o "Faturar Para" faz — múltiplos faturamentos de um
+          orçamento não são múltiplos pagadores. */}
+      {hasMultipleCustomers(quote.customerConfigs) && (
         <div className="flex justify-end">
           <Combobox
             value={quoteCustomerFilter || "all"}
             onValueChange={(value) => setQuoteCustomerFilter(value === "all" ? null : typeof value === "string" ? value : null)}
             options={[
               { value: "all", label: "Completo" },
-              ...quote.customerConfigs.map((config) => ({
+              ...dedupeConfigsByCustomer(quote.customerConfigs).configs.map((config) => ({
                 value: config.customerId,
                 label: config.customer?.corporateName || config.customer?.fantasyName || "Cliente",
               })),
@@ -243,7 +251,18 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
 
       {/* Pricing items table */}
       {(() => {
-        if (part !== "budget") return null;
+        // OS DOIS CARTÕES MOSTRAM OS SERVIÇOS, e pela mesma tabela.
+        //
+        // O faturamento listava pagador, parcelas e boletos sem dizer o que
+        // estava sendo cobrado: quem abria a cobrança via "R$ 0,20" e um nome,
+        // e precisava voltar ao Orçamento para descobrir por qual serviço. São
+        // cartões independentes desde 16/09 — um deles não pode depender do
+        // outro estar aberto para fazer sentido.
+        //
+        // A tabela é a MESMA de propósito. O que muda entre os cartões não é a
+        // lista, é o recorte: `quote.customerConfigs` já vem filtrado para a
+        // fatura DESTE veículo (`configsForTask`), então o resumo logo abaixo
+        // soma o que este caminhão paga, e não o contrato inteiro.
         const filteredServices = services.filter(
           (item) => !quoteCustomerFilter || item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId,
         );
@@ -301,7 +320,9 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
 
         // Group by customer when "Completo" with 2+ customers — 2-column layout
         // Use customerConfigs order to ensure consistent "Cliente N" numbering with billing section
-        if (!quoteCustomerFilter && (quote.customerConfigs?.length ?? 0) >= 2) {
+        // Por CLIENTES distintos: com uma fatia por veículo, contar fatias abria
+        // um grupo por caminhão para o mesmo pagador.
+        if (!quoteCustomerFilter && hasMultipleCustomers(quote.customerConfigs)) {
           const servicesByCustomer = new Map<string, typeof filteredServices>();
           for (const item of filteredServices) {
             const customerId = item.invoiceToCustomer?.id || "__unassigned__";
@@ -381,7 +402,8 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
 
       {/* Pricing Summary */}
       {(() => {
-        if (part !== "budget") return null;
+        // Acompanha a tabela acima nos dois cartões: uma lista de serviços sem
+        // subtotal, desconto e total é meia resposta.
         const configs = quote.customerConfigs || [];
         const hasConfigs = configs.length > 0;
 
@@ -508,7 +530,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
         (() => {
           const configs = quoteCustomerFilter
             ? quote.customerConfigs!.filter((c) => c.customerId === quoteCustomerFilter)
-            : quote.customerConfigs!.length >= 2
+            : hasMultipleCustomers(quote.customerConfigs)
               ? quote.customerConfigs!
               : [];
 
