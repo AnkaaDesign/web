@@ -369,7 +369,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
     canEditObservation,
-    canEditIdentity, canEditSector, canEditBonification,
+    canEditIdentity, canEditSector, canEditBonification, canEditOrderNumber,
     canEditDates, canEditEntryDate, canEditTerm, canEditResponsibles, canEditServices,
     canEditLayout, canEditPaint, canEditCuts,
   } = useTaskPermissions();
@@ -3454,6 +3454,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           um mesmo orçamento a citarem o mesmo número na nota e no
                           boleto. O pedido é por ENTREGA: aqui é onde se corrige um
                           caminhão sem mexer nos irmãos. */}
+                      {canEditOrderNumber && (
                       <FormField
                         control={form.control}
                         name="customerOrderNumber"
@@ -3471,17 +3472,26 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                                 className="bg-transparent"
                                 onChange={(value: string | number | null) => field.onChange(value === null || value === "" ? null : String(value))}
                                 onBlur={field.onBlur}
-                                disabled={isSubmitting || !canEditIdentity}
+                                disabled={isSubmitting}
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      )}
                     </div>
 
-                    {/* Sector, Status and Bonification in a row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Setor, Status e Bonificação numa linha.
+                        A grade acompanha QUANTOS campos de fato entram: sem a
+                        bonificação (que é gateada), três colunas deixavam Setor e
+                        Status ocupando dois terços e um vão vazio no resto da
+                        linha. Com dois campos, cada um fica com metade. */}
+                    <div
+                      className={`grid grid-cols-1 gap-4 ${
+                        canViewBonificationField ? "md:grid-cols-3" : "md:grid-cols-2"
+                      }`}
+                    >
                       {/* Sector */}
                       <SectorSelector control={form.control} disabled={isSubmitting || !canEditSector} productionOnly />
 

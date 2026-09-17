@@ -121,6 +121,11 @@ const ENTRY_DATE_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGE
 //   TERM (canEditTerm = PRODUCTION_MANAGER + ADMIN) — the delivery deadline is production
 //   management's; COMMERCIAL and LOGISTIC must not change it. Mirrors the API `term` domain.
 const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
+//   Nº DO PEDIDO (`Task.customerOrderNumber`) — ADMIN, FINANCEIRO e COMERCIAL. É o pedido de
+//   compra que vai na nota e no boleto: dado comercial/fiscal, não de chão. Estava em
+//   `IDENTITY_EDIT_PRIVILEGES`, que inclui LOGÍSTICA e GERENTE DE PRODUÇÃO — os dois viam o
+//   campo editável e a API respondia 400. Espelha o domínio `orderNumber` da api.
+const ORDER_NUMBER_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL];
 // VIEWING-only gate for the "Faturar Para" line in Informações Gerais: quem NÃO tem o cartão
 // Faturamento e ainda assim precisa saber para quem a nota sai. Hoje é só o gerente de produção
 // (ADMIN/FINANCEIRO/COMERCIAL leem isso no próprio cartão). Abrir para outro setor é acrescentar
@@ -701,7 +706,7 @@ function TaskDetailContent() {
              */
             id: "customerOrderNumber",
             label: "N° do Pedido",
-            editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            editablePrivilege: ORDER_NUMBER_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.customerOrderNumber,
             edit: canEdit

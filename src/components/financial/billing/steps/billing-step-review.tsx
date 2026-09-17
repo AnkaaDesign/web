@@ -651,7 +651,14 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   // APROVAR — enquanto esta cobrança não tiver sido aprovada. O rótulo diz o
                   // RECORTE: num orçamento cobrado veículo a veículo, "Aprovar Faturamento" sem
                   // qualificação fazia o operador achar que tinha fechado os sessenta.
-                  if (!billingApprovedAt) {
+                  //
+                  // ⚠️ E NÃO BASTA "sem carimbo": `cancelForTaskCancellation` ZERA
+                  // `approvedAt` ao cancelar o orçamento, então uma cobrança
+                  // CANCELADA satisfaz `!billingApprovedAt` e voltava a oferecer
+                  // "Aprovar" — que a rota recusa com "não é possível faturar um
+                  // orçamento em Cancelado". "Liquidar", logo abaixo, já tinha a
+                  // guarda; esta não tinha.
+                  if (!billingApprovedAt && billingStatus !== "CANCELLED") {
                     opts.push({
                       value: APPROVE_OPTION_VALUE,
                       label: isPerVehicleBilling ? "Aprovar Faturamento (esta cobrança)" : "Aprovar Faturamento",

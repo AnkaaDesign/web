@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { billingService, type BillingListParams, type BillingListResponse } from "@/api-client/billing";
+import { receivableKeys, reconciliationKeys } from "@/hooks/common/query-keys";
 
 export const billingKeys = {
   all: ["billings"] as const,
@@ -97,6 +98,13 @@ export function useApproveBilling() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-quotes"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // ⚠️ E O DINHEIRO A RECEBER. Aprovar ou liquidar uma cobrança CRIA ou QUITA
+      // fatura, parcelas e boletos — que é exatamente o acervo de onde a
+      // Conciliação tira os candidatos a casamento. Sem isto o extrato continuava
+      // oferecendo parcelas que já não existem (e escondendo as que acabaram de
+      // nascer) até alguém dar F5.
+      queryClient.invalidateQueries({ queryKey: receivableKeys.all });
+      queryClient.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
   });
 }
@@ -116,6 +124,13 @@ export function useSettleBilling() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-quotes"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // ⚠️ E O DINHEIRO A RECEBER. Aprovar ou liquidar uma cobrança CRIA ou QUITA
+      // fatura, parcelas e boletos — que é exatamente o acervo de onde a
+      // Conciliação tira os candidatos a casamento. Sem isto o extrato continuava
+      // oferecendo parcelas que já não existem (e escondendo as que acabaram de
+      // nascer) até alguém dar F5.
+      queryClient.invalidateQueries({ queryKey: receivableKeys.all });
+      queryClient.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
   });
 }

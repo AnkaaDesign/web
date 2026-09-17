@@ -571,13 +571,14 @@ export const quickBudgetWidget: WidgetDefinition<Config> = {
     "Crie um orçamento sem sair do painel — agrupado em Tarefa, Informações e Serviços, exatamente como o formulário completo.",
   icon: IconReceipt,
   category: "other",
-  // Mirror /financeiro/orcamento page privileges. PRODUCTION_MANAGER is
-  // intentionally excluded — managers don't create budgets.
-  allowedSectors: [
-    SECTOR_PRIVILEGES.ADMIN,
-    SECTOR_PRIVILEGES.COMMERCIAL,
-    SECTOR_PRIVILEGES.FINANCIAL,
-  ],
+  // Espelha `POST /budgets`, que é `@Roles(ADMIN, COMMERCIAL)` — e NÃO a lista de
+  // quem VÊ a tela de Orçamentos.
+  //
+  // ⚠️ O FINANCEIRO estava aqui. Pelo botão da lista o `PrivilegeRoute` o barrava
+  // antes do formulário; por este widget ele preenchia tudo — tarefa, cliente,
+  // serviços, valores — e tomava 403 no Salvar, com o trabalho perdido. Mostrar
+  // uma porta que o servidor fecha é pior do que não mostrar porta nenhuma.
+  allowedSectors: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
   defaultSize: { cols: 2, rows: 4 },
   minSize: { cols: 2, rows: 3 },
   maxSize: { cols: 4, rows: 4 },

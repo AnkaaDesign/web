@@ -100,6 +100,14 @@ export function useTaskPermissions() {
   // Mirrors the API `term` field domain (task.permissions.ts) — a commercial
   // user who still reaches a term input gets a 400 from the field validator.
   const canEditTerm = isAdmin || isProductionManager;
+  // Nº do Pedido do cliente (`Task.customerOrderNumber`) — ADMIN, FINANCEIRO e
+  // COMERCIAL. É o pedido de compra que vai na nota e no boleto: dado
+  // comercial/fiscal, não de chão de fábrica. O GERENTE DE PRODUÇÃO via o campo
+  // e a API o recusava.
+  //
+  // Espelha o domínio `orderNumber` de `task.permissions.ts`, que por sua vez
+  // repete a audiência de `PATCH /budgets/:id/customer-config-order-number`.
+  const canEditOrderNumber = isAdmin || isFinancial || isCommercial;
   const canEditResponsibles = !isFinancial && !isDesigner && !isLogistic && !isProductionManager;
   const canEditServices = !isWarehouse;
   const canEditLayout = !isFinancial && !isDesigner;
@@ -154,6 +162,7 @@ export function useTaskPermissions() {
     canEditDates,
     canEditEntryDate,
     canEditTerm,
+    canEditOrderNumber,
     canEditResponsibles,
     canEditServices,
     canEditLayout,

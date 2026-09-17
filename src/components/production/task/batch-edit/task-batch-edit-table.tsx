@@ -93,7 +93,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
   // Prazo de Entrega — PRODUCTION_MANAGER/ADMIN only. Sem isso a grade mandava o `term` de
   // TODA linha editada (o payload é a linha inteira, não o diff), e o validador de campos da
   // API recusava o lote inteiro por causa de uma coluna que o usuário nem tocou.
-  const { canEditTerm } = useTaskPermissions();
+  const { canEditTerm, canEditOrderNumber } = useTaskPermissions();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Task, Task> | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
@@ -256,6 +256,37 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         // A linha vai inteira para a API, então um campo que o setor não pode escrever tem de
         // SAIR do payload — mandá-lo inalterado derruba o lote no validador de campos.
         if (!canEditTerm) delete transformed.data.term;
+        if (!canEditOrderNumber) delete transformed.data.customerOrderNumber;
+
+        // ── PLACA E CHASSI MORAM EM `truck`, NÃO NO TOPO ──────────────────────
+        //
+        // A grade os montava no primeiro nível de `data`. O schema de update só os
+        // conhece dentro de `truck` e NÃO é `.strict()`: o zod APAGA a chave que
+        // não reconhece, sem erro. O operador editava a placa de doze caminhões,
+        // lia "12 tarefas atualizadas com sucesso" e nada mudava. (Só
+        // `customerOrderNumber` é de primeiro nível — é da TAREFA, não do veículo.)
+        //
+        // ⚠️ E SÓ QUANDO MUDOU. A grade manda a LINHA INTEIRA, então `plate` e
+        // `chassisNumber` nunca são `undefined` — montar `truck` sempre faria
+        // toda tarefa carregar um bloco de veículo, e o repositório faz `upsert`:
+        // tarefa que NÃO tem caminhão ganharia um, criado do nada e com `spot`
+        // forçado a nulo contra o `@default(YARD_WAIT)` — um veículo nascido fora
+        // do mapa do pátio, em cada gravação de lote.
+        const original = tasks.find((t: any) => t.id === task.id);
+        const { plate, chassisNumber, ...semVeiculo } = transformed.data;
+        const placaMudou = (plate || "") !== (original?.truck?.plate || "");
+        const chassiMudou = (chassisNumber || "") !== (original?.truck?.chassisNumber || "");
+        transformed.data = semVeiculo;
+        if (placaMudou || chassiMudou) {
+          transformed.data = {
+            ...semVeiculo,
+            truck: {
+              ...(semVeiculo.truck ?? {}),
+              ...(placaMudou ? { plate: plate || null } : {}),
+              ...(chassiMudou ? { chassisNumber: chassisNumber || null } : {}),
+            },
+          };
+        }
 
         return transformed;
       });
@@ -311,6 +342,8 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                     <IconListNumbers className="mr-2 h-4 w-4" />
                     Preencher Nº de Série
                   </Button>
+                  {/* Só quem pode ESCREVER o Nº do Pedido vê o atalho que o espalha. */}
+                  {canEditOrderNumber && (
                   <Button
                     type="button"
                     variant="outline"
@@ -321,6 +354,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                     <IconCopy className="mr-2 h-4 w-4" />
                     Repetir Nº do Pedido
                   </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -425,7 +459,11 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         </TableCell>
                         <TableCell className="w-28 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput name={`tasks.${index}.data.customerOrderNumber`} placeholder="Nº Pedido" />
+                            <FormInput
+                              name={`tasks.${index}.data.customerOrderNumber`}
+                              placeholder="Nº Pedido"
+                              disabled={!canEditOrderNumber}
+                            />
                           </div>
                         </TableCell>
                         <TableCell className="w-24 p-0 !border-r-0">

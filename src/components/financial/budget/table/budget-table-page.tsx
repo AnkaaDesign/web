@@ -8,7 +8,7 @@ import { useBudgets } from "@/hooks";
 import { getBudgets } from "@/api-client/budget";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useAuth } from "@/contexts/auth-context";
-import { canEditQuote } from "@/utils/permissions/quote-permissions";
+import { canCreateQuote } from "@/utils/permissions/quote-permissions";
 import { FAVORITE_PAGES, routes } from "@/constants";
 import type { Budget } from "@/types/budget";
 import { primaryTask } from "@/utils/quote-tasks";
@@ -45,7 +45,11 @@ export function BudgetTablePage() {
   const navigate = useNavigate();
   const returnTo = useReturnTo();
   const { user } = useAuth();
-  const canEdit = canEditQuote(user?.sector?.privileges || "");
+  // CADASTRAR é outra pergunta que EDITAR: `POST /budgets` é ADMIN+COMERCIAL, e o
+  // financeiro (que edita o orçamento pela tela de detalhe) não CRIA. O botão usava
+  // `canEditQuote`, e o financeiro só descobria a diferença ao ser barrado pelo
+  // `PrivilegeRoute` na tela seguinte — ou, pelo widget do painel, no 403 do Salvar.
+  const canCreate = canCreateQuote(user?.sector?.privileges || "");
 
   // Server mode: page/pageSize/sort ride the URL the table writes; search + filters arrive here.
   const [searchParams] = useSearchParams();
@@ -213,7 +217,7 @@ export function BudgetTablePage() {
             { label: "Orçamentos" },
           ]}
           actions={
-            canEdit
+            canCreate
               ? [
                   {
                     key: "create",
