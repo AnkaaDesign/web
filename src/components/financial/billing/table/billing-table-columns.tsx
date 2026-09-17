@@ -29,29 +29,46 @@ import {
 } from "@/components/financial/shared/quote-table-shared";
 
 /**
- * Due date of the FIRST installment (parcela nº 1) across all customer configs, regardless of its
- * status — so every task quote shows a vencimento, not only the overdue ones. Falls back
- * to the earliest due date when parcelas aren't numbered from 1.
+ * O VENCIMENTO QUE INTERESSA: a parcela EM ABERTO mais antiga da cobrança DESTA linha. Sem nenhuma
+ * em aberto, a última — a data em que o contrato terminou de ser pago.
  *
- * The API mirrors this resolution byte for byte for the `currentInstallmentDueDate` sort key
- * (`task-prisma.repository.ts` → `resolveFirstInstallmentDueDate`); keep both in sync or the
- * rendered date and the sort order disagree.
+ * ⚠️ Era "a parcela nº 1, qualquer que fosse o estado dela", com a justificativa de que assim toda
+ * linha mostra uma data. Mostrava — a errada. Caso real, orçamento 903 (KI Distribuidora): parcela
+ * 1 vence 27/08 e está PAGA, parcela 2 vence 16/09 e está VENCIDA. A linha vinha marcada "Vencido"
+ * e exibia 27/08, uma data que ninguém deve, ao lado de um selo dizendo que se deve.
+ *
+ * ⚠️ E varria os pagadores do ORÇAMENTO inteiro: num orçamento de sessenta caminhões cobrados um a
+ * um, as sessenta linhas mostravam o mesmo vencimento.
+ *
+ * A API espelha isto byte a byte na chave de ordenação `currentInstallmentDueDate`
+ * (`task-prisma.repository.ts` → `resolveCurrentInstallmentDueDate`); os dois TÊM de concordar,
+ * senão a data desenhada e a ordem da coluna discordam.
  */
 export const findFirstInstallmentDueDate = (task: Task): Date | null => {
   const configs = task.quote?.customerConfigs;
   if (!configs || configs.length === 0) return null;
-  let best: { number: number; due: Date } | null = null;
-  for (const config of configs) {
+
+  // A cobrança desta linha. Sem ela (acervo sem cobertura), cai no orçamento inteiro.
+  const billingId = (task as any)?.billingEntry?.billingId ?? null;
+  const doRecorte = billingId
+    ? configs.filter((c: any) => (c?.billing?.id ?? c?.billingId) === billingId)
+    : configs;
+  const escopo = doRecorte.length > 0 ? doRecorte : configs;
+
+  let emAberto: Date | null = null;
+  let ultima: Date | null = null;
+  for (const config of escopo) {
     for (const installment of config.installments || []) {
       const due = installment.dueDate ? new Date(installment.dueDate) : null;
-      if (!due) continue;
-      const number = installment.number ?? Number.MAX_SAFE_INTEGER;
-      if (!best || number < best.number || (number === best.number && due.getTime() < best.due.getTime())) {
-        best = { number, due };
-      }
+      if (!due || Number.isNaN(due.getTime())) continue;
+      if (!ultima || due.getTime() > ultima.getTime()) ultima = due;
+      // Cancelada não se deve; paga já se pagou. Nenhuma das duas é "vencimento".
+      const st = (installment as any).status;
+      if (st === "PAID" || st === "CANCELLED") continue;
+      if (!emAberto || due.getTime() < emAberto.getTime()) emAberto = due;
     }
   }
-  return best?.due ?? null;
+  return emAberto ?? ultima;
 };
 
 const money = (value: unknown): number | null => {

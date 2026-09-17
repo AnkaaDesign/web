@@ -3,7 +3,6 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
-import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPhone, formatPaidInstallmentLabel, formatInstallmentPaymentForm } from "@/utils";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
@@ -18,7 +17,7 @@ import { useNfseDetail } from "@/hooks/financial/use-nfse";
 import { canApproveQuote } from "@/utils/permissions/quote-permissions";
 import { round2 } from "@/utils/quote-money";
 import type { Invoice } from "@/types/invoice";
-import type { BILLING_STATUS, TASK_QUOTE_STATUS } from "@/types/task-quote";
+import type { BILLING_STATUS } from "@/types/task-quote";
 import { BILLING_STATUS_LABELS } from "@/constants";
 import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import {
@@ -141,7 +140,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
    * seletor só foi o que fez "aprovar faturamento" ser uma transição de status
    * do orçamento — e, por isso, um ato que atingia as N cobranças dele.
    */
-  const quoteStatus = useWatch({ control, name: "status" }) || "";
   /**
    * O ESTADO DA COBRANÇA. Recuo para `approvedAt` quando a consulta não trouxe
    * `status`: aprovada sem estado lido é "Aprovado", não-aprovada é "Pendente" —
@@ -569,14 +567,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             {billingStatus === "SETTLED" && task?.quoteId && (
               <ReceiptDownloadButton quoteId={task.quoteId} task={task} />
             )}
-            {/* O ESTADO DO ORÇAMENTO, em leitura — o contrato que se está cobrando.
-                Editá-lo é no assistente de Orçamento; aqui é contexto. */}
-            {quoteStatus ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Orçamento</span>
-                <QuoteStatusBadge status={quoteStatus as TASK_QUOTE_STATUS} size="default" />
-              </div>
-            ) : null}
+            {/* O ESTADO DO ORÇAMENTO SAIU DAQUI (decisão do dono, 17/09).
+                Ele tinha sido posto como "contexto" quando o cabeçalho passou a
+                mostrar o estado da COBRANÇA — mas dois selos lado a lado, um
+                rotulado e outro não, competem pela mesma leitura e poluem o
+                cabeçalho. Esta tela é a do faturamento; o estado do orçamento se
+                vê no orçamento. */}
             {canActOnBilling ? (
               <Combobox
                 value={billingStatus}

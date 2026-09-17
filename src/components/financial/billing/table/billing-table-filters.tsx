@@ -120,6 +120,10 @@ export const BILLING_LIST_INCLUDE = {
       },
     },
   },
+  // A COBRANÇA DESTA LINHA. Sem isto, `findFirstInstallmentDueDate` não consegue
+  // recortar os pagadores da cobrança do veículo e volta a olhar o orçamento
+  // inteiro — sessenta linhas com o mesmo vencimento.
+  billingEntry: { select: { billingId: true } },
 } as const;
 
 export function createBillingFilterDefs(opts: { invoiceCustomers: Customer[]; taskCustomers: Customer[] }): DataTableFilterDef<Task>[] {
@@ -266,12 +270,26 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
 
   const dueDate = toPrismaDateRange(filters.dueDateRange);
   if (dueDate) {
-    andBranches.push({
-      // `number: 1` on purpose: the Vencimento COLUMN renders the first installment's due date,
-      // and matching ANY installment made a quarter of the results show a date outside the range
-      // the user had just typed. Filter and column have to answer about the same date.
-      quote: { is: { customerConfigs: { some: { installments: { some: { number: 1, dueDate } } } } } },
+    // O PRINCÍPIO CONTINUA O MESMO — filtro e coluna têm de responder sobre a MESMA data —, mas a
+    // data da coluna mudou: não é mais "a parcela nº 1", é "a parcela EM ABERTO mais antiga da
+    // cobrança desta linha". Casar por `number: 1` passou a trazer linha cuja parcela 1 está paga
+    // e cujo vencimento exibido é outro.
+    //
+    // "A mais antiga em aberto cai na faixa" se escreve em duas cláusulas: existe uma em aberto
+    // DENTRO da faixa, e não existe nenhuma em aberto ANTES do começo dela. Sem a segunda, uma
+    // cobrança com parcelas abertas em setembro e outubro apareceria num filtro de outubro
+    // mostrando setembro — exatamente o desencontro que este bloco existe para impedir.
+    const emAberto = { status: { notIn: ["PAID", "CANCELLED"] } };
+    const escopo = (cond: Record<string, unknown>) => ({
+      billingEntry: { is: { billing: { customerConfigs: { some: { installments: { some: cond } } } } } },
     });
+    andBranches.push(escopo({ ...emAberto, dueDate }));
+    const inicio = (dueDate as Record<string, unknown>)?.gte;
+    if (inicio) {
+      andBranches.push({
+        NOT: escopo({ ...emAberto, dueDate: { lt: inicio } }),
+      });
+    }
   }
 
   const where: Record<string, unknown> = {};

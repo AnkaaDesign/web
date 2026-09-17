@@ -26,13 +26,17 @@ export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteS
       label: 'Aguardando Reanálise',
       variant: 'orange',
     },
-    // Cor PRÓPRIA, e não o verde de `approved`/`completed`: verde nesta tabela
-    // quer dizer "terminou", e aqui falta a contra-assinatura da Ankaa. Quem
-    // varre a lista atrás do que está parado do NOSSO lado precisa achar esta
-    // linha sem ler o rótulo.
+    // ⚠️ VERDE, o MESMO de `SETTLED` no faturamento (decisão do dono, 17/09).
+    //
+    // Era verde-água, por um argumento que não se sustentou no uso: "verde quer
+    // dizer terminou, e aqui ainda falta a nossa contra-assinatura". Na prática o
+    // que o operador lê varrendo as duas telas é outra coisa — verde é o DESFECHO
+    // BOM da fase daquela lista. Em Orçamentos, o desfecho bom da cerimônia é o
+    // cliente ter assinado; em Faturamento, é o dinheiro ter entrado. Duas telas,
+    // a mesma leitura, e nenhuma delas exige ler o rótulo.
     SIGNED: {
       label: 'Assinado',
-      variant: 'teal',
+      variant: 'completed',
     },
     // ⚠️ MESMA COR DO `PENDING` DO FATURAMENTO, por decisão do dono (17/09): a
     // mesma palavra tem de ter a mesma cor nas duas telas, senão o operador
