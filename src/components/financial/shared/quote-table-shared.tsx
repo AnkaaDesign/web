@@ -10,25 +10,28 @@ import { NFSE_DOCUMENT_FIELDS, NFSE_REQUIRED_CUSTOMER_FIELDS } from "@/lib/billi
 import { PAYMENT_TYPE_OPTIONS, configToTypeValue, legacyToConfig } from "@/components/financial/payment-config-field";
 import { formatDate } from "@/utils";
 import {
-  billingApprovedAtOf,
-  billingStatusOf,
-  billingStatusOrderOf,
-  configsForTask,
+  coveredTaskCount,
   perVehicleAmount,
   quotePerVehicleTotal,
   quoteVehicleCount,
 } from "@/utils/quote-tasks";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import type { Task } from "@/types";
-import type { BILLING_STATUS } from "@/types/task-quote";
+import type { Billing, TaskQuoteCustomerConfig } from "@/types/task-quote";
 import type { Customer } from "@/types";
 
 /**
- * Cells, value extractors and the customer picker shared by the two financial task tables
- * (Orçamentos and Faturamento). Both list the SAME entity (Task, joined to its TaskQuote) with
- * the same identifier/customer/date semantics, and the two hand-rolled tables they replaced had
- * already drifted apart in small ways (one showed `-` for a zero total, the other didn't). One
- * copy keeps them honest.
+ * Cells, value extractors and the customer picker shared by the two financial tables
+ * (Orçamentos e Faturamento).
+ *
+ * ⚠️ AS DUAS LISTAS DEIXARAM DE LISTAR A MESMA COISA. Orçamentos tem uma linha por
+ * CONTRATO (`TaskQuote`) e Faturamento uma linha por COBRANÇA (`Billing`); nenhuma
+ * das duas lista tarefas. O que sobrou aqui é o que independe da unidade da linha —
+ * as datas, o travessão, os conversores de filtro, o seletor de cliente — mais os
+ * extratores que recebem uma LISTA DE PAGADORES e por isso servem às duas sem saber
+ * de onde ela veio. O que era típico da linha-veículo (`taskQuoteTotal`,
+ * `taskBillingConfigs`, `taskIdentifier`…) saiu: Orçamentos agrega os seus em
+ * `budget/table/quote-row-shared.tsx` e Faturamento lê escalares da cobrança.
  */
 
 /**
@@ -53,96 +56,94 @@ export const ATTENTION_CUSTOMER_SELECT = {
 export const MutedDash = () => <span className="text-muted-foreground">-</span>;
 
 // ---------------------------------------------------------------------------
-// A LINHA É UM VEÍCULO, O ORÇAMENTO PODE SER DE SESSENTA
+// O QUE UMA COBRANÇA COBRA
 //
-// As duas tabelas listam TAREFAS (`useTasks`), uma linha por veículo, e um
-// orçamento multitarefa aparece em N linhas com o mesmo número. Duas coisas
-// mudam de significado nesse mundo, e as duas passam por aqui:
+// A lista de Faturamento passou a ter UMA LINHA POR `Billing`. Um orçamento
+// `JOINT` de quatro caminhões é UMA linha; um `PER_TASK` de quatro são quatro.
+// Com isso some a divisão `quote.total ÷ N`, que existia só para EXPLICAR por que
+// o mesmo contrato aparecia N vezes: a linha não é mais uma fatia de um contrato,
+// é a cobrança inteira de um recorte, e o número que ela mostra é o que essa
+// cobrança cobra.
 //
-//   · o VALOR — `quote.total` é o contrato (`por veículo × N`), e a linha quer a
-//     fatia dela (a soma das N fatias volta a dar o contrato);
-//   · as FATIAS DE FATURAMENTO — com `PER_TASK` há uma configuração por veículo,
-//     todas do mesmo cliente, e a linha quer a DELA. Sem filtrar, a célula
-//     "Faturar Para" de um orçamento de sessenta caminhões lia
-//     "Marquespan / Marquespan +58" e a de pedido repetia o mesmo número
-//     sessenta vezes.
+// A propriedade que fecha a conta, e que dá para conferir na tela: num orçamento,
+// Σ(valores das linhas de Faturamento) = `quote.total`. Valia antes por acidente
+// (`total ÷ N × N`); agora vale por construção.
 // ---------------------------------------------------------------------------
 
-/** Quantos veículos o orçamento desta linha cobre. 1 quando não há orçamento. */
-export const taskQuoteVehicleCount = (task: Task): number =>
-  task.quote ? quoteVehicleCount(task.quote) : 1;
-
-/** `true` quando a linha é um dos N veículos de um orçamento — o caso que muda a leitura. */
-export const isMultiVehicleQuote = (task: Task): boolean => taskQuoteVehicleCount(task) > 1;
+/** Duas casas — a mesma precisão em que o valor foi gravado (`Decimal(10,2)`). */
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /**
- * O valor DESTE veículo — `quote.total ÷ nº de veículos`.
- *
- * Nulo quando não há orçamento ou o total é zero, para a célula mostrar o
- * travessão em vez de "R$ 0,00" (o comportamento que as duas tabelas já tinham).
+ * Σ de uma coluna de dinheiro dos pagadores. `null` quando não há pagador
+ * carregado — que é "a consulta não trouxe a relação", nunca "vale zero".
  */
-export const taskQuoteTotal = (task: Task): number | null => quotePerVehicleTotal(task.quote);
-
-/** O subtotal DESTE veículo, pela mesma divisão do total. */
-export const taskQuoteSubtotal = (task: Task): number | null => {
-  const grand = Number(task.quote?.subtotal ?? 0);
-  if (!task.quote || !Number.isFinite(grand) || grand === 0) return null;
-  return perVehicleAmount(grand, quoteVehicleCount(task.quote));
-};
-
-/**
- * As configurações de faturamento que dizem respeito a ESTA linha.
- *
- * `JOINT` → todas (uma por cliente, `taskId` nulo, cobrindo os N veículos).
- * `PER_TASK` → a do veículo desta linha.
- */
-export const taskBillingConfigs = (task: Task) =>
-  configsForTask(task.quote?.customerConfigs, task.id);
-
-/**
- * Quando o faturamento DESTA linha foi aprovado.
- *
- * A aprovação é do FATURAMENTO que cobre este veículo, não do orçamento:
- * `TaskQuote.billingApprovedAt` só é gravado quando o ÚLTIMO fecha, então lê-lo
- * aqui mostrava cinquenta e nove caminhões faturados como não faturados até o
- * sexagésimo sair. O faturamento responde primeiro; o campo do orçamento é a
- * compatibilidade com o registro antigo, que não tem marca em faturamento nenhum.
- */
-export const taskBillingApprovedAt = (task: Task): Date | string | null => {
-  const stamped = taskBillingConfigs(task)
-    .map((c) => billingApprovedAtOf(c as any))
-    .find(Boolean);
-  // Nenhuma fatia desta linha aprovada: cai no campo do ORÇAMENTO, que é a marca
-  // do registro ANTIGO (gravado antes de as fatias terem a sua própria) e vale
-  // para todos os veículos dele.
-  return stamped ?? task.quote?.billingApprovedAt ?? null;
-};
-
-/**
- * O ESTADO DA COBRANÇA DESTA LINHA.
- *
- * Mesma regra de `taskBillingApprovedAt`: a linha é UM VEÍCULO, e o estado é o da cobrança que o
- * cobre — não o do orçamento, que descreve o contrato e é UM SÓ para as N cobranças. Num orçamento
- * cobrado veículo a veículo o caminhão 12 pode estar liquidado e o 13 vencido.
- *
- * `null` quer dizer "a consulta não trouxe o estado" (o include automático do servidor traz id,
- * `approvedAt` e cobertura, não `status`), nunca "não há cobrança".
- */
-export const taskBillingStatus = (task: Task): BILLING_STATUS | null => {
-  const configs = taskBillingConfigs(task);
-  // Entre as fatias desta linha, vence a de MENOR `statusOrder` — a que pede ação mais cedo
-  // (vencido antes de pendente, pendente antes de aprovado). Duas fatias na mesma linha só
-  // acontecem quando há dois pagadores do mesmo recorte, e nesse caso as duas são do MESMO
-  // `Billing`, então o desempate é estabilidade e não escolha.
-  let best: { order: number; status: BILLING_STATUS } | null = null;
+function sumConfigMoney(
+  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+  key: "total" | "subtotal",
+): number | null {
+  if (!configs || configs.length === 0) return null;
+  let sum = 0;
+  let sawNumber = false;
   for (const config of configs) {
-    const status = billingStatusOf(config as any);
-    if (!status) continue;
-    const order = billingStatusOrderOf(config as any) ?? Number.MAX_SAFE_INTEGER;
-    if (!best || order < best.order) best = { order, status };
+    const n = Number(config?.[key]);
+    if (!Number.isFinite(n)) continue;
+    sawNumber = true;
+    sum += n;
   }
-  return best?.status ?? null;
-};
+  return sawNumber ? round2(sum) : null;
+}
+
+/**
+ * QUANTOS VEÍCULOS ESTA COBRANÇA COBRA.
+ *
+ * Cobertura vazia cai em "cobre o orçamento inteiro", e é deliberado que caia aí
+ * e não em um: uma lista vazia significa "a consulta não pediu a relação" ou "a
+ * fatia acabou de nascer", nunca "esta cobrança é de um veículo" — responder um
+ * faria uma cobrança de sessenta caminhões ser lida como de um. É a mesma regra
+ * de `computeQuoteMoney.coveredTaskCount`.
+ */
+export function billingCoveredVehicles(billing: Billing): number {
+  const covered = coveredTaskCount(billing);
+  if (covered > 0) return covered;
+  return billing.quote ? quoteVehicleCount(billing.quote) : 1;
+}
+
+/**
+ * O VALOR DESTA COBRANÇA — `Σ customerConfigs[].total`.
+ *
+ * ⚠️ NÃO se recalcula. A conta já foi feita e GRAVADA: `computeQuoteMoney`
+ * produz `configTotal`, que é o mesmo número em `TaskQuoteCustomerConfig.total`,
+ * em `Invoice.totalAmount` e na soma das parcelas. Refazê-la na célula criaria
+ * uma segunda aritmética de dinheiro, que diverge da primeira no primeiro
+ * arredondamento e faz a tela e o boleto discordarem em centavos.
+ *
+ * SOMA os pagadores em vez de ler o primeiro: dois clientes dividindo os serviços
+ * do MESMO recorte são DOIS `customerConfigs` dentro de UMA cobrança, e o que a
+ * cobrança cobra é a soma dos dois.
+ *
+ * O recuo, e o que ele é: sem pagador carregado, `por veículo × veículos
+ * cobertos` — os dois presentes no payload da lista. Não é uma segunda fórmula,
+ * é exatamente a que gerou o número gravado.
+ */
+export function billingChargedTotal(billing: Billing): number | null {
+  const summed = sumConfigMoney(billing.customerConfigs, "total");
+  if (summed !== null) return summed > 0 ? summed : null;
+  const perVehicle = quotePerVehicleTotal(billing.quote);
+  if (perVehicle == null) return null;
+  const value = round2(perVehicle * billingCoveredVehicles(billing));
+  return value > 0 ? value : null;
+}
+
+/** O subtotal desta cobrança, pela mesma regra do total. */
+export function billingChargedSubtotal(billing: Billing): number | null {
+  const summed = sumConfigMoney(billing.customerConfigs, "subtotal");
+  if (summed !== null) return summed > 0 ? summed : null;
+  const grand = Number(billing.quote?.subtotal ?? 0);
+  if (!billing.quote || !Number.isFinite(grand) || grand === 0) return null;
+  const perVehicle = perVehicleAmount(grand, quoteVehicleCount(billing.quote));
+  const value = round2(perVehicle * billingCoveredVehicles(billing));
+  return value > 0 ? value : null;
+}
 
 /** Date cell used by every date column here — dash when absent, never wrapped. */
 export const renderDateCell = (date: Date | string | null | undefined) =>
@@ -151,23 +152,19 @@ export const renderDateCell = (date: Date | string | null | undefined) =>
 export const dateExportValue = (date: Date | string | null | undefined) => (date ? formatDate(date) : "");
 
 /**
- * How a truck is identified on the shop floor: the serial number when it has one, otherwise the
- * plate. Sorting falls back to `serialNumber` alone (see the SORT_FIELD_MAPs) because that is the
- * only scalar the API can order by.
- */
-export const taskIdentifier = (task: Task): string => task.serialNumber || task.truck?.plate || "";
-
-/**
- * Invoice-to customers of a task's quote, in config order, blanks dropped.
+ * Invoice-to customers de uma lista de PAGADORES, na ordem deles, brancos fora.
  *
- * Deduplicado e restrito às fatias DESTA linha: num orçamento `PER_TASK` de
- * sessenta caminhões há sessenta configurações do MESMO cliente, e a lista crua
- * fazia a célula anunciar "Marquespan / Marquespan +58" — um único tomador lido
- * como sessenta.
+ * ⚠️ Recebe os pagadores, não a linha. Enquanto a lista era de veículos, a
+ * função tinha de RECORTAR: num orçamento `PER_TASK` de sessenta caminhões há
+ * sessenta configurações do MESMO cliente, e a lista crua fazia a célula
+ * anunciar "Marquespan / Marquespan +58" — um tomador lido como sessenta. Com a
+ * linha sendo a COBRANÇA o recorte já veio pronto (`billing.customerConfigs` é,
+ * por definição, o recorte desta cobrança) e só a deduplicação sobrevive.
  */
-export function invoiceToCustomerNames(task: Task): string[] {
-  const configs = taskBillingConfigs(task);
-  if (configs.length === 0) return [];
+export function invoiceToCustomerNames(
+  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+): string[] {
+  if (!configs || configs.length === 0) return [];
   const names = configs
     .map((c) => c.customer?.corporateName || c.customer?.fantasyName || "")
     .filter(Boolean);
@@ -175,11 +172,11 @@ export function invoiceToCustomerNames(task: Task): string[] {
 }
 
 /**
- * A quote can be billed to several customers, so this cell shows the first two side by side plus
- * a `+N` overflow marker — the same shape both legacy tables used.
+ * Uma cobrança pode ser dividida entre clientes, então a célula mostra os dois
+ * primeiros lado a lado e um `+N` — o mesmo formato que as tabelas antigas usavam.
  */
-export function InvoiceToCustomersCell({ task }: { task: Task }) {
-  const names = invoiceToCustomerNames(task);
+export function InvoiceToCustomersCell({ configs }: { configs?: readonly TaskQuoteCustomerConfig[] | null }) {
+  const names = invoiceToCustomerNames(configs);
   if (names.length === 0) return <MutedDash />;
   if (names.length === 1) return <TruncatedTextWithTooltip text={names[0]} className="text-sm" />;
   return (
@@ -192,30 +189,6 @@ export function InvoiceToCustomersCell({ task }: { task: Task }) {
   );
 }
 
-/** The task's OWN customer (who the work is for) — distinct from the invoice-to customers. */
-export function taskCustomerName(task: Task): string {
-  return task.customer?.corporateName || task.customer?.fantasyName || "";
-}
-
-/**
- * Purchase-order numbers across the quote's customer configs. Multi-customer quotes can carry one
- * per customer, so this is a list — and an empty entry is dropped rather than shown as a gap
- * (the attention rule is what points at a MISSING one, on the field itself).
- */
-export function quoteOrderNumbers(task: Task): string[] {
-  // O pedido de compra é DESTE VEÍCULO. Morava na configuração de faturamento,
-  // por cliente, o que obrigava os N caminhões de um orçamento a citarem o mesmo
-  // número na nota e no boleto — e o pedido é por entrega.
-  const own = ((task as { customerOrderNumber?: string | null }).customerOrderNumber ?? "").trim();
-  return own ? [own] : [];
-}
-
-export function OrderNumbersCell({ task }: { task: Task }) {
-  const numbers = quoteOrderNumbers(task);
-  if (numbers.length === 0) return <MutedDash />;
-  return <TruncatedTextWithTooltip text={numbers.join(", ")} className="text-sm tabular-nums" />;
-}
-
 /**
  * How this quote gets paid, worded exactly as the wizard's "Condição de Pagamento" picker words it
  * ("À Vista - Boleto", "Parcelado 3x") — the list has to say the same thing as the form, or the two
@@ -225,9 +198,11 @@ export function OrderNumbersCell({ task }: { task: Task }) {
  * the same `legacyToConfig` the wizard uses so an old record reads the same as a new one. Distinct
  * conditions across a multi-customer quote are listed, deduped.
  */
-export function paymentMethodLabels(task: Task): string[] {
+export function paymentMethodLabels(
+  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+): string[] {
   const seen = new Set<string>();
-  for (const config of taskBillingConfigs(task)) {
+  for (const config of configs ?? []) {
     const cfg = (config as { paymentConfig?: PaymentConfig | null }).paymentConfig ?? legacyToConfig((config as { paymentCondition?: string | null }).paymentCondition);
     const label = PAYMENT_TYPE_OPTIONS.find((o) => o.value === configToTypeValue(cfg))?.label;
     if (label) {
@@ -251,22 +226,27 @@ export function paymentMethodLabels(task: Task): string[] {
   return [...seen];
 }
 
-export function PaymentMethodCell({ task }: { task: Task }) {
-  const labels = paymentMethodLabels(task);
+export function PaymentMethodCell({ configs }: { configs?: readonly TaskQuoteCustomerConfig[] | null }) {
+  const labels = paymentMethodLabels(configs);
   if (labels.length === 0) return <MutedDash />;
   return <TruncatedTextWithTooltip text={labels.join(", ")} className="text-sm" />;
 }
 
 /**
- * Paid / total installments across every customer config — the collections progress at a glance.
+ * Parcelas pagas / total, somando TODOS os pagadores recebidos — o andamento da
+ * cobrança num relance.
  *
- * Das fatias DESTA linha: com `PER_TASK` cada veículo tem o seu plano de
- * parcelas, e somar os sessenta faria a linha do caminhão 12 anunciar "3/180".
+ * ⚠️ Recebe os pagadores, não a linha, pelo mesmo motivo de
+ * `invoiceToCustomerNames`: enquanto a linha era um veículo, somar os sessenta
+ * planos de um `PER_TASK` fazia a linha do caminhão 12 anunciar "3/180". A
+ * cobrança já é o recorte, então a soma dela é exata.
  */
-export function installmentProgress(task: Task): { paid: number; total: number } {
+export function installmentProgress(
+  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+): { paid: number; total: number } {
   let paid = 0;
   let total = 0;
-  for (const config of taskBillingConfigs(task)) {
+  for (const config of configs ?? []) {
     for (const installment of config.installments ?? []) {
       total += 1;
       if (installment.status === "PAID") paid += 1;
@@ -456,10 +436,15 @@ export function orderNumberPresenceWhere(value: unknown): Record<string, unknown
   const lacks = value === false || value === "false";
   if (!has && !lacks) return undefined;
   // O NÚMERO DO PEDIDO É DA TAREFA (`Task.customerOrderNumber`) desde que um
-  // orçamento passou a cobrir N caminhões — o pedido é por ENTREGA. Estas duas
-  // listas listam TAREFAS, então o filtro é do próprio registro da linha, e não
-  // mais um `some` sobre as configurações de faturamento do orçamento (a coluna
-  // antiga foi removida: mandá-la agora derruba a consulta inteira).
+  // orçamento passou a cobrir N caminhões — o pedido é por ENTREGA. As condições
+  // aqui são sobre o registro da TAREFA, e não mais um `some` sobre as
+  // configurações de faturamento do orçamento (a coluna antiga foi removida:
+  // mandá-la agora derruba a consulta inteira).
+  //
+  // ⚠️ Quem chama pendura isto onde as tarefas estiverem: a lista de Orçamentos
+  // em `tasks: { some: … }` do contrato. O Faturamento NÃO usa mais esta função —
+  // `GET /billings` não aceita `where`, e o `hasOrderNumber` de lá é um parâmetro
+  // plano que o servidor traduz sobre a cobertura da cobrança.
   return has
     ? // AND de dois `not` em vez de `NOT: [a, b]`, que o Prisma lê como NOT(a AND b).
       { AND: [{ customerOrderNumber: { not: null } }, { customerOrderNumber: { not: "" } }] }

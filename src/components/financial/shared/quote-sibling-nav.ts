@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 
 import { useTasks, useTaskQuotes } from "@/hooks";
+import { useBillings } from "@/hooks/financial/use-billing";
+import type { BillingListParams } from "@/api-client/billing";
 import { primaryTask } from "@/utils/quote-tasks";
 
 /**
@@ -27,7 +29,15 @@ import { primaryTask } from "@/utils/quote-tasks";
  * page through there, and inventing one would page the user somewhere they never were.
  */
 
-/** Ordered ids come back from one request, so the pager spans at most this many records. */
+/**
+ * Ordered ids come back from one request, so the pager spans at most this many records.
+ *
+ * ⚠️ TEM DE CABER NO TETO DA ROTA. `/tasks` e `/task-quotes` aceitam mil, e
+ * `GET /billings` passou a aceitar mil pelo MESMO motivo: o teto anterior, de
+ * duzentos, recortava a resposta sem dizer nada — nem no `meta`, nem num erro — e
+ * o pager então afirmava "12 / 200" numa lista de 325. Subir um sem o outro é
+ * reintroduzir esse recorte mudo.
+ */
 const SIBLING_LIMIT = 1000;
 
 export interface QuoteSiblingState {
@@ -189,4 +199,62 @@ export function useBudgetSiblingIds(
     }
     return { ids: widened, complete: true };
   }, [hasFastPath, placeholderIds, data, currentTaskId]);
+}
+
+/**
+ * O pager da lista de FATURAMENTO, que agora tem UMA LINHA POR COBRANÇA.
+ *
+ * ✅ O QUE ISTO CONSERTA: o pager contava TAREFAS (`useQuoteSiblingIds` chama
+ * `useTasks`, e o `currentId` era `openTaskId`). O detalhe de um faturamento
+ * `JOINT` de quatro caminhões anunciava "1 / 4" — quatro tarefas na lista, UMA
+ * cobrança na tela —, e apertar "próximo" quatro vezes mostrava quatro vezes a
+ * MESMA cobrança. Percorrendo cobranças, um `JOINT` de quatro lê a posição real
+ * dele na lista ("87 / 325"), e um `PER_TASK` de quatro lê "1 / 4" — e aí está
+ * certo, porque ali são quatro cobranças.
+ *
+ * ⚠️ `currentId` TEM de ser o billingId resolvido, nunca `openTaskId`: a rota
+ * canônica é `/financeiro/faturamento/detalhes/:billingId`, e um id de tarefa
+ * simplesmente não estaria na lista — `useRecordNavigation` reporta `total: 0`
+ * para um id que não acha, e o pager sumiria de sob o cursor.
+ *
+ * ⚠️ Função NOVA em vez de um parâmetro em `useQuoteSiblingIds`: aquela continua
+ * de pé para quem lista TAREFAS, e o fetcher está cravado dentro dela. Trocar a
+ * assinatura comum é o caminho mais curto para mandar params de `/billings` para
+ * `/tasks` — 400 na cara, ou, pior, filtro mudo.
+ */
+export function useBillingSiblingIds(
+  fallbackQuery: Record<string, unknown>,
+  currentBillingId: string,
+  state: QuoteSiblingState,
+): { ids: string[] | undefined; complete: boolean } {
+  const placeholderIds = state.ids && state.ids.length > 0 ? state.ids : undefined;
+  const hasFastPath = !!state.idsComplete && !!placeholderIds;
+
+  const params = useMemo(
+    () => ({ ...(state.listQuery ?? fallbackQuery), page: 1, limit: SIBLING_LIMIT }) as unknown as BillingListParams,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(state.listQuery ?? fallbackQuery)],
+  );
+
+  const { data } = useBillings(params, {
+    enabled: !hasFastPath && !!currentBillingId,
+    // Sem isto o hook é staleTime 0 e cada salto refaria a busca de mil linhas.
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  return useMemo(() => {
+    if (hasFastPath) return { ids: placeholderIds, complete: true };
+    const list = data?.data as Array<{ id: string }> | undefined;
+    if (!list) return { ids: placeholderIds, complete: false };
+    const widened = list.map((b) => b.id);
+    // A lista alargada só é uma melhora se ela CONTIVER este registro. Pode não
+    // conter: além de mil linhas, ou quando a cobrança não cabe na consulta
+    // canônica (um orçamento PENDING, que o filtro `quoteStatuses` exclui de
+    // propósito). Nesse caso o recorte da página é melhor do que nada.
+    if (currentBillingId && !widened.includes(currentBillingId)) {
+      return placeholderIds ? { ids: placeholderIds, complete: false } : { ids: undefined, complete: false };
+    }
+    return { ids: widened, complete: true };
+  }, [hasFastPath, placeholderIds, data, currentBillingId]);
 }

@@ -1,6 +1,6 @@
 import { TASK_STATUS } from "@/constants";
 import type { Task } from "@/types";
-import type { TaskQuote } from "@/types/task-quote";
+import type { Billing, TaskQuote, TaskQuoteCustomerConfig } from "@/types/task-quote";
 
 /**
  * The shape the attention engine evaluates TASK_QUOTE rules against.
@@ -133,6 +133,95 @@ export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<TaskQuo
     });
   }
   return entities;
+}
+
+/**
+ * Os orçamentos de uma lista cuja LINHA É UMA COBRANÇA (`Billing`).
+ *
+ * ⚠️ A ENTIDADE CONTINUA SENDO `TASK_QUOTE`, e isso está certo: as duas regras
+ * que acendem nesta tela — o pedido de compra em falta e o cadastro do cliente
+ * incompleto — são sobre o CONTRATO e sobre o CLIENTE, não sobre a fatia. O
+ * descritor de `TASK_QUOTE` já aponta para Orçamento e Faturamento, e o ack do
+ * detalhe é pelo `quote.id`. Um entityType `BILLING` exigiria descritor, regras e
+ * ack próprios, e não é o que estas regras perguntam.
+ *
+ * ⚠️ O `Map` de dedupe CONTINUA OBRIGATÓRIO, por um motivo diferente do antigo:
+ * não são mais N linhas de veículo, são as N COBRANÇAS de um `PER_TASK`, que
+ * dividem o mesmo `quote.id`. Registrar o mesmo id N vezes faz a última vencer, e
+ * o alerta passaria a depender de qual cobrança o laço visitou por último.
+ *
+ * ⚠️ CONSEQUÊNCIA VISÍVEL, e ela é honesta: num `PER_TASK`, as N linhas do mesmo
+ * orçamento piscam JUNTAS. O cadastro incompleto do cliente trava as N, e é isso
+ * que o anel está dizendo.
+ *
+ * ✅ `anyVehicleMissingOrderNumber` FICA CORRETO — lido de `billing.quote.tasks`,
+ * que traz os N veículos do contrato. Pelo caminho antigo a resposta saía das
+ * LINHAS CARREGADAS, que numa lista paginada são um subconjunto dos sessenta: um
+ * branco fora da página não acendia, e a contagem do menu (feita no servidor, que
+ * vê todos) discordava da tela.
+ */
+export function toAttentionQuoteEntitiesFromBillings(billings: ReadonlyArray<Billing>): AttentionQuoteEntity[] {
+  const byQuoteId = new Map<string, AttentionQuoteEntity>();
+  for (const billing of billings) {
+    const quote = billing.quote;
+    // `setEntities` descarta o que não tem id, então um orçamento buscado sem
+    // `id: true` no select não registraria nada — em silêncio.
+    if (!quote?.id) continue;
+
+    // 🔴 OS PAGADORES VÊM DA COBRANÇA, E A COBRANÇA VOLTA PARA DENTRO DELES.
+    //
+    // As duas regras avaliam `customerConfigs`, e uma delas lê `billing.id` e
+    // `billing.approvedAt` DENTRO de cada pagador (é assim que ela pergunta "esta
+    // fatia já foi faturada?"). No payload da lista de cobranças a relação é ao
+    // contrário — o pagador pende da cobrança —, e sem este enxerto a regra leria
+    // "nenhum pagador tem cobrança", que é o primeiro ramo da janela dela: o anel
+    // acenderia também nas linhas JÁ FATURADAS, exatamente as que ele não deve
+    // perseguir. O motor avalia o registro LOCAL e ignora a resposta do servidor
+    // para ele (engine.ts passo 1b), então o que falta aqui não é completado por
+    // ninguém.
+    const configs = (billing.customerConfigs ?? []).map((config) => ({
+      ...config,
+      billing: { id: billing.id, approvedAt: billing.approvedAt ?? null },
+    })) as TaskQuoteCustomerConfig[];
+
+    // O desempate espelha o `tasks: { some: { status: COMPLETED } }` da regra no
+    // servidor: entre os veículos, vence um que já esteja COMPLETED. A regra
+    // pergunta "algum veículo já ficou pronto?" — num orçamento de sessenta
+    // caminhões o dinheiro já está parado quando o primeiro sai — e o avaliador
+    // do cliente lê `task.status`, um campo só.
+    //
+    // ⚠️ O status vem da COBERTURA DA COBRANÇA, que é a única parte do payload que
+    // o traz (`quote.tasks` da lista seleciona só id e pedido de compra). Como
+    // cada cobrança de um `PER_TASK` cobre UM veículo, a varredura tem de
+    // atravessar as N cobranças do orçamento — daí o acúmulo abaixo, e não um
+    // "a primeira vence".
+    const covered = (billing.tasks ?? []).map((t) => t.task).filter(Boolean) as Array<{ id: string; status: string }>;
+    const anchor = covered.find((t) => t.status === TASK_STATUS.COMPLETED) ?? covered[0] ?? null;
+
+    const existing = byQuoteId.get(quote.id);
+    if (existing) {
+      // As N cobranças de um `PER_TASK` são N pagadores do MESMO orçamento, e a
+      // pergunta da regra (`some`) é sobre todos eles.
+      existing.customerConfigs = [...(existing.customerConfigs ?? []), ...configs];
+      // Uma vez satisfeito o `some` do veículo concluído, nenhuma cobrança
+      // seguinte pode desfazê-lo.
+      if (existing.task.status !== TASK_STATUS.COMPLETED && anchor) {
+        if (anchor.status === TASK_STATUS.COMPLETED || !existing.task.id) {
+          existing.task = { id: anchor.id, status: anchor.status };
+        }
+      }
+      continue;
+    }
+
+    const vehicles = (quote.tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+    byQuoteId.set(quote.id, {
+      ...(quote as TaskQuote),
+      customerConfigs: configs,
+      task: anchor ? { id: anchor.id, status: anchor.status } : { id: "", status: "" },
+      anyVehicleMissingOrderNumber: vehicles.some(missingOrderNumber),
+    });
+  }
+  return [...byQuoteId.values()];
 }
 
 /** Same shape for a single task on a detail page. */

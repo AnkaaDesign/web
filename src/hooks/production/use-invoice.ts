@@ -5,6 +5,7 @@ import { nfseService } from '@/api-client/nfse';
 import { taskQuoteKeys } from '@/hooks/production/use-task-quote';
 import { dashboardQueryKeys } from '@/hooks/common/use-dashboard';
 import { taskKeys } from '@/hooks';
+import { billingKeys } from '@/hooks/financial/use-billing';
 
 export const invoiceKeys = {
   all: ['invoices'] as const,
@@ -19,12 +20,23 @@ export const invoiceKeys = {
 };
 
 /**
- * Invalidate all billing-related caches (invoices, quotes, tasks, dashboard)
+ * Invalidate all billing-related caches (invoices, quotes, tasks, dashboard).
+ *
+ * 🔴 `billingKeys.all` É OBRIGATÓRIA AQUI, e faltava.
+ *
+ * A lista de Faturamento passou a ser uma lista de COBRANÇAS: ela lê
+ * `["billings","list",params]`, e `billingKeys.all = ["billings"]` é o prefixo
+ * que a alcança. Enquanto a lista era de tarefas, `taskKeys.all` a cobria por
+ * acidente — as treze chamadas desta função (conciliar boleto, marcar parcela
+ * paga, cancelar NFS-e, e o botão "Conciliar Boletos" DA PRÓPRIA tela) pareciam
+ * atualizar a tela. Sem esta linha, o boleto concilia, o servidor grava, e a
+ * lista continua mostrando o estado anterior até alguém recarregar a página.
  */
 function invalidateAllBillingCaches(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
   queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
   queryClient.invalidateQueries({ queryKey: taskKeys.all });
+  queryClient.invalidateQueries({ queryKey: billingKeys.all });
   queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all });
 }
 

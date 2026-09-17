@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { billingService } from "@/api-client/billing";
+import { billingService, type BillingListParams, type BillingListResponse } from "@/api-client/billing";
 
 export const billingKeys = {
   all: ["billings"] as const,
@@ -51,18 +51,27 @@ export function useBillingsByQuote(quoteId: string | undefined, options?: { enab
  * Uma pergunta que a lista de faturamento não sabia fazer: as linhas eram
  * TAREFAS, e um orçamento de sessenta caminhões cobrado junto aparecia sessenta
  * vezes, cada linha repetindo o mesmo contrato. Aqui cada linha é uma COBRANÇA.
+ *
+ * ⚠️ AS OPÇÕES DE REACT-QUERY VÃO NO SEGUNDO ARGUMENTO, e é uma separação que
+ * este hook precisa ter. `useTasks` aceita `staleTime`/`refetchOnWindowFocus`
+ * misturados aos params porque sabe peneirá-los antes de montar a query string;
+ * aqui `params` vai INTEIRO para o axios, então um `refetchOnWindowFocus:
+ * "always"` deixado ali viraria `?refetchOnWindowFocus=always` na URL da API —
+ * parâmetro que o servidor ignora, e que muda a `queryKey` a cada render sem
+ * mudar a resposta.
  */
-export function useBillings(params?: {
-  page?: number;
-  limit?: number;
-  quoteId?: string;
-  customerId?: string;
-  approved?: boolean;
-  deliveredOnly?: boolean;
-}) {
-  return useQuery({
+export function useBillings(
+  params?: BillingListParams,
+  options?: { enabled?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean | "always" },
+) {
+  return useQuery<BillingListResponse>({
     queryKey: billingKeys.list(params ?? {}),
     queryFn: () => billingService.list(params),
+    enabled: options?.enabled !== false,
+    ...(options?.staleTime !== undefined ? { staleTime: options.staleTime } : {}),
+    ...(options?.refetchOnWindowFocus !== undefined
+      ? { refetchOnWindowFocus: options.refetchOnWindowFocus }
+      : {}),
   });
 }
 

@@ -4,8 +4,8 @@ import { IconAlertTriangle, IconExternalLink, IconFileInvoice, IconRefresh } fro
 
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableFilterValues, DataTableRowAction, DataTableRowClickMeta } from "@/components/ui/datatable";
-import { useTasks } from "@/hooks";
-import { getTasks } from "@/api-client";
+import { useBillings } from "@/hooks/financial/use-billing";
+import { billingService, type BillingListParams } from "@/api-client/billing";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useUserPrivileges } from "@/hooks/common/use-auth";
 import { useReconcileBoletos } from "@/hooks/production/use-invoice";
@@ -13,19 +13,34 @@ import { useToast } from "@/hooks/common/use-toast";
 import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "@/constants";
-import type { Task } from "@/types";
+import type { Billing } from "@/types/task-quote";
 import { customerIdsFromFilter, initialTableParams, useSelectedCustomers } from "@/components/financial/shared/quote-table-shared";
 import { buildQuoteSiblingState } from "@/components/financial/shared/quote-sibling-nav";
-import { toAttentionQuoteEntities } from "@/components/financial/shared/quote-attention";
+import { toAttentionQuoteEntitiesFromBillings } from "@/components/financial/shared/quote-attention";
 import { BILLING_DEFAULT_SORTING, buildBillingOrderBy, createBillingColumns } from "./billing-table-columns";
-import { BILLING_DEFAULT_PAGE_SIZE, BILLING_LIST_INCLUDE, buildBillingQuery, createBillingFilterDefs } from "./billing-table-filters";
-
-const getRowId = (t: Task) => t.id;
+import { BILLING_DEFAULT_PAGE_SIZE, buildBillingQuery, createBillingFilterDefs } from "./billing-table-filters";
 
 /**
- * The export pages through the full filtered set rather than asking for it in one shot. The tasks
- * endpoint caps `limit` at 1000; 200 keeps each response small enough to stay responsive while
- * still finishing a few-hundred-row export in two or three round trips.
+ * A LINHA É UMA COBRANÇA.
+ *
+ * Era uma TAREFA (`useTasks` + `getRowId = t.id`), e um orçamento `JOINT` de
+ * quatro caminhões virava quatro linhas com o mesmo número 984: o rodapé dizia
+ * "4 resultado(s)", o pager do detalhe dizia "1 / 4" e o dono leu quatro
+ * faturamentos porque a tela desenhou quatro. Há UMA cobrança ali — uma fatura,
+ * um plano de parcelas, uma NFS-e. Num `PER_TASK` de quatro, as quatro linhas
+ * continuam, e aí estão certas.
+ *
+ * Trocar a unidade da consulta para `GET /billings` conserta de lambuja o rodapé,
+ * a seleção múltipla (marcar "tudo" deixou de marcar quatro coisas que são uma) e
+ * o "Abrir em nova guia", cujo id passa a ser a URL canônica da cobrança.
+ */
+// Module-level so the identity never churns (a fresh literal would rebuild the row model).
+const getRowId = (b: Billing) => b.id;
+
+/**
+ * The export pages through the full filtered set rather than asking for it in one shot. The
+ * billings endpoint caps `limit` at 1000; 200 keeps each response small enough to stay responsive
+ * while still finishing a few-hundred-row export in two or three round trips.
  */
 const EXPORT_PAGE_SIZE = 200;
 
@@ -90,39 +105,48 @@ export function BillingTablePage() {
     [params, sorting],
   );
 
-  const query = useMemo(
-    () => ({
-      ...listQuery,
-      page,
-      limit: pageSize,
-      include: BILLING_LIST_INCLUDE,
-      // Boletos get paid and quotes get approved while this list is open in another tab.
-      refetchOnWindowFocus: "always" as const,
-    }),
+  // ⚠️ SEM `include`: o grafo desta lista é do SERVIDOR (`BillingService.LIST_INCLUDE`).
+  // A rota antiga aceitava um include montado aqui, e era preciso — a cobrança
+  // ficava a três relações da tarefa. Mandá-lo agora não dá erro: é ignorado.
+  const query = useMemo<BillingListParams>(
+    () => ({ ...listQuery, page, limit: pageSize }),
     [listQuery, page, pageSize],
   );
 
-  const { data: response, isLoading, error } = useTasks(query as never);
-  const tasks = useMemo(() => ((response as { data?: Task[] } | undefined)?.data ?? []) as Task[], [response]);
-  const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
+  const {
+    data: response,
+    isLoading,
+    error,
+  } = useBillings(query, {
+    // Boletos get paid and quotes get approved while this list is open in another tab.
+    // ⚠️ No SEGUNDO argumento: `useBillings` manda o primeiro inteiro para a query
+    // string, então isto aqui dentro viraria `?refetchOnWindowFocus=always`.
+    refetchOnWindowFocus: "always",
+  });
+  const billings = useMemo(() => (response?.data ?? []) as Billing[], [response]);
+  const totalRecords = response?.meta?.totalRecords ?? 0;
 
-  // Attention: the rows are TASKS but the signal belongs to the TASK QUOTE — that is the entity
-  // whose nav home is Faturamento/Orçamento and whose id the detail page acks. Registering the
-  // quotes locally (rather than relying on the server summary) is what makes the ring clear the
-  // instant someone fills the missing field, instead of on the next 60s poll.
-  const quoteEntities = useMemo(() => toAttentionQuoteEntities(tasks), [tasks]);
+  // Attention: a linha é uma COBRANÇA, mas o sinal continua sendo do ORÇAMENTO —
+  // é a entidade cuja casa na navegação é Faturamento/Orçamento e cujo id o
+  // detalhe confirma, e as duas regras que acendem aqui (pedido de compra em
+  // falta, cadastro do cliente incompleto) são do contrato e do cliente, não da
+  // fatia. Registrar localmente (em vez de depender do resumo do servidor) é o que
+  // faz o anel apagar no instante em que alguém preenche o campo, e não no
+  // próximo ciclo de 60s.
+  //
+  // ⚠️ Consequência aceita: num `PER_TASK`, as N linhas do mesmo orçamento piscam
+  // juntas — o cadastro incompleto trava as N, e é isso que o anel diz.
+  const quoteEntities = useMemo(() => toAttentionQuoteEntitiesFromBillings(billings), [billings]);
   useRegisterAttentionEntities("TASK_QUOTE", quoteEntities);
   // The row class is computed imperatively per row, so the page must re-render on any flip.
   useAttentionVersion();
   usePresenceVersion();
 
-  const fetchAllForExport = useCallback(async (): Promise<Task[]> => {
-    const all: Task[] = [];
+  const fetchAllForExport = useCallback(async (): Promise<Billing[]> => {
+    const all: Billing[] = [];
     for (let p = 1; ; p++) {
-      const res = (await getTasks({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE, include: BILLING_LIST_INCLUDE } as never)) as
-        | { data?: Task[]; meta?: { hasNextPage?: boolean } }
-        | undefined;
-      const rows = (res?.data ?? []) as Task[];
+      const res = await billingService.list({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE });
+      const rows = (res?.data ?? []) as Billing[];
       all.push(...rows);
       if (res?.meta?.hasNextPage === false || rows.length < EXPORT_PAGE_SIZE) break;
       // Defensive backstop against an unbounded loop if `meta` ever goes missing.
@@ -141,21 +165,29 @@ export function BillingTablePage() {
   const columns = useMemo(() => createBillingColumns(), []);
   const filterDefs = useMemo(() => createBillingFilterDefs({ invoiceCustomers, taskCustomers }), [invoiceCustomers, taskCustomers]);
 
+  // ⚠️ NAVEGA COM `billing.id`, que é a URL CANÔNICA da cobrança. A página de
+  // detalhe já resolve os dois ids (`GET /billings/:id` primeiro, `by-task` como
+  // ponte) e reescreve o endereço quando chega por tarefa — então nada muda lá.
   const onRowClick = useCallback(
-    (task: Task, meta: DataTableRowClickMeta) => {
-      navigate(routes.financial.billing.details(task.id), {
-        state: buildQuoteSiblingState({ returnTo, orderedIds: meta.orderedIds, totalRecords, listQuery }),
+    (billing: Billing, meta: DataTableRowClickMeta) => {
+      navigate(routes.financial.billing.details(billing.id), {
+        state: buildQuoteSiblingState({
+          returnTo,
+          orderedIds: meta.orderedIds,
+          totalRecords,
+          listQuery: listQuery as Record<string, unknown>,
+        }),
       });
     },
     [navigate, returnTo, totalRecords, listQuery],
   );
 
   const getRowClassName = useCallback(
-    (task: Task) => cn(attentionRowClassFor("TASK_QUOTE", task.quote?.id), presenceRowClassFor("TASK_QUOTE", task.quote?.id)),
+    (billing: Billing) => cn(attentionRowClassFor("TASK_QUOTE", billing.quoteId), presenceRowClassFor("TASK_QUOTE", billing.quoteId)),
     [],
   );
 
-  const rowActions = useMemo<DataTableRowAction<Task>[]>(
+  const rowActions = useMemo<DataTableRowAction<Billing>[]>(
     () => [
       {
         key: "open-new-tab",
@@ -178,7 +210,7 @@ export function BillingTablePage() {
       ) : null}
 
       <div className="min-h-0 flex-1">
-        <DataTablePage<Task>
+        <DataTablePage<Billing>
           title="Faturamento"
           icon={IconFileInvoice}
           favoritePage={FAVORITE_PAGES.FINANCEIRO_FATURAMENTO}
@@ -203,7 +235,7 @@ export function BillingTablePage() {
           }
           table={{
             tableId: "financial-billing-list",
-            data: tasks,
+            data: billings,
             columns,
             filterDefs,
             rowActions,
@@ -221,8 +253,13 @@ export function BillingTablePage() {
             // and the legacy table showed the same columns to all of them. Per-column
             // `defaultVisible` is what decides the starting view.
             estimateRowHeight: 44,
-            searchPlaceholder: "Buscar por nome, número de série, placa, cliente...",
-            emptyMessage: "Nenhuma tarefa encontrada. Ajuste os filtros.",
+            // "nº do orçamento" é NOVO, e não é só texto: buscar "984" nesta lista
+            // não achava o orçamento 984 (`budgetNumber` não estava no
+            // `searchingFor` de tarefa). Com a linha sendo a cobrança, o contrato
+            // entra na busca naturalmente — é o número que o financeiro fala ao
+            // telefone.
+            searchPlaceholder: "Buscar por nº do orçamento, nome, número de série, placa, cliente...",
+            emptyMessage: "Nenhum faturamento encontrado. Ajuste os filtros.",
             exportTitle: "Faturamento",
             exportFilename: "faturamento",
           }}

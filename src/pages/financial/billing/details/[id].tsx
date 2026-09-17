@@ -67,7 +67,7 @@ import { useNextNfseNumber } from "@/hooks/financial/use-nfse";
 // Imported from the filters module rather than the table barrel so the detail route does not pull
 // the whole list page into its bundle.
 import { BILLING_FALLBACK_LIST_QUERY } from "@/components/financial/billing/table/billing-table-filters";
-import { readQuoteSiblingState, useQuoteSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
+import { readQuoteSiblingState, useBillingSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toAttentionQuoteEntity } from "@/components/financial/shared/quote-attention";
@@ -634,10 +634,23 @@ const BillingDetailPageInner = ({
   // Ordered sibling ids + the prev/next widget. Declared up here (before the loading/not-found
   // early returns) because these are hooks; the widget itself is rendered in `headerExtra` further
   // down, left of "Ver Dossiê" and clear of the wizard's own step buttons.
-  const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BILLING_FALLBACK_LIST_QUERY, id ?? "", siblingState);
+  //
+  // ⚠️ O PAGER CONTA COBRANÇAS, não veículos. Contava tarefas (`useQuoteSiblingIds`
+  // sobre `useTasks`, com `currentId = openTaskId`), e por isso o detalhe de um
+  // faturamento `JOINT` de quatro caminhões anunciava "1 / 4": quatro tarefas na
+  // lista, UMA cobrança na tela — e "próximo" quatro vezes mostrava quatro vezes a
+  // mesma. `currentId` passa a ser o billingId RESOLVIDO (nunca `openTaskId`: um
+  // id de tarefa não está na lista de cobranças, e um id que o pager não acha faz
+  // o widget sumir de sob o cursor). Um `PER_TASK` de quatro continua lendo
+  // "1 / 4" — ali são quatro cobranças de verdade.
+  const { ids: siblingIds, complete: siblingIdsComplete } = useBillingSiblingIds(
+    BILLING_FALLBACK_LIST_QUERY,
+    resolvedBillingId ?? "",
+    siblingState,
+  );
   const recordNav = useRecordNavigation({
     ids: siblingIds,
-    currentId: id ?? "",
+    currentId: resolvedBillingId ?? "",
     toRoute: (rid) => routes.financial.billing.details(rid),
     // Carried forward on every hop so the pager, the "voltar" target and the reconstructed list
     // all survive paging.
@@ -645,7 +658,7 @@ const BillingDetailPageInner = ({
     // No ←/→ here: this is a form, and the hook's guard only skips a FOCUSED input, so an arrow
     // key pressed with focus on the page body would page away mid-edit.
     keyboard: false,
-    enabled: !!id,
+    enabled: !!resolvedBillingId,
     // Same reason as the Orçamento page: the guard's pushState patch would catch a bare navigate,
     // but it replays only the URL and would drop the id list the pager runs on.
     onNavigate: guardedNavigate,
