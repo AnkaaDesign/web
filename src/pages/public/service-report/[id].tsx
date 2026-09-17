@@ -5,7 +5,10 @@ import { taskQuoteService } from "@/api-client/task-quote";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility";
-import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
+import { generatePaymentText, generateGuaranteeText,
+  formatBillingStreetLine,
+  formatBillingLocalityLine,
+} from "@/utils/quote-text-generators";
 import { projectInstallments } from "@/utils/installment-projection";
 import { dossierArchiveFilename, dossierPdfFilename } from "@/utils/document-filename";
 import { filenameFromDisposition, signatureService } from "@/api-client/signature";
@@ -394,6 +397,26 @@ export function PublicServiceReportPage() {
         // dossiê do nº 0915 chegou a dizer "via boleto" na frase e "Pagamento via
         // Pix" três linhas abaixo, porque os dois liam fontes diferentes.
         pix: receivingAccountFor(paymentMethod),
+        // O QUADRO DO TOMADOR — o cadastro que a prefeitura exige na NFS-e.
+        //
+        // É o que abre a seção "Faturamento" no PDF, e faltava inteiro aqui: a
+        // página pública ia direto para a frase das parcelas. O quadro existe
+        // para que o cliente CONFIRA razão social, CNPJ, inscrições e endereço
+        // antes de aprovar — um dado errado só aparece depois da nota autorizada,
+        // quando corrigir custa cancelar e substituir, com a prefeitura no meio.
+        // Tirá-lo da página pública era tirá-lo justamente de quem confere.
+        billing: (() => {
+          const c = (config?.customerData ?? config?.customer ?? {}) as any;
+          const doc = c.cnpj || c.cpf || null;
+          return {
+            corporateName: c.corporateName || c.fantasyName || null,
+            documentFormatted: doc ? (c.cnpj ? formatCNPJ(c.cnpj) : doc) : null,
+            stateRegistration: c.stateRegistration || null,
+            municipalRegistration: c.municipalRegistration || null,
+            addressLine: formatBillingStreetLine(c),
+            addressLocality: formatBillingLocalityLine(c),
+          };
+        })(),
       };
     })
     .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);
@@ -830,6 +853,30 @@ export function PublicServiceReportPage() {
               </div>
             ) : null}
 
+            {/* ⚠️ GARANTIAS VEM ANTES DO FATURAMENTO — a ordem é a do PDF.
+                Esta página é o MESMO documento noutro meio, e ela lia
+                Prazo → Pagamento → Garantias enquanto o PDF lia
+                Prazo → Garantias → Faturamento. Quem recebe o link e o anexo no
+                mesmo e-mail compara os dois, e uma ordem diferente faz parecer
+                que são documentos diferentes. */}
+            {/* Guarantee */}
+            {guaranteeText && (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                  Garantias
+                </h3>
+                <p
+                  className="text-gray-700"
+                  dangerouslySetInnerHTML={{
+                    __html: guaranteeText.replace(
+                      /(\d+)\s*(anos?)/gi,
+                      "<strong>$1 $2</strong>"
+                    ),
+                  }}
+                />
+              </div>
+            )}
+
             {/* Payment conditions — the same prose the budget page shows (custom
                 text → structured config → legacy condition), with the settlement
                 method woven in. One block per customer in Completo.
@@ -837,8 +884,11 @@ export function PublicServiceReportPage() {
                 com o PDF do dossiê — ver o comentário em `paymentBlocks`. */}
             {paymentBlocks.length > 0 && (
               <div className="mb-6">
+                {/* "Faturamento", como no PDF. A seção deixou de ser só a frase
+                    das parcelas quando ganhou o quadro do tomador — e o título
+                    "Condições de pagamento" descrevia metade dela. */}
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                  Condições de pagamento
+                  Faturamento
                 </h3>
                 <div className="space-y-3">
                   {paymentBlocks.map((block: {
@@ -848,12 +898,58 @@ export function PublicServiceReportPage() {
                     orderNumber: string | null;
                     installments: Array<{ number: number; dueDate: string | Date; amount: number; paid: boolean }>;
                     pix: { key: string; keyKind: string; holder: string } | null;
+                    billing: {
+                      corporateName: string | null;
+                      documentFormatted: string | null;
+                      stateRegistration: string | null;
+                      municipalRegistration: string | null;
+                      addressLine: string | null;
+                      addressLocality: string | null;
+                    };
                   }, i: number) => (
                     <div key={block.id || i}>
                       {block.customerName && (
                         <p className="text-sm font-semibold text-gray-800">{block.customerName}</p>
                       )}
-                      {block.paymentText && <p className="text-gray-700">{block.paymentText}</p>}
+
+                      {/* O quadro do tomador, na mesma ordem e com os mesmos
+                          rótulos do PDF — um filete o separa da cláusula, que é
+                          coisa de outra natureza: cadastro a conferir × acordo a
+                          cumprir. */}
+                      {(block.billing.corporateName || block.billing.documentFormatted) && (
+                        <dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                          {block.billing.corporateName && (
+                            <>
+                              <dt className="text-gray-500">Razão social</dt>
+                              <dd className="text-gray-800">{block.billing.corporateName}</dd>
+                            </>
+                          )}
+                          {block.billing.documentFormatted && (
+                            <>
+                              <dt className="text-gray-500">CNPJ / CPF</dt>
+                              <dd className="text-gray-800">{block.billing.documentFormatted}</dd>
+                            </>
+                          )}
+                          <dt className="text-gray-500">Inscrição estadual</dt>
+                          <dd className="text-gray-800">{block.billing.stateRegistration || "—"}</dd>
+                          <dt className="text-gray-500">Inscrição municipal</dt>
+                          <dd className="text-gray-800">{block.billing.municipalRegistration || "—"}</dd>
+                          {(block.billing.addressLine || block.billing.addressLocality) && (
+                            <>
+                              <dt className="text-gray-500">Endereço</dt>
+                              <dd className="text-gray-800">
+                                {[block.billing.addressLine, block.billing.addressLocality]
+                                  .filter(Boolean)
+                                  .join(" — ")}
+                              </dd>
+                            </>
+                          )}
+                        </dl>
+                      )}
+
+                      {block.paymentText && (
+                        <p className="border-t border-gray-200 pt-3 text-gray-700">{block.paymentText}</p>
+                      )}
                       {block.orderNumber && (
                         <p className="text-sm text-gray-600 mt-1">
                           <span className="font-semibold">N° do Pedido:</span> {block.orderNumber}
@@ -913,24 +1009,6 @@ export function PublicServiceReportPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Guarantee */}
-            {guaranteeText && (
-              <div className="mb-6">
-                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                  Garantias
-                </h3>
-                <p
-                  className="text-gray-700"
-                  dangerouslySetInnerHTML={{
-                    __html: guaranteeText.replace(
-                      /(\d+)\s*(anos?)/gi,
-                      "<strong>$1 $2</strong>"
-                    ),
-                  }}
-                />
               </div>
             )}
 
