@@ -18,6 +18,8 @@ import {
   type DeliverySettings,
 } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-context";
+import { SECTOR_PRIVILEGES } from "@/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -77,6 +79,20 @@ interface EnvelopeSigner {
    * lidos de uma API anterior a este recurso; o fallback deriva do `side`.
    */
   ceremony?: "OTP" | "INTERNAL";
+  /**
+   * O COLABORADOR designado para contra-assinar — só no signatário da Ankaa.
+   *
+   * É o campo que `countersign` confere no servidor (`ankaa.userId === actorUserId`),
+   * e é o que permite não desenhar o botão para quem levaria 403. Opcional porque
+   * uma API anterior à sua exposição não o manda; ver `canCountersign`.
+   */
+  userId?: string | null;
+  /**
+   * A MESMA pergunta, já respondida pelo servidor — "esta sessão pode
+   * contra-assinar?". Quando vier, tem precedência sobre `userId`: ela nasce do
+   * mesmo lugar que a recusa, então não há como as duas discordarem.
+   */
+  podeContraAssinar?: boolean;
   /** O recorte que este signatário recebeu. */
   documentId?: string | null;
   sections?: string[];
@@ -317,6 +333,8 @@ export function SignatureEnvelopeCard({
    */
   embedded?: boolean;
 }) {
+  // Quem está olhando — a contra-assinatura é dela ou não é (ver `canCountersign`).
+  const { user } = useAuth();
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -530,6 +548,33 @@ export function SignatureEnvelopeCard({
   /** Lacunas do veículo ainda vazias — a última chance de preenchê-las. */
   const pendingSlots = current?.pendingLateSlots ?? [];
 
+  /**
+   * ESTA SESSÃO É QUEM CONTRA-ASSINA?
+   *
+   * ⚠️ Não era perguntado, e o botão aparecia para todo mundo que podia gerir a
+   * coleta — quem não fosse o designado clicava e levava 403 com o nome de outra
+   * pessoa na mensagem. O servidor confere duas coisas (ver `countersign`):
+   * `ankaa.userId === actorUserId`, OU o setor do ator ser ADMIN. A decisão do
+   * dono (17/09) é que o administrador PODE contra-assinar sem trocar o
+   * responsável — o documento segue dizendo o nome congelado e a TRILHA registra
+   * quem executou.
+   *
+   * `podeContraAssinar` vem do servidor já respondido e tem precedência.
+   * `userId` é o recuo quando só ele foi exposto.
+   *
+   * ⚠️ FALHA ABERTA quando NENHUM dos dois vem: uma API anterior à exposição do
+   * campo não manda nem um nem outro, e esconder o botão ali seria trocar um erro
+   * visível (o 403, com o motivo escrito) por uma tela onde a contra-assinatura
+   * simplesmente não existe e ninguém sabe por quê. Com o campo presente, a
+   * pergunta é feita de verdade.
+   */
+  const souOAdmin = (user?.sector?.privileges ?? "") === SECTOR_PRIVILEGES.ADMIN;
+  const souOContraAssinante =
+    ankaaSigner?.podeContraAssinar ??
+    (ankaaSigner?.userId != null
+      ? ankaaSigner.userId === user?.id || souOAdmin
+      : true);
+
   const canCountersign =
     canManage &&
     !!current &&
@@ -537,6 +582,7 @@ export function SignatureEnvelopeCard({
     !!ankaaSigner &&
     ankaaSigner.status !== "SIGNED" &&
     ankaaSigner.ceremony === "INTERNAL" &&
+    souOContraAssinante &&
     customerPending === 0;
   const label = current ? ENVELOPE_LABEL[current.status] ?? { text: current.status, tone: "muted" as Tone } : null;
 

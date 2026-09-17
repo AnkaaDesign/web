@@ -225,21 +225,26 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   // `quote` is a to-one relation: every condition on it goes inside `is`, never as a sibling of it.
   const quoteWhere: Record<string, unknown> = {};
 
-  // AS CONDIÇÕES SOBRE A COBRANÇA — reunidas num `some` só.
+  // AS CONDIÇÕES SOBRE A COBRANÇA — todas sobre a COBRANÇA DESTA LINHA.
   //
-  // Um orçamento tem 1..N cobranças, e `some` significa "existe uma que satisfaz". Juntar as duas
-  // condições no MESMO `some` é a leitura certa: "Vencido" + "faturado em setembro" pergunta por
-  // uma cobrança que seja as duas coisas, e não por um orçamento que tenha uma vencida e outra
-  // (qualquer outra) faturada em setembro.
+  // ⚠️ Perguntavam ao ORÇAMENTO (`quote.is.billings.some`), e a coluna mostra a LINHA. Num
+  // orçamento de sessenta caminhões com UMA fatia vencida, `some` é verdadeiro para o orçamento
+  // inteiro: o filtro "Vencido" trazia os sessenta, cinquenta e nove deles exibindo outro selo.
+  // A lista é de VEÍCULOS, e o veículo tem UMA cobrança — `Task.billingEntry`, relação de-um
+  // (`BillingTask?`) com `@@unique([taskId])`. É o mesmo caminho que a coluna Status Faturamento
+  // ordena e que o filtro de Vencimento já usa, e `taskWhereSchema` o aceita desde 16/09.
   //
-  // ⚠️ O estado era `quote.status in [...]`. Além de perguntar à entidade errada, aquilo dava uma
-  // resposta só para as N cobranças do orçamento — a última cascata que rodasse.
-  const billingSome: Record<string, unknown> = {};
+  // Continuam reunidas numa condição só, pelo mesmo motivo de antes: "Vencido" + "faturado em
+  // setembro" pergunta por uma cobrança que seja as duas coisas.
+  //
+  // ⚠️ O estado era, antes disso, `quote.status in [...]`. Além de perguntar à entidade errada,
+  // aquilo dava uma resposta só para as N cobranças do orçamento — a última cascata que rodasse.
+  const billingWhere: Record<string, unknown> = {};
 
   const billingStatuses = Array.isArray(filters.billingStatuses)
     ? filters.billingStatuses.filter((s): s is string => typeof s === "string")
     : [];
-  if (billingStatuses.length > 0) billingSome.status = { in: billingStatuses };
+  if (billingStatuses.length > 0) billingWhere.status = { in: billingStatuses };
 
   const budgetNumber = toPositiveInt(filters.budgetNumber);
   if (budgetNumber != null) quoteWhere.budgetNumber = budgetNumber;
@@ -250,18 +255,22 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   const totalRange = toNumberRange(filters.totalRange);
   if (totalRange) quoteWhere.total = totalRange;
 
-  // "Faturado em" também é da COBRANÇA: `TaskQuote.billingApprovedAt` só é gravado quando a
-  // ÚLTIMA fatia fecha, então um orçamento de sessenta caminhões com cinquenta e nove faturados
-  // não entrava em faixa nenhuma. A coluna já lê `billing.approvedAt` (ver `taskBillingApprovedAt`);
-  // o filtro passa a perguntar o mesmo, senão a faixa e a data mostrada discordam.
+  // "Faturado em" também é da COBRANÇA DESTA LINHA: `TaskQuote.billingApprovedAt` só é gravado
+  // quando a ÚLTIMA fatia fecha, então um orçamento de sessenta caminhões com cinquenta e nove
+  // faturados não entrava em faixa nenhuma. A coluna lê `billing.approvedAt` da linha (ver
+  // `taskBillingApprovedAt`); o filtro pergunta o mesmo, senão a faixa e a data mostrada discordam.
   const billingApproved = toPrismaDateRange(filters.billingApprovedRange);
-  if (billingApproved) billingSome.approvedAt = billingApproved;
-
-  if (Object.keys(billingSome).length > 0) quoteWhere.billings = { some: billingSome };
+  if (billingApproved) billingWhere.approvedAt = billingApproved;
 
   // Extra AND branches rather than more keys on `quoteWhere`: each of these is its own `some` over
   // `customerConfigs`, and collapsing them would silently mean "one config satisfying ALL of them".
   const andBranches: Record<string, unknown>[] = [];
+
+  // Relação de-UM: `is`, nunca `some`. Vai num ramo do `AND` e não dentro de `quoteWhere` porque
+  // `billingEntry` é da TAREFA, não do orçamento — é irmão de `quote`, não filho.
+  if (Object.keys(billingWhere).length > 0) {
+    andBranches.push({ billingEntry: { is: { billing: billingWhere } } });
+  }
 
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
   // No nível da TAREFA: o número do pedido é dela agora (ver

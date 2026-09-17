@@ -55,9 +55,18 @@ export const taskQuoteService = {
    * chama mais.
    */
 
-  // Reverte a aprovação de faturamento (exige boletos baixados e NFS-e canceladas).
-  // Continua endereçada pelo ORÇAMENTO: a reversão desfaz o ciclo de cobrança
-  // inteiro dele, não uma cobrança isolada.
+  /**
+   * REVERTER O CICLO DE COBRANÇA DO ORÇAMENTO INTEIRO.
+   *
+   * ⚠️ Não é "reverter o faturamento desta tela". Endereçada pelo ORÇAMENTO, ela
+   * desmonta TODAS as cobranças dele: num orçamento de três lotes, apaga fatura,
+   * parcela e boleto dos três e dá baixa no Sicredi de títulos que o cliente já
+   * tem na mão. Para desfazer UMA cobrança use `billingService.revert(billingId)`
+   * — `PUT /billings/:id/revert`.
+   *
+   * Nenhuma tela chama esta rota hoje; ela fica para o dia em que existir o ato
+   * "reverter tudo", que ainda não tem tela.
+   */
   revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 
   // Reject (sends back to PENDING with a reason)

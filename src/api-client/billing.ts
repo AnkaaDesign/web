@@ -65,6 +65,18 @@ export const billingService = {
    */
   settle: (billingId: string) => apiClient.put(`/billings/${billingId}/settle`),
 
+  /**
+   * DESFAZ ESTA COBRANÇA — apaga a fatura, as parcelas e os boletos dela, baixa
+   * os títulos no Sicredi e levanta o carimbo de aprovação. Só dela.
+   *
+   * Substitui `taskQuoteService.revertBilling(quoteId)` nesta tela. Aquela rota
+   * desmonta o ciclo do ORÇAMENTO INTEIRO: num orçamento de três lotes, reverter
+   * o lote 3 apagava fatura e boleto dos lotes 1 e 2 e dava baixa em boletos que
+   * o cliente já tinha na mão. Ela continua de pé no servidor para "reverter
+   * tudo", que é outro ato — e que ninguém pede de dentro da tela de UMA cobrança.
+   */
+  revert: (billingId: string) => apiClient.put(`/billings/${billingId}/revert`),
+
   /** Esta cobrança pode ser recomposta, ou já está congelada por fatura/aprovação? */
   frozen: (billingId: string) => apiClient.get(`/billings/${billingId}/frozen`),
 };

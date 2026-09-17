@@ -1453,35 +1453,72 @@ const FinancialBudgetDetailPageInner = () => {
         return;
       }
 
-      const quoteData: any = {
-        taskId,
-        expiresAt: data.expiresAt,
-        subtotal: data.subtotal || 0,
-        total: data.total || 0,
-        guaranteeYears: data.guaranteeYears || null,
-        customGuaranteeText: data.customGuaranteeText || null,
-        customForecastDays: data.customForecastDays || null,
-        layoutFileIds: resolvedLayoutIds,
-        simultaneousTasks: data.simultaneousTasks || null,
-        billingSplit: data.billingSplit || "JOINT",
-        // ─── OS LOTES VIRAM COBERTURA ────────────────────────────────────────
-        //
-        // O formulário guarda UMA fatura por cliente e a repartição num campo
-        // só. A API recebe uma fatura por (cliente × lote), cada uma com a
-        // cobertura explícita. A expansão acontece aqui, no save, e só quando há
-        // lotes: nos outros modos a cobertura é derivável e mandá-la seria
-        // payload inútil — e uma segunda fonte de verdade sobre quem cobra quem.
-        customerConfigs: expandConfigsIntoLots(
-          data.customerConfigs || [],
-          (data.billingSplit || "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
-          quoteTasks(existingQuote as any).map((t: any) => t.id),
-          data.billingGroups,
-        ),
-        services: validServices.map((item: any) => ({
-          ...item,
-          amount: item.amount ?? 0,
-        })),
-      };
+      // TRAVADO POR DINHEIRO? — a pergunta é da COBRANÇA, não do status do orçamento.
+      //
+      // Espelha `isQuoteMoneyLocked(billings)` no servidor: trava = ALGUMA cobrança com
+      // `approvedAt`. A fatura, os boletos e a nota saíram sobre o preço atual, e o
+      // servidor RECUSA O CORPO INTEIRO se ele trouxer qualquer chave fora de
+      // `QUOTE_SAFE_AFTER_BILLING_FIELDS`. É a mesma conta que a tela de Faturamento faz
+      // (`billing/details/[id].tsx`) e que o app faz (`budget_form_screen.dart`).
+      const isQuoteLocked = approvedBillingCount > 0;
+
+      /**
+       * ⚠️ `taskId` NÃO VAI NO CORPO, travado ou não.
+       *
+       * A FK do vínculo mora em `Task` (`task Task? @relation("TASK_QUOTE")`) —
+       * `TaskQuote` não tem essa coluna, e o `update` do servidor nem lê a chave (ele
+       * reconcilia por `taskIds`). Mandá-la custava duas coisas, as duas ruins:
+       *   • `filterToMaterialChanges` compara com `existing.taskId`, que é sempre
+       *     `undefined`, então a chave SEMPRE parecia alterada — o "Nenhuma alteração
+       *     detectada" do servidor virava inalcançável e toda gravação forçava
+       *     reconcile + changelog completos;
+       *   • com cobrança aprovada a guarda recusa por PRESENÇA de chave, e `taskId`
+       *     não está na lista segura — então TODA gravação desta tela dava 400,
+       *     inclusive a que só prorrogava a validade.
+       *
+       * Os outros dois clientes já fazem assim. Este era o único que ainda mandava.
+       */
+      const quoteData: any = isQuoteLocked
+        ? {
+            // SÓ O QUE A LISTA SEGURA ACEITA. `subtotal`/`total` ficam de fora não só
+            // pela trava: eles vão em escala POR VEÍCULO e nunca batem com o contrato,
+            // então sobreviveriam ao filtro de mudança material e derrubariam o corpo
+            // mesmo numa gravação que não mexeu em preço nenhum.
+            expiresAt: data.expiresAt,
+            guaranteeYears: data.guaranteeYears || null,
+            customGuaranteeText: data.customGuaranteeText || null,
+            customForecastDays: data.customForecastDays || null,
+            layoutFileIds: resolvedLayoutIds,
+            simultaneousTasks: data.simultaneousTasks || null,
+          }
+        : {
+            expiresAt: data.expiresAt,
+            subtotal: data.subtotal || 0,
+            total: data.total || 0,
+            guaranteeYears: data.guaranteeYears || null,
+            customGuaranteeText: data.customGuaranteeText || null,
+            customForecastDays: data.customForecastDays || null,
+            layoutFileIds: resolvedLayoutIds,
+            simultaneousTasks: data.simultaneousTasks || null,
+            billingSplit: data.billingSplit || "JOINT",
+            // ─── OS LOTES VIRAM COBERTURA ────────────────────────────────────────
+            //
+            // O formulário guarda UMA fatura por cliente e a repartição num campo
+            // só. A API recebe uma fatura por (cliente × lote), cada uma com a
+            // cobertura explícita. A expansão acontece aqui, no save, e só quando há
+            // lotes: nos outros modos a cobertura é derivável e mandá-la seria
+            // payload inútil — e uma segunda fonte de verdade sobre quem cobra quem.
+            customerConfigs: expandConfigsIntoLots(
+              data.customerConfigs || [],
+              (data.billingSplit || "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
+              quoteTasks(existingQuote as any).map((t: any) => t.id),
+              data.billingGroups,
+            ),
+            services: validServices.map((item: any) => ({
+              ...item,
+              amount: item.amount ?? 0,
+            })),
+          };
 
       if (existingQuote?.id) {
         // Short-circuit: skip the quote update entirely when no quote-form
@@ -1562,17 +1599,97 @@ const FinancialBudgetDetailPageInner = () => {
               dirty.customerConfigs ||
               dirty.services,
           );
-        if (quoteFieldDirty) {
-          // Pin the CURRENT server status on the value update so the backend's
-          // auto-revert-to-PENDING (which fires only when no status is sent) is
-          // suppressed — editing values keeps the existing approval. The status
-          // TRANSITION itself is applied separately below, AFTER the values are
-          // saved, so it validates against the fresh values.
-          quoteData.status = existingQuote.status;
-          await updateQuoteMutation.mutateAsync({
-            id: existingQuote.id,
-            data: quoteData,
+        // ⚠️ O QUE NÃO VAI SER GRAVADO, DITO EM VOZ ALTA.
+        //
+        // Com cobrança aprovada o corpo é reduzido à lista segura, e os campos de
+        // dinheiro ficam de fora — se fossem, o servidor recusaria a gravação inteira.
+        // Sem este aviso, o operador editaria o preço, veria o toast de sucesso da
+        // prorrogação de validade e sairia achando que o preço mudou. O formulário
+        // não desabilita esses campos (ainda), então quem avisa é aqui.
+        if (
+          isQuoteLocked &&
+          (billingGroupsChanged ||
+            servicesReordered ||
+            Boolean(
+              dirty.subtotal ||
+                dirty.total ||
+                dirty.services ||
+                dirty.customerConfigs ||
+                dirty.billingSplit,
+            ))
+        ) {
+          toast.warning("Valores não alterados: o faturamento já foi aprovado", {
+            description:
+              "Preço, serviços, clientes e divisão só mudam depois de reverter o " +
+              "faturamento na tela de Faturamento. O restante foi salvo.",
           });
+        }
+
+        // ─── O "PIN" DE STATUS FICOU SÓ PARA `APPROVED` ─────────────────────
+        //
+        // ⚠️ DECISÃO DO DONO, 2026-05, RECONFIRMADA EM 2026-06-10, registrada no
+        // cabeçalho de `task-quote.guards.ts`: "pinning" é intencional — editar
+        // valores NÃO deve derrubar a aprovação quando o cliente fixa o status.
+        // Ela continua valendo e está preservada abaixo.
+        //
+        // O que MUDOU é o recorte, por um fato que aquela decisão não tinha como
+        // prever: `SIGNED` só passou a existir em 09/2026. Fixar o status de um
+        // orçamento ASSINADO enquanto se muda o preço deixa a tela afirmando
+        // assinaturas válidas para um valor que o cliente nunca viu — e o
+        // envelope é derrubado no pós-commit de qualquer jeito, então o pin não
+        // salva a coleta, só esconde que ela caiu. Em `EXPIRED` vale o mesmo: o
+        // valor está voltando para a mesa, que é a definição do estado.
+        //
+        // Os três motivos que o agente levantou para tirar o pin por inteiro
+        // estão abaixo; o primeiro é o que a decisão do dono responde, os outros
+        // dois continuam de pé e são o que restringe o pin a `APPROVED`:
+        //
+        // Esta gravação mandava `status: existingQuote.status` em TODA gravação
+        // suja. `status` presente — mesmo igual ao atual — é o cliente dizendo
+        // "mantenha este estado", e o servidor então NÃO roda o auto-revert
+        // `APPROVED|SIGNED|EXPIRED → PENDING` da edição de valor. Pela web ele
+        // nunca rodava: editar o preço de um orçamento ASSINADO o deixava
+        // assinado, com o envelope afirmando um valor que o cliente nunca viu.
+        //
+        // E o pin só tem efeito exatamente no caso em que ele não devia ter:
+        // o auto-revert só dispara quando `services` ou `customerConfigs` vão
+        // no corpo. Sem essas chaves o pin é inerte — e não é inócuo, porque
+        // `existingQuote` é lido uma vez na abertura da página: se o estado
+        // mudou no servidor nesse meio-tempo (aprovação feita noutra tela), o
+        // pin deixa de ser no-op e REGRAVA o estado velho. É o mesmo defeito
+        // que o app corrigiu lendo o estado da cópia recarregada.
+        //
+        // Num orçamento TRAVADO há ainda a terceira razão, que é a do app:
+        // sobre orçamento travado o servidor recusa `status` vindo de fora
+        // ("Use o endpoint de atualização de status") e a gravação inteira cai.
+        //
+        // A TRANSIÇÃO escolhida no seletor continua sendo aplicada logo abaixo,
+        // pelo endpoint próprio, depois dos valores — que é o que a torna
+        // validada contra o preço recém-gravado.
+        let statusAfterSave = existingQuote.status as TASK_QUOTE_STATUS;
+        if (quoteFieldDirty) {
+          // O PIN, no recorte acima: só `APPROVED`, e só com o orçamento
+          // destravado (sobre travado o servidor recusa `status` vindo de fora e
+          // a gravação inteira cai).
+          const payload =
+            !isQuoteLocked && existingQuote.status === "APPROVED"
+              ? { ...quoteData, status: "APPROVED" }
+              : quoteData;
+          const saved: any = await updateQuoteMutation.mutateAsync({
+            id: existingQuote.id,
+            data: payload,
+          });
+          // O estado DEPOIS da gravação — pode ter mudado agora mesmo, pelo
+          // auto-revert. Reproduzir os saltos a partir do estado lido na
+          // abertura pediria ao servidor um caminho que não existe mais.
+          //
+          // ⚠️ O interceptor do axios devolve a RESPOSTA inteira, não o envelope:
+          // o orçamento está em `res.data.data`. Ler `res.status` traria 200 — o
+          // código HTTP —, que passaria adiante como se fosse um estado.
+          const quoteSalva = (saved as any)?.data?.data ?? (saved as any)?.data ?? null;
+          if (typeof quoteSalva?.status === "string") {
+            statusAfterSave = quoteSalva.status as TASK_QUOTE_STATUS;
+          }
         }
 
         // Apply the chosen status transition AFTER the value save, through the
@@ -1586,15 +1703,17 @@ const FinancialBudgetDetailPageInner = () => {
         // several steps in one session (e.g. APPROVED → PENDING → APPROVED).
         // The server only accepts single legal hops, so we
         // replay the whole path hop-by-hop — each validated by the backend.
+        //
+        // ⚠️ A ORIGEM É `statusAfterSave`, não o estado lido na abertura da
+        // página: a gravação de valores acima pode ter acabado de devolver o
+        // orçamento a PENDING pelo auto-revert, e pedir o caminho a partir de
+        // APPROVED faria o servidor recusar um salto que já não parte de lá.
         const targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
-        if (targetStatus && targetStatus !== existingQuote.status) {
-          const path = getQuoteStatusPath(
-            existingQuote.status as TASK_QUOTE_STATUS,
-            targetStatus,
-          );
+        if (targetStatus && targetStatus !== statusAfterSave) {
+          const path = getQuoteStatusPath(statusAfterSave, targetStatus);
           if (path.length === 0) {
             throw new Error(
-              `Não há um caminho de status válido de "${existingQuote.status}" até "${targetStatus}".`,
+              `Não há um caminho de status válido de "${statusAfterSave}" até "${targetStatus}".`,
             );
           }
           const reason =

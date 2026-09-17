@@ -79,7 +79,10 @@ const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   // APPROVED → PENDING existe para o caminho de desistência mais comum, o
   // cliente voltando atrás ANTES de haver cobrança. Depois que alguma cobrança
   // foi aprovada o servidor barra a edição (`isQuoteMoneyLocked`) e o caminho é
-  // `/revert-billing`, que limpa boleto e NFS-e antes.
+  // "Reverter Faturamento" — hoje `PUT /billings/:id/revert`, que desfaz AQUELA
+  // cobrança (baixa os boletos dela e deixa a NFS-e viva para ser substituída).
+  // `PUT /task-quotes/:id/revert-billing` continua de pé, mas desmonta o ciclo do
+  // orçamento INTEIRO e nenhuma tela o chama.
   APPROVED: ['PENDING', 'CANCELLED'],
   // Terminal: um orçamento cancelado não volta. Recotar cria um novo.
   CANCELLED: [],

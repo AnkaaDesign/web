@@ -678,12 +678,65 @@ describe("TASK_QUOTE — cadastro do cliente incompleto", () => {
   it("stays silent on a cancelled quote", async () => {
     // O recorte é APPROVED. ⚠️ Havia aqui um caso com SETTLED — "passado o faturamento a nota já
     // saiu, logo o cadastro estava bom" —, que era a JANELA se fechando sozinha porque o orçamento
-    // andava depois de faturado. Ela não fecha mais: APPROVED é terminal, e quem anda é a
-    // cobrança. Fechar a janela agora é perguntar a `billings.some.approvedAt`, no espelho do
-    // servidor também — ver o comentário da regra em `rules.ts`.
+    // andava depois de faturado. Ela não fecha mais pelo status: APPROVED é terminal, e quem anda
+    // é a cobrança. Quem fecha a janela agora é `billing.approvedAt` — ver os casos abaixo.
     setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, { status: TASK_QUOTE_STATUS.CANCELLED })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  // ── A JANELA, agora fechada pela COBRANÇA ─────────────────────────────────
+  //
+  // Espelho de `OR: [{ billings: { none: {} } }, { billings: { some: { approvedAt: null } } }]`
+  // no servidor. Sem isto a regra acendia para todo orçamento aprovado e entregue, para sempre:
+  // 94 linhas piscando contra 44 que o menu contava.
+  it("silencia depois que a cobrança foi aprovada — a nota já saiu", async () => {
+    setEntities("TASK_QUOTE", [
+      quote({ cnpj: null, cpf: null }, {
+        customerConfigs: [
+          {
+            customerId: OTHER_CUSTOMER,
+            generateInvoice: true,
+            customer: { ...completeCustomer, cnpj: null, cpf: null },
+            billing: { id: "billing-1", approvedAt: "2026-09-01T12:00:00.000Z" },
+          },
+        ],
+      }),
+    ]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  it("continua acendendo quando UMA das cobranças ainda não foi aprovada", async () => {
+    // Orçamento cobrado veículo a veículo: a primeira fatia saiu, a segunda não. O cadastro ainda
+    // trava a nota da segunda, e é por ela que a regra existe.
+    setEntities("TASK_QUOTE", [
+      quote({ cnpj: null, cpf: null }, {
+        customerConfigs: [
+          {
+            customerId: OTHER_CUSTOMER,
+            generateInvoice: true,
+            customer: { ...completeCustomer, cnpj: null, cpf: null },
+            billing: { id: "billing-1", approvedAt: "2026-09-01T12:00:00.000Z" },
+          },
+          {
+            customerId: OTHER_CUSTOMER,
+            generateInvoice: true,
+            customer: { ...completeCustomer, cnpj: null, cpf: null },
+            billing: { id: "billing-2", approvedAt: null },
+          },
+        ],
+      }),
+    ]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-2", "customerData")).toEqual(ARMED);
+  });
+
+  it("acende quando ainda não existe cobrança nenhuma", async () => {
+    // `billings: { none: {} }` — o pagador está lá, a cobrança ainda não nasceu.
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null })]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-2", "customerData")).toEqual(ARMED);
   });
 
   it("stays silent while the task is still in flight", async () => {

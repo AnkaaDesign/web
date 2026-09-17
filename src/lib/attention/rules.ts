@@ -444,13 +444,24 @@ export const ATTENTION_RULES: AttentionRule[] = [
   // O recorte é APPROVED, não "qualquer status": antes disso o orçamento ainda pode nem ser
   // aprovado, e o cadastro só trava quando a nota está para sair.
   //
-  // ⚠️ A JANELA ALARGOU em 16/09/2026, e não por escolha desta regra. Ela fechava sozinha porque
-  // o orçamento ANDAVA depois de faturado (BILLING_APPROVED, UPCOMING, …) e saía do recorte; com
-  // o ciclo do pagamento fora do enum, APPROVED é o último estado e o orçamento fica nele para
-  // sempre. Fechar a janela agora é perguntar à COBRANÇA (`billings.some.approvedAt != null`) —
-  // e o espelho no servidor (`RULE_QUERIES`, attention.service.ts) ainda não pergunta isso.
-  // Divergir aqui faria a contagem do menu e a linha piscando discordarem, então os dois lados
-  // seguem alargados juntos até o espelho mudar.
+  // ⚠️ A JANELA FECHA NA COBRANÇA, não no status do orçamento. Ela fechava sozinha porque o
+  // orçamento ANDAVA depois de faturado (BILLING_APPROVED, UPCOMING, …) e saía do recorte; com o
+  // ciclo do pagamento fora do enum, APPROVED é o último estado e o orçamento fica nele para
+  // sempre. Sem a condição abaixo a regra acendia para todo orçamento aprovado e entregue, para
+  // sempre — inclusive os já pagos.
+  //
+  // O espelho no servidor (`RULE_QUERIES`, attention.service.ts) FECHOU a janela:
+  //     OR: [{ billings: { none: {} } }, { billings: { some: { approvedAt: null } } }]
+  // e este lado seguiu alargado, com um comentário afirmando que o servidor também não perguntava.
+  // O resultado era a contagem do menu (do servidor) discordando das linhas piscando (daqui):
+  // 94 linhas acendiam para 44 contadas, e o número do menu passou a parecer quebrado.
+  //
+  // O CAMINHO É OUTRO, o significado é o mesmo. Do lado do cliente o orçamento não traz a relação
+  // `billings` (nenhuma das duas listas a pede, e pedi-la seria uma terceira leitura do mesmo
+  // dado): o que chega é o PAGADOR com a cobrança pendurada — `customerConfigs[].billing` —, que a
+  // API injeta em todo caminho que devolve `customerConfigs` (ver `withCoverageInclude`), sempre
+  // com `approvedAt`. Como toda cobrança tem ao menos um pagador, "alguma cobrança não aprovada"
+  // e "algum pagador cuja cobrança não está aprovada" são a mesma pergunta.
   //
   // Resolve-se por CLIENTE, não por orçamento: preencher o CNPJ de um cliente apaga o alerta de
   // todos os orçamentos dele de uma vez.
@@ -466,6 +477,22 @@ export const ATTENTION_RULES: AttentionRule[] = [
       nodes: [
         { op: "eq", field: "task.status", value: TASK_STATUS.COMPLETED },
         { op: "eq", field: "status", value: TASK_QUOTE_STATUS.APPROVED },
+        {
+          // A JANELA — os dois ramos do `OR` do servidor, na mesma ordem.
+          op: "or",
+          nodes: [
+            // `billings: { none: {} }` — ainda não há cobrança nenhuma. Sem pagador não há
+            // `billing` pendurado em lugar nenhum, e o `some` devolve falso sobre lista vazia.
+            {
+              op: "not",
+              node: { op: "some", field: "customerConfigs", node: { op: "notNull", field: "billing.id" } },
+            },
+            // `billings: { some: { approvedAt: null } }` — alguma ainda não foi aprovada, e é
+            // dela que a nota vai sair. Cobre também o pagador sem cobrança: ali `approvedAt`
+            // é ausente, que é a mesma resposta que nulo.
+            { op: "some", field: "customerConfigs", node: { op: "isNull", field: "billing.approvedAt" } },
+          ],
+        },
         {
           op: "some",
           field: "customerConfigs",

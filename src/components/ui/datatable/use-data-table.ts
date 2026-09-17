@@ -552,6 +552,26 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
 
     enableSorting,
     enableMultiSort: true,
+    /**
+     * TODO CLIQUE SOMA — é deliberado, e a UI foi feita para isso.
+     *
+     * A convenção comum é "clique troca, shift+clique soma". Aqui não há
+     * modificador: cada clique ACRESCENTA a coluna ao fim da prioridade, e o
+     * cabeçalho passa a imprimir o número da posição (1, 2, 3…) assim que há
+     * mais de uma — ver `showSortOrder` em `data-table.tsx`. `enableSortingRemoval`
+     * fecha o ciclo por coluna: asc → desc → fora.
+     *
+     * ⚠️ O que o clique NÃO faz é descartar a ordenação primária: ela continua em
+     * primeiro lugar e o servidor a recebe primeiro (`buildBillingOrderBy` monta o
+     * array na mesma ordem). Quando a ordenação primária "some" ao clicar em
+     * Vencimento, o descarte é do SERVIDOR — a varredura do sort computado não
+     * seleciona o campo, e o comparador pula a chave (ver
+     * `TASK_SELECT_DUE_DATE_SORT` em `task-prisma.repository.ts`).
+     *
+     * O custo real desta escolha é não haver gesto de "trocar a ordenação": para
+     * ficar com uma só, o usuário precisa tirar a anterior com dois cliques. Se um
+     * dia isso incomodar, o lugar é aqui — e a troca afeta TODAS as tabelas.
+     */
     isMultiSortEvent: () => true,
     enableSortingRemoval: true,
     maxMultiSortColCount: 5,

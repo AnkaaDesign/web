@@ -36,6 +36,7 @@ import { useState, useCallback } from "react";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
 import { taskQuoteService } from "@/api-client/task-quote";
+import { billingService } from "@/api-client/billing";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { FileThumbnail, useFileViewer } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ import {
   sortQuoteTasks,
   quoteTasks,
   coverageSummary,
+  coverageLabels,
   coveredTaskCount,
   coveredTaskIds,
 } from "@/utils/quote-tasks";
@@ -70,9 +72,13 @@ import {
 // Agora são AÇÕES SOBRE ESTA COBRANÇA, cada uma com a sua rota:
 //   · aprovar  → PUT /billings/:id/approve
 //   · liquidar → PUT /billings/:id/settle
-//   · reverter → PUT /task-quotes/:id/revert-billing  (desfaz o ciclo INTEIRO do
-//                orçamento: baixa boletos e cancela notas; por isso continua
-//                endereçado pelo orçamento)
+//   · reverter → PUT /billings/:id/revert
+//
+// ⚠️ A reversão era `PUT /task-quotes/:id/revert-billing`, endereçada pelo
+// ORÇAMENTO, e desfazia o ciclo INTEIRO dele: reverter o lote 3 apagava fatura,
+// parcela e boleto dos lotes 1 e 2 e dava baixa no Sicredi de títulos que o
+// cliente já tinha na mão. A rota do orçamento segue de pé no servidor para
+// "reverter tudo" — que é outro ato, e não é o desta tela.
 //
 // O status do orçamento se edita no assistente de ORÇAMENTO. Aqui ele aparece
 // como contexto, em leitura — é o contrato que se está cobrando.
@@ -192,6 +198,29 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       })),
     [task?.quote],
   );
+
+  /**
+   * COMO ESTA COBRANÇA SE CHAMA, numa linha — a cobertura dela.
+   *
+   * Existe para o diálogo de reversão NOMEAR o que vai desfazer. Ele dizia
+   * "reverter o orçamento", e num orçamento cobrado veículo a veículo isso lia
+   * como "reverter os sessenta" — que é exatamente o que a rota antiga fazia.
+   * Agora a reversão é de UMA cobrança e o texto tem de dizer qual.
+   */
+  const revertCoverageLabel = useMemo(() => {
+    const total = reviewVehicles.length;
+    if (total <= 1) return null;
+    const labels = (customerConfigs as any[])
+      .flatMap((c) => coverageLabels(c as any, reviewVehicles))
+      .filter(Boolean);
+    const unicos = Array.from(new Set(labels));
+    if (unicos.length === 0 || unicos.length === total) return null;
+    if (unicos.length <= 3) return unicos.join(", ");
+    return `${unicos.slice(0, 2).join(", ")} +${unicos.length - 2}`;
+  }, [customerConfigs, reviewVehicles]);
+
+  /** Quantas faturas do orçamento esta tela NÃO está mexendo. */
+  const outrasFaturas = Math.max(0, (allCustomerConfigs as any[]).length - (customerConfigs as any[]).length);
 
   // Attention on the quote's `orderNumber`. The Resumo is where this page usually OPENS (it jumps
   // here whenever invoices already exist), while the editable field lives on a customer step that
@@ -413,7 +442,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   // Reverter só faz sentido depois de aprovar — e "aprovada" é a pergunta que a
   // COBRANÇA responde (`approvedAt`), não mais uma lista de estados do orçamento.
-  const canRevertBilling = canActOnBilling && !!billingApprovedAt;
+  // `billing.id` entra na conta porque a reversão passou a ser endereçada pela COBRANÇA:
+  // sem id não há a quem endereçar, e oferecer a opção seria oferecer um clique morto.
+  const canRevertBilling = canActOnBilling && !!billingApprovedAt && !!billing?.id;
 
   // Whether the revert-billing option should be offered. Mirrors the backend precondition
   // (revertBillingApproval): the revert flow itself baixa's active boletos and leaves live
@@ -441,10 +472,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   }, [canRevertBilling, filteredInvoices]);
 
   const handleRevertBilling = useCallback(async () => {
-    if (!task?.quoteId) return;
+    // ⚠️ ENDEREÇADO PELA COBRANÇA, não pelo orçamento. Era
+    // `taskQuoteService.revertBilling(task.quoteId)` — `PUT /task-quotes/:id/revert-billing`,
+    // que desmonta o ciclo do orçamento INTEIRO. Desta tela, que é a de UMA cobrança,
+    // isso apagava fatura, parcela e boleto das IRMÃS e dava baixa no Sicredi de títulos
+    // que o cliente já tinha na mão. Sem `billing.id` não há a quem endereçar: não
+    // reverter é melhor do que reverter o que não foi pedido.
+    if (!billing?.id) return;
     setRevertBillingLoading(true);
     try {
-      await taskQuoteService.revertBilling(task.quoteId);
+      await billingService.revert(billing.id);
       window.location.reload();
     } catch (err: any) {
       // O backend concatena TODOS os bloqueios numa mensagem só, que passa fácil de 400
@@ -460,7 +497,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       setRevertBillingLoading(false);
       setRevertBillingDialogOpen(false);
     }
-  }, [task?.quoteId]);
+  }, [billing?.id]);
 
   // Compute paid/total installment counts for PARTIAL badge
   const installmentCounts = useMemo(() => {
@@ -1368,11 +1405,26 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       <AlertDialog open={revertBillingDialogOpen} onOpenChange={setRevertBillingDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reverter aprovação de faturamento?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {revertCoverageLabel
+                ? `Reverter a cobrança de ${revertCoverageLabel}?`
+                : "Reverter aprovação desta cobrança?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá baixar os boletos ativos no Sicredi, remover as faturas e parcelas, e
-              reverter o orçamento para <strong>Aprovado</strong>. O orçamento poderá ser editado
-              e aprovado novamente.
+              {/* ⚠️ O TEXTO NOMEIA A COBRANÇA. Dizia "reverter o orçamento" — e dizia a
+                  verdade, porque a rota chamada era a do orçamento inteiro. Agora o ato é
+                  de UMA cobrança e o operador precisa ler qual, antes de clicar. */}
+              Esta ação age <strong>somente sobre esta cobrança</strong>
+              {revertCoverageLabel ? <> (<strong>{revertCoverageLabel}</strong>)</> : null}: baixa
+              os boletos ativos dela no Sicredi, remove a fatura e as parcelas dela e levanta o
+              carimbo de aprovação. A cobrança poderá ser editada e aprovada novamente.
+              {outrasFaturas > 0 && (
+                <>
+                  {" "}
+                  As outras {outrasFaturas} fatura{outrasFaturas > 1 ? "s" : ""} deste orçamento
+                  não são tocadas.
+                </>
+              )}
               <br />
               <br />
               <strong>A NFS-e não é cancelada agora</strong> e continua válida na prefeitura,
