@@ -348,21 +348,27 @@ export function BudgetStepReview({
     orderNumberAttention?.active && billsIbipora && !orderNumberText
       ? attentionFieldClass(orderNumberAttention)
       : "";
-  const purchaseOrderLine =
+  // ── É UMA LINHA DO RESUMO DO VEÍCULO, NÃO UMA SEÇÃO ──────────────────────
+  //
+  // Saía como cartão próprio no meio do Resumo — entre "Condições de Pagamento"
+  // e "Prazo de Entrega" —, e era ALI que o anel de atenção piscava. Um número
+  // que pertence ao veículo, cobrado num lugar onde o veículo não está, manda o
+  // operador procurar o campo na seção errada: ele fica em "Dados da tarefa",
+  // ao lado da placa e do chassi. Agora a linha mora no mesmo quadro que Série,
+  // Chassi e Plaqueta, que é onde o leitor a procura — e o anel pisca lá.
+  const purchaseOrderRow =
     orderNumberText || orderNumberAttentionClass ? (
-      <div className="bg-muted/30 rounded-lg p-4">
-        <div
-          // O recuo é INCONDICIONAL: fazê-lo depender da classe de atenção movia a
-          // linha 8px para a direita no instante em que o anel aparecia, e de volta
-          // no instante em que o número era digitado.
-          className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", orderNumberAttentionClass)}
-          title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
-        >
-          N° do Pedido:{" "}
-          <span className={cn("font-medium", orderNumberText ? "text-foreground" : "text-muted-foreground")}>
-            {orderNumberText || "Pendente"}
-          </span>
-        </div>
+      <div
+        className={cn(
+          "flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5",
+          orderNumberAttentionClass,
+        )}
+        title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+      >
+        <span className="text-sm text-muted-foreground">N° do Pedido</span>
+        <span className={cn("text-sm font-medium", orderNumberText ? "" : "text-muted-foreground")}>
+          {orderNumberText || "Pendente"}
+        </span>
       </div>
     ) : null;
 
@@ -645,6 +651,12 @@ export function BudgetStepReview({
                 )}
               </>
             )}
+            {/* O PEDIDO DE COMPRA, no quadro a que pertence.
+                Some quando a TABELA de veículos já o mostra linha a linha
+                (`anyVehicleOrderNumber`) — dizer a mesma coisa duas vezes na
+                mesma tela —, e quando o Resumo está filtrado por um cliente,
+                porque o pedido é da ENTREGA e não do pagador. */}
+            {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderRow}
             {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
                 existe: no create ainda não há caminhão gravado. */}
             {resolvedTask?.truck?.vinPlate && (
@@ -1056,13 +1068,6 @@ export function BudgetStepReview({
             </div>
           );
         })()}
-
-      {/* O PEDIDO DE COMPRA — UMA linha para o orçamento inteiro.
-          Saía duas vezes: um bloco solto depois dos cartões de cliente e outro
-          no caso de cliente único, e com um cliente os dois renderizavam. Com a
-          coluna na tabela de veículos acima, esta linha só faz sentido como
-          resumo — e some quando a tabela já a mostra veículo a veículo. */}
-      {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderLine}
 
       {/* Delivery Deadline */}
       {(customForecastDays || (simultaneousTasks && simultaneousTasks > 1)) && (
