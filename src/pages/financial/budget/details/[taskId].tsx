@@ -1746,6 +1746,17 @@ const FinancialBudgetDetailPageInner = () => {
         }
       } else {
         quoteData.status = "PENDING";
+        // ⚠️ O VEÍCULO. `taskQuoteCreateSchema` exige `taskId` OU `taskIds`, e este
+        // corpo não levava nenhum dos dois — toda criação de orçamento por esta
+        // tela respondia 400.
+        //
+        // O `taskId` ficou de fora quando a chave foi removida do corpo de
+        // ATUALIZAÇÃO (ali ela é um fantasma: a coluna mudou de lado, `TaskQuote`
+        // não a tem, e mandá-la derrubava qualquer gravação de orçamento com
+        // cobrança aprovada). A remoção foi aplicada aos dois ramos, e no de
+        // criação ela é obrigatória: é a ÚNICA coisa que diz de qual caminhão é o
+        // orçamento que está nascendo.
+        quoteData.taskIds = [taskId];
         await createQuoteMutation.mutateAsync(quoteData);
       }
 
