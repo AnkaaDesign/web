@@ -456,6 +456,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     truckCategory: task.truck?.category ? (TRUCK_CATEGORY_LABELS[task.truck.category] || task.truck.category) : null,
     truckImplementType: task.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[task.truck.implementType] || task.truck.implementType) : null,
     simultaneousTasks: task.quote.simultaneousTasks || null,
+    // O estado, para o carimbo — ver `budgetStamp`.
+    status: (task.quote as { status?: string | null }).status ?? null,
     // Global customer discount from config
     discountType: firstConfig?.discountType || null,
     discountValue: firstConfig?.discountValue != null ? Number(firstConfig.discountValue) : null,
@@ -484,6 +486,13 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 }
 
 export interface BudgetHtmlData {
+  /**
+   * O ESTADO DO ORÇAMENTO — só para carimbar o que não vale mais.
+   *
+   * Opcional porque o documento não depende dele para nada: um orçamento vivo
+   * imprime igual com ou sem o campo. Quem o manda ganha a tarja.
+   */
+  status?: string | null;
   corporateName: string;
   customerDocument?: string | null;
   taskName: string;
@@ -580,6 +589,33 @@ export async function exportBudgetPdfFromData(data: BudgetHtmlData): Promise<voi
       printWindow.close();
     };
   };
+}
+
+/**
+ * O CARIMBO DO DOCUMENTO QUE NÃO VALE MAIS.
+ *
+ * Um orçamento cancelado imprimia idêntico a um vivo: mesmo cabeçalho, mesmo
+ * número, mesmos valores, mesma linha de assinatura. Fora da tela não havia
+ * como distinguir os dois — e o PDF é justamente a forma que sai da tela, por
+ * e-mail e por WhatsApp, e volta semanas depois como se fosse uma proposta.
+ *
+ * ⚠️ CARIMBA-SE TEXTO, NÃO FUNDO. Um `background` some na impressão quando o
+ * navegador está com "gráficos de plano de fundo" desligado — que é o padrão —,
+ * e a tarja sumiria exatamente no arquivo que ela existe para marcar.
+ *
+ * ⚠️ NÃO VALE PARA O DOCUMENTO ASSINADO. Este gerador monta uma folha nova a
+ * cada impressão; o PDF da cerimônia é selado (PAdES) e escrever nele quebraria
+ * o selo. Um documento assinado que depois foi cancelado se explica pela
+ * trilha, não por uma tarja aplicada por cima da prova.
+ */
+const STAMPED_STATUSES: Record<string, string> = {
+  CANCELLED: "CANCELADO",
+};
+
+function budgetStamp(status: string | null | undefined): string {
+  const label = status ? STAMPED_STATUSES[status] : undefined;
+  if (!label) return "";
+  return `<div class="stamp" aria-hidden="true">${escapeHtml(label)}</div>`;
 }
 
 /**
@@ -924,6 +960,29 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
     .page:last-child {
       page-break-after: auto;
+    }
+
+    /* A tarja do documento sem valor. Texto, e nao fundo: um background nao sai
+       na impressao com "graficos de plano de fundo" desligado, que e o padrao.
+       print-color-adjust garante a cor mesmo assim. Translucida o bastante para
+       nao esconder nenhum valor da folha. */
+    .stamp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 90pt;
+      font-weight: 800;
+      letter-spacing: 6pt;
+      color: rgba(200, 30, 30, 0.16);
+      border: 6px solid rgba(200, 30, 30, 0.16);
+      border-radius: 8mm;
+      padding: 4mm 10mm;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* Header */
@@ -1325,6 +1384,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 <body>
   <!-- Page 1 - Front -->
   <div class="page">
+    ${budgetStamp(data.status)}
     <!-- Header -->
     <header class="header">
       <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
@@ -1426,6 +1486,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
   <!-- Page 2 - Back (Layout + Signatures) -->
   <div class="page">
+    ${budgetStamp(data.status)}
     <!-- Header -->
     <header class="header">
       <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
