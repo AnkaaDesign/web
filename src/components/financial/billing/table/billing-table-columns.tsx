@@ -354,18 +354,18 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
       id: "billingStatus",
       header: "Status Faturamento",
       accessorFn: (t) => taskBillingStatus(t),
-      // ⛔ SEM ORDENAÇÃO NO SERVIDOR, e não por esquecimento.
+      // ORDENÁVEL NO SERVIDOR — pelo caminho curto, não por chave computada.
       //
-      // A linha é uma TAREFA e o estado está em task → quote → customerConfigs → billing: um
-      // caminho que passa por relação de MUITOS, e `orderBy` do Prisma não atravessa isso. Ordenar
-      // só a página já carregada faria cada página parecer ordenada com a ordem global errada —
-      // o mesmo defeito que `currentInstallmentDueDate` resolveu com uma chave COMPUTADA no
-      // repositório da API (varredura completa + ordenação em memória antes de paginar).
+      // Esta coluna passou um tempo sem ordenação porque o caminho parecia atravessar relação de
+      // MUITOS (task → quote → customerConfigs → billing), e `orderBy` do Prisma não atravessa
+      // isso. Havia um caminho mais curto e de-UM o tempo todo: `task → billingEntry → billing`,
+      // que o banco garante único (`BillingTask.@@unique([taskId])`). Faltava só a relação estar
+      // DECLARADA como `BillingTask?` em vez de `BillingTask[]` — enquanto era lista, o Prisma a
+      // tratava como de-muitos e se recusava a ordenar por ela.
       //
-      // O conserto de verdade é uma chave dessas para o estado da cobrança
-      // (`taskOrderByFieldsSchema` + `task-prisma.repository.ts`). Enquanto ela não existe, o
-      // cabeçalho não oferece uma ordenação que o servidor ignoraria em silêncio.
-      enableSorting: false,
+      // Ordena por `statusOrder`, o espelho numérico, e não pelo `status`: alfabeticamente
+      // "APPROVED" viria antes de "OVERDUE", que é o contrário da ordem da atenção.
+      enableSorting: true,
       size: 190,
       minSize: 140,
       meta: {
@@ -420,8 +420,10 @@ export const BILLING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Rec
   // Whitelisted by the API as a computed key (`taskOrderByFieldsSchema`); nulls go last on its side.
   currentInstallmentDueDate: (d) => ({ currentInstallmentDueDate: d }),
   billingApprovedAt: (d) => ({ quote: { billingApprovedAt: { sort: d, nulls: "last" } } }),
-  // `billingStatus` NÃO está aqui de propósito — ver o comentário da coluna: o estado mora atrás
-  // de uma relação de muitos e o Prisma não ordena por ele.
+  // O CAMINHO CURTO: `task → billingEntry → billing`, de-UM em toda a extensão porque o banco
+  // garante um faturamento por veículo. Ordena pelo espelho numérico — alfabeticamente "APPROVED"
+  // viria antes de "OVERDUE", que é o inverso da ordem da atenção.
+  billingStatus: (d) => ({ billingEntry: { billing: { statusOrder: d } } }),
   createdAt: (d) => ({ createdAt: d }),
 };
 
@@ -430,17 +432,22 @@ export const BILLING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Rec
  * cold mount, when nothing is in the URL) and once as `buildBillingOrderBy([])`. They must agree.
  *
  * ⚠️ ERA `quoteStatus asc` — a ordem da ação pendente do ORÇAMENTO. Com o ciclo do pagamento fora
- * daquele enum, essa ordenação passaria a agrupar a lista inteira num valor só ("Aprovado"), e
- * ordenar pelo estado da COBRANÇA não é possível no servidor (ver a coluna). O entregue há mais
- * tempo primeiro é a ordem honesta para a fila de faturar: é o que está esperando cobrança há
- * mais tempo.
+ * daquele enum, essa ordenação agruparia a lista inteira num valor só ("Aprovado"). O padrão agora
+ * é o estado da COBRANÇA, que é a ordem da atenção desta tela: vencido → pendente → parcial →
+ * aprovado → liquidado. Desempata pelo entregue há mais tempo, que é o que espera cobrança há mais
+ * tempo.
  */
-export const BILLING_DEFAULT_SORTING: { id: string; desc: boolean }[] = [{ id: "finishedAt", desc: true }];
+export const BILLING_DEFAULT_SORTING: { id: string; desc: boolean }[] = [
+  { id: "billingStatus", desc: false },
+  { id: "finishedAt", desc: true },
+];
 
 export function buildBillingOrderBy(sorting: { id: string; desc: boolean }[]): Record<string, unknown> | Record<string, unknown>[] {
   const entries = sorting
     .map((s) => BILLING_SORT_FIELD_MAP[s.id]?.(s.desc ? "desc" : "asc"))
     .filter((e): e is Record<string, unknown> => !!e);
-  if (entries.length === 0) return [{ finishedAt: "desc" }];
+  if (entries.length === 0) {
+    return [{ billingEntry: { billing: { statusOrder: "asc" } } }, { finishedAt: "desc" }];
+  }
   return entries.length === 1 ? entries[0] : entries;
 }

@@ -24,7 +24,7 @@ export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteS
     // em atraso, que é `BILLING_STATUS.OVERDUE` — noutra entidade e noutro badge.
     EXPIRED: {
       label: 'Aguardando Reanálise',
-      variant: 'expired',
+      variant: 'orange',
     },
     // Cor PRÓPRIA, e não o verde de `approved`/`completed`: verde nesta tabela
     // quer dizer "terminou", e aqui falta a contra-assinatura da Ankaa. Quem
@@ -34,14 +34,27 @@ export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteS
       label: 'Assinado',
       variant: 'teal',
     },
+    // ⚠️ MESMA COR DO `PENDING` DO FATURAMENTO, por decisão do dono (17/09): a
+    // mesma palavra tem de ter a mesma cor nas duas telas, senão o operador
+    // aprende duas linguagens para o mesmo conceito. Era cinza (`secondary`),
+    // que dizia "inerte" — e pendente não é inerte, é espera com dono.
+    //
+    // Foi essa troca que obrigou `EXPIRED` a sair do âmbar acima: os dois
+    // ficariam idênticos, e justamente os dois que o comercial precisa separar
+    // ("esperando o cliente" × "voltou para a minha mesa").
     PENDING: {
       label: 'Pendente',
-      variant: 'secondary',
+      variant: 'pending',
     },
     // O ÚLTIMO estado do orçamento — daqui em diante quem anda é a COBRANÇA.
+    //
+    // ⚠️ AZUL, e a mesma cor do `APPROVED` do faturamento (decisão do dono,
+    // 17/09). Era verde, que nesta casa quer dizer "terminou" — e aprovar o
+    // orçamento não termina nada, abre a cobrança. Verde ficou reservado para
+    // `SETTLED`, que é onde o dinheiro de fato entrou.
     APPROVED: {
       label: 'Aprovado',
-      variant: 'approved',
+      variant: 'processing',
     },
     CANCELLED: {
       label: 'Cancelado',
