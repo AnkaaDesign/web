@@ -410,15 +410,20 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         return v ? <TruncatedTextWithTooltip text={v} className="truncate" /> : <span className="text-muted-foreground">-</span>;
       },
     },
+    // ⚠️ O RÓTULO DIZIA "Status Faturamento" e o valor é `quote.status` — o do ORÇAMENTO.
+    // Funcionava por acidente enquanto o enum do orçamento carregava o ciclo do pagamento; desde
+    // 16/09/2026 ele tem cinco estados e nenhum deles é de cobrança, então a coluna anunciaria
+    // faturamento e mostraria "Pendente"/"Aprovado" do contrato. O estado da cobrança é
+    // `BILLING_STATUS`, mora no `Billing`, e quem o mostra é a lista de Faturamento.
     {
       id: "paymentStatus",
-      header: "Status Faturamento",
+      header: "Status do Orçamento",
       accessorFn: (row) => row.quote?.status ?? "",
       enableSorting: true,
       size: 160,
       meta: {
         defaultVisible: false,
-        headerLabel: "Status Faturamento",
+        headerLabel: "Status do Orçamento",
         requiredPrivilege: FINANCIAL_SECTORS,
         exportValue: (row) => (row.quote?.status ? TASK_QUOTE_STATUS_LABELS[row.quote.status] ?? row.quote.status : ""),
       },

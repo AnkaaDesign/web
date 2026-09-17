@@ -1,5 +1,5 @@
 import { routes, TASK_OBSERVATION_TYPE, TASK_STATUS, TASK_QUOTE_STATUS } from "../constants";
-import { TASK_OBSERVATION_TYPE_LABELS, TASK_STATUS_LABELS } from "../constants";
+import { TASK_OBSERVATION_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS } from "../constants";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
@@ -8,13 +8,16 @@ import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
 /**
  * Resolve where to send a user when they "edit" a task's quote (commercial
  * users, and the quote-section edit button). Billing (faturamento) is reached
- * whenever the quote has been APPROVED — i.e. past PENDING (BUDGET_APPROVED or
- * further along the billing lifecycle) and not a CANCELLED quote — regardless of
- * whether the task is finished yet. Billing approval no longer requires the task
- * to be COMPLETED (due dates anchor on the approval moment), so an approved quote
- * on an unfinished task can still generate invoices/boletos from the billing
- * wizard. Only pending/cancelled/no-quote cases stay in the budget (orçamento)
- * workflow.
+ * once the quote is APPROVED — the last state of the budget lifecycle —
+ * regardless of whether the task is finished yet: billing approval no longer
+ * requires the task to be COMPLETED (due dates anchor on the approval moment),
+ * so an approved quote on an unfinished task can still generate invoices/boletos
+ * from the billing wizard. Everything before approval, plus cancelled and
+ * quote-less tasks, stays in the budget (orçamento) workflow.
+ *
+ * ⚠️ O RECORTE TEM DE SER O MESMO de `isTaskQuoteBillingPhase`, que rotula o item
+ * de menu que chama esta função: divergir faz o menu dizer "Orçamento" e abrir o
+ * assistente de faturar.
  */
 export function getTaskQuoteEditRoute(task: Task): string {
   const status = task.quote?.status;
@@ -32,6 +35,9 @@ export function getTaskQuoteEditRoute(task: Task): string {
     TASK_QUOTE_STATUS.CANCELLED,
     undefined,
   ];
+  // Com o enum encolhido a lista negativa e a positiva coincidem (só sobra APPROVED), mas a forma
+  // positiva fica: é ela que garante que um estado novo de ORÇAMENTO nasça no assistente de
+  // orçamento, e não no de cobrança.
   const isQuoteApproved = !!status && !PRE_BILLING.includes(status as TASK_QUOTE_STATUS);
   return isQuoteApproved
     ? routes.financial.billing.details(task.id)
@@ -201,7 +207,7 @@ export function formatTaskSummary(task: Task): string {
 }
 
 /**
- * Calculate task price from quote total (only BUDGET_APPROVED or later quote).
+ * Calculate task price from quote total (zero until the quote leaves PENDING).
  *
  * A FATIA DESTE VEÍCULO. `TaskQuote.total` é o valor do CONTRATO (`preço por
  * veículo × N`) desde que um orçamento passou a cobrir N caminhões — devolver o
@@ -429,18 +435,14 @@ export function isQuoteExpired(quote: TaskQuote): boolean {
 }
 
 /**
- * Get quote status label in Portuguese
+ * O rótulo do estado do ORÇAMENTO, em português.
+ *
+ * Delega ao mapa canônico em vez de manter uma cópia: esta função guardava uma
+ * TERCEIRA lista de rótulos (com "Orçamento Aprovado", "A Vencer" e os estados
+ * de cobrança), que sobreviveu a duas mudanças de enum sem ninguém notar porque
+ * nada aqui é conferido pelo compilador.
  */
 export function getQuoteStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    PENDING: 'Pendente',
-    BUDGET_APPROVED: 'Orçamento Aprovado',
-    BILLING_APPROVED: 'Faturamento Aprovado',
-    UPCOMING: 'A Vencer',
-    DUE: 'Vencido',
-    PARTIAL: 'Parcial',
-    SETTLED: 'Liquidado',
-  };
-  return labels[status] || status;
+  return TASK_QUOTE_STATUS_LABELS[status as TASK_QUOTE_STATUS] || status;
 }
 

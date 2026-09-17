@@ -11,6 +11,8 @@ import { PAYMENT_TYPE_OPTIONS, configToTypeValue, legacyToConfig } from "@/compo
 import { formatDate } from "@/utils";
 import {
   billingApprovedAtOf,
+  billingStatusOf,
+  billingStatusOrderOf,
   configsForTask,
   perVehicleAmount,
   quotePerVehicleTotal,
@@ -18,6 +20,7 @@ import {
 } from "@/utils/quote-tasks";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import type { Task } from "@/types";
+import type { BILLING_STATUS } from "@/types/task-quote";
 import type { Customer } from "@/types";
 
 /**
@@ -113,6 +116,32 @@ export const taskBillingApprovedAt = (task: Task): Date | string | null => {
   // do registro ANTIGO (gravado antes de as fatias terem a sua própria) e vale
   // para todos os veículos dele.
   return stamped ?? task.quote?.billingApprovedAt ?? null;
+};
+
+/**
+ * O ESTADO DA COBRANÇA DESTA LINHA.
+ *
+ * Mesma regra de `taskBillingApprovedAt`: a linha é UM VEÍCULO, e o estado é o da cobrança que o
+ * cobre — não o do orçamento, que descreve o contrato e é UM SÓ para as N cobranças. Num orçamento
+ * cobrado veículo a veículo o caminhão 12 pode estar liquidado e o 13 vencido.
+ *
+ * `null` quer dizer "a consulta não trouxe o estado" (o include automático do servidor traz id,
+ * `approvedAt` e cobertura, não `status`), nunca "não há cobrança".
+ */
+export const taskBillingStatus = (task: Task): BILLING_STATUS | null => {
+  const configs = taskBillingConfigs(task);
+  // Entre as fatias desta linha, vence a de MENOR `statusOrder` — a que pede ação mais cedo
+  // (vencido antes de pendente, pendente antes de aprovado). Duas fatias na mesma linha só
+  // acontecem quando há dois pagadores do mesmo recorte, e nesse caso as duas são do MESMO
+  // `Billing`, então o desempate é estabilidade e não escolha.
+  let best: { order: number; status: BILLING_STATUS } | null = null;
+  for (const config of configs) {
+    const status = billingStatusOf(config as any);
+    if (!status) continue;
+    const order = billingStatusOrderOf(config as any) ?? Number.MAX_SAFE_INTEGER;
+    if (!best || order < best.order) best = { order, status };
+  }
+  return best?.status ?? null;
 };
 
 /** Date cell used by every date column here — dash when absent, never wrapped. */

@@ -222,7 +222,8 @@ export function BillingStepInfo({
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
   // The SHARED requirement list. This used to check five fields while the save gate checked nine,
-  // so a customer could show "Dados completos" here and still be refused at BILLING_APPROVED —
+  // so a customer could show "Dados completos" here and still be refused when approving the
+  // billing —
   // and the attention rule, which is built from the same list, would blink over a row this badge
   // called fine. `missing` is surfaced in the badge's tooltip so "incompletos" says WHAT.
   const getCustomerValidationStatus = (customerId: string) => {

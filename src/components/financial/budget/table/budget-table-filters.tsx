@@ -2,7 +2,7 @@ import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, I
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer, Task } from "@/types";
-import { TASK_QUOTE_STATUS, TASK_QUOTE_STATUS_LABELS, TASK_STATUS, TASK_STATUS_LABELS } from "@/constants";
+import { TASK_QUOTE_STATUS_LABELS, TASK_STATUS, TASK_STATUS_LABELS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import {
   ATTENTION_CUSTOMER_SELECT,
@@ -14,22 +14,14 @@ import {
   toPositiveInt,
   toPrismaDateRange,
 } from "@/components/financial/shared/quote-table-shared";
-import { buildBudgetOrderBy } from "./budget-table-columns";
+import { BUDGET_QUOTE_STATUSES, buildBudgetOrderBy } from "./budget-table-columns";
 
 export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 
 /** The list is the BUDGET half of a quote's lifecycle — everything past approval belongs to Faturamento. */
-// Os estados que a lista de ORÇAMENTOS mostra — os anteriores ao faturamento.
-// SIGNED e EXPIRED precisam estar aqui: sem eles o comercial não consegue
-// filtrar "o que está esperando a nossa assinatura" nem "o que venceu e preciso
-// reprecificar", que são as duas perguntas que os dois estados existem para
-// responder.
-export const BUDGET_QUOTE_STATUSES = [
-  TASK_QUOTE_STATUS.PENDING,
-  TASK_QUOTE_STATUS.SIGNED,
-  TASK_QUOTE_STATUS.EXPIRED,
-  TASK_QUOTE_STATUS.BUDGET_APPROVED,
-];
+// Definida em `budget-table-columns` (a coluna também precisa dela) e reexportada aqui, que é onde
+// o resto do app já a procurava.
+export { BUDGET_QUOTE_STATUSES } from "./budget-table-columns";
 
 const BUDGET_QUOTE_STATUS_OPTIONS = BUDGET_QUOTE_STATUSES.map((value) => ({ value, label: TASK_QUOTE_STATUS_LABELS[value] }));
 
@@ -188,7 +180,7 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const quoteStatuses = Array.isArray(filters.quoteStatuses) ? filters.quoteStatuses.filter((s): s is string => typeof s === "string") : [];
   const quoteWhere: Record<string, unknown> = {
     // Narrowing WITHIN the list's own scope: an explicit status pick can only ever be a subset of
-    // [PENDING, BUDGET_APPROVED], never a way out of it.
+    // dos cinco estados do orçamento, never a way out of it.
     status: { in: quoteStatuses.length > 0 ? quoteStatuses : BUDGET_QUOTE_STATUSES },
   };
 

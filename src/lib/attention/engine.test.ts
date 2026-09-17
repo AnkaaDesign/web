@@ -495,10 +495,10 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
 
   const quote = (over: Record<string, unknown> = {}) => ({
     id: "quote-1",
-    // BUDGET_APPROVED, not BILLING_APPROVED: the rule now stops once the quote has been billed,
-    // because at that point the nota is out and the pedido number can no longer block it. That
-    // narrowing is what removed eleven long-settled Ibiporã quotes from the Faturamento list.
-    status: TASK_QUOTE_STATUS.BUDGET_APPROVED,
+    // APPROVED é o ÚLTIMO estado do orçamento — antes chamado BUDGET_APPROVED. O recorte da regra
+    // continua sendo este; o que mudou é que o orçamento não anda mais depois dele (o ciclo do
+    // pagamento virou `BILLING_STATUS`, noutra entidade).
+    status: TASK_QUOTE_STATUS.APPROVED,
     task: { id: "task-9", status: TASK_STATUS.COMPLETED },
     anyVehicleMissingOrderNumber: true,
     customerConfigs: [
@@ -566,23 +566,13 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
+  // O recorte é uma LISTA POSITIVA de estados (PENDING, SIGNED, APPROVED), e não "tudo que não é
+  // CANCELLED". A forma negativa deixava passar todo estado pós-nota, e orçamentos cujo dinheiro
+  // estava no banco havia meses seguiam piscando — era metade do motivo de a lista de Faturamento
+  // parecer em chamas. Com o enum do orçamento encolhido, CANCELLED é o único estado fora da
+  // lista, e é este teste que guarda a forma positiva.
   it("stays silent on a cancelled quote", async () => {
     setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.CANCELLED })]);
-    await settle();
-    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
-  });
-
-  // The regression that made the Faturamento list unreadable: the rule used to say "not
-  // CANCELLED", which let every post-invoice status through. Quotes whose nota was issued and
-  // whose money had been in the bank for months went on blinking, and nobody could act on them.
-  it.each([
-    TASK_QUOTE_STATUS.BILLING_APPROVED,
-    TASK_QUOTE_STATUS.UPCOMING,
-    TASK_QUOTE_STATUS.DUE,
-    TASK_QUOTE_STATUS.PARTIAL,
-    TASK_QUOTE_STATUS.SETTLED,
-  ])("stays silent once the quote has been billed (%s)", async (status) => {
-    setEntities("TASK_QUOTE", [quote({ status })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
@@ -639,7 +629,7 @@ describe("TASK_QUOTE — cadastro do cliente incompleto", () => {
 
   const quote = (customerOver: Record<string, unknown> = {}, over: Record<string, unknown> = {}) => ({
     id: "quote-2",
-    status: TASK_QUOTE_STATUS.BUDGET_APPROVED,
+    status: TASK_QUOTE_STATUS.APPROVED,
     task: { id: "task-10", status: TASK_STATUS.COMPLETED },
     customerConfigs: [{ customerId: OTHER_CUSTOMER, generateInvoice: true, customer: { ...completeCustomer, ...customerOver } }],
     ...over,
@@ -685,9 +675,13 @@ describe("TASK_QUOTE — cadastro do cliente incompleto", () => {
     expect(row("TASK_QUOTE", "quote-2")).toBeNull();
   });
 
-  it("stays silent once the quote has been billed", async () => {
-    // Past BUDGET_APPROVED the nota is already out, so the cadastro was necessarily good enough.
-    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, { status: TASK_QUOTE_STATUS.SETTLED })]);
+  it("stays silent on a cancelled quote", async () => {
+    // O recorte é APPROVED. ⚠️ Havia aqui um caso com SETTLED — "passado o faturamento a nota já
+    // saiu, logo o cadastro estava bom" —, que era a JANELA se fechando sozinha porque o orçamento
+    // andava depois de faturado. Ela não fecha mais: APPROVED é terminal, e quem anda é a
+    // cobrança. Fechar a janela agora é perguntar a `billings.some.approvedAt`, no espelho do
+    // servidor também — ver o comentário da regra em `rules.ts`.
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, { status: TASK_QUOTE_STATUS.CANCELLED })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-2")).toBeNull();
   });

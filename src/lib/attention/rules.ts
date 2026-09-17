@@ -71,7 +71,7 @@ function notYetInvoiced(): PredicateNode {
       // ⚠️ Se os dois lados divergirem, a contagem do menu (que vem do servidor)
       // e a linha piscando na tela deixam de concordar.
       { op: "eq", field: "status", value: TASK_QUOTE_STATUS.SIGNED },
-      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.BUDGET_APPROVED },
+      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.APPROVED },
     ],
   };
 }
@@ -435,15 +435,22 @@ export const ATTENTION_RULES: AttentionRule[] = [
   // R7 — Tarefa entregue, orçamento aprovado, e o CADASTRO do cliente não permite emitir a nota.
   //
   // O par da R6, e pela mesma razão: é dinheiro parado por causa de um campo. `validateCustomerData`
-  // (nas duas páginas de detalhe) já RECUSA salvar como BILLING_APPROVED enquanto faltar qualquer
-  // um destes campos — a regra só antecipa essa recusa para a lista, em vez de deixar o usuário
+  // (nas duas páginas de detalhe) já RECUSA aprovar o faturamento enquanto faltar qualquer um
+  // destes campos — a regra só antecipa essa recusa para a lista, em vez de deixar o usuário
   // descobrir no fim do wizard. Por isso a lista de campos vem de `lib/billing-customer-data.ts`,
   // a mesma que o gate de salvamento e os selos "Dados completos/incompletos" consomem: se um dia
   // a NFS-e exigir outro campo, muda-se num lugar só e as quatro superfícies concordam.
   //
-  // O recorte é BUDGET_APPROVED, não "qualquer status": antes disso o orçamento ainda pode nem ser
-  // aprovado, e depois disso a nota JÁ SAIU — logo o cadastro já estava bom. É o que torna a regra
-  // finita: ela existe exatamente na janela em que o dado bloqueia alguém.
+  // O recorte é APPROVED, não "qualquer status": antes disso o orçamento ainda pode nem ser
+  // aprovado, e o cadastro só trava quando a nota está para sair.
+  //
+  // ⚠️ A JANELA ALARGOU em 16/09/2026, e não por escolha desta regra. Ela fechava sozinha porque
+  // o orçamento ANDAVA depois de faturado (BILLING_APPROVED, UPCOMING, …) e saía do recorte; com
+  // o ciclo do pagamento fora do enum, APPROVED é o último estado e o orçamento fica nele para
+  // sempre. Fechar a janela agora é perguntar à COBRANÇA (`billings.some.approvedAt != null`) —
+  // e o espelho no servidor (`RULE_QUERIES`, attention.service.ts) ainda não pergunta isso.
+  // Divergir aqui faria a contagem do menu e a linha piscando discordarem, então os dois lados
+  // seguem alargados juntos até o espelho mudar.
   //
   // Resolve-se por CLIENTE, não por orçamento: preencher o CNPJ de um cliente apaga o alerta de
   // todos os orçamentos dele de uma vez.
@@ -458,7 +465,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       op: "and",
       nodes: [
         { op: "eq", field: "task.status", value: TASK_STATUS.COMPLETED },
-        { op: "eq", field: "status", value: TASK_QUOTE_STATUS.BUDGET_APPROVED },
+        { op: "eq", field: "status", value: TASK_QUOTE_STATUS.APPROVED },
         {
           op: "some",
           field: "customerConfigs",

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { billingService } from "@/api-client/billing";
 
 export const billingKeys = {
@@ -63,5 +63,50 @@ export function useBillings(params?: {
   return useQuery({
     queryKey: billingKeys.list(params ?? {}),
     queryFn: () => billingService.list(params),
+  });
+}
+
+/**
+ * APROVAR ESTA COBRANÇA — a fatura, a NFS-e e os boletos DELA.
+ *
+ * O único caminho de "aprovar faturamento" na tela. Era uma transição de status
+ * do ORÇAMENTO (`updateStatus(quoteId, "BILLING_APPROVED")`), o que num
+ * orçamento cobrado veículo a veículo emitia os sessenta de uma vez — o estado
+ * era um só para N cobranças. O endpoint de status hoje recusa aquele valor.
+ *
+ * Invalida a TAREFA e o ORÇAMENTO junto com a cobrança: a lista de Faturamento é
+ * uma lista de tarefas, o estado que ela mostra vem do `billing` pendurado no
+ * orçamento, e a aprovação também grava `TaskQuote.billingApprovedAt` quando a
+ * última fatia fecha.
+ */
+export function useApproveBilling() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (billingId: string) => billingService.approve(billingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+/**
+ * LIQUIDAR ESTA COBRANÇA À MÃO — o orçamento direto, pago à vista.
+ *
+ * Substitui `updateStatus(quoteId, "SETTLED")`, que dava por pagas também as
+ * cobranças irmãs.
+ */
+export function useSettleBilling() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (billingId: string) => billingService.settle(billingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
   });
 }

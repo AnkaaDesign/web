@@ -491,17 +491,22 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
         return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : <MutedDash />;
       },
     },
+    // ⚠️ O RÓTULO DIZIA "Status Faturamento" e o valor é `quote.status` — o do ORÇAMENTO.
+    // Funcionava por acidente enquanto o enum do orçamento carregava o ciclo do pagamento; desde
+    // 16/09/2026 ele tem cinco estados e nenhum deles é de cobrança, então a coluna anunciaria
+    // faturamento e mostraria "Pendente"/"Aprovado" do contrato. O estado da cobrança é
+    // `BILLING_STATUS`, mora no `Billing`, e quem o mostra é a lista de Faturamento.
     {
       id: "paymentStatus",
-      header: "Status Faturamento",
+      header: "Status do Orçamento",
       accessorFn: (t) => t.quote?.status || "",
       enableSorting: false,
       size: 160,
       meta: {
         defaultVisible: false,
         requiredPrivilege: FINANCIAL_COLUMN_VIEWERS,
-        headerLabel: "Status Faturamento",
-        exportHeader: "Status Faturamento",
+        headerLabel: "Status do Orçamento",
+        exportHeader: "Status do Orçamento",
         exportValue: (t) => t.quote?.status || "",
       },
       cell: ({ row }) => (row.original.quote?.status ? <QuoteStatusBadge status={row.original.quote.status as never} size="sm" /> : <MutedDash />),

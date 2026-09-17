@@ -2,7 +2,7 @@ import { IconCalendar, IconCalendarDollar, IconCurrencyReal, IconFileText, IconH
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer, Task } from "@/types";
-import { TASK_QUOTE_STATUS, TASK_QUOTE_STATUS_LABELS } from "@/constants";
+import { BILLING_STATUS, BILLING_STATUS_LABELS, BILLING_STATUS_ORDER } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import {
   ATTENTION_CUSTOMER_SELECT,
@@ -19,19 +19,20 @@ import { buildBillingOrderBy } from "./billing-table-columns";
 export const BILLING_DEFAULT_PAGE_SIZE = 40;
 
 /**
- * Billing-relevant quote statuses. PENDING is absent on purpose: the server's
- * `shouldDisplayForFinancial` scope already excludes it (a pending quote is an Orçamento, not a
- * Faturamento), so offering it would be a filter that always returns nothing.
+ * O ESTADO DA COBRANÇA — os seis de `BILLING_STATUS`, na ordem da ação pendente.
+ *
+ * ⚠️ Eram estados do ORÇAMENTO. A lista perguntava `quote.status in [...]`, o que só funcionava
+ * porque o enum do orçamento carregava o ciclo do pagamento dentro dele; depois do encolhimento
+ * restariam APPROVED e CANCELLED, e o filtro que o financeiro mais usa ("o que está vencido?")
+ * deixaria de existir. Agora a pergunta é sobre o `Billing`.
+ *
+ * ⚠️ NÃO há "A Vencer": aprovada é `APPROVED`, que já quer dizer "cobrado, esperando pagar".
  */
-const BILLING_QUOTE_STATUS_OPTIONS = [
-  TASK_QUOTE_STATUS.BUDGET_APPROVED,
-  TASK_QUOTE_STATUS.BILLING_APPROVED,
-  TASK_QUOTE_STATUS.UPCOMING,
-  TASK_QUOTE_STATUS.DUE,
-  TASK_QUOTE_STATUS.PARTIAL,
-  TASK_QUOTE_STATUS.SETTLED,
-  TASK_QUOTE_STATUS.CANCELLED,
-].map((value) => ({ value, label: TASK_QUOTE_STATUS_LABELS[value] }));
+const BILLING_STATUS_OPTIONS = (Object.values(BILLING_STATUS) as BILLING_STATUS[])
+  // Ordenado por `BILLING_STATUS_ORDER` e não pela ordem de declaração: é a MESMA ordem em que as
+  // linhas chegam da lista, e é o que a coluna Status ordena. Derivar evita a terceira cópia.
+  .sort((a, b) => BILLING_STATUS_ORDER[a] - BILLING_STATUS_ORDER[b])
+  .map((value) => ({ value, label: BILLING_STATUS_LABELS[value] }));
 
 /**
  * Task-status scope. `finished` is the server's own default, so it is sent ONLY when the user
@@ -75,16 +76,35 @@ export const BILLING_LIST_INCLUDE = {
         select: {
           id: true,
           customerId: true,
-          // QUANDO esta cobrança foi faturada — e QUAIS veículos ela cobre —
-          // vêm do FATURAMENTO (`billing.approvedAt` / `billing.tasks`), que a
-          // API pendura sozinha aqui (`withCoverageInclude`). Não peça nada
-          // disso à mão: sem isso, a linha do caminhão 12 lia a aprovação do
-          // ORÇAMENTO inteiro, que só é gravada quando a última fecha.
+          // O FATURAMENTO, pedido À MÃO — e é a única parte deste include que
+          // NÃO se pode deixar para a API pendurar sozinha.
           //
-          // ⚠️ `billingApprovedAt` era pedido AQUI e a coluna saiu do pagador em
-          // `20260916180000_billing_owns_its_state`. Pedi-la é 500 do Prisma
-          // ("Unknown field ... for select statement"), e derrubava a LISTA
-          // inteira de faturamento — não uma coluna, a tela toda.
+          // `withCoverageInclude` injeta `billing` em todo caminho que devolve
+          // `customerConfigs`, mas com um recorte fixo: id, `approvedAt` e a
+          // cobertura. O ESTADO (`status`/`statusOrder`) não está nele, e é
+          // exatamente o que esta lista mostra e filtra — sem pedi-lo, a coluna
+          // Status Faturamento ficaria vazia em todas as linhas.
+          //
+          // ⚠️ Quem pede `billing` à mão é RESPEITADO INTEIRO: a API não
+          // completa o que faltar. Por isso a cobertura (`tasks`) está repetida
+          // aqui — sem ela, `configsForTask` não sabe qual fatia é a desta
+          // linha e passa a devolver todas, que é a fatura conjunta lida em
+          // sessenta linhas de veículo.
+          //
+          // ⚠️ `billingApprovedAt` já foi pedido no PAGADOR e a coluna saiu dele
+          // em `20260916180000_billing_owns_its_state`. Pedi-la ali é 500 do
+          // Prisma ("Unknown field ... for select statement"), e derrubava a
+          // LISTA inteira — não uma coluna, a tela toda. A data mora no
+          // faturamento, abaixo.
+          billing: {
+            select: {
+              id: true,
+              approvedAt: true,
+              status: true,
+              statusOrder: true,
+              tasks: { select: { taskId: true } },
+            },
+          },
           // "Forma de Pagamento" column. `paymentConfig` is the current shape, `paymentCondition`
           // the legacy string the same helper converts — a record saved before the redesign has to
           // read the same as one saved after it.
@@ -113,12 +133,12 @@ export function createBillingFilterDefs(opts: { invoiceCustomers: Customer[]; ta
       options: TASK_STATUS_SCOPE_OPTIONS,
     },
     {
-      key: "quoteStatuses",
+      key: "billingStatuses",
       label: "Status Faturamento",
       type: "multiselect",
       icon: <IconReceipt2 className="h-4 w-4" />,
       placeholder: "Selecione o status...",
-      options: BILLING_QUOTE_STATUS_OPTIONS,
+      options: BILLING_STATUS_OPTIONS,
     },
     {
       key: "budgetNumber",
@@ -201,8 +221,21 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   // `quote` is a to-one relation: every condition on it goes inside `is`, never as a sibling of it.
   const quoteWhere: Record<string, unknown> = {};
 
-  const quoteStatuses = Array.isArray(filters.quoteStatuses) ? filters.quoteStatuses.filter((s): s is string => typeof s === "string") : [];
-  if (quoteStatuses.length > 0) quoteWhere.status = { in: quoteStatuses };
+  // AS CONDIÇÕES SOBRE A COBRANÇA — reunidas num `some` só.
+  //
+  // Um orçamento tem 1..N cobranças, e `some` significa "existe uma que satisfaz". Juntar as duas
+  // condições no MESMO `some` é a leitura certa: "Vencido" + "faturado em setembro" pergunta por
+  // uma cobrança que seja as duas coisas, e não por um orçamento que tenha uma vencida e outra
+  // (qualquer outra) faturada em setembro.
+  //
+  // ⚠️ O estado era `quote.status in [...]`. Além de perguntar à entidade errada, aquilo dava uma
+  // resposta só para as N cobranças do orçamento — a última cascata que rodasse.
+  const billingSome: Record<string, unknown> = {};
+
+  const billingStatuses = Array.isArray(filters.billingStatuses)
+    ? filters.billingStatuses.filter((s): s is string => typeof s === "string")
+    : [];
+  if (billingStatuses.length > 0) billingSome.status = { in: billingStatuses };
 
   const budgetNumber = toPositiveInt(filters.budgetNumber);
   if (budgetNumber != null) quoteWhere.budgetNumber = budgetNumber;
@@ -213,8 +246,14 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
   const totalRange = toNumberRange(filters.totalRange);
   if (totalRange) quoteWhere.total = totalRange;
 
+  // "Faturado em" também é da COBRANÇA: `TaskQuote.billingApprovedAt` só é gravado quando a
+  // ÚLTIMA fatia fecha, então um orçamento de sessenta caminhões com cinquenta e nove faturados
+  // não entrava em faixa nenhuma. A coluna já lê `billing.approvedAt` (ver `taskBillingApprovedAt`);
+  // o filtro passa a perguntar o mesmo, senão a faixa e a data mostrada discordam.
   const billingApproved = toPrismaDateRange(filters.billingApprovedRange);
-  if (billingApproved) quoteWhere.billingApprovedAt = billingApproved;
+  if (billingApproved) billingSome.approvedAt = billingApproved;
+
+  if (Object.keys(billingSome).length > 0) quoteWhere.billings = { some: billingSome };
 
   // Extra AND branches rather than more keys on `quoteWhere`: each of these is its own `some` over
   // `customerConfigs`, and collapsing them would silently mean "one config satisfying ALL of them".

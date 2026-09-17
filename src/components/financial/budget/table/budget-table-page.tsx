@@ -89,7 +89,7 @@ export function BudgetTablePage() {
   const tasks = useMemo(() => ((response as { data?: Task[] } | undefined)?.data ?? []) as Task[], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
 
-  // Attention: the rows are TASKS but the signal belongs to the TASK QUOTE. A BUDGET_APPROVED
+  // Attention: the rows are TASKS but the signal belongs to the TASK QUOTE. An APPROVED
   // quote shows up on BOTH financial lists, so both register it — otherwise the same record would
   // ring on Faturamento and sit silent here, which is exactly the kind of disagreement between
   // surfaces this system exists to prevent.

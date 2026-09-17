@@ -24,20 +24,37 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
   return null;
 };
 
+/**
+ * O CICLO DO ORÇAMENTO — os cinco, e nada além.
+ *
+ * ⚠️ Escrito à mão e NÃO conferido pelo compilador contra `TASK_QUOTE_STATUS`:
+ * o zod de `taskQuoteCreateNestedSchema` valida `status`, e um valor fora do
+ * enum é ERRO de validação — foi assim que o formulário passou a recusar um
+ * orçamento assinado ou vencido por não saber que o estado existia. Estado novo
+ * entra AQUI também, sempre.
+ *
+ * `CANCELLED` entrou junto com o encolhimento: ele sempre foi estado de
+ * orçamento e faltava nesta lista.
+ */
 export const taskQuoteStatusSchema = z.enum([
-  'PENDING',
-  // Os dois estados que a API acrescentou em `20260911160000` e que este schema
-  // não conhecia: o zod de `taskQuoteCreateNestedSchema` valida `status`, e um
-  // valor fora do enum é ERRO de validação — o formulário recusava um orçamento
-  // assinado ou vencido por não saber que o estado existe.
-  'SIGNED',
   'EXPIRED',
-  'BUDGET_APPROVED',
-  'BILLING_APPROVED',
-  'UPCOMING',
-  'DUE',
+  'SIGNED',
+  'PENDING',
+  'APPROVED',
+  'CANCELLED',
+]);
+
+/**
+ * O CICLO DO FATURAMENTO, que saiu do orçamento em 16/09/2026. Mesmo aviso da
+ * lista acima. ⚠️ Não existe `UPCOMING`/"A Vencer".
+ */
+export const billingStatusSchema = z.enum([
+  'OVERDUE',
+  'PENDING',
+  'APPROVED',
   'PARTIAL',
   'SETTLED',
+  'CANCELLED',
 ]);
 
 export const discountTypeSchema = z.enum([

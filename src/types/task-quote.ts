@@ -3,7 +3,20 @@ import type { File } from './file';
 import type { Installment } from './invoice';
 import type { Task } from './task';
 
-export type TASK_QUOTE_STATUS = 'PENDING' | 'SIGNED' | 'EXPIRED' | 'BUDGET_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
+/**
+ * O CICLO DO ORÇAMENTO — e só dele. Encolheu para cinco em 16/09/2026: o
+ * pagamento é de outra entidade (`Billing`), e o ciclo dele é `BILLING_STATUS`.
+ *
+ * ⚠️ Espelho de `@/constants/enums`. O enum lá é o valor; este é o tipo que as
+ * telas usam. Os dois têm de ter os mesmos cinco membros.
+ */
+export type TASK_QUOTE_STATUS = 'EXPIRED' | 'SIGNED' | 'PENDING' | 'APPROVED' | 'CANCELLED';
+/**
+ * O CICLO DO FATURAMENTO. Derivado no servidor de `approvedAt` + das parcelas;
+ * nenhuma tela o escreve. ⚠️ Não existe "A Vencer": depois de aprovar é
+ * `APPROVED`, que já quer dizer "cobrado, esperando pagar".
+ */
+export type BILLING_STATUS = 'OVERDUE' | 'PENDING' | 'APPROVED' | 'PARTIAL' | 'SETTLED' | 'CANCELLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
 /**
  * JUNTO, SEPARADO OU EM LOTES.
@@ -62,6 +75,22 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
     /** Quando ESTE faturamento foi aprovado. `TaskQuote.billingApprovedAt` é
      *  quando o ÚLTIMO fechou — "o orçamento inteiro está faturado". */
     approvedAt?: Date | string | null;
+    /**
+     * O ESTADO DA COBRANÇA — o que a lista de Faturamento mostra e ordena.
+     *
+     * ⚠️ NÃO é `quote.status`: aquele é o ciclo do orçamento, que termina em
+     * `APPROVED`. Um orçamento aprovado pode ter uma cobrança liquidada e outra
+     * vencida ao mesmo tempo, e era ter um campo só para as duas que fazia a
+     * lista escolher "a última que rodasse".
+     *
+     * ⚠️ Só chega quando a consulta pede `billing: { select: { status: true,
+     * statusOrder: true, … } }` explicitamente — o include automático do
+     * servidor (`withCoverageInclude`) traz id, `approvedAt` e a cobertura, não
+     * o estado.
+     */
+    status?: BILLING_STATUS;
+    /** Espelho numérico de `status` para ordenação — ver `BILLING_STATUS_ORDER`. */
+    statusOrder?: number;
     createdAt?: Date | string;
     tasks?: Array<{
       taskId: string;
@@ -176,4 +205,42 @@ export interface TaskQuote extends BaseEntity {
   task?: Task;
   services?: TaskQuoteService[];
   customerConfigs?: TaskQuoteCustomerConfig[];
+
+  /**
+   * AS COBRANÇAS deste orçamento — 1..N, cada uma com id, cobertura e estado
+   * próprios.
+   *
+   * É onde mora tudo que é do pagamento. `customerConfigs` é a lista de
+   * PAGADORES; ela aponta para a cobrança por `billingId`/`billing`, e não o
+   * contrário.
+   *
+   * ⚠️ Relação: só vem quando a consulta a pede. Ausente NÃO quer dizer "não há
+   * cobrança" — quer dizer "não perguntei".
+   */
+  billings?: Billing[];
+}
+
+/**
+ * UMA COBRANÇA — o que é cobrado, de quem, em quantas parcelas e com que nota.
+ *
+ * Separada de `TaskQuote` em 16/09/2026: o orçamento se altera até a execução do
+ * serviço; o faturamento, até o pagamento terminar. Um orçamento tem 1..N
+ * cobranças (uma por veículo, por lote, ou uma só para todos).
+ */
+export interface Billing {
+  id: string;
+  quoteId: string;
+  /** Quando ESTA cobrança foi aprovada — nulo enquanto `status` for `PENDING`. */
+  approvedAt?: Date | string | null;
+  /** Derivado no servidor de `approvedAt` + das parcelas. Ninguém o digita. */
+  status: BILLING_STATUS;
+  /** Espelho numérico de `status` — ver `BILLING_STATUS_ORDER`. */
+  statusOrder: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  /** OS VEÍCULOS que esta cobrança cobre. */
+  tasks?: Array<{ taskId: string; task?: Task | null }>;
+  /** A QUEM se cobra, e em que termos. Um por pagador. */
+  customerConfigs?: TaskQuoteCustomerConfig[];
+  quote?: TaskQuote;
 }

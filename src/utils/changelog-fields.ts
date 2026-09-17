@@ -1652,13 +1652,25 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle task quote fields
   if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE) {
     if ((field === "status" || field === "status_transition") && typeof value === "string") {
-      // Legacy status values from before quote status refactor
+      // ESTADOS APOSENTADOS — o histórico NÃO é reescrito quando o enum muda.
+      //
+      // O changelog guarda o valor cru de quando o evento aconteceu, então há linhas em produção
+      // com `BUDGET_APPROVED` e com os cinco estados de cobrança que saíram do orçamento em
+      // 16/09/2026 (`BILLING_APPROVED`, `UPCOMING`, `DUE`, `PARTIAL`, `SETTLED`), além dos nomes
+      // de antes da refatoração anterior. Sem este mapa, o histórico de todo orçamento já faturado
+      // passaria a exibir o valor cru em inglês.
+      //
+      // Os rótulos são os que a tela usava NAQUELA ÉPOCA — inclusive "A Vencer", que não existe
+      // mais em lugar nenhum: o histórico conta o que se via, não o que se veria hoje.
       const legacyQuoteStatusLabels: Record<string, string> = {
         DRAFT: "Rascunho",
-        APPROVED: "Aprovado",
         REJECTED: "Rejeitado",
-        CANCELLED: "Cancelado",
-        EXPIRED: "Expirado",
+        BUDGET_APPROVED: "Orçamento Aprovado",
+        BILLING_APPROVED: "Faturamento Aprovado",
+        UPCOMING: "A Vencer",
+        DUE: "Vencido",
+        PARTIAL: "Parcial",
+        SETTLED: "Liquidado",
       };
       return TASK_QUOTE_STATUS_LABELS[value as TASK_QUOTE_STATUS] || legacyQuoteStatusLabels[value] || value;
     }

@@ -8,8 +8,8 @@
 //   • the attention rule `task-quote.billing-customer-incomplete` (lib/attention/rules.ts),
 //     which BUILDS its predicate from this list — so the blink can never ask for a field the
 //     save gate does not require, nor stay silent about one it does;
-//   • the save gate on both quote wizards (`validateCustomerData`), which refuses
-//     BILLING_APPROVED while anything here is empty;
+//   • the save gate on both quote wizards (`validateCustomerData`), which refuses to APPROVE THE
+//     BILLING (`PUT /billings/:id/approve`) while anything here is empty;
 //   • the "Dados completos / Dados incompletos" badges on the Faturar Para and Resumo steps;
 //   • the per-input highlight on the customer step.
 //

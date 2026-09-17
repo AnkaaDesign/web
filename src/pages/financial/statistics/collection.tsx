@@ -11,7 +11,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getBonusPeriodStart, getBonusPeriodEnd } from '@/utils/bonus';
-import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES } from '@/constants';
+import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, TASK_QUOTE_STATUS, TASK_QUOTE_STATUS_LABELS } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
 import { usePricingVisible } from '@/hooks/common/use-pricing-visible';
@@ -121,15 +121,23 @@ const INVOICE_STATUS_OPTIONS = [
 ];
 
 // Estágios do Orçamento — applies to quote-funnel endpoint (sales side)
-const QUOTE_STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Pendente' },
-  { value: 'BUDGET_APPROVED', label: 'Orçamento Aprovado' },
-  { value: 'BILLING_APPROVED', label: 'Faturamento Aprovado' },
-  { value: 'UPCOMING', label: 'A Vencer' },
-  { value: 'DUE', label: 'Vencido' },
-  { value: 'PARTIAL', label: 'Parcial' },
-  { value: 'SETTLED', label: 'Liquidado' },
-];
+//
+// ⚠️ SÓ OS ESTADOS DO ORÇAMENTO. A lista trazia também o ciclo do pagamento (Faturamento Aprovado,
+// A Vencer, Vencido, Parcial, Liquidado) porque ele morava no mesmo enum; hoje aquilo é
+// `BILLING_STATUS`, de outra entidade, e pedir esses valores ao funil de VENDAS filtra por um
+// estado que o orçamento não tem — devolvendo zero sempre.
+//
+// Derivado do mapa canônico e não transcrito: era uma quarta cópia dos rótulos, e cópia de rótulo
+// é o que sobrevive a uma mudança de enum sem ninguém notar.
+const QUOTE_STATUS_OPTIONS = (
+  [
+    TASK_QUOTE_STATUS.EXPIRED,
+    TASK_QUOTE_STATUS.SIGNED,
+    TASK_QUOTE_STATUS.PENDING,
+    TASK_QUOTE_STATUS.APPROVED,
+    TASK_QUOTE_STATUS.CANCELLED,
+  ] as const
+).map((value) => ({ value: value as string, label: TASK_QUOTE_STATUS_LABELS[value] }));
 
 type XMode = 'month' | 'year';
 const X_AXIS_OPTIONS: Array<{ value: XMode; label: string }> = [
@@ -1865,6 +1873,10 @@ const FinancialOverviewPage = () => {
     const periodMaxLabel = metricStats.max.value > 0 ? metricStats.max.name : '—';
     const periodMinLabel = metricStats.min && metricStats.min.value > 0 ? metricStats.min.name : '—';
     const activeOfTotal = `${metricStats.activeCount} de ${metricStats.totalCount} períodos`;
+    // ⚠️ `SETTLED` era um ESTÁGIO DO FUNIL DE ORÇAMENTOS enquanto "liquidado" era estado do
+    // orçamento. Não é mais: liquidar é da cobrança. O servidor decide os estágios que devolve
+    // (`stageDefs` em `invoice-analytics.service.ts`) e a leitura já era defensiva — quando o
+    // estágio não vem, o cartão recai na contagem agregada de `quoteItems`.
     const cycleSettled = quoteFunnel.find(s => s.stage === 'SETTLED');
 
     const peakClick = metricStats.max.value > 0 && metricStats.max.name !== '-'

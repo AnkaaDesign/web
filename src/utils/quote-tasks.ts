@@ -1,3 +1,8 @@
+// `import type` puro: este módulo é deliberadamente livre de dependências de
+// runtime (é o espelho de `api/src/utils/quote-tasks.ts` e roda nos dois lados),
+// e um tipo é apagado na compilação.
+import type { BILLING_STATUS } from "../types/task-quote";
+
 /**
  * As TAREFAS de um orçamento — a fonte única sobre ordem, contagem e âncora.
  *
@@ -236,7 +241,14 @@ export interface BillingConfigLike extends BillingCoverageLike {
   id?: string;
   customerId?: string | null;
   billingId?: string | null;
-  billing?: (BillingCoverageLike & { id?: string; approvedAt?: Date | string | null }) | null;
+  billing?:
+    | (BillingCoverageLike & {
+        id?: string;
+        approvedAt?: Date | string | null;
+        status?: BILLING_STATUS;
+        statusOrder?: number;
+      })
+    | null;
 }
 
 /** As linhas de cobertura, venham do faturamento ou do pagador que aponta para ele. */
@@ -282,6 +294,36 @@ export function billingApprovedAtOf(
 /** Atalho legível: este faturamento já foi aprovado? */
 export function isBillingApproved(config: BillingConfigLike | null | undefined): boolean {
   return billingApprovedAtOf(config) != null;
+}
+
+/**
+ * O ESTADO DESTA COBRANÇA — pergunte ao faturamento, nunca ao orçamento.
+ *
+ * `quote.status` é o ciclo do CONTRATO e termina em `APPROVED`; quem anda depois
+ * disso é a cobrança, e um orçamento pode ter uma liquidada e outra vencida ao
+ * mesmo tempo. Ler o estado do orçamento aqui obrigava as duas a ter a mesma
+ * resposta — na prática, a da última cascata que rodasse.
+ *
+ * Aceita o faturamento em si ou o pagador que aponta para um, como as demais
+ * funções desta seção. Devolve `null` quando a consulta não pediu `status`: o
+ * include automático do servidor traz id, `approvedAt` e a cobertura, não o
+ * estado — e "não perguntei" não é "não tem".
+ */
+export function billingStatusOf(
+  config: BillingConfigLike | null | undefined,
+): BILLING_STATUS | null {
+  const own = (config as { status?: BILLING_STATUS } | null | undefined)?.status;
+  if (own !== undefined) return own ?? null;
+  return config?.billing?.status ?? null;
+}
+
+/** O espelho numérico de `billingStatusOf`, para ordenar. Ver `BILLING_STATUS_ORDER`. */
+export function billingStatusOrderOf(
+  config: BillingConfigLike | null | undefined,
+): number | null {
+  const own = (config as { statusOrder?: number } | null | undefined)?.statusOrder;
+  if (own !== undefined) return own ?? null;
+  return config?.billing?.statusOrder ?? null;
 }
 
 /** Quantos veículos este faturamento cobra. É o multiplicador do valor da fatura. */

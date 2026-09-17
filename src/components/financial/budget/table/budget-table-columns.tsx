@@ -4,7 +4,7 @@ import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
-import { TASK_STATUS_LABELS, getBadgeVariant } from "@/constants";
+import { TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, getBadgeVariant } from "@/constants";
 import type { TASK_STATUS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import { formatCurrency } from "@/utils";
@@ -325,9 +325,13 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
       },
       cell: ({ row }) => {
         const status = row.original.quote?.status;
-        // The list is scoped to PENDING/BUDGET_APPROVED; anything else means the quote moved on
-        // between fetch and render, and a billing-stage badge here would be misleading.
-        if (status !== "PENDING" && status !== "BUDGET_APPROVED") return <MutedDash />;
+        // O escopo da lista é `BUDGET_QUOTE_STATUSES`, e a guarda tem de ser ELE — não uma cópia.
+        // Enquanto era a dupla literal ["PENDING", "BUDGET_APPROVED"], todo orçamento ASSINADO ou
+        // AGUARDANDO REANÁLISE caía no traço: o filtro sabia dos quatro estados, a coluna sabia de
+        // dois, e a tela dizia "-" para o estado que o comercial mais precisa ver.
+        // Traço só sobra para o que não é estado de orçamento nenhum (um payload antigo com
+        // `BUDGET_APPROVED`, por exemplo): desenhar um badge sem rótulo é pior que a ausência.
+        if (!status || !BUDGET_QUOTE_STATUSES.includes(status as TASK_QUOTE_STATUS)) return <MutedDash />;
         return <QuoteStatusBadge status={status as TASK_QUOTE_STATUS} size="sm" />;
       },
     },
@@ -344,11 +348,42 @@ export function createBudgetColumns(): DataTableColumnDef<Task>[] {
   ];
 }
 
-/** Plain-text status labels for exports (the cell renders a badge). */
-const QUOTE_STATUS_EXPORT: Partial<Record<TASK_QUOTE_STATUS, string>> = {
-  PENDING: "Pendente",
-  BUDGET_APPROVED: "Orçamento Aprovado",
-} as Partial<Record<TASK_QUOTE_STATUS, string>>;
+/**
+ * Os estados que a lista de ORÇAMENTOS mostra — TODOS os do orçamento, na ordem da AÇÃO PENDENTE
+ * (a mesma de `TASK_QUOTE_STATUS_ORDER`): vencido → assinado → pendente → aprovado → cancelado.
+ *
+ * SIGNED e EXPIRED precisam estar aqui: sem eles o comercial não consegue filtrar "o que está
+ * esperando a nossa assinatura" nem "o que venceu e preciso reprecificar", que são as duas
+ * perguntas que os dois estados existem para responder.
+ *
+ * ⚠️ SÃO OS CINCO, e a lista deixou de ser um RECORTE do enum. Enquanto o enum descrevia também o
+ * pagamento, "orçamento" era o prefixo dele e esta constante existia para cortar o resto fora.
+ * Depois da separação o enum do orçamento É o ciclo do orçamento: recortá-lo esconderia estado
+ * válido, que é como a coluna Status passou a desenhar traço em orçamento assinado. CANCELLED
+ * entrou junto — um orçamento cancelado é um orçamento, e ele não tem cobrança para aparecer do
+ * outro lado.
+ *
+ * Mora AQUI, e não no arquivo de filtros, porque a coluna também precisa dela e `budget-table-filters`
+ * já importa deste módulo — o caminho inverso seria um ciclo.
+ */
+export const BUDGET_QUOTE_STATUSES: TASK_QUOTE_STATUS[] = [
+  "EXPIRED",
+  "SIGNED",
+  "PENDING",
+  "APPROVED",
+  "CANCELLED",
+] as TASK_QUOTE_STATUS[];
+
+/**
+ * Rótulos em texto puro para a exportação (a célula desenha um badge).
+ *
+ * Derivado do mapa canônico em vez de reescrito à mão: a versão anterior listava só dois estados,
+ * então a planilha saía com a coluna Status EM BRANCO exatamente nas linhas assinadas — o mesmo
+ * defeito da célula, num lugar em que ninguém olha até precisar.
+ */
+const QUOTE_STATUS_EXPORT: Partial<Record<TASK_QUOTE_STATUS, string>> = Object.fromEntries(
+  BUDGET_QUOTE_STATUSES.map((s) => [s, TASK_QUOTE_STATUS_LABELS[s]]),
+) as Partial<Record<TASK_QUOTE_STATUS, string>>;
 
 /** column id → API `orderBy` entry. Ids absent here are not server-sortable. */
 export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Record<string, unknown>> = {

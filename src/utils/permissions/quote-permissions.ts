@@ -31,9 +31,12 @@ export function canDeleteQuote(userRole: string): boolean {
 }
 
 /**
- * Check if user can update task quote status.
- * ADMIN, FINANCIAL, and COMMERCIAL can update status.
- * COMMERCIAL cannot set BILLING_APPROVED (only ADMIN/FINANCIAL can).
+ * Quem pode mexer no status DO ORÇAMENTO.
+ *
+ * ADMIN, FINANCEIRO e COMERCIAL abrem o seletor; o que cada um pode escolher é
+ * decidido em `getAvailableQuoteStatusTransitions`. Aprovar FATURAMENTO não
+ * passa mais por aqui — é `PUT /billings/:id/approve`, e o gate é o da rota
+ * (ADMIN/FINANCEIRO).
  */
 export function canUpdateQuoteStatus(userRole: string): boolean {
   return [
@@ -44,65 +47,52 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
 }
 
 /**
- * Valid status transitions for task quote.
+ * O GRAFO DO ORÇAMENTO — quatro arestas, e nenhuma delas é de cobrança.
  *
- * Typical flow:
- *   PENDING -> BUDGET_APPROVED -> BILLING_APPROVED -> UPCOMING -> PARTIAL -> SETTLED
+ * Fluxo: PENDING → APPROVED, com SIGNED e EXPIRED entrando pela CERIMÔNIA de
+ * assinatura (por isso não são DESTINO de ninguém aqui: o que as linhas deles
+ * declaram é como se SAI deles), e CANCELLED como terminal.
  *
- * DUE status represents overdue installments:
- *   UPCOMING -> DUE (when installments become overdue)
- *   DUE -> PARTIAL (when overdue installment gets paid but not all)
- *   DUE -> SETTLED (when last installment gets paid)
- *   PARTIAL -> DUE (when another installment becomes overdue)
+ * ⚠️ O GRAFO ENCOLHEU EM 16/09/2026. Ele descrevia também o ciclo do pagamento —
+ * BILLING_APPROVED → UPCOMING → PARTIAL/DUE → SETTLED, com as voltas de estorno.
+ * Nada disso é transição de orçamento: é a cobrança andando, e a cobrança agora
+ * é o `Billing`, cujo estado NINGUÉM digita (`BillingStatusCascadeService` o
+ * deriva das parcelas). Some com isso uma classe inteira de defeito que este
+ * grafo tinha por construção: um orçamento com duas cobranças, uma paga e outra
+ * vencida, precisava escolher UMA aresta — escolhia a última que rodasse.
  *
- * BILLING_APPROVED is a critical transition: it triggers automatic invoice
- * and boleto generation, which is hard to reverse. The UI should confirm
- * before allowing this transition.
- *
- * Currently all statuses can transition to any other status (except themselves)
- * to allow administrative corrections.
+ * ⚠️ ESPELHA `validateStatusTransition` em
+ * `api/src/modules/production/task-quote/task-quote.service.ts`, byte a byte.
+ * Divergir faz a tela oferecer uma transição que o servidor devolve em 400.
  */
 const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
-  // CANCELLED from PENDING/BUDGET_APPROVED mirrors the task being cancelled
-  // before any billing phase. The quote follows the task into the terminal
-  // CANCELLED state. Once billing has started, cancellation is no longer a
-  // direct quote transition (the billing flow must be unwound first).
-  PENDING: ['BUDGET_APPROVED', 'CANCELLED'],
-  // SIGNED e EXPIRED são escritos pela CERIMÔNIA, nunca escolhidos num menu —
-  // por isso não são DESTINO de ninguém aqui. O que estas duas linhas declaram é
-  // como se SAI deles. Espelham `validateStatusTransition` na API: divergir faz
-  // a tela oferecer uma transição que o servidor devolve em 400.
-  //
+  // Vencido sem todas as assinaturas. O comercial reanalisa o valor: reformula
+  // (o que já devolve o orçamento a PENDING pelo auto-revert do servidor),
+  // estende a validade, ou cancela. NÃO vai direto para APPROVED — aprovar sem
+  // assinatura é exatamente o que a cerimônia existe para impedir.
+  EXPIRED: ['PENDING', 'CANCELLED'],
   // De SIGNED não se vai para EXPIRED: aceita a proposta dentro do prazo, o
   // relógio para de correr contra o cliente — o que falta é nosso.
-  SIGNED: ['BUDGET_APPROVED', 'PENDING', 'CANCELLED'],
-  // De EXPIRED não se vai direto para BUDGET_APPROVED: aprovar sem assinatura é
-  // o que a cerimônia existe para impedir. Reformular o valor já devolve o
-  // orçamento a PENDING pelo auto-revert do servidor.
-  EXPIRED: ['PENDING', 'CANCELLED'],
-  // SETTLED from BUDGET_APPROVED covers "direct" quotes (orçamento direto)
-  // paid upfront with no billing/installment phase. The server's settleManually
-  // handles this safely (no installments/boletos exist yet to clean up).
-  BUDGET_APPROVED: ['BILLING_APPROVED', 'PENDING', 'SETTLED', 'CANCELLED'],
-  // SETTLED from BILLING_APPROVED covers prepayment (customer pays before
-  // installments are tracked) and recovery from quotes stuck at BILLING_APPROVED
-  // when the auto-transition to UPCOMING failed. The server's settleManually
-  // handles installment + boleto cleanup safely from this state.
-  BILLING_APPROVED: ['UPCOMING', 'SETTLED'],
-  UPCOMING: ['PARTIAL', 'DUE', 'BILLING_APPROVED', 'SETTLED'],
-  DUE: ['PARTIAL', 'SETTLED', 'UPCOMING'],
-  PARTIAL: ['SETTLED', 'DUE', 'UPCOMING'],
-  // SETTLED -> PARTIAL is intentionally allowed to handle payment reversal
-  // (chargeback/estorno) scenarios where a previously settled invoice has
-  // a payment reversed and returns to partial payment state.
-  SETTLED: ['PARTIAL'],
-  // CANCELLED is terminal: a cancelled quote has no further transitions.
+  SIGNED: ['APPROVED', 'PENDING', 'CANCELLED'],
+  PENDING: ['APPROVED', 'CANCELLED'],
+  // APPROVED é o ÚLTIMO estado do orçamento: dele só se volta ou se cancela.
+  // APPROVED → PENDING existe para o caminho de desistência mais comum, o
+  // cliente voltando atrás ANTES de haver cobrança. Depois que alguma cobrança
+  // foi aprovada o servidor barra a edição (`isQuoteMoneyLocked`) e o caminho é
+  // `/revert-billing`, que limpa boleto e NFS-e antes.
+  APPROVED: ['PENDING', 'CANCELLED'],
+  // Terminal: um orçamento cancelado não volta. Recotar cria um novo.
   CANCELLED: [],
 };
 
 /**
- * Get available next statuses for a given quote status and user role.
- * Returns only statuses the user is allowed to transition to.
+ * Os destinos legais a partir de `currentStatus` para este setor.
+ *
+ * ⚠️ APROVAR O ORÇAMENTO É DO COMERCIAL. Espelha `validateQuoteStatusChangeRole`
+ * na API, que restringe `APPROVED` a ADMIN/COMERCIAL — o FINANCEIRO não aprova
+ * venda, ele aprova COBRANÇA, e isso é outro botão e outra rota
+ * (`PUT /billings/:id/approve`). Antes era o contrário: o filtro tirava
+ * `BILLING_APPROVED` do COMERCIAL, porque os dois atos moravam no mesmo enum.
  */
 export function getAvailableQuoteStatusTransitions(
   currentStatus: TASK_QUOTE_STATUS,
@@ -110,10 +100,8 @@ export function getAvailableQuoteStatusTransitions(
 ): TASK_QUOTE_STATUS[] {
   const transitions = VALID_TRANSITIONS[currentStatus] || [];
 
-  // COMMERCIAL can approve the budget (BUDGET_APPROVED) but cannot approve
-  // billing (BILLING_APPROVED) — that belongs to ADMIN/FINANCIAL.
-  if (userRole === SECTOR_PRIVILEGES.COMMERCIAL) {
-    return transitions.filter((s) => s !== 'BILLING_APPROVED');
+  if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
+    return transitions.filter((s) => s !== 'APPROVED');
   }
 
   return transitions;
@@ -125,10 +113,10 @@ export function getAvailableQuoteStatusTransitions(
  * [] when `from === to` or no legal path exists.
  *
  * The status dropdowns gate their options by the *form* status, so within one
- * editing session a user can advance several steps (e.g. PENDING →
- * BUDGET_APPROVED → BILLING_APPROVED). The server only accepts single legal
- * hops, so the save must replay the path hop-by-hop. BFS yields the shortest
- * legal path through VALID_TRANSITIONS.
+ * editing session a user can step back and forth (e.g. APPROVED → PENDING →
+ * APPROVED). The server only accepts single legal hops, so the save must replay
+ * the path hop-by-hop. BFS yields the shortest legal path through
+ * VALID_TRANSITIONS.
  */
 export function getQuoteStatusPath(
   from: TASK_QUOTE_STATUS,

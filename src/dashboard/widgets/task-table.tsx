@@ -949,23 +949,10 @@ function buildColumnCatalog(): ColumnDef[] {
       render: (t) => {
         const q: any = t.quote;
         if (!q?.status) return <span className="text-muted-foreground text-sm">—</span>;
-        // Installments live under quote.customerConfigs[].installments (the
-        // API's base task include hydrates them). Flatten across configs for
-        // the badge's paid/total progress display.
-        const installments: any[] =
-          (q.customerConfigs ?? []).flatMap((cc: any) => cc?.installments ?? []) ?? [];
-        const paidCount = installments.length
-          ? installments.filter((i) => i.paid || i.paidAt).length
-          : undefined;
-        const totalCount = installments.length || undefined;
-        return (
-          <QuoteStatusBadge
-            status={q.status}
-            paidCount={paidCount}
-            totalCount={totalCount}
-            size="sm"
-          />
-        );
+        // Sem contagem de parcelas: o progresso "3/6" é do PAGAMENTO, e pagamento é da cobrança
+        // (`BILLING_STATUS.PARTIAL`), não do orçamento. Esta coluna é a do orçamento — a tarefa é
+        // a entidade da linha, e o que ela tem é um contrato, não uma fatura.
+        return <QuoteStatusBadge status={q.status} size="sm" />;
       },
     },
     {
@@ -1364,7 +1351,20 @@ const taskTableConfigSchemaInner = z.object({
       hasBudget: z.enum(TRI_STATE).default("any"),
       isOverdue: z.enum(TRI_STATE).default("any"),
       serviceOrderTypes: z.array(z.nativeEnum(SERVICE_ORDER_TYPE)).default([]),
-      quoteStatuses: z.array(z.nativeEnum(TASK_QUOTE_STATUS)).default([]),
+      // ⚠️ PENEIRA, e não validação estrita: um dashboard GRAVADO pode trazer um estado que o
+      // enum não tem mais (os presets pediam `BUDGET_APPROVED` até 16/09/2026). O `safeParse` que
+      // lê esta configuração descarta a CONFIGURAÇÃO INTEIRA quando qualquer campo falha — colunas,
+      // ordenação e todos os outros filtros junto —, então um valor aposentado num filtro zerava o
+      // widget do usuário. Descartar o valor e manter o resto é a falha proporcional.
+      quoteStatuses: z
+        .preprocess(
+          (v) =>
+            Array.isArray(v)
+              ? v.filter((x) => (Object.values(TASK_QUOTE_STATUS) as string[]).includes(x as string))
+              : v,
+          z.array(z.nativeEnum(TASK_QUOTE_STATUS)),
+        )
+        .default([]),
       defaultSearch: z.string().default(""),
     })
     .default({

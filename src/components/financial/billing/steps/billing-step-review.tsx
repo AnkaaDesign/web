@@ -15,10 +15,12 @@ import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseCancelDialog } from "@/components/financial/nfse/nfse-cancel-dialog";
 import { useTaskNfseHistory } from "@/hooks/production/use-invoice";
 import { useNfseDetail } from "@/hooks/financial/use-nfse";
-import { canApproveQuote, canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
+import { canApproveQuote } from "@/utils/permissions/quote-permissions";
 import { round2 } from "@/utils/quote-money";
 import type { Invoice } from "@/types/invoice";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import type { BILLING_STATUS, TASK_QUOTE_STATUS } from "@/types/task-quote";
+import { BILLING_STATUS_LABELS } from "@/constants";
+import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,16 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink, IconX } from "@tabler/icons-react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState, useCallback } from "react";
@@ -64,72 +56,41 @@ import {
   coverageSummary,
   coveredTaskCount,
   coveredTaskIds,
-  billingApprovedAtOf,
 } from "@/utils/quote-tasks";
 
-// Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
-// on the same transition, and disagreeing meant this dialog waved through a status the page then
-// refused. BUDGET_APPROVED is also the window `task-quote.billing-customer-incomplete` fires in.
-const STATUSES_REQUIRING_COMPLETE_DATA = ["BUDGET_APPROVED", "BILLING_APPROVED"];
-
-// Canonical label map for every quote status (used for the trigger-render fallback).
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pendente",
-  BUDGET_APPROVED: "Orçamento Aprovado",
-  BILLING_APPROVED: "Faturamento Aprovado",
-  UPCOMING: "A Vencer",
-  DUE: "Vencido",
-  PARTIAL: "Parcial",
-  SETTLED: "Liquidado",
-};
-
-// Synthetic combobox option that triggers the revert-billing flow instead of a status change.
+// ═══════════════════════════════════════════════════════════════════════════
+// ESTA TELA NÃO MEXE NO STATUS DO ORÇAMENTO — ELA AGE SOBRE A COBRANÇA
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Havia aqui um seletor de STATUS DO ORÇAMENTO que oferecia "Aprovar
+// Faturamento" (BILLING_APPROVED), "Liquidado" (SETTLED) e os estados
+// automáticos de vencimento como contexto desabilitado. Todos eles eram estados
+// do orçamento porque a cobrança não existia como entidade — e, sendo um só para
+// N cobranças, aprovar o primeiro de sessenta caminhões emitia os sessenta.
+//
+// Agora são AÇÕES SOBRE ESTA COBRANÇA, cada uma com a sua rota:
+//   · aprovar  → PUT /billings/:id/approve
+//   · liquidar → PUT /billings/:id/settle
+//   · reverter → PUT /task-quotes/:id/revert-billing  (desfaz o ciclo INTEIRO do
+//                orçamento: baixa boletos e cancela notas; por isso continua
+//                endereçado pelo orçamento)
+//
+// O status do orçamento se edita no assistente de ORÇAMENTO. Aqui ele aparece
+// como contexto, em leitura — é o contrato que se está cobrando.
+const APPROVE_OPTION_VALUE = "__APPROVE_BILLING__";
+const SETTLE_OPTION_VALUE = "__SETTLE_BILLING__";
 const REVERT_OPTION_VALUE = "__REVERT_BILLING__";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// APROVAR O FATURAMENTO DESTE VEÍCULO — UM ATO DA FATIA, NÃO UMA TRANSIÇÃO
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Com cobrança fatiada (veículo a veículo ou em lotes) a PRIMEIRA aprovação leva
-// o orçamento a BILLING_APPROVED e a cascata o move para UPCOMING/DUE/PARTIAL.
-// As fatias 2..N não mexem mais no status do orçamento — ele já está no ciclo de
-// recebíveis — e por isso não podem depender dele.
-//
-// Era o que acontecia: o seletor só oferecia "Aprovar Faturamento" enquanto o
-// status fosse PRÉ-faturamento, então depois do primeiro caminhão nenhum outro
-// tinha por onde ser faturado. Num orçamento de sessenta, cinquenta e nove
-// ficavam sem fatura, sem nota e sem boleto, e não havia outro caminho na tela.
-//
-// A opção agora é SINTÉTICA, como a de reverter: não é um status, é uma ação
-// sobre a fatia que cobre o veículo aberto. Aparece enquanto essa fatia não
-// tiver sido aprovada, em qualquer status do orçamento.
-const APPROVE_SLICE_OPTION_VALUE = "__APPROVE_BILLING_SLICE__";
-
-// Statuses meaning billing has already been approved (invoice/NF/boleto exist or are generating).
-// Pre-billing (e.g. BUDGET_APPROVED) → the forward action is to APPROVE faturamento, which
-// generates the documents. Post-billing → the only manual actions are revert or mark-as-settled.
-const POST_BILLING_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
-
-// Action-oriented (verb) labels for selectable options, vs STATUS_LABELS (the state name shown in
-// the trigger). e.g. the BILLING_APPROVED option reads "Aprovar Faturamento", but once current it
-// reads "Faturamento Aprovado".
-const ACTION_LABELS: Record<string, string> = {
-  BILLING_APPROVED: "Aprovar Faturamento",
-  SETTLED: "Liquidado",
-};
-
-// Statuses that are set automatically and cannot be manually selected (shown disabled for context)
-const AUTOMATIC_STATUSES = ["UPCOMING", "DUE", "PARTIAL"];
-
-const getStatusTriggerClass = (status: string) => {
+// A cor do gatilho, nas MESMAS cores de `BillingStatusBadge` — divergir faria a
+// mesma situação ter duas cores conforme o usuário pudesse ou não agir.
+const getBillingTriggerClass = (status: string) => {
   const map: Record<string, string> = {
-    PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
-    BUDGET_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
-    BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
-    UPCOMING: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
-    DUE: "bg-red-600 text-white hover:bg-red-700 border-red-700",
-    PARTIAL: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
+    OVERDUE: "bg-red-700 text-white hover:bg-red-800 border-red-800",
+    PENDING: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
+    APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
+    PARTIAL: "bg-cyan-500 text-white hover:bg-cyan-600 border-cyan-600",
     SETTLED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
+    CANCELLED: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
   };
   return map[status] || "";
 };
@@ -153,18 +114,42 @@ interface BillingStepReviewProps {
    */
   visibleConfigIdx?: number[];
   /**
-   * Aprovar o faturamento da FATIA que cobre o veículo aberto.
-   *
-   * Vive na página porque é ela que tem o diálogo de confirmação irreversível
-   * (com as prévias da nota e dos boletos) e a rota da fatia.
+   * A COBRANÇA desta página — a entidade cujo estado o cabeçalho mostra e sobre
+   * a qual as ações agem. Resolvida pela página (ela é endereçada pelo id da
+   * cobrança); aqui chega pronta.
    */
-  onApproveVehicleBilling?: () => void;
+  billing?: { id?: string; status?: BILLING_STATUS | null; approvedAt?: Date | string | null } | null;
+  /**
+   * Aprovar ESTA cobrança — `PUT /billings/:id/approve`.
+   *
+   * Vive na página porque é ela que tem o diálogo de confirmação irreversível,
+   * com as prévias da nota e dos boletos.
+   */
+  onApproveBilling?: () => void;
+  /** Liquidar ESTA cobrança à mão — `PUT /billings/:id/settle`. */
+  onSettleBilling?: () => void;
 }
 
-export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, onApproveVehicleBilling }: BillingStepReviewProps) {
+export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, billing, onApproveBilling, onSettleBilling }: BillingStepReviewProps) {
   const navigate = useNavigate();
-  const { control, setValue } = useFormContext();
-  const currentStatus = useWatch({ control, name: "status" }) || "";
+  const { control } = useFormContext();
+  /**
+   * O ESTADO DO ORÇAMENTO — contexto em LEITURA, nunca editável daqui.
+   *
+   * É o contrato que se está cobrando. Editá-lo é assunto do assistente de
+   * Orçamento: esta tela age sobre a COBRANÇA, e misturar as duas coisas num
+   * seletor só foi o que fez "aprovar faturamento" ser uma transição de status
+   * do orçamento — e, por isso, um ato que atingia as N cobranças dele.
+   */
+  const quoteStatus = useWatch({ control, name: "status" }) || "";
+  /**
+   * O ESTADO DA COBRANÇA. Recuo para `approvedAt` quando a consulta não trouxe
+   * `status`: aprovada sem estado lido é "Aprovado", não-aprovada é "Pendente" —
+   * as duas leituras que `BillingStatusCascade` daria na ausência de parcelas.
+   */
+  const billingApprovedAt = billing?.approvedAt ?? null;
+  const billingStatus = (billing?.status ??
+    (billingApprovedAt ? "APPROVED" : "PENDING")) as BILLING_STATUS;
   // FATURAMENTO FATIADO: alguma fatura cobre MENOS que todos os veículos. É a
   // pergunta sobre a COBERTURA, não sobre o modo, e cobre com a mesma conta a
   // cobrança veículo a veículo e o lote — num orçamento em lotes, `billingSplit
@@ -179,38 +164,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       return covered > 0 && covered < total;
     });
   })();
-  /**
-   * A FATIA QUE COBRE O VEÍCULO ABERTO ainda espera aprovação?
-   *
-   * Lê o orçamento GRAVADO (`task.quote.customerConfigs`), não o formulário: a
-   * pergunta é sobre o que o servidor já faturou, e o formulário não carrega
-   * `billingApprovedAt`. Uma fatia sem cobertura é o orçamento que nasceu antes
-   * do vínculo — ali não há veículo a distinguir, e ela conta como a fatia deste.
-   */
-  const vehicleSlicePending = useMemo(() => {
-    if (!task?.id) return false;
-    const configs = ((task?.quote?.customerConfigs ?? []) as any[]).filter(
-      (c) => !billingApprovedAtOf(c as any),
-    );
-    if (configs.length === 0) return false;
-    return configs.some((c) => {
-      const covered = coveredTaskIds(c as any);
-      return covered.length === 0 || covered.includes(task.id);
-    });
-  }, [task?.id, task?.quote]);
-
-  /**
-   * A ação "faturar este veículo" deve aparecer?
-   *
-   * Só com cobrança fatiada (do contrário aprovar é a transição de status de
-   * sempre), só enquanto a fatia deste caminhão estiver pendente, e só para quem
-   * pode aprovar faturamento — COMMERCIAL origina orçamento, não fatura.
-   */
-  const canOfferSliceApproval =
-    !!onApproveVehicleBilling &&
-    isPerVehicleBilling &&
-    vehicleSlicePending &&
-    canApproveQuote(userPrivilege);
+  // ⚠️ SAÍRAM DAQUI `vehicleSlicePending` e `canOfferSliceApproval`. Eram a ginástica de descobrir
+  // "a fatia que cobre o veículo aberto já foi aprovada?" varrendo `customerConfigs` e casando
+  // coberturas — necessária enquanto a cobrança não era uma linha com id. Agora a página resolve a
+  // cobrança pela rota e a passa pronta em `billing`, e a pergunta é um campo: `approvedAt`.
 
   const services = useWatch({ control, name: "services" }) || [];
   const allCustomerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
@@ -445,22 +402,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return groups;
   }, [hasMultipleCustomers, validServices, customersCache, customerConfigs]);
 
-  const canChangeStatus = canUpdateQuoteStatus(userPrivilege);
-
-  // Allowed transitions from the current status for this user.
-  // Helper centralizes role + transition logic.
-  const allowedNextStatuses = useMemo(() => {
-    if (!currentStatus) return [] as string[];
-    return getAvailableQuoteStatusTransitions(currentStatus as TASK_QUOTE_STATUS, userPrivilege);
-  }, [currentStatus, userPrivilege]);
-
-  // Reject/cancel dialog state — when downgrading to PENDING from a non-PENDING status
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [pendingDestructiveStatus, setPendingDestructiveStatus] = useState<string | null>(null);
-  // Generic confirmation for non-reject destructive transitions (e.g. SETTLED -> PARTIAL)
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string | null>(null);
+  // Quem age sobre a COBRANÇA é ADMIN/FINANCEIRO — é o gate das rotas
+  // `/billings/:id/approve` e `/billings/:id/settle`. O COMERCIAL origina
+  // orçamento, não fatura; ele abre esta tela em leitura.
+  const canActOnBilling = canApproveQuote(userPrivilege);
 
   // Revert billing approval state
   const [revertBillingDialogOpen, setRevertBillingDialogOpen] = useState(false);
@@ -468,8 +413,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // Mensagem completa dos bloqueios devolvidos pelo backend quando a reversão é recusada.
   const [revertBlockers, setRevertBlockers] = useState<string | null>(null);
 
-  const revertableStatuses = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL"];
-  const canRevertBilling = canChangeStatus && revertableStatuses.includes(currentStatus);
+  // Reverter só faz sentido depois de aprovar — e "aprovada" é a pergunta que a
+  // COBRANÇA responde (`approvedAt`), não mais uma lista de estados do orçamento.
+  const canRevertBilling = canActOnBilling && !!billingApprovedAt;
 
   // Whether the revert-billing option should be offered. Mirrors the backend precondition
   // (revertBillingApproval): the revert flow itself baixa's active boletos and leaves live
@@ -534,10 +480,14 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return { paid, total };
   }, [invoices]);
 
-  // Validate customer data completeness for statuses that require it
-  const validateCustomerDataForStatus = useCallback((targetStatus: string): boolean => {
-    if (!STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) return true;
-
+  /**
+   * O cadastro dos pagadores desta cobrança permite emitir a nota?
+   *
+   * Roda ANTES de abrir a confirmação de aprovação. A página tem a mesma guarda
+   * (`validateCustomerData`) porque as duas correm sobre o mesmo ato — divergir
+   * fazia este diálogo liberar o que a página então recusava.
+   */
+  const validateCustomerDataForBilling = useCallback((): boolean => {
     for (let i = 0; i < customerConfigs.length; i++) {
       const config = customerConfigs[i];
       const data = config.customerData || {};
@@ -614,121 +564,88 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 Ver Tarefa
               </Button>
             )}
-            {currentStatus === "SETTLED" && task?.quoteId && (
+            {/* O RECIBO DE QUITAÇÃO é do contrato, mas quem o libera é a
+                COBRANÇA: só existe depois que ela está liquidada. */}
+            {billingStatus === "SETTLED" && task?.quoteId && (
               <ReceiptDownloadButton quoteId={task.quoteId} task={task} />
             )}
-            {canChangeStatus ? (
+            {/* O ESTADO DO ORÇAMENTO, em leitura — o contrato que se está cobrando.
+                Editá-lo é no assistente de Orçamento; aqui é contexto. */}
+            {quoteStatus ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Orçamento</span>
+                <QuoteStatusBadge status={quoteStatus as TASK_QUOTE_STATUS} size="default" />
+              </div>
+            ) : null}
+            {canActOnBilling ? (
               <Combobox
-                value={currentStatus}
+                value={billingStatus}
                 onValueChange={(v) => {
-                  if (v && typeof v === "string" && v !== currentStatus) {
-                    // Revert action — selected from inside the combobox (it replaces the old
-                    // separate button). Open the confirmation dialog; this is a different endpoint
-                    // (revertBilling) and must short-circuit before any status setValue.
-                    if (v === REVERT_OPTION_VALUE) {
-                      setRevertBillingDialogOpen(true);
-                      return;
-                    }
-                    // Ação da FATIA: não mexe no status do orçamento (ele já
-                    // está no ciclo de recebíveis), então não passa pelo
-                    // `setValue("status", …)` — abre direto a confirmação.
-                    if (v === APPROVE_SLICE_OPTION_VALUE) {
-                      onApproveVehicleBilling?.();
-                      return;
-                    }
-                    if (!validateCustomerDataForStatus(v)) return;
-                    // Reject/cancel: downgrading any non-PENDING status back to PENDING — collect reason
-                    if (v === "PENDING" && currentStatus !== "PENDING") {
-                      setPendingDestructiveStatus(v);
-                      setRejectReason("");
-                      setRejectDialogOpen(true);
-                      return;
-                    }
-                    // Generic confirmation for other backwards transitions handled by valid-transitions map
-                    // (e.g. SETTLED -> PARTIAL, BUDGET_APPROVED -> PENDING handled above already).
-                    const isBackward =
-                      (currentStatus === "BUDGET_APPROVED" && v === "PENDING") ||
-                      (currentStatus === "SETTLED" && v === "PARTIAL");
-                    if (isBackward) {
-                      setPendingConfirmStatus(v);
-                      setConfirmDialogOpen(true);
-                      return;
-                    }
-                    setValue("status", v, { shouldDirty: true });
+                  if (!v || typeof v !== "string") return;
+                  // Todas as opções são AÇÕES sintéticas: nenhuma delas é um estado que se
+                  // escolhe. `Billing.status` é derivado no servidor das parcelas e de
+                  // `approvedAt` — o seletor existe para DISPARAR o ato, não para digitar o
+                  // resultado dele.
+                  if (v === REVERT_OPTION_VALUE) {
+                    setRevertBillingDialogOpen(true);
+                    return;
+                  }
+                  if (v === APPROVE_OPTION_VALUE) {
+                    if (!validateCustomerDataForBilling()) return;
+                    onApproveBilling?.();
+                    return;
+                  }
+                  if (v === SETTLE_OPTION_VALUE) {
+                    onSettleBilling?.();
+                    return;
                   }
                 }}
                 options={(() => {
-                  const opts: Array<{ value: string; label: string; disabled?: boolean }> = [];
-                  const isPostBilling = POST_BILLING_STATUSES.includes(currentStatus);
+                  const opts: Array<{ value: string; label: string; disabled?: boolean }> = [
+                    // O estado corrente, desabilitado: é o que o gatilho renderiza. O Combobox
+                    // rotula o gatilho procurando o valor ATUAL entre as opções — sem esta linha
+                    // ele cai no placeholder "Selecione uma opção", sem rótulo e sem cor.
+                    { value: billingStatus, label: BILLING_STATUS_LABELS[billingStatus] ?? billingStatus, disabled: true },
+                  ];
 
-                  // Revert action first — sits before the due-states. The revert flow cancels active
-                  // boletos/NFS-e itself, so it is offered whenever the backend would accept it
-                  // (post-billing + nothing paid + no NFS-e processing).
+                  // Reverter primeiro: é a saída de emergência de uma aprovação recém-feita.
+                  // O fluxo baixa os boletos ativos e deixa as NFS-e vivas (a próxima aprovação
+                  // as substitui), então é oferecido sempre que o servidor o aceitaria.
                   if (canRevertForBilling) {
                     opts.push({ value: REVERT_OPTION_VALUE, label: "Reverter Faturamento" });
                   }
 
-                  // FATURAR ESTE VEÍCULO. Só entra aqui quando o orçamento já
-                  // saiu do pré-faturamento — antes disso a transição de status
-                  // BUDGET_APPROVED → BILLING_APPROVED é o caminho normal e já
-                  // carrega o rótulo "(este veículo)". A partir daí o status não
-                  // tem mais o que dizer sobre as fatias que faltam, e sem esta
-                  // opção elas não teriam por onde ser faturadas.
-                  if (canOfferSliceApproval && isPostBilling) {
+                  // APROVAR — enquanto esta cobrança não tiver sido aprovada. O rótulo diz o
+                  // RECORTE: num orçamento cobrado veículo a veículo, "Aprovar Faturamento" sem
+                  // qualificação fazia o operador achar que tinha fechado os sessenta.
+                  if (!billingApprovedAt) {
                     opts.push({
-                      value: APPROVE_SLICE_OPTION_VALUE,
-                      label: "Aprovar Faturamento (este veículo)",
+                      value: APPROVE_OPTION_VALUE,
+                      label: isPerVehicleBilling ? "Aprovar Faturamento (esta cobrança)" : "Aprovar Faturamento",
                     });
                   }
 
-                  // Candidate statuses for this step, in display order:
-                  //  - Pre-billing (e.g. BUDGET_APPROVED): the forward action is to APPROVE
-                  //    faturamento (BILLING_APPROVED — generates the invoice/NF/boleto) or settle
-                  //    directly. The automatic due-states are not shown yet (no invoice exists).
-                  //  - Post-billing (UPCOMING/DUE/PARTIAL/…): show the due-states for context
-                  //    (disabled) plus the settle action; reverting is the synthetic option above.
-                  const values = isPostBilling
-                    ? [...AUTOMATIC_STATUSES, "SETTLED"]
-                    : ["BILLING_APPROVED", "SETTLED"];
-                  // Always include the current status so the trigger renders its label.
-                  if (!values.includes(currentStatus)) values.unshift(currentStatus);
-
-                  const seen = new Set<string>();
-                  for (const v of values) {
-                    if (seen.has(v)) continue;
-                    seen.add(v);
-                    // Disable: the current status (can't select itself), automatic due-states, and
-                    // anything outside the user's allowed transitions (e.g. COMMERCIAL can't approve
-                    // billing — getAvailableQuoteStatusTransitions strips BILLING_APPROVED for them).
-                    const isCurrent = v === currentStatus;
-                    const isAutomatic = AUTOMATIC_STATUSES.includes(v);
-                    const isAllowed = isCurrent || allowedNextStatuses.includes(v as TASK_QUOTE_STATUS);
-                    // Selectable options use the verb label; the current status uses its state name.
-                    // Num orçamento que cobra veículo a veículo, aprovar aqui
-                    // fatura SÓ este caminhão — o rótulo tem de dizer isso, ou o
-                    // operador lê "Aprovar Faturamento" e acha que fechou os
-                    // sessenta.
-                    const label = isCurrent
-                      ? (STATUS_LABELS[v] || v)
-                      : v === "BILLING_APPROVED" && isPerVehicleBilling
-                        ? "Aprovar Faturamento (este veículo)"
-                        : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
-                    opts.push({ value: v, label, disabled: isCurrent || isAutomatic || !isAllowed });
+                  // LIQUIDAR À MÃO — o orçamento direto, pago à vista, sem boleto a conciliar.
+                  // Só depois de aprovada (antes disso não há o que quitar) e enquanto não estiver
+                  // liquidada ou cancelada.
+                  if (billingApprovedAt && billingStatus !== "SETTLED" && billingStatus !== "CANCELLED") {
+                    opts.push({ value: SETTLE_OPTION_VALUE, label: "Marcar como Liquidado" });
                   }
+
                   return opts;
                 })()}
                 searchable={false}
                 clearable={false}
-                disabled={disabled}
-                className="w-[240px]"
-                triggerClassName={cn("font-medium", getStatusTriggerClass(currentStatus))}
+                disabled={disabled || isGenerating}
+                className="w-[260px]"
+                triggerClassName={cn("font-medium", getBillingTriggerClass(billingStatus))}
               />
             ) : (
-              <QuoteStatusBadge
-                status={currentStatus as TASK_QUOTE_STATUS}
+              <BillingStatusBadge
+                status={billingStatus}
                 size="lg"
-                paidCount={installmentCounts.paid}
-                totalCount={installmentCounts.total}
+                paidCount={installmentCounts.total > 0 ? installmentCounts.paid : undefined}
+                totalCount={installmentCounts.total > 0 ? installmentCounts.total : undefined}
               />
             )}
             </div>
@@ -1445,92 +1362,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
         );
       })()}
 
-      {/* Reject / Cancel reason dialog — collected before reverting to PENDING.
-          The reason is stored in the form ("statusReason") and forwarded to
-          taskQuoteService.updateStatus by the parent's executeSave. */}
-      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rejeitar Orçamento</DialogTitle>
-            <DialogDescription>
-              Informe o motivo da rejeição. O status do orçamento voltará para Pendente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 space-y-2">
-            <Label htmlFor="reject-reason" className="text-sm font-medium">
-              Motivo da rejeição <span className="text-destructive">*</span>
-            </Label>
-            <Textarea
-              id="reject-reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Descreva o motivo (mínimo 5 caracteres)..."
-              rows={4}
-              className="resize-none"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRejectDialogOpen(false);
-                setRejectReason("");
-                setPendingDestructiveStatus(null);
-              }}
-            >
-              Voltar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={rejectReason.trim().length < 5}
-              onClick={() => {
-                if (rejectReason.trim().length < 5 || !pendingDestructiveStatus) return;
-                setValue("statusReason", rejectReason.trim(), { shouldDirty: true });
-                setValue("status", pendingDestructiveStatus, { shouldDirty: true });
-                setRejectDialogOpen(false);
-                setPendingDestructiveStatus(null);
-                setRejectReason("");
-              }}
-            >
-              Confirmar Rejeição
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Generic confirmation for backwards transitions (cancel-style ops without reason). */}
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reverter status do orçamento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja reverter o status? Esta ação altera o estado do orçamento
-              e pode afetar fluxos automáticos (faturas, boletos, NFS-e).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setConfirmDialogOpen(false);
-                setPendingConfirmStatus(null);
-              }}
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingConfirmStatus) {
-                  setValue("status", pendingConfirmStatus, { shouldDirty: true });
-                }
-                setConfirmDialogOpen(false);
-                setPendingConfirmStatus(null);
-              }}
-            >
-              Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* ⚠️ SAÍRAM DAQUI o diálogo de "Rejeitar Orçamento" (voltar para PENDENTE com motivo) e a
+          confirmação genérica de reversão de status. Os dois mexiam no STATUS DO ORÇAMENTO a
+          partir da tela de cobrança — a mesma mistura que fazia "aprovar faturamento" ser uma
+          transição do orçamento. Rejeitar é ato do comercial e vive no assistente de Orçamento
+          (`budget-step-review`), que tem o mesmo diálogo. O que sobra aqui age sobre a COBRANÇA. */}
 
       {/* Revert billing approval confirmation */}
       <AlertDialog open={revertBillingDialogOpen} onOpenChange={setRevertBillingDialogOpen}>

@@ -67,7 +67,9 @@ import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { InstallmentStatusBadge } from "../../components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "../../components/production/task/billing/bank-slip-status-badge";
-import { QuoteStatusBadge } from "../../components/production/task/quote/quote-status-badge";
+import { BillingStatusBadge } from "../../components/financial/billing/billing-status-badge";
+import { billingStatusOf } from "../../utils/quote-tasks";
+import type { BILLING_STATUS } from "../../types/task-quote";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker, type ColumnSort } from "../components/column-picker";
@@ -155,7 +157,7 @@ const COLUMN_KEYS = [
   "bankSlipStatus",
   "nossoNumero",
   "paymentMethod",
-  "quoteStatus",
+  "billingStatus",
 ] as const;
 type ColumnKey = (typeof COLUMN_KEYS)[number];
 const COLUMN_LABELS: Record<ColumnKey, string> = {
@@ -170,19 +172,23 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   bankSlipStatus: "Status do boleto",
   nossoNumero: "Nosso número",
   paymentMethod: "Forma",
-  quoteStatus: "Status do orçamento",
+  billingStatus: "Status do faturamento",
 };
 
-// Quote statuses that may have installments worth tracking. We exclude
-// PENDING/BUDGET_APPROVED because those quotes haven't
-// been turned into bills yet.
-const RELEVANT_QUOTE_STATUSES = [
-  TASK_QUOTE_STATUS.BILLING_APPROVED,
-  TASK_QUOTE_STATUS.UPCOMING,
-  TASK_QUOTE_STATUS.DUE,
-  TASK_QUOTE_STATUS.PARTIAL,
-  TASK_QUOTE_STATUS.SETTLED,
-] as const;
+// AS COBRANÇAS QUE JÁ VIRARAM BOLETO — a pergunta é da cobrança, não do orçamento.
+//
+// Era uma lista de estados do ORÇAMENTO (BILLING_APPROVED..SETTLED), que só existia porque o ciclo
+// do pagamento morava naquele enum. Com a separação, "já foi cobrado" é `Billing.approvedAt`
+// preenchido: um orçamento APROVADO pode ter uma cobrança emitida e outra ainda por montar, e
+// perguntar ao orçamento traria as parcelas das duas ou de nenhuma.
+const BILLED_QUOTE_WHERE = {
+  quote: {
+    is: {
+      status: TASK_QUOTE_STATUS.APPROVED,
+      billings: { some: { approvedAt: { not: null } } },
+    },
+  },
+} as const;
 
 // ============================================================================
 // Schema
@@ -297,7 +303,8 @@ interface FlatInstallment {
   taskName: string;
   taskSerial: string | null;
 
-  quoteStatus: TASK_QUOTE_STATUS;
+  /** O estado da COBRANÇA a que esta parcela pertence — não o do orçamento. */
+  billingStatus: BILLING_STATUS | null;
 
   customerId: string;
   customerName: string;
@@ -389,7 +396,7 @@ function flattenTasksToInstallments(tasks: any[] | undefined): FlatInstallment[]
           taskName: task.name ?? "—",
           taskSerial: task.serialNumber ?? null,
 
-          quoteStatus: quote.status as TASK_QUOTE_STATUS,
+          billingStatus: (billingStatusOf(cfg) ?? null) as BILLING_STATUS | null,
 
           customerId: cfg.customer?.id ?? cfg.customerId,
           customerName: customerLabel(cfg.customer),
@@ -507,6 +514,13 @@ const TASK_INCLUDE = {
         select: {
           id: true,
           customerId: true,
+          // O ESTADO DA COBRANÇA — pedido à mão porque o include automático do servidor traz id,
+          // `approvedAt` e a cobertura, e não `status`. É o que a coluna "Status do faturamento"
+          // desenha. A cobertura (`tasks`) vai junto: quem pede `billing` à mão é respeitado
+          // inteiro, e sem ela nenhuma função de `quote-tasks` sabe qual fatia cobre qual veículo.
+          billing: {
+            select: { id: true, approvedAt: true, status: true, statusOrder: true, tasks: { select: { taskId: true } } },
+          },
           customer: { select: { id: true, fantasyName: true, corporateName: true } },
           installments: {
             select: {
@@ -542,9 +556,13 @@ function useFlatInstallments(refetchInterval: number) {
     () => ({
       page: 1,
       limit: 200,
-      where: { quote: { status: { in: [...RELEVANT_QUOTE_STATUSES] } } },
+      where: BILLED_QUOTE_WHERE,
       include: TASK_INCLUDE,
-      orderBy: [{ quote: { statusOrder: "asc" } }, { finishedAt: "desc" }],
+      // Sem `quote.statusOrder`: com o escopo acima ele é APPROVED em todas as linhas, e ordenar
+      // por uma constante é ruído. O estado da COBRANÇA não é ordenável no servidor (é relação de
+      // muitos — ver o comentário da coluna em `billing-table-columns`), então a ordem é a da
+      // entrega, e o widget reordena por vencimento/balde do lado do cliente de qualquer forma.
+      orderBy: [{ finishedAt: "desc" }],
       ...(refetchInterval > 0 && { refetchInterval }),
     }),
     [refetchInterval],
@@ -766,11 +784,16 @@ function makeColumns(): Record<ColumnKey, ColumnDef> {
           <span className="text-muted-foreground">—</span>
         ),
     },
-    quoteStatus: {
-      key: "quoteStatus",
-      label: COLUMN_LABELS.quoteStatus,
+    billingStatus: {
+      key: "billingStatus",
+      label: COLUMN_LABELS.billingStatus,
       width: "minmax(0, 0.9fr)",
-      render: (r) => <QuoteStatusBadge status={r.quoteStatus} size="sm" />,
+      render: (r) =>
+        r.billingStatus ? (
+          <BillingStatusBadge status={r.billingStatus} size="sm" />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
   };
 }

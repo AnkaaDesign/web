@@ -30,27 +30,34 @@ export const taskQuoteService = {
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.put(`/task-quotes/${id}/status`, { status, reason }),
 
-  // Budget Approve (commercial approves the budget: PENDING → BUDGET_APPROVED)
+  // Aprovação COMERCIAL do orçamento (PENDING/SIGNED → APPROVED). É o último
+  // estado do orçamento; o que vem depois é cobrança, e cobrança tem rota
+  // própria (`billingService.approve`).
   approve: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
   // Budget Approve (alias)
   budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
   /**
-   * Aprova o faturamento de UM VEÍCULO de um orçamento que cobra veículo a
-   * veículo (`billingSplit = PER_TASK`).
+   * ⚠️ APROVAR FATURAMENTO NÃO MORA MAIS AQUI.
    *
-   * A aprovação conjunta continua sendo `updateStatus(id, "BILLING_APPROVED")`,
-   * que o servidor roteia para `internalApprove` sem fatia — ele aprova TODAS as
-   * pendentes de uma vez. Os sessenta caminhões do Marquespan não terminam no
-   * mesmo dia: cada aprovação emite a fatura, a NFS-e e os boletos daquele
-   * veículo, com o vencimento contado dali, e o orçamento só grava
-   * `billingApprovedAt` quando a última fatia fecha.
+   * Era `updateStatus(id, "BILLING_APPROVED")` para a aprovação conjunta e
+   * `PUT /task-quotes/:id/internal-approve/:taskId` para uma fatia. Os dois
+   * endereçavam a cobrança pelo ORÇAMENTO (ou por um dos veículos dela), porque
+   * a cobrança não tinha id. Agora tem: use `billingService.approve(billingId)`
+   * — `PUT /billings/:id/approve` —, que emite a fatura, a NFS-e e os boletos
+   * DAQUELA cobrança e de mais nenhuma. O endpoint de status RECUSA
+   * `BILLING_APPROVED`: o valor não existe mais no enum.
+   *
+   * Liquidação manual, pelo mesmo motivo, é `billingService.settle(billingId)`.
+   *
+   * A rota da fatia continua de pé no servidor para o app instalado; o web não a
+   * chama mais.
    */
-  internalApproveSlice: (id: string, taskId: string) =>
-    apiClient.put(`/task-quotes/${id}/internal-approve/${taskId}`),
 
-  // Revert billing approval back to BUDGET_APPROVED (requires all bank slips + NFS-e cancelled)
+  // Reverte a aprovação de faturamento (exige boletos baixados e NFS-e canceladas).
+  // Continua endereçada pelo ORÇAMENTO: a reversão desfaz o ciclo de cobrança
+  // inteiro dele, não uma cobrança isolada.
   revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 
   // Reject (sends back to PENDING with a reason)
@@ -69,7 +76,9 @@ export const taskQuoteService = {
   updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
     apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
 
-  // Recibo de quitação (PDF) — só existe depois que o orçamento chega a SETTLED
+  // Recibo de quitação (PDF) — só existe depois que a cobrança é liquidada
+  // (`BILLING_STATUS.SETTLED`). O recibo é do orçamento porque é o contrato que
+  // se quita; o estado que o libera é o da cobrança.
   getReceiptPdf: (id: string) =>
     apiClient.get(`/task-quotes/${id}/receipt`, { responseType: 'blob' }),
 

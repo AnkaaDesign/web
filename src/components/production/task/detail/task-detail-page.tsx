@@ -127,16 +127,14 @@ const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL];
 //   editor (`canEditTasks` excludes them). ADMIN is added downstream, so it isn't listed.
 const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.LOGISTIC];
 
-// Per-status colors for the quote/faturamento status (TASK_QUOTE isn't in ENTITY_BADGE_CONFIG, so we
-// map values → badge variants here — same palette as QuoteStatusBadge).
+// Cores por estado DO ORÇAMENTO (TASK_QUOTE não está em ENTITY_BADGE_CONFIG, então o mapa mora
+// aqui — mesma paleta de `QuoteStatusBadge`). Os cinco, e só eles: o ciclo do pagamento saiu deste
+// enum em 16/09/2026 e é `BILLING_STATUS`, com badge e tela próprios.
 const QUOTE_STATUS_VARIANTS: Record<string, string> = {
+  EXPIRED: "expired",
+  SIGNED: "teal",
   PENDING: "secondary",
-  BUDGET_APPROVED: "processing",
-  BILLING_APPROVED: "approved",
-  UPCOMING: "pending",
-  DUE: "destructive",
-  PARTIAL: "inProgress",
-  SETTLED: "completed",
+  APPROVED: "approved",
   CANCELLED: "cancelled",
 };
 
@@ -1044,18 +1042,12 @@ function TaskDetailContent() {
                           quoteReasonRef.current = undefined;
                           const next = v as TASK_QUOTE_STATUS;
                           const current = t.quote?.status;
-                          if (next === TASK_QUOTE_STATUS.BILLING_APPROVED) {
-                            return confirm({
-                              title: "Faturamento Aprovado — Ação Irreversível",
-                              description:
-                                "Serão geradas, automaticamente e de forma irreversível: faturas por cliente, boletos no Sicredi por parcela, e NFS-e por fatura. Confira valores, descontos, CNPJ/CPF e parcelas antes de confirmar.",
-                              confirmLabel: "Confirmar Faturamento",
-                              destructive: true,
-                            });
-                          }
-                          if (next === TASK_QUOTE_STATUS.PARTIAL && current === TASK_QUOTE_STATUS.SETTLED) {
-                            return confirm({ title: "Reverter para Parcial", description: "Indica estorno de pagamento. Confirma?" });
-                          }
+                          // ⚠️ NÃO HÁ MAIS "aprovar faturamento" aqui, nem estorno de pagamento.
+                          // Os dois eram transições deste seletor porque o ciclo do pagamento
+                          // morava no enum do orçamento; aprovar cobrança é
+                          // `PUT /billings/:id/approve`, na tela de Faturamento, onde se vê O QUE
+                          // vai ser cobrado antes de emitir nota — e não num dropdown de detalhe
+                          // de tarefa.
                           if (next === TASK_QUOTE_STATUS.PENDING && current && current !== TASK_QUOTE_STATUS.PENDING) {
                             const reason = await askReason({
                               title: "Rejeitar / reverter para Pendente",
@@ -1077,8 +1069,7 @@ function TaskDetailContent() {
                           if (!t.quote) return;
                           await taskQuoteService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
                           // A raw axios PUT bypasses react-query — invalidate the task detail, quote and
-                          // invoice caches so a status change (esp. the irreversible BILLING_APPROVED that
-                          // mints invoices/boletos/NFS-e) is reflected instead of leaving the UI stale.
+                          // invoice caches so the change is reflected instead of leaving the UI stale.
                           await Promise.all([
                             queryClient.invalidateQueries({ queryKey: ["tasks"] }),
                             queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),

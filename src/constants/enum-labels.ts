@@ -141,6 +141,7 @@ import {
   STATISTICS_METRIC,
   STATISTICS_PERIOD,
   TASK_QUOTE_STATUS,
+  BILLING_STATUS,
   RESCHEDULE_REASON,
   INVOICE_STATUS,
   INSTALLMENT_STATUS,
@@ -2469,37 +2470,52 @@ export const STATISTICS_PERIOD_LABELS: Record<STATISTICS_PERIOD, string> = {
 // =====================
 
 export const TASK_QUOTE_STATUS_LABELS: Record<TASK_QUOTE_STATUS, string> = {
-  [TASK_QUOTE_STATUS.PENDING]: "Pendente",
-  [TASK_QUOTE_STATUS.SIGNED]: "Assinado",
+  // NÃO é "Vencido": vencida é a PARCELA, e esse rótulo é do
+  // `BILLING_STATUS.OVERDUE`, noutra entidade. Este diz o que o comercial tem de
+  // FAZER com o orçamento.
   [TASK_QUOTE_STATUS.EXPIRED]: "Aguardando Reanálise",
-  [TASK_QUOTE_STATUS.BUDGET_APPROVED]: "Orçamento Aprovado",
-  [TASK_QUOTE_STATUS.BILLING_APPROVED]: "Faturamento Aprovado",
-  [TASK_QUOTE_STATUS.UPCOMING]: "A Vencer",
-  [TASK_QUOTE_STATUS.DUE]: "Vencido",
-  [TASK_QUOTE_STATUS.PARTIAL]: "Parcial",
-  [TASK_QUOTE_STATUS.SETTLED]: "Liquidado",
+  [TASK_QUOTE_STATUS.SIGNED]: "Assinado",
+  [TASK_QUOTE_STATUS.PENDING]: "Pendente",
+  // Sem o prefixo "Orçamento": a tela já se chama Orçamentos, e o estado de
+  // faturamento mudou de entidade. Repetir a palavra era desambiguar de algo que
+  // não mora mais aqui.
+  [TASK_QUOTE_STATUS.APPROVED]: "Aprovado",
   [TASK_QUOTE_STATUS.CANCELLED]: "Cancelado",
 };
 
 /**
- * Returns the display label for a task quote based on its status.
- * Before BUDGET_APPROVED → "Orçamento" (budget phase)
- * BUDGET_APPROVED or later → "Faturamento" (billing/invoicing phase)
+ * Os rótulos do ciclo do FATURAMENTO. ⚠️ Não há "A Vencer": depois de aprovar, o
+ * estado é "Aprovado", que já significa "cobrado, esperando pagar".
  */
-export function getTaskQuoteDisplayLabel(status?: TASK_QUOTE_STATUS | string | null): string {
-  if (!status || status === TASK_QUOTE_STATUS.PENDING) {
-    return 'Orçamento';
-  }
-  return 'Faturamento';
-}
+export const BILLING_STATUS_LABELS: Record<BILLING_STATUS, string> = {
+  // Aqui "Vencido" é literal: há parcela em atraso.
+  [BILLING_STATUS.OVERDUE]: "Vencido",
+  [BILLING_STATUS.PENDING]: "Pendente",
+  [BILLING_STATUS.APPROVED]: "Aprovado",
+  [BILLING_STATUS.PARTIAL]: "Parcial",
+  [BILLING_STATUS.SETTLED]: "Liquidado",
+  [BILLING_STATUS.CANCELLED]: "Cancelado",
+};
 
 /**
- * Returns whether the task quote is in the billing phase (past budget).
- * PENDING or no status → false (budget/orçamento phase)
- * BUDGET_APPROVED or later → true (billing/faturamento phase)
+ * "Orçamento" ou "Faturamento"? — por qual das duas telas este registro se abre.
+ *
+ * ⚠️ O RECORTE É `APPROVED`, e tem de ser o MESMO de `getTaskQuoteEditRoute`:
+ * este texto rotula o item de menu que aquela função endereça, e divergir faz o
+ * menu dizer "Orçamento" e abrir o assistente de faturar.
+ *
+ * Era "tudo que não é PENDING é Faturamento", o que só funcionava porque o enum
+ * antigo carregava o ciclo do pagamento dentro dele: SIGNED, EXPIRED e CANCELLED
+ * liam como Faturamento, e um orçamento vencido — que existe justamente para o
+ * comercial reabrir — abria a tela de cobrança.
  */
+export function getTaskQuoteDisplayLabel(status?: TASK_QUOTE_STATUS | string | null): string {
+  return isTaskQuoteBillingPhase(status) ? 'Faturamento' : 'Orçamento';
+}
+
+/** O orçamento já passou pela aprovação comercial (e portanto é assunto do financeiro)? */
 export function isTaskQuoteBillingPhase(status?: TASK_QUOTE_STATUS | string | null): boolean {
-  return !!status && status !== TASK_QUOTE_STATUS.PENDING;
+  return status === TASK_QUOTE_STATUS.APPROVED;
 }
 
 // =====================

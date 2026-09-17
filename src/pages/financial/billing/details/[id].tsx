@@ -5,7 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
 import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { BillingCoveredVehicles } from "@/components/financial/billing/steps/billing-covered-vehicles";
-import { useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
+import { billingKeys, useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
+import { billingService } from "@/api-client/billing";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
@@ -23,7 +24,7 @@ import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
-import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
+import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
 import {
   quoteTasks,
   quoteVehicleCount,
@@ -61,7 +62,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import { BillingDocumentPreviews } from "@/components/financial/billing/preview/billing-document-previews";
 import { useNextNfseNumber } from "@/hooks/financial/use-nfse";
 // Imported from the filters module rather than the table barrel so the detail route does not pull
@@ -266,14 +266,9 @@ const BillingDetailPageInner = ({
   // Foto da plaqueta (VIN) — imagem única, espelhando o campo do formulário de Tarefa.
   const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
-  /**
-   * A confirmação aberta é a de uma FATIA (este veículo) e não a do orçamento?
-   *
-   * As fatias 2..N são aprovadas por uma ação do seletor que NÃO muda o status
-   * do orçamento, então `form.status` não tem como distinguir as duas — este
-   * sinalizador faz a confirmação e o `executeSave` falarem do mesmo ato.
-   */
-  const [approvingVehicleSlice, setApprovingVehicleSlice] = useState(false);
+  // ⚠️ SAIU `approvingVehicleSlice`. Ele existia para a confirmação e o `executeSave` saberem se o
+  // clique era "aprovar o orçamento inteiro" ou "aprovar esta fatia" — duas rotas diferentes que
+  // a tela precisava distinguir porque uma delas era uma transição de status. Hoje há um ato só.
   // Predicted NFS-e número (last emitted + 1) — fetched only while the approval modal is open.
   const { data: nextNfse } = useNextNfseNumber(billingApprovalDialogOpen);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -356,6 +351,10 @@ const BillingDetailPageInner = ({
             select: {
               id: true,
               approvedAt: true,
+              // O ESTADO PRÓPRIO da cobrança — é o que o cabeçalho do Resumo mostra e o que
+              // decide quais ações o seletor oferece. Derivado no servidor; ninguém o digita.
+              status: true,
+              statusOrder: true,
               createdAt: true,
               tasks: { select: { taskId: true } },
               customerConfigs: { select: { id: true, customerId: true } },
@@ -542,10 +541,11 @@ const BillingDetailPageInner = ({
       details: "" as string,
       finishedAt: null as Date | null,
       // Quote fields
+      //
+      // `status` é o do ORÇAMENTO e esta tela NÃO o altera — ele é lido para o Resumo mostrar de
+      // que contrato é esta cobrança, e reenviado na gravação só para suprimir o auto-revert a
+      // PENDING do servidor. Rejeitar/reverter o orçamento é no assistente de Orçamento.
       status: "" as string,
-      // Optional reason captured by the BillingStepReview reject/cancel dialog.
-      // Forwarded to taskQuoteService.updateStatus when transitioning to PENDING.
-      statusReason: "" as string,
       expiresAt: null as Date | null,
       subtotal: 0,
       total: 0,
@@ -1112,11 +1112,6 @@ const BillingDetailPageInner = ({
     setCurrentStep(firstCustomerStepIdx + pos);
   }, [orderNumberAttentionActive, customerDataAttentionActive, invoices.length, customerConfigs, firstCustomerStepIdx]);
 
-  const STATUSES_REQUIRING_COMPLETE_DATA = [
-    "BUDGET_APPROVED",
-    "BILLING_APPROVED",
-  ];
-
   // Step validation. Parameterized by step (not read off `currentStep`) so a
   // jump can run every gate between here and the target — see handleStepClick.
   const validateStep = useCallback((step: number) => {
@@ -1142,24 +1137,25 @@ const BillingDetailPageInner = ({
 
   const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
-  // Validate customer required fields — only called when status requires it
+  /**
+   * O que a APROVAÇÃO DA COBRANÇA exige: serviços com valor válido, atribuição de cliente quando
+   * há mais de um pagador, e cadastro completo de quem vai receber nota.
+   *
+   * Chamada só no caminho de aprovar — era disparada por `status === "BILLING_APPROVED"`, um
+   * estado do orçamento que deixou de existir. O ato é o mesmo; o gatilho agora é o ato em si.
+   */
   const validateCustomerData = useCallback((): boolean => {
     const configs = form.getValues("customerConfigs") || [];
     const services = form.getValues("services") || [];
-    const targetStatus = form.getValues("status");
     const validServices = services.filter((s: any) => s.description?.trim());
 
-    if (targetStatus === "BILLING_APPROVED") {
-      const negativeAmountServices = validServices.filter(
-        (s: any) => Number(s.amount) < 0,
-      );
-      if (negativeAmountServices.length > 0) {
-        if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
-        toast.error("Serviços com valor negativo", {
-          description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
-        });
-        return false;
-      }
+    const negativeAmountServices = validServices.filter((s: any) => Number(s.amount) < 0);
+    if (negativeAmountServices.length > 0) {
+      if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
+      toast.error("Serviços com valor negativo", {
+        description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
+      });
+      return false;
     }
 
     // ⚠️ CLIENTES DISTINTOS, nunca FATURAS. Num orçamento cobrado veículo a
@@ -1179,8 +1175,21 @@ const BillingDetailPageInner = ({
       }
     }
 
-    for (let i = 0; i < configs.length; i++) {
+    // ⚠️ SÓ OS PAGADORES DESTA COBRANÇA.
+    //
+    // Varria `configs` inteiro, que é a lista do ORÇAMENTO: num orçamento com quatro cobranças,
+    // aprovar a primeira era recusado porque o cliente da QUARTA estava sem CNPJ — e o toast
+    // mandava o operador para um passo que esta página nem renderiza (os passos são construídos a
+    // partir de `visibleConfigIdx`, então `firstCustomerStepIdx + i` com `i` GLOBAL aponta para
+    // fora). Aprovar uma cobrança não pode depender das outras; é a mesma regra que fez a rota
+    // deixar de ser do orçamento.
+    const scoped =
+      visibleConfigIdx.length > 0 ? visibleConfigIdx : configs.map((_: any, i: number) => i);
+
+    for (let pos = 0; pos < scoped.length; pos++) {
+      const i = scoped[pos];
       const config = configs[i];
+      if (!config) continue;
       const data = config.customerData || {};
       const paymentConfig = form.getValues(`customerConfigs.${i}.paymentConfig` as any);
       const paymentCondition = form.getValues(`customerConfigs.${i}.paymentCondition` as any);
@@ -1196,13 +1205,14 @@ const BillingDetailPageInner = ({
       const errors: string[] = skipCadastro ? [] : missingBillingCustomerLabels(data);
       if (!paymentCondition && !(paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
-        setCurrentStep(firstCustomerStepIdx + i);
+        // A POSIÇÃO entre os passos VISÍVEIS, não o índice global — ver o comentário acima.
+        setCurrentStep(firstCustomerStepIdx + pos);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
         // Com mais de uma fatura o nome do cliente se repete, e a mensagem
         // mandava o operador para "um passo do mesmo cliente" sem dizer qual.
         // O veículo desempata.
         const where =
-          configs.length > 1 && coveredTaskCount(config) > 0
+          scoped.length > 1 && coveredTaskCount(config) > 0
             ? `${name} (${coverageSummary(config, quoteVehicles, quoteVehicleRows as any)})`
             : name;
         toast.error(`${where} - campos obrigatórios`, { description: errors.join(", ") });
@@ -1211,7 +1221,7 @@ const BillingDetailPageInner = ({
     }
 
     return true;
-  }, [form, servicesStepIdx, firstCustomerStepIdx, quoteVehicles, quoteVehicleRows]);
+  }, [form, servicesStepIdx, firstCustomerStepIdx, quoteVehicles, quoteVehicleRows, visibleConfigIdx]);
 
   const nextStep = useCallback(() => {
     if (validateCurrentStep()) {
@@ -1249,25 +1259,21 @@ const BillingDetailPageInner = ({
 
 
   // Core save logic
-  const executeSave = useCallback(async (options?: { approveVehicleSlice?: boolean }) => {
+  const executeSave = useCallback(async (options?: { approveBilling?: boolean }) => {
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
-    const targetStatus = formData.status;
     /**
-     * ESTA GRAVAÇÃO APROVA A FATIA DO VEÍCULO ABERTO?
+     * ESTA GRAVAÇÃO APROVA A COBRANÇA?
      *
-     * Duas portas chegam aqui: a transição de status da PRIMEIRA aprovação
-     * (BUDGET_APPROVED → BILLING_APPROVED, com o rótulo "(este veículo)") e a
-     * ação sintética do seletor, que é como as fatias 2..N são faturadas — nelas
-     * o status do orçamento não muda, porque ele já está no ciclo de recebíveis.
+     * UMA porta só. Eram duas — a transição de status `BUDGET_APPROVED →
+     * BILLING_APPROVED` (que aprovava o orçamento inteiro) e uma ação sintética
+     * do seletor para as fatias 2..N, que existia porque depois da primeira
+     * aprovação o status já tinha andado e não servia mais de gatilho. Com a
+     * cobrança sendo uma entidade, aprovar é sempre o mesmo ato sobre a mesma
+     * coisa: `PUT /billings/:id/approve`.
      */
-    const approveVehicleSlice =
-      !!options?.approveVehicleSlice ||
-      (targetStatus === "BILLING_APPROVED" &&
-        targetStatus !== quote.status &&
-        isPerVehicleBilling &&
-        !!task?.id);
+    const approveBilling = !!options?.approveBilling && !!currentBilling?.id;
 
     setIsSaving(true);
     try {
@@ -1340,11 +1346,14 @@ const BillingDetailPageInner = ({
       }
 
       // 4. Update quote data
-      // When the quote is post-billing-approval (locked), only send fields the backend allows
-      // editing on a locked quote. Sending billing-structural fields (subtotal, services,
-      // customerConfigs) would throw a 400 and prevent the status update from executing.
-      const BILLING_LOCKED_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
-      const isQuoteLocked = quote.status && BILLING_LOCKED_STATUSES.includes(quote.status);
+      // TRAVADO POR DINHEIRO? — a pergunta é da COBRANÇA, não do status do orçamento.
+      //
+      // Era uma lista de estados (`BILLING_APPROVED`..`SETTLED`), o que num orçamento faturado
+      // veículo a veículo travava os cinquenta e nove que ainda nem tinham sido cobrados assim que
+      // o primeiro saía. Espelha `isQuoteMoneyLocked(billings)` no servidor: trava = ALGUMA
+      // cobrança com `approvedAt` — a fatura, os boletos e a nota saíram sobre o preço atual, e o
+      // servidor recusa o corpo inteiro se ele trouxer campo estrutural.
+      const isQuoteLocked = approvedBillingCount > 0;
 
       // ═══════════════════════════════════════════════════════════════════════
       // A DIVISÃO DO FATURAMENTO MUDOU?
@@ -1439,20 +1448,16 @@ const BillingDetailPageInner = ({
             customerConfigs: billingConfigsPayload,
           };
 
-      // Status handling — two phases, deterministic:
-      //  (1) The VALUE update pins the CURRENT status so the backend's
-      //      auto-revert-to-PENDING (which fires only when no status is sent) is
-      //      suppressed — editing values keeps the existing approval.
-      //  (2) The status TRANSITION runs through the dedicated /status endpoint
-      //      AFTER the values are saved, so it validates the transition graph AND
-      //      its prerequisites (e.g. "total > 0") against the freshly-persisted
-      //      values — this is why an immediate/pre-save status change could fail
-      //      and leave the quote PENDING. It also handles BILLING_APPROVED's
-      //      invoice/boleto/NFS-e generation. Forwards the optional reject reason.
-      // Locked quotes (BILLING_APPROVED+) send a reduced payload with no status
-      // (those statuses don't auto-revert and the generic path can't change them).
-      const statusChanged = targetStatus && targetStatus !== quote.status;
-
+      // O STATUS DO ORÇAMENTO NÃO SE EDITA DESTA TELA — ela é a da cobrança.
+      //
+      // O que continua sendo necessário é FIXAR o status atual no corpo: o auto-revert do servidor
+      // devolve o orçamento a PENDING quando uma gravação mexe em valores e NÃO manda status, e
+      // editar a cobrança não pode desfazer a aprovação comercial. Num orçamento travado o corpo
+      // reduzido não leva status nenhum (nada ali auto-reverte).
+      //
+      // ⚠️ Saiu daqui a segunda fase, que replicava hop a hop um caminho de transição até
+      // `BILLING_APPROVED` (com uma guarda para nunca ATRAVESSAR aquele estado, porque atravessá-lo
+      // emitia nota). Aprovar cobrança é uma chamada, a `PUT /billings/:id/approve`, logo abaixo.
       if (!isQuoteLocked) {
         quotePayload.status = quote.status;
       }
@@ -1474,64 +1479,25 @@ const BillingDetailPageInner = ({
       // mas o número do pedido é justamente o que chega depois, quando o cliente
       // o manda e a nota já está para sair.
 
-      if (approveVehicleSlice) {
-        // A aprovação de faturamento de um orçamento fatiado é um ato DAQUELE
-        // veículo, e tem rota própria: `updateStatus` roteia para a aprovação SEM
-        // fatia, que fatura os sessenta de uma vez. As duas exigem
-        // FINANCEIRO/ADMIN e chegam ao log como linhas distintas — "faturei o
-        // orçamento inteiro" e "faturei o caminhão 37" não são o mesmo ato.
-        //
-        // Fora do caminho de transição de propósito: da segunda fatia em diante
-        // o orçamento já está em UPCOMING/DUE/PARTIAL e não há transição
-        // nenhuma a replicar. Passar por `getQuoteStatusPath` ali faria a tela
-        // mover o status do orçamento para trás só para poder aprovar uma fatia.
-        await taskQuoteService.internalApproveSlice(quote.id, task.id);
-        form.setValue("statusReason" as any, "");
-      } else if (statusChanged) {
-        // The dropdown gates options by the FORM status, so the user can advance
-        // several steps in one session. The server only accepts single legal
-        // hops, so replay the whole path hop-by-hop. Guard: never auto-pass
-        // THROUGH BILLING_APPROVED as an intermediate (it triggers invoice/boleto
-        // generation) — it may only be the final target.
-        const path = getQuoteStatusPath(
-          quote.status as TASK_QUOTE_STATUS,
-          targetStatus as TASK_QUOTE_STATUS,
-        );
-        if (path.length === 0) {
-          throw new Error(
-            `Não há um caminho de status válido de "${quote.status}" até "${targetStatus}".`,
-          );
-        }
-        if (path.slice(0, -1).includes("BILLING_APPROVED" as TASK_QUOTE_STATUS)) {
-          throw new Error(
-            'Aprove o faturamento como uma etapa separada antes de avançar para o próximo status.',
-          );
-        }
-        const reason = (formData as any).statusReason?.trim() || undefined;
-        for (const step of path) {
-          await taskQuoteService.updateStatus(
-            quote.id,
-            step as TASK_QUOTE_STATUS,
-            step === "PENDING" ? reason : undefined,
-          );
-        }
-        // Clear once consumed so a later edit doesn't accidentally re-send the same reason.
-        form.setValue("statusReason" as any, "");
+      if (approveBilling) {
+        // APROVAR ESTA COBRANÇA — e nenhuma outra. `PUT /billings/:id/approve` emite a fatura, a
+        // NFS-e e os boletos DELA. Endereçar por id é a diferença que faz: os sessenta caminhões
+        // do Marquespan não terminam no mesmo dia, e cada aprovação conta o vencimento a partir
+        // dela; o orçamento só grava `billingApprovedAt` quando a última fecha.
+        await billingService.approve(currentBilling.id);
       }
 
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: billingKeys.all });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["dashboards"] });
 
-      const isBillingApproval =
-        approveVehicleSlice ||
-        (targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status);
-      if (isBillingApproval) {
+      if (approveBilling) {
         setIsGenerating(true);
         toast.success(
           isPerVehicleBilling
-            ? "Faturamento deste veículo aprovado! Gerando fatura, boleto e NFS-e..."
+            ? "Faturamento desta cobrança aprovado! Gerando fatura, boleto e NFS-e..."
             : "Faturamento aprovado! Gerando faturas, boletos e NFS-e...",
           {
             description: "Aguarde a geração ser concluída.",
@@ -1552,10 +1518,11 @@ const BillingDetailPageInner = ({
   }, [
     quote?.id,
     quote?.status,
-    // A aprovação de UMA fatia depende do recorte de faturamento e do veículo
-    // aberto: sem os dois na lista, um `executeSave` memorizado faturaria o
-    // orçamento inteiro depois de o operador trocar de veículo pelo paginador.
     isPerVehicleBilling,
+    // A COBRANÇA aberta: sem ela na lista, um `executeSave` memorizado aprovaria a cobrança
+    // ANTERIOR depois de o operador trocar de página pelo paginador de irmãs.
+    currentBilling?.id,
+    approvedBillingCount,
     task?.id,
     form,
     queryClient,
@@ -1572,7 +1539,6 @@ const BillingDetailPageInner = ({
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
-    const targetStatus = formData.status;
 
     const configs = formData.customerConfigs || [];
     const services = formData.services || [];
@@ -1588,17 +1554,49 @@ const BillingDetailPageInner = ({
       return;
     }
 
-    if (STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) {
-      if (!validateCustomerData()) return;
-    }
+    // Gravar é só gravar: o cadastro completo é exigência de APROVAR, e a aprovação tem o seu
+    // próprio caminho (o seletor do Resumo → `handleApproveBilling`). Exigi-lo aqui impedia salvar
+    // um rascunho de cobrança enquanto se espera o CNPJ do cliente.
+    await executeSave();
+  }, [quote?.id, task?.id, form, executeSave, servicesStepIdx]);
 
-    if (targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status) {
-      setBillingApprovalDialogOpen(true);
+  /**
+   * APROVAR ESTA COBRANÇA — a porta única, vinda do seletor do Resumo.
+   *
+   * Roda as guardas (cadastro do tomador, serviços atribuídos) e abre a confirmação irreversível;
+   * quem chama a rota é `executeSave({ approveBilling: true })`, depois de gravar os valores — a
+   * nota sai sobre o que está persistido, não sobre o que está na tela.
+   */
+  const handleApproveBilling = useCallback(() => {
+    if (!currentBilling?.id) {
+      toast.error("Esta cobrança ainda não foi criada. Salve antes de aprovar.");
       return;
     }
+    if (!validateCustomerData()) return;
+    setBillingApprovalDialogOpen(true);
+  }, [currentBilling?.id, validateCustomerData]);
 
-    await executeSave();
-  }, [quote?.id, task?.id, quote?.status, form, validateCustomerData, executeSave, servicesStepIdx]);
+  /** LIQUIDAR À MÃO — `PUT /billings/:id/settle`, o orçamento direto pago à vista. */
+  const handleSettleBilling = useCallback(async () => {
+    if (!currentBilling?.id) return;
+    const ok = window.confirm(
+      "Marcar esta cobrança como liquidada? As parcelas dela serão dadas por pagas e os boletos em aberto, cancelados.",
+    );
+    if (!ok) return;
+    setIsSaving(true);
+    try {
+      await billingService.settle(currentBilling.id);
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: billingKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Faturamento liquidado.");
+    } catch {
+      // O interceptor do axios já emite o toast de erro.
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentBilling?.id, queryClient]);
 
   // Loading state
   if (isTaskLoading) {
@@ -1854,10 +1852,10 @@ const BillingDetailPageInner = ({
                   userPrivilege={userPrivilege}
                   disabled={!canEdit}
                   isGenerating={isGenerating}
-                  onApproveVehicleBilling={() => {
-                    setApprovingVehicleSlice(true);
-                    setBillingApprovalDialogOpen(true);
-                  }}
+                  // A COBRANÇA desta página — o estado que o cabeçalho mostra e o alvo das ações.
+                  billing={currentBilling}
+                  onApproveBilling={handleApproveBilling}
+                  onSettleBilling={handleSettleBilling}
                   filterCustomerId={
                     dossieCustomerId !== "all" ? dossieCustomerId : undefined
                   }
@@ -1994,23 +1992,19 @@ const BillingDetailPageInner = ({
           </AlertDialogDescription>
 
           <AlertDialogFooter className="mt-2">
-            <AlertDialogCancel disabled={isSaving} onClick={() => setApprovingVehicleSlice(false)}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={isSaving}
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={async () => {
                 setBillingApprovalDialogOpen(false);
-                const sliceOnly = approvingVehicleSlice;
-                setApprovingVehicleSlice(false);
-                await executeSave(sliceOnly ? { approveVehicleSlice: true } : undefined);
+                await executeSave({ approveBilling: true });
               }}
             >
               {isSaving
                 ? "Processando..."
                 : isPerVehicleBilling
-                  ? "Confirmar Faturamento Deste Veículo"
+                  ? "Confirmar Faturamento Desta Cobrança"
                   : "Confirmar Faturamento Aprovado"}
             </AlertDialogAction>
           </AlertDialogFooter>

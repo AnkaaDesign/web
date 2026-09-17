@@ -52,7 +52,9 @@ import { vehicleCombinations } from "@/utils/vehicle-combinations";
  *  Orçamento move entre pendente e aprovado, e nada mais. */
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
-  { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
+  // "Aprovado", sem o prefixo "Orçamento": a tela já se chama Orçamento, e o estado de faturamento
+  // mudou de entidade — repetir a palavra era desambiguar de algo que não mora mais aqui.
+  { value: "APPROVED", label: "Aprovado" },
 ];
 
 /**
@@ -95,8 +97,7 @@ const getStatusTriggerClass = (status: string) => {
     // contra-assinatura" — ver o comentário em `quote-status-badge`.
     SIGNED: "bg-teal-500 text-white hover:bg-teal-600 border-teal-600",
     EXPIRED: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
-    BUDGET_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
-    BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
+    APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
     CANCELLED: "bg-red-700 text-white hover:bg-red-800 border-red-800",
   };
   return map[status] || "";
@@ -375,7 +376,7 @@ export function BudgetStepReview({
 
   // The cadastro half of the same story. The Faturamento Resumo has had this since the rule
   // landed; the Orçamento one did not — which is backwards, because
-  // `task-quote.billing-customer-incomplete` fires at BUDGET_APPROVED, a status set on THIS wizard.
+  // `task-quote.billing-customer-incomplete` fires at APPROVED, a status set on THIS wizard.
   const customerDataAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "customerData");
   const attentionCustomerFor = (config: any, keys: string[]): string => {
     if (!customerDataAttention?.active) return "";
@@ -484,7 +485,7 @@ export function BudgetStepReview({
     );
   }, [currentStatus, userRole]);
 
-  // Reject-reason dialog: required when reverting from BUDGET_APPROVED to PENDING.
+  // Reject-reason dialog: required when reverting from APPROVED to PENDING.
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [pendingRejectStatus, setPendingRejectStatus] = useState<string | null>(null);

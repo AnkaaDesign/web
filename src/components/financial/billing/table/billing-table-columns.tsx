@@ -1,10 +1,10 @@
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import type { Task } from "@/types";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
+import type { BILLING_STATUS } from "@/types/task-quote";
+import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { TASK_QUOTE_STATUS_LABELS } from "@/constants";
+import { BILLING_STATUS_LABELS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import { formatCurrency } from "@/utils";
 import {
@@ -22,6 +22,7 @@ import {
   taskIdentifier,
   isMultiVehicleQuote,
   taskBillingApprovedAt,
+  taskBillingStatus,
   taskQuoteSubtotal,
   taskQuoteTotal,
   taskQuoteVehicleCount,
@@ -29,7 +30,7 @@ import {
 
 /**
  * Due date of the FIRST installment (parcela nº 1) across all customer configs, regardless of its
- * status — so every task quote shows a vencimento, not only the ones currently "DUE". Falls back
+ * status — so every task quote shows a vencimento, not only the overdue ones. Falls back
  * to the earliest due date when parcelas aren't numbered from 1.
  *
  * The API mirrors this resolution byte for byte for the `currentInstallmentDueDate` sort key
@@ -341,22 +342,55 @@ export function createBillingColumns(): DataTableColumnDef<Task>[] {
       cell: ({ row }) => <PaymentMethodCell task={row.original} />,
     },
     {
-      id: "quoteStatus",
+      // O ESTADO DA COBRANÇA — `billing.status`, e não `quote.status`.
+      //
+      // Lia o orçamento porque o ciclo do pagamento morava lá dentro. Duas consequências, e a
+      // segunda é a que matava a coluna: um orçamento com uma fatia liquidada e outra vencida
+      // tinha de escolher UM estado para as duas, e depois do encolhimento do enum do orçamento
+      // toda linha desta lista leria "Aprovado".
+      //
+      // ⚠️ É o estado da fatia DESTA LINHA (a que cobre este veículo), não o do orçamento: ver
+      // `taskBillingStatus`.
+      id: "billingStatus",
       header: "Status Faturamento",
-      // Renders the status, sorts by its numeric `statusOrder` mirror.
-      accessorFn: (t) => t.quote?.statusOrder ?? null,
-      enableSorting: true,
+      accessorFn: (t) => taskBillingStatus(t),
+      // ⛔ SEM ORDENAÇÃO NO SERVIDOR, e não por esquecimento.
+      //
+      // A linha é uma TAREFA e o estado está em task → quote → customerConfigs → billing: um
+      // caminho que passa por relação de MUITOS, e `orderBy` do Prisma não atravessa isso. Ordenar
+      // só a página já carregada faria cada página parecer ordenada com a ordem global errada —
+      // o mesmo defeito que `currentInstallmentDueDate` resolveu com uma chave COMPUTADA no
+      // repositório da API (varredura completa + ordenação em memória antes de paginar).
+      //
+      // O conserto de verdade é uma chave dessas para o estado da cobrança
+      // (`taskOrderByFieldsSchema` + `task-prisma.repository.ts`). Enquanto ela não existe, o
+      // cabeçalho não oferece uma ordenação que o servidor ignoraria em silêncio.
+      enableSorting: false,
       size: 190,
       minSize: 140,
       meta: {
         headerLabel: "Status Faturamento",
         exportHeader: "Status Faturamento",
-        exportValue: (t) => (t.quote?.status ? (TASK_QUOTE_STATUS_LABELS[t.quote.status as TASK_QUOTE_STATUS] ?? t.quote.status) : ""),
+        exportValue: (t) => {
+          const status = taskBillingStatus(t);
+          return status ? (BILLING_STATUS_LABELS[status] ?? status) : "";
+        },
       },
       cell: ({ row }) => {
-        const status = row.original.quote?.status;
+        const status = taskBillingStatus(row.original);
+        // Traço aqui significa "esta consulta não trouxe o estado" (um include sem
+        // `billing.status`), não "não há cobrança": o servidor só devolve tarefa nesta lista
+        // quando o orçamento passou da aprovação comercial.
         if (!status) return <MutedDash />;
-        return <QuoteStatusBadge status={status as TASK_QUOTE_STATUS} size="sm" />;
+        const { paid, total } = installmentProgress(row.original);
+        return (
+          <BillingStatusBadge
+            status={status as BILLING_STATUS}
+            size="sm"
+            paidCount={total > 0 ? paid : undefined}
+            totalCount={total > 0 ? total : undefined}
+          />
+        );
       },
     },
     {
@@ -386,23 +420,27 @@ export const BILLING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Rec
   // Whitelisted by the API as a computed key (`taskOrderByFieldsSchema`); nulls go last on its side.
   currentInstallmentDueDate: (d) => ({ currentInstallmentDueDate: d }),
   billingApprovedAt: (d) => ({ quote: { billingApprovedAt: { sort: d, nulls: "last" } } }),
-  quoteStatus: (d) => ({ quote: { statusOrder: d } }),
+  // `billingStatus` NÃO está aqui de propósito — ver o comentário da coluna: o estado mora atrás
+  // de uma relação de muitos e o Prisma não ordena por ele.
   createdAt: (d) => ({ createdAt: d }),
 };
 
 /**
  * Default sort, stated twice on purpose — once as TanStack sorting state (the header arrows at
  * cold mount, when nothing is in the URL) and once as `buildBillingOrderBy([])`. They must agree.
+ *
+ * ⚠️ ERA `quoteStatus asc` — a ordem da ação pendente do ORÇAMENTO. Com o ciclo do pagamento fora
+ * daquele enum, essa ordenação passaria a agrupar a lista inteira num valor só ("Aprovado"), e
+ * ordenar pelo estado da COBRANÇA não é possível no servidor (ver a coluna). O entregue há mais
+ * tempo primeiro é a ordem honesta para a fila de faturar: é o que está esperando cobrança há
+ * mais tempo.
  */
-export const BILLING_DEFAULT_SORTING: { id: string; desc: boolean }[] = [
-  { id: "quoteStatus", desc: false },
-  { id: "finishedAt", desc: true },
-];
+export const BILLING_DEFAULT_SORTING: { id: string; desc: boolean }[] = [{ id: "finishedAt", desc: true }];
 
 export function buildBillingOrderBy(sorting: { id: string; desc: boolean }[]): Record<string, unknown> | Record<string, unknown>[] {
   const entries = sorting
     .map((s) => BILLING_SORT_FIELD_MAP[s.id]?.(s.desc ? "desc" : "asc"))
     .filter((e): e is Record<string, unknown> => !!e);
-  if (entries.length === 0) return [{ quote: { statusOrder: "asc" } }, { finishedAt: "desc" }];
+  if (entries.length === 0) return [{ finishedAt: "desc" }];
   return entries.length === 1 ? entries[0] : entries;
 }

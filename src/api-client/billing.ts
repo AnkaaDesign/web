@@ -43,8 +43,27 @@ export const billingService = {
     deliveredOnly?: boolean;
   }) => apiClient.get("/billings", { params }),
 
-  /** Aprova ESTA cobrança — emite a fatura, a NFS-e e os boletos dela, e de mais nenhuma. */
+  /**
+   * APROVA ESTA COBRANÇA — emite a fatura, a NFS-e e os boletos dela, e de mais
+   * nenhuma.
+   *
+   * É o ÚNICO endereço de "aprovar faturamento". Era
+   * `PUT /task-quotes/:id/status` com `status: 'BILLING_APPROVED'`, que aprovava
+   * o orçamento inteiro porque o estado era do orçamento — num orçamento cobrado
+   * veículo a veículo isso emitia os sessenta de uma vez. O endpoint antigo hoje
+   * RECUSA o valor (ele não existe mais no enum).
+   */
   approve: (billingId: string) => apiClient.put(`/billings/${billingId}/approve`),
+
+  /**
+   * LIQUIDAÇÃO MANUAL desta cobrança — o orçamento direto, pago à vista sem
+   * parcela nem boleto para conciliar.
+   *
+   * Substitui `updateStatus(quoteId, 'SETTLED')`. Pelo mesmo motivo da aprovação:
+   * "liquidado" é estado da COBRANÇA, e marcá-lo no orçamento dava por pagas
+   * também as cobranças irmãs que ninguém tinha recebido.
+   */
+  settle: (billingId: string) => apiClient.put(`/billings/${billingId}/settle`),
 
   /** Esta cobrança pode ser recomposta, ou já está congelada por fatura/aprovação? */
   frozen: (billingId: string) => apiClient.get(`/billings/${billingId}/frozen`),

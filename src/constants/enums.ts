@@ -2853,24 +2853,59 @@ export enum PAYROLL_MONTH {
 // Task Quote Enums
 // =====================
 
+/**
+ * O CICLO DO ORÇAMENTO — e só dele.
+ *
+ * Encolheu para cinco em 16/09/2026. Os cinco estados de cobrança que moravam
+ * aqui (`BILLING_APPROVED`, `UPCOMING`, `DUE`, `PARTIAL`, `SETTLED`) descreviam
+ * o pagamento, que é de outra entidade: o faturamento é `Billing`, e o ciclo
+ * dele é {@link BILLING_STATUS}.
+ *
+ * ⚠️ ESPELHO de `api/src/constants/enums.ts`. Divergir aqui não dá erro de
+ * compilação — dá filtro que não filtra e badge sem rótulo.
+ */
 export enum TASK_QUOTE_STATUS {
-  PENDING = "PENDING",
+  /**
+   * Passou da validade sem todas as assinaturas; volta ao comercial para
+   * reanálise do valor. O rótulo é "Aguardando Reanálise" e não "Vencido":
+   * vencida é a PARCELA, e isso é {@link BILLING_STATUS.OVERDUE}, noutra
+   * entidade.
+   */
+  EXPIRED = "EXPIRED",
   /**
    * Todos os responsáveis do CLIENTE assinaram; falta a contra-assinatura da
    * Ankaa. Existe para que "o que depende de nós" seja visível numa lista.
    */
   SIGNED = "SIGNED",
+  PENDING = "PENDING",
   /**
-   * Passou da validade sem todas as assinaturas; volta ao comercial para
-   * reanálise do valor. ⚠️ `DUE` já se chama "Vencido" na tela e é outra coisa
-   * (parcela em atraso) — o rótulo aqui é "Aguardando Reanálise".
+   * O ÚLTIMO estado do orçamento. Era `BUDGET_APPROVED`; o prefixo existia só
+   * para desambiguar de `BILLING_APPROVED`, que morreu junto com a confusão.
    */
-  EXPIRED = "EXPIRED",
-  BUDGET_APPROVED = "BUDGET_APPROVED",
-  BILLING_APPROVED = "BILLING_APPROVED",
-  UPCOMING = "UPCOMING",
-  DUE = "DUE",
+  APPROVED = "APPROVED",
+  CANCELLED = "CANCELLED",
+}
+
+/**
+ * O CICLO DO FATURAMENTO — `Billing.status`, derivado de `approvedAt` + das
+ * parcelas por `BillingStatusCascadeService` no servidor. Ninguém o digita.
+ *
+ * ⚠️ NÃO existe "A Vencer"/`UPCOMING`: depois de aprovar, o estado é `APPROVED`,
+ * que já quer dizer "cobrado, esperando pagar".
+ */
+export enum BILLING_STATUS {
+  /**
+   * Há parcela vencida e não paga. Fura a ordem cronológica de propósito: é o
+   * único estado que pede ação hoje.
+   */
+  OVERDUE = "OVERDUE",
+  /** A cobrança existe e ainda não foi aprovada — `approvedAt` nulo. */
+  PENDING = "PENDING",
+  /** Aprovada e cobrada; nenhuma parcela paga ainda. */
+  APPROVED = "APPROVED",
+  /** Alguma parcela paga, e nenhuma vencida. */
   PARTIAL = "PARTIAL",
+  /** Todas as parcelas ativas pagas. */
   SETTLED = "SETTLED",
   CANCELLED = "CANCELLED",
 }

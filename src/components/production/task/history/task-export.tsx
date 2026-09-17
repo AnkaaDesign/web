@@ -168,9 +168,14 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
       return value != null ? formatCurrency(value) : "";
     },
   },
+  // ⚠️ O RÓTULO DIZIA "Status Faturamento" e o valor é `quote.status` — o do ORÇAMENTO.
+  // Funcionava por acidente enquanto o enum do orçamento carregava o ciclo do pagamento; desde
+  // 16/09/2026 ele tem cinco estados e nenhum deles é de cobrança, então a coluna anunciaria
+  // faturamento e mostraria "Pendente"/"Aprovado" do contrato. O estado da cobrança é
+  // `BILLING_STATUS`, mora no `Billing`, e quem o mostra é a lista de Faturamento.
   {
     id: "paymentStatus",
-    label: "Status Faturamento",
+    label: "Status do Orçamento",
     getValue: (task: Task) => {
       const status = task.quote?.status as TASK_QUOTE_STATUS | undefined;
       return status ? TASK_QUOTE_STATUS_LABELS[status] || status : "";

@@ -5,6 +5,8 @@ import {
   XYZ_CATEGORY,
   ASSIGNMENT_TYPE,
   TASK_STATUS,
+  TASK_QUOTE_STATUS,
+  BILLING_STATUS,
   ORDER_STATUS,
   SERVICE_ORDER_STATUS,
   AIRBRUSHING_STATUS,
@@ -145,6 +147,37 @@ export const TASK_STATUS_ORDER: Record<TASK_STATUS, number> = {
   [TASK_STATUS.IN_PRODUCTION]: 3,
   [TASK_STATUS.COMPLETED]: 4,
   [TASK_STATUS.CANCELLED]: 5,
+};
+
+// ⚠️ PERSISTIDO em `TaskQuote.statusOrder`, escrito pela API junto com `status`.
+// Espelho de `api/src/constants/sortOrders.ts`: as listas de Orçamento e
+// Faturamento ORDENAM E PAGINAM por essa coluna no servidor, então a ordem aqui
+// e a de lá têm de ser a mesma — divergir não dá erro, dá lista fora de ordem.
+//
+// A ordem é a da AÇÃO PENDENTE, da nossa para a do cliente: vencido
+// (reprecificar) → assinado (falta a nossa contra-assinatura) → pendente
+// (esperando o cliente) → aprovado (não há mais nada a fazer aqui).
+export const TASK_QUOTE_STATUS_ORDER: Record<TASK_QUOTE_STATUS, number> = {
+  [TASK_QUOTE_STATUS.EXPIRED]: 1,
+  [TASK_QUOTE_STATUS.SIGNED]: 2,
+  [TASK_QUOTE_STATUS.PENDING]: 3,
+  [TASK_QUOTE_STATUS.APPROVED]: 4,
+  [TASK_QUOTE_STATUS.CANCELLED]: 5,
+};
+
+// ⚠️ PERSISTIDO em `Billing.statusOrder`, escrito junto com `Billing.status` por
+// `BillingStatusCascadeService` — os dois nunca andam separados.
+//
+// Mesma lógica de ação pendente: vencido primeiro, porque é o único que pede
+// providência HOJE; depois o que depende de NÓS (aprovar o faturamento); depois
+// o que depende do cliente (pagar).
+export const BILLING_STATUS_ORDER: Record<BILLING_STATUS, number> = {
+  [BILLING_STATUS.OVERDUE]: 1,
+  [BILLING_STATUS.PENDING]: 2,
+  [BILLING_STATUS.APPROVED]: 3,
+  [BILLING_STATUS.PARTIAL]: 4,
+  [BILLING_STATUS.SETTLED]: 5,
+  [BILLING_STATUS.CANCELLED]: 6,
 };
 
 export const ORDER_STATUS_ORDER: Record<string, number> = {

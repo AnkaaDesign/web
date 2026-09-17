@@ -938,7 +938,7 @@ function commercialLayout(): DashboardLayout {
           filters: {
             ...EMPTY_TASK_FILTERS,
             status: [TASK_STATUS.COMPLETED],
-            quoteStatuses: ["BUDGET_APPROVED"],
+            quoteStatuses: ["APPROVED"],
           },
           presets: [],
           behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
@@ -1072,7 +1072,7 @@ function financialLayout(): DashboardLayout {
           filters: {
             ...EMPTY_TASK_FILTERS,
             status: [TASK_STATUS.COMPLETED],
-            quoteStatuses: ["BUDGET_APPROVED"],
+            quoteStatuses: ["APPROVED"],
           },
           presets: [],
           behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
