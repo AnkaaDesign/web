@@ -1730,7 +1730,27 @@ const FinancialBudgetDetailPageInner = () => {
         // orçamento a PENDING pelo auto-revert, e pedir o caminho a partir de
         // APPROVED faria o servidor recusar um salto que já não parte de lá.
         const targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
-        if (targetStatus && targetStatus !== statusAfterSave) {
+
+        // ── O SERVIDOR MOVEU O ESTADO? ENTÃO O ALVO ESTÁ VELHO ─────────────────
+        //
+        // O comentário acima cuidou da ORIGEM e esqueceu o ALVO. `targetStatus`
+        // vem do seletor, que carrega o estado de quando a PÁGINA ABRIU — e o
+        // usuário não precisa ter tocado nele. Quando a gravação acima derruba as
+        // assinaturas, o servidor devolve o orçamento a PENDENTE; um instante
+        // depois este bloco calculava o caminho PENDENTE → APROVADO e o replicava,
+        // desfazendo a reversão que acabara de acontecer.
+        //
+        // Medido em produção (nº 984, 17/09): reversão às 20:05:32, reaprovação
+        // às 20:05:33. O servidor agora RECUSA aprovar sobre coleta invalidada —
+        // isto aqui evita que o usuário veja esse erro por um pedido que ele não
+        // fez, e explica o que aconteceu.
+        const servidorMoveuOEstado = statusAfterSave !== (existingQuote.status as TASK_QUOTE_STATUS);
+        if (servidorMoveuOEstado) {
+          toast.info(
+            "O orçamento voltou para Pendente: a alteração invalidou as assinaturas já colhidas. " +
+              "Reenvie para assinatura antes de aprovar de novo.",
+          );
+        } else if (targetStatus && targetStatus !== statusAfterSave) {
           const path = getQuoteStatusPath(statusAfterSave, targetStatus);
           if (path.length === 0) {
             throw new Error(
