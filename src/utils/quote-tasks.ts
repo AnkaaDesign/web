@@ -460,10 +460,24 @@ export function taskInvoiceCustomerNames(
   const seen = new Set<string>();
   const names: string[] = [];
   for (const config of configsForTask(configs, taskId)) {
-    const key = config.customerId ?? config.customer?.id ?? "";
+    const name = (config.customer?.corporateName || config.customer?.fantasyName || "").trim();
+    // ⚠️ A CHAVE RECUA PARA O NOME, e sem isso a deduplicação existia e não fazia
+    // nada.
+    //
+    // Era `config.customerId ?? config.customer?.id ?? ""`, e as duas guardas
+    // testavam a chave antes de usá-la: com `customerId` fora do `select` — que é
+    // o caso do include do detalhe da tarefa — a chave saía VAZIA, o `Set` nunca
+    // guardava nada e cada fatia virava uma linha. Num orçamento `PER_TASK` de
+    // quatro caminhões para UM cliente, "Faturar Para" listava o mesmo nome
+    // quatro vezes.
+    //
+    // O nome é chave pior que o id (dois clientes homônimos colapsariam), mas
+    // ele SEMPRE está aqui — é o próprio valor que a função devolve. Entre
+    // colapsar homônimos e repetir o mesmo cliente N vezes, repetir é o defeito
+    // que aparece todo dia.
+    const key = config.customerId ?? config.customer?.id ?? name.toLowerCase();
     if (key && seen.has(key)) continue;
     if (key) seen.add(key);
-    const name = (config.customer?.corporateName || config.customer?.fantasyName || "").trim();
     if (name) names.push(name);
   }
   return names;

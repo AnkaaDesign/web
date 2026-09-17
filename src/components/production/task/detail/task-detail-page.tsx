@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUOTE_STATUS_CONFIG } from "@/components/production/task/quote/quote-status-badge";
+import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import {
   IconClipboardList,
   IconCalendarEvent,
@@ -137,6 +138,24 @@ const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRI
 // contra laranja. O comentário antigo jurava ser "a mesma paleta" — foi a promessa que sobreviveu à
 // decisão de 17/09, não a cor. Os cinco, e só eles: o ciclo do pagamento saiu deste enum em
 // 16/09/2026 e é `BILLING_STATUS`, com badge e tela próprios.
+/**
+ * A COBRANÇA QUE COBRE ESTE VEÍCULO.
+ *
+ * Um orçamento pode ter N faturamentos (um por caminhão, ou um por lote). A
+ * primeira fatia do orçamento não responde por este veículo — com `PER_TASK` ela
+ * é a do caminhão 1, e a tela do 37 mostraria o estado do 1. Casa pela cobertura
+ * (`billing.tasks`) e só recua para a única cobrança quando ela é uma só.
+ */
+function billingOfTask(task: Task): { status?: string | null } | null {
+  const configs = (task.quote as { customerConfigs?: any[] } | undefined)?.customerConfigs ?? [];
+  const cobrindo = configs.find((c) =>
+    (c?.billing?.tasks ?? []).some((bt: { taskId?: string }) => bt?.taskId === task.id),
+  );
+  if (cobrindo?.billing) return cobrindo.billing;
+  const unicas = [...new Set(configs.map((c) => c?.billing?.id).filter(Boolean))];
+  return unicas.length === 1 ? (configs.find((c) => c?.billing)?.billing ?? null) : null;
+}
+
 const QUOTE_STATUS_VARIANTS: Record<string, string> = Object.fromEntries(
   Object.entries(QUOTE_STATUS_CONFIG).map(([status, { variant }]) => [status, variant]),
 );
@@ -199,6 +218,10 @@ const DETAIL_INCLUDE = {
           installments: { orderBy: { number: "asc" } },
           responsible: true,
           customerSignature: true,
+          // O FATURAMENTO a que este pagador pertence — é dele o estado da
+          // COBRANÇA, que não é o estado do orçamento. Sem este include a tela
+          // não tinha como saber e mostrava o do orçamento no lugar.
+          billing: { include: { tasks: true } },
         },
       },
     },
@@ -1077,7 +1100,12 @@ function TaskDetailContent() {
                 },
                 {
                   id: "quoteStatus",
-                  label: "Status",
+                  // ⚠️ "Status" SOZINHO, num cartão chamado Faturamento, lia como
+                  // o estado da COBRANÇA — e é o do ORÇAMENTO. O dono abriu uma
+                  // tarefa cuja cobrança está PENDENTE e leu "Aprovado" aqui.
+                  // Os dois ciclos são separados desde 16/09/2026; o rótulo
+                  // precisa dizer de qual deles fala.
+                  label: "Status do Orçamento",
                   dataType: "enum" as const,
                   accessor: (t: Task) => t.quote?.status,
                   edit: canEditQuote
@@ -1129,6 +1157,36 @@ function TaskDetailContent() {
                         },
                       }
                     : undefined,
+                },
+                {
+                  /**
+                   * O ESTADO DA COBRANÇA — outro ciclo, outro enum, outra tela.
+                   *
+                   * O cartão mostrava um "Status" só, e ele era o do ORÇAMENTO.
+                   * Numa tarefa cuja cobrança está PENDENTE, a linha lia
+                   * "Aprovado" — que é verdade sobre o orçamento e mentira sobre
+                   * o dinheiro. Os dois ciclos se separaram em 16/09/2026
+                   * (`Billing` virou entidade com estado próprio) e a tela ainda
+                   * falava por um só.
+                   *
+                   * SÓ LEITURA aqui, e de propósito: ninguém digita este estado.
+                   * `BillingStatusCascade` o deriva das parcelas, e aprovar
+                   * cobrança é `PUT /billings/:id/approve`, na tela de
+                   * Faturamento — onde se vê O QUE vai ser cobrado antes de
+                   * emitir nota.
+                   *
+                   * Lê a cobrança que cobre ESTE veículo, não a primeira do
+                   * orçamento: num orçamento cobrado veículo a veículo há uma por
+                   * caminhão, e a do vizinho não diz nada sobre este.
+                   */
+                  id: "billingStatus",
+                  label: "Status do Faturamento",
+                  accessor: (t: Task) => billingOfTask(t)?.status ?? null,
+                  render: (t: Task) => {
+                    const billing = billingOfTask(t);
+                    if (!billing?.status) return <span className="text-muted-foreground">—</span>;
+                    return <BillingStatusBadge status={billing.status as never} />;
+                  },
                 },
               ],
             } as DetailSectionDef<Task>,

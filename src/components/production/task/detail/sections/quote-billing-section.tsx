@@ -54,7 +54,6 @@ import {
   perVehicleAmount,
   quoteVehicleCount,
   coveredTaskCount,
-  coverageLabels,
 } from "@/utils/quote-tasks";
 
 /**
@@ -75,33 +74,26 @@ import {
 function quoteClauseArgs(
   quote: any,
   config: any,
-  /**
-   * TODAS as fatias do orçamento — `rawQuote.customerConfigs`, nunca as
-   * filtradas por veículo que esta tela usa para renderizar. A pergunta aqui é
-   * "os lotes deste orçamento têm todos o mesmo tamanho?", e a lista filtrada
-   * traz uma fatia só: ela responderia "sim" sempre, e o caso desigual — o
-   * único em que a generalização mente — nunca seria detectado.
-   */
-  allConfigs: readonly any[],
 ): { prefix: string; vehicleCount: number; coveredVehicleCount: number | undefined } {
-  const vehicleCount = quoteVehicleCount(quote);
+  // ⚠️ ESTA PÁGINA É DE UM CAMINHÃO, e a cláusula tem de falar da fatura DELE.
+  //
+  // O escopo saía do CONTRATO: `vehicleCount` era `quoteVehicleCount(quote)`, e
+  // num orçamento de quatro veículos cobrados separadamente a frase virava
+  //
+  //   "Fica acertado o pagamento, PARA CADA UM DOS 4 VEÍCULOS, em 2 parcelas de
+  //    R$ 0,10 (…). Serão 8 COBRANÇAS NO TOTAL."
+  //
+  // As duas partes em maiúsculas são do contrato inteiro e não têm o que fazer
+  // na página do caminhão 78000: quem a abre quer saber quando ESTE paga, não
+  // quantas cobranças os quatro somam. Esse é o texto do DOCUMENTO, que fala do
+  // negócio todo; aqui o assunto é uma fatura.
+  //
+  // Passando `vehicleCount = coveredVehicleCount`, `paymentScope` não emite
+  // prefixo e `invoiceCount` dá 1 — some a contagem de cobranças. Numa fatura
+  // CONJUNTA os dois já eram iguais, então aquele caso não muda uma vírgula.
   const covered = coveredTaskCount(config) || undefined;
-  const sizes = new Set(
-    (allConfigs ?? []).map((c) => coveredTaskCount(c)).filter((n) => n > 0),
-  );
-  if (sizes.size <= 1) return { prefix: "", vehicleCount, coveredVehicleCount: covered };
-  const labels = coverageLabels(config, quote?.tasks ?? []);
-  if (labels.length === 0) return { prefix: "", vehicleCount, coveredVehicleCount: covered };
-  const shown =
-    labels.length <= 3
-      ? labels.join(", ")
-      : `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
-  // Com prefixo, escopo e contagem saem: a frase já diz de quem fala.
-  return {
-    prefix: `${labels.length === 1 ? "Veículo" : "Veículos"} ${shown}: `,
-    vehicleCount: 1,
-    coveredVehicleCount: 1,
-  };
+  const escopo = covered ?? quoteVehicleCount(quote);
+  return { prefix: "", vehicleCount: escopo, coveredVehicleCount: covered };
 }
 
 /**
@@ -127,7 +119,14 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
    * diferença que a tela precisava mostrar: dois veículos do mesmo orçamento
    * podem ter vindo em pedidos diferentes.
    */
-  const taskOrderNumber = (task.customerOrderNumber ?? "").trim() || null;
+  // ⚠️ O Nº DO PEDIDO SAIU DAQUI, e de propósito.
+  //
+  // Ele ficava dentro das Condições de Pagamento, herdado de quando morava na
+  // fatia do cliente. Desde a migração `20260909170000` o pedido é do VEÍCULO
+  // (`Task.customerOrderNumber`) — e esta é a página do veículo, onde ele já
+  // aparece como campo próprio, ao lado da placa e da série. Repeti-lo dentro do
+  // bloco de pagamento sugeria que ele fosse do faturamento, que é exatamente a
+  // leitura antiga e errada.
 
   // Fetch invoice data for inline boleto/NFS-e display in the quote section.
   // Pela rota do ORÇAMENTO, filtradas pela cobertura: a rota por tarefa não
@@ -499,7 +498,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                 // R$ 583,33" sem dizer que são por veículo e que haverá doze
                 // cobranças — exatamente a ambiguidade que o escopo existe para
                 // desfazer. O documento já dizia certo; esta tela, não.
-                const clause = quoteClauseArgs(quote as any, config, rawQuote.customerConfigs ?? []);
+                const clause = quoteClauseArgs(quote as any, config);
                 const configPaymentBody = generatePaymentText({
                   customPaymentText: config.customPaymentText,
                   paymentConfig: (config as any).paymentConfig,
@@ -562,12 +561,6 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                           Condições de Pagamento
                         </div>
                         <p className="text-sm text-muted-foreground">{configPaymentText}</p>
-                      </div>
-                    )}
-
-                    {taskOrderNumber && (
-                      <div className="text-sm text-muted-foreground">
-                        N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
                       </div>
                     )}
 
@@ -707,7 +700,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           const config = configs[0];
           const configTotal = typeof config.total === "number" ? config.total : Number(config.total) || 0;
           // Mesma leitura do cartão por cliente acima.
-          const clause = quoteClauseArgs(quote as any, config, rawQuote.customerConfigs ?? []);
+          const clause = quoteClauseArgs(quote as any, config);
           const paymentBody = generatePaymentText({
             customPaymentText: config.customPaymentText,
             paymentConfig: (config as any).paymentConfig,
@@ -717,7 +710,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
             coveredVehicleCount: clause.coveredVehicleCount,
           });
           const paymentText = paymentBody ? `${clause.prefix}${paymentBody}` : "";
-          const hasContent = paymentText || taskOrderNumber;
+          const hasContent = Boolean(paymentText);
           return hasContent ? (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
               {paymentText && (
@@ -729,11 +722,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {taskOrderNumber && (
-                <div className="text-sm text-muted-foreground">
-                  N° do Pedido: <span className="font-medium text-foreground">{taskOrderNumber}</span>
-                </div>
-              )}
+
             </div>
           ) : null;
         }
