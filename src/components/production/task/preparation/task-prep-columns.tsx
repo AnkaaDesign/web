@@ -36,6 +36,10 @@ function cellTasks(row: Row<ClusteredTask>): Task[] {
 }
 
 const FINANCIAL_SECTORS = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL];
+// "Faturar Para" carrega NOMES, não dinheiro — é a única coluna do bloco financeiro que o gerente
+// de produção enxerga. Gate próprio de propósito: pôr PRODUCTION_MANAGER dentro de
+// `FINANCIAL_SECTORS` abriria junto "Valor Total" e "Status do Orçamento", que são preço.
+const INVOICE_TO_SECTORS = [...FINANCIAL_SECTORS, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
 // Sectors that may see responsibles / forecast (legacy `canViewRestrictedFields`).
 const RESTRICTED_VIEWERS = [
   SECTOR_PRIVILEGES.ADMIN,
@@ -285,7 +289,9 @@ export const TASK_PREP_SECTOR_DEFAULTS: Partial<Record<SECTOR_PRIVILEGES, Partia
   [SECTOR_PRIVILEGES.WAREHOUSE]: sectorConfig(["name", "identificador", "soProduction", "pintura", "status", "sector"]),
   [SECTOR_PRIVILEGES.LOGISTIC]: sectorConfig(["identificador", "name", "customer", "forecastDate", "entryDate", "soLogistic", "soProduction", "term"]),
   [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: sectorConfig([
-    "name", "customer", "identificador", "forecastDate", "soProduction", "soArtwork", "soLogistic", "soCommercial", "responsibles", "status", "sector",
+    // "invoiceToCustomers" entra ligado: o gerente de produção passou a precisar ver para quem o
+    // veículo será faturado. Só o NOME — "total" e "paymentStatus" seguem fora do alcance dele.
+    "name", "customer", "invoiceToCustomers", "identificador", "forecastDate", "soProduction", "soArtwork", "soLogistic", "soCommercial", "responsibles", "status", "sector",
   ]),
   [SECTOR_PRIVILEGES.COMMERCIAL]: sectorConfig(["customer", "name", "identificador", "total", "paymentStatus", "forecastDate", "term", "soCommercial", "bonification"]),
   [SECTOR_PRIVILEGES.FINANCIAL]: sectorConfig(["customer", "total", "invoiceToCustomers", "paymentStatus", "name", "identificador", "forecastDate", "term", "soCommercial", "soLogistic", "bonification"]),
@@ -404,7 +410,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       header: "Faturar Para",
       accessorFn: (row) => invoiceCustomers(row),
       size: 200,
-      meta: { defaultVisible: false, headerLabel: "Faturar Para", requiredPrivilege: FINANCIAL_SECTORS, exportValue: (row) => invoiceCustomers(row) },
+      meta: { defaultVisible: false, headerLabel: "Faturar Para", requiredPrivilege: INVOICE_TO_SECTORS, exportValue: (row) => invoiceCustomers(row) },
       cell: ({ getValue }) => {
         const v = getValue() as string;
         return v ? <TruncatedTextWithTooltip text={v} className="truncate" /> : <span className="text-muted-foreground">-</span>;

@@ -8,9 +8,11 @@ interface DateTimeCellProps {
   name: string;
   placeholder?: string;
   defaultTime?: string; // Format: "HH:mm" e.g., "07:30"
+  /** Read-only cell — used when the sector may not write the field (e.g. Prazo). */
+  disabled?: boolean;
 }
 
-export function DateTimeCell({ control, name, placeholder, defaultTime = "07:30" }: DateTimeCellProps) {
+export function DateTimeCell({ control, name, placeholder, defaultTime = "07:30", disabled }: DateTimeCellProps) {
   // Parse default time
   const [defaultHour, defaultMinute] = defaultTime.split(":").map(Number);
 
@@ -49,6 +51,7 @@ export function DateTimeCell({ control, name, placeholder, defaultTime = "07:30"
               onChange={handleDateChange(field)}
               placeholder={placeholder}
               mode="datetime"
+              disabled={disabled}
             />
           </FormControl>
         </FormItem>

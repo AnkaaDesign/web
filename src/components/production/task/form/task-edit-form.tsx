@@ -370,7 +370,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
     canEditObservation,
     canEditIdentity, canEditSector, canEditBonification,
-    canEditDates, canEditResponsibles, canEditServices,
+    canEditDates, canEditEntryDate, canEditTerm, canEditResponsibles, canEditServices,
     canEditLayout, canEditPaint, canEditCuts,
   } = useTaskPermissions();
 
@@ -3680,19 +3680,22 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                     {/* Second Row: Entry Date and Deadline */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Entry Date - Date only - DISABLED for Financial and Designer users */}
+                      {/* Data de Entrada — LOGISTIC/PRODUCTION_MANAGER/ADMIN (API `entryDate`
+                          domain). Gating it on the generic `canEditDates` let COMMERCIAL type a
+                          date the server then rejected. */}
                       <FormField
                         control={form.control}
                         name="entryDate"
-                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />}
+                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || !canEditEntryDate, allowManualInput: true } as any} />}
                       />
 
-                      {/* Deadline - DateTime - DISABLED for Financial and Designer users */}
+                      {/* Prazo de Entrega — PRODUCTION_MANAGER/ADMIN only (API `term` domain).
+                          Same reason as above: `canEditDates` is the wrong flag here. */}
                       <FormField
                         control={form.control}
                         name="term"
                         render={({ field }) => (
-                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />
+                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || !canEditTerm, allowManualInput: true } as any} />
                         )}
                       />
                     </div>

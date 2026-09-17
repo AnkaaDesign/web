@@ -81,6 +81,11 @@ export function BudgetStepTask({
   // Sector-based visibility
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isProductionManagerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
+  // Prazo de Entrega — PRODUCTION_MANAGER/ADMIN only (API `term` field domain). O orçamento é
+  // trabalho do comercial, então na prática a tarefa nasce daqui SEM prazo e a produção o define
+  // depois. Deixar o campo aberto derrubaria o `POST /tasks/batch-with-quote` inteiro.
+  const canEditTerm = isAdminUser || isProductionManagerUser;
 
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
@@ -418,8 +423,8 @@ export function BudgetStepTask({
                   </div>
                 )}
 
-                {/* Forecast Date + Term */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Forecast Date + Term (o Prazo só aparece para quem pode gravá-lo) */}
+                <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
                   <FormField
                     control={control}
                     name="forecastDate"
@@ -432,18 +437,20 @@ export function BudgetStepTask({
                       />
                     )}
                   />
-                  <FormField
-                    control={control}
-                    name="term"
-                    render={({ field }) => (
-                      <DateTimeInput
-                        {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
-                        mode="datetime"
-                        label="Prazo de Entrega"
-                        disabled={disabled}
-                      />
-                    )}
-                  />
+                  {canEditTerm && (
+                    <FormField
+                      control={control}
+                      name="term"
+                      render={({ field }) => (
+                        <DateTimeInput
+                          {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
+                          mode="datetime"
+                          label="Prazo de Entrega"
+                          disabled={disabled}
+                        />
+                      )}
+                    />
+                  )}
                 </div>
 
                 {/* Details */}

@@ -380,7 +380,9 @@ export function TaskScheduleTable({
         key: "setTerm",
         label: menuRows.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo",
         icon: <IconCalendarTime className="mr-2 h-4 w-4" />,
-        hidden: () => !(isAdmin || isProductionManager || isCommercial),
+        // Prazo = PRODUCTION_MANAGER + ADMIN (API `term` domain). COMMERCIAL saía daqui com um
+        // botão que o servidor recusa desde 17/09/2026.
+        hidden: () => !(isAdmin || isProductionManager),
         onClick: (rs) => handleAction("setTerm", rs),
       },
       {

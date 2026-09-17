@@ -95,10 +95,11 @@ export function useTaskPermissions() {
   // that receive it (LOGISTIC / PRODUCTION_MANAGER) + ADMIN. COMMERCIAL is excluded.
   // Mirrors the API `entryDate` field domain (task.permissions.ts).
   const canEditEntryDate = canEditDates && !isCommercial;
-  // Prazo de Entrega — the deadline negotiated with the customer. COMMERCIAL +
-  // ADMIN only; PRODUCTION_MANAGER and LOGISTIC are excluded. Mirrors the API
-  // `term` field domain (task.permissions.ts).
-  const canEditTerm = isAdmin || isCommercial;
+  // Prazo de Entrega — the deadline the shop commits to. PRODUCTION_MANAGER +
+  // ADMIN only; COMMERCIAL lost it on 17/09/2026 and LOGISTIC never had it.
+  // Mirrors the API `term` field domain (task.permissions.ts) — a commercial
+  // user who still reaches a term input gets a 400 from the field validator.
+  const canEditTerm = isAdmin || isProductionManager;
   const canEditResponsibles = !isFinancial && !isDesigner && !isLogistic && !isProductionManager;
   const canEditServices = !isWarehouse;
   const canEditLayout = !isFinancial && !isDesigner;

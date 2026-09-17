@@ -741,8 +741,8 @@ export function TaskPreparationPage() {
         key: "definir-prazo",
         label: "Definir/Alterar Prazo",
         icon: <IconCalendarTime className="h-4 w-4" />,
-        // Prazo de Entrega — COMMERCIAL + ADMIN only (the API `term` field domain).
-        requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL],
+        // Prazo de Entrega — PRODUCTION_MANAGER + ADMIN only (the API `term` field domain).
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
         onClick: (rows) => setTermModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
       {

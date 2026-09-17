@@ -619,10 +619,10 @@ export function TaskScheduleTablePage() {
       },
       {
         key: "set-term",
-        // Prazo de Entrega — COMMERCIAL + ADMIN only (the API `term` field domain).
+        // Prazo de Entrega — PRODUCTION_MANAGER + ADMIN only (the API `term` field domain).
         label: "Definir Prazo",
         icon: <IconCalendarTime className="h-4 w-4" />,
-        hidden: () => !(isAdmin || isCommercial),
+        hidden: () => !(isAdmin || isProductionManager),
         onClick: (r) => setTermModal({ open: true, tasks: r }),
       },
       {

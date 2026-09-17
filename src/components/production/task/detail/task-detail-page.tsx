@@ -29,7 +29,7 @@ import {
   IconLayoutGrid,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
-import type { DetailSectionDef, PersistedDetailConfig } from "@/components/ui/detailpage";
+import type { DetailFieldDef, DetailSectionDef, PersistedDetailConfig } from "@/components/ui/detailpage";
 import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,9 +118,14 @@ const DATE_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LO
 //   ENTRY DATE (canEditEntryDate = canEditDates minus COMMERCIAL) — only the desks that
 //   physically receive the vehicle record its arrival. Mirrors the API `entryDate` domain.
 const ENTRY_DATE_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
-//   TERM (canEditTerm = COMMERCIAL + ADMIN) — the customer deadline is negotiated by the
-//   commercial desk; PRODUCTION_MANAGER and LOGISTIC must not change it. Mirrors the API `term` domain.
-const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL];
+//   TERM (canEditTerm = PRODUCTION_MANAGER + ADMIN) — the delivery deadline is production
+//   management's; COMMERCIAL and LOGISTIC must not change it. Mirrors the API `term` domain.
+const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
+// VIEWING-only gate for the "Faturar Para" line in Informações Gerais: quem NÃO tem o cartão
+// Faturamento e ainda assim precisa saber para quem a nota sai. Hoje é só o gerente de produção
+// (ADMIN/FINANCEIRO/COMERCIAL leem isso no próprio cartão). Abrir para outro setor é acrescentar
+// um item aqui — e nada de dinheiro vem junto, a linha é só o nome.
+const INVOICE_TO_OVERVIEW_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
 //   STATUS — deliberately NOT an `editablePrivilege`: the status editor's real gate is a CAPABILITY
 //   (`canManageStatus` = admin/team-leader, `canFinish` = ADMIN/PM/LOGISTIC) plus the transition state
 //   machine, which a privilege list can't express — COMMERCIAL/DESIGNER/FINANCIAL may open the editor
@@ -569,6 +574,39 @@ function TaskDetailContent() {
                 }
               : undefined,
           },
+          // FATURAR PARA, em Informações Gerais — a leitura de quem NÃO tem o cartão Faturamento.
+          //
+          // O gerente de produção precisa saber para quem a nota vai sair (é o que decide a quem
+          // o veículo é entregue e cobrado), mas não vê preço. Então aqui vai o NOME e só: sem
+          // valor, sem status, sem link para a ficha do cliente, sem edição.
+          //
+          // Só entra quando o cartão "Faturamento" NÃO entra (`showQuote` = ADMIN/FINANCEIRO/
+          // COMERCIAL) — senão o mesmo nome apareceria duas vezes na mesma tela.
+          ...(!showQuote
+            ? [
+                {
+                  id: "invoiceToCustomersOverview",
+                  label: "Faturar Para",
+                  requiredPrivilege: INVOICE_TO_OVERVIEW_PRIVILEGES,
+                  // `accessor` decide o vazio (some quando não há orçamento); `render` desenha.
+                  accessor: (t: Task) => taskInvoiceCustomerLabel(t.quote?.customerConfigs, t.id) || null,
+                  render: (t: Task) => {
+                    const names = taskInvoiceCustomerNames(t.quote?.customerConfigs, t.id);
+                    if (!names.length) return <span className="text-muted-foreground">—</span>;
+                    // Mais de um pagador: um nome por linha, mesma forma do cartão Faturamento.
+                    return (
+                      <div className="flex flex-col items-end gap-0.5">
+                        {names.map((n, i) => (
+                          <span key={i} className="truncate">
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  },
+                } as DetailFieldDef<Task>,
+              ]
+            : []),
           {
             id: "sector",
             label: "Setor",

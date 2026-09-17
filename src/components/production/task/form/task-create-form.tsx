@@ -99,10 +99,10 @@ export const TaskCreateForm = () => {
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
   const isProductionManagerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
-  // Prazo de Entrega — COMMERCIAL/ADMIN only (mirrors the API `term` field domain
-  // and `useTaskPermissions().canEditTerm`). LOGISTIC/PRODUCTION_MANAGER create the
-  // task without a deadline; the commercial desk sets it afterwards.
-  const canEditTerm = isAdminUser || isCommercialUser;
+  // Prazo de Entrega — PRODUCTION_MANAGER/ADMIN only (mirrors the API `term` field
+  // domain and `useTaskPermissions().canEditTerm`). COMMERCIAL/LOGISTIC create the
+  // task without a deadline; production management sets it afterwards.
+  const canEditTerm = isAdminUser || isProductionManagerUser;
 
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
@@ -824,7 +824,7 @@ export const TaskCreateForm = () => {
                         )}
 
                         {/* Forecast Date + Term in same row. The Prazo field only renders for
-                            COMMERCIAL/ADMIN — the API rejects `term` from every other sector. */}
+                            PRODUCTION_MANAGER/ADMIN — the API rejects `term` from every other sector. */}
                         <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
                           <FormField
                             control={form.control}

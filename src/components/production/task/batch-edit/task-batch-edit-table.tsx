@@ -22,6 +22,7 @@ import { DateCell } from "./cells/date-cell";
 import { cn } from "@/lib/utils";
 import { TaskBatchResultDialog } from "./task-batch-result-dialog";
 import { useBatchUpdateTasks } from "../../../../hooks";
+import { useTaskPermissions } from "@/hooks/common/use-task-permissions";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { createNameSchema, createDescriptionSchema, nullableDate } from "../../../../schemas";
@@ -89,6 +90,10 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
   }
 
   const navigate = useNavigate();
+  // Prazo de Entrega — PRODUCTION_MANAGER/ADMIN only. Sem isso a grade mandava o `term` de
+  // TODA linha editada (o payload é a linha inteira, não o diff), e o validador de campos da
+  // API recusava o lote inteiro por causa de uma coluna que o usuário nem tocou.
+  const { canEditTerm } = useTaskPermissions();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Task, Task> | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
@@ -247,6 +252,10 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           id: task.id,
           data: { ...task.data },
         };
+
+        // A linha vai inteira para a API, então um campo que o setor não pode escrever tem de
+        // SAIR do payload — mandá-lo inalterado derruba o lote no validador de campos.
+        if (!canEditTerm) delete transformed.data.term;
 
         return transformed;
       });
@@ -441,7 +450,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         </TableCell>
                         <TableCell className="w-40 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <DateTimeCell control={form.control} name={`tasks.${index}.data.term`} placeholder="Prazo de entrega" defaultTime="07:30" />
+                            <DateTimeCell control={form.control} name={`tasks.${index}.data.term`} placeholder="Prazo de entrega" defaultTime="07:30" disabled={!canEditTerm} />
                           </div>
                         </TableCell>
                         <TableCell className="w-40 p-0 !border-r-0">

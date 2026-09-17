@@ -27,6 +27,7 @@ import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useReturnTo } from "@/hooks/common/use-return-to";
+import { useTaskPermissions } from "@/hooks/common/use-task-permissions";
 import { toast } from "sonner";
 import {
   IconReceipt,
@@ -102,6 +103,10 @@ function todayPlusDays(days: number): string {
 function Render({ config }: WidgetRenderProps<Config>) {
   const navigate = useNavigate();
   const returnTo = useReturnTo();
+  // Prazo de Entrega — PRODUCTION_MANAGER/ADMIN (API `term` field domain). O widget é de
+  // ADMIN/COMERCIAL/FINANCEIRO, então na prática só o ADMIN vê o campo; para os outros a
+  // tarefa nasce sem prazo (mandá-lo devolvia 400 do validador de campos).
+  const { canEditTerm } = useTaskPermissions();
   const { data: customersData } = useCustomers({
     orderBy: { fantasyName: "asc" },
   } as any);
@@ -168,7 +173,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
         customerId,
         name: taskName || undefined,
         serialNumber: serialNumber || undefined,
-        term: term ? new Date(term) : undefined,
+        term: canEditTerm && term ? new Date(term) : undefined,
         forecastDate: forecastDate ? new Date(forecastDate) : undefined,
         details: details || undefined,
       } as any);
@@ -283,16 +288,18 @@ function Render({ config }: WidgetRenderProps<Config>) {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Prazo</Label>
-              <input
-                type="date"
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none"
-              />
-            </div>
+          <div className={canEditTerm ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+            {canEditTerm && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Prazo</Label>
+                <input
+                  type="date"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none"
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">Liberação</Label>
               <input
