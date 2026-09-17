@@ -17,7 +17,7 @@ export const externalOperationServiceItemSchema = z.object({
   position: z.number().int().min(0).optional(),
 });
 
-// Payment config schema (same shape as TaskQuoteCustomerConfig.paymentConfig)
+// Payment config schema (same shape as BudgetPayer.paymentConfig)
 export const externalOperationPaymentConfigSchema = z.object({
   type: z.enum(["CASH", "INSTALLMENTS"]),
   method: z.enum(["PIX", "BANK_SLIP"]).optional(),

@@ -15,11 +15,11 @@ import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
  * from the billing wizard. Everything before approval, plus cancelled and
  * quote-less tasks, stays in the budget (orçamento) workflow.
  *
- * ⚠️ O RECORTE TEM DE SER O MESMO de `isTaskQuoteBillingPhase`, que rotula o item
+ * ⚠️ O RECORTE TEM DE SER O MESMO de `isBudgetBillingPhase`, que rotula o item
  * de menu que chama esta função: divergir faz o menu dizer "Orçamento" e abrir o
  * assistente de faturar.
  */
-export function getTaskQuoteEditRoute(task: Task): string {
+export function getBudgetEditRoute(task: Task): string {
   const status = task.quote?.status;
   // ⚠️ LISTA POSITIVA, e não "tudo que não é PENDING nem CANCELLED".
   //
@@ -209,7 +209,7 @@ export function formatTaskSummary(task: Task): string {
 /**
  * Calculate task price from quote total (zero until the quote leaves PENDING).
  *
- * A FATIA DESTE VEÍCULO. `TaskQuote.total` é o valor do CONTRATO (`preço por
+ * A FATIA DESTE VEÍCULO. `Budget.total` é o valor do CONTRATO (`preço por
  * veículo × N`) desde que um orçamento passou a cobrir N caminhões — devolver o
  * total aqui daria o valor dos sessenta para cada um deles.
  */
@@ -424,12 +424,12 @@ export function validateAllServiceOrdersCompleted(task: Task): ServiceOrderValid
 // TASK QUOTE UTILITIES
 // ============================================================================
 
-import type { TaskQuote } from '../types/task-quote';
+import type { Budget } from '../types/budget';
 
 /**
  * Check if quote is expired
  */
-export function isQuoteExpired(quote: TaskQuote): boolean {
+export function isQuoteExpired(quote: Budget): boolean {
   if (!quote.expiresAt) return false;
   return new Date(quote.expiresAt) < new Date();
 }

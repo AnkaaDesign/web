@@ -2,7 +2,7 @@ import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, I
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer } from "@/types";
-import type { TaskQuote } from "@/types/task-quote";
+import type { Budget } from "@/types/budget";
 import { TASK_QUOTE_STATUS_LABELS, TASK_STATUS, TASK_STATUS_LABELS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import {
@@ -58,7 +58,7 @@ export const BUDGET_QUOTE_INCLUDE = {
   customerConfigs: true,
 } as const;
 
-export function createBudgetFilterDefs(opts: { invoiceCustomers: Customer[]; taskCustomers: Customer[] }): DataTableFilterDef<TaskQuote>[] {
+export function createBudgetFilterDefs(opts: { invoiceCustomers: Customer[]; taskCustomers: Customer[] }): DataTableFilterDef<Budget>[] {
   return [
     {
       key: "budgetNumber",
@@ -94,14 +94,14 @@ export function createBudgetFilterDefs(opts: { invoiceCustomers: Customer[]; tas
       label: "Faturar Para (Cliente)",
       queryKey: "customers-budget-invoice-filter",
       selectedOptions: opts.invoiceCustomers,
-    }) as unknown as DataTableFilterDef<TaskQuote>,
+    }) as unknown as DataTableFilterDef<Budget>,
     createCustomerFilterDef({
       key: "taskCustomerIds",
       label: "Cliente da Tarefa",
       queryKey: "customers-budget-task-filter",
       selectedOptions: opts.taskCustomers,
       icon: <IconUserDollar className="h-4 w-4" />,
-    }) as unknown as DataTableFilterDef<TaskQuote>,
+    }) as unknown as DataTableFilterDef<Budget>,
     {
       key: "totalRange",
       label: "Faixa de Valor",
@@ -170,7 +170,7 @@ const stringList = (value: unknown): string[] =>
  * A versão anterior consultava `GET /tasks` e usava SEIS parâmetros de primeira
  * classe daquela rota — `status`, `customerIds`, `termRange`,
  * `forecastDateRange`, `entryDateRange`, `finishedDateRange`, `createdAtRange`.
- * Nenhum deles existe em `/task-quotes`, e o topo do schema de lá NÃO é
+ * Nenhum deles existe em `/budgets`, e o topo do schema de lá NÃO é
  * `.strict()`: uma chave desconhecida é APAGADA em silêncio. Um filtro esquecido
  * não daria erro — daria 200 com o filtro simplesmente não aplicado, que é a
  * pior forma de errar numa tela que alguém usa para decidir o que cobrar.
@@ -226,7 +226,7 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const vehicle: Record<string, unknown> = {};
 
   const taskStatuses = stringList(filters.taskStatuses);
-  // 🔴 Vai aqui e NUNCA como `status` de topo: no `/task-quotes` o `status` do
+  // 🔴 Vai aqui e NUNCA como `status` de topo: no `/budgets` o `status` do
   // topo é o enum do ORÇAMENTO (valor único), e mandar um array de status de
   // TAREFA para ele devolve 400 e derruba a tela inteira.
   if (taskStatuses.length > 0) vehicle.status = { in: taskStatuses };
@@ -272,7 +272,7 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
  * refresh, "abrir em nova guia"). It MUST stay a faithful mirror of the list's own defaults: a
  * divergence does not error, it just makes "próximo" land on a record that was not the next row.
  *
- * 🔴 É um `where` de TASK-QUOTE, e só pode ser enviado para `GET /task-quotes`.
+ * 🔴 É um `where` de TASK-QUOTE, e só pode ser enviado para `GET /budgets`.
  * Mandá-lo para `/tasks` — que é o que o pager fazia — devolve 400: o
  * `taskWhereSchema` é `.strict()` e recusa `tasks` e `budgetNumber`. Ver
  * `useBudgetSiblingIds`, que é quem o consome.

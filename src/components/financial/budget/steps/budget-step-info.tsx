@@ -18,7 +18,7 @@ import {
   type LayoutOption,
 } from "@/components/financial/common/approved-layout-picker";
 import { formatCNPJ } from "@/utils";
-import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/task-quote-calculations";
+import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/budget-calculations";
 import { getCustomers } from "@/api-client";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 

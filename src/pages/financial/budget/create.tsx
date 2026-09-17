@@ -15,7 +15,7 @@ import {
   SERVICE_ORDER_TYPE,
   FAVORITE_PAGES,
 } from "@/constants";
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
+import { budgetKeys } from "@/hooks/production/use-budget";
 import {
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
@@ -944,7 +944,7 @@ export const FinancialBudgetCreatePage = () => {
       }
 
       if (successCount > 0) {
-        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+        queryClient.invalidateQueries({ queryKey: budgetKeys.all });
         allowNavigation();
         navigate(firstCreatedTaskId
           ? routes.production.preparation.details(firstCreatedTaskId)

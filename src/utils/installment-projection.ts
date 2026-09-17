@@ -1,4 +1,4 @@
-import type { PaymentConfig } from "@/types/task-quote";
+import type { PaymentConfig } from "@/types/budget";
 // Legacy-enum → structured-config mapping lives with the payment WORDING so the
 // projected dates and the sentence describing them can never drift apart.
 import { conditionToConfig } from "./quote-text-generators";

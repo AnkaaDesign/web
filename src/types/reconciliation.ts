@@ -343,7 +343,7 @@ export interface ReconciliationMatchInstallment {
   paidAt: string | null;
   status: string;
   // Normalized on the backend to the same shape whether the installment is
-  // backed by a classic Invoice or a Faturamento TaskQuoteCustomerConfig.
+  // backed by a classic Invoice or a Faturamento BudgetPayer.
   invoice?: {
     id: string;
     totalAmount: number;

@@ -1,7 +1,7 @@
 // `import type` puro: este módulo é deliberadamente livre de dependências de
 // runtime (é o espelho de `api/src/utils/quote-tasks.ts` e roda nos dois lados),
 // e um tipo é apagado na compilação.
-import type { BILLING_STATUS } from "../types/task-quote";
+import type { BILLING_STATUS } from "../types/budget";
 
 /**
  * As TAREFAS de um orçamento — a fonte única sobre ordem, contagem e âncora.
@@ -127,7 +127,7 @@ export function describeQuoteVehicles(
 /**
  * QUANTOS VEÍCULOS o orçamento cobre, aceitando os dois caminhos.
  *
- * `vehicleCount` é coluna em `TaskQuote` (a API a mantém em `recalcQuoteTotals`)
+ * `vehicleCount` é coluna em `Budget` (a API a mantém em `recalcQuoteTotals`)
  * e é o ÚNICO caminho quando a tela não carregou as tarefas — o que é a regra nas
  * listas: a de Orçamentos e a de Faturamento pedem um punhado de escalares do
  * orçamento, nunca a relação de veículos. `tasks.length` continua valendo onde
@@ -197,7 +197,7 @@ export function quotePerVehicleTotal(
 //
 // ESPELHA a seção gêmea de `api/src/utils/quote-tasks.ts`.
 //
-// TRÊS GERAÇÕES: a coluna `TaskQuoteCustomerConfig.taskId` (nulo = "todos");
+// TRÊS GERAÇÕES: a coluna `BudgetPayer.taskId` (nulo = "todos");
 // depois uma relação gravada, mas pendurada no PAGADOR; hoje `Billing.tasks` —
 // a cobertura é do FATURAMENTO, que é uma entidade com id próprio e é o que a
 // rota `/financeiro/faturamento/:billingId` endereça.
@@ -280,7 +280,7 @@ export function billingIdOf(config: BillingConfigLike | null | undefined): strin
 /**
  * ESTE FATURAMENTO JÁ FOI APROVADO? — pergunte ao faturamento, não ao pagador.
  *
- * Era `TaskQuoteCustomerConfig.billingApprovedAt`, uma data por pagador: dois
+ * Era `BudgetPayer.billingApprovedAt`, uma data por pagador: dois
  * pagadores do mesmo recorte tinham duas datas para um evento só.
  */
 export function billingApprovedAtOf(

@@ -2500,7 +2500,7 @@ export const BILLING_STATUS_LABELS: Record<BILLING_STATUS, string> = {
 /**
  * "Orçamento" ou "Faturamento"? — por qual das duas telas este registro se abre.
  *
- * ⚠️ O RECORTE É `APPROVED`, e tem de ser o MESMO de `getTaskQuoteEditRoute`:
+ * ⚠️ O RECORTE É `APPROVED`, e tem de ser o MESMO de `getBudgetEditRoute`:
  * este texto rotula o item de menu que aquela função endereça, e divergir faz o
  * menu dizer "Orçamento" e abrir o assistente de faturar.
  *
@@ -2509,12 +2509,12 @@ export const BILLING_STATUS_LABELS: Record<BILLING_STATUS, string> = {
  * liam como Faturamento, e um orçamento vencido — que existe justamente para o
  * comercial reabrir — abria a tela de cobrança.
  */
-export function getTaskQuoteDisplayLabel(status?: TASK_QUOTE_STATUS | string | null): string {
-  return isTaskQuoteBillingPhase(status) ? 'Faturamento' : 'Orçamento';
+export function getBudgetDisplayLabel(status?: TASK_QUOTE_STATUS | string | null): string {
+  return isBudgetBillingPhase(status) ? 'Faturamento' : 'Orçamento';
 }
 
 /** O orçamento já passou pela aprovação comercial (e portanto é assunto do financeiro)? */
-export function isTaskQuoteBillingPhase(status?: TASK_QUOTE_STATUS | string | null): boolean {
+export function isBudgetBillingPhase(status?: TASK_QUOTE_STATUS | string | null): boolean {
   return status === TASK_QUOTE_STATUS.APPROVED;
 }
 

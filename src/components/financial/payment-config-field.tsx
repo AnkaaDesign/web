@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 
 // ─── Type selector options ────────────────────────────────────────────────────
 

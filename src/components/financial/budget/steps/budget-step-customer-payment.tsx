@@ -17,7 +17,7 @@ import {
   ENTRADA_OPTIONS,
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import {
   BillingSplitField,
   type BillingSplitValue,

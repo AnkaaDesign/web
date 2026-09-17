@@ -24,7 +24,7 @@ import {
 import { rollbackFieldChange } from "@/api-client/task";
 import { useQueryClient } from "@tanstack/react-query";
 import { taskKeys, serviceOrderKeys, truckKeys, changeLogKeys } from "../../hooks/common/query-keys";
-import { taskQuoteKeys } from "../../hooks/production/use-task-quote";
+import { budgetKeys } from "../../hooks/production/use-budget";
 import type { ChangeLog, File as AnkaaFile } from "../../types";
 import {
   CHANGE_LOG_ENTITY_TYPE,
@@ -3045,7 +3045,7 @@ export function TaskWithServiceOrdersChangelog({
         queryClient.invalidateQueries({ queryKey: taskKeys.all }),
         queryClient.invalidateQueries({ queryKey: serviceOrderKeys.all }),
         queryClient.invalidateQueries({ queryKey: truckKeys.all }),
-        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+        queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
         queryClient.invalidateQueries({ queryKey: changeLogKeys.all }),
       ]);
     } catch {

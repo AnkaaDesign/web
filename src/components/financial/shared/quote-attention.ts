@@ -1,6 +1,6 @@
 import { TASK_STATUS } from "@/constants";
 import type { Task } from "@/types";
-import type { Billing, TaskQuote, TaskQuoteCustomerConfig } from "@/types/task-quote";
+import type { Billing, Budget, BudgetPayer } from "@/types/budget";
 
 /**
  * The shape the attention engine evaluates TASK_QUOTE rules against.
@@ -14,12 +14,12 @@ import type { Billing, TaskQuote, TaskQuoteCustomerConfig } from "@/types/task-q
  * quote → task include, so the predicate path is `task.status` — byte-identical to the
  * `where: { task: { status } }` the API mirror uses. One rule, one path, two evaluators.
  */
-// `Omit<…, "task">`: `TaskQuote.task` é a TAREFA inteira (e está `@deprecated`
+// `Omit<…, "task">`: `Budget.task` é a TAREFA inteira (e está `@deprecated`
 // desde o multitarefa). O que a regra de atenção avalia é um par mínimo — id e
 // status —, e uma interseção com o tipo completo exigiria montar uma Task de
 // verdade aqui só para satisfazer o compilador, ou voltar a `any`, que foi como
 // o defeito do "mesmo `quote.id` registrado N vezes" passou sem ser visto.
-export type AttentionQuoteEntity = Omit<TaskQuote, "task"> & {
+export type AttentionQuoteEntity = Omit<Budget, "task"> & {
   task: { id: string; status: string };
   /**
    * ALGUM VEÍCULO deste orçamento está sem número de pedido de compra.
@@ -83,7 +83,7 @@ export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQ
     if (existing && existing.task.status === TASK_STATUS.COMPLETED) continue;
     if (existing && task.status !== TASK_STATUS.COMPLETED) continue;
     byQuoteId.set(quote.id, {
-      ...(quote as TaskQuote),
+      ...(quote as Budget),
       task: { id: task.id, status: task.status },
       anyVehicleMissingOrderNumber: missing,
     });
@@ -106,13 +106,13 @@ export function toAttentionQuoteEntities(tasks: ReadonlyArray<Task>): AttentionQ
  * relação `tasks`, então a resposta é sempre sobre os N.
  *
  * ⚠️ ÓRFÃO — existe orçamento sem tarefa nenhuma, e ele PASSA a aparecer nesta
- * lista (consultando `TaskQuote` não há mais a junção que os escondia). Sem
+ * lista (consultando `Budget` não há mais a junção que os escondia). Sem
  * veículo não há `task.status`, e as duas regras que leem esse campo exigem
  * COMPLETED, então nenhuma delas dispararia de qualquer forma — mas o registro
  * tem de existir mesmo assim, com um par vazio, senão as OUTRAS regras do
  * orçamento (cliente incompleto, por exemplo) deixam de ser avaliadas para ele.
  */
-export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<TaskQuote>): AttentionQuoteEntity[] {
+export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<Budget>): AttentionQuoteEntity[] {
   const entities: AttentionQuoteEntity[] = [];
   for (const quote of quotes) {
     // `setEntities` drops anything without an id, so a quote fetched without `id: true` in the
@@ -127,7 +127,7 @@ export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<TaskQuo
     // que satisfaz a regra é o que faz os dois avaliadores concordarem.
     const anchor = vehicles.find((t) => t.status === TASK_STATUS.COMPLETED) ?? vehicles[0] ?? null;
     entities.push({
-      ...(quote as TaskQuote),
+      ...(quote as Budget),
       task: anchor ? { id: anchor.id, status: anchor.status } : { id: "", status: "" },
       anyVehicleMissingOrderNumber: vehicles.some(missingOrderNumber),
     });
@@ -182,7 +182,7 @@ export function toAttentionQuoteEntitiesFromBillings(billings: ReadonlyArray<Bil
     const configs = (billing.customerConfigs ?? []).map((config) => ({
       ...config,
       billing: { id: billing.id, approvedAt: billing.approvedAt ?? null },
-    })) as TaskQuoteCustomerConfig[];
+    })) as BudgetPayer[];
 
     // O desempate espelha o `tasks: { some: { status: COMPLETED } }` da regra no
     // servidor: entre os veículos, vence um que já esteja COMPLETED. A regra
@@ -215,7 +215,7 @@ export function toAttentionQuoteEntitiesFromBillings(billings: ReadonlyArray<Bil
 
     const vehicles = (quote.tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
     byQuoteId.set(quote.id, {
-      ...(quote as TaskQuote),
+      ...(quote as Budget),
       customerConfigs: configs,
       task: anchor ? { id: anchor.id, status: anchor.status } : { id: "", status: "" },
       anyVehicleMissingOrderNumber: vehicles.some(missingOrderNumber),
@@ -229,9 +229,9 @@ export function toAttentionQuoteEntity(task: Task | null | undefined): Attention
   if (!task?.quote?.id) return null;
   // Com a relação carregada, a pergunta é sobre os N veículos; sem ela, sobre o
   // que a tela tem — a tarefa aberta.
-  const vehicles = ((task.quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  const vehicles = ((task.quote as Budget).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
   return {
-    ...(task.quote as TaskQuote),
+    ...(task.quote as Budget),
     task: { id: task.id, status: task.status },
     anyVehicleMissingOrderNumber:
       vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
@@ -240,7 +240,7 @@ export function toAttentionQuoteEntity(task: Task | null | undefined): Attention
 
 /**
  * Same shape when the quote was loaded separately from the task — the Orçamento detail page
- * fetches them with two queries (`useTaskDetail` + `useTaskQuoteByTask`) rather than one include.
+ * fetches them with two queries (`useTaskDetail` + `useBudgetByTask`) rather than one include.
  */
 export function toAttentionQuoteEntityFromParts(
   quote: { id?: string } | null | undefined,
@@ -249,9 +249,9 @@ export function toAttentionQuoteEntityFromParts(
   if (!quote?.id || !task?.id) return null;
   // O orçamento desta página vem com `tasks` (a lista de veículos); a tarefa
   // aberta é o recuo quando ele ainda não existe.
-  const vehicles = ((quote as TaskQuote).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
+  const vehicles = ((quote as Budget).tasks ?? []) as Array<{ customerOrderNumber?: string | null }>;
   return {
-    ...(quote as TaskQuote),
+    ...(quote as Budget),
     task: { id: task.id, status: task.status },
     anyVehicleMissingOrderNumber:
       vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),

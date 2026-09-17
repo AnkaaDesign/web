@@ -85,7 +85,7 @@ export function useBillings(
  *
  * Invalida a TAREFA e o ORÇAMENTO junto com a cobrança: a lista de Faturamento é
  * uma lista de tarefas, o estado que ela mostra vem do `billing` pendurado no
- * orçamento, e a aprovação também grava `TaskQuote.billingApprovedAt` quando a
+ * orçamento, e a aprovação também grava `Budget.billingApprovedAt` quando a
  * última fatia fecha.
  */
 export function useApproveBilling() {

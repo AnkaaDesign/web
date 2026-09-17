@@ -2,7 +2,7 @@
  * Task Quote and Production Service Order Bidirectional Synchronization Utilities
  *
  * This module provides synchronization logic for the frontend form between
- * TaskQuoteServices and Production Service Orders. The sync happens in real-time
+ * BudgetItems and Production Service Orders. The sync happens in real-time
  * as the user edits the form.
  *
  * Sync Rules (1:1 mapping):
@@ -53,7 +53,7 @@ export function areDescriptionsEqual(desc1: string | null | undefined, desc2: st
  * Gets the quote services that should be created/exist based on PRODUCTION service orders.
  * Returns services that need to be added to quote.
  *
- * NEW APPROACH: Since TaskQuoteService now has its own observation field,
+ * NEW APPROACH: Since BudgetItem now has its own observation field,
  * we sync description → description and observation → observation separately.
  * Match is based on description only (not combined).
  */
@@ -93,7 +93,7 @@ export function getQuoteServicesToAddFromServiceOrders(
  * Gets the service orders that should be created/exist based on quote services.
  * Returns services that need to be added to service orders.
  *
- * NEW APPROACH: Since TaskQuoteService now has its own observation field,
+ * NEW APPROACH: Since BudgetItem now has its own observation field,
  * we sync description → description and observation → observation separately.
  * Match is based on description only (not combined).
  *

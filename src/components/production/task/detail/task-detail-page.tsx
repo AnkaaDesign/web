@@ -43,12 +43,12 @@ import { useImplementMeasuresByTruck } from "@/hooks/administration/use-implemen
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetService } from "@/api-client/budget";
 import { invoiceKeys } from "@/hooks/production/use-invoice";
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
+import { budgetKeys } from "@/hooks/production/use-budget";
 import { getCustomers } from "@/api-client/customer";
 import { getSectors } from "@/api-client/sector";
-import { isValidTaskStatusTransition, getTaskQuoteEditRoute } from "@/utils/task";
+import { isValidTaskStatusTransition, getBudgetEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import { taskInvoiceCustomerLabel } from "@/utils/quote-tasks";
@@ -632,7 +632,7 @@ function TaskDetailContent() {
             /**
              * O PEDIDO DE COMPRA DO CLIENTE, deste veículo.
              *
-             * Morava em `TaskQuoteCustomerConfig.orderNumber`, por CLIENTE, e os N
+             * Morava em `BudgetPayer.orderNumber`, por CLIENTE, e os N
              * caminhões de um orçamento eram obrigados a citar o mesmo número na
              * nota e no boleto. O pedido é por ENTREGA — e é aqui, na tela do
              * caminhão, que se corrige UM sem mexer nos irmãos.
@@ -908,7 +908,7 @@ function TaskDetailContent() {
               // The "Faturamento" title opens the in-app quote/billing DETAIL page; the header
               // "Visualizar" action opens the PUBLIC, customer-facing quote view (by quote id) in a
               // new tab (faithful to the legacy Visualizar button).
-              onTitleClick: (t: Task) => navigate(getTaskQuoteEditRoute(t), { state: { returnTo } }),
+              onTitleClick: (t: Task) => navigate(getBudgetEditRoute(t), { state: { returnTo } }),
               headerActions: (t: Task) => {
                 const q = t.quote;
                 if (!q) return null;
@@ -937,7 +937,7 @@ function TaskDetailContent() {
                    *
                    * 1. EDITÁVEL. A numeração já saiu torta, e o número é a referência que o
                    *    cliente cita no e-mail, no pedido de compra e na descrição do Pix —
-                   *    não havia como acertá-lo por tela nenhuma. `PUT /task-quotes/:id`
+                   *    não havia como acertá-lo por tela nenhuma. `PUT /budgets/:id`
                    *    passou a aceitar `budgetNumber`; a rota é `@Roles(ADMIN, FINANCIAL,
                    *    COMMERCIAL)`, que é exatamente este gate.
                    * 2. GATEADO NA LEITURA. Antes o campo aparecia para todo mundo, inclusive
@@ -981,10 +981,10 @@ function TaskDetailContent() {
                         onCommit: async (v: unknown, t: Task) => {
                           const quoteId = t.quote?.id;
                           if (!quoteId) return;
-                          await taskQuoteService.update(quoteId, { budgetNumber: Number(v) } as any);
+                          await budgetService.update(quoteId, { budgetNumber: Number(v) } as any);
                           await Promise.all([
                             queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-                            queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+                            queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
                           ]);
                         },
                       }
@@ -1033,7 +1033,7 @@ function TaskDetailContent() {
                             // inherits on a 1:1 replacement, but sending the terms explicitly
                             // keeps this path correct on its own.
                             const prev = t.quote?.customerConfigs?.[0];
-                            await taskQuoteService.update(quoteId, {
+                            await budgetService.update(quoteId, {
                               customerConfigs: [
                                 {
                                   customerId: v as string,
@@ -1054,7 +1054,7 @@ function TaskDetailContent() {
                             });
                             await Promise.all([
                               queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-                              queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+                              queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
                             ]);
                           },
                         }
@@ -1118,12 +1118,12 @@ function TaskDetailContent() {
                         },
                         onCommit: async (v: unknown, t: Task) => {
                           if (!t.quote) return;
-                          await taskQuoteService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
+                          await budgetService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
                           // A raw axios PUT bypasses react-query — invalidate the task detail, quote and
                           // invoice caches so the change is reflected instead of leaving the UI stale.
                           await Promise.all([
                             queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-                            queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+                            queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
                             queryClient.invalidateQueries({ queryKey: invoiceKeys.all }),
                           ]);
                         },
@@ -1433,10 +1433,10 @@ function TaskDetailContent() {
       title: editLockReason || undefined,
       onClick: () =>
         // Commercial users ALWAYS edit through the quote (orçamento/faturamento by quote status),
-        // even for a quote-less task — getTaskQuoteEditRoute falls back to the budget page, where the
+        // even for a quote-less task — getBudgetEditRoute falls back to the budget page, where the
         // quote gets created. Prep-edit is reserved for the other sectors (admin/logistics/PM/etc.).
         role === SECTOR_PRIVILEGES.COMMERCIAL
-          ? navigate(getTaskQuoteEditRoute(task), { state: { returnTo } })
+          ? navigate(getBudgetEditRoute(task), { state: { returnTo } })
           : // Forward the prev/next id list into the edit page so the pager survives the edit round-trip.
             navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: siblingIds } }),
     });

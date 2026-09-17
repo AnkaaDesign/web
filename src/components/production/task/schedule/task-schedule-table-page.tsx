@@ -47,7 +47,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getTaskById } from "@/api-client";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES, TASK_STATUS } from "@/constants";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
+import { getBudgetDisplayLabel } from "@/constants/enum-labels";
 import { isDateInPast } from "@/utils";
 import type { Task } from "@/types";
 import type { CopyableTaskField } from "@/types/task-copy";
@@ -56,7 +56,7 @@ import { canDeleteTasks, canFinishTask, canLeaderManageTask } from "@/utils/perm
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { SetStatusModal } from "./set-status-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetTermModal } from "./set-term-modal";
@@ -392,7 +392,7 @@ export function TaskScheduleTablePage() {
   const handleEdit = useCallback(
     (targets: Task[]) => {
       if (targets.length === 1) {
-        if (isCommercial) navigate(getTaskQuoteEditRoute(targets[0]), { state: { returnTo } });
+        if (isCommercial) navigate(getBudgetEditRoute(targets[0]), { state: { returnTo } });
         else navigate(routes.production.schedule.edit(targets[0].id));
       } else if (targets.length > 1) {
         navigate(`${routes.production.schedule.batchEdit}?ids=${targets.map((t) => t.id).join(",")}`);
@@ -605,10 +605,10 @@ export function TaskScheduleTablePage() {
       },
       {
         key: "quote",
-        label: getTaskQuoteDisplayLabel(undefined),
+        label: getBudgetDisplayLabel(undefined),
         icon: <IconReceipt className="h-4 w-4" />,
         hidden: (r) => r.length !== 1 || !canViewQuoteMenu || isCommercial,
-        onClick: (r) => navigate(getTaskQuoteEditRoute(r[0]), { state: { returnTo } }),
+        onClick: (r) => navigate(getBudgetEditRoute(r[0]), { state: { returnTo } }),
       },
       {
         key: "set-sector",

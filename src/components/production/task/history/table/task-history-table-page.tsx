@@ -48,7 +48,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getTasks, getTaskById } from "@/api-client";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES, TASK_STATUS } from "@/constants";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
+import { getBudgetDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "@/types";
 import type { CopyableTaskField } from "@/types/task-copy";
 import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
@@ -56,7 +56,7 @@ import { canDeleteTasks, canFinishTask, canLeaderManageTask } from "@/utils/perm
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { useConfirm } from "../../detail/use-confirm";
 import { taskCancelConfirmOpts } from "../../cancel-confirmation";
 import { SetStatusModal } from "../../schedule/set-status-modal";
@@ -319,7 +319,7 @@ export function TaskHistoryTablePage() {
   const handleEdit = useCallback(
     (targets: Task[]) => {
       if (targets.length === 1) {
-        if (isCommercial) navigate(getTaskQuoteEditRoute(targets[0]), { state: { returnTo } });
+        if (isCommercial) navigate(getBudgetEditRoute(targets[0]), { state: { returnTo } });
         else navigate(routes.production.history.edit(targets[0].id));
       } else if (targets.length > 1) {
         navigate(`${routes.production.schedule.batchEdit}?ids=${targets.map((t) => t.id).join(",")}`);
@@ -530,10 +530,10 @@ export function TaskHistoryTablePage() {
       },
       {
         key: "quote",
-        label: getTaskQuoteDisplayLabel(undefined),
+        label: getBudgetDisplayLabel(undefined),
         icon: <IconReceipt className="h-4 w-4" />,
         hidden: (r) => r.length !== 1 || !canViewQuoteMenu || isCommercial,
-        onClick: (r) => navigate(getTaskQuoteEditRoute(r[0]), { state: { returnTo } }),
+        onClick: (r) => navigate(getBudgetEditRoute(r[0]), { state: { returnTo } }),
       },
       {
         key: "set-sector",

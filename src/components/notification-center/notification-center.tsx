@@ -115,8 +115,13 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   OrderSchedule: "/estoque/pedidos/agendamentos/detalhes",
 
   // Task quote / budget routes (entityId is the taskId)
+  // ⚠️ AS TRÊS CHAVES SÃO VALORES que o servidor manda, não nomes nossos: o
+  // modelo virou `Budget` na API, mas as notificações já gravadas (e o app
+  // instalado) ainda chegam como `TASK_QUOTE`/`TaskQuote`. Apagar uma delas
+  // quebra a navegação de notificações antigas sem o `tsc` acusar nada.
   TASK_QUOTE: "/financeiro/orcamento/detalhes",
   TaskQuote: "/financeiro/orcamento/detalhes",
+  Budget: "/financeiro/orcamento/detalhes",
 
   // Secullum solicitation routes — HR review page (time-adjustment requests).
   // The admin-only integration-mapping page is NOT used here; per-notification

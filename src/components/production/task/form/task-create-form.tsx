@@ -60,7 +60,7 @@ import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
-import { taskQuoteService } from "../../../../api-client/task-quote";
+import { budgetService } from "../../../../api-client/budget";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -558,7 +558,7 @@ export const TaskCreateForm = () => {
                 }
               }
 
-              // Auto-create a minimal TaskQuote for the task (if it has a customer)
+              // Auto-create a minimal Budget for the task (if it has a customer)
               // Only COMMERCIAL and ADMIN can create quotes via the API
               const createdTaskId = result.data?.id;
               const effectiveCustomerId = customerId || result.data?.customerId;
@@ -580,7 +580,7 @@ export const TaskCreateForm = () => {
                 const expiresAt = new Date();
                 expiresAt.setDate(expiresAt.getDate() + 30);
                 try {
-                  await taskQuoteService.create({
+                  await budgetService.create({
                     taskId: createdTaskId,
                     subtotal: 0,
                     total: 0,

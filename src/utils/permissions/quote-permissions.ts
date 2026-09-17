@@ -1,6 +1,6 @@
 import { SECTOR_PRIVILEGES } from '@/constants';
 import type { SECTOR_PRIVILEGES as SECTOR_PRIVILEGES_TYPE } from '@/constants';
-import type { TASK_QUOTE_STATUS } from '@/types/task-quote';
+import type { TASK_QUOTE_STATUS } from '@/types/budget';
 
 export function canViewQuote(userRole: string): boolean {
   return [
@@ -81,7 +81,7 @@ const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   // foi aprovada o servidor barra a edição (`isQuoteMoneyLocked`) e o caminho é
   // "Reverter Faturamento" — hoje `PUT /billings/:id/revert`, que desfaz AQUELA
   // cobrança (baixa os boletos dela e deixa a NFS-e viva para ser substituída).
-  // `PUT /task-quotes/:id/revert-billing` continua de pé, mas desmonta o ciclo do
+  // `PUT /budgets/:id/revert-billing` continua de pé, mas desmonta o ciclo do
   // orçamento INTEIRO e nenhuma tela o chama.
   APPROVED: ['PENDING', 'CANCELLED'],
   // Terminal: um orçamento cancelado não volta. Recotar cria um novo.

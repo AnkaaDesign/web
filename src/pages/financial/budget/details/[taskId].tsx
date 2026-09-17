@@ -11,18 +11,18 @@ import {
 import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
-  useTaskQuoteByTask,
-  useCreateTaskQuote,
-  useUpdateTaskQuote,
-  taskQuoteKeys,
-} from "@/hooks/production/use-task-quote";
-import { taskQuoteService } from "@/api-client/task-quote";
+  useBudgetByTask,
+  useCreateBudget,
+  useUpdateBudget,
+  budgetKeys,
+} from "@/hooks/production/use-budget";
+import { budgetService } from "@/api-client/budget";
 import {
   canViewQuote,
   canEditQuote,
   getQuoteStatusPath,
 } from "@/utils/permissions/quote-permissions";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import type { TASK_QUOTE_STATUS } from "@/types/budget";
 import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -131,15 +131,15 @@ const FinancialBudgetDetailPageInner = () => {
 
   // Fetch existing quote
   const { data: quoteResponse, isLoading: quoteLoading } =
-    useTaskQuoteByTask(taskId || "");
+    useBudgetByTask(taskId || "");
   // Unwrap the API response: backend may wrap as { data: quote } or return the quote directly.
   // Guard with .id to prevent treating an empty wrapper object ({ data: null }) as a valid quote.
   const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
   const existingQuote = rawQuote?.id ? rawQuote : null;
 
   // Mutations
-  const createQuoteMutation = useCreateTaskQuote();
-  const updateQuoteMutation = useUpdateTaskQuote();
+  const createQuoteMutation = useCreateBudget();
+  const updateQuoteMutation = useUpdateBudget();
   const { updateAsync: updateTaskAsync } = useTaskMutations();
 
   // Permissions
@@ -263,7 +263,7 @@ const FinancialBudgetDetailPageInner = () => {
       expiresAt: getDefaultExpiresAt(),
       status: "PENDING" as string,
       // Captured by BudgetStepReview when rejecting a quote (status -> PENDING).
-      // Forwarded to taskQuoteService.updateStatus on Save (see handleSubmit).
+      // Forwarded to budgetService.updateStatus on Save (see handleSubmit).
       statusReason: "" as string,
       subtotal: 0,
       total: 0,
@@ -374,7 +374,7 @@ const FinancialBudgetDetailPageInner = () => {
   // cada um para a sua tarefa ÂNCORA — a rota continua sendo por tarefa. Pelo
   // hook antigo, que percorre tarefas, "próximo" repetia o mesmo orçamento uma
   // vez por veículo; e `BUDGET_FALLBACK_LIST_QUERY` agora é um `where` de
-  // TaskQuote, que `/tasks` recusaria com 400.
+  // Budget, que `/tasks` recusaria com 400.
   const { ids: siblingIds, complete: siblingIdsComplete } = useBudgetSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
   const recordNav = useRecordNavigation({
     ids: siblingIds,
@@ -489,7 +489,7 @@ const FinancialBudgetDetailPageInner = () => {
         ? new Date(existingQuote.expiresAt)
         : getDefaultExpiresAt(),
       status: existingQuote.status || "PENDING",
-      // POR VEÍCULO, não o contrato. `TaskQuote.subtotal/total` guardam o valor
+      // POR VEÍCULO, não o contrato. `Budget.subtotal/total` guardam o valor
       // do CONTRATO (`por veículo × N`), mas o formulário — e o resumo que lê
       // dele — trabalham em valor de UM veículo: o resumo aplica o "× N" ele
       // mesmo. Semear com o contrato fazia o "× N" incidir sobre um número que
@@ -1487,7 +1487,7 @@ const FinancialBudgetDetailPageInner = () => {
        * ⚠️ `taskId` NÃO VAI NO CORPO, travado ou não.
        *
        * A FK do vínculo mora em `Task` (`task Task? @relation("TASK_QUOTE")`) —
-       * `TaskQuote` não tem essa coluna, e o `update` do servidor nem lê a chave (ele
+       * `Budget` não tem essa coluna, e o `update` do servidor nem lê a chave (ele
        * reconcilia por `taskIds`). Mandá-la custava duas coisas, as duas ruins:
        *   • `filterToMaterialChanges` compara com `existing.taskId`, que é sempre
        *     `undefined`, então a chave SEMPRE parecia alterada — o "Nenhuma alteração
@@ -1741,7 +1741,7 @@ const FinancialBudgetDetailPageInner = () => {
             (form.getValues("statusReason" as any) as string | undefined)?.trim() ||
             undefined;
           for (const step of path) {
-            await taskQuoteService.updateStatus(
+            await budgetService.updateStatus(
               existingQuote.id,
               step as any,
               // Reason only applies to a downgrade-to-PENDING step.
@@ -1757,7 +1757,7 @@ const FinancialBudgetDetailPageInner = () => {
         // tela respondia 400.
         //
         // O `taskId` ficou de fora quando a chave foi removida do corpo de
-        // ATUALIZAÇÃO (ali ela é um fantasma: a coluna mudou de lado, `TaskQuote`
+        // ATUALIZAÇÃO (ali ela é um fantasma: a coluna mudou de lado, `Budget`
         // não a tem, e mandá-la derrubava qualquer gravação de orçamento com
         // cobrança aprovada). A remoção foi aplicada aos dois ramos, e no de
         // criação ela é obrigatória: é a ÚNICA coisa que diz de qual caminhão é o
@@ -1766,7 +1766,7 @@ const FinancialBudgetDetailPageInner = () => {
         await createQuoteMutation.mutateAsync(quoteData);
       }
 
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       // Tasks embed quote data (budget value + status badges). When only the quote
       // half changed, updateTaskAsync above is skipped, so invalidate tasks explicitly.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });

@@ -8,7 +8,7 @@ import { externalOperationCreateSchema } from "../../../../schemas";
 import { useExternalOperationMutations, useItems, useCanViewPrices, useCustomers } from "../../../../hooks";
 import { routes, EXTERNAL_OPERATION_TYPE, EXTERNAL_OPERATION_TYPE_LABELS, FAVORITE_PAGES } from "../../../../constants";
 import { ExternalOperationBillingSection, type BillingServiceRow } from "./external-operation-billing-section";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import { toast } from "@/components/ui/sonner";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";

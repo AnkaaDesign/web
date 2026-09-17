@@ -17,7 +17,7 @@ import { useNfseDetail } from "@/hooks/financial/use-nfse";
 import { canApproveQuote } from "@/utils/permissions/quote-permissions";
 import { round2 } from "@/utils/quote-money";
 import type { Invoice } from "@/types/invoice";
-import type { BILLING_STATUS } from "@/types/task-quote";
+import type { BILLING_STATUS } from "@/types/budget";
 import { BILLING_STATUS_LABELS } from "@/constants";
 import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import {
@@ -35,7 +35,7 @@ import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState, useCallback } from "react";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetService } from "@/api-client/budget";
 import { billingService } from "@/api-client/billing";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { FileThumbnail, useFileViewer } from "@/components/common/file";
@@ -74,7 +74,7 @@ import {
 //   · liquidar → PUT /billings/:id/settle
 //   · reverter → PUT /billings/:id/revert
 //
-// ⚠️ A reversão era `PUT /task-quotes/:id/revert-billing`, endereçada pelo
+// ⚠️ A reversão era `PUT /budgets/:id/revert-billing`, endereçada pelo
 // ORÇAMENTO, e desfazia o ciclo INTEIRO dele: reverter o lote 3 apagava fatura,
 // parcela e boleto dos lotes 1 e 2 e dava baixa no Sicredi de títulos que o
 // cliente já tinha na mão. A rota do orçamento segue de pé no servidor para
@@ -473,7 +473,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   const handleRevertBilling = useCallback(async () => {
     // ⚠️ ENDEREÇADO PELA COBRANÇA, não pelo orçamento. Era
-    // `taskQuoteService.revertBilling(task.quoteId)` — `PUT /task-quotes/:id/revert-billing`,
+    // `budgetService.revertBilling(task.quoteId)` — `PUT /budgets/:id/revert-billing`,
     // que desmonta o ciclo do orçamento INTEIRO. Desta tela, que é a de UMA cobrança,
     // isso apagava fatura, parcela e boleto das IRMÃS e dava baixa no Sicredi de títulos
     // que o cliente já tinha na mão. Sem `billing.id` não há a quem endereçar: não
@@ -1744,7 +1744,7 @@ function ReceiptDownloadButton({ quoteId, task }: { quoteId: string; task: any }
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const res = await taskQuoteService.getReceiptPdf(quoteId);
+      const res = await budgetService.getReceiptPdf(quoteId);
       const blob =
         res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
       const filename = buildReceiptFilename(task);

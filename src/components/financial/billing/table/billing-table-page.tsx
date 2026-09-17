@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/common/use-toast";
 import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "@/constants";
-import type { Billing } from "@/types/task-quote";
+import type { Billing } from "@/types/budget";
 import { customerIdsFromFilter, initialTableParams, useSelectedCustomers } from "@/components/financial/shared/quote-table-shared";
 import { buildQuoteSiblingState } from "@/components/financial/shared/quote-sibling-nav";
 import { toAttentionQuoteEntitiesFromBillings } from "@/components/financial/shared/quote-attention";

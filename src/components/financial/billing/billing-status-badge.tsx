@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BILLING_STATUS_LABELS } from "@/constants";
-import type { BILLING_STATUS } from "@/types/task-quote";
+import type { BILLING_STATUS } from "@/types/budget";
 
 interface BillingStatusBadgeProps {
   status: BILLING_STATUS;

@@ -4,13 +4,13 @@ import { IconAlertTriangle, IconExternalLink, IconFileDescription, IconPlus } fr
 
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableFilterValues, DataTableRowAction } from "@/components/ui/datatable";
-import { useTaskQuotes } from "@/hooks";
-import { getTaskQuotes } from "@/api-client/task-quote";
+import { useBudgets } from "@/hooks";
+import { getBudgets } from "@/api-client/budget";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditQuote } from "@/utils/permissions/quote-permissions";
 import { FAVORITE_PAGES, routes } from "@/constants";
-import type { TaskQuote } from "@/types/task-quote";
+import type { Budget } from "@/types/budget";
 import { primaryTask } from "@/utils/quote-tasks";
 import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,13 @@ import { BUDGET_DEFAULT_PAGE_SIZE, BUDGET_QUOTE_INCLUDE, buildBudgetQuery, creat
  * Era uma TAREFA (`useTasks` + `getRowId = t.id`), e um orçamento de quatro
  * caminhões virava quatro linhas com o mesmo número 984, `meta.totalRecords = 4`
  * e um rodapé anunciando "4 resultado(s)". O dono leu quatro orçamentos porque a
- * tela desenhou quatro. A unidade da consulta mudou para `GET /task-quotes`, e
+ * tela desenhou quatro. A unidade da consulta mudou para `GET /budgets`, e
  * com ela o rodapé, a seleção múltipla (marcar "tudo" deixou de marcar quatro
  * coisas que são uma) e o piscar da atenção (quatro linhas compartilhando o
  * mesmo `quote.id` piscavam em coro) se consertaram sozinhos.
  */
 // Module-level so the identity never churns (a fresh literal would rebuild the row model).
-const getRowId = (q: TaskQuote) => q.id;
+const getRowId = (q: Budget) => q.id;
 
 /**
  * The export pages through the full filtered set rather than asking for it in one shot. The
@@ -97,8 +97,8 @@ export function BudgetTablePage() {
     [listQuery, page, pageSize],
   );
 
-  const { data: response, isLoading, error } = useTaskQuotes(query);
-  const quotes = useMemo(() => ((response as { data?: TaskQuote[] } | undefined)?.data ?? []) as TaskQuote[], [response]);
+  const { data: response, isLoading, error } = useBudgets(query);
+  const quotes = useMemo(() => ((response as { data?: Budget[] } | undefined)?.data ?? []) as Budget[], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
 
   // Attention: a linha e a entidade registrada passaram a ser A MESMA COISA. Um orçamento APPROVED
@@ -111,11 +111,11 @@ export function BudgetTablePage() {
   useAttentionVersion();
   usePresenceVersion();
 
-  const fetchAllForExport = useCallback(async (): Promise<TaskQuote[]> => {
-    const all: TaskQuote[] = [];
+  const fetchAllForExport = useCallback(async (): Promise<Budget[]> => {
+    const all: Budget[] = [];
     for (let p = 1; ; p++) {
-      const res = await getTaskQuotes({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE, include: BUDGET_QUOTE_INCLUDE });
-      const rows = (res?.data ?? []) as TaskQuote[];
+      const res = await getBudgets({ ...listQuery, page: p, limit: EXPORT_PAGE_SIZE, include: BUDGET_QUOTE_INCLUDE });
+      const rows = (res?.data ?? []) as Budget[];
       all.push(...rows);
       if (res?.meta?.hasNextPage === false || rows.length < EXPORT_PAGE_SIZE) break;
       // Defensive backstop against an unbounded loop if `meta` ever goes missing.
@@ -146,10 +146,10 @@ export function BudgetTablePage() {
   const anchorIds = useMemo(() => quotes.map((q) => primaryTask(q)?.id).filter((id): id is string => !!id), [quotes]);
 
   const onRowClick = useCallback(
-    (quote: TaskQuote) => {
+    (quote: Budget) => {
       const anchor = primaryTask(quote)?.id;
       // ÓRFÃO: existem orçamentos sem tarefa nenhuma, e eles passaram a aparecer
-      // (consultando `TaskQuote` não há mais a junção que os escondia — é um
+      // (consultando `Budget` não há mais a junção que os escondia — é um
       // ganho: são registros com número, valor e validade que ninguém conseguia
       // achar). Sem âncora não há para onde navegar, e `details(undefined)`
       // levaria a `/detalhes/undefined`.
@@ -172,11 +172,11 @@ export function BudgetTablePage() {
   );
 
   const getRowClassName = useCallback(
-    (quote: TaskQuote) => cn(attentionRowClassFor("TASK_QUOTE", quote.id), presenceRowClassFor("TASK_QUOTE", quote.id)),
+    (quote: Budget) => cn(attentionRowClassFor("TASK_QUOTE", quote.id), presenceRowClassFor("TASK_QUOTE", quote.id)),
     [],
   );
 
-  const rowActions = useMemo<DataTableRowAction<TaskQuote>[]>(
+  const rowActions = useMemo<DataTableRowAction<Budget>[]>(
     () => [
       {
         key: "open-new-tab",
@@ -203,7 +203,7 @@ export function BudgetTablePage() {
       ) : null}
 
       <div className="min-h-0 flex-1">
-        <DataTablePage<TaskQuote>
+        <DataTablePage<Budget>
           title="Orçamentos"
           icon={IconFileDescription}
           favoritePage={FAVORITE_PAGES.FINANCEIRO_ORCAMENTO}

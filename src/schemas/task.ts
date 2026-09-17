@@ -6,7 +6,7 @@ import type { Task } from "../types";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, TRUCK_CATEGORY, IMPLEMENT_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
-import { taskQuoteCreateNestedSchema } from "./task-quote";
+import { budgetCreateNestedSchema } from "./budget";
 import { responsibleCreateInlineSchema } from "./responsible";
 import { optionalPlateSchema, optionalChassisSchema } from "./truck";
 
@@ -1249,7 +1249,7 @@ export const taskCreateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    quote: taskQuoteCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    quote: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     // Require at least one of: customer, serialNumber, plate, or name
@@ -1410,7 +1410,7 @@ export const taskUpdateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    quote: taskQuoteCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    quote: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   // Auto-fill dates based on status changes (before validation)
   .transform((data) => {

@@ -4,7 +4,7 @@ import { useTaskMutations, useTaskBatchMutations, useSectors, useCustomers } fro
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -291,7 +291,7 @@ export function TaskList({ className }: TaskListProps) {
       // Commercial users edit a task through its quote (orçamento/faturamento by quote status),
       // never the production prep-edit form which targets other sectors (admin/logistics/PM/etc.).
       if (userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-        navigate(getTaskQuoteEditRoute(items[0]));
+        navigate(getBudgetEditRoute(items[0]));
       } else {
         navigate(routes.production.schedule.edit(items[0].id));
       }

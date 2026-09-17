@@ -1,5 +1,5 @@
 import type { DataTableColumnDef } from "@/components/ui/datatable";
-import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
+import type { TASK_QUOTE_STATUS, Budget } from "@/types/budget";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,7 @@ import {
  *
  * Era uma tarefa: um orçamento de quatro caminhões ocupava quatro linhas com o
  * MESMO número 984, o rodapé dizia "4 resultado(s)", e o dono leu quatro
- * orçamentos onde há um. A lista passou a consultar `GET /task-quotes`, e com
+ * orçamentos onde há um. A lista passou a consultar `GET /budgets`, e com
  * isso cai todo o andaime que existia só para EXPLICAR a repetição: a marca
  * "N veíc." na célula do número, o sufixo "/veíc." no valor e as divisões
  * `total ÷ N`. As colunas que perguntavam ao registro da linha (nome,
@@ -68,7 +68,7 @@ const moneyExport = (value: unknown) => {
  * fatura conjunta cobra; a fatia fica no hover, que é onde alguém a procura
  * quando precisa conferir a proposta veículo a veículo.
  */
-const perVehicleHint = (quote: TaskQuote, total: number | null): string | undefined => {
+const perVehicleHint = (quote: Budget, total: number | null): string | undefined => {
   const n = quoteVehiclesLoadedCount(quote);
   if (!total || n <= 1) return undefined;
   return `${formatCurrency(Math.round((total / n) * 100) / 100)} por veículo — ${n} veículos`;
@@ -80,7 +80,7 @@ const perVehicleHint = (quote: TaskQuote, total: number | null): string | undefi
  * Sem ele a coluna afirma um prazo único num orçamento cujos quatro caminhões
  * têm quatro prazos — e quem lê não tem como saber que está vendo o mais cedo.
  */
-const renderEarliestDate = (quote: TaskQuote, field: "term" | "forecastDate" | "entryDate") => {
+const renderEarliestDate = (quote: Budget, field: "term" | "forecastDate" | "entryDate") => {
   const date = earliestTaskDate(quote, field);
   if (!date) return <MutedDash />;
   const filled = taskDateSpread(quote, field);
@@ -88,7 +88,7 @@ const renderEarliestDate = (quote: TaskQuote, field: "term" | "forecastDate" | "
   return <span title={`o mais cedo de ${filled} veículos`}>{renderDateCell(date)}</span>;
 };
 
-export function createBudgetColumns(): DataTableColumnDef<TaskQuote>[] {
+export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
   return [
     {
       // The number people quote at each other on the phone — the fastest way to find a budget.
@@ -121,7 +121,7 @@ export function createBudgetColumns(): DataTableColumnDef<TaskQuote>[] {
       // ❌ PERDE a ordenação: `name` é campo da TAREFA, e o Prisma não ordena o
       // pai por campo de relação de LISTA. Mantê-la em BUDGET_SORT_FIELD_MAP
       // desenharia a seta no cabeçalho para uma ordem que o servidor descarta em
-      // silêncio (o `orderBy` do `/task-quotes` não é `.strict()`).
+      // silêncio (o `orderBy` do `/budgets` não é `.strict()`).
       enableSorting: false,
       size: 240,
       minSize: 160,
@@ -168,7 +168,7 @@ export function createBudgetColumns(): DataTableColumnDef<TaskQuote>[] {
       // coluna no Prisma). A célula anunciaria "1 veículo" para um orçamento que
       // não tem nenhum. Ver `quoteVehiclesLoadedCount`.
       accessorFn: (q) => quoteVehiclesLoadedCount(q),
-      // ✚ GANHA ordenação: `vehicleCount` é escalar do próprio TaskQuote, e
+      // ✚ GANHA ordenação: `vehicleCount` é escalar do próprio Budget, e
       // ordenar por ele agora responde a uma pergunta sobre a LINHA ("os
       // contratos maiores primeiro") em vez de agrupar veículos.
       enableSorting: true,
@@ -519,7 +519,7 @@ export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Reco
  * ⚠️ O critério secundário era `term`, e ele MORREU com a migração (prazo é da
  * tarefa, e são N por linha). `expiresAt` é o substituto certo, não um substituto
  * qualquer: a validade é o relógio que esta lista corre, e é escalar do próprio
- * orçamento. Devolver o prazo exigiria desnormalizar `TaskQuote.earliestTerm`
+ * orçamento. Devolver o prazo exigiria desnormalizar `Budget.earliestTerm`
  * junto de `recalcQuoteTotals` — outra mudança, com migration.
  */
 export const BUDGET_DEFAULT_SORTING: { id: string; desc: boolean }[] = [

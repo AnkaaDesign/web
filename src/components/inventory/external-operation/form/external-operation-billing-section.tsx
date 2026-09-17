@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
 import { PaymentConfigField } from "@/components/financial/payment-config-field";
 import { formatCurrency } from "../../../../utils";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import type { Customer } from "@/types/customer";
 
 export interface BillingServiceRow {

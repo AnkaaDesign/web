@@ -40,7 +40,7 @@ import {
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { useTasks, useTaskMutations, useTaskBatchMutations } from "@/hooks/production/use-task";
 import { canEditTasks, canFinishTask, canManageTaskStatus, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { TaskDuplicateModal } from "@/components/production/task/modals/task-duplicate-modal";
 import { SetSectorModal } from "@/components/production/task/schedule/set-sector-modal";
@@ -636,8 +636,8 @@ export function TaskPreparationPage() {
             navigate(`${routes.production.schedule.batchEdit}?ids=${expandClusterTaskIds(rows).join(",")}`);
           } else if (isCommercial) {
             // COMMERCIAL always edits via the budget/invoice pages, never the task form.
-            // getTaskQuoteEditRoute handles the no-quote case (falls back to the budget page).
-            navigate(getTaskQuoteEditRoute(rows[0]));
+            // getBudgetEditRoute handles the no-quote case (falls back to the budget page).
+            navigate(getBudgetEditRoute(rows[0]));
           } else {
             navigate(routes.production.preparation.edit(rows[0].id));
           }
@@ -850,7 +850,7 @@ export function TaskPreparationPage() {
         onClick: (rows) => openAdvanced("layout", expandClusterTaskIds(rows)),
       },
       {
-        // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the
+        // COMMERCIAL sets the quote's approved layout files (Budget.layoutFiles) — distinct from the
         // truck "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
         key: "adv-quote-layout",
         label: "Adicionar Layout Aprovados",

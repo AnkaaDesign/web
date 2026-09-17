@@ -1,6 +1,6 @@
 // Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
 import { formatCurrencyUnmasked as formatCurrency, formatDate } from './index';
-import type { PaymentConfig, TaskQuote } from '../types/task-quote';
+import type { PaymentConfig, Budget } from '../types/budget';
 
 /**
  * Convert number to written form in Portuguese
@@ -223,10 +223,10 @@ export function generatePaymentText(quote: PaymentTextData): string {
  * Generate guarantee terms text based on quote data
  */
 export function generateGuaranteeText(
-  // Só os dois campos da garantia. Era `TaskQuote` inteiro, e isso obrigava quem
+  // Só os dois campos da garantia. Era `Budget` inteiro, e isso obrigava quem
   // tem um RECORTE do orçamento — a página pública, que recebe um veículo
   // estreito por tarefa — a mentir para o compilador com um `as`.
-  quote: Pick<TaskQuote, 'guaranteeYears' | 'customGuaranteeText'>,
+  quote: Pick<Budget, 'guaranteeYears' | 'customGuaranteeText'>,
 ): string {
   if (quote.customGuaranteeText) {
     return quote.customGuaranteeText;

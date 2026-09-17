@@ -11,7 +11,7 @@ import type { Invoice, Installment } from "./invoice";
 // Main Entity Interfaces
 // =====================
 
-// Same shape as TaskQuoteCustomerConfig.paymentConfig
+// Same shape as BudgetPayer.paymentConfig
 export interface ExternalOperationPaymentConfigData {
   type: "CASH" | "INSTALLMENTS";
   cashDays?: number;

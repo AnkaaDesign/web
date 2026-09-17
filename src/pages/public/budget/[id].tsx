@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetService } from "@/api-client/budget";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility";
@@ -13,7 +13,7 @@ import { toast } from "@/components/ui/sonner";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 import { signatureService } from "@/api-client/signature";
 import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
-import type { TaskQuote } from "@/types/task-quote";
+import type { Budget } from "@/types/budget";
 import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
 import {
   quoteTasks,
@@ -44,7 +44,7 @@ const getFileServeUrl = (file: { id: string } | null | undefined): string => {
 /**
  * O VEÍCULO como a página pública o recebe.
  *
- * `GET /task-quotes/public/:id` devolve um recorte estreito de cada tarefa — o
+ * `GET /budgets/public/:id` devolve um recorte estreito de cada tarefa — o
  * que o documento imprime e nada mais: ninguém que abre um link de orçamento
  * precisa (nem deve receber) a tarefa inteira com status, setor e datas de
  * produção.
@@ -72,7 +72,7 @@ interface PublicQuoteVehicle {
 // `Omit<…, "task" | "tasks">`: as duas relações são `Task` no tipo do sistema, e
 // aqui elas chegam no recorte público acima. Sem o `Omit` o `extends` não fecha —
 // era isso que o `tasks?: any[]` de antes escondia.
-interface QuoteData extends Omit<TaskQuote, "task" | "tasks"> {
+interface QuoteData extends Omit<Budget, "task" | "tasks"> {
   /** @deprecated Forma anterior ao multitarefa — a API ainda a emite para clientes antigos. */
   task?: PublicQuoteVehicle;
   /** OS VEÍCULOS do orçamento, na ordem do documento. */
@@ -179,7 +179,7 @@ export function PublicBudgetPage() {
 
     try {
       setLoading(true);
-      const response = await taskQuoteService.getPublic(id);
+      const response = await budgetService.getPublic(id);
       if (response.data?.success && response.data?.data) {
         setQuote(response.data.data);
         setError(null);

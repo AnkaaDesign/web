@@ -28,7 +28,7 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
  * O CICLO DO ORÇAMENTO — os cinco, e nada além.
  *
  * ⚠️ Escrito à mão e NÃO conferido pelo compilador contra `TASK_QUOTE_STATUS`:
- * o zod de `taskQuoteCreateNestedSchema` valida `status`, e um valor fora do
+ * o zod de `budgetCreateNestedSchema` valida `status`, e um valor fora do
  * enum é ERRO de validação — foi assim que o formulário passou a recusar um
  * orçamento assinado ou vencido por não saber que o estado existia. Estado novo
  * entra AQUI também, sempre.
@@ -36,7 +36,7 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
  * `CANCELLED` entrou junto com o encolhimento: ele sempre foi estado de
  * orçamento e faltava nesta lista.
  */
-export const taskQuoteStatusSchema = z.enum([
+export const budgetStatusSchema = z.enum([
   'EXPIRED',
   'SIGNED',
   'PENDING',
@@ -94,7 +94,7 @@ export type PaymentConfig = z.infer<typeof paymentConfigSchema>;
 // Guarantee years options
 export const GUARANTEE_YEARS_OPTIONS = [5, 10, 15] as const;
 
-export const taskQuoteServiceSchema = z.object({
+export const budgetItemSchema = z.object({
   id: z.string().uuid().optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(400),
   observation: z.string().max(2000).optional().nullable(),
@@ -103,7 +103,7 @@ export const taskQuoteServiceSchema = z.object({
 });
 
 // Lenient service schema for nested creation (allows incomplete services during editing)
-const taskQuoteServiceCreateSchema = z.object({
+const budgetItemCreateSchema = z.object({
   id: z.string().uuid().optional(),
   description: z.string().optional().default(''),
   observation: z.string().max(2000).optional().nullable(),
@@ -113,7 +113,7 @@ const taskQuoteServiceCreateSchema = z.object({
 });
 
 // Preprocess services array to filter out empty placeholder services
-const taskQuoteServicesArraySchema = z.preprocess(
+const budgetItemsArraySchema = z.preprocess(
   (val) => {
     // Filter out empty quote services (those without descriptions)
     if (Array.isArray(val)) {
@@ -121,11 +121,11 @@ const taskQuoteServicesArraySchema = z.preprocess(
     }
     return val;
   },
-  z.array(taskQuoteServiceCreateSchema).optional().default([])
+  z.array(budgetItemCreateSchema).optional().default([])
 );
 
 // Customer config schema for per-customer billing
-export const taskQuoteCustomerConfigSchema = z.object({
+export const budgetPayerSchema = z.object({
   /**
    * O ID DESTA FATURA, quando o formulário edita uma que já existe.
    *
@@ -176,11 +176,11 @@ export const taskQuoteCustomerConfigSchema = z.object({
 });
 
 // Schema that allows optional quote or validates quote when services exist
-export const taskQuoteCreateNestedSchema = z
+export const budgetCreateNestedSchema = z
   .object({
     expiresAt: z.coerce.date().optional().nullable(),
-    status: taskQuoteStatusSchema.optional().default('PENDING'),
-    services: taskQuoteServicesArraySchema, // Uses preprocessing to filter empty services
+    status: budgetStatusSchema.optional().default('PENDING'),
+    services: budgetItemsArraySchema, // Uses preprocessing to filter empty services
     // Aggregate totals (computed from customerConfigs)
     subtotal: z.preprocess(preprocessMoney, z.number().optional().nullable()),
     total: z.preprocess(preprocessMoney, z.number().optional().nullable()),
@@ -205,7 +205,7 @@ export const taskQuoteCreateNestedSchema = z
       (val) => val === '' || val === null || val === undefined ? null : Number(val),
       z.number().int().min(1).max(100).optional().nullable()
     ),
-    customerConfigs: z.array(taskQuoteCustomerConfigSchema).optional(),
+    customerConfigs: z.array(budgetPayerSchema).optional(),
   })
   .optional()
   .superRefine((data, ctx) => {
@@ -247,11 +247,11 @@ export const taskQuoteCreateNestedSchema = z
     }
   });
 
-// `taskQuoteSchema` foi REMOVIDO. Não tinha nenhum consumidor (o wizard de
+// `budgetSchema` foi REMOVIDO. Não tinha nenhum consumidor (o wizard de
 // criação e o de edição validam à mão) e continuava exigindo `taskId` como campo
 // obrigatório de UMA tarefa — a premissa que o orçamento multitarefa desfez. Um
 // schema morto com a forma antiga é uma armadilha para quem for mexer aqui
 // amanhã: o que a API aceita hoje é `taskIds[]` + `billingSplit`.
-export type TaskQuoteServiceFormData = z.infer<typeof taskQuoteServiceSchema>;
-export type TaskQuoteCustomerConfigFormData = z.infer<typeof taskQuoteCustomerConfigSchema>;
-export type TaskQuoteCreateNestedFormData = z.infer<typeof taskQuoteCreateNestedSchema>;
+export type BudgetItemFormData = z.infer<typeof budgetItemSchema>;
+export type BudgetPayerFormData = z.infer<typeof budgetPayerSchema>;
+export type BudgetCreateNestedFormData = z.infer<typeof budgetCreateNestedSchema>;

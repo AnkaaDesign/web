@@ -39,17 +39,17 @@ export interface PaymentConfig {
   specificDate?: string; // YYYY-MM-DD
 }
 
-export interface TaskQuoteService extends BaseEntity {
+export interface BudgetItem extends BaseEntity {
   description: string;
   observation?: string | null;
   amount: number;
   quoteId: string;
   invoiceToCustomerId?: string | null;
   invoiceToCustomer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
-  quote?: TaskQuote;
+  quote?: Budget;
 }
 
-export interface TaskQuoteCustomerConfig extends BaseEntity {
+export interface BudgetPayer extends BaseEntity {
   quoteId: string;
   customerId: string;
   /**
@@ -72,7 +72,7 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   billing?: {
     id: string;
     quoteId?: string;
-    /** Quando ESTE faturamento foi aprovado. `TaskQuote.billingApprovedAt` é
+    /** Quando ESTE faturamento foi aprovado. `Budget.billingApprovedAt` é
      *  quando o ÚLTIMO fechou — "o orçamento inteiro está faturado". */
     approvedAt?: Date | string | null;
     /**
@@ -148,7 +148,7 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   installments?: Installment[];
 }
 
-export interface TaskQuote extends BaseEntity {
+export interface Budget extends BaseEntity {
   budgetNumber: number;
   subtotal: number;
   total: number;
@@ -185,7 +185,7 @@ export interface TaskQuote extends BaseEntity {
   tasks?: Task[];
 
   /**
-   * QUANTOS VEÍCULOS o orçamento cobre — coluna em `TaskQuote`, mantida pela API
+   * QUANTOS VEÍCULOS o orçamento cobre — coluna em `Budget`, mantida pela API
    * junto dos totais (`recalcQuoteTotals`).
    *
    * Existe porque `total` é o valor do CONTRATO (`por veículo × N`) e as LISTAS
@@ -203,8 +203,8 @@ export interface TaskQuote extends BaseEntity {
    * leia por `quoteTasks()` / `primaryTask()` em `@/utils/quote-tasks`.
    */
   task?: Task;
-  services?: TaskQuoteService[];
-  customerConfigs?: TaskQuoteCustomerConfig[];
+  services?: BudgetItem[];
+  customerConfigs?: BudgetPayer[];
 
   /**
    * AS COBRANÇAS deste orçamento — 1..N, cada uma com id, cobertura e estado
@@ -223,7 +223,7 @@ export interface TaskQuote extends BaseEntity {
 /**
  * UMA COBRANÇA — o que é cobrado, de quem, em quantas parcelas e com que nota.
  *
- * Separada de `TaskQuote` em 16/09/2026: o orçamento se altera até a execução do
+ * Separada de `Budget` em 16/09/2026: o orçamento se altera até a execução do
  * serviço; o faturamento, até o pagamento terminar. Um orçamento tem 1..N
  * cobranças (uma por veículo, por lote, ou uma só para todos).
  */
@@ -241,6 +241,6 @@ export interface Billing {
   /** OS VEÍCULOS que esta cobrança cobre. */
   tasks?: Array<{ taskId: string; task?: Task | null }>;
   /** A QUEM se cobra, e em que termos. Um por pagador. */
-  customerConfigs?: TaskQuoteCustomerConfig[];
-  quote?: TaskQuote;
+  customerConfigs?: BudgetPayer[];
+  quote?: Budget;
 }

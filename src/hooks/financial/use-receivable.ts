@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { receivableService } from "@/api-client/receivable";
 import { receivableKeys, reconciliationKeys, taskKeys } from "@/hooks/common/query-keys";
-// taskQuoteKeys lives with its hooks, not in the shared factory file.
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
+// budgetKeys lives with its hooks, not in the shared factory file.
+import { budgetKeys } from "@/hooks/production/use-budget";
 import type {
   ReceivableAllocatePayload,
   ReceivableMatchPayload,
@@ -124,7 +124,7 @@ export function useReceivableMutations() {
     // A task match can mint an orçamento and a fatura, so the task and
     // task-quote namespaces are no longer accurate either.
     qc.invalidateQueries({ queryKey: taskKeys.all });
-    qc.invalidateQueries({ queryKey: taskQuoteKeys.all });
+    qc.invalidateQueries({ queryKey: budgetKeys.all });
   };
 
   const matchMutation = useMutation({

@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { TASK_QUOTE_STATUS } from '@/types/task-quote';
+import type { TASK_QUOTE_STATUS } from '@/types/budget';
 
 interface QuoteStatusBadgeProps {
   status: TASK_QUOTE_STATUS;

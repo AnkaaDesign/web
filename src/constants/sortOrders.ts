@@ -149,7 +149,7 @@ export const TASK_STATUS_ORDER: Record<TASK_STATUS, number> = {
   [TASK_STATUS.CANCELLED]: 5,
 };
 
-// ⚠️ PERSISTIDO em `TaskQuote.statusOrder`, escrito pela API junto com `status`.
+// ⚠️ PERSISTIDO em `Budget.statusOrder`, escrito pela API junto com `status`.
 // Espelho de `api/src/constants/sortOrders.ts`: as listas de Orçamento e
 // Faturamento ORDENAM E PAGINAM por essa coluna no servidor, então a ordem aqui
 // e a de lá têm de ser a mesma — divergir não dá erro, dá lista fora de ordem.

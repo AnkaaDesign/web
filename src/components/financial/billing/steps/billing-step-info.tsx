@@ -12,7 +12,7 @@ import { getCustomers } from "@/api-client/customer";
 import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useResponsibles } from "@/hooks/administration/use-responsible";
-import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/task-quote-calculations";
+import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/budget-calculations";
 import {
   coverageSummary,
   hasMultipleCustomers as hasMultipleCustomersOf,

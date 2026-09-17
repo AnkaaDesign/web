@@ -17,7 +17,7 @@ import {
   ENTRADA_OPTIONS,
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";

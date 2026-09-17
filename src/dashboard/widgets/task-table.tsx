@@ -62,7 +62,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import type { CopyableTaskField } from "@/types/task-copy";
 import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
-import { getTaskQuoteEditRoute } from "../../utils/task";
+import { getBudgetEditRoute } from "../../utils/task";
 import { useReturnTo } from "../../hooks/common/use-return-to";
 import { useSectors } from "../../hooks/administration/use-sector";
 import { useCustomers } from "../../hooks/administration/use-customer";
@@ -1651,7 +1651,7 @@ const TASK_INCLUDE = {
   truck: true,
   // The API's base task include already hydrates `quote.customerConfigs.installments`.
   // Don't override with `{ include: { installments: true } }` — `installments`
-  // is not a direct relation on TaskQuote, only on TaskQuoteCustomerConfig,
+  // is not a direct relation on Budget, only on BudgetPayer,
   // and Prisma rejects the unknown field.
   quote: true,
   layouts: true,
@@ -1923,7 +1923,7 @@ function TaskTableRender({
             break;
           case "quote":
             if (actionTasks.length === 1) {
-              navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
+              navigate(getBudgetEditRoute(actionTasks[0]), { state: { returnTo } });
             }
             break;
           case "setTerm":

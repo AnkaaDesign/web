@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTaskQuotes, taskQuoteService } from '@/api-client/task-quote';
+import { getBudgets, budgetService } from '@/api-client/budget';
 import { taskKeys } from '../common/query-keys';
 
-export const taskQuoteKeys = {
+export const budgetKeys = {
   all: ['task-quotes'] as const,
-  lists: () => [...taskQuoteKeys.all, 'list'] as const,
-  list: (filters?: any) => [...taskQuoteKeys.lists(), filters] as const,
-  details: () => [...taskQuoteKeys.all, 'detail'] as const,
-  detail: (id: string) => [...taskQuoteKeys.details(), id] as const,
-  byTask: (taskId: string) => [...taskQuoteKeys.all, 'byTask', taskId] as const,
+  lists: () => [...budgetKeys.all, 'list'] as const,
+  list: (filters?: any) => [...budgetKeys.lists(), filters] as const,
+  details: () => [...budgetKeys.all, 'detail'] as const,
+  detail: (id: string) => [...budgetKeys.details(), id] as const,
+  byTask: (taskId: string) => [...budgetKeys.all, 'byTask', taskId] as const,
   suggestion: (params: { name: string; customerId: string; category: string; implementType: string }) =>
-    [...taskQuoteKeys.all, 'suggestion', params] as const,
+    [...budgetKeys.all, 'suggestion', params] as const,
 };
 
-export interface UseTaskQuotesParams extends Record<string, unknown> {
+export interface UseBudgetsParams extends Record<string, unknown> {
   enabled?: boolean;
   refetchOnWindowFocus?: boolean | 'always';
   /**
@@ -36,19 +36,19 @@ export interface UseTaskQuotesParams extends Record<string, unknown> {
  * GET e o `staleTime` era ignorado. A paginação, ao contrário, ENTRA na chave —
  * cada página é uma entrada de cache própria.
  */
-export function useTaskQuotes(params?: UseTaskQuotesParams) {
+export function useBudgets(params?: UseBudgetsParams) {
   const queryClient = useQueryClient();
   const { enabled = true, refetchOnWindowFocus, staleTime, ...restParams } = params ?? {};
 
   const queryKey = useMemo(
-    () => taskQuoteKeys.list(restParams),
+    () => budgetKeys.list(restParams),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(restParams)],
   );
 
   const query = useQuery({
     queryKey,
-    queryFn: () => getTaskQuotes(restParams),
+    queryFn: () => getBudgets(restParams),
     enabled,
     staleTime: staleTime ?? 0,
     retry: 2,
@@ -56,32 +56,32 @@ export function useTaskQuotes(params?: UseTaskQuotesParams) {
   });
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+    queryClient.invalidateQueries({ queryKey: budgetKeys.all });
   };
 
   return { ...query, refresh };
 }
 
 // Get quote by ID
-export function useTaskQuote(id: string) {
+export function useBudget(id: string) {
   return useQuery({
-    queryKey: taskQuoteKeys.detail(id),
-    queryFn: () => taskQuoteService.getById(id),
+    queryKey: budgetKeys.detail(id),
+    queryFn: () => budgetService.getById(id),
     enabled: !!id,
   });
 }
 
 // Get quote by task ID
-export function useTaskQuoteByTask(taskId: string) {
+export function useBudgetByTask(taskId: string) {
   return useQuery({
-    queryKey: taskQuoteKeys.byTask(taskId),
-    queryFn: () => taskQuoteService.getByTaskId(taskId),
+    queryKey: budgetKeys.byTask(taskId),
+    queryFn: () => budgetService.getByTaskId(taskId),
     enabled: !!taskId,
   });
 }
 
 // Get suggestion based on matching task fields
-export function useTaskQuoteSuggestion(params: {
+export function useBudgetSuggestion(params: {
   name: string;
   customerId: string;
   category: string;
@@ -89,8 +89,8 @@ export function useTaskQuoteSuggestion(params: {
 }) {
   const enabled = !!(params.name && params.customerId && params.category && params.implementType);
   return useQuery({
-    queryKey: taskQuoteKeys.suggestion(params),
-    queryFn: () => taskQuoteService.getSuggestion(params).then((res) => res.data),
+    queryKey: budgetKeys.suggestion(params),
+    queryFn: () => budgetService.getSuggestion(params).then((res) => res.data),
     enabled,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     retry: false,
@@ -98,14 +98,14 @@ export function useTaskQuoteSuggestion(params: {
 }
 
 // Create quote
-export function useCreateTaskQuote() {
+export function useCreateBudget() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: taskQuoteService.create,
+    mutationFn: budgetService.create,
     onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (POST /task-quotes).
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Success/error toasts are emitted by the axios interceptor (POST /budgets).
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       // Tasks embed quote data (budget, status) — refresh task lists + details too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
@@ -113,15 +113,15 @@ export function useCreateTaskQuote() {
 }
 
 // Update quote
-export function useUpdateTaskQuote() {
+export function useUpdateBudget() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      taskQuoteService.update(id, data),
+      budgetService.update(id, data),
     onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id).
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Success/error toasts are emitted by the axios interceptor (PUT /budgets/:id).
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       // Tasks embed quote data (budget, status) — refresh task lists + details too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
@@ -133,10 +133,10 @@ export function useApproveQuote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => taskQuoteService.approve(id),
+    mutationFn: (id: string) => budgetService.approve(id),
     onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/budget-approve).
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Success/error toasts are emitted by the axios interceptor (PUT /budgets/:id/budget-approve).
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       // Approving a quote flips task budget status — refresh task lists + details too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
@@ -149,10 +149,10 @@ export function useRejectQuote() {
 
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      taskQuoteService.reject(id, reason),
+      budgetService.reject(id, reason),
     onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/status).
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Success/error toasts are emitted by the axios interceptor (PUT /budgets/:id/status).
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       // Rejecting a quote flips task budget status — refresh task lists + details too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },

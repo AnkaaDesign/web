@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowMerge, IconInfoCircle, IconLoader2 } from "@tabler/icons-react";
-import { taskQuoteService } from "@/api-client/task-quote";
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
+import { budgetService } from "@/api-client/budget";
+import { budgetKeys } from "@/hooks/production/use-budget";
 import { taskKeys } from "@/hooks";
 import { toast } from "@/components/ui/sonner";
 
@@ -61,7 +61,7 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
     setLoading(true);
     setError(null);
     setVerdict(null);
-    taskQuoteService
+    budgetService
       .mergePreview(taskIds)
       .then((res: any) => {
         if (cancelled) return;
@@ -80,12 +80,12 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
   const handleMerge = useCallback(async () => {
     setMerging(true);
     try {
-      const res: any = await taskQuoteService.merge(taskIds);
+      const res: any = await budgetService.merge(taskIds);
       // As duas chaves, e não só a do orçamento: a lista de Orçamentos, a de
       // Faturamento, a Agenda e o Cronograma são todas consultas de TAREFA, e é
       // nelas que a união aparece (N linhas viram N linhas do mesmo número).
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+        queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
         queryClient.invalidateQueries({ queryKey: taskKeys.all }),
         queryClient.invalidateQueries({ queryKey: ["billings"] }),
       ]);

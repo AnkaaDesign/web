@@ -2,7 +2,7 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { MutedDash } from "@/components/financial/shared/quote-table-shared";
 import { dedupeConfigsByCustomer, orderNumberLabel, orderNumbersOfTasks, quoteTasks, quoteVehicleCount } from "@/utils/quote-tasks";
 import type { Task } from "@/types";
-import type { TaskQuote } from "@/types/task-quote";
+import type { Budget } from "@/types/budget";
 
 /**
  * Células e extratores da lista de ORÇAMENTOS, onde a linha é o CONTRATO.
@@ -10,7 +10,7 @@ import type { TaskQuote } from "@/types/task-quote";
  * ⚠️ Arquivo NOVO de propósito. `quote-table-shared.tsx` continua sendo a casa
  * dos genéricos (MutedDash, as datas, os filtros de cliente) e de tudo que é
  * tipado `(task: Task)`, e o Faturamento importa dezesseis símbolos de lá
- * assumindo essa assinatura. Reescrevê-los para `(quote: TaskQuote)` quebraria
+ * assumindo essa assinatura. Reescrevê-los para `(quote: Budget)` quebraria
  * aquela lista sem um único erro nesta.
  *
  * O QUE MUDA quando a linha deixa de ser um veículo: sete colunas passavam a
@@ -22,7 +22,7 @@ import type { TaskQuote } from "@/types/task-quote";
  */
 
 /** Os veículos do orçamento na ordem canônica, sempre como lista. */
-const vehiclesOf = (quote: TaskQuote): Task[] => quoteTasks<Task>(quote);
+const vehiclesOf = (quote: Budget): Task[] => quoteTasks<Task>(quote);
 
 /**
  * QUANTOS VEÍCULOS, lendo a relação e não o desnormalizado.
@@ -34,7 +34,7 @@ const vehiclesOf = (quote: TaskQuote): Task[] => quoteTasks<Task>(quote);
  * validade, nenhuma tarefa), e pelo caminho antigo a célula anunciaria "1
  * veículo" para eles, que é a coluna afirmando algo que não existe.
  */
-export function quoteVehiclesLoadedCount(quote: TaskQuote): number {
+export function quoteVehiclesLoadedCount(quote: Budget): number {
   return Array.isArray(quote.tasks) ? quote.tasks.length : quoteVehicleCount(quote);
 }
 
@@ -62,7 +62,7 @@ function contractedLabel(values: readonly string[], maxVisible = 2): string | nu
 // ---------------------------------------------------------------------------
 
 /** Como cada veículo se identifica no chão de fábrica: a série, senão a placa. */
-export function quoteIdentifiers(quote: TaskQuote): string[] {
+export function quoteIdentifiers(quote: Budget): string[] {
   const seen = new Set<string>();
   for (const task of vehiclesOf(quote)) {
     const value = (task.serialNumber || task.truck?.plate || "").trim();
@@ -72,7 +72,7 @@ export function quoteIdentifiers(quote: TaskQuote): string[] {
 }
 
 /** "78000" num veículo; "78000, 78001 +2" em quatro. Lista completa no `title`. */
-export function quoteIdentifierLabel(quote: TaskQuote): string | null {
+export function quoteIdentifierLabel(quote: Budget): string | null {
   return contractedLabel(quoteIdentifiers(quote));
 }
 
@@ -89,7 +89,7 @@ export function quoteIdentifierLabel(quote: TaskQuote): string | null {
  * palavra. Sobra mais de um nome só quando os veículos foram batizados
  * diferente, e aí a divergência É a informação.
  */
-export function quoteNames(quote: TaskQuote): string[] {
+export function quoteNames(quote: Budget): string[] {
   const seen = new Set<string>();
   for (const task of vehiclesOf(quote)) {
     const name = (task.name ?? "").trim();
@@ -98,7 +98,7 @@ export function quoteNames(quote: TaskQuote): string[] {
   return [...seen];
 }
 
-export function quoteNameLabel(quote: TaskQuote): string | null {
+export function quoteNameLabel(quote: Budget): string | null {
   return contractedLabel(quoteNames(quote), 1);
 }
 
@@ -111,7 +111,7 @@ export function quoteNameLabel(quote: TaskQuote): string | null {
  * necessariamente quem paga (essa é a coluna "Clientes", das fatias de
  * faturamento). Num orçamento multitarefa o cliente da obra é quase sempre um só.
  */
-export function quoteCustomerNames(quote: TaskQuote): string[] {
+export function quoteCustomerNames(quote: Budget): string[] {
   const seen = new Set<string>();
   for (const task of vehiclesOf(quote)) {
     const name = (task.customer?.corporateName || task.customer?.fantasyName || "").trim();
@@ -120,7 +120,7 @@ export function quoteCustomerNames(quote: TaskQuote): string[] {
   return [...seen];
 }
 
-export function quoteCustomerLabel(quote: TaskQuote): string | null {
+export function quoteCustomerLabel(quote: Budget): string | null {
   return contractedLabel(quoteCustomerNames(quote), 1);
 }
 
@@ -137,14 +137,14 @@ export function quoteCustomerLabel(quote: TaskQuote): string | null {
  * 12 tinha de achar a dele. Com a linha valendo o contrato, a pergunta certa é
  * "quem paga este orçamento?", e a resposta é a lista deduplicada por CLIENTE.
  */
-export function quoteInvoiceToCustomerNames(quote: TaskQuote): string[] {
+export function quoteInvoiceToCustomerNames(quote: Budget): string[] {
   const { configs } = dedupeConfigsByCustomer(quote.customerConfigs ?? []);
   const names = configs.map((c) => (c.customer?.corporateName || c.customer?.fantasyName || "").trim()).filter(Boolean);
   return [...new Set(names)];
 }
 
 /** Dois nomes lado a lado e um marcador `+N` — a mesma forma da célula que substitui. */
-export function QuoteInvoiceToCustomersCell({ quote }: { quote: TaskQuote }) {
+export function QuoteInvoiceToCustomersCell({ quote }: { quote: Budget }) {
   const names = quoteInvoiceToCustomerNames(quote);
   if (names.length === 0) return <MutedDash />;
   if (names.length === 1) return <TruncatedTextWithTooltip text={names[0]} className="text-sm" />;
@@ -163,7 +163,7 @@ export function QuoteInvoiceToCustomersCell({ quote }: { quote: TaskQuote }) {
 // ---------------------------------------------------------------------------
 
 /** Os pedidos de compra dos veículos, sem brancos e sem repetição. */
-export const quoteOrderNumbers = (quote: TaskQuote): string[] => orderNumbersOfTasks(vehiclesOf(quote));
+export const quoteOrderNumbers = (quote: Budget): string[] => orderNumbersOfTasks(vehiclesOf(quote));
 
 /**
  * Uma linha só. `orderNumberLabel` já resolve este problema — dedupe e contração
@@ -171,9 +171,9 @@ export const quoteOrderNumbers = (quote: TaskQuote): string[] => orderNumbersOfT
  * documento imprimem; reusá-lo é o que impede a lista de inventar um terceiro
  * jeito de escrever o mesmo campo.
  */
-export const quoteOrderNumberLabel = (quote: TaskQuote): string | null => orderNumberLabel(vehiclesOf(quote), 40);
+export const quoteOrderNumberLabel = (quote: Budget): string | null => orderNumberLabel(vehiclesOf(quote), 40);
 
-export function QuoteOrderNumbersCell({ quote }: { quote: TaskQuote }) {
+export function QuoteOrderNumbersCell({ quote }: { quote: Budget }) {
   const numbers = quoteOrderNumbers(quote);
   if (numbers.length === 0) return <MutedDash />;
   return <TruncatedTextWithTooltip text={quoteOrderNumberLabel(quote) ?? ""} className="text-sm tabular-nums" />;
@@ -196,7 +196,7 @@ type QuoteTaskDateField = "term" | "forecastDate" | "entryDate";
  *
  * `null` quando não há veículo ou todos estão sem a data.
  */
-export function earliestTaskDate(quote: TaskQuote, field: QuoteTaskDateField): Date | null {
+export function earliestTaskDate(quote: Budget, field: QuoteTaskDateField): Date | null {
   let earliest: Date | null = null;
   for (const task of vehiclesOf(quote)) {
     const raw = task[field];
@@ -209,7 +209,7 @@ export function earliestTaskDate(quote: TaskQuote, field: QuoteTaskDateField): D
 }
 
 /** Quantos veículos têm ESTA data preenchida — o que decide se vale explicar no `title`. */
-export function taskDateSpread(quote: TaskQuote, field: QuoteTaskDateField): number {
+export function taskDateSpread(quote: Budget, field: QuoteTaskDateField): number {
   return vehiclesOf(quote).filter((t) => !!t[field]).length;
 }
 
@@ -228,7 +228,7 @@ export function taskDateSpread(quote: TaskQuote, field: QuoteTaskDateField): num
  * `distinct` conta quantos estados diferentes existem, para a célula poder dizer
  * no `title` que o badge é um resumo e não o estado de todos.
  */
-export function quoteTaskStatus(quote: TaskQuote): { status: string; distinct: number } | null {
+export function quoteTaskStatus(quote: Budget): { status: string; distinct: number } | null {
   let best: { status: string; order: number } | null = null;
   const seen = new Set<string>();
   for (const task of vehiclesOf(quote)) {

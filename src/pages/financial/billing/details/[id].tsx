@@ -7,8 +7,8 @@ import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { BillingCoveredVehicles } from "@/components/financial/billing/steps/billing-covered-vehicles";
 import { billingKeys, useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
 import { billingService } from "@/api-client/billing";
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetKeys } from "@/hooks/production/use-budget";
+import { budgetService } from "@/api-client/budget";
 import { customerService } from "@/api-client/customer";
 import { uploadSingleFile } from "@/api-client/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -1490,7 +1490,7 @@ const BillingDetailPageInner = ({
         quotePayload.status = quote.status;
       }
 
-      await taskQuoteService.update(quote.id, quotePayload);
+      await budgetService.update(quote.id, quotePayload);
 
       // ═══════════════════════════════════════════════════════════════════════
       // O PEDIDO DE COMPRA NÃO PASSA MAIS POR AQUI
@@ -1516,7 +1516,7 @@ const BillingDetailPageInner = ({
       }
 
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       queryClient.invalidateQueries({ queryKey: billingKeys.all });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["dashboards"] });
@@ -1615,7 +1615,7 @@ const BillingDetailPageInner = ({
     try {
       await billingService.settle(currentBilling.id);
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       queryClient.invalidateQueries({ queryKey: billingKeys.all });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Faturamento liquidado.");

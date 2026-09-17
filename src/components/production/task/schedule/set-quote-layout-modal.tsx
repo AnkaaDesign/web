@@ -6,9 +6,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type FileWithPreview } from "@/components/common/file";
 import { uploadSingleFile } from "@/api-client/file";
 import { taskService } from "@/api-client/task";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetService } from "@/api-client/budget";
 import { taskKeys } from "../../../../hooks";
-import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
+import { budgetKeys } from "@/hooks/production/use-budget";
 import { ApprovedLayoutPicker, type LayoutOption } from "@/components/financial/common/approved-layout-picker";
 import { IconLoader2, IconPhoto } from "@tabler/icons-react";
 import { toast } from "@/components/ui/sonner";
@@ -97,7 +97,7 @@ const computeCommonLayouts = (quoteTasks: QuoteTask[]): LayoutOption[] => {
 };
 
 /**
- * Bulk-set the quote's approved layout files (TaskQuote.layoutFiles, up to 2) for
+ * Bulk-set the quote's approved layout files (Budget.layoutFiles, up to 2) for
  * every selected task that has a quote.
  *
  * When every selected task shares the same task layouts (the common plate/serial
@@ -277,7 +277,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
       const results: PromiseSettledResult<unknown>[] = [];
       for (const t of quoteTasks) {
         try {
-          results.push({ status: "fulfilled", value: await taskQuoteService.updateLayoutFile(t.quoteId, resolvedIds) });
+          results.push({ status: "fulfilled", value: await budgetService.updateLayoutFile(t.quoteId, resolvedIds) });
         } catch (e) {
           results.push({ status: "rejected", reason: e });
         }
@@ -292,7 +292,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
             : `Layout do orçamento removido de ${succeeded} tarefa${succeeded > 1 ? "s" : ""}`,
         );
         queryClient.invalidateQueries({ queryKey: taskKeys.all });
-        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+        queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       }
       if (failed > 0) {
         toast.error(`Falha ao atualizar ${failed} orçamento${failed > 1 ? "s" : ""}`);

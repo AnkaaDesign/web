@@ -17,7 +17,7 @@ import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
 import type { Bonus } from "./bonus";
 import type { BonusDiscount } from "./bonusDiscount";
-import type { TaskQuote } from "./task-quote";
+import type { Budget } from "./budget";
 import type { Responsible } from "./responsible";
 
 // =====================
@@ -34,7 +34,7 @@ export interface Task extends BaseEntity {
   /**
    * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
    *
-   * Morava em `TaskQuoteCustomerConfig.orderNumber` — por CLIENTE — e isso
+   * Morava em `BudgetPayer.orderNumber` — por CLIENTE — e isso
    * obrigava os N caminhões de um mesmo orçamento a citarem o mesmo número na
    * nota e no boleto. O pedido é por ENTREGA: cada veículo tem o seu.
    */
@@ -67,8 +67,8 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
-  quoteId?: string | null; // Foreign key to TaskQuote
-  quote?: TaskQuote; // Task quote (one-to-one: each task has its own unique quote)
+  quoteId?: string | null; // Foreign key to Budget
+  quote?: Budget; // Task quote (one-to-one: each task has its own unique quote)
   budgets?: File[];
   invoices?: File[];
   receipts?: File[];

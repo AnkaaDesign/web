@@ -8,13 +8,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency, formatDate } from "@/utils";
-import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
+import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/budget-calculations";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants";
 import { quoteTasks, hasMultipleCustomers as hasMultipleCustomersOf } from "@/utils/quote-tasks";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
-import { useTaskQuoteSuggestion } from "@/hooks/production/use-task-quote";
+import { useBudgetSuggestion } from "@/hooks/production/use-budget";
 import {
   IconPlus,
   IconTrash,
@@ -33,7 +33,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   getQuoteServicesToAddFromServiceOrders,
   type SyncServiceOrder,
-} from "@/utils/task-quote-service-order-sync";
+} from "@/utils/budget-service-order-sync";
 
 const ADJUSTMENT_PRESETS = [0, 5, 10, 15, 20];
 
@@ -81,7 +81,7 @@ export function BudgetStepServices({
 
   const {
     data: suggestionApiResponse,
-  } = useTaskQuoteSuggestion(
+  } = useBudgetSuggestion(
     isCreateMode ? suggestionParams : { name: "", customerId: "", category: "", implementType: "" },
   );
 

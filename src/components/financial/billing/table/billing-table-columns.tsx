@@ -1,6 +1,6 @@
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import type { Task } from "@/types";
-import type { Billing, BILLING_STATUS } from "@/types/task-quote";
+import type { Billing, BILLING_STATUS } from "@/types/budget";
 import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -432,7 +432,7 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       id: "billingApprovedAt",
       header: "Faturado em",
       // ESCALAR DA PRÓPRIA LINHA. Era procurado entre os pagadores e caía em
-      // `TaskQuote.billingApprovedAt`, que só é gravado quando a ÚLTIMA fatia
+      // `Budget.billingApprovedAt`, que só é gravado quando a ÚLTIMA fatia
       // fecha — cinquenta e nove veículos faturados liam "-". A cobrança carrega
       // a própria data, e por isso a coluna também ORDENA no servidor.
       accessorFn: (b) => b.approvedAt ?? null,

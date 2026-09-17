@@ -45,7 +45,7 @@ import {
   missingBillingCustomerLabels,
 } from "@/lib/billing-customer-data";
 import { round2 } from "@/utils/quote-money";
-import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
+import type { TASK_QUOTE_STATUS, Budget } from "@/types/budget";
 import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
 /** Os destinos que ESTE passo oferece. Curados de propósito: o passo de
@@ -1090,7 +1090,7 @@ export function BudgetStepReview({
             Garantia
           </div>
           <p className="text-sm text-muted-foreground">
-            {generateGuaranteeText({ guaranteeYears, customGuaranteeText } as TaskQuote)}
+            {generateGuaranteeText({ guaranteeYears, customGuaranteeText } as Budget)}
           </p>
         </div>
       )}
@@ -1147,7 +1147,7 @@ export function BudgetStepReview({
       })()}
 
       {/* Reject reason dialog — required when reverting to PENDING.
-          NOTE: parent FinancialBudgetDetailPage submits via taskQuoteService.update +
+          NOTE: parent FinancialBudgetDetailPage submits via budgetService.update +
           updateStatus on save; the reason is stored in form ("statusReason") and forwarded. */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { isValidTaskStatusTransition, getTaskStatusLabel } from "../../../../utils";
 import { shouldShowInteractiveElements, canEditTasks, canDeleteTasks } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
@@ -287,7 +287,7 @@ export function TaskTable({
       } else if (userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
         // Commercial users edit a task through its quote (orçamento/faturamento by quote status),
         // never the production prep-edit form which targets other sectors.
-        navigate(getTaskQuoteEditRoute(contextMenu.items[0]));
+        navigate(getBudgetEditRoute(contextMenu.items[0]));
       } else {
         // Single edit
         navigate(routes.production.schedule.edit(contextMenu.items[0].id));

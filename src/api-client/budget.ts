@@ -1,8 +1,8 @@
 import { apiClient } from './axiosClient';
 import type { BaseGetManyResponse } from '../types/common';
-import type { TaskQuote } from '../types/task-quote';
+import type { Budget } from '../types/budget';
 
-export type TaskQuoteGetManyResponse = BaseGetManyResponse<TaskQuote>;
+export type BudgetGetManyResponse = BaseGetManyResponse<Budget>;
 
 /**
  * A LISTA DE ORÇAMENTOS — uma linha por CONTRATO, não por veículo.
@@ -14,29 +14,29 @@ export type TaskQuoteGetManyResponse = BaseGetManyResponse<TaskQuote>;
  * e foi por isso que a lista nasceu consultando `/tasks` — o único cliente que
  * já tinha esta forma. Molde idêntico ao de `taskService.getTasks`.
  */
-export async function getTaskQuotes(params: Record<string, unknown> = {}): Promise<TaskQuoteGetManyResponse> {
-  const response = await apiClient.get<TaskQuoteGetManyResponse>('/task-quotes', { params });
+export async function getBudgets(params: Record<string, unknown> = {}): Promise<BudgetGetManyResponse> {
+  const response = await apiClient.get<BudgetGetManyResponse>('/budgets', { params });
   return response.data;
 }
 
-export const taskQuoteService = {
+export const budgetService = {
   // Get all quotes
-  getAll: (params?: any) => apiClient.get('/task-quotes', { params }),
+  getAll: (params?: any) => apiClient.get('/budgets', { params }),
 
-  /** Ver `getTaskQuotes` — o envelope já desembrulhado, para listas paginadas. */
-  getMany: getTaskQuotes,
+  /** Ver `getBudgets` — o envelope já desembrulhado, para listas paginadas. */
+  getMany: getBudgets,
 
   // Get by ID
-  getById: (id: string) => apiClient.get(`/task-quotes/${id}`),
+  getById: (id: string) => apiClient.get(`/budgets/${id}`),
 
   // Get by task ID
-  getByTaskId: (taskId: string) => apiClient.get(`/task-quotes/task/${taskId}`),
+  getByTaskId: (taskId: string) => apiClient.get(`/budgets/task/${taskId}`),
 
   // Create
-  create: (data: any) => apiClient.post('/task-quotes', data),
+  create: (data: any) => apiClient.post('/budgets', data),
 
   // Update
-  update: (id: string, data: any) => apiClient.put(`/task-quotes/${id}`, data),
+  update: (id: string, data: any) => apiClient.put(`/budgets/${id}`, data),
 
   /**
    * SIMPLIFICAR ORÇAMENTO — N orçamentos de 1 veículo viram 1 de N.
@@ -52,41 +52,41 @@ export const taskQuoteService = {
    */
   mergePreview: (taskIds: string[]) =>
     apiClient.post(
-      '/task-quotes/merge/preview',
+      '/budgets/merge/preview',
       { taskIds },
       { metadata: { suppressToast: true } } as any,
     ),
 
   merge: (taskIds: string[], billingSplit?: 'JOINT' | 'PER_TASK') =>
-    apiClient.post('/task-quotes/merge', { taskIds, ...(billingSplit ? { billingSplit } : {}) }),
+    apiClient.post('/budgets/merge', { taskIds, ...(billingSplit ? { billingSplit } : {}) }),
 
   // Update only the layout files — layoutFileIds is a safe-after-billing field, so
   // this works on locked quotes too. Toast suppressed so batch callers can emit one
   // summary. Sends the ordered File-id array (replaces the relation; [] clears).
   updateLayoutFile: (id: string, layoutFileIds: string[]) =>
     apiClient.put(
-      `/task-quotes/${id}`,
+      `/budgets/${id}`,
       { layoutFileIds },
       { metadata: { suppressToast: true } } as any,
     ),
 
   // Update status
   updateStatus: (id: string, status: string, reason?: string) =>
-    apiClient.put(`/task-quotes/${id}/status`, { status, reason }),
+    apiClient.put(`/budgets/${id}/status`, { status, reason }),
 
   // Aprovação COMERCIAL do orçamento (PENDING/SIGNED → APPROVED). É o último
   // estado do orçamento; o que vem depois é cobrança, e cobrança tem rota
   // própria (`billingService.approve`).
-  approve: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
+  approve: (id: string) => apiClient.put(`/budgets/${id}/budget-approve`),
 
   // Budget Approve (alias)
-  budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
+  budgetApprove: (id: string) => apiClient.put(`/budgets/${id}/budget-approve`),
 
   /**
    * ⚠️ APROVAR FATURAMENTO NÃO MORA MAIS AQUI.
    *
    * Era `updateStatus(id, "BILLING_APPROVED")` para a aprovação conjunta e
-   * `PUT /task-quotes/:id/internal-approve/:taskId` para uma fatia. Os dois
+   * `PUT /budgets/:id/internal-approve/:taskId` para uma fatia. Os dois
    * endereçavam a cobrança pelo ORÇAMENTO (ou por um dos veículos dela), porque
    * a cobrança não tinha id. Agora tem: use `billingService.approve(billingId)`
    * — `PUT /billings/:id/approve` —, que emite a fatura, a NFS-e e os boletos
@@ -111,14 +111,14 @@ export const taskQuoteService = {
    * Nenhuma tela chama esta rota hoje; ela fica para o dia em que existir o ato
    * "reverter tudo", que ainda não tem tela.
    */
-  revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
+  revertBilling: (id: string) => apiClient.put(`/budgets/${id}/revert-billing`),
 
   // Reject (sends back to PENDING with a reason)
   reject: (id: string, reason?: string) =>
-    apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING', reason }),
+    apiClient.put(`/budgets/${id}/status`, { status: 'PENDING', reason }),
 
   // Cancel (sends back to PENDING)
-  cancel: (id: string) => apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING' }),
+  cancel: (id: string) => apiClient.put(`/budgets/${id}/status`, { status: 'PENDING' }),
 
   // Update just the orderNumber on a customerConfig — safe to call on locked quotes
   /**
@@ -127,23 +127,23 @@ export const taskQuoteService = {
    * o pedido de um caminhão use `PUT /tasks/:id` (ou `PUT /tasks/batch`).
    */
   updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
-    apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
+    apiClient.patch(`/budgets/${id}/customer-config-order-number`, { customerId, orderNumber }),
 
   // Recibo de quitação (PDF) — só existe depois que a cobrança é liquidada
   // (`BILLING_STATUS.SETTLED`). O recibo é do orçamento porque é o contrato que
   // se quita; o estado que o libera é o da cobrança.
   getReceiptPdf: (id: string) =>
-    apiClient.get(`/task-quotes/${id}/receipt`, { responseType: 'blob' }),
+    apiClient.get(`/budgets/${id}/receipt`, { responseType: 'blob' }),
 
   // Delete
-  delete: (id: string) => apiClient.delete(`/task-quotes/${id}`),
+  delete: (id: string) => apiClient.delete(`/budgets/${id}`),
 
   // Get expired
-  getExpired: () => apiClient.get('/task-quotes/expired/list'),
+  getExpired: () => apiClient.get('/budgets/expired/list'),
 
   // Get suggestion based on matching task fields
   getSuggestion: (params: { name: string; customerId: string; category: string; implementType: string }) =>
-    apiClient.get('/task-quotes/suggest', { params }),
+    apiClient.get('/budgets/suggest', { params }),
 
   // =====================
   // PUBLIC ENDPOINTS (No Authentication Required)
@@ -158,7 +158,7 @@ export const taskQuoteService = {
   //      so the browser HTTP cache and any CDN/proxy in front cannot keep the body.
   // (Request headers like Cache-Control trigger CORS preflight failures, so we
   //  rely on response-side directives instead.)
-  getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`, {
+  getPublic: (id: string) => apiClient.get(`/budgets/public/${id}`, {
     params: { _t: Date.now() },
   }),
 
@@ -166,7 +166,7 @@ export const taskQuoteService = {
   uploadPublicSignature: (id: string, file: File) => {
     const formData = new FormData();
     formData.append('signature', file);
-    return apiClient.post(`/task-quotes/public/${id}/signature`, formData, {
+    return apiClient.post(`/budgets/public/${id}/signature`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

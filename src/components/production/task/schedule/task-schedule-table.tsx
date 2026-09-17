@@ -10,13 +10,13 @@ import {
 } from "@tanstack/react-table";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
+import { getBudgetDisplayLabel } from "@/constants/enum-labels";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks, canDeleteTasks, canFinishTask, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -254,7 +254,7 @@ export function TaskScheduleTable({
         case "edit":
           if (actionTasks.length === 1) {
             if (user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL) {
-              navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
+              navigate(getBudgetEditRoute(actionTasks[0]), { state: { returnTo } });
             } else {
               navigate(routes.production.schedule.edit(actionTasks[0].id));
             }
@@ -264,7 +264,7 @@ export function TaskScheduleTable({
           }
           break;
         case "quote":
-          if (actionTasks.length === 1) navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
+          if (actionTasks.length === 1) navigate(getBudgetEditRoute(actionTasks[0]), { state: { returnTo } });
           break;
         case "delete":
           setDeleteDialog({ tasks: actionTasks });
@@ -364,7 +364,7 @@ export function TaskScheduleTable({
       },
       {
         key: "quote",
-        label: getTaskQuoteDisplayLabel(menuRows[0]?.quote?.status),
+        label: getBudgetDisplayLabel(menuRows[0]?.quote?.status),
         icon: <IconReceipt className="mr-2 h-4 w-4" />,
         hidden: (rs) => !(userCanViewQuote && rs.length === 1 && !isCommercial),
         onClick: (rs) => handleAction("quote", rs),

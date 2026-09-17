@@ -12,7 +12,7 @@ import {
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer } from "@/types";
-import type { Billing } from "@/types/task-quote";
+import type { Billing } from "@/types/budget";
 import type { BillingListParams } from "@/api-client/billing";
 import {
   BILLING_STATUS,

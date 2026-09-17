@@ -1,7 +1,7 @@
 // Installment / Bank-slip tracker widget.
 //
-// Lists every installment from every billed task (Task → TaskQuote →
-// TaskQuoteCustomerConfig → Installment[]) flattened into a single sortable,
+// Lists every installment from every billed task (Task → Budget →
+// BudgetPayer → Installment[]) flattened into a single sortable,
 // filterable table. Designed to mirror the task-table widget's robustness so
 // the user can build dashboards that track boleto payments end-to-end:
 //
@@ -69,7 +69,7 @@ import { InstallmentStatusBadge } from "../../components/production/task/billing
 import { BankSlipStatusBadge } from "../../components/production/task/billing/bank-slip-status-badge";
 import { BillingStatusBadge } from "../../components/financial/billing/billing-status-badge";
 import { billingStatusOf } from "../../utils/quote-tasks";
-import type { BILLING_STATUS } from "../../types/task-quote";
+import type { BILLING_STATUS } from "../../types/budget";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker, type ColumnSort } from "../components/column-picker";

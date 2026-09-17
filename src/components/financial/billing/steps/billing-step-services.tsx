@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency } from "@/utils";
-import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
+import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/budget-calculations";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { Label } from "@/components/ui/label";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
@@ -133,7 +133,7 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
   );
 
   // Reorder services on drag end — array order is the persisted order on submit
-  // (the API stamps TaskQuoteService.position from the array index).
+  // (the API stamps BudgetItem.position from the array index).
   const handleDragEnd = useCallback(
     (event: any) => {
       const { active, over } = event;

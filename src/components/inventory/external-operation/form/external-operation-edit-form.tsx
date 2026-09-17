@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { ExternalOperationItemSelector } from "./external-operation-item-selector";
 import { ExternalOperationBillingSection, type BillingServiceRow } from "./external-operation-billing-section";
 import { legacyToConfig } from "@/components/financial/payment-config-field";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import { EXTERNAL_OPERATION_STATUS } from "../../../../constants";
 import { useExternalOperationFormUrlState } from "@/hooks/inventory/use-external-operation-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";

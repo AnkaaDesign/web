@@ -55,7 +55,7 @@ function whileInFlight(node: PredicateNode): PredicateNode {
  * Written as the two statuses that precede billing rather than as "not CANCELLED / not SETTLED",
  * because the negative form let every post-invoice status through: eleven Ibiporã quotes whose
  * nota had been issued and whose money had been in the bank for months kept blinking, which is
- * half of why the Faturamento list looked like it was on fire. A new TaskQuoteStatus added later
+ * half of why the Faturamento list looked like it was on fire. A new BudgetStatus added later
  * defaults to "already past this point", which is the safe direction for an alert.
  */
 function notYetInvoiced(): PredicateNode {

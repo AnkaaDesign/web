@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoiceService } from '@/api-client/invoice';
 import { nfseService } from '@/api-client/nfse';
-import { taskQuoteKeys } from '@/hooks/production/use-task-quote';
+import { budgetKeys } from '@/hooks/production/use-budget';
 import { dashboardQueryKeys } from '@/hooks/common/use-dashboard';
 import { taskKeys } from '@/hooks';
 import { billingKeys } from '@/hooks/financial/use-billing';
@@ -34,7 +34,7 @@ export const invoiceKeys = {
  */
 function invalidateAllBillingCaches(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-  queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+  queryClient.invalidateQueries({ queryKey: budgetKeys.all });
   queryClient.invalidateQueries({ queryKey: taskKeys.all });
   queryClient.invalidateQueries({ queryKey: billingKeys.all });
   queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all });

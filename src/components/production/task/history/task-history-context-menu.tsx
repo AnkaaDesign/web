@@ -6,7 +6,7 @@ import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFac
 import { useAnnouncePresenceForIds, useSendWarning } from "@/lib/attention";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
+import { getBudgetDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { useConfirm } from "../detail/use-confirm";
@@ -22,7 +22,7 @@ import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
-import { getTaskQuoteEditRoute } from "@/utils/task";
+import { getBudgetEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import {
   AlertDialog,
@@ -144,7 +144,7 @@ export function TaskHistoryContextMenu({
 
   // Per-item advanced menu permissions
   // COMMERCIAL is intentionally excluded from the layouts form: they get the
-  // quote-layout form instead (edits TaskQuote.layoutFileId, not task layouts)
+  // quote-layout form instead (edits Budget.layoutFileId, not task layouts)
   const canAccessLayouts = isAdmin || isDesigner || isProductionManager;
   const canAccessCutPlan = isAdmin || isDesigner || isProductionManager;
   const canAccessPaints = canAccessAdvancedMenu && !isDesigner;
@@ -224,7 +224,7 @@ export function TaskHistoryContextMenu({
   const handleEdit = () => {
     if (taskIds.length === 1) {
       if (isCommercial) {
-        navigate(getTaskQuoteEditRoute(task), { state: { returnTo } });
+        navigate(getBudgetEditRoute(task), { state: { returnTo } });
       } else {
         const editRoute =
           navigationRoute === 'preparation' ? routes.production.preparation.edit(taskIds[0]) :
@@ -696,14 +696,14 @@ export function TaskHistoryContextMenu({
 
           {/* Quote - ADMIN, FINANCIAL (single selection only).
               Hidden for COMMERCIAL: their "Editar" already routes to this same
-              quote page (getTaskQuoteEditRoute), so the entry would be redundant. */}
+              quote page (getBudgetEditRoute), so the entry would be redundant. */}
           {canViewQuote(user?.sector?.privileges || "") && !isBulk && !isCommercial && (
             <DropdownMenuItem onClick={() => {
-              navigate(getTaskQuoteEditRoute(task), { state: { returnTo } });
+              navigate(getBudgetEditRoute(task), { state: { returnTo } });
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />
-              <span className="truncate">{getTaskQuoteDisplayLabel(task.quote?.status)}</span>
+              <span className="truncate">{getBudgetDisplayLabel(task.quote?.status)}</span>
             </DropdownMenuItem>
           )}
 
@@ -858,7 +858,7 @@ export function TaskHistoryContextMenu({
         onConfirm={handleSetTermConfirm}
       />
 
-      {/* Quote Layout Modal (COMMERCIAL) — edits TaskQuote.layoutFileId */}
+      {/* Quote Layout Modal (COMMERCIAL) — edits Budget.layoutFileId */}
       <SetQuoteLayoutModal
         open={quoteLayoutModalOpen}
         onOpenChange={setQuoteLayoutModalOpen}

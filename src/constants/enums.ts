@@ -2887,6 +2887,18 @@ export enum TASK_QUOTE_STATUS {
 }
 
 /**
+ * NOME NOVO DO MESMO CICLO. A entidade passou a se chamar `Budget` na API
+ * (commit `9c31acaa`), que expôs `BUDGET_STATUS` como alias sem apagar o antigo.
+ * Aqui é igual: mesmo objeto, mesmos VALORES gravados (`"APPROVED"`, …).
+ *
+ * ⚠️ `TASK_QUOTE_STATUS` continua sendo a declaração e segue em uso nas telas —
+ * este alias existe para que o código novo já escreva o nome certo. Não troque
+ * os valores: há filtros salvos e linhas de changelog com eles.
+ */
+export const BUDGET_STATUS = TASK_QUOTE_STATUS;
+export type BUDGET_STATUS = TASK_QUOTE_STATUS;
+
+/**
  * O CICLO DO FATURAMENTO — `Billing.status`, derivado de `approvedAt` + das
  * parcelas por `BillingStatusCascadeService` no servidor. Ninguém o digita.
  *

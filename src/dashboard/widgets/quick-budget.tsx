@@ -1,4 +1,4 @@
-// Quick-budget widget — inline form that creates a Task + TaskQuote (Budget)
+// Quick-budget widget — inline form that creates a Task + Budget (Budget)
 // directly from the home dashboard. NO navigation to the full wizard.
 //
 // Mirrors the field set of /financeiro/orcamento/cadastrar grouped by step:
@@ -10,7 +10,7 @@
 // Submits in two calls (matching the wizard):
 //   1. createTaskAsync({ status: PREPARATION, customerId, name, details,
 //                        term, forecastDate, serialNumber })
-//   2. useCreateTaskQuote().mutateAsync({
+//   2. useCreateBudget().mutateAsync({
 //        taskId, expiresAt, status: PENDING,
 //        subtotal, total,
 //        customGuaranteeText, customForecastDays,
@@ -52,7 +52,7 @@ import {
 import { IconAdjustments, IconLayout } from "@tabler/icons-react";
 import { useCustomers } from "../../hooks/administration/use-customer";
 import { useTaskMutations } from "../../hooks/production/use-task";
-import { useCreateTaskQuote } from "../../hooks/production/use-task-quote";
+import { useCreateBudget } from "../../hooks/production/use-budget";
 import { WidgetCard } from "../components/widget-card";
 import { Section, SectionGroup, ToggleRow } from "./_shared";
 import {
@@ -123,7 +123,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
   const [services, setServices] = useState<ServiceLine[]>([{ description: "", amount: 0 }]);
 
   const { createAsync: createTaskAsync, isLoading: isTaskMutating } = useTaskMutations();
-  const createQuote = useCreateTaskQuote();
+  const createQuote = useCreateBudget();
 
   const customerOptions = useMemo(
     () =>

@@ -15,9 +15,9 @@ import {
   quotePerVehicleTotal,
   quoteVehicleCount,
 } from "@/utils/quote-tasks";
-import type { PaymentConfig } from "@/schemas/task-quote";
+import type { PaymentConfig } from "@/schemas/budget";
 import type { Task } from "@/types";
-import type { Billing, TaskQuoteCustomerConfig } from "@/types/task-quote";
+import type { Billing, BudgetPayer } from "@/types/budget";
 import type { Customer } from "@/types";
 
 /**
@@ -25,7 +25,7 @@ import type { Customer } from "@/types";
  * (Orçamentos e Faturamento).
  *
  * ⚠️ AS DUAS LISTAS DEIXARAM DE LISTAR A MESMA COISA. Orçamentos tem uma linha por
- * CONTRATO (`TaskQuote`) e Faturamento uma linha por COBRANÇA (`Billing`); nenhuma
+ * CONTRATO (`Budget`) e Faturamento uma linha por COBRANÇA (`Billing`); nenhuma
  * das duas lista tarefas. O que sobrou aqui é o que independe da unidade da linha —
  * as datas, o travessão, os conversores de filtro, o seletor de cliente — mais os
  * extratores que recebem uma LISTA DE PAGADORES e por isso servem às duas sem saber
@@ -78,7 +78,7 @@ const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 1
  * carregado — que é "a consulta não trouxe a relação", nunca "vale zero".
  */
 function sumConfigMoney(
-  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+  configs: readonly BudgetPayer[] | null | undefined,
   key: "total" | "subtotal",
 ): number | null {
   if (!configs || configs.length === 0) return null;
@@ -112,7 +112,7 @@ export function billingCoveredVehicles(billing: Billing): number {
  * O VALOR DESTA COBRANÇA — `Σ customerConfigs[].total`.
  *
  * ⚠️ NÃO se recalcula. A conta já foi feita e GRAVADA: `computeQuoteMoney`
- * produz `configTotal`, que é o mesmo número em `TaskQuoteCustomerConfig.total`,
+ * produz `configTotal`, que é o mesmo número em `BudgetPayer.total`,
  * em `Invoice.totalAmount` e na soma das parcelas. Refazê-la na célula criaria
  * uma segunda aritmética de dinheiro, que diverge da primeira no primeiro
  * arredondamento e faz a tela e o boleto discordarem em centavos.
@@ -162,7 +162,7 @@ export const dateExportValue = (date: Date | string | null | undefined) => (date
  * por definição, o recorte desta cobrança) e só a deduplicação sobrevive.
  */
 export function invoiceToCustomerNames(
-  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+  configs: readonly BudgetPayer[] | null | undefined,
 ): string[] {
   if (!configs || configs.length === 0) return [];
   const names = configs
@@ -175,7 +175,7 @@ export function invoiceToCustomerNames(
  * Uma cobrança pode ser dividida entre clientes, então a célula mostra os dois
  * primeiros lado a lado e um `+N` — o mesmo formato que as tabelas antigas usavam.
  */
-export function InvoiceToCustomersCell({ configs }: { configs?: readonly TaskQuoteCustomerConfig[] | null }) {
+export function InvoiceToCustomersCell({ configs }: { configs?: readonly BudgetPayer[] | null }) {
   const names = invoiceToCustomerNames(configs);
   if (names.length === 0) return <MutedDash />;
   if (names.length === 1) return <TruncatedTextWithTooltip text={names[0]} className="text-sm" />;
@@ -199,7 +199,7 @@ export function InvoiceToCustomersCell({ configs }: { configs?: readonly TaskQuo
  * conditions across a multi-customer quote are listed, deduped.
  */
 export function paymentMethodLabels(
-  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+  configs: readonly BudgetPayer[] | null | undefined,
 ): string[] {
   const seen = new Set<string>();
   for (const config of configs ?? []) {
@@ -226,7 +226,7 @@ export function paymentMethodLabels(
   return [...seen];
 }
 
-export function PaymentMethodCell({ configs }: { configs?: readonly TaskQuoteCustomerConfig[] | null }) {
+export function PaymentMethodCell({ configs }: { configs?: readonly BudgetPayer[] | null }) {
   const labels = paymentMethodLabels(configs);
   if (labels.length === 0) return <MutedDash />;
   return <TruncatedTextWithTooltip text={labels.join(", ")} className="text-sm" />;
@@ -242,7 +242,7 @@ export function PaymentMethodCell({ configs }: { configs?: readonly TaskQuoteCus
  * cobrança já é o recorte, então a soma dela é exata.
  */
 export function installmentProgress(
-  configs: readonly TaskQuoteCustomerConfig[] | null | undefined,
+  configs: readonly BudgetPayer[] | null | undefined,
 ): { paid: number; total: number } {
   let paid = 0;
   let total = 0;

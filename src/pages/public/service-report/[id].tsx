@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { pickPrimaryResponsible } from "@/types/responsible";
 import { useParams } from "react-router-dom";
-import { taskQuoteService } from "@/api-client/task-quote";
+import { budgetService } from "@/api-client/budget";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility";
@@ -121,7 +121,7 @@ export function PublicServiceReportPage() {
     if (!id) { setError("ID não fornecido."); setLoading(false); return; }
     try {
       setLoading(true);
-      const response = await taskQuoteService.getPublic(id);
+      const response = await budgetService.getPublic(id);
       if (response.data?.success && response.data?.data) {
         setQuote(response.data.data);
         setError(null);

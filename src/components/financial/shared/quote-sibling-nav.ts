@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useTasks, useTaskQuotes } from "@/hooks";
+import { useTasks, useBudgets } from "@/hooks";
 import { useBillings } from "@/hooks/financial/use-billing";
 import type { BillingListParams } from "@/api-client/billing";
 import { primaryTask } from "@/utils/quote-tasks";
@@ -10,7 +10,7 @@ import { primaryTask } from "@/utils/quote-tasks";
  *
  * Both pages are keyed by a TASK id and both are reachable from a dozen places that know nothing
  * about a list — a notification, a deep link, the reconciliation "Orçamento vinculado" badge, the
- * home dashboard, `getTaskQuoteEditRoute` on the task detail, a refresh, Back, "abrir em nova
+ * home dashboard, `getBudgetEditRoute` on the task detail, a refresh, Back, "abrir em nova
  * guia". The task detail solved this with `useTaskSiblingIds`: navigation state is a fast path,
  * and everything else RECONSTRUCTS the list. This is the same idea with one addition the task
  * page does not need.
@@ -32,7 +32,7 @@ import { primaryTask } from "@/utils/quote-tasks";
 /**
  * Ordered ids come back from one request, so the pager spans at most this many records.
  *
- * ⚠️ TEM DE CABER NO TETO DA ROTA. `/tasks` e `/task-quotes` aceitam mil, e
+ * ⚠️ TEM DE CABER NO TETO DA ROTA. `/tasks` e `/budgets` aceitam mil, e
  * `GET /billings` passou a aceitar mil pelo MESMO motivo: o teto anterior, de
  * duzentos, recortava a resposta sem dizer nada — nem no `meta`, nem num erro — e
  * o pager então afirmava "12 / 200" numa lista de 325. Subir um sem o outro é
@@ -133,7 +133,7 @@ export function useQuoteSiblingIds(
     const widened = list.map((t) => t.id);
     // The widened list is only an improvement if it actually CONTAINS this record. It may not:
     // past SIBLING_LIMIT rows, or when the user reached a record the canonical list does not carry
-    // (a quote-less task routed here by `getTaskQuoteEditRoute`, a not-yet-finished task opened
+    // (a quote-less task routed here by `getBudgetEditRoute`, a not-yet-finished task opened
     // from Faturamento). `useRecordNavigation` reports `total: 0` for an id it cannot find, which
     // would make the widget VANISH from under the cursor a moment after it appeared — strictly
     // worse than the page-scoped pager the user already had.
@@ -159,7 +159,7 @@ export function useQuoteSiblingIds(
  *
  * ⚠️ Função NOVA em vez de um parâmetro em `useQuoteSiblingIds`: o Faturamento
  * ainda lista tarefas e chama aquela com um `where` de Task. Mudar a assinatura
- * de lá é o caminho mais curto para mandar um `where` de TaskQuote para `/tasks`,
+ * de lá é o caminho mais curto para mandar um `where` de Budget para `/tasks`,
  * que é 400 na cara — ou, pior, filtro mudo.
  */
 export function useBudgetSiblingIds(
@@ -179,7 +179,7 @@ export function useBudgetSiblingIds(
     [JSON.stringify(state.listQuery ?? fallbackQuery)],
   );
 
-  const { data } = useTaskQuotes({
+  const { data } = useBudgets({
     ...params,
     enabled: !hasFastPath && !!currentTaskId,
     // Sem isto o hook é staleTime 0 e cada salto refaria a busca de 1000 linhas.
