@@ -7,6 +7,7 @@ import {
   IconClipboardList,
   IconCalendarEvent,
   IconReceipt2,
+  IconCash,
   IconListCheck,
   IconNote,
   IconPaint,
@@ -80,7 +81,7 @@ import { TaskWithServiceOrdersChangelog } from "@/components/ui/task-with-servic
 import { useConfirm } from "./use-confirm";
 import { useReason } from "./use-reason";
 import { TaskServiceOrderGroup } from "./service-orders-section";
-import { QuoteBillingBreakdown } from "./sections/quote-billing-section";
+import { BudgetBreakdown, BillingBreakdown } from "./sections/quote-billing-section";
 import { PaintsSection } from "./sections/paints-section";
 import { ResponsiblesSection } from "./sections/responsibles-section";
 import { TruckImplementMeasureSection } from "./sections/truck-implement-measure-section";
@@ -146,7 +147,7 @@ const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRI
  * é a do caminhão 1, e a tela do 37 mostraria o estado do 1. Casa pela cobertura
  * (`billing.tasks`) e só recua para a única cobrança quando ela é uma só.
  */
-function billingOfTask(task: Task): { status?: string | null } | null {
+function billingOfTask(task: Task): { id?: string; status?: string | null } | null {
   const configs = (task.quote as { customerConfigs?: any[] } | undefined)?.customerConfigs ?? [];
   const cobrindo = configs.find((c) =>
     (c?.billing?.tasks ?? []).some((bt: { taskId?: string }) => bt?.taskId === task.id),
@@ -918,19 +919,34 @@ function TaskDetailContent() {
         // Reschedule history sits with the dates (just below the forecast/date rows).
         render: (t: Task) => <ForecastHistoryCollapsible taskId={t.id} />,
       },
-      // Quote — status inline-editable (colored), value read-only; full billing breakdown below.
+      /**
+       * DUAS SEÇÕES, PORQUE SÃO DUAS COISAS.
+       *
+       * Era UM cartão cujo título ALTERNAVA: "Orçamento" enquanto pendente,
+       * "Faturamento" depois de aprovado. Isso descrevia o mundo em que o
+       * pagamento era um estado do orçamento — e esse mundo acabou em
+       * 16/09/2026, quando `Billing` virou entidade com ciclo, estado e tela
+       * próprios. Um cartão que troca de nome conforme o status afirma que a
+       * coisa VIROU outra; elas coexistem.
+       *
+       * O corte é pela pergunta: o que foi PROPOSTO (serviços, preço, prazo,
+       * garantia, layout, assinatura) contra o que vai ser COBRADO (pagador,
+       * condição, parcelas, boletos, notas).
+       *
+       * Os dois campos de status vão cada um para o seu cartão — que é o ponto
+       * de partida disto: o dono abriu uma tarefa com cobrança PENDENTE e leu
+       * "Aprovado", porque o único "Status" do cartão era o do orçamento.
+       */
+      // ORÇAMENTO — o que foi proposto.
       ...(showQuote && task?.quote && (task.quote.services?.length ?? 0) > 0
         ? [
             {
               id: "quote",
-              // Legacy toggled the title: a still-PENDING quote is an "Orçamento", once approved it
-              // becomes "Faturamento".
-              label: !task.quote.status || task.quote.status === TASK_QUOTE_STATUS.PENDING ? "Orçamento" : "Faturamento",
+              label: "Orçamento",
               icon: IconReceipt2,
               span: quoteSpan,
-              // The "Faturamento" title opens the in-app quote/billing DETAIL page; the header
-              // "Visualizar" action opens the PUBLIC, customer-facing quote view (by quote id) in a
-              // new tab (faithful to the legacy Visualizar button).
+              // O título abre o orçamento DENTRO do app; o "Visualizar" do
+              // cabeçalho abre a página PÚBLICA, a que o cliente vê.
               onTitleClick: (t: Task) => navigate(getBudgetEditRoute(t), { state: { returnTo } }),
               headerActions: (t: Task) => {
                 const q = t.quote;
@@ -950,7 +966,7 @@ function TaskDetailContent() {
                   </Button>
                 );
               },
-              render: (t: Task) => <QuoteBillingBreakdown task={t} />,
+              render: (t: Task) => <BudgetBreakdown task={t} />,
               fields: [
                 {
                   /**
@@ -1019,6 +1035,93 @@ function TaskDetailContent() {
                   dataType: "date" as const,
                   accessor: (t: Task) => (t.quote as { expiresAt?: Date } | undefined)?.expiresAt ?? null,
                 },
+                {
+                  id: "quoteStatus",
+                  // ⚠️ "Status" SOZINHO, num cartão chamado Faturamento, lia como
+                  // o estado da COBRANÇA — e é o do ORÇAMENTO. O dono abriu uma
+                  // tarefa cuja cobrança está PENDENTE e leu "Aprovado" aqui.
+                  // Os dois ciclos são separados desde 16/09/2026; o rótulo
+                  // precisa dizer de qual deles fala.
+                  label: "Status do Orçamento",
+                  dataType: "enum" as const,
+                  accessor: (t: Task) => t.quote?.status,
+                  edit: canEditQuote
+                    ? {
+                        get: (t: Task) => t.quote?.status ?? null,
+                        enum: {
+                          values: Object.values(TASK_QUOTE_STATUS),
+                          labels: TASK_QUOTE_STATUS_LABELS,
+                          variants: QUOTE_STATUS_VARIANTS,
+                          transitions: (current: string) => [current, ...getAvailableQuoteStatusTransitions(current as TASK_QUOTE_STATUS, role)],
+                        },
+                        beforeCommit: async (v: unknown, t: Task) => {
+                          quoteReasonRef.current = undefined;
+                          const next = v as TASK_QUOTE_STATUS;
+                          const current = t.quote?.status;
+                          // ⚠️ NÃO HÁ MAIS "aprovar faturamento" aqui, nem estorno de pagamento.
+                          // Os dois eram transições deste seletor porque o ciclo do pagamento
+                          // morava no enum do orçamento; aprovar cobrança é
+                          // `PUT /billings/:id/approve`, na tela de Faturamento, onde se vê O QUE
+                          // vai ser cobrado antes de emitir nota — e não num dropdown de detalhe
+                          // de tarefa.
+                          if (next === TASK_QUOTE_STATUS.PENDING && current && current !== TASK_QUOTE_STATUS.PENDING) {
+                            const reason = await askReason({
+                              title: "Rejeitar / reverter para Pendente",
+                              description: "Informe o motivo (mínimo 5 caracteres).",
+                              label: "Motivo",
+                              placeholder: "Motivo da rejeição...",
+                              required: true,
+                              minLength: 5,
+                              confirmLabel: "Confirmar",
+                            });
+                            if (reason === null) return false;
+                            // Safety net — the dialog already blocks Confirm until the reason is ≥5 chars.
+                            if (reason.trim().length < 5) return false;
+                            quoteReasonRef.current = reason.trim();
+                          }
+                          return true;
+                        },
+                        onCommit: async (v: unknown, t: Task) => {
+                          if (!t.quote) return;
+                          await budgetService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
+                          // A raw axios PUT bypasses react-query — invalidate the task detail, quote and
+                          // invoice caches so the change is reflected instead of leaving the UI stale.
+                          await Promise.all([
+                            queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+                            queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
+                            queryClient.invalidateQueries({ queryKey: invoiceKeys.all }),
+                          ]);
+                        },
+                      }
+                    : undefined,
+                },
+              ],
+            } as DetailSectionDef<Task>,
+          ]
+        : []),
+      // FATURAMENTO — o que vai ser cobrado.
+      //
+      // Mesma condição de exibição do Orçamento, de propósito: a condição de
+      // pagamento e o pagador são acordados JUNTO com a proposta e existem antes
+      // de qualquer cobrança ser aprovada. Esconder o cartão até haver fatura
+      // deixaria invisível justamente o que ainda dá para conferir a tempo.
+      ...(showQuote && task?.quote && (task.quote.services?.length ?? 0) > 0
+        ? [
+            {
+              id: "billing",
+              label: "Faturamento",
+              icon: IconCash,
+              span: quoteSpan,
+              // O título abre a cobrança QUE COBRE ESTE VEÍCULO — não a primeira
+              // do orçamento. Num orçamento cobrado veículo a veículo há uma por
+              // caminhão, e a do vizinho não diz nada sobre este. Sem cobrança
+              // ainda, não há para onde ir e o título não é clicável.
+              onTitleClick: (t: Task) => {
+                const billingId = billingOfTask(t)?.id;
+                if (billingId) navigate(routes.financial.billing.details(billingId), { state: { returnTo } });
+              },
+              render: (t: Task) => <BillingBreakdown task={t} />,
+              fields: [
                 {
                   id: "invoiceToCustomers",
                   // relation: without this the editor fell through to a TEXT input pre-filled with the
@@ -1097,67 +1200,7 @@ function TaskDetailContent() {
                       </div>
                     );
                   },
-                },
-                {
-                  id: "quoteStatus",
-                  // ⚠️ "Status" SOZINHO, num cartão chamado Faturamento, lia como
-                  // o estado da COBRANÇA — e é o do ORÇAMENTO. O dono abriu uma
-                  // tarefa cuja cobrança está PENDENTE e leu "Aprovado" aqui.
-                  // Os dois ciclos são separados desde 16/09/2026; o rótulo
-                  // precisa dizer de qual deles fala.
-                  label: "Status do Orçamento",
-                  dataType: "enum" as const,
-                  accessor: (t: Task) => t.quote?.status,
-                  edit: canEditQuote
-                    ? {
-                        get: (t: Task) => t.quote?.status ?? null,
-                        enum: {
-                          values: Object.values(TASK_QUOTE_STATUS),
-                          labels: TASK_QUOTE_STATUS_LABELS,
-                          variants: QUOTE_STATUS_VARIANTS,
-                          transitions: (current: string) => [current, ...getAvailableQuoteStatusTransitions(current as TASK_QUOTE_STATUS, role)],
-                        },
-                        beforeCommit: async (v: unknown, t: Task) => {
-                          quoteReasonRef.current = undefined;
-                          const next = v as TASK_QUOTE_STATUS;
-                          const current = t.quote?.status;
-                          // ⚠️ NÃO HÁ MAIS "aprovar faturamento" aqui, nem estorno de pagamento.
-                          // Os dois eram transições deste seletor porque o ciclo do pagamento
-                          // morava no enum do orçamento; aprovar cobrança é
-                          // `PUT /billings/:id/approve`, na tela de Faturamento, onde se vê O QUE
-                          // vai ser cobrado antes de emitir nota — e não num dropdown de detalhe
-                          // de tarefa.
-                          if (next === TASK_QUOTE_STATUS.PENDING && current && current !== TASK_QUOTE_STATUS.PENDING) {
-                            const reason = await askReason({
-                              title: "Rejeitar / reverter para Pendente",
-                              description: "Informe o motivo (mínimo 5 caracteres).",
-                              label: "Motivo",
-                              placeholder: "Motivo da rejeição...",
-                              required: true,
-                              minLength: 5,
-                              confirmLabel: "Confirmar",
-                            });
-                            if (reason === null) return false;
-                            // Safety net — the dialog already blocks Confirm until the reason is ≥5 chars.
-                            if (reason.trim().length < 5) return false;
-                            quoteReasonRef.current = reason.trim();
-                          }
-                          return true;
-                        },
-                        onCommit: async (v: unknown, t: Task) => {
-                          if (!t.quote) return;
-                          await budgetService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
-                          // A raw axios PUT bypasses react-query — invalidate the task detail, quote and
-                          // invoice caches so the change is reflected instead of leaving the UI stale.
-                          await Promise.all([
-                            queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-                            queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
-                            queryClient.invalidateQueries({ queryKey: invoiceKeys.all }),
-                          ]);
-                        },
-                      }
-                    : undefined,
-                },
+                },,
                 {
                   /**
                    * O ESTADO DA COBRANÇA — outro ciclo, outro enum, outra tela.
@@ -1187,7 +1230,7 @@ function TaskDetailContent() {
                     if (!billing?.status) return <span className="text-muted-foreground">—</span>;
                     return <BillingStatusBadge status={billing.status as never} />;
                   },
-                },
+                },,
               ],
             } as DetailSectionDef<Task>,
           ]

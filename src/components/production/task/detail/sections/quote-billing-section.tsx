@@ -105,7 +105,41 @@ function quoteClauseArgs(
  * deadline, guarantee, approved layout thumbnails and the customer signature. Returns null when
  * the task has no quote.
  */
-export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode {
+/**
+ * DUAS SEÇÕES, UM RENDERIZADOR.
+ *
+ * Orçamento e faturamento viraram entidades separadas em 16/09/2026 — ciclos,
+ * estados e telas próprios —, e o detalhe da tarefa continuava mostrando os dois
+ * num cartão só, com um título que alternava entre "Orçamento" e "Faturamento"
+ * conforme o status. O cartão dizia uma palavra e mostrava as duas coisas.
+ *
+ * O que separa os blocos é a pergunta que cada um responde:
+ *
+ *   ORÇAMENTO  — o que foi PROPOSTO: serviços, preço, desconto, total, prazo de
+ *                entrega, garantia, layout aprovado e a assinatura da proposta.
+ *   FATURAMENTO — o que vai ser COBRADO: pagador, condição de pagamento,
+ *                parcelas, boletos e notas fiscais.
+ *
+ * ⚠️ O CORPO CONTINUA NUM RENDERIZADOR SÓ, com `part` escolhendo os blocos.
+ * Copiá-lo em dois componentes duplicaria oitocentas linhas de JSX e, com elas,
+ * a derivação que decide QUAL fatia do orçamento pertence a este veículo
+ * (`configsForTask`, `coveredTaskCount`) — a regra mais delicada do arquivo, e a
+ * que já causou o caminhão 12 exibindo os sessenta blocos do orçamento inteiro.
+ * Uma cópia divergiria na primeira correção feita só de um lado.
+ *
+ * Cada seção tem o SEU filtro de cliente, e não um compartilhado: são cartões
+ * independentes agora, e um controle num cartão que mexe no outro é ação à
+ * distância. O custo é um `useState` repetido.
+ */
+export function BudgetBreakdown({ task }: { task: Task }): React.ReactNode {
+  return <QuoteBillingBreakdown task={task} part="budget" />;
+}
+
+export function BillingBreakdown({ task }: { task: Task }): React.ReactNode {
+  return <QuoteBillingBreakdown task={task} part="billing" />;
+}
+
+function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "billing" }): React.ReactNode {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const [quoteCustomerFilter, setQuoteCustomerFilter] = useState<string | null>(null);
@@ -209,6 +243,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Pricing items table */}
       {(() => {
+        if (part !== "budget") return null;
         const filteredServices = services.filter(
           (item) => !quoteCustomerFilter || item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId,
         );
@@ -346,6 +381,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Pricing Summary */}
       {(() => {
+        if (part !== "budget") return null;
         const configs = quote.customerConfigs || [];
         const hasConfigs = configs.length > 0;
 
@@ -466,7 +502,8 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
       })()}
 
       {/* Per-Customer Config Cards */}
-      {quote.customerConfigs &&
+      {part === "billing" &&
+        quote.customerConfigs &&
         quote.customerConfigs.length > 0 &&
         (() => {
           const configs = quoteCustomerFilter
@@ -668,7 +705,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
         })()}
 
       {/* Delivery Deadline */}
-      {(quote.customForecastDays || (quote.simultaneousTasks && quote.simultaneousTasks > 1)) && (
+      {part === "budget" && (quote.customForecastDays || (quote.simultaneousTasks && quote.simultaneousTasks > 1)) && (
         <div className="bg-muted/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
             <IconTruck className="h-4 w-4 text-muted-foreground" />
@@ -687,6 +724,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Payment Conditions */}
       {(() => {
+        if (part !== "billing") return null;
         const configs = quote.customerConfigs || [];
         // When filtering a specific customer, use that config's payment data
         if (quoteCustomerFilter) {
@@ -751,6 +789,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Boletos & NFS-e for single-customer case (not shown in per-customer cards) */}
       {(() => {
+        if (part !== "billing") return null;
         const configs = quote.customerConfigs || [];
         // Only show here when there's a single config and no customer filter (per-customer cards don't render)
         if (quoteCustomerFilter || configs.length !== 1) return null;
@@ -863,10 +902,11 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           depois canceladas cujo faturamento foi revertido (invoiceId → null). Os blocos acima
           leem apenas as notas da fatura viva, então sem isto uma nota que existiu de verdade
           na prefeitura simplesmente sumia da tela. Escopo de tarefa, renderizado uma vez. */}
-      <TaskNfseHistoryCard taskId={task.id} />
+      {part === "billing" && <TaskNfseHistoryCard taskId={task.id} />}
 
       {/* Guarantee */}
       {(() => {
+        if (part !== "budget") return null;
         const guaranteeText = generateGuaranteeText(quote);
         return guaranteeText ? (
           <div className="bg-muted/30 rounded-lg p-4">
@@ -880,7 +920,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
       })()}
 
       {/* Layout File Preview (the layoutFiles array) */}
-      {(quote.layoutFiles?.length ?? 0) > 0 && (
+      {part === "budget" && (quote.layoutFiles?.length ?? 0) > 0 && (
         <div className="bg-muted/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
             <IconPhoto className="h-4 w-4 text-muted-foreground" />
@@ -906,6 +946,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Customer Signature - read from the first config (or filtered config) */}
       {(() => {
+        if (part !== "budget") return null;
         const sigConfig = quoteCustomerFilter ? quote.customerConfigs?.find((c: any) => c.customerId === quoteCustomerFilter) : quote.customerConfigs?.[0];
         const configSig = sigConfig?.customerSignature;
         if (!configSig) return null;
@@ -933,7 +974,7 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
 
       {/* Assinatura eletrônica — mesmo painel da página de orçamento (status, link
           pessoal de cada signatário, WhatsApp, reenvio, PDF e hash). */}
-      <SignatureEnvelopeCard quoteId={quote.id} canManage={canManageSignature} embedded />
+      {part === "budget" && <SignatureEnvelopeCard quoteId={quote.id} canManage={canManageSignature} embedded />}
     </div>
   );
 }
