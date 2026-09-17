@@ -60,7 +60,7 @@ import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
-import { budgetService } from "../../../../api-client/budget";
+import { batchCreateTasksWithQuote } from "../../../../api-client/task";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -521,11 +521,26 @@ export const TaskCreateForm = () => {
           combinations.push({});
         }
 
-        // Create all tasks sequentially
-        // Each task gets its own individual layout instance
+        // ═══════════════════════════════════════════════════════════════════
+        // AS TAREFAS E O ORÇAMENTO — UM COMMIT SÓ, E UM ORÇAMENTO SÓ
+        // ═══════════════════════════════════════════════════════════════════
+        //
+        // Antes este laço gravava uma tarefa por combinação e, DENTRO dele, um
+        // orçamento por tarefa. Duas placas e dois números de série produziam
+        // quatro tarefas e QUATRO orçamentos: quatro números, quatro PDFs,
+        // quatro cerimônias de assinatura e quatro cobranças para o MESMO
+        // trabalho — que chega ao cliente como quatro propostas de um caminhão
+        // em vez de uma de quatro.
+        //
+        // Agora o laço só MONTA. Quem grava é `POST /tasks/batch-with-quote`,
+        // numa transação só: ou as N tarefas e o orçamento que as cobre nascem
+        // juntos, ou nada nasce. É o mesmo caminho da tela de criação de
+        // orçamento (`/financeiro/orcamento/criar`).
         let successCount = 0;
         let errorCount = 0;
-        let firstCreatedRepIds: string[] | undefined;
+        const createdTaskIds: string[] = [];
+        const effectiveCustomerId = customerId || undefined;
+        const taskPayloads: any[] = [];
 
         for (let i = 0; i < combinations.length; i++) {
           const { plate, serialNumber } = combinations[i];
@@ -535,69 +550,78 @@ export const TaskCreateForm = () => {
             ...truckData,
           });
 
-          // For the first task, include newResponsibles
-          // For subsequent tasks, use the created responsible IDs
+          // Os responsáveis NOVOS viajam UMA vez. O servidor os cria uma vez
+          // para o lote (deduplicados por nome + telefone) e liga o id em TODAS
+          // as tarefas — antes isso era uma dança de mandá-los na primeira
+          // requisição e reaproveitar os ids nas seguintes, que só existia
+          // porque as tarefas nasciam uma a uma.
           if (i === 0 && newResponsibles.length > 0) {
             (task as any).newResponsibles = newResponsibles;
-          } else if (i > 0 && firstCreatedRepIds && firstCreatedRepIds.length > 0) {
-            const existing = task.responsibleIds || [];
-            task.responsibleIds = [...existing, ...firstCreatedRepIds];
           }
 
-          try {
-            const result = await createAsync(task as any);
-            if (result?.success) {
-              successCount++;
+          taskPayloads.push(task);
+        }
 
-              // After first task, extract responsible IDs for subsequent tasks
-              if (i === 0) {
-                if (newResponsibles.length > 0 && result.data?.responsibles) {
-                  firstCreatedRepIds = result.data.responsibles
-                    .filter((r: any) => newResponsibles.some(nr => nr.name === r.name && nr.phone === r.phone))
-                    .map((r: any) => r.id);
-                }
+        // O ORÇAMENTO MÍNIMO — UM, para todos os veículos do lote. Só COMMERCIAL
+        // e ADMIN podem criá-lo pela API, e sem cliente não há a quem cobrar.
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+        const quoteData =
+          effectiveCustomerId && (isCommercialUser || isAdminUser)
+            ? {
+                status: "PENDING" as const,
+                billingSplit: "JOINT" as const,
+                subtotal: 0,
+                total: 0,
+                expiresAt: expiresAt.toISOString(),
+                customerConfigs: [{ customerId: effectiveCustomerId, subtotal: 0, total: 0 }],
+                services: [{ description: "A definir", amount: 0 }],
               }
+            : null;
 
-              // Auto-create a minimal Budget for the task (if it has a customer)
-              // Only COMMERCIAL and ADMIN can create quotes via the API
-              const createdTaskId = result.data?.id;
-              const effectiveCustomerId = customerId || result.data?.customerId;
-
-              // Create the task's airbrushings (each created task gets its own copies). Failure
-              // is non-blocking — the task itself already persisted.
-              if (createdTaskId && (data.airbrushings?.length ?? 0) > 0) {
-                try {
-                  await createAirbrushingsForTask(
-                    createdTaskId,
-                    data.airbrushings,
-                    effectiveCustomerId ? { id: effectiveCustomerId, name: "" } : undefined,
-                  );
-                } catch {
-                  toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
+        try {
+          if (quoteData) {
+            const created = await batchCreateTasksWithQuote({ tasks: taskPayloads, quote: quoteData });
+            for (const t of created?.data?.tasks ?? []) createdTaskIds.push(t.id);
+            successCount = createdTaskIds.length;
+          } else {
+            // Sem orçamento não há o que duplicar: as tarefas nascem uma a uma,
+            // como sempre nasceram.
+            for (const task of taskPayloads) {
+              try {
+                const result = await createAsync(task as any);
+                if (result?.success && result.data?.id) {
+                  createdTaskIds.push(result.data.id);
+                  successCount++;
+                } else {
+                  errorCount++;
                 }
+              } catch {
+                errorCount++;
               }
-              if (createdTaskId && effectiveCustomerId && (isCommercialUser || isAdminUser)) {
-                const expiresAt = new Date();
-                expiresAt.setDate(expiresAt.getDate() + 30);
-                try {
-                  await budgetService.create({
-                    taskId: createdTaskId,
-                    subtotal: 0,
-                    total: 0,
-                    expiresAt: expiresAt.toISOString(),
-                    customerConfigs: [{ customerId: effectiveCustomerId, subtotal: 0, total: 0 }],
-                    services: [{ description: 'A definir', amount: 0 }],
-                  });
-                } catch {
-                  // Quote creation failure is non-blocking — task was created successfully
-                  toast.warning("Tarefa criada, mas não foi possível criar o orçamento automaticamente.");
-                }
-              }
-            } else {
-              errorCount++;
             }
-          } catch (error) {
-            errorCount++;
+          }
+        } catch {
+          // TUDO OU NADA. A rota atômica não deixa tarefa órfã para trás, então
+          // o lote inteiro conta como falha. O aviso de erro vem do
+          // interceptador do axios.
+          errorCount = combinations.length;
+        }
+
+        // As aerografias vêm DEPOIS e são não-bloqueantes: são entidades
+        // próprias, com o seu ciclo de pagamento, e uma falha ali não pode
+        // desfazer a tarefa e o orçamento que já existem.
+        if ((data.airbrushings?.length ?? 0) > 0) {
+          for (const createdTaskId of createdTaskIds) {
+            try {
+              await createAirbrushingsForTask(
+                createdTaskId,
+                data.airbrushings,
+                effectiveCustomerId ? { id: effectiveCustomerId, name: "" } : undefined,
+              );
+            } catch {
+              toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
+            }
           }
         }
 

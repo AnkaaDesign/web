@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useTaskMutations, useTaskBatchMutations, useTaskDetail } from "../../../../hooks";
+import { batchCreateTasksWithQuote } from "@/api-client/task";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, PAYMENT_CONDITION } from "../../../../constants";
 import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
@@ -172,20 +173,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
     const truckData = sourceTask.truck;
 
-    // A DUPLICATA É DE UM VEÍCULO, a origem pode ser de sessenta.
-    //
-    // `quote.total` é o valor do CONTRATO desde o orçamento multitarefa. Copiado
-    // cru, a cópia de um caminhão nasceria cobrando pelos sessenta.
-    //
-    // O divisor de CADA FATURA é a COBERTURA dela, não o modo: uma fatura de um
-    // veículo divide por 1, uma de lote por k, a conjunta por N. Ler
-    // `billingSplit === "PER_TASK"` dava 1 para tudo que não fosse "separado" —
-    // e num orçamento em lotes isso copiaria o valor de vinte caminhões para uma
-    // tarefa só.
-    const sourceVehicleCount = quoteVehicleCount(sourceTask.quote);
-    const configVehicleCount = (config: any) =>
-      coveredTaskCount(config) || sourceVehicleCount;
-
     return {
       // Basic fields
       name: sourceTask.name,
@@ -255,55 +242,77 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
           }
         : null,
 
-      // Quote (creates NEW record with same values, budget number auto-incremented by API)
-      ...(sourceTask.quote && sourceTask.quote.services?.length > 0
-        ? {
-            quote: {
-              status: 'PENDING' as const,
-              services: sourceTask.quote.services.map((item: any) => ({
-                description: item.description,
-                amount: Number(item.amount) || 0,
-                observation: item.observation || null,
-              })),
-              // O VALOR DE UM VEÍCULO. A duplicata é de uma tarefa só, e desde o
-              // orçamento multitarefa `quote.total` é o valor do CONTRATO
-              // (`por veículo × N`): copiá-lo cru fazia a cópia de um caminhão
-              // nascer cobrando pelos sessenta. (A API recalcula ao gravar, mas o
-              // que sai daqui é o que o operador confere na tela.)
-              subtotal: perVehicleAmount(sourceTask.quote.subtotal, sourceVehicleCount),
-              total: perVehicleAmount(sourceTask.quote.total, sourceVehicleCount),
-              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-              guaranteeYears: sourceTask.quote.guaranteeYears != null ? Number(sourceTask.quote.guaranteeYears) : null,
-              customGuaranteeText: sourceTask.quote.customGuaranteeText,
-              customForecastDays: sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
-              simultaneousTasks: sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
-              layoutFileIds: (sourceTask.quote.layoutFiles || []).map((f: any) => f.id),
-              // UMA configuração por CLIENTE. Num orçamento `PER_TASK` há uma por
-              // VEÍCULO, todas do mesmo cliente: mandá-las todas para uma tarefa
-              // só criaria sessenta fatias conjuntas do mesmo cliente, e a segunda
-              // já violaria o índice parcial que garante uma fatia conjunta por
-              // cliente — 500 na criação.
-              customerConfigs: firstConfigPerCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
-                customerId: config.customerId,
-                subtotal: perVehicleAmount(config.subtotal, configVehicleCount(config)),
-                total: perVehicleAmount(config.total, configVehicleCount(config)),
-                discountType: config.discountType || 'NONE',
-                discountValue: config.discountValue != null ? Number(config.discountValue) : null,
-                discountReference: config.discountReference || null,
-                customPaymentText: config.customPaymentText || null,
-                responsibleId: config.responsibleId || null,
-                paymentCondition: normalizePaymentCondition(config.paymentCondition),
-                paymentConfig: config.paymentConfig || null,
-                generateInvoice: config.generateInvoice ?? true,
-                generateBankSlip: config.generateBankSlip ?? true,
-              })) || [],
-            },
-          }
-        : {}),
-
       // Observation is NOT copied (per business requirement)
       // Cuts are NOT duplicated (separate workflow)
       // Airbrushings are NOT duplicated (separate workflow)
+    };
+  };
+
+  /**
+   * O ORÇAMENTO DAS CÓPIAS — UM SÓ, PARA TODAS ELAS.
+   *
+   * Cada cópia levava o seu próprio `quote` embutido, e `POST /tasks/batch` cria
+   * um orçamento por tarefa que o traz. Cinco números de série viravam cinco
+   * orçamentos: cinco números, cinco PDFs, cinco cerimônias de assinatura e
+   * cinco cobranças para o mesmo trabalho, que o cliente recebe como cinco
+   * propostas de um caminhão em vez de uma de cinco.
+   *
+   * Agora o orçamento é montado UMA vez, aqui, e viaja no topo do corpo de
+   * `POST /tasks/batch-with-quote` — o mesmo caminho que a tela de criação de
+   * orçamento usa. As N cópias e o orçamento nascem no mesmo commit.
+   *
+   * ⚠️ UMA configuração por CLIENTE, e não uma por veículo. Quem reparte a
+   * cobertura é o SERVIDOR (`planCoverage`): com `JOINT` ele cria um faturamento
+   * cobrindo as N cópias, com `PER_TASK` cria N de uma cópia cada. Mandar as N
+   * daqui duplicaria a fatia conjunta do mesmo cliente e violaria o índice
+   * parcial que garante uma só.
+   */
+  const buildSharedQuote = () => {
+    if (!sourceTask?.quote || !(sourceTask.quote.services?.length > 0)) return null;
+
+    // O VALOR É POR VEÍCULO. Desde o orçamento multitarefa `quote.total` é o
+    // valor do CONTRATO (`por veículo × N`); copiá-lo cru faria cinco cópias
+    // nascerem cobrando pelos sessenta do orçamento de origem. A API multiplica
+    // de volta pelo número de tarefas do lote (ver `computeQuoteMoney`).
+    //
+    // O divisor de CADA FATURA é a COBERTURA dela, não o modo: uma fatura de um
+    // veículo divide por 1, uma de lote por k, a conjunta por N.
+    const sourceVehicleCount = quoteVehicleCount(sourceTask.quote);
+    const configVehicleCount = (config: any) => coveredTaskCount(config) || sourceVehicleCount;
+
+    return {
+      status: 'PENDING' as const,
+      billingSplit: (sourceTask.quote as any).billingSplit ?? 'JOINT',
+      services: sourceTask.quote.services.map((item: any) => ({
+        description: item.description,
+        amount: Number(item.amount) || 0,
+        observation: item.observation || null,
+      })),
+      subtotal: perVehicleAmount(sourceTask.quote.subtotal, sourceVehicleCount),
+      total: perVehicleAmount(sourceTask.quote.total, sourceVehicleCount),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      guaranteeYears: sourceTask.quote.guaranteeYears != null ? Number(sourceTask.quote.guaranteeYears) : null,
+      customGuaranteeText: sourceTask.quote.customGuaranteeText,
+      customForecastDays:
+        sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
+      simultaneousTasks:
+        sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
+      layoutFileIds: (sourceTask.quote.layoutFiles || []).map((f: any) => f.id),
+      customerConfigs:
+        firstConfigPerCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
+          customerId: config.customerId,
+          subtotal: perVehicleAmount(config.subtotal, configVehicleCount(config)),
+          total: perVehicleAmount(config.total, configVehicleCount(config)),
+          discountType: config.discountType || 'NONE',
+          discountValue: config.discountValue != null ? Number(config.discountValue) : null,
+          discountReference: config.discountReference || null,
+          customPaymentText: config.customPaymentText || null,
+          responsibleId: config.responsibleId || null,
+          paymentCondition: normalizePaymentCondition(config.paymentCondition),
+          paymentConfig: config.paymentConfig || null,
+          generateInvoice: config.generateInvoice ?? true,
+          generateBankSlip: config.generateBankSlip ?? true,
+        })) || [],
     };
   };
 
@@ -315,8 +324,16 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       setIsSubmitting(true);
 
       let success = false;
+      const quote = buildSharedQuote();
 
-      if (tasksToCreate.length === 1) {
+      if (quote) {
+        // TUDO OU NADA, E UM ORÇAMENTO SÓ. Antes o orçamento vinha embutido em
+        // cada tarefa e o servidor criava um por cópia; agora as N cópias e o
+        // orçamento que as cobre nascem na mesma transação.
+        const result = await batchCreateTasksWithQuote({ tasks: tasksToCreate, quote });
+        success = result.success;
+      } else if (tasksToCreate.length === 1) {
+        // A origem não tem orçamento — não há o que copiar, e a cópia nasce só.
         const result = await createAsync(tasksToCreate[0]);
         success = result.success;
       } else {
