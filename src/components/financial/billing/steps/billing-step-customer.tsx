@@ -588,8 +588,18 @@ export function BillingStepCustomer({
                 mostrar só as cobranças do veículo aberto: abrir o caminhão da
                 terceira fatia não montava o passo de índice 0, e o controle de
                 junto/separado/lotes SUMIA da tela. Agora quem decide é a página,
-                que sabe qual é o primeiro passo VISÍVEL. */}
-            {showBillingSplit && (
+                que sabe qual é o primeiro passo VISÍVEL.
+
+                ⚠️ A CONTAGEM DE VEÍCULOS ENTRA NA CONDIÇÃO, e não só dentro do
+                componente. `BillingSplitField` devolve `null` com um veículo — o
+                comentário acima já dizia isso —, mas o INVÓLUCRO continuava
+                sendo renderizado: um item de flex com `flex-1 min-w-[260px]` e
+                nada dentro. O resultado era um buraco de 260px no meio da linha
+                "Faturamento e Pagamento", entre "Gerar Boleto" e "Condição de
+                Pagamento", em todo orçamento de UM veículo — que é a esmagadora
+                maioria. Quem decide não renderizar tem de ser quem ocupa o
+                espaço. */}
+            {showBillingSplit && (vehicles?.length ?? 0) > 1 && (
               <div className="flex-1 min-w-[260px]">
                 <BillingSplitField
                   vehicles={vehicles ?? []}

@@ -619,8 +619,16 @@ export function BudgetStepCustomerPayment({
                 diferente), e repeti-la por passo faria a segunda cópia
                 sobrescrever a primeira sem que ninguém notasse. Com um veículo
                 só o componente não renderiza nada — a pergunta não existe.
+
+                ⚠️ E A CONTAGEM ENTRA NA CONDIÇÃO, não só dentro do componente.
+                `BillingSplitField` devolve `null` com um veículo, mas o
+                INVÓLUCRO continuava sendo renderizado: um item de flex com
+                `flex-1 min-w-[260px]` e nada dentro, ou seja, um buraco de 260px
+                no meio da linha em todo orçamento de UM veículo — que é a
+                esmagadora maioria. Quem decide não renderizar tem de ser quem
+                ocupa o espaço. (Defeito gêmeo em `billing-step-customer`.)
                 ═════════════════════════════════════════════════════════════ */}
-            {configIndex === 0 && (
+            {configIndex === 0 && ((existingVehicles?.length ?? 0) > 1 || (vehicleCount ?? 0) > 1) && (
               <div className="flex-1 min-w-[260px]">
                 <BillingSplitField
                   vehicles={existingVehicles ?? []}

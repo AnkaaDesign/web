@@ -252,6 +252,37 @@ export function BillingStepInfo({
             // remover. O chip repetia o nome e dizia menos — dois lugares para a
             // mesma informação, e o de baixo é o que responde "dá para emitir?".
             hideDefaultBadges
+            // ⚠️ O GATILHO DIZ O NOME, não "1 selecionado".
+            //
+            // Sem `renderValue` o modo múltiplo cai na contagem genérica — e num
+            // faturamento com UM cliente, que é a esmagadora maioria, o campo
+            // informava exatamente nada: "1 selecionado" ao lado de um bloco
+            // "Responsável" que mostra o nome da pessoa. O nome está aqui do
+            // lado, nos cartões logo abaixo; faltava no lugar onde o olho bate
+            // primeiro.
+            //
+            // O nome sai dos CONFIGS (e do cache), não de `selectedOptions`: numa
+            // busca assíncrona o cliente já escolhido pode não estar na página
+            // carregada, e o rótulo sairia vazio justamente no caso em que a tela
+            // abre com um cliente salvo.
+            renderValue={() => {
+              if (selectedCustomerIds.length === 0) {
+                return <span className="opacity-70">Selecione os clientes para faturamento</span>;
+              }
+              const nameOf = (c: any) => {
+                const cached = customersCache.current.get(c.customerId);
+                return (
+                  c.customerData?.corporateName ||
+                  c.customerData?.fantasyName ||
+                  cached?.corporateName ||
+                  cached?.fantasyName ||
+                  "Cliente"
+                );
+              };
+              const first = nameOf(customerConfigs[0]);
+              const rest = selectedCustomerIds.length - 1;
+              return <span className="truncate">{rest > 0 ? `${first} +${rest}` : first}</span>;
+            }}
             value={selectedCustomerIds}
             onValueChange={handleCustomerChange}
             async={true}
@@ -401,6 +432,26 @@ export function BillingStepInfo({
                           <div className="text-xs text-muted-foreground">{formatBrazilianPhone(selectedResp.phone)}</div>
                         )}
                       </div>
+                      {/* A LIXEIRA QUE FALTAVA. O cartão do cliente, três blocos
+                          acima, tem a dele; este não tinha, e os dois cartões são
+                          visualmente o mesmo objeto — o mesmo fundo, o mesmo
+                          recorte, o mesmo lugar na página. Tirar o responsável
+                          exigia abrir o combobox e achar o "x", que é outro alvo,
+                          noutro lugar, para a mesma ação. */}
+                      {!disabled && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setValue(`customerConfigs.${idxReal(i)}.responsibleId`, null, {
+                              shouldDirty: true,
+                            })
+                          }
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
