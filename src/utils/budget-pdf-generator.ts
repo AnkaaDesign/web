@@ -8,7 +8,7 @@ import {
   formatBillingLocalityLine,
 } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
-import { coveredTaskCount, orderNumberLabel } from "./quote-tasks";
+import { coveredTaskCount } from "./quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
@@ -449,10 +449,6 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
       municipalRegistration: (task.customer as any)?.municipalRegistration || null,
       addressLine: formatBillingStreetLine(task.customer as any),
       addressLocality: formatBillingLocalityLine(task.customer as any),
-      // O pedido de compra é do VEÍCULO (`Task.customerOrderNumber`): numa nota
-      // conjunta o documento cita os números dos caminhões que ela cobre, sem
-      // repetir os iguais.
-      orderNumber: orderNumberLabel(pdfVehicles ?? []),
     },
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
@@ -548,7 +544,11 @@ export interface BudgetHtmlData {
     municipalRegistration?: string | null;
     addressLine?: string | null;
     addressLocality?: string | null;
-    orderNumber?: string | null;
+    // ⚠️ SEM `orderNumber`. O pedido de compra é do VEÍCULO desde
+    // `20260909170000` e tem COLUNA PRÓPRIA na tabela de veículos, que mostra
+    // qual pedido é de qual caminhão. Aqui ele vinha achatado num rótulo só —
+    // e, pior, era passado e nunca renderizado: dado morto que sugeria ao
+    // próximo leitor que o quadro do tomador o exibisse.
   } | null;
   simultaneousTasks?: number | null;
   customerFilter?: string | null; // Customer ID to filter services by

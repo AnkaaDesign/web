@@ -21,9 +21,9 @@ import { QuoteVehicleTable } from "@/components/public/quote-vehicle-table";
 import {
   quoteTasks,
   primaryTask,
-  orderNumberLabel,
   hasMultipleCustomers,
   coveredTaskIds,
+  coverageSummary,
   quoteVehicleCount,
 } from "@/utils/quote-tasks";
 import { COMPANY_INFO, BRAND_COLORS, BILLING_CONTACT, receivingAccountFor, whatsappLinkFor } from "@/config/company";
@@ -301,10 +301,64 @@ export function PublicServiceReportPage() {
     .flatMap((c: any) => c.installments || [])
     .sort((a: any, b: any) => a.number - b.number);
 
-  // One payment clause per config on show — a single block normally, one per
-  // customer in Completo (mirroring the budget page).
-  const paymentBlocks = relevantConfigs
-    .map((config: any) => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UM BLOCO POR PLANO, NÃO POR FATURA
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Era `relevantConfigs.map(...)`: um bloco por fatia de faturamento. Num
+  // orçamento `PER_TASK` de quatro caminhões do MESMO cliente isso rendia quatro
+  // quadros do tomador idênticos — mesma razão social, mesmo CNPJ, mesmas
+  // inscrições, mesmo endereço — cada um seguido da mesma cláusula, palavra por
+  // palavra. Com sessenta caminhões seriam sessenta. O documento repetia a
+  // mesma informação e não acrescentava nada em nenhuma repetição.
+  //
+  // O PDF do dossiê nunca fez isso: ele agrupa as fatias por TERMOS + TAMANHO DA
+  // COBERTURA e emite uma cláusula por grupo (ver `sliceKey` em
+  // `signature-envelope.service.ts`). Esta página é o MESMO documento noutro
+  // meio, e divergir dele é o defeito.
+  //
+  // A CHAVE É A DE LÁ, mais o CLIENTE. No PDF o quadro do tomador é um só
+  // porque o documento é recortado por cliente; aqui o "Completo" mostra todos,
+  // e agrupar sem o cliente fundiria duas empresas diferentes que por acaso
+  // pagam igual num quadro só.
+  //
+  // ⚠️ O QUE NÃO SE AGRUPA: as PARCELAS. Cada fatia tem as suas, com as suas
+  // datas — em `PER_TASK` o financeiro aprova veículo a veículo e cada fatura
+  // ganha o seu calendário. Uma tabela por fatia, rotulada pela cobertura
+  // quando há mais de uma, exatamente como o `paymentSchedule` do PDF.
+  const clauseKey = (config: any): string =>
+    JSON.stringify([
+      config?.customerId ?? config?.customer?.id ?? null,
+      config?.discountType ?? "NONE",
+      config?.discountValue != null ? Number(config.discountValue) : null,
+      config?.paymentCondition ?? null,
+      config?.customPaymentText ?? null,
+      // O vencimento da 1ª parcela fica DE FORA, como no servidor: em `PER_TASK`
+      // cada fatia ganha a sua data, e isso quebraria a frase única em sessenta
+      // por uma diferença que a própria cláusula já resolve citando a primeira.
+      config?.paymentConfig ?? null,
+      coveredTaskIds(config).length,
+    ]);
+
+  const clauseGroups: any[][] = [];
+  const groupByKey = new Map<string, any[]>();
+  for (const config of relevantConfigs) {
+    const key = clauseKey(config);
+    let group = groupByKey.get(key);
+    if (!group) {
+      group = [];
+      groupByKey.set(key, group);
+      clauseGroups.push(group);
+    }
+    group.push(config);
+  }
+
+  const paymentBlocks = clauseGroups
+    .map((group: any[]) => {
+      // A fatia que representa o grupo. Todas têm os mesmos termos e o mesmo
+      // cliente por construção da chave, então qualquer uma serve para a
+      // cláusula e para o quadro do tomador.
+      const config: any = group[0];
       const configInstallments = (config?.installments || [])
         .slice()
         .sort((a: any, b: any) => a.number - b.number);
@@ -359,20 +413,14 @@ export function PublicServiceReportPage() {
           vehicleCount: quoteVehicleCount(quote as any),
           coveredVehicleCount: coveredTaskIds(config).length || undefined,
         }),
-        // O PEDIDO DE COMPRA DO CLIENTE, mostrado junto das condições de
-        // pagamento, exatamente como na página do orçamento.
+        // ⚠️ O Nº DO PEDIDO SAIU DAQUI, como já saíra do PDF.
         //
-        // Mora na TAREFA (`Task.customerOrderNumber`) e responde pela COBERTURA
-        // desta fatura: o pedido do caminhão quando ela cobra um, os do lote
-        // quando cobra vinte, os N quando é conjunta — como `orderNumberLabel`
-        // monta na nota. Era `config.taskId`, coluna removida em
-        // `20260913120000_billing_coverage`.
-        orderNumber: (() => {
-          const covered = new Set(coveredTaskIds(config));
-          const all = quoteTasks<any>(quote);
-          const own = covered.size > 0 ? all.filter((t: any) => covered.has(t.id)) : [];
-          return orderNumberLabel(own.length > 0 ? own : all);
-        })(),
+        // Ele identifica a ENTREGA, não a cobrança, e mora na TAREFA desde
+        // `20260909170000` — um orçamento de quatro caminhões pode ter quatro
+        // pedidos diferentes. A tabela de veículos, no alto desta mesma página,
+        // tem coluna própria para ele e mostra qual pedido é de qual caminhão.
+        // Repeti-lo aqui, achatado num rótulo só, dizia menos e sugeria que
+        // fosse do faturamento.
         // AS PARCELAS EMITIDAS, com data e valor — e a conta que as recebe.
         //
         // ⚠️ Esta página dizia explicitamente "No parcela-by-parcela table: the
@@ -386,12 +434,31 @@ export function PublicServiceReportPage() {
         //
         // Nada é projetado: sai das parcelas que EXISTEM. Sem faturamento
         // aprovado a tabela não aparece e a frase continua sozinha, como sempre.
-        installments: configInstallments.map((inst: any) => ({
-          number: inst.number,
-          dueDate: inst.dueDate,
-          amount: Number(inst.amount ?? 0),
-          paid: inst.status === "PAID",
-        })),
+        // UMA TABELA POR FATIA — ver a nota do agrupamento acima. O rótulo só
+        // aparece quando há mais de uma: com uma só, a tabela sai sem título,
+        // como sempre saiu.
+        schedules: group
+          .map((slice: any) => {
+            const rows = ((slice?.installments || []) as any[])
+              .slice()
+              .sort((a: any, b: any) => a.number - b.number)
+              .map((inst: any) => ({
+                number: inst.number,
+                dueDate: inst.dueDate,
+                amount: Number(inst.amount ?? 0),
+                paid: inst.status === "PAID",
+              }));
+            if (rows.length === 0) return null;
+            return {
+              id: slice?.id,
+              label:
+                group.length > 1
+                  ? coverageSummary(slice, quoteVehicleCount(quote as any), quoteTasks<any>(quote))
+                  : null,
+              installments: rows,
+            };
+          })
+          .filter((b): b is NonNullable<typeof b> => b !== null),
         // A conta sai da forma REAL da parcela — a mesma fonte da frase logo
         // acima (`paymentMethod`), para que o documento não se contradiga: o
         // dossiê do nº 0915 chegou a dizer "via boleto" na frase e "Pagamento via
@@ -419,7 +486,7 @@ export function PublicServiceReportPage() {
         })(),
       };
     })
-    .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);
+    .filter((block: { paymentText: string; schedules: unknown[] }) => block.paymentText || block.schedules.length > 0);
 
   // All installments that have a bank slip
   const bankSlipInstallments = installments
@@ -895,8 +962,11 @@ export function PublicServiceReportPage() {
                     id?: string;
                     customerName: string | null;
                     paymentText: string;
-                    orderNumber: string | null;
-                    installments: Array<{ number: number; dueDate: string | Date; amount: number; paid: boolean }>;
+                    schedules: Array<{
+                      id?: string;
+                      label: string | null;
+                      installments: Array<{ number: number; dueDate: string | Date; amount: number; paid: boolean }>;
+                    }>;
                     pix: { key: string; keyKind: string; holder: string } | null;
                     billing: {
                       corporateName: string | null;
@@ -950,19 +1020,20 @@ export function PublicServiceReportPage() {
                       {block.paymentText && (
                         <p className="border-t border-gray-200 pt-3 text-gray-700">{block.paymentText}</p>
                       )}
-                      {block.orderNumber && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          <span className="font-semibold">N° do Pedido:</span> {block.orderNumber}
-                        </p>
-                      )}
-
-                      {block.installments.length > 0 && (
-                        <table className="mt-3 w-full border-collapse text-sm">
+                      {block.schedules.map((sched, si) => (
+                        <div key={sched.id || si} className="mt-3">
+                          {/* O rótulo só existe quando a cláusula cobre mais de
+                              uma fatura: ele diz DE QUAIS caminhões são estas
+                              datas. Com uma só, a tabela sai sem título. */}
+                          {sched.label && (
+                            <p className="mb-1 text-sm font-semibold text-gray-800">{sched.label}</p>
+                          )}
+                          <table className="w-full border-collapse text-sm">
                           <tbody>
-                            {block.installments.map((inst) => (
+                            {sched.installments.map((inst) => (
                               <tr key={inst.number} className="border-b border-dotted border-gray-300 last:border-0">
                                 <td className="py-1.5 pr-4 text-gray-700">
-                                  Parcela {inst.number}/{block.installments.length} – vencimento em{" "}
+                                  Parcela {inst.number}/{sched.installments.length} – vencimento em{" "}
                                   {formatDate(inst.dueDate)}
                                   {inst.paid && (
                                     <span className="ml-1.5 text-xs font-semibold" style={{ color: COMPANY.primaryGreen }}>
@@ -977,7 +1048,8 @@ export function PublicServiceReportPage() {
                             ))}
                           </tbody>
                         </table>
-                      )}
+                        </div>
+                      ))}
 
                       {block.pix && (
                         <div className="mt-4 border-t border-gray-200 pt-3">
