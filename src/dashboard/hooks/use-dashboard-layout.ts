@@ -8,7 +8,7 @@
 // to /preferences/:id; discardAndExit() restores from the snapshot.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useAuth } from "../../contexts/auth-context";
 import { usePrivileges } from "../../hooks/common/use-privileges";
 import { useMyPreferences } from "./use-my-preferences";

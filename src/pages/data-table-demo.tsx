@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { IconCash, IconEdit, IconExternalLink, IconInfoCircle, IconTrash } from "@tabler/icons-react";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { Badge } from "@/components/ui/badge";
@@ -245,7 +245,7 @@ export function DataTableDemoPage() {
           icon: IconInfoCircle,
           variant: "outline",
           onClick: () =>
-            toast.message("Tabela de demonstração", {
+            toast.info("Tabela de demonstração", {
               description:
                 "Clique numa linha → detalhe. Arraste as bordas para redimensionar, arraste o cabeçalho para reordenar, clique para ordenar (múltiplas), botão direito para o menu, fixe linhas no topo.",
             }),

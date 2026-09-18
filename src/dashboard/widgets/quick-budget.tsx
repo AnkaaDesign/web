@@ -28,7 +28,7 @@ import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useTaskPermissions } from "@/hooks/common/use-task-permissions";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   IconReceipt,
   IconPlus,

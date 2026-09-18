@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { useGoalMutations, useUpsertGoalYear } from "@/hooks/administration/use-goal";
 import { GOAL_METRIC, GOAL_METRIC_UNIT } from "@/constants";
