@@ -4,7 +4,6 @@
  *
  * Used by:
  * - Budget public page (src/pages/public/budget/[id].tsx)
- * - Budget PDF generator (src/utils/budget-pdf-generator.ts)
  */
 export const COMPANY_INFO = {
   name: "Ankaa Design",
@@ -38,29 +37,33 @@ export const BRAND_COLORS = {
 } as const;
 
 /**
- * NFS-e issuer data — Prefeitura de Ibiporã / Elotech OXY (the real DANFS-e the
- * integration emits). These values are transcribed verbatim from an authorized
- * NFS-e PDF so the pre-emission preview matches the document the prefeitura
- * actually produces. The `numeroNfse`, código de verificação, chave de acesso
- * and final ISS values only exist AFTER emission — the preview shows those as
- * "a ser atribuído".
+ * NFS-e issuer data — o PRESTADOR como o DANFSe nacional o imprime.
+ *
+ * A Elotech/Prefeitura de Ibiporã migrou a emissão para o **padrão nacional**
+ * (Nota Técnica nº 008 SE/CGNFS-e), e com ele saíram do documento o brasão da
+ * prefeitura, o cabeçalho da Secretaria de Fazenda, os campos de RPS e o site
+ * de autenticidade — por isso esses dados não moram mais aqui. O que o
+ * documento nacional pede do emitente é o que está abaixo.
+ *
+ * `numeroNfse`, chave de acesso, número/série da DPS e o QR Code só existem
+ * DEPOIS da emissão — a prévia os mostra como "a ser atribuída".
  *
  * Used by:
  * - NFS-e preview (src/components/financial/billing/preview/nfse-preview.tsx)
  */
 export const NFSE_ISSUER = {
-  municipio: "PREFEITURA DO MUNICÍPIO DE IBIPORÃ",
-  secretaria: "SECRETARIA MUNICIPAL DE FAZENDA",
-  municipioEndereco: "PADRE VITORIANO VALENTE, 540 - 86200000 - CENTRO - IBIPORA - PR",
   prestador: {
     inscricaoMunicipal: "53459",
     cnpj: "13.636.938/0001-44",
     razaoSocial: "S. RODRIGUES & G. RODRIGUES LTDA",
     fantasia: "Ankaa Design",
-    regimeFiscal: "LUCRO PRESUMIDO",
+    /** "Simples Nacional na Data de Competência" — a empresa é do lucro presumido. */
+    simplesNacional: "Não Optante",
     endereco: "RUA LUIZ CARLOS ZANI, 2493 - JARDIM SANTA PAULA",
     municipioUf: "IBIPORA-PR",
-    cep: "86.200-000",
+    /** Código IBGE de Ibiporã — o DANFSe o imprime ao lado do CEP. */
+    codigoIbge: "4109807",
+    cep: "86204-020",
     telefone: "(43) 98428-3228",
     email: "ankaadesign@outlook.com",
   },
@@ -68,10 +71,8 @@ export const NFSE_ISSUER = {
   itemListaServico: "141201 Funilaria e lanternagem.",
   cnae: "4520002",
   localPrestacao: "IBIPORA-PR",
-  naturezaOperacao: "Tributado no Município",
   /** Alíquota do ISSQN em % (ELOTECH_OXY_SERVICO_LC_ALIQUOTA). */
   issAliquota: 2,
-  siteAutenticidade: "https://ibipora.oxy.elotech.com.br/iss/autenticar-documento-fiscal",
 } as const;
 
 /**

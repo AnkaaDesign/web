@@ -119,6 +119,33 @@ interface BillingStepReviewProps {
    */
   visibleConfigIdx?: number[];
   /**
+   * OS VEÍCULOS QUE ESTA COBRANÇA COBRE — o mesmo recorte do passo "Veículos".
+   *
+   * O Resumo desenhava UMA placa, UM número de série e UM chassi: os da tarefa
+   * pela qual a página foi aberta. Numa cobrança de quatro veículos isso é a
+   * identificação de um caminhão sobre uma nota que cita quatro — e quem confere
+   * antes de aprovar não tinha como ver os outros três.
+   *
+   * Vem pronto da página (`coveredVehicleRows`), que é quem sabe resolver a
+   * cobrança pela rota. Ausente ⇒ recai na tarefa aberta, que é o que a tela
+   * sempre mostrou.
+   */
+  vehicles?: Array<{
+    id: string;
+    name?: string | null;
+    serialNumber?: string | null;
+    customerOrderNumber?: string | null;
+    /** Conclusão DESTE veículo: numa cobrança de quatro elas divergem. */
+    finishedAt?: Date | string | null;
+    truck?: {
+      plate?: string | null;
+      chassisNumber?: string | null;
+      /** Categoria e implemento são POR VEÍCULO — um lote pode misturar tipos. */
+      category?: string | null;
+      implementType?: string | null;
+    } | null;
+  }>;
+  /**
    * A COBRANÇA desta página — a entidade cujo estado o cabeçalho mostra e sobre
    * a qual as ações agem. Resolvida pela página (ela é endereçada pelo id da
    * cobrança); aqui chega pronta.
@@ -135,7 +162,7 @@ interface BillingStepReviewProps {
   onSettleBilling?: () => void;
 }
 
-export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, billing, onApproveBilling, onSettleBilling }: BillingStepReviewProps) {
+export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId, visibleConfigIdx, vehicles, billing, onApproveBilling, onSettleBilling }: BillingStepReviewProps) {
   const navigate = useNavigate();
   const { control } = useFormContext();
   /**
@@ -306,6 +333,113 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       ? attentionFieldClass(orderNumberAttention)
       : "";
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // O PEDIDO DE COMPRA MUDOU DE DONO — e a tela ainda o mostrava no do pagador
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // A linha "N° do Pedido" morava no cartão do CLIENTE, herdada de quando o
+  // número era campo da configuração de faturamento. A coluna foi dropada: hoje
+  // é `Task.customerOrderNumber`, POR VEÍCULO — um orçamento de quatro caminhões
+  // tem quatro pedidos de compra, e imprimir um só no cartão do pagador era
+  // atribuir ao cliente um número que é do caminhão.
+  //
+  // Agora a linha é do RESUMO DA TAREFA, junto dos outros identificadores do
+  // veículo, e em cobrança multiveículo é uma COLUNA da relação: cada linha
+  // responde pelo seu.
+  //
+  // O sinal de atenção (`task-quote.orderNumber`) vinha por cartão porque a
+  // linha estava lá. Ele segue existindo, agregado: acende quando ALGUMA das
+  // cobranças desta página está sem o número que a nota dela vai citar.
+  const orderNumberAttentionClass = (customerConfigs as any[]).some(
+    (c: any) => attentionOrderNumberFor(c) !== "",
+  )
+    ? attentionFieldClass(orderNumberAttention)
+    : "";
+
+  /**
+   * A RELAÇÃO QUE O RESUMO IMPRIME — os veículos desta cobrança.
+   *
+   * Recuo para a tarefa aberta quando a página não mandou o recorte (o Resumo é
+   * montado também em `reviewOnly`): um orçamento de um veículo segue com as
+   * mesmas três linhas de sempre.
+   */
+  const coveredVehicles = useMemo(() => {
+    if (vehicles && vehicles.length > 0) return vehicles;
+    return task
+      ? [
+          {
+            id: task.id,
+            name: task.name ?? null,
+            serialNumber: task.serialNumber ?? null,
+            customerOrderNumber: task.customerOrderNumber ?? null,
+            finishedAt: task.finishedAt ?? null,
+            truck: task.truck ?? null,
+          },
+        ]
+      : [];
+  }, [vehicles, task]);
+
+  /**
+   * O QUE É DA COBRANÇA E O QUE É DE UM CAMINHÃO SÓ.
+   *
+   * "Logomarca", "Categoria", "Implemento" e "Finalizado em" eram lidos da
+   * tarefa ABERTA e impressos como se valessem para a cobrança inteira. Numa
+   * cobrança de quatro veículos isso é falso em três deles: os tipos podem
+   * misturar num lote e as datas de conclusão quase sempre divergem.
+   *
+   * Uniforme ⇒ a linha de sempre. Divergente ⇒ o tipo vira COLUNA da relação (é
+   * onde cada veículo responde por si) e a conclusão vira faixa.
+   */
+  const vehicleTypeLabelOf = (v: any): string =>
+    [
+      v?.truck?.category
+        ? TRUCK_CATEGORY_LABELS[v.truck.category as TRUCK_CATEGORY] || v.truck.category
+        : "",
+      v?.truck?.implementType
+        ? IMPLEMENT_TYPE_LABELS[v.truck.implementType as IMPLEMENT_TYPE] || v.truck.implementType
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+  const vehicleFacts = useMemo(() => {
+    const distinct = (values: Array<string | null | undefined>) =>
+      Array.from(new Set(values.map((v) => (v ?? "").trim()).filter(Boolean)));
+    const names = distinct(coveredVehicles.map((v: any) => v.name));
+    const types = distinct(coveredVehicles.map((v: any) => vehicleTypeLabelOf(v)));
+    const finishedTimes = coveredVehicles
+      .map((v: any) => (v.finishedAt ? new Date(v.finishedAt as any).getTime() : NaN))
+      .filter((t: number) => Number.isFinite(t))
+      .sort((a: number, b: number) => a - b);
+    const first: any = coveredVehicles[0] ?? {};
+    return {
+      names,
+      /** Categoria e implemento SÃO DA COBERTURA (só valem quando uniformes). */
+      category: (first?.truck?.category ?? null) as string | null,
+      implementType: (first?.truck?.implementType ?? null) as string | null,
+      /** Todos do mesmo tipo (ou tipo nenhum declarado). */
+      sameType: types.length <= 1,
+      finishedFirst: finishedTimes.length > 0 ? new Date(finishedTimes[0]) : null,
+      finishedLast:
+        finishedTimes.length > 0 ? new Date(finishedTimes[finishedTimes.length - 1]) : null,
+    };
+    // `vehicleTypeLabelOf` é puro sobre os rótulos importados — não entra nas deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coveredVehicles]);
+
+  /**
+   * O pedido de compra DAQUELE veículo.
+   *
+   * O do caminhão ABERTO sai do FORMULÁRIO — é o que acabou de ser digitado na
+   * grade do passo "Veículos", e esta é a tela onde se confere antes de aprovar.
+   * Os irmãos saem do registro.
+   */
+  const orderNumberOfVehicle = (v: { id?: string | null; customerOrderNumber?: string | null }): string | null => {
+    if (v?.id && v.id === task?.id) return (formOrderNumber ?? "").trim() || null;
+    const found = quoteVehicles.find((t) => t.id === v?.id);
+    return ((found?.customerOrderNumber ?? v?.customerOrderNumber ?? "") as string).trim() || null;
+  };
+
   // Same idea for `task-quote.billing-customer-incomplete`: the Resumo is where the user lands
   // once a nota exists, so the cadastro gap has to be visible here too. Each summary row asks
   // about the keys IT renders, so only the row that is actually short of data lights up.
@@ -398,7 +532,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     round2([...perCustomerTotals.values()].reduce((a, b) => a + b, 0)) || subtotal;
   const total = perVehicleTotal;
   const discountAmount = Math.max(0, round2(subtotal - perVehicleTotal));
-  const reviewVehicleCount = Math.max(1, quoteVehicleCount(task?.quote));
+  // ═══════════════════════════════════════════════════════════════════════════
+  // O MULTIPLICADOR É A COBERTURA DESTA COBRANÇA, NÃO O TAMANHO DO ORÇAMENTO
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Era `quoteVehicleCount(task?.quote)`: os veículos do ORÇAMENTO INTEIRO. Numa
+  // cobrança de lote — 4 dos 60 — o cabeçalho lia "× 60" e "TOTAL GERAL
+  // R$ 66.026,40" enquanto o cartão do pagador, cem linhas abaixo e correto,
+  // lia "Total R$ 4.401,76" — que é o que o boleto cobra. Dois totais opostos na
+  // MESMA tela, e o em negrito, na hora de aprovar, era o errado.
+  const reviewVehicleCount = Math.max(1, coveredVehicles.length);
   const showPerVehicleTotals = reviewVehicleCount > 1;
   const grandTotal = round2(perVehicleTotal * reviewVehicleCount);
 
@@ -695,7 +838,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           <div className="space-y-1">
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
               <span className="text-sm text-muted-foreground">Logomarca</span>
-              <span className="text-sm font-medium">{task.name}</span>
+              <span className="text-sm font-medium">
+                {vehicleFacts.names.length > 1
+                  ? vehicleFacts.names.length === 2
+                    ? vehicleFacts.names.join(" · ")
+                    : `${vehicleFacts.names.length} logomarcas`
+                  : vehicleFacts.names[0] ?? task.name}
+              </span>
             </div>
             {task.customer && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
@@ -703,47 +852,162 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 <span className="text-sm font-medium">{task.customer.corporateName || task.customer.fantasyName}</span>
               </div>
             )}
-            {task.truck?.plate && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Placa</span>
-                <span className="text-sm font-medium">{task.truck.plate}</span>
+            {/* ─── OS IDENTIFICADORES DO VEÍCULO ──────────────────────────
+                Com UM veículo, as mesmas linhas de sempre. Com N, uma RELAÇÃO:
+                a nota cita os N, e conferir antes de aprovar exige ver os N.
+
+                Por que TABELA ROLÁVEL e não "e mais N": os identificadores são
+                exatamente o que se confere aqui — esconder linhas atrás de um
+                clique esconde justamente as que podem estar erradas. Com
+                sessenta caminhões a altura é travada e a rolagem resolve, sem
+                estado novo e sem um segundo gesto. O cabeçalho fica fixo para a
+                coluna continuar nomeada no meio da lista. */}
+            {coveredVehicles.length > 1 ? (
+              <div
+                className={cn("overflow-hidden rounded-lg bg-muted/50", orderNumberAttentionClass)}
+                title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+              >
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-muted-foreground">
+                    Esta cobrança cobre {coveredVehicles.length} veículos
+                  </span>
+                  <Badge variant="secondary">{coveredVehicles.length}</Badge>
+                </div>
+                <div
+                  className={cn(
+                    "overflow-x-auto border-t border-border",
+                    coveredVehicles.length > 8 && "max-h-[22rem] overflow-y-auto",
+                  )}
+                >
+                  <table className="w-full">
+                    <thead className="sticky top-0 bg-muted/70">
+                      <tr>
+                        {!vehicleFacts.sameType && (
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Tipo</th>
+                        )}
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Nº de Série</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Placa</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Chassi</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">N° do Pedido</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {coveredVehicles.map((v: any) => {
+                        const pedido = orderNumberOfVehicle(v);
+                        return (
+                          <tr key={v.id}>
+                            {!vehicleFacts.sameType && (
+                              <td className="px-4 py-2 text-sm">{vehicleTypeLabelOf(v) || "—"}</td>
+                            )}
+                            <td className="px-4 py-2 text-sm font-medium tabular-nums">
+                              {v.serialNumber || v.name || "—"}
+                            </td>
+                            <td className="px-4 py-2 text-sm">{v.truck?.plate || "—"}</td>
+                            <td className="px-4 py-2 text-sm tabular-nums">
+                              {v.truck?.chassisNumber ? formatChassis(v.truck.chassisNumber) : "—"}
+                            </td>
+                            <td className={cn("px-4 py-2 text-sm", !pedido && "text-muted-foreground")}>
+                              {pedido || "Pendente"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            ) : (
+              <>
+                {task.truck?.plate && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Placa</span>
+                    <span className="text-sm font-medium">{task.truck.plate}</span>
+                  </div>
+                )}
+                {task.serialNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Nº de Série</span>
+                    <span className="text-sm font-medium">{task.serialNumber}</span>
+                  </div>
+                )}
+                {task.truck?.chassisNumber && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Chassi</span>
+                    <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+                  </div>
+                )}
+                {/* O PEDIDO DE COMPRA — daqui, e não do cartão do pagador: ele
+                    mora em `Task.customerOrderNumber`. Normalmente só aparece
+                    preenchido; quando uma regra o está pedindo, a linha é
+                    desenhada VAZIA e destacada — um valor que falta e não tem nó
+                    no DOM é um sinal sem para onde apontar. */}
+                {(() => {
+                  const pedido = orderNumberOfVehicle(coveredVehicles[0] ?? { id: task?.id });
+                  if (!pedido && !orderNumberAttentionClass) return null;
+                  return (
+                    <div
+                      className={cn(
+                        "flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5",
+                        orderNumberAttentionClass,
+                      )}
+                      title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
+                    >
+                      <span className="text-sm text-muted-foreground">N° do Pedido</span>
+                      <span className={cn("text-sm font-medium", !pedido && "text-muted-foreground")}>
+                        {pedido || "Pendente"}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </>
             )}
-            {task.serialNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Nº de Série</span>
-                <span className="text-sm font-medium">{task.serialNumber}</span>
-              </div>
-            )}
-            {task.truck?.chassisNumber && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Chassi</span>
-                <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
-              </div>
-            )}
-            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. */}
-            {task.truck?.vinPlate && (
+            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só no
+                caso de UM veículo: a foto é de um caminhão, e exibi-la sozinha
+                sob uma relação de quatro é o mesmo defeito que esta correção
+                desfez. */}
+            {coveredVehicles.length <= 1 && task.truck?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Plaqueta</span>
                 <FileThumbnail file={task.truck.vinPlate} size="sm" onClick={() => fileViewerContext?.actions.viewFiles([task.truck!.vinPlate!] as never, 0)} />
               </div>
             )}
-            {task.truck?.category && (
+            {/* O portão é da COBERTURA e o valor também tem de ser: ler o tipo da
+                tarefa-âncora enquanto se pergunta "todos são iguais?" aos
+                cobertos é o mesmo defeito, um passo adiante. */}
+            {vehicleFacts.sameType && vehicleFacts.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>
-                <span className="text-sm font-medium">{TRUCK_CATEGORY_LABELS[task.truck.category as TRUCK_CATEGORY] || task.truck.category}</span>
+                <span className="text-sm font-medium">
+                  {TRUCK_CATEGORY_LABELS[vehicleFacts.category as TRUCK_CATEGORY] || vehicleFacts.category}
+                </span>
               </div>
             )}
-            {task.truck?.implementType && (
+            {vehicleFacts.sameType && vehicleFacts.implementType && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Implemento</span>
-                <span className="text-sm font-medium">{IMPLEMENT_TYPE_LABELS[task.truck.implementType as IMPLEMENT_TYPE] || task.truck.implementType}</span>
+                <span className="text-sm font-medium">
+                  {IMPLEMENT_TYPE_LABELS[vehicleFacts.implementType as IMPLEMENT_TYPE] || vehicleFacts.implementType}
+                </span>
               </div>
             )}
-            {task.finishedAt && (
+            {/* A conclusão da COBRANÇA: uma data quando todos terminaram no mesmo
+                dia, a faixa quando não — que é o caso comum de um lote. */}
+            {(vehicleFacts.finishedFirst || task.finishedAt) && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Finalizado em</span>
-                <span className="text-sm font-medium">{formatDate(task.finishedAt)}</span>
+                <span className="text-sm text-muted-foreground">
+                  {vehicleFacts.finishedFirst &&
+                  vehicleFacts.finishedLast &&
+                  formatDate(vehicleFacts.finishedFirst) !== formatDate(vehicleFacts.finishedLast)
+                    ? "Finalizados entre"
+                    : "Finalizado em"}
+                </span>
+                <span className="text-sm font-medium">
+                  {vehicleFacts.finishedFirst && vehicleFacts.finishedLast
+                    ? formatDate(vehicleFacts.finishedFirst) === formatDate(vehicleFacts.finishedLast)
+                      ? formatDate(vehicleFacts.finishedFirst)
+                      : `${formatDate(vehicleFacts.finishedFirst)} e ${formatDate(vehicleFacts.finishedLast)}`
+                    : formatDate(task.finishedAt!)}
+                </span>
               </div>
             )}
           </div>
@@ -1025,25 +1289,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         <span className="text-sm font-medium text-right max-w-[60%]">{paymentText}</span>
                       </div>
                     )}
-                    {(() => {
-                      // Normally shown only when filled. When a rule is asking for it, the row is
-                      // rendered EMPTY and highlighted — a missing value with no DOM node is a
-                      // signal with nothing to point at.
-                      const attnCls = attentionOrderNumberFor(config);
-                      const orderNumberText = orderNumberForConfig(config);
-                      if (!orderNumberText && !attnCls) return null;
-                      return (
-                        <div
-                          className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attnCls)}
-                          title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
-                        >
-                          <span className="text-sm text-muted-foreground">N° do Pedido</span>
-                          <span className={cn("text-sm font-medium", !orderNumberText && "text-muted-foreground")}>
-                            {orderNumberText || "Pendente"}
-                          </span>
-                        </div>
-                      );
-                    })()}
+                    {/* O "N° DO PEDIDO" SAIU DAQUI. Ele é da TAREFA
+                        (`Task.customerOrderNumber`), não do pagador — a coluna do
+                        pagador foi dropada. Num orçamento de quatro veículos há
+                        quatro pedidos de compra, e imprimir a lista deles no
+                        cartão do cliente sugeria que fossem dele. A linha (e, em
+                        cobrança multiveículo, a coluna) está no Resumo da Tarefa,
+                        junto dos outros identificadores de cada caminhão. */}
                   </div>
 
                   {/* Installments / NFS-e */}

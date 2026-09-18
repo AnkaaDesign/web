@@ -7,8 +7,7 @@ import { BRAND_ASSETS } from '@/config/assets';
  * Shared, branded PDF generator for a single purchase order ("Pedido de Compra").
  *
  * Used by the order detail view and the create/edit forms so every order document
- * looks identical and professional. Modeled on the budget PDF generator
- * (src/utils/budget-pdf-generator.ts): centralized company branding + brand colors.
+ * looks identical and professional: centralized company branding + brand colors.
  *
  * IMPORTANT: the print stylesheet uses `@page { margin: 0 }`. This is what removes
  * the browser's own print header/footer (page URL, date, title, page number) that

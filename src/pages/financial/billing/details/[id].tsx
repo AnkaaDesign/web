@@ -1,12 +1,13 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
 import { useTaskBillingInvoices } from "@/hooks/production/use-invoice";
 import { BillingCoveredVehicles } from "@/components/financial/billing/steps/billing-covered-vehicles";
 import { billingKeys, useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
 import { billingService } from "@/api-client/billing";
+import { signatureService } from "@/api-client/signature";
 import { budgetKeys } from "@/hooks/production/use-budget";
 import { budgetService } from "@/api-client/budget";
 import { customerService } from "@/api-client/customer";
@@ -293,6 +294,13 @@ const BillingDetailPageInner = ({
       },
       // Task layouts — the pool the billing "Layout Aprovado" picker chooses from.
       layouts: { include: { file: true } },
+      // OS RESPONSÁVEIS DO ORÇAMENTO (`Task.responsibles`, relação
+      // `TaskResponsibles`) — a lista de onde saem os SIGNATÁRIOS do documento.
+      // O quadro "Responsável pelo Orçamento" precisa dela para mostrar TODOS os
+      // contatos, e não só o escolhido: um orçamento assinado por duas pessoas
+      // aparecia aqui com uma, porque o cartão só desenhava
+      // `customerConfigs[].responsibleId` — que é UM contato, o da fatura.
+      responsibles: true,
       quote: {
         include: {
           services: true,
@@ -308,6 +316,10 @@ const BillingDetailPageInner = ({
               serialNumber: true,
               createdAt: true,
               customerOrderNumber: true,
+              // Data de conclusão de CADA veículo: numa cobrança de quatro eles
+              // terminam em dias diferentes, e o Resumo mostrava a do caminhão
+              // aberto como se fosse a da cobrança inteira.
+              finishedAt: true,
               // Chassi junto: a tabela de veículos do passo 1 mostra as mesmas
               // colunas do documento, e um chassi ausente ali leria como "a
               // registrar" num caminhão que já o tem.
@@ -389,7 +401,13 @@ const BillingDetailPageInner = ({
       name?: string | null;
       serialNumber?: string | null;
       customerOrderNumber?: string | null;
-      truck?: { plate?: string | null } | null;
+      finishedAt?: Date | string | null;
+      truck?: {
+        plate?: string | null;
+        chassisNumber?: string | null;
+        category?: string | null;
+        implementType?: string | null;
+      } | null;
     }>;
     if (fromQuote.length > 0) return fromQuote;
     return task
@@ -399,7 +417,15 @@ const BillingDetailPageInner = ({
             name: task.name,
             serialNumber: task.serialNumber,
             customerOrderNumber: task.customerOrderNumber ?? null,
-            truck: task.truck ? { plate: task.truck.plate } : null,
+            finishedAt: task.finishedAt ?? null,
+            truck: task.truck
+              ? {
+                  plate: task.truck.plate,
+                  chassisNumber: task.truck.chassisNumber,
+                  category: task.truck.category,
+                  implementType: task.truck.implementType,
+                }
+              : null,
           },
         ]
       : [];
@@ -450,13 +476,34 @@ const BillingDetailPageInner = ({
     [quote],
   );
 
-  /** Há coleta de assinaturas em andamento? Refatiar a derruba — a tela avisa antes. */
+  /**
+   * HÁ COLETA DE ASSINATURAS EM ANDAMENTO? Refatiar a derruba — a tela avisa antes.
+   *
+   * ⚠️ Era `(quote as any)?.signatureEnvelopes`, e a resposta NUNCA traz essa
+   * relação: nem `findByTaskId` nem o include padrão do orçamento a pedem. O
+   * `as any` escondia a ausência do `tsc`, e os três status comparados
+   * ("PENDING", "SENT", "PARTIALLY_SIGNED") sequer existem no enum — só
+   * `RUNNING` existe. Ou seja: o aviso que existe exatamente para o financeiro
+   * não refatiar uma cobrança com coleta aberta era `false` desde sempre.
+   *
+   * Agora vem do mesmo lugar que o cartão de assinatura da própria página lê.
+   * `retry: false` e erro engolido de propósito: CONTABILIDADE enxerga esta tela
+   * e não enxerga a rota de envelopes — ali a resposta é 403, e "não sei" tem de
+   * degradar para "não avisa", nunca para uma tela quebrada.
+   */
+  const { data: quoteEnvelopes } = useQuery({
+    queryKey: ["signature-envelopes", "quote", quote?.id],
+    queryFn: async () => {
+      const res: any = await signatureService.listForQuote(quote!.id);
+      return (res?.data?.data ?? res?.data ?? []) as Array<{ status?: string }>;
+    },
+    enabled: !!quote?.id,
+    retry: false,
+    staleTime: 30_000,
+  });
   const hasRunningSignature = useMemo(
-    () =>
-      ((quote as any)?.signatureEnvelopes ?? []).some((e: any) =>
-        ["PENDING", "SENT", "PARTIALLY_SIGNED", "RUNNING"].includes(String(e?.status ?? "")),
-      ),
-    [quote],
+    () => (quoteEnvelopes ?? []).some((e) => String(e?.status ?? "") === "RUNNING"),
+    [quoteEnvelopes],
   );
 
   // Attention: register this quote so its rules evaluate and honour their ack policy — the same
@@ -613,14 +660,21 @@ const BillingDetailPageInner = ({
   const configsForPreviewAtInvoiceScale = useMemo(
     () =>
       configsForApprovalPreview.map((c: any) => {
+        // ⚠️ O RECUO DEPENDE DE A COBRANÇA SER FATIADA.
+        //
+        // Cobertura desconhecida numa cobrança CONJUNTA é "todos" — é a leitura
+        // que a ausência sempre teve. Numa cobrança FATIADA é "este veículo": ali
+        // `quoteVehicles` punha a prévia em escala de orçamento e o diálogo
+        // irreversível desenhava, para uma fatia de um caminhão, o boleto e a
+        // nota dos sessenta.
         const covered =
           (Array.isArray(c?.taskIds) && c.taskIds.length > 0
             ? c.taskIds.length
-            : coveredTaskCount(c as any)) || quoteVehicles || 1;
+            : coveredTaskCount(c as any)) || (isPerVehicleBilling ? 1 : quoteVehicles) || 1;
         const escala = (v: unknown) => Math.round((Number(v) || 0) * covered * 100) / 100;
         return { ...c, subtotal: escala(c?.subtotal), total: escala(c?.total) };
       }),
-    [configsForApprovalPreview, quoteVehicles],
+    [configsForApprovalPreview, quoteVehicles, isPerVehicleBilling],
   );
 
   // Unsaved changes guard — mirrors the Orçamento wizard. It was absent here, which was survivable
@@ -1687,9 +1741,19 @@ const BillingDetailPageInner = ({
   const isServicesStep = servicesStepIdx !== null && currentStep === servicesStepIdx;
   const isReviewStep = currentStep === totalSteps;
 
-  const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate]
-    .filter(Boolean)
-    .join(" - ");
+  /**
+   * O NOME DESTA COBRANÇA — e uma cobrança não é um caminhão.
+   *
+   * Era sempre `nome - série da tarefa aberta`: numa cobrança conjunta de quatro
+   * (ou de quarenta) o cabeçalho batizava o documento com o número de UM deles,
+   * e as quatro páginas da mesma cobrança liam títulos diferentes conforme o
+   * veículo por onde se entrou. Com mais de um veículo coberto o título diz a
+   * cobertura; com um só, segue exatamente como sempre foi.
+   */
+  const taskDisplayName =
+    coveredVehicleRows.length > 1
+      ? [task.name, `${coveredVehicleRows.length} veículos`].filter(Boolean).join(" - ")
+      : [task.name, task.serialNumber || task.truck?.plate].filter(Boolean).join(" - ");
 
   return (
     <PrivilegeRoute
@@ -1849,6 +1913,10 @@ const BillingDetailPageInner = ({
                           <BillingStepInfo
                             disabled={!canEdit}
                             customersCache={customersCache}
+                            // Para o quadro de responsáveis listar os do
+                            // ORÇAMENTO (os signatários), e não só o contato
+                            // gravado nesta fatura.
+                            task={task}
                             vehicles={quoteVehicleRows as any}
                             // O RECORTE: os pagadores desta cobrança, não os do
                             // orçamento. Sem isto, três caminhões do mesmo
@@ -1900,6 +1968,10 @@ const BillingDetailPageInner = ({
                   // Resumo desenhava as três lado a lado — que é exatamente a
                   // tela de uma cobrança mostrando as cobranças das outras.
                   visibleConfigIdx={visibleConfigIdx}
+                  // OS VEÍCULOS DESTA COBRANÇA — o mesmo recorte do passo 1. Sem
+                  // isto o Resumo imprimia placa, série e chassi de UM caminhão
+                  // sobre uma nota que cita quatro.
+                  vehicles={coveredVehicleRows as any}
                 />
 
                 {/* ASSINATURA — só leitura.
@@ -1923,7 +1995,7 @@ const BillingDetailPageInner = ({
 
       {/* Billing Approval Confirmation Dialog */}
       <AlertDialog open={billingApprovalDialogOpen} onOpenChange={setBillingApprovalDialogOpen}>
-        <AlertDialogContent className="max-w-3xl w-[95vw] border-red-500 border-2 max-h-[92vh] overflow-y-auto">
+        <AlertDialogContent className="max-w-5xl w-[95vw] border-red-500 border-2 max-h-[92vh] overflow-y-auto">
           <AlertDialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
@@ -1987,38 +2059,42 @@ const BillingDetailPageInner = ({
             />
           </div>
 
-          <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 my-2 space-y-3">
-            <p className="text-sm font-semibold text-red-800 dark:text-red-300">
-              Ao confirmar, as seguintes ações serão executadas automaticamente:
-            </p>
-            <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold">1.</span>
-                <span>
-                  <strong>Faturas</strong> serão geradas para cada cliente vinculado ao
-                  {isPerVehicleBilling ? " veículo" : " orçamento"}
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold">2.</span>
-                <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold">3.</span>
-                <span><strong>Notas Fiscais (NFS-e)</strong> serão emitidas automaticamente para cada fatura</span>
-              </li>
-            </ul>
-          </div>
+          {/* As duas caixas de aviso lado a lado: o modal ficou largo o bastante,
+              e empilhá-las só empurrava o botão de confirmar para fora da tela. */}
+          <div className="grid gap-3 my-2 lg:grid-cols-2 lg:items-start">
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 space-y-3 h-full">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                Ao confirmar, as seguintes ações serão executadas automaticamente:
+              </p>
+              <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 font-bold">1.</span>
+                  <span>
+                    <strong>Faturas</strong> serão geradas para cada cliente vinculado ao
+                    {isPerVehicleBilling ? " veículo" : " orçamento"}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 font-bold">2.</span>
+                  <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 font-bold">3.</span>
+                  <span><strong>Notas Fiscais (NFS-e)</strong> serão emitidas automaticamente para cada fatura</span>
+                </li>
+              </ul>
+            </div>
 
-          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 my-1">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              Verifique antes de confirmar:
-            </p>
-            <ul className="text-sm text-amber-700 dark:text-amber-400 mt-1 space-y-1 list-disc list-inside">
-              <li>Valores, descontos e condições de pagamento estão corretos?</li>
-              <li>Os dados do(s) cliente(s) estão atualizados (CNPJ/CPF, endereço)?</li>
-              <li>As parcelas e datas de vencimento estão configuradas?</li>
-            </ul>
+            <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 h-full">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                Verifique antes de confirmar:
+              </p>
+              <ul className="text-sm text-amber-700 dark:text-amber-400 mt-1 space-y-1 list-disc list-inside">
+                <li>Valores, descontos e condições de pagamento estão corretos?</li>
+                <li>Os dados do(s) cliente(s) estão atualizados (CNPJ/CPF, endereço)?</li>
+                <li>As parcelas e datas de vencimento estão configuradas?</li>
+              </ul>
+            </div>
           </div>
 
           <AlertDialogDescription className="text-sm text-muted-foreground mt-1">

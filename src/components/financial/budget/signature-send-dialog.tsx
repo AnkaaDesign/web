@@ -229,7 +229,19 @@ export function SignatureSendDialog({
 
   const canChoose = (preflight?.channels.length ?? 0) > 1;
   const blockers = preflight?.blockers ?? [];
-  const blocked = blockers.length > 0;
+  /**
+   * O PREFLIGHT QUE NÃO RESPONDEU NÃO DISSE "PODE".
+   *
+   * `blocked` era só `blockers.length > 0`, e com a resposta ausente a lista vem
+   * vazia — quer dizer que a falha da conferência era lida como aprovação em
+   * todos os pontos que consultam `blocked`. O botão acabava desabilitado por
+   * tabela (`signingCount === 0`, porque sem preflight não há destinatários),
+   * mas por acidente: bastaria alguém passar a contar os signatários de outra
+   * fonte para o modal oferecer o envio de um orçamento que o servidor recusa.
+   *
+   * Sem conferência não há envio, e o aviso abaixo oferece tentar de novo.
+   */
+  const blocked = blockers.length > 0 || failed;
 
   const effectiveLabel = channel ? DELIVERY_CHANNEL_LABELS[channel] : null;
 
@@ -271,11 +283,24 @@ export function SignatureSendDialog({
               {failed && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                   <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <span className="text-foreground">
-                    Não foi possível conferir os cadastros agora. O envio segue pelo
-                    canal configurado no servidor — se algum responsável estiver sem
-                    contato, o erro aparecerá ao confirmar.
-                  </span>
+                  <div className="space-y-2">
+                    <span className="block text-foreground">
+                      Não foi possível conferir os cadastros agora, e sem essa
+                      conferência não dá para saber se o orçamento pode mesmo ir para
+                      assinatura — o servidor recusa layout ausente, validade vencida,
+                      dois pagadores e coleta já emitida. Tente de novo em um instante.
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      disabled={busy || loading}
+                      onClick={() => void load()}
+                    >
+                      {loading ? <IconLoader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Tentar de novo
+                    </Button>
+                  </div>
                 </div>
               )}
 

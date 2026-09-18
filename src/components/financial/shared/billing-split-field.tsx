@@ -31,6 +31,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconAlertTriangle, IconPlus } from "@tabler/icons-react";
 
 export type BillingSplitValue = "JOINT" | "PER_TASK" | "CUSTOM";
@@ -217,46 +218,89 @@ export function BillingSplitField({
     { value: String(normalized.length + 1), label: "Novo lote" },
   ];
 
+  // ─── OS AVISOS SAÍRAM DO FLUXO ──────────────────────────────────────────
+  //
+  // Eram dois `<p>` logo abaixo do seletor. Este controle vive numa fileira
+  // `flex flex-wrap gap-4 items-end` ("Faturamento e Pagamento"), e um parágrafo
+  // de duas linhas debaixo do combobox EMPURRA o campo para cima: o seletor
+  // perdia o alinhamento dos vizinhos (Gerar NF, Gerar Boleto, Condição de
+  // Pagamento) e a fileira inteira ficava torta. Pior: o aviso só existe em
+  // alguns estados, então a MESMA tela tinha dois desenhos diferentes conforme o
+  // orçamento já tivesse fatura aprovada ou não.
+  //
+  // Agora nenhum dos dois ocupa espaço:
+  //   · TRAVA (fatura aprovada) → o campo fica desabilitado e a razão sai no
+  //     hover, que é onde quem tenta mexer vai procurar;
+  //   · assinatura em andamento → um sinal ao lado do rótulo, na linha que já
+  //     existe.
+  //
+  // ⚠️ O `<span tabIndex={0}>` em volta do gatilho NÃO é enfeite: um controle
+  // desabilitado engole os eventos de ponteiro e o tooltip nunca abriria. É o
+  // mesmo recurso que `page-header.tsx` usa para ação desabilitada com motivo —
+  // `tabIndex` acrescenta o caminho do teclado, que o `<span>` sozinho não tem.
+  const lockReason =
+    approvedCount > 0
+      ? `${
+          approvedCount === 1
+            ? "Uma fatura deste orçamento já foi aprovada"
+            : `${approvedCount} faturas deste orçamento já foram aprovadas`
+        }: a divisão não pode mais mudar. Reverta o faturamento para refatiar.`
+      : null;
+
+  const selector = (
+    <Combobox
+      value={value}
+      onValueChange={(v) => setSplit((v || "JOINT") as BillingSplitValue)}
+      disabled={locked}
+      options={[
+        { value: "JOINT", label: `Fatura única para os ${count} veículos` },
+        { value: "PER_TASK", label: "Uma fatura por veículo" },
+        // Lotes só onde os veículos JÁ EXISTEM: ver a nota em `vehicles`.
+        ...(allowCustom
+          ? [{ value: "CUSTOM", label: "Lotes — agrupar veículos por fatura" }]
+          : []),
+      ]}
+      placeholder="Fatura única"
+      searchable={false}
+      emptyText="Nenhuma opção"
+    />
+  );
+
   return (
     <div className={cn("space-y-2", className)}>
-      <Label className="text-sm font-medium">Faturamento dos {count} veículos</Label>
-      <Combobox
-        value={value}
-        onValueChange={(v) => setSplit((v || "JOINT") as BillingSplitValue)}
-        disabled={locked}
-        options={[
-          { value: "JOINT", label: `Fatura única para os ${count} veículos` },
-          { value: "PER_TASK", label: "Uma fatura por veículo" },
-          // Lotes só onde os veículos JÁ EXISTEM: ver a nota em `vehicles`.
-          ...(allowCustom
-            ? [{ value: "CUSTOM", label: "Lotes — agrupar veículos por fatura" }]
-            : []),
-        ]}
-        placeholder="Fatura única"
-        searchable={false}
-        emptyText="Nenhuma opção"
-      />
+      <div className="flex items-center gap-1.5">
+        <Label className="text-sm font-medium">Faturamento dos {count} veículos</Label>
+        {warnSignature && !lockReason && value !== "JOINT" && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                tabIndex={0}
+                className="inline-flex cursor-help text-amber-600 dark:text-amber-500"
+              >
+                <IconAlertTriangle className="h-3.5 w-3.5" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[280px]">
+              Mudar a divisão altera a cláusula de pagamento do documento: a coleta de assinaturas
+              em andamento é cancelada e precisa ser reenviada.
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
 
-      {approvedCount > 0 && (
-        <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
-          <IconAlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            {approvedCount === 1
-              ? "Uma fatura deste orçamento já foi aprovada"
-              : `${approvedCount} faturas deste orçamento já foram aprovadas`}
-            : a divisão não pode mais mudar. Reverta o faturamento para refatiar.
-          </span>
-        </p>
-      )}
-
-      {warnSignature && approvedCount === 0 && value !== "JOINT" && (
-        <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
-          <IconAlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            Mudar a divisão altera a cláusula de pagamento do documento: a coleta de assinaturas em
-            andamento é cancelada e precisa ser reenviada.
-          </span>
-        </p>
+      {lockReason ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className="block cursor-not-allowed">
+              {selector}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[280px]">
+            {lockReason}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        selector
       )}
 
       {/* ─── A COMPOSIÇÃO DOS LOTES ────────────────────────────────────────

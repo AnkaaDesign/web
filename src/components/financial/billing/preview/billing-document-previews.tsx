@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IconFileInvoice, IconBarcode, IconExternalLink } from "@tabler/icons-react";
 import { routes } from "@/constants";
 import { projectInstallments } from "@/utils/installment-projection";
 import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-preview";
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
+import { buildDiscriminacao } from "@/utils/nfse-discriminacao";
 import {
   coveredTaskIds,
   orderNumberLabel,
@@ -53,6 +54,8 @@ interface TaskVehicle {
   chassisNumber?: string | null;
   category?: string | null;
   implementType?: string | null;
+  /** O pedido de compra DESTE veículo — a discriminação o cita quando divergem. */
+  orderNumber?: string | null;
 }
 
 interface BillingDocumentPreviewsProps {
@@ -103,47 +106,6 @@ function formatPhone(phone?: string): string {
   if (d.length === 11) return d.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
   if (d.length === 10) return d.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
   return phone || "";
-}
-
-/** Um veículo por extenso — espelha `describeOneVehicle` da emissão. */
-function describeOneVehicle(v: TaskVehicle): string {
-  const typeParts: string[] = [];
-  if (v.category) typeParts.push(API_TRUCK_CATEGORY_LABELS[v.category] ?? v.category);
-  if (v.implementType) typeParts.push(API_IMPLEMENT_TYPE_LABELS[v.implementType] ?? v.implementType);
-  const idParts: string[] = [];
-  if (v.serialNumber) idParts.push(`n série: ${v.serialNumber}`);
-  if (v.plate) idParts.push(`placa: ${v.plate}`);
-  if (v.chassisNumber) idParts.push(`chassi: ${v.chassisNumber}`);
-  const typePart = typeParts.join(" ");
-  const idPart = idParts.join(", ");
-  if (typePart && idPart) return `${typePart} de ${idPart}`;
-  return typePart || idPart;
-}
-
-/**
- * A DISCRIMINAÇÃO dos veículos que ESTA nota cobre.
- *
- * Mesmas três faixas da emissão (`elotech-oxy-nfse.service.ts`): um por extenso,
- * dois ou três por extenso, e de quatro em diante a CONTAGEM mais a faixa de
- * séries — o teto de 11 linhas da discriminação não cabe sessenta caminhões, e
- * o que o fiscal lê é a lista de serviços.
- */
-function buildVehicleRef(vehicles: TaskVehicle[], budgetNumber?: number | null): string {
-  const described = vehicles.map(describeOneVehicle).filter(Boolean);
-  if (described.length === 0) return "";
-  if (described.length === 1) {
-    return `Referente aos serviços executados no veículo ${described[0]}.`;
-  }
-  if (described.length <= 3) {
-    return `Referente aos serviços executados nos veículos ${described.join("; ")}.`;
-  }
-  const serials = vehicles
-    .map((v) => v.serialNumber)
-    .filter((n): n is string => Boolean(n))
-    .sort();
-  const range = serials.length > 1 ? ` (séries ${serials[0]} a ${serials[serials.length - 1]})` : "";
-  const budgetRef = budgetNumber ? ` Orçamento nº ${budgetNumber}.` : "";
-  return `Referente aos serviços executados em ${vehicles.length} veículos${range}.` + budgetRef;
 }
 
 /** Greedy packer mirroring sicredi-boleto.scheduler.ts buildServiceLines. */
@@ -321,17 +283,19 @@ function buildCustomerDoc(
   const baseCalculoIss = Math.max(0, round2(totalServicos - totalDescontos));
   const valorIss = round2((baseCalculoIss * 2) / 100);
 
-  // NFS-e discriminação — order number IS cleaned here ("PEDIDO NR 123" → "123")
+  // NFS-e discriminação — order number IS cleaned here ("PEDIDO NR 123" → "123").
+  // A montagem é a MESMA regra da emissão (`nfse-discriminacao.ts`, cópia do
+  // módulo da API): é o que o diálogo de confirmação promete mostrar.
   const cleanOrderNumber = (orderNumber || "").replace(/^PEDIDO\s+NR\s+/i, "").trim();
-  const vehicleRef = buildVehicleRef(
-    coveredVehicles.length > 0 ? coveredVehicles : [task],
-    budgetNumber,
-  );
-  const discLines: string[] = [];
-  if (cleanOrderNumber) discLines.push(`Pedido: ${cleanOrderNumber}`);
-  if (vehicleRef) discLines.push(vehicleRef);
-  serviceDescs.forEach((d) => discLines.push(d));
-  const discriminacao = discLines.join("\n");
+  const discriminacao = buildDiscriminacao({
+    orderNumber: cleanOrderNumber,
+    budgetNumber: budgetNumber ?? null,
+    vehicles: coveredVehicles.length > 0 ? coveredVehicles : [task],
+    services: serviceDescs,
+    fallbackLabel: `Ref. OS ${task.serialNumber || (budgetNumber ? `Orçamento ${budgetNumber}` : "")}`.trim(),
+    categoryLabels: API_TRUCK_CATEGORY_LABELS,
+    implementLabels: API_IMPLEMENT_TYPE_LABELS,
+  });
 
   const enderecoParts = [cd.address, cd.addressNumber].filter(Boolean).join(", ");
   const endereco = [enderecoParts, cd.addressComplement, cd.neighborhood].filter(Boolean).join(" - ");
@@ -414,6 +378,47 @@ function ScaledDoc({ width, children }: { width: number; children: React.ReactNo
   return <div style={{ zoom: width / 760 }}>{children}</div>;
 }
 
+/**
+ * A FAIXA DE MINIATURAS CABE NUMA LINHA SÓ.
+ *
+ * Antes cada cartão tinha 224px travados no código e a faixa era `flex-wrap`:
+ * três documentos somavam 696px numa faixa de ~706px e bastava a barra de
+ * rolagem do modal (17px) aparecer para o terceiro cair sozinho numa segunda
+ * fileira — com uns 460px de vazio ao lado dele. Agora a largura do cartão é o
+ * que sobra dividido pelo número de documentos, medido de verdade
+ * (`ResizeObserver`), com piso e teto; abaixo do piso a faixa rola na
+ * horizontal em vez de quebrar.
+ */
+const STRIP_GAP = 12; // gap-3
+const MIN_CARD = 150; // abaixo disto a miniatura vira mancha
+const MAX_CARD = 320; // acima disto um documento só ocuparia o modal inteiro
+/**
+ * TETO do recorte, em múltiplos da largura — não a altura dele.
+ *
+ * Altura FIXA era o segundo vazio: o DANFSe e o boleto, reduzidos, são mais
+ * BAIXOS que a caixa, e cada cartão terminava com uma faixa branca entre o fim
+ * do documento e o rodapé. Agora a caixa toma a altura natural do documento
+ * reduzido (é isso que o `zoom` devolve) e só corta — com o esmaecido embaixo —
+ * quando o documento passa deste teto.
+ */
+const THUMB_MAX_RATIO = 1.45;
+
+/** Largura REAL do elemento, acompanhada por `ResizeObserver`. */
+function useElementWidth<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => setWidth(el.clientWidth);
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
 function renderDoc(entry: DocEntry) {
   return entry.kind === "nfse" ? (
     <NfsePreview data={entry.data as NfsePreviewData} />
@@ -470,9 +475,12 @@ export function BillingDocumentPreviews({
       // OS VEÍCULOS QUE ESTA FATURA COBRE, na ordem do documento. Recai no
       // veículo aberto quando a relação não veio — um orçamento de um veículo
       // continua com a discriminação de sempre.
-      const coveredVehicles = idsForDoc
-        .map((tid) => (vehiclesByTask ?? {})[tid])
-        .filter((v): v is TaskVehicle => Boolean(v));
+      // Cada veículo carrega o SEU pedido de compra: numa fatura conjunta eles
+      // podem divergir, e a discriminação cita o de cada um em vez de amontoar.
+      const coveredVehicles: TaskVehicle[] = idsForDoc.flatMap((tid) => {
+        const vehicle = (vehiclesByTask ?? {})[tid];
+        return vehicle ? [{ ...vehicle, orderNumber: numbers[tid] ?? null }] : [];
+      });
       const doc = buildCustomerDoc(
         config,
         configServices,
@@ -506,6 +514,22 @@ export function BillingDocumentPreviews({
     vehiclesByTask,
     budgetNumber,
   ]);
+
+  const [stripRef, stripWidth] = useElementWidth<HTMLDivElement>();
+  const cardWidth = useMemo(() => {
+    const count = Math.max(docs.length, 1);
+    if (!stripWidth) return MAX_CARD; // antes da primeira medição
+    const share = (stripWidth - STRIP_GAP * (count - 1)) / count;
+    return Math.floor(Math.max(MIN_CARD, Math.min(MAX_CARD, share)));
+  }, [docs.length, stripWidth]);
+  const thumbMaxHeight = `min(${Math.round(cardWidth * THUMB_MAX_RATIO)}px, 38vh)`;
+  /**
+   * Documentos demais para o piso de 150px: a faixa passa a rolar na horizontal.
+   * Centralizar o que transborda esconderia o primeiro cartão atrás da borda
+   * esquerda, sem rolagem que o alcance — então aí a linha alinha à esquerda.
+   */
+  const rowOverflows =
+    stripWidth > 0 && docs.length * cardWidth + STRIP_GAP * (docs.length - 1) > stripWidth;
 
   const nfseCount = docs.filter((d) => d.kind === "nfse").length;
   const boletoCount = docs.filter((d) => d.kind === "boleto").length;
@@ -543,36 +567,56 @@ export function BillingDocumentPreviews({
         <span className="ml-auto">Clique para abrir em nova aba · documentos ainda não emitidos</span>
       </div>
 
-      <div className="flex flex-wrap gap-3 rounded-lg border border-border bg-neutral-100 dark:bg-neutral-800 p-3 max-h-[44vh] overflow-y-auto">
-        {docs.map((d) => (
-          <button
-            key={d.key}
-            type="button"
-            onClick={() => openInNewTab(d)}
-            className="group flex flex-col overflow-hidden rounded-md border border-border bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-2 hover:ring-primary"
-            style={{ width: 224 }}
-            title={`Abrir ${d.label} — ${d.sublabel} em nova aba`}
-          >
-            {/* Scaled thumbnail (top portion of the document) — no overlay over the PDF */}
-            <div className="relative" style={{ height: 224, overflow: "hidden", borderBottom: "1px solid #e5e5e5" }}>
-              <ScaledDoc width={224}>{renderDoc(d)}</ScaledDoc>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-white" />
-            </div>
-            {/* Always-visible footer affordance (never overlaps the PDF) */}
-            <div className="flex items-center gap-1.5 px-2 py-1.5">
-              {d.kind === "nfse" ? (
-                <IconFileInvoice className="h-4 w-4 shrink-0 text-emerald-600" />
-              ) : (
-                <IconBarcode className="h-4 w-4 shrink-0 text-blue-600" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-foreground">{d.label}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{d.sublabel}</p>
+      <div className="rounded-lg border border-border bg-neutral-100 dark:bg-neutral-800 p-3 overflow-x-auto">
+        <div
+          ref={stripRef}
+          className="grid"
+          style={{
+            gridTemplateColumns: `repeat(${docs.length}, ${cardWidth}px)`,
+            gap: STRIP_GAP,
+            justifyContent: rowOverflows ? "start" : "center",
+            // Sem esticar: cartões de documentos de alturas diferentes param
+            // onde o documento para, em vez de crescerem até o mais alto.
+            alignItems: "start",
+          }}
+        >
+          {docs.map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => openInNewTab(d)}
+              className="group flex flex-col overflow-hidden rounded-md border border-border bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-2 hover:ring-primary"
+              style={{ width: cardWidth }}
+              title={`Abrir ${d.label} — ${d.sublabel} em nova aba`}
+            >
+              {/* Scaled thumbnail (top portion of the document) — no overlay over the PDF */}
+              <div
+                className="relative"
+                style={{
+                  maxHeight: thumbMaxHeight,
+                  overflow: "hidden",
+                  borderBottom: "1px solid #e5e5e5",
+                }}
+              >
+                <ScaledDoc width={cardWidth}>{renderDoc(d)}</ScaledDoc>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-white" />
               </div>
-              <IconExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-            </div>
-          </button>
-        ))}
+              {/* Always-visible footer affordance (never overlaps the PDF) */}
+              <div className="flex items-center gap-1.5 px-2 py-1.5">
+                {d.kind === "nfse" ? (
+                  <IconFileInvoice className="h-4 w-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <IconBarcode className="h-4 w-4 shrink-0 text-blue-600" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-foreground">{d.label}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{d.sublabel}</p>
+                </div>
+                <IconExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

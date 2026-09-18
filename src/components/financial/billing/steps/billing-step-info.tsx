@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
@@ -12,6 +12,8 @@ import { getCustomers } from "@/api-client/customer";
 import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
 import { useResponsibles } from "@/hooks/administration/use-responsible";
+import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
+import { cn } from "@/lib/utils";
 import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/budget-calculations";
 import {
   coverageSummary,
@@ -44,6 +46,7 @@ interface BillingStepInfoProps {
 }
 
 export function BillingStepInfo({
+  task,
   disabled,
   customersCache,
   vehicles,
@@ -78,13 +81,107 @@ export function BillingStepInfo({
   // carried over when the user does a remove-then-add instead of atomic replacement.
   const lastRemovedSingleConfigRef = useRef<any>(null);
 
-  const { data: responsiblesData } = useResponsibles({ isActive: true, pageSize: 200 });
-  const allResponsibles = responsiblesData?.data || [];
-  const responsibleOptions = allResponsibles.map((r: any) => ({
-    value: r.id,
-    label: r.name,
-    description: r.phone ? formatBrazilianPhone(r.phone) : undefined,
-  }));
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OS CONTATOS DO CLIENTE — TODOS, e não só o escolhido
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // ESTE CAMPO É SINGULAR DE PROPÓSITO. `BudgetCustomerConfig.responsibleId` é
+  // UMA coluna (relação `CUSTOMER_CONFIG_RESPONSIBLE`), e o zod da API declara
+  // uma chave só: é o CONTATO DESTA FATURA — quem a NFS-e e o boleto citam e
+  // para quem a cobrança é enviada. Duas pessoas não cabem nesse papel.
+  //
+  // Quem é PLURAL é outra coisa, e é a origem da confusão: `Task.responsibles`
+  // (relação `TaskResponsibles`) guarda os responsáveis do ORÇAMENTO, e é dessa
+  // lista que saem os signatários — por isso o dossiê assinado traz dois nomes
+  // enquanto este quadro mostrava um. Essa lista se edita no assistente de
+  // ORÇAMENTO (o editor de linhas de `budget/details/[taskId].tsx`); daqui ela é
+  // contexto, não escolha.
+  //
+  // O DEFEITO era o quadro não exibir NADA além do escolhido: os demais contatos
+  // do cliente não apareciam em lugar nenhum da tela, e a lista do combobox
+  // vinha do cadastro inteiro sem distinguir quem é deste cliente de quem não é.
+  // Quem faturava não tinha como saber que existiam — muito menos trocar.
+  const { data: responsiblesData } = useResponsibles({
+    isActive: true,
+    // O universo de onde as opções saem. Cortar aqui vira "este contato não
+    // existe" na hora de escolher, que é um erro silencioso e caro.
+    pageSize: 500,
+  });
+  // A ordem é nossa: `ResponsibleGetManyFormData` não tem `orderBy` (mandá-lo
+  // seria erro de tipo), e uma lista de contatos fora de ordem alfabética obriga
+  // a varrer o combobox inteiro para achar um nome.
+  const allResponsibles = useMemo(
+    () =>
+      [...(responsiblesData?.data || [])].sort((a: any, b: any) =>
+        String(a?.name ?? "").localeCompare(String(b?.name ?? ""), "pt-BR"),
+      ),
+    [responsiblesData],
+  );
+
+  /**
+   * OS RESPONSÁVEIS DO ORÇAMENTO — `Task.responsibles`.
+   *
+   * É a lista de onde saem os SIGNATÁRIOS do documento, e é ela que explica um
+   * dossiê com duas assinaturas num quadro que mostrava um nome. Entra aqui como
+   * contexto: quem a edita é o assistente de Orçamento.
+   */
+  const budgetResponsibles: any[] = (task?.responsibles ?? []) as any[];
+
+  /**
+   * Os contatos DESTE cliente.
+   *
+   * Duas origens, unidas: `Responsible.companyId` (o vínculo do cadastro) e os
+   * responsáveis do orçamento. A segunda não é redundância — um contato
+   * cadastrado sem empresa some da primeira, e era justamente ele que ficava
+   * invisível na tela.
+   */
+  const responsiblesOfCustomer = (customerId?: string | null): any[] => {
+    const porVinculo = customerId
+      ? allResponsibles.filter((r: any) => r.companyId === customerId)
+      : [];
+    const vistos = new Set(porVinculo.map((r: any) => r.id));
+    const doOrcamento = budgetResponsibles.filter((r: any) => r?.id && !vistos.has(r.id));
+    return [...porVinculo, ...doOrcamento].sort((a: any, b: any) =>
+      String(a?.name ?? "").localeCompare(String(b?.name ?? ""), "pt-BR"),
+    );
+  };
+
+  /** Papéis + telefone, que é o que distingue dois contatos do mesmo cliente. */
+  const describeResponsible = (r: any): string | undefined => {
+    const parts = [
+      formatResponsibleRoles(getResponsibleRoles(r)),
+      r.phone ? formatBrazilianPhone(r.phone) : "",
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" · ") : undefined;
+  };
+
+  /**
+   * As opções: os do cliente PRIMEIRO, os demais depois e rotulados.
+   *
+   * Os demais continuam escolhíveis — um contato pode ter sido cadastrado sem
+   * empresa, e escondê-lo tornaria impossível reproduzir uma escolha antiga (ou
+   * conservar a que já está gravada, que ficaria sem rótulo no gatilho).
+   */
+  const responsibleOptionsFor = (customerId?: string | null) => {
+    const doCliente = responsiblesOfCustomer(customerId);
+    const idsDoCliente = new Set(doCliente.map((r: any) => r.id));
+    return [
+      ...doCliente.map((r: any) => ({
+        value: r.id,
+        label: r.name,
+        description: describeResponsible(r),
+      })),
+      ...allResponsibles
+        .filter((r: any) => !idsDoCliente.has(r.id))
+        .map((r: any) => ({
+          value: r.id,
+          label: r.name,
+          description: ["Não cadastrado neste cliente", describeResponsible(r)]
+            .filter(Boolean)
+            .join(" · "),
+        })),
+    ];
+  };
 
   // Pin the Ibiporã customer first (the highest-volume invoice-to client).
   const PINNED_CUSTOMER_ID = PINNED_CUSTOMERS.IBIPORA;
@@ -387,7 +484,20 @@ export function BillingStepInfo({
             {customerConfigs.map((config: any, i: number) => {
               const cached = customersCache.current.get(config.customerId);
               const customerName = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
-              const selectedResp = allResponsibles.find((r: any) => r.id === config.responsibleId);
+              const contatosDoCliente = responsiblesOfCustomer(config.customerId);
+              // A escolha gravada pode ser um contato INATIVO (fora de
+              // `allResponsibles`): procurar nas três origens é o que impede a
+              // tela de dizer "nenhum responsável" sobre uma fatura que tem um.
+              const selectedResp =
+                contatosDoCliente.find((r: any) => r.id === config.responsibleId) ||
+                allResponsibles.find((r: any) => r.id === config.responsibleId) ||
+                budgetResponsibles.find((r: any) => r?.id === config.responsibleId);
+              // O escolhido entra na relação mesmo sem vínculo com o cliente:
+              // esconder a escolha gravada seria mentir sobre o que vai na nota.
+              const contatosVisiveis =
+                selectedResp && !contatosDoCliente.some((r: any) => r.id === selectedResp.id)
+                  ? [...contatosDoCliente, selectedResp]
+                  : contatosDoCliente;
 
               return (
                 // A chave não pode ser o cliente: num orçamento cobrado veículo
@@ -411,7 +521,7 @@ export function BillingStepInfo({
                           shouldDirty: true,
                         })
                       }
-                      options={responsibleOptions}
+                      options={responsibleOptionsFor(config.customerId)}
                       placeholder="Selecione o responsável..."
                       searchPlaceholder="Buscar responsável..."
                       emptyText="Nenhum responsável encontrado"
@@ -420,38 +530,95 @@ export function BillingStepInfo({
                       disabled={disabled}
                       className="w-full"
                     />
+                    {contatosDoCliente.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        {contatosDoCliente.length} contatos cadastrados neste cliente. O escolhido é
+                        o que a nota, o boleto e a cobrança citam — os signatários do documento são
+                        os responsáveis do orçamento, e se editam lá.
+                      </p>
+                    )}
                   </div>
-                  {selectedResp && (
-                    <div className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3">
-                      <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                        <IconUser className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{selectedResp.name}</div>
-                        {selectedResp.phone && (
-                          <div className="text-xs text-muted-foreground">{formatBrazilianPhone(selectedResp.phone)}</div>
-                        )}
-                      </div>
-                      {/* A LIXEIRA QUE FALTAVA. O cartão do cliente, três blocos
-                          acima, tem a dele; este não tinha, e os dois cartões são
-                          visualmente o mesmo objeto — o mesmo fundo, o mesmo
-                          recorte, o mesmo lugar na página. Tirar o responsável
-                          exigia abrir o combobox e achar o "x", que é outro alvo,
-                          noutro lugar, para a mesma ação. */}
-                      {!disabled && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            setValue(`customerConfigs.${idxReal(i)}.responsibleId`, null, {
-                              shouldDirty: true,
-                            })
-                          }
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </Button>
-                      )}
+                  {/* ─── TODOS OS CONTATOS DO CLIENTE, NÃO SÓ O ESCOLHIDO ──────
+                      Era um cartão só, o do selecionado. Um cliente com dois
+                      contatos — o caso do orçamento que gerou este conserto —
+                      aparecia com um, e o outro só existia dentro do combobox
+                      fechado. Agora a relação é a do cadastro: o escolhido vem
+                      destacado, e os demais trocam com um clique. */}
+                  {contatosVisiveis.length > 0 && (
+                    <div className="space-y-2">
+                      {contatosVisiveis.map((rep: any) => {
+                        const isSelected = rep.id === config.responsibleId;
+                        const roles = formatResponsibleRoles(getResponsibleRoles(rep));
+                        return (
+                          <div
+                            key={rep.id}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg px-4 py-3",
+                              isSelected
+                                ? "bg-primary/10 ring-1 ring-primary/30"
+                                : "bg-muted/30",
+                            )}
+                          >
+                            <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                              <IconUser className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{rep.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {[roles, rep.phone ? formatBrazilianPhone(rep.phone) : ""]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <>
+                                <Badge variant="secondary" className="whitespace-nowrap">
+                                  Contato desta fatura
+                                </Badge>
+                                {/* A LIXEIRA QUE FALTAVA. O cartão do cliente, no
+                                    quadro ao lado, tem a dele; este não tinha, e os
+                                    dois são visualmente o mesmo objeto. Tirar o
+                                    responsável exigia abrir o combobox e achar o
+                                    "x" — outro alvo, noutro lugar, para a mesma
+                                    ação. */}
+                                {!disabled && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() =>
+                                      setValue(
+                                        `customerConfigs.${idxReal(i)}.responsibleId`,
+                                        null,
+                                        { shouldDirty: true },
+                                      )
+                                    }
+                                  >
+                                    <IconTrash className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
+                            ) : (
+                              !disabled && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="whitespace-nowrap"
+                                  onClick={() =>
+                                    setValue(
+                                      `customerConfigs.${idxReal(i)}.responsibleId`,
+                                      rep.id,
+                                      { shouldDirty: true },
+                                    )
+                                  }
+                                >
+                                  Usar este
+                                </Button>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
