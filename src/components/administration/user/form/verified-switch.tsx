@@ -25,7 +25,7 @@ export function VerifiedSwitch({ disabled }: VerifiedSwitchProps) {
               Verificação Manual do Usuário
             </FormLabel>
             <p className="text-sm text-muted-foreground">
-              Marque para verificar o usuário manualmente, sem exigir confirmação por email/SMS
+              Marque para verificar o usuário manualmente, sem exigir confirmação por e-mail/WhatsApp
             </p>
           </div>
           <FormControl>

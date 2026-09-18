@@ -83,7 +83,7 @@ export function VerificationCodeForm({
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-semibold">Verificar conta</CardTitle>
         <CardDescription className="text-base">
-          Digite o código de {codeLength} dígitos enviado {verificationType === "phone" ? "por SMS" : "por email"}
+          Digite o código de {codeLength} dígitos enviado {verificationType === "phone" ? "por WhatsApp" : "por e-mail"}
           {contactInfo && <span className="font-medium"> para {contactInfo}</span>}
         </CardDescription>
       </CardHeader>
