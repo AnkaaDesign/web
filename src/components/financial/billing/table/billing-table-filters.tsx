@@ -58,25 +58,24 @@ const BILLING_STATUS_OPTIONS = (Object.values(BILLING_STATUS) as BILLING_STATUS[
  * exige `quote.status notIn [PENDING, SIGNED, EXPIRED]`.
  *
  * `GET /billings` NÃO tem padrão para este parâmetro — quem não o manda vê tudo.
- * Estes dois estados reproduzem exatamente o escopo antigo:
+ * O padrão da tela é UM estado:
  *
- *  · `APPROVED` — vendido; é o que se fatura.
- *  · `CANCELLED` — um orçamento cancelado com cobrança viva é justamente o que
- *    alguém precisa achar e encerrar. Escondê-lo faria o passivo sumir da tela
- *    sem sumir do banco.
+ *  · `APPROVED` — vendido; é o que se fatura, e é a fila que o financeiro abre.
  *
  * Ficam de fora `PENDING`, `SIGNED` e `EXPIRED`. O motivo está no schema antigo,
  * e continua valendo: "um orçamento vencido, à espera de reanálise do valor,
  * aparecendo na fila de faturar é pedir para alguém faturar um preço que o
  * comercial acabou de decidir rever".
  *
+ * ⚠️ `CANCELLED` TAMBÉM ficou de fora do padrão (antes vinha junto). Uma cobrança
+ * viva pendurada num orçamento cancelado continua no banco e continua achável —
+ * mas agora só marcando "Cancelado" à mão neste filtro. Quem for caçar passivo
+ * precisa abrir o escopo.
+ *
  * O filtro é VISÍVEL para que dê para ampliar o escopo à mão quando a pergunta
- * for outra — mas vazio quer dizer estes dois, e não "todos".
+ * for outra — mas vazio quer dizer este estado, e não "todos".
  */
-export const BILLING_DEFAULT_QUOTE_STATUSES: string[] = [
-  TASK_QUOTE_STATUS.APPROVED,
-  TASK_QUOTE_STATUS.CANCELLED,
-];
+export const BILLING_DEFAULT_QUOTE_STATUSES: string[] = [TASK_QUOTE_STATUS.APPROVED];
 
 const QUOTE_STATUS_OPTIONS = (Object.values(TASK_QUOTE_STATUS) as TASK_QUOTE_STATUS[]).map((value) => ({
   value,
@@ -94,7 +93,12 @@ const QUOTE_STATUS_OPTIONS = (Object.values(TASK_QUOTE_STATUS) as TASK_QUOTE_STA
  * não foi entregue.
  *
  * Só há duas opções porque só há dois estados que a rota sabe responder: o
- * parâmetro é booleano e `false` não filtra nada. Vazio = "Todas".
+ * parâmetro é booleano e `false` não filtra nada.
+ *
+ * ⚠️ VAZIO = "Entregues", não "Todas" — mesma convenção do status do orçamento.
+ * Faturar é cobrar o que já saiu, então a fila abre nesse recorte. Ver "Todas"
+ * exige escolher "Todas" explicitamente, e é por isso que essa opção existe na
+ * lista em vez de ser só o placeholder.
  */
 const DELIVERY_OPTIONS = [
   { value: "delivered", label: "Entregues" },
@@ -136,7 +140,8 @@ export function createBillingFilterDefs(opts: { invoiceCustomers: Customer[]; ta
       label: "Entrega",
       type: "select",
       icon: <IconTruckDelivery className="h-4 w-4" />,
-      placeholder: "Todas",
+      // O texto do campo vazio DIZ o padrão, em vez de sugerir "todas".
+      placeholder: "Entregues",
       options: DELIVERY_OPTIONS,
     },
     {
@@ -154,7 +159,7 @@ export function createBillingFilterDefs(opts: { invoiceCustomers: Customer[]; ta
       icon: <IconFileInvoice className="h-4 w-4" />,
       // O texto do campo vazio DIZ o padrão, em vez de sugerir "todos": é o que
       // impede alguém de concluir que a lista já mostra orçamento pendente.
-      placeholder: "Aprovados e cancelados",
+      placeholder: "Aprovados",
       options: QUOTE_STATUS_OPTIONS,
     },
     {
@@ -257,9 +262,10 @@ export function buildBillingQuery(filters: DataTableFilterValues, search: string
     : [];
   q.quoteStatuses = quoteStatuses.length > 0 ? quoteStatuses : BILLING_DEFAULT_QUOTE_STATUSES;
 
-  // Vazio é "Todas": `deliveredOnly=false` não filtra nada no servidor, então
-  // mandá-lo seria ruído na query string e na `queryKey`.
-  if (filters.delivery === "delivered") q.deliveredOnly = true;
+  // ⚠️ Vazio é "Entregues" — ver `DELIVERY_OPTIONS`. Só "all", escolhido à mão,
+  // solta o filtro; e aí não se manda `deliveredOnly=false`, que não filtra nada
+  // no servidor e só seria ruído na query string e na `queryKey`.
+  if (filters.delivery !== "all") q.deliveredOnly = true;
 
   if (filters.approved === "approved") q.approved = true;
   else if (filters.approved === "pending") q.approved = false;
