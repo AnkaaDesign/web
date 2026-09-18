@@ -4,7 +4,7 @@ import { Suspense, useEffect } from "react";
 // call sites below are unchanged.
 import { lazyWithRetry as lazy } from "@/lib/lazy-with-retry";
 import { ErrorBoundary } from "@/components/navigation/error-boundary";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -695,36 +695,86 @@ function App() {
                 `AuthProvider` (no catch-all), e é por isso que toda mensagem de
                 toast das páginas públicas é invisível hoje — defeito já
                 documentado em `pages/public/signature/[token].tsx`. */}
+            {/* UM provider para as duas telas do portal, e não um por rota.
+
+                Eram dois `element` IRMÃOS, cada um abrindo o seu
+                `ResponsibleAuthProvider`. Como irmãos, entrar e painel nunca
+                estão montados ao mesmo tempo: sair da tela de entrada DESMONTAVA
+                um provider e MONTAVA outro, com estado zerado. O token sobrevive
+                (mora no localStorage), então ninguém era deslogado — mas o
+                provider novo nascia com `isLoading: true` e refazia
+                `GET /cliente/auth/eu` do zero, e o contato via um spinner de
+                tela cheia no instante seguinte a acertar o código, logo depois
+                de a sessão inteira já ter vindo na resposta do login.
+
+                Como rota-MÃE, o provider atravessa a navegação: o estado que
+                `enter()` acabou de preencher continua lá e a ida para o painel é
+                imediata. O <Toaster/> pelo mesmo motivo — um só, e não um por
+                tela.
+
+                A mãe é uma rota de LAYOUT, sem `path`, e isso é deliberado. Com
+                `path="/cliente"` ela casaria SOZINHA: `/cliente` puro passaria a
+                renderizar o provider com um <Outlet/> vazio — uma página em
+                branco onde antes havia o catch-all. Sem `path`, a mãe só entra
+                quando um filho casa, e `/cliente` puro segue caindo no catch-all
+                exatamente como antes do portal existir. (Este erro foi cometido
+                e pego pelo teste em `constants/routes.customer.test.ts`.) */}
             <Route
-              path="/cliente/entrar"
               element={
                 <ResponsibleAuthProvider>
                   <Toaster />
-                  <Suspense fallback={<PageLoader />}>
-                    <ClienteEntrarPage />
-                  </Suspense>
-                </ResponsibleAuthProvider>
-              }
-            />
-            <Route
-              path="/cliente/painel/*"
-              element={
-                <ResponsibleAuthProvider>
-                  <Toaster />
-                  <ResponsibleRoute>
-                    <ResponsibleLayout />
-                  </ResponsibleRoute>
+                  <Outlet />
                 </ResponsibleAuthProvider>
               }
             >
               <Route
-                index
+                path="/cliente/entrar"
                 element={
                   <Suspense fallback={<PageLoader />}>
-                    <ClientePainelPage />
+                    <ClienteEntrarPage />
                   </Suspense>
                 }
               />
+              <Route
+                path="/cliente/painel/*"
+                element={
+                  <ResponsibleRoute>
+                    <ResponsibleLayout />
+                  </ResponsibleRoute>
+                }
+              >
+                <Route
+                  index
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClientePainelPage />
+                    </Suspense>
+                  }
+                />
+                {/* Sub-rota que não existe volta para o painel.
+
+                    Sem esta linha, `/cliente/painel/qualquer-coisa` casava com o
+                    shell e com NENHUM filho: o <Outlet/> renderizava `null` e o
+                    contato via o cabeçalho do portal sobre uma página EM BRANCO
+                    — sem erro, sem 404 e sem caminho de volta. Um link velho, um
+                    autocomplete do navegador ou um `state.from` guardado de uma
+                    rota que deixou de existir chegam exatamente assim. E o
+                    `state.from` piora: a pessoa entra com o código e é mandada
+                    de volta para a mesma página vazia.
+
+                    ⚠️ Isto NÃO cobre `/cliente/painel/orcamento/:id` nem
+                    `/cliente/painel/dossie/:id`: essas URLs nem chegam aqui.
+                    `/cliente/:customerId/orcamento/:id` é uma rota PÚBLICA irmã
+                    e o React Router a pontua ACIMA de um splat, então ela engole
+                    o caminho com `customerId = "painel"`. Há teste fixando isso
+                    em `constants/routes.customer.test.ts`: se um dia o portal
+                    precisar de uma seção com um desses nomes, a colisão aparece
+                    lá antes de aparecer para o cliente. */}
+                <Route
+                  path="*"
+                  element={<Navigate to={routes.customer.portal.root} replace />}
+                />
+              </Route>
             </Route>
 
             {/* All other routes wrapped in auth and notification providers */}
