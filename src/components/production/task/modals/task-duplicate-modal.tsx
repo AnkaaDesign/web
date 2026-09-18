@@ -307,7 +307,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
           discountValue: config.discountValue != null ? Number(config.discountValue) : null,
           discountReference: config.discountReference || null,
           customPaymentText: config.customPaymentText || null,
-          responsibleId: config.responsibleId || null,
           paymentCondition: normalizePaymentCondition(config.paymentCondition),
           paymentConfig: config.paymentConfig || null,
           generateInvoice: config.generateInvoice ?? true,

@@ -121,7 +121,6 @@ export interface BudgetPayer extends BaseEntity {
    * para as tarefas) — nenhuma tela deste repositório o manda.
    */
   orderNumber?: string | null;
-  responsibleId?: string | null;
   paymentCondition?: string | null;
   paymentConfig?: PaymentConfig | null;
   customerSignatureId?: string | null;

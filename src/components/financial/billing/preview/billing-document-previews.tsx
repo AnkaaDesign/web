@@ -301,8 +301,8 @@ function buildCustomerDoc(
   const endereco = [enderecoParts, cd.addressComplement, cd.neighborhood].filter(Boolean).join(" - ");
   const municipioUf = [cd.city, cd.state].filter(Boolean).join("-");
   const cnpjCpf = formatCnpjCpf(cd.cnpj, cd.cpf);
-  // Mesma precedência da emissão (cadastro → responsável do faturamento); `phones` é array.
-  const tomadorContact = resolveTomadorContact(cd, (config as any)?.responsible);
+  // Mesma precedência da emissão (cadastro do cliente); `phones` é array.
+  const tomadorContact = resolveTomadorContact(cd);
   const cep = formatCep(cd.zipCode);
 
   const now = new Date();

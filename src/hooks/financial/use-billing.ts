@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { billingService, type BillingListParams, type BillingListResponse } from "@/api-client/billing";
 import { receivableKeys, reconciliationKeys } from "@/hooks/common/query-keys";
 
@@ -69,6 +69,19 @@ export function useBillings(
     queryKey: billingKeys.list(params ?? {}),
     queryFn: () => billingService.list(params),
     enabled: options?.enabled !== false,
+    // ⚠️ A PÁGINA ANTERIOR FICA NA TELA ENQUANTO A SEGUINTE VIAJA.
+    //
+    // Paginar troca a `queryKey`, e sem isto o React Query devolve `undefined`
+    // até a resposta chegar: a lista pisca vazia e `meta.totalRecords` vira 0 —
+    // que a tabela lê como "existe 1 página", colapsando o rodapé e
+    // DESABILITANDO o próprio botão de avançar que o usuário acabou de clicar.
+    // Era o "clico e às vezes não vai" desta tela.
+    //
+    // `keepPreviousData` é a resposta idiomática: os dados velhos seguem
+    // visíveis, `isPlaceholderData` marca que são velhos, e a contagem nunca
+    // passa por zero. Ver também o `effectiveRowCount` do DataTable, que é o
+    // cinto de segurança para as listas que ainda não fazem isto.
+    placeholderData: keepPreviousData,
     ...(options?.staleTime !== undefined ? { staleTime: options.staleTime } : {}),
     ...(options?.refetchOnWindowFocus !== undefined
       ? { refetchOnWindowFocus: options.refetchOnWindowFocus }

@@ -199,7 +199,7 @@ export function PublicServiceReportPage() {
   const primaryResponsible = pickPrimaryResponsible<any>(
     quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? []),
   );
-  const contactName = activeConfig?.responsible?.name || primaryResponsible?.name || "";
+  const contactName = primaryResponsible?.name || "";
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
 

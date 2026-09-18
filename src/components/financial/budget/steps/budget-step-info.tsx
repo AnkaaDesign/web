@@ -236,7 +236,6 @@ export function BudgetStepInfo({
           customPaymentText: null,
           generateInvoice: true,
           generateBankSlip: true,
-          responsibleId: null,
           customerData: {
             corporateName: cached?.corporateName || "",
             fantasyName: cached?.fantasyName || "",

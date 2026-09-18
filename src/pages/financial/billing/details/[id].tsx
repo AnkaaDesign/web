@@ -295,11 +295,11 @@ const BillingDetailPageInner = ({
       // Task layouts — the pool the billing "Layout Aprovado" picker chooses from.
       layouts: { include: { file: true } },
       // OS RESPONSÁVEIS DO ORÇAMENTO (`Task.responsibles`, relação
-      // `TaskResponsibles`) — a lista de onde saem os SIGNATÁRIOS do documento.
-      // O quadro "Responsável pelo Orçamento" precisa dela para mostrar TODOS os
-      // contatos, e não só o escolhido: um orçamento assinado por duas pessoas
-      // aparecia aqui com uma, porque o cartão só desenhava
-      // `customerConfigs[].responsibleId` — que é UM contato, o da fatura.
+      // `TaskResponsibles`) — a lista de onde saem os SIGNATÁRIOS do documento,
+      // e a ÚNICA: `BudgetPayer.responsibleId`, o contato eleito por fatura, não
+      // existe mais. Havia um quadro "Responsável pelo Orçamento" que desenhava
+      // aquele contato único, e um orçamento assinado por duas pessoas aparecia
+      // nele com uma só. Quem escolhe quem assina é o envio para assinatura.
       responsibles: true,
       quote: {
         include: {
@@ -840,19 +840,6 @@ const BillingDetailPageInner = ({
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
         generateBankSlip: config.generateBankSlip !== false,
-        responsibleId: config.responsibleId || null,
-        // Contato do responsável escolhido para ESTE faturamento — é o que a emissão usa
-        // quando o cadastro do cliente não tem telefone/e-mail, então o Resumo e a
-        // pré-visualização precisam dele para não mostrarem contato vazio numa nota que
-        // sai preenchida. Não é reenviado no save (o payload lista os campos um a um).
-        responsible: config.responsible
-          ? {
-              id: config.responsible.id,
-              name: config.responsible.name,
-              email: config.responsible.email ?? null,
-              phone: config.responsible.phone ?? null,
-            }
-          : null,
         customerData: {
           corporateName: config.customer?.corporateName || "",
           fantasyName: config.customer?.fantasyName || "",
@@ -1483,7 +1470,6 @@ const BillingDetailPageInner = ({
         customPaymentText: c.customPaymentText || null,
         generateInvoice: c.generateInvoice !== false,
         generateBankSlip: c.generateBankSlip !== false,
-        responsibleId: c.responsibleId || null,
       });
 
       const billingConfigsPayload = billingSplitChanged
@@ -1913,11 +1899,6 @@ const BillingDetailPageInner = ({
                           <BillingStepInfo
                             disabled={!canEdit}
                             customersCache={customersCache}
-                            // Para o quadro de responsáveis listar os do
-                            // ORÇAMENTO (os signatários), e não só o contato
-                            // gravado nesta fatura.
-                            task={task}
-                            vehicles={quoteVehicleRows as any}
                             // O RECORTE: os pagadores desta cobrança, não os do
                             // orçamento. Sem isto, três caminhões do mesmo
                             // cliente apareciam como "3 selecionados" do mesmo

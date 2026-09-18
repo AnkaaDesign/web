@@ -535,7 +535,6 @@ const FinancialBudgetDetailPageInner = () => {
             c.generateInvoice !== undefined ? c.generateInvoice : true,
           generateBankSlip:
             c.generateBankSlip !== undefined ? c.generateBankSlip : true,
-          responsibleId: c.responsibleId || null,
           customerData: {
             corporateName: c.customer?.corporateName || "",
             fantasyName: c.customer?.fantasyName || "",

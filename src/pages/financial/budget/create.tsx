@@ -289,7 +289,6 @@ export const FinancialBudgetCreatePage = () => {
         customPaymentText: null,
         generateInvoice: true,
         generateBankSlip: true,
-        responsibleId: null,
         customerData: {
           corporateName: customerData?.corporateName || "",
           fantasyName: customerData?.fantasyName || "",

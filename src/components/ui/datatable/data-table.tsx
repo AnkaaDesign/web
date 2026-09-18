@@ -33,6 +33,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { cn } from "@/lib/utils";
 import { useDataTable } from "./use-data-table";
+import { useUrlParams } from "./use-url-params";
 import { DataTableToolbar, type ShareAction } from "./data-table-toolbar";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableFilterSheet } from "./data-table-filter-sheet";
@@ -317,7 +318,10 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     rowReorder,
   } = props;
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  // UM escritor por tabela, compartilhado com o motor (`useDataTable`). Ver
+  // `useUrlParams`: dois acumuladores independentes voltam a se apagar.
+  const writeUrl = useUrlParams(syncUrl);
   const internalScrollRef = useRef<HTMLDivElement | null>(null);
   // Windowed mode: `autoHeight` + a shared (external) scroll container → this table has NO inner scroll
   // and virtualizes against that page container via scrollMargin, so several tables stack under one
@@ -390,18 +394,12 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
 
   const writeParam = useCallback(
     (key: string, value: string | null) => {
-      if (!syncUrl) return;
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (value) next.set(key, value);
-          else next.delete(key);
-          return next;
-        },
-        { replace: true },
-      );
+      writeUrl((p) => {
+        if (value) p.set(key, value);
+        else p.delete(key);
+      });
     },
-    [setSearchParams, syncUrl],
+    [writeUrl],
   );
 
   // Mirror the "view selected only" toggle to the URL so it persists across reloads and is encoded
@@ -502,8 +500,26 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     return rows;
   }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selForFilter, getId, getSubRows, pruneSubRows]);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // A CONTAGEM NÃO É ZERO ENQUANTO A PRÓXIMA PÁGINA NÃO CHEGA
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Em modo servidor, uma consulta sem `placeholderData` devolve `undefined`
+  // enquanto a página seguinte viaja, e a tela repassa `rowCount = 0`. O
+  // TanStack calcula `getPageCount() = 0`, o rodapé colapsa para "1 de 1" e
+  // DESABILITA o botão de avançar — exatamente no instante em que o usuário
+  // costuma clicar de novo. Era o "clico e às vezes não vai" do Faturamento.
+  //
+  // Zero não é a resposta; é a ausência de resposta. Enquanto ela não chega,
+  // vale a última contagem conhecida. Zero de verdade (uma busca sem resultado)
+  // chega com `isLoading` falso e passa direto.
+  const lastKnownRowCount = useRef(0);
+  if (typeof rowCount === "number" && rowCount > 0) lastKnownRowCount.current = rowCount;
+  const effectiveRowCount = mode === "server" && isLoading && !rowCount ? lastKnownRowCount.current : rowCount;
+
   const dt = useDataTable<TData>({
     tableId,
+    writeUrl,
     data: filtered,
     columns,
     scrollRef,
@@ -516,7 +532,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     // ref note in DataRowInner). A stable `getRowId` prop must stay stable all the way down.
     getRowId,
     mode,
-    rowCount,
+    rowCount: effectiveRowCount,
     defaultPageSize,
     defaultSorting,
     enableColumnResizing,
@@ -650,7 +666,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
       onSelectionChangeRef.current?.([...idSet]);
     }
   }, [selectionKey]);
-  const totalItems = mode === "client" ? filtered.length : rowCount ?? filtered.length;
+  // Mesma razão do `effectiveRowCount`: "0 resultado(s)" piscando no rodapé a
+  // cada troca de página é ruído, e é mentira enquanto a resposta não chegou.
+  const totalItems = mode === "client" ? filtered.length : effectiveRowCount ?? filtered.length;
   // Export row sources — the share dialog lets the user pick the scope (selected / current page /
   // ALL filtered rows). "Selected" and "All" are resolved lazily on export: client mode reads the
   // in-memory pre-pagination model; server mode calls the page's fetch-all hook (one request).

@@ -1,42 +1,20 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { formatCNPJ, formatBrazilianPhone } from "@/utils";
-import { IconUsers, IconUser, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
+import { formatCNPJ } from "@/utils";
+import { IconUsers, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
 import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 import { PINNED_CUSTOMERS } from "@/config/company";
-import { useResponsibles } from "@/hooks/administration/use-responsible";
-import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
-import { cn } from "@/lib/utils";
 import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/budget-calculations";
-import {
-  coverageSummary,
-  hasMultipleCustomers as hasMultipleCustomersOf,
-} from "@/utils/quote-tasks";
 
 interface BillingStepInfoProps {
-  task?: any;
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
-  /**
-   * OS VEÍCULOS do orçamento — só para NOMEAR a fatura.
-   *
-   * O rótulo de cada responsável era o nome do cliente; num orçamento cobrado
-   * veículo a veículo ele se repete N vezes e não identifica nada. O veículo
-   * desempata.
-   */
-  vehicles?: Array<{
-    id: string;
-    name?: string | null;
-    serialNumber?: string | null;
-    truck?: { plate?: string | null } | null;
-  }>;
   /**
    * As posições, na lista do ORÇAMENTO, dos pagadores DESTA cobrança.
    * Ausente = a lista inteira — é a tela de orçamento, onde a pergunta é do
@@ -46,10 +24,8 @@ interface BillingStepInfoProps {
 }
 
 export function BillingStepInfo({
-  task,
   disabled,
   customersCache,
-  vehicles,
   configIdx,
 }: BillingStepInfoProps) {
   const { control, setValue, getValues } = useFormContext();
@@ -74,114 +50,10 @@ export function BillingStepInfo({
   // mesmo sobre o contrato).
   const escopo: number[] = configIdx ?? todosConfigs.map((_: any, i: number) => i);
   const customerConfigs = escopo.map((i) => todosConfigs[i]).filter(Boolean);
-  /** A posição REAL no formulário de um config deste recorte. */
-  const idxReal = (posNoEscopo: number) => escopo[posNoEscopo];
 
   // Stores the last single customer config before it was removed, so discount can be
   // carried over when the user does a remove-then-add instead of atomic replacement.
   const lastRemovedSingleConfigRef = useRef<any>(null);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // OS CONTATOS DO CLIENTE — TODOS, e não só o escolhido
-  // ═══════════════════════════════════════════════════════════════════════════
-  //
-  // ESTE CAMPO É SINGULAR DE PROPÓSITO. `BudgetCustomerConfig.responsibleId` é
-  // UMA coluna (relação `CUSTOMER_CONFIG_RESPONSIBLE`), e o zod da API declara
-  // uma chave só: é o CONTATO DESTA FATURA — quem a NFS-e e o boleto citam e
-  // para quem a cobrança é enviada. Duas pessoas não cabem nesse papel.
-  //
-  // Quem é PLURAL é outra coisa, e é a origem da confusão: `Task.responsibles`
-  // (relação `TaskResponsibles`) guarda os responsáveis do ORÇAMENTO, e é dessa
-  // lista que saem os signatários — por isso o dossiê assinado traz dois nomes
-  // enquanto este quadro mostrava um. Essa lista se edita no assistente de
-  // ORÇAMENTO (o editor de linhas de `budget/details/[taskId].tsx`); daqui ela é
-  // contexto, não escolha.
-  //
-  // O DEFEITO era o quadro não exibir NADA além do escolhido: os demais contatos
-  // do cliente não apareciam em lugar nenhum da tela, e a lista do combobox
-  // vinha do cadastro inteiro sem distinguir quem é deste cliente de quem não é.
-  // Quem faturava não tinha como saber que existiam — muito menos trocar.
-  const { data: responsiblesData } = useResponsibles({
-    isActive: true,
-    // O universo de onde as opções saem. Cortar aqui vira "este contato não
-    // existe" na hora de escolher, que é um erro silencioso e caro.
-    pageSize: 500,
-  });
-  // A ordem é nossa: `ResponsibleGetManyFormData` não tem `orderBy` (mandá-lo
-  // seria erro de tipo), e uma lista de contatos fora de ordem alfabética obriga
-  // a varrer o combobox inteiro para achar um nome.
-  const allResponsibles = useMemo(
-    () =>
-      [...(responsiblesData?.data || [])].sort((a: any, b: any) =>
-        String(a?.name ?? "").localeCompare(String(b?.name ?? ""), "pt-BR"),
-      ),
-    [responsiblesData],
-  );
-
-  /**
-   * OS RESPONSÁVEIS DO ORÇAMENTO — `Task.responsibles`.
-   *
-   * É a lista de onde saem os SIGNATÁRIOS do documento, e é ela que explica um
-   * dossiê com duas assinaturas num quadro que mostrava um nome. Entra aqui como
-   * contexto: quem a edita é o assistente de Orçamento.
-   */
-  const budgetResponsibles: any[] = (task?.responsibles ?? []) as any[];
-
-  /**
-   * Os contatos DESTE cliente.
-   *
-   * Duas origens, unidas: `Responsible.companyId` (o vínculo do cadastro) e os
-   * responsáveis do orçamento. A segunda não é redundância — um contato
-   * cadastrado sem empresa some da primeira, e era justamente ele que ficava
-   * invisível na tela.
-   */
-  const responsiblesOfCustomer = (customerId?: string | null): any[] => {
-    const porVinculo = customerId
-      ? allResponsibles.filter((r: any) => r.companyId === customerId)
-      : [];
-    const vistos = new Set(porVinculo.map((r: any) => r.id));
-    const doOrcamento = budgetResponsibles.filter((r: any) => r?.id && !vistos.has(r.id));
-    return [...porVinculo, ...doOrcamento].sort((a: any, b: any) =>
-      String(a?.name ?? "").localeCompare(String(b?.name ?? ""), "pt-BR"),
-    );
-  };
-
-  /** Papéis + telefone, que é o que distingue dois contatos do mesmo cliente. */
-  const describeResponsible = (r: any): string | undefined => {
-    const parts = [
-      formatResponsibleRoles(getResponsibleRoles(r)),
-      r.phone ? formatBrazilianPhone(r.phone) : "",
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join(" · ") : undefined;
-  };
-
-  /**
-   * As opções: os do cliente PRIMEIRO, os demais depois e rotulados.
-   *
-   * Os demais continuam escolhíveis — um contato pode ter sido cadastrado sem
-   * empresa, e escondê-lo tornaria impossível reproduzir uma escolha antiga (ou
-   * conservar a que já está gravada, que ficaria sem rótulo no gatilho).
-   */
-  const responsibleOptionsFor = (customerId?: string | null) => {
-    const doCliente = responsiblesOfCustomer(customerId);
-    const idsDoCliente = new Set(doCliente.map((r: any) => r.id));
-    return [
-      ...doCliente.map((r: any) => ({
-        value: r.id,
-        label: r.name,
-        description: describeResponsible(r),
-      })),
-      ...allResponsibles
-        .filter((r: any) => !idsDoCliente.has(r.id))
-        .map((r: any) => ({
-          value: r.id,
-          label: r.name,
-          description: ["Não cadastrado neste cliente", describeResponsible(r)]
-            .filter(Boolean)
-            .join(" · "),
-        })),
-    ];
-  };
 
   // Pin the Ibiporã customer first (the highest-volume invoice-to client).
   const PINNED_CUSTOMER_ID = PINNED_CUSTOMERS.IBIPORA;
@@ -283,7 +155,6 @@ export function BillingStepInfo({
           customPaymentText: null,
           generateInvoice: true,
           generateBankSlip: true,
-          responsibleId: null,
           customerData: {
             corporateName: cached?.corporateName || "",
             fantasyName: cached?.fantasyName || "",
@@ -470,163 +341,6 @@ export function BillingStepInfo({
           )}
         </CardContent>
       </Card>
-
-      {/* Responsável pelo Orçamento */}
-      {customerConfigs.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <IconUser className="h-4 w-4 text-muted-foreground" />
-              Responsável pelo Orçamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {customerConfigs.map((config: any, i: number) => {
-              const cached = customersCache.current.get(config.customerId);
-              const customerName = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
-              const contatosDoCliente = responsiblesOfCustomer(config.customerId);
-              // A escolha gravada pode ser um contato INATIVO (fora de
-              // `allResponsibles`): procurar nas três origens é o que impede a
-              // tela de dizer "nenhum responsável" sobre uma fatura que tem um.
-              const selectedResp =
-                contatosDoCliente.find((r: any) => r.id === config.responsibleId) ||
-                allResponsibles.find((r: any) => r.id === config.responsibleId) ||
-                budgetResponsibles.find((r: any) => r?.id === config.responsibleId);
-              // O escolhido entra na relação mesmo sem vínculo com o cliente:
-              // esconder a escolha gravada seria mentir sobre o que vai na nota.
-              const contatosVisiveis =
-                selectedResp && !contatosDoCliente.some((r: any) => r.id === selectedResp.id)
-                  ? [...contatosDoCliente, selectedResp]
-                  : contatosDoCliente;
-
-              return (
-                // A chave não pode ser o cliente: num orçamento cobrado veículo
-                // a veículo as N faturas são do MESMO cliente, e a chave repetida
-                // faz o React reaproveitar o nó da primeira para todas.
-                <div key={config.id || `${config.customerId}-${i}`} className="space-y-4">
-                  <div className="space-y-2">
-                    {customerConfigs.length > 1 && (
-                      // Com fatias do mesmo cliente o nome se repete e não
-                      // identifica nada: o que desempata é o VEÍCULO coberto.
-                      <Label className="text-xs text-muted-foreground">
-                        {hasMultipleCustomersOf(customerConfigs)
-                          ? customerName
-                          : `${customerName} — ${coverageSummary(config, vehicles?.length ?? 0, vehicles as any)}`}
-                      </Label>
-                    )}
-                    <Combobox
-                      value={config.responsibleId || ""}
-                      onValueChange={(v) =>
-                        setValue(`customerConfigs.${idxReal(i)}.responsibleId`, v || null, {
-                          shouldDirty: true,
-                        })
-                      }
-                      options={responsibleOptionsFor(config.customerId)}
-                      placeholder="Selecione o responsável..."
-                      searchPlaceholder="Buscar responsável..."
-                      emptyText="Nenhum responsável encontrado"
-                      clearable
-                      searchable
-                      disabled={disabled}
-                      className="w-full"
-                    />
-                    {contatosDoCliente.length > 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        {contatosDoCliente.length} contatos cadastrados neste cliente. O escolhido é
-                        o que a nota, o boleto e a cobrança citam — os signatários do documento são
-                        os responsáveis do orçamento, e se editam lá.
-                      </p>
-                    )}
-                  </div>
-                  {/* ─── TODOS OS CONTATOS DO CLIENTE, NÃO SÓ O ESCOLHIDO ──────
-                      Era um cartão só, o do selecionado. Um cliente com dois
-                      contatos — o caso do orçamento que gerou este conserto —
-                      aparecia com um, e o outro só existia dentro do combobox
-                      fechado. Agora a relação é a do cadastro: o escolhido vem
-                      destacado, e os demais trocam com um clique. */}
-                  {contatosVisiveis.length > 0 && (
-                    <div className="space-y-2">
-                      {contatosVisiveis.map((rep: any) => {
-                        const isSelected = rep.id === config.responsibleId;
-                        const roles = formatResponsibleRoles(getResponsibleRoles(rep));
-                        return (
-                          <div
-                            key={rep.id}
-                            className={cn(
-                              "flex items-center gap-3 rounded-lg px-4 py-3",
-                              isSelected
-                                ? "bg-primary/10 ring-1 ring-primary/30"
-                                : "bg-muted/30",
-                            )}
-                          >
-                            <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                              <IconUser className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{rep.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {[roles, rep.phone ? formatBrazilianPhone(rep.phone) : ""]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </div>
-                            </div>
-                            {isSelected ? (
-                              <>
-                                <Badge variant="secondary" className="whitespace-nowrap">
-                                  Contato desta fatura
-                                </Badge>
-                                {/* A LIXEIRA QUE FALTAVA. O cartão do cliente, no
-                                    quadro ao lado, tem a dele; este não tinha, e os
-                                    dois são visualmente o mesmo objeto. Tirar o
-                                    responsável exigia abrir o combobox e achar o
-                                    "x" — outro alvo, noutro lugar, para a mesma
-                                    ação. */}
-                                {!disabled && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() =>
-                                      setValue(
-                                        `customerConfigs.${idxReal(i)}.responsibleId`,
-                                        null,
-                                        { shouldDirty: true },
-                                      )
-                                    }
-                                  >
-                                    <IconTrash className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </>
-                            ) : (
-                              !disabled && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="whitespace-nowrap"
-                                  onClick={() =>
-                                    setValue(
-                                      `customerConfigs.${idxReal(i)}.responsibleId`,
-                                      rep.id,
-                                      { shouldDirty: true },
-                                    )
-                                  }
-                                >
-                                  Usar este
-                                </Button>
-                              )
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

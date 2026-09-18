@@ -166,7 +166,6 @@ export const budgetPayerSchema = z.object({
    * mas nenhuma tela deste repositório o envia: ver `purchase-order-vehicles`.
    */
   orderNumber: z.string().max(100).optional().nullable(),
-  responsibleId: z.string().uuid().optional().nullable(),
   installments: z.array(z.object({
     id: z.string().uuid().optional(),
     number: z.number().int(),

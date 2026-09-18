@@ -1183,10 +1183,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               ? `${data.address}, ${data.addressNumber || "s/n"} - ${data.neighborhood ? data.neighborhood + ", " : ""}${data.city}/${data.state}`
               : "-";
             // Fone/Fax e E-Mail que a prefeitura vai imprimir no tomador. `phones` é ARRAY:
-            // a nota leva o primeiro, o Resumo mostra todos. Cai para o responsável do
-            // faturamento quando o cadastro do cliente não tem contato — mesma precedência
-            // da emissão, senão o Resumo diria "sem telefone" numa nota que sai com um.
-            const tomadorContact = resolveTomadorContact(data, (config as any).responsible);
+            // a nota leva o primeiro, o Resumo mostra todos. Mesma precedência da emissão,
+            // senão o Resumo diria "sem telefone" numa nota que sai com um.
+            const tomadorContact = resolveTomadorContact(data);
 
             // ─── DE QUAIS VEÍCULOS É ESTA FATURA ─────────────────────────
             //

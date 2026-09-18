@@ -42,14 +42,6 @@ interface BillingStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
-  /** OS VEÍCULOS do orçamento — repassados ao bloco de responsáveis para nomear
-   *  cada fatura pelo caminhão que ela cobra. */
-  vehicles?: Array<{
-    id: string;
-    name?: string | null;
-    serialNumber?: string | null;
-    truck?: { plate?: string | null } | null;
-  }>;
 }
 
 export function BillingStepTask({
@@ -58,7 +50,6 @@ export function BillingStepTask({
   initialCustomer,
   vinPlateFiles,
   onVinPlateFilesChange,
-  vehicles,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -352,7 +343,7 @@ export function BillingStepTask({
       </Card>
 
       {/* Faturar Para — customer selector for invoicing */}
-      <BillingStepInfo disabled={disabled} customersCache={customersCache} vehicles={vehicles} />
+      <BillingStepInfo disabled={disabled} customersCache={customersCache} />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSearchParams } from "react-router-dom";
 import { useTablePreferences } from "@/hooks/common/use-table-preferences";
+import type { UrlParamWriter } from "./use-url-params";
 import type { ColumnAlign, DataTableColumnDef, DataTableMode, PersistedTableConfig } from "./data-table-types";
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,16 @@ export interface UseDataTableParams<TData> {
    * effect waits for this so it can't apply against an un-gated column set. Defaults to true.
    */
   sectorReady?: boolean;
+  /**
+   * O escritor da query string, criado pelo `DataTable` e COMPARTILHADO com ele.
+   *
+   * Tem de ser um só por tabela: dois escritores são dois acumuladores, e duas
+   * escritas no mesmo tick vindas de acumuladores diferentes voltam a se apagar
+   * (é o defeito que `useUrlParams` documenta). Antes havia dois — um aqui,
+   * outro no componente —, e filtrar perdia o filtro da URL porque o motor
+   * apagava o `page` logo depois, a partir de uma base sem ele.
+   */
+  writeUrl: UrlParamWriter;
 }
 
 export interface UseDataTableResult<TData> {
@@ -198,6 +209,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     syncUrl = true,
     sectorDefault,
     sectorReady = true,
+    writeUrl,
   } = params;
 
   const dataColumnIds = useMemo(() => columns.map((c) => c.id), [columns]);
@@ -208,7 +220,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
   const { localConfig, localDirty, serverConfig, isServerLoaded } = prefs;
 
   // --- URL: parse once so it can seed initial state and define precedence ---
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const urlSeed = useRef<{
     sort?: SortingState;
     page?: number;
@@ -415,55 +427,93 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persist, ready, columnOrder, columnSizing, columnVisibility, columnAlignment, rowPinning, pagination.pageSize, sorting, expanded]);
 
-  // --- URL writers (functional updater so concurrent writers don't clobber) ---
-  const writeUrl = useCallback(
-    (mutate: (p: URLSearchParams) => void) => {
-      if (!syncUrl) return;
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          mutate(next);
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams, syncUrl],
-  );
+  /**
+   * O estado COMMITADO, para os manipuladores calcularem `next` sem virar
+   * reducer impuro.
+   *
+   * Escrever na URL de dentro de um updater do `setState` é efeito colateral em
+   * função que o React chama DURANTE o render — e que ele pode chamar duas vezes
+   * (StrictMode) ou descartar (render concorrente). Era o que a paginação fazia,
+   * e é a mesma armadilha que a seleção de linhas já tinha corrigido logo abaixo.
+   */
+  const sortingRef = useRef(sorting);
+  sortingRef.current = sorting;
+  const paginationRef = useRef(pagination);
+  paginationRef.current = pagination;
 
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
       userInteracted.current = true;
-      setSorting((prev) => {
-        const next = applyUpdater(updater, prev);
-        persistSortRef.current = next; // user's own sort → this is what we persist
-        writeUrl((p) => (next.length ? p.set("sort", JSON.stringify(next)) : p.delete("sort")));
-        return next;
-      });
-      // sorting changes invalidate the current page
+      const next = applyUpdater(updater, sortingRef.current);
+      persistSortRef.current = next; // user's own sort → this is what we persist
+      setSorting(next);
+      // Ordenar invalida a página corrente.
       setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
-      writeUrl((p) => p.delete("page"));
+      // ⚠️ UMA escrita, com as duas mudanças. Eram duas chamadas, e a segunda
+      // partia da mesma base da primeira: a ordem NUNCA chegava à URL, e numa
+      // lista em modo servidor é da URL que a consulta sai — o cabeçalho girava
+      // a seta e o servidor devolvia a ordem antiga.
+      writeUrl((p) => {
+        next.length ? p.set("sort", JSON.stringify(next)) : p.delete("sort");
+        p.delete("page");
+      });
     },
     [writeUrl],
   );
 
   const handlePaginationChange = useCallback(
     (updater: Updater<PaginationState>) => {
-      setPagination((prev) => {
-        const next = applyUpdater(updater, prev);
-        writeUrl((p) => {
-          next.pageIndex ? p.set("page", String(next.pageIndex + 1)) : p.delete("page");
-          next.pageSize !== defaultPageSize ? p.set("pageSize", String(next.pageSize)) : p.delete("pageSize");
-        });
-        if (next.pageSize !== prev.pageSize) {
-          userInteracted.current = true;
-          persistPageSizeRef.current = next.pageSize; // user's own page-size → persist this
-        }
-        return next;
+      const prev = paginationRef.current;
+      const next = applyUpdater(updater, prev);
+      if (next.pageSize !== prev.pageSize) {
+        userInteracted.current = true;
+        persistPageSizeRef.current = next.pageSize; // user's own page-size → persist this
+      }
+      setPagination(next);
+      writeUrl((p) => {
+        next.pageIndex ? p.set("page", String(next.pageIndex + 1)) : p.delete("page");
+        next.pageSize !== defaultPageSize ? p.set("pageSize", String(next.pageSize)) : p.delete("pageSize");
       });
     },
     [writeUrl, defaultPageSize],
   );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // A URL MANDA NA PÁGINA — e não o contrário
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Numa lista em modo servidor existem DUAS verdades sobre "que página é esta":
+  // o `pagination.pageIndex` daqui, que desenha o rodapé, e o `?page=` da URL,
+  // de onde a PÁGINA monta a consulta. Elas se sincronizavam num sentido só
+  // (tabela → URL) e só no clique, com a URL sendo lida uma única vez, no
+  // mount, para semear o estado.
+  //
+  // Bastava a URL mudar por qualquer outro caminho — voltar do navegador, um
+  // link restaurado, uma escrita concorrente que apagasse o `page` — para as
+  // duas divergirem PARA SEMPRE: o rodapé anunciando a página 3 enquanto a
+  // consulta buscava a 1. Foi o "mudei de página e o conteúdo continuou o
+  // mesmo" relatado no Faturamento.
+  //
+  // Com este efeito a URL é a fonte, e o estado interno a segue. O caminho
+  // normal continua barato: o clique escreve o `?page=`, o efeito relê o mesmo
+  // valor e não faz nada.
+  const urlPage = syncUrl ? searchParams.get("page") : null;
+  const urlPageSize = syncUrl ? searchParams.get("pageSize") : null;
+  useEffect(() => {
+    if (!syncUrl) return;
+    const pageNum = urlPage ? Number(urlPage) : 1;
+    const pageIndex = Number.isFinite(pageNum) ? Math.max(0, pageNum - 1) : 0;
+    const sizeNum = urlPageSize ? Number(urlPageSize) : NaN;
+    setPagination((p) => {
+      // `pageSize` sem valor na URL NÃO significa "volte ao padrão": as
+      // restaurações (config do servidor, padrão do setor) escrevem o tamanho
+      // apenas quando ele difere do padrão, então a ausência quer dizer "o que
+      // já está valendo". Só um valor explícito e válido troca o tamanho.
+      const pageSize = Number.isFinite(sizeNum) && sizeNum > 0 ? sizeNum : p.pageSize;
+      if (p.pageIndex === pageIndex && p.pageSize === pageSize) return p;
+      return { pageIndex, pageSize };
+    });
+  }, [urlPage, urlPageSize, syncUrl]);
 
   // Pure reducer — NO side effects. The `sel` URL param is mirrored in a follow-up effect below, keyed
   // on `rowSelection`. Calling `writeUrl` (a router `setSearchParams`) from inside the state updater made

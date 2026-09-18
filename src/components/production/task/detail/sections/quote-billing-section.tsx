@@ -5,7 +5,6 @@ import {
   IconReceipt,
   IconNote,
   IconBuilding,
-  IconUser,
   IconCreditCard,
   IconTruck,
   IconFileInvoice,
@@ -586,15 +585,6 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
                         config.customer?.corporateName || config.customer?.fantasyName || "Cliente"
                       )}
                     </div>
-
-                    {config.responsible?.name && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <IconUser className="h-4 w-4" />
-                        <span>
-                          Responsável: <span className="font-medium text-foreground">{config.responsible.name}</span>
-                        </span>
-                      </div>
-                    )}
 
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
