@@ -56,9 +56,29 @@ import {
 
 const CODE_LENGTH = 6;
 
-/** Espelha o cooldown do servidor (`RESEND_COOLDOWN_MS`). Só decora a contagem —
- *  quem recusa de verdade é a API, aqui é para não convidar ao erro. */
+/**
+ * Quanto tempo o botão de reenviar fica em espera. Espelha o cooldown do
+ * servidor (`RESEND_COOLDOWN_MS`, 120s por CONTATO). Só decora a contagem —
+ * quem recusa de verdade é a API.
+ *
+ * ⚠️ São DOIS limites, e o segundo é o que morde:
+ *   • cooldown de 120s por contato, em `ResponsibleAuthChallengeService.issue`;
+ *   • `@VerificationSendRateLimit()` na rota: 2 pedidos por 5 MINUTOS por IP em
+ *     produção, com bloqueio longo depois disso.
+ * Contando só o primeiro, a tela liberava o botão aos 120s e o segundo reenvio
+ * (t=240s) caía no teto do throttler — 429, com uma mensagem que não é a deste
+ * fluxo. Por isso `TOO_MANY_REQUESTS_COOLDOWN_SECONDS` abaixo: quando a API
+ * devolve 429, a espera passa a ser a do balde de 5 minutos, não a de 2.
+ */
 const RESEND_COOLDOWN_SECONDS = 120;
+
+/** A janela do `@VerificationSendRateLimit()` (5 min). Usada só após um 429. */
+const TOO_MANY_REQUESTS_COOLDOWN_SECONDS = 300;
+
+/** O status HTTP da falha, quando houver — `undefined` para falha de rede. */
+function statusOf(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } })?.response?.status;
+}
 
 const contactSchema = z.object({
   contact: z.string().trim().min(1, "Informe seu e-mail ou telefone"),
@@ -92,6 +112,10 @@ export default function ClienteEntrarPage() {
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  // Verdadeiro só depois de um 429. Distingue "espere para REENVIAR" (por
+  // contato) de "o servidor parou de aceitar pedidos deste IP" (vale para
+  // qualquer contato, e portanto também tranca o passo 1).
+  const [rateLimited, setRateLimited] = useState(false);
 
   // Evita o envio duplo do auto-submit: o efeito dispara ao completar as 6
   // casas, e um clique no botão no mesmo instante mandaria de novo — gastando
@@ -105,7 +129,12 @@ export default function ClienteEntrarPage() {
   });
 
   useEffect(() => {
-    if (cooldown <= 0) return;
+    if (cooldown <= 0) {
+      // Zerou a contagem: o bloqueio do throttler também deixa de valer na tela.
+      // Quem recusa de verdade continua sendo a API — isto só devolve o botão.
+      setRateLimited(false);
+      return;
+    }
     const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
@@ -129,9 +158,21 @@ export default function ClienteEntrarPage() {
         setCooldown(RESEND_COOLDOWN_SECONDS);
         setStep("code");
       } catch (err) {
-        setError(
-          serverMessage(err, "Não foi possível enviar o código agora. Tente novamente."),
-        );
+        // 429 é o teto de 2 pedidos por 5 minutos por IP. A mensagem que a API
+        // devolve aí é a genérica do throttler, que não explica nada a quem
+        // está tentando entrar — e repetir o botão em 120s só produziria outro
+        // 429. Aqui o fluxo se explica e a espera passa a ser a do balde certo.
+        if (statusOf(err) === 429) {
+          setError(
+            "Muitas tentativas seguidas. Aguarde alguns minutos antes de pedir outro código.",
+          );
+          setRateLimited(true);
+          setCooldown(TOO_MANY_REQUESTS_COOLDOWN_SECONDS);
+        } else {
+          setError(
+            serverMessage(err, "Não foi possível enviar o código agora. Tente novamente."),
+          );
+        }
       } finally {
         isResend ? setResending(false) : setBusy(false);
       }
@@ -264,13 +305,21 @@ export default function ClienteEntrarPage() {
               </CardContent>
 
               <CardFooter className={styles.footer}>
+                {/* Só o 429 tranca ESTE botão, e não o cooldown de reenvio: o
+                    cooldown é por CONTATO (trocar o contato digitado é
+                    legítimo e comum — erro de digitação), enquanto o teto do
+                    throttler é por IP e vale para qualquer contato. */}
                 <Button
                   type="submit"
                   className={styles.button}
-                  disabled={busy || !form.formState.isValid}
+                  disabled={busy || rateLimited || !form.formState.isValid}
                 >
                   {busy && <LoadingSpinner size="sm" className="mr-2" />}
-                  {busy ? "Enviando..." : "Receber código"}
+                  {busy
+                    ? "Enviando..."
+                    : rateLimited
+                      ? `Aguarde ${cooldown}s`
+                      : "Receber código"}
                 </Button>
               </CardFooter>
             </form>

@@ -120,21 +120,27 @@ export const cleanEmail = (value: string): string => {
 };
 
 /**
- * Cleans SMS verification codes
+ * Cleans the 6-digit verification code sent to the user's phone.
+ *
+ * O NOME segue `Sms` porque é o identificador exportado e consumido em outros
+ * pontos; renomear é refactor, não faxina de texto. O CANAL, esse mudou: a perna
+ * do telefone deixou de ser SMS (Twilio saiu do código) e passou a ser o canal
+ * oficial de WhatsApp. As mensagens abaixo são vistas pelo usuário, então elas
+ * não podem prometer um canal que não existe mais.
  */
 export const cleanSmsCode = (value: string): string => {
   if (!value || typeof value !== "string") {
-    throw new Error("Código SMS é obrigatório");
+    throw new Error("Código de verificação é obrigatório");
   }
 
   const cleaned = value.replace(/\s/g, "");
 
   if (cleaned.length !== 6) {
-    throw new Error("Código SMS deve ter 6 dígitos");
+    throw new Error("Código de verificação deve ter 6 dígitos");
   }
 
   if (!/^\d{6}$/.test(cleaned)) {
-    throw new Error("Código SMS deve conter apenas números");
+    throw new Error("Código de verificação deve conter apenas números");
   }
 
   return cleaned;

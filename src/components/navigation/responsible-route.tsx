@@ -17,6 +17,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
+import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
 interface ResponsibleRouteProps {
@@ -36,7 +37,7 @@ interface ResponsibleRouteProps {
 }
 
 export function ResponsibleRoute({ children, roles }: ResponsibleRouteProps) {
-  const { responsible, isLoading, hasRole } = useResponsibleAuth();
+  const { responsible, isLoading, restoreFailed, retryRestore, hasRole } = useResponsibleAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -47,6 +48,25 @@ export function ResponsibleRoute({ children, roles }: ResponsibleRouteProps) {
           role="status"
           aria-label="Carregando"
         />
+      </div>
+    );
+  }
+
+  // Existe token guardado, mas o servidor não respondeu — rede caída, 5xx, 429.
+  // NÃO mandamos para a tela de entrada: "não sei se a sessão vale" não é "a
+  // sessão não vale", e aqui o custo do engano é alto. Sem senha para
+  // redigitar, voltar ao login significa pedir outro código: uma mensagem, um
+  // cooldown de 2 minutos e uma das 5 do teto horário — tudo isso para uma
+  // pessoa que, quase sempre, continua logada.
+  if (!responsible && restoreFailed) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+        <h1 className="text-lg font-semibold">Não foi possível falar com o servidor</h1>
+        <p className="text-sm text-muted-foreground">
+          Sua sessão continua guardada neste aparelho. Verifique sua conexão e tente de novo — você
+          não precisa pedir um código novo.
+        </p>
+        <Button onClick={retryRestore}>Tentar de novo</Button>
       </div>
     );
   }

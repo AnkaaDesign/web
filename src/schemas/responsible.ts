@@ -181,23 +181,19 @@ export const responsibleGetManySchema = z.object({
     .optional(),
 });
 
-// Responsible login schema
-export const responsibleLoginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email é obrigatório')
-    .email('Email inválido'),
-  password: z
-    .string()
-    .min(1, 'Senha é obrigatória'),
-});
-
-// Password update schema
-export const responsiblePasswordUpdateSchema = z.object({
-  password: z
-    .string()
-    .min(6, 'Senha deve ter no mínimo 6 caracteres'),
-});
+// O login por SENHA do responsável não existe mais, e com ele saíram
+// `responsibleLoginSchema` e `responsiblePasswordUpdateSchema`.
+//
+// Não é limpeza cosmética: os dois descreviam credenciais que a API NUNCA
+// aceitou. `POST /responsibles/login` emitia um JWT sem claim `sub` — nenhuma
+// guarda jamais o aceitou — e `PATCH /responsibles/:id/password` sequer existia
+// como rota, então a tela que usava o segundo dava 404 no submit. As colunas
+// correspondentes foram apagadas do banco (migration
+// `20260917220000_portal_do_cliente_sessao_por_otp`).
+//
+// O acesso do contato de cliente agora é por código de uso único, e vive em
+// `api-client/responsible-auth.ts` — não em schema de formulário, porque não há
+// formulário de credencial a validar.
 
 // Batch operations schemas
 export const responsibleBatchCreateSchema = z.object({
@@ -245,8 +241,6 @@ export type ResponsibleCreateFormData = z.infer<typeof responsibleCreateSchema>;
 export type ResponsibleCreateInlineFormData = z.infer<typeof responsibleCreateInlineSchema>;
 export type ResponsibleUpdateFormData = z.infer<typeof responsibleUpdateSchema>;
 export type ResponsibleGetManyFormData = z.infer<typeof responsibleGetManySchema>;
-export type ResponsibleLoginFormData = z.infer<typeof responsibleLoginSchema>;
-export type ResponsiblePasswordUpdateFormData = z.infer<typeof responsiblePasswordUpdateSchema>;
 export type ResponsibleBatchCreateFormData = z.infer<typeof responsibleBatchCreateSchema>;
 export type ResponsibleBatchUpdateFormData = z.infer<typeof responsibleBatchUpdateSchema>;
 export type ResponsibleBatchDeleteFormData = z.infer<typeof responsibleBatchDeleteSchema>;

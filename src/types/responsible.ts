@@ -124,15 +124,11 @@ export interface ResponsibleGetManyResponse {
   };
 }
 
-export interface ResponsibleLoginFormData {
-  email: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  responsible: Responsible;
-}
+// `ResponsibleLoginFormData` e `AuthResponse` saíram daqui junto com o login por
+// senha do responsável. Descreviam o contrato de `POST /responsibles/login`, que
+// emitia um JWT sem claim `sub` — nenhuma guarda o aceitava — e que foi removido
+// da API. A sessão do portal é um token OPACO, não um JWT, e seu contrato vive
+// em `api-client/responsible-auth.ts` (`ResponsibleSessionResult`).
 
 // Formatted responsible display
 export interface ResponsibleDisplay {

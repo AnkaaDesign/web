@@ -107,8 +107,14 @@ export const responsibleAuthApi = {
   /**
    * Quem sou eu. O servidor relê a sessão do banco a cada requisição, então um
    * 401 aqui significa revogada ou cadastro desativado — não "token velho".
+   *
+   * Devolve a MESMA forma que `verifyCode` devolve em `responsible`. Não é
+   * simetria estética: esta é a única fonte da sessão depois de um F5, e
+   * enquanto ela devolvia só um recorte (`id`, `name`, `roles`, `companyId`) o
+   * contexto completava o resto com valores inventados — e o nome da empresa
+   * sumia do cabeçalho do portal até o próximo login.
    */
-  async me(): Promise<Pick<ResponsibleSessionUser, "id" | "name" | "roles" | "companyId">> {
+  async me(): Promise<ResponsibleSessionUser> {
     const { data } = await client.get("/cliente/auth/eu");
     return data;
   },

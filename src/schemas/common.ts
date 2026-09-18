@@ -181,8 +181,10 @@ export const contactMethodSchema = z
     { message: "Digite um email ou telefone válido" }
   );
 
-// SMS code schema
-export const smsCodeSchema = z.string().transform(cleanSmsCode).refine(isValidSmsCode, { message: "Código SMS inválido" });
+// Código de 6 dígitos enviado ao telefone. O identificador segue `sms` (é o que
+// os consumidores importam); o canal hoje é o WhatsApp oficial, e a mensagem
+// abaixo é vista pelo usuário.
+export const smsCodeSchema = z.string().transform(cleanSmsCode).refine(isValidSmsCode, { message: "Código de verificação inválido" });
 
 // Generic 6-digit verification code schema (unified for all verification types)
 export const verificationCodeSchema = z

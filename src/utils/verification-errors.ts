@@ -180,7 +180,7 @@ export const VERIFICATION_ERROR_CONFIG: Record<VERIFICATION_ERROR_CODE, Omit<Ver
     severity: VERIFICATION_ERROR_SEVERITY.MEDIUM,
     userMessage: "Aguarde um pouco antes de tentar novamente. Isso ajuda a manter sua conta segura.",
     technicalMessage: "Contact is in cooldown period",
-    suggestedActions: ["Aguarde o tempo indicado", "Use o código que você já recebeu", "Verifique se já não recebeu o código por SMS ou e-mail"],
+    suggestedActions: ["Aguarde o tempo indicado", "Use o código que você já recebeu", "Verifique se já não recebeu o código por WhatsApp ou e-mail"],
     retryable: true,
     progressiveMessage: "Aguarde para tentar",
   },
@@ -207,29 +207,35 @@ export const VERIFICATION_ERROR_CONFIG: Record<VERIFICATION_ERROR_CODE, Omit<Ver
   },
 
   // Service errors
+  //
+  // A CHAVE continua `SMS_SEND_FAILED`: é o código que a API devolve, e
+  // renomeá-la aqui quebraria o mapeamento sem trocar nada do outro lado. O que
+  // muda é o TEXTO — a perna do telefone deixou de ser SMS (Twilio) e passou a
+  // ser o canal oficial de WhatsApp, então oferecer "tente por SMS" mandaria a
+  // pessoa para um canal que não existe mais no sistema.
   [VERIFICATION_ERROR_CODE.SMS_SEND_FAILED]: {
     category: VERIFICATION_ERROR_CATEGORY.EXTERNAL_SERVICE,
     severity: VERIFICATION_ERROR_SEVERITY.HIGH,
-    userMessage: "Não foi possível enviar o SMS. Tente usar verificação por e-mail ou tente novamente mais tarde.",
-    technicalMessage: "SMS service failed to send message",
+    userMessage: "Não foi possível enviar o código por WhatsApp. Tente usar verificação por e-mail ou tente novamente mais tarde.",
+    technicalMessage: "WhatsApp delivery failed to send the access code",
     suggestedActions: [
       "Tente verificação por e-mail como alternativa",
-      "Verifique se o número de telefone está correto",
+      "Verifique se o número de telefone está correto e tem WhatsApp",
       "Aguarde alguns minutos e tente novamente",
       "Entre em contato com o suporte se o problema persistir",
     ],
     retryable: true,
     retryAfter: 2 * 60 * 1000, // 2 minutes
-    progressiveMessage: "Erro no envio de SMS",
+    progressiveMessage: "Erro no envio por WhatsApp",
   },
 
   [VERIFICATION_ERROR_CODE.EMAIL_SEND_FAILED]: {
     category: VERIFICATION_ERROR_CATEGORY.EXTERNAL_SERVICE,
     severity: VERIFICATION_ERROR_SEVERITY.HIGH,
-    userMessage: "Não foi possível enviar o e-mail. Tente usar verificação por SMS ou tente novamente mais tarde.",
+    userMessage: "Não foi possível enviar o e-mail. Tente usar verificação por WhatsApp ou tente novamente mais tarde.",
     technicalMessage: "Email service failed to send message",
     suggestedActions: [
-      "Tente verificação por SMS como alternativa",
+      "Tente verificação por WhatsApp como alternativa",
       "Verifique se o e-mail está correto",
       "Aguarde alguns minutos e tente novamente",
       "Verifique sua caixa de spam",
