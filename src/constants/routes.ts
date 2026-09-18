@@ -174,7 +174,6 @@ export const routes = {
     create: "/financeiro/clientes/responsaveis/cadastrar",
     details: (id: string) => `/financeiro/clientes/responsaveis/detalhes/${id}`,
     edit: (id: string) => `/financeiro/clientes/responsaveis/editar/${id}`,
-    password: (id: string) => `/financeiro/clientes/responsaveis/senha/${id}`,
     root: "/financeiro/clientes/responsaveis",
   },
 
@@ -889,6 +888,25 @@ export const routes = {
         allowlist. */
     commercial: "/cliente/comercial",
     root: "/cliente",
+
+    /**
+     * PORTAL DO CLIENTE — a área LOGADA do responsável.
+     *
+     * Fica sob /cliente pelo mesmo motivo que a assinatura: o
+     * `MobileUsageGuard` casa por PREFIXO (`mobile-usage-guard.tsx`), então
+     * `/cliente/*` inteiro já está isento, e é no celular que o contato do
+     * cliente abre estas telas. Uma área em `/portal` ou `/minha-area` seria
+     * silenciosamente redirecionada para `/install`.
+     *
+     * Não confundir com as rotas acima: aquelas são PÚBLICAS, abertas por
+     * capability (UUID do orçamento ou token do signatário). Estas exigem
+     * sessão, e o eixo de permissão delas é `ResponsibleRole`, nunca
+     * `SECTOR_PRIVILEGES`.
+     */
+    portal: {
+      login: "/cliente/entrar",
+      root: "/cliente/painel",
+    },
   },
 
   // Public certificate route (no authentication required)

@@ -21,6 +21,9 @@ import { MobileUsageGuard } from "@/components/navigation/mobile-usage-guard";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
+import { ResponsibleAuthProvider } from "@/contexts/responsible-auth-context";
+import { ResponsibleLayout } from "@/layouts/responsible-layout";
+import { ResponsibleRoute } from "@/components/navigation/responsible-route";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupWebNotifications } from "@/lib/setup-notifications";
 import { PushNotificationSetup } from "@/components/common/push-notification-setup";
@@ -79,7 +82,6 @@ const ResponsiblesList = lazy(() => import("@/pages/responsibles/index"));
 const ResponsiblesNew = lazy(() => import("@/pages/responsibles/new"));
 const ResponsiblesDetails = lazy(() => import("@/pages/responsibles/details/[id]"));
 const ResponsiblesEdit = lazy(() => import("@/pages/responsibles/[id]/edit"));
-const ResponsiblesPassword = lazy(() => import("@/pages/responsibles/[id]/password"));
 
 // Financial
 const FinancialRoot = lazy(() => import("@/pages/financial/root").then((module) => ({ default: module.FinancialRootPage })));
@@ -215,6 +217,10 @@ const CommercialContactPage = lazy(() => import("@/pages/public/commercial").the
 
 // Public app-install landing page (no auth, no providers)
 const InstallPage = lazy(() => import("@/pages/install").then((module) => ({ default: module.InstallPage })));
+
+// PORTAL DO CLIENTE (área logada do responsável)
+const ClienteEntrarPage = lazy(() => import("@/pages/cliente/entrar"));
+const ClientePainelPage = lazy(() => import("@/pages/cliente/painel"));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
 const PrivacyPolicyPage = lazy(() => import("@/pages/public/privacy-policy").then((module) => ({ default: module.PrivacyPolicyPage })));
@@ -673,6 +679,53 @@ function App() {
                 </Suspense>
               }
             />
+
+            {/* PORTAL DO CLIENTE — a área LOGADA do responsável.
+                
+                É uma TERCEIRA metade do router, e precisa vir antes do catch-all
+                "*" abaixo, senão aquele a engoliria.
+
+                Não herda o `AuthProvider`: aquele carrega um FUNCIONÁRIO
+                (sector.privileges, ledSector, currentContractStatus) e traz
+                junto sete providers internos, socket de notificação e push. Um
+                contato de cliente dentro daquele contexto é a classe de defeito
+                que este desenho existe para evitar.
+
+                Traz o PRÓPRIO <Toaster/>: o único do app está dentro do
+                `AuthProvider` (no catch-all), e é por isso que toda mensagem de
+                toast das páginas públicas é invisível hoje — defeito já
+                documentado em `pages/public/signature/[token].tsx`. */}
+            <Route
+              path="/cliente/entrar"
+              element={
+                <ResponsibleAuthProvider>
+                  <Toaster />
+                  <Suspense fallback={<PageLoader />}>
+                    <ClienteEntrarPage />
+                  </Suspense>
+                </ResponsibleAuthProvider>
+              }
+            />
+            <Route
+              path="/cliente/painel/*"
+              element={
+                <ResponsibleAuthProvider>
+                  <Toaster />
+                  <ResponsibleRoute>
+                    <ResponsibleLayout />
+                  </ResponsibleRoute>
+                </ResponsibleAuthProvider>
+              }
+            >
+              <Route
+                index
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ClientePainelPage />
+                  </Suspense>
+                }
+              />
+            </Route>
 
             {/* All other routes wrapped in auth and notification providers */}
             <Route
@@ -1297,14 +1350,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ResponsiblesEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.responsibles.password(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ResponsiblesPassword />
                     </Suspense>
                   }
                 />

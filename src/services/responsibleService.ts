@@ -5,8 +5,6 @@ import type {
   ResponsibleUpdateFormData,
   ResponsibleGetManyFormData,
   ResponsibleGetManyResponse,
-  ResponsibleLoginFormData,
-  AuthResponse,
   ResponsibleRole,
 } from '@/types/responsible';
 
@@ -97,14 +95,6 @@ class ResponsibleService {
   }
 
   /**
-   * Responsible login
-   */
-  async login(data: ResponsibleLoginFormData): Promise<AuthResponse> {
-    const response = await apiClient.post('/responsibles/login', data);
-    return response.data;
-  }
-
-  /**
    * Search responsibles by name or phone
    */
   async search(query: string, companyId?: string): Promise<Responsible[]> {
@@ -153,12 +143,15 @@ class ResponsibleService {
     return response.data;
   }
 
-  /**
-   * Update responsible password
-   */
-  async updatePassword(id: string, password: string): Promise<void> {
-    await apiClient.patch(`/responsibles/${id}/password`, { password });
-  }
+  // `login` e `updatePassword` foram REMOVIDOS.
+  //
+  // `login` chamava `POST /responsibles/login`, que nunca autenticou nada (o
+  // JWT saía sem `sub`) e nenhum componente deste app jamais o chamou.
+  // `updatePassword` chamava `PATCH /responsibles/:id/password` — uma rota que
+  // NUNCA EXISTIU na API: a tela de senha dava 404 no submit, e era o único
+  // caminho de interface para dar senha a um responsável.
+  //
+  // O acesso do responsável agora é por OTP, em `api-client/responsible-auth.ts`.
 }
 
 export const responsibleService = new ResponsibleService();

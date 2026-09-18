@@ -188,10 +188,6 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
     deleteMutation.mutate(ids);
   }, [deleteDialog, deleteMutation]);
 
-  const handleUpdatePassword = useCallback((responsible: Responsible) => {
-    navigate(routes.responsibles.password(responsible.id));
-  }, [navigate]);
-
   // Filter removal handler
   const onRemoveFilter = useCallback((key: string, _value?: any) => {
     if (key === "searchingFor") {
@@ -316,7 +312,6 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}
             onDelete={handleBulkDelete}
-            onUpdatePassword={handleUpdatePassword}
             onDataChange={handleTableDataChange}
             className="h-full"
             searchTerm={searchingFor}

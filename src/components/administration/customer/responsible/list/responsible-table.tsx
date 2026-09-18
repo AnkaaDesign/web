@@ -48,7 +48,6 @@ interface ResponsibleTableProps {
   onEdit?: (responsibles: Responsible[]) => void;
   onDelete?: (responsibles: Responsible[]) => void;
   onToggleActive?: (responsible: Responsible) => void;
-  onUpdatePassword?: (responsible: Responsible) => void;
   onDataChange?: (data: { responsibles: Responsible[]; totalRecords: number }) => void;
   className?: string;
   searchTerm?: string;
@@ -60,7 +59,6 @@ export function ResponsibleTable({
   onEdit,
   onDelete,
   onToggleActive,
-  onUpdatePassword,
   onDataChange,
   className,
   searchTerm,
@@ -258,18 +256,6 @@ export function ResponsibleTable({
         onToggleActive(responsible);
       } else {
         toggleActiveMutation.mutate(responsible.id);
-      }
-      setContextMenu(null);
-    }
-  };
-
-  const handleUpdatePassword = () => {
-    if (contextMenu && !contextMenu.isBulk) {
-      const responsible = contextMenu.responsibles[0];
-      if (onUpdatePassword) {
-        onUpdatePassword(responsible);
-      } else {
-        navigate(routes.responsibles.password(responsible.id));
       }
       setContextMenu(null);
     }
@@ -485,12 +471,10 @@ export function ResponsibleTable({
             {contextMenu?.isBulk && contextMenu.responsibles.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
 
-          {!contextMenu?.isBulk && contextMenu?.responsibles[0]?.email && (
-            <DropdownMenuItem onClick={handleUpdatePassword}>
-              <IconLock className="mr-2 h-4 w-4" />
-              Alterar Senha
-            </DropdownMenuItem>
-          )}
+          {/* "Alterar Senha" saiu: o responsável não tem mais senha. Ele entra no
+              portal por código de uso único enviado ao contato do cadastro, e
+              não há credencial para um funcionário definir. A tela que existia
+              aqui chamava uma rota que a API nunca teve — dava 404 no submit. */}
 
           <DropdownMenuSeparator />
 
