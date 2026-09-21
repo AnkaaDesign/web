@@ -5,7 +5,6 @@
 // `@/api-client/portal`.
 export { VeiculoIdentidadeCard } from "./veiculo-identidade-card";
 export { VeiculoAndamentoCard, VeiculoAndamentoConteudo } from "./veiculo-andamento-card";
-export { VeiculoResumoCard } from "./veiculo-resumo-card";
 export {
   PORTAL_VEICULOS_DEFAULT_SORTING,
   VEICULO_SORT_FIELD_MAP,

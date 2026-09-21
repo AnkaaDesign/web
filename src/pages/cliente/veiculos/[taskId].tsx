@@ -44,7 +44,7 @@
 // chassi são lidos de uma plaqueta suja no pátio, e refazer isso é uma
 // caminhada até o veículo. Ela remenda `history.pushState`, então `<Link>`
 // dentro dos cards também é interceptado.
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { IconAlertTriangle, IconCar, IconLock } from "@tabler/icons-react";
 
@@ -54,8 +54,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
-import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { routes } from "@/constants";
 import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
 import { PORTAL_CAPABILITY, hasPortalCapability } from "@/utils/portal-capabilities";
@@ -65,7 +63,6 @@ import { PortalBand, PortalBandSkeleton, portalEst } from "@/components/cliente/
 import { VeiculoAndamentoCard } from "@/components/cliente/veiculo/veiculo-andamento-card";
 import { VeiculoIdentidadeCard } from "@/components/cliente/veiculo/veiculo-identidade-card";
 import { VeiculoMedidasCard } from "@/components/cliente/veiculo/veiculo-medidas-card";
-import { VeiculoResumoCard } from "@/components/cliente/veiculo/veiculo-resumo-card";
 
 /**
  * ⚠️ Espelha a GRADE FINAL — faixa de duas colunas, faixa cheia.
@@ -118,22 +115,17 @@ export function ClientePortalVeiculoDetalhePage() {
   const canWriteOrder =
     canWrite && hasPortalCapability(responsible?.roles, PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER);
 
-  // O card da identidade é quem sabe se há trabalho não salvo; a guarda mora
-  // aqui porque quem navega é a PÁGINA (voltar, migalha, abas do portal).
-  const [identidadeDirty, setIdentidadeDirty] = useState(false);
-  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation } =
-    useUnsavedChangesGuard({ isDirty: identidadeDirty });
-
-  const voltar = useCallback(() => {
-    guardedNavigate(routes.customer.portal.veiculos);
-  }, [guardedNavigate]);
-
+  // ⛔ A GUARDA DE NAVEGAÇÃO SAIU COM O FORMULÁRIO.
+  //
+  // Ela existia porque placa e chassi ficavam em rascunho até alguém apertar
+  // `Salvar`, e sair da tela no meio custava uma caminhada de volta ao veículo
+  // no pátio. Agora cada linha se grava no próprio duplo clique
+  // (`PortalInlineField`): não há rascunho, então não há o que proteger — e
+  // somem juntos o `useUnsavedChangesGuard`, o `UnsavedChangesDialog`, o
+  // `guardedNavigate` e o estado `dirty` que subia do card até aqui.
   const onSaved = useCallback(() => {
-    // Salvou: a guarda pode parar de vigiar, mesmo que o formulário ainda
-    // pareça sujo para o `react-hook-form` por um instante.
-    allowNavigation();
-    setIdentidadeDirty(false);
-  }, [allowNavigation]);
+    void refetch();
+  }, [refetch]);
 
   // ── O CABEÇALHO, IGUAL NOS TRÊS ESTADOS ──────────────────────────────────
   //
@@ -152,16 +144,6 @@ export function ClientePortalVeiculoDetalhePage() {
       ? `Série ${identity.serialNumber}`
       : veiculo?.name || "Veículo";
 
-  // ⚠️ O subtítulo NÃO repete o que já está no título nem o que virou badge:
-  // o marco foi para o badge, e o orçamento é uma linha (clicável) do card de
-  // contexto. O que sobra aqui é a outra forma de reconhecer o caminhão.
-  const subtitulo = [
-    identity?.plate && identity?.serialNumber ? `Série ${identity.serialNumber}` : null,
-    veiculo?.name && veiculo.name !== titulo ? veiculo.name : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   // O estado do veículo é o MARCO, nunca `Task.status` — ver o cabeçalho.
   const marco = veiculo ? (veiculo.cancelled ? "Cancelado" : veiculo.milestoneLabel) : null;
 
@@ -169,20 +151,17 @@ export function ClientePortalVeiculoDetalhePage() {
     <PageHeader
       variant="detail"
       title={titulo}
-      subtitle={subtitulo || undefined}
       icon={IconCar}
       status={
         marco
           ? { label: marco, variant: veiculo?.cancelled ? "destructive" : "secondary" }
           : undefined
       }
-      backButton={{ onClick: voltar }}
       breadcrumbs={[
         { label: "Início", href: routes.customer.portal.root },
         { label: "Veículos", href: routes.customer.portal.veiculos },
         { label: titulo },
       ]}
-      onBreadcrumbNavigate={guardedNavigate}
     />
   );
 
@@ -248,20 +227,21 @@ export function ClientePortalVeiculoDetalhePage() {
   // que devolve `null` no render já ocupou a célula, e a coluna vizinha ficaria
   // vazia com a outra empilhada. A guarda de lá é a defensiva; esta compõe a
   // grade.
-  const temResumo =
-    !!identity?.customer ||
-    !!veiculo.budget ||
-    !!veiculo.progress?.entryDate ||
-    !!veiculo.progress?.forecastDate ||
-    !!veiculo.progress?.finishedAt;
-
   return (
     <div className="space-y-4">
       {header}
 
-      {/* ⚠️ CADA CARD VIAJA COM A SUA ALTURA ESTIMADA — ver `portal-detail.tsx`.
-          A faixa põe cada um na coluna mais BAIXA, como `balanceColumns` faz no
-          `DetailPage`, em vez de alternar esquerda/direita às cegas. */}
+      {/* ── A FAIXA DE DUAS COLUNAS: O VEÍCULO | O ANDAMENTO ────────────────
+          Decisão do dono, com o print na mão: eram três caixas empilhadas
+          (identificação, contexto ao lado, andamento inteiro embaixo) e o
+          andamento — que é o que o cliente vem ver — começava abaixo da dobra.
+          Agora são duas metades: à esquerda o que o veículo É e o que dele se
+          corrige; à direita, em que pé ele está.
+
+          ⚠️ AS DUAS TÊM A MESMA ALTURA. É a regra do `DetailPage` que
+          `PortalBand` copia — faixa `items-stretch`, cada card com `grow`. A
+          estimativa aqui só escolheria a coluna se houvesse mais de dois
+          cards; com exatamente dois, ela mantém a ordem de leitura. */}
       <PortalBand
         items={[
           identity
@@ -271,13 +251,12 @@ export function ClientePortalVeiculoDetalhePage() {
                     veiculo={veiculo}
                     canWrite={canWrite}
                     canWriteOrder={canWriteOrder}
-                    onDirtyChange={setIdentidadeDirty}
                     onSaved={onSaved}
                   />
                 ),
-                // Série, placa, chassi, pedido, plaqueta e a barra de ações —
-                // o card mais alto da tela em qualquer estado.
-                est: portalEst({ rows: 5, blocks: 1 }),
+                // Série, placa, chassi, pedido e plaqueta, mais o subgrupo de
+                // contexto que era um card à parte.
+                est: portalEst({ rows: 9, blocks: 1 }),
               }
             : {
                 // Sem a seção `VEHICLE` não há identidade a mostrar — e dizer
@@ -297,36 +276,32 @@ export function ClientePortalVeiculoDetalhePage() {
                 ),
                 est: portalEst({ extra: 160 }),
               },
-          temResumo
-            ? {
-                node: <VeiculoResumoCard veiculo={veiculo} />,
-                est: portalEst({
-                  rows:
-                    (identity?.customer ? 1 : 0) +
-                    (veiculo.budget ? 1 : 0) +
-                    (veiculo.progress?.entryDate ? 1 : 0) +
-                    (veiculo.progress?.forecastDate ? 1 : 0) +
-                    (veiculo.progress?.finishedAt ? 1 : 0),
-                }),
-              }
-            : null,
+          {
+            node: (
+              <VeiculoAndamentoCard progress={veiculo.progress} cancelled={veiculo.cancelled} />
+            ),
+            est: portalEst({
+              extra:
+                // Cinco marcos, mais uma linha por O.S. e outra pelo controle
+                // de qualidade quando a produção fecha.
+                5 * 44 + (veiculo.progress?.steps?.length ?? 0) * 40 + 40,
+            }),
+          },
         ]}
       />
 
-      {/* AS MEDIDAS, depois da identidade e antes do andamento.
-          É a ordem do trabalho do cliente: ele identifica o caminhão, confere o
-          que mediu, e então acompanha. O card some sozinho quando nenhuma face
-          foi informada — e some inteiro sem a seção `VEHICLE`, porque medida é
-          dado de veículo e segue o mesmo recorte da identidade. */}
-      {identity && <VeiculoMedidasCard measures={identity.measures} />}
-
-      <VeiculoAndamentoCard progress={veiculo.progress} cancelled={veiculo.cancelled} />
-
-      <UnsavedChangesDialog
-        open={showDialog}
-        onConfirm={confirmNavigation}
-        onCancel={cancelNavigation}
-      />
+      {/* AS MEDIDAS, embaixo da faixa e de largura inteira.
+          É a ordem do trabalho do cliente: ele identifica o caminhão, acompanha
+          o andamento, e confere o que mediu. O card some sozinho quando nenhuma
+          face foi informada — e some inteiro sem a seção `VEHICLE`, porque
+          medida é dado de veículo e segue o mesmo recorte da identidade. */}
+      {identity && (
+        <VeiculoMedidasCard
+          taskId={veiculo.id}
+          measures={identity.measures}
+          canWrite={canWrite}
+        />
+      )}
     </div>
   );
 }
