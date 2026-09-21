@@ -48,6 +48,14 @@ import { BudgetStepServices } from "@/components/financial/budget/steps/budget-s
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
+import { BudgetRequestCard } from "@/components/financial/budget/budget-request-card";
+import { BudgetStateActions } from "@/components/financial/budget/budget-state-actions";
+import {
+  envelopeGlanceOf,
+  useQuoteEnvelopes,
+} from "@/components/financial/budget/use-quote-envelopes";
+
+import { budgetRequestOf } from "@/types/budget-request";
 // Imported from the filters module rather than the table barrel so the detail route does not pull
 // the whole list page into its bundle.
 import { BUDGET_FALLBACK_LIST_QUERY } from "@/components/financial/budget/table/budget-table-filters";
@@ -67,6 +75,27 @@ import {
   billingIdOf,
 } from "@/utils/quote-tasks";
 import { expandConfigsIntoLots } from "@/components/financial/shared/billing-split-field";
+
+/**
+ * A ÂNCORA DA ASSINATURA ELETRÔNICA, no fim do passo de Resumo.
+ *
+ * Existe para o estado `PRE_APPROVED`: ali a ação certa não é escrever um
+ * status — a aresta `PRE_APPROVED → PENDING` é escrita pela EMISSÃO da coleta —
+ * e sim descer até o card que a emite. Um id e não um ref porque quem rola é o
+ * card de ações, que não conhece este componente.
+ */
+const SIGNATURE_ANCHOR_ID = "assinatura-eletronica";
+
+/**
+ * O PASSO E A ÂNCORA DO LAYOUT APROVADO.
+ *
+ * ⚠️ É o passo 2 ("Informações"), e não o 1: o seletor (`ApprovedLayoutPicker`)
+ * mora em `budget-step-info.tsx`, no fim dele. O passo 1 trata dos layouts DA
+ * TAREFA (enviar, aprovar, reprovar); o que a assinatura cobra é o layout
+ * escolhido para o ORÇAMENTO, que é este.
+ */
+const LAYOUT_STEP = 2;
+const LAYOUT_PICKER_ANCHOR_ID = "layout-aprovado";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -124,6 +153,11 @@ const FinancialBudgetDetailPageInner = () => {
         layouts: { include: { file: true } },
         baseFiles: true,
         responsibles: true,
+        // A TINTA GERAL, pelo nome e pelo hex. O passo 1 edita `paintId` por um
+        // seletor que resolve o nome por conta própria; o painel da REQUISIÇÃO
+        // precisa mostrar a cor que o cliente pediu sem abrir passo nenhum, e
+        // sem a relação aqui ele só teria o uuid.
+        generalPainting: true,
       },
     },
   );
@@ -345,6 +379,42 @@ const FinancialBudgetDetailPageInner = () => {
         customerOrderNumber: t.customerOrderNumber ?? null,
       })),
     [existingQuote],
+  );
+
+  /**
+   * OS VEÍCULOS PARA O ACORDEÃO DE IDENTIFICAÇÃO do passo 1.
+   *
+   * ⛔ Só `taskId` é EDITÁVEL: o formulário desta página é de UMA tarefa (campos
+   * `serialNumber`/`plate`/`chassisNumber`/`customerOrderNumber` singulares,
+   * semeados de `task`, gravados num `PUT /tasks/:id`). Os demais painéis são
+   * leitura e levam ao detalhe de cada um. Ver `VeiculosDoOrcamento`.
+   */
+  const stepTaskVehicles = useMemo(
+    () =>
+      quoteTasks(existingQuote as any).map((t: any) => ({
+        id: t.id,
+        serialNumber: t.serialNumber ?? null,
+        customerOrderNumber: t.customerOrderNumber ?? null,
+        truck: t.truck
+          ? { plate: t.truck.plate ?? null, chassisNumber: t.truck.chassisNumber ?? null }
+          : null,
+      })),
+    [existingQuote],
+  );
+
+  /**
+   * Abre OUTRO veículo do mesmo orçamento.
+   *
+   * Pelo `guardedNavigate` porque sair daqui com edição pendente é exatamente o
+   * que a guarda existe para perguntar — e a rota é `key`ada por `:taskId`, então
+   * o assistente inteiro renasce semeado do outro caminhão.
+   */
+  const openVehicle = useCallback(
+    (otherTaskId: string) => {
+      if (!otherTaskId || otherTaskId === taskId) return;
+      guardedNavigate(routes.financial.budget.details(otherTaskId));
+    },
+    [guardedNavigate, taskId],
   );
 
   /**
@@ -833,6 +903,76 @@ const FinancialBudgetDetailPageInner = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layouts, layoutFiles, layoutsInitialized]);
+
+  // ── A REQUISIÇÃO DO PORTAL ───────────────────────────────────────────────
+  //
+  // `null` em todo orçamento nascido por dentro — que é a imensa maioria —, e o
+  // painel simplesmente não é desenhado. Ver `budgetRequestOf`: ausência da
+  // relação quer dizer "não perguntei", nunca "não houve requisição".
+  const budgetRequest = useMemo(() => budgetRequestOf(existingQuote), [existingQuote]);
+
+  // ── A COLETA DE ASSINATURAS, PARA QUEM DECIDE O ENCAMINHAMENTO ────────────
+  //
+  // ⛔ O `status` do orçamento NÃO basta para decidir o que oferecer: há
+  // orçamentos em `REQUESTED` com coleta `RUNNING` e assinaturas colhidas, e a
+  // tela oferecia "Enviar para pré-aprovação" a um documento já assinado. A
+  // MESMA consulta do `SignatureEnvelopeCard` (mesma chave, uma requisição só),
+  // para que as duas metades desta página nunca discordem.
+  const { data: quoteEnvelopes } = useQuoteEnvelopes(existingQuote?.id);
+  const envelopeGlance = useMemo(() => envelopeGlanceOf(quoteEnvelopes), [quoteEnvelopes]);
+
+  // O estado do FORMULÁRIO, não o lido na abertura. Os botões do painel escrevem
+  // nele, e o painel precisa reler o que escreveu: senão continuaria oferecendo
+  // "enviar para pré-aprovação" depois de o usuário já ter escolhido, e o aviso
+  // de "ao salvar, o orçamento vai para …" nunca apareceria.
+  const watchedStatus = form.watch("status");
+
+  /**
+   * O avanço escolhido no painel da requisição.
+   *
+   * ⚠️ ESCREVE NO FORMULÁRIO, e não na API. O assistente tem um único caminho de
+   * gravação — `handleSubmit` grava os valores e só então replica o caminho de
+   * status pelo endpoint próprio, para que o servidor valide a transição contra
+   * o preço recém-gravado. Um botão que chamasse `PUT /budgets/:id/status` aqui
+   * correria com as edições abertas e poderia mandar para assinatura um
+   * orçamento cujos serviços ainda estão na tela, por digitar.
+   */
+  const handleRequestAdvance = useCallback(
+    (next: string) => {
+      form.setValue("status", next, { shouldDirty: true });
+    },
+    [form],
+  );
+
+  /**
+   * DO AVISO ATÉ O LUGAR DE RESOLVER.
+   *
+   * "Selecione um layout aprovado antes de enviar o orçamento para assinatura"
+   * é o impedimento mais comum do modal de envio, e ele dizia o que falta sem
+   * dizer onde — o "passo sem saída". Leva ao passo do seletor e rola até ele.
+   *
+   * `setCurrentStep` direto, e não `handleStepClick`: voltar é sempre livre (a
+   * validação só barra quem PULA para a frente).
+   */
+  const goToLayoutStep = useCallback(() => {
+    setCurrentStep(LAYOUT_STEP);
+    // O passo já está MONTADO (1–3 ficam no DOM, escondidos por CSS), mas só
+    // fica VISÍVEL no commit seguinte, e `scrollIntoView` num elemento com
+    // `display:none` não rola coisa alguma. Daí o atraso — sem ele o operador
+    // cai no topo do passo e tem de procurar o seletor.
+    window.setTimeout(() => {
+      document
+        .getElementById(LAYOUT_PICKER_ANCHOR_ID)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+  }, []);
+
+  /** Rola até a Assinatura eletrônica, no fim do próprio passo de Resumo. */
+  const scrollToSignature = useCallback(() => {
+    document
+      .getElementById(SIGNATURE_ANCHOR_ID)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
@@ -1871,6 +2011,26 @@ const FinancialBudgetDetailPageInner = () => {
 
   const isLastStep = currentStep === totalSteps;
 
+  /**
+   * QUANTO DA REQUISIÇÃO DESENHAR NESTE PASSO — `null` = nada.
+   *
+   * Passo 1 e Resumo: ficha inteira (montar a tarefa a partir do pedido; e
+   * conferir o montado contra o pedido). Passo 3: faixa de uma linha, porque o
+   * briefing é o insumo de QUE serviços cobrar e tirá-lo dali seria perder o
+   * insumo — mas quem digita preço não precisa da ficha. Passo 2 e passos de
+   * Cliente: nada. Ver `budget-request-card.tsx`.
+   *
+   * ⚠️ O passo 3 é "Serviços" SEMPRE: os passos variáveis (um por cliente de
+   * faturamento) entram a partir do 4, e o Resumo é sempre o último.
+   */
+  const requestVariant: "full" | "summary" | null = isLastStep
+    ? "full"
+    : currentStep === 1
+      ? "full"
+      : currentStep === 3
+        ? "summary"
+        : null;
+
   // Step-2's "Layout Aprovado" picker is sourced from these options. Build them
   // from the LIVE layouts state (what the user is editing in Step 1) merged
   // with the persisted task.layouts, deduped by File id, images only. This makes
@@ -1998,12 +2158,46 @@ const FinancialBudgetDetailPageInner = () => {
       <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
 
       <div className="flex-1 overflow-y-auto pb-6">
+        {/* A REQUISIÇÃO — acima dos passos, e não dentro de um deles, porque
+            não é campo de passo nenhum: é leitura. Fora do `FormProvider` pelo
+            mesmo motivo. Só aparece quando o orçamento nasceu no portal; um
+            orçamento feito por dentro não tem `request`.
+
+            ⚠️ E NÃO EM TODOS OS PASSOS. Desenhada inteira nos cinco, ela virava
+            moldura — quem preenchia prazos ou condição de pagamento relia pela
+            quinta vez quem pediu e a tabela de placas. Onde cada forma aparece
+            está em `requestVariant`, logo abaixo; o porquê de cada uma, no
+            cabeçalho de `budget-request-card.tsx`.
+
+            ⚠️ SÓ LEITURA. As ações de estado ("Enviar para pré-aprovação",
+            "Enviar para assinatura") saíram daqui para o ÚLTIMO passo
+            (`BudgetStateActions`, abaixo), onde a decisão se consuma. */}
+        {budgetRequest && requestVariant && (
+          <div className="mb-4">
+            <BudgetRequestCard
+              request={budgetRequest}
+              status={watchedStatus || existingQuote?.status}
+              task={task}
+              variant={requestVariant}
+              // OS VEÍCULOS vêm do ORÇAMENTO, não de `task`: a tela é aberta
+              // pelo id de UM caminhão e o orçamento cobre N. `quoteTasks`
+              // também cobre a forma legada (`quote.task` singular).
+              vehicles={quoteTasks(existingQuote)}
+            />
+          </div>
+        )}
+
         <FormProvider {...form}>
           {/* Steps 1–3 stay mounted (hidden via CSS) to preserve useFieldArray state */}
           <div style={{ display: currentStep === 1 ? undefined : "none" }}>
             <BudgetStepTask
               isEditMode
               disabled={isSubmitting || !canEdit}
+              // O ACORDEÃO POR VEÍCULO. `vehicles` é o orçamento inteiro;
+              // `currentVehicleId` é o único editável — ver o memo acima.
+              vehicles={stepTaskVehicles}
+              currentVehicleId={taskId}
+              onOpenVehicle={openVehicle}
               responsibleRows={responsibleRows}
               onResponsibleRowsChange={handleResponsibleRowsChange}
               showResponsibleErrors={showResponsibleErrors}
@@ -2075,6 +2269,21 @@ const FinancialBudgetDetailPageInner = () => {
 
           {currentStep === totalSteps && (
             <>
+              {/* AS AÇÕES DE ESTADO, no passo em que a decisão se consuma — o
+                  mesmo passo do "Salvar" do cabeçalho. Ver o cabeçalho de
+                  `budget-state-actions.tsx`. */}
+              <BudgetStateActions
+                status={watchedStatus || existingQuote?.status}
+                serverStatus={existingQuote?.status}
+                // ⛔ O SEGUNDO EIXO. Coleta viva cala os encaminhamentos: ver o
+                // cabeçalho de `budget-state-actions.tsx`.
+                envelope={envelopeGlance}
+                userRole={userRole}
+                disabled={isSubmitting || !canEdit}
+                onAdvance={handleRequestAdvance}
+                onGoToSignature={scrollToSignature}
+              />
+
               <BudgetStepReview
                 task={task}
                 disabled={isSubmitting || !canEdit}
@@ -2088,8 +2297,16 @@ const FinancialBudgetDetailPageInner = () => {
                   orçamento está fechado e pronto para ir ao cliente. Só aparece
                   depois que a quote existe — não há o que congelar antes disso. */}
               {existingQuote?.id && (
-                <div className="mt-6">
-                  <SignatureEnvelopeCard quoteId={existingQuote.id} canManage={canEdit} />
+                <div className="mt-6" id={SIGNATURE_ANCHOR_ID}>
+                  <SignatureEnvelopeCard
+                    quoteId={existingQuote.id}
+                    canManage={canEdit}
+                    // O IMPEDIMENTO DO LAYOUT TEM ENDEREÇO: o passo 2 deste
+                    // mesmo assistente, onde vive o seletor de layout aprovado.
+                    // Sem isto o modal de envio dizia o que falta e não dizia
+                    // onde resolver.
+                    onResolveLayout={goToLayoutStep}
+                  />
                 </div>
               )}
             </>

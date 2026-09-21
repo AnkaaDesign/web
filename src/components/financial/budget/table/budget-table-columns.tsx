@@ -145,11 +145,23 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
         // A planilha não tem hover: sai a lista INTEIRA, sem contração.
         exportValue: (q) => quoteIdentifiers(q).join(", "),
       },
+      // ⚠️ UMA LINHA, ALTURA FIXA. As séries de um orçamento multiveículo NÃO
+      // viram uma etiqueta por veículo empilhada na célula: a linha da tabela
+      // passaria a ter altura variável (um orçamento de sessenta caminhões
+      // esticaria a linha para fora da tela) e a lista deixaria de ser
+      // varrível. A contração é `contractedLabel` — "90201, 90202 +1" —, a
+      // mesma forma do nº do pedido, e o conjunto INTEIRO fica no hover.
       cell: ({ row }) => {
         const all = quoteIdentifiers(row.original);
         if (all.length === 0) return <MutedDash />;
         return (
-          <span className="text-sm truncate" title={all.length > 2 ? all.join(", ") : undefined}>
+          <span
+            className="text-sm truncate whitespace-nowrap"
+            // O título cobre QUALQUER veículo escondido, e não só o "+N": com
+            // dois identificadores longos a própria célula corta por largura, e
+            // o `> 2` de antes deixava essa linha sem tooltip nenhum.
+            title={all.length > 1 ? all.join(", ") : undefined}
+          >
             {quoteIdentifierLabel(row.original)}
           </span>
         );
@@ -450,26 +462,36 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
 }
 
 /**
- * Os estados que a lista de ORÇAMENTOS mostra — TODOS os do orçamento, na ordem da AÇÃO PENDENTE
- * (a mesma de `TASK_QUOTE_STATUS_ORDER`): vencido → assinado → pendente → aprovado → cancelado.
+ * OS OITO ESTADOS DO ORÇAMENTO, na ordem de ATENÇÃO.
  *
- * SIGNED e EXPIRED precisam estar aqui: sem eles o comercial não consegue filtrar "o que está
- * esperando a nossa assinatura" nem "o que venceu e preciso reprecificar", que são as duas
- * perguntas que os dois estados existem para responder.
+ * Eram cinco até 20/09/2026, quando o portal do responsável acrescentou
+ * `REQUESTED` (a requisição que o cliente abre), `IN_NEGOTIATION` (com o
+ * vendedor do cliente) e `PRE_APPROVED` (ele aprovou; falta lançar as
+ * assinaturas). `PENDING` continua sendo o mesmo VALOR e passou a se chamar
+ * "Aguardando Assinatura".
  *
- * ⚠️ SÃO OS CINCO, e a lista deixou de ser um RECORTE do enum. Enquanto o enum descrevia também o
- * pagamento, "orçamento" era o prefixo dele e esta constante existia para cortar o resto fora.
- * Depois da separação o enum do orçamento É o ciclo do orçamento: recortá-lo esconderia estado
- * válido, que é como a coluna Status passou a desenhar traço em orçamento assinado. CANCELLED
- * entrou junto — um orçamento cancelado é um orçamento, e ele não tem cobrança para aparecer do
- * outro lado.
+ * ⚠️ ESTA LISTA É TRÊS COISAS AO MESMO TEMPO: as opções do filtro, o
+ * `where.status = { in: … }` PADRÃO da lista, e o guard da célula. Um estado
+ * que não esteja aqui NÃO APARECE NA TELA de jeito nenhum — não some do
+ * filtro, some da tabela.
  *
- * Mora AQUI, e não no arquivo de filtros, porque a coluna também precisa dela e `budget-table-filters`
- * já importa deste módulo — o caminho inverso seria um ciclo.
+ * Mora AQUI, e não no arquivo de filtros, porque a coluna também precisa dela e
+ * `budget-table-filters` já importa deste módulo — o caminho inverso seria um
+ * ciclo.
  */
 export const BUDGET_QUOTE_STATUSES: TASK_QUOTE_STATUS[] = [
+  // ⚠️ Na ORDEM DE ATENÇÃO (`TASK_QUOTE_STATUS_ORDER`), não alfabética: esta lista
+  // também desenha o seletor de filtro, e o operador lê o seletor na mesma ordem
+  // em que lê a tabela.
+  //
+  // ⚠️ Status que NÃO estiver aqui não aparece na tela de jeito nenhum — a lista é
+  // ao mesmo tempo as opções do filtro, o `where.status = { in: … }` PADRÃO e o
+  // guard da célula.
+  "REQUESTED",
   "EXPIRED",
+  "PRE_APPROVED",
   "SIGNED",
+  "IN_NEGOTIATION",
   "PENDING",
   "APPROVED",
   "CANCELLED",

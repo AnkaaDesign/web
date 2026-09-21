@@ -19,7 +19,8 @@ import { BUDGET_QUOTE_STATUSES, buildBudgetOrderBy } from "./budget-table-column
 
 export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 
-/** The list is the BUDGET half of a quote's lifecycle — everything past approval belongs to Faturamento. */
+/** O ciclo INTEIRO do orçamento — da requisição ao cancelamento. Quem passou da aprovação é
+ *  assunto do Faturamento, e é a única coisa que esta lista não mostra. */
 // Definida em `budget-table-columns` (a coluna também precisa dela) e reexportada aqui, que é onde
 // o resto do app já a procurava.
 export { BUDGET_QUOTE_STATUSES } from "./budget-table-columns";
@@ -221,7 +222,11 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const quoteStatuses = stringList(filters.quoteStatuses);
   const where: Record<string, unknown> = {
     // Narrowing WITHIN the list's own scope: an explicit status pick can only ever be a subset
-    // dos cinco estados do orçamento, never a way out of it.
+    // dos estados do orçamento, never a way out of it. Sem escolha, o padrão é
+    // `BUDGET_QUOTE_STATUSES` — o ciclo inteiro, requisição inclusive, que é o que
+    // faz uma requisição recém-chegada do portal aparecer na lista do comercial
+    // sem ele precisar montar filtro nenhum (ela ainda sobe ao TOPO, porque
+    // `statusOrder` de `REQUESTED` é 1 e a ordenação padrão é por ele).
     status: { in: quoteStatuses.length > 0 ? quoteStatuses : BUDGET_QUOTE_STATUSES },
   };
 

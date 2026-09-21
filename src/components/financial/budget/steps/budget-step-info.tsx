@@ -547,7 +547,14 @@ export function BudgetStepInfo({
 
       {/* Layout Aprovados — pick the budget's approved layout FROM the task's
           layouts, or upload a NEW one (auto-approved). Selection is authoritative:
-          on Save every non-selected task layout is reproved. Shared with billing. */}
+          on Save every non-selected task layout is reproved. Shared with billing.
+
+          ⚠️ O `id` é ENDEREÇO, não enfeite: o modal de envio para assinatura
+          recusa o orçamento sem layout aprovado e agora oferece um botão que
+          traz o operador até AQUI. Ver `goToLayoutStep` no detalhe do orçamento
+          e `LAYOUT_PICKER_ANCHOR_ID`. Renomear este id quebra aquele atalho em
+          silêncio. */}
+      <div id="layout-aprovado">
       <ApprovedLayoutPicker
         layouts={layouts}
         layoutFiles={layoutFiles}
@@ -556,6 +563,7 @@ export function BudgetStepInfo({
         uploadLabel="Selecione ou envie um layout"
         disabled={disabled}
       />
+      </div>
     </div>
   );
 }

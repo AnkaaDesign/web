@@ -170,14 +170,17 @@ export const FinancialBudgetCreatePage = () => {
       term: null as Date | null,
       paintId: null as string | null,
       paintIds: [] as string[],
+      // ⚠️ SEM a O.S. comercial "Em Negociação".
+      //
+      // Toda tarefa nascia com ela, `IN_PROGRESS`, e a descrição — TEXTO LIVRE —
+      // era o que o sistema lia para saber que o orçamento estava em negociação:
+      // concluí-la APROVAVA o orçamento e reabri-la o rebaixava de APPROVED para
+      // PENDING. O estado virou `TASK_QUOTE_STATUS.IN_NEGOTIATION` em
+      // 20/09/2026, com máquina de transições, e o acoplamento saiu dos dois
+      // lados. Continuar enviando a O.S. daqui recriaria em cada tarefa nova
+      // justamente as linhas que a migration removeu — o cliente é quem manda
+      // `serviceOrders`, então apagar o servidor não basta.
       serviceOrders: [
-        {
-          description: "Em Negociação",
-          type: SERVICE_ORDER_TYPE.COMMERCIAL,
-          status: SERVICE_ORDER_STATUS.IN_PROGRESS,
-          statusOrder: 2,
-          assignedToId: null,
-        },
         {
           description: "Elaborar Layout",
           type: SERVICE_ORDER_TYPE.ARTWORK,

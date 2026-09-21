@@ -35,6 +35,7 @@ import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
 import { TASK_QUOTE_STATUS_LABELS } from "@/constants/enum-labels";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
+import { QUOTE_STATUS_OPTIONS_IN_ORDER, isQuoteRejection } from "@/utils/quote-status";
 import { cn } from "@/lib/utils";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { PINNED_CUSTOMERS } from "@/config/company";
@@ -48,24 +49,40 @@ import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, Budget } from "@/types/budget";
 import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
-/** Os destinos que ESTE passo oferece. Curados de propósito: o passo de
- *  Orçamento move entre pendente e aprovado, e nada mais. */
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "PENDING", label: "Pendente" },
-  // "Aprovado", sem o prefixo "Orçamento": a tela já se chama Orçamento, e o estado de faturamento
-  // mudou de entidade — repetir a palavra era desambiguar de algo que não mora mais aqui.
-  { value: "APPROVED", label: "Aprovado" },
-];
+/**
+ * Os destinos que ESTE passo oferece — O CICLO INTEIRO, na ordem de atenção.
+ *
+ * ⚠️ ERAM DOIS, escritos à mão: `{PENDING: "Pendente"}` e `{APPROVED: "Aprovado"}`.
+ * A curadoria fazia sentido no enum de cinco, em que o passo de Orçamento de
+ * fato só movia entre pendente e aprovado (os outros três eram escritos pela
+ * cerimônia ou terminais). Com o portal deixou de fazer: `IN_NEGOTIATION` —
+ * a transição que a feature inteira existe para permitir, e a que torna o VALOR
+ * visível para quem requisitou — simplesmente não aparecia no menu, e o
+ * comercial não tinha como mandar uma requisição ao vendedor do cliente por
+ * tela nenhuma.
+ *
+ * Os dois rótulos à mão também já haviam envelhecido: "Pendente" virou
+ * "Aguardando Assinatura" em 20/09/2026 e este combobox continuava dizendo
+ * "Pendente" ao lado de uma tabela que dizia outra coisa. Derivar de
+ * `TASK_QUOTE_STATUS_LABELS` resolve as duas coisas de uma vez.
+ *
+ * A CURADORIA REAL nunca esteve aqui: quem decide o que é clicável é
+ * `getAvailableQuoteStatusTransitions` (papel + grafo), logo abaixo, e é ela que
+ * continua desabilitando o que não é destino legal — `SIGNED` e `EXPIRED`
+ * inclusive, que só a cerimônia escreve.
+ */
+const STATUS_OPTIONS: Array<{ value: string; label: string }> = QUOTE_STATUS_OPTIONS_IN_ORDER;
 
 /**
- * Os destinos curados MAIS o status atual, quando ele não é um deles.
+ * As opções MAIS o status atual, quando ele não é uma delas.
  *
- * `SIGNED` e `EXPIRED` são escritos pela CERIMÔNIA, nunca escolhidos num menu —
- * por isso não são destino em `VALID_TRANSITIONS` e nunca estiveram na lista
- * acima. Só que o Combobox rotula o gatilho procurando o valor ATUAL entre as
- * opções: assim que o cliente assinava, o orçamento ia para `SIGNED`, o valor
- * sumia da lista e o badge virava o placeholder "Selecione uma opção" — sem
- * rótulo e sem cor, justamente na tela onde se confere o que está faltando.
+ * A REDE DE SEGURANÇA continua valendo mesmo agora que a lista acima é o enum
+ * inteiro: o Combobox rotula o gatilho procurando o valor ATUAL entre as opções,
+ * e um estado gravado que a tela não conheça (um valor legado num changelog, um
+ * membro novo do enum que ainda não chegou a este bundle) transformaria o badge
+ * no placeholder "Selecione uma opção" — sem rótulo e sem cor, justamente na
+ * tela onde se confere o que está faltando. Foi o que aconteceu com `SIGNED`
+ * quando a lista era curada a dois valores.
  *
  * O atual entra só para o gatilho ter o que mostrar, e sai desabilitado (ninguém
  * transiciona para onde já está). Mesma forma de `billing-step-review`, que
@@ -520,8 +537,14 @@ export function BudgetStepReview({
                     value={currentStatus}
                     onValueChange={(v) => {
                       if (v && typeof v === "string" && v !== currentStatus) {
-                        // Reject path — require a reason when stepping back to PENDING.
-                        if (v === "PENDING" && currentStatus && currentStatus !== "PENDING") {
+                        // Reject path — require a reason ONLY when PENDING is a step BACK.
+                        //
+                        // ⚠️ O teste era `v === "PENDING" && atual !== "PENDING"`, e o portal
+                        // abriu dois caminhos até PENDING que vêm de ANTES dele
+                        // (`REQUESTED` e `PRE_APPROVED`): mandar uma requisição para assinatura
+                        // abria um diálogo "Rejeitar Orçamento" pedindo o motivo da rejeição.
+                        // Ver `isQuoteRejection`.
+                        if (isQuoteRejection(currentStatus, v)) {
                           setPendingRejectStatus(v);
                           setRejectReason("");
                           setRejectDialogOpen(true);

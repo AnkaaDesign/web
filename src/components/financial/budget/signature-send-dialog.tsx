@@ -54,6 +54,7 @@ import {
   IconCircleCheck,
   IconLoader2,
   IconMail,
+  IconPhoto,
   IconRotate,
   IconSend,
   IconTruck,
@@ -77,6 +78,7 @@ export function SignatureSendDialog({
   mode,
   busy,
   onSend,
+  onResolveLayout,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,6 +94,17 @@ export function SignatureSendDialog({
      */
     signers: Array<{ responsibleId: string; sections: QuoteSection[] }>,
   ) => Promise<void> | void;
+  /**
+   * LEVA AO PASSO 1, onde o layout aprovado é escolhido.
+   *
+   * O impedimento do layout é o único dos quatro que se resolve na MESMA tela
+   * que abriu este modal — e o texto do servidor diz o que falta sem dizer onde.
+   * Quem fecha o modal é este componente; para ONDE ir é decisão de quem passa
+   * o callback (no assistente do orçamento, o passo das Informações).
+   * Quem não passa o callback (o detalhe da tarefa, a tela de faturamento) só
+   * não ganha o atalho; o aviso continua lá.
+   */
+  onResolveLayout?: () => void;
 }) {
   const [preflight, setPreflight] = useState<DeliveryPreflight | null>(null);
   const [loading, setLoading] = useState(false);
@@ -125,12 +138,16 @@ export function SignatureSendDialog({
           : (data.channels.find(c => data.channelStatus[c]?.ready) ?? data.defaultChannel);
       setChannel(preferred);
     } catch {
-      // Sem preflight o modal não inventa: some com as opções e deixa o envio
-      // seguir com o padrão do servidor, que é o comportamento de antes desta
-      // tela. Falhar aqui não pode impedir de enviar.
-      setPreflight(null);
+      // A CONFERÊNCIA FALHOU — MAS O QUE JÁ ESTAVA NA TELA CONTINUA.
+      //
+      // Apagar `preflight` aqui deixava o operador com a faixa de erro e mais
+      // nada: nem quem receberia, nem por qual canal. Pior no "Tentar de novo",
+      // onde a segunda falha apagava a lista que a primeira carga tinha trazido.
+      //
+      // O ENVIO segue travado por `failed` (ver `blocked`) — o que não se trava
+      // é a INFORMAÇÃO. Um modal que some com tudo não diz ao operador nem o que
+      // ele estava prestes a fazer.
       setFailed(true);
-      setChannel(null);
     } finally {
       setLoading(false);
     }
@@ -270,15 +287,50 @@ export function SignatureSendDialog({
             </div>
           ) : (
             <>
-              {blockers.map(b => (
-                <div
-                  key={b}
-                  className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs"
-                >
-                  <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                  <span className="text-foreground">{b}</span>
-                </div>
-              ))}
+              {blockers.map(b => {
+                // O IMPEDIMENTO DO LAYOUT TEM ENDEREÇO, e o texto do servidor
+                // não o diz. Casa pelo assunto e não pela frase inteira: a
+                // mensagem da api já existe em duas redações (preflight e
+                // emissão) e comparar byte a byte perderia o atalho na primeira
+                // vez que alguém corrigisse uma vírgula lá.
+                const isLayout = /layout/i.test(b);
+                return (
+                  <div
+                    key={b}
+                    className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs"
+                  >
+                    <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <div className="min-w-0 space-y-2">
+                      <span className="block text-foreground">{b}</span>
+                      {isLayout && onResolveLayout && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={busy}
+                          onClick={() => {
+                            onOpenChange(false);
+                            onResolveLayout();
+                          }}
+                        >
+                          <IconPhoto className="h-3.5 w-3.5" />
+                          Escolher o layout aprovado
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* A lista continua abaixo — dizer isso evita que a faixa vermelha
+                  seja lida como "não há mais nada aqui", que era o efeito do
+                  `!blocked` que sumia com ela. */}
+              {blockers.length > 0 && (preflight?.recipients.length ?? 0) > 0 && (
+                <p className="px-0.5 text-[11px] text-muted-foreground">
+                  O envio fica travado até isto ser resolvido. Abaixo continua quem
+                  receberia o quê — dá para conferir e ajustar o recorte agora.
+                </p>
+              )}
 
               {failed && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
@@ -289,6 +341,9 @@ export function SignatureSendDialog({
                       conferência não dá para saber se o orçamento pode mesmo ir para
                       assinatura — o servidor recusa layout ausente, validade vencida,
                       dois pagadores e coleta já emitida. Tente de novo em um instante.
+                      {preflight
+                        ? " O que aparece abaixo é a conferência anterior, e não o cadastro de agora."
+                        : ""}
                     </span>
                     <Button
                       variant="outline"
@@ -304,8 +359,12 @@ export function SignatureSendDialog({
                 </div>
               )}
 
-              {/* ---- Canal ---- */}
-              {preflight && !blocked && (
+              {/* ---- Canal ----
+                   SEM `!blocked`: com impedimento o operador continua tendo de
+                   saber POR ONDE o orçamento iria, e quem está sem o contato
+                   daquele canal — é isso que ele vai corrigir no cadastro
+                   enquanto resolve o impedimento. Quem trava o envio é o botão. */}
+              {preflight && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {canChoose ? "Como enviar" : "Canal de envio"}
@@ -386,7 +445,7 @@ export function SignatureSendDialog({
               )}
 
               {/* ---- Aviso do canal escolhido ---- */}
-              {missingContact.length > 0 && !blocked && (
+              {missingContact.length > 0 && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                   <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                   <span className="space-y-1 text-foreground">
@@ -426,7 +485,6 @@ export function SignatureSendDialog({
                 const vehicles = preflight?.vehicles ?? [];
                 const withGaps = vehicles.filter((v) => v.missing.length > 0);
                 const legacyMissing = preflight?.vehicle?.missing ?? [];
-                if (blocked) return null;
                 if (withGaps.length === 0 && legacyMissing.length === 0) return null;
                 const multi = vehicles.length > 1;
                 const missing = withGaps[0]?.missing ?? legacyMissing;
@@ -453,8 +511,17 @@ export function SignatureSendDialog({
                 );
               })()}
 
-              {/* ---- Quem recebe o quê ---- */}
-              {preflight && preflight.recipients.length > 0 && !blocked && (
+              {/* ---- Quem recebe o quê ----
+                   ⚠️ NÃO se esconde com impedimento. O cabeçalho deste modal
+                   promete "abaixo dá para mudar contato a contato", e com
+                   `!blocked` a promessa era quebrada EXATAMENTE quando há algo
+                   errado — que é quando o operador mais precisa ver quem
+                   receberia (e conferir se o recorte de cada um está certo
+                   antes de resolver o impedimento e reabrir o modal).
+                   Com `failed` era pior ainda: não há nada errado com o
+                   orçamento, só a conferência que não respondeu, e a tela
+                   inteira sumia. Travado fica o BOTÃO, não a informação. */}
+              {preflight && preflight.recipients.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

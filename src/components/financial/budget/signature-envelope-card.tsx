@@ -41,6 +41,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { SignatureSendDialog } from "./signature-send-dialog";
+import { useQuoteEnvelopes } from "./use-quote-envelopes";
 import {
   QuoteChangeList,
   quoteChangesHeadline,
@@ -323,6 +324,7 @@ export function SignatureEnvelopeCard({
   quoteId,
   canManage,
   embedded = false,
+  onResolveLayout,
 }: {
   quoteId: string | null | undefined;
   canManage: boolean;
@@ -332,11 +334,23 @@ export function SignatureEnvelopeCard({
    * dentro de um `Card` do DetailPage — dois cartões aninhados destoavam.
    */
   embedded?: boolean;
+  /**
+   * Atalho para o passo em que o LAYOUT APROVADO é escolhido — repassado ao
+   * modal de envio, que é onde o impedimento aparece. Só o assistente do
+   * orçamento tem esse passo para oferecer; as outras telas que embutem este
+   * card não passam nada e o modal apenas não desenha o botão.
+   */
+  onResolveLayout?: () => void;
 }) {
   // Quem está olhando — a contra-assinatura é dela ou não é (ver `canCountersign`).
   const { user } = useAuth();
-  const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ⚠️ A LISTA NÃO É MAIS ESTADO LOCAL. Ela vem da consulta compartilhada
+  // (`use-quote-envelopes.ts`) porque o card de encaminhamento, acima nesta
+  // mesma tela, precisa saber se há coleta viva para NÃO oferecer "Enviar para
+  // pré-aprovação". Mesma chave = uma requisição só, e o `refetch` de qualquer
+  // ação daqui atualiza os dois.
+  const { data: envelopeData, isLoading: loading, refetch } = useQuoteEnvelopes<Envelope>(quoteId);
+  const envelopes = envelopeData ?? [];
   const [busy, setBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -396,21 +410,12 @@ export function SignatureEnvelopeCard({
           ? " por e-mail"
           : "";
 
+  // Recarrega a consulta compartilhada. Continua se chamando `load` porque é
+  // isso que ela é para o resto do arquivo (o `run()` e a sondagem abaixo); o
+  // que mudou é quem guarda o resultado.
   const load = useCallback(async () => {
-    if (!quoteId) return setLoading(false);
-    try {
-      const res: any = await signatureService.listForQuote(quoteId);
-      setEnvelopes(res?.data?.data ?? res?.data ?? []);
-    } catch {
-      // ausência de envelopes não é erro
-    } finally {
-      setLoading(false);
-    }
-  }, [quoteId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+    await refetch();
+  }, [refetch]);
 
   /**
    * Re-consulta enquanto houver convite sem desfecho.
@@ -1217,6 +1222,7 @@ export function SignatureEnvelopeCard({
           quoteId={quoteId}
           mode={sendDialog ?? "create"}
           busy={busy}
+          onResolveLayout={onResolveLayout}
           onSend={async (ch, signers) => {
             setSendDialog(null);
             await run(
@@ -1243,6 +1249,7 @@ export function SignatureEnvelopeCard({
           quoteId={quoteId}
           mode={sendDialog ?? "create"}
           busy={busy}
+          onResolveLayout={onResolveLayout}
           onSend={async (ch, signers) => {
             setSendDialog(null);
             await run(
