@@ -348,6 +348,8 @@ export interface SimulateInput {
      * the salary from positionId when only that is given. */
     salary?: number;
     performanceLevel: number;
+    /** Quanto do período a pessoa conta (0–1). Ausente = período inteiro. */
+    eligibilityWeight?: number;
   }>;
   config?: {
     k?: number;
@@ -382,6 +384,14 @@ export interface SimulateResponseUser {
   performanceLevel: number;
   bonus: number;
   baseBonus: number;
+  /** Peso do período (0–1) que o servidor aplicou. */
+  eligibilityWeight: number;
+  /** Bruto já prorrateado pelo peso — é o que a folha teria como base. */
+  grossBonus: number;
+  /** Bruto + extras − descontos do período, pela mesma conta da lista. */
+  netBonus: number;
+  /** `netBonus − grossBonus`: positivo é extra, negativo é desconto. */
+  adjustments: number;
   ratio: number;
   x: number;
   anchor: number;

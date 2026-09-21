@@ -24,7 +24,12 @@ export interface SimulatedUser {
   // Simulation fields
   position: string;
   performanceLevel: number;
+  /** Bruto do período, já prorrateado pelo peso. */
   bonusAmount: number;
+  /** Extras − descontos do período aplicados sobre o bruto simulado. */
+  adjustmentAmount: number;
+  /** O que cairia na folha: bruto + ajustes. */
+  netBonusAmount: number;
   /**
    * Peso de elegibilidade do período (0–1), vindo do MESMO cadastro que a folha
    * usa. 1 = período inteiro. Menor que 1 = entrou, saiu ou esteve afastado no
@@ -182,7 +187,12 @@ export function createBonusSimulationColumns({
             mode="single"
             value={u.position}
             onValueChange={(value) => {
-              if (value && typeof value === "string") onPositionChange(u.id, value);
+              // O "×" não esvazia: ele DESFAZ. Cargo vazio não existe nesta
+              // tela — a linha é uma hipótese sobre uma pessoa que já tem um
+              // cargo, e limpar o campo deixava a simulação sem base e o bônus
+              // parado no valor da hipótese anterior.
+              if (typeof value === "string" && value) onPositionChange(u.id, value);
+              else onPositionChange(u.id, u.originalPosition);
             }}
             options={positionOptions.map((pos) => ({ value: pos, label: pos }))}
             placeholder="Selecione o cargo"
@@ -217,15 +227,50 @@ export function createBonusSimulationColumns({
     },
     {
       id: "bonusAmount",
-      header: "Bônus",
+      header: "Bônus Bruto",
       accessorFn: (row) => row.bonusAmount,
       enableSorting: true,
       size: 140,
       minSize: 120,
       meta: { align: "right", exportValue: (row) => formatCurrency(row.bonusAmount) },
       cell: ({ row }) => (
-        <span className={cn("font-bold tabular-nums", row.original.bonusAmount > 0 ? "text-green-600" : "text-muted-foreground")}>
-          {formatCurrency(row.original.bonusAmount)}
+        <span className="font-semibold tabular-nums">{formatCurrency(row.original.bonusAmount)}</span>
+      ),
+    },
+    {
+      // Extras e descontos do período REAL da pessoa, aplicados sobre a base
+      // simulada. Promover alguém não apaga o desconto dele — muda a base
+      // sobre a qual ele incide, e é isso que esta coluna mostra.
+      id: "adjustmentAmount",
+      header: "Ajustes",
+      accessorFn: (row) => row.adjustmentAmount,
+      enableSorting: true,
+      size: 130,
+      minSize: 110,
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.adjustmentAmount) },
+      cell: ({ row }) => {
+        const value = row.original.adjustmentAmount;
+        if (Math.abs(value) < 0.005) return <span className="tabular-nums text-muted-foreground">{formatCurrency(0)}</span>;
+        const isExtra = value > 0;
+        return (
+          <span className={cn("tabular-nums", isExtra ? "text-green-600" : "text-red-600")}>
+            {isExtra ? "+" : "-"}
+            {formatCurrency(Math.abs(value))}
+          </span>
+        );
+      },
+    },
+    {
+      id: "netBonusAmount",
+      header: "Bônus Líquido",
+      accessorFn: (row) => row.netBonusAmount,
+      enableSorting: true,
+      size: 150,
+      minSize: 130,
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.netBonusAmount) },
+      cell: ({ row }) => (
+        <span className={cn("font-bold tabular-nums", row.original.netBonusAmount > 0 ? "text-green-600" : "text-muted-foreground")}>
+          {formatCurrency(row.original.netBonusAmount)}
         </span>
       ),
     },
