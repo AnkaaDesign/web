@@ -5,4 +5,5 @@ export { AddPaintCombobox } from "./add-paint-combobox";
 export { AvailabilitySummary } from "./availability-summary";
 export { ComponentsAvailabilityTable } from "./components-availability-table";
 export { PaintPlanDetailModal } from "./paint-plan-detail-modal";
+export { PaintPurchaseDialog } from "./paint-purchase-dialog";
 export type { SelectionRow, PaintStatus, AddPaintPayload } from "./types";

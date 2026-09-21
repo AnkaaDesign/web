@@ -342,7 +342,6 @@ const BillingDetailPageInner = ({
             include: {
               customer: { include: { logo: true } },
               installments: { orderBy: { number: "asc" } },
-              responsible: true,
             },
           },
           // OS FATURAMENTOS — as entidades, não a lista de pagadores.

@@ -227,7 +227,6 @@ const DETAIL_INCLUDE = {
         include: {
           customer: { include: { logo: true } },
           installments: { orderBy: { number: "asc" } },
-          responsible: true,
           customerSignature: true,
           // O FATURAMENTO a que este pagador pertence — é dele o estado da
           // COBRANÇA, que não é o estado do orçamento. Sem este include a tela

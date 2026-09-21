@@ -143,7 +143,6 @@ export interface BudgetPayer extends BaseEntity {
     streetType?: string | null;
     registrationStatus?: string | null;
   };
-  responsible?: { id: string; name: string; role?: string; email?: string | null; phone?: string | null };
   installments?: Installment[];
 }
 
