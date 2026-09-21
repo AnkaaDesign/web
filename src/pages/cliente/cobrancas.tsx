@@ -66,6 +66,7 @@ import type { INSTALLMENT_STATUS } from "@/constants";
 import type { BILLING_STATUS } from "@/types/budget";
 import { formatCurrency, formatDate } from "@/utils";
 import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
+import { cn } from "@/lib/utils";
 
 const Dash = () => <span className="text-muted-foreground">—</span>;
 
@@ -168,14 +169,22 @@ const installmentColumns: Array<PortalTableColumn<PortalChargeInstallment>> = [
       return (
         <span className="whitespace-nowrap tabular-nums">
           {formatCurrency(installment.paidAmount)}
-          {installment.paidAt ? (
-            <span className="ml-1 text-sm text-muted-foreground">
-              em {formatDate(installment.paidAt)}
-            </span>
-          ) : null}
         </span>
       );
     },
+  },
+  {
+    // ⛔ A DATA SAIU DE DENTRO DO VALOR. Ela vinha grudada ("R$ 4.453,13 em
+    // 17/09/2026"), e duas grandezas na mesma célula quebram as duas: o
+    // dinheiro perde o alinhamento à direita que faz uma coluna de valores ser
+    // lida de cima a baixo, e a data perde o cabeçalho que diz o que ela é.
+    // Coluna própria, como manda a tabela.
+    id: "pagoEm",
+    header: "Pago em",
+    align: "right",
+    className: "whitespace-nowrap tabular-nums text-muted-foreground",
+    cell: (installment) =>
+      installment.paidAt ? formatDate(installment.paidAt) : <Dash />,
   },
   {
     id: "situacao",
@@ -246,7 +255,6 @@ const nfseColumns: Array<PortalTableColumn<PortalChargeNfse>> = [
 function CobrancaCard({ cobranca }: { cobranca: PortalCharge }) {
   const installments = cobranca.installments ?? [];
   const nfse = cobranca.nfse ?? [];
-  const veiculos = cobranca.vehicles ?? [];
 
   const total = cobranca.totalAmount ?? 0;
   const pago = cobranca.paidAmount ?? 0;
@@ -261,26 +269,13 @@ function CobrancaCard({ cobranca }: { cobranca: PortalCharge }) {
     <PortalSectionCard
       title={titulo}
       description={
-        <span className="space-y-1">
-          <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span>
-              Total <strong className="text-foreground">{formatCurrency(total)}</strong>
-            </span>
-            <span>
-              Pago <strong className="text-foreground">{formatCurrency(pago)}</strong>
-            </span>
-            <span>
-              Em aberto <strong className="text-foreground">{formatCurrency(emAberto)}</strong>
-            </span>
-          </span>
-          {veiculos.length > 0 ? (
-            <span className="block truncate">
-              {veiculos
-                .map((v) => v.plate || v.serialNumber || v.name || "veículo")
-                .join(" · ")}
-            </span>
-          ) : null}
-        </span>
+        /* ⛔ E AQUI NÃO VAI MAIS NADA. Os três valores desceram para a faixa
+           acima das parcelas — alinhados com a tabela, e o "Em aberto" com o
+           peso que ele tem na decisão de quem paga. A lista de veículos saiu
+           inteira: quem abre Cobranças veio pelo DINHEIRO, e a placa já está na
+           tela do veículo e na do orçamento; ali ela só empurrava a tabela para
+           baixo sem responder pergunta nenhuma. */
+        undefined
       }
       action={
         // ⚠️ `BillingStatusBadge`, e o estado vem do bloco `billing` ANINHADO —
@@ -297,6 +292,37 @@ function CobrancaCard({ cobranca }: { cobranca: PortalCharge }) {
       }
     >
       <div className="space-y-4">
+        {/* ── O DINHEIRO, EM TRÊS BLOCOS DE LARGURA IGUAL ───────────────────
+            ⛔ Era uma frase corrida no subtítulo do card, e o número que decide
+            — o que ainda falta pagar — ficava por último, sem peso, no fim de
+            uma linha de texto.
+
+            Aqui os três dividem a mesma faixa, encostada na tabela de parcelas,
+            e só o "Em aberto" vem em corpo maior: é ele que o financeiro do
+            cliente veio ver. Quando a conta fecha, ele PERDE o destaque em vez
+            de virar um zero gritando na tela. */}
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-border">
+          <div className="bg-muted/50 px-4 py-3">
+            <p className="text-sm text-muted-foreground">Total</p>
+            <p className="tabular-nums text-foreground">{formatCurrency(total)}</p>
+          </div>
+          <div className="bg-muted/50 px-4 py-3">
+            <p className="text-sm text-muted-foreground">Pago</p>
+            <p className="tabular-nums text-foreground">{formatCurrency(pago)}</p>
+          </div>
+          <div className="bg-muted/50 px-4 py-3">
+            <p className="text-sm text-muted-foreground">Em aberto</p>
+            <p
+              className={cn(
+                "text-lg font-semibold tabular-nums",
+                emAberto > 0 ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {formatCurrency(emAberto)}
+            </p>
+          </div>
+        </div>
+
         <div>
           <p className="mb-2 text-sm text-muted-foreground">Parcelas</p>
           <PortalTable
@@ -412,13 +438,6 @@ export function ClientePortalCobrancasPage() {
     <div className="space-y-4">
       <PageHeader
         title="Cobranças"
-        // O TOTAL É PARTE DA RESPOSTA, não enfeite: sem ele o contato não tem
-        // como saber que existem mais faturas do que os cartões desta página.
-        subtitle={
-          totalRecords > 0
-            ? `${totalRecords} ${totalRecords === 1 ? "cobrança" : "cobranças"} — parcelas, boletos e notas fiscais dos seus orçamentos.`
-            : "Parcelas, boletos e notas fiscais dos seus orçamentos."
-        }
         icon={IconFileInvoice}
         breadcrumbs={[
           { label: "Início", href: routes.customer.portal.root },
