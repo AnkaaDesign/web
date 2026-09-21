@@ -66,6 +66,23 @@ export const useAuth = () => {
   return context;
 };
 
+/**
+ * O MESMO contexto, sem a exigência de estar dentro do `AuthProvider`.
+ *
+ * Existe por causa do PORTAL DO CLIENTE: aquela árvore é irmã do `AuthProvider`
+ * (App.tsx monta `/cliente/*` FORA dele, deliberadamente — um contato de cliente
+ * não pode carregar o contexto de um FUNCIONÁRIO). Componentes genéricos de UI
+ * que o portal reusa — `DataTable` → `useTablePreferences` → `useMyPreferences`
+ * — chamavam `useAuth()` só para descobrir `user?.id`, e lá fora isso não
+ * devolve `null`: LANÇA, e a tela inteira do portal morre em tela branca.
+ *
+ * Quem precisa do funcionário de verdade continua usando `useAuth()` e continua
+ * falhando alto. Quem só quer saber "tem funcionário logado?" usa este.
+ */
+export const useOptionalAuth = (): AuthContextType | null => {
+  return useContext(AuthContext) ?? null;
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }

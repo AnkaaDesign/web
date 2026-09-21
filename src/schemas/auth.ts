@@ -20,6 +20,33 @@ export const signInSchema = z.object({
 
 export type SignInFormData = z.infer<typeof signInSchema>;
 
+// =====================
+// Login único — os dois passos da tela de entrada
+// =====================
+//
+// A tela virou máquina de dois passos (contato → senha ou código), e por isso
+// a senha NÃO pode continuar sendo exigida no mesmo schema do contato: no
+// passo 1 ela ainda não foi pedida, e o `isValid` do formulário manteria o
+// botão "Continuar" desligado para sempre.
+//
+// São dois schemas em vez de um resolver que troca de forma no meio do caminho
+// porque cada passo tem seu próprio formulário — e `signInSchema` continua
+// intacto, que é o contrato de `POST /auth/login`.
+
+/** Passo 1 — só o contato. O formato continua validado como sempre foi. */
+export const loginContactSchema = z.object({
+  contact: contactStringSchema,
+});
+
+export type LoginContactFormData = z.infer<typeof loginContactSchema>;
+
+/** Passo 2 (funcionário) — a senha, com a MESMA exigência de antes. */
+export const loginPasswordSchema = z.object({
+  password: passwordSchema,
+});
+
+export type LoginPasswordFormData = z.infer<typeof loginPasswordSchema>;
+
 // Register schema with simple password validation
 export const signUpSchema = z
   .object({

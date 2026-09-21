@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { apiClient } from "./axiosClient";
 import type {
   SignInFormData,
+  LoginContactFormData,
   SignUpFormData,
   PasswordResetRequestFormData,
   PasswordResetFormData,
@@ -20,6 +21,9 @@ import type {
 } from "../schemas";
 import type { User, AuthTokenResponse, AuthMessageResponse, AuthUserResponse } from "../types";
 
+/** A segunda credencial que a tela de entrada deve pedir depois do contato. */
+export type LoginMethod = "PASSWORD" | "CODE";
+
 // =====================
 // Core Authentication
 // =====================
@@ -27,6 +31,13 @@ import type { User, AuthTokenResponse, AuthMessageResponse, AuthUserResponse } f
 export const authService = {
   // Login with email or phone
   login: (data: SignInFormData) => apiClient.post<AuthTokenResponse>("/auth/login", data).then((res) => res.data),
+
+  // Login único, passo 1 — que credencial a tela deve pedir a seguir.
+  // Responde SEMPRE 200: `PASSWORD` para funcionário conhecido, `CODE` para
+  // todo o resto (contato de cliente — ou ninguém). O ramo padrão é `CODE` de
+  // propósito; o porquê está em `AuthService.resolveLoginMethod`, na API.
+  resolveLoginMethod: (data: LoginContactFormData) =>
+    apiClient.post<{ success: boolean; message: string; data: { method: LoginMethod } }>("/auth/login-method", data).then((res) => res.data),
 
   // Register with email or phone
   register: (data: SignUpFormData) => apiClient.post<AuthTokenResponse>("/auth/register", data).then((res) => res.data),
