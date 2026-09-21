@@ -37,6 +37,18 @@ interface ImplementMeasureFormProps {
   onChange?: (side: 'left' | 'right' | 'back', data: ImplementMeasureCreateFormData) => void;
   // Support for onSave prop (current usage)
   onSave?: (data: ImplementMeasureCreateFormData) => void;
+  /**
+   * A FOTO DE FUNDO DA TRASEIRA.
+   *
+   * ⚠️ Era declarada e IGNORADA (`showPhoto: _showPhoto`) — a traseira sempre
+   * oferecia "Adicionar Foto". No portal do cliente isso é perda silenciosa: o
+   * `POST /cliente/me/orcamentos` não carrega `photoFile`, então a foto seria
+   * escolhida, o componente toastaria "será salva ao submeter" e nada chegaria
+   * ao servidor. Passar `false` esconde a oferta inteira (botão, fundo e aviso).
+   *
+   * Padrão `true` de propósito: é o comportamento que os três chamadores
+   * internos já tinham quando a prop não fazia nada.
+   */
   showPhoto?: boolean;
   disabled?: boolean;
   taskName?: string;
@@ -310,7 +322,7 @@ export const ImplementMeasureForm = ({
   layout,
   onChange,
   onSave,
-  showPhoto: _showPhoto,
+  showPhoto = true,
   disabled = false,
   taskName,
   previewMode = false,
@@ -1423,7 +1435,7 @@ export const ImplementMeasureForm = ({
                   }}
                 >
                 {/* Photo background for back side */}
-                {selectedSide === 'back' && photoState.imageUrl && (
+                {selectedSide === 'back' && showPhoto && photoState.imageUrl && (
                   <img
                     src={photoState.imageUrl}
                     alt="Layout background"
@@ -1559,26 +1571,33 @@ export const ImplementMeasureForm = ({
                   </Button>
                 )}
 
-                <Button
-                  type="button"
-                  onClick={selectedSide === 'back' ? handlePhotoUpload : addDoor}
-                  size="sm"
-                  variant="default"
-                  disabled={disabled}
-                  className="flex-1"
-                >
-                  {selectedSide === 'back' ? (
-                    <>
-                      <IconCamera className="h-4 w-4 mr-1" />
-                      {photoState.imageUrl ? 'Substituir Foto' : 'Adicionar Foto'}
-                    </>
-                  ) : (
-                    <>
-                      <IconPlus className="h-4 w-4 mr-1" />
-                      Adicionar Porta
-                    </>
-                  )}
-                </Button>
+                {/* ⚠️ A traseira só oferece FOTO, e a foto depende de `showPhoto`
+                    (ver a prop). Sem ela o botão some em vez de virar
+                    "Adicionar Porta": porta na traseira não é desenhada por
+                    este componente (o laço de portas pula `back`), e oferecer
+                    um botão que não produz nada visível é pior que não ter. */}
+                {(selectedSide !== 'back' || showPhoto) && (
+                  <Button
+                    type="button"
+                    onClick={selectedSide === 'back' ? handlePhotoUpload : addDoor}
+                    size="sm"
+                    variant="default"
+                    disabled={disabled}
+                    className="flex-1"
+                  >
+                    {selectedSide === 'back' ? (
+                      <>
+                        <IconCamera className="h-4 w-4 mr-1" />
+                        {photoState.imageUrl ? 'Substituir Foto' : 'Adicionar Foto'}
+                      </>
+                    ) : (
+                      <>
+                        <IconPlus className="h-4 w-4 mr-1" />
+                        Adicionar Porta
+                      </>
+                    )}
+                  </Button>
+                )}
               </>
             )}
 
@@ -1599,7 +1618,7 @@ export const ImplementMeasureForm = ({
       </div>
 
       {/* Photo Status Indicator - only show for back side */}
-      {selectedSide === 'back' && photoState.imageUrl && (
+      {selectedSide === 'back' && showPhoto && photoState.imageUrl && (
         <Alert className="mt-4">
           <AlertDescription className="flex items-center justify-between">
             <span className="flex items-center gap-2">

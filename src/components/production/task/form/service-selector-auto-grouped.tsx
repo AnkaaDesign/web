@@ -799,10 +799,16 @@ function ServiceRow({
         return [SERVICE_ORDER_STATUS.COMPLETED];
 
       // ── WAITING_ARTWORK ───────────────────────────────────────────────────
-      // Em Negociação set to this state by the auto-sync when the quote is
-      // budget-approved but no artwork is uploaded yet. The state auto-clears
-      // when artwork is added. Manual overrides mirror the IN_PROGRESS branch:
-      // anyone can Pausar / Concluir, admins also Voltar para Pendente.
+      // ⚠️ Este estado era ESCRITO pelo auto-sync da O.S. comercial "Em
+      // Negociação" (orçamento aprovado e ainda sem arte) e se limpava sozinho
+      // quando a arte entrava. O acoplamento inteiro saiu em 20/09/2026 junto
+      // com aquela O.S. — o estado do orçamento é `TASK_QUOTE_STATUS`, não a
+      // descrição de uma ordem de serviço. `WAITING_ARTWORK` continua um estado
+      // VÁLIDO e legítimo; o que mudou é que agora só uma pessoa o escolhe, à
+      // mão, e nada mais o tira dali sozinho.
+      //
+      // As opções manuais espelham o ramo IN_PROGRESS: qualquer um pode Pausar /
+      // Concluir, e o admin também Voltar para Pendente.
       case SERVICE_ORDER_STATUS.WAITING_ARTWORK:
         if (isAdmin) return [
           SERVICE_ORDER_STATUS.PENDING,

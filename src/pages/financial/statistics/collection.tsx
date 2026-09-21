@@ -11,7 +11,8 @@ import { Combobox } from '@/components/ui/combobox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getBonusPeriodStart, getBonusPeriodEnd } from '@/utils/bonus';
-import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, TASK_QUOTE_STATUS, TASK_QUOTE_STATUS_LABELS } from '@/constants';
+import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES } from '@/constants';
+import { QUOTE_STATUS_OPTIONS_IN_ORDER } from '@/utils/quote-status';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
 import { usePricingVisible } from '@/hooks/common/use-pricing-visible';
@@ -129,15 +130,13 @@ const INVOICE_STATUS_OPTIONS = [
 //
 // Derivado do mapa canônico e não transcrito: era uma quarta cópia dos rótulos, e cópia de rótulo
 // é o que sobrevive a uma mudança de enum sem ninguém notar.
-const QUOTE_STATUS_OPTIONS = (
-  [
-    TASK_QUOTE_STATUS.EXPIRED,
-    TASK_QUOTE_STATUS.SIGNED,
-    TASK_QUOTE_STATUS.PENDING,
-    TASK_QUOTE_STATUS.APPROVED,
-    TASK_QUOTE_STATUS.CANCELLED,
-  ] as const
-).map((value) => ({ value: value as string, label: TASK_QUOTE_STATUS_LABELS[value] }));
+//
+// ⚠️ E A LISTA TAMBÉM PASSOU A SER DERIVADA, pela mesma razão uma camada acima: os cinco valores
+// estavam escritos à mão aqui, e quando o portal acrescentou `REQUESTED`, `IN_NEGOTIATION` e
+// `PRE_APPROVED` o funil de VENDAS ficou sem como filtrar justamente os três estágios novos —
+// incluindo a requisição, que é a boca do funil. Uma lista literal de cinco strings continua
+// compilando depois de o enum crescer; o que quebra é a pergunta que a tela consegue fazer.
+const QUOTE_STATUS_OPTIONS = QUOTE_STATUS_OPTIONS_IN_ORDER;
 
 type XMode = 'month' | 'year';
 const X_AXIS_OPTIONS: Array<{ value: XMode; label: string }> = [

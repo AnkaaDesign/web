@@ -1,5 +1,5 @@
 import { routes, TASK_OBSERVATION_TYPE, TASK_STATUS, TASK_QUOTE_STATUS } from "../constants";
-import { TASK_OBSERVATION_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS } from "../constants";
+import { TASK_OBSERVATION_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, isBudgetBillingPhase } from "../constants";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
@@ -20,26 +20,23 @@ import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
  * assistente de faturar.
  */
 export function getBudgetEditRoute(task: Task): string {
-  const status = task.quote?.status;
-  // ⚠️ LISTA POSITIVA, e não "tudo que não é PENDING nem CANCELLED".
+  // ⚠️ A MESMA FUNÇÃO que rotula o item de menu, e não uma segunda lista com o
+  // mesmo recorte escrito à mão.
   //
-  // A forma negativa mandava para o FATURAMENTO todo estado que nascesse depois
-  // dela. Com SIGNED e EXPIRED isso deixou de ser hipótese: um orçamento vencido
-  // — que existe justamente para o comercial reabrir e rever o preço — abria o
-  // assistente de faturar. E o comercial, que é quem clica neste botão, não tem
-  // o que fazer naquela tela.
-  const PRE_BILLING: Array<TASK_QUOTE_STATUS | undefined> = [
-    TASK_QUOTE_STATUS.PENDING,
-    TASK_QUOTE_STATUS.SIGNED,
-    TASK_QUOTE_STATUS.EXPIRED,
-    TASK_QUOTE_STATUS.CANCELLED,
-    undefined,
-  ];
-  // Com o enum encolhido a lista negativa e a positiva coincidem (só sobra APPROVED), mas a forma
-  // positiva fica: é ela que garante que um estado novo de ORÇAMENTO nasça no assistente de
-  // orçamento, e não no de cobrança.
-  const isQuoteApproved = !!status && !PRE_BILLING.includes(status as TASK_QUOTE_STATUS);
-  return isQuoteApproved
+  // Aqui morava um `PRE_BILLING` positivo — PENDING, SIGNED, EXPIRED, CANCELLED,
+  // `undefined` — e tudo fora dele abria o FATURAMENTO. A forma positiva foi
+  // escolhida para que "um estado novo nasça no assistente de orçamento", e é
+  // exatamente o oposto do que ela fazia: o que não está numa lista de
+  // PRÉ-faturamento é, por construção, PÓS-faturamento. Quando o portal
+  // acrescentou `REQUESTED`, `IN_NEGOTIATION` e `PRE_APPROVED`, esta função
+  // passou a mandar o comercial de uma requisição recém-nascida — sem um único
+  // serviço e com total zero — direto para o assistente de FATURAR.
+  //
+  // `isBudgetBillingPhase` é TOTAL (`status === APPROVED`) e não tem como
+  // envelhecer: só o último estado do orçamento abre a cobrança. Chamá-la também
+  // cumpre literalmente o aviso que já estava escrito acima — "o recorte tem de
+  // ser o mesmo" —, que duas cópias nunca puderam garantir.
+  return isBudgetBillingPhase(task.quote?.status)
     ? routes.financial.billing.details(task.id)
     : routes.financial.budget.details(task.id);
 }
