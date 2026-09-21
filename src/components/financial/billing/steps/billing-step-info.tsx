@@ -201,7 +201,11 @@ export function BillingStepInfo({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    // UMA coluna: o cartão vizinho era o "Responsável pelo Orçamento", que saiu
+    // quando o orçamento deixou de ter responsável próprio. A grade de duas
+    // colunas ficou para trás com um filho só, e o "Faturar Para" passou a
+    // ocupar metade da tela com a outra metade vazia.
+    <div className="space-y-4">
       {/* Faturar Para */}
       <Card>
         <CardHeader className="pb-3">
