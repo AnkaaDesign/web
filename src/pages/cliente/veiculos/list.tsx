@@ -219,7 +219,6 @@ export function ClientePortalVeiculosPage() {
         <DataTablePage<PortalVehicleDetail>
           title="Veículos"
           icon={IconCar}
-          subtitle={responsible?.companyName || undefined}
           breadcrumbs={[
             { label: "Início", href: routes.customer.portal.root },
             { label: "Veículos" },

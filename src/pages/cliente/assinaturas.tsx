@@ -165,7 +165,6 @@ export function ClientePortalAssinaturasPage() {
     <div className="space-y-4">
       <PageHeader
         title="Assinaturas"
-        subtitle="Os documentos que dependem da sua assinatura."
         icon={IconSignature}
         // ⚠️ MIGALHAS EM TODA TELA DO PORTAL. Eram quatro telas com e cinco
         // sem, e a barra de abas do portal não substitui o caminho: ela diz

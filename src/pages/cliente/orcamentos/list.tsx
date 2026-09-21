@@ -187,7 +187,6 @@ export function ClientePortalOrcamentosPage() {
       <div className="min-h-0 flex-1">
         <DataTablePage<PortalBudget>
           title="Orçamentos"
-          subtitle="Tudo que a Ankaa orçou para a sua empresa, na ordem do que espera por você."
           icon={IconFileText}
           // Migalhas em toda tela do portal menos o Início, que é a raiz. A
           // lista de Veículos já as tinha; esta e a de Pedidos não.

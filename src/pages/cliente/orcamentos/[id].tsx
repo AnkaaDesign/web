@@ -111,7 +111,6 @@ import {
   orcamentoTemDecisao,
   portalEst,
   portalRoleSigns,
-  portalWaitingOn,
   resolvePortalSections,
 } from "@/components/cliente/orcamento";
 
@@ -157,10 +156,6 @@ export function ClientePortalOrcamentoDetalhePage() {
   const backToList = () => navigate(routes.customer.portal.orcamentos);
 
   const titulo = budget?.budgetNumber ? `Orçamento nº ${budget.budgetNumber}` : "Orçamento";
-  // "De quem é a vez" é a primeira pergunta do contato, e é DERIVADA do estado.
-  // No subtítulo do cabeçalho ela chega antes de qualquer card.
-  const waiting = budget ? portalWaitingOn(budget.status) : null;
-
   const header = (
     <PageHeader
       variant="detail"
@@ -181,9 +176,7 @@ export function ClientePortalOrcamentoDetalhePage() {
           titulo
         )
       }
-      subtitle={waiting?.detail || undefined}
       icon={IconFileText}
-      backButton={{ onClick: backToList }}
       breadcrumbs={[
         { label: "Início", href: routes.customer.portal.root },
         { label: "Orçamentos", href: routes.customer.portal.orcamentos },

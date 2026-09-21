@@ -51,7 +51,6 @@ import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils";
 import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 
-import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,19 +61,6 @@ import {
   PortalRowLink,
   PortalSubheading,
 } from "@/components/cliente/portal-detail";
-
-/** Rótulos dos papéis. Espelha `RESPONSIBLE_ROLE_LABELS` da API. */
-const ROLE_LABELS: Record<string, string> = {
-  COMMERCIAL: "Comercial",
-  SELLER: "Vendedor",
-  REPRESENTATIVE: "Representante",
-  COORDINATOR: "Coordenador",
-  PURCHASING: "Compras",
-  MARKETING: "Marketing",
-  FINANCIAL: "Financeiro",
-  FLEET_MANAGER: "Gestor de Frota",
-  DRIVER: "Motorista",
-};
 
 // =====================================================
 // Peças
@@ -137,7 +123,7 @@ export default function ClientePainelPage() {
    */
   void usePricingVisible();
 
-  const { data, isLoading, isError, refetch, isFetching } = usePortalSummary();
+  const { data, isLoading, isError, refetch } = usePortalSummary();
   const summary = data?.data;
 
   /**
@@ -194,43 +180,17 @@ export default function ClientePainelPage() {
 
   const waitingCount = preApprovals.length + signatures.length;
 
-  const firstName = responsible?.name?.trim().split(/\s+/)[0] ?? "";
-
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={firstName ? `Olá, ${firstName}` : "Início"}
-        // Empresa e PAPÉIS no subtítulo, dentro do card do cabeçalho — e não
-        // numa faixa solta abaixo dele. Cada seção desta tela mora no seu card
-        // contornado, e uma fileira de etiquetas flutuando entre dois cards é
-        // justamente o scroll contínuo que a preferência do dono proíbe.
-        //
-        // Os papéis ficam à vista porque respondem sozinhos a pergunta que o
-        // suporte mais recebe: "por que o fulano vê preço e eu não?".
-        subtitle={
-          <div className="space-y-1.5">
-            {responsible?.companyName && <p>{responsible.companyName}</p>}
-            {roles.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {roles.map((role) => (
-                  <Badge key={role} variant="secondary">
-                    {ROLE_LABELS[role] ?? role}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        }
-        icon={IconChecklist}
-        actions={[
-          {
-            key: "refresh",
-            label: "Atualizar",
-            onClick: () => void refetch(),
-            loading: isFetching,
-          },
-        ]}
-      />
+      {/* ⛔ O CABEÇALHO DESTA TELA SAIU INTEIRO (decisão do dono).
+          Ele era um card só para dizer "Início" — a palavra que a aba ativa já
+          diz, dois centímetros acima — e um botão "Atualizar" que competia com
+          o F5 e com o refetch automático da consulta. Um card que não responde
+          nada empurra para baixo o primeiro que responde: "Precisa de um
+          orçamento?".
+
+          ⚠️ As outras telas do portal MANTÊM o cabeçalho: nelas ele carrega a
+          migalha, que é o caminho de volta. Aqui não há volta — esta é a raiz. */}
 
       {/* A CHAMADA PARA A REQUISIÇÃO — só para quem pode abrir uma.
           É a razão de ser do portal para o Comercial, o Vendedor, o
