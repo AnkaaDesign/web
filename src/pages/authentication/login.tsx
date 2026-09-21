@@ -30,6 +30,14 @@
 // `/cliente/entrar` continua existindo e funcionando: há links de notificação e
 // de assinatura apontando para lá, e `responsible-route.tsx` redireciona para
 // ela. Esta tela é a porta larga, não a substituição daquela.
+//
+// ⚠️ UMA PESSOA PODE SER OS DOIS SUJEITOS. Como a sonda pergunta só "é
+// funcionário?", quem também é responsável de cliente sempre cai no passo da
+// senha. As duas sessões convivem no navegador (chaves `ankaa_token` e
+// `ankaa_cliente_token`, cada uma no seu axios), então o problema nunca foi
+// técnico: era não haver como PEDIR a outra porta. O passo da senha oferece
+// "Sou responsável de cliente — entrar com código", que reusa o mesmo
+// `askForCode` do passo 1. Ver o comentário longo lá embaixo.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -364,6 +372,7 @@ export function LoginPage() {
                     Esqueceu sua senha?
                   </Link>
                 </div>
+
               </CardContent>
 
               <CardFooter className={styles.footer}>
@@ -464,6 +473,37 @@ export function LoginPage() {
                     Esqueceu sua senha?
                   </Link>
                 </div>
+
+                {/* A SONDA ESCOLHE UMA PORTA, E UMA PESSOA PODE TER AS DUAS.
+                    `resolveLoginMethod` responde `PASSWORD` para todo contato
+                    que existe como funcionário, e NÃO pergunta à tabela de
+                    responsáveis — de propósito, porque consultar os dois lados
+                    transformaria a sonda num oráculo (o comentário dela explica).
+                    A consequência é que quem é funcionário E responsável de
+                    cliente chegava aqui sem nenhum caminho para o portal. Não é
+                    hipótese: no banco de produção de hoje são dois contatos, um
+                    deles sócio do MEI que é cliente da casa.
+
+                    Os outros dois casos que caem aqui são o ex-funcionário que
+                    virou contato do cliente (a senha existe mas `signIn` recusa
+                    por vínculo encerrado) e quem ainda não definiu senha — nos
+                    dois a sonda promete uma credencial que não vai funcionar.
+
+                    A saída aparece para TODO MUNDO nesta tela, e não só para
+                    quem a sonda "sabe" ser responsável: é isso que preserva o
+                    segredo, porque o fluxo de código responde igual para
+                    responsável cadastrado e para ninguém. */}
+                <button
+                  type="button"
+                  className={cn(styles.link, "mx-auto block disabled:opacity-60")}
+                  disabled={isLoading}
+                  onClick={() => {
+                    setError("");
+                    void askForCode(contact, { isResend: false });
+                  }}
+                >
+                  Entrar como cliente
+                </button>
               </CardContent>
 
               <CardFooter className="flex flex-col space-y-2">
