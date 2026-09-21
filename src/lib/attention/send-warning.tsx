@@ -12,7 +12,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 
 import { apiClient } from "@/api-client/axiosClient";
 import { getUsers } from "@/api-client";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth, useOptionalAuth } from "@/contexts/auth-context";
 import { CONTRACT_STATUS, SECTOR_PRIVILEGES } from "@/constants";
 import { canAccessAnyPrivilege } from "@/utils/privilege";
 import { toast } from "@/components/ui/sonner";
@@ -55,7 +55,17 @@ const SendWarningContext = createContext<SendWarningApi | null>(null);
  * the current user's sector isn't allowed to send warnings (ADMIN/COMMERCIAL only —
  * enforced again server-side in AttentionService.sendWarning). */
 export function useSendWarning(): SendWarningApi {
-  const { user } = useAuth();
+  // ⚠️ `useOptionalAuth`. Este hook é chamado SEM CONDIÇÃO por
+  // `ui/detailpage/inline-edit-field.tsx`, e o PORTAL DO CLIENTE monta
+  // `DetailPage` numa árvore IRMÃ do `AuthProvider` (`App.tsx` põe `/cliente/*`
+  // fora dele de propósito). `useAuth()` lá fora LANÇA, e a tela inteira do
+  // portal morre em branco antes de desenhar um pixel.
+  //
+  // Sem funcionário não há privilégio de setor, `allowed` é falso e o retorno já
+  // é o no-op que este hook devolve a quem não pode avisar — a degradação certa,
+  // e não um contorno. O DIÁLOGO abaixo continua em `useAuth()`: ele só é
+  // montado dentro do `SendWarningProvider`, que é do lado funcionário.
+  const user = useOptionalAuth()?.user ?? null;
   const api = useContext(SendWarningContext);
   const allowed = canSendAttentionWarning(user?.sector?.privileges);
   return allowed && api ? api : { open: () => {} };

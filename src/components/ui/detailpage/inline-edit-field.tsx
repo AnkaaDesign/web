@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/sonner";
 import { IconArrowBackUp, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useAttentionField, attentionRowClass, useAnnouncePresence, useSendWarning, canSendAttentionWarning, type AttentionEntityType } from "@/lib/attention";
-import { useAuth } from "@/contexts/auth-context";
+import { useOptionalAuth } from "@/contexts/auth-context";
 import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { Input } from "@/components/ui/input";
@@ -382,7 +382,17 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
   // standing icon on the row: it only appears once the field is actually opened
   // (double-click), next to the editor for editable fields, or as the double-click
   // action itself for read-only fields (which have no editor to sit next to).
-  const { user } = useAuth();
+  // ⚠️ `useOptionalAuth`, NUNCA `useAuth`. O PORTAL DO CLIENTE monta `DetailPage`
+  // (e, por ele, este campo) numa árvore que é IRMÃ do `AuthProvider` — `App.tsx`
+  // põe `/cliente/*` fora dele de propósito, porque um contato de cliente não
+  // pode carregar o contexto de um FUNCIONÁRIO. `useAuth()` lá fora não devolve
+  // `null`: LANÇA, e a tela inteira do portal morre em branco.
+  //
+  // Sem funcionário, o campo DEGRADA: não há privilégio a consultar, então não
+  // há "enviar aviso" nem edição gateada por privilégio — que é a leitura certa,
+  // e não um contorno. Quem precisa do funcionário de verdade continua em
+  // `useAuth()` e continua falhando alto.
+  const user = useOptionalAuth()?.user ?? null;
   const canSendWarning = canSendAttentionWarning(user?.sector?.privileges);
   // Recipients = the people who can ACT on this field. Normally that is the field's own
   // privilege gate, but a field whose edit gate is a capability (team leadership, a state

@@ -1205,7 +1205,18 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
                   // `-mt-px` lets this divider overlap (not stack on top of) the last row's bottom border
                   // when content fills and scrolls flush; over empty space (short content) it's invisible.
                   <div className="-mt-px border-t border-border bg-muted/40 px-4">
-                    <DataTablePagination table={table} totalItems={totalItems} pageSizeOptions={dt.pageSizeOptions} />
+                    <DataTablePagination
+                      table={table}
+                      totalItems={totalItems}
+                      pageSizeOptions={dt.pageSizeOptions}
+                      // ⚠️ LIDOS AQUI, e não lá dentro: o rodapé é `memo` e o `table` é a
+                      // mesma instância a cada render. Ver o comentário em
+                      // `data-table-pagination.tsx` — era por isso que "próxima página"
+                      // avançava uma vez e travava.
+                      pageIndex={table.getState().pagination.pageIndex}
+                      pageSize={table.getState().pagination.pageSize}
+                      pageCount={table.getPageCount()}
+                    />
                   </div>
                 )}
               </div>

@@ -64,10 +64,22 @@ export const authKeys = {
 // =====================
 
 export function useCurrentUser() {
+  // SEM TOKEN, `GET /auth/me` SÓ PODE DAR 401 — e 401 aqui não é informação, é
+  // um toast vermelho ("Não Autorizado") disparado pelo interceptor do axios.
+  //
+  // Isso não é hipotético: o PORTAL DO CLIENTE reusa `DataTable`, que chama
+  // `usePrivileges()` → `useCurrentUser()` para recortar coluna por privilégio
+  // de SETOR. Um contato de cliente não tem `ankaa_token`, então cada tabela do
+  // portal pintava a tela com o erro de autenticação de um app em que ele nem
+  // está. Desabilitada, a consulta devolve `data: undefined` — exatamente o que
+  // o 401 devolveria, sem a viagem nem o toast.
+  const hasSession = !!safeLocalStorage.getItem("ankaa_token");
+
   return useQuery({
     queryKey: authKeys.currentUser(),
     queryFn: () => authService.me(),
     select: (response) => response.data,
+    enabled: hasSession,
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

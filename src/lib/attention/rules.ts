@@ -49,30 +49,67 @@ function whileInFlight(node: PredicateNode): PredicateNode {
 }
 
 /**
+ * A JANELA DA NOTA — para cada estado do orçamento, se faltar um campo de
+ * faturamento ainda BLOQUEIA alguma coisa.
+ *
+ * ⚠️ ERA UMA LISTA POSITIVA SOLTA, de três `eq`, e o comentário dela dizia que
+ * "um BudgetStatus novo acrescentado depois cai por padrão em 'já passou deste
+ * ponto'". Isso era verdade para o enum de cinco, em que tudo que faltava
+ * declarar era posterior à nota. Com o portal o enum ganhou TRÊS estados que são
+ * ANTERIORES a tudo — uma requisição recém-nascida não tem serviço, não tem
+ * valor e não tem documento — e a omissão passou a afirmar deles exatamente o
+ * contrário do que são. Nenhum compilador reclamaria: uma lista de três `eq`
+ * continua bem-formada quando o enum cresce.
+ *
+ * Por isso a forma agora é um `Record` TOTAL: acrescentar um membro ao enum sem
+ * classificá-lo aqui é erro de compilação, e a decisão é tomada por quem
+ * acrescenta o estado — não herdada por omissão.
+ *
+ * ⚠️ ESPELHO de `NOT_YET_INVOICED` (`attention.service.ts`). Se os dois lados
+ * divergirem, a contagem do menu (que vem do servidor) e a linha piscando na
+ * tela deixam de concordar.
+ */
+const INVOICE_WINDOW: Record<TASK_QUOTE_STATUS, boolean> = {
+  // Envelope lançado: o preço está acertado e a nota vem a seguir.
+  [TASK_QUOTE_STATUS.PENDING]: true,
+  // Assinado pelo cliente é pré-faturamento — faltar o número do pedido trava.
+  [TASK_QUOTE_STATUS.SIGNED]: true,
+  [TASK_QUOTE_STATUS.APPROVED]: true,
+
+  // ── FORA DA JANELA: quem segura a nota aqui é o PREÇO, não o cadastro ──────
+  //
+  // Vencido volta para a mesa do comercial reprecificar; cobrar dele o número do
+  // pedido de compra é pedir um dado que talvez nem se use. Ele reentra sozinho
+  // quando a reformulação o devolve a PENDING.
+  [TASK_QUOTE_STATUS.EXPIRED]: false,
+  // ── E OS TRÊS DO PORTAL, pela MESMA razão e com mais força ─────────────────
+  //
+  // Requisição não tem serviço nem valor: não há nota para travar. "Em
+  // Negociação" é o preço em discussão com o vendedor do cliente, e
+  // "Pré-aprovado" espera a Ankaa LANÇAR o documento — nos três o que falta é o
+  // acordo, não o cadastro. Deixá-los de fora é o mesmo recorte de EXPIRED.
+  [TASK_QUOTE_STATUS.REQUESTED]: false,
+  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: false,
+  [TASK_QUOTE_STATUS.PRE_APPROVED]: false,
+
+  [TASK_QUOTE_STATUS.CANCELLED]: false,
+};
+
+/**
  * The quote has not been billed yet — the only window in which a missing invoicing field is
  * still BLOCKING anything.
  *
- * Written as the two statuses that precede billing rather than as "not CANCELLED / not SETTLED",
+ * Written as the statuses that precede billing rather than as "not CANCELLED / not SETTLED",
  * because the negative form let every post-invoice status through: eleven Ibiporã quotes whose
  * nota had been issued and whose money had been in the bank for months kept blinking, which is
- * half of why the Faturamento list looked like it was on fire. A new BudgetStatus added later
- * defaults to "already past this point", which is the safe direction for an alert.
+ * half of why the Faturamento list looked like it was on fire.
  */
 function notYetInvoiced(): PredicateNode {
   return {
     op: "or",
-    nodes: [
-      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.PENDING },
-      // Espelha `NOT_YET_INVOICED` no servidor. Assinado pelo cliente é
-      // pré-faturamento: a nota vem a seguir, e faltar o número do pedido ainda
-      // trava. EXPIRED fica de fora dos dois lados — ali quem segura a nota é o
-      // PREÇO, que voltou para a mesa do comercial.
-      //
-      // ⚠️ Se os dois lados divergirem, a contagem do menu (que vem do servidor)
-      // e a linha piscando na tela deixam de concordar.
-      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.SIGNED },
-      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.APPROVED },
-    ],
+    nodes: (Object.keys(INVOICE_WINDOW) as TASK_QUOTE_STATUS[])
+      .filter((status) => INVOICE_WINDOW[status])
+      .map((status) => ({ op: "eq", field: "status", value: status }) as PredicateNode),
   };
 }
 

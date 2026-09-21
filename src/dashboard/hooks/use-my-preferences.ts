@@ -3,13 +3,19 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../contexts/auth-context";
+import { useOptionalAuth } from "../../contexts/auth-context";
 import { usePreferences, useCreatePreferences, useUpdatePreferences } from "../../hooks/common/use-preferences";
 import { preferencesKeys } from "../../hooks/common/query-keys";
 import type { Preferences } from "../../types";
 
 export function useMyPreferences() {
-  const { user } = useAuth();
+  // `useOptionalAuth` e não `useAuth`: o PORTAL DO CLIENTE monta `DataTable` /
+  // `DetailPage` FORA do `AuthProvider` (App.tsx o mantém irmão de propósito), e
+  // `useAuth()` LANÇA lá fora — a tela do contato morria em branco antes de
+  // desenhar a primeira linha. Sem funcionário, `userId` é `null`, a consulta
+  // nasce desabilitada (`enabled: !!userId`), a criação preguiçosa sai pelo
+  // `if (!userId) return`, e o layout da tabela vive só no localStorage.
+  const user = useOptionalAuth()?.user ?? null;
   const queryClient = useQueryClient();
   const userId = user?.id ?? null;
 

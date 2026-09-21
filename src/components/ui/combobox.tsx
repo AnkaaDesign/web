@@ -315,9 +315,29 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   valueRef.current = value;
 
   // Reset pagination when search changes
+  //
+  // ⚠️ `hasMore` TAMBÉM zera aqui, e essa linha é a correção de um defeito que
+  // custava uma página inteira de opções.
+  //
+  // A lista some (as opções da busca anterior são descartadas acima), o
+  // contêiner encolhe e o navegador dispara um `scroll` — e o `onScroll` da
+  // lista chama `loadMore()` assim que passa de 85%. Nesse instante a página 1
+  // da NOVA busca ainda está no ar, mas `hasMore` guardava a resposta da busca
+  // ANTERIOR: ainda era `true`. Resultado, com `currentPage` já de volta a 1:
+  // um pedido de PÁGINA 2 da busca nova antes de a página 1 chegar.
+  //
+  // Quem chegasse por último ganhava. Se a página 1 chegasse depois, o efeito
+  // de `asyncResponse` SUBSTITUI a lista pela página 1 — e as 20 linhas da
+  // página 2 evaporavam, enquanto `currentPage` continuava em 2. O próximo
+  // "carregar mais" pedia a 3: aquelas 20 linhas ficavam inalcançáveis, e para
+  // quem estava rolando a lista parecia ter parado de carregar.
+  //
+  // Zerado, o `loadMore` não tem como disparar antes da página 1 da busca nova
+  // — e quando ela chega, ela mesma diz se há mais.
   useEffect(() => {
     // console.log('[Combobox] Search changed, resetting pagination. debouncedSearch:', debouncedSearch);
     setCurrentPage(1);
+    setHasMore(false);
     // Clear options for new search to show loading state
     // Don't re-add initialOptions here - let the async query handle it
     if (debouncedSearch !== '') {
@@ -392,14 +412,47 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     }
   }, [asyncResponse, debouncedSearch]); // getOptionValue, initialOptions and value are read via refs
 
+  // ─── AS DUAS TRAVAS DO "CARREGAR MAIS" ───────────────────────────────────
+  //
+  // `isLoadingMore` é ESTADO, e estado só vale no render seguinte. Uma rolagem
+  // de roda dispara vários `scroll` no mesmo quadro, e todos leem o mesmo
+  // `false` do fechamento — a mesma página saía pedida duas ou três vezes.
+  // A trava de verdade é um ref, que muda no ato.
+  const loadMoreLockRef = useRef(false);
+
+  // O SENTINELA — uma linha invisível no FIM da lista, observada pelo
+  // `IntersectionObserver`.
+  //
+  // ⚠️ Substitui a conta de porcentagem no `onScroll` do contêiner. Aquela conta
+  // presumia saber QUEM rola: ela lia `scrollTop/clientHeight/scrollHeight` de
+  // um elemento específico e só funcionava se fosse exatamente ele a rolar.
+  // Bastava um ancestral com `overflow` (um popover, um contêiner de diálogo,
+  // uma mudança de layout) para a roda do usuário rolar OUTRA caixa: a conta
+  // nunca passava de 85%, `loadMore` nunca disparava, e a lista parecia ter
+  // parado de carregar — sem erro, sem log, sem nada para depurar.
+  //
+  // O observador não pergunta quem rola. Ele pergunta "o fim da lista apareceu?",
+  // que é a pergunta que de fato interessa, e o navegador responde sozinho.
+  const sentinelaRef = useRef<HTMLDivElement | null>(null);
+  // E o termo buscado MAIS RECENTE, para descartar a resposta de uma página que
+  // foi pedida para uma busca que já não está na tela: sem isto, as linhas de
+  // "azul" entravam no fim da lista de "verde".
+  const debouncedSearchRef = useRef(debouncedSearch);
+  debouncedSearchRef.current = debouncedSearch;
+
   // Load more function
   const loadMore = useCallback(async () => {
-    if (!queryFn || isLoadingMore || !hasMore) return;
+    if (!queryFn || loadMoreLockRef.current || isLoadingMore || !hasMore) return;
 
+    loadMoreLockRef.current = true;
+    const requestedSearch = debouncedSearch;
     setIsLoadingMore(true);
     try {
       const nextPage = currentPage + 1;
-      const result = await queryFn(debouncedSearch, nextPage);
+      const result = await queryFn(requestedSearch, nextPage);
+
+      // A busca mudou enquanto esta página vinha: a resposta é de outra lista.
+      if (debouncedSearchRef.current !== requestedSearch) return;
 
       // Handle backward compatibility
       if (Array.isArray(result)) {
@@ -454,9 +507,31 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         console.error("Error loading more options:", error);
       }
     } finally {
+      loadMoreLockRef.current = false;
       setIsLoadingMore(false);
     }
   }, [queryFn, isLoadingMore, hasMore, currentPage, debouncedSearch]);
+
+  // `rootMargin` de 120px: pede a página seguinte um pouco ANTES de o fim
+  // aparecer, para que a lista não trave visivelmente ao chegar no fundo.
+  //
+  // `open` está nas dependências porque o conteúdo do popover só existe no DOM
+  // enquanto ele está aberto — sem isso o observador se prenderia a um nó morto
+  // e nunca mais dispararia depois do primeiro fechamento.
+  useEffect(() => {
+    if (!async || !open || !hasMore) return;
+    const alvo = sentinelaRef.current;
+    if (!alvo || typeof IntersectionObserver === "undefined") return;
+
+    const observador = new IntersectionObserver(
+      entradas => {
+        if (entradas.some(e => e.isIntersecting)) void loadMore();
+      },
+      { rootMargin: "120px" },
+    );
+    observador.observe(alvo);
+    return () => observador.disconnect();
+  }, [async, open, hasMore, loadMore]);
 
   // Determine options source
   const options = async ? allAsyncOptions : propOptions || [];
@@ -827,16 +902,9 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                 // Ensure pointer events work properly
                 e.stopPropagation();
               }}
-              onScroll={(e) => {
-                // Auto-load more on scroll near bottom (only for async mode)
-                if (async && hasMore && !isLoadingMore) {
-                  const target = e.target as HTMLDivElement;
-                  const scrollPercentage = ((target.scrollTop + target.clientHeight) / target.scrollHeight) * 100;
-                  if (scrollPercentage > 85) {
-                    loadMore();
-                  }
-                }
-              }}
+              // Sem `onScroll`: quem pede a próxima página é o sentinela do fim
+              // da lista (ver `sentinelaRef`). A conta de porcentagem que morava
+              // aqui só funcionava quando ERA ESTE o elemento que rolava.
             >
               <div className="p-2">
                 {!isMultiple && clearable && selectedValues.length > 0 && (
@@ -993,7 +1061,11 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                   })
                 )}
 
-                {/* Load more button for async mode */}
+                {/* O fim da lista. `aria-hidden`: é gatilho, não conteúdo. */}
+                {async && hasMore && <div ref={sentinelaRef} aria-hidden className="h-px w-full" />}
+
+                {/* O botão continua — rolar é o caminho comum, clicar é o que
+                    resta para teclado, leitor de tela e para quem prefere. */}
                 {async && hasMore && (
                   <div className="pt-2 pb-1 px-1 border-t dark:border-border/30 mt-1">
                     <Button

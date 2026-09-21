@@ -569,8 +569,7 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
   // O recorte é uma LISTA POSITIVA de estados (PENDING, SIGNED, APPROVED), e não "tudo que não é
   // CANCELLED". A forma negativa deixava passar todo estado pós-nota, e orçamentos cujo dinheiro
   // estava no banco havia meses seguiam piscando — era metade do motivo de a lista de Faturamento
-  // parecer em chamas. Com o enum do orçamento encolhido, CANCELLED é o único estado fora da
-  // lista, e é este teste que guarda a forma positiva.
+  // parecer em chamas. É este teste que guarda a forma positiva.
   it("stays silent on a cancelled quote", async () => {
     setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.CANCELLED })]);
     await settle();
@@ -592,6 +591,29 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     // pedido de compra é pedir um dado que talvez nem seja usado — e este
     // alerta existe para nomear trabalho que destrava dinheiro HOJE.
     setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.EXPIRED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  // ── OS TRÊS DO PORTAL (20/09/2026) ──────────────────────────────────────
+  //
+  // ⚠️ Este teste existe porque a lista de estados era três `eq` soltos com um
+  // comentário dizendo que "um BudgetStatus novo cai por padrão em 'já passou
+  // deste ponto'". Era verdade para o enum de cinco, em que tudo que faltasse
+  // declarar vinha DEPOIS da nota. Os três do portal vêm ANTES de tudo, e a
+  // omissão passaria a afirmar deles o contrário do que são — sem uma linha de
+  // erro de compilação, porque uma lista de `eq` continua bem-formada quando o
+  // enum cresce. O recorte agora é um `Record` TOTAL (`INVOICE_WINDOW`), e é este
+  // teste que prova a classificação dos três.
+  //
+  // Os três caem do mesmo lado de EXPIRED e pela mesma razão: o que segura a
+  // nota ali é o PREÇO, não o cadastro. Uma requisição não tem sequer serviço.
+  it.each([
+    [TASK_QUOTE_STATUS.REQUESTED, "requisição: não há serviço, valor nem nota para travar"],
+    [TASK_QUOTE_STATUS.IN_NEGOTIATION, "em negociação: o preço está na mesa do vendedor do cliente"],
+    [TASK_QUOTE_STATUS.PRE_APPROVED, "pré-aprovado: espera a Ankaa lançar o documento"],
+  ])("silencia em %s — %s", async (status) => {
+    setEntities("TASK_QUOTE", [quote({ status })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
