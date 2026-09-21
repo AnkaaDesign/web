@@ -159,7 +159,14 @@ function VeiculoUnicoRows({ vehicle }: { vehicle: PortalVehicle }) {
       {pedido ? <DetailRow label="Pedido" value={codigo(pedido)} /> : null}
       {vehicle.milestoneLabel ? <DetailRow label="Andamento" value={vehicle.milestoneLabel} /> : null}
       {previsao ? (
-        <DetailRow label="Previsão" value={<span className="tabular-nums">{formatDate(previsao)}</span>} />
+        /* ⚠️ "Liberação", e não "Previsão": `forecastDate` é quando o CLIENTE
+             libera o veículo para a Ankaa, não quando a Ankaa o devolve pronto.
+             O rótulo antigo dizia o oposto do campo. Editável na tela do
+             veículo, por veículo. */
+        <DetailRow
+          label="Liberação do veículo"
+          value={<span className="tabular-nums">{formatDate(previsao)}</span>}
+        />
       ) : null}
       {vehicle.cancelled ? (
         <DetailRow

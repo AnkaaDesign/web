@@ -46,6 +46,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { portalFileUrl, portalThumbnailUrl } from "@/components/cliente/veiculo/portal-file-url";
 import { cn } from "@/lib/utils";
 import { PortalCard, PortalSubheading } from "../portal-detail";
+import { Badge } from "@/components/ui/badge";
+import { PAINT_FINISH_LABELS, PAINT_FINISH } from "@/constants";
 import { VehicleChips } from "./vehicle-chips";
 
 /**
@@ -95,20 +97,57 @@ function Arquivos({ files, label }: { files: PortalFile[]; label: string }) {
   );
 }
 
-/** Uma tinta: a amostra de cor, o nome e o acabamento. */
+/**
+ * UMA TINTA — a mesma peça que o lado funcionário desenha.
+ *
+ * ⛔ ERA UMA ETIQUETA MINÚSCULA com a cor em 16 px e o acabamento CRU
+ * ("Blue Ocean · PEARL"). Dois defeitos num item só:
+ *
+ *   · `PEARL` é o valor do enum, não uma palavra. A casa inteira mostra
+ *     "Perolizado" (`PAINT_FINISH_LABELS`), e o portal era a única tela que
+ *     vazava o banco para o cliente.
+ *   · A amostra era menor que o texto ao lado. Numa tela cujo assunto é COR,
+ *     a cor tem de ser a primeira coisa que se vê — é assim em
+ *     `paint-type/detail/related-paints-card.tsx`, que é a régua: amostra
+ *     grande com anel, nome em `font-medium`, hexadecimal em monoespaçada e o
+ *     acabamento como etiqueta.
+ *
+ * ⛔ E SEM O HEXADECIMAL (decisão do dono, segunda passada). `#032545` embaixo
+ * do nome é endereço de máquina: ninguém compra tinta por ele, a amostra ao lado
+ * já mostra a cor, e ele empurrava para baixo o que de fato identifica a tinta.
+ * No lugar dele entra o TIPO ("Poliéster"), que junto com o acabamento
+ * ("Perolizado") é o par que o funileiro do cliente precisa ouvir.
+ */
 function Tinta({ paint }: { paint: PortalPaint }) {
+  const acabamento = paint.finish
+    ? (PAINT_FINISH_LABELS[paint.finish as PAINT_FINISH] ?? paint.finish)
+    : null;
+
   return (
-    <span className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1">
+    <div className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/50 px-3 py-2">
       <span
         aria-hidden
-        className="h-4 w-4 shrink-0 rounded-sm border border-border"
+        className="h-10 w-10 shrink-0 rounded-lg shadow-sm ring-1 ring-border/60 dark:ring-border"
         style={paint.hex ? { backgroundColor: paint.hex } : undefined}
       />
-      <span className="text-sm">
-        {paint.name ?? "Tinta sem nome"}
-        {paint.finish ? <span className="text-muted-foreground"> · {paint.finish}</span> : null}
-      </span>
-    </span>
+      <div className="min-w-0 space-y-0.5">
+        <p className="truncate text-sm font-medium text-foreground">
+          {paint.name ?? "Tinta sem nome"}
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {paint.type ? (
+            <Badge variant="outline" size="sm">
+              {paint.type}
+            </Badge>
+          ) : null}
+          {acabamento ? (
+            <Badge variant="outline" size="sm">
+              {acabamento}
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 

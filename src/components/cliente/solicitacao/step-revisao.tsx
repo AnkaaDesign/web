@@ -31,6 +31,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCNPJ, formatCPF, formatChassis, formatPlate } from "@/utils";
 import { PAINT_FINISH_LABELS } from "@/constants";
@@ -53,14 +54,22 @@ interface StepRevisaoProps {
   baseFiles: FileWithPreview[];
 }
 
-/** Uma linha rótulo/valor. O rótulo nunca é menor que o valor ao lado. */
+/**
+ * Uma linha rótulo/valor — a MESMA das telas de detalhe.
+ *
+ * ⛔ ERA UMA LINHA PRÓPRIA, inventada aqui: `flex justify-between` com
+ * `border-b`. Fundo nenhum, divisória em vez de bloco — e o dono viu o
+ * resultado lado a lado com o detalhe do orçamento: no resumo da requisição os
+ * campos "somem" no cinza, porque nada os delimita. `ui/detail-row.tsx` é o que
+ * TODA tela de detalhe desta casa usa, importa só `react` + `cn` (seguro fora
+ * do `AuthProvider`, que é o requisito do portal) e já traz o `—` itálico do
+ * vazio.
+ *
+ * É a mesma correção que `portal-detail.tsx` já tinha feito nos cards do
+ * portal; este arquivo tinha ficado para trás.
+ */
 function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border/60 py-2 last:border-0">
-      <span className="text-sm text-muted-foreground">{rotulo}</span>
-      <span className="text-sm font-medium">{valor}</span>
-    </div>
-  );
+  return <DetailRow label={rotulo} value={valor} />;
 }
 
 const vazio = <span className="font-normal text-muted-foreground">Não informado</span>;
@@ -115,7 +124,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             Cliente do serviço
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           {novoCliente ? (
             <>
               <Linha
@@ -175,7 +184,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             Faturar para
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           <Linha
             rotulo="Cliente a faturar"
             valor={pagador?.fantasyName ?? pagador?.corporateName ?? vazio}
@@ -214,7 +223,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             cartão abaixo.
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           {veiculosPreenchidos.length === 0 ? (
             <EmptyState
               title="Nenhum veículo informado"
@@ -268,7 +277,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             Uma medida só, a mesma para todos os veículos desta requisição.
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           {!temMedidas ? (
             <p className="text-sm text-muted-foreground">
               Você não informou as medidas. O implemento é medido na entrada do veículo.
@@ -315,7 +324,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             Pintura geral
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           {novaTinta ? (
             <>
               <Linha
@@ -377,7 +386,7 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2 pt-0">
           {baseFiles.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum arquivo anexado.</p>
           ) : (

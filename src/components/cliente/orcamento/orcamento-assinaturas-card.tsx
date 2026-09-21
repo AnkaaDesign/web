@@ -81,7 +81,24 @@ export function OrcamentoAssinaturasCard({
   );
 
   return (
-    <PortalCard icon={IconSignature} title="Assinaturas" description="O que deste orçamento está esperando por você.">
+    <PortalCard
+      icon={IconSignature}
+      title="Assinaturas"
+      description="O que deste orçamento está esperando por você."
+      actions={
+        /* ⚠️ O MESMO ATALHO DOS OUTROS DOIS CARDS ("Abrir veículo", "Ver
+           cobranças"): este card mostra só o que este ORÇAMENTO espera, e a
+           tela cheia mostra tudo o que espera pela pessoa — inclusive de outros
+           orçamentos. Sem a saída, quem chegou aqui por um link de assinatura
+           não tinha como descobrir que havia mais. */
+        <Button variant="outline" size="sm" asChild>
+          <Link to={routes.customer.portal.assinaturas} className="gap-1">
+            Ver assinaturas
+            <IconChevronRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </Button>
+      }
+    >
       {isLoading ? (
         <Skeleton className="h-16 w-full" />
       ) : isError ? (

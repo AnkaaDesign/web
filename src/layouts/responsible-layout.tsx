@@ -194,7 +194,16 @@ export const ResponsibleLayout = () => {
   // rolagem vaza para a página inteira em vez de ficar na tabela.
   return (
     <div className="flex h-dvh w-full flex-col bg-background">
-      <header className="shrink-0 border-b bg-card">
+      {/* ⚠️ O SEPARADOR É UMA COSTURA, NÃO UM TRAÇO — decisão do dono, olhando o
+          portal no escuro. Eram TRÊS valores empilhados em 4 pixels: a página é
+          `--background` 11%, o cabeçalho é `--card` 15% e a borda cheia é
+          `--border` 22%. O degrau de fundo (11→15) já separa as duas faixas
+          sozinho; a borda por cima dele saltava mais 7 pontos e virava a linha
+          mais clara da tela, logo acima do conteúdo que a pessoa veio ler.
+          A meia opacidade a devolve a ~18% — ela some no escuro e continua
+          fazendo o trabalho no claro, onde o degrau de fundo é quase nada
+          (branco contra 98%). */}
+      <header className="shrink-0 border-b border-border/50 bg-card">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{responsible?.name}</p>

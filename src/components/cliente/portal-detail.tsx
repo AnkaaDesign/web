@@ -101,7 +101,22 @@ export function PortalCard({
     // O conteúdo continua alinhado ao TOPO: o corpo é fluxo normal dentro do
     // `CardContent`, então a sobra vira respiro embaixo, não vão no meio.
     <Card className={cn("flex min-w-0 grow flex-col", className)}>
-      <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-start sm:justify-between">
+      {/* ⚠️ `items-center` QUANDO HÁ AÇÃO, e não `items-start`.
+          O dono viu o sintoma: "Abrir veículo" pousava mais baixo que a palavra
+          "Veículos" ao lado. Com `items-start`, título e botão encostam pelo
+          TOPO — e como o botão é mais alto que uma linha de texto, o texto
+          parece subir. Centrado, os dois compartilham a mesma linha de base
+          óptica, que é o que o olho espera de um cabeçalho.
+
+          Sem ação, `items-start` continua valendo: aí o que se alinha é o ícone
+          com a primeira linha do título, e centrar afastaria o ícone de um
+          título de duas linhas. */}
+      <CardHeader
+        className={cn(
+          "flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:justify-between",
+          actions ? "sm:items-center" : "sm:items-start",
+        )}
+      >
         <div className="flex min-w-0 items-start gap-2">
           {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />}
           <div className="min-w-0 space-y-1">
