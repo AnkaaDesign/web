@@ -43,7 +43,7 @@
 // A unicidade é por (cliente, número). Um número que já existe significa
 // "acrescente estes veículos àquele pedido", e a tela diz isso ANTES de enviar —
 // o rótulo do botão troca. Quem repete o número de propósito é quem está certo.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -79,6 +79,20 @@ import { usePortalPedidoPorNumero } from "./usar-pedido-por-numero";
 export interface PedidoFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * ABRIR JÁ MARCANDO OS PENDENTES — é o que diferencia a faixa âmbar do botão
+   * "Novo pedido" do cabeçalho, que abre em branco.
+   *
+   * ⛔ OS DOIS FAZIAM EXATAMENTE A MESMA COISA (`setDialogOpen(true)`), e o dono
+   * perguntou a diferença olhando a tela: não havia nenhuma. Dois botões com o
+   * mesmo efeito, a dois cliques de distância, ensinam que um deles mente.
+   *
+   * A faixa promete resolver os veículos que ela ACABOU de contar, então o
+   * diálogo aberto por ela chega com esses veículos marcados e só o número por
+   * digitar. A lista já vem filtrada por `semPedido` — marcar é marcar o que
+   * veio.
+   */
+  marcarPendentes?: boolean;
 }
 
 /**
@@ -97,7 +111,11 @@ const pedidoDe = (vehicle: PortalVehicleDetail): string | null => {
   return identity?.purchaseOrder?.number?.trim() || identity?.customerOrderNumber?.trim() || null;
 };
 
-export function PedidoFormDialog({ open, onOpenChange }: PedidoFormDialogProps) {
+export function PedidoFormDialog({
+  open,
+  onOpenChange,
+  marcarPendentes = false,
+}: PedidoFormDialogProps) {
   const [number, setNumber] = useState("");
   const [issuedAt, setIssuedAt] = useState<Date | null>(null);
   const [search, setSearch] = useState("");
@@ -165,6 +183,28 @@ export function PedidoFormDialog({ open, onOpenChange }: PedidoFormDialogProps) 
       return next;
     });
 
+  /**
+   * A MARCAÇÃO AUTOMÁTICA DA FAIXA ÂMBAR — uma vez por abertura.
+   *
+   * ⚠️ `marcouNestaAbertura` existe para que desmarcar VALHA. Sem ele, o efeito
+   * remarcaria o veículo no próximo render (trocar de página, digitar na busca)
+   * e a caixa voltaria sozinha — o clássico controle que não obedece.
+   */
+  const marcouNestaAbertura = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      marcouNestaAbertura.current = false;
+      return;
+    }
+    if (!marcarPendentes || marcouNestaAbertura.current || visiveis.length === 0) return;
+    marcouNestaAbertura.current = true;
+    setSelected((current) => {
+      const next = new Map(current);
+      for (const vehicle of visiveis) next.set(vehicle.id, portalVehicleLabel(vehicle));
+      return next;
+    });
+  }, [open, marcarPendentes, visiveis]);
+
   const reset = () => {
     setNumber("");
     setIssuedAt(null);
@@ -220,8 +260,17 @@ export function PedidoFormDialog({ open, onOpenChange }: PedidoFormDialogProps) 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               {/* Rótulo no mesmo tamanho do controle ao lado (§10). */}
+              {/* ⚠️ O ASTERISCO É VERMELHO. Em cinza, na mesma cor do rótulo,
+                  ele lê como pontuação — e o campo obrigatório deixa de se
+                  anunciar. `aria-hidden` porque quem ouve a tela já recebe a
+                  obrigatoriedade pelo `required` do controle, e "asterisco"
+                  falado no meio do rótulo é ruído. */}
               <Label htmlFor="pedido-numero" className="text-sm">
-                Número do pedido *
+                Número do pedido{" "}
+                <span className="text-destructive" aria-hidden>
+                  *
+                </span>
+                <span className="sr-only">(obrigatório)</span>
               </Label>
               <Input
                 id="pedido-numero"

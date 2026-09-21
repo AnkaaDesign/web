@@ -42,7 +42,6 @@ import { IconShoppingCart, IconShoppingCartPlus } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
 import {
   usePortalPurchaseOrders,
@@ -248,14 +247,20 @@ export function ClientePortalPedidosPage() {
       {avisoVisivel ? (
         <div className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span>
+            {/* ⛔ A FAIXA PERDEU O BOTÃO, e é a segunda correção do mesmo
+                ponto: primeiro os dois faziam a MESMA chamada; depois passaram
+                a fazer coisas parecidas com nomes diferentes — e o dono
+                perguntou de novo qual era a diferença. Quando a resposta precisa
+                de explicação, o controle está sobrando.
+
+                Ficou UM: "Novo pedido", no cabeçalho, onde a casa põe o criar.
+                Ele já abre com os veículos pendentes marcados, que era a única
+                coisa que o botão daqui fazia de diferente. A faixa volta a ser o
+                que sempre foi — o aviso que dá o número. */}
             {semPedido === 1
-              ? "1 veículo ainda está sem número de pedido de compra."
-              : `${semPedido} veículos ainda estão sem número de pedido de compra.`}
+              ? "1 veículo ainda está sem número de pedido de compra. Use “Novo pedido” — ele já vem marcado."
+              : `${semPedido} veículos ainda estão sem número de pedido de compra. Use “Novo pedido” — eles já vêm marcados.`}
           </span>
-          <Button size="sm" className="shrink-0" onClick={() => setDialogOpen(true)}>
-            <IconShoppingCartPlus className="mr-2 h-4 w-4" />
-            Informar agora
-          </Button>
         </div>
       ) : null}
 
@@ -265,7 +270,6 @@ export function ClientePortalPedidosPage() {
       <div className="min-h-0 flex-1">
         <DataTablePage<PortalPurchaseOrder>
           title="Pedidos de compra"
-          subtitle="Os números de pedido que a sua empresa emitiu, e os veículos que cada um cobre."
           icon={IconShoppingCart}
           breadcrumbs={[
             { label: "Início", href: routes.customer.portal.root },
@@ -283,6 +287,12 @@ export function ClientePortalPedidosPage() {
                     key: "novo",
                     label: "Novo pedido",
                     icon: IconShoppingCartPlus,
+                    // ⚠️ JÁ MARCANDO OS PENDENTES: a lista do diálogo abre
+                    // filtrada por "sem pedido", então marcar o que veio é o
+                    // atalho certo para o caso comum — e desmarcar continua
+                    // valendo. Quem precisa corrigir um pedido de veículo que já
+                    // tem número liga "Mostrar também os que já têm pedido" lá
+                    // dentro.
                     onClick: () => setDialogOpen(true),
                   },
                 ]
@@ -322,7 +332,13 @@ export function ClientePortalPedidosPage() {
         />
       </div>
 
-      {canWrite && <PedidoFormDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
+      {canWrite && (
+        <PedidoFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          marcarPendentes
+        />
+      )}
     </div>
   );
 }
