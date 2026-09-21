@@ -25,23 +25,15 @@
 //
 // ⚠️ A CHAVE DA TRASEIRA É `back`, NUNCA `rear`. Está assim no servidor e no
 // cliente tipado; inventar `rear` não dá erro de compilação, dá uma face vazia.
+import { useCallback, useRef, useState } from "react";
 import { IconRuler } from "@tabler/icons-react";
 
-import type { PortalMeasure, PortalMeasureSection } from "@/api-client/portal";
-import { DetailRow } from "@/components/ui/detail-row";
-import { PortalCard, PortalDash, PortalRows, PortalSubheading } from "../portal-detail";
-import { PortalTable } from "../portal-table";
+import { Button } from "@/components/ui/button";
+import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 
-/**
- * Metros com vírgula e sufixo, sempre.
- *
- * Duas casas fixas de propósito: `6.2` e `6.20` são o mesmo número e leituras
- * diferentes numa coluna — a segunda alinha com as vizinhas, a primeira não.
- */
-function metros(valor: number | null | undefined): string | null {
-  if (valor === null || valor === undefined || Number.isNaN(valor)) return null;
-  return `${valor.toFixed(2).replace(".", ",")} m`;
-}
+import type { PortalMeasure } from "@/api-client/portal";
+import { usePortalUpdateVehicleIdentity } from "@/api-client/portal";
+import { PortalCard } from "../portal-detail";
 
 const FACES: Array<{ chave: keyof Medidas; rotulo: string }> = [
   // A ordem é a do formulário, e a do caminhão visto de trás para a frente:
@@ -57,92 +49,182 @@ interface Medidas {
   back: PortalMeasure | null;
 }
 
-function Face({ rotulo, medida }: { rotulo: string; medida: PortalMeasure }) {
-  const total = medida.sections.reduce((soma, s) => soma + (s.width ?? 0), 0);
+export function VeiculoMedidasCard({
+  taskId,
+  measures,
+  canWrite,
+}: {
+  taskId: string;
+  measures: Medidas | null | undefined;
+  canWrite: boolean;
+}) {
+  const mutation = usePortalUpdateVehicleIdentity();
+  const [lado, setLado] = useState<keyof Medidas>("left");
+  const [erro, setErro] = useState<string | null>(null);
 
-  return (
-    <div className="space-y-2">
-      <PortalSubheading>{rotulo}</PortalSubheading>
-      <PortalRows>
-        <DetailRow label="Altura" value={metros(medida.height) ?? <PortalDash />} />
-        {/* O comprimento total é SOMA, não um campo — o formulário o mostra
-            calculado e quem confere procura por ele aqui pelo mesmo motivo. */}
-        <DetailRow
-          label="Comprimento total"
-          value={medida.sections.length ? (metros(total) ?? <PortalDash />) : <PortalDash />}
-        />
-      </PortalRows>
+  // ⛔ SEM NENHUMA FACE, o card não existe para quem só LÊ — "medidas vazias"
+  // leria como "medimos e deu zero". Para quem ESCREVE ele existe mesmo vazio:
+  // é ali que a medida que falta vai ser desenhada.
+  const temAlguma = FACES.some((f) => {
+    const m = measures?.[f.chave];
+    return !!m && (m.height !== null || (m.sections ?? []).length > 0);
+  });
+  if (!temAlguma && !canWrite) return null;
 
-      {medida.sections.length > 0 && (
-        <PortalTable<PortalMeasureSection>
-          columns={[
-            {
-              id: "posicao",
-              header: "#",
-              cell: (s) => <span className="tabular-nums">{s.position + 1}</span>,
-              className: "w-10",
-            },
-            {
-              id: "largura",
-              header: "Largura",
-              align: "right",
-              cell: (s) => <span className="tabular-nums">{metros(s.width) ?? "—"}</span>,
-            },
-            {
-              id: "tipo",
-              header: "Seção",
-              // "Porta" e "—" em vez de "Sim/Não": a coluna responde "o que é
-              // esta seção", e um "Não" não descreve nada.
-              cell: (s) =>
-                s.isDoor ? (
-                  <span className="font-medium text-foreground">Porta</span>
-                ) : (
-                  <span className="text-muted-foreground">Fechada</span>
-                ),
-            },
-            {
-              id: "altura-porta",
-              header: "Altura da porta",
-              align: "right",
-              cell: (s) =>
-                s.isDoor ? (
-                  <span className="tabular-nums">{metros(s.doorHeight) ?? "—"}</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                ),
-            },
-          ]}
-          rows={[...medida.sections].sort((a, b) => a.position - b.position)}
-          getRowId={(s) => `${rotulo}-${s.position}`}
-        />
-      )}
-    </div>
+  /**
+   * OS TRÊS LADOS DE UMA VEZ — e não só o que está aberto.
+   *
+   * ⛔ ERA `layout` (um lado), e o dono viu o sintoma: mudar o motorista, ir
+   * para o sapo e clicar "Espelhar Motorista" trazia o valor ANTIGO, ou copiava
+   * na direção errada. A razão está no componente: ele guarda os três lados em
+   * estado INTERNO (`sideStates`) e o botão de copiar/espelhar lê o lado
+   * VIZINHO de lá. Passando um lado só, os outros dois nunca eram semeados e
+   * ficavam no padrão de fábrica (2,00 × 2,00) — era esse padrão que o espelho
+   * copiava.
+   *
+   * `layouts` é a prop que o próprio componente criou para isso ("CRITICAL:
+   * Sync state when layouts prop changes"). Com ela, copiar e espelhar passam a
+   * ler a medida de verdade.
+   */
+  const paraLayout = (m: PortalMeasure | null | undefined) => ({
+    height: m?.height ?? 0,
+    sections: (m?.sections ?? []).map((secao, index) => ({
+      width: secao.width ?? 0,
+      isDoor: !!secao.isDoor,
+      doorHeight: secao.doorHeight ?? null,
+      position: typeof secao.position === "number" ? secao.position : index,
+    })),
+  });
+  const layouts = {
+    left: paraLayout(measures?.left),
+    right: paraLayout(measures?.right),
+    back: paraLayout(measures?.back),
+  };
+
+  /**
+   * O DESENHO GRAVA — e grava SÓ A FACE que mudou.
+   *
+   * ⚠️ METROS → CENTÍMETROS aqui, porque a rota do portal fala centímetros na
+   * borda (a mesma convenção da requisição) e o servidor divide por 100 antes
+   * de gravar. As duas conversões se cancelam; uma divisão a mais em qualquer
+   * ponto produz um implemento de 7,8 centímetros em vez de um erro.
+   *
+   * ⚠️ `onChange` do `ImplementMeasureForm` dispara a cada arrasto. Gravar a
+   * cada evento seria uma escrita por pixel: o `setTimeout` junta a rajada e
+   * manda uma vez, 700 ms depois de a mão parar.
+   */
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * ⛔ NADA É GRAVADO ANTES DE A PESSOA TOCAR NO DESENHO.
+   *
+   * `ImplementMeasureForm` EMITE `onChange` AO MONTAR, com o implemento padrão
+   * de 2,00 × 2,00 que ele usa por dentro — é o mesmo comportamento que obriga o
+   * assistente de requisição a peneirar "medida intocada" antes de enviar. Sem
+   * esta trava, abrir a tela de um veículo já gravava uma medida que ninguém
+   * mediu: o toast "atualizada com sucesso" aparecia sozinho no carregamento, e
+   * um caminhão SEM medida ganhava 2,00 × 2,00 por visita.
+   *
+   * A prova de intenção é o EVENTO DE ENTRADA — ponteiro ou teclado dentro do
+   * desenho. Montagem não produz nenhum dos dois.
+   */
+  const interagiu = useRef(false);
+  const aoMudar = useCallback(
+    (side: "left" | "right" | "back", dados: { height?: number | null; sections?: unknown }) => {
+      if (!canWrite || !interagiu.current) return;
+      const chave = LADO_PARA_PAYLOAD[side];
+      const emCentimetros = {
+        height: Math.round(((dados.height ?? 0) as number) * 100),
+        sections: (((dados.sections ?? []) as Array<Record<string, unknown>>) ?? []).map(
+          (secao, index) => ({
+            width: Math.round(((secao.width as number) ?? 0) * 100),
+            isDoor: !!secao.isDoor,
+            doorHeight:
+              typeof secao.doorHeight === "number" ? Math.round(secao.doorHeight * 100) : null,
+            position: typeof secao.position === "number" ? secao.position : index,
+          }),
+        ),
+      };
+
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        setErro(null);
+        mutation
+          .mutateAsync({ taskId, data: { medidas: { [chave]: emCentimetros } } as never })
+          .catch(() => setErro("Não foi possível salvar a medida. Tente de novo."));
+      }, 700);
+    },
+    [canWrite, mutation, taskId],
   );
-}
-
-export function VeiculoMedidasCard({ measures }: { measures: Medidas | null | undefined }) {
-  // Sem NENHUMA face medida, o card não existe. É a regra da casa
-  // (`ui/detailpage/detail-section.tsx:56`): seção sem conteúdo não vira
-  // carcaça. E aqui o vazio seria enganoso de um jeito específico — "medidas
-  // vazias" leria como "medimos e deu zero", quando o certo é "ainda não foram
-  // informadas", que é assunto do assistente de requisição, não desta tela.
-  const faces = FACES.map((f) => ({ ...f, medida: measures?.[f.chave] ?? null })).filter(
-    (f): f is { chave: keyof Medidas; rotulo: string; medida: PortalMeasure } =>
-      !!f.medida && (f.medida.height !== null || f.medida.sections.length > 0),
-  );
-  if (!faces.length) return null;
 
   return (
     <PortalCard
       icon={IconRuler}
       title="Medidas do implemento"
-      description="O que foi informado na requisição, face a face."
+      description={
+        canWrite
+          ? "Arraste para ajustar. O que você mudar aqui é o que a produção usa."
+          : "O que foi informado na requisição."
+      }
+      actions={
+        mutation.isPending ? (
+          <span className="text-sm text-muted-foreground">Salvando…</span>
+        ) : undefined
+      }
     >
-      <div className="space-y-5">
-        {faces.map((f) => (
-          <Face key={f.chave} rotulo={f.rotulo} medida={f.medida} />
-        ))}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {FACES.map((f) => (
+            <Button
+              key={f.chave}
+              type="button"
+              size="sm"
+              variant={f.chave === lado ? "default" : "outline"}
+              onClick={() => setLado(f.chave)}
+            >
+              {f.rotulo}
+            </Button>
+          ))}
+        </div>
+
+        {/* ⛔ SEM `key`, E É O PONTO DA CORREÇÃO. Remontar a cada troca de aba
+            jogava fora o `sideStates` inteiro — inclusive o lado que a pessoa
+            acabou de ajustar —, e o espelho voltava a copiar o padrão de
+            fábrica. Quem sincroniza é a prop `layouts`; a troca de lado é só
+            `selectedSide` mudando. */}
+        {/* ⚠️ A CAPTURA É NO INVÓLUCRO, e na fase de captura: o desenho tem
+            canvas, botões e campos lá dentro, e esperar o evento borbulhar de
+            cada um deles seria uma lista para esquecer um. */}
+        <div
+          onPointerDownCapture={() => {
+            interagiu.current = true;
+          }}
+          onKeyDownCapture={() => {
+            interagiu.current = true;
+          }}
+        >
+        <ImplementMeasureForm
+          selectedSide={lado}
+          layouts={layouts as never}
+          onSideChange={setLado}
+          onChange={canWrite ? (aoMudar as never) : undefined}
+          showPhoto={false}
+          disabled={!canWrite}
+        />
+        </div>
+
+        {erro ? (
+          <p className="text-sm text-destructive" role="alert">
+            {erro}
+          </p>
+        ) : null}
       </div>
     </PortalCard>
   );
 }
+
+/** A chave que a rota do portal espera para cada lado. */
+const LADO_PARA_PAYLOAD: Record<"left" | "right" | "back", "esquerda" | "direita" | "traseira"> = {
+  left: "esquerda",
+  right: "direita",
+  back: "traseira",
+};
