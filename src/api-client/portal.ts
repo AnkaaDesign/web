@@ -66,7 +66,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import { toast } from "@/components/ui/sonner";
-import type { TASK_QUOTE_STATUS } from "@/types/budget";
+import type { PaymentConfig, TASK_QUOTE_STATUS } from "@/types/budget";
 import type { QuoteSection } from "./signature";
 import { responsibleAuthClient } from "./responsible-auth";
 
@@ -310,6 +310,8 @@ export interface PortalPaint {
   name: string | null;
   hex: string | null;
   finish: string | null;
+  /** `PaintType.name` — "Poliéster", "Acrílica". Achatado pelo projetor. */
+  type: string | null;
 }
 
 /** Uma seção da medida de um lado do implemento. ⚠️ Larguras em METROS. */
@@ -567,6 +569,28 @@ export interface PortalBudgetPayer {
   id: string;
   customerId: string;
   customerName: string | null;
+  /**
+   * ── O ACORDO, e não só as parcelas ──────────────────────────────────────
+   *
+   * ⛔ O card de Pagamento mostrava a TABELA de parcelas e mais nada: nem a
+   * forma (boleto ou Pix), nem a condição, nem se sai nota, nem para quem a
+   * fatura vai. O cliente lia "3 parcelas de R$ X" sem saber como paga nem a
+   * partir de quando conta o prazo — e a resposta estava no PDF, que é
+   * exatamente o documento que o portal existe para substituir.
+   *
+   * É o mesmo conjunto que a cláusula impressa cita, e `generatePaymentText`
+   * (o gerador do PDF) é reusado na tela para que as duas NUNCA divirjam.
+   */
+  subtotal: number | null;
+  total: number | null;
+  discountType: string | null;
+  discountValue: number | null;
+  paymentCondition: string | null;
+  /** `PaymentConfig` (`types/budget.ts`) serializado. */
+  paymentConfig: PaymentConfig | null;
+  customPaymentText: string | null;
+  generateInvoice: boolean | null;
+  generateBankSlip: boolean | null;
   installments: PortalBudgetInstallment[];
 }
 
@@ -1086,6 +1110,15 @@ export interface PortalBudgetRequestVehicleInput {
   /** 17 caracteres, sem I/O/Q. */
   chassisNumber?: string | null;
   /**
+   * CATEGORIA E IMPLEMENTO — valores de enum, nunca rótulo.
+   *
+   * ⚠️ O formulário pergunta UMA vez (o lote inteiro é o mesmo modelo de
+   * implemento, como as medidas) e `buildSolicitacaoPayload` copia para cada
+   * veículo — a mesma mecânica de `medidas`. O servidor grava um por `Truck`.
+   */
+  category?: string | null;
+  implementType?: string | null;
+  /**
    * ⚠️ CENTÍMETROS na borda; o servidor divide por 100 antes de gravar.
    *
    * ⚠️ E cada lado é `{ height, sections[] }`, NÃO um número solto — o implemento
@@ -1166,6 +1199,20 @@ export interface PortalVehicleIdentityInput {
   serialNumber?: string | null;
   plate?: string | null;
   chassisNumber?: string | null;
+  /**
+   * CATEGORIA E IMPLEMENTO — dado do cliente, e é ele quem corrige.
+   *
+   * ⚠️ Valor de ENUM (`TRUCK_CATEGORY` / `IMPLEMENT_TYPE`), nunca o rótulo em
+   * português: a coluna no banco é enum e o servidor recusa o que não for um
+   * dos valores. `null` apaga a escolha, que é legítimo — o cadastro nasce sem
+   * os dois.
+   *
+   * ⛔ Os dois passam pela guarda do DOCUMENTO CONGELADO como a placa: a folha
+   * assinada imprime "Truck · Frigorífico", então trocá-los depois da
+   * assinatura devolve 409.
+   */
+  category?: string | null;
+  implementType?: string | null;
   /**
    * O número do pedido de compra do cliente.
    *
