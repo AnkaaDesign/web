@@ -116,6 +116,17 @@ export default function ClienteEntrarPage() {
   // contato) de "o servidor parou de aceitar pedidos deste IP" (vale para
   // qualquer contato, e portanto também tranca o passo 1).
   const [rateLimited, setRateLimited] = useState(false);
+  /**
+   * A espera POR CONTATO, em segundos — a do 400 "Aguarde N segundos".
+   *
+   * Ela NÃO tranca o botão (ver a nota no rodapé do passo 1: trocar o contato
+   * digitado é legítimo, e o cooldown é daquele contato, não desta pessoa). O
+   * que ela faz é CONTAR: o aviso dizia "Aguarde 120 segundos" e ficava
+   * parado, então quem esperasse não tinha como saber se já podia tentar, e
+   * quem tentasse cedo gastava o pedido e reiniciava a contagem. Um número que
+   * anda transforma uma parede numa fila.
+   */
+  const [esperaDoContato, setEsperaDoContato] = useState(0);
 
   // Evita o envio duplo do auto-submit: o efeito dispara ao completar as 6
   // casas, e um clique no botão no mesmo instante mandaria de novo — gastando
@@ -139,6 +150,12 @@ export default function ClienteEntrarPage() {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
+  useEffect(() => {
+    if (esperaDoContato <= 0) return;
+    const timer = setTimeout(() => setEsperaDoContato((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [esperaDoContato]);
+
   const destination =
     (location.state as { from?: { pathname: string } } | null)?.from?.pathname ??
     routes.customer.portal.root;
@@ -146,6 +163,7 @@ export default function ClienteEntrarPage() {
   const askForCode = useCallback(
     async (value: string, { isResend }: { isResend: boolean }) => {
       setError("");
+      setEsperaDoContato(0);
       isResend ? setResending(true) : setBusy(true);
       try {
         const result = await requestCode(value);
@@ -169,9 +187,15 @@ export default function ClienteEntrarPage() {
           setRateLimited(true);
           setCooldown(TOO_MANY_REQUESTS_COOLDOWN_SECONDS);
         } else {
-          setError(
-            serverMessage(err, "Não foi possível enviar o código agora. Tente novamente."),
+          const mensagem = serverMessage(
+            err,
+            "Não foi possível enviar o código agora. Tente novamente.",
           );
+          setError(mensagem);
+          // O servidor diz quantos segundos faltam; a tela passa a contá-los.
+          // Sem isto o aviso congela num número que envelhece sozinho.
+          const segundos = Number(/Aguarde\s+(\d+)\s+segundos/i.exec(mensagem)?.[1] ?? 0);
+          setEsperaDoContato(segundos > 0 ? segundos : 0);
         }
       } finally {
         isResend ? setResending(false) : setBusy(false);
@@ -262,7 +286,15 @@ export default function ClienteEntrarPage() {
               <CardContent className={styles.form}>
                 {error && (
                   <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription>
+                      {/* A contagem SUBSTITUI o número congelado da mensagem do
+                          servidor. Repetir os dois ("Aguarde 120 segundos …
+                          faltam 14s") seria pior que só um: quem lê acredita no
+                          primeiro. */}
+                      {esperaDoContato > 0
+                        ? `Este contato pediu um código há pouco. Tente de novo em ${esperaDoContato}s — ou use outro contato.`
+                        : error}
+                    </AlertDescription>
                   </Alert>
                 )}
 

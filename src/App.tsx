@@ -221,6 +221,22 @@ const InstallPage = lazy(() => import("@/pages/install").then((module) => ({ def
 // PORTAL DO CLIENTE (área logada do responsável)
 const ClienteEntrarPage = lazy(() => import("@/pages/cliente/entrar"));
 const ClientePainelPage = lazy(() => import("@/pages/cliente/painel"));
+// As seções do portal. Cada arquivo exporta `default` além do nome — `lazy()`
+// só sabe carregar o default, e o nome existe para quem importa direto.
+//
+// ⚠️ TODO SEGMENTO É PLURAL, e isso não é estilo: `/cliente/:customerId/orcamento/:id`
+// é uma rota PÚBLICA irmã e o React Router a pontua ACIMA de `/cliente/painel/*`.
+// Uma seção chamada `orcamento` (singular) NUNCA seria alcançada — a pública a
+// engoliria com `customerId = "painel"`. Há teste fixando cada uma destas em
+// `constants/routes.customer.test.ts`.
+const ClienteOrcamentosPage = lazy(() => import("@/pages/cliente/orcamentos/list"));
+const ClienteOrcamentoDetalhePage = lazy(() => import("@/pages/cliente/orcamentos/[id]"));
+const ClienteSolicitarPage = lazy(() => import("@/pages/cliente/solicitar"));
+const ClienteVeiculosPage = lazy(() => import("@/pages/cliente/veiculos/list"));
+const ClienteVeiculoDetalhePage = lazy(() => import("@/pages/cliente/veiculos/[taskId]"));
+const ClienteAssinaturasPage = lazy(() => import("@/pages/cliente/assinaturas"));
+const ClienteCobrancasPage = lazy(() => import("@/pages/cliente/cobrancas"));
+const ClientePedidosPage = lazy(() => import("@/pages/cliente/pedidos"));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
 const PrivacyPolicyPage = lazy(() => import("@/pages/public/privacy-policy").then((module) => ({ default: module.PrivacyPolicyPage })));
@@ -770,6 +786,72 @@ function App() {
                     em `constants/routes.customer.test.ts`: se um dia o portal
                     precisar de uma seção com um desses nomes, a colisão aparece
                     lá antes de aparecer para o cliente. */}
+                {/* As seções, TODAS antes do `path="*"` abaixo — ele é um
+                    catch-all irmão e engoliria qualquer uma declarada depois. */}
+                <Route
+                  path="orcamentos"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteOrcamentosPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="orcamentos/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteOrcamentoDetalhePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="solicitar"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteSolicitarPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="veiculos"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteVeiculosPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="veiculos/:taskId"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteVeiculoDetalhePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="assinaturas"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteAssinaturasPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="cobrancas"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClienteCobrancasPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="pedidos"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ClientePedidosPage />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path="*"
                   element={<Navigate to={routes.customer.portal.root} replace />}
