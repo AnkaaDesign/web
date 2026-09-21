@@ -33,15 +33,20 @@ const PORTAL_SELECTOR = '[data-radix-popper-content-wrapper],[data-radix-popover
  * Status state machine — faithful port of the legacy schedule-detail control.
  * Options are keyed off the SO's CURRENT status (+ the viewer's role and the SO type):
  * the current state keeps its noun label, every transition is an action verb.
- * `isAutoCompletingTask` = a COMMERCIAL "Em Negociação" SO that auto-completes when the
- * quote is approved, so manual "Concluir" is never offered.
+ *
+ * ⚠️ Havia aqui um `isAutoCompletingTask`: a O.S. COMMERCIAL cuja descrição fosse
+ * exatamente "Em Negociação" não oferecia "Concluir", porque o servidor a fechava
+ * sozinho ao aprovar o orçamento. A comparação era por TEXTO, sensível a caixa E
+ * a acento — das 486 linhas em produção ela não reconhecia 20 ("Em Negociacao",
+ * "NEGOCIACAO"), que ganhavam o botão que as outras não tinham. O acoplamento
+ * inteiro saiu em 20/09/2026: o estado é do orçamento
+ * (`TASK_QUOTE_STATUS.IN_NEGOTIATION`) e nenhuma O.S. o move mais.
  */
 function getStatusOptions(so: ServiceOrderRow, type: SERVICE_ORDER_TYPE, role: string): ComboboxOption[] {
   const isArtworkServiceOrder = type === SERVICE_ORDER_TYPE.ARTWORK;
   const isDesignerUser = role === SECTOR_PRIVILEGES.DESIGNER;
   const isAdminUser = role === SECTOR_PRIVILEGES.ADMIN;
   const currentSOStatus = so.status as SERVICE_ORDER_STATUS | null;
-  const isAutoCompletingTask = type === SERVICE_ORDER_TYPE.COMMERCIAL && so.description === "Em Negociação";
   const canCancel = canCancelServiceOrder(role as SECTOR_PRIVILEGES);
 
   const options: ComboboxOption[] = [];
@@ -54,19 +59,19 @@ function getStatusOptions(so: ServiceOrderRow, type: SERVICE_ORDER_TYPE, role: s
     // Em Andamento → Pausar, (artwork) Enviar para Aprovação, Concluir, Voltar (admin), Cancelar.
     options.push({ value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Em Andamento" }, { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausar" });
     if (isArtworkServiceOrder) options.push({ value: SERVICE_ORDER_STATUS.WAITING_APPROVE, label: "Enviar para Aprovação" });
-    if (!(isArtworkServiceOrder && isDesignerUser) && !isAutoCompletingTask) options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+    if (!(isArtworkServiceOrder && isDesignerUser)) options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
     if (isAdminUser) options.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
     if (canCancel) options.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
   } else if (currentSOStatus === SERVICE_ORDER_STATUS.PAUSED) {
     // Pausado → Continuar (resume), Concluir, Voltar (admin), Cancelar.
     options.push({ value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausado" }, { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Continuar" });
-    if (!isAutoCompletingTask) options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+    options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
     if (isAdminUser) options.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
     if (canCancel) options.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
   } else if (currentSOStatus === SERVICE_ORDER_STATUS.WAITING_ARTWORK) {
     // Aguardando Arte → Pausar, Concluir, Voltar (admin), Cancelar.
     options.push({ value: SERVICE_ORDER_STATUS.WAITING_ARTWORK, label: "Aguardando Arte" }, { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausar" });
-    if (!isAutoCompletingTask) options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+    options.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
     if (isAdminUser) options.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
     if (canCancel) options.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
   } else if (currentSOStatus === SERVICE_ORDER_STATUS.WAITING_APPROVE) {

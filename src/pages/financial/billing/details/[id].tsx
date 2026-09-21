@@ -342,7 +342,14 @@ const BillingDetailPageInner = ({
             include: {
               customer: { include: { logo: true } },
               installments: { orderBy: { number: "asc" } },
-              responsible: true,
+              // ⛔ E AQUI TAMBÉM NÃO. O comentário doze linhas acima já dizia
+              // que `BudgetPayer.responsibleId` saiu na migration
+              // `20260918120000` — e a chave da relação sobreviveu bem aqui.
+              // O include de tarefa é PASSTHROUGH no zod
+              // (`api/src/schemas/task.ts:1098`), então a chave inventada
+              // atravessa a validação e estoura no Prisma: `GET /tasks/:id`
+              // devolvia 500 e ESTA TELA INTEIRA morria — não por
+              // `GET /billings/:id`, que já foi consertado, mas por esta linha.
             },
           },
           // OS FATURAMENTOS — as entidades, não a lista de pagadores.

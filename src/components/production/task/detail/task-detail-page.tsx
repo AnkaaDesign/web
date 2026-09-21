@@ -53,6 +53,7 @@ import { getSectors } from "@/api-client/sector";
 import { isValidTaskStatusTransition, getBudgetEditRoute } from "@/utils/task";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { isQuoteRejection } from "@/utils/quote-status";
 import { taskInvoiceCustomerLabel, taskInvoiceCustomerNames } from "@/utils/quote-tasks";
 import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCanViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
@@ -227,7 +228,12 @@ const DETAIL_INCLUDE = {
         include: {
           customer: { include: { logo: true } },
           installments: { orderBy: { number: "asc" } },
-          responsible: true,
+          // ⛔ NÃO peça `responsible` aqui. A relação saiu de `BudgetPayer` na
+          // migration `20260918120000`, e o Prisma RECUSA o include inteiro —
+          // `GET /tasks/:id` devolvia 500 e a tela de detalhe da tarefa, que é
+          // a única porta para aprovar um layout, ficava morta para TODA
+          // tarefa. Ninguém lia o campo: quem responde pelo orçamento é
+          // `Task.responsibles`, já incluído acima. Ver `types/budget.ts:154`.
           customerSignature: true,
           // O FATURAMENTO a que este pagador pertence — é dele o estado da
           // COBRANÇA, que não é o estado do orçamento. Sem este include a tela
@@ -1107,7 +1113,14 @@ function TaskDetailContent() {
                           // `PUT /billings/:id/approve`, na tela de Faturamento, onde se vê O QUE
                           // vai ser cobrado antes de emitir nota — e não num dropdown de detalhe
                           // de tarefa.
-                          if (next === TASK_QUOTE_STATUS.PENDING && current && current !== TASK_QUOTE_STATUS.PENDING) {
+                          //
+                          // ⚠️ E O MOTIVO SÓ É PEDIDO QUANDO PENDING É UM PASSO ATRÁS.
+                          // O teste era `próximo === PENDING && atual !== PENDING`, verdadeiro
+                          // enquanto todo caminho até PENDING vinha de depois dele. O portal
+                          // abriu `REQUESTED → PENDING` e `PRE_APPROVED → PENDING`, que são o
+                          // caminho FELIZ — e mandar uma requisição para assinatura passou a
+                          // abrir um diálogo de REJEIÇÃO. Ver `isQuoteRejection`.
+                          if (isQuoteRejection(current, next)) {
                             const reason = await askReason({
                               title: "Rejeitar / reverter para Pendente",
                               description: "Informe o motivo (mínimo 5 caracteres).",
