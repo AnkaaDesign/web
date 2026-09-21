@@ -157,12 +157,24 @@ export const TASK_STATUS_ORDER: Record<TASK_STATUS, number> = {
 // A ordem é a da AÇÃO PENDENTE, da nossa para a do cliente: vencido
 // (reprecificar) → assinado (falta a nossa contra-assinatura) → pendente
 // (esperando o cliente) → aprovado (não há mais nada a fazer aqui).
+//
+// Cresceu em 20/09/2026 com o portal do responsável: primeiro o que a ANKAA deve,
+// depois o que o CLIENTE deve, por último os terminais.
+//
+// ⚠️ GÊMEO do mapa da API (`api/src/constants/sortOrders.ts`) E do `UPDATE` de
+// backfill da migration `20260920120000`. Os três têm de dizer o mesmo número.
 export const TASK_QUOTE_STATUS_ORDER: Record<TASK_QUOTE_STATUS, number> = {
-  [TASK_QUOTE_STATUS.EXPIRED]: 1,
-  [TASK_QUOTE_STATUS.SIGNED]: 2,
-  [TASK_QUOTE_STATUS.PENDING]: 3,
-  [TASK_QUOTE_STATUS.APPROVED]: 4,
-  [TASK_QUOTE_STATUS.CANCELLED]: 5,
+  // ── a Ankaa deve ──
+  [TASK_QUOTE_STATUS.REQUESTED]: 1,
+  [TASK_QUOTE_STATUS.EXPIRED]: 2,
+  [TASK_QUOTE_STATUS.PRE_APPROVED]: 3,
+  [TASK_QUOTE_STATUS.SIGNED]: 4,
+  // ── o cliente deve ──
+  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: 5,
+  [TASK_QUOTE_STATUS.PENDING]: 6,
+  // ── terminais ──
+  [TASK_QUOTE_STATUS.APPROVED]: 7,
+  [TASK_QUOTE_STATUS.CANCELLED]: 8,
 };
 
 // ⚠️ PERSISTIDO em `Billing.statusOrder`, escrito junto com `Billing.status` por

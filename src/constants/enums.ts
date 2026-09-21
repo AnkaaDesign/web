@@ -2877,6 +2877,13 @@ export enum TASK_QUOTE_STATUS {
    * Ankaa. Existe para que "o que depende de nós" seja visível numa lista.
    */
   SIGNED = "SIGNED",
+  /**
+   * Envelope lançado, esperando as assinaturas do cliente.
+   *
+   * ⚠️ O VALOR continua `"PENDING"` de propósito — ele viaja em filtro salvo, no
+   * app Flutter em produção e em changelog gravado como string. Só o RÓTULO
+   * mudou, em 20/09/2026, para "Aguardando Assinatura".
+   */
   PENDING = "PENDING",
   /**
    * O ÚLTIMO estado do orçamento. Era `BUDGET_APPROVED`; o prefixo existia só
@@ -2884,6 +2891,21 @@ export enum TASK_QUOTE_STATUS {
    */
   APPROVED = "APPROVED",
   CANCELLED = "CANCELLED",
+
+  /**
+   * O cliente pediu pelo PORTAL e ninguém precificou ainda. Nasce sem serviço e
+   * sem valor — só briefing, arquivos e veículos. Primeiro da fila.
+   */
+  REQUESTED = "REQUESTED",
+  /**
+   * Com o VENDEDOR do cliente, para pré-aprovar ou recusar. É daqui que o valor
+   * passa a ser visível para quem requisitou.
+   *
+   * ⚠️ Substituiu a O.S. comercial "Em Negociação", removida em 20/09/2026.
+   */
+  IN_NEGOTIATION = "IN_NEGOTIATION",
+  /** O vendedor aprovou; espera a Ankaa LANÇAR as assinaturas. */
+  PRE_APPROVED = "PRE_APPROVED",
 }
 
 /**

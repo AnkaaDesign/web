@@ -10,7 +10,15 @@ import type { Task } from './task';
  * ⚠️ Espelho de `@/constants/enums`. O enum lá é o valor; este é o tipo que as
  * telas usam. Os dois têm de ter os mesmos cinco membros.
  */
-export type TASK_QUOTE_STATUS = 'EXPIRED' | 'SIGNED' | 'PENDING' | 'APPROVED' | 'CANCELLED';
+export type TASK_QUOTE_STATUS =
+  | 'REQUESTED'
+  | 'EXPIRED'
+  | 'PRE_APPROVED'
+  | 'SIGNED'
+  | 'IN_NEGOTIATION'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'CANCELLED';
 /**
  * O CICLO DO FATURAMENTO. Derivado no servidor de `approvedAt` + das parcelas;
  * nenhuma tela o escreve. ⚠️ Não existe "A Vencer": depois de aprovar é
@@ -143,7 +151,10 @@ export interface BudgetPayer extends BaseEntity {
     streetType?: string | null;
     registrationStatus?: string | null;
   };
-  responsible?: { id: string; name: string; role?: string; email?: string | null; phone?: string | null };
+  // ⛔ `responsible` NÃO existe mais em `BudgetPayer` — a coluna saiu na
+  // migration `20260918120000`. O tipo continuou declarando o campo, e um tipo
+  // que promete o que o servidor não manda é como uma tela volta vazia sem
+  // erro. Quem responde pelo orçamento é `Task.responsibles`.
   installments?: Installment[];
 }
 

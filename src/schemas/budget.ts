@@ -25,7 +25,7 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 };
 
 /**
- * O CICLO DO ORÇAMENTO — os cinco, e nada além.
+ * O CICLO DO ORÇAMENTO — os OITO, e nada além.
  *
  * ⚠️ Escrito à mão e NÃO conferido pelo compilador contra `TASK_QUOTE_STATUS`:
  * o zod de `budgetCreateNestedSchema` valida `status`, e um valor fora do
@@ -35,10 +35,19 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
  *
  * `CANCELLED` entrou junto com o encolhimento: ele sempre foi estado de
  * orçamento e faltava nesta lista.
+ *
+ * ⚠️ Os TRÊS DO PORTAL (`REQUESTED`, `IN_NEGOTIATION`, `PRE_APPROVED`) entraram
+ * em 20/09/2026 e é exatamente o aviso acima repetindo-se: enquanto faltavam
+ * aqui, uma tarefa cujo orçamento estivesse num deles era RECUSADA pelo
+ * formulário de tarefa (`taskCreateSchema`/`taskUpdateSchema` embutem este
+ * schema em `quote`), com um erro de campo que não fala de estado nenhum.
  */
 export const budgetStatusSchema = z.enum([
+  'REQUESTED',
   'EXPIRED',
+  'PRE_APPROVED',
   'SIGNED',
+  'IN_NEGOTIATION',
   'PENDING',
   'APPROVED',
   'CANCELLED',

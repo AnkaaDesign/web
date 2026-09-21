@@ -131,7 +131,7 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  quote?: boolean | { include?: { services?: boolean; layoutFiles?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task quote (one-to-one: each task has its own unique quote)
+  quote?: boolean | { include?: { services?: boolean; layoutFiles?: boolean; customerSignature?: boolean; customerConfigs?: boolean } }; // Task quote (one-to-one: each task has its own unique quote). `responsible` SAIU: a relação não existe mais em `BudgetPayer` (migration `20260918120000`).
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:

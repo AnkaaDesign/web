@@ -70,11 +70,11 @@ const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   // (o que já devolve o orçamento a PENDING pelo auto-revert do servidor),
   // estende a validade, ou cancela. NÃO vai direto para APPROVED — aprovar sem
   // assinatura é exatamente o que a cerimônia existe para impedir.
-  EXPIRED: ['PENDING', 'CANCELLED'],
+  EXPIRED: ['PENDING', 'REQUESTED', 'CANCELLED'],
   // De SIGNED não se vai para EXPIRED: aceita a proposta dentro do prazo, o
   // relógio para de correr contra o cliente — o que falta é nosso.
   SIGNED: ['APPROVED', 'PENDING', 'CANCELLED'],
-  PENDING: ['APPROVED', 'CANCELLED'],
+  PENDING: ['APPROVED', 'IN_NEGOTIATION', 'CANCELLED'],
   // APPROVED é o ÚLTIMO estado do orçamento: dele só se volta ou se cancela.
   // APPROVED → PENDING existe para o caminho de desistência mais comum, o
   // cliente voltando atrás ANTES de haver cobrança. Depois que alguma cobrança
@@ -86,6 +86,21 @@ const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   APPROVED: ['PENDING', 'CANCELLED'],
   // Terminal: um orçamento cancelado não volta. Recotar cria um novo.
   CANCELLED: [],
+
+  // ─── O CAMINHO DO PORTAL (20/09/2026) ─────────────────────────────────────
+  //
+  // A requisição nasce sem serviço e sem valor. O comercial monta, e daí saem
+  // dois caminhos: manda ao VENDEDOR do cliente pré-aprovar, ou vai direto para
+  // assinatura quando não há intermediário — cliente direto não tem vendedor.
+  //
+  // ⚠️ NÃO vai direto para APPROVED: requisição não tem documento nem valor
+  // acordado, e é APPROVED que destrava a cobrança.
+  REQUESTED: ['IN_NEGOTIATION', 'PENDING', 'CANCELLED'],
+  // Recusar devolve a REQUESTED — para o comercial refazer, não para o limbo.
+  IN_NEGOTIATION: ['PRE_APPROVED', 'REQUESTED', 'CANCELLED'],
+  // PENDING é escrito pela emissão do envelope; a volta existe para o vendedor
+  // que se retrata antes de o documento sair.
+  PRE_APPROVED: ['PENDING', 'IN_NEGOTIATION', 'CANCELLED'],
 };
 
 /**

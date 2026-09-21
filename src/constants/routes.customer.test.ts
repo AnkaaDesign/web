@@ -69,7 +69,18 @@ describe("a familia /cliente depois que o portal logado entrou", () => {
         {
           id: "portalShell",
           path: `${routes.customer.portal.root}/*`,
-          children: [{ id: "portalIndex", index: true }, { id: "portalResto", path: "*" }],
+          children: [
+            { id: "portalIndex", index: true },
+            { id: "portalOrcamentos", path: "orcamentos" },
+            { id: "portalOrcamento", path: "orcamentos/:id" },
+            { id: "portalSolicitar", path: "solicitar" },
+            { id: "portalVeiculos", path: "veiculos" },
+            { id: "portalVeiculo", path: "veiculos/:taskId" },
+            { id: "portalAssinaturas", path: "assinaturas" },
+            { id: "portalCobrancas", path: "cobrancas" },
+            { id: "portalPedidos", path: "pedidos" },
+            { id: "portalResto", path: "*" },
+          ],
         },
       ],
     },
@@ -128,5 +139,54 @@ describe("a familia /cliente depois que o portal logado entrou", () => {
   it("documenta a colisao: 'orcamento' e 'dossie' nao podem virar secoes do portal", () => {
     expect(quem(`${routes.customer.portal.root}/orcamento/ID`)).toBe("budgetPorCliente");
     expect(quem(`${routes.customer.portal.root}/dossie/ID`)).toBe("dossiePorCliente");
+  });
+
+  // ── AS SECOES DO PORTAL (20/09/2026) ──────────────────────────────────────
+  //
+  // Cada uma tem de casar com o SEU filho, e nao com a publica irmã nem com o
+  // catch-all do shell. O teste acima prova que a colisao existe; estes provam
+  // que cada secao nova escapou dela.
+  //
+  // ⚠️ SECAO NOVA NO PORTAL PRECISA DE LINHA AQUI. Sem ela, a colisao volta
+  // calada: a pessoa clica no menu e recebe um documento publico, ou o painel.
+  it("cada secao do portal alcanca a PROPRIA tela", () => {
+    const shell = "portalProvider > portalShell > ";
+    expect(quem(routes.customer.portal.orcamentos)).toBe(shell + "portalOrcamentos");
+    expect(quem(routes.customer.portal.orcamento("ID"))).toBe(shell + "portalOrcamento");
+    expect(quem(routes.customer.portal.solicitar)).toBe(shell + "portalSolicitar");
+    expect(quem(routes.customer.portal.veiculos)).toBe(shell + "portalVeiculos");
+    expect(quem(routes.customer.portal.veiculo("TASK"))).toBe(shell + "portalVeiculo");
+    expect(quem(routes.customer.portal.assinaturas)).toBe(shell + "portalAssinaturas");
+    expect(quem(routes.customer.portal.cobrancas)).toBe(shell + "portalCobrancas");
+    expect(quem(routes.customer.portal.pedidos)).toBe(shell + "portalPedidos");
+  });
+
+  // O PLURAL E' A DEFESA, E E' SO ISSO QUE SEPARA UMA DA OUTRA.
+  //
+  // `orcamentos` escapa porque o terceiro segmento deixa de casar com o literal
+  // `orcamento` da rota publica. Trocar para o singular — por "consistencia",
+  // por refatoracao ou por engano — devolve a secao inteira para a publica, e o
+  // contato passa a ver um documento aberto por capability no lugar da lista
+  // logada dele.
+  it("o singular seria engolido pela rota publica; o plural nao e'", () => {
+    expect(quem(`${routes.customer.portal.root}/orcamentos/ID`)).toBe(
+      "portalProvider > portalShell > portalOrcamento",
+    );
+    expect(quem(`${routes.customer.portal.root}/orcamento/ID`)).toBe("budgetPorCliente");
+
+    expect(routes.customer.portal.orcamentos.split("/").filter(Boolean)).toEqual([
+      "cliente",
+      "painel",
+      "orcamentos",
+    ]);
+  });
+
+  // Nenhuma secao do portal pode ensombrar as publicas, que sao as que chegam
+  // por WhatsApp e continuam tendo de abrir para quem nao tem sessao.
+  it("as publicas seguem intactas depois das secoes novas", () => {
+    expect(quem("/cliente/UUID/orcamento/ID")).toBe("budgetPorCliente");
+    expect(quem("/cliente/UUID/dossie/ID")).toBe("dossiePorCliente");
+    expect(quem("/cliente/assinar/TOKEN")).toBe("signature");
+    expect(quem("/cliente")).toBe("catchAll");
   });
 });

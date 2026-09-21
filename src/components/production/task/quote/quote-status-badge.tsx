@@ -57,8 +57,32 @@ export const QUOTE_STATUS_CONFIG: Record<TASK_QUOTE_STATUS, { label: string; var
   // ficariam idênticos, e justamente os dois que o comercial precisa separar
   // ("esperando o cliente" × "voltou para a minha mesa").
   PENDING: {
-    label: 'Pendente',
+    label: 'Aguardando Assinatura',
     variant: 'pending',
+  },
+  // ⚠️ ROXO, cor que nenhum outro estado usa nas duas telas. Requisição é o único
+  // estado em que o trabalho ainda NÃO EXISTE — não há serviço, não há valor, não
+  // há documento. Dar a ele um âmbar ou um laranja o misturaria com "voltou para
+  // a minha mesa", e é o oposto: nunca esteve na mesa de ninguém.
+  REQUESTED: {
+    label: 'Requisição',
+    variant: 'purple',
+  },
+  // ⚠️ NÃO é da família do âmbar de `PENDING`, ainda que as duas sejam "a bola
+  // está com eles": são justamente as duas que o comercial precisa separar numa
+  // varredura ("negociando o preço" × "assinando o que já foi acertado"), e o
+  // repositório já pagou esse preço uma vez — foi por isso que `EXPIRED` teve de
+  // sair do âmbar em 17/09. Verde-água estava livre desde que `SIGNED` virou verde.
+  IN_NEGOTIATION: {
+    label: 'Em Negociação',
+    variant: 'teal',
+  },
+  // Vizinho do azul de `APPROVED` de propósito: é o mesmo "acertado, seguindo",
+  // um passo antes. Índigo e não `info`/`primary`, que são apelidos DEPRECADOS do
+  // mesmo blue-700 de `APPROVED` — iguais na tela, e o estado sumiria dentro dele.
+  PRE_APPROVED: {
+    label: 'Pré-aprovado',
+    variant: 'indigo',
   },
   // O ÚLTIMO estado do orçamento — daqui em diante quem anda é a COBRANÇA.
   //
@@ -92,6 +116,16 @@ const TRIGGER_CLASS_BY_VARIANT: Record<string, string> = {
   expired: 'bg-amber-600 text-white hover:bg-amber-700 border-amber-700',
   orange: 'bg-orange-500 text-white hover:bg-orange-600 border-orange-600',
   cancelled: 'bg-red-700 text-white hover:bg-red-800 border-red-800',
+  // Os três do portal (20/09/2026). Sem estas linhas `quoteStatusTriggerClass`
+  // devolvia `''` e o GATILHO do seletor de status saía INCOLOR ao lado de um
+  // badge colorido — mesma palavra, duas aparências, na mesma tela.
+  //
+  // ⚠️ Este mapa NÃO é derivado de `badgeVariants`: o gatilho é um `<button>` do
+  // combobox e precisa de `border-*`, que o `<Badge>` não tem. Variante nova em
+  // `QUOTE_STATUS_CONFIG` precisa de linha AQUI também.
+  purple: 'bg-purple-600 text-white hover:bg-purple-700 border-purple-700',
+  teal: 'bg-teal-500 text-white hover:bg-teal-600 border-teal-600',
+  indigo: 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-700',
   secondary: 'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 border-neutral-300',
 };
 

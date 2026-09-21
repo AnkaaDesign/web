@@ -906,6 +906,30 @@ export const routes = {
     portal: {
       login: "/cliente/entrar",
       root: "/cliente/painel",
+
+      /**
+       * ⚠️ TODO SEGMENTO AQUI É PLURAL, E NÃO É ESTILO — É A COLISÃO.
+       *
+       * `/cliente/:customerId/orcamento/:id` é uma rota PÚBLICA irmã, e o React
+       * Router a pontua ACIMA de `/cliente/painel/*`. Uma seção do portal
+       * chamada `orcamento` (singular) NUNCA seria alcançada: a pública a
+       * engoliria com `customerId = "painel"`. Com `orcamentos`, o terceiro
+       * segmento deixa de casar com o literal `orcamento` e o portal ganha a
+       * rota. O mesmo vale para `dossie`.
+       *
+       * Há teste fixando cada uma destas em `constants/routes.customer.test.ts`.
+       * Acrescentar seção ao portal SEM acrescentar linha lá é como a colisão
+       * volta.
+       */
+      orcamentos: "/cliente/painel/orcamentos",
+      orcamento: (id: string) => `/cliente/painel/orcamentos/${id}`,
+      /** A REQUISIÇÃO — o assistente que cria um orçamento em `REQUESTED`. */
+      solicitar: "/cliente/painel/solicitar",
+      veiculos: "/cliente/painel/veiculos",
+      veiculo: (taskId: string) => `/cliente/painel/veiculos/${taskId}`,
+      assinaturas: "/cliente/painel/assinaturas",
+      cobrancas: "/cliente/painel/cobrancas",
+      pedidos: "/cliente/painel/pedidos",
     },
   },
 
