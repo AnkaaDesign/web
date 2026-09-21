@@ -51,7 +51,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { IMPLEMENT_TYPE_LABELS, TRUCK_CATEGORY_LABELS } from "@/constants";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
@@ -411,6 +413,16 @@ function primeiraMensagem(no: unknown, profundidade = 0): string | null {
  * formulário ainda não tem — e "medida que existe na tela e não no envio" é a
  * classe de defeito que esta tela inteira evita.
  */
+/** Derivadas do mapa de rótulos — ver a nota em `veiculo-identidade-card.tsx`. */
+const CATEGORIA_OPCOES = Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+const IMPLEMENTO_OPCOES = Object.entries(IMPLEMENT_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
 function MedidasDoImplemento({
   disabled,
   totalDeVeiculos,
@@ -534,6 +546,74 @@ function MedidasDoImplemento({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pb-6">
+        {/* ── O QUE O IMPLEMENTO É, antes de quanto ele mede ────────────────
+            Categoria e implemento são dado do CLIENTE, e ele os sabe no momento
+            em que pede o orçamento — pintar baú frigorífico não custa o mesmo
+            que pintar um sider, e até aqui o comercial descobria isso por
+            telefone, depois de receber a requisição.
+
+            ⚠️ PERGUNTADOS UMA VEZ, como as medidas e pela mesma razão (ver o
+            cabeçalho deste componente): o lote é do mesmo modelo de implemento.
+            `buildSolicitacaoPayload` copia a escolha para cada veículo.
+
+            ⚠️ Em branco é resposta: quem não souber segue sem escolher, e os
+            dois continuam corrigíveis por veículo no portal, depois. */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField
+            control={control}
+            name="category"
+            render={({ field: f }) => (
+              <FormItem>
+                <FormLabel>Categoria do veículo</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={f.value ?? ""}
+                    onValueChange={(next) =>
+                      f.onChange(typeof next === "string" && next ? next : null)
+                    }
+                    mode="single"
+                    options={CATEGORIA_OPCOES}
+                    getOptionLabel={(o) => o.label}
+                    getOptionValue={(o) => o.value}
+                    placeholder="Não informada"
+                    searchable={false}
+                    clearable
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="implementType"
+            render={({ field: f }) => (
+              <FormItem>
+                <FormLabel>Tipo de implemento</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={f.value ?? ""}
+                    onValueChange={(next) =>
+                      f.onChange(typeof next === "string" && next ? next : null)
+                    }
+                    mode="single"
+                    options={IMPLEMENTO_OPCOES}
+                    getOptionLabel={(o) => o.label}
+                    getOptionValue={(o) => o.value}
+                    placeholder="Não informado"
+                    searchable={false}
+                    clearable
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex gap-2">

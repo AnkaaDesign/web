@@ -174,6 +174,10 @@ export const ClientePortalSolicitarPage = () => {
       // uma medida que ninguém tirou. Quem cria os lados é o interruptor
       // "Informar medidas" do passo 3.
       medidas: null,
+      // ⛔ `null` e não um valor de partida: "Truck" ou "Sider" escolhidos por
+      // omissão entrariam no orçamento como se o cliente os tivesse dito.
+      category: null,
+      implementType: null,
     },
   });
 
@@ -332,7 +336,6 @@ export const ClientePortalSolicitarPage = () => {
       <PageHeader
         variant="form"
         title="Solicitar orçamento"
-        subtitle="Conte o que você precisa. O comercial da Ankaa devolve o orçamento com os valores."
         // ⚠️ ERA O ÚNICO CABEÇALHO DO PORTAL SEM ÍCONE — as outras oito telas
         // têm. E é o MESMO `IconFilePlus` do botão que traz o contato até aqui,
         // no Início: o ícone é a continuidade entre o convite e a tela.

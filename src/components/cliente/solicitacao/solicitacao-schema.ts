@@ -392,6 +392,19 @@ export const solicitacaoSchema = z
      * até o orçamento. Ligar o interruptor é o ato afirmativo que cria os lados.
      */
     medidas: medidasSchema.nullable().optional(),
+    /**
+     * CATEGORIA E IMPLEMENTO — perguntados UMA vez, como as medidas.
+     *
+     * ⚠️ Mesma doutrina da regra 4 do cabeçalho: o que muda de caminhão para
+     * caminhão é a IDENTIFICAÇÃO (série, placa, chassi); o implemento é o mesmo
+     * modelo no lote inteiro. Perguntar por linha encheria o formulário de
+     * repetição e produziria lotes incoerentes por descuido.
+     *
+     * ⚠️ `null` é "não sei", e é o padrão: o cliente que não souber segue, e o
+     * campo continua corrigível no portal depois, veículo a veículo.
+     */
+    category: z.string().trim().nullable().optional(),
+    implementType: z.string().trim().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     const temExistente = !!data.customerId && data.customerId !== NOVO_CLIENTE_VALUE;
@@ -666,6 +679,11 @@ export function buildSolicitacaoPayload(values: SolicitacaoFormData): PortalBudg
       // aqui, que uma vira N — em cópias independentes.
       const medidas = medidasParaPayload(values.medidas);
       if (medidas) veiculo.medidas = medidas;
+      // A MESMA cópia-para-todos das medidas, e pela mesma razão.
+      const categoria = trimOrUndefined(values.category ?? undefined);
+      if (categoria) veiculo.category = categoria;
+      const implemento = trimOrUndefined(values.implementType ?? undefined);
+      if (implemento) veiculo.implementType = implemento;
       return veiculo;
     }),
   };
