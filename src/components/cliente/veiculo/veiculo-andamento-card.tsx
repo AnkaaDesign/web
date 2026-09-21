@@ -36,16 +36,15 @@
 // Reclamação"), tempo trabalhado, quem executou, pausa, vaga no barracão,
 // bonificação, observação, detalhe da tarefa, motivo de recorte, preço de
 // aerografia e `Task.term`.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { IconCheck, IconClock, IconLock, IconPhoto, IconTimelineEvent } from "@tabler/icons-react";
 
 import type { PortalFile, PortalStep, PortalVehicleProgress } from "@/api-client/portal";
-import { Badge, type BadgeProps } from "@/components/ui/badge";
+import type { BadgeProps } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate, formatDateTime } from "@/utils";
 import { cn } from "@/lib/utils";
 import { PortalCard, PortalSubheading } from "../portal-detail";
-import { PortalTable, type PortalTableColumn } from "../portal-table";
 
 import { portalFileUrl, portalThumbnailUrl } from "./portal-file-url";
 
@@ -88,12 +87,15 @@ function MarcoLinha({
   reachedAt,
   atual,
   ultimo,
+  children,
 }: {
   label: string;
   reached: boolean;
   reachedAt: string | null;
   atual: boolean;
   ultimo: boolean;
+  /** As O.S. penduradas NESTE marco — ver `VeiculoAndamentoConteudo`. */
+  children?: ReactNode;
 }) {
   return (
     <li className="relative flex gap-3 pb-6 last:pb-0">
@@ -155,23 +157,41 @@ function MarcoLinha({
             </span>
           )}
         </div>
+
+        {children ? <div className="mt-2 space-y-1.5">{children}</div> : null}
       </div>
     </li>
   );
 }
 
 /**
- * AS ETAPAS — as ORDENS DE SERVIÇO de produção, em tabela.
+ * UMA ORDEM DE SERVIÇO, PENDURADA NO MARCO "Em produção".
  *
- * ⛔ Eram um `<ul class="divide-y">` com dois `<span>` por linha, e o estado da
- * etapa só aparecia quando NÃO havia data ("a fazer" no lugar do dia). Quem
- * estava lendo tinha de inferir a situação da ausência de um carimbo. Agora são
- * três colunas nomeadas, sobre `PortalTable` — o mesmo desenho das parcelas e
- * dos serviços, na mesma tela.
+ * ⛔ ERA UMA TABELA SOLTA embaixo da linha do tempo ("Ordens de serviço", três
+ * colunas). Decisão do dono: a produção não é um anexo do andamento — ela é o
+ * andamento. Com a tabela à parte, a linha dizia "Em produção · 09/10" e ponto,
+ * e o cliente tinha de descer, achar a tabela e casar as datas de cabeça para
+ * descobrir o que estava sendo feito no caminhão dele.
  *
- * ⚠️ SÓ EXISTEM PARA O.S. DE TIPO `PRODUCTION` NÃO CANCELADAS: o servidor já
- * filtra, e `steps: []` é o normal de um veículo que ainda não entrou na fila.
- * Vazio aqui não desenha tabela nenhuma — ver o `etapas.length > 0` abaixo.
+ * Aqui cada O.S. é um degrau DENTRO do marco, com início e fim próprios: a
+ * pergunta "em que pé está?" e a pergunta "o que já foi feito?" passam a ter
+ * uma resposta só, lida de cima para baixo.
+ *
+ * ⚠️ O PONTO SEGUE O ESTADO DA O.S., não o do marco: uma etapa ainda em
+ * andamento dentro de uma produção já concluída é possível (retrabalho), e
+ * pintá-la de verde por herança mentiria sobre o que está aberto.
+ */
+/**
+ * O ESTADO DE UMA ETAPA — as três palavras que a O.S. pode ter.
+ *
+ * ⛔ A TABELA DE "Ordens de serviço" SAIU e o BADGE também (decisão do dono, em
+ * duas passadas): as etapas viraram degraus dentro do marco "Em produção", e o
+ * estado delas é dito pelo MESMO marcador dos marcos — check, relógio, ponto
+ * vazado. Este mapa sobreviveu porque a palavra continua necessária para quem
+ * ouve a tela: é ela que vai no `sr-only` de `EtapaLinha`.
+ *
+ * ⚠️ SÓ EXISTEM O.S. DE TIPO `PRODUCTION` NÃO CANCELADAS: o servidor já filtra,
+ * e `steps: []` é o normal de um veículo que ainda não entrou na fila.
  */
 const ETAPA_BADGE: Record<PortalStep["status"], { label: string; variant: BadgeProps["variant"] }> = {
   PENDING: { label: "A fazer", variant: "secondary" },
@@ -179,37 +199,59 @@ const ETAPA_BADGE: Record<PortalStep["status"], { label: string; variant: BadgeP
   COMPLETED: { label: "Concluída", variant: "completed" },
 };
 
-const etapaColumns: Array<PortalTableColumn<PortalStep>> = [
-  {
-    id: "descricao",
-    header: "Etapa",
-    cell: (step) => <span className="text-sm">{step.description ?? "Etapa"}</span>,
-  },
-  {
-    id: "situacao",
-    header: "Situação",
-    cell: (step) => {
-      const badge = ETAPA_BADGE[step.status];
-      return (
-        <Badge variant={badge.variant} size="sm">
-          {badge.label}
-        </Badge>
-      );
-    },
-  },
-  {
-    id: "quando",
-    header: "Quando",
-    align: "right",
-    className: "whitespace-nowrap tabular-nums text-muted-foreground",
-    cell: (step) =>
-      step.finishedAt
-        ? formatDate(step.finishedAt)
-        : step.startedAt
-          ? `desde ${formatDate(step.startedAt)}`
-          : "—",
-  },
-];
+function EtapaLinha({ step }: { step: PortalStep }) {
+  const concluida = step.status === "COMPLETED";
+  const correndo = step.status === "IN_PROGRESS";
+  const inicio = step.startedAt ? formatDate(step.startedAt) : null;
+  const fim = step.finishedAt ? formatDate(step.finishedAt) : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-muted/50 px-3 py-2">
+      {/* ⛔ O BADGE "Concluída" SAIU (decisão do dono). Ele dizia em palavra o
+          que o marcador já diz em símbolo, e numa coluna de quatro linhas
+          viravam quatro etiquetas verdes disputando a atenção com as datas —
+          que são a informação que muda de linha para linha. O estado agora é o
+          MESMO vocabulário dos marcos acima: check para o que fechou, relógio
+          para o que corre, ponto vazado para o que não começou. */}
+      <span
+        aria-hidden
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+          concluida && "border-primary bg-primary text-primary-foreground",
+          correndo && "border-primary bg-background text-primary",
+          !concluida && !correndo && "border-border bg-background text-muted-foreground",
+        )}
+      >
+        {concluida ? (
+          <IconCheck className="h-2.5 w-2.5" />
+        ) : correndo ? (
+          <IconClock className="h-2.5 w-2.5" />
+        ) : (
+          <span className="h-1 w-1 rounded-full bg-current" />
+        )}
+      </span>
+      {/* A situação continua NOMEADA para quem não enxerga o símbolo. */}
+      <span className="sr-only">{ETAPA_BADGE[step.status].label}</span>
+
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+        {step.description ?? "Etapa"}
+      </span>
+
+      {/* ⚠️ AS DUAS DATAS, e o travessão quando falta uma: "começou e não
+          terminou" é justamente o estado que o cliente quer distinguir de
+          "nem começou". */}
+      <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+        {inicio || fim ? (
+          <>
+            {inicio ?? "—"} <span aria-hidden>→</span> {fim ?? "—"}
+          </>
+        ) : (
+          "a fazer"
+        )}
+      </span>
+    </div>
+  );
+}
 
 export interface VeiculoAndamentoProps {
   /**
@@ -246,6 +288,13 @@ export function VeiculoAndamentoConteudo({ progress, cancelled }: VeiculoAndamen
   // servidor; aqui só se escolhe qual marcador fica cheio.
   const indiceAtual = marcos.findIndex((m) => !m.reached);
 
+  // ── O CONTROLE DE QUALIDADE, DERIVADO ──────────────────────────────────
+  // O porquê está no comentário da escada, logo abaixo.
+  const todasConcluidas = etapas.length > 0 && etapas.every((e) => e.status === "COMPLETED");
+  /** A MESMA data do marco `CONCLUIDO`: os dois terminam juntos. */
+  const concluidoEm =
+    marcos.find((m) => m.key === "CONCLUIDO" && m.reached)?.reachedAt ?? progress?.finishedAt ?? null;
+
   if (!progress) {
     return (
       <EmptyState
@@ -278,26 +327,52 @@ export function VeiculoAndamentoConteudo({ progress, cancelled }: VeiculoAndamen
 
       <ol className="relative">
         {marcos.map((marco, index) => (
-          <MarcoLinha
-            key={marco.key}
-            label={marco.label}
-            reached={marco.reached}
-            reachedAt={marco.reachedAt}
-            atual={index === indiceAtual}
-            ultimo={index === marcos.length - 1}
-          />
+          <Fragment key={marco.key}>
+            {/* ⛔ O CONTROLE DE QUALIDADE É UM DEGRAU PRÓPRIO, e vem ANTES de
+                "Concluído" — decisão do dono, segunda passada. Ele estava
+                pendurado dentro de "Em produção", junto das O.S., e ali lia
+                como se fosse mais uma ordem de serviço. Não é: as ordens
+                acabam, o veículo passa pela conferência, e é a aprovação dela
+                que conclui a tarefa.
+
+                ⚠️ É DERIVADO, e de dois fatos que já estão na resposta: só
+                existe quando TODA O.S. fechou, e carrega a data do marco
+                `CONCLUIDO` — os dois terminam no mesmo instante. Sem esse
+                marco, fica em andamento, que é a resposta honesta para "as
+                ordens acabaram, e agora?". Ele não recalcula nada; a regra
+                monotônica continua sendo do servidor. */}
+            {marco.key === "CONCLUIDO" && todasConcluidas ? (
+              <MarcoLinha
+                label="Controle de qualidade"
+                reached={!!concluidoEm}
+                reachedAt={concluidoEm}
+                atual={!concluidoEm}
+                ultimo={false}
+              />
+            ) : null}
+
+            <MarcoLinha
+              label={marco.label}
+              reached={marco.reached}
+              reachedAt={marco.reachedAt}
+              atual={index === indiceAtual}
+              ultimo={index === marcos.length - 1}
+            >
+              {/* ⛔ SEM ETAPA, NADA PENDURADO. `steps: []` é o normal de quem
+                  ainda não entrou na fila de produção, e uma carcaça vazia
+                  sugeriria que algo sumiu.
+
+                  ⚠️ O ALVO É `EM_PRODUCAO` PELA CHAVE, não pelo rótulo nem pela
+                  posição: o rótulo é texto que se conserta e a posição muda se
+                  um marco novo entrar na escada. A chave é o contrato do
+                  servidor (`portal-read.service.ts`). */}
+              {marco.key === "EM_PRODUCAO" && etapas.length > 0
+                ? etapas.map((step) => <EtapaLinha key={step.id} step={step} />)
+                : null}
+            </MarcoLinha>
+          </Fragment>
         ))}
       </ol>
-
-      {/* ⛔ SEM ETAPA, SEM TABELA — e sem carcaça. `steps: []` é o normal de
-          quem ainda não entrou na fila de produção, e uma tabela vazia com três
-          cabeçalhos sugeriria que algo sumiu. */}
-      {etapas.length > 0 ? (
-        <div className="space-y-1.5">
-          <PortalSubheading>Ordens de serviço</PortalSubheading>
-          <PortalTable columns={etapaColumns} rows={etapas} getRowId={(step) => step.id} />
-        </div>
-      ) : null}
 
       {temFoto ? (
         <div className="space-y-3">
