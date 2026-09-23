@@ -7,9 +7,6 @@ export interface BudgetVehicleTab {
   label: string;
   /** Segunda linha discreta — a placa quando o rótulo é a série. */
   detail?: string | null;
-  /** A pintura geral do veículo, para distinguir os caminhões num relance. */
-  paintName?: string | null;
-  paintHex?: string | null;
   /** Há alteração não salva neste veículo. */
   dirty?: boolean;
 }
@@ -31,6 +28,10 @@ interface BudgetVehicleTabsProps {
  *
  * Trocar de aba não descarta nada: os valores de todos os veículos vivem no mesmo
  * formulário, e um "Salvar" grava todos.
+ *
+ * A aba NÃO mostra a tinta (pedido do dono, 23/09): o card identifica o caminhão
+ * pela série e pela placa; a pintura é conteúdo do veículo, e aparece na seção
+ * "Tintas" dele e no Resumo.
  */
 export function BudgetVehicleTabs({ vehicles, activeTaskId, onSelect, className }: BudgetVehicleTabsProps) {
   return (
@@ -49,7 +50,7 @@ export function BudgetVehicleTabs({ vehicles, activeTaskId, onSelect, className 
             aria-selected={active}
             data-testid={`budget-vehicle-tab-${index + 1}`}
             onClick={() => onSelect(v.taskId)}
-            title={v.paintName ? `${v.label} · ${v.paintName}` : v.label}
+            title={v.detail ? `${v.label} · ${v.detail}` : v.label}
             className={cn(
               "flex min-w-[9rem] shrink-0 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
               active
@@ -76,17 +77,7 @@ export function BudgetVehicleTabs({ vehicles, activeTaskId, onSelect, className 
                   />
                 )}
               </span>
-              {(v.paintName || v.detail) && (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {v.paintHex && (
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full border border-border"
-                      style={{ backgroundColor: v.paintHex }}
-                    />
-                  )}
-                  <span className="truncate">{v.paintName || v.detail}</span>
-                </span>
-              )}
+              {v.detail && <span className="truncate text-xs text-muted-foreground">{v.detail}</span>}
             </span>
           </button>
         );
