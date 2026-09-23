@@ -1,6 +1,7 @@
 import { formatDate } from "@/utils/date";
 import { COMPANY_INFO } from "@/config/company";
 import { columnHeaderText, rawColumnValue, valueToString } from "./data-table-utils";
+import { withPricingVisible } from "@/utils/pricing-visibility";
 import type { DataTableColumnDef } from "./data-table-types";
 
 import { BRAND_ASSETS } from '@/config/assets';
@@ -57,6 +58,25 @@ export interface ExportRequest<TData> {
   filename: string;
   /** Document title shown in the PDF. */
   title: string;
+  /** PDF only: a line under the header on the FIRST page (e.g. whose share the values are). */
+  subtitle?: string;
+}
+
+/**
+ * The "Total" line of the PDF: each column's `meta.exportTotal` over the exported rows, and the
+ * label in the first column that has no total of its own. `null` when no column declares one.
+ */
+function totalRow<TData>(columns: DataTableColumnDef<TData>[], rows: TData[]): string[] | null {
+  if (!columns.some((c) => c.meta?.exportTotal)) return null;
+  const cells = columns.map((c) => {
+    // Forced visible, like every exported cell (see `rawColumnValue`): hiding prices on screen
+    // must not print "R$ ••••••" as the document's total.
+    const v = c.meta?.exportTotal ? withPricingVisible(() => c.meta!.exportTotal!(rows)) : undefined;
+    return Array.isArray(v) ? v.map((x) => valueToString(x)).join(", ") : valueToString(v);
+  });
+  const labelAt = columns.findIndex((c) => !c.meta?.exportTotal);
+  if (labelAt >= 0) cells[labelAt] = "Total";
+  return cells;
 }
 
 export async function exportToXlsx<TData>({ rows, columns, filename, title }: ExportRequest<TData>): Promise<void> {
@@ -80,7 +100,7 @@ export async function exportToXlsx<TData>({ rows, columns, filename, title }: Ex
   XLSX.writeFile(wb, `${filename}_${stamp()}.xlsx`);
 }
 
-export async function exportToPdf<TData>({ rows, columns, filename, title }: ExportRequest<TData>): Promise<void> {
+export async function exportToPdf<TData>({ rows, columns, filename, title, subtitle }: ExportRequest<TData>): Promise<void> {
   const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const autoTable = (autoTableMod.default ?? autoTableMod) as unknown as (
     doc: unknown,
@@ -143,10 +163,32 @@ export async function exportToPdf<TData>({ rows, columns, filename, title }: Exp
     doc.text(COMPANY_INFO.websiteUrl, M, lineY + 43);
   };
 
+  // The subtitle sits between the header rule and the table, on the first page only — the
+  // continuation pages keep the plain header, and the table starts lower just once.
+  const TABLE_TOP = 74;
+  let startY = TABLE_TOP;
+  if (subtitle) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_DARK);
+    const lines = doc.splitTextToSize(subtitle, pageW - 2 * M) as string[];
+    doc.text(lines, M, TABLE_TOP + 6);
+    startY = TABLE_TOP + 6 + lines.length * 11;
+  }
+  const total = totalRow(columns, rows);
+
   autoTable(doc, {
     head: [columns.map((c) => columnHeaderText(c))],
     body: rows.map((row) => columns.map((col) => textCell(col, row))),
-    margin: { top: 74, bottom: 64, left: M, right: M },
+    ...(total
+      ? {
+          foot: [total],
+          showFoot: "lastPage",
+          footStyles: { fillColor: [232, 240, 232], textColor: TEXT_DARK, fontStyle: "bold", lineWidth: { top: 0.75, right: 0, bottom: 0, left: 0 }, lineColor: BRAND_GREEN },
+        }
+      : {}),
+    startY,
+    margin: { top: TABLE_TOP, bottom: 64, left: M, right: M },
     // One line per row (truncate with "…", never wrap) + horizontal rules ONLY — the
     // per-side lineWidth draws a bottom rule on each cell, so there are NO vertical borders.
     styles: {
@@ -167,13 +209,13 @@ export async function exportToPdf<TData>({ rows, columns, filename, title }: Exp
   });
 
   // Stamp "Página X de Y" once the total page count is known (right side of the footer band).
-  const total = doc.getNumberOfPages();
-  for (let i = 1; i <= total; i++) {
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...TEXT_GRAY);
-    doc.text(`Página ${i} de ${total}`, pageW - M, pageH - 54 + 13, { align: "right" });
+    doc.text(`Página ${i} de ${pages}`, pageW - M, pageH - 54 + 13, { align: "right" });
   }
 
   doc.save(`${filename}_${stamp()}.pdf`);
