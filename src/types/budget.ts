@@ -253,6 +253,12 @@ export interface Billing {
   status: BILLING_STATUS;
   /** Espelho numérico de `status` — ver `BILLING_STATUS_ORDER`. */
   statusOrder: number;
+  /**
+   * O ESTADO DA PARTE dos pagadores filtrados em "Faturar Para" — a mesma regra
+   * de `status`, aplicada só às parcelas deles. `GET /billings` só o manda quando
+   * a lista tem esse filtro; fora dele, é `status` que vale.
+   */
+  payerStatus?: BILLING_STATUS | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
   /** OS VEÍCULOS que esta cobrança cobre. */

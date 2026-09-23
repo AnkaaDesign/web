@@ -44,6 +44,13 @@ declare module "@tanstack/react-table" {
      * variant's `label` is the text shown in the picker, e.g. "Quantidade Arredondada".
      */
     exportVariants?: Array<{ id: string; label: string; exportValue: (row: TData) => ExportCellValue }>;
+    /**
+     * The column's total over the EXPORTED rows, printed in a "Total" line at the end of the PDF
+     * (e.g. a money column's sum). Columns without it leave that cell blank. The XLSX gets no
+     * total line on purpose: a spreadsheet is re-sorted and re-filtered, and a total row inside
+     * the data would be sorted along with it.
+     */
+    exportTotal?: (rows: TData[]) => ExportCellValue;
     /** Horizontal alignment of the cell + header content. */
     align?: "left" | "center" | "right";
     /** Whether the column is visible by default (defaults to true). */

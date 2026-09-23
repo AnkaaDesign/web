@@ -13,11 +13,17 @@ import { useToast } from "@/hooks/common/use-toast";
 import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "@/constants";
+import type { Customer } from "@/types";
 import type { Billing } from "@/types/budget";
-import { customerIdsFromFilter, initialTableParams, useSelectedCustomers } from "@/components/financial/shared/quote-table-shared";
+import {
+  customerFilterLabel,
+  customerIdsFromFilter,
+  initialTableParams,
+  useSelectedCustomers,
+} from "@/components/financial/shared/quote-table-shared";
 import { buildQuoteSiblingState } from "@/components/financial/shared/quote-sibling-nav";
 import { toAttentionQuoteEntitiesFromBillings } from "@/components/financial/shared/quote-attention";
-import { BILLING_DEFAULT_SORTING, buildBillingOrderBy, createBillingColumns } from "./billing-table-columns";
+import { BILLING_DEFAULT_SORTING, billingExportLabels, buildBillingOrderBy, createBillingColumns } from "./billing-table-columns";
 import { BILLING_DEFAULT_PAGE_SIZE, buildBillingQuery, createBillingFilterDefs } from "./billing-table-filters";
 
 /**
@@ -162,7 +168,23 @@ export function BillingTablePage() {
   const invoiceCustomers = useSelectedCustomers(invoiceCustomerIds);
   const taskCustomers = useSelectedCustomers(taskCustomerIds);
 
-  const columns = useMemo(() => createBillingColumns(), []);
+  // A LENTE: os clientes de "Faturar Para" recortam as colunas de pagador (ver
+  // `BillingColumnsOptions.lens`). Chaveada pela lista de ids em texto para que
+  // as colunas só se refaçam quando a lente muda de fato.
+  const lensKey = invoiceCustomerIds.join(",");
+  const columns = useMemo(() => createBillingColumns({ lens: lensKey ? lensKey.split(",") : [] }), [lensKey]);
+
+  // O PDF DE UM CLIENTE — ver `billingExportLabels`.
+  const lensNames = useMemo(
+    () =>
+      invoiceCustomerIds
+        .map((id) => invoiceCustomers.find((c) => c.id === id))
+        .filter((c): c is Customer => !!c)
+        .map(customerFilterLabel)
+        .filter(Boolean),
+    [invoiceCustomerIds, invoiceCustomers],
+  );
+  const exportLabels = useMemo(() => billingExportLabels(invoiceCustomerIds, lensNames), [invoiceCustomerIds, lensNames]);
   const filterDefs = useMemo(() => createBillingFilterDefs({ invoiceCustomers, taskCustomers }), [invoiceCustomers, taskCustomers]);
 
   // ⚠️ NAVEGA COM `billing.id`, que é a URL CANÔNICA da cobrança. A página de
@@ -260,8 +282,9 @@ export function BillingTablePage() {
             // telefone.
             searchPlaceholder: "Buscar por nº do orçamento, nome, número de série, placa, cliente...",
             emptyMessage: "Nenhum faturamento encontrado. Ajuste os filtros.",
-            exportTitle: "Faturamento",
-            exportFilename: "faturamento",
+            exportTitle: exportLabels.title,
+            exportFilename: exportLabels.filename,
+            exportSubtitle: exportLabels.subtitle,
           }}
         />
       </div>
