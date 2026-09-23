@@ -1,0 +1,10 @@
+# G6a/G6b — arquivos INTEIROS fora da contagem de resíduo (scripts/guard-residual.sh).
+# Um glob por linha, relativo à raiz do web. Só entra aqui o que precisa falar
+# "truck" para sempre; o resto fica na catraca (.residual-baseline.json) e cai.
+# Exceção temporária leva `até=AAAA-MM-DD` na linha.
+#
+# O estúdio 3D (Truck Studio) é outra ferramenta, fora do rework do implemento.
+src/pages/tools/truck-studio/**
+# Cópia GERADA do contrato da api (export-contracts.ts --irmaos): o nome do
+# enum vem de lá e muda lá.
+src/generated/**
