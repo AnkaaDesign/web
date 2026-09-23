@@ -11,7 +11,6 @@ export { FileItem } from "./file-item";
 export { VideoPlayer } from "./video-player";
 export { PDFViewer } from "./pdf-viewer";
 export { InlinePdfViewer } from "./inline-pdf-viewer";
-export { FileList } from "./file-list";
 export { FileViewerProvider, FileViewerContext, useFileViewer, useFileViewerStandalone, FileViewerButton } from "./file-viewer";
 export { FileViewerCard, detectFileType, getFileTypeIcon, generateThumbnailUrl, formatFileSize, getFileTypeLabel, canPreviewFile } from "./file-viewer-card";
 export { FileSuggestions } from "./file-suggestions";
