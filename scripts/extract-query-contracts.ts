@@ -27,7 +27,8 @@
  * pedir existe".
  *
  * Só vão para `formas` os modelos cujo schema o teste da api registra (Task,
- * Budget, Airbrushing, Customer, File). O resto sai em `semSchema`, para o dono
+ * Budget, Airbrushing, Customer, File e, desde a revisão da Fase A, User,
+ * Item, Supplier e ChangeLog). O resto sai em `semSchema`, para o dono
  * do teste registrar quando quiser — o teste lê apenas `formas`.
  *
  * Rodar (Node ≥ 23, que remove os tipos sozinho):
@@ -78,6 +79,28 @@ registrar(["useFiles", "useFilesInfinite", "getFiles"], {
 });
 registrar(["useFile", "getFileById"], {
   modelo: "File", rota: "GET /files/:id", schema: "file.fileQuerySchema", unica: true,
+});
+// Revisão da Fase A (R-B-11): as rotas com mais consultas em `semSchema`.
+registrar(["useUsers", "useUsersInfinite", "getUsers"], {
+  modelo: "User", rota: "GET /users", schema: "user.userGetManySchema", unica: false,
+});
+registrar(["useUser", "getUserById"], {
+  modelo: "User", rota: "GET /users/:id", schema: "user.userQuerySchema", unica: true,
+});
+registrar(["useItems", "useItemsInfinite", "getItems"], {
+  modelo: "Item", rota: "GET /items", schema: "item.itemGetManySchema", unica: false,
+});
+registrar(["useItem", "getItemById"], {
+  modelo: "Item", rota: "GET /items/:id", schema: "item.itemQuerySchema", unica: true,
+});
+registrar(["useSuppliers", "useSuppliersInfinite", "getSuppliers"], {
+  modelo: "Supplier", rota: "GET /suppliers", schema: "supplier.supplierGetManySchema", unica: false,
+});
+registrar(["useSupplierDetail", "getSupplierById"], {
+  modelo: "Supplier", rota: "GET /suppliers/:id", schema: "supplier.supplierQuerySchema", unica: true,
+});
+registrar(["useChangeLogs", "useChangeLogsInfinite", "getChangeLogs"], {
+  modelo: "ChangeLog", rota: "GET /changelogs", schema: "changelog.changeLogGetManySchema", unica: false,
 });
 
 /**
