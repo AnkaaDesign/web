@@ -246,6 +246,9 @@ const DETAIL_INCLUDE = {
 } as const;
 
 // Every detail section id (SO sections are `so-${TYPE}`) — the basis for the per-sector default below.
+// ⚠️ Os ids são PERSISTIDOS (preferências do usuário em localStorage e no servidor,
+// `use-detail-preferences.ts`): "layout" é a seção das MEDIDAS e "layouts" a das artes.
+// Trocar o id aqui apaga a escolha salva de quem já arrumou a página — só com migração versionada.
 const ALL_DETAIL_SECTION_IDS = [
   "overview", "dates", "quote",
   "so-COMMERCIAL", "so-ARTWORK", "so-LOGISTIC", "so-PRODUCTION",
@@ -423,7 +426,7 @@ function TaskDetailContent() {
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ]);
   const canViewRestricted = canViewLayoutBadges; // responsibles / forecast
-  const canViewLayout =
+  const canViewMeasures =
     has([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]) ||
     (role === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user as never));
   // Canonical airbrushing money-visibility gate (FINANCIAL / ACCOUNTING / ADMIN / COMMERCIAL) —
@@ -1322,7 +1325,7 @@ function TaskDetailContent() {
           }) as DetailSectionDef<Task>,
       ),
       // Medidas do Implemento (SVG layout preview).
-      ...(hasLayout && canViewLayout
+      ...(hasLayout && canViewMeasures
         ? [
             {
               id: "layout",
@@ -1563,7 +1566,7 @@ function TaskDetailContent() {
     airbrushings.length,
     hasLayout,
     hasDossie,
-    canViewLayout,
+    canViewMeasures,
     canViewLayoutBadges,
     canViewBaseFiles,
     canViewCheckinFiles,

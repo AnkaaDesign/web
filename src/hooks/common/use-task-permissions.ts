@@ -68,7 +68,7 @@ export function useTaskPermissions() {
   const canViewBonification = isAdmin || isFinancial || isCommercial || isProduction;
   const canViewDates = !isWarehouse;
   const canViewServices = !isWarehouse && !isPlotting;
-  const canViewLayout = isAdmin || isLogistic || isProductionManager || (isProduction && isTeamLeader);
+  const canViewMeasures = isAdmin || isLogistic || isProductionManager || (isProduction && isTeamLeader);
   const canViewTruckSpot = isAdmin || isLogistic || isProductionManager;
   const canViewPaint = !isWarehouse && !isFinancial && !isLogistic && !isProductionManager;
   const canViewLogoPaint = canViewPaint && !isCommercial;
@@ -140,7 +140,7 @@ export function useTaskPermissions() {
     canViewBonification,
     canViewDates,
     canViewServices,
-    canViewLayout,
+    canViewMeasures,
     canViewTruckSpot,
     canViewPaint,
     canViewLogoPaint,

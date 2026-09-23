@@ -962,8 +962,8 @@ export const TaskCreateForm = () => {
                 {/* Medidas do Implemento - LOGISTIC/ADMIN */}
                 {showLayout && (
                   <AccordionItem
-                    value="layout"
-                    id="accordion-item-layout"
+                    value="measures"
+                    id="accordion-item-measures"
                     className="border border-border rounded-lg"
                   >
                     <Card className="border-0">

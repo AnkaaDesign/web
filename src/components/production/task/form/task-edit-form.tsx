@@ -154,7 +154,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     privilege, isTeamLeader,
     canViewRestrictedFields,
     canViewBonification: canViewBonificationField,
-    canViewDates, canViewServices, canViewLayout, canViewTruckSpot,
+    canViewDates, canViewServices, canViewMeasures, canViewTruckSpot,
     canViewPaint, canViewLogoPaint, canViewCuts,
     canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
@@ -563,10 +563,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     finishedAt: "dates",
     // Services
     serviceOrders: "serviceOrders",
-    // Layout
-    leftSideMeasure: "layout",
-    rightSideMeasure: "layout",
-    backSideMeasure: "layout",
+    // Medidas do implemento
+    leftSideMeasure: "measures",
+    rightSideMeasure: "measures",
+    backSideMeasure: "measures",
     // Spot
     spot: "spot",
     // Paint
@@ -668,7 +668,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     }
   }, [openAccordion, scrollToAccordion]);
 
-  const { data: layoutsData } = useImplementMeasuresByTruck(truckId || "", { enabled: !!truckId });
+  const { data: measuresData } = useImplementMeasuresByTruck(truckId || "", { enabled: !!truckId });
 
   // Calculate truck length from layout sections for spot selector
   // Uses the same two-tier cabin logic as garage view and API:
@@ -676,7 +676,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // 7-10m body: 2.4m cabin (larger trucks)
   // >= 10m body: no cabin (semi-trailers)
   const truckLength = useMemo(() => {
-    const layout = layoutsData?.leftSideMeasure || layoutsData?.rightSideMeasure;
+    const layout = measuresData?.leftSideMeasure || measuresData?.rightSideMeasure;
     if (!layout?.sections || layout.sections.length === 0) {
       return null;
     }
@@ -695,13 +695,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       return sectionsSum + CABIN_LENGTH_LARGE;
     }
     return sectionsSum;
-  }, [layoutsData]);
+  }, [measuresData]);
 
   // Debug logging for layouts
   useEffect(() => {
     
-  }, [layoutsData, truckId, truckLength]);
-  const { createOrUpdateTruckMeasure: _createOrUpdateTruckMeasure, delete: deleteLayout } = useImplementMeasureMutations();
+  }, [measuresData, truckId, truckLength]);
+  const { createOrUpdateTruckMeasure: _createOrUpdateTruckMeasure, delete: deleteMeasure } = useImplementMeasureMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
@@ -710,7 +710,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // Only sync if we have no pending modifications (modifiedLayoutSides is empty)
     // AND we don't have pending layout changes flag set
     // This prevents overwriting user changes that haven't been saved yet
-    if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && layoutsData) {
+    if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && measuresData) {
 
       const newStates: Record<ImplementFace, any> = {
         left: currentLayoutStates.left,
@@ -719,46 +719,46 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       };
 
       // Sync left side
-      if (layoutsData.leftSideMeasure?.sections) {
+      if (measuresData.leftSideMeasure?.sections) {
         newStates.left = {
-          height: layoutsData.leftSideMeasure.height,
-          sections: layoutsData.leftSideMeasure.sections.map((s: any) => ({
+          height: measuresData.leftSideMeasure.height,
+          sections: measuresData.leftSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.leftSideMeasure.photoId,
+          photoId: measuresData.leftSideMeasure.photoId,
         };
         
       }
 
       // Sync right side
-      if (layoutsData.rightSideMeasure?.sections) {
+      if (measuresData.rightSideMeasure?.sections) {
         newStates.right = {
-          height: layoutsData.rightSideMeasure.height,
-          sections: layoutsData.rightSideMeasure.sections.map((s: any) => ({
+          height: measuresData.rightSideMeasure.height,
+          sections: measuresData.rightSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.rightSideMeasure.photoId,
+          photoId: measuresData.rightSideMeasure.photoId,
         };
         
       }
 
       // Sync back side
-      if (layoutsData.backSideMeasure?.sections) {
+      if (measuresData.backSideMeasure?.sections) {
         newStates.back = {
-          height: layoutsData.backSideMeasure.height,
-          sections: layoutsData.backSideMeasure.sections.map((s: any) => ({
+          height: measuresData.backSideMeasure.height,
+          sections: measuresData.backSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.backSideMeasure.photoId,
+          photoId: measuresData.backSideMeasure.photoId,
         };
         
       }
@@ -768,7 +768,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     } else if (modifiedLayoutSides.size > 0) {
       
     }
-  }, [layoutsData, modifiedLayoutSides.size, hasLayoutChanges]);
+  }, [measuresData, modifiedLayoutSides.size, hasLayoutChanges]);
 
   // When layout section opens WITHOUT existing layouts, mark as having changes
   // Mark layout changes when user starts editing a new layout
@@ -781,8 +781,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // Real-time validation of layout width balance
   useEffect(() => {
     // Use current editing state if available, otherwise use saved data
-    const leftLayout = currentLayoutStates.left || layoutsData?.leftSideMeasure;
-    const rightLayout = currentLayoutStates.right || layoutsData?.rightSideMeasure;
+    const leftLayout = currentLayoutStates.left || measuresData?.leftSideMeasure;
+    const rightLayout = currentLayoutStates.right || measuresData?.rightSideMeasure;
     const leftSections = leftLayout?.sections || leftLayout?.sections;
     const rightSections = rightLayout?.sections || rightLayout?.sections;
 
@@ -803,7 +803,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       // Clear error if one side doesn't have sections
       setLayoutWidthError(null);
     }
-  }, [layoutsData, currentLayoutStates]);
+  }, [measuresData, currentLayoutStates]);
 
   // Map task data to form values
   const mapDataToForm = useCallback((taskData: Task): TaskUpdateFormData => {
@@ -1221,21 +1221,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         // If layout changes exist, add layout data to changedData
 
         // Handle layout deletion if user clicked the remove button
-        if (shouldDeleteLayouts && layoutsData) {
+        if (shouldDeleteLayouts && measuresData) {
 
           const deletePromises: Promise<any>[] = [];
 
-          if (layoutsData.leftSideMeasure?.id) {
+          if (measuresData.leftSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.leftSideMeasure.id));
+            deletePromises.push(deleteMeasure(measuresData.leftSideMeasure.id));
           }
-          if (layoutsData.rightSideMeasure?.id) {
+          if (measuresData.rightSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.rightSideMeasure.id));
+            deletePromises.push(deleteMeasure(measuresData.rightSideMeasure.id));
           }
-          if (layoutsData.backSideMeasure?.id) {
+          if (measuresData.backSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.backSideMeasure.id));
+            deletePromises.push(deleteMeasure(measuresData.backSideMeasure.id));
           }
 
           if (deletePromises.length > 0) {
@@ -3490,10 +3490,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                 {/* Quote is now accessed via context menu - removed from edit form */}
 
                 {/* Medidas do Implemento - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
-                {canViewLayout && (
+                {canViewMeasures && (
           <AccordionItem
-            value="layout"
-            id="accordion-item-layout"
+            value="measures"
+            id="accordion-item-measures"
             className="border border-border rounded-lg"
           >
                 <Card className="border-0">
@@ -3513,7 +3513,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           <div className="flex gap-2">
                             <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
                               Motorista
-                              {layoutsData?.leftSideMeasure && (
+                              {measuresData?.leftSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3521,7 +3521,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             </Button>
                             <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
                               Sapo
-                              {layoutsData?.rightSideMeasure && (
+                              {measuresData?.rightSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3529,7 +3529,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             </Button>
                             <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
                               Traseira
-                              {layoutsData?.backSideMeasure && (
+                              {measuresData?.backSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3544,10 +3544,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               {(() => {
                                 const currentState = currentLayoutStates[selectedLayoutSide];
                                 const savedLayout = selectedLayoutSide === "left"
-                                  ? layoutsData?.leftSideMeasure
+                                  ? measuresData?.leftSideMeasure
                                   : selectedLayoutSide === "right"
-                                    ? layoutsData?.rightSideMeasure
-                                    : layoutsData?.backSideMeasure;
+                                    ? measuresData?.rightSideMeasure
+                                    : measuresData?.backSideMeasure;
 
                                 const currentLayout = currentState || savedLayout;
                                 const sections = currentLayout?.sections || currentLayout?.sections;
@@ -3566,10 +3566,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           selectedSide={selectedLayoutSide}
                           layout={(() => {
                             const savedLayout = selectedLayoutSide === "left"
-                              ? layoutsData?.leftSideMeasure
+                              ? measuresData?.leftSideMeasure
                               : selectedLayoutSide === "right"
-                                ? layoutsData?.rightSideMeasure
-                                : layoutsData?.backSideMeasure;
+                                ? measuresData?.rightSideMeasure
+                                : measuresData?.backSideMeasure;
 
                             if (modifiedLayoutSides.has(selectedLayoutSide) && currentLayoutStates[selectedLayoutSide]) {
                               return currentLayoutStates[selectedLayoutSide];
@@ -3580,10 +3580,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           validationError={layoutWidthError}
                           onChange={(side, layoutData) => {
                             const savedLayout = side === "left"
-                              ? layoutsData?.leftSideMeasure
+                              ? measuresData?.leftSideMeasure
                               : side === "right"
-                                ? layoutsData?.rightSideMeasure
-                                : layoutsData?.backSideMeasure;
+                                ? measuresData?.rightSideMeasure
+                                : measuresData?.backSideMeasure;
 
                             const hasSavedLayout = savedLayout?.sections && savedLayout.sections.length > 0;
                             const isFirstEmitForSide = !initialLayoutStateEmittedRef.current.has(side);
