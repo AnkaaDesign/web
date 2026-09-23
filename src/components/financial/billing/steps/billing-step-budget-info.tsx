@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,12 @@ interface BillingStepBudgetInfoProps {
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
   // The task's layout files — the pool the approved layout is chosen from.
   layouts?: LayoutOption[];
+  /**
+   * Substitui o seletor quando o orçamento tem UM LAYOUT PARA CADA VEÍCULO: aqui o
+   * seletor só sabe o compartilhado, e a API recusa trocar o layout de um orçamento
+   * por veículo pelo caminho antigo. O aviso manda para a tela do orçamento.
+   */
+  layoutNotice?: ReactNode;
 }
 
 export function BillingStepBudgetInfo({
@@ -43,6 +50,7 @@ export function BillingStepBudgetInfo({
   layoutFiles,
   onLayoutFilesChange,
   layouts,
+  layoutNotice,
 }: BillingStepBudgetInfoProps) {
   const { control, setValue } = useFormContext();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
@@ -245,12 +253,14 @@ export function BillingStepBudgetInfo({
         </CardContent>
       </Card>
 
-      <ApprovedLayoutPicker
-        layouts={layouts}
-        layoutFiles={layoutFiles}
-        onChange={handleLayoutFileChange}
-        disabled={disabled}
-      />
+      {layoutNotice ?? (
+        <ApprovedLayoutPicker
+          layouts={layouts}
+          layoutFiles={layoutFiles}
+          onChange={handleLayoutFileChange}
+          disabled={disabled}
+        />
+      )}
     </div>
   );
 }

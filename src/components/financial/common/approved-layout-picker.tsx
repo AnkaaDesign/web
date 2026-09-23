@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +97,13 @@ interface ApprovedLayoutPickerProps {
    * prep-board layout modals read the same. Defaults to the wrapping grid.
    */
   horizontal?: boolean;
+  /**
+   * O título do cartão. No orçamento de N veículos com layout por veículo há um
+   * seletor por caminhão, e cada um precisa dizer DE QUAL caminhão é.
+   */
+  title?: ReactNode;
+  /** Ação no cabeçalho do cartão (p.ex. "Usar em todos os veículos"). */
+  headerAction?: ReactNode;
 }
 
 /**
@@ -121,6 +128,8 @@ export function ApprovedLayoutPicker({
   onUploadFiles,
   uploadLabel = "Selecione ou envie um layout",
   horizontal = false,
+  title = "Layout Aprovados",
+  headerAction,
 }: ApprovedLayoutPickerProps) {
   // Fixed-width card + horizontal-scroll strip (matches LayoutFileUploadField's card
   // variant) vs. the default wrapping grid.
@@ -313,13 +322,16 @@ export function ApprovedLayoutPicker({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <IconPhoto className="h-4 w-4 text-muted-foreground" />
-          Layout Aprovados
-          <Badge
-            variant={selectedCount > 0 ? "secondary" : "outline"}
-            className="ml-auto text-[11px] font-normal tabular-nums"
-          >
-            {selectedCount}/{maxFiles}
-          </Badge>
+          {title}
+          <span className="ml-auto flex items-center gap-2">
+            {headerAction}
+            <Badge
+              variant={selectedCount > 0 ? "secondary" : "outline"}
+              className="text-[11px] font-normal tabular-nums"
+            >
+              {selectedCount}/{maxFiles}
+            </Badge>
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>

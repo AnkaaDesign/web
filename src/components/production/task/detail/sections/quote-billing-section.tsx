@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import { layoutScopeOf, layoutFilesForTask } from "@/utils/quote-layout-coverage";
+import { useBudgetByTask } from "@/hooks/production/use-budget";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -188,8 +190,19 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
   // cancelar e reenviar a coleta de assinaturas (ADMIN | FINANCIAL | COMMERCIAL).
   const canManageSignature = canEditQuote(currentUser?.sector?.privileges || "");
 
+  // UM LAYOUT PARA CADA VEÍCULO: esta seção é a de UM caminhão, então mostra só as
+  // artes dele. A cobertura vem da leitura do orçamento pela tarefa (a do `include`
+  // da tarefa não a traz), e só é pedida quando o orçamento é por veículo.
+  const layoutPerVehicle = layoutScopeOf(task.quote as any) === "PER_VEHICLE";
+  const { data: coverageQuoteResponse } = useBudgetByTask(layoutPerVehicle ? task.id : "");
+  const coverageQuote =
+    (coverageQuoteResponse as any)?.data?.data || (coverageQuoteResponse as any)?.data || null;
+
   const rawQuote = task.quote;
   if (!rawQuote) return null;
+  const shownLayoutFiles: any[] = layoutPerVehicle
+    ? layoutFilesForTask(coverageQuote ?? { layoutScope: "PER_VEHICLE", layoutFiles: [] }, task.id)
+    : ((rawQuote as any).layoutFiles || []);
 
   // ─── AS FATURAS DESTE VEÍCULO ────────────────────────────────────────────────
   //
@@ -932,14 +945,14 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
       })()}
 
       {/* Layout File Preview (the layoutFiles array) */}
-      {part === "budget" && (quote.layoutFiles?.length ?? 0) > 0 && (
+      {part === "budget" && shownLayoutFiles.length > 0 && (
         <div className="bg-muted/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
             <IconPhoto className="h-4 w-4 text-muted-foreground" />
             Layout Aprovados
           </div>
           <div className="flex flex-wrap justify-start gap-3">
-            {(quote.layoutFiles || []).map((layoutFile: any) => (
+            {shownLayoutFiles.map((layoutFile: any) => (
               <img
                 key={layoutFile.id}
                 src={`${getApiBaseUrl()}/files/thumbnail/${layoutFile.id}`}
