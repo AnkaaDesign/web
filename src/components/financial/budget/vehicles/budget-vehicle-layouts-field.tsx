@@ -34,7 +34,10 @@ interface BudgetVehicleLayoutsFieldProps {
 }
 
 const withPreview = (picked: File[]): FileWithPreview[] =>
-  picked.map((f) => Object.assign(f, { preview: URL.createObjectURL(f) }) as FileWithPreview);
+  picked.map(
+    (f) =>
+      Object.assign(f, { preview: URL.createObjectURL(f) }) as FileWithPreview,
+  );
 
 /**
  * O LAYOUT APROVADO de um orçamento de N veículos.
@@ -64,7 +67,8 @@ export function BudgetVehicleLayoutsField({
   disabled,
 }: BudgetVehicleLayoutsFieldProps) {
   const handleSharedUpload = useCallback(
-    (picked: File[]) => onSharedFilesChange([...sharedFiles, ...withPreview(picked)].slice(0, 2)),
+    (picked: File[]) =>
+      onSharedFilesChange([...sharedFiles, ...withPreview(picked)].slice(0, 2)),
     [sharedFiles, onSharedFilesChange],
   );
 
@@ -86,7 +90,10 @@ export function BudgetVehicleLayoutsField({
             data-testid="budget-layout-per-vehicle"
           />
           <div className="space-y-1">
-            <Label htmlFor="budget-layout-per-vehicle" className="cursor-pointer">
+            <Label
+              htmlFor="budget-layout-per-vehicle"
+              className="cursor-pointer"
+            >
               Um layout para cada veículo
             </Label>
             <p className="text-xs text-muted-foreground">
@@ -99,64 +106,73 @@ export function BudgetVehicleLayoutsField({
       </Card>
 
       {!perVehicle ? (
-        <ApprovedLayoutPicker
-          layouts={options}
-          layoutFiles={sharedFiles}
-          onChange={onSharedFilesChange}
-          onUploadFiles={handleSharedUpload}
-          uploadLabel="Selecione ou envie um layout"
-          title="Layout Aprovados — todos os veículos"
-          disabled={disabled}
-        />
+        <div data-testid="budget-vehicle-layout-shared">
+          <ApprovedLayoutPicker
+            layouts={options}
+            layoutFiles={sharedFiles}
+            onChange={onSharedFilesChange}
+            onUploadFiles={handleSharedUpload}
+            uploadLabel="Selecione ou envie um layout"
+            title="Layout Aprovados — todos os veículos"
+            disabled={disabled}
+          />
+        </div>
       ) : (
         vehicles.map((v, index) => {
           const files = filesByTask[v.taskId] ?? [];
           return (
-            <ApprovedLayoutPicker
+            <div
               key={v.taskId}
-              layouts={options}
-              layoutFiles={files}
-              onChange={(next) => onTaskFilesChange(v.taskId, next)}
-              onUploadFiles={(picked) =>
-                onTaskFilesChange(v.taskId, [...files, ...withPreview(picked)].slice(0, 2))
-              }
-              uploadLabel="Selecione ou envie um layout"
-              disabled={disabled}
-              title={
-                <span className="flex items-center gap-2">
-                  <span>
-                    Veículo {index + 1} · {v.label}
-                  </span>
-                  {v.paintHex && (
-                    <span
-                      className="h-3 w-3 rounded-full border border-border"
-                      style={{ backgroundColor: v.paintHex }}
-                      title={v.paintName ?? undefined}
-                    />
-                  )}
-                  {files.length === 0 && (
-                    <span className="text-xs font-normal text-amber-600 dark:text-amber-400">
-                      sem layout
+              data-testid={`budget-vehicle-layout-${index + 1}`}
+            >
+              <ApprovedLayoutPicker
+                layouts={options}
+                layoutFiles={files}
+                onChange={(next) => onTaskFilesChange(v.taskId, next)}
+                onUploadFiles={(picked) =>
+                  onTaskFilesChange(
+                    v.taskId,
+                    [...files, ...withPreview(picked)].slice(0, 2),
+                  )
+                }
+                uploadLabel="Selecione ou envie um layout"
+                disabled={disabled}
+                title={
+                  <span className="flex items-center gap-2">
+                    <span>
+                      Veículo {index + 1} · {v.label}
                     </span>
-                  )}
-                </span>
-              }
-              headerAction={
-                vehicles.length > 1 && files.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => onUseForAll(v.taskId)}
-                    disabled={disabled}
-                  >
-                    <IconCopy className="h-3.5 w-3.5" />
-                    Usar em todos
-                  </Button>
-                ) : null
-              }
-            />
+                    {v.paintHex && (
+                      <span
+                        className="h-3 w-3 rounded-full border border-border"
+                        style={{ backgroundColor: v.paintHex }}
+                        title={v.paintName ?? undefined}
+                      />
+                    )}
+                    {files.length === 0 && (
+                      <span className="text-xs font-normal text-amber-600 dark:text-amber-400">
+                        sem layout
+                      </span>
+                    )}
+                  </span>
+                }
+                headerAction={
+                  vehicles.length > 1 && files.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => onUseForAll(v.taskId)}
+                      disabled={disabled}
+                    >
+                      <IconCopy className="h-3.5 w-3.5" />
+                      Usar em todos
+                    </Button>
+                  ) : null
+                }
+              />
+            </div>
           );
         })
       )}

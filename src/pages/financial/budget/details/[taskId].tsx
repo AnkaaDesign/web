@@ -576,7 +576,8 @@ const FinancialBudgetDetailPageInner = () => {
   // um reset parcial (só a tarefa aberta) seguido de outro com os irmãos faria o
   // segundo perder o que o operador tivesse começado a digitar.
   useEffect(() => {
-    if (!task || !vehiclesReady) return;
+    // O orçamento também: sem ele a lista de veículos ainda é só a tarefa aberta.
+    if (!task || !vehiclesReady || quoteLoading) return;
     const loadedVehicles = vehicleTasks.filter(Boolean) as any[];
 
     // Seed each vehicle's Plaqueta photo from its persisted truck relation.
@@ -830,12 +831,12 @@ const FinancialBudgetDetailPageInner = () => {
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id, existingQuote?.id, vehiclesReady]); // use IDs — object refs change on every refetch and would wipe unsaved edits
+  }, [task?.id, existingQuote?.id, vehiclesReady, quoteLoading]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
   // Initialize the vehicles' own state (layouts) and the COMMON state that lives
   // outside the form (responsáveis, arquivos base) once every vehicle has loaded.
   useEffect(() => {
-    if (!task || !vehiclesReady) return;
+    if (!task || !vehiclesReady || quoteLoading) return;
     const loadedVehicles = vehicleTasks.filter(Boolean) as any[];
 
     // Responsáveis — COMUNS ao orçamento; semeados da tarefa aberta.
@@ -914,7 +915,7 @@ const FinancialBudgetDetailPageInner = () => {
     // selected as a quote layout). That left the layout pointing at a local temp id
     // with no file left to upload, so submit sent the temp id and the API rejected it
     // ("Invalid uuid"). Mirrors the sibling effect's id-only guard.
-  }, [task?.id, vehiclesReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [task?.id, vehiclesReady, quoteLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // As artes que podem virar "layout aprovado": as imagens APROVADAS de TODOS os
   // veículos, como estão AGORA no passo 1 (um layout removido ou reprovado ali some

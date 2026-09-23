@@ -158,6 +158,10 @@ export function BudgetStepTask({
   // Campos DO VEÍCULO. `v("plate")` é `plate` na criação e `vehicles.<i>.plate` na
   // edição de um orçamento de N veículos.
   const v = (field: string) => `${vehicleFieldPrefix}${field}`;
+  // Chave de remontagem das seções do veículo, UMA POR PARTE: as seções são irmãs
+  // umas das outras, e a mesma chave em dois irmãos faz o React duplicar ou sumir
+  // com eles.
+  const vk = (part: string) => (vehicleKey ? `${vehicleKey}:${part}` : undefined);
   const multiVehicle = isEditMode && vehicleCount > 1;
   const vehicleSuffix = multiVehicle && activeVehicleLabel ? ` — ${activeVehicleLabel}` : "";
   const commonSuffix = multiVehicle ? " — comum a todos os veículos" : "";
@@ -167,7 +171,8 @@ export function BudgetStepTask({
         type="button"
         variant="ghost"
         size="sm"
-        className="h-6 gap-1 px-1.5 text-xs font-normal text-muted-foreground"
+        // Mais baixo que o rótulo, para o campo não descer em relação aos vizinhos.
+        className="-my-1 h-5 gap-1 px-1.5 text-xs font-normal text-muted-foreground"
         onClick={() => onApplyToOtherVehicles(field)}
       >
         <IconCopy className="h-3 w-3" />
@@ -336,7 +341,7 @@ export function BudgetStepTask({
                      são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
                      fileira. Com quatro colunas a plaqueta caía sozinha numa
                      linha inteira, parecendo uma seção própria. */
-                  <div key={vehicleKey} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                  <div key={vk("identificacao")} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <FormField
                       control={control}
                       name={v("serialNumber")}
@@ -544,7 +549,7 @@ export function BudgetStepTask({
                 <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
                   <div className="space-y-1">
                     <FormField
-                      key={vehicleKey}
+                      key={vk("previsao")}
                       control={control}
                       name={v("forecastDate")}
                       render={({ field }) => (
@@ -560,7 +565,7 @@ export function BudgetStepTask({
                   </div>
                   {canEditTerm && (
                     <FormField
-                      key={vehicleKey}
+                      key={vk("prazo")}
                       control={control}
                       name={v("term")}
                       render={({ field }) => (
@@ -577,7 +582,7 @@ export function BudgetStepTask({
 
                 {/* Details */}
                 <FormField
-                  key={vehicleKey}
+                  key={vk("detalhes")}
                   control={control}
                   name={v("details")}
                   render={({ field }) => (
@@ -663,7 +668,7 @@ export function BudgetStepTask({
               <AccordionContent>
                 <CardContent className="space-y-2 pt-0">
                   <GeneralPaintingSelector
-                    key={vehicleKey}
+                    key={vk("tinta")}
                     name={v("paintId")}
                     control={control}
                     disabled={disabled}
@@ -752,7 +757,7 @@ export function BudgetStepTask({
               <AccordionContent>
                 <CardContent className="pt-0">
                   <LayoutFileUploadField
-                    key={vehicleKey}
+                    key={vk("layouts")}
                     onFilesChange={onLayoutsChange}
                     onStatusChange={onLayoutStatusChange}
                     maxFiles={5}
@@ -809,7 +814,7 @@ export function BudgetStepTask({
               <AccordionContent>
                 <CardContent className="pt-0">
                   <MultiAirbrushingSelector
-                    key={vehicleKey}
+                    key={vk("aerografia")}
                     name={v("airbrushings")}
                     control={control}
                     disabled={disabled}

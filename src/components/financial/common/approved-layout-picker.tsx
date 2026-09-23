@@ -461,12 +461,13 @@ export function ApprovedLayoutPicker({
               })}
 
               {/* Quote layouts with no matching task art — selected, removable, no status */}
-              {orphanLayoutFiles.map((f) => {
+              {orphanLayoutFiles.map((f, index) => {
                 const id = (f as any).uploadedFileId || f.id;
                 const src = layoutThumbSrc(f);
                 return (
                   <div
-                    key={id}
+                    // Um arquivo recém-solto ainda não tem id (é um File do navegador).
+                    key={id ?? `local-${index}`}
                     className={cn(
                       "overflow-hidden rounded-lg border-2 border-primary bg-card ring-2 ring-primary/30",
                       cardWidthClass,
