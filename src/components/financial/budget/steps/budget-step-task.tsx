@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   IconClipboardList,
@@ -13,7 +13,9 @@ import {
   IconHash,
   IconId,
   IconSparkles,
-  IconExternalLink,
+  IconCopy,
+  IconRuler,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import {
   TRUCK_CATEGORY,
@@ -23,6 +25,7 @@ import {
   SECTOR_PRIVILEGES,
 } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
+import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,45 +42,15 @@ import { ResponsibleManager } from "@/components/administration/customer/respons
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatChassis, formatPlate } from "@/utils";
 import { FileCardUploadField, FileUploadField } from "@/components/common/file";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 
-/**
- * UM VEÍCULO DO ORÇAMENTO, como o acordeão precisa conhecê-lo.
- *
- * ⚠️ Vem do ORÇAMENTO (`Budget.tasks`), não da tarefa aberta: a tela é aberta
- * pelo id de UM caminhão e o orçamento cobre N.
- */
-export interface StepTaskVehicle {
-  id: string;
-  serialNumber?: string | null;
-  customerOrderNumber?: string | null;
-  truck?: { plate?: string | null; chassisNumber?: string | null } | null;
-}
-
 interface BudgetStepTaskProps {
   disabled?: boolean;
   isEditMode?: boolean;
-  /**
-   * TODOS os veículos do orçamento, para o acordeão de identificação.
-   *
-   * ⛔ Só o `currentVehicleId` é EDITÁVEL aqui, e isso não é uma limitação de
-   * tela: o formulário desta página carrega `serialNumber`/`plate`/`chassisNumber`/
-   * `customerOrderNumber` SINGULARES, semeados da tarefa aberta, e o Salvar
-   * escreve um `PUT /tasks/:id` nessa tarefa e um `truck` nela. Não há contrato
-   * para gravar N veículos daqui. Os outros painéis são leitura, com o caminho
-   * para abrir cada um na sua própria tela. Inventar campos editáveis para eles
-   * produziria edições que o Salvar descartaria em silêncio.
-   */
-  vehicles?: StepTaskVehicle[];
-  /** O veículo por onde a tela foi aberta — o único editável. */
-  currentVehicleId?: string | null;
-  /** Abre outro veículo do mesmo orçamento (navega para o detalhe dele). */
-  onOpenVehicle?: (taskId: string) => void;
   responsibleRows: ResponsibleRowData[];
   onResponsibleRowsChange: (rows: ResponsibleRowData[]) => void;
   showResponsibleErrors: boolean;
@@ -90,14 +63,43 @@ interface BudgetStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. Edit mode only. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
+
+  // ─── ORÇAMENTO DE N VEÍCULOS (só na edição) ─────────────────────────────────
+  //
+  // O passo tem duas metades. COMUM a todos: logomarca, cliente, categoria,
+  // implemento, tamanho, responsáveis e arquivos base — mesmo orçamento, mesmo
+  // preço, mesmo caminhão. DE CADA veículo: série, placa, pedido, chassi, plaqueta,
+  // previsão, prazo, detalhes, pintura geral e aerografia. Decisão do dono,
+  // 23/09/2026, a partir do caso Carlotti (nº 990).
+
+  /**
+   * Prefixo dos campos DO VEÍCULO no formulário (`vehicles.<i>.`). Sem ele os campos
+   * têm os nomes de sempre — é o que a criação usa.
+   */
+  vehicleFieldPrefix?: string;
+  /** Identidade do veículo mostrado: as seções dele remontam ao trocar de aba. */
+  vehicleKey?: string;
+  /** Quantos veículos o orçamento cobre. Com 2+, o passo mostra as abas e os rótulos. */
+  vehicleCount?: number;
+  /** "39088" — como o veículo mostrado é chamado nos títulos das seções. */
+  activeVehicleLabel?: string;
+  /** As abas de escolha do veículo (`BudgetVehicleTabs`). */
+  vehicleTabs?: ReactNode;
+  /** Copia o valor do veículo mostrado para os demais. */
+  onApplyToOtherVehicles?: (field: "customerOrderNumber" | "forecastDate" | "paintId") => void;
+  /** O tamanho do implemento, lançado pela Logística — aqui só se lê. */
+  measuresSummary?: ReactNode;
+  /**
+   * Campos comuns que hoje DIVERGEM entre os veículos (dado anterior a esta tela, ou
+   * editado tarefa a tarefa). `onEqualize` faz o próximo salvar gravar o valor
+   * mostrado em todos.
+   */
+  commonDivergence?: { fields: string[]; equalized: boolean; onEqualize: () => void } | null;
 }
 
 export function BudgetStepTask({
   disabled,
   isEditMode = false,
-  vehicles,
-  currentVehicleId,
-  onOpenVehicle,
   responsibleRows,
   onResponsibleRowsChange,
   showResponsibleErrors,
@@ -109,6 +111,14 @@ export function BudgetStepTask({
   onPaintCreated,
   vinPlateFiles,
   onVinPlateFilesChange,
+  vehicleFieldPrefix = "",
+  vehicleKey,
+  vehicleCount = 1,
+  activeVehicleLabel,
+  vehicleTabs,
+  onApplyToOtherVehicles,
+  measuresSummary,
+  commonDivergence,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -145,6 +155,31 @@ export function BudgetStepTask({
     }
   }, [openAccordion, scrollToAccordion]);
 
+  // Campos DO VEÍCULO. `v("plate")` é `plate` na criação e `vehicles.<i>.plate` na
+  // edição de um orçamento de N veículos.
+  const v = (field: string) => `${vehicleFieldPrefix}${field}`;
+  // Chave de remontagem das seções do veículo, UMA POR PARTE: as seções são irmãs
+  // umas das outras, e a mesma chave em dois irmãos faz o React duplicar ou sumir
+  // com eles.
+  const vk = (part: string) => (vehicleKey ? `${vehicleKey}:${part}` : undefined);
+  const multiVehicle = isEditMode && vehicleCount > 1;
+  const vehicleSuffix = multiVehicle && activeVehicleLabel ? ` — ${activeVehicleLabel}` : "";
+  const commonSuffix = multiVehicle ? " — comum a todos os veículos" : "";
+  const applyButton = (field: "customerOrderNumber" | "forecastDate" | "paintId", label: string) =>
+    multiVehicle && onApplyToOtherVehicles && !disabled ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        // Mais baixo que o rótulo, para o campo não descer em relação aos vizinhos.
+        className="-my-1 h-5 gap-1 px-1.5 text-xs font-normal text-muted-foreground"
+        onClick={() => onApplyToOtherVehicles(field)}
+      >
+        <IconCopy className="h-3 w-3" />
+        {label}
+      </Button>
+    ) : null;
+
   // Calculate how many tasks will be created (create mode only)
   const taskCount = useMemo(() => {
     if (isEditMode) return 1;
@@ -158,6 +193,11 @@ export function BudgetStepTask({
 
   return (
     <div className={openAccordion === 'base-files' || openAccordion === 'layouts' ? 'pb-64' : ''}>
+      {multiVehicle && vehicleTabs && (
+        <div className="sticky top-0 z-10 -mx-1 mb-4 bg-background/95 px-1 pb-2 pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          {vehicleTabs}
+        </div>
+      )}
       <Accordion
         type="single"
         collapsible
@@ -249,34 +289,62 @@ export function BudgetStepTask({
                   />
                 </div>
 
-                {/* ── OS VEÍCULOS ──────────────────────────────────────────
-                    Série, placa, nº do pedido, chassi e plaqueta são a
-                    IDENTIFICAÇÃO de UM caminhão, e num orçamento de quatro eles
-                    diferem entre si — ao contrário da logomarca e do cliente,
-                    que são do orçamento inteiro. Por isso saíram da grade plana
-                    e viraram um acordeão de um painel por veículo, o mesmo
-                    padrão do assistente do cliente
-                    (`components/cliente/solicitacao/step-veiculos.tsx`).
-                    Ver `VeiculosDoOrcamento` no fim deste arquivo. */}
+                {/* Tamanho — comum: mesmo orçamento, mesmo implemento. Lançado pela
+                    Logística na tarefa e replicado aos irmãos pela API; aqui só se lê. */}
+                {isEditMode && measuresSummary && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconRuler className="h-4 w-4" />
+                    <span>Tamanho do implemento:</span>
+                    <span className="font-medium text-foreground">{measuresSummary}</span>
+                  </div>
+                )}
+
+                {multiVehicle && commonDivergence && commonDivergence.fields.length > 0 && (
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                    <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-amber-900 dark:text-amber-100">
+                        Os veículos estão com valores diferentes em{" "}
+                        <span className="font-medium">{commonDivergence.fields.join(", ")}</span>. Esses campos
+                        são comuns ao orçamento: o que aparece aqui é o do veículo aberto.
+                      </p>
+                      {commonDivergence.equalized ? (
+                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                          Ao salvar, todos os veículos ficam com os valores mostrados aqui.
+                        </p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={commonDivergence.onEqualize}
+                          disabled={disabled}
+                        >
+                          Igualar todos os veículos a estes valores
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {multiVehicle && (
+                  <div className="flex items-center gap-2 border-t border-border pt-4 text-sm font-medium">
+                    <IconTruck className="h-4 w-4 text-muted-foreground" />
+                    Deste veículo{vehicleSuffix}
+                  </div>
+                )}
+
+                {/* Plates + Serial Numbers */}
                 {isEditMode ? (
-                  <VeiculosDoOrcamento
-                    vehicles={vehicles}
-                    currentVehicleId={currentVehicleId}
-                    onOpenVehicle={onOpenVehicle}
-                  >
-                  {/* ⚠️ UMA LINHA SÓ, e é pedido do dono: "coloque tudo em
-                      linha, chassi, placa, serial etc.". Série, placa, nº do
-                      pedido, chassi e plaqueta são a identificação do MESMO
-                      caminhão — lidos juntos, numa varredura horizontal. Em
-                      duas linhas, chassi e plaqueta caíam para baixo e a
-                      identidade de um veículo virava dois blocos.
-                      Abaixo de `xl` a grade volta a quebrar: cinco campos em
-                      1280px ficariam estreitos demais para um chassi de 17
-                      caracteres. */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  /* CINCO colunas: série, placa, nº do pedido, chassi e plaqueta
+                     são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
+                     fileira. Com quatro colunas a plaqueta caía sozinha numa
+                     linha inteira, parecendo uma seção própria. */
+                  <div key={vk("identificacao")} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <FormField
                       control={control}
-                      name="serialNumber"
+                      name={v("serialNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -298,7 +366,7 @@ export function BudgetStepTask({
                     />
                     <FormField
                       control={control}
-                      name="plate"
+                      name={v("plate")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -334,12 +402,13 @@ export function BudgetStepTask({
                         criação (abaixo) ele vale para todos os que nascerem. */}
                     <FormField
                       control={control}
-                      name="customerOrderNumber"
+                      name={v("customerOrderNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
                             <IconHash className="h-4 w-4" />
                             N° do Pedido
+                            {applyButton("customerOrderNumber", "Repetir nos demais")}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -359,7 +428,7 @@ export function BudgetStepTask({
                     />
                     <FormField
                       control={control}
-                      name="chassisNumber"
+                      name={v("chassisNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -410,7 +479,6 @@ export function BudgetStepTask({
                       </FormItem>
                     )}
                   </div>
-                  </VeiculosDoOrcamento>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <SerialNumberRangeInput
@@ -479,22 +547,27 @@ export function BudgetStepTask({
 
                 {/* Forecast Date + Term (o Prazo só aparece para quem pode gravá-lo) */}
                 <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
-                  <FormField
-                    control={control}
-                    name="forecastDate"
-                    render={({ field }) => (
-                      <DateTimeInput
-                        {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
-                        mode="datetime"
-                        label="Data de Previsão de Liberação"
-                        disabled={disabled}
-                      />
-                    )}
-                  />
+                  <div className="space-y-1">
+                    <FormField
+                      key={vk("previsao")}
+                      control={control}
+                      name={v("forecastDate")}
+                      render={({ field }) => (
+                        <DateTimeInput
+                          {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
+                          mode="datetime"
+                          label="Data de Previsão de Liberação"
+                          disabled={disabled}
+                        />
+                      )}
+                    />
+                    {applyButton("forecastDate", "Aplicar esta previsão aos demais veículos")}
+                  </div>
                   {canEditTerm && (
                     <FormField
+                      key={vk("prazo")}
                       control={control}
-                      name="term"
+                      name={v("term")}
                       render={({ field }) => (
                         <DateTimeInput
                           {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
@@ -509,8 +582,9 @@ export function BudgetStepTask({
 
                 {/* Details */}
                 <FormField
+                  key={vk("detalhes")}
                   control={control}
-                  name="details"
+                  name={v("details")}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
@@ -548,7 +622,7 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconUser className="h-5 w-5" />
-                    Responsáveis
+                    Responsáveis{commonSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
@@ -587,13 +661,15 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconPalette className="h-5 w-5" />
-                    Tintas
+                    Tintas{vehicleSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
-                <CardContent className="space-y-6 pt-0">
+                <CardContent className="space-y-2 pt-0">
                   <GeneralPaintingSelector
+                    key={vk("tinta")}
+                    name={v("paintId")}
                     control={control}
                     disabled={disabled}
                     userPrivilege={user?.sector?.privileges}
@@ -601,6 +677,7 @@ export function BudgetStepTask({
                     onPaintCreated={onPaintCreated}
                     quickCreateDescription='Informe os dados básicos da nova tinta. Ao salvar o orçamento, uma ordem de serviço "Formular Cor" será criada para a equipe de artes.'
                   />
+                  {applyButton("paintId", "Aplicar esta pintura aos demais veículos")}
                 </CardContent>
               </AccordionContent>
             </Card>
@@ -618,7 +695,7 @@ export function BudgetStepTask({
               <CardHeader className="flex-1 py-4">
                 <CardTitle className="flex items-center gap-2">
                   <IconFileText className="h-5 w-5" />
-                  Arquivos Base
+                  Arquivos Base{commonSuffix}
                   {baseFiles.length > 0 && (
                     <Badge variant="secondary" className="ml-1">
                       {baseFiles.length}
@@ -668,7 +745,7 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconPhoto className="h-5 w-5" />
-                    Layout Referência
+                    Layout Referência{vehicleSuffix}
                     {layouts.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {layouts.length}
@@ -680,6 +757,7 @@ export function BudgetStepTask({
               <AccordionContent>
                 <CardContent className="pt-0">
                   <LayoutFileUploadField
+                    key={vk("layouts")}
                     onFilesChange={onLayoutsChange}
                     onStatusChange={onLayoutStatusChange}
                     maxFiles={5}
@@ -729,190 +807,26 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconSparkles className="h-5 w-5" />
-                    Aerografias
+                    Aerografias{vehicleSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
                 <CardContent className="pt-0">
-                  <MultiAirbrushingSelector control={control} disabled={disabled} customerId={customerIdValue || undefined} />
+                  <MultiAirbrushingSelector
+                    key={vk("aerografia")}
+                    name={v("airbrushings")}
+                    control={control}
+                    disabled={disabled}
+                    customerId={customerIdValue || undefined}
+                    canViewFinancials={canViewAirbrushingFinancials(user as any)}
+                  />
                 </CardContent>
               </AccordionContent>
             </Card>
           </AccordionItem>
         )}
       </Accordion>
-    </div>
-  );
-}
-
-/**
- * O ACORDEÃO DOS VEÍCULOS — um painel por caminhão do orçamento.
- *
- * ⚠️ POR QUE ACORDEÃO, E NÃO A GRADE PLANA DE ANTES. Logomarca e cliente são do
- * ORÇAMENTO: um só, e plano está certo. Série, placa, nº do pedido, chassi e
- * plaqueta são do VEÍCULO, e num orçamento de quatro caminhões eles são quatro
- * conjuntos diferentes — a grade plana mostrava um deles sem dizer de qual era,
- * e os outros três não existiam em tela nenhuma deste passo. É o mesmo padrão
- * (e o mesmo cabeçalho "Série NNNN · PLACA", que se atualiza enquanto se digita)
- * do assistente do cliente, em `components/cliente/solicitacao/step-veiculos.tsx`.
- *
- * ⛔ UM SÓ É EDITÁVEL, E ISSO ESTÁ ESCRITO NA TELA. O formulário desta página é
- * de UMA tarefa — campos singulares, semeados da tarefa da URL, e um
- * `PUT /tasks/:id` no Salvar. Os demais painéis mostram o que está gravado e
- * oferecem "Abrir este veículo", que é a rota de detalhe dele. Campos editáveis
- * ali seriam edições silenciosamente descartadas no Salvar.
- *
- * ⚠️ `children` E NÃO UMA CÓPIA DOS CAMPOS. Os cinco `FormField` continuam sendo
- * os mesmos do passo, escritos uma vez só; este componente apenas decide em que
- * painel eles são desenhados. Duplicá-los garantiria que um dos dois jogos
- * envelhecesse.
- */
-function VeiculosDoOrcamento({
-  vehicles,
-  currentVehicleId,
-  onOpenVehicle,
-  children,
-}: {
-  vehicles?: StepTaskVehicle[];
-  currentVehicleId?: string | null;
-  onOpenVehicle?: (taskId: string) => void;
-  children: React.ReactNode;
-}) {
-  const { control } = useFormContext();
-  // O QUE ESTÁ SENDO DIGITADO, para o cabeçalho do painel aberto acompanhar.
-  // Ler do formulário (e não de `vehicles`) é o que faz o título mudar junto com
-  // a placa — em `vehicles` está o que o servidor tem, que é o de antes do
-  // Salvar.
-  const serialNumber = useWatch({ control, name: "serialNumber" });
-  const plate = useWatch({ control, name: "plate" });
-  const chassisNumber = useWatch({ control, name: "chassisNumber" });
-
-  // A lista DEGRADA para um veículo só: é o caso de um orçamento de um caminhão,
-  // e também o da abertura, antes de o orçamento ter chegado. Sem isto os campos
-  // não teriam painel nenhum em que ser desenhados.
-  const rows: StepTaskVehicle[] =
-    vehicles && vehicles.length > 0
-      ? vehicles
-      : [{ id: currentVehicleId || "atual" }];
-  const currentId = currentVehicleId || rows[0]?.id;
-
-  const [open, setOpen] = useState<string | undefined>(currentId ?? undefined);
-  // Trocar de registro pelo pager remonta a página inteira (a rota é `key`ada
-  // pelo `:taskId`), mas a lista pode chegar depois do primeiro render: sem isto
-  // o acordeão abriria fechado num orçamento de N.
-  useEffect(() => {
-    if (currentId) setOpen(currentId);
-  }, [currentId]);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <IconTruck className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Veículos</span>
-          <Badge variant="secondary">{rows.length}</Badge>
-        </div>
-        {rows.length > 1 && (
-          <span className="text-sm text-muted-foreground">
-            Este orçamento cobre {rows.length} caminhões. Aqui você edita o que está aberto — os
-            outros se editam na tela deles.
-          </span>
-        )}
-      </div>
-
-      <Accordion type="single" collapsible value={open} onValueChange={setOpen} className="space-y-2">
-        {rows.map((vehicle, index) => {
-          const isCurrent = vehicle.id === currentId;
-          const rowSerial = isCurrent ? serialNumber : vehicle.serialNumber;
-          const rowPlate = isCurrent ? plate : vehicle.truck?.plate;
-          const rowChassis = isCurrent ? chassisNumber : vehicle.truck?.chassisNumber;
-          return (
-            <AccordionItem
-              key={vehicle.id || index}
-              value={vehicle.id || `veiculo-${index}`}
-              className="rounded-lg border border-border px-3"
-            >
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex min-w-0 flex-1 items-center gap-2 pr-2 text-left">
-                  <IconTruck className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-sm font-medium">
-                    {tituloDoVeiculo(rowSerial, rowPlate, rowChassis, index)}
-                  </span>
-                  {isCurrent && rows.length > 1 && (
-                    <Badge variant="secondary" className="shrink-0">
-                      Aberto
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-4">
-                {isCurrent ? (
-                  children
-                ) : (
-                  /* LEITURA — e o caminho para editar. Ver o ⛔ do cabeçalho. */
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      <LeituraDoVeiculo label="Número de Série" value={vehicle.serialNumber} />
-                      <LeituraDoVeiculo
-                        label="Placa"
-                        value={vehicle.truck?.plate ? formatPlate(vehicle.truck.plate) : null}
-                      />
-                      <LeituraDoVeiculo label="N° do Pedido" value={vehicle.customerOrderNumber} />
-                      <LeituraDoVeiculo
-                        label="Chassi"
-                        value={
-                          vehicle.truck?.chassisNumber
-                            ? formatChassis(vehicle.truck.chassisNumber)
-                            : null
-                        }
-                      />
-                    </div>
-                    {onOpenVehicle && vehicle.id && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => onOpenVehicle(vehicle.id)}
-                      >
-                        <IconExternalLink className="h-4 w-4" />
-                        Abrir este veículo
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
-    </div>
-  );
-}
-
-/** O que identifica o painel quando ele está fechado — o mesmo do portal. */
-function tituloDoVeiculo(
-  serial: string | null | undefined,
-  plate: string | null | undefined,
-  chassis: string | null | undefined,
-  index: number,
-): string {
-  const s = (serial ?? "").trim();
-  const p = (plate ?? "").trim();
-  const c = (chassis ?? "").trim();
-  if (s && p) return `Série ${s} · ${formatPlate(p)}`;
-  if (s) return `Série ${s}`;
-  if (p) return formatPlate(p);
-  if (c) return `Chassi ${formatChassis(c)}`;
-  return `Veículo ${index + 1}`;
-}
-
-function LeituraDoVeiculo({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="rounded-lg bg-muted/50 px-3 py-2">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value?.trim() || "—"}</p>
     </div>
   );
 }

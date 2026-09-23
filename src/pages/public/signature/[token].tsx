@@ -60,6 +60,11 @@ import {
 } from "@/components/public/signature/identity";
 import { QuoteChangeList } from "@/components/signature/quote-change-list";
 import {
+  OrderNumberFields,
+  orderNumberClientProblem,
+  orderNumberPayload,
+} from "@/components/public/signature/order-number-fields";
+import {
   IconAlertCircle,
   IconBrandWhatsapp,
   IconCheck,
@@ -117,6 +122,12 @@ export default function PublicSignaturePage() {
   const [consentChecked, setConsentChecked] = useState(false);
   /** Termo + declarações. Abre sozinho quando o código é enviado. */
   const [termsOpen, setTermsOpen] = useState(false);
+  /**
+   * Nº do pedido por veículo (chave `__all` = "mesmo pedido para todos"). Só
+   * usado quando o signatário é de Compras — ver `OrderNumberFields`.
+   */
+  const [orderValues, setOrderValues] = useState<Record<string, string>>({});
+  const [orderSameForAll, setOrderSameForAll] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -153,6 +164,12 @@ export default function PublicSignaturePage() {
   const allAccepted = useMemo(
     () => (state?.declarations ?? []).every(d => accepted[d.key]),
     [state, accepted],
+  );
+
+  /** O que ainda falta do nº do pedido; `null` quando não há exigência ou já está pronto. */
+  const orderProblem = useMemo(
+    () => orderNumberClientProblem(state?.orderNumber, orderValues, orderSameForAll),
+    [state?.orderNumber, orderValues, orderSameForAll],
   );
 
   /**
@@ -315,15 +332,20 @@ export default function PublicSignaturePage() {
     if (code.replace(/\D/g, "").length !== 6)
       return setStepError("Digite os 6 dígitos do código.");
     if (!allAccepted) return setStepError("Aceite todas as declarações para assinar.");
+    if (orderProblem) return setStepError(orderProblem);
     setBusy(true);
     try {
       const geo = await collectGeo();
+      const orderNumbers = state?.orderNumber?.required
+        ? orderNumberPayload(state.orderNumber, orderValues, orderSameForAll)
+        : undefined;
       await signatureService.sign(token, {
         challengeId,
         code: code.replace(/\D/g, ""),
         declarations: (state?.declarations ?? []).map(d => d.key),
         clientTimestamp: new Date().toISOString(),
         geo,
+        ...(orderNumbers?.length ? { orderNumbers } : {}),
       });
       // Sem toast próprio: o `api-client` já anuncia a mensagem que o servidor
       // devolve neste POST ("Orçamento assinado com sucesso."), e o cartão verde
@@ -334,6 +356,9 @@ export default function PublicSignaturePage() {
     } catch (e) {
       const message = extractApiMessage(e, "Não foi possível concluir a assinatura.");
       setStepError(message);
+      // Recusa pelo pedido: a Ankaa pode ter registrado o número enquanto a
+      // página estava aberta — recarregar mostra o que já está lá.
+      if (/pedido/i.test(message)) void load();
       // Só apaga o código quando foi ELE que o servidor recusou. Numa queda de
       // conexão o que o signatário digitou está certo, e limpar o campo o obriga
       // a sair da página para reler o WhatsApp — justamente no passo final.
@@ -473,6 +498,7 @@ export default function PublicSignaturePage() {
   const channel: DeliveryChannel = signer.channel ?? "EMAIL";
   const isWhatsApp = channel === "WHATSAPP";
   const channelLabel = isWhatsApp ? "WhatsApp" : "e-mail";
+  const missingCount = (state.orderNumber?.vehicles ?? []).filter(v => !v.value?.trim()).length;
 
   return (
     <Shell>
@@ -597,6 +623,23 @@ export default function PublicSignaturePage() {
                 aceite" dentro de uma janela intitulada "Recusar assinatura" é
                 pedir o contrário do ato, e a recusa não usa esse aceite (o
                 servidor exige motivo + código, não declarações). */}
+            {/* Nº DO PEDIDO — só para quem assina por Compras. Antes do aceite
+                porque é condição do ato: sem ele o servidor recusa. Some no modo
+                recusa: recusar não exige pedido nenhum. */}
+            {!refusing && state.orderNumber && (
+              <OrderNumberFields
+                gate={state.orderNumber}
+                values={orderValues}
+                onChange={(key, value) => {
+                  setStepError(null);
+                  setOrderValues(prev => ({ ...prev, [key]: value }));
+                }}
+                sameForAll={orderSameForAll}
+                onSameForAllChange={setOrderSameForAll}
+                disabled={busy}
+              />
+            )}
+
             {refusing ? null : (
               <label className="flex cursor-pointer items-start gap-2.5 text-sm">
                 <Checkbox
@@ -768,7 +811,7 @@ export default function PublicSignaturePage() {
                 className="w-full"
                 size="lg"
                 onClick={handleSign}
-                disabled={busy || !allAccepted || !consentChecked}
+                disabled={busy || !allAccepted || !consentChecked || !!orderProblem}
               >
                 {busy ? (
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -981,6 +1024,19 @@ export default function PublicSignaturePage() {
                 {/* Assinar e recusar passam pela MESMA porta: o código no
                     WhatsApp. É exigência do servidor, e o aviso existe para o
                     signatário não estranhar que "Recusar" peça o CPF dele. */}
+                {/* Avisada JÁ na revisão: descobrir a exigência só no modal,
+                    com o código em trânsito, faria quem não tem o número à mão
+                    deixar o código vencer procurando por ele. */}
+                {!refusing && state.orderNumber?.required && (
+                  <Alert>
+                    <AlertDescription>
+                      Tenha em mãos o <strong>nº do pedido de compra</strong>
+                      {missingCount > 1 ? ` dos ${missingCount} veículos` : ""}: como você assina
+                      pelo setor de compras, ele será pedido para concluir a assinatura.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {refusing && (
                   <Alert variant="warning">
                     <AlertDescription>

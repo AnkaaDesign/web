@@ -1,6 +1,12 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBuilding, IconCalendarTime, IconHash, IconX } from "@tabler/icons-react";
+import {
+  IconBuilding,
+  IconCalendarTime,
+  IconHash,
+  IconShoppingCartPlus,
+  IconX,
+} from "@tabler/icons-react";
 
 import type {
   PaintPlanDetailComponent,
@@ -9,6 +15,8 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -18,9 +26,10 @@ import {
   type PAINT_FINISH,
   type TASK_STATUS,
 } from "@/constants";
-import { usePaintPlanDetail } from "@/hooks";
+import { usePaintPlanDetail, usePrivileges } from "@/hooks";
+import { useDebounce } from "@/hooks/common/use-debounce";
 
-import { formatGrams, formatLiters, formatRatioPct, formatUnits } from "./format";
+import { formatGrams, formatRatioPct, formatUnits } from "./format";
 
 interface PaintPlanDetailModalProps {
   paintId: string | null;
@@ -30,6 +39,10 @@ interface PaintPlanDetailModalProps {
   forecastDate?: string;
   /** Global (shared-stock) component availability, so the modal matches the card/table. */
   globalComponents: ProductionAvailabilityComponent[];
+  /** O volume é editável aqui também — e é o MESMO número do card. */
+  onVolumeChange?: (paintId: string, volume: number) => void;
+  /** Pedir os componentes desta tinta. Quem abre o pedido FECHA este modal. */
+  onRequestPurchase?: (paintId: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -141,11 +154,21 @@ export function PaintPlanDetailModal({
   volumeLiters,
   forecastDate,
   globalComponents,
+  onVolumeChange,
+  onRequestPurchase,
   open,
   onOpenChange,
 }: PaintPlanDetailModalProps) {
   const navigate = useNavigate();
-  const { data, isLoading } = usePaintPlanDetail(open ? paintId : null, volumeLiters, forecastDate);
+  const { canManageWarehouse } = usePrivileges();
+  // Digitar não pode disparar uma busca por tecla: a fórmula recalcula quando a
+  // mão para. O número que o card mostra, porém, muda na hora.
+  const debouncedVolume = useDebounce(volumeLiters, 350);
+  const { data, isLoading } = usePaintPlanDetail(
+    open ? paintId : null,
+    debouncedVolume,
+    forecastDate,
+  );
   const detail = data?.data ?? null;
   const paint = detail?.paint;
 
@@ -206,10 +229,32 @@ export function PaintPlanDetailModal({
                 {paint.code}
               </Badge>
             ) : null}
-            <span className="ml-auto text-sm text-muted-foreground">
-              Volume:{" "}
-              <span className="font-semibold text-foreground">{formatLiters(volumeLiters)}</span>
-            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <Label
+                htmlFor="detail-volume"
+                className="whitespace-nowrap text-xs text-muted-foreground"
+              >
+                Volume a produzir
+              </Label>
+              <div className="relative w-28">
+                <Input
+                  id="detail-volume"
+                  type="decimal"
+                  decimals={2}
+                  min={0}
+                  value={volumeLiters}
+                  onChange={(v) =>
+                    paintId &&
+                    onVolumeChange?.(paintId, typeof v === "number" ? v : Number(v) || 0)
+                  }
+                  disabled={!onVolumeChange}
+                  className="pr-7 text-right font-medium"
+                />
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  L
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Tasks — capped height with its own scroll */}
@@ -303,6 +348,24 @@ export function PaintPlanDetailModal({
               </p>
             )}
           </section>
+
+          {/* O passo seguinte de "falta componente": comprar. Só quem cria
+              pedido vê o botão — a página é de produção, o pedido é de compras. */}
+          {canManageWarehouse && onRequestPurchase && detail?.formula ? (
+            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+              <p className="min-w-0 text-xs text-muted-foreground">
+                Monta um pedido com os componentes desta fórmula para o volume acima.
+              </p>
+              <Button
+                onClick={() => paintId && onRequestPurchase(paintId)}
+                className="flex-shrink-0"
+                disabled={volumeLiters <= 0}
+              >
+                <IconShoppingCartPlus className="h-4 w-4" />
+                Fazer pedido
+              </Button>
+            </div>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

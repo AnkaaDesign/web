@@ -203,12 +203,11 @@ export function OrderDetailPage() {
         tone: "blue",
         onClick: async () => {
           try {
+            // The status update alone is enough: the API stamps fulfilledAt on every pending
+            // item inside the same transaction. This used to fire a second, non-atomic
+            // batchMarkOrderItemsFulfilled call, which left the order "Atendido" over
+            // "Pendente" items whenever it failed — and never ran at all on the other paths.
             await updateAsync({ id: order.id, data: { status: ORDER_STATUS.FULFILLED } });
-            const itemIds = order.items?.map((item) => item.id) || [];
-            if (itemIds.length > 0) {
-              const { batchMarkOrderItemsFulfilled } = await import("../../../../api-client");
-              await batchMarkOrderItemsFulfilled(itemIds);
-            }
             refetch();
           } catch (e) {
             if (process.env.NODE_ENV !== "production") console.error("Error marking order as done:", e);

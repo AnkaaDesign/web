@@ -289,8 +289,21 @@ export interface PublicSignerState {
   company: { name: string; cnpj: string | null };
   declarations: Array<{ key: string; text: string }>;
   canSign: boolean;
+  /**
+   * Nº do pedido de compra. `null` (ou ausente, em API antiga) para quem não é
+   * de Compras. Para Compras: cada veículo com o número já registrado ou `null`;
+   * `required` diz se falta algum — e aí a assinatura só é aceita com o número
+   * de cada veículo que está sem ele.
+   */
+  orderNumber?: PublicOrderNumberGate | null;
   /** Só em `ceremony === "INTERNAL"`: diz onde o ato de fato acontece. */
   internalNotice?: string;
+}
+
+export interface PublicOrderNumberGate {
+  required: boolean;
+  maxLength: number;
+  vehicles: Array<{ taskId: string; label: string; value: string | null }>;
 }
 
 /** Um dos PDFs congelados por uma coleta. */
@@ -346,6 +359,8 @@ export const signatureService = {
       declarations: string[];
       clientTimestamp?: string;
       geo?: { lat: number; lon: number; accuracy?: number } | null;
+      /** Só para signatário de Compras: o pedido dos veículos que estão sem. */
+      orderNumbers?: Array<{ taskId: string; value: string }>;
     },
   ) => apiClient.post(`/assinatura/publico/${token}/assinar`, data),
 

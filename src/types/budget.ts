@@ -158,6 +158,12 @@ export interface BudgetPayer extends BaseEntity {
   installments?: Installment[];
 }
 
+/** Ver `Budget.layoutScope`. */
+export type QuoteLayoutScope = "SHARED" | "PER_VEHICLE";
+
+/** Uma arte aprovada do orçamento, com os veículos que ela cobre (só em `PER_VEHICLE`). */
+export type QuoteLayoutFile = File & { quoteLayoutTasks?: Array<{ taskId: string }> };
+
 export interface Budget extends BaseEntity {
   budgetNumber: number;
   subtotal: number;
@@ -172,7 +178,20 @@ export interface Budget extends BaseEntity {
 
   customForecastDays: number | null;
 
-  layoutFiles?: File[];
+  /**
+   * As artes aprovadas do orçamento — o "Layout" do documento.
+   *
+   * Com `layoutScope = PER_VEHICLE`, cada arte carrega em `quoteLayoutTasks` os
+   * veículos a que se aplica (ver `utils/quote-layout-coverage.ts`). Em `SHARED`
+   * a lista vem vazia e toda arte vale para todos.
+   */
+  layoutFiles?: QuoteLayoutFile[];
+
+  /**
+   * A arte é a mesma para os N veículos (`SHARED`, o de sempre) ou cada caminhão
+   * tem a sua (`PER_VEHICLE`)? Ausente = `SHARED` (API anterior a esta coluna).
+   */
+  layoutScope?: QuoteLayoutScope;
 
   simultaneousTasks: number | null;
 
@@ -246,6 +265,12 @@ export interface Billing {
   status: BILLING_STATUS;
   /** Espelho numérico de `status` — ver `BILLING_STATUS_ORDER`. */
   statusOrder: number;
+  /**
+   * O ESTADO DA PARTE dos pagadores filtrados em "Faturar Para" — a mesma regra
+   * de `status`, aplicada só às parcelas deles. `GET /billings` só o manda quando
+   * a lista tem esse filtro; fora dele, é `status` que vale.
+   */
+  payerStatus?: BILLING_STATUS | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
   /** OS VEÍCULOS que esta cobrança cobre. */

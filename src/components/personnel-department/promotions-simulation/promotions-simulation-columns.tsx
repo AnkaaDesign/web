@@ -236,7 +236,10 @@ export function createPromotionsSimulationColumns({
             mode="single"
             value={u.positionId ?? undefined}
             onValueChange={(value) => {
-              if (value && typeof value === "string") onPositionChange(u.id, value);
+              // O "×" DESFAZ, não esvazia: cargo vazio não existe aqui, e
+              // limpar o campo deixava a linha presa na última hipótese.
+              if (typeof value === "string" && value) onPositionChange(u.id, value);
+              else if (u.originalPositionId) onPositionChange(u.id, u.originalPositionId);
             }}
             options={positionOptions}
             placeholder="Selecione o cargo"

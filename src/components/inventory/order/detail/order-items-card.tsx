@@ -97,10 +97,22 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
   const [isSaving, setIsSaving] = useState(false);
 
   // Check if order allows inline editing
-  const canEditItems = [ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED, ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED].includes(order.status);
+  // OVERDUE belongs here: it is a fulfillment-phase state (an order past its forecast that was
+  // never marked as done), and its items are exactly the ones that still need to be marked.
+  // Leaving it out froze the whole table — no selection, no per-item action, no inline edit —
+  // on precisely the orders that needed attention.
+  const canEditItems = [
+    ORDER_STATUS.CREATED,
+    ORDER_STATUS.PARTIALLY_FULFILLED,
+    ORDER_STATUS.OVERDUE,
+    ORDER_STATUS.FULFILLED,
+    ORDER_STATUS.PARTIALLY_RECEIVED,
+  ].includes(order.status);
   // WAREHOUSE receives items into stock; marking them as done (fulfilled) is the
   // purchasing-side confirmation and is ADMIN-only, matching the API's role gates.
-  const canReceiveItems = canEditItems;
+  // Receiving needs a prior fulfillment, so it stays closed while the order is OVERDUE — the
+  // API rejects receiving an item with no fulfilledAt anyway (order-item.service.ts).
+  const canReceiveItems = canEditItems && order.status !== ORDER_STATUS.OVERDUE;
   const canFulfillItems = canEditItems && isAdmin;
 
   // Check if there are unsaved changes
@@ -608,7 +620,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
                       <span className="text-sm">{item.orderedQuantity}</span>
                     </TableCell>
                     <TableCell className="text-center py-2">
-                      {canEditItems ? (
+                      {canReceiveItems ? (
                         <div className="flex items-center justify-center">
                           <input
                             type="number"

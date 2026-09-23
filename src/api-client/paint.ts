@@ -667,6 +667,79 @@ export interface PaintPlanDetailResponse {
   data: PaintPlanDetailResult | null;
 }
 
+// =====================
+// Paint purchase (do volume de tinta para o pedido de compra)
+// =====================
+
+/** Fórmula inteira, ou só o que falta no estoque. */
+export type PaintPurchaseMode = "FULL" | "MISSING";
+
+export interface PaintPurchasePlanParams {
+  paintId: string;
+  volumeLiters: number;
+  mode: PaintPurchaseMode;
+}
+
+export interface PaintPurchasePlanItem {
+  itemId: string;
+  itemName: string;
+  uniCode: string | null;
+  ratio: number;
+  requiredGrams: number;
+  requiredUnits: number | null;
+  availableUnits: number;
+  missingUnits: number | null;
+  /** o que vai para o pedido, sempre em embalagem inteira */
+  quantity: number;
+  packageLabel: string | null;
+  unitPrice: number;
+  totalPrice: number;
+  supplierId: string | null;
+  supplierName: string | null;
+  measured: boolean;
+  included: boolean;
+}
+
+export interface PaintPurchasePlan {
+  paint: {
+    id: string;
+    name: string;
+    hex: string;
+    code: string | null;
+    finish: string;
+    typeName: string | null;
+    brandName: string | null;
+  };
+  volumeLiters: number;
+  mode: PaintPurchaseMode;
+  items: PaintPurchasePlanItem[];
+  totals: { itemCount: number; totalUnits: number; totalPrice: number };
+  suggestedSupplierId: string | null;
+  suggestedSupplierName: string | null;
+  supplierCount: number;
+  suggestedDescription: string;
+  warnings: string[];
+}
+
+export interface PaintPurchasePlanResponse {
+  success: boolean;
+  message: string;
+  data: PaintPurchasePlan | null;
+}
+
+export interface PaintPurchaseOrderParams extends PaintPurchasePlanParams {
+  description: string;
+  supplierId?: string | null;
+  forecast?: string | null;
+  notes?: string | null;
+}
+
+export interface PaintPurchaseOrderResponse {
+  success: boolean;
+  message: string;
+  data: { id: string } | null;
+}
+
 export class PaintProductionService {
   private readonly basePath = "/paints/productions";
 
@@ -747,6 +820,22 @@ export class PaintProductionService {
     const response = await apiClient.get<PaintPlanDetailResponse>(`${this.basePath}/paint-plan-detail`, {
       params: { paintId, volumeLiters, ...(forecastDate ? { forecastDate } : {}) },
     });
+    return response.data;
+  }
+
+  // =====================
+  // Purchase (pedido de componentes)
+  // =====================
+
+  /** O que o pedido levaria: componentes, quantidades e preço, sem gravar nada. */
+  async previewPaintPurchase(params: PaintPurchasePlanParams): Promise<PaintPurchasePlanResponse> {
+    const response = await apiClient.post<PaintPurchasePlanResponse>(`${this.basePath}/purchase-preview`, params);
+    return response.data;
+  }
+
+  /** Cria o pedido. O servidor recalcula a partir do volume — não manda quantidade. */
+  async createPaintPurchaseOrder(params: PaintPurchaseOrderParams): Promise<PaintPurchaseOrderResponse> {
+    const response = await apiClient.post<PaintPurchaseOrderResponse>(`${this.basePath}/purchase-order`, params);
     return response.data;
   }
 }
@@ -1059,6 +1148,8 @@ export const calculateProductionAvailability = (selections: ProductionAvailabili
   paintProductionService.calculateProductionAvailability(selections);
 export const getPaintPlanDetail = (paintId: string, volumeLiters: number, forecastDate?: string) =>
   paintProductionService.getPaintPlanDetail(paintId, volumeLiters, forecastDate);
+export const previewPaintPurchase = (params: PaintPurchasePlanParams) => paintProductionService.previewPaintPurchase(params);
+export const createPaintPurchaseOrder = (params: PaintPurchaseOrderParams) => paintProductionService.createPaintPurchaseOrder(params);
 
 // Paint Type exports
 export const getPaintTypes = (params: PaintTypeGetManyFormData = {}) => paintTypeService.getPaintTypes(params);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   FormControl,
@@ -39,6 +39,12 @@ interface BudgetStepInfoProps {
   customersCache: React.MutableRefObject<Map<string, any>>;
   selectedCustomers: Map<string, any>;
   setSelectedCustomers: (customers: Map<string, any>) => void;
+  /**
+   * Substitui o seletor de layout. O orçamento de N veículos passa o seu
+   * (`BudgetVehicleLayoutsField`), que sabe dar um layout a cada caminhão; com um
+   * veículo só — e na criação — fica o seletor de sempre.
+   */
+  layoutSlot?: ReactNode;
 }
 
 const VALIDITY_PERIOD_OPTIONS = [
@@ -68,6 +74,7 @@ export function BudgetStepInfo({
   customersCache,
   selectedCustomers: _selectedCustomers,
   setSelectedCustomers,
+  layoutSlot,
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
@@ -553,16 +560,19 @@ export function BudgetStepInfo({
           recusa o orçamento sem layout aprovado e agora oferece um botão que
           traz o operador até AQUI. Ver `goToLayoutStep` no detalhe do orçamento
           e `LAYOUT_PICKER_ANCHOR_ID`. Renomear este id quebra aquele atalho em
-          silêncio. */}
+          silêncio. Vale para as duas formas: o seletor único e o por veículo
+          (`layoutSlot`). */}
       <div id="layout-aprovado">
-      <ApprovedLayoutPicker
-        layouts={layouts}
-        layoutFiles={layoutFiles}
-        onChange={handleLayoutChange}
-        onUploadFiles={handleUploadFiles}
-        uploadLabel="Selecione ou envie um layout"
-        disabled={disabled}
-      />
+        {layoutSlot ?? (
+          <ApprovedLayoutPicker
+            layouts={layouts}
+            layoutFiles={layoutFiles}
+            onChange={handleLayoutChange}
+            onUploadFiles={handleUploadFiles}
+            uploadLabel="Selecione ou envie um layout"
+            disabled={disabled}
+          />
+        )}
       </div>
     </div>
   );

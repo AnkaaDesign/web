@@ -88,6 +88,8 @@ interface DataTableShareDialogProps<TData> {
   resolveAllRows?: () => Promise<TData[]>;
   title: string;
   filename: string;
+  /** First-page line under the PDF header, computed from the exported rows. */
+  subtitle?: (rows: TData[]) => string | undefined;
 }
 
 /**
@@ -150,6 +152,7 @@ export function DataTableShareDialog<TData>({
   resolveAllRows,
   title,
   filename,
+  subtitle,
 }: DataTableShareDialogProps<TData>) {
   const exportable = useMemo(() => columns.filter((c) => !c.meta?.excludeFromExport), [columns]);
   // Flatten columns into picker entries: each column contributes its base entry plus one extra
@@ -252,7 +255,7 @@ export function DataTableShareDialog<TData>({
         notify.error("Atenção", "Nenhum registro para exportar.");
         return;
       }
-      const req = { rows, columns: resolveExportColumns(), filename, title };
+      const req = { rows, columns: resolveExportColumns(), filename, title, subtitle: subtitle?.(rows) };
       if (isXlsx) await exportToXlsx(req);
       else await exportToPdf(req);
       notify.success("Exportado", `${rows.length} registro(s) exportado(s) com sucesso.`);

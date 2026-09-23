@@ -25,6 +25,11 @@ interface GeneralPaintingSelectorProps {
   onPaintCreated?: (paint: Paint) => void;
   /** Subtitle for the quick-create dialog (context-specific) */
   quickCreateDescription?: string;
+  /**
+   * O campo do formulário que guarda a tinta. `paintId` na tarefa; no orçamento de N
+   * veículos, `vehicles.<i>.paintId` — cada caminhão tem a sua pintura geral.
+   */
+  name?: string;
 }
 
 export function GeneralPaintingSelector({
@@ -36,6 +41,7 @@ export function GeneralPaintingSelector({
   allowQuickCreate,
   onPaintCreated,
   quickCreateDescription,
+  name = "paintId",
 }: GeneralPaintingSelectorProps) {
   const queryClient = useQueryClient();
 
@@ -56,7 +62,7 @@ export function GeneralPaintingSelector({
   const paintsCache = useRef<Map<string, Paint>>(new Map());
 
   // Watch paintId from form state - persists across accordion unmount/remount
-  const selectedPaintId = useWatch({ control, name: "paintId" }) as string | undefined;
+  const selectedPaintId = useWatch({ control, name }) as string | undefined;
 
   // Fetch selected paint details by ID - React Query cache persists across unmount/remount
   const { data: selectedPaintData } = useQuery({
@@ -253,7 +259,7 @@ export function GeneralPaintingSelector({
     <>
     <FormField
       control={control}
-      name="paintId"
+      name={name}
       render={({ field }) => {
         // Update selected paint when field value changes
         useEffect(() => {

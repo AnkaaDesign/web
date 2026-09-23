@@ -309,6 +309,8 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             // Populated by the simulation sync effect once /bonus/simulate
             // returns. Starts at 0 to avoid a flash of stale legacy values.
             bonusAmount: 0,
+            adjustmentAmount: 0,
+            netBonusAmount: 0,
             eligibilityWeight: elig?.weight ?? 1,
             eligibilityReason: elig ? describeWeight(elig) : '',
           };
@@ -439,6 +441,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               positionName: u.position,
               sectorName: u.sectorName ?? undefined,
               performanceLevel: u.performanceLevel,
+              // O peso vai JUNTO: é o servidor que prorrateia e depois aplica
+              // extras e descontos do período sobre a base já prorrateada —
+              // a mesma ordem da folha.
+              eligibilityWeight: u.eligibilityWeight,
             })),
             // Send the period so the API injects the saved reajuste — the
             // simulation then matches the real (saved) bonus to the cent.
@@ -450,11 +456,17 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const { data: simulation } = useBonusSimulation(simulationInput, {
     enabled: simulationInput !== null,
   });
-  const bonusByUserId = useMemo(() => {
-    const map = new Map<string, number>();
+  const settlementByUserId = useMemo(() => {
+    const map = new Map<string, { gross: number; adjustments: number; net: number }>();
     if (simulation?.users) {
       for (const u of simulation.users) {
-        if (u.id) map.set(u.id, u.bonus);
+        if (!u.id) continue;
+        // `grossBonus` já vem prorrateado pelo peso que mandamos; os campos
+        // novos só faltam se a API for antiga, e aí o cliente prorrateia como
+        // antes e fica sem ajustes.
+        const gross = u.grossBonus ?? u.bonus;
+        const net = u.netBonus ?? gross;
+        map.set(u.id, { gross, adjustments: u.adjustments ?? net - gross, net });
       }
     }
     return map;
@@ -465,22 +477,33 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     if (!simulation?.users) return;
     setSimulatedUsers(prev => {
       const next = prev.map(u => {
-        // `/bonus/simulate` calcula o valor de PERÍODO INTEIRO — ele só recebe
-        // cargo e nível, e não tem como saber que a pessoa entrou no dia 14 ou
-        // saiu no dia 17. O prorrateio é o mesmo `weight` que entra no divisor:
-        // quem contou 0,73 no denominador recebe 73% do valor.
-        const fullPeriodBonus = bonusByUserId.get(u.id) ?? 0;
-        const newBonus = Math.round(fullPeriodBonus * u.eligibilityWeight * 100) / 100;
-        return Math.abs(u.bonusAmount - newBonus) < 0.005 ? u : { ...u, bonusAmount: newBonus };
+        // O prorrateio (o mesmo `weight` que entra no divisor da média) e os
+        // lançamentos do período são aplicados NO SERVIDOR, na ordem da folha:
+        // primeiro o peso, depois extras e descontos. Aqui só se copia.
+        const s = settlementByUserId.get(u.id);
+        const newBonus = s?.gross ?? 0;
+        const newNet = s?.net ?? 0;
+        const newAdjust = s?.adjustments ?? 0;
+        const same =
+          Math.abs(u.bonusAmount - newBonus) < 0.005 &&
+          Math.abs(u.netBonusAmount - newNet) < 0.005 &&
+          Math.abs(u.adjustmentAmount - newAdjust) < 0.005;
+        return same ? u : { ...u, bonusAmount: newBonus, netBonusAmount: newNet, adjustmentAmount: newAdjust };
       });
       // Reference equality short-circuit if nothing changed.
       const changed = next.some((u, i) => u !== prev[i]);
       return changed ? next : prev;
     });
-  }, [simulation, bonusByUserId]);
+  }, [simulation, settlementByUserId]);
 
   const totalBonusAmount = useMemo(() =>
     filteredUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
+    [filteredUsers]
+  );
+  // O total que a folha pagaria. Sem ele a tela somava bruto embaixo de linhas
+  // que mostram líquido, e os dois números nunca fechavam.
+  const totalNetBonusAmount = useMemo(() =>
+    filteredUsers.reduce((sum, user) => sum + user.netBonusAmount, 0),
     [filteredUsers]
   );
 
@@ -530,9 +553,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     setSimulatedUsers(prev => {
       let changed = false;
       const next = prev.map(user => {
-        if (!filteredIds.has(user.id) && user.bonusAmount !== 0) {
+        if (!filteredIds.has(user.id) && (user.bonusAmount !== 0 || user.netBonusAmount !== 0)) {
           changed = true;
-          return { ...user, bonusAmount: 0 };
+          return { ...user, bonusAmount: 0, netBonusAmount: 0, adjustmentAmount: 0 };
         }
         return user;
       });
@@ -856,12 +879,24 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             </div>
 
             <div className="flex flex-col" style={{ width: "9rem" }}>
-              <Label className="text-sm font-medium mb-1.5">Bônus Total</Label>
+              <Label className="text-sm font-medium mb-1.5">Bônus Bruto</Label>
               <Input
                 type="text"
                 value={formatCurrency(totalBonusAmount)}
                 readOnly
+                className="h-10 text-center font-semibold bg-transparent cursor-default"
+                title="Soma do bônus bruto das linhas visíveis"
+              />
+            </div>
+
+            <div className="flex flex-col" style={{ width: "9rem" }}>
+              <Label className="text-sm font-medium mb-1.5">Bônus Líquido</Label>
+              <Input
+                type="text"
+                value={formatCurrency(totalNetBonusAmount)}
+                readOnly
                 className="h-10 text-center font-semibold bg-transparent cursor-default text-green-600"
+                title="Soma do bônus líquido das linhas visíveis — bruto mais extras, menos descontos do período"
               />
             </div>
           </div>

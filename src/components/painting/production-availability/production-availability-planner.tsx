@@ -17,6 +17,7 @@ import { AddPaintCard } from "./add-paint-card";
 import { AvailabilitySummary } from "./availability-summary";
 import { ComponentsAvailabilityTable } from "./components-availability-table";
 import { PaintPlanDetailModal } from "./paint-plan-detail-modal";
+import { PaintPurchaseDialog } from "./paint-purchase-dialog";
 import { PaintSelectionCard } from "./paint-selection-card";
 import type { AddPaintPayload, PaintStatus, SelectionRow } from "./types";
 
@@ -51,6 +52,9 @@ export function ProductionAvailabilityPlanner() {
   const [rows, setRows] = useState<SelectionRow[]>([]);
   const [addKey, setAddKey] = useState(0);
   const [detailPaintId, setDetailPaintId] = useState<string | null>(null);
+  // O pedido vive FORA do modal de detalhe: abrir um fecha o outro, senão a
+  // tela fica com dois diálogos empilhados dizendo a mesma coisa.
+  const [purchasePaintId, setPurchasePaintId] = useState<string | null>(null);
   // Re-seed the schedule paints whenever the forecast date changes (preserving any
   // manually-added paints), but NOT on a mere refetch of the same date.
   const seededKeyRef = useRef<string | null>(null);
@@ -173,8 +177,16 @@ export function ProductionAvailabilityPlanner() {
     toast.success("Seleção restaurada a partir do cronograma.");
   }, [defaultsResp, forecastDate]);
 
+  const handleRequestPurchase = useCallback((paintId: string) => {
+    setDetailPaintId(null);
+    setPurchasePaintId(paintId);
+  }, []);
+
   const showSeedSkeleton = loadingDefaults && seededKeyRef.current === null;
   const detailRow = detailPaintId ? rows.find((r) => r.paintId === detailPaintId) : null;
+  const purchaseRow = purchasePaintId
+    ? rows.find((r) => r.paintId === purchasePaintId)
+    : null;
 
   return (
     <>
@@ -278,9 +290,23 @@ export function ProductionAvailabilityPlanner() {
         volumeLiters={detailRow?.volumeLiters ?? 0}
         forecastDate={forecastIso}
         globalComponents={result?.components ?? []}
+        onVolumeChange={handleVolumeChange}
+        onRequestPurchase={handleRequestPurchase}
         open={detailPaintId !== null}
         onOpenChange={(o) => {
           if (!o) setDetailPaintId(null);
+        }}
+      />
+
+      <PaintPurchaseDialog
+        paintId={purchasePaintId}
+        paintName={purchaseRow?.paintName ?? ""}
+        hex={purchaseRow?.hex ?? "#888888"}
+        volumeLiters={purchaseRow?.volumeLiters ?? 0}
+        onVolumeChange={handleVolumeChange}
+        open={purchasePaintId !== null}
+        onOpenChange={(o) => {
+          if (!o) setPurchasePaintId(null);
         }}
       />
     </>

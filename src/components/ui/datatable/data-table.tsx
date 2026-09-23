@@ -232,6 +232,11 @@ export interface DataTableProps<TData> {
   bare?: boolean;
   exportTitle?: string;
   exportFilename?: string;
+  /**
+   * A line printed under the PDF header on the first page, computed from the rows being exported
+   * — e.g. whose share of the values the document shows. `undefined` prints nothing.
+   */
+  exportSubtitle?: (rows: TData[]) => string | undefined;
   isLoading?: boolean;
   emptyMessage?: string;
   /**
@@ -309,6 +314,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     bare = false,
     exportTitle = "Dados",
     exportFilename = tableId,
+    exportSubtitle,
     isLoading = false,
     emptyMessage = "Nenhum resultado encontrado",
     syncUrl = true,
@@ -1252,6 +1258,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
           resolveAllRows={canExportAll ? resolveAllRows : undefined}
           title={exportTitle}
           filename={exportFilename}
+          subtitle={exportSubtitle}
         />
       )}
 

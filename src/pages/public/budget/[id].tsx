@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { layoutScopeOf, coveredTaskIdsOfLayout } from "@/utils/quote-layout-coverage";
 import { useParams } from "react-router-dom";
 import { budgetService } from "@/api-client/budget";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
@@ -388,10 +389,44 @@ export function PublicBudgetPage() {
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
 
-  // Use serve endpoint for full quality images (layoutFiles array, up to 2)
-  const layoutImageUrls: string[] = (quote.layoutFiles || [])
+  // Use serve endpoint for full quality images (layoutFiles array).
+  //
+  // Com UM LAYOUT PARA CADA VEÍCULO, cada arte sai com a legenda dos caminhões que
+  // ela cobre ("Veículo 39088"), na ordem dos veículos — a mesma do documento
+  // assinado. No compartilhado, sem legenda: igual ao de sempre.
+  const layoutPerVehicle = layoutScopeOf(quote as any) === "PER_VEHICLE";
+  const publicVehicles = quoteTasks<any>(quote);
+  const publicVehicleLabel = (taskId: string) => {
+    const index = publicVehicles.findIndex((t: any) => t.id === taskId);
+    const t = publicVehicles[index];
+    return t?.serialNumber || t?.truck?.plate || `${index + 1}`;
+  };
+  const layoutImages: Array<{ url: string; caption: string | null; order: number }> = (quote.layoutFiles || [])
     .filter((f: any) => f?.id)
-    .map((f: any) => getFileServeUrl(f));
+    .map((f: any) => {
+      if (!layoutPerVehicle) return { url: getFileServeUrl(f), caption: null, order: 0 };
+      const covered = coveredTaskIdsOfLayout(f).filter((id) =>
+        publicVehicles.some((t: any) => t.id === id),
+      );
+      const order = Math.min(
+        ...covered.map((id) => publicVehicles.findIndex((t: any) => t.id === id)),
+        Number.MAX_SAFE_INTEGER,
+      );
+      const labels = covered
+        .sort(
+          (a, b) =>
+            publicVehicles.findIndex((t: any) => t.id === a) -
+            publicVehicles.findIndex((t: any) => t.id === b),
+        )
+        .map(publicVehicleLabel);
+      const caption =
+        covered.length === publicVehicles.length
+          ? "Todos os veículos"
+          : `${labels.length === 1 ? "Veículo" : "Veículos"} ${labels.join(", ")}`;
+      return { url: getFileServeUrl(f), caption, order };
+    })
+    .sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+  const layoutImageUrls: string[] = layoutImages.map((img) => img.url);
   
   /**
    * Bloco "Layout", posicionado conforme o documento: quando a arte existe, ela
@@ -406,9 +441,18 @@ export function PublicBudgetPage() {
           Layout
         </h3>
         <div className="flex w-full flex-col items-center gap-4">
-          {layoutImageUrls.map((url, i) => (
-            <img key={i} src={url} alt="Layout" className="max-w-full h-auto object-contain" style={{ maxHeight: 397 }} />
-          ))}
+          {layoutImages.map((img, i) =>
+            img.caption ? (
+              <figure key={i} className="flex w-full flex-col items-center gap-2">
+                <figcaption className="text-sm font-semibold" style={{ color: COMPANY.primaryGreen }}>
+                  {img.caption}
+                </figcaption>
+                <img src={img.url} alt={`Layout — ${img.caption}`} className="max-w-full h-auto object-contain" style={{ maxHeight: 397 }} />
+              </figure>
+            ) : (
+              <img key={i} src={img.url} alt="Layout" className="max-w-full h-auto object-contain" style={{ maxHeight: 397 }} />
+            ),
+          )}
         </div>
       </div>
     ) : null;

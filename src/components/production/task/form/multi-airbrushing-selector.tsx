@@ -29,6 +29,11 @@ interface MultiAirbrushingSelectorProps {
    * para que criar e editar ofereçam exatamente os mesmos campos.
    */
   showStatus?: boolean;
+  /**
+   * O campo do formulário que guarda a lista. `airbrushings` na tarefa; no orçamento de N
+   * veículos, `vehicles.<i>.airbrushings` — a aerografia é de cada caminhão.
+   */
+  name?: string;
 }
 
 interface AirbrushingItem extends AirbrushingFieldValues {
@@ -152,12 +157,12 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
 };
 
 export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, MultiAirbrushingSelectorProps>(
-  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId, canViewFinancials = true, showStatus }, ref) => {
+  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId, canViewFinancials = true, showStatus, name = "airbrushings" }, ref) => {
     const statusVisible = showStatus ?? isEditMode;
 
     // Use controller to properly manage form field
     const { field } = useController({
-      name: "airbrushings" as any,
+      name: name as any,
       control,
     });
 
