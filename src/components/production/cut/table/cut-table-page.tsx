@@ -38,7 +38,7 @@ import { createCutColumns, CUT_SECTOR_DEFAULTS } from "./cut-table-columns";
 import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor } from "@/lib/attention";
 
 // Trimmed include — only what the columns render (task name, file thumbnail/name, recut parent file).
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   task: { include: { customer: true } },
   file: true,
   parentCut: { include: { file: true } },

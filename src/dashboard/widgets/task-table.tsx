@@ -1641,7 +1641,7 @@ function buildOrderBy(config: TaskTableConfig): Array<Record<string, any>> {
 // Render
 // ============================================================================
 
-const TASK_INCLUDE = {
+export const TASK_INCLUDE = {
   customer: true,
   sector: true,
   generalPainting: true,

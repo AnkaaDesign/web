@@ -44,7 +44,7 @@ import {
 import { createOrderColumns, ORDER_SECTOR_DEFAULTS, ORDER_PRICE_VIEWERS } from "./order-table-columns";
 
 // Trimmed include — only what the columns render (supplier name, item totals/count).
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   supplier: true,
   items: { include: { item: true } },
   _count: { select: { items: true } },

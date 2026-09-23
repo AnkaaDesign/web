@@ -85,7 +85,7 @@ const SCHEDULE_STATUS: TASK_STATUS[] = [TASK_STATUS.WAITING_PRODUCTION, TASK_STA
  * (not `select`) so the API repository's Decimal→number mapper runs and `quote.total` arrives
  * as a real number.
  */
-const SCHEDULE_LIST_INCLUDE = {
+export const SCHEDULE_LIST_INCLUDE = {
   sector: true,
   customer: true,
   generalPainting: { include: { paintType: true, paintBrand: true } },

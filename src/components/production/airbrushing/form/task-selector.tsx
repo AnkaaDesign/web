@@ -21,7 +21,7 @@ const getTaskRowId = (t: ClusteredTask) => t.id;
  * prep column has the data it renders — service-order progress, forecast reschedule flag, the truck
  * measures behind "Medidas", the quote billing customers ("Faturar Para"), painting, sector, etc.
  */
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   serviceOrders: { select: { id: true, type: true, status: true, assignedToId: true, description: true, observation: true } },
   forecastHistory: {
     select: { source: true, previousDate: true, newDate: true, reason: true, createdAt: true },

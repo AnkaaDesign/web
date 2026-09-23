@@ -51,7 +51,7 @@ function formatMeasureValue(measure: Measure): string {
   return "—";
 }
 
-const DETAIL_INCLUDE = {
+export const DETAIL_INCLUDE = {
   brands: true,
   category: true,
   supplier: true,

@@ -134,7 +134,7 @@ type ViewMode = "month" | "year";
 const WEEK_DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const MINI_WEEK_DAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
-const TASK_INCLUDE = {
+export const TASK_INCLUDE = {
   customer: { select: { fantasyName: true, corporateName: true } },
   sector: { select: { id: true, name: true } },
 } as const;

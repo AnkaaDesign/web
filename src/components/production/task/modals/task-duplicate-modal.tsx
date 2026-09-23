@@ -21,7 +21,7 @@ import {
 } from "@/utils/quote-tasks";
 
 // Full include config for refetching the task with ALL relations needed for duplication
-const DUPLICATE_TASK_INCLUDE = {
+export const DUPLICATE_TASK_INCLUDE = {
   sector: true,
   customer: true,
   responsibles: true,

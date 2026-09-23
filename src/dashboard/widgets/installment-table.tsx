@@ -502,7 +502,7 @@ function applySort(
 // Data fetching
 // ============================================================================
 
-const TASK_INCLUDE = {
+export const TASK_INCLUDE = {
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
   quote: {
     select: {

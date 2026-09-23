@@ -22,7 +22,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { createObservationColumns } from "./observation-table-columns";
 
 // Trimmed include — only what the columns render (task name + files count).
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   task: true,
   files: true,
 } as const;

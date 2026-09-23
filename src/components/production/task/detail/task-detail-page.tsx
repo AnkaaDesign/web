@@ -199,7 +199,7 @@ function ViewToggle({ view, onChange }: { view: FileViewMode; onChange: (v: File
 // Heavier than the list include, but matched to what the detail page actually renders. Truck layout
 // objects are NOT pulled here — `useImplementMeasuresByTruck` (used by the layout section) fetches them, and the
 // changelog only needs the scalar `*SideMeasureId` FKs that come with `truck: true`.
-const DETAIL_INCLUDE = {
+export const DETAIL_INCLUDE = {
   customer: { include: { logo: true } },
   sector: true,
   responsibles: true,

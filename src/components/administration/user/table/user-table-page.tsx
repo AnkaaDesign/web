@@ -48,7 +48,7 @@ import { buildUserFilterDefs } from "./user-table-filters";
 // Trimmed include — only what the columns render (position/sector/ledSector names, ppe sizes, the
 // current contract for status + the date columns, the most-recent admission's document checklist for
 // the DOCUMENTOS progress, and the created-tasks count badge).
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   position: true,
   sector: true,
   ledSector: true,

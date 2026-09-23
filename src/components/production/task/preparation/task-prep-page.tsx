@@ -85,7 +85,7 @@ import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-
 // beyond the minimal Medidas fields. The only nested billing data is the quote's customerConfigs
 // customer names (the FINANCIAL "Faturar Para" column). `assignedToId` is the one extra scalar we keep
 // so the progress cell can flag "pending assigned to you".
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   serviceOrders: { select: { id: true, type: true, status: true, assignedToId: true, description: true, observation: true } },
   // Forecast "reagendada" flag on the date cell: fetch ONLY the latest MANUAL reschedule (not the full
   // history that the legacy view loaded). where+orderBy+take:1 keeps this a single tiny row per task,

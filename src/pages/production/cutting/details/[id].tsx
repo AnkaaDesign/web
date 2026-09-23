@@ -49,7 +49,7 @@ const PAGE_PRIVILEGES = [
   SECTOR_PRIVILEGES.ADMIN,
 ];
 
-const DETAIL_INCLUDE = {
+export const DETAIL_INCLUDE = {
   file: true,
   task: { include: { customer: true, sector: true } },
   parentCut: { include: { file: true } },

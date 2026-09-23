@@ -520,7 +520,7 @@ function applySort(rows: FlatOrder[], sorts: OrderTableConfig["sorts"]): FlatOrd
 // Data fetching
 // ============================================================================
 
-const ORDER_INCLUDE = {
+export const ORDER_INCLUDE = {
   supplier: {
     select: { id: true, fantasyName: true, corporateName: true },
   },

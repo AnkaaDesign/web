@@ -6,7 +6,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { getItems, getItemById } from "@/api-client";
 import type { Item } from "@/types";
 
-const ITEM_INCLUDE = {
+export const ITEM_INCLUDE = {
   prices: true,
   measures: true,
   brands: true,

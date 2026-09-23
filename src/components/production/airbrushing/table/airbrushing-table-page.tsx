@@ -37,7 +37,7 @@ import { SetStatusModal } from "./set-status-modal";
 // "Identificador", the side measures behind "Medidas", painter name. NOTE: the layouts count column
 // is intentionally omitted (the API include has no `_count`, so counting would require fetching
 // every layouts File[] — a heavy payload for a single number).
-const LIST_INCLUDE = {
+export const LIST_INCLUDE = {
   task: {
     include: {
       customer: true,

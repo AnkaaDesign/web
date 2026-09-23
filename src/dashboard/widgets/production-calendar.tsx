@@ -177,7 +177,7 @@ type ProductionCalendarConfig = z.infer<typeof productionCalendarConfigSchema>;
 // Render
 // ============================================================
 
-const TASK_INCLUDE = {
+export const TASK_INCLUDE = {
   customer: { select: { fantasyName: true, corporateName: true } },
   sector: { select: { id: true, name: true } },
 } as const;
