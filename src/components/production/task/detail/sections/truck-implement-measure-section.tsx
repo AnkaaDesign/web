@@ -11,11 +11,12 @@ import {
   IconZoomOut,
   IconZoomReset,
 } from "@tabler/icons-react";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
   const { data: layouts } = useImplementMeasuresByTruck(truckId, { includePhoto: true });
-  const [selectedSide, setSelectedSide] = useState<'left' | 'right' | 'back'>('left');
+  const [selectedSide, setSelectedSide] = useState<ImplementFace>('left');
 
   // Theme detection for SVG colors (matching mobile version)
   const { theme } = useTheme();

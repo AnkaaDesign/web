@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/sonner";
 import { implementMeasureService } from "../../api-client";
 import type { ImplementMeasureCreateFormData, ImplementMeasureUpdateFormData } from "../../schemas";
 import { taskKeys } from "../common/query-keys";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 // Query keys
 export const implementMeasureQueryKeys = {
@@ -102,7 +103,7 @@ export const useImplementMeasureMutations = () => {
   });
 
   const createOrUpdateTruckMeasureMutation = useMutation({
-    mutationFn: ({ truckId, side, data }: { truckId: string; side: "left" | "right" | "back"; data: ImplementMeasureCreateFormData }) =>
+    mutationFn: ({ truckId, side, data }: { truckId: string; side: ImplementFace; data: ImplementMeasureCreateFormData }) =>
       implementMeasureService.createOrUpdateTruckMeasure(truckId, side, data),
     onSuccess: async (response, variables) => {
       // Use refetchQueries to immediately refetch and get fresh data

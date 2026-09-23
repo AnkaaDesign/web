@@ -79,6 +79,7 @@ import { useImplementMeasuresByTruck, useImplementMeasureMutations } from "../..
 import { TRUCK_SPOT } from "../../../../constants";
 import { useOtherEditors } from "@/lib/attention";
 import { IconEdit } from "@tabler/icons-react";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 interface TaskEditFormProps {
   task: Task;
@@ -480,7 +481,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
-  const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [selectedLayoutSide, setSelectedLayoutSide] = useState<ImplementFace>("left");
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
   // hasLayoutStatusChanges is now defined earlier (line 195) to avoid temporal dead zone
@@ -617,7 +618,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
   // Track current layout state during editing (not saved yet)
   // Initialize with default values to support validation before user edits
-  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>(() => {
+  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<ImplementFace, any>>(() => {
     const defaults = {
       left: {
         height: 1,
@@ -639,10 +640,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   });
 
   // Track which sides were actually modified by the user
-  const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<'left' | 'right' | 'back'>>(new Set());
+  const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<ImplementFace>>(new Set());
 
   // Track which sides have emitted their initial state (to avoid marking as "modified" on first render)
-  const initialLayoutStateEmittedRef = useRef<Set<'left' | 'right' | 'back'>>(new Set());
+  const initialLayoutStateEmittedRef = useRef<Set<ImplementFace>>(new Set());
 
   // Get truck ID from task - with safety check
   const truckId = task.truck?.id;
@@ -711,7 +712,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // This prevents overwriting user changes that haven't been saved yet
     if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && layoutsData) {
 
-      const newStates: Record<'left' | 'right' | 'back', any> = {
+      const newStates: Record<ImplementFace, any> = {
         left: currentLayoutStates.left,
         right: currentLayoutStates.right,
         back: currentLayoutStates.back,

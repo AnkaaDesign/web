@@ -4,6 +4,7 @@ import { apiClient } from "./axiosClient";
 import type { ImplementMeasure, BaseGetUniqueResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse } from "../types";
 import type { ImplementMeasureCreateFormData, ImplementMeasureUpdateFormData } from "../schemas";
 import { safeFileDownload } from "./platform-utils";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 // Response Types
 type ImplementMeasureGetUniqueResponse = BaseGetUniqueResponse<ImplementMeasure>;
@@ -34,7 +35,7 @@ interface ImplementMeasureUsageResponse {
     implementMeasureId: string;
     trucks: Array<{
       truckId: string;
-      side: "left" | "right" | "back";
+      side: ImplementFace;
     }>;
   };
 }
@@ -58,7 +59,7 @@ export const implementMeasureService = {
   getImplementMeasureUsage: (implementMeasureId: string) => apiClient.get<ImplementMeasureUsageResponse>(`/implement-measure/${implementMeasureId}/usage`),
 
   // Assign implement measure to truck
-  assignImplementMeasureToTruck: (implementMeasureId: string, data: { truckId: string; side: "left" | "right" | "back" }) =>
+  assignImplementMeasureToTruck: (implementMeasureId: string, data: { truckId: string; side: ImplementFace }) =>
     apiClient.post<ImplementMeasureAssignResponse>(`/implement-measure/${implementMeasureId}/assign-to-truck`, data),
 
   // Get implement measures by truck ID
@@ -77,7 +78,7 @@ export const implementMeasureService = {
   delete: (id: string) => apiClient.delete<ImplementMeasureDeleteResponse>(`/implement-measure/${id}`),
 
   // Create or update truck implement measure for specific side
-  createOrUpdateTruckMeasure: (truckId: string, side: "left" | "right" | "back", data: ImplementMeasureCreateFormData) =>
+  createOrUpdateTruckMeasure: (truckId: string, side: ImplementFace, data: ImplementMeasureCreateFormData) =>
     apiClient.post<ImplementMeasureCreateResponse>(`/implement-measure/truck/${truckId}/${side}`, data),
 
   // Generate SVG for implement measure

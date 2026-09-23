@@ -25,6 +25,7 @@ import { z } from "zod";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 // Type definitions for the operations
 type BulkOperationType = "arts" | "baseFiles" | "paints" | "cuttingPlans" | "layout" | "serviceOrder";
@@ -87,7 +88,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const [, setCutsCount] = useState(0);
 
   // States for layout editing - visual editor like task edit form
-  const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [selectedLayoutSide, setSelectedLayoutSide] = useState<ImplementFace>("left");
   const [layoutStates, setLayoutStates] = useState<{
     left: any | null;
     right: any | null;

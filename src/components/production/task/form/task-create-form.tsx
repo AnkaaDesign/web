@@ -61,6 +61,7 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
 import { batchCreateTasksWithQuote } from "../../../../api-client/task";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -225,9 +226,9 @@ export const TaskCreateForm = () => {
   }, [showResponsibleErrors]);
 
   // Layout state
-  const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [selectedLayoutSide, setSelectedLayoutSide] = useState<ImplementFace>("left");
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
-  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>({
+  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<ImplementFace, any>>({
     left: {
       height: 1,
       sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
@@ -244,7 +245,7 @@ export const TaskCreateForm = () => {
       photoId: null,
     },
   });
-  const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<'left' | 'right' | 'back'>>(new Set());
+  const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<ImplementFace>>(new Set());
   const [layoutWidthError, setLayoutWidthError] = useState<string | null>(null);
 
   // Layout width validation

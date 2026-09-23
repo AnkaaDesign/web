@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTheme } from "@/contexts/theme-context";
 import type { ImplementMeasureCreateFormData } from "../../../schemas";
 import { getApiBaseUrl } from "@/config/api";
+import { FACE_LABEL, type ImplementFace } from "@/constants/implement-faces";
 
 /**
  * Menor altura de porta que a GEOMETRIA aceita, em centímetros.
@@ -26,7 +27,7 @@ import { getApiBaseUrl } from "@/config/api";
 const MIN_DOOR_HEIGHT_CM = 90;
 
 interface ImplementMeasureFormProps {
-  selectedSide?: 'left' | 'right' | 'back';
+  selectedSide?: ImplementFace;
   layouts?: {
     left: ImplementMeasureCreateFormData;
     right: ImplementMeasureCreateFormData;
@@ -34,7 +35,7 @@ interface ImplementMeasureFormProps {
   };
   // Support for single layout prop (current usage)
   layout?: ImplementMeasureCreateFormData;
-  onChange?: (side: 'left' | 'right' | 'back', data: ImplementMeasureCreateFormData) => void;
+  onChange?: (side: ImplementFace, data: ImplementMeasureCreateFormData) => void;
   // Support for onSave prop (current usage)
   onSave?: (data: ImplementMeasureCreateFormData) => void;
   /**
@@ -53,7 +54,7 @@ interface ImplementMeasureFormProps {
   disabled?: boolean;
   taskName?: string;
   previewMode?: boolean;
-  onSideChange?: (side: 'left' | 'right' | 'back') => void;
+  onSideChange?: (side: ImplementFace) => void;
   validationError?: string | null;
 }
 
@@ -433,15 +434,15 @@ export const ImplementMeasureForm = ({
   const hasPendingChangesRef = useRef<boolean>(false);
 
   // Track which sides have had their initial state emitted
-  const initialStateEmittedRef = useRef<Record<'left' | 'right' | 'back', boolean>>({
+  const initialStateEmittedRef = useRef<Record<ImplementFace, boolean>>({
     left: false,
     right: false,
     back: false,
   });
 
   // Store state for all three sides
-  const [sideStates, setSideStates] = useState<Record<'left' | 'right' | 'back', SideState>>(() => {
-    const initialStates: Record<'left' | 'right' | 'back', SideState> = {
+  const [sideStates, setSideStates] = useState<Record<ImplementFace, SideState>>(() => {
+    const initialStates: Record<ImplementFace, SideState> = {
       left: { height: 200, totalWidth: 200, doors: [] },
       right: { height: 200, totalWidth: 200, doors: [] },
       back: { height: 200, totalWidth: 200, doors: [] }  // Back side defaults to 2m x 2m
@@ -484,7 +485,7 @@ export const ImplementMeasureForm = ({
     // Handle layouts prop (plural - original usage)
     else if (layouts) {
       Object.keys(layouts).forEach((side) => {
-        const layoutData = layouts[side as 'left' | 'right' | 'back'];
+        const layoutData = layouts[side as ImplementFace];
         if (layoutData) {
           const state: SideState = {
             height: (layoutData.height || 2) * 100,
@@ -516,7 +517,7 @@ export const ImplementMeasureForm = ({
             state.doors = extractedDoors;
           }
 
-          initialStates[side as 'left' | 'right' | 'back'] = state;
+          initialStates[side as ImplementFace] = state;
         }
       });
     }
@@ -547,7 +548,7 @@ export const ImplementMeasureForm = ({
 
       // Sync each side that has data in layouts prop
       Object.keys(layouts).forEach((side) => {
-        const layoutData = layouts[side as 'left' | 'right' | 'back'];
+        const layoutData = layouts[side as ImplementFace];
         if (layoutData?.sections && Array.isArray(layoutData.sections)) {
           const state: SideState = {
             height: (layoutData.height || 2) * 100,
@@ -576,7 +577,7 @@ export const ImplementMeasureForm = ({
           });
 
           state.doors = extractedDoors;
-          newStates[side as 'left' | 'right' | 'back'] = state;
+          newStates[side as ImplementFace] = state;
           hasChanges = true;
         }
       });
@@ -1183,7 +1184,7 @@ export const ImplementMeasureForm = ({
   }, [currentState, segments]);
 
   // Copy from another side
-  const copyFromSide = useCallback((fromSide: 'left' | 'right' | 'back') => {
+  const copyFromSide = useCallback((fromSide: ImplementFace) => {
     if (fromSide === selectedSide) return;
 
     const sourceState = sideStates[fromSide];
@@ -1203,7 +1204,7 @@ export const ImplementMeasureForm = ({
   }, [selectedSide, sideStates, updateCurrentSide]);
 
   // Mirror from another side
-  const mirrorFromSide = useCallback((fromSide: 'left' | 'right' | 'back') => {
+  const mirrorFromSide = useCallback((fromSide: ImplementFace) => {
     if (fromSide === selectedSide) return;
 
     const sourceState = sideStates[fromSide];
@@ -1231,13 +1232,7 @@ export const ImplementMeasureForm = ({
   }, [selectedSide, sideStates, updateCurrentSide]);
 
   // Get label for side
-  const getSideLabel = (side: 'left' | 'right' | 'back') => {
-    switch (side) {
-      case 'left': return 'Motorista';
-      case 'right': return 'Sapo';
-      case 'back': return 'Traseira';
-    }
-  };
+  const getSideLabel = (side: ImplementFace) => FACE_LABEL[side];
 
   // Handle photo selection (file will be uploaded with task submission)
   const handlePhotoUpload = useCallback(() => {

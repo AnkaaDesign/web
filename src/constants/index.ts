@@ -9,3 +9,4 @@ export * from "./badge-colors";
 export * from "./deployment-labels";
 export * from "./deployment-sort-orders";
 export * from "./service-descriptions";
+export * from "./implement-faces";

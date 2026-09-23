@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 
 import type { PortalMeasure } from "@/api-client/portal";
+import type { ImplementFace } from "@/constants/implement-faces";
 import { usePortalUpdateVehicleIdentity } from "@/api-client/portal";
 import { PortalCard } from "../portal-detail";
 
@@ -129,7 +130,7 @@ export function VeiculoMedidasCard({
    */
   const interagiu = useRef(false);
   const aoMudar = useCallback(
-    (side: "left" | "right" | "back", dados: { height?: number | null; sections?: unknown }) => {
+    (side: ImplementFace, dados: { height?: number | null; sections?: unknown }) => {
       if (!canWrite || !interagiu.current) return;
       const chave = LADO_PARA_PAYLOAD[side];
       const emCentimetros = {
@@ -223,7 +224,7 @@ export function VeiculoMedidasCard({
 }
 
 /** A chave que a rota do portal espera para cada lado. */
-const LADO_PARA_PAYLOAD: Record<"left" | "right" | "back", "esquerda" | "direita" | "traseira"> = {
+const LADO_PARA_PAYLOAD: Record<ImplementFace, "esquerda" | "direita" | "traseira"> = {
   left: "esquerda",
   right: "direita",
   back: "traseira",
