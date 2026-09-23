@@ -212,12 +212,17 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
           customer: true,
           createdBy: true,
           generalPainting: true,
-          truck: true,
-          serviceOrders: {
+          // A coluna "Medidas" (formatTaskMeasures) lê as seções da lateral; com
+          // `truck: true` elas não vinham e a coluna saía "-" em toda linha.
+          truck: {
             include: {
-              service: true,
+              leftSideMeasure: { include: { sections: true } },
+              rightSideMeasure: { include: { sections: true } },
             },
           },
+          // A O.S. não tem relação `service` (a descrição é dela mesma): o
+          // `include.service` que morava aqui fazia a exportação inteira falhar.
+          serviceOrders: true,
           observation: true,
         },
       });
