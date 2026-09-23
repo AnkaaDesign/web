@@ -104,6 +104,21 @@ interface BudgetStepReviewProps {
   onStatusChange?: (status: string) => void;
   layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string; preview?: string | null }>;
   isCreateMode?: boolean;
+  /**
+   * Orçamento de N veículos: a pintura geral e as miniaturas do layout de cada um,
+   * para a relação de veículos mostrar o que muda de caminhão para caminhão.
+   */
+  vehicleExtras?: Record<
+    string,
+    { paintName?: string | null; paintHex?: string | null; layoutThumbs?: string[] }
+  >;
+  /** Clicar numa linha da relação de veículos leva à aba dele no passo 1. */
+  onVehicleSelect?: (taskId: string) => void;
+  /**
+   * Layout por veículo: as artes agrupadas pelos veículos que as usam. Ausente = o
+   * layout compartilhado de sempre (`layoutFiles`).
+   */
+  layoutGroups?: Array<{ label: string; thumbs: string[] }>;
 }
 
 export function BudgetStepReview({
@@ -115,6 +130,9 @@ export function BudgetStepReview({
   layoutFiles,
   disabled,
   isCreateMode,
+  vehicleExtras,
+  onVehicleSelect,
+  layoutGroups,
 }: BudgetStepReviewProps) {
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
@@ -262,6 +280,21 @@ export function BudgetStepReview({
   // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
   const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
   const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
+  // Na edição de um orçamento de N veículos, cada caminhão está no formulário
+  // (`vehicles[i]`) — o que acabou de ser digitado em QUALQUER aba, não só na aberta.
+  const formVehicles = useWatch({ control, name: "vehicles" }) as
+    | Array<{
+        taskId: string;
+        serialNumber?: string;
+        plate?: string;
+        chassisNumber?: string;
+        customerOrderNumber?: string | null;
+      }>
+    | undefined;
+  const formVehicleById = useMemo(
+    () => new Map((formVehicles ?? []).map((v) => [v.taskId, v])),
+    [formVehicles],
+  );
 
   /**
    * OS VEÍCULOS EM TABELA — as MESMAS colunas do documento e da página pública.
@@ -281,18 +314,22 @@ export function BudgetStepReview({
       value ? (map[value as keyof typeof map] ?? value) : null;
     const existing = existingQuote?.tasks ?? [];
     if (existing.length > 0) {
-      return sortQuoteTasks(existing as any[]).map((t: any) => ({
-        key: t.id,
-        serialNumber: t.serialNumber ?? null,
-        plate: t.truck?.plate ?? null,
-        chassis: t.truck?.chassisNumber ?? null,
-        orderNumber:
-          t.id === openTaskId
-            ? ((formOrderNumber ?? "").trim() || null)
-            : ((t.customerOrderNumber ?? "").trim() || null),
-        category: label(TRUCK_CATEGORY_LABELS as any, t.truck?.category),
-        implement: label(IMPLEMENT_TYPE_LABELS as any, t.truck?.implementType),
-      }));
+      return sortQuoteTasks(existing as any[]).map((t: any) => {
+        const live = formVehicleById.get(t.id);
+        return {
+          key: t.id,
+          serialNumber: (live ? live.serialNumber : t.serialNumber) || null,
+          plate: (live ? live.plate : t.truck?.plate) || null,
+          chassis: (live ? live.chassisNumber : t.truck?.chassisNumber) || null,
+          orderNumber: live
+            ? ((live.customerOrderNumber ?? "").trim() || null)
+            : t.id === openTaskId
+              ? ((formOrderNumber ?? "").trim() || null)
+              : ((t.customerOrderNumber ?? "").trim() || null),
+          category: label(TRUCK_CATEGORY_LABELS as any, t.truck?.category),
+          implement: label(IMPLEMENT_TYPE_LABELS as any, t.truck?.implementType),
+        };
+      });
     }
     // Na CRIAÇÃO os caminhões ainda não existem: categoria e implemento são os
     // do formulário e valem para todos os que vão nascer, como o nº do pedido.
@@ -318,6 +355,7 @@ export function BudgetStepReview({
     openTaskId,
     formCategory,
     formImplementType,
+    formVehicleById,
   ]);
 
   // Cada coluna só existe se ALGUM veículo a tiver — a mesma regra do documento
@@ -337,10 +375,15 @@ export function BudgetStepReview({
   // um valor que falta e não tem nó no DOM é um sinal sem para onde apontar.
   const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
   const orderNumberText = useMemo(() => {
+    if (formVehicles && formVehicles.length > 0) {
+      return orderNumberLabel(
+        formVehicles.map((v) => ({ customerOrderNumber: v.customerOrderNumber ?? null })),
+      );
+    }
     const siblings = ((existingQuote?.tasks ?? []) as Array<{ id: string; customerOrderNumber?: string | null }>)
       .filter((t) => t.id !== openTaskId);
     return orderNumberLabel([{ customerOrderNumber: formOrderNumber ?? null }, ...siblings]);
-  }, [formOrderNumber, existingQuote, openTaskId]);
+  }, [formOrderNumber, existingQuote, openTaskId, formVehicles]);
   const billsIbipora = (customerConfigs ?? []).some(
     (c: any) => c?.customerId === PINNED_CUSTOMERS.IBIPORA && c?.generateInvoice !== false,
   );
@@ -601,13 +644,27 @@ export function BudgetStepReview({
                           <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Categoria</th>
                         )}
                         {anyVehicleImplement && (
-                          <th className="pb-1 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Implemento</th>
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Implemento</th>
+                        )}
+                        {vehicleExtras && (
+                          <th className="pb-1 pr-3 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Pintura</th>
+                        )}
+                        {vehicleExtras && (
+                          <th className="pb-1 text-left text-[0.65rem] font-semibold uppercase tracking-wide">Layout</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {vehicleRows.map((v, i) => (
-                        <tr key={v.key} className="border-t border-border/40">
+                        <tr
+                          key={v.key}
+                          className={cn(
+                            "border-t border-border/40",
+                            onVehicleSelect && "cursor-pointer hover:bg-muted",
+                          )}
+                          onClick={onVehicleSelect ? () => onVehicleSelect(v.key) : undefined}
+                          title={onVehicleSelect ? "Editar este veículo" : undefined}
+                        >
                           <td className="py-1 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
                           <td className="py-1 pr-3 font-medium">{v.serialNumber || <span className="italic text-muted-foreground">a registrar</span>}</td>
                           <td className="py-1 pr-3 font-medium">{v.plate || <span className="italic text-muted-foreground">a registrar</span>}</td>
@@ -621,7 +678,42 @@ export function BudgetStepReview({
                             <td className="py-1 pr-3 font-medium">{v.category || <span className="text-muted-foreground">—</span>}</td>
                           )}
                           {anyVehicleImplement && (
-                            <td className="py-1 font-medium">{v.implement || <span className="text-muted-foreground">—</span>}</td>
+                            <td className="py-1 pr-3 font-medium">{v.implement || <span className="text-muted-foreground">—</span>}</td>
+                          )}
+                          {vehicleExtras && (
+                            <td className="py-1 pr-3 font-medium">
+                              {vehicleExtras[v.key]?.paintName ? (
+                                <span className="flex items-center gap-1.5">
+                                  {vehicleExtras[v.key]?.paintHex && (
+                                    <span
+                                      className="h-2.5 w-2.5 shrink-0 rounded-full border border-border"
+                                      style={{ backgroundColor: vehicleExtras[v.key]?.paintHex ?? undefined }}
+                                    />
+                                  )}
+                                  {vehicleExtras[v.key]?.paintName}
+                                </span>
+                              ) : (
+                                <span className="italic text-muted-foreground">a definir</span>
+                              )}
+                            </td>
+                          )}
+                          {vehicleExtras && (
+                            <td className="py-1">
+                              {(vehicleExtras[v.key]?.layoutThumbs ?? []).length > 0 ? (
+                                <span className="flex gap-1">
+                                  {(vehicleExtras[v.key]?.layoutThumbs ?? []).map((src, k) => (
+                                    <img
+                                      key={k}
+                                      src={src}
+                                      alt="Layout"
+                                      className="h-8 w-14 rounded border border-border bg-background object-contain"
+                                    />
+                                  ))}
+                                </span>
+                              ) : (
+                                <span className="italic text-muted-foreground">sem layout</span>
+                              )}
+                            </td>
                           )}
                         </tr>
                       ))}
@@ -1100,8 +1192,33 @@ export function BudgetStepReview({
         </div>
       )}
 
+      {/* Layout por veículo: as artes agrupadas pelos caminhões que as usam. */}
+      {layoutGroups && layoutGroups.length > 0 && (
+        <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <IconPhoto className="h-4 w-4 text-muted-foreground" />
+            Layout
+          </div>
+          {layoutGroups.map((group, g) => (
+            <div key={g} className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</div>
+              <div className={cn("grid gap-3", group.thumbs.length <= 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
+                {group.thumbs.map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt={`Layout — ${group.label}`}
+                    className="w-full max-h-[420px] rounded-lg bg-background object-contain shadow-sm"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Layout Preview (renders the layoutFiles array, up to 2) */}
-      {(() => {
+      {!layoutGroups && (() => {
         // A persisted File id is a UUID; a not-yet-uploaded file carries a local temp
         // id (`<timestamp>-<random>`) the thumbnail endpoint would 404 on (→ broken
         // image). So resolve a local object-URL preview first, then a server
