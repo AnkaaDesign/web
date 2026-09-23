@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   IconClipboardList,
@@ -13,6 +13,9 @@ import {
   IconHash,
   IconId,
   IconSparkles,
+  IconCopy,
+  IconRuler,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import {
   TRUCK_CATEGORY,
@@ -22,6 +25,7 @@ import {
   SECTOR_PRIVILEGES,
 } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
+import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +41,7 @@ import { GeneralPaintingSelector } from "@/components/production/task/form/gener
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FileCardUploadField, FileUploadField } from "@/components/common/file";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
@@ -58,6 +63,38 @@ interface BudgetStepTaskProps {
   /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. Edit mode only. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
+
+  // ─── ORÇAMENTO DE N VEÍCULOS (só na edição) ─────────────────────────────────
+  //
+  // O passo tem duas metades. COMUM a todos: logomarca, cliente, categoria,
+  // implemento, tamanho, responsáveis e arquivos base — mesmo orçamento, mesmo
+  // preço, mesmo caminhão. DE CADA veículo: série, placa, pedido, chassi, plaqueta,
+  // previsão, prazo, detalhes, pintura geral e aerografia. Decisão do dono,
+  // 23/09/2026, a partir do caso Carlotti (nº 990).
+
+  /**
+   * Prefixo dos campos DO VEÍCULO no formulário (`vehicles.<i>.`). Sem ele os campos
+   * têm os nomes de sempre — é o que a criação usa.
+   */
+  vehicleFieldPrefix?: string;
+  /** Identidade do veículo mostrado: as seções dele remontam ao trocar de aba. */
+  vehicleKey?: string;
+  /** Quantos veículos o orçamento cobre. Com 2+, o passo mostra as abas e os rótulos. */
+  vehicleCount?: number;
+  /** "39088" — como o veículo mostrado é chamado nos títulos das seções. */
+  activeVehicleLabel?: string;
+  /** As abas de escolha do veículo (`BudgetVehicleTabs`). */
+  vehicleTabs?: ReactNode;
+  /** Copia o valor do veículo mostrado para os demais. */
+  onApplyToOtherVehicles?: (field: "customerOrderNumber" | "forecastDate" | "paintId") => void;
+  /** O tamanho do implemento, lançado pela Logística — aqui só se lê. */
+  measuresSummary?: ReactNode;
+  /**
+   * Campos comuns que hoje DIVERGEM entre os veículos (dado anterior a esta tela, ou
+   * editado tarefa a tarefa). `onEqualize` faz o próximo salvar gravar o valor
+   * mostrado em todos.
+   */
+  commonDivergence?: { fields: string[]; equalized: boolean; onEqualize: () => void } | null;
 }
 
 export function BudgetStepTask({
@@ -74,6 +111,14 @@ export function BudgetStepTask({
   onPaintCreated,
   vinPlateFiles,
   onVinPlateFilesChange,
+  vehicleFieldPrefix = "",
+  vehicleKey,
+  vehicleCount = 1,
+  activeVehicleLabel,
+  vehicleTabs,
+  onApplyToOtherVehicles,
+  measuresSummary,
+  commonDivergence,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -110,6 +155,26 @@ export function BudgetStepTask({
     }
   }, [openAccordion, scrollToAccordion]);
 
+  // Campos DO VEÍCULO. `v("plate")` é `plate` na criação e `vehicles.<i>.plate` na
+  // edição de um orçamento de N veículos.
+  const v = (field: string) => `${vehicleFieldPrefix}${field}`;
+  const multiVehicle = isEditMode && vehicleCount > 1;
+  const vehicleSuffix = multiVehicle && activeVehicleLabel ? ` — ${activeVehicleLabel}` : "";
+  const commonSuffix = multiVehicle ? " — comum a todos os veículos" : "";
+  const applyButton = (field: "customerOrderNumber" | "forecastDate" | "paintId", label: string) =>
+    multiVehicle && onApplyToOtherVehicles && !disabled ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 gap-1 px-1.5 text-xs font-normal text-muted-foreground"
+        onClick={() => onApplyToOtherVehicles(field)}
+      >
+        <IconCopy className="h-3 w-3" />
+        {label}
+      </Button>
+    ) : null;
+
   // Calculate how many tasks will be created (create mode only)
   const taskCount = useMemo(() => {
     if (isEditMode) return 1;
@@ -123,6 +188,11 @@ export function BudgetStepTask({
 
   return (
     <div className={openAccordion === 'base-files' || openAccordion === 'layouts' ? 'pb-64' : ''}>
+      {multiVehicle && vehicleTabs && (
+        <div className="sticky top-0 z-10 -mx-1 mb-4 bg-background/95 px-1 pb-2 pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          {vehicleTabs}
+        </div>
+      )}
       <Accordion
         type="single"
         collapsible
@@ -214,16 +284,62 @@ export function BudgetStepTask({
                   />
                 </div>
 
+                {/* Tamanho — comum: mesmo orçamento, mesmo implemento. Lançado pela
+                    Logística na tarefa e replicado aos irmãos pela API; aqui só se lê. */}
+                {isEditMode && measuresSummary && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconRuler className="h-4 w-4" />
+                    <span>Tamanho do implemento:</span>
+                    <span className="font-medium text-foreground">{measuresSummary}</span>
+                  </div>
+                )}
+
+                {multiVehicle && commonDivergence && commonDivergence.fields.length > 0 && (
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                    <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-amber-900 dark:text-amber-100">
+                        Os veículos estão com valores diferentes em{" "}
+                        <span className="font-medium">{commonDivergence.fields.join(", ")}</span>. Esses campos
+                        são comuns ao orçamento: o que aparece aqui é o do veículo aberto.
+                      </p>
+                      {commonDivergence.equalized ? (
+                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                          Ao salvar, todos os veículos ficam com os valores mostrados aqui.
+                        </p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={commonDivergence.onEqualize}
+                          disabled={disabled}
+                        >
+                          Igualar todos os veículos a estes valores
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {multiVehicle && (
+                  <div className="flex items-center gap-2 border-t border-border pt-4 text-sm font-medium">
+                    <IconTruck className="h-4 w-4 text-muted-foreground" />
+                    Deste veículo{vehicleSuffix}
+                  </div>
+                )}
+
                 {/* Plates + Serial Numbers */}
                 {isEditMode ? (
                   /* CINCO colunas: série, placa, nº do pedido, chassi e plaqueta
                      são a IDENTIFICAÇÃO do mesmo veículo e pertencem à mesma
                      fileira. Com quatro colunas a plaqueta caía sozinha numa
                      linha inteira, parecendo uma seção própria. */
-                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                  <div key={vehicleKey} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <FormField
                       control={control}
-                      name="serialNumber"
+                      name={v("serialNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -245,7 +361,7 @@ export function BudgetStepTask({
                     />
                     <FormField
                       control={control}
-                      name="plate"
+                      name={v("plate")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -281,12 +397,13 @@ export function BudgetStepTask({
                         criação (abaixo) ele vale para todos os que nascerem. */}
                     <FormField
                       control={control}
-                      name="customerOrderNumber"
+                      name={v("customerOrderNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
                             <IconHash className="h-4 w-4" />
                             N° do Pedido
+                            {applyButton("customerOrderNumber", "Repetir nos demais")}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -306,7 +423,7 @@ export function BudgetStepTask({
                     />
                     <FormField
                       control={control}
-                      name="chassisNumber"
+                      name={v("chassisNumber")}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
@@ -425,22 +542,27 @@ export function BudgetStepTask({
 
                 {/* Forecast Date + Term (o Prazo só aparece para quem pode gravá-lo) */}
                 <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
-                  <FormField
-                    control={control}
-                    name="forecastDate"
-                    render={({ field }) => (
-                      <DateTimeInput
-                        {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
-                        mode="datetime"
-                        label="Data de Previsão de Liberação"
-                        disabled={disabled}
-                      />
-                    )}
-                  />
+                  <div className="space-y-1">
+                    <FormField
+                      key={vehicleKey}
+                      control={control}
+                      name={v("forecastDate")}
+                      render={({ field }) => (
+                        <DateTimeInput
+                          {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
+                          mode="datetime"
+                          label="Data de Previsão de Liberação"
+                          disabled={disabled}
+                        />
+                      )}
+                    />
+                    {applyButton("forecastDate", "Aplicar esta previsão aos demais veículos")}
+                  </div>
                   {canEditTerm && (
                     <FormField
+                      key={vehicleKey}
                       control={control}
-                      name="term"
+                      name={v("term")}
                       render={({ field }) => (
                         <DateTimeInput
                           {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
@@ -455,8 +577,9 @@ export function BudgetStepTask({
 
                 {/* Details */}
                 <FormField
+                  key={vehicleKey}
                   control={control}
-                  name="details"
+                  name={v("details")}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
@@ -494,7 +617,7 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconUser className="h-5 w-5" />
-                    Responsáveis
+                    Responsáveis{commonSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
@@ -533,13 +656,15 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconPalette className="h-5 w-5" />
-                    Tintas
+                    Tintas{vehicleSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
-                <CardContent className="space-y-6 pt-0">
+                <CardContent className="space-y-2 pt-0">
                   <GeneralPaintingSelector
+                    key={vehicleKey}
+                    name={v("paintId")}
                     control={control}
                     disabled={disabled}
                     userPrivilege={user?.sector?.privileges}
@@ -547,6 +672,7 @@ export function BudgetStepTask({
                     onPaintCreated={onPaintCreated}
                     quickCreateDescription='Informe os dados básicos da nova tinta. Ao salvar o orçamento, uma ordem de serviço "Formular Cor" será criada para a equipe de artes.'
                   />
+                  {applyButton("paintId", "Aplicar esta pintura aos demais veículos")}
                 </CardContent>
               </AccordionContent>
             </Card>
@@ -564,7 +690,7 @@ export function BudgetStepTask({
               <CardHeader className="flex-1 py-4">
                 <CardTitle className="flex items-center gap-2">
                   <IconFileText className="h-5 w-5" />
-                  Arquivos Base
+                  Arquivos Base{commonSuffix}
                   {baseFiles.length > 0 && (
                     <Badge variant="secondary" className="ml-1">
                       {baseFiles.length}
@@ -614,7 +740,7 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconPhoto className="h-5 w-5" />
-                    Layout Referência
+                    Layout Referência{vehicleSuffix}
                     {layouts.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {layouts.length}
@@ -626,6 +752,7 @@ export function BudgetStepTask({
               <AccordionContent>
                 <CardContent className="pt-0">
                   <LayoutFileUploadField
+                    key={vehicleKey}
                     onFilesChange={onLayoutsChange}
                     onStatusChange={onLayoutStatusChange}
                     maxFiles={5}
@@ -675,13 +802,20 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconSparkles className="h-5 w-5" />
-                    Aerografias
+                    Aerografias{vehicleSuffix}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
                 <CardContent className="pt-0">
-                  <MultiAirbrushingSelector control={control} disabled={disabled} customerId={customerIdValue || undefined} />
+                  <MultiAirbrushingSelector
+                    key={vehicleKey}
+                    name={v("airbrushings")}
+                    control={control}
+                    disabled={disabled}
+                    customerId={customerIdValue || undefined}
+                    canViewFinancials={canViewAirbrushingFinancials(user as any)}
+                  />
                 </CardContent>
               </AccordionContent>
             </Card>
