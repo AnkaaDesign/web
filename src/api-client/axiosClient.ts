@@ -5,6 +5,10 @@ import type { AxiosRequestConfig, AxiosInstance, InternalAxiosRequestConfig, Can
 import qs from "qs";
 import { notify } from "./notify";
 import { safeLocalStorage } from "./platform-utils";
+import { CLIENT_HEADER, clientHeaderValue, isClientHeaderEnabled } from "./client-header";
+
+const SEND_CLIENT_HEADER = isClientHeaderEnabled();
+const CLIENT_HEADER_VALUE = clientHeaderValue();
 
 // =====================
 // Enhanced Type Definitions
@@ -550,6 +554,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Add request ID header if enabled
       if (finalConfig.enableRequestId) {
         config.headers["X-Request-ID"] = requestId;
+      }
+
+      // Quem chama (censo de consultas da API). Desligado até a API aceitar o
+      // cabeçalho no CORS — ver `client-header.ts`.
+      if (SEND_CLIENT_HEADER) {
+        config.headers[CLIENT_HEADER] = CLIENT_HEADER_VALUE;
       }
 
       // CRITICAL: Clean query parameters to remove empty strings, null, undefined
