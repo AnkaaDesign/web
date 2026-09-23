@@ -61,7 +61,7 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
 import { batchCreateTasksWithQuote } from "../../../../api-client/task";
-import type { ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, FACE_MEASURE_FIELD, type ImplementFace } from "@/constants/implement-faces";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -442,6 +442,28 @@ export const TaskCreateForm = () => {
             customerId: customerIdValue || undefined,
           }));
 
+        // A FOTO DA FACE (A7). O editor de medidas guarda a foto escolhida em
+        // `photoFile` e só a sobe quem salva — a edição a manda no multipart
+        // (`implementMeasurePhotos.<face>`). A criação monta JSON e só levava
+        // `photoId`, que numa foto recém-escolhida é nulo: a foto da traseira
+        // escolhida aqui se perdia sem aviso. Agora ela sobe antes, uma vez, e o
+        // id vai para a medida de cada tarefa do lote (como no lote da API).
+        const uploadedMeasurePhotoIds: Partial<Record<ImplementFace, string>> = {};
+        if (hasLayoutChanges) {
+          for (const side of modifiedLayoutSides) {
+            const photoFile = currentLayoutStates[side]?.photoFile;
+            if (!(photoFile instanceof File)) continue;
+            try {
+              const response = await uploadSingleFile(photoFile, { fileContext: 'implementMeasurePhotos' });
+              if (response.success && response.data) {
+                uploadedMeasurePhotoIds[side] = response.data.id;
+              }
+            } catch (error: any) {
+              toast.error(`Erro ao enviar a foto da face ${FACE_LABEL[side]}: ${error.message}`);
+            }
+          }
+        }
+
         // Build layout section data from modified sides (each task creates its own layout records)
         const buildLayoutSectionData = () => {
           if (!hasLayoutChanges || modifiedLayoutSides.size === 0) return {};
@@ -449,11 +471,10 @@ export const TaskCreateForm = () => {
           for (const side of modifiedLayoutSides) {
             const sideData = currentLayoutStates[side];
             if (sideData) {
-              const key = side === "left" ? "leftSideMeasure" : side === "right" ? "rightSideMeasure" : "backSideMeasure";
-              layoutData[key] = {
+              layoutData[FACE_MEASURE_FIELD[side]] = {
                 height: sideData.height,
                 sections: sideData.sections || sideData.sections,
-                photoId: sideData.photoId || null,
+                photoId: uploadedMeasurePhotoIds[side] || sideData.photoId || null,
               };
             }
           }
