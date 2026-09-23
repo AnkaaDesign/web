@@ -6,6 +6,7 @@ import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 import { buildDiscriminacao } from "@/utils/nfse-discriminacao";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
 import {
   coveredTaskIds,
   orderNumberLabel,
@@ -25,28 +26,14 @@ import {
  * boleto's seuNumero and informativos.
  */
 
-// Exact label maps used by the API's discriminação/informativo builders
-// (differ from the web display labels, e.g. "Carga seca" vs "Carga Seca").
-const API_TRUCK_CATEGORY_LABELS: Record<string, string> = {
-  MINI: "Mini",
-  VUC: "VUC",
-  THREE_QUARTER: "3/4",
-  RIGID: "Toco",
-  TRUCK: "Truck",
-  SEMI_TRAILER: "Semirreboque",
-  SEMI_TRAILER_2_AXLES: "Semirreboque 2 Eixos",
-  B_DOUBLE_FRONT: "Bitrem Composição Dianteira",
-  B_DOUBLE_REAR: "Bitrem Composição Traseira",
-  BITRUCK: "Bitruck",
-};
-const API_IMPLEMENT_TYPE_LABELS: Record<string, string> = {
-  DRY_CARGO: "Carga seca",
-  REFRIGERATED: "Refrigerado",
-  INSULATED: "Isotérmico",
-  CURTAIN_SIDE: "Sider",
-  TANK: "Tanque",
-  FLATBED: "Prancha/Plataforma",
-};
+// As palavras de cada documento, do contrato da API (D-18): a NFS-e da tarefa
+// diz "Carga seca"/"Isotérmico"/"Prancha/Plataforma"; o informativo do boleto
+// diz "Carga Seca"/"Isoplastic"/"Carroceria". A prévia usava as da NFS-e nos
+// dois documentos, e o boleto mostrado não era o boleto registrado.
+const NFSE_CATEGORY_LABELS: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.nfseTask;
+const NFSE_IMPLEMENT_LABELS: Record<string, string> = IMPLEMENT_TYPE_PROFILE_LABELS.nfseTask;
+const BOLETO_CATEGORY_LABELS: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.invoice;
+const BOLETO_IMPLEMENT_LABELS: Record<string, string> = IMPLEMENT_TYPE_PROFILE_LABELS.invoice;
 
 interface TaskVehicle {
   plate?: string | null;
@@ -141,8 +128,8 @@ function buildBoletoInformativos(
   else if (nfPart) parts.push(nfPart);
 
   const vehicleType = [
-    task.category ? API_TRUCK_CATEGORY_LABELS[task.category] ?? task.category : "",
-    task.implementType ? API_IMPLEMENT_TYPE_LABELS[task.implementType] ?? task.implementType : "",
+    task.category ? BOLETO_CATEGORY_LABELS[task.category] ?? task.category : "",
+    task.implementType ? BOLETO_IMPLEMENT_LABELS[task.implementType] ?? task.implementType : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -293,8 +280,8 @@ function buildCustomerDoc(
     vehicles: coveredVehicles.length > 0 ? coveredVehicles : [task],
     services: serviceDescs,
     fallbackLabel: `Ref. OS ${task.serialNumber || (budgetNumber ? `Orçamento ${budgetNumber}` : "")}`.trim(),
-    categoryLabels: API_TRUCK_CATEGORY_LABELS,
-    implementLabels: API_IMPLEMENT_TYPE_LABELS,
+    categoryLabels: NFSE_CATEGORY_LABELS,
+    implementLabels: NFSE_IMPLEMENT_LABELS,
   });
 
   const enderecoParts = [cd.address, cd.addressNumber].filter(Boolean).join(", ");
