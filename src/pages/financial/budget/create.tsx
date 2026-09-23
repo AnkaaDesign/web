@@ -765,16 +765,18 @@ export const FinancialBudgetCreatePage = () => {
       const { plates, category, implementType } = data;
       const hasTruckFields = (plates && plates.length > 0) || category || implementType;
       const buildTruckData = (plate?: string) => {
-        // Sem nenhum campo, o caminhão nasce VAZIO (`truck: {}`), como nascia
+        // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), como nascia
         // quando o tipo tinha "Refrigerado" de padrão (antes do D-25): cada
         // tarefa tem exatamente um implemento (DD1); só o tipo não se inventa.
-        if (!hasTruckFields && !plate) return { truck: {} };
         return {
-          truck: {
-            ...(plate && { plate }),
-            category: category || undefined,
-            implementType: implementType || undefined,
-          },
+          truck:
+            hasTruckFields || plate
+              ? {
+                  ...(plate && { plate }),
+                  category: category || undefined,
+                  implementType: implementType || undefined,
+                }
+              : {},
         };
       };
 

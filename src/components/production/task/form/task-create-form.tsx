@@ -515,19 +515,19 @@ export const TaskCreateForm = () => {
         const buildTruckData = (plate?: string) => {
           const layoutSectionData = buildLayoutSectionData();
           const hasTruckFields = plate || category || implementType || hasLayoutChanges;
-          // Sem nenhum campo, o caminhão nasce VAZIO (`truck: {}`), e não
+          // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), e não
           // deixa de nascer: com o tipo "Refrigerado" de padrão (antes do
           // D-25) toda tarefa criada aqui tinha caminhão, e cada tarefa tem
           // exatamente um implemento (DD1). O que não se inventa é o tipo.
-          if (!hasTruckFields) return { truck: {} };
-
           return {
-            truck: {
-              ...(plate && { plate }),
-              category: category || undefined,
-              implementType: implementType || undefined,
-              ...layoutSectionData,
-            },
+            truck: hasTruckFields
+              ? {
+                  ...(plate && { plate }),
+                  category: category || undefined,
+                  implementType: implementType || undefined,
+                  ...layoutSectionData,
+                }
+              : {},
           };
         };
 
