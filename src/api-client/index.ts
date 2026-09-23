@@ -78,7 +78,6 @@ export * from "./throttler";
 export * from "./truck";
 export * from "./warehouse-location";
 export * from "./implementMeasure";
-export * from "./services/implementMeasureSection";
 export * from "./services/team-staff";
 export * from "./user";
 export * from "./dashboard";

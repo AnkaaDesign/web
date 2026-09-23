@@ -51,47 +51,11 @@ export const useImplementMeasuresByTruck = (
       // Single API call - backend now returns everything needed for previews
       // Only includes photo if explicitly requested
       const response = await implementMeasureService.getByTruckId(truckId, { includePhoto });
-      const measuresData = response.data.data;
-
-      // If backend already includes sections (which it should after our fix),
-      // we don't need additional fetches
-      if (measuresData.leftSideMeasure?.sections ||
-          measuresData.rightSideMeasure?.sections ||
-          measuresData.backSideMeasure?.sections) {
-        return measuresData;
-      }
-
-      // Fallback: If sections aren't included (old API version),
-      // fetch them separately but without photos for preview
-      const fetchWithSections = async (measure: any) => {
-        if (!measure?.id) return measure;
-        try {
-          const detailResponse = await implementMeasureService.getById(measure.id, {
-            include: {
-              sections: true,
-              ...(includePhoto && { photo: true })
-            }
-          });
-          return detailResponse.data.data;
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('[useImplementMeasuresByTruck] Error fetching implement measure details:', error);
-          }
-          return measure;
-        }
-      };
-
-      const [leftSideMeasure, rightSideMeasure, backSideMeasure] = await Promise.all([
-        fetchWithSections(measuresData.leftSideMeasure),
-        fetchWithSections(measuresData.rightSideMeasure),
-        fetchWithSections(measuresData.backSideMeasure),
-      ]);
-
-      return {
-        leftSideMeasure,
-        rightSideMeasure,
-        backSideMeasure,
-      };
+      // A API sempre devolve as seções de cada face (o repositório as inclui) e
+      // `null` na face sem medida. Havia aqui um recuo para uma "versão antiga da
+      // API" que buscava as seções medida a medida e remontava a resposta só com
+      // as 3 faces que conhecia — a face nova sumiria ali em silêncio. Saiu.
+      return response.data.data;
     },
     enabled: enabled && !!truckId,
     staleTime: 5 * 60 * 1000,
