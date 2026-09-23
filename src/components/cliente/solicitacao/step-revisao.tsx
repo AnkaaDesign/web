@@ -46,6 +46,7 @@ import {
   type LadoImplemento,
   type SolicitacaoFormData,
 } from "./solicitacao-schema";
+import { IMPLEMENT_FACES } from "@/constants/implement-faces";
 
 interface StepRevisaoProps {
   /** Nomes já vistos pelos comboboxes — ver `onOptionsSeen`. */
@@ -74,7 +75,8 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
 
 const vazio = <span className="font-normal text-muted-foreground">Não informado</span>;
 
-const LADOS: readonly LadoImplemento[] = ["left", "right", "back"];
+/** As faces vêm da lista única (G18): a frente, quando entrar, aparece aqui sozinha. */
+const LADOS: readonly LadoImplemento[] = IMPLEMENT_FACES;
 
 /**
  * Centímetro inteiro → metro com vírgula, como o `ImplementMeasureForm` escreve.

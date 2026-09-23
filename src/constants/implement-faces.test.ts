@@ -57,16 +57,53 @@ const FONTES = import.meta.glob<string>(
   { query: "?raw", import: "default", eager: true },
 );
 
-describe("nenhuma união de faces escrita à mão", () => {
+/**
+ * Uma sequência de literais de face ligados por `|` (união) ou `,` (array), em
+ * QUALQUER ordem. Conta como lista de faces escrita à mão quando junta um lado
+ * (`left`/`right`) com `back` ou `front`: só `"left" | "right"` é também o
+ * alinhamento/direção de mil componentes, e só `"front" | "back"` é a ordem das
+ * notas — esses não são faces do implemento.
+ */
+const SEQUENCIA = /(?:(['"])(?:left|right|back|front)\1\s*[|,]\s*)+(['"])(?:left|right|back|front)\2/g;
+
+function listasDeFaceAMao(fonte: string): string[] {
+  const achadas: string[] = [];
+  for (const m of fonte.matchAll(SEQUENCIA)) {
+    const faces = new Set(m[0].match(/left|right|back|front/g));
+    const lado = faces.has("left") || faces.has("right");
+    if (lado && (faces.has("back") || faces.has("front"))) achadas.push(m[0]);
+  }
+  return achadas;
+}
+
+describe("nenhuma lista de faces escrita à mão", () => {
   it("o glob enxergou o código-fonte", () => {
     expect(Object.keys(FONTES).length).toBeGreaterThan(500);
   });
 
-  it("use ImplementFace em vez de 'left' | 'right' | 'back'", () => {
-    const uniao = /(['"])left\1\s*\|\s*(['"])right\2\s*\|\s*(['"])back\3/;
+  it.each([
+    ["união na ordem de hoje", "type L = 'left' | 'right' | 'back';"],
+    ["união permutada", "type L = 'right' | 'left' | 'back';"],
+    ["array", 'const LADOS = ["left", "right", "back"] as const;'],
+    ["Record com face faltando", "type M = Record<'left' | 'back', number>;"],
+    ["com a frente", "type L = 'left' | 'right' | 'back' | 'front';"],
+  ])("a varredura acusa %s", (_nome, fonte) => {
+    expect(listasDeFaceAMao(fonte)).not.toEqual([]);
+  });
+
+  it.each([
+    ["alinhamento", 'align?: "left" | "right" | "center";'],
+    ["direção", 'direction: "left" | "right"'],
+    ["ordem das notas", 'where: "front" | "back"'],
+  ])("a varredura não acusa %s", (_nome, fonte) => {
+    expect(listasDeFaceAMao(fonte)).toEqual([]);
+  });
+
+  it("use IMPLEMENT_FACES/ImplementFace em vez de listar as faces à mão", () => {
     const achados = Object.entries(FONTES)
-      .filter(([, fonte]) => uniao.test(fonte))
-      .map(([arquivo]) => arquivo);
+      .map(([arquivo, fonte]) => [arquivo, listasDeFaceAMao(fonte)] as const)
+      .filter(([, listas]) => listas.length > 0)
+      .map(([arquivo, listas]) => `${arquivo}: ${listas.join(" ; ")}`);
     expect(achados).toEqual([]);
   });
 });

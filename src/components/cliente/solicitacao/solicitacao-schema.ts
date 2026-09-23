@@ -49,6 +49,7 @@ import type {
   PortalMeasureSideInput,
   PortalNewCustomerInput,
 } from "@/api-client/portal";
+import type { ImplementFace } from "@/constants/implement-faces";
 
 /**
  * O valor que o combobox de cliente carrega enquanto o cliente ainda NÃO existe
@@ -230,17 +231,22 @@ export function novasMedidas(): MedidasFormData {
   return { esquerda: novaMedidaLado(), direita: novaMedidaLado(), traseira: novaMedidaLado() };
 }
 
-/** O lado do `ImplementMeasureForm` ↔ a chave das medidas da requisição. */
+/**
+ * O lado do `ImplementMeasureForm` ↔ a chave das medidas da requisição.
+ *
+ * Cobre EXATAMENTE as faces de `IMPLEMENT_FACES` (G18): quando a frente entrar
+ * lá, o `tsc` aponta este mapa, e a requisição do portal decide a sua chave.
+ */
 export const LADO_DO_IMPLEMENTO = {
   left: "esquerda",
   right: "direita",
   back: "traseira",
-} as const;
+} as const satisfies Record<ImplementFace, string>;
 
-export type LadoImplemento = keyof typeof LADO_DO_IMPLEMENTO;
+export type LadoImplemento = ImplementFace;
 
 /** Os rótulos do formulário INTERNO — "Motorista" e "Sapo" são os do chão. */
-export const ROTULO_DO_LADO: Record<LadoImplemento, string> = {
+export const ROTULO_DO_LADO: Record<ImplementFace, string> = {
   left: "Motorista",
   right: "Sapo",
   back: "Traseira",

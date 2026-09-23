@@ -72,6 +72,7 @@ import {
   type MedidasFormData,
   type SolicitacaoFormData,
 } from "./solicitacao-schema";
+import { IMPLEMENT_FACES } from "@/constants/implement-faces";
 
 interface StepVeiculosProps {
   disabled?: boolean;
@@ -368,7 +369,8 @@ export function SolicitacaoStepVeiculos({ disabled }: StepVeiculosProps) {
   );
 }
 
-const LADOS: readonly LadoImplemento[] = ["left", "right", "back"];
+/** As faces vêm da lista única (G18): a frente, quando entrar, aparece aqui sozinha. */
+const LADOS: readonly LadoImplemento[] = IMPLEMENT_FACES;
 
 /**
  * A primeira mensagem de erro que houver sob este nó, em qualquer profundidade.
