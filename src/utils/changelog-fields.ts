@@ -28,6 +28,7 @@ import {
   ADMISSION_DOCUMENT_TYPE_LABELS,
   ADMISSION_DOCUMENT_STATUS_LABELS,
 } from '@constants';
+import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
 import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis, formatPixKey } from "./formatters";
@@ -1722,31 +1723,18 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
 
   // Handle truck category (for both TRUCK entity and truck.category in TASK entity)
   if ((field === "category" || field === "truck.category") && typeof value === "string") {
-    const truckCategoryLabels: Record<string, string> = {
-      MINI: "Mini",
-      VUC: "VUC (Veículo Urbano de Carga)",
-      THREE_QUARTER: "3/4",
-      RIGID: "Toco",
-      TRUCK: "Caminhão",
-      SEMI_TRAILER: "Semirreboque",
-      SEMI_TRAILER_2_AXLES: "Semirreboque 2 Eixos",
-      B_DOUBLE_FRONT: "Bitrem Composição Dianteira",
-      B_DOUBLE_REAR: "Bitrem Composição Traseira",
-      BITRUCK: "Bitruck",
-    };
+    // Perfil `webChangelog` do contrato da API: o histórico tem palavras
+    // próprias ("VUC (Veículo Urbano de Carga)", "Caminhão"), diferentes da tela.
+    const truckCategoryLabels: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.webChangelog;
     return truckCategoryLabels[value] || value;
   }
 
   // Handle truck implement type
   if ((field === "implementType" || field === "truck.implementType") && typeof value === "string") {
     const implementTypeLabels: Record<string, string> = {
-      DRY_CARGO: "Carga Seca",
-      REFRIGERATED: "Refrigerado",
-      INSULATED: "Isoplastic",
-      CURTAIN_SIDE: "Sider",
-      TANK: "Tanque",
-      FLATBED: "Carroceria",
-      CORRUGATED: "Baú (Legado)", // Legacy value - migrated to REFRIGERATED
+      ...IMPLEMENT_TYPE_PROFILE_LABELS.webChangelog,
+      // Valor fora do enum, só em linhas antigas do histórico (migrado para REFRIGERATED).
+      CORRUGATED: "Baú (Legado)",
     };
     return implementTypeLabels[value] || value;
   }

@@ -184,6 +184,7 @@ import {
   WORK_ACCIDENT_REPORT_TYPE,
   PAYROLL_DISCOUNT_TYPE,
 } from "./enums";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "./document-labels";
 
 // =====================
 // Status Labels
@@ -542,27 +543,12 @@ export const TRUCK_MANUFACTURER_LABELS: Record<TRUCK_MANUFACTURER, string> = {
   [TRUCK_MANUFACTURER.MAN]: "MAN",
 };
 
-export const TRUCK_CATEGORY_LABELS: Record<TRUCK_CATEGORY, string> = {
-  [TRUCK_CATEGORY.MINI]: 'Mini',
-  [TRUCK_CATEGORY.VUC]: 'VUC',
-  [TRUCK_CATEGORY.THREE_QUARTER]: '3/4',
-  [TRUCK_CATEGORY.RIGID]: 'Toco',
-  [TRUCK_CATEGORY.TRUCK]: 'Truck',
-  [TRUCK_CATEGORY.SEMI_TRAILER]: 'Semirreboque',
-  [TRUCK_CATEGORY.SEMI_TRAILER_2_AXLES]: 'Semirreboque 2 Eixos',
-  [TRUCK_CATEGORY.B_DOUBLE_FRONT]: 'Bitrem Composição Dianteira',
-  [TRUCK_CATEGORY.B_DOUBLE_REAR]: 'Bitrem Composição Traseira',
-  [TRUCK_CATEGORY.BITRUCK]: 'Bitruck',
-};
+// Os rótulos de TELA de categoria e implemento vêm do contrato da API (perfil
+// `screen` de `document-labels.ts`, D-18). A nota, o boleto e o changelog têm
+// os SEUS perfis lá; mexer na tela não muda documento nenhum.
+export const TRUCK_CATEGORY_LABELS: Record<TRUCK_CATEGORY, string> = TRUCK_CATEGORY_PROFILE_LABELS.screen;
 
-export const IMPLEMENT_TYPE_LABELS: Record<IMPLEMENT_TYPE, string> = {
-  [IMPLEMENT_TYPE.DRY_CARGO]: 'Carga Seca',
-  [IMPLEMENT_TYPE.REFRIGERATED]: 'Refrigerado',
-  [IMPLEMENT_TYPE.INSULATED]: 'Isoplastic',
-  [IMPLEMENT_TYPE.CURTAIN_SIDE]: 'Sider',
-  [IMPLEMENT_TYPE.TANK]: 'Tanque',
-  [IMPLEMENT_TYPE.FLATBED]: 'Carroceria',
-};
+export const IMPLEMENT_TYPE_LABELS: Record<IMPLEMENT_TYPE, string> = IMPLEMENT_TYPE_PROFILE_LABELS.screen;
 
 // =====================
 // Warning Labels
