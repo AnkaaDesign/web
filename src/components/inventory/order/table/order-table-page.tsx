@@ -54,9 +54,19 @@ const LIST_INCLUDE = {
 const PAYMENT_MANAGERS = [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING];
 
 // Statuses an order can be received from: it must already be marked as done (fulfilled).
-// OVERDUE is included because it's a timing flag — its items can be fulfilled while the
-// order-level status stays OVERDUE; the API re-checks fulfilledAt per item either way.
-const RECEIVABLE_STATUSES: ORDER_STATUS[] = [ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED, ORDER_STATUS.OVERDUE];
+// OVERDUE is deliberately NOT here. It is a fulfillment-phase state, not a timing flag over
+// some other state: the daily cron only stamps OVERDUE on orders that are *not* yet fulfilled
+// (cron.service.ts), and the moment every item gets a fulfilledAt the order is auto-promoted
+// to FULFILLED (checkAndUpdateOrderFulfillmentStatus). So an OVERDUE order always has a
+// pending item, and offering "receive" on it only produced the API's rejection.
+const RECEIVABLE_STATUSES: ORDER_STATUS[] = [ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED];
+
+// Statuses an order can still be marked as done from — the mirror image of the above.
+const FULFILLABLE_STATUSES: ORDER_STATUS[] = [
+  ORDER_STATUS.CREATED,
+  ORDER_STATUS.PARTIALLY_FULFILLED,
+  ORDER_STATUS.OVERDUE,
+];
 
 // The API caps `limit` at 100, so the list is server-paginated (page/limit/sort/filters all go to the
 // server). Page + sort ride the URL the DataTable writes in server mode; search + filters arrive via
@@ -288,11 +298,12 @@ export function OrderTablePage() {
         icon: <IconCheck className="h-4 w-4" />,
         // ADMIN gate: fulfillment is the purchasing-side confirmation with the supplier.
         requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
-        // Shown whenever at least one selected order can still be fulfilled (CREATED).
-        hidden: (rows) => !rows.some((o) => o.status === ORDER_STATUS.CREATED),
+        // Shown whenever at least one selected order is still in the fulfillment phase —
+        // which includes OVERDUE, the state an un-fulfilled order lands in past its forecast.
+        hidden: (rows) => !rows.some((o) => FULFILLABLE_STATUSES.includes(o.status)),
         onClick: (rows) =>
           void runStatusUpdate(
-            rows.filter((o) => o.status === ORDER_STATUS.CREATED),
+            rows.filter((o) => FULFILLABLE_STATUSES.includes(o.status)),
             ORDER_STATUS.FULFILLED,
           ),
       },
