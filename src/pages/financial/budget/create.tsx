@@ -10,7 +10,6 @@ import {
 import {
   routes,
   TASK_STATUS,
-  IMPLEMENT_TYPE,
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE,
   FAVORITE_PAGES,
@@ -165,7 +164,9 @@ export const FinancialBudgetCreatePage = () => {
        */
       customerOrderNumber: null as string | null,
       category: "",
-      implementType: IMPLEMENT_TYPE.REFRIGERATED,
+      // Vazio (D-25). O padrão era REFRIGERATED e todo orçamento criado por aqui gravava
+      // "Refrigerado" no implemento, escolhido ou não — o dado de tipo não é confiável por isso.
+      implementType: "",
       forecastDate: null as Date | null,
       term: null as Date | null,
       paintId: null as string | null,

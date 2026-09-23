@@ -22,7 +22,7 @@ import { BillingStepCustomer } from "@/components/financial/billing/steps/billin
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import { BillingStepBudgetInfo } from "@/components/financial/billing/steps/billing-step-budget-info";
-import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
+import { SECTOR_PRIVILEGES, routes } from "@/constants";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
@@ -591,7 +591,8 @@ const BillingDetailPageInner = ({
       // API pular o campo e a foto antiga sobreviveria a uma remoção.
       vinPlateId: null as string | null,
       category: "" as string,
-      implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
+      // Vazio, nunca um tipo inventado: este valor alimenta a prévia da NFS-e (D-25).
+      implementType: "" as string,
       details: "" as string,
       finishedAt: null as Date | null,
       // Quote fields
@@ -761,7 +762,8 @@ const BillingDetailPageInner = ({
       chassisNumber: task.truck?.chassisNumber || "",
       vinPlateId: task.truck?.vinPlateId || null,
       category: task.truck?.category || "",
-      implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
+      // Sem tipo gravado a prévia mostra nada — antes ela inventava "Refrigerado" (D-25).
+      implementType: task.truck?.implementType || "",
       details: task.details || "",
       finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
     };

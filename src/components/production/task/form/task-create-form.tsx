@@ -123,7 +123,8 @@ export const TaskCreateForm = () => {
       plates: [],
       serialNumbers: [],
       category: "",
-      implementType: IMPLEMENT_TYPE.REFRIGERATED,
+      // Vazio (D-25): com o padrão REFRIGERATED toda tarefa criada aqui gravava "Refrigerado".
+      implementType: "",
       forecastDate: null,
       term: null,
       paintId: null,
