@@ -76,8 +76,12 @@ const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 1
 /**
  * Σ de uma coluna de dinheiro dos pagadores. `null` quando não há pagador
  * carregado — que é "a consulta não trouxe a relação", nunca "vale zero".
+ *
+ * Exportada para a lente do Faturamento, que soma só os pagadores filtrados e,
+ * de propósito, SEM o recuo de `billingChargedTotal` (que devolveria o valor da
+ * cobrança inteira).
  */
-function sumConfigMoney(
+export function sumConfigMoney(
   configs: readonly BudgetPayer[] | null | undefined,
   key: "total" | "subtotal",
 ): number | null {

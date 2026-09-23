@@ -1,6 +1,6 @@
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import type { Task } from "@/types";
-import type { Billing, BILLING_STATUS } from "@/types/budget";
+import type { Billing, BILLING_STATUS, BudgetPayer } from "@/types/budget";
 import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -20,6 +20,7 @@ import {
   invoiceToCustomerNames,
   paymentMethodLabels,
   renderDateCell,
+  sumConfigMoney,
 } from "@/components/financial/shared/quote-table-shared";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -100,9 +101,12 @@ function billingFinishedAt(billing: Billing): Date | null {
  * `billingEntry.billingId` para achar os desta linha — senão as sessenta linhas de veículo de um
  * `PER_TASK` mostravam o mesmo vencimento. `billing.customerConfigs` JÁ É o recorte, e metade
  * complicada da função some.
+ *
+ * Recebe os PAGADORES, não a cobrança: com a lente do "Faturar Para", o vencimento é o da parte
+ * do cliente filtrado — a parcela vencida do OUTRO pagador não é dívida dele.
  */
-export const findFirstInstallmentDueDate = (billing: Billing): Date | null => {
-  const configs = billing.customerConfigs ?? [];
+export const findFirstInstallmentDueDate = (payers: readonly BudgetPayer[] | null | undefined): Date | null => {
+  const configs = payers ?? [];
   if (configs.length === 0) return null;
 
   let emAberto: Date | null = null;
@@ -125,6 +129,36 @@ const moneyCell = (n: number | null) =>
   n ? <span className="text-sm font-medium whitespace-nowrap tabular-nums">{formatCurrency(n)}</span> : <MutedDash />;
 
 const moneyExport = (n: number | null) => (n && n > 0 ? formatCurrency(n) : "");
+
+/** Σ de uma coluna de dinheiro sobre as linhas exportadas — a linha "Total" do PDF. */
+const moneyTotal = (rows: Billing[], value: (b: Billing) => number | null) =>
+  formatCurrency(Math.round(rows.reduce((sum, b) => sum + (value(b) ?? 0), 0) * 100) / 100);
+
+/** Zero e ausente leem igual na célula (travessão) — é o que `billingChargedTotal` já devolve. */
+const positiveOrNull = (n: number | null) => (n !== null && n > 0 ? n : null);
+
+/**
+ * "Faturar Para" com a lente ligada: os pagadores filtrados e, discreto, quantos OUTROS dividem
+ * esta cobrança. A divisão não pode sumir da tela — é ela que explica por que o valor da linha é
+ * menor que o do orçamento. Só nomes no aviso, nunca valores: a parte do outro não é desta linha.
+ */
+function LensPayersCell({ shown, others }: { shown: BudgetPayer[]; others: BudgetPayer[] }) {
+  if (others.length === 0) return <InvoiceToCustomersCell configs={shown} />;
+  const names = invoiceToCustomerNames(others).join(", ");
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <div className="min-w-0 flex-1">
+        <InvoiceToCustomersCell configs={shown} />
+      </div>
+      <span
+        className="text-muted-foreground text-xs shrink-0 tabular-nums"
+        title={`Divide esta cobrança com: ${names}. Fora do filtro — não entra nos valores desta linha.`}
+      >
+        +{others.length}
+      </span>
+    </div>
+  );
+}
 
 /**
  * O NÚMERO DO PEDIDO, E O QUE FALTA DELE.
@@ -165,7 +199,63 @@ function BillingOrderNumbersCell({ billing }: { billing: Billing }) {
  * quando ESTA fatia nasceu). Herdar a preferência de coluna salva sob o id antigo
  * seria mostrar a escolha do usuário com um significado que não é o dela.
  */
-export function createBillingColumns(): DataTableColumnDef<Billing>[] {
+export interface BillingColumnsOptions {
+  /**
+   * A LENTE: os clientes marcados em "Faturar Para". Vazia = a cobrança inteira.
+   *
+   * Dois pagadores do mesmo recorte são UMA cobrança (Ibiporã e RKO no orçamento 269). Sem a
+   * lente, filtrar pela RKO trazia a linha certa com os números da cobrança inteira, e o PDF
+   * mandado à RKO cobrava dela os R$ 14.306,00 da Ibiporã. Com a lente, toda coluna que pergunta
+   * a um pagador — Faturar Para, Subtotal, Valor, Em Aberto, Parcelas, Vencimento, Forma de
+   * Pagamento, Status — pergunta só aos filtrados. As da cobrança e dos veículos não mudam.
+   *
+   * ⚠️ O recorte é feito AQUI, nas colunas, e nunca nos dados da lista: a regra de atenção
+   * "cadastro incompleto" lê os pagadores da linha registrada localmente, e uma linha já
+   * recortada apagaria o anel do outro pagador enquanto a navegação continua contando-o.
+   */
+  lens?: readonly string[];
+}
+
+export function createBillingColumns({ lens = [] }: BillingColumnsOptions = {}): DataTableColumnDef<Billing>[] {
+  const lensSet = new Set(lens);
+  const hasLens = lensSet.size > 0;
+  /** Os pagadores que esta tela olha: os da lente, ou todos. */
+  const payers = (b: Billing): BudgetPayer[] =>
+    hasLens ? (b.customerConfigs ?? []).filter((c) => lensSet.has(c.customerId)) : (b.customerConfigs ?? []);
+  /** Os que dividem a cobrança e ficaram FORA da lente. */
+  const outsideLens = (b: Billing): BudgetPayer[] =>
+    hasLens ? (b.customerConfigs ?? []).filter((c) => !lensSet.has(c.customerId)) : [];
+  // Com lente, soma SÓ os filtrados e sem recuo: o recuo de `billingChargedTotal`
+  // ("por veículo × veículos", para quando os pagadores não vieram) é o valor da
+  // cobrança INTEIRA — exatamente o número que a lente existe para não mostrar.
+  const lensTotal = (b: Billing) => (hasLens ? positiveOrNull(sumConfigMoney(payers(b), "total")) : billingChargedTotal(b));
+  const lensSubtotal = (b: Billing) =>
+    hasLens ? positiveOrNull(sumConfigMoney(payers(b), "subtotal")) : billingChargedSubtotal(b);
+  /** O estado da parte (`payerStatus`, calculado no servidor pela mesma regra) ou o da cobrança. */
+  const statusOf = (b: Billing): BILLING_STATUS | null => (hasLens ? (b.payerStatus ?? b.status) : b.status) ?? null;
+  /**
+   * O QUE FALTA RECEBER — `valor − Σ pago`, nunca negativo.
+   *
+   * Pago é `paidAmount`, e não o estado da parcela: é ele que registra a parcela quitada pela
+   * metade (que continua PENDING), e em todas as parcelas PAID do acervo ele está preenchido.
+   * Liquidado e Cancelado são zero pelo ESTADO, porque há cobrança liquidada por conciliação sem
+   * parcela nenhuma — pela conta ela deveria tudo.
+   */
+  const openBalance = (b: Billing): number | null => {
+    const status = statusOf(b);
+    if (status === "SETTLED" || status === "CANCELLED") return 0;
+    const value = lensTotal(b);
+    if (value === null) return null;
+    let paid = 0;
+    for (const config of payers(b)) {
+      for (const installment of config.installments ?? []) {
+        const n = Number(installment.paidAmount ?? 0);
+        if (Number.isFinite(n)) paid += n;
+      }
+    }
+    return Math.max(0, Math.round((value - paid) * 100) / 100);
+  };
+
   return [
     {
       // The number people quote at each other on the phone — the fastest way to find a faturamento.
@@ -299,9 +389,11 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       meta: {
         headerLabel: "Faturar Para",
         exportHeader: "Faturar Para",
-        exportValue: (b) => invoiceToCustomerNames(b.customerConfigs),
+        // Só os da lente: o PDF vai para o cliente, e o nome de quem divide a
+        // cobrança com ele não é informação dele.
+        exportValue: (b) => invoiceToCustomerNames(payers(b)),
       },
-      cell: ({ row }) => <InvoiceToCustomersCell configs={row.original.customerConfigs} />,
+      cell: ({ row }) => <LensPayersCell shown={payers(row.original)} others={outsideLens(row.original)} />,
     },
     {
       // Visível por padrão aqui: sem o pedido a nota não é emitida, então nesta
@@ -334,7 +426,7 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
     {
       id: "billingSubtotal",
       header: "Subtotal",
-      accessorFn: (b) => billingChargedSubtotal(b),
+      accessorFn: (b) => lensSubtotal(b),
       enableSorting: false,
       size: 140,
       minSize: 110,
@@ -344,7 +436,8 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Subtotal",
         exportHeader: "Subtotal",
-        exportValue: (b) => moneyExport(billingChargedSubtotal(b)),
+        exportValue: (b) => moneyExport(lensSubtotal(b)),
+        exportTotal: (rows) => moneyTotal(rows, lensSubtotal),
       },
       cell: ({ getValue }) => moneyCell(getValue() as number | null),
     },
@@ -362,7 +455,7 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       // ⚠️ SEM SETA, de propósito: `Billing` não tem coluna de valor. Ordenar por
       // `quote.total` ordenaria pelo CONTRATO, o que num `PER_TASK` de sessenta é
       // a MESMA chave para as sessenta linhas — uma seta que não ordena nada.
-      accessorFn: (b) => billingChargedTotal(b),
+      accessorFn: (b) => lensTotal(b),
       enableSorting: false,
       size: 140,
       minSize: 110,
@@ -373,7 +466,30 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
         requiredPrivilege: MONEY_PRIVILEGES,
         headerLabel: "Valor",
         exportHeader: "Valor",
-        exportValue: (b) => moneyExport(billingChargedTotal(b)),
+        exportValue: (b) => moneyExport(lensTotal(b)),
+        exportTotal: (rows) => moneyTotal(rows, lensTotal),
+      },
+      cell: ({ getValue }) => moneyCell(getValue() as number | null),
+    },
+    {
+      // O QUE AINDA FALTA RECEBER desta cobrança (ou da parte do cliente
+      // filtrado). "Valor" diz quanto se cobra; esta diz quanto se deve — é o
+      // número de um PDF de pendências, e é a soma dela que fecha o documento.
+      id: "openBalance",
+      header: "Em Aberto",
+      accessorFn: (b) => openBalance(b),
+      // Conta sobre as parcelas; o servidor não tem coluna para ordenar.
+      enableSorting: false,
+      size: 140,
+      minSize: 110,
+      meta: {
+        defaultVisible: false,
+        align: "right",
+        requiredPrivilege: MONEY_PRIVILEGES,
+        headerLabel: "Em Aberto",
+        exportHeader: "Em Aberto",
+        exportValue: (b) => moneyExport(openBalance(b)),
+        exportTotal: (rows) => moneyTotal(rows, openBalance),
       },
       cell: ({ getValue }) => moneyCell(getValue() as number | null),
     },
@@ -382,7 +498,7 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       // pagadores são os DELA.
       id: "installments",
       header: "Parcelas",
-      accessorFn: (b) => installmentProgress(b.customerConfigs).total,
+      accessorFn: (b) => installmentProgress(payers(b)).total,
       enableSorting: false,
       size: 110,
       minSize: 90,
@@ -391,12 +507,12 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
         headerLabel: "Parcelas",
         exportHeader: "Parcelas (pagas/total)",
         exportValue: (b) => {
-          const { paid, total } = installmentProgress(b.customerConfigs);
+          const { paid, total } = installmentProgress(payers(b));
           return total > 0 ? `${paid}/${total}` : "";
         },
       },
       cell: ({ row }) => {
-        const { paid, total } = installmentProgress(row.original.customerConfigs);
+        const { paid, total } = installmentProgress(payers(row.original));
         if (total === 0) return <MutedDash />;
         const settled = paid === total;
         return (
@@ -417,14 +533,14 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       // chave assim mesmo daria 400 no clique do cabeçalho.
       id: "currentInstallmentDueDate",
       header: "Vencimento",
-      accessorFn: (b) => findFirstInstallmentDueDate(b),
+      accessorFn: (b) => findFirstInstallmentDueDate(payers(b)),
       enableSorting: false,
       size: 140,
       minSize: 110,
       meta: {
         headerLabel: "Vencimento",
         exportHeader: "Vencimento",
-        exportValue: (b) => dateExportValue(findFirstInstallmentDueDate(b)),
+        exportValue: (b) => dateExportValue(findFirstInstallmentDueDate(payers(b))),
       },
       cell: ({ getValue }) => renderDateCell(getValue() as Date | null),
     },
@@ -453,7 +569,7 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       // filtro "Entrega". O que o financeiro precisa ver de relance é COMO se paga.
       id: "paymentMethod",
       header: "Forma de Pagamento",
-      accessorFn: (b) => paymentMethodLabels(b.customerConfigs).join(", "),
+      accessorFn: (b) => paymentMethodLabels(payers(b)).join(", "),
       // A forma mora numa coluna JSON (`paymentConfig`); não há escalar para
       // ordenar, nem entrada em BILLING_SORT_FIELD_MAP.
       enableSorting: false,
@@ -462,9 +578,9 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       meta: {
         headerLabel: "Forma de Pagamento",
         exportHeader: "Forma de Pagamento",
-        exportValue: (b) => paymentMethodLabels(b.customerConfigs).join(", "),
+        exportValue: (b) => paymentMethodLabels(payers(b)).join(", "),
       },
-      cell: ({ row }) => <PaymentMethodCell configs={row.original.customerConfigs} />,
+      cell: ({ row }) => <PaymentMethodCell configs={payers(row.original)} />,
     },
     {
       // O ESTADO DA COBRANÇA — agora um ESCALAR DA LINHA (`Billing.status`).
@@ -476,19 +592,26 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       // ordenação vira `statusOrder`, coluna indexada e padrão da rota.
       id: "billingStatus",
       header: "Status Faturamento",
-      accessorFn: (b) => b.status ?? null,
+      // Com lente, o estado da PARTE (`payerStatus`): "Parcial" porque o OUTRO
+      // pagador pagou não é o estado de quem recebe o PDF. ⚠️ A seta continua
+      // ordenando pelo estado da COBRANÇA (`statusOrder`) — o da parte não é
+      // coluna. Numa lente as linhas são poucas, e o filtro de estado já é o da parte.
+      accessorFn: (b) => statusOf(b),
       enableSorting: true,
       size: 190,
       minSize: 140,
       meta: {
         headerLabel: "Status Faturamento",
         exportHeader: "Status Faturamento",
-        exportValue: (b) => (b.status ? (BILLING_STATUS_LABELS[b.status] ?? b.status) : ""),
+        exportValue: (b) => {
+          const status = statusOf(b);
+          return status ? (BILLING_STATUS_LABELS[status] ?? status) : "";
+        },
       },
       cell: ({ row }) => {
-        const status = row.original.status;
+        const status = statusOf(row.original);
         if (!status) return <MutedDash />;
-        const { paid, total } = installmentProgress(row.original.customerConfigs);
+        const { paid, total } = installmentProgress(payers(row.original));
         return (
           <BillingStatusBadge
             status={status as BILLING_STATUS}
@@ -519,6 +642,50 @@ export function createBillingColumns(): DataTableColumnDef<Billing>[] {
       cell: ({ getValue }) => renderDateCell(getValue() as Date | string | null),
     },
   ];
+}
+
+/** "RKO Alimentos LTDA" → "rko-alimentos-ltda", para o nome do arquivo exportado. */
+const fileSlug = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+/**
+ * O PDF DE UM CLIENTE: título, nome do arquivo e a linha sob o cabeçalho.
+ *
+ * Com a lente ligada, o documento é "o faturamento da RKO" e tem de dizer isso
+ * por si só — depois que sai daqui, um PDF com R$ 13.850,60 não se distingue de um
+ * com a cobrança inteira de R$ 28.156,60. Quando alguma linha exportada é de uma
+ * cobrança dividida, a linha avisa que os valores são a parte do cliente — sem
+ * dizer com quem ela é dividida, que não é informação dele.
+ *
+ * `lensNames` pode chegar vazio (os nomes vêm de uma consulta à parte, e o
+ * filtro vem da URL antes dela); o texto então fala em "cliente filtrado".
+ */
+export function billingExportLabels(lensIds: readonly string[], lensNames: readonly string[]) {
+  const one = lensIds.length === 1;
+  const singleName = one ? lensNames[0] : undefined;
+  const title = singleName
+    ? `Faturamento — ${singleName}`
+    : lensIds.length > 0
+      ? `Faturamento — ${lensIds.length} cliente(s)`
+      : "Faturamento";
+  const filename = singleName ? `faturamento_${fileSlug(singleName)}` : "faturamento";
+  const subtitle = (rows: Billing[]): string | undefined => {
+    if (lensIds.length === 0) return undefined;
+    const lensSet = new Set(lensIds);
+    const who = lensNames.length > 0 ? lensNames.join(", ") : one ? "cliente filtrado" : "clientes filtrados";
+    const header = `${one ? "Cliente" : "Clientes"}: ${who}.`;
+    const divided = rows.some((b) => (b.customerConfigs ?? []).some((c) => !lensSet.has(c.customerId)));
+    return divided
+      ? `${header} Nos faturamentos divididos com outra empresa, os valores são somente a parte ${one ? "deste cliente" : "destes clientes"}.`
+      : header;
+  };
+  return { title, filename, subtitle };
 }
 
 /**
