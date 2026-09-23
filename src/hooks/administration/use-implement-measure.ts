@@ -35,6 +35,8 @@ export const useImplementMeasureDetail = (
   });
 };
 
+type MeasuresByTruck = { leftSideMeasure: any; rightSideMeasure: any; backSideMeasure: any };
+
 // Get implement measures by truck ID
 export const useImplementMeasuresByTruck = (
   truckId: string,
@@ -56,7 +58,11 @@ export const useImplementMeasuresByTruck = (
       // `null` na face sem medida. Havia aqui um recuo para uma "versão antiga da
       // API" que buscava as seções medida a medida e remontava a resposta só com
       // as 3 faces que conhecia — a face nova sumiria ali em silêncio. Saiu.
-      return response.data.data;
+      //
+      // O tipo continua o que os consumidores sempre enxergaram: o recuo devolvia
+      // `any` por face, e a prévia/edição leem `sections` e `photo` sem checar
+      // (a API os manda). Retipar com o tipo da resposta é do P20.
+      return response.data.data as MeasuresByTruck;
     },
     enabled: enabled && !!truckId,
     staleTime: 5 * 60 * 1000,
