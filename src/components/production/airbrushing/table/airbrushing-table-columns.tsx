@@ -6,6 +6,8 @@ import {
   PAYMENT_METHOD_LABELS,
   NFSE_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
+  AIRBRUSHING_STATUS,
+  AIRBRUSHING_QUOTE_STATUS,
 } from "../../../../constants";
 import type { NFSE_STATUS } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
@@ -15,6 +17,24 @@ import { Badge } from "@/components/ui/badge";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
+
+/**
+ * "3 propostas · 1 aguardando você" sob o selo Em Cotação. `quotes` só chega para quem
+ * pode ler a cotação (ADMIN/COMMERCIAL/FINANCIAL); sem ele, a linha mostra só o selo.
+ */
+function QuotationSummary({ airbrushing }: { airbrushing: Airbrushing }) {
+  const quotes = airbrushing.quotes;
+  if (!quotes) return null;
+  const proposals = quotes.filter((q) => q.amount != null && q.status !== AIRBRUSHING_QUOTE_STATUS.DECLINED).length;
+  const awaiting = quotes.filter((q) => q.status === AIRBRUSHING_QUOTE_STATUS.PROPOSED || q.status === AIRBRUSHING_QUOTE_STATUS.ACCEPTED).length;
+  if (proposals === 0) return <span className="whitespace-nowrap text-xs text-muted-foreground">Sem propostas ainda</span>;
+  return (
+    <span className="whitespace-nowrap text-xs text-muted-foreground">
+      {proposals} {proposals === 1 ? "proposta" : "propostas"}
+      {awaiting > 0 && <span className="font-medium text-amber-700 dark:text-amber-400"> · {awaiting} aguardando você</span>}
+    </span>
+  );
+}
 
 /**
  * Sectors allowed to see monetary / payment data on an airbrushing (Aerografia).
@@ -107,9 +127,11 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       size: 150,
       minSize: 120,
       meta: { headerLabel: "Pintor", exportValue: (row) => row.painter?.name || "" },
-      cell: ({ getValue }) => {
+      cell: ({ getValue, row }) => {
         const v = getValue() as string;
-        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("—");
+        if (v) return <TruncatedTextWithTooltip text={v} className="text-sm" />;
+        // Sem pintor ainda porque está em cotação — ele nasce da proposta selecionada.
+        return row.original.status === AIRBRUSHING_STATUS.QUOTING ? muted("Em cotação") : muted("—");
       },
     },
     {
@@ -139,9 +161,12 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       minSize: 120,
       meta: { headerLabel: "Status", exportValue: (row) => AIRBRUSHING_STATUS_LABELS[row.status] || row.status },
       cell: ({ row }) => (
-        <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[row.original.status] || "default"} className="whitespace-nowrap">
-          {AIRBRUSHING_STATUS_LABELS[row.original.status] || row.original.status}
-        </Badge>
+        <div className="flex flex-col items-start gap-0.5">
+          <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[row.original.status] || "default"} className="whitespace-nowrap">
+            {AIRBRUSHING_STATUS_LABELS[row.original.status] || row.original.status}
+          </Badge>
+          {row.original.status === AIRBRUSHING_STATUS.QUOTING && <QuotationSummary airbrushing={row.original} />}
+        </div>
       ),
     },
     {

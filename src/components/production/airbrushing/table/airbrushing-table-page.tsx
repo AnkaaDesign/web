@@ -53,6 +53,10 @@ const LIST_INCLUDE = {
   // A NFS-e do aerografista alimenta a coluna "NFS-e" (oculta por padrão). É uma linha 1:1
   // barata — nada a ver com os arquivos de nota ANEXADOS, que continuam fora do include.
   nfse: true,
+  // Negociações da cotação — alimentam o indicador "N propostas · M aguardando você" das
+  // linhas Em Cotação. Barato: poucas linhas por aerografia, e a API só devolve para
+  // ADMIN/COMMERCIAL/FINANCIAL (os demais recebem `[]`).
+  quotes: true,
 } as const;
 
 // Valor SINTÉTICO do filtro de NFS-e: "aerografia sem nenhuma nota". Não pertence a
@@ -290,7 +294,9 @@ export function AirbrushingTablePage() {
 
   const confirmStatus = useCallback(
     async (status: AIRBRUSHING_STATUS) => {
-      const rows = statusDialog;
+      // Em cotação não muda de status por aqui (a API recusa com 400): segue adiante pela
+      // seleção de uma proposta, no detalhe. As demais linhas da seleção seguem normalmente.
+      const rows = statusDialog?.filter((a) => a.status !== AIRBRUSHING_STATUS.QUOTING);
       if (rows?.length) await applyStatus(rows, status);
       setStatusDialog(null);
     },
@@ -348,7 +354,7 @@ export function AirbrushingTablePage() {
         icon: <IconProgressCheck className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: AIRBRUSHING_MANAGE_PRIVILEGES,
-        hidden: (rows) => rows.length === 0,
+        hidden: (rows) => rows.length === 0 || rows.every((a) => a.status === AIRBRUSHING_STATUS.QUOTING),
         onClick: (rows) => setStatusDialog(rows),
       },
       {
