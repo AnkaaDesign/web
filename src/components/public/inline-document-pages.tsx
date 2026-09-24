@@ -20,14 +20,36 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import { VENDOR_ASSETS } from '@/config/assets';
 pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
+/**
+ * Pixels de canvas por folha no modo `sharpZoom` — a largura do bitmap, não a
+ * da tela.
+ *
+ * No celular a folha ocupa ~360px de CSS, e o pdf.js desenha o bitmap na
+ * densidade da tela (2–3×): legível parado, mas a pinça do navegador amplia um
+ * bitmap de ~1000px e o texto de 7pt vira borrão. Desenhar a ~1600px de largura
+ * deixa ampliar 2× com nitidez. O teto de 4× segura a memória: uma A4 a 1600px
+ * são ~3,6 Mpx de canvas por folha, longe do limite de 16,7 Mpx do Safari iOS —
+ * e o WebView do WhatsApp é justamente onde a memória é mais curta.
+ */
+const PAGE_PIXELS = 1600;
+
+function sharpRatio(width: number | undefined): number | undefined {
+  if (typeof window === "undefined" || !width) return undefined;
+  const native = window.devicePixelRatio || 1;
+  return Math.min(4, Math.max(native, PAGE_PIXELS / width));
+}
+
 export function InlineDocumentPages({
   url,
   width,
   className = "",
+  sharpZoom = false,
 }: {
   url: string;
   width?: number;
   className?: string;
+  /** Desenha o bitmap em alta resolução para a pinça ampliar sem borrar. */
+  sharpZoom?: boolean;
 }) {
   const [numPages, setNumPages] = useState(0);
   const [error, setError] = useState(false);
@@ -60,7 +82,12 @@ export function InlineDocumentPages({
             width={width}
             renderTextLayer
             renderAnnotationLayer={false}
-            className={i < numPages - 1 ? "mb-3" : ""}
+            devicePixelRatio={sharpZoom ? sharpRatio(width) : undefined}
+            // `overflow-hidden` + sombra: a camada de texto do pdf.js tem spans
+            // que passam da borda da folha em alguns navegadores embutidos, e
+            // eram eles — não o documento — que criavam rolagem lateral. A
+            // sombra separa uma folha da outra no fundo branco do cartão.
+            className={`overflow-hidden shadow-sm ring-1 ring-border ${i < numPages - 1 ? "mb-3" : ""}`}
           />
         ))}
       </Document>

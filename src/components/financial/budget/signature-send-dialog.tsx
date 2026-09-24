@@ -193,16 +193,18 @@ export function SignatureSendDialog({
     setOverrides(prev => ({ ...prev, [responsibleId]: next }));
   };
 
-  /** Quantos PDFs a coleta vai congelar com as escolhas atuais. */
+  /**
+   * Quantos PDFs a coleta vai congelar com as escolhas atuais.
+   *
+   * UM POR RESPONSÁVEL QUE ASSINA — cada um recebe o seu documento, só com a
+   * linha dele e a da Ankaa, e não vê quem mais assina (a API faz assim desde
+   * 24/09/2026). Mais o completo só com a Ankaa quando ninguém recebe tudo: é o
+   * instrumento que ela contra-assina.
+   */
   const variantCount = useMemo(() => {
-    const keys = new Set<string>();
-    for (const r of preflight?.recipients ?? []) {
-      const sections = sectionsOf(r);
-      if (sections.length) keys.add(sections.join("+"));
-    }
-    // O recorte COMPLETO existe sempre — é o que a Ankaa contra-assina.
-    keys.add(QUOTE_SECTIONS.join("+"));
-    return keys.size;
+    const signing = (preflight?.recipients ?? []).map(sectionsOf).filter(s => s.length > 0);
+    const someoneGetsAll = signing.some(s => s.length === QUOTE_SECTIONS.length);
+    return signing.length + (someoneGetsAll ? 0 : 1);
   }, [preflight, sectionsOf]);
 
   const signingCount = (preflight?.recipients ?? []).filter(r => sectionsOf(r).length > 0).length;
@@ -256,9 +258,10 @@ export function SignatureSendDialog({
             {mode === "create" ? "Enviar para assinatura" : "Reenviar para assinatura"}
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed">
-            O documento é congelado como está e cada responsável recebe um link
-            pessoal para revisar e assinar. Cada um recebe apenas as seções da
-            função dele — abaixo dá para mudar contato a contato.
+            O documento é congelado como está e cada responsável recebe o seu
+            próprio documento, por link pessoal, sem ver quem mais assina. Cada
+            um recebe apenas as seções da função dele — abaixo dá para mudar
+            contato a contato.
           </DialogDescription>
         </DialogHeader>
 
