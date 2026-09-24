@@ -8,10 +8,10 @@ import { FormLabel } from '@/components/ui/form';
 import { CustomerCombobox } from '@/components/ui/customer-combobox';
 import { cn } from '@/lib/utils';
 import { responsibleService } from '@/services/responsibleService';
-import { toBrazilianNameCase } from '@/utils/formatters';
+import { formatCNPJ, toBrazilianNameCase } from '@/utils/formatters';
 import { isValidCPF } from '@/utils/validators';
 import type { Responsible, ResponsibleRole, ResponsibleRowData } from '@/types/responsible';
-import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles } from '@/types/responsible';
+import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles, formatResponsibleRoles } from '@/types/responsible';
 
 interface ResponsibleRowProps {
   control?: any;
@@ -199,6 +199,35 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const getOptionLabel = useCallback((rep: Responsible) => `${rep.name} - ${formatPhoneDisplay(rep.phone)}`, []);
     const getOptionDescription = useCallback((rep: Responsible) => rep.email || undefined, []);
 
+    // Each option says whom the contact works for — roles, then the registered
+    // company and the customers served through tasks, with fantasy name,
+    // corporate name and CNPJ — so two "João" can be told apart at a glance.
+    // The API also searches all of these, so what is shown is what matches.
+    const renderResponsibleOption = useCallback((rep: Responsible) => {
+      const customers = [
+        ...(rep.company ? [rep.company] : []),
+        ...(rep.servedCustomers ?? []).filter(c => c.id !== rep.company?.id),
+      ];
+      const shown = customers.slice(0, 3);
+      const roles = formatResponsibleRoles(rep.roles);
+      return (
+        <div className="min-w-0">
+          <div className="truncate">{getOptionLabel(rep)}</div>
+          {roles && <div className="truncate text-xs text-muted-foreground">{roles}</div>}
+          {shown.map(customer => (
+            <div key={customer.id} className="truncate text-xs text-muted-foreground">
+              <span className="font-medium">{customer.fantasyName}</span>
+              {customer.corporateName && customer.corporateName !== customer.fantasyName && ` · ${customer.corporateName}`}
+              {customer.cnpj && ` · ${formatCNPJ(customer.cnpj)}`}
+            </div>
+          ))}
+          {customers.length > shown.length && (
+            <div className="text-xs text-muted-foreground">+{customers.length - shown.length} cliente(s)</div>
+          )}
+        </div>
+      );
+    }, [getOptionLabel]);
+
     // Fixed top content for "Cadastrar novo" button (pinned between search and scrollable list)
     const fixedTopContent = useCallback((searchTerm: string) => (
       <div
@@ -385,6 +414,8 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 getOptionValue={getOptionValue}
                 getOptionLabel={getOptionLabel}
                 getOptionDescription={getOptionDescription}
+                renderOption={renderResponsibleOption}
+                searchPlaceholder="Nome, telefone, cliente ou CNPJ..."
                 placeholder="Selecione ou cadastre novo"
                 emptyText="Nenhum responsável encontrado"
                 disabled={disabled || readOnly}

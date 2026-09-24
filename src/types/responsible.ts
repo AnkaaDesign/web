@@ -50,6 +50,8 @@ export interface Responsible {
   deletedAt?: Date | null;
   company?: Customer | null;
   tasks?: Task[];
+  /** Clientes atendidos pelas tarefas, além de `company` (só na listagem). */
+  servedCustomers?: Pick<Customer, 'id' | 'fantasyName' | 'corporateName' | 'cnpj'>[];
 }
 
 export interface ResponsibleCreateFormData {

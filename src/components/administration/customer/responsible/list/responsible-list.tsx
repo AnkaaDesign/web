@@ -264,7 +264,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
             onChange={(value) => {
               setSearch(value);
             }}
-            placeholder="Buscar por nome, telefone, email..."
+            placeholder="Buscar por nome, telefone, email, cliente ou CNPJ..."
             isPending={displaySearchText !== searchingFor}
           />
           <div className="flex gap-2">
