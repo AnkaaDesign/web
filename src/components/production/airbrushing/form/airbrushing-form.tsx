@@ -4,7 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAirbrushing, useAirbrushingMutations, useTaskDetail, useUsers } from "../../../../hooks";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
-import { airbrushingCreateSchema, airbrushingUpdateSchema } from "../../../../schemas";
+import { airbrushingCreateSchema, airbrushingUpdateSchema, AIRBRUSHING_CREATION_MODE } from "../../../../schemas";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import {
   routes,
   AIRBRUSHING_STATUS,
@@ -66,6 +67,8 @@ const makeEmptyAirbrushing = () => ({
   id: `airbrushing-${crypto.randomUUID()}`,
   // Toda aerografia nova nasce em cotação — sem pintor e sem valor (a API garante o mesmo).
   status: AIRBRUSHING_STATUS.QUOTING,
+  // "Enviar para cotação" é o padrão; "Já aprovada" é escolha explícita na própria linha.
+  creationMode: AIRBRUSHING_CREATION_MODE.QUOTATION,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
   // Mesmos padrões da linha que o `MultiAirbrushingSelector` cria — assim a linha semeada e
   // a adicionada pelo botão nascem idênticas.
@@ -142,6 +145,8 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const canViewFinancials = canViewAirbrushingFinancials(user);
 
   const isEdit = mode === "edit";
+  // "Já aprovada" exige aerografista — mesma trava da tarefa e do orçamento.
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
 
   // Wizard step state (URL-backed).
   const [currentStep, setCurrentStep] = useState<number>(() => getStepFromUrl(searchParams));
@@ -398,7 +403,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
             toast.error("Preencha ao menos uma aerografia (descrição, datas ou layouts).");
             return false;
           }
-          return true;
+          return guardAirbrushingCreation(form, ["airbrushings"]);
         }
         // Edit — all fields optional; only fail on malformed values.
         const ok = await form.trigger(VALIDATED_FIELDS as any);
@@ -439,7 +444,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       default:
         return true;
     }
-  }, [mode, form, selectedTasks]);
+  }, [mode, form, selectedTasks, guardAirbrushingCreation]);
 
   const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 

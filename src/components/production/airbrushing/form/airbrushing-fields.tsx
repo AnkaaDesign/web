@@ -4,7 +4,9 @@ import { FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconInfoCircle, IconPhoto, IconUsersGroup } from "@tabler/icons-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { IconCircleCheck, IconInfoCircle, IconPhoto, IconUsersGroup } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
 import { PainterSelector } from "./painter-selector";
 import {
   AIRBRUSHING_STATUS,
@@ -16,6 +18,7 @@ import {
   PAYMENT_METHOD,
   PAYMENT_METHOD_LABELS,
 } from "../../../../constants";
+import { AIRBRUSHING_CREATION_MODE, AIRBRUSHING_CREATION_MODE_LABELS, type AirbrushingCreationMode } from "@/schemas/airbrushing";
 import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, resolveAirbrushingDueDate } from "@/utils/airbrushing";
 import { formatDate } from "@/utils/date";
 
@@ -48,6 +51,11 @@ export interface AirbrushingFieldValues {
   finishedAt?: Date | string | null;
   painterId?: string | null;
   painter?: AirbrushingPainterRef | null;
+  /**
+   * Só numa aerografia NOVA: vai para cotação ou já foi aprovada fora do sistema. Campo de
+   * formulário — `buildAirbrushingPayload` não o envia (ver `AIRBRUSHING_CREATION_MODE`).
+   */
+  creationMode?: AirbrushingCreationMode | null;
 }
 
 export type AirbrushingFieldErrors = Partial<Record<keyof AirbrushingFieldValues, string | undefined>>;
@@ -68,9 +76,9 @@ export interface AirbrushingFieldsProps {
   showActualDates?: boolean;
   initialPainter?: AirbrushingPainterRef | null;
   /**
-   * Aerografia AINDA NÃO GRAVADA. Toda aerografia nasce em cotação (a API a coloca em
-   * QUOTING quando chega sem aerografista): pintor, valor, status e datas reais não são
-   * escolhidos aqui — nascem da proposta selecionada.
+   * Aerografia AINDA NÃO GRAVADA. Ganha a escolha "Enviar para cotação" (padrão — a API a grava
+   * em QUOTING por chegar sem aerografista; pintor, valor, status e datas reais nascem da
+   * proposta selecionada) ou "Já aprovada" (pintor obrigatório, valor e status escolhidos aqui).
    */
   isNew?: boolean;
   /**
@@ -134,6 +142,55 @@ const dueDateRuleOptions: ComboboxOption[] = Object.values(AIRBRUSHING_DUE_DATE_
   label: AIRBRUSHING_DUE_DATE_RULE_LABELS[value],
 }));
 
+const creationModeOptions = [AIRBRUSHING_CREATION_MODE.QUOTATION, AIRBRUSHING_CREATION_MODE.APPROVED] as const;
+
+/**
+ * Escolha do nascimento de uma aerografia nova — dois botões de rádio lado a lado, compactos.
+ * Trocar o modo reescreve os campos que dependem dele (ver `handleCreationModeChange`).
+ */
+function AirbrushingCreationModeControl({
+  value,
+  onChange,
+  disabled,
+  idPrefix,
+}: {
+  value: AirbrushingCreationMode;
+  onChange: (next: AirbrushingCreationMode) => void;
+  disabled?: boolean;
+  idPrefix: string;
+}) {
+  return (
+    <RadioGroup
+      value={value}
+      onValueChange={(next) => onChange(next as AirbrushingCreationMode)}
+      disabled={disabled}
+      aria-label="Como esta aerografia entra no sistema"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+    >
+      {creationModeOptions.map((option) => {
+        const id = `${idPrefix}-creation-mode-${option}`;
+        const active = value === option;
+        const Icon = option === AIRBRUSHING_CREATION_MODE.QUOTATION ? IconUsersGroup : IconCircleCheck;
+        return (
+          <label
+            key={option}
+            htmlFor={id}
+            className={cn(
+              "flex h-10 items-center gap-2.5 rounded-md border px-3 text-sm transition-colors",
+              disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40",
+              active ? "border-primary bg-primary/5 font-medium text-foreground" : "border-border text-muted-foreground",
+            )}
+          >
+            <RadioGroupItem value={option} id={id} />
+            <Icon className={cn("h-4 w-4 flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+            <span className="truncate">{AIRBRUSHING_CREATION_MODE_LABELS[option]}</span>
+          </label>
+        );
+      })}
+    </RadioGroup>
+  );
+}
+
 /** Aviso da cotação — o que acontece com pintor e valor enquanto a aerografia está em cotação. */
 export function AirbrushingQuotationNotice({ isNew }: { isNew?: boolean }) {
   return (
@@ -179,9 +236,12 @@ export function AirbrushingFields({
   isNew = false,
   quoting = false,
 }: AirbrushingFieldsProps) {
-  // Nova ou gravada em cotação: pintor e valor só nascem da proposta selecionada.
-  const inQuotation = isNew || quoting;
-  const status = value.status ?? (isNew ? AIRBRUSHING_STATUS.QUOTING : AIRBRUSHING_STATUS.PREPARATION);
+  // Aerografia nova: o modo escolhido decide. Sem escolha registrada, vai para cotação.
+  const creationMode: AirbrushingCreationMode = value.creationMode ?? AIRBRUSHING_CREATION_MODE.QUOTATION;
+  const approvedAtCreation = isNew && creationMode === AIRBRUSHING_CREATION_MODE.APPROVED;
+  // Nova indo para cotação, ou gravada em cotação: pintor e valor só nascem da proposta selecionada.
+  const inQuotation = (isNew && !approvedAtCreation) || quoting;
+  const status = value.status ?? (inQuotation ? AIRBRUSHING_STATUS.QUOTING : AIRBRUSHING_STATUS.PREPARATION);
   const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
   const dueDateRule = value.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
 
@@ -201,6 +261,26 @@ export function AirbrushingFields({
     });
   };
 
+  // Trocar o modo reescreve TUDO que depende dele, para a linha nunca misturar os dois:
+  // cotação = sem pintor, sem valor, sem datas reais e Em Cotação; aprovada = Em Preparação.
+  const handleCreationModeChange = (next: AirbrushingCreationMode) => {
+    if (next === creationMode) return;
+    if (next === AIRBRUSHING_CREATION_MODE.APPROVED) {
+      onChange({ creationMode: next, status: AIRBRUSHING_STATUS.PREPARATION, paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING });
+      return;
+    }
+    onChange({
+      creationMode: next,
+      status: AIRBRUSHING_STATUS.QUOTING,
+      paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+      painterId: null,
+      painter: null,
+      price: null,
+      startedAt: null,
+      finishedAt: null,
+    });
+  };
+
   const handleRuleChange = (next: string) => {
     // Cada regra consome um campo diferente; limpar os outros evita que um valor órfão de
     // uma regra anterior volte a valer se o usuário trocar de ideia duas vezes.
@@ -214,13 +294,25 @@ export function AirbrushingFields({
 
   return (
     <div className="space-y-4">
+      {isNew && (
+        <AirbrushingCreationModeControl value={creationMode} onChange={handleCreationModeChange} disabled={disabled} idPrefix={idPrefix} />
+      )}
+
       {inQuotation && <AirbrushingQuotationNotice isNew={isNew} />}
 
       {/* Linha 1: Pintor | Descrição (Input de uma linha, ao lado do pintor). Em cotação o
           pintor some: ele é o da proposta selecionada, e a descrição ocupa a linha toda. */}
       <div className={inQuotation ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
         {!inQuotation && (
-          <Field label="Pintor" error={errors?.painterId}>
+          <Field
+            label={
+              <>
+                Pintor
+                {approvedAtCreation && <span className="text-destructive">*</span>}
+              </>
+            }
+            error={errors?.painterId}
+          >
             <PainterSelector
               value={value.painterId ?? undefined}
               onChange={(userId) => onChange({ painterId: userId ?? null })}
@@ -245,9 +337,10 @@ export function AirbrushingFields({
         </Field>
       </div>
 
-      {/* Linha 2: Status | Status do Pagamento. Uma aerografia nova nasce em cotação — não há
-          status a escolher. */}
-      {showStatus && !isNew && (
+      {/* Linha 2: Status | Status do Pagamento. Uma aerografia nova indo para cotação não tem
+          status a escolher; a já aprovada escolhe (sem Em Cotação), mesmo onde o status fica
+          escondido no cadastro. */}
+      {((showStatus && !isNew) || approvedAtCreation) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Status" error={errors?.status}>
             <Combobox

@@ -1,6 +1,7 @@
 import { airbrushingService } from "../api-client/airbrushing";
 import { createAirbrushingFormData } from "./form-data-helper";
 import { AIRBRUSHING_DUE_DATE_RULE, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_STATUS } from "../constants";
+import { AIRBRUSHING_CREATION_MODE } from "../schemas/airbrushing";
 
 // Shared "create the airbrushings for a freshly-created task" routine, used by the task
 // CREATE form and the BUDGET form. Mirrors the create branch of the task-edit form's
@@ -22,6 +23,10 @@ const newFilesOf = (files: any[]): File[] =>
  *
  * Aceita tanto uma linha do `MultiAirbrushingSelector` quanto os valores do react-hook-form:
  * os nomes dos campos são os mesmos nos dois.
+ *
+ * Lista FECHADA de propósito: campos só de formulário (`creationMode`, `persistedStatus`,
+ * `painter`, arquivos) nunca chegam à API. O modo de criação não precisa viajar — a API decide
+ * pela presença de `painterId` (com aerografista: status e valor recebidos; sem: Em Cotação).
  */
 export const buildAirbrushingPayload = (a: any): Record<string, any> => ({
   status: a.status,
@@ -88,7 +93,10 @@ export const hasNonDefaultAirbrushingConfig = (a: any): boolean =>
   (!!a?.dueDateRule && a.dueDateRule !== AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) ||
   // Em Cotação é o status de nascimento de toda aerografia nova; Preparação é o padrão antigo.
   (!!a?.status && a.status !== AIRBRUSHING_STATUS.PREPARATION && a.status !== AIRBRUSHING_STATUS.QUOTING) ||
-  (!!a?.paymentStatus && a.paymentStatus !== AIRBRUSHING_PAYMENT_STATUS.PENDING);
+  (!!a?.paymentStatus && a.paymentStatus !== AIRBRUSHING_PAYMENT_STATUS.PENDING) ||
+  // Marcar "Já aprovada" é uma decisão explícita: a linha não pode sumir em silêncio — ela
+  // segue para o envio e a trava de aerografista obrigatório a segura se faltar o pintor.
+  (!a?.persistedStatus && a?.creationMode === AIRBRUSHING_CREATION_MODE.APPROVED);
 
 // Skip the empty default row the selector may seed — only create rows carrying real data.
 const isMeaningful = (a: any): boolean =>

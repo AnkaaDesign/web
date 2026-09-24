@@ -13,6 +13,7 @@ import {
   IconFileInvoice,
   IconPhoto,
   IconFileTypePdf,
+  IconRoute,
 } from "@tabler/icons-react";
 import {
   AIRBRUSHING_STATUS,
@@ -24,6 +25,7 @@ import {
   PAYMENT_METHOD_LABELS,
 } from "../../../../constants";
 import type { File as AnkaaFile } from "../../../../types";
+import { AIRBRUSHING_CREATION_MODE_LABELS } from "@/schemas/airbrushing";
 import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, resolveAirbrushingDueDate } from "@/utils/airbrushing";
 import { formatCurrency } from "@/utils/number";
 import { formatDate, formatDateTime } from "@/utils/date";
@@ -82,6 +84,10 @@ export function buildAirbrushingReviewSections(
   // Seção 2 — o serviço. Previsto E real sempre aparecem: uma linha "-" diz que a aerografia
   // ainda não começou, e sumir com ela faria a revisão mudar de tamanho a cada etapa.
   const aerografia: AirbrushingReviewRow[] = [
+    // Só no cadastro (a edição não tem modo): diz se ela vai para cotação ou já entra aprovada.
+    ...(a.creationMode
+      ? [{ key: "creationMode", label: "Entrada", icon: <IconRoute className="h-4 w-4" />, value: AIRBRUSHING_CREATION_MODE_LABELS[a.creationMode] }]
+      : []),
     { key: "painter", label: "Pintor", icon: <IconBrush className="h-4 w-4" />, value: quoting ? "Definido na cotação" : dash(painterName) },
     { key: "description", label: "Descrição", icon: <IconFileDescription className="h-4 w-4" />, value: dash(a.description) },
     { key: "status", label: "Status", icon: <IconSpray className="h-4 w-4" />, value: AIRBRUSHING_STATUS_LABELS[status] || "-" },

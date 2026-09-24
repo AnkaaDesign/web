@@ -31,6 +31,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import { uploadSingleFile } from "@/api-client/file";
 import { getCustomers, getPaintById, getTaskById } from "@/api-client";
 import { customerService } from "@/api-client/customer";
@@ -304,6 +305,7 @@ const FinancialBudgetDetailPageInner = () => {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
   // Tracks whether the form has received its first server-data reset.
   // Ref: used inside the effect (always current, no stale closure).
   // State: signals child components that need to wait before running side-effects.
@@ -1244,6 +1246,10 @@ const FinancialBudgetDetailPageInner = () => {
       return;
     }
 
+    // 0a'. Aerografia NOVA marcada "Já aprovada" exige aerografista — em cada veículo.
+    const airbrushingListNames = (((data as any).vehicles || []) as unknown[]).map((_, index) => `vehicles.${index}.airbrushings`);
+    if (!guardAirbrushingCreation(form, airbrushingListNames)) return;
+
     setIsSubmitting(true);
     try {
       // 0b. Edição inline de função em contato JÁ CADASTRADO.
@@ -2099,6 +2105,7 @@ const FinancialBudgetDetailPageInner = () => {
     }
   }, [
     form,
+    guardAirbrushingCreation,
     taskId,
     task,
     existingQuote,

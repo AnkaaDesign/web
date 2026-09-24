@@ -864,3 +864,53 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
   layoutIds: airbrushing.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
 }));
+
+// =====================
+// Creation mode (UI only — never sent to the API)
+// =====================
+
+/**
+ * Como uma aerografia NOVA entra no sistema:
+ *   • QUOTATION — vai para cotação: sem aerografista e sem valor; a API a grava Em Cotação e
+ *     avisa todos os aerografistas.
+ *   • APPROVED  — já foi combinada fora do sistema: o aerografista é escolhido aqui (e avisado
+ *     como designado), o valor é opcional e o status é o escolhido (Em Preparação por padrão).
+ *
+ * É só um campo de formulário: `buildAirbrushingPayload` monta o payload por lista fechada de
+ * campos, então `creationMode` nunca chega à API — quem decide lá é a presença de `painterId`.
+ */
+export const AIRBRUSHING_CREATION_MODE = {
+  QUOTATION: "QUOTATION",
+  APPROVED: "APPROVED",
+} as const;
+
+export type AirbrushingCreationMode = (typeof AIRBRUSHING_CREATION_MODE)[keyof typeof AIRBRUSHING_CREATION_MODE];
+
+export const AIRBRUSHING_CREATION_MODE_LABELS: Record<AirbrushingCreationMode, string> = {
+  QUOTATION: "Enviar para cotação",
+  APPROVED: "Já aprovada (definir aerografista)",
+};
+
+export const AIRBRUSHING_APPROVED_PAINTER_REQUIRED_MESSAGE = "Selecione o aerografista da aerografia já aprovada";
+
+/**
+ * Uma linha de aerografia de um formulário de criação (assistente, tarefa ou orçamento).
+ * Linha já gravada (`persistedStatus`) não passa por aqui: o modo só existe no nascimento.
+ * `passthrough` porque a linha carrega arquivos e o resto da configuração, que não são
+ * validados aqui.
+ */
+export const airbrushingCreationRowSchema = z
+  .object({
+    creationMode: z.enum([AIRBRUSHING_CREATION_MODE.QUOTATION, AIRBRUSHING_CREATION_MODE.APPROVED]).nullable().optional(),
+    persistedStatus: z.string().nullable().optional(),
+    painterId: z.string().nullable().optional(),
+  })
+  .passthrough()
+  .superRefine((row, ctx) => {
+    if (row.persistedStatus) return;
+    if (row.creationMode === AIRBRUSHING_CREATION_MODE.APPROVED && !row.painterId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["painterId"], message: AIRBRUSHING_APPROVED_PAINTER_REQUIRED_MESSAGE });
+    }
+  });
+
+export const airbrushingCreationRowsSchema = z.array(airbrushingCreationRowSchema);

@@ -27,6 +27,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "@/api-client/file";
 import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -87,6 +88,7 @@ export const FinancialBudgetCreatePage = () => {
   // Re-entrancy guard for handleSubmit — see the comment there. `disabled: isSubmitting` alone can't
   // stop a rapid second click, because the state update hasn't re-rendered the button yet.
   const isSubmittingRef = useRef<boolean>(false);
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
@@ -534,6 +536,8 @@ export const FinancialBudgetCreatePage = () => {
     // airbrushings per row — a second pass would create a duplicate set. The REF is what blocks;
     // React state updates are async, so the disabled button alone loses the race.
     if (isSubmittingRef.current) return;
+    // Aerografia marcada "Já aprovada" exige aerografista — antes de gravar tarefa e orçamento.
+    if (!guardAirbrushingCreation(form, ["airbrushings"])) return;
     isSubmittingRef.current = true;
 
     const data = form.getValues();
@@ -960,6 +964,7 @@ export const FinancialBudgetCreatePage = () => {
     }
   }, [
     form,
+    guardAirbrushingCreation,
     responsibleRows,
     layouts,
     layoutIds,

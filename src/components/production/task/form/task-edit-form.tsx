@@ -71,6 +71,7 @@ import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/sonner";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import { toTitleCase } from "../../../../utils";
 // Quote is now accessed via context menu, not from the edit form
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
@@ -479,6 +480,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
+  // Aerografia NOVA marcada "Já aprovada" exige aerografista — travado antes de gravar qualquer coisa.
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
@@ -951,6 +954,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     async (changedData: Partial<TaskUpdateFormData>) => {
       console.log('[TaskEditForm] handleFormSubmit called');
       console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2));
+
+      if (!guardAirbrushingCreation(form, ['airbrushings'])) return;
 
       // CRITICAL FIX: Set submission flag immediately to prevent sync interference
       // This must happen BEFORE any async operations to prevent race conditions
@@ -2358,7 +2363,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasLayoutStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasLayoutStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates, guardAirbrushingCreation]
   );
 
   // Use the edit form hook with change detection

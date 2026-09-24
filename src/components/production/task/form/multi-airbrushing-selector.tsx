@@ -9,6 +9,7 @@ import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE } from "../../../../constants";
 import { AirbrushingFields, type AirbrushingFieldValues } from "@/components/production/airbrushing/form/airbrushing-fields";
+import { AIRBRUSHING_CREATION_MODE } from "@/schemas/airbrushing";
 
 interface MultiAirbrushingSelectorProps {
   control: any;
@@ -128,6 +129,8 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
     dueDayOfMonth: airbrushing.dueDayOfMonth ?? null,
     dueDate: airbrushing.dueDate ?? null,
     persistedStatus: airbrushing.persistedStatus ?? null,
+    // Só a linha nova escolhe o modo; sem escolha registrada, vai para cotação.
+    creationMode: airbrushing.persistedStatus ? null : (airbrushing.creationMode ?? AIRBRUSHING_CREATION_MODE.QUOTATION),
     // Linha nova nasce em cotação; uma gravada sem status (não deveria existir) cai em Preparação.
     status: airbrushing.status || (airbrushing.persistedStatus ? AIRBRUSHING_STATUS.PREPARATION : AIRBRUSHING_STATUS.QUOTING),
     paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
@@ -170,7 +173,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     const statusVisible = showStatus ?? isEditMode;
 
     // Use controller to properly manage form field
-    const { field } = useController({
+    // `fieldState.error` traz os erros por linha publicados por `useAirbrushingCreationGuard`
+    // (`<name>.<i>.painterId`).
+    const { field, fieldState } = useController({
       name: name as any,
       control,
     });
@@ -233,6 +238,8 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           id: airbrushing.id, // Preserve ID for sync back
           // Viaja junto para que um re-map form → local não perca a origem da linha.
           persistedStatus: airbrushing.persistedStatus ?? null,
+          // Campo de formulário (cotação × já aprovada) — `buildAirbrushingPayload` não o envia.
+          creationMode: airbrushing.creationMode ?? null,
           status: airbrushing.status,
           paymentStatus: airbrushing.paymentStatus,
           paymentMethod: airbrushing.paymentMethod ?? null,
@@ -280,6 +287,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         // Toda aerografia nova nasce em cotação — sem pintor e sem valor (a API garante o mesmo).
         status: AIRBRUSHING_STATUS.QUOTING,
         persistedStatus: null,
+        creationMode: AIRBRUSHING_CREATION_MODE.QUOTATION,
         paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
         paymentMethod: null,
         dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
@@ -372,6 +380,12 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           {airbrushings.map((airbrushing, index) => {
             const isNew = !airbrushing.persistedStatus;
             const quoting = airbrushing.persistedStatus === AIRBRUSHING_STATUS.QUOTING;
+            // O erro do envio só vale enquanto a linha continua "já aprovada" e sem pintor — sem
+            // resolver cobrindo as linhas, é isto que o apaga assim que o pintor é escolhido.
+            const painterError =
+              isNew && airbrushing.creationMode === AIRBRUSHING_CREATION_MODE.APPROVED && !airbrushing.painterId
+                ? ((fieldState.error as any)?.[index]?.painterId?.message as string | undefined)
+                : undefined;
             return (
               <div key={airbrushing.id} className="border border-border rounded-lg p-4 space-y-4">
                 {/* Cabeçalho da linha: identificação + remover. A lixeira mora aqui (e não
@@ -411,6 +425,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   idPrefix={`airbrushing-${airbrushing.id}`}
                   isNew={isNew}
                   quoting={quoting}
+                  errors={painterError ? { painterId: painterError } : undefined}
                   /* Layouts — same uploader as the main task layout (card look, PDF/EPS/AI
                      accepted), COM o seletor de status: um layout de aerografia carrega o
                      mesmo fluxo Rascunho/Aprovado/Reprovado do layout de tarefa, e é ele que

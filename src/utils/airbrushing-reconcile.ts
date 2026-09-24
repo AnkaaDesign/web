@@ -3,6 +3,7 @@ import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RU
 import type { FileWithPreview } from "@/components/common/file";
 import { buildAirbrushingPayload, hasNonDefaultAirbrushingConfig } from "@/utils/airbrushing-submit";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
+import { AIRBRUSHING_CREATION_MODE } from "@/schemas/airbrushing";
 
 // A RECONCILIAÇÃO DAS AEROGRAFIAS DE UMA TAREFA — planejar e executar.
 //
@@ -275,8 +276,9 @@ export function emptyAirbrushingRow(): Record<string, any> {
   return {
     // Default empty airbrushing row
     id: `airbrushing-initial`,
-    // Nova → nasce em cotação (sem pintor e sem valor).
+    // Nova → nasce em cotação (sem pintor e sem valor), salvo se marcada "Já aprovada".
     status: AIRBRUSHING_STATUS.QUOTING,
+    creationMode: AIRBRUSHING_CREATION_MODE.QUOTATION,
     paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
     paymentMethod: null,
     dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
