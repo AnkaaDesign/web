@@ -86,7 +86,8 @@ export function getServiceOrderStatusOrder(status: string): number {
 }
 
 export function getAirbrushingStatusOrder(status: string): number {
-  return getSortOrder(status, AIRBRUSHING_STATUS_ORDER);
+  // `??`, não o `||` de getSortOrder: Em Cotação é 0 e viraria o padrão.
+  return AIRBRUSHING_STATUS_ORDER[status] ?? 1;
 }
 
 export function getUserStatusOrder(status: string): number {

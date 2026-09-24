@@ -282,7 +282,12 @@ export const SERVICE_ORDER_TYPE_DISPLAY_ORDER: SERVICE_ORDER_TYPE[] = [
 
 // Mirrors TASK_STATUS: prepared → released to the floor ("Disponibilizar para
 // Produção", admin/commercial only) → painted → concluded.
+//
+// QUOTING comes FIRST: the airbrushing is born without painter or price, the
+// painters send proposals and the commercial selects one — only then it enters
+// PREPARATION, already with painter and price. Mirrors the API.
 export enum AIRBRUSHING_STATUS {
+  QUOTING = "QUOTING",
   PREPARATION = "PREPARATION",
   WAITING_PRODUCTION = "WAITING_PRODUCTION",
   IN_PRODUCTION = "IN_PRODUCTION",
@@ -293,6 +298,36 @@ export enum AIRBRUSHING_STATUS {
 export enum AIRBRUSHING_PAYMENT_STATUS {
   PENDING = "PENDING",
   PAID = "PAID",
+}
+
+/** Estado da negociação de um aerografista numa aerografia em cotação. Espelha a API. */
+export enum AIRBRUSHING_QUOTE_STATUS {
+  /** Proposta do aerografista aguardando o comercial. */
+  PROPOSED = "PROPOSED",
+  /** Contraproposta do comercial aguardando o aerografista. */
+  COUNTERED = "COUNTERED",
+  /** Aerografista aceitou a contraproposta — ainda NÃO é a seleção. */
+  ACCEPTED = "ACCEPTED",
+  /** Aerografista recusou. */
+  DECLINED = "DECLINED",
+  /** Proposta escolhida: aerografista e valor gravados na aerografia. */
+  SELECTED = "SELECTED",
+  /** Cotação encerrada sem esta proposta. */
+  NOT_SELECTED = "NOT_SELECTED",
+}
+
+export enum AIRBRUSHING_QUOTE_PARTY {
+  PAINTER = "PAINTER",
+  COMPANY = "COMPANY",
+}
+
+export enum AIRBRUSHING_QUOTE_ACTION {
+  PROPOSAL = "PROPOSAL",
+  COUNTER = "COUNTER",
+  ACCEPT = "ACCEPT",
+  DECLINE = "DECLINE",
+  SELECT = "SELECT",
+  CLOSE = "CLOSE",
 }
 
 /** Como o vencimento da aerografia é derivado do término. Espelha a API. */

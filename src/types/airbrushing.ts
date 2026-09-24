@@ -5,6 +5,9 @@ import type {
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_DUE_DATE_RULE,
+  AIRBRUSHING_QUOTE_STATUS,
+  AIRBRUSHING_QUOTE_PARTY,
+  AIRBRUSHING_QUOTE_ACTION,
   PAYMENT_METHOD,
   ORDER_BY_DIRECTION,
   NFSE_STATUS,
@@ -52,7 +55,74 @@ export interface Airbrushing extends BaseEntity {
   layouts?: File[];
   /** NFS-e emitida automaticamente para o aerografista quando a aerografia é concluída. */
   nfse?: AirbrushingNfse | null;
+  /** Quando entrou em cotação (criada sem aerografista, ou reaberta). */
+  quotationOpenedAt?: Date | null;
+  /** Quando os aerografistas foram avisados da cotação. */
+  quotationNotifiedAt?: Date | null;
+  /** Quando a cotação terminou (seleção ou cancelamento). */
+  quotationClosedAt?: Date | null;
+  /**
+   * Negociações da cotação, uma por aerografista. A API recorta por papel:
+   * ADMIN/COMMERCIAL/FINANCIAL veem todas; os demais recebem `[]`.
+   */
+  quotes?: AirbrushingQuote[];
 }
+
+// =====================
+// Cotação (negociação por aerografista)
+// =====================
+
+/** Negociação de um aerografista numa aerografia em cotação. */
+export interface AirbrushingQuote {
+  id: string;
+  airbrushingId: string;
+  painterId: string;
+  status: AIRBRUSHING_QUOTE_STATUS;
+  /**
+   * Valor em jogo: em PROPOSED é o lance do aerografista; em COUNTERED/ACCEPTED é a
+   * contraproposta do comercial; em SELECTED é o valor fechado. `null` só quando ele
+   * recusou sem nunca propor.
+   */
+  amount: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  painter?: { id: string; name: string; avatarId?: string | null } | null;
+  /** Linha do tempo, em ordem cronológica crescente. */
+  events?: AirbrushingQuoteEvent[];
+}
+
+/** Um lance ou decisão dentro da negociação. */
+export interface AirbrushingQuoteEvent {
+  id: string;
+  quoteId: string;
+  party: AIRBRUSHING_QUOTE_PARTY;
+  action: AIRBRUSHING_QUOTE_ACTION;
+  amount: number | null;
+  note: string | null;
+  userId: string | null;
+  createdAt: Date;
+  user?: { id: string; name: string } | null;
+}
+
+/** GET /airbrushing-quotes/airbrushing/:id — visão do comercial. */
+export interface AirbrushingQuoteOverview {
+  airbrushing: {
+    id: string;
+    status: AIRBRUSHING_STATUS;
+    price: number | null;
+    painterId: string | null;
+    quotationOpenedAt: Date | null;
+    quotationNotifiedAt: Date | null;
+    quotationClosedAt: Date | null;
+  };
+  /** Mais recentes primeiro (updatedAt desc). */
+  quotes: AirbrushingQuote[];
+  /** Aerografistas que ainda não responderam — só enquanto a aerografia está em cotação. */
+  pendingPainters: { id: string; name: string; avatarId: string | null }[];
+}
+
+export interface AirbrushingQuoteOverviewResponse extends BaseGetUniqueResponse<AirbrushingQuoteOverview> {}
+export interface AirbrushingQuoteActionResponse extends BaseUpdateResponse<AirbrushingQuote> {}
 
 // =====================
 // NFS-e do Aerografista
@@ -166,6 +236,8 @@ export interface AirbrushingIncludes {
         include?: UserIncludes;
       };
   nfse?: boolean;
+  /** Qualquer forma vira, na API, o include completo (painter + events). */
+  quotes?: boolean | { include?: { painter?: boolean; events?: boolean } };
 }
 
 // =====================

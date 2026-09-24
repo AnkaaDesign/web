@@ -146,6 +146,21 @@ export const airbrushingIncludeSchema = z
         }),
       ])
       .optional(),
+    // Negociações da cotação. A API transforma qualquer forma no mesmo include
+    // seguro (painter id/nome/avatar + events em ordem cronológica).
+    quotes: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z
+            .object({
+              painter: z.boolean().optional(),
+              events: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
   })
   .partial();
 

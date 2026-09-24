@@ -8,3 +8,4 @@ export * from "./use-cut";
 export * from "./use-cut-item-filters";
 export * from "./use-airbrushing";
 export * from "./use-airbrushing-nfse";
+export * from "./use-airbrushing-quote";
