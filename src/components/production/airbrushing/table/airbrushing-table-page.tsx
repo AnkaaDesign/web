@@ -53,10 +53,6 @@ const LIST_INCLUDE = {
   // A NFS-e do aerografista alimenta a coluna "NFS-e" (oculta por padrão). É uma linha 1:1
   // barata — nada a ver com os arquivos de nota ANEXADOS, que continuam fora do include.
   nfse: true,
-  // Negociações da cotação — alimentam o indicador "N propostas · M aguardando você" das
-  // linhas Em Cotação. Barato: poucas linhas por aerografia, e a API só devolve para
-  // ADMIN/COMMERCIAL/FINANCIAL (os demais recebem `[]`).
-  quotes: true,
 } as const;
 
 // Valor SINTÉTICO do filtro de NFS-e: "aerografia sem nenhuma nota". Não pertence a
