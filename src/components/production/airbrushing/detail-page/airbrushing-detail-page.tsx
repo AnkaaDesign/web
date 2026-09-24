@@ -719,25 +719,6 @@ export function AirbrushingDetailPage() {
       ),
     });
 
-    // --- NFS-e do Aerografista (financial-only) ---
-    // O id é "nfse" e NÃO "invoices": este último já pertence à galeria de notas fiscais
-    // ANEXADAS (arquivos), que é outra coisa — colidir apagaria uma das duas seções.
-    //
-    // Esta é a seção ÚNICA do documento fiscal: DANFSe (PDF) e XML autorizado ficam juntos
-    // no bloco "Documentos da nota". `invoices` entra porque é lá que o servidor conecta o
-    // File do DANFSe — é de onde sai nome/tamanho/miniatura sem uma segunda busca.
-    // `span: 2` porque o corpo agora tem três blocos + documentos e ficava espremido em
-    // meia largura (quem já personalizou a largura desta seção mantém a escolha dele).
-    list.push({
-      id: "nfse",
-      label: "NFS-e do Aerografista",
-      icon: IconReceiptTax,
-      span: 2,
-      requiredPrivilege: MONEY_GATE,
-      headerActions: () => <AirbrushingNfseHeaderBadges nfse={nfse} />,
-      render: (a) => <AirbrushingNfseSection airbrushingId={a.id} canManage={canManageNfse} invoices={a.invoices ?? []} />,
-    });
-
     // --- Tarefa Relacionada (read-only; belongs to the Task) ---
     if (airbrushing?.task) {
       list.push({
@@ -838,34 +819,49 @@ export function AirbrushingDetailPage() {
       });
     }
 
-    // --- Notas Fiscais Anexadas (financial-only) ---
-    // O DANFSe gerado pelo sistema é conectado pelo servidor na MESMA relação
-    // (AIRBRUSHING_INVOICES) em que caem os anexos manuais. Aqui ele sai da lista: seu lugar
-    // é a seção "NFS-e do Aerografista", junto do XML. O filtro é por `pdfFileId` e nada
-    // mais — em notas antigas (pdfFileId nulo) o PDF simplesmente continua entre os anexos,
-    // que é melhor do que adivinhar por nome de arquivo e esconder o anexo errado.
+    // --- NFS-e (financial-only) — depois de Tarefa e Layouts ---
+    // O id continua "nfse" (e não "invoices", que era a antiga seção de anexos) para que
+    // o layout que cada usuário personalizou continue apontando para esta seção.
     //
-    // A seção continua existindo mesmo com a subtração: há arquivos que usuários anexaram à
-    // mão e sumir com eles seria perda de dado visível.
-    const attachedInvoices = (airbrushing?.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId);
-    if (attachedInvoices.length > 0) {
-      list.push({
-        id: "invoices",
-        label: "Notas Fiscais Anexadas",
-        icon: IconFileInvoice,
-        span: 1,
-        requiredPrivilege: MONEY_GATE,
-        headerActions: (a) => <Badge variant="secondary">{(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId).length}</Badge>,
-        render: (a) => (
-          <AirbrushingFilesSection
-            files={(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId)}
-            emptyIcon={IconFileInvoice}
-            emptyTitle="Nenhuma nota fiscal cadastrada"
-            emptyDescription="Esta aerografia não possui notas fiscais anexadas."
-          />
-        ),
-      });
-    }
+    // Esta é a seção ÚNICA do documento fiscal: DANFSe (PDF) e XML autorizado ficam juntos
+    // no bloco "Documentos da nota". `invoices` entra porque é lá que o servidor conecta o
+    // File do DANFSe — é de onde sai nome/tamanho/miniatura sem uma segunda busca.
+    // `span: 2` porque o corpo agora tem três blocos + documentos e ficava espremido em
+    // meia largura (quem já personalizou a largura desta seção mantém a escolha dele).
+    //
+    // As notas fiscais ANEXADAS à mão também moram aqui, num bloco próprio abaixo da nota
+    // emitida: documento fiscal da aerografia é um assunto só, com uma seção só.
+    list.push({
+      id: "nfse",
+      label: "NFS-e",
+      icon: IconReceiptTax,
+      span: 2,
+      requiredPrivilege: MONEY_GATE,
+      headerActions: () => <AirbrushingNfseHeaderBadges nfse={nfse} />,
+      render: (a) => {
+        // O DANFSe gerado pelo sistema é conectado pelo servidor na MESMA relação
+        // (AIRBRUSHING_INVOICES) em que caem os anexos manuais; ele já aparece em
+        // "Documentos da nota", então sai da lista de anexos. O filtro é por `pdfFileId` e
+        // nada mais — em notas antigas (pdfFileId nulo) o PDF continua entre os anexos, que
+        // é melhor do que adivinhar por nome de arquivo e esconder o anexo errado.
+        const attachedInvoices = (a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId);
+        return (
+          <div className="space-y-3">
+            <AirbrushingNfseSection airbrushingId={a.id} canManage={canManageNfse} invoices={a.invoices ?? []} />
+            {attachedInvoices.length > 0 && (
+              <SubBlock title={`Notas fiscais anexadas (${attachedInvoices.length})`}>
+                <AirbrushingFilesSection
+                  files={attachedInvoices}
+                  emptyIcon={IconFileInvoice}
+                  emptyTitle="Nenhuma nota fiscal cadastrada"
+                  emptyDescription="Esta aerografia não possui notas fiscais anexadas."
+                />
+              </SubBlock>
+            )}
+          </div>
+        );
+      },
+    });
 
     // --- Recibos: NÃO há seção própria ---
     // Os recibos são exibidos dentro de "Preço & Pagamento" (o comprovante pertence ao
