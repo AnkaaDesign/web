@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   IconInfoCircle,
-  IconLock,
   IconBuilding,
   IconUser
 } from '@tabler/icons-react';
@@ -46,35 +45,20 @@ const responsibleSchema = z.object({
       },
       { message: 'CPF inválido' },
     ),
-  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').optional().nullable().or(z.literal('')),
   companyId: z.string().optional().nullable().or(z.literal('')),
   // A contact can hold several roles at once (e.g. proprietário + financeiro).
   roles: z.array(z.nativeEnum(ResponsibleRole)).min(1, 'Selecione ao menos uma função'),
   isActive: z.boolean().default(true),
-  hasSystemAccess: z.boolean().default(false),
 });
 
-/**
- * O schema depende do modo por causa do e-mail.
- *
- * O e-mail é opcional em criação e edição: muito cadastro não tem e-mail, e a
- * exigência real pertence à emissão do envelope de assinatura, que recusa
- * nominalmente quem está sem endereço na hora de enviar.
- */
-const buildResponsibleSchema = (_mode: 'create' | 'edit') =>
-  responsibleSchema.superRefine((data, ctx) => {
-    const email = (data.email || '').trim();
-
-    // O e-mail também é ELE o usuário do login — habilitar acesso sem e-mail
-    // cria uma conta em que ninguém consegue entrar.
-    if (data.hasSystemAccess && !email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['email'],
-        message: 'Informe o e-mail para habilitar o acesso ao sistema',
-      });
-    }
-  });
+// Não há mais `password` nem "Habilitar acesso ao sistema". O portal do cliente
+// entra por código de uso único enviado ao telefone ou ao e-mail do contato, e
+// a coluna de senha foi apagada da API (76855c16). Todo contato ATIVO pode
+// entrar, então o controle de acesso é o switch "Ativo" do cartão de Status.
+//
+// O e-mail é opcional em criação e edição: muito cadastro não tem e-mail, e a
+// exigência real pertence à emissão do envelope de assinatura, que recusa
+// nominalmente quem está sem endereço na hora de enviar.
 
 type ResponsibleFormData = z.infer<typeof responsibleSchema>;
 
@@ -191,23 +175,19 @@ export function ResponsibleForm({
     }));
   }, []);
 
-  const schema = useMemo(() => buildResponsibleSchema(mode), [mode]);
-
   const form = useForm<ResponsibleFormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(responsibleSchema),
     defaultValues: {
       name: initialData?.name || '',
       phone: initialData?.phone || '',
       email: initialData?.email || '',
       cpf: initialData?.cpf || '',
-      password: '',
       companyId: initialData?.companyId || '',
       // Sem função pré-selecionada: quem cadastra escolhe. O schema exige ao
       // menos uma ("Selecione ao menos uma função"), então o campo vazio avisa
       // em vez de gravar um "Comercial" que ninguém marcou.
       roles: getResponsibleRoles(initialData),
       isActive: initialData?.isActive ?? true,
-      hasSystemAccess: !!(initialData?.email && initialData?.password),
     },
     mode: 'onBlur',
     reValidateMode: 'onChange',
@@ -221,9 +201,6 @@ export function ResponsibleForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, initialData?.id]);
 
-  const hasSystemAccess = form.watch('hasSystemAccess');
-  const watchedEmail = form.watch('email');
-
   // Track form state changes
   useEffect(() => {
     if (onFormStateChange) {
@@ -234,16 +211,6 @@ export function ResponsibleForm({
     }
   }, [form.formState.isValid, form.formState.isDirty, onFormStateChange]);
 
-  // Desligar o acesso apaga a SENHA, não o e-mail. O e-mail deixou de ser
-  // credencial de login: é por ele que sai o convite e o código da assinatura
-  // eletrônica, e limpá-lo aqui apagava silenciosamente o contato do
-  // responsável ao mexer num interruptor que fala de outra coisa.
-  useEffect(() => {
-    if (!hasSystemAccess) {
-      form.setValue('password', '');
-    }
-  }, [hasSystemAccess, form]);
-
   const handleSubmit = async (data: ResponsibleFormData) => {
     // Clean up data before submitting
     const submitData: any = {
@@ -252,17 +219,8 @@ export function ResponsibleForm({
       email: (data.email || '').trim() || null,
       // Dígitos puros: é assim que a API grava (e o `cpfNormalized` gerado indexa).
       cpf: (data.cpf || '').replace(/\D/g, '') || null,
-      password: hasSystemAccess && data.password ? data.password : null,
       companyId: data.companyId || null,
     };
-
-    // Remove hasSystemAccess as it's not part of the API
-    delete submitData.hasSystemAccess;
-
-    // Remove password if editing and it's empty
-    if (mode === 'edit' && !submitData.password) {
-      delete submitData.password;
-    }
 
     await onSubmit(submitData);
   };
@@ -343,9 +301,9 @@ export function ResponsibleForm({
                 />
 
                 {/* Fileira 2 — por onde se fala com ela. O e-mail vive AQUI, e
-                    não mais dentro de "Acesso ao Sistema": ele é o canal do
-                    convite e do código da assinatura eletrônica, coisa que todo
-                    responsável tem, com ou sem login. */}
+                    é o canal do convite e do código da assinatura
+                    eletrônica, e um dos dois caminhos (com o telefone) do
+                    código de entrada no portal do cliente. */}
                 <FormField
                   control={form.control}
                   name="email"
@@ -363,7 +321,7 @@ export function ResponsibleForm({
                         />
                       </FormControl>
                       <p className="text-xs text-muted-foreground">
-                        Recebe o convite e o código da assinatura eletrônica.
+                        Recebe o convite e o código da assinatura eletrônica e pode receber o código de entrada no portal.
                       </p>
                       <FormMessage />
                     </FormItem>
@@ -494,82 +452,6 @@ export function ResponsibleForm({
             </CardContent>
           </Card>
 
-          {/* System Access */}
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconLock className="h-5 w-5 text-muted-foreground" />
-                Acesso ao Sistema
-              </CardTitle>
-              <CardDescription>Configure o acesso do responsável ao sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <FormField
-                control={form.control}
-                name="hasSystemAccess"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <FormLabel>Habilitar acesso ao sistema</FormLabel>
-                        <p className="text-sm text-muted-foreground">
-                          Permite que o responsável faça login no sistema
-                        </p>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              {/* O usuário do login é o e-mail das Informações Básicas — este
-                  cartão só decide SE há acesso e qual a senha. Repetir o campo
-                  aqui daria a entender que existe um segundo e-mail. */}
-              {hasSystemAccess && (
-                <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-12">
-                  <div className="md:col-span-7">
-                    <p className="text-sm text-muted-foreground">
-                      Entra com o e-mail{' '}
-                      <span className="font-medium text-foreground">
-                        {(watchedEmail || '').trim() || '— informe o e-mail acima'}
-                      </span>
-                      .
-                    </p>
-                  </div>
-
-                  {mode === 'create' && (
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem className="md:col-span-5">
-                          <FormLabel>Senha <span className="text-destructive">*</span></FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="password"
-                              placeholder="Mínimo 6 caracteres"
-                              disabled={isSubmitting}
-                              className="bg-transparent"
-                              value={field.value || ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Status */}
           <Card className="border-border">
             <CardHeader>
@@ -588,8 +470,10 @@ export function ResponsibleForm({
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <FormLabel>Ativo</FormLabel>
+                        {/* Sem senha no portal, "Ativo" É o controle de acesso:
+                            o código de entrada só é emitido para contato ativo. */}
                         <p className="text-sm text-muted-foreground">
-                          Define se o responsável está ativo no sistema
+                          Um contato inativo deixa de aparecer nas seleções de responsável e não consegue entrar no portal do cliente
                         </p>
                       </div>
                       <FormControl>

@@ -34,11 +34,17 @@ export interface Responsible {
    * houver um número cadastrado para conferir.
    */
   cpf?: string | null;
-  password?: string | null;
   companyId?: string | null;
   roles: ResponsibleRole[];
   isActive: boolean;
-  lastLogin?: Date | null;
+  /**
+   * Portal do cliente. Não há senha: o contato entra por código de uso único
+   * (telefone ou e-mail) e todo contato ATIVO pode entrar. `verified` é
+   * carimbado na primeira sessão concluída — é registro de que ele JÁ entrou,
+   * não pré-requisito de login. `lastLoginAt` é o último login concluído.
+   */
+  verified?: boolean;
+  lastLoginAt?: Date | string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -52,7 +58,6 @@ export interface ResponsibleCreateFormData {
   name: string;
   /** Dígitos puros; a API valida mod-11 e recusa CPF inválido. */
   cpf?: string | null;
-  password?: string | null;
   companyId?: string | null;
   roles: ResponsibleRole[];
   isActive?: boolean;
@@ -64,7 +69,6 @@ export interface ResponsibleUpdateFormData {
   name?: string;
   /** Dígitos puros; a API valida mod-11 e recusa CPF inválido. */
   cpf?: string | null;
-  password?: string | null;
   roles?: ResponsibleRole[];
   isActive?: boolean;
 }
@@ -74,7 +78,6 @@ export interface ResponsibleCreateInline {
   phone: string;
   name: string;
   cpf?: string | null;
-  password?: string | null;
   roles: ResponsibleRole[];
   isActive?: boolean;
 }
@@ -140,7 +143,8 @@ export interface ResponsibleDisplay {
   email?: string;
   companyName: string;
   isActive: boolean;
-  hasSystemAccess: boolean;
+  /** Já entrou no portal do cliente (`Responsible.verified`). */
+  hasEnteredPortal: boolean;
 }
 
 // Responsible role labels for display

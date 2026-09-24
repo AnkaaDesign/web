@@ -120,15 +120,6 @@ export const budgetService = {
   // Cancel (sends back to PENDING)
   cancel: (id: string) => apiClient.put(`/budgets/${id}/status`, { status: 'PENDING' }),
 
-  // Update just the orderNumber on a customerConfig — safe to call on locked quotes
-  /**
-   * @deprecated O número do pedido é do VEÍCULO (`Task.customerOrderNumber`).
-   * Esta rota grava o mesmo número em TODAS as tarefas do orçamento. Para editar
-   * o pedido de um caminhão use `PUT /tasks/:id` (ou `PUT /tasks/batch`).
-   */
-  updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
-    apiClient.patch(`/budgets/${id}/customer-config-order-number`, { customerId, orderNumber }),
-
   // Recibo de quitação (PDF) — só existe depois que a cobrança é liquidada
   // (`BILLING_STATUS.SETTLED`). O recibo é do orçamento porque é o contrato que
   // se quita; o estado que o libera é o da cobrança.

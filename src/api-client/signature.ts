@@ -185,20 +185,8 @@ export interface DeliveryPreflight extends DeliverySettings {
   } | null;
   channelStatus: Record<DeliveryChannel, PreflightChannelStatus>;
   /**
-   * Identificação do veículo no momento do envio. Aviso, nunca bloqueio.
+   * Identificação de cada veículo no momento do envio. Aviso, nunca bloqueio.
    *
-   * O documento é congelado com o que existe AGORA: placa e chassi preenchidos
-   * depois não entram nele — nem podem, é o documento que foi assinado. É o caso
-   * comum do implemento 0 km, orçado antes de emplacar.
-   */
-  /**
-   * @deprecated Descreve só o PRIMEIRO veículo. Use `vehicles`.
-   *
-   * Mantido porque a API ainda o envia (o app instalado nos aparelhos depende
-   * dele) e porque remover aqui não removeria de lá.
-   */
-  vehicle: { plate: string | null; chassisNumber: string | null; missing: string[] } | null;
-  /**
    * Um por veículo do orçamento, na ordem do documento.
    *
    * Um orçamento pode cobrir sessenta caminhões, e a lacuna de cadastro existe

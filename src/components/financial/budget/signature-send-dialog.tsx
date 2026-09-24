@@ -415,9 +415,6 @@ export function SignatureSendDialog({
                    orçamento está sem placa do veículo" — nem o inverso, um em
                    que faltam cinquenta e nove como se fosse um.
 
-                   `vehicles` é a fonte; `vehicle` (o primeiro) é o recuo para
-                   uma API anterior a esta feature.
-
                    O TEXTO deixou de anunciar uma perda: desde as lacunas de
                    cadastro tardio, o dado é carimbado na lacuna quando chega,
                    sem tocar nos bytes assinados, e o aditivo de identificação
@@ -425,11 +422,10 @@ export function SignatureSendDialog({
               {(() => {
                 const vehicles = preflight?.vehicles ?? [];
                 const withGaps = vehicles.filter((v) => v.missing.length > 0);
-                const legacyMissing = preflight?.vehicle?.missing ?? [];
                 if (blocked) return null;
-                if (withGaps.length === 0 && legacyMissing.length === 0) return null;
+                if (withGaps.length === 0) return null;
                 const multi = vehicles.length > 1;
-                const missing = withGaps[0]?.missing ?? legacyMissing;
+                const missing = withGaps[0].missing;
                 const plural = multi || missing.length > 1;
                 return (
                   <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
