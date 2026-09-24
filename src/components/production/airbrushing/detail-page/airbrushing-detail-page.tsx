@@ -248,10 +248,14 @@ export function AirbrushingDetailPage() {
   // servidor, que ignora em SILÊNCIO (200, sem mudança) quem não pode. Esconder o
   // controle aqui é o que evita o clique que parece funcionar e não faz nada.
   const canApproveLayouts = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]);
-  // VER a nota segue o gate de dinheiro (MONEY_GATE, que inclui COMMERCIAL), mas EMITIR /
-  // CANCELAR é mais estreito no servidor — ADMIN/Contabilidade/Financeiro. Sem esse recorte
-  // o comercial veria botões que só devolvem 403.
-  const canManageNfse = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL]);
+  // EMITIR / CANCELAR a nota espelha o FISCAL_ADMIN do servidor (painter-nfse.controller):
+  // ADMIN/Contabilidade/Financeiro e o Comercial, dono do sistema de aerografia.
+  const canManageNfse = hasAnyPrivilegeAccess([
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.ACCOUNTING,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+  ]);
   const canActOnQuotes = hasAnyPrivilegeAccess(QUOTE_ACT_GATE);
   const reopenMutation = useReopenAirbrushingQuotation();
   const [showReopenDialog, setShowReopenDialog] = useState(false);
