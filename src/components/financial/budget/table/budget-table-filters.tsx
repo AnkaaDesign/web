@@ -1,6 +1,4 @@
-import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, IconFileText, IconHash, IconProgressCheck, IconReceipt2, IconUserDollar,
-  IconTruck,
-} from "@tabler/icons-react";
+import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, IconFileText, IconHash, IconProgressCheck, IconReceipt2, IconUserDollar } from "@tabler/icons-react";
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer } from "@/types";
@@ -113,29 +111,6 @@ export function createBudgetFilterDefs(opts: { invoiceCustomers: Customer[]; tas
       // The value itself is money — a user who cannot see the column must not be able to
       // binary-search it with a range filter either.
       requiredPrivilege: MONEY_PRIVILEGES,
-    },
-    {
-      /**
-       * ORÇAMENTO COM OU SEM VEÍCULO.
-       *
-       * Existe porque a lista passou a consultar ORÇAMENTOS. Enquanto ela
-       * consultava tarefas, os 105 orçamentos sem nenhum veículo eram invisíveis
-       * por construção; agora eles existem, e o padrão "Com veículo" mantém a
-       * tela operacional — mas o filtro é a porta que faltava para alcançá-los,
-       * e entre eles há orçamento APROVADO de R$ 11.710,00.
-       */
-      key: "vehiclePresence",
-      label: "Veículos",
-      type: "select",
-      icon: <IconTruck className="h-4 w-4" />,
-      placeholder: "Com veículo",
-      options: [
-        { value: "WITH", label: "Com veículo" },
-        { value: "WITHOUT", label: "Sem nenhum veículo" },
-        { value: "ALL", label: "Todos" },
-      ],
-      formatValue: (v) =>
-        v === "WITHOUT" ? "Sem nenhum veículo" : v === "ALL" ? "Com e sem veículo" : "Com veículo",
     },
     {
       key: "hasOrderNumber",
@@ -283,26 +258,16 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
   if (orderNumberWhere) and.push({ tasks: { some: orderNumberWhere } });
 
-  // ── ORÇAMENTO SEM NENHUM VEÍCULO: fora do padrão, e alcançável ────────────
+  // ── SÓ ORÇAMENTO COM VEÍCULO: regra da lista, não filtro ─────────────────
   //
-  // Há 105 deles em produção — o mais antigo de janeiro, o mais novo de agosto,
-  // todos com serviços, 83 com pagador e faturamento. Nenhum tem tarefa.
-  //
-  // Enquanto a lista consultava TAREFAS eles eram invisíveis: uma consulta por
-  // tarefa nunca os alcança. Ao passar a consultar ORÇAMENTOS eles apareceram de
-  // uma vez — e, como a ordenação secundária é a validade e eles são os mais
-  // antigos, ocuparam a primeira página inteira com linha sem logomarca, sem
-  // identificador e sem veículo. Quem abre a tela lê "alguma coisa deu errado".
-  //
-  // O padrão volta a ser a lista OPERACIONAL: orçamento que tem caminhão. Mas
-  // eles NÃO voltam a ser invisíveis — o filtro "Veículos" os traz, e entre eles
-  // há orçamento APROVADO de R$ 11.710,00 que ninguém via desde que foi feito.
+  // Orçamento é de caminhão. A API recusa criar um sem tarefa e cancela o
+  // orçamento quando o último veículo é excluído; os órfãos antigos foram
+  // apagados. A condição fica mesmo assim, fixa, para que um resto de dado
+  // nunca volte a ocupar a primeira página.
   //
   // ⚠️ Não é `where.tasks` direto: `tasks` pode já estar em `AND` pelo bloco
   // acima, e a chave de topo o sobrescreveria em silêncio.
-  const vehiclePresence = String(filters.vehiclePresence ?? "WITH");
-  if (vehiclePresence === "WITH") and.push({ tasks: { some: {} } });
-  else if (vehiclePresence === "WITHOUT") and.push({ tasks: { none: {} } });
+  and.push({ tasks: { some: {} } });
 
   if (and.length > 0) where.AND = and;
 
