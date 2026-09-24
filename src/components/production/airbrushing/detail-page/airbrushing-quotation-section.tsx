@@ -2,9 +2,9 @@
 //
 // Uma aerografia criada sem aerografista nasce Em Cotação: cada aerografista abre UMA
 // negociação (AirbrushingQuote) com VALOR + TEMPO DE EXECUÇÃO, e o comercial compara,
-// contrapropõe ou seleciona. A contraproposta é da COTAÇÃO: uma só, para todos que têm
-// proposta aguardando resposta (valor, tempo ou os dois — o que ficar em branco continua o
-// de cada um). Aceitar NÃO é ser selecionado — só "Selecionar" grava aerografista, valor e
+// contrapropõe ou seleciona. A contraproposta é da COTAÇÃO: uma só, para todos que já
+// enviaram proposta, inclusive quem aceitou (valor, tempo ou os dois — o que ficar em branco
+// continua o de cada um). Aceitar NÃO é ser selecionado — só "Selecionar" grava aerografista, valor e
 // tempo (os da negociação, nunca digitados), encerra as demais e leva a aerografia para Em
 // Preparação. Depois de encerrada, a seção fica como histórico somente leitura.
 //
@@ -76,11 +76,15 @@ import type { Airbrushing, AirbrushingQuote, AirbrushingQuoteEvent, File as Anka
 /** Vez do comercial: há um valor que o aerografista sustenta — dá para selecionar. */
 const SELECTABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.ACCEPTED]);
 /**
- * Quem a contraproposta para todos alcança: a proposta do aerografista aguardando resposta
- * (PROPOSED) ou a própria contraproposta em revisão (COUNTERED). Quem já ACEITOU fica de fora
- * — as condições estão combinadas e o que resta é selecionar — espelha canCompanyCounter da API.
+ * Quem a contraproposta para todos alcança: toda negociação ativa — proposta do aerografista,
+ * contraproposta anterior e também quem já ACEITOU (aceitar não encerra a conversa enquanto
+ * ninguém foi selecionado). Só quem recusou fica de fora — espelha canCompanyCounter da API.
  */
-const COUNTERABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.COUNTERED]);
+const COUNTERABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([
+  AIRBRUSHING_QUOTE_STATUS.PROPOSED,
+  AIRBRUSHING_QUOTE_STATUS.COUNTERED,
+  AIRBRUSHING_QUOTE_STATUS.ACCEPTED,
+]);
 /** Selecionar aparece também em COUNTERED, desabilitado com o motivo — a vez é dele. */
 const SELECT_SHOWN = new Set<AIRBRUSHING_QUOTE_STATUS>([...SELECTABLE, AIRBRUSHING_QUOTE_STATUS.COUNTERED]);
 
@@ -245,15 +249,9 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
     [quotes],
   );
 
-  const counts = useMemo(() => {
-    const by = (status: AIRBRUSHING_QUOTE_STATUS) => quotes.filter((q) => q.status === status).length;
-    return {
-      proposals: quotes.filter((q) => q.amount != null).length,
-      awaitingCompany: by(AIRBRUSHING_QUOTE_STATUS.PROPOSED) + by(AIRBRUSHING_QUOTE_STATUS.ACCEPTED),
-      awaitingPainter: by(AIRBRUSHING_QUOTE_STATUS.COUNTERED),
-      declined: by(AIRBRUSHING_QUOTE_STATUS.DECLINED),
-    };
-  }, [quotes]);
+  // Quantas negociações dá para selecionar agora — os selos "Menor valor/prazo" só fazem
+  // sentido quando há com o que comparar.
+  const selectableCount = useMemo(() => quotes.filter((q) => SELECTABLE.has(q.status)).length, [quotes]);
 
   // Menor valor que dá para fechar AGORA — é a comparação que importa para o comercial.
   const lowestSelectableId = useMemo(() => {
@@ -286,7 +284,6 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
 
   // Quem a contraproposta para todos alcança agora.
   const counterTargets = useMemo(() => (isOpen ? quotes.filter((q) => COUNTERABLE.has(q.status)) : []), [quotes, isOpen]);
-  const acceptedCount = useMemo(() => quotes.filter((q) => q.status === AIRBRUSHING_QUOTE_STATUS.ACCEPTED).length, [quotes]);
 
   const selected = quotes.find((q) => q.status === AIRBRUSHING_QUOTE_STATUS.SELECTED) ?? null;
 
@@ -354,23 +351,14 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
         </div>
       )}
 
-      {isOpen ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatTile label="Propostas" value={counts.proposals} />
-          <StatTile label="Aguardando você" value={counts.awaitingCompany} highlight={counts.awaitingCompany > 0} />
-          <StatTile label="Aguardando aerografista" value={counts.awaitingPainter} />
-          <StatTile label="Recusaram" value={counts.declined} />
+      {!isOpen && selected && (
+        <div className="flex items-center gap-3 rounded-lg border border-green-600/30 bg-green-600/10 p-3 text-sm">
+          <IconTrophy className="h-5 w-5 flex-shrink-0 text-green-700 dark:text-green-400" />
+          <span>
+            <span className="font-semibold">{painterName(selected)}</span> foi selecionado por{" "}
+            <span className="font-semibold tabular-nums">{termsOf(selected, " em ")}</span>.
+          </span>
         </div>
-      ) : (
-        selected && (
-          <div className="flex items-center gap-3 rounded-lg border border-green-600/30 bg-green-600/10 p-3 text-sm">
-            <IconTrophy className="h-5 w-5 flex-shrink-0 text-green-700 dark:text-green-400" />
-            <span>
-              <span className="font-semibold">{painterName(selected)}</span> foi selecionado por{" "}
-              <span className="font-semibold tabular-nums">{termsOf(selected, " em ")}</span>.
-            </span>
-          </div>
-        )
       )}
 
       {/* ---------- Média das propostas (o que os aerografistas pediram) ---------- */}
@@ -428,7 +416,7 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Propostas ({sorted.length})</p>
             {showRowActions && (
-              <ActionWithReason reason={counterTargets.length === 0 ? "Nenhuma proposta aguardando resposta" : null}>
+              <ActionWithReason reason={counterTargets.length === 0 ? "Nenhum aerografista enviou proposta ainda" : null}>
                 <Button type="button" variant="outline" size="sm" onClick={() => setCounterAllOpen(true)} disabled={counterTargets.length === 0}>
                   <IconArrowsExchange className="mr-1.5 h-4 w-4" />
                   Contraproposta para todos ({counterTargets.length})
@@ -443,8 +431,8 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
               isOpen={isOpen}
               canAct={canAct}
               startDate={startDate}
-              isLowest={quote.id === lowestSelectableId && counts.awaitingCompany > 1}
-              isFastest={quote.id === fastestSelectableId && counts.awaitingCompany > 1}
+              isLowest={quote.id === lowestSelectableId && selectableCount > 1}
+              isFastest={quote.id === fastestSelectableId && selectableCount > 1}
               expanded={expanded.has(quote.id)}
               onToggle={() => toggleExpanded(quote.id)}
               onSelect={() => setSelectTarget(quote)}
@@ -457,7 +445,6 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
         open={counterAllOpen}
         airbrushingId={airbrushing.id}
         targets={counterTargets}
-        acceptedCount={acceptedCount}
         startDate={startDate}
         onClose={() => setCounterAllOpen(false)}
       />
@@ -469,15 +456,6 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
 // =====================
 // Peças
 // =====================
-
-function StatTile({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
-  return (
-    <div className={cn("rounded-lg border p-3", highlight ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-muted/30")}>
-      <p className={cn("text-2xl font-semibold leading-none", highlight && "text-amber-700 dark:text-amber-400")}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-    </div>
-  );
-}
 
 /** Botão desabilitado não dispara hover: o span recebe o tooltip no lugar dele. */
 function ActionWithReason({ reason, children }: { reason: string | null; children: React.ReactNode }) {
@@ -649,10 +627,8 @@ function QuoteEventBubble({ event, painter }: { event: AirbrushingQuoteEvent; pa
 interface CounterAllQuotesDialogProps {
   open: boolean;
   airbrushingId: string;
-  /** Negociações que recebem a contraproposta (PROPOSED/COUNTERED). */
+  /** Negociações que recebem a contraproposta (PROPOSED/COUNTERED/ACCEPTED). */
   targets: AirbrushingQuote[];
-  /** Quem já aceitou — fica de fora, e o diálogo diz isso. */
-  acceptedCount: number;
   startDate: Date | string | null;
   onClose: () => void;
 }
@@ -665,11 +641,11 @@ const EMPTY_COUNTER: AirbrushingQuoteCounterAllFormData = {
 };
 
 /**
- * Contraproposta para TODOS que têm proposta aguardando resposta. Novo valor e novo tempo
+ * Contraproposta para TODOS que já enviaram proposta, inclusive quem aceitou. Novo valor e novo tempo
  * são opcionais (pelo menos um); o que ficar em branco continua o de cada negociação — por
  * isso a lista mostra, para cada um, as condições de hoje e as que ele vai receber.
  */
-function CounterAllQuotesDialog({ open, airbrushingId, targets, acceptedCount, startDate, onClose }: CounterAllQuotesDialogProps) {
+function CounterAllQuotesDialog({ open, airbrushingId, targets, startDate, onClose }: CounterAllQuotesDialogProps) {
   const { mutateAsync, isPending } = useCounterAllAirbrushingQuotes();
   const form = useForm<AirbrushingQuoteCounterAllFormData>({
     resolver: zodResolver(airbrushingQuoteCounterAllSchema),
@@ -713,7 +689,7 @@ function CounterAllQuotesDialog({ open, airbrushingId, targets, acceptedCount, s
         <DialogHeader>
           <DialogTitle>Contraproposta para todos</DialogTitle>
           <DialogDescription>
-            Vale para quem tem proposta aguardando resposta. Informe um novo valor, um novo tempo ou os dois — o que ficar em branco continua o de cada um.
+            Vale para todos que já enviaram proposta, inclusive quem aceitou. Informe um novo valor, um novo tempo ou os dois — o que ficar em branco continua o de cada um.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -771,11 +747,6 @@ function CounterAllQuotesDialog({ open, airbrushingId, targets, acceptedCount, s
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-medium">Recebem ({targets.length})</p>
-                {acceptedCount > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {acceptedCount === 1 ? "1 que já aceitou fica de fora" : `${acceptedCount} que já aceitaram ficam de fora`}
-                  </p>
-                )}
               </div>
               <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
                 {targets.map((quote) => {
