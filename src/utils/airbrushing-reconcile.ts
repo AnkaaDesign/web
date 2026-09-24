@@ -237,6 +237,9 @@ export type AirbrushingPlan = ReturnType<typeof planAirbrushingReconciliation>;
 export function airbrushingToFormRow(a: any): Record<string, any> {
   return {
     id: a.id, // Preserve original airbrushing ID
+    // Status GRAVADO — é o que o seletor usa para saber que a linha existe e se está em
+    // cotação (pintor e valor travados). Não é enviado: `buildAirbrushingPayload` ignora.
+    persistedStatus: a.status,
     startDate: a.startDate ? new Date(a.startDate) : null,
     finishDate: a.finishDate ? new Date(a.finishDate) : null,
     startedAt: a.startedAt ? new Date(a.startedAt) : null,
@@ -272,7 +275,8 @@ export function emptyAirbrushingRow(): Record<string, any> {
   return {
     // Default empty airbrushing row
     id: `airbrushing-initial`,
-    status: AIRBRUSHING_STATUS.PREPARATION,
+    // Nova → nasce em cotação (sem pintor e sem valor).
+    status: AIRBRUSHING_STATUS.QUOTING,
     paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
     paymentMethod: null,
     dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,

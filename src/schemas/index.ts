@@ -6,6 +6,7 @@ export * from "./activity";
 export * from "./activity-url-state";
 export * from "./timeClockEntry";
 export * from "./airbrushing";
+export * from "./airbrushing-quote";
 export * from "./borrow";
 export * from "./changelog";
 export * from "./customer";

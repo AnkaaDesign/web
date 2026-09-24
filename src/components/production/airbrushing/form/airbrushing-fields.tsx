@@ -4,7 +4,7 @@ import { FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconInfoCircle, IconPhoto } from "@tabler/icons-react";
+import { IconInfoCircle, IconPhoto, IconUsersGroup } from "@tabler/icons-react";
 import { PainterSelector } from "./painter-selector";
 import {
   AIRBRUSHING_STATUS,
@@ -67,6 +67,18 @@ export interface AirbrushingFieldsProps {
   /** Mostra "Iniciado em" / "Finalizado em" (datas reais). */
   showActualDates?: boolean;
   initialPainter?: AirbrushingPainterRef | null;
+  /**
+   * Aerografia AINDA NÃO GRAVADA. Toda aerografia nasce em cotação (a API a coloca em
+   * QUOTING quando chega sem aerografista): pintor, valor, status e datas reais não são
+   * escolhidos aqui — nascem da proposta selecionada.
+   */
+  isNew?: boolean;
+  /**
+   * A aerografia está GRAVADA em cotação (status persistido QUOTING). Pintor e valor
+   * ficam travados — só a seleção de uma proposta os define — e o status só pode
+   * continuar em cotação ou ser cancelado (a API recusa o resto com 400).
+   */
+  quoting?: boolean;
   /** Prefixo dos `name` dos date pickers — só precisa ser único dentro da página. */
   idPrefix?: string;
   errors?: AirbrushingFieldErrors;
@@ -103,7 +115,15 @@ const asDate = (value: Date | string | null | undefined): Date | null => {
 /** `mode="date"`/`"datetime"` nunca entregam um DateRange — a assinatura larga vem do componente. */
 const onlyDate = (value: Date | DateRange | null): Date | null => (value instanceof Date ? value : null);
 
-const statusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_STATUS).map((value) => ({ value, label: AIRBRUSHING_STATUS_LABELS[value] }));
+// Fora de cotação, Em Cotação não é destino de edição: voltar para lá é o "Reabrir cotação"
+// do detalhe. Em cotação, a única saída pelo formulário é cancelar.
+const statusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_STATUS)
+  .filter((value) => value !== AIRBRUSHING_STATUS.QUOTING)
+  .map((value) => ({ value, label: AIRBRUSHING_STATUS_LABELS[value] }));
+const quotingStatusOptions: ComboboxOption[] = [AIRBRUSHING_STATUS.QUOTING, AIRBRUSHING_STATUS.CANCELLED].map((value) => ({
+  value,
+  label: AIRBRUSHING_STATUS_LABELS[value],
+}));
 const paymentStatusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_PAYMENT_STATUS).map((value) => ({
   value,
   label: AIRBRUSHING_PAYMENT_STATUS_LABELS[value],
@@ -113,6 +133,23 @@ const dueDateRuleOptions: ComboboxOption[] = Object.values(AIRBRUSHING_DUE_DATE_
   value,
   label: AIRBRUSHING_DUE_DATE_RULE_LABELS[value],
 }));
+
+/** Aviso da cotação — o que acontece com pintor e valor enquanto a aerografia está em cotação. */
+export function AirbrushingQuotationNotice({ isNew }: { isNew?: boolean }) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 text-sm">
+      <IconUsersGroup className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
+      <div className="space-y-0.5">
+        <p className="font-medium text-foreground">{isNew ? "Esta aerografia vai para cotação" : "Aerografia em cotação"}</p>
+        <p className="text-muted-foreground">
+          {isNew
+            ? "Ao salvar, todos os aerografistas são avisados para enviar o seu valor. O aerografista e o valor são definidos quando você selecionar uma das propostas no detalhe da aerografia."
+            : "O aerografista e o valor são definidos ao selecionar uma proposta, no detalhe da aerografia. Por aqui, a cotação só pode ser mantida ou cancelada."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Bloco de campos de uma aerografia, compartilhado por criação e edição.
@@ -139,8 +176,12 @@ export function AirbrushingFields({
   idPrefix = "airbrushing",
   errors,
   layoutsSlot,
+  isNew = false,
+  quoting = false,
 }: AirbrushingFieldsProps) {
-  const status = value.status ?? AIRBRUSHING_STATUS.PREPARATION;
+  // Nova ou gravada em cotação: pintor e valor só nascem da proposta selecionada.
+  const inQuotation = isNew || quoting;
+  const status = value.status ?? (isNew ? AIRBRUSHING_STATUS.QUOTING : AIRBRUSHING_STATUS.PREPARATION);
   const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
   const dueDateRule = value.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
 
@@ -173,16 +214,21 @@ export function AirbrushingFields({
 
   return (
     <div className="space-y-4">
-      {/* Linha 1: Pintor | Descrição (Input de uma linha, ao lado do pintor) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Pintor" error={errors?.painterId}>
-          <PainterSelector
-            value={value.painterId ?? undefined}
-            onChange={(userId) => onChange({ painterId: userId ?? null })}
-            initialUser={initialPainter ?? value.painter ?? undefined}
-            disabled={disabled}
-          />
-        </Field>
+      {inQuotation && <AirbrushingQuotationNotice isNew={isNew} />}
+
+      {/* Linha 1: Pintor | Descrição (Input de uma linha, ao lado do pintor). Em cotação o
+          pintor some: ele é o da proposta selecionada, e a descrição ocupa a linha toda. */}
+      <div className={inQuotation ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+        {!inQuotation && (
+          <Field label="Pintor" error={errors?.painterId}>
+            <PainterSelector
+              value={value.painterId ?? undefined}
+              onChange={(userId) => onChange({ painterId: userId ?? null })}
+              initialUser={initialPainter ?? value.painter ?? undefined}
+              disabled={disabled}
+            />
+          </Field>
+        )}
 
         <Field label="Descrição" error={errors?.description}>
           <Input
@@ -199,14 +245,15 @@ export function AirbrushingFields({
         </Field>
       </div>
 
-      {/* Linha 2: Status | Status do Pagamento */}
-      {showStatus && (
+      {/* Linha 2: Status | Status do Pagamento. Uma aerografia nova nasce em cotação — não há
+          status a escolher. */}
+      {showStatus && !isNew && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Status" error={errors?.status}>
             <Combobox
               value={status}
               onValueChange={(next) => handleStatusChange((next as string) || AIRBRUSHING_STATUS.PREPARATION)}
-              options={statusOptions}
+              options={quoting ? quotingStatusOptions : statusOptions}
               placeholder="Selecione o status"
               searchable={false}
               clearable={false}
@@ -214,7 +261,7 @@ export function AirbrushingFields({
             />
           </Field>
 
-          {canViewFinancials && (
+          {canViewFinancials && !quoting && (
             <Field
               label="Status do Pagamento"
               hint={
@@ -266,8 +313,8 @@ export function AirbrushingFields({
         />
       </div>
 
-      {/* Linha 4: datas reais */}
-      {showActualDates && (
+      {/* Linha 4: datas reais — não existem antes de haver um aerografista. */}
+      {showActualDates && !inQuotation && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DateTimeInput
             field={{
@@ -306,14 +353,21 @@ export function AirbrushingFields({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Valor do Serviço" error={errors?.price}>
-              <Input
-                type="currency"
-                value={value.price ?? undefined}
-                onChange={(next) => onChange({ price: typeof next === "number" ? next : null })}
-                placeholder="R$ 0,00"
-                disabled={disabled}
-                className="bg-transparent"
-              />
+              {inQuotation ? (
+                <>
+                  <Input type="text" value="Em cotação" disabled className="bg-transparent" />
+                  <p className="text-xs text-muted-foreground">Definido ao selecionar uma proposta.</p>
+                </>
+              ) : (
+                <Input
+                  type="currency"
+                  value={value.price ?? undefined}
+                  onChange={(next) => onChange({ price: typeof next === "number" ? next : null })}
+                  placeholder="R$ 0,00"
+                  disabled={disabled}
+                  className="bg-transparent"
+                />
+              )}
             </Field>
 
             <Field label="Forma de Pagamento" error={errors?.paymentMethod}>

@@ -14,6 +14,8 @@ interface AirbrushingFormFieldsProps {
   canViewFinancials?: boolean;
   /** Seletor de layouts — o rótulo e a posição são do `AirbrushingFields` (ver o slot lá). */
   layoutsSlot?: ReactNode;
+  /** Status GRAVADO é Em Cotação — pintor e valor travados (ver `AirbrushingFields`). */
+  quoting?: boolean;
 }
 
 /** Campos escalares que este bloco escreve no react-hook-form. */
@@ -42,7 +44,7 @@ const FIELD_NAMES = [
  * mantém criação (linhas do `MultiAirbrushingSelector`, estado local) e edição (RHF)
  * pixel a pixel iguais.
  */
-export function AirbrushingFormFields({ control, disabled, initialPainter, canViewFinancials = true, layoutsSlot }: AirbrushingFormFieldsProps) {
+export function AirbrushingFormFields({ control, disabled, initialPainter, canViewFinancials = true, layoutsSlot, quoting }: AirbrushingFormFieldsProps) {
   const { setValue } = useFormContext();
   // useWatch (nunca `useState` espelhando o form): resets e refetches continuam refletidos.
   const watched = useWatch({ control }) as Record<string, any>;
@@ -76,6 +78,7 @@ export function AirbrushingFormFields({ control, disabled, initialPainter, canVi
       initialPainter={initialPainter}
       idPrefix="airbrushing"
       layoutsSlot={layoutsSlot}
+      quoting={quoting}
     />
   );
 }

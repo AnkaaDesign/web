@@ -28,6 +28,8 @@ import {
   IconEye,
   IconPaperclip,
   IconLoader2,
+  IconUsersGroup,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
@@ -83,6 +85,8 @@ import { formatDate } from "@/utils";
 import { formatFileSize, getFileDownloadUrl } from "@/utils/file";
 import type { Airbrushing, File as AnkaaFile } from "../../../../types";
 import { AirbrushingFilesSection } from "./airbrushing-files-section";
+import { AirbrushingQuotationSection } from "./airbrushing-quotation-section";
+import { useReopenAirbrushingQuotation } from "../../../../hooks/production/use-airbrushing-quote";
 import { AirbrushingNfseSection, AirbrushingNfseHeaderBadges, DocumentRow, SubBlock } from "./airbrushing-nfse-section";
 // Resolve each Layout wrapper to its backing File (id/filename/path) — shared with the
 // task-detail airbrushing section so both download the real File, not the Layout id.
@@ -92,10 +96,18 @@ import { getAirbrushingLayouts } from "@/components/production/task/detail/secti
 // `PrivilegeGate` (SECTOR_PRIVILEGES[]) shape used by requiredPrivilege/editablePrivilege.
 const MONEY_GATE: SECTOR_PRIVILEGES[] = [...AIRBRUSHING_FINANCE_PRIVILEGES];
 
+// Cotação: ver é de quem a API deixa ler (GET /airbrushing-quotes/airbrushing/:id);
+// contrapropor, selecionar e reabrir, só ADMIN/COMMERCIAL. Todos já estão no MONEY_GATE —
+// a seção é feita de valores.
+const QUOTE_VIEW_GATE: SECTOR_PRIVILEGES[] = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL];
+const QUOTE_ACT_GATE: SECTOR_PRIVILEGES[] = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL];
+
 // Valid transitions for inline status edits (the current value is always kept by the editor).
 // Mirrors the task lifecycle: Em Preparação → Aguardando Produção → Em Produção → Concluído,
 // with a step back at every stage and Cancelado reachable until the job is concluded.
 const AIRBRUSHING_STATUS_TRANSITIONS: Record<string, AIRBRUSHING_STATUS[]> = {
+  // Em cotação só se cancela por aqui: seguir adiante é selecionar uma proposta.
+  [AIRBRUSHING_STATUS.QUOTING]: [AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.PREPARATION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.WAITING_PRODUCTION]: [AIRBRUSHING_STATUS.PREPARATION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.IN_PRODUCTION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED, AIRBRUSHING_STATUS.CANCELLED],
@@ -240,6 +252,9 @@ export function AirbrushingDetailPage() {
   // CANCELAR é mais estreito no servidor — ADMIN/Contabilidade/Financeiro. Sem esse recorte
   // o comercial veria botões que só devolvem 403.
   const canManageNfse = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL]);
+  const canActOnQuotes = hasAnyPrivilegeAccess(QUOTE_ACT_GATE);
+  const reopenMutation = useReopenAirbrushingQuotation();
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
 
   /**
    * fileId → LayoutStatus. A seção de layouts trabalha com os Files (é o File que baixa e
@@ -308,6 +323,8 @@ export function AirbrushingDetailPage() {
   });
 
   const airbrushing = response?.data as Airbrushing | undefined;
+  // Em cotação, pintor e valor só nascem da seleção de uma proposta — nada de edição inline.
+  const isQuoting = airbrushing?.status === AIRBRUSHING_STATUS.QUOTING;
 
   /**
    * A nota também é lida AQUI — não só dentro da seção — porque a página precisa de
@@ -382,6 +399,20 @@ export function AirbrushingDetailPage() {
   const sections = useMemo<DetailSectionDef<Airbrushing>[]>(() => {
     const list: DetailSectionDef<Airbrushing>[] = [];
 
+    // --- Cotação ---
+    // Enquanto aberta é o coração da página; encerrada, fica como histórico da escolha.
+    // Só existe para aerografia que passou por cotação (`quotationOpenedAt`).
+    if (isQuoting || airbrushing?.quotationOpenedAt) {
+      list.push({
+        id: "quotation",
+        label: "Cotação",
+        icon: IconUsersGroup,
+        span: 2,
+        requiredPrivilege: QUOTE_VIEW_GATE,
+        render: (a) => <AirbrushingQuotationSection airbrushing={a} canAct={canActOnQuotes} />,
+      });
+    }
+
     // --- Informações da Aerografia ---
     list.push({
       id: "info",
@@ -423,7 +454,9 @@ export function AirbrushingDetailPage() {
           icon: IconUser,
           dataType: "relation",
           accessor: (a) => a.painter?.name ?? null,
-          edit: canEdit
+          render: isQuoting ? () => <span className="text-muted-foreground">Definido na cotação</span> : undefined,
+          keepWhenEmpty: isQuoting,
+          edit: canEdit && !isQuoting
             ? {
                 get: (a) => a.painterId ?? null,
                 loadOptions: loadPainters,
@@ -513,7 +546,9 @@ export function AirbrushingDetailPage() {
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.price ?? null,
-          edit: canEdit
+          render: isQuoting ? () => <span className="text-muted-foreground">Definido na cotação</span> : undefined,
+          keepWhenEmpty: isQuoting,
+          edit: canEdit && !isQuoting
             ? {
                 get: (a) => a.price ?? null,
                 placeholder: "0,00",
@@ -864,6 +899,9 @@ export function AirbrushingDetailPage() {
     // A nota entra nas deps porque o `pdfFileId` decide o que sobra na galeria de anexos
     // (e alimenta os badges do cabeçalho da seção fiscal).
     nfse,
+    isQuoting,
+    airbrushing?.quotationOpenedAt,
+    canActOnQuotes,
     canEdit,
     canSettlePayment,
     canManageNfse,
@@ -908,11 +946,33 @@ export function AirbrushingDetailPage() {
       });
     }
 
+    // Reabrir: tira aerografista e valor e devolve para cotação. Só antes da produção e do
+    // pagamento — a API recusa o resto.
+    if (
+      canActOnQuotes &&
+      (airbrushing.status === AIRBRUSHING_STATUS.PREPARATION || airbrushing.status === AIRBRUSHING_STATUS.WAITING_PRODUCTION) &&
+      (airbrushing.paymentStatus ?? AIRBRUSHING_PAYMENT_STATUS.PENDING) === AIRBRUSHING_PAYMENT_STATUS.PENDING
+    ) {
+      list.push({ key: "reopen-quotation", label: "Reabrir cotação", icon: IconArrowBackUp, onClick: () => setShowReopenDialog(true) });
+    }
+
     if (canEdit) list.push({ key: "edit", label: "Editar", icon: IconEdit, variant: "default", onClick: () => navigate(routes.production.airbrushings.edit(airbrushing.id)) });
     if (canDelete) list.push({ key: "delete", label: "Excluir", icon: IconTrash, onClick: () => setShowDeleteDialog(true) });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [airbrushing, canEdit, canDelete, canRelease, updateAsync, navigate]);
+  }, [airbrushing, canEdit, canDelete, canRelease, canActOnQuotes, updateAsync, navigate]);
+
+  const handleReopen = async (e: React.MouseEvent) => {
+    // Mantém o diálogo aberto até a resposta — o AlertDialogAction fecharia no clique.
+    e.preventDefault();
+    if (!airbrushing) return;
+    try {
+      await reopenMutation.mutateAsync({ airbrushingId: airbrushing.id });
+      setShowReopenDialog(false);
+    } catch {
+      // O interceptor global já mostra o erro.
+    }
+  };
 
   return (
     <>
@@ -962,6 +1022,36 @@ export function AirbrushingDetailPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reabrir cotação */}
+      <AlertDialog open={showReopenDialog} onOpenChange={(o) => !o && !reopenMutation.isPending && setShowReopenDialog(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir cotação?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  A aerografia volta para Em Cotação
+                  {airbrushing?.painter?.name ? (
+                    <>
+                      {" "}e deixa de ter <span className="font-semibold text-foreground">{airbrushing.painter.name}</span> como aerografista
+                    </>
+                  ) : null}
+                  . O aerografista e o valor são removidos.
+                </p>
+                <p>Todos os aerografistas serão avisados novamente para enviar o seu valor.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reopenMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopen} disabled={reopenMutation.isPending}>
+              {reopenMutation.isPending && <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Reabrir cotação
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

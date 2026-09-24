@@ -64,7 +64,8 @@ const makeEmptyAirbrushing = () => ({
   // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share an id,
   // and `updateAirbrushing` matches on id — so editing one row would silently write into both.
   id: `airbrushing-${crypto.randomUUID()}`,
-  status: AIRBRUSHING_STATUS.PREPARATION,
+  // Toda aerografia nova nasce em cotação — sem pintor e sem valor (a API garante o mesmo).
+  status: AIRBRUSHING_STATUS.QUOTING,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
   // Mesmos padrões da linha que o `MultiAirbrushingSelector` cria — assim a linha semeada e
   // a adicionada pelo botão nascem idênticas.
@@ -394,7 +395,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
         if (mode === "create") {
           const configs = (form.getValues("airbrushings" as any) ?? []) as any[];
           if (!configs.some(isMeaningfulAirbrushing)) {
-            toast.error("Preencha ao menos uma aerografia (pintor, preço, datas ou layouts).");
+            toast.error("Preencha ao menos uma aerografia (descrição, datas ou layouts).");
             return false;
           }
           return true;
@@ -803,6 +804,9 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               disabled={isSubmitting}
                               initialPainter={airbrushing?.painter ?? undefined}
                               canViewFinancials={canViewFinancials}
+                              // Status GRAVADO (não o do formulário): cancelar pelo combobox não
+                              // pode destravar pintor e valor antes de salvar.
+                              quoting={airbrushing?.status === AIRBRUSHING_STATUS.QUOTING}
                               layoutsSlot={
                                 <LayoutFileUploadField
                                   onFilesChange={handleLayoutsChange}

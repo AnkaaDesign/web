@@ -76,11 +76,13 @@ export function buildAirbrushingReviewSections(
   const status = (a.status as AIRBRUSHING_STATUS) ?? AIRBRUSHING_STATUS.PREPARATION;
   const paymentStatus = (a.paymentStatus as AIRBRUSHING_PAYMENT_STATUS) ?? AIRBRUSHING_PAYMENT_STATUS.PENDING;
   const dueDateRule = (a.dueDateRule as AIRBRUSHING_DUE_DATE_RULE) ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
+  // Em cotação, pintor e valor ainda não existem: nascem da proposta selecionada.
+  const quoting = status === AIRBRUSHING_STATUS.QUOTING;
 
   // Seção 2 — o serviço. Previsto E real sempre aparecem: uma linha "-" diz que a aerografia
   // ainda não começou, e sumir com ela faria a revisão mudar de tamanho a cada etapa.
   const aerografia: AirbrushingReviewRow[] = [
-    { key: "painter", label: "Pintor", icon: <IconBrush className="h-4 w-4" />, value: dash(painterName) },
+    { key: "painter", label: "Pintor", icon: <IconBrush className="h-4 w-4" />, value: quoting ? "Definido na cotação" : dash(painterName) },
     { key: "description", label: "Descrição", icon: <IconFileDescription className="h-4 w-4" />, value: dash(a.description) },
     { key: "status", label: "Status", icon: <IconSpray className="h-4 w-4" />, value: AIRBRUSHING_STATUS_LABELS[status] || "-" },
     { key: "startDate", label: "Início Previsto", icon: <IconCalendar className="h-4 w-4" />, value: dateOr(a.startDate) },
@@ -97,7 +99,7 @@ export function buildAirbrushingReviewSections(
         key: "price",
         label: "Valor do Serviço",
         icon: <IconCurrencyReal className="h-4 w-4" />,
-        value: a.price != null ? formatCurrency(Number(a.price)) : "-",
+        value: quoting ? "Definido na cotação" : a.price != null ? formatCurrency(Number(a.price)) : "-",
         emphasis: true,
       },
       {

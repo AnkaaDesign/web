@@ -77,7 +77,7 @@ export const airbrushingNewLayoutStatuses = (a: any): string[] | undefined => {
  * A linha carrega alguma configuração que FOGE dos padrões (pagamento ou status)?
  *
  * Sem isto, uma linha preenchida SÓ com forma de pagamento/vencimento era considerada vazia e
- * descartada inteira. Os padrões (Preparação / Pendente / "dias após o término" sem prazo) não
+ * descartada inteira. Os padrões (Em Cotação ou Preparação / Pendente / "dias após o término" sem prazo) não
  * contam — senão a linha vazia que o seletor semeia viraria uma aerografia fantasma.
  */
 export const hasNonDefaultAirbrushingConfig = (a: any): boolean =>
@@ -86,7 +86,8 @@ export const hasNonDefaultAirbrushingConfig = (a: any): boolean =>
   a?.dueDayOfMonth != null ||
   !!a?.dueDate ||
   (!!a?.dueDateRule && a.dueDateRule !== AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH) ||
-  (!!a?.status && a.status !== AIRBRUSHING_STATUS.PREPARATION) ||
+  // Em Cotação é o status de nascimento de toda aerografia nova; Preparação é o padrão antigo.
+  (!!a?.status && a.status !== AIRBRUSHING_STATUS.PREPARATION && a.status !== AIRBRUSHING_STATUS.QUOTING) ||
   (!!a?.paymentStatus && a.paymentStatus !== AIRBRUSHING_PAYMENT_STATUS.PENDING);
 
 // Skip the empty default row the selector may seed — only create rows carrying real data.
