@@ -201,23 +201,6 @@ function AirbrushingCreationModeControl({
   );
 }
 
-/** Aviso da cotação — o que acontece com pintor e valor enquanto a aerografia está em cotação. */
-export function AirbrushingQuotationNotice({ isNew }: { isNew?: boolean }) {
-  return (
-    <div className="flex gap-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 text-sm">
-      <IconUsersGroup className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
-      <div className="space-y-0.5">
-        <p className="font-medium text-foreground">{isNew ? "Esta aerografia vai para cotação" : "Aerografia em cotação"}</p>
-        <p className="text-muted-foreground">
-          {isNew
-            ? "Ao salvar, todos os aerografistas são avisados para enviar valor e tempo de execução. Aerografista, valor e pagamento são definidos depois que você selecionar uma proposta, no detalhe da aerografia."
-            : "Aerografista, valor e pagamento são definidos ao selecionar uma proposta, no detalhe da aerografia. Por aqui, dá para ajustar o início e o orçamento de abertura, ou cancelar a cotação."}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Bloco de campos de uma aerografia, compartilhado por criação e edição.
  *
@@ -350,7 +333,6 @@ export function AirbrushingFields({
         <AirbrushingCreationModeControl value={creationMode} onChange={handleCreationModeChange} disabled={disabled} idPrefix={idPrefix} />
       )}
 
-      {inQuotation && <AirbrushingQuotationNotice isNew={isNew} />}
 
       {/* Linha 1: Pintor | Descrição. Em cotação o pintor some (ele é o da proposta
           selecionada) e o Início Previsto sobe para o lado da descrição. */}
@@ -456,16 +438,11 @@ export function AirbrushingFields({
       {/* Orçamento da empresa — opcional, só em cotação. É dinheiro: some para quem não vê valores. */}
       {inQuotation && canViewFinancials && (
         <div className="space-y-3 rounded-lg border border-border/60 p-4">
-          <div className="space-y-0.5">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <IconReceipt2 className="h-4 w-4 text-muted-foreground" />
-              Orçamento da empresa
-              <span className="font-normal text-muted-foreground">(opcional)</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Se você já tem um valor, os aerografistas podem aceitar, contrapropor ou recusar. Em branco, cada um envia o seu.
-            </p>
-          </div>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <IconReceipt2 className="h-4 w-4 text-muted-foreground" />
+            Orçamento da empresa
+            <span className="font-normal text-muted-foreground">(opcional)</span>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Valor" error={errors?.quotationOfferAmount}>
               <Input
@@ -501,9 +478,7 @@ export function AirbrushingFields({
                   executionTime={value.quotationOfferExecutionTime}
                   unit={value.quotationOfferExecutionTimeUnit}
                 />
-              ) : (
-                <p className="text-xs text-muted-foreground">Sem tempo, cada aerografista informa o seu ao aceitar.</p>
-              )}
+              ) : null}
             </Field>
           </div>
         </div>
