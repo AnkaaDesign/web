@@ -7,7 +7,7 @@ import { FileSuggestions } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { Badge } from "@/components/ui/badge";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE } from "../../../../constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, EXECUTION_TIME_UNIT } from "../../../../constants";
 import { AirbrushingFields, type AirbrushingFieldValues } from "@/components/production/airbrushing/form/airbrushing-fields";
 import { AIRBRUSHING_CREATION_MODE } from "@/schemas/airbrushing";
 
@@ -138,6 +138,11 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
     description: airbrushing.description ?? null,
     startDate: airbrushing.startDate || null,
     finishDate: airbrushing.finishDate || null,
+    executionTime: airbrushing.executionTime ?? null,
+    executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+    quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+    quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+    quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
     startedAt: airbrushing.startedAt || null,
     finishedAt: airbrushing.finishedAt || null,
     painterId: airbrushing.painterId || null,
@@ -251,6 +256,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           description: airbrushing.description,
           startDate: airbrushing.startDate,
           finishDate: airbrushing.finishDate,
+          executionTime: airbrushing.executionTime ?? null,
+          executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+          quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+          quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+          quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
           startedAt: airbrushing.startedAt,
           finishedAt: airbrushing.finishedAt,
           painterId: airbrushing.painterId,
@@ -298,6 +308,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         description: null,
         startDate: null,
         finishDate: null,
+        executionTime: null,
+        executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+        quotationOfferAmount: null,
+        quotationOfferExecutionTime: null,
+        quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
         startedAt: null,
         finishedAt: null,
         painterId: null,

@@ -1,9 +1,11 @@
 // Seção "Cotação" do detalhe da aerografia — o lado do comercial da negociação.
 //
 // Uma aerografia criada sem aerografista nasce Em Cotação: cada aerografista abre UMA
-// negociação (AirbrushingQuote) e o comercial compara, contrapropõe ou seleciona. Aceitar
-// uma contraproposta NÃO é ser selecionado — só "Selecionar" grava aerografista e valor
-// (o da negociação, nunca digitado), encerra as demais e leva a aerografia para Em
+// negociação (AirbrushingQuote) com VALOR + TEMPO DE EXECUÇÃO, e o comercial compara,
+// contrapropõe ou seleciona. A contraproposta é da COTAÇÃO: uma só, para todos que têm
+// proposta aguardando resposta (valor, tempo ou os dois — o que ficar em branco continua o
+// de cada um). Aceitar NÃO é ser selecionado — só "Selecionar" grava aerografista, valor e
+// tempo (os da negociação, nunca digitados), encerra as demais e leva a aerografia para Em
 // Preparação. Depois de encerrada, a seção fica como histórico somente leitura.
 //
 // As regras de quem pode o quê espelham utils/airbrushing-quote.ts da API; a API valida
@@ -14,7 +16,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  IconArrowRight,
   IconArrowsExchange,
+  IconCalendarCheck,
   IconChevronDown,
   IconChevronUp,
   IconCircleCheck,
@@ -22,6 +26,7 @@ import {
   IconHandFinger,
   IconLoader2,
   IconMessage,
+  IconReceipt2,
   IconTrophy,
   IconUsersGroup,
 } from "@tabler/icons-react";
@@ -45,9 +50,10 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
-import { useAirbrushingQuotes, useCounterAirbrushingQuote, useSelectAirbrushingQuote } from "@/hooks/production/use-airbrushing-quote";
+import { useAirbrushingQuotes, useCounterAllAirbrushingQuotes, useSelectAirbrushingQuote } from "@/hooks/production/use-airbrushing-quote";
 import { airbrushingKeys } from "@/hooks/common/query-keys";
-import { airbrushingQuoteCounterSchema, type AirbrushingQuoteCounterFormData } from "@/schemas/airbrushing-quote";
+import { airbrushingQuoteCounterAllSchema, type AirbrushingQuoteCounterAllFormData } from "@/schemas/airbrushing-quote";
+import { ExecutionTimeInput } from "@/components/production/airbrushing/form/execution-time-input";
 import {
   AIRBRUSHING_STATUS,
   AIRBRUSHING_QUOTE_STATUS,
@@ -56,8 +62,10 @@ import {
   AIRBRUSHING_QUOTE_ACTION_LABELS,
   AIRBRUSHING_QUOTE_PARTY,
   ENTITY_BADGE_CONFIG,
+  EXECUTION_TIME_UNIT,
 } from "@/constants";
 import { formatCurrency } from "@/utils/number";
+import { formatExecutionTime, formatExpectedFinishDate, formatQuoteTerms } from "@/utils/airbrushing";
 import { formatDateTime, formatRelativeTime } from "@/utils/date";
 import type { Airbrushing, AirbrushingQuote, AirbrushingQuoteEvent, File as AnkaaFile } from "@/types";
 
@@ -68,9 +76,9 @@ import type { Airbrushing, AirbrushingQuote, AirbrushingQuoteEvent, File as Anka
 /** Vez do comercial: há um valor que o aerografista sustenta — dá para selecionar. */
 const SELECTABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.ACCEPTED]);
 /**
- * O comercial contrapõe uma proposta do aerografista ou revisa a própria contraproposta.
- * Depois que ele ACEITOU, não há o que contrapor: o valor está combinado e o que resta é
- * selecionar (ou não) — espelha canCompanyCounter da API.
+ * Quem a contraproposta para todos alcança: a proposta do aerografista aguardando resposta
+ * (PROPOSED) ou a própria contraproposta em revisão (COUNTERED). Quem já ACEITOU fica de fora
+ * — as condições estão combinadas e o que resta é selecionar — espelha canCompanyCounter da API.
  */
 const COUNTERABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.COUNTERED]);
 /** Selecionar aparece também em COUNTERED, desabilitado com o motivo — a vez é dele. */
@@ -97,6 +105,92 @@ const AMOUNT_CAPTION: Record<AIRBRUSHING_QUOTE_STATUS, string> = {
 };
 
 const painterName = (quote: AirbrushingQuote): string => quote.painter?.name ?? "Aerografista";
+
+/** "R$ 820,00 · 2 dias" — negociação anterior ao tempo de execução mostra só o valor. */
+const termsOf = (quote: { amount: number | null; executionTime?: number | null; executionTimeUnit?: string | null }, separator?: string): string =>
+  formatQuoteTerms(quote.amount, quote.executionTime, quote.executionTimeUnit as EXECUTION_TIME_UNIT | null | undefined, separator) || "—";
+
+/** Ações em que o aerografista diz as PRÓPRIAS condições (o aceite carrega as que ele topou). */
+const PAINTER_ASK_ACTIONS = new Set<AIRBRUSHING_QUOTE_ACTION>([AIRBRUSHING_QUOTE_ACTION.PROPOSAL, AIRBRUSHING_QUOTE_ACTION.COUNTER, AIRBRUSHING_QUOTE_ACTION.ACCEPT]);
+
+interface PainterAsksSummary {
+  count: number;
+  averageAmount: number;
+  minAmount: number;
+  maxAmount: number;
+  /** "2,5 dias" / "8 horas" — vazio quando nenhum pedido tem tempo (negociações antigas). */
+  averageTime: string;
+}
+
+const formatDecimal = (value: number): string => {
+  const rounded = Math.round(value * 10) / 10;
+  return rounded.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+};
+
+/**
+ * Média das propostas — a MESMA regra no web e no app: para cada negociação que não foi
+ * recusada, o último pedido DO AEROGRAFISTA (evento dele de proposta, contraproposta ou aceite)
+ * que tenha valor. A média do tempo converte tudo para horas (1 dia = 24 h) só para a conta e
+ * mostra em dias se todos os pedidos foram em dias; senão, em horas.
+ */
+const summarizePainterAsks = (quotes: AirbrushingQuote[]): PainterAsksSummary | null => {
+  const asks: AirbrushingQuoteEvent[] = [];
+  for (const quote of quotes) {
+    if (quote.status === AIRBRUSHING_QUOTE_STATUS.DECLINED) continue;
+    const events = quote.events ?? [];
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (event.party === AIRBRUSHING_QUOTE_PARTY.PAINTER && PAINTER_ASK_ACTIONS.has(event.action) && event.amount != null) {
+        asks.push(event);
+        break;
+      }
+    }
+  }
+  if (asks.length === 0) return null;
+
+  const amounts = asks.map((a) => a.amount as number);
+  const timed = asks.filter((a) => a.executionTime && a.executionTimeUnit);
+  let averageTime = "";
+  if (timed.length > 0) {
+    const hours = timed.map((a) => (a.executionTimeUnit === EXECUTION_TIME_UNIT.HOURS ? (a.executionTime as number) : (a.executionTime as number) * 24));
+    const avgHours = hours.reduce((sum, h) => sum + h, 0) / hours.length;
+    const allDays = timed.every((a) => a.executionTimeUnit === EXECUTION_TIME_UNIT.DAYS);
+    const value = allDays ? avgHours / 24 : avgHours;
+    const shown = formatDecimal(value);
+    const one = Math.round(value * 10) / 10 === 1;
+    averageTime = `${shown} ${allDays ? (one ? "dia" : "dias") : one ? "hora" : "horas"}`;
+  }
+
+  return {
+    count: asks.length,
+    averageAmount: amounts.reduce((sum, a) => sum + a, 0) / amounts.length,
+    minAmount: Math.min(...amounts),
+    maxAmount: Math.max(...amounts),
+    averageTime,
+  };
+};
+
+/** Duração em horas, para comparar prazos em unidades diferentes (dias contam 24h). */
+const durationHours = (quote: AirbrushingQuote): number | null => {
+  if (!quote.executionTime || !quote.executionTimeUnit) return null;
+  return quote.executionTimeUnit === EXECUTION_TIME_UNIT.HOURS ? quote.executionTime : quote.executionTime * 24;
+};
+
+/**
+ * Condições de uma negociação depois da contraproposta — o que a empresa mandou vence, o
+ * que ficou em branco continua o que estava em jogo. Espelha mergeCounterTerms da API.
+ */
+const mergeCounterTerms = (
+  quote: AirbrushingQuote,
+  counter: { amount?: number | null; executionTime?: number | null; executionTimeUnit?: string | null },
+): { amount: number | null; executionTime: number | null; executionTimeUnit: string | null } => {
+  const changesTime = counter.executionTime != null && counter.executionTimeUnit != null;
+  return {
+    amount: counter.amount != null ? counter.amount : quote.amount,
+    executionTime: changesTime ? counter.executionTime! : (quote.executionTime ?? null),
+    executionTimeUnit: changesTime ? counter.executionTimeUnit! : (quote.executionTimeUnit ?? null),
+  };
+};
 
 /** Avatar a partir só do `avatarId` — a API manda o id, não o File inteiro. */
 const avatarFile = (avatarId: string | null | undefined): AnkaaFile | null => (avatarId ? ({ id: avatarId } as AnkaaFile) : null);
@@ -172,6 +266,28 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
     return best?.id ?? null;
   }, [quotes, isOpen]);
 
+  // Menor prazo entre os que dá para fechar — o valor mais baixo nem sempre é o que entrega antes.
+  const fastestSelectableId = useMemo(() => {
+    if (!isOpen) return null;
+    let best: AirbrushingQuote | null = null;
+    let bestHours = Number.POSITIVE_INFINITY;
+    for (const q of quotes) {
+      const hours = durationHours(q);
+      if (!SELECTABLE.has(q.status) || hours == null) continue;
+      if (hours < bestHours) {
+        best = q;
+        bestHours = hours;
+      }
+    }
+    return best?.id ?? null;
+  }, [quotes, isOpen]);
+
+  const asksSummary = useMemo(() => summarizePainterAsks(quotes), [quotes]);
+
+  // Quem a contraproposta para todos alcança agora.
+  const counterTargets = useMemo(() => (isOpen ? quotes.filter((q) => COUNTERABLE.has(q.status)) : []), [quotes, isOpen]);
+  const acceptedCount = useMemo(() => quotes.filter((q) => q.status === AIRBRUSHING_QUOTE_STATUS.ACCEPTED).length, [quotes]);
+
   const selected = quotes.find((q) => q.status === AIRBRUSHING_QUOTE_STATUS.SELECTED) ?? null;
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -183,7 +299,7 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
       return next;
     });
 
-  const [counterTarget, setCounterTarget] = useState<AirbrushingQuote | null>(null);
+  const [counterAllOpen, setCounterAllOpen] = useState(false);
   const [selectTarget, setSelectTarget] = useState<AirbrushingQuote | null>(null);
 
   if (isLoading) {
@@ -202,6 +318,12 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
   const openedAt = overview.airbrushing.quotationOpenedAt;
   const closedAt = overview.airbrushing.quotationClosedAt;
   const notifiedAt = overview.airbrushing.quotationNotifiedAt;
+  // A visão da cotação traz o início e o orçamento; o detalhe é o reserva (API antiga).
+  const startDate = overview.airbrushing.startDate ?? airbrushing.startDate ?? null;
+  const offerAmount = overview.airbrushing.quotationOfferAmount ?? airbrushing.quotationOfferAmount ?? null;
+  const offerTime = overview.airbrushing.quotationOfferExecutionTime ?? airbrushing.quotationOfferExecutionTime ?? null;
+  const offerUnit = overview.airbrushing.quotationOfferExecutionTimeUnit ?? airbrushing.quotationOfferExecutionTimeUnit ?? null;
+  const showRowActions = canAct && isOpen;
 
   return (
     <div className="space-y-4">
@@ -222,6 +344,16 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
         )}
       </div>
 
+      {/* Orçamento de abertura — o ponto de partida que todos receberam. */}
+      {offerAmount != null && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm">
+          <IconReceipt2 className="h-4 w-4 flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
+          <span className="text-muted-foreground">Orçamento enviado:</span>
+          <span className="font-semibold tabular-nums">{termsOf({ amount: offerAmount, executionTime: offerTime, executionTimeUnit: offerUnit }, " em ")}</span>
+          {!offerTime && <span className="text-xs text-muted-foreground">(o tempo fica com cada aerografista)</span>}
+        </div>
+      )}
+
       {isOpen ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatTile label="Propostas" value={counts.proposals} />
@@ -235,10 +367,31 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
             <IconTrophy className="h-5 w-5 flex-shrink-0 text-green-700 dark:text-green-400" />
             <span>
               <span className="font-semibold">{painterName(selected)}</span> foi selecionado por{" "}
-              <span className="font-semibold">{selected.amount != null ? formatCurrency(selected.amount) : "—"}</span>.
+              <span className="font-semibold tabular-nums">{termsOf(selected, " em ")}</span>.
             </span>
           </div>
         )
+      )}
+
+      {/* ---------- Média das propostas (o que os aerografistas pediram) ---------- */}
+      {asksSummary && (
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 rounded-lg border border-border bg-muted/30 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Média das propostas</p>
+            <p className="leading-tight tabular-nums">
+              <span className="text-2xl font-semibold">{formatCurrency(asksSummary.averageAmount)}</span>
+              {asksSummary.averageTime && <span className="text-sm font-medium text-muted-foreground"> · {asksSummary.averageTime}</span>}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            Média de {asksSummary.count} {asksSummary.count === 1 ? "proposta" : "propostas"}
+            {asksSummary.count > 1 && asksSummary.minAmount !== asksSummary.maxAmount && (
+              <>
+                {" · "}de {formatCurrency(asksSummary.minAmount)} a {formatCurrency(asksSummary.maxAmount)}
+              </>
+            )}
+          </p>
+        </div>
       )}
 
       {/* ---------- Quem ainda não respondeu ---------- */}
@@ -271,24 +424,44 @@ export function AirbrushingQuotationSection({ airbrushing, canAct }: Airbrushing
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Barra da lista: a contraproposta é UMA ação da cotação, para todos de uma vez. */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Propostas ({sorted.length})</p>
+            {showRowActions && (
+              <ActionWithReason reason={counterTargets.length === 0 ? "Nenhuma proposta aguardando resposta" : null}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setCounterAllOpen(true)} disabled={counterTargets.length === 0}>
+                  <IconArrowsExchange className="mr-1.5 h-4 w-4" />
+                  Contraproposta para todos ({counterTargets.length})
+                </Button>
+              </ActionWithReason>
+            )}
+          </div>
           {sorted.map((quote) => (
             <QuoteRow
               key={quote.id}
               quote={quote}
               isOpen={isOpen}
               canAct={canAct}
+              startDate={startDate}
               isLowest={quote.id === lowestSelectableId && counts.awaitingCompany > 1}
+              isFastest={quote.id === fastestSelectableId && counts.awaitingCompany > 1}
               expanded={expanded.has(quote.id)}
               onToggle={() => toggleExpanded(quote.id)}
-              onCounter={() => setCounterTarget(quote)}
               onSelect={() => setSelectTarget(quote)}
             />
           ))}
         </div>
       )}
 
-      <CounterQuoteDialog quote={counterTarget} onClose={() => setCounterTarget(null)} />
-      <SelectQuoteDialog quote={selectTarget} onClose={() => setSelectTarget(null)} />
+      <CounterAllQuotesDialog
+        open={counterAllOpen}
+        airbrushingId={airbrushing.id}
+        targets={counterTargets}
+        acceptedCount={acceptedCount}
+        startDate={startDate}
+        onClose={() => setCounterAllOpen(false)}
+      />
+      <SelectQuoteDialog quote={selectTarget} startDate={startDate} onClose={() => setSelectTarget(null)} />
     </div>
   );
 }
@@ -321,30 +494,34 @@ function ActionWithReason({ reason, children }: { reason: string | null; childre
   );
 }
 
+
 interface QuoteRowProps {
   quote: AirbrushingQuote;
   isOpen: boolean;
   canAct: boolean;
+  /** Início previsto da aerografia — base do término de cada proposta. */
+  startDate: Date | string | null;
   isLowest: boolean;
+  isFastest: boolean;
   expanded: boolean;
   onToggle: () => void;
-  onCounter: () => void;
   onSelect: () => void;
 }
 
-function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCounter, onSelect }: QuoteRowProps) {
+function QuoteRow({ quote, isOpen, canAct, startDate, isLowest, isFastest, expanded, onToggle, onSelect }: QuoteRowProps) {
   const isSelected = quote.status === AIRBRUSHING_QUOTE_STATUS.SELECTED;
   const isInactive = quote.status === AIRBRUSHING_QUOTE_STATUS.DECLINED || quote.status === AIRBRUSHING_QUOTE_STATUS.NOT_SELECTED;
   const needsCompany = isOpen && SELECTABLE.has(quote.status);
   const lastNote = lastNoteOf(quote);
   const events = quote.events ?? [];
+  const time = formatExecutionTime(quote.executionTime, quote.executionTimeUnit);
+  const finish = formatExpectedFinishDate(startDate, quote.executionTime, quote.executionTimeUnit);
 
   const selectBlockedReason = (() => {
     if (quote.status === AIRBRUSHING_QUOTE_STATUS.COUNTERED) return "Aguarde a resposta do aerografista à contraproposta";
     if (quote.amount == null) return "Esta negociação não tem valor";
     return null;
   })();
-  const showCounter = canAct && isOpen && COUNTERABLE.has(quote.status);
   const showSelect = canAct && isOpen && SELECT_SHOWN.has(quote.status);
 
   return (
@@ -356,7 +533,7 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
       )}
     >
       <div className="space-y-2 p-3">
-        {/* Quem, em que estado, e o valor em jogo — nome e selos nunca são cortados. */}
+        {/* Quem, em que estado, e as condições em jogo — nome e selos nunca são cortados. */}
         <div className="flex items-start gap-3">
           <UserAvatarDisplay avatar={avatarFile(quote.painter?.avatarId)} userName={painterName(quote)} size="md" shape="circle" />
           <div className="min-w-0 flex-1 space-y-1">
@@ -373,11 +550,19 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
                   Menor valor
                 </Badge>
               )}
+              {isFastest && (
+                <Badge variant="teal" className="whitespace-nowrap text-xs">
+                  Menor prazo
+                </Badge>
+              )}
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <p className={cn("text-lg font-semibold leading-tight tabular-nums", isLowest && "text-green-700 dark:text-green-400")}>
-              {quote.amount != null ? formatCurrency(quote.amount) : "—"}
+            <p className="leading-tight tabular-nums" title={finish ? `Término previsto: ${finish}` : undefined}>
+              <span className={cn("text-lg font-semibold", isLowest && "text-green-700 dark:text-green-400")}>
+                {quote.amount != null ? formatCurrency(quote.amount) : "—"}
+              </span>
+              {time && <span className={cn("text-sm font-medium text-muted-foreground", isFastest && "text-teal-700 dark:text-teal-400")}> · {time}</span>}
             </p>
             <p className="text-xs text-muted-foreground">{AMOUNT_CAPTION[quote.status]}</p>
           </div>
@@ -390,7 +575,7 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
           </p>
         )}
 
-        {/* Rodapé: histórico à esquerda, ações à direita. */}
+        {/* Rodapé: histórico à esquerda, seleção à direita. A contraproposta é da seção. */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
           <div className="flex min-w-0 items-center gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={onToggle} aria-expanded={expanded} className="-ml-2 h-8 text-muted-foreground">
@@ -401,23 +586,13 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
               Atualizado {formatRelativeTime(quote.updatedAt)}
             </span>
           </div>
-          {(showCounter || showSelect) && (
-            <div className="flex items-center gap-2">
-              {showCounter && (
-                <Button type="button" variant="outline" size="sm" onClick={onCounter}>
-                  <IconArrowsExchange className="mr-1.5 h-4 w-4" />
-                  {quote.status === AIRBRUSHING_QUOTE_STATUS.COUNTERED ? "Revisar" : "Contraproposta"}
-                </Button>
-              )}
-              {showSelect && (
-                <ActionWithReason reason={selectBlockedReason}>
-                  <Button type="button" size="sm" onClick={onSelect} disabled={!!selectBlockedReason}>
-                    <IconHandFinger className="mr-1.5 h-4 w-4" />
-                    Selecionar
-                  </Button>
-                </ActionWithReason>
-              )}
-            </div>
+          {showSelect && (
+            <ActionWithReason reason={selectBlockedReason}>
+              <Button type="button" size="sm" onClick={onSelect} disabled={!!selectBlockedReason}>
+                <IconHandFinger className="mr-1.5 h-4 w-4" />
+                Selecionar
+              </Button>
+            </ActionWithReason>
           )}
         </div>
       </div>
@@ -441,6 +616,8 @@ function QuoteEventBubble({ event, painter }: { event: AirbrushingQuoteEvent; pa
   // Encerramento sem autor é do sistema (outra proposta selecionada, aerografia cancelada).
   const author = fromCompany ? (event.user?.name ?? (event.action === AIRBRUSHING_QUOTE_ACTION.CLOSE ? "Sistema" : "Comercial")) : painter;
   const isDecisive = event.action === AIRBRUSHING_QUOTE_ACTION.SELECT;
+  // O lance diz valor e/ou tempo — uma contraproposta só de prazo não tem valor.
+  const terms = formatQuoteTerms(event.amount, event.executionTime, event.executionTimeUnit);
 
   return (
     <div className={cn("flex", fromCompany ? "justify-end" : "justify-start")}>
@@ -456,9 +633,9 @@ function QuoteEventBubble({ event, painter }: { event: AirbrushingQuoteEvent; pa
           <span>·</span>
           <span>{AIRBRUSHING_QUOTE_ACTION_LABELS[event.action] ?? event.action}</span>
           <span>·</span>
-          <span title={formatDateTime(event.createdAt)}>{formatDateTime(event.createdAt)}</span>
+          <span>{formatDateTime(event.createdAt)}</span>
         </div>
-        {event.amount != null && <p className="mt-0.5 font-semibold tabular-nums">{formatCurrency(event.amount)}</p>}
+        {terms && <p className="mt-0.5 font-semibold tabular-nums">{terms}</p>}
         {event.note && <p className="mt-0.5 whitespace-pre-wrap break-words">{event.note}</p>}
       </div>
     </div>
@@ -469,67 +646,162 @@ function QuoteEventBubble({ event, painter }: { event: AirbrushingQuoteEvent; pa
 // Diálogos
 // =====================
 
-function CounterQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null; onClose: () => void }) {
-  const { mutateAsync, isPending } = useCounterAirbrushingQuote();
-  const form = useForm<AirbrushingQuoteCounterFormData>({
-    resolver: zodResolver(airbrushingQuoteCounterSchema),
-    defaultValues: { amount: undefined as unknown as number, note: null },
+interface CounterAllQuotesDialogProps {
+  open: boolean;
+  airbrushingId: string;
+  /** Negociações que recebem a contraproposta (PROPOSED/COUNTERED). */
+  targets: AirbrushingQuote[];
+  /** Quem já aceitou — fica de fora, e o diálogo diz isso. */
+  acceptedCount: number;
+  startDate: Date | string | null;
+  onClose: () => void;
+}
+
+const EMPTY_COUNTER: AirbrushingQuoteCounterAllFormData = {
+  amount: null,
+  executionTime: null,
+  executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+  note: null,
+};
+
+/**
+ * Contraproposta para TODOS que têm proposta aguardando resposta. Novo valor e novo tempo
+ * são opcionais (pelo menos um); o que ficar em branco continua o de cada negociação — por
+ * isso a lista mostra, para cada um, as condições de hoje e as que ele vai receber.
+ */
+function CounterAllQuotesDialog({ open, airbrushingId, targets, acceptedCount, startDate, onClose }: CounterAllQuotesDialogProps) {
+  const { mutateAsync, isPending } = useCounterAllAirbrushingQuotes();
+  const form = useForm<AirbrushingQuoteCounterAllFormData>({
+    resolver: zodResolver(airbrushingQuoteCounterAllSchema),
+    defaultValues: EMPTY_COUNTER,
   });
 
-  // Reabre com o valor em jogo desta negociação — a contraproposta costuma partir dele.
+  // Cada abertura começa limpa: a contraproposta anterior já foi enviada.
   useEffect(() => {
-    if (quote) form.reset({ amount: (quote.amount ?? undefined) as unknown as number, note: null });
-  }, [quote, form]);
+    if (open) form.reset(EMPTY_COUNTER);
+  }, [open, form]);
 
-  const onSubmit = async (values: AirbrushingQuoteCounterFormData) => {
-    if (!quote) return;
+  const amount = form.watch("amount");
+  const executionTime = form.watch("executionTime");
+  const executionTimeUnit = form.watch("executionTimeUnit");
+  const counter = { amount: amount ?? null, executionTime: executionTime ?? null, executionTimeUnit: executionTime ? (executionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null };
+  const hasChange = counter.amount != null || counter.executionTime != null;
+
+  const onSubmit = async (values: AirbrushingQuoteCounterAllFormData) => {
+    const time = values.executionTime ?? null;
     try {
-      await mutateAsync({ quoteId: quote.id, data: { amount: values.amount, note: values.note ?? null } });
+      await mutateAsync({
+        airbrushingId,
+        data: {
+          amount: values.amount ?? null,
+          executionTime: time,
+          executionTimeUnit: time != null ? (values.executionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null,
+          note: values.note ?? null,
+        },
+      });
       onClose();
     } catch {
       // O interceptor global já mostra o erro; o diálogo fica aberto para corrigir.
     }
   };
 
-  const reference =
-    quote?.amount != null
-      ? quote.status === AIRBRUSHING_QUOTE_STATUS.PROPOSED
-        ? `Proposta atual do aerografista: ${formatCurrency(quote.amount)}.`
-        : `Valor em jogo: ${formatCurrency(quote.amount)}.`
-      : null;
+  const eitherError = form.formState.errors.amount?.message;
 
   return (
-    <Dialog open={!!quote} onOpenChange={(open) => !open && !isPending && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={(next) => !next && !isPending && onClose()}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Contraproposta para {quote ? painterName(quote) : ""}</DialogTitle>
+          <DialogTitle>Contraproposta para todos</DialogTitle>
           <DialogDescription>
-            {reference} O aerografista poderá aceitar, recusar ou responder com outro valor. Aceitar não o seleciona: a escolha continua sendo sua.
+            Vale para quem tem proposta aguardando resposta. Informe um novo valor, um novo tempo ou os dois — o que ficar em branco continua o de cada um.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor da contraproposta</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="currency"
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Novo valor</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="currency"
+                        value={field.value ?? null}
+                        onChange={(value) => {
+                          field.onChange(typeof value === "number" && value > 0 ? value : null);
+                          if (form.formState.isSubmitted) void form.trigger();
+                        }}
+                        onBlur={field.onBlur}
+                        placeholder="Manter o de cada um"
+                        disabled={isPending}
+                        transparent
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="executionTime"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel>Novo tempo</FormLabel>
+                    <ExecutionTimeInput
                       value={field.value ?? null}
-                      onChange={(value) => field.onChange(typeof value === "number" ? value : undefined)}
-                      onBlur={field.onBlur}
-                      placeholder="R$ 0,00"
+                      unit={executionTimeUnit}
+                      onChange={(next) => {
+                        field.onChange(next.executionTime);
+                        form.setValue("executionTimeUnit", next.executionTimeUnit);
+                        if (form.formState.isSubmitted) void form.trigger();
+                      }}
+                      placeholder="Manter"
                       disabled={isPending}
-                      transparent
+                      invalid={!!fieldState.error}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            {eitherError && <p className="-mt-2 text-sm font-medium text-destructive">{eitherError}</p>}
+
+            {/* Quem recebe e o que muda para cada um. */}
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">Recebem ({targets.length})</p>
+                {acceptedCount > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {acceptedCount === 1 ? "1 que já aceitou fica de fora" : `${acceptedCount} que já aceitaram ficam de fora`}
+                  </p>
+                )}
+              </div>
+              <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                {targets.map((quote) => {
+                  const next = mergeCounterTerms(quote, counter);
+                  const nextFinish = formatExpectedFinishDate(startDate, next.executionTime, next.executionTimeUnit as EXECUTION_TIME_UNIT | null);
+                  return (
+                    <li key={quote.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <UserAvatarDisplay avatar={avatarFile(quote.painter?.avatarId)} userName={painterName(quote)} size="xs" shape="circle" bordered={false} />
+                      <span className="min-w-0 flex-1 break-words font-medium">{painterName(quote)}</span>
+                      <span className="flex shrink-0 flex-wrap items-center justify-end gap-x-1.5 text-right tabular-nums">
+                        <span className={cn(hasChange ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground")}>{termsOf(quote)}</span>
+                        {hasChange && (
+                          <>
+                            <IconArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-semibold" title={nextFinish ? `Término previsto: ${nextFinish}` : undefined}>
+                              {termsOf(next)}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
             <FormField
               control={form.control}
               name="note"
@@ -541,9 +813,9 @@ function CounterQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(e.target.value)}
                       onBlur={field.onBlur}
-                      placeholder="Ex.: conseguimos fechar por este valor se o prazo for mantido."
+                      placeholder="Ex.: fechamos neste valor se o prazo for mantido."
                       maxLength={1000}
-                      rows={3}
+                      rows={2}
                       disabled={isPending}
                     />
                   </FormControl>
@@ -551,13 +823,16 @@ function CounterQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null
                 </FormItem>
               )}
             />
+
+            <p className="text-xs text-muted-foreground">Cada um pode aceitar, recusar ou responder. Aceitar não o seleciona: a escolha continua sendo sua.</p>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || targets.length === 0}>
                 {isPending ? <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <IconArrowsExchange className="mr-1.5 h-4 w-4" />}
-                Enviar contraproposta
+                Enviar para {targets.length}
               </Button>
             </DialogFooter>
           </form>
@@ -567,10 +842,12 @@ function CounterQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null
   );
 }
 
-function SelectQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null; onClose: () => void }) {
+function SelectQuoteDialog({ quote, startDate, onClose }: { quote: AirbrushingQuote | null; startDate: Date | string | null; onClose: () => void }) {
   const { mutateAsync, isPending } = useSelectAirbrushingQuote();
   const name = quote ? painterName(quote) : "";
   const amount = quote?.amount != null ? formatCurrency(quote.amount) : "—";
+  const time = quote ? formatExecutionTime(quote.executionTime, quote.executionTimeUnit) : "";
+  const finish = quote ? formatExpectedFinishDate(startDate, quote.executionTime, quote.executionTimeUnit) : "";
 
   const handleConfirm = async (e: React.MouseEvent) => {
     // Mantém o diálogo aberto até a resposta — o AlertDialogAction fecharia no clique.
@@ -590,12 +867,29 @@ function SelectQuoteDialog({ quote, onClose }: { quote: AirbrushingQuote | null;
         <AlertDialogHeader>
           <AlertDialogTitle>Selecionar {name}?</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p>
-                <span className="font-semibold text-foreground">{name}</span> passa a ser o aerografista desta aerografia pelo valor de{" "}
-                <span className="font-semibold text-foreground">{amount}</span>
-                {quote?.status === AIRBRUSHING_QUOTE_STATUS.ACCEPTED ? " — a contraproposta que ele aceitou." : " — a proposta que ele enviou."}
+                <span className="font-semibold text-foreground">{name}</span> passa a ser o aerografista desta aerografia
+                {quote?.status === AIRBRUSHING_QUOTE_STATUS.ACCEPTED ? ", nas condições da contraproposta que ele aceitou:" : ", nas condições da proposta que ele enviou:"}
               </p>
+              <div className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Valor</p>
+                  <p className="font-semibold tabular-nums text-foreground">{amount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Tempo</p>
+                  <p className="font-semibold text-foreground">{time || "—"}</p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <IconCalendarCheck className="h-3 w-3" />
+                    Término
+                  </p>
+                  <p className="font-semibold tabular-nums text-foreground">{finish || "—"}</p>
+                </div>
+              </div>
+              {time && !finish && <p className="text-xs">Sem início previsto, o término fica em aberto até a data de início ser definida.</p>}
               <p>A cotação é encerrada e a aerografia segue para Em Preparação. Os demais aerografistas serão avisados de que não foram selecionados.</p>
             </div>
           </AlertDialogDescription>

@@ -330,6 +330,12 @@ export enum AIRBRUSHING_QUOTE_ACTION {
   CLOSE = "CLOSE",
 }
 
+/** Unidade do tempo de execução da aerografia (e das condições da cotação). Espelha a API. */
+export enum EXECUTION_TIME_UNIT {
+  HOURS = "HOURS",
+  DAYS = "DAYS",
+}
+
 /** Como o vencimento da aerografia é derivado do término. Espelha a API. */
 export enum AIRBRUSHING_DUE_DATE_RULE {
   DAYS_AFTER_FINISH = "DAYS_AFTER_FINISH",

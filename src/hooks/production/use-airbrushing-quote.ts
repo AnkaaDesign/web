@@ -8,7 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { airbrushingQuoteService } from "@/api-client/airbrushing-quote";
-import type { AirbrushingQuoteCounterData, AirbrushingQuoteSelectData } from "@/api-client/airbrushing-quote";
+import type { AirbrushingQuoteCounterAllData, AirbrushingQuoteCounterData, AirbrushingQuoteSelectData } from "@/api-client/airbrushing-quote";
 import { airbrushingKeys, taskKeys } from "../common/query-keys";
 
 export const airbrushingQuoteKeys = {
@@ -49,6 +49,16 @@ export function useCounterAirbrushingQuote() {
   const invalidate = useInvalidateAirbrushingQuotes();
   return useMutation({
     mutationFn: ({ quoteId, data }: { quoteId: string; data: AirbrushingQuoteCounterData }) => airbrushingQuoteService.counterAirbrushingQuote(quoteId, data),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Contraproposta para todos os aerografistas com proposta aguardando resposta. */
+export function useCounterAllAirbrushingQuotes() {
+  const invalidate = useInvalidateAirbrushingQuotes();
+  return useMutation({
+    mutationFn: ({ airbrushingId, data }: { airbrushingId: string; data: AirbrushingQuoteCounterAllData }) =>
+      airbrushingQuoteService.counterAllAirbrushingQuotes(airbrushingId, data),
     onSuccess: () => invalidate(),
   });
 }

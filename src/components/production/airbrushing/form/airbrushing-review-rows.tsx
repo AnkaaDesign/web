@@ -14,6 +14,7 @@ import {
   IconPhoto,
   IconFileTypePdf,
   IconRoute,
+  IconHourglass,
 } from "@tabler/icons-react";
 import {
   AIRBRUSHING_STATUS,
@@ -23,10 +24,18 @@ import {
   AIRBRUSHING_DUE_DATE_RULE,
   AIRBRUSHING_DUE_DATE_RULE_LABELS,
   PAYMENT_METHOD_LABELS,
+  EXECUTION_TIME_UNIT,
 } from "../../../../constants";
 import type { File as AnkaaFile } from "../../../../types";
 import { AIRBRUSHING_CREATION_MODE_LABELS } from "@/schemas/airbrushing";
-import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, resolveAirbrushingDueDate } from "@/utils/airbrushing";
+import {
+  AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS,
+  computeExpectedFinishDate,
+  formatExecutionTime,
+  formatExpectedFinishDate,
+  formatQuoteTerms,
+  resolveAirbrushingDueDate,
+} from "@/utils/airbrushing";
 import { formatCurrency } from "@/utils/number";
 import { formatDate, formatDateTime } from "@/utils/date";
 import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
@@ -80,6 +89,10 @@ export function buildAirbrushingReviewSections(
   const dueDateRule = (a.dueDateRule as AIRBRUSHING_DUE_DATE_RULE) ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
   // Em cotação, pintor e valor ainda não existem: nascem da proposta selecionada.
   const quoting = status === AIRBRUSHING_STATUS.QUOTING;
+  const executionUnit = a.executionTime ? ((a.executionTimeUnit as EXECUTION_TIME_UNIT) ?? EXECUTION_TIME_UNIT.DAYS) : null;
+  const hoursUnit = executionUnit === EXECUTION_TIME_UNIT.HOURS;
+  // Término: calculado do início + tempo (mesma regra da API); sem tempo, o que já estava gravado.
+  const expectedFinish = a.executionTime ? dash(formatExpectedFinishDate(a.startDate, a.executionTime, executionUnit)) : dateOr(a.finishDate);
 
   // Seção 2 — o serviço. Previsto E real sempre aparecem: uma linha "-" diz que a aerografia
   // ainda não começou, e sumir com ela faria a revisão mudar de tamanho a cada etapa.
@@ -91,15 +104,36 @@ export function buildAirbrushingReviewSections(
     { key: "painter", label: "Pintor", icon: <IconBrush className="h-4 w-4" />, value: quoting ? "Definido na cotação" : dash(painterName) },
     { key: "description", label: "Descrição", icon: <IconFileDescription className="h-4 w-4" />, value: dash(a.description) },
     { key: "status", label: "Status", icon: <IconSpray className="h-4 w-4" />, value: AIRBRUSHING_STATUS_LABELS[status] || "-" },
-    { key: "startDate", label: "Início Previsto", icon: <IconCalendar className="h-4 w-4" />, value: dateOr(a.startDate) },
-    { key: "finishDate", label: "Término Previsto", icon: <IconCalendar className="h-4 w-4" />, value: dateOr(a.finishDate) },
-    { key: "startedAt", label: "Iniciado em", icon: <IconClock className="h-4 w-4" />, value: dateTimeOr(a.startedAt) },
-    { key: "finishedAt", label: "Finalizado em", icon: <IconClock className="h-4 w-4" />, value: dateTimeOr(a.finishedAt) },
+    {
+      key: "startDate",
+      label: "Início Previsto",
+      icon: <IconCalendar className="h-4 w-4" />,
+      value: hoursUnit ? dateTimeOr(a.startDate) : dateOr(a.startDate),
+    },
+    // Em cotação o tempo e o término vêm da proposta selecionada; o que se revisa é o orçamento.
+    ...(quoting
+      ? []
+      : [
+          { key: "executionTime", label: "Tempo de Execução", icon: <IconHourglass className="h-4 w-4" />, value: dash(formatExecutionTime(a.executionTime, executionUnit)) },
+          { key: "finishDate", label: "Término Previsto", icon: <IconCalendar className="h-4 w-4" />, value: expectedFinish },
+          { key: "startedAt", label: "Iniciado em", icon: <IconClock className="h-4 w-4" />, value: dateTimeOr(a.startedAt) },
+          { key: "finishedAt", label: "Finalizado em", icon: <IconClock className="h-4 w-4" />, value: dateTimeOr(a.finishedAt) },
+        ]),
   ];
 
   // Seção 3 — dinheiro. Some inteira para quem não pode ver valores.
   const pagamento: AirbrushingReviewRow[] = [];
-  if (canViewFinancials) {
+  if (canViewFinancials && quoting) {
+    // Em cotação não há pagamento a revisar — só o orçamento de abertura, se houver.
+    const offerAmount = a.quotationOfferAmount != null && a.quotationOfferAmount > 0 ? a.quotationOfferAmount : null;
+    pagamento.push({
+      key: "quotationOffer",
+      label: "Orçamento da Empresa",
+      icon: <IconCurrencyReal className="h-4 w-4" />,
+      value: offerAmount != null ? formatQuoteTerms(offerAmount, a.quotationOfferExecutionTime, a.quotationOfferExecutionTime ? (a.quotationOfferExecutionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null, " em ") : "Sem orçamento — cada aerografista envia o seu",
+      emphasis: offerAmount != null,
+    });
+  } else if (canViewFinancials) {
     pagamento.push(
       {
         key: "price",
@@ -157,7 +191,7 @@ export function buildAirbrushingReviewSections(
     if (dueDateRule !== AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE) {
       const preview = resolveAirbrushingDueDate(
         { dueDateRule, paymentTermDays: a.paymentTermDays, dueDayOfMonth: a.dueDayOfMonth, dueDate: a.dueDate },
-        a.finishedAt ?? a.finishDate,
+        a.finishedAt ?? computeExpectedFinishDate(a.startDate, a.executionTime, executionUnit) ?? a.finishDate,
       );
       pagamento.push({
         key: "previewDueDate",

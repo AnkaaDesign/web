@@ -10,6 +10,7 @@ import {
   IconHistory,
   IconCalendar,
   IconCalendarEvent,
+  IconHourglass,
   IconUser,
   IconCircleDot,
   IconCreditCard,
@@ -80,7 +81,7 @@ import {
   TASK_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
-import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS } from "@/utils/airbrushing";
+import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, computeExpectedFinishDate, formatExecutionTime, formatExpectedFinishDate } from "@/utils/airbrushing";
 import { formatDate } from "@/utils";
 import { formatFileSize, getFileDownloadUrl } from "@/utils/file";
 import type { Airbrushing, File as AnkaaFile } from "../../../../types";
@@ -504,20 +505,35 @@ export function AirbrushingDetailPage() {
               }
             : undefined,
         },
+        // Tempo de execução: é ele (com o início) que define o término — editado no formulário,
+        // onde a prévia do término acompanha. Em cotação ele vem da proposta selecionada.
+        {
+          id: "executionTime",
+          label: "Tempo de Execução",
+          icon: IconHourglass,
+          dataType: "text",
+          accessor: (a) => formatExecutionTime(a.executionTime, a.executionTimeUnit) || null,
+          render: (a) => {
+            const text = formatExecutionTime(a.executionTime, a.executionTimeUnit);
+            if (text) return <span>{text}</span>;
+            return <span className="text-muted-foreground">{isQuoting ? "Definido na cotação" : "—"}</span>;
+          },
+          keepWhenEmpty: isQuoting,
+        },
+        // Término previsto: CALCULADO (início + tempo, mesma regra da API). Aerografia antiga,
+        // sem tempo, mostra o término que foi gravado.
         {
           id: "finishDate",
           label: "Término Previsto",
           icon: IconCalendarEvent,
           dataType: "date",
-          accessor: (a) => a.finishDate ?? null,
-          edit: canEdit
-            ? {
-                get: (a) => a.finishDate ?? null,
-                onCommit: async (v, a) => {
-                  await updateAsync({ id: a.id, data: { finishDate: (v as Date) ?? null } });
-                },
-              }
-            : undefined,
+          accessor: (a) => computeExpectedFinishDate(a.startDate, a.executionTime, a.executionTimeUnit) ?? a.finishDate ?? null,
+          render: (a) => {
+            const computed = formatExpectedFinishDate(a.startDate, a.executionTime, a.executionTimeUnit);
+            if (computed) return <span>{computed}</span>;
+            if (a.finishDate) return <span>{formatDate(a.finishDate)}</span>;
+            return <span className="text-muted-foreground">{a.executionTime ? "Informe o início previsto" : "—"}</span>;
+          },
         },
         // Actual timestamps are stamped by the production floor (start/finish) — read-only here.
         { id: "startedAt", label: "Iniciado em", icon: IconCalendar, dataType: "datetime", accessor: (a) => a.startedAt ?? null },

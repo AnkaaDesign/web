@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, nullableDate, toFormData } from "./common";
 import type { Airbrushing } from "../types";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, PAYMENT_METHOD } from "../constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, EXECUTION_TIME_UNIT, PAYMENT_METHOD } from "../constants";
 
 // =====================
 // Include Schema Based on Prisma Schema
@@ -668,6 +668,25 @@ const airbrushingPaymentConfigShape = {
   dueDate: nullableDate.optional(),
 };
 
+/**
+ * Tempo de execução e orçamento de abertura — espelha `airbrushingExecutionShape` na API.
+ * Com tempo + unidade, a API DERIVA `finishDate` do `startDate`; `quotationOffer*` só é
+ * aceito com a aerografia em cotação (fora disso a API descarta).
+ */
+export const airbrushingExecutionTimeSchema = z
+  .number({ invalid_type_error: "Tempo de execução inválido" })
+  .int("O tempo de execução deve ser um número inteiro")
+  .min(1, "O tempo de execução deve ser maior que zero")
+  .max(999, "Tempo de execução acima do permitido");
+
+const airbrushingExecutionShape = {
+  executionTime: airbrushingExecutionTimeSchema.nullable().optional(),
+  executionTimeUnit: z.nativeEnum(EXECUTION_TIME_UNIT).nullable().optional(),
+  quotationOfferAmount: z.number({ invalid_type_error: "Orçamento inválido" }).positive("O orçamento deve ser maior que zero").nullable().optional(),
+  quotationOfferExecutionTime: airbrushingExecutionTimeSchema.nullable().optional(),
+  quotationOfferExecutionTimeUnit: z.nativeEnum(EXECUTION_TIME_UNIT).nullable().optional(),
+};
+
 export const airbrushingCreateSchema = z
   .object({
     startDate: nullableDate.optional(),
@@ -693,6 +712,7 @@ export const airbrushingCreateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).default(AIRBRUSHING_PAYMENT_STATUS.PENDING),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     taskId: z.string().uuid("Tarefa inválida"),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
@@ -731,6 +751,7 @@ export const airbrushingUpdateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).optional(),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     taskId: z.string().uuid("Tarefa inválida").optional(),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
@@ -830,6 +851,7 @@ export const airbrushingCreateNestedSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
@@ -857,6 +879,11 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   paymentTermDays: airbrushing.paymentTermDays,
   dueDayOfMonth: airbrushing.dueDayOfMonth,
   dueDate: airbrushing.dueDate,
+  executionTime: airbrushing.executionTime ?? null,
+  executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+  quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+  quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+  quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
   taskId: airbrushing.taskId,
   painterId: airbrushing.painterId,
   receiptIds: airbrushing.receipts?.map((file) => file.id),

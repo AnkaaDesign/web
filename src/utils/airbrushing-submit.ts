@@ -1,7 +1,8 @@
 import { airbrushingService } from "../api-client/airbrushing";
 import { createAirbrushingFormData } from "./form-data-helper";
-import { AIRBRUSHING_DUE_DATE_RULE, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_STATUS } from "../constants";
+import { AIRBRUSHING_DUE_DATE_RULE, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_STATUS, EXECUTION_TIME_UNIT } from "../constants";
 import { AIRBRUSHING_CREATION_MODE } from "../schemas/airbrushing";
+import { computeExpectedFinishDate } from "./airbrushing";
 
 // Shared "create the airbrushings for a freshly-created task" routine, used by the task
 // CREATE form and the BUDGET form. Mirrors the create branch of the task-edit form's
@@ -28,7 +29,36 @@ const newFilesOf = (files: any[]): File[] =>
  * `painter`, arquivos) nunca chegam à API. O modo de criação não precisa viajar — a API decide
  * pela presença de `painterId` (com aerografista: status e valor recebidos; sem: Em Cotação).
  */
-export const buildAirbrushingPayload = (a: any): Record<string, any> => ({
+export const buildAirbrushingPayload = (a: any): Record<string, any> => {
+  const executionTime = positiveIntOrNull(a.executionTime);
+  const executionTimeUnit = executionTime != null ? (a.executionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null;
+  // Com tempo, o término é DERIVADO (a API recalcula igual e sobrescreve); sem tempo, vale o
+  // término que a linha já tinha — aerografia antiga, anterior ao tempo de execução.
+  const derivedFinish = computeExpectedFinishDate(a.startDate, executionTime, executionTimeUnit);
+  const payload: Record<string, any> = {
+    ...buildScalarPayload(a),
+    finishDate: derivedFinish ?? (executionTime != null ? null : (a.finishDate ?? null)),
+    executionTime,
+    executionTimeUnit,
+  };
+  // Orçamento de abertura: só viaja quando a linha o carrega (a API o descarta fora de
+  // cotação). Sem valor não há orçamento — o tempo dele cai junto.
+  if (a.quotationOfferAmount !== undefined) {
+    const offerAmount = typeof a.quotationOfferAmount === "number" && a.quotationOfferAmount > 0 ? a.quotationOfferAmount : null;
+    const offerTime = offerAmount != null ? positiveIntOrNull(a.quotationOfferExecutionTime) : null;
+    payload.quotationOfferAmount = offerAmount;
+    payload.quotationOfferExecutionTime = offerTime;
+    payload.quotationOfferExecutionTimeUnit = offerTime != null ? (a.quotationOfferExecutionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null;
+  }
+  return payload;
+};
+
+const positiveIntOrNull = (value: unknown): number | null => {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+const buildScalarPayload = (a: any): Record<string, any> => ({
   status: a.status,
   paymentStatus: a.paymentStatus,
   paymentMethod: a.paymentMethod ?? null,
@@ -102,6 +132,7 @@ export const hasNonDefaultAirbrushingConfig = (a: any): boolean =>
 const isMeaningful = (a: any): boolean =>
   a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
   !!a.description?.trim() ||
+  a.executionTime != null || a.quotationOfferAmount != null ||
   hasNonDefaultAirbrushingConfig(a) ||
   uploadedIds(a.layouts).length > 0 || newFilesOf(a.layouts).length > 0 ||
   uploadedIds(a.receiptFiles).length > 0 || newFilesOf(a.receiptFiles).length > 0 ||
@@ -137,6 +168,11 @@ export interface AirbrushingConfig {
   description?: string | null;
   startDate?: any;
   finishDate?: any;
+  executionTime?: number | null;
+  executionTimeUnit?: string | null;
+  quotationOfferAmount?: number | null;
+  quotationOfferExecutionTime?: number | null;
+  quotationOfferExecutionTimeUnit?: string | null;
   startedAt?: any;
   finishedAt?: any;
   painterId?: string | null;

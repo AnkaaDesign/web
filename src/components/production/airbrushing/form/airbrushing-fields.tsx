@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { IconCircleCheck, IconInfoCircle, IconPhoto, IconUsersGroup } from "@tabler/icons-react";
+import { IconCircleCheck, IconInfoCircle, IconPhoto, IconReceipt2, IconUsersGroup } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { PainterSelector } from "./painter-selector";
+import { ExecutionTimeInput, ExpectedFinishPreview, type ExecutionTimeValue } from "./execution-time-input";
 import {
   AIRBRUSHING_STATUS,
   AIRBRUSHING_STATUS_LABELS,
@@ -17,9 +18,10 @@ import {
   AIRBRUSHING_DUE_DATE_RULE_LABELS,
   PAYMENT_METHOD,
   PAYMENT_METHOD_LABELS,
+  EXECUTION_TIME_UNIT,
 } from "../../../../constants";
 import { AIRBRUSHING_CREATION_MODE, AIRBRUSHING_CREATION_MODE_LABELS, type AirbrushingCreationMode } from "@/schemas/airbrushing";
-import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, resolveAirbrushingDueDate } from "@/utils/airbrushing";
+import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, computeExpectedFinishDate, resolveAirbrushingDueDate } from "@/utils/airbrushing";
 import { formatDate } from "@/utils/date";
 
 export interface AirbrushingPainterRef {
@@ -46,7 +48,15 @@ export interface AirbrushingFieldValues {
   price?: number | null;
   description?: string | null;
   startDate?: Date | string | null;
+  /** Término previsto — DERIVADO de início + tempo; só é digitado em aerografia antiga, sem tempo. */
   finishDate?: Date | string | null;
+  /** Tempo de execução (inteiro 1–999) + unidade. Substitui o término digitável. */
+  executionTime?: number | null;
+  executionTimeUnit?: string | null;
+  /** Orçamento de abertura da cotação: valor (sem ele não há orçamento) + tempo opcional. */
+  quotationOfferAmount?: number | null;
+  quotationOfferExecutionTime?: number | null;
+  quotationOfferExecutionTimeUnit?: string | null;
   startedAt?: Date | string | null;
   finishedAt?: Date | string | null;
   painterId?: string | null;
@@ -200,8 +210,8 @@ export function AirbrushingQuotationNotice({ isNew }: { isNew?: boolean }) {
         <p className="font-medium text-foreground">{isNew ? "Esta aerografia vai para cotação" : "Aerografia em cotação"}</p>
         <p className="text-muted-foreground">
           {isNew
-            ? "Ao salvar, todos os aerografistas são avisados para enviar o seu valor. O aerografista e o valor são definidos quando você selecionar uma das propostas no detalhe da aerografia."
-            : "O aerografista e o valor são definidos ao selecionar uma proposta, no detalhe da aerografia. Por aqui, a cotação só pode ser mantida ou cancelada."}
+            ? "Ao salvar, todos os aerografistas são avisados para enviar valor e tempo de execução. Aerografista, valor e pagamento são definidos depois que você selecionar uma proposta, no detalhe da aerografia."
+            : "Aerografista, valor e pagamento são definidos ao selecionar uma proposta, no detalhe da aerografia. Por aqui, dá para ajustar o início e o orçamento de abertura, ou cancelar a cotação."}
         </p>
       </div>
     </div>
@@ -212,11 +222,12 @@ export function AirbrushingQuotationNotice({ isNew }: { isNew?: boolean }) {
  * Bloco de campos de uma aerografia, compartilhado por criação e edição.
  *
  * Ordem (idêntica nos dois modos, e a mesma da revisão):
- *   1. Pintor | Descrição
+ *   1. Pintor | Descrição            (em cotação: Descrição | Início Previsto)
  *   2. Status | Status do Pagamento
- *   3. Início Previsto | Término Previsto
+ *   3. Início Previsto | Tempo de Execução + prévia do Término Previsto (calculado)
+ *      (em cotação: Orçamento da empresa — valor + tempo, ambos opcionais)
  *   4. Iniciado em | Finalizado em
- *   5. Pagamento: Valor | Forma | Regra | campo da regra + prévia do vencimento
+ *   5. Pagamento: Valor | Forma | Regra | campo da regra + prévia do vencimento (fora de cotação)
  *   6. Layouts (`layoutsSlot`)
  *
  * O valor fica DENTRO do bloco de pagamento — ele é o que a aerografia custa a pagar, e
@@ -244,12 +255,17 @@ export function AirbrushingFields({
   const status = value.status ?? (inQuotation ? AIRBRUSHING_STATUS.QUOTING : AIRBRUSHING_STATUS.PREPARATION);
   const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
   const dueDateRule = value.dueDateRule ?? AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH;
+  // Em horas o horário do início importa (8 horas a partir das 9h terminam às 17h) — o
+  // seletor de início ganha a hora; em dias, só a data.
+  const timeUnitInPlay = inQuotation ? (value.quotationOfferExecutionTime ? value.quotationOfferExecutionTimeUnit : null) : value.executionTimeUnit;
+  const startNeedsTime = timeUnitInPlay === EXECUTION_TIME_UNIT.HOURS;
+  const hasOffer = value.quotationOfferAmount != null && value.quotationOfferAmount > 0;
 
   // A prévia usa a MESMA referência do servidor: término real quando existe, término
   // previsto enquanto o serviço não acabou.
   const previewDueDate = resolveAirbrushingDueDate(
     { dueDateRule, paymentTermDays: value.paymentTermDays, dueDayOfMonth: value.dueDayOfMonth, dueDate: value.dueDate },
-    value.finishedAt ?? value.finishDate,
+    value.finishedAt ?? computeExpectedFinishDate(value.startDate, value.executionTime, value.executionTime ? (value.executionTimeUnit ?? EXECUTION_TIME_UNIT.DAYS) : null) ?? value.finishDate,
   );
 
   const handleStatusChange = (next: string) => {
@@ -266,9 +282,18 @@ export function AirbrushingFields({
   const handleCreationModeChange = (next: AirbrushingCreationMode) => {
     if (next === creationMode) return;
     if (next === AIRBRUSHING_CREATION_MODE.APPROVED) {
-      onChange({ creationMode: next, status: AIRBRUSHING_STATUS.PREPARATION, paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING });
+      // O orçamento de abertura só existe em cotação — a API o descartaria de qualquer jeito.
+      onChange({
+        creationMode: next,
+        status: AIRBRUSHING_STATUS.PREPARATION,
+        paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+        quotationOfferAmount: null,
+        quotationOfferExecutionTime: null,
+      });
       return;
     }
+    // Em cotação o pagamento é definido depois (com o aerografista escolhido) e o tempo de
+    // execução vem da proposta selecionada.
     onChange({
       creationMode: next,
       status: AIRBRUSHING_STATUS.QUOTING,
@@ -278,6 +303,13 @@ export function AirbrushingFields({
       price: null,
       startedAt: null,
       finishedAt: null,
+      finishDate: null,
+      executionTime: null,
+      paymentMethod: null,
+      dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
+      paymentTermDays: null,
+      dueDayOfMonth: null,
+      dueDate: null,
     });
   };
 
@@ -292,6 +324,26 @@ export function AirbrushingFields({
     });
   };
 
+  const handleExecutionTimeChange = (next: ExecutionTimeValue) => {
+    onChange({ executionTime: next.executionTime, executionTimeUnit: next.executionTimeUnit });
+  };
+
+  const startDateInput = (
+    <DateTimeInput
+      field={{
+        value: asDate(value.startDate),
+        onChange: (next) => onChange({ startDate: onlyDate(next) }),
+        onBlur: () => {},
+        name: `${idPrefix}.startDate`,
+      }}
+      label="Início Previsto"
+      mode={startNeedsTime ? "datetime" : "date"}
+      context="start"
+      disabled={disabled}
+      error={errors?.startDate}
+    />
+  );
+
   return (
     <div className="space-y-4">
       {isNew && (
@@ -300,9 +352,9 @@ export function AirbrushingFields({
 
       {inQuotation && <AirbrushingQuotationNotice isNew={isNew} />}
 
-      {/* Linha 1: Pintor | Descrição (Input de uma linha, ao lado do pintor). Em cotação o
-          pintor some: ele é o da proposta selecionada, e a descrição ocupa a linha toda. */}
-      <div className={inQuotation ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+      {/* Linha 1: Pintor | Descrição. Em cotação o pintor some (ele é o da proposta
+          selecionada) e o Início Previsto sobe para o lado da descrição. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {!inQuotation && (
           <Field
             label={
@@ -335,6 +387,8 @@ export function AirbrushingFields({
             className="bg-transparent"
           />
         </Field>
+
+        {inQuotation && startDateInput}
       </div>
 
       {/* Linha 2: Status | Status do Pagamento. Uma aerografia nova indo para cotação não tem
@@ -376,35 +430,84 @@ export function AirbrushingFields({
         </div>
       )}
 
-      {/* Linha 3: datas previstas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DateTimeInput
-          field={{
-            value: asDate(value.startDate),
-            onChange: (next) => onChange({ startDate: onlyDate(next) }),
-            onBlur: () => {},
-            name: `${idPrefix}.startDate`,
-          }}
-          label="Início Previsto"
-          mode="date"
-          context="start"
-          disabled={disabled}
-          error={errors?.startDate}
-        />
-        <DateTimeInput
-          field={{
-            value: asDate(value.finishDate),
-            onChange: (next) => onChange({ finishDate: onlyDate(next) }),
-            onBlur: () => {},
-            name: `${idPrefix}.finishDate`,
-          }}
-          label="Término Previsto"
-          mode="date"
-          context="end"
-          disabled={disabled}
-          error={errors?.finishDate}
-        />
-      </div>
+      {/* Linha 3: Início Previsto | Tempo de Execução — o término não se digita: sai dos dois. */}
+      {!inQuotation && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {startDateInput}
+          <Field label="Tempo de Execução" error={errors?.executionTime ?? errors?.executionTimeUnit}>
+            <ExecutionTimeInput
+              id={`${idPrefix}-execution-time`}
+              value={value.executionTime}
+              unit={value.executionTimeUnit}
+              onChange={handleExecutionTimeChange}
+              disabled={disabled}
+              invalid={!!errors?.executionTime}
+            />
+            <ExpectedFinishPreview
+              startDate={value.startDate}
+              executionTime={value.executionTime}
+              unit={value.executionTimeUnit}
+              fallbackFinishDate={value.finishDate}
+            />
+          </Field>
+        </div>
+      )}
+
+      {/* Orçamento da empresa — opcional, só em cotação. É dinheiro: some para quem não vê valores. */}
+      {inQuotation && canViewFinancials && (
+        <div className="space-y-3 rounded-lg border border-border/60 p-4">
+          <div className="space-y-0.5">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <IconReceipt2 className="h-4 w-4 text-muted-foreground" />
+              Orçamento da empresa
+              <span className="font-normal text-muted-foreground">(opcional)</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Se você já tem um valor, os aerografistas podem aceitar, contrapropor ou recusar. Em branco, cada um envia o seu.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Valor" error={errors?.quotationOfferAmount}>
+              <Input
+                type="currency"
+                value={value.quotationOfferAmount ?? undefined}
+                onChange={(next) => onChange({ quotationOfferAmount: typeof next === "number" && next > 0 ? next : null })}
+                placeholder="R$ 0,00"
+                disabled={disabled}
+                className="bg-transparent"
+              />
+            </Field>
+            <Field
+              label={
+                <>
+                  Tempo de Execução <span className="font-normal text-muted-foreground">(opcional)</span>
+                </>
+              }
+              error={errors?.quotationOfferExecutionTime}
+            >
+              <ExecutionTimeInput
+                id={`${idPrefix}-offer-execution-time`}
+                value={value.quotationOfferExecutionTime}
+                unit={value.quotationOfferExecutionTimeUnit}
+                onChange={(next) =>
+                  onChange({ quotationOfferExecutionTime: next.executionTime, quotationOfferExecutionTimeUnit: next.executionTimeUnit })
+                }
+                disabled={disabled || !hasOffer}
+                placeholder={hasOffer ? "Ex.: 2" : "Informe o valor"}
+              />
+              {hasOffer && value.quotationOfferExecutionTime ? (
+                <ExpectedFinishPreview
+                  startDate={value.startDate}
+                  executionTime={value.quotationOfferExecutionTime}
+                  unit={value.quotationOfferExecutionTimeUnit}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Sem tempo, cada aerografista informa o seu ao aceitar.</p>
+              )}
+            </Field>
+          </div>
+        </div>
+      )}
 
       {/* Linha 4: datas reais — não existem antes de haver um aerografista. */}
       {showActualDates && !inQuotation && (
@@ -440,27 +543,22 @@ export function AirbrushingFields({
 
       {/* Pagamento — valor, forma e vencimento juntos. É exatamente o que Contas a Pagar
           exibe nas colunas "Valor", "Forma" e "Vencimento". */}
-      {canViewFinancials && (
+      {/* Em cotação não há pagamento a configurar: ele é definido depois de selecionado o
+          aerografista (valor e prazo vêm da proposta). */}
+      {canViewFinancials && !inQuotation && (
         <div className="rounded-lg border border-border/60 p-4 space-y-4">
           <p className="text-sm font-semibold text-foreground">Pagamento</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Valor do Serviço" error={errors?.price}>
-              {inQuotation ? (
-                <>
-                  <Input type="text" value="Em cotação" disabled className="bg-transparent" />
-                  <p className="text-xs text-muted-foreground">Definido ao selecionar uma proposta.</p>
-                </>
-              ) : (
-                <Input
-                  type="currency"
-                  value={value.price ?? undefined}
-                  onChange={(next) => onChange({ price: typeof next === "number" ? next : null })}
-                  placeholder="R$ 0,00"
-                  disabled={disabled}
-                  className="bg-transparent"
-                />
-              )}
+              <Input
+                type="currency"
+                value={value.price ?? undefined}
+                onChange={(next) => onChange({ price: typeof next === "number" ? next : null })}
+                placeholder="R$ 0,00"
+                disabled={disabled}
+                className="bg-transparent"
+              />
             </Field>
 
             <Field label="Forma de Pagamento" error={errors?.paymentMethod}>

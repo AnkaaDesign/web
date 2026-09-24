@@ -1,5 +1,5 @@
 import { airbrushingService } from "@/api-client/airbrushing";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE } from "@/constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, EXECUTION_TIME_UNIT } from "@/constants";
 import type { FileWithPreview } from "@/components/common/file";
 import { buildAirbrushingPayload, hasNonDefaultAirbrushingConfig } from "@/utils/airbrushing-submit";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
@@ -123,6 +123,7 @@ export function planAirbrushingReconciliation(
   const isMeaningful = (a: any): boolean =>
     a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
     !!a.description?.trim() ||
+    a.executionTime != null || a.quotationOfferAmount != null ||
     // Uma linha preenchida só com forma de pagamento/vencimento também é uma aerografia real.
     hasNonDefaultAirbrushingConfig(a) ||
     uploadedIds(rowReceipts(a)).length > 0 || uploadedIds(rowInvoices(a)).length > 0 || uploadedIds(rowLayouts(a)).length > 0 ||
@@ -144,6 +145,13 @@ export function planAirbrushingReconciliation(
     if (time(a.dueDate) !== time(orig.dueDate)) return true;
     if (time(a.startDate) !== time(orig.startDate)) return true;
     if (time(a.finishDate) !== time(orig.finishDate)) return true;
+    // Tempo de execução e orçamento de abertura — o término sai do tempo, então mudar só o
+    // tempo também é uma alteração real.
+    if ((a.executionTime ?? null) !== (orig.executionTime ?? null)) return true;
+    if ((a.executionTimeUnit ?? null) !== (orig.executionTimeUnit ?? null)) return true;
+    if ((a.quotationOfferAmount ?? null) !== (orig.quotationOfferAmount ?? null)) return true;
+    if ((a.quotationOfferExecutionTime ?? null) !== (orig.quotationOfferExecutionTime ?? null)) return true;
+    if ((a.quotationOfferExecutionTimeUnit ?? null) !== (orig.quotationOfferExecutionTimeUnit ?? null)) return true;
     if (time(a.startedAt) !== time(orig.startedAt)) return true;
     if (time(a.finishedAt) !== time(orig.finishedAt)) return true;
     if (!sameIds(uploadedIds(rowReceipts(a)), origFileIds(orig.receipts))) return true;
@@ -257,6 +265,13 @@ export function airbrushingToFormRow(a: any): Record<string, any> {
     paymentTermDays: (a as any).paymentTermDays ?? null,
     dueDayOfMonth: (a as any).dueDayOfMonth ?? null,
     dueDate: (a as any).dueDate ? new Date((a as any).dueDate) : null,
+    // Tempo de execução + orçamento de abertura — semeados pelo mesmo motivo do pagamento:
+    // ausentes, o save mandaria null por cima do que está gravado.
+    executionTime: a.executionTime ?? null,
+    executionTimeUnit: a.executionTimeUnit ?? null,
+    quotationOfferAmount: a.quotationOfferAmount ?? null,
+    quotationOfferExecutionTime: a.quotationOfferExecutionTime ?? null,
+    quotationOfferExecutionTimeUnit: a.quotationOfferExecutionTimeUnit ?? null,
     painterId: a.painterId || null,
     painter: a.painter || null,
     receiptIds: a.receipts?.map((r: any) => r.id) || [],
@@ -289,6 +304,11 @@ export function emptyAirbrushingRow(): Record<string, any> {
     description: null,
     startDate: null,
     finishDate: null,
+    executionTime: null,
+    executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+    quotationOfferAmount: null,
+    quotationOfferExecutionTime: null,
+    quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
     startedAt: null,
     finishedAt: null,
     painterId: null,

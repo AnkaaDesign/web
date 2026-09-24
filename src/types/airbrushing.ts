@@ -8,6 +8,7 @@ import type {
   AIRBRUSHING_QUOTE_STATUS,
   AIRBRUSHING_QUOTE_PARTY,
   AIRBRUSHING_QUOTE_ACTION,
+  EXECUTION_TIME_UNIT,
   PAYMENT_METHOD,
   ORDER_BY_DIRECTION,
   NFSE_STATUS,
@@ -23,7 +24,10 @@ import type { User, UserIncludes } from "./user";
 
 export interface Airbrushing extends BaseEntity {
   startDate: Date | null; // Expected/planned start date
-  finishDate: Date | null; // Expected/planned finish date
+  finishDate: Date | null; // Expected/planned finish date — derived by the API from startDate + execution time when both exist
+  /** Tempo de execução (inteiro 1–999). Com a unidade, a API deriva `finishDate` do `startDate`. */
+  executionTime?: number | null;
+  executionTimeUnit?: EXECUTION_TIME_UNIT | null;
   startedAt: Date | null; // Actual start timestamp
   finishedAt: Date | null; // Actual finish timestamp
   price: number | null;
@@ -61,6 +65,11 @@ export interface Airbrushing extends BaseEntity {
   quotationNotifiedAt?: Date | null;
   /** Quando a cotação terminou (seleção ou cancelamento). */
   quotationClosedAt?: Date | null;
+  /** Orçamento de abertura da cotação (valor que a empresa já tem). Só existe em cotação. */
+  quotationOfferAmount?: number | null;
+  /** Tempo do orçamento de abertura — opcional mesmo quando há valor. */
+  quotationOfferExecutionTime?: number | null;
+  quotationOfferExecutionTimeUnit?: EXECUTION_TIME_UNIT | null;
   /**
    * Negociações da cotação, uma por aerografista. A API recorta por papel:
    * ADMIN/COMMERCIAL/FINANCIAL veem todas; os demais recebem `[]`.
@@ -84,6 +93,9 @@ export interface AirbrushingQuote {
    * recusou sem nunca propor.
    */
   amount: number | null;
+  /** Tempo em jogo (mesma regra do `amount`). Null em negociações anteriores ao tempo de execução. */
+  executionTime?: number | null;
+  executionTimeUnit?: EXECUTION_TIME_UNIT | null;
   createdAt: Date;
   updatedAt: Date;
   painter?: { id: string; name: string; avatarId?: string | null } | null;
@@ -98,6 +110,9 @@ export interface AirbrushingQuoteEvent {
   party: AIRBRUSHING_QUOTE_PARTY;
   action: AIRBRUSHING_QUOTE_ACTION;
   amount: number | null;
+  /** O tempo que aquele lance disse (null quando o lance não falou de tempo). */
+  executionTime?: number | null;
+  executionTimeUnit?: EXECUTION_TIME_UNIT | null;
   note: string | null;
   userId: string | null;
   createdAt: Date;
@@ -114,6 +129,12 @@ export interface AirbrushingQuoteOverview {
     quotationOpenedAt: Date | null;
     quotationNotifiedAt: Date | null;
     quotationClosedAt: Date | null;
+    startDate?: Date | null;
+    executionTime?: number | null;
+    executionTimeUnit?: EXECUTION_TIME_UNIT | null;
+    quotationOfferAmount?: number | null;
+    quotationOfferExecutionTime?: number | null;
+    quotationOfferExecutionTimeUnit?: EXECUTION_TIME_UNIT | null;
   };
   /** Mais recentes primeiro (updatedAt desc). */
   quotes: AirbrushingQuote[];

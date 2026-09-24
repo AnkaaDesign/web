@@ -12,6 +12,7 @@ import {
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_DUE_DATE_RULE,
   FAVORITE_PAGES,
+  EXECUTION_TIME_UNIT,
 } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -43,7 +44,7 @@ import { FileSuggestions, type FileWithPreview } from "@/components/common/file"
 // mesmo uploader do layout de tarefa mais o seletor de status por arquivo.
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
-import { createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
+import { buildAirbrushingPayload, createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
 import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import { useAuth } from "@/contexts/auth-context";
 import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
@@ -81,6 +82,11 @@ const makeEmptyAirbrushing = () => ({
   description: null,
   startDate: null,
   finishDate: null,
+  executionTime: null,
+  executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+  quotationOfferAmount: null,
+  quotationOfferExecutionTime: null,
+  quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
   startedAt: null,
   finishedAt: null,
   painterId: null,
@@ -107,6 +113,11 @@ const VALIDATED_FIELDS = [
   "paymentStatus",
   "startDate",
   "finishDate",
+  "executionTime",
+  "executionTimeUnit",
+  "quotationOfferAmount",
+  "quotationOfferExecutionTime",
+  "quotationOfferExecutionTimeUnit",
   "startedAt",
   "finishedAt",
   "price",
@@ -216,6 +227,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     defaultValues: {
       startDate: null,
       finishDate: null,
+      executionTime: null,
+      executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+      quotationOfferAmount: null,
+      quotationOfferExecutionTime: null,
+      quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
       startedAt: null,
       finishedAt: null,
       price: null,
@@ -244,6 +260,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     form.reset({
       startDate: airbrushing.startDate ?? null,
       finishDate: airbrushing.finishDate ?? null,
+      executionTime: airbrushing.executionTime ?? null,
+      executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+      quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+      quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+      quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
       // startedAt/finishedAt are server-managed timestamps — keep them in state so
       // an update does not wipe them, but they have no form UI.
       startedAt: airbrushing.startedAt ?? null,
@@ -502,7 +523,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       // `receiptIds`/`invoiceIds` NUNCA saem daqui: o backend traduz um array vazio em
       // `receipts: { set: [] }`, ou seja, desanexa tudo. Como este formulário não gerencia
       // recibos nem notas fiscais, omitir os campos é o que preserva os anexos existentes.
-      const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...data } = form.getValues() as Record<string, any>;
+      const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...rawData } = form.getValues() as Record<string, any>;
+      // Na edição, os escalares passam pela MESMA normalização do cadastro: término derivado de
+      // início + tempo, unidade só junto do número, orçamento sem valor = sem orçamento.
+      const data = mode === "create" ? rawData : { ...rawData, ...buildAirbrushingPayload(rawData) };
 
       // `instanceof File` além de `!uploaded`: é exatamente o que o helper de FormData
       // anexa como blob, e `newLayoutStatuses` abaixo casa por ÍNDICE com essa lista —
@@ -976,7 +1000,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2">
                                   <IconCreditCard className="h-5 w-5" />
-                                  Pagamento
+                                  {reviewItems.every((item) => item.values.status === AIRBRUSHING_STATUS.QUOTING) ? "Orçamento" : "Pagamento"}
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="pt-0">

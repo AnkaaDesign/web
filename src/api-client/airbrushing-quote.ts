@@ -7,14 +7,29 @@
 
 import { apiClient } from "./axiosClient";
 import type { AirbrushingQuoteOverviewResponse, AirbrushingQuoteActionResponse } from "../types";
+import type { EXECUTION_TIME_UNIT } from "../constants";
 
 // =====================
 // Form Data Types
 // =====================
 
-/** Corpo do POST /airbrushing-quotes/:quoteId/counter. */
+/** Corpo do POST /airbrushing-quotes/:quoteId/counter (por negociação — a UI não oferece mais). */
 export interface AirbrushingQuoteCounterData {
-  amount: number;
+  amount?: number | null;
+  executionTime?: number | null;
+  executionTimeUnit?: EXECUTION_TIME_UNIT | null;
+  note?: string | null;
+}
+
+/**
+ * Corpo do POST /airbrushing-quotes/airbrushing/:airbrushingId/counter — contraproposta
+ * para TODOS os que têm proposta aguardando resposta (PROPOSED/COUNTERED). Pelo menos
+ * valor OU tempo; tempo e unidade vão juntos. O que não vier continua o de cada negociação.
+ */
+export interface AirbrushingQuoteCounterAllData {
+  amount?: number | null;
+  executionTime?: number | null;
+  executionTimeUnit?: EXECUTION_TIME_UNIT | null;
   note?: string | null;
 }
 
@@ -38,6 +53,12 @@ export class AirbrushingQuoteService {
 
   async counterAirbrushingQuote(quoteId: string, data: AirbrushingQuoteCounterData): Promise<AirbrushingQuoteActionResponse> {
     const response = await apiClient.post<AirbrushingQuoteActionResponse>(`${this.basePath}/${quoteId}/counter`, data);
+    return response.data;
+  }
+
+  /** Contraproposta para todos; devolve a mesma visão do GET. */
+  async counterAllAirbrushingQuotes(airbrushingId: string, data: AirbrushingQuoteCounterAllData): Promise<AirbrushingQuoteOverviewResponse> {
+    const response = await apiClient.post<AirbrushingQuoteOverviewResponse>(`${this.basePath}/airbrushing/${airbrushingId}/counter`, data);
     return response.data;
   }
 
@@ -66,5 +87,7 @@ export const airbrushingQuoteService = new AirbrushingQuoteService();
 
 export const getAirbrushingQuotes = (airbrushingId: string) => airbrushingQuoteService.getAirbrushingQuotes(airbrushingId);
 export const counterAirbrushingQuote = (quoteId: string, data: AirbrushingQuoteCounterData) => airbrushingQuoteService.counterAirbrushingQuote(quoteId, data);
+export const counterAllAirbrushingQuotes = (airbrushingId: string, data: AirbrushingQuoteCounterAllData) =>
+  airbrushingQuoteService.counterAllAirbrushingQuotes(airbrushingId, data);
 export const selectAirbrushingQuote = (quoteId: string, data?: AirbrushingQuoteSelectData) => airbrushingQuoteService.selectAirbrushingQuote(quoteId, data);
 export const reopenAirbrushingQuotation = (airbrushingId: string) => airbrushingQuoteService.reopenAirbrushingQuotation(airbrushingId);
