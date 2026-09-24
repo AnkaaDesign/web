@@ -11,7 +11,8 @@ import { responsibleService } from '@/services/responsibleService';
 import { formatCNPJ, toBrazilianNameCase } from '@/utils/formatters';
 import { isValidCPF } from '@/utils/validators';
 import type { Responsible, ResponsibleRole, ResponsibleRowData } from '@/types/responsible';
-import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles, formatResponsibleRoles } from '@/types/responsible';
+import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles } from '@/types/responsible';
+import { ResponsibleRoleBadges } from './responsible-role-badges';
 
 interface ResponsibleRowProps {
   control?: any;
@@ -209,20 +210,19 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
         ...(rep.servedCustomers ?? []).filter(c => c.id !== rep.company?.id),
       ];
       const shown = customers.slice(0, 3);
-      const roles = formatResponsibleRoles(rep.roles);
       return (
-        <div className="min-w-0">
-          <div className="truncate">{getOptionLabel(rep)}</div>
-          {roles && <div className="truncate text-xs text-muted-foreground">{roles}</div>}
+        <div className="min-w-0 space-y-1 py-0.5">
+          {rep.roles?.length > 0 && <ResponsibleRoleBadges roles={rep.roles} maxVisible={3} />}
+          <div className="truncate font-medium">{getOptionLabel(rep)}</div>
           {shown.map(customer => (
-            <div key={customer.id} className="truncate text-xs text-muted-foreground">
+            <div key={customer.id} className="truncate text-sm text-muted-foreground">
               <span className="font-medium">{customer.fantasyName}</span>
               {customer.corporateName && customer.corporateName !== customer.fantasyName && ` · ${customer.corporateName}`}
               {customer.cnpj && ` · ${formatCNPJ(customer.cnpj)}`}
             </div>
           ))}
           {customers.length > shown.length && (
-            <div className="text-xs text-muted-foreground">+{customers.length - shown.length} cliente(s)</div>
+            <div className="text-sm text-muted-foreground">+{customers.length - shown.length} cliente(s)</div>
           )}
         </div>
       );
