@@ -782,6 +782,7 @@ export function AirbrushingDetailPage() {
           {
             id: "taskStatus",
             label: "Status da Tarefa",
+            icon: IconCircleDot,
             accessor: (a) => a.task?.status ?? null,
             render: (a) =>
               a.task ? (
