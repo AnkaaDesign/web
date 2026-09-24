@@ -67,12 +67,14 @@ import type { Airbrushing, AirbrushingQuote, AirbrushingQuoteEvent, File as Anka
 
 /** Vez do comercial: há um valor que o aerografista sustenta — dá para selecionar. */
 const SELECTABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.ACCEPTED]);
-/** Negociações ainda vivas — o comercial pode contrapropor (inclusive revisar a própria). */
-const COUNTERABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([
-  AIRBRUSHING_QUOTE_STATUS.PROPOSED,
-  AIRBRUSHING_QUOTE_STATUS.COUNTERED,
-  AIRBRUSHING_QUOTE_STATUS.ACCEPTED,
-]);
+/**
+ * O comercial contrapõe uma proposta do aerografista ou revisa a própria contraproposta.
+ * Depois que ele ACEITOU, não há o que contrapor: o valor está combinado e o que resta é
+ * selecionar (ou não) — espelha canCompanyCounter da API.
+ */
+const COUNTERABLE = new Set<AIRBRUSHING_QUOTE_STATUS>([AIRBRUSHING_QUOTE_STATUS.PROPOSED, AIRBRUSHING_QUOTE_STATUS.COUNTERED]);
+/** Selecionar aparece também em COUNTERED, desabilitado com o motivo — a vez é dele. */
+const SELECT_SHOWN = new Set<AIRBRUSHING_QUOTE_STATUS>([...SELECTABLE, AIRBRUSHING_QUOTE_STATUS.COUNTERED]);
 
 /** Ordem da comparação: o fechado primeiro, depois o que pede ação, depois o resto. */
 const STATUS_RANK: Record<AIRBRUSHING_QUOTE_STATUS, number> = {
@@ -339,11 +341,11 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
 
   const selectBlockedReason = (() => {
     if (quote.status === AIRBRUSHING_QUOTE_STATUS.COUNTERED) return "Aguarde a resposta do aerografista à contraproposta";
-    if (quote.status === AIRBRUSHING_QUOTE_STATUS.DECLINED) return "O aerografista recusou esta cotação";
     if (quote.amount == null) return "Esta negociação não tem valor";
     return null;
   })();
-  const counterBlockedReason = COUNTERABLE.has(quote.status) ? null : "O aerografista recusou esta cotação";
+  const showCounter = canAct && isOpen && COUNTERABLE.has(quote.status);
+  const showSelect = canAct && isOpen && SELECT_SHOWN.has(quote.status);
 
   return (
     <div
@@ -353,14 +355,16 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
         isInactive && "opacity-70",
       )}
     >
-      <div className="flex flex-col gap-3 p-3 md:flex-row md:items-center">
-        {/* Quem + estado */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="space-y-2 p-3">
+        {/* Quem, em que estado, e o valor em jogo — nome e selos nunca são cortados. */}
+        <div className="flex items-start gap-3">
           <UserAvatarDisplay avatar={avatarFile(quote.painter?.avatarId)} userName={painterName(quote)} size="md" shape="circle" />
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-semibold">{painterName(quote)}</span>
-              {isSelected && <IconCircleCheck className="h-4 w-4 text-green-600" />}
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="break-words font-semibold leading-tight">{painterName(quote)}</span>
+              {isSelected && <IconCircleCheck className="h-4 w-4 shrink-0 text-green-600" />}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING_QUOTE[quote.status] ?? "default"} className="whitespace-nowrap text-xs">
                 {AIRBRUSHING_QUOTE_STATUS_LABELS[quote.status]}
               </Badge>
@@ -370,49 +374,51 @@ function QuoteRow({ quote, isOpen, canAct, isLowest, expanded, onToggle, onCount
                 </Badge>
               )}
             </div>
-            {lastNote ? (
-              <p className="line-clamp-2 text-xs text-muted-foreground" title={lastNote.note ?? undefined}>
-                <IconMessage className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
-                <span className="font-medium">{lastNote.party === AIRBRUSHING_QUOTE_PARTY.PAINTER ? "Aerografista" : "Comercial"}:</span> “{lastNote.note}”
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground" title={formatDateTime(quote.updatedAt)}>
-                Atualizado {formatRelativeTime(quote.updatedAt)}
-              </p>
-            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={cn("text-lg font-semibold leading-tight tabular-nums", isLowest && "text-green-700 dark:text-green-400")}>
+              {quote.amount != null ? formatCurrency(quote.amount) : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">{AMOUNT_CAPTION[quote.status]}</p>
           </div>
         </div>
 
-        {/* Valor em jogo */}
-        <div className="md:w-48 md:text-right">
-          <p className={cn("text-lg font-semibold tabular-nums", isLowest && "text-green-700 dark:text-green-400")}>
-            {quote.amount != null ? formatCurrency(quote.amount) : "—"}
+        {lastNote && (
+          <p className="line-clamp-2 text-xs text-muted-foreground" title={lastNote.note ?? undefined}>
+            <IconMessage className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
+            <span className="font-medium">{lastNote.party === AIRBRUSHING_QUOTE_PARTY.PAINTER ? "Aerografista" : "Comercial"}:</span> “{lastNote.note}”
           </p>
-          <p className="text-xs text-muted-foreground">{AMOUNT_CAPTION[quote.status]}</p>
-        </div>
+        )}
 
-        {/* Ações */}
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
-          {canAct && isOpen && (
-            <>
-              <ActionWithReason reason={counterBlockedReason}>
-                <Button type="button" variant="outline" size="sm" onClick={onCounter} disabled={!!counterBlockedReason}>
+        {/* Rodapé: histórico à esquerda, ações à direita. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onToggle} aria-expanded={expanded} className="-ml-2 h-8 text-muted-foreground">
+              {expanded ? <IconChevronUp className="mr-1 h-4 w-4" /> : <IconChevronDown className="mr-1 h-4 w-4" />}
+              Negociação ({events.length})
+            </Button>
+            <span className="truncate text-xs text-muted-foreground" title={formatDateTime(quote.updatedAt)}>
+              Atualizado {formatRelativeTime(quote.updatedAt)}
+            </span>
+          </div>
+          {(showCounter || showSelect) && (
+            <div className="flex items-center gap-2">
+              {showCounter && (
+                <Button type="button" variant="outline" size="sm" onClick={onCounter}>
                   <IconArrowsExchange className="mr-1.5 h-4 w-4" />
                   {quote.status === AIRBRUSHING_QUOTE_STATUS.COUNTERED ? "Revisar" : "Contraproposta"}
                 </Button>
-              </ActionWithReason>
-              <ActionWithReason reason={selectBlockedReason}>
-                <Button type="button" size="sm" onClick={onSelect} disabled={!!selectBlockedReason}>
-                  <IconHandFinger className="mr-1.5 h-4 w-4" />
-                  Selecionar
-                </Button>
-              </ActionWithReason>
-            </>
+              )}
+              {showSelect && (
+                <ActionWithReason reason={selectBlockedReason}>
+                  <Button type="button" size="sm" onClick={onSelect} disabled={!!selectBlockedReason}>
+                    <IconHandFinger className="mr-1.5 h-4 w-4" />
+                    Selecionar
+                  </Button>
+                </ActionWithReason>
+              )}
+            </div>
           )}
-          <Button type="button" variant="ghost" size="sm" onClick={onToggle} aria-expanded={expanded} className="text-muted-foreground">
-            {expanded ? <IconChevronUp className="mr-1 h-4 w-4" /> : <IconChevronDown className="mr-1 h-4 w-4" />}
-            Negociação ({events.length})
-          </Button>
         </div>
       </div>
 
