@@ -90,7 +90,7 @@ function ItemDetailContent() {
   usePageTracker({ title: item ? `Produto: ${item.name}` : "Produto", icon: "package" });
 
   // This item's purchasing is governed by any active order schedule that lists it. Surface the
-  // schedule's projected "expected" quantity (gap + one cycle) on the calculation section.
+  // quantity the schedule will order on its next run on the calculation section.
   const { data: schedulesResponse } = useOrderSchedules({ where: { isActive: true }, limit: 100, enabled: !!item });
 
   const targetSchedule = useMemo(() => {
@@ -106,7 +106,7 @@ function ItemDetailContent() {
     const projItem = scheduleProjectionResponse?.data?.items?.find((p) => p.itemId === item.id);
     if (!projItem) return null;
     return {
-      quantity: projItem.quantityGapPlusCycle,
+      quantity: projItem.quantityScheduled ?? projItem.quantityGapPlusCycle,
       scheduleName: targetSchedule.name,
       scheduleId: targetSchedule.id,
       nextRun: scheduleProjectionResponse?.data?.meta?.nextRun ?? targetSchedule.nextRun ?? null,
