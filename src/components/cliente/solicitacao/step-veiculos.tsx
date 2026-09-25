@@ -541,7 +541,7 @@ function MedidasDoImplemento({
             </CardTitle>
             <CardDescription>
               {totalDeVeiculos > 1
-                ? `Uma medida só, aplicada aos ${totalDeVeiculos} veículos da requisição. São caminhões do mesmo modelo — não é preciso repetir os números em cada linha.`
+                ? `Uma medida só, aplicada aos ${totalDeVeiculos} veículos da requisição. São implementos do mesmo modelo — não é preciso repetir os números em cada linha.`
                 : "A medida vale para todos os veículos desta requisição. Se acrescentar mais veículos, todos recebem esta mesma medida."}
             </CardDescription>
           </div>

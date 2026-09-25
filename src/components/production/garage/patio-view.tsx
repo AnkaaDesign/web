@@ -181,9 +181,9 @@ export function PatioView({ implementList, onImplementSelect, className }: Patio
       <div className={cn('flex flex-col items-center gap-4 p-8', className)}>
         <h2 className="text-xl font-bold">Pátio</h2>
         <p className="text-muted-foreground text-center">
-          Nenhum caminhão no pátio.
+          Nenhum implemento no pátio.
           <br />
-          Caminhões aparecem aqui quando entram mas ainda não têm vaga atribuída.
+          Implementos aparecem aqui quando entram mas ainda não têm vaga atribuída.
         </p>
       </div>
     );
@@ -256,7 +256,7 @@ export function PatioView({ implementList, onImplementSelect, className }: Patio
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>Clique em um caminhão para atribuir uma vaga</span>
+        <span>Clique em um implemento para atribuir uma vaga</span>
       </div>
     </div>
   );

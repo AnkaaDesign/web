@@ -43,13 +43,13 @@ describe("layoutFilesForTask", () => {
 });
 
 describe("perVehicleLayoutsPayload", () => {
-  it("uma arte por caminhão vira uma entrada por arte com o seu caminhão", () => {
+  it("uma arte por implemento vira uma entrada por arte com o seu implemento", () => {
     expect(perVehicleLayoutsPayload([T1, T2], { [T1]: [A], [T2]: [B] })).toEqual([
       { fileId: A, taskIds: [T1] },
       { fileId: B, taskIds: [T2] },
     ]);
   });
-  it("a mesma arte em todos os caminhões cobre todos (taskIds null)", () => {
+  it("a mesma arte em todos os implementos cobre todos (taskIds null)", () => {
     expect(perVehicleLayoutsPayload([T1, T2], { [T1]: [A], [T2]: [A] })).toEqual([
       { fileId: A, taskIds: null },
     ]);
@@ -80,7 +80,7 @@ describe("layoutsKey / persistedLayoutsKey", () => {
       layoutsKey(sharedLayoutsPayload([A]), [T1, T2]),
     );
   });
-  it("trocar a arte de UM caminhão é mudança", () => {
+  it("trocar a arte de UM implemento é mudança", () => {
     const quote = { layoutScope: "PER_VEHICLE" as const, layoutFiles: [file(A, [T1]), file(B, [T2])] };
     const fromScreen = perVehicleLayoutsPayload([T1, T2], { [T1]: [A], [T2]: [A] });
     expect(layoutsKey(fromScreen, [T1, T2])).not.toBe(persistedLayoutsKey(quote, [T1, T2]));

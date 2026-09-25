@@ -1450,7 +1450,7 @@ function AllGaragesView({ implementList, containerWidth, containerHeight, garage
       if (draggedImplement.sectorName) {
         const expectedGarage = getGarageForSectorName(draggedImplement.sectorName);
         if (expectedGarage && expectedGarage !== targetGarageId) {
-          onMoveRejected?.(`Este caminhão pertence ao setor ${draggedImplement.sectorName} e só pode ir no Barracão ${expectedGarage.slice(1)}`);
+          onMoveRejected?.(`Este implemento pertence ao setor ${draggedImplement.sectorName} e só pode ir no Barracão ${expectedGarage.slice(1)}`);
           return;
         }
       }

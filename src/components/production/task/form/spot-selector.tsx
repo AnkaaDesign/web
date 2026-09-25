@@ -291,7 +291,7 @@ export function SpotSelector({
     <div className={cn('space-y-2', className)}>
       {!implementLength || implementLength <= 0 ? (
         <p className="text-sm text-muted-foreground italic">
-          Preencha o layout do caminhão para selecionar o local
+          Preencha o layout do implemento para selecionar o local
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-3">

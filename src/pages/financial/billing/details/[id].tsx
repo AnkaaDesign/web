@@ -1875,7 +1875,7 @@ const BillingDetailPageInner = ({
                       layoutScopeOf(quote as any) === "PER_VEHICLE" ? (
                         <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                           Este orçamento tem <span className="font-medium text-foreground">um layout para cada veículo</span>.
-                          Para trocar a arte de algum caminhão, use a tela do orçamento, no passo Informações.
+                          Para trocar a arte de algum implemento, use a tela do orçamento, no passo Informações.
                         </div>
                       ) : undefined
                     }

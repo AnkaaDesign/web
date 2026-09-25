@@ -1491,7 +1491,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               layoutStates.back?.sections?.length > 0) && (
               <Alert className="mt-2">
                 <AlertDescription>
-                  Os layouts configurados serão aplicados a todos os caminhões das {currentTaskIds.length} tarefas selecionadas.
+                  Os layouts configurados serão aplicados a todos os implementos das {currentTaskIds.length} tarefas selecionadas.
                 </AlertDescription>
               </Alert>
             )}

@@ -89,11 +89,11 @@ describe("as faturas que dizem respeito a ESTE veículo", () => {
     { id: "c4", customerId: CLIENTE_A, tasks: cov("t4") },
   ];
 
-  it("a tela do caminhão 2 mostra a fatura DELE, não as quatro", () => {
+  it("a tela do veículo 2 mostra a fatura DELE, não as quatro", () => {
     expect(configsForTask(perTask, "t2").map((c) => c.id)).toEqual(["c2"]);
   });
 
-  it("numa fatura conjunta, a tela de qualquer caminhão mostra a fatura", () => {
+  it("numa fatura conjunta, a tela de qualquer veículo mostra a fatura", () => {
     const joint = [{ id: "c1", customerId: CLIENTE_A, tasks: cov("t1", "t2", "t3", "t4") }];
     expect(configsForTask(joint, "t3").map((c) => c.id)).toEqual(["c1"]);
   });

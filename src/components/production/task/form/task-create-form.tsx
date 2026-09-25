@@ -776,7 +776,7 @@ export const TaskCreateForm = () => {
                               <FormItem className="flex flex-col">
                                 <FormLabel className="flex items-center gap-2">
                                   <IconTruck className="h-4 w-4" />
-                                  Categoria do Caminhão
+                                  Categoria do Implemento
                                 </FormLabel>
                                 <Combobox
                                   value={field.value || ""}

@@ -698,7 +698,7 @@ export function GaragesPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Solicitar Movimentação</AlertDialogTitle>
               <AlertDialogDescription>
-                Deseja solicitar a movimentação do caminhão &quot;{movementRequest?.taskName}&quot;?
+                Deseja solicitar a movimentação do implemento &quot;{movementRequest?.taskName}&quot;?
                 A equipe de logística será notificada.
               </AlertDialogDescription>
             </AlertDialogHeader>

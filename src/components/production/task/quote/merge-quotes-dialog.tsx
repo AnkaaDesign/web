@@ -113,7 +113,7 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
           </DialogTitle>
           <DialogDescription>
             Junta os orçamentos dos veículos selecionados num só — um documento e uma cerimônia de
-            assinatura, em vez de um por caminhão.
+            assinatura, em vez de um por veículo.
           </DialogDescription>
         </DialogHeader>
 

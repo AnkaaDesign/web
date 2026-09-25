@@ -3099,7 +3099,7 @@ function TaskTableConfigComponent({
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Categoria do caminhão</Label>
+            <Label className="text-xs">Categoria do implemento</Label>
             <Combobox
               mode="multiple"
               value={c.filters.implementCategories}

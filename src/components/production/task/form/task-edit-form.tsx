@@ -2984,7 +2984,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         name="implement.category"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel>Categoria do Caminhão</FormLabel>
+                            <FormLabel>Categoria do Implemento</FormLabel>
                             <Combobox
                               value={field.value || ""}
                               onValueChange={field.onChange}
@@ -3141,7 +3141,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                       {/* N° do Pedido — o pedido de compra do cliente, DESTE
                           veículo. Morava na configuração de faturamento do
-                          orçamento, por CLIENTE, e isso obrigava os N caminhões de
+                          orçamento, por CLIENTE, e isso obrigava os N veículos de
                           um mesmo orçamento a citarem o mesmo número na nota e no
                           boleto. O pedido é por ENTREGA: aqui é onde se corrige um
                           caminhão sem mexer nos irmãos. */}
@@ -3644,7 +3644,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       <CardHeader className="flex-1 py-4">
                         <CardTitle className="flex items-center gap-2">
                           <IconMapPin className="h-5 w-5" />
-                          Local do Caminhão
+                          Local do Implemento
                         </CardTitle>
                       </CardHeader>
                     </AccordionTrigger>

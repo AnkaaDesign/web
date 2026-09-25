@@ -98,8 +98,8 @@ export function BudgetVehicleLayoutsField({
             </Label>
             <p className="text-xs text-muted-foreground">
               {perVehicle
-                ? "Cada caminhão recebe só a arte escolhida para ele. No documento, cada layout sai com o número do veículo."
-                : `O mesmo layout vale para os ${vehicles.length} veículos. Ligue quando os caminhões tiverem artes diferentes.`}
+                ? "Cada implemento recebe só a arte escolhida para ele. No documento, cada layout sai com o número do veículo."
+                : `O mesmo layout vale para os ${vehicles.length} veículos. Ligue quando os implementos tiverem artes diferentes.`}
             </p>
           </div>
         </CardContent>
