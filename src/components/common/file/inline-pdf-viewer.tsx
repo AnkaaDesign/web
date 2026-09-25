@@ -56,10 +56,10 @@ export interface InlinePdfViewerProps {
   /** Escala descoberta no arquivo (ou o padrão da casa, quando ele não traz cota). */
   onScaleDetected?: (detection: ScaleDetection) => void;
   /**
-   * O caminhão da tarefa. Quando vem, o cotador roda sozinho assim que o
+   * O implemento da tarefa. Quando vem, o cotador roda sozinho assim que o
    * arquivo carrega — não há botão a apertar.
    *
-   * É o caminhão e não os painéis porque quem resolve as medidas é a API: o
+   * É o implemento e não os painéis porque quem resolve as medidas é a API: o
    * `ImplementMeasure` guarda METRO e o cotador trabalha em centímetro, e essa
    * conversão passou a existir num lugar só.
    */
@@ -212,7 +212,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
      *
      * A página vive num contêiner de rolagem, então aumentar a escala sozinha
      * mantém fixo o canto superior esquerdo — quem estava olhando o rodapé de um
-     * caminhão de 15 m ia parar no teto. Guardando onde o ponteiro está e
+     * implemento de 15 m ia parar no teto. Guardando onde o ponteiro está e
      * corrigindo a rolagem na proporção do zoom, o ponto sob o cursor continua
      * sob o cursor, que é o que todo visualizador de mapa faz.
      */

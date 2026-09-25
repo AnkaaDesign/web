@@ -74,7 +74,7 @@ export interface BillingListResponse {
 /**
  * O FATURAMENTO TEM ENDEREÇO PRÓPRIO.
  *
- * Antes, cobrança só se abria por VEÍCULO — e num orçamento de quatro caminhões
+ * Antes, cobrança só se abria por VEÍCULO — e num orçamento de quatro implementos
  * cobrados um a um, os quatro abriam a MESMA página, que desenhava
  * "Fatura 1 · 2 · 3 · 4" lado a lado. Não era defeito de tela: não havia quatro
  * endereços porque não havia quatro coisas.

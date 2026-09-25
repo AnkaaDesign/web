@@ -113,7 +113,7 @@ export const BillingDetailPage = () => {
   //
   // Era o veículo, e não podia ser outra coisa: enquanto "faturamento" foi uma
   // lista pendurada no orçamento, não havia id que significasse a cobrança. Num
-  // orçamento de quatro caminhões cobrados JUNTOS isso dava QUATRO endereços para
+  // orçamento de quatro implementos cobrados JUNTOS isso dava QUATRO endereços para
   // UMA cobrança — quatro URLs, quatro favoritos, o mesmo conteúdo.
   //
   // A rota aceita os dois ids e CONVERGE. O que obriga a resolução a acontecer
@@ -216,7 +216,7 @@ const BillingDetailPageInner = ({
    * O VEÍCULO ABERTO — o pedido (quando se chegou por um), senão a âncora da
    * cobertura.
    *
-   * Qual caminhão está aberto é uma PREFERÊNCIA DE VISTA dentro da cobrança, não
+   * Qual implemento está aberto é uma PREFERÊNCIA DE VISTA dentro da cobrança, não
    * a identidade da coisa que se está vendo: por isso viaja em
    * `location.state.openTaskId` e não na URL.
    */
@@ -317,12 +317,12 @@ const BillingDetailPageInner = ({
               createdAt: true,
               customerOrderNumber: true,
               // Data de conclusão de CADA veículo: numa cobrança de quatro eles
-              // terminam em dias diferentes, e o Resumo mostrava a do caminhão
+              // terminam em dias diferentes, e o Resumo mostrava a do implemento
               // aberto como se fosse a da cobrança inteira.
               finishedAt: true,
               // Chassi junto: a tabela de veículos do passo 1 mostra as mesmas
               // colunas do documento, e um chassi ausente ali leria como "a
-              // registrar" num caminhão que já o tem.
+              // registrar" num implemento que já o tem.
               implement: {
                 select: {
                   id: true,
@@ -332,7 +332,7 @@ const BillingDetailPageInner = ({
                   chassisNumber: true,
                   // Categoria e implemento: é assim que a discriminação da NFS-e
                   // nomeia o veículo ("Toco Refrigerado de n série: X"). Sem
-                  // eles a prévia descreveria um caminhão sem tipo, diferente da
+                  // eles a prévia descreveria um implemento sem tipo, diferente da
                   // nota que vai sair.
                   category: true,
                   type: true,
@@ -390,7 +390,7 @@ const BillingDetailPageInner = ({
 
   // ─── FATURAR ESTE VEÍCULO OU O ORÇAMENTO INTEIRO ─────────────────────────────
   //
-  // Um orçamento pode cobrir sessenta caminhões, e esta tela é aberta pela TAREFA
+  // Um orçamento pode cobrir sessenta implementos, e esta tela é aberta pela TAREFA
   // — ou seja, por UM deles. Com `billingSplit = PER_TASK` a decisão é veículo a
   // veículo ("os sessenta não terminam no mesmo dia"): a aprovação daqui fatura
   // só este, pela rota dedicada, e o orçamento fecha quando a última fatia sai.
@@ -446,11 +446,11 @@ const BillingDetailPageInner = ({
    * "Fatiado" é: alguma fatura cobre MENOS que todos os veículos. Cobre a
    * cobrança veículo a veículo e o lote com a mesma conta, porque a pergunta é
    * sobre a cobertura e não sobre o modo — e é ela que decide se a aprovação
-   * desta tela fecha só o que cobre o caminhão aberto (rota da fatia) ou o
+   * desta tela fecha só o que cobre o implemento aberto (rota da fatia) ou o
    * orçamento inteiro.
    *
    * Antes era `billingSplit === "PER_TASK"`: num orçamento em lotes a resposta
-   * seria "não", e aprovar um caminhão emitiria os três lotes de uma vez.
+   * seria "não", e aprovar um implemento emitiria os três lotes de uma vez.
    */
   const isPerVehicleBilling = useMemo(() => {
     if (quoteVehicles <= 1) return false;
@@ -478,7 +478,7 @@ const BillingDetailPageInner = ({
    *
    * Com uma que seja, a divisão congela: a cobertura de uma fatura aprovada
    * sustenta nota fiscal autorizada e boletos registrados, e mudá-la alteraria
-   * retroativamente de quais caminhões é um documento fiscal que já saiu.
+   * retroativamente de quais implementos é um documento fiscal que já saiu.
    */
   const approvedBillingCount = useMemo(
     () => ((quote as any)?.billings ?? []).filter((b: any) => b?.approvedAt).length,
@@ -635,7 +635,7 @@ const BillingDetailPageInner = ({
    * aprovadas e, quando a cobrança é fatiada, só as que cobrem o veículo ABERTO.
    * Sem o filtro o diálogo dizia "serão gerados apenas os documentos deste
    * veículo" logo acima das prévias das QUATRO notas e dos QUATRO boletos do
-   * orçamento inteiro — e depois de aprovar o primeiro caminhão ele ainda
+   * orçamento inteiro — e depois de aprovar o primeiro implemento ele ainda
    * mostrava a nota dele, já emitida, como se fosse sair de novo.
    */
   const configsForApprovalPreview = useMemo(() => {
@@ -675,7 +675,7 @@ const BillingDetailPageInner = ({
         // Cobertura desconhecida numa cobrança CONJUNTA é "todos" — é a leitura
         // que a ausência sempre teve. Numa cobrança FATIADA é "este veículo": ali
         // `quoteVehicles` punha a prévia em escala de orçamento e o diálogo
-        // irreversível desenhava, para uma fatia de um caminhão, o boleto e a
+        // irreversível desenhava, para uma fatia de um implemento, o boleto e a
         // nota dos sessenta.
         const covered =
           (Array.isArray(c?.taskIds) && c.taskIds.length > 0
@@ -701,7 +701,7 @@ const BillingDetailPageInner = ({
   //
   // ⚠️ O PAGER CONTA COBRANÇAS, não veículos. Contava tarefas (`useQuoteSiblingIds`
   // sobre `useTasks`, com `currentId = openTaskId`), e por isso o detalhe de um
-  // faturamento `JOINT` de quatro caminhões anunciava "1 / 4": quatro tarefas na
+  // faturamento `JOINT` de quatro implementos anunciava "1 / 4": quatro tarefas na
   // lista, UMA cobrança na tela — e "próximo" quatro vezes mostrava quatro vezes a
   // mesma. `currentId` passa a ser o billingId RESOLVIDO (nunca `openTaskId`: um
   // id de tarefa não está na lista de cobranças, e um id que o pager não acha faz
@@ -831,7 +831,7 @@ const BillingDetailPageInner = ({
         id: config.id,
         customerId: config.customerId,
         // A COBERTURA — de quais veículos esta fatura é. É o que faz o passo
-        // saber que é "do caminhão 37" em vez de "Cliente 2", e é o que impede a
+        // saber que é "do implemento 37" em vez de "Cliente 2", e é o que impede a
         // gravação de refatiar sem querer: mandando a cobertura de volta, o
         // servidor não reexpande pelo modo.
         taskIds: coveredTaskIds(config as any),
@@ -903,7 +903,7 @@ const BillingDetailPageInner = ({
   //
   // A rota é `/financeiro/faturamento/detalhes/:taskId` — um VEÍCULO. Mas a tela
   // montava um passo para CADA fatia do orçamento: num orçamento de quatro
-  // caminhões cobrados um a um, o operador abria o caminhão 46990 e via
+  // implementos cobrados um a um, o operador abria o implemento 46990 e via
   // "Fatura 1 · Fatura 2 · Fatura 3 · Fatura 4" na mesma página, com o passo
   // "Tarefa" editando um veículo só. Quatro cobranças separadas, uma página,
   // um veículo editável: as três coisas em desacordo.
@@ -997,7 +997,7 @@ const BillingDetailPageInner = ({
     //
     // Havia, e era um editor de TAREFA morando na tela de cobrança: nome,
     // categoria, implemento, série, placa, chassi, pedido, plaqueta, data de
-    // conclusão, detalhes. Um caminhão só — o aberto —, enquanto a fatura cobra
+    // conclusão, detalhes. Um implemento só — o aberto —, enquanto a fatura cobra
     // N. Depois que a grade "Veículos desta cobrança" passou a existir, o mesmo
     // veículo tinha placa, chassi e número de pedido em DOIS lugares na MESMA
     // tela, com o de cima escrevendo por cima do de baixo ao salvar.
@@ -1008,7 +1008,7 @@ const BillingDetailPageInner = ({
     // Sobrou: Veículos, Fatura/Cliente 1..N, e Resumo.
     //
     // "Veículos" NÃO é o passo antigo com outro nome: ali não há nada da tarefa.
-    // É a grade dos caminhões que ESTA cobrança cobre, com os três campos que a
+    // É a grade dos implementos que ESTA cobrança cobre, com os três campos que a
     // nota fiscal exige — placa, chassi e número do pedido —, um por linha, no
     // recorte do documento.
     const base: Array<{ id: number; name: string; description: string }> = [
@@ -1042,8 +1042,8 @@ const BillingDetailPageInner = ({
     //
     // Os passos se chamavam "Cliente 1", "Cliente 2", "Cliente 3", "Cliente 4",
     // os quatro com o MESMO nome de cliente na descrição, porque num orçamento
-    // cobrado veículo a veículo há uma fatura por caminhão e todas são do mesmo
-    // cliente. Nada na tela dizia qual passo era qual caminhão: o operador
+    // cobrado veículo a veículo há uma fatura por implemento e todas são do mesmo
+    // cliente. Nada na tela dizia qual passo era qual implemento: o operador
     // editava o segundo achando que era o segundo veículo, e a gravação —
     // reenviando as quatro sem cobertura — aplicava o último a todos.
     //
@@ -1239,7 +1239,7 @@ const BillingDetailPageInner = ({
     }
 
     // ⚠️ CLIENTES DISTINTOS, nunca FATURAS. Num orçamento cobrado veículo a
-    // veículo há uma fatura por caminhão, TODAS do mesmo cliente: contar faturas
+    // veículo há uma fatura por implemento, TODAS do mesmo cliente: contar faturas
     // fazia esta guarda exigir `invoiceToCustomerId` em todo serviço e RECUSAR a
     // aprovação com um erro impossível de obedecer — o seletor "Faturar Para" só
     // aparece quando há mais de um cliente. Era o bloqueio que impedia faturar um
@@ -1364,7 +1364,7 @@ const BillingDetailPageInner = ({
       // formulário do passo "Tarefa". O passo saiu: nada disso é assunto de
       // cobrança. Manter a gravação seria pior que inútil — ela reenviaria os
       // valores CARREGADOS e passaria por cima do que a grade "Veículos desta
-      // cobrança" acabou de escrever, campo a campo, em cada caminhão.
+      // cobrança" acabou de escrever, campo a campo, em cada implemento.
       //
       // O que a nota precisa (placa, chassi, número do pedido) a grade grava, uma
       // linha por vez, no veículo certo. O resto é produção, e se edita em
@@ -1547,7 +1547,7 @@ const BillingDetailPageInner = ({
       // O PEDIDO DE COMPRA NÃO PASSA MAIS POR AQUI
       // ═══════════════════════════════════════════════════════════════════════
       //
-      // Era gravado neste ponto, do formulário, e só para o caminhão ABERTO —
+      // Era gravado neste ponto, do formulário, e só para o implemento ABERTO —
       // numa fatura que cobra quatro. A grade "Veículos desta cobrança" grava o
       // de CADA UM, ao sair do campo, direto na tarefa daquele veículo. Manter as
       // duas escritas era garantir que a de baixo perdesse para a de cima.
@@ -1560,7 +1560,7 @@ const BillingDetailPageInner = ({
 
       if (approveBilling) {
         // APROVAR ESTA COBRANÇA — e nenhuma outra. `PUT /billings/:id/approve` emite a fatura, a
-        // NFS-e e os boletos DELA. Endereçar por id é a diferença que faz: os sessenta caminhões
+        // NFS-e e os boletos DELA. Endereçar por id é a diferença que faz: os sessenta implementos
         // do Marquespan não terminam no mesmo dia, e cada aprovação conta o vencimento a partir
         // dela; o orçamento só grava `billingApprovedAt` quando a última fecha.
         await billingService.approve(currentBilling.id);
@@ -1739,7 +1739,7 @@ const BillingDetailPageInner = ({
   const isReviewStep = currentStep === totalSteps;
 
   /**
-   * O NOME DESTA COBRANÇA — e uma cobrança não é um caminhão.
+   * O NOME DESTA COBRANÇA — e uma cobrança não é um implemento.
    *
    * Era sempre `nome - série da tarefa aberta`: numa cobrança conjunta de quatro
    * (ou de quarenta) o cabeçalho batizava o documento com o número de UM deles,
@@ -1858,7 +1858,7 @@ const BillingDetailPageInner = ({
                       chegam tarde por natureza — o pedido de compra em especial, que a
                       API deixou de fora das guardas do orçamento exatamente por isso.
                       Travar aqui desfazia na tela o que o servidor abriu de propósito e
-                      mandava quem emite a nota corrigir cada caminhão em Produção. */}
+                      mandava quem emite a nota corrigir cada implemento em Produção. */}
                   <BillingCoveredVehicles
                     vehicles={coveredVehicleRows as any}
                     disabled={!canEdit}
@@ -1919,7 +1919,7 @@ const BillingDetailPageInner = ({
                             disabled={!canEdit}
                             customersCache={customersCache}
                             // O RECORTE: os pagadores desta cobrança, não os do
-                            // orçamento. Sem isto, três caminhões do mesmo
+                            // orçamento. Sem isto, três implementos do mesmo
                             // cliente apareciam como "3 selecionados" do mesmo
                             // CNPJ numa página que cobra um.
                             configIdx={visibleConfigIdx}
@@ -1969,7 +1969,7 @@ const BillingDetailPageInner = ({
                   // tela de uma cobrança mostrando as cobranças das outras.
                   visibleConfigIdx={visibleConfigIdx}
                   // OS VEÍCULOS DESTA COBRANÇA — o mesmo recorte do passo 1. Sem
-                  // isto o Resumo imprimia placa, série e chassi de UM caminhão
+                  // isto o Resumo imprimia placa, série e chassi de UM implemento
                   // sobre uma nota que cita quatro.
                   vehicles={coveredVehicleRows as any}
                 />
@@ -2016,7 +2016,7 @@ const BillingDetailPageInner = ({
             </p>
             {isPerVehicleBilling && (
               // O orçamento cobra veículo a veículo: o que sai daqui é a fatura
-              // DESTE caminhão. Sem dizê-lo, quem aprova acha que está fechando
+              // DESTE implemento. Sem dizê-lo, quem aprova acha que está fechando
               // os sessenta — e o contrário também assusta.
               <p className="mb-2 text-sm font-semibold text-red-700 dark:text-red-400">
                 Este orçamento cobra veículo a veículo ({quoteVehicles} veículos). Serão gerados

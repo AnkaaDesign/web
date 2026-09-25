@@ -206,7 +206,7 @@ export function useBudgetSiblingIds(
  *
  * ✅ O QUE ISTO CONSERTA: o pager contava TAREFAS (`useQuoteSiblingIds` chama
  * `useTasks`, e o `currentId` era `openTaskId`). O detalhe de um faturamento
- * `JOINT` de quatro caminhões anunciava "1 / 4" — quatro tarefas na lista, UMA
+ * `JOINT` de quatro implementos anunciava "1 / 4" — quatro tarefas na lista, UMA
  * cobrança na tela —, e apertar "próximo" quatro vezes mostrava quatro vezes a
  * MESMA cobrança. Percorrendo cobranças, um `JOINT` de quatro lê a posição real
  * dele na lista ("87 / 325"), e um `PER_TASK` de quatro lê "1 / 4" — e aí está

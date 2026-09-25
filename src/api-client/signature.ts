@@ -189,8 +189,8 @@ export interface DeliveryPreflight extends DeliverySettings {
    *
    * Um por veículo do orçamento, na ordem do documento.
    *
-   * Um orçamento pode cobrir sessenta caminhões, e a lacuna de cadastro existe
-   * em graus diferentes por caminhão: alguns já chegaram emplacados, outros não.
+   * Um orçamento pode cobrir sessenta implementos, e a lacuna de cadastro existe
+   * em graus diferentes por implemento: alguns já chegaram emplacados, outros não.
    */
   vehicles?: Array<{
     taskId: string;

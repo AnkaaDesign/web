@@ -3,7 +3,7 @@
 // AS COLUNAS DA LISTA DE ORÇAMENTOS DO CLIENTE.
 //
 // ⚠️ A LINHA É UM ORÇAMENTO, não um veículo. A lista interna já pagou esse preço
-// uma vez: um orçamento de quatro caminhões ocupava quatro linhas com o mesmo
+// uma vez: um orçamento de quatro implementos ocupava quatro linhas com o mesmo
 // número, e o rodapé anunciava "4 resultado(s)". O portal nasce com a unidade
 // certa — `GET /cliente/me/orcamentos` devolve orçamentos.
 //

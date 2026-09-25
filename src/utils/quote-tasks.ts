@@ -28,7 +28,7 @@ import type { BILLING_STATUS } from "../types/budget";
  *   A (2) é a perigosa. Um link de navegação, um rótulo de tabela ou um nome de
  *   arquivo precisa de UMA tarefa e qualquer uma serve. Um total, um documento
  *   ou uma decisão de faturamento precisa de TODAS, e responder com a primeira
- *   ali é o defeito que faz um orçamento de sessenta caminhões cobrar por um.
+ *   ali é o defeito que faz um orçamento de sessenta implementos cobrar por um.
  */
 
 export interface QuoteTaskLike {
@@ -346,7 +346,7 @@ export function coversTask(
  *
  * É a resposta à pergunta que faltava: o assistente mostrava "Cliente 1",
  * "Cliente 2", "Cliente 3", "Cliente 4" — o MESMO cliente quatro vezes, sem
- * dizer de qual caminhão era cada passo. O operador editava o segundo achando
+ * dizer de qual implemento era cada passo. O operador editava o segundo achando
  * que era o segundo veículo.
  *
  * Devolve a lista de rótulos curtos, na ordem da cobertura: série quando existe,
@@ -375,7 +375,7 @@ export function coverageLabels(
  * O rótulo de UM faturamento, em uma linha.
  *
  * `total` = quantos veículos o orçamento tem. Cobrir todos não vira lista: num
- * orçamento de sessenta caminhões, "Todos os 60 veículos" é a informação, e
+ * orçamento de sessenta implementos, "Todos os 60 veículos" é a informação, e
  * imprimir as sessenta séries é ruído que ninguém lê.
  */
 export function coverageSummary(
@@ -395,9 +395,9 @@ export function coverageSummary(
  * As FATURAS que dizem respeito a ESTE veículo.
  *
  * Aqui a pergunta é "das N faturas deste orçamento, quais cobram ESTE
- * caminhão?". Mostrar todas na tela de um veículo faz sessenta blocos de
+ * implemento?". Mostrar todas na tela de um veículo faz sessenta blocos de
  * parcelas aparecerem na tarefa de cada um, com o cliente repetido sessenta
- * vezes no seletor — e o primeiro bloco, que é o do caminhão 1, sendo lido como
+ * vezes no seletor — e o primeiro bloco, que é o do implemento 1, sendo lido como
  * se fosse o daquele.
  */
 export function configsForTask<T extends BillingConfigLike>(
@@ -419,10 +419,10 @@ export function configsForTask<T extends BillingConfigLike>(
 // "FATURAR PARA" NUMA LINHA DE TAREFA
 //
 // Uma tarefa é UM VEÍCULO. A pergunta que a tela da tarefa faz não é "quais
-// clientes este orçamento fatura?" e sim "quem paga ESTE caminhão?".
+// clientes este orçamento fatura?" e sim "quem paga ESTE implemento?".
 //
 // As duas coincidiam enquanto um orçamento tinha uma tarefa. Deixaram de
-// coincidir no primeiro orçamento cobrado veículo a veículo: quatro caminhões de
+// coincidir no primeiro orçamento cobrado veículo a veículo: quatro implementos de
 // UM cliente têm quatro fatias, e listar todas imprimia
 //
 //     53.842.320 Kennedy de Campos Teixeira
@@ -469,7 +469,7 @@ export function taskInvoiceCustomerNames(
     // testavam a chave antes de usá-la: com `customerId` fora do `select` — que é
     // o caso do include do detalhe da tarefa — a chave saía VAZIA, o `Set` nunca
     // guardava nada e cada fatia virava uma linha. Num orçamento `PER_TASK` de
-    // quatro caminhões para UM cliente, "Faturar Para" listava o mesmo nome
+    // quatro implementos para UM cliente, "Faturar Para" listava o mesmo nome
     // quatro vezes.
     //
     // O nome é chave pior que o id (dois clientes homônimos colapsariam), mas
@@ -500,7 +500,7 @@ export function taskInvoiceCustomerLabel(
 // perguntar "este orçamento tem mais de um cliente?".
 //
 // Com `billingSplit = PER_TASK` existe uma fatia POR VEÍCULO. Um orçamento de
-// quatro caminhões para UM cliente tem QUATRO configurações — e toda leitura que
+// quatro implementos para UM cliente tem QUATRO configurações — e toda leitura que
 // contava fatias passou a afirmar que havia quatro clientes. O estrago medido no
 // orçamento nº 0976 (4 veículos, 1 cliente, `PER_TASK`):
 //
@@ -577,7 +577,7 @@ export function hasMultipleCustomers(
 //
 // ESPELHA `orderNumbersOfTasks` / `orderNumberLabel` de
 // `api/src/utils/quote-tasks.ts`. Mora em `Task.customerOrderNumber` — por
-// VEÍCULO — desde que um orçamento passou a cobrir N caminhões. Antes era campo
+// VEÍCULO — desde que um orçamento passou a cobrir N implementos. Antes era campo
 // da configuração de faturamento, por CLIENTE, e os sessenta veículos eram
 // obrigados a citar o mesmo pedido na nota e no boleto.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -602,7 +602,7 @@ export function orderNumbersOfTasks(
  * UMA LINHA para a nota, o boleto e o documento.
  *
  * Um número quando é um só — o caso comum, inclusive num orçamento de sessenta
- * caminhões comprados no mesmo pedido. Vários, separados por vírgula, quando
+ * implementos comprados no mesmo pedido. Vários, separados por vírgula, quando
  * diferem: a nota conjunta cobre todos, e omitir os outros faria o cliente
  * receber uma nota que não bate com nenhum pedido dele.
  */
@@ -630,7 +630,7 @@ export function orderNumberLabel(
 /**
  * COMO CHAMAR UM VEÍCULO numa linha de formulário.
  *
- * A tabela de pedidos de compra precisa identificar o caminhão para quem digita
+ * A tabela de pedidos de compra precisa identificar o implemento para quem digita
  * — e num orçamento de sessenta a coluna é a única coisa que distingue uma linha
  * da seguinte. Série e placa são o que o operador tem na mão (a nota de entrada,
  * o documento do veículo); o nome da tarefa é o recuo quando nenhum dos dois foi
@@ -663,7 +663,7 @@ export function vehicleRowLabel(
 //
 // Enquanto havia uma fatura por cliente as duas listas coincidiam, e os
 // assistentes mapeavam 1:1. Deixaram de coincidir no primeiro orçamento cobrado
-// veículo a veículo: quatro caminhões de UM cliente viraram quatro passos
+// veículo a veículo: quatro implementos de UM cliente viraram quatro passos
 // "Cliente 1..4", todos com o mesmo nome, e o save reenviava os quatro — o
 // último gravando por cima dos outros três.
 //

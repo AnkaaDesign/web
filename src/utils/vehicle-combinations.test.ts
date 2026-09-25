@@ -7,7 +7,7 @@ import { vehicleCombinations, vehicleCombinationCount } from "./vehicle-combinat
  * Duas telas dependem desta função e precisam concordar: o passo 1 conta quantas
  * tarefas vão nascer ("4 tarefas serão criadas") e o submit monta uma carga por
  * combinação. Enquanto a regra viveu duplicada nos dois lugares, um ajuste num
- * deles bastava para o aviso prometer quatro caminhões e o servidor gravar três.
+ * deles bastava para o aviso prometer quatro implementos e o servidor gravar três.
  *
  * O N° do Pedido do passo 1 é gravado em TODAS essas tarefas — o cliente compra
  * os quatro num pedido só —, e é por isso que a contagem precisa ser exata: um
@@ -41,7 +41,7 @@ describe("vehicleCombinations", () => {
   });
 
   /**
-   * Sem placa e sem série ainda existe UMA tarefa — um orçamento de um caminhão
+   * Sem placa e sem série ainda existe UMA tarefa — um orçamento de um implemento
    * que ainda não tem identificação é o começo normal de uma negociação. Devolver
    * lista vazia aqui faria o submit não criar nada, em silêncio.
    */

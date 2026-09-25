@@ -86,7 +86,7 @@ interface BudgetRequestCardProps {
    *
    * ⚠️ Vem do ORÇAMENTO (`Budget.tasks`), não de `task`: a tela é aberta pelo id
    * de UM veículo e o orçamento cobre N. Listá-los aqui evita que o comercial
-   * tenha de andar até o passo de Revisão só para saber de quantos caminhões o
+   * tenha de andar até o passo de Revisão só para saber de quantos implementos o
    * cliente está falando enquanto lê o briefing.
    */
   vehicles?: RequestVehicle[];
@@ -285,7 +285,7 @@ export function BudgetRequestCard({
                 mesmos três campos em leitura, dois dedos acima, só fazia o
                 operador conferir duas vezes a mesma coisa — e dava duas fontes
                 para o mesmo dado numa tela onde uma delas é a que se altera.
-                A CONTAGEM fica: "quantos caminhões este orçamento cobre" é o
+                A CONTAGEM fica: "quantos implementos este orçamento cobre" é o
                 que a requisição declara, e é o que o acordeão abaixo não diz
                 num relance. */}
 

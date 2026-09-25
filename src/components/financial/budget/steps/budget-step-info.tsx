@@ -41,7 +41,7 @@ interface BudgetStepInfoProps {
   setSelectedCustomers: (customers: Map<string, any>) => void;
   /**
    * Substitui o seletor de layout. O orçamento de N veículos passa o seu
-   * (`BudgetVehicleLayoutsField`), que sabe dar um layout a cada caminhão; com um
+   * (`BudgetVehicleLayoutsField`), que sabe dar um layout a cada implemento; com um
    * veículo só — e na criação — fica o seletor de sempre.
    */
   layoutSlot?: ReactNode;

@@ -4,7 +4,7 @@
 //
 // ⛔ O DADO QUE ENTRAVA E NÃO VOLTAVA. O cliente desenha as três faces no
 // assistente de requisição — é o passo mais trabalhoso dele, o único em que ele
-// mede um caminhão de verdade com uma trena — e o servidor as devolve em
+// mede um implemento de verdade com uma trena — e o servidor as devolve em
 // `identity.measures`. Nenhuma tela do portal as desenhava. Quem quisesse
 // conferir o que informou não tinha onde: restava confiar na memória ou ligar
 // para o comercial e pedir que ele lesse do outro lado.
@@ -37,7 +37,7 @@ import { usePortalUpdateVehicleIdentity } from "@/api-client/portal";
 import { PortalCard } from "../portal-detail";
 
 const FACES: Array<{ chave: keyof Medidas; rotulo: string }> = [
-  // A ordem é a do formulário, e a do caminhão visto de trás para a frente:
+  // A ordem é a do formulário, e a do implemento visto de trás para a frente:
   // o motorista à esquerda, o sapo à direita, a traseira por último.
   { chave: "left", rotulo: "Lado do motorista" },
   { chave: "right", rotulo: "Lado do sapo" },
@@ -123,7 +123,7 @@ export function VeiculoMedidasCard({
    * assistente de requisição a peneirar "medida intocada" antes de enviar. Sem
    * esta trava, abrir a tela de um veículo já gravava uma medida que ninguém
    * mediu: o toast "atualizada com sucesso" aparecia sozinho no carregamento, e
-   * um caminhão SEM medida ganhava 2,00 × 2,00 por visita.
+   * um implemento SEM medida ganhava 2,00 × 2,00 por visita.
    *
    * A prova de intenção é o EVENTO DE ENTRADA — ponteiro ou teclado dentro do
    * desenho. Montagem não produz nenhum dos dois.

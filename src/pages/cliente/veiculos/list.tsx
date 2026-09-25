@@ -4,8 +4,8 @@
 //
 // ⚠️ A unidade aqui é o veículo, e isso é o oposto da lista de ORÇAMENTOS, onde
 // a linha é o contrato. Não é inconsistência: o contato que abre esta tela está
-// procurando um caminhão ("o da placa tal"), não um documento. Um orçamento de
-// quatro caminhões ocupa quatro linhas aqui, de propósito.
+// procurando um implemento ("o da placa tal"), não um documento. Um orçamento de
+// quatro implementos ocupa quatro linhas aqui, de propósito.
 //
 // O que a tela existe para resolver: VEÍCULO SEM PLACA OU SEM CHASSI. Esses dois
 // números a Ankaa não tem como saber, e sem eles não sai NFS-e nem entrega. Por

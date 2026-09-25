@@ -39,7 +39,7 @@ export interface FileViewerState {
   currentPdfUrl: string | null;
   /** Status de layout dos arquivos abertos agora (ver `FileViewerOptions`). */
   layoutStatusByFileId?: Record<string, string | null | undefined>;
-  /** Caminhão da tarefa aberta agora (ver `FileViewerOptions`). */
+  /** Implemento da tarefa aberta agora (ver `FileViewerOptions`). */
   layoutImplementId?: string;
 }
 

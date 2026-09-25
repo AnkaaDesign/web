@@ -70,7 +70,7 @@ interface BillingStepCustomerProps {
   quoteId?: string;
   /**
    * OS VEÍCULOS do orçamento, com id — para o controle de divisão e para o
-   * cabeçalho que diz de qual caminhão é ESTA fatura.
+   * cabeçalho que diz de qual implemento é ESTA fatura.
    */
   vehicles?: BillingSplitVehicle[];
   /** Os veículos que ESTA fatura cobra, resolvidos pela página. */
@@ -144,7 +144,7 @@ export function BillingStepCustomer({
    *
    * A pergunta que a tela não respondia. Num orçamento cobrado veículo a veículo
    * os passos se chamavam "Cliente 1..4", os quatro com o mesmo nome de cliente,
-   * e nada dizia qual era qual caminhão — o operador editava o segundo achando
+   * e nada dizia qual era qual implemento — o operador editava o segundo achando
    * que era o segundo veículo, e a gravação aplicava o último a todos.
    */
   const coveredVehicles = useMemo(() => {
@@ -233,7 +233,7 @@ export function BillingStepCustomer({
 
   // ─── O DINHEIRO DESTE PASSO É POR VEÍCULO ────────────────────────────────
   //
-  // O formulário guarda o preço de UM caminhão (ver `billing-step-services`),
+  // O formulário guarda o preço de UM implemento (ver `billing-step-services`),
   // enquanto a fatura cobra `por veículo × veículos cobertos`. Os dois campos
   // abaixo mostravam o unitário com o rótulo "Total", e era esse número que o
   // conferente levava para o diálogo de aprovação — onde o boleto sai pelo
@@ -585,7 +585,7 @@ export function BillingStepCustomer({
                 a pergunta não existe.
 
                 Era `configIndex === 0`, e isso quebrou quando a página passou a
-                mostrar só as cobranças do veículo aberto: abrir o caminhão da
+                mostrar só as cobranças do veículo aberto: abrir o implemento da
                 terceira fatia não montava o passo de índice 0, e o controle de
                 junto/separado/lotes SUMIA da tela. Agora quem decide é a página,
                 que sabe qual é o primeiro passo VISÍVEL.

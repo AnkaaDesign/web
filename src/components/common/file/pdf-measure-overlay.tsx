@@ -43,7 +43,7 @@ export interface PdfMeasureOverlayProps {
    * Escala de cada face reconhecida.
    *
    * Quando existe, ela manda: a escala da página é a que o desenho declara, a
-   * da face é a que as medidas do caminhão impõem. Divergindo as duas, a régua
+   * da face é a que as medidas do implemento impõem. Divergindo as duas, a régua
    * e a cota automática davam números diferentes para a mesma distância — e a
    * que vale para quem cola é a da face.
    */

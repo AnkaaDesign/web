@@ -154,7 +154,7 @@ interface Envelope {
    * O ADITIVO de identificação do veículo, quando já emitido.
    *
    * Documento à parte, selado com o mesmo certificado, que declara o chassi e a
-   * placa que só existiram depois da assinatura — porque o caminhão só vem para
+   * placa que só existiram depois da assinatura — porque o veículo só vem para
    * a empresa depois de o orçamento ser aprovado, e a aprovação É esta
    * assinatura.
    */
@@ -713,8 +713,8 @@ export function SignatureEnvelopeCard({
                 Falta a contra-assinatura da Ankaa ({ankaaSigner!.name}). Ao confirmar, o
                 documento final é emitido e o orçamento é aprovado.
               </p>
-              {/* INFORMA, não bloqueia. O chassi só se lê com o caminhão no
-                  pátio, e o caminhão só vem depois de o orçamento ser aprovado —
+              {/* INFORMA, não bloqueia. O chassi só se lê com o veículo no
+                  pátio, e o veículo só vem depois de o orçamento ser aprovado —
                   ou seja, depois desta assinatura. A lacuna em branco é o estado
                   NORMAL de um implemento 0 km, não um descuido a corrigir. */}
               {pendingSlots.length > 0 && (
@@ -1047,7 +1047,7 @@ export function SignatureEnvelopeCard({
         </div>
 
         {/* ---- Aditivo de identificação do veículo ----
-            O orçamento de um implemento 0 km é assinado antes de o caminhão
+            O orçamento de um implemento 0 km é assinado antes de o veículo
             chegar, e diz "a registrar" no lugar do chassi. Esta folha, selada à
             parte, é onde a identificação de fato aparece. */}
         {/* Entre o selo e a entrega o painel ficava mudo: o documento diz

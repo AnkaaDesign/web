@@ -521,9 +521,9 @@ export const TaskCreateForm = () => {
         const buildImplementData = (plate?: string, serialNumber?: string) => {
           const layoutSectionData = buildLayoutSectionData();
           const hasImplementFields = serialNumber || plate || category || implementType || hasLayoutChanges;
-          // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), e não
+          // Sem nenhum campo, o implemento nasce VAZIO (objeto vazio), e não
           // deixa de nascer: com o tipo "Refrigerado" de padrão (antes do
-          // D-25) toda tarefa criada aqui tinha caminhão, e cada tarefa tem
+          // D-25) toda tarefa criada aqui tinha implemento, e cada tarefa tem
           // exatamente um implemento (DD1). O que não se inventa é o tipo.
           return {
             implement: hasImplementFields
@@ -566,7 +566,7 @@ export const TaskCreateForm = () => {
         // orçamento por tarefa. Duas placas e dois números de série produziam
         // quatro tarefas e QUATRO orçamentos: quatro números, quatro PDFs,
         // quatro cerimônias de assinatura e quatro cobranças para o MESMO
-        // trabalho — que chega ao cliente como quatro propostas de um caminhão
+        // trabalho — que chega ao cliente como quatro propostas de um implemento
         // em vez de uma de quatro.
         //
         // Agora o laço só MONTA. Quem grava é `POST /tasks/batch-with-quote`,

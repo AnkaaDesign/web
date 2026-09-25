@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export interface BudgetVehicleTab {
   taskId: string;
-  /** Como o operador identifica o caminhão: série, senão placa, senão "Veículo N". */
+  /** Como o operador identifica o implemento: série, senão placa, senão "Veículo N". */
   label: string;
   /** Segunda linha discreta — a placa quando o rótulo é a série. */
   detail?: string | null;
@@ -19,17 +19,17 @@ interface BudgetVehicleTabsProps {
 }
 
 /**
- * A ESCOLHA DO VEÍCULO no passo 1 de um orçamento de N caminhões.
+ * A ESCOLHA DO VEÍCULO no passo 1 de um orçamento de N implementos.
  *
  * O passo 1 tem duas metades: o que é COMUM a todos (logomarca, cliente, categoria,
- * implemento, tamanho, responsáveis, arquivos base) e o que é DE CADA caminhão (série,
+ * implemento, tamanho, responsáveis, arquivos base) e o que é DE CADA implemento (série,
  * placa, chassi, plaqueta, pedido, previsão, detalhes, pintura geral, aerografia). Estas
- * abas escolhem qual caminhão a segunda metade mostra; a primeira não muda.
+ * abas escolhem qual implemento a segunda metade mostra; a primeira não muda.
  *
  * Trocar de aba não descarta nada: os valores de todos os veículos vivem no mesmo
  * formulário, e um "Salvar" grava todos.
  *
- * A aba NÃO mostra a tinta (pedido do dono, 23/09): o card identifica o caminhão
+ * A aba NÃO mostra a tinta (pedido do dono, 23/09): o card identifica o implemento
  * pela série e pela placa; a pintura é conteúdo do veículo, e aparece na seção
  * "Tintas" dele e no Resumo.
  */

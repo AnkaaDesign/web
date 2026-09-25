@@ -19,11 +19,11 @@
 //     por 100 é o SERVIDOR (contrato §5, armadilha 3). Daqui sai centímetro.
 //
 //  4. ⛔ AS MEDIDAS SÃO UMA SÓ, DA REQUISIÇÃO INTEIRA — não uma por veículo.
-//     Quem pede dez caminhões pede dez caminhões DO MESMO MODELO; digitar a
+//     Quem pede dez implementos pede dez implementos DO MESMO MODELO; digitar a
 //     mesma altura e o mesmo comprimento dez vezes era trabalho inventado, e
 //     cada repetição era uma chance a mais de duas linhas divergirem sem
 //     ninguém perceber. O que continua por linha é o que de fato muda de
-//     caminhão para caminhão: série, placa e chassi.
+//     implemento para implemento: série, placa e chassi.
 //     O payload de §5 segue tendo `medidas` DENTRO de cada veículo (é assim que
 //     o servidor grava, uma medida por `Implement`) — quem replica é
 //     `buildSolicitacaoPayload`, e cada veículo recebe uma CÓPIA própria.
@@ -331,7 +331,7 @@ export const veiculoSchema = z
     plate: z.string().trim(),
     chassisNumber: z.string().trim(),
     // ⛔ NÃO HÁ MEDIDA AQUI. Ela é da REQUISIÇÃO (ver `medidasSchema` acima e a
-    // regra 4 do cabeçalho). O que muda de caminhão para caminhão é a
+    // regra 4 do cabeçalho). O que muda de implemento para implemento é a
     // identificação; o implemento é o mesmo modelo no lote inteiro.
   })
   .superRefine((row, ctx) => {
@@ -401,8 +401,8 @@ export const solicitacaoSchema = z
     /**
      * CATEGORIA E IMPLEMENTO — perguntados UMA vez, como as medidas.
      *
-     * ⚠️ Mesma doutrina da regra 4 do cabeçalho: o que muda de caminhão para
-     * caminhão é a IDENTIFICAÇÃO (série, placa, chassi); o implemento é o mesmo
+     * ⚠️ Mesma doutrina da regra 4 do cabeçalho: o que muda de implemento para
+     * implemento é a IDENTIFICAÇÃO (série, placa, chassi); o implemento é o mesmo
      * modelo no lote inteiro. Perguntar por linha encheria o formulário de
      * repetição e produziria lotes incoerentes por descuido.
      *

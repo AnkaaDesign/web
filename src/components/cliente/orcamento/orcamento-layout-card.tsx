@@ -4,7 +4,7 @@
 //
 // ⛔ O DEFEITO QUE O DONO VIU: *"mesmo que tenha 3 veículos, não precisaria
 // mostrar layout para os 3, já que será o mesmo"*. Esta tela iterava
-// `vehicles.filter(v => !!v.layout)` e abria UM acordeão POR CAMINHÃO — três
+// `vehicles.filter(v => !!v.layout)` e abria UM acordeão POR IMPLEMENTO — três
 // blocos idênticos, com as MESMAS miniaturas, para uma arte só.
 //
 // E eram literalmente as mesmas: `Layout`, `File` e `Paint` são relações N:N com
@@ -16,7 +16,7 @@
 //
 // Pela ASSINATURA da arte: `[pintura geral, cores da logomarca, artes,
 // arquivos-base]`, cada lista pelos IDs em ordem. Mesma assinatura, mesmo
-// bloco; as etiquetas dos caminhões que a partilham vão no cabeçalho dele. Uma
+// bloco; as etiquetas dos implementos que a partilham vão no cabeçalho dele. Uma
 // arte só ⇒ um bloco só, aberto, SEM acordeão — que é o caso comum.
 //
 // ⚠️ IDs, e nunca conteúdo: comparar nome de arquivo ou hex de tinta juntaria
@@ -155,7 +155,7 @@ function Tinta({ paint }: { paint: PortalPaint }) {
 type VeiculoComLayout = PortalVehicle & { layout: NonNullable<PortalVehicle["layout"]> };
 
 interface ArteAgrupada {
-  /** A assinatura — é ela que decide se dois caminhões partilham a arte. */
+  /** A assinatura — é ela que decide se dois implementos partilham a arte. */
   key: string;
   layout: NonNullable<PortalVehicle["layout"]>;
   vehicles: VeiculoComLayout[];
@@ -187,7 +187,7 @@ function temConteudo(layout: NonNullable<PortalVehicle["layout"]>): boolean {
   );
 }
 
-/** Agrupa na ORDEM DOS VEÍCULOS — o primeiro caminhão que traz a arte a ancora. */
+/** Agrupa na ORDEM DOS VEÍCULOS — o primeiro implemento que traz a arte a ancora. */
 function agruparPorArte(vehicles: PortalVehicle[]): ArteAgrupada[] {
   const grupos: ArteAgrupada[] = [];
   const porChave = new Map<string, ArteAgrupada>();
@@ -196,7 +196,7 @@ function agruparPorArte(vehicles: PortalVehicle[]): ArteAgrupada[] {
     const layout = vehicle.layout;
     // ⚠️ Layout VAZIO não vira bloco. Desenhar "nada de layout registrado para
     // este veículo" era a carcaça que o sistema não desenha — e num orçamento
-    // de quinze caminhões eram quinze delas.
+    // de quinze implementos eram quinze delas.
     if (!layout || !temConteudo(layout)) continue;
 
     const key = assinaturaDoLayout(layout);
@@ -286,7 +286,7 @@ export function OrcamentoLayoutCard({ budget }: { budget: PortalBudget }) {
 
           {arteUnica ? (
             <div className="space-y-3">
-              {/* Uma arte para vários caminhões: as etiquetas dizem QUAIS, sem
+              {/* Uma arte para vários implementos: as etiquetas dizem QUAIS, sem
                   repetir o bloco para cada um. */}
               {artes[0].vehicles.length > 1 ? (
                 <VehicleChips vehicles={artes[0].vehicles} limit={artes[0].vehicles.length} />

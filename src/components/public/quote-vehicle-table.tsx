@@ -63,7 +63,7 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   // são classificação, não identidade, e uma coluna inteira de travessões não
   // informa nada.
   // O PEDIDO DE COMPRA sai SEMPRE, com os de identidade. Ele é por VEÍCULO —
-  // dois caminhões do mesmo orçamento podem ter vindo em pedidos diferentes —, e
+  // dois implementos do mesmo orçamento podem ter vindo em pedidos diferentes —, e
   // é por isso que deixou de ser uma linha do quadro do tomador, onde só cabia um
   // número. Sair só quando já está preenchido escondia justamente a coluna que o
   // cliente precisa conferir: o número costuma chegar DEPOIS da emissão.

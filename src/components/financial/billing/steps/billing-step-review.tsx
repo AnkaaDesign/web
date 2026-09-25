@@ -67,7 +67,7 @@ import {
 // Faturamento" (BILLING_APPROVED), "Liquidado" (SETTLED) e os estados
 // automáticos de vencimento como contexto desabilitado. Todos eles eram estados
 // do orçamento porque a cobrança não existia como entidade — e, sendo um só para
-// N cobranças, aprovar o primeiro de sessenta caminhões emitia os sessenta.
+// N cobranças, aprovar o primeiro de sessenta implementos emitia os sessenta.
 //
 // Agora são AÇÕES SOBRE ESTA COBRANÇA, cada uma com a sua rota:
 //   · aprovar  → PUT /billings/:id/approve
@@ -123,7 +123,7 @@ interface BillingStepReviewProps {
    *
    * O Resumo desenhava UMA placa, UM número de série e UM chassi: os da tarefa
    * pela qual a página foi aberta. Numa cobrança de quatro veículos isso é a
-   * identificação de um caminhão sobre uma nota que cita quatro — e quem confere
+   * identificação de um implemento sobre uma nota que cita quatro — e quem confere
    * antes de aprovar não tinha como ver os outros três.
    *
    * Vem pronto da página (`coveredVehicleRows`), que é quem sabe resolver a
@@ -184,7 +184,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // FATURAMENTO FATIADO: alguma fatura cobre MENOS que todos os veículos. É a
   // pergunta sobre a COBERTURA, não sobre o modo, e cobre com a mesma conta a
   // cobrança veículo a veículo e o lote — num orçamento em lotes, `billingSplit
-  // === "PER_TASK"` responderia "não" e aprovar um caminhão emitiria os três
+  // === "PER_TASK"` responderia "não" e aprovar um implemento emitiria os três
   // lotes de uma vez. Quando é fatiado, a aprovação desta tela fecha só o que
   // cobre o veículo aberto. Ver `internalApproveSlice`.
   const isPerVehicleBilling = (() => {
@@ -288,7 +288,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   //
   // Mora em `Task.customerOrderNumber`. Uma FATIA de faturamento cobre um
   // veículo, um lote ou os N, e a linha responde pelo que ela COBRE: o número
-  // daquele caminhão, os do lote, ou a lista que a nota conjunta vai citar.
+  // daquele implemento, os do lote, ou a lista que a nota conjunta vai citar.
   //
   // O valor do veículo ABERTO vem do FORMULÁRIO — é o que acabou de ser digitado
   // no passo Tarefa, e esta é a tela em que se confere antes de aprovar o
@@ -338,9 +338,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   //
   // A linha "N° do Pedido" morava no cartão do CLIENTE, herdada de quando o
   // número era campo da configuração de faturamento. A coluna foi dropada: hoje
-  // é `Task.customerOrderNumber`, POR VEÍCULO — um orçamento de quatro caminhões
+  // é `Task.customerOrderNumber`, POR VEÍCULO — um orçamento de quatro implementos
   // tem quatro pedidos de compra, e imprimir um só no cartão do pagador era
-  // atribuir ao cliente um número que é do caminhão.
+  // atribuir ao cliente um número que é do implemento.
   //
   // Agora a linha é do RESUMO DA TAREFA, junto dos outros identificadores do
   // veículo, e em cobrança multiveículo é uma COLUNA da relação: cada linha
@@ -378,7 +378,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   }, [vehicles, task]);
 
   /**
-   * O QUE É DA COBRANÇA E O QUE É DE UM CAMINHÃO SÓ.
+   * O QUE É DA COBRANÇA E O QUE É DE UM IMPLEMENTO SÓ.
    *
    * "Logomarca", "Categoria", "Implemento" e "Finalizado em" eram lidos da
    * tarefa ABERTA e impressos como se valessem para a cobrança inteira. Numa
@@ -428,7 +428,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   /**
    * O pedido de compra DAQUELE veículo.
    *
-   * O do caminhão ABERTO sai do FORMULÁRIO — é o que acabou de ser digitado na
+   * O do implemento ABERTO sai do FORMULÁRIO — é o que acabou de ser digitado na
    * grade do passo "Veículos", e esta é a tela onde se confere antes de aprovar.
    * Os irmãos saem do registro.
    */
@@ -511,16 +511,16 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   // ═══════════════════════════════════════════════════════════════════════════
   //
   // `services[].amount` e `customerConfigs[].total` do FORMULÁRIO são o preço de
-  // UM caminhão (é o que `billing-step-services.recalculateTotals` escreve, e o
+  // UM implemento (é o que `billing-step-services.recalculateTotals` escreve, e o
   // que o assistente de Orçamento já exibia com as três linhas). Este Resumo
   // somava as fatias sem dizer o que estava somando, e o número mudava de
   // significado com o modo: numa fatura única de 4 veículos ele mostrava
-  // R$ 1.100,44 (um caminhão) e num `PER_TASK` mostrava R$ 4.401,76 (o contrato)
+  // R$ 1.100,44 (um implemento) e num `PER_TASK` mostrava R$ 4.401,76 (o contrato)
   // — a mesma linha, com o mesmo rótulo, dizendo duas coisas.
   //
   // UM VALOR POR CLIENTE: em `PER_TASK` há uma fatia por veículo e todas
   // carregam o MESMO valor unitário; somá-las devolveria o contrato onde se quer
-  // o preço do caminhão.
+  // o preço do implemento.
   const subtotal = validServices.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
   const perCustomerTotals = new Map<string, number>();
   for (const c of customerConfigs as any[]) {
@@ -857,7 +857,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 Por que TABELA ROLÁVEL e não "e mais N": os identificadores são
                 exatamente o que se confere aqui — esconder linhas atrás de um
                 clique esconde justamente as que podem estar erradas. Com
-                sessenta caminhões a altura é travada e a rolagem resolve, sem
+                sessenta implementos a altura é travada e a rolagem resolve, sem
                 estado novo e sem um segundo gesto. O cabeçalho fica fixo para a
                 coluna continuar nomeada no meio da lista. */}
             {coveredVehicles.length > 1 ? (
@@ -960,7 +960,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               </>
             )}
             {/* Plaqueta — é uma FOTO (implement.vinPlate -> File), não texto. Só no
-                caso de UM veículo: a foto é de um caminhão, e exibi-la sozinha
+                caso de UM veículo: a foto é de um implemento, e exibi-la sozinha
                 sob uma relação de quatro é o mesmo defeito que esta correção
                 desfez. */}
             {coveredVehicles.length <= 1 && task.implement?.vinPlate && (
@@ -1122,7 +1122,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               </span>
             </div>
             {/* As MESMAS três linhas do assistente de Orçamento. Sem elas, a tela
-                em que o faturamento é aprovado mostrava o preço de um caminhão
+                em que o faturamento é aprovado mostrava o preço de um implemento
                 onde o boleto cobra o de quatro. */}
             {showPerVehicleTotals && (
               <>
@@ -1149,7 +1149,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             // O QUE ESTA FATURA COBRA: `por veículo × veículos cobertos`. O
             // formulário guarda o unitário (ver o bloco de totais acima), e
             // imprimir o unitário aqui fazia o cartão da fatura de quatro
-            // caminhões mostrar o preço de um — e a cláusula de pagamento
+            // implementos mostrar o preço de um — e a cláusula de pagamento
             // dividir esse preço pelas parcelas, prometendo ao cliente uma
             // parcela de R$ 366,81 enquanto o boleto sai por R$ 1.467,25.
             const configPerVehicleTotal = Number(config.total) || 0;
@@ -1161,7 +1161,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               paymentCondition: config.paymentCondition,
               total: configTotal,
               vehicleCount: reviewVehicles.length,
-              // A cláusula descreve o que ESTA fatura cobra: um caminhão, um
+              // A cláusula descreve o que ESTA fatura cobra: um implemento, um
               // lote, ou os N. Sem a cobertura, um orçamento em lotes imprimiria
               // a frase da fatura conjunta sobre o valor de vinte.
               coveredVehicleCount: coveredTaskCount(config) || undefined,
@@ -1189,7 +1189,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             //
             // O cartão se chamava só pelo nome do cliente. Num orçamento cobrado
             // veículo a veículo, os quatro cartões tinham o MESMO título e o
-            // conferente não tinha como saber qual era qual caminhão — nem por
+            // conferente não tinha como saber qual era qual implemento — nem por
             // que os valores diferiam.
             const coverage = coverageSummary(config, reviewVehicles.length, reviewVehicles);
             const showCoverage = reviewVehicles.length > 1 && coveredTaskCount(config) > 0;
@@ -1292,7 +1292,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         quatro pedidos de compra, e imprimir a lista deles no
                         cartão do cliente sugeria que fossem dele. A linha (e, em
                         cobrança multiveículo, a coluna) está no Resumo da Tarefa,
-                        junto dos outros identificadores de cada caminhão. */}
+                        junto dos outros identificadores de cada implemento. */}
                   </div>
 
                   {/* Installments / NFS-e */}

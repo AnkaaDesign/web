@@ -171,7 +171,7 @@ function MarcoLinha({
  * colunas). Decisão do dono: a produção não é um anexo do andamento — ela é o
  * andamento. Com a tabela à parte, a linha dizia "Em produção · 09/10" e ponto,
  * e o cliente tinha de descer, achar a tabela e casar as datas de cabeça para
- * descobrir o que estava sendo feito no caminhão dele.
+ * descobrir o que estava sendo feito no implemento dele.
  *
  * Aqui cada O.S. é um degrau DENTRO do marco, com início e fim próprios: a
  * pergunta "em que pé está?" e a pergunta "o que já foi feito?" passam a ter
@@ -273,7 +273,7 @@ export interface VeiculoAndamentoProps {
  *
  * Existe separado porque o andamento aparece em DOIS lugares com molduras
  * diferentes: sozinho no detalhe do veículo (um cartão por veículo) e dentro do
- * detalhe do ORÇAMENTO, onde N caminhões dividem UM cartão com seletor. Aninhar
+ * detalhe do ORÇAMENTO, onde N implementos dividem UM cartão com seletor. Aninhar
  * cartão dentro de cartão para reaproveitar o componente seria pagar a moldura
  * duas vezes.
  */

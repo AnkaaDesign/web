@@ -12,11 +12,11 @@
 // ── Por que um cartão com SELETOR, e não N cartões ──────────────────────────
 //
 // O andamento é o único bloco desta tela que é MESMO por veículo: a arte três
-// caminhões partilham (por isso o card de Layout agrupa), mas o caminhão que
+// implementos partilham (por isso o card de Layout agrupa), mas o implemento que
 // entrou ontem e o que saiu semana passada estão em pontos diferentes da
 // escada. Empilhar quinze linhas do tempo abertas faria da tela um rolo, e é
-// justamente o que o §10 proíbe. Então: um cartão, um seletor de caminhão, uma
-// escada por vez — com o caminhão MENOS adiantado aberto por padrão, que é o
+// justamente o que o §10 proíbe. Então: um cartão, um seletor de implemento, uma
+// escada por vez — com o implemento MENOS adiantado aberto por padrão, que é o
 // que decide a entrega da coleta inteira.
 //
 // ⚠️ `progress` é `undefined` sem a seção `DELIVERY`, e aí não há cartão
@@ -25,7 +25,7 @@
 // recusa no meio de um documento que ela vê por inteiro.
 //
 // ⚠️ E `steps: []` é o NORMAL. Só há O.S. para tarefa de tipo `PRODUCTION` não
-// cancelada; enquanto o caminhão não entra na fila, a escada existe e a lista de
+// cancelada; enquanto o implemento não entra na fila, a escada existe e a lista de
 // ordens não. Quem trata isso é `VeiculoAndamentoConteudo`, sem carcaça.
 import { useState } from "react";
 import { IconTimelineEvent } from "@tabler/icons-react";
@@ -90,7 +90,7 @@ export function OrcamentoAndamentoCard({ vehicles }: { vehicles: PortalVehicle[]
           <p className="text-sm text-muted-foreground">{atual.milestoneLabel}</p>
         ) : null}
 
-        {/* ⚠️ `key` no veículo: trocar de caminhão é trocar de assunto, e sem
+        {/* ⚠️ `key` no veículo: trocar de implemento é trocar de assunto, e sem
             ela o React reaproveitaria a árvore anterior — o que faz a escada
             velha piscar por um quadro sob o rótulo novo. */}
         <VeiculoAndamentoConteudo

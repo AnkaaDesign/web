@@ -78,7 +78,7 @@ function quoteClauseArgs(
   quote: any,
   config: any,
 ): { prefix: string; vehicleCount: number; coveredVehicleCount: number | undefined } {
-  // ⚠️ ESTA PÁGINA É DE UM CAMINHÃO, e a cláusula tem de falar da fatura DELE.
+  // ⚠️ ESTA PÁGINA É DE UM IMPLEMENTO, e a cláusula tem de falar da fatura DELE.
   //
   // O escopo saía do CONTRATO: `vehicleCount` era `quoteVehicleCount(quote)`, e
   // num orçamento de quatro veículos cobrados separadamente a frase virava
@@ -87,7 +87,7 @@ function quoteClauseArgs(
   //    R$ 0,10 (…). Serão 8 COBRANÇAS NO TOTAL."
   //
   // As duas partes em maiúsculas são do contrato inteiro e não têm o que fazer
-  // na página do caminhão 78000: quem a abre quer saber quando ESTE paga, não
+  // na página do implemento 78000: quem a abre quer saber quando ESTE paga, não
   // quantas cobranças os quatro somam. Esse é o texto do DOCUMENTO, que fala do
   // negócio todo; aqui o assunto é uma fatura.
   //
@@ -127,7 +127,7 @@ function quoteClauseArgs(
  * Copiá-lo em dois componentes duplicaria oitocentas linhas de JSX e, com elas,
  * a derivação que decide QUAL fatia do orçamento pertence a este veículo
  * (`configsForTask`, `coveredTaskCount`) — a regra mais delicada do arquivo, e a
- * que já causou o caminhão 12 exibindo os sessenta blocos do orçamento inteiro.
+ * que já causou o implemento 12 exibindo os sessenta blocos do orçamento inteiro.
  * Uma cópia divergiria na primeira correção feita só de um lado.
  *
  * Cada seção tem o SEU filtro de cliente, e não um compartilhado: são cartões
@@ -152,7 +152,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
    *
    * Morava na configuração de faturamento, por CLIENTE, e a coluna já não existe:
    * o pedido é da ENTREGA (`Task.customerOrderNumber`). Aqui a resposta é simples
-   * porque a tela é de UM caminhão — o número dele, não o dos irmãos. É também a
+   * porque a tela é de UM implemento — o número dele, não o dos irmãos. É também a
    * diferença que a tela precisava mostrar: dois veículos do mesmo orçamento
    * podem ter vindo em pedidos diferentes.
    */
@@ -190,7 +190,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
   // cancelar e reenviar a coleta de assinaturas (ADMIN | FINANCIAL | COMMERCIAL).
   const canManageSignature = canEditQuote(currentUser?.sector?.privileges || "");
 
-  // UM LAYOUT PARA CADA VEÍCULO: esta seção é a de UM caminhão, então mostra só as
+  // UM LAYOUT PARA CADA VEÍCULO: esta seção é a de UM implemento, então mostra só as
   // artes dele. A cobertura vem da leitura do orçamento pela tarefa (a do `include`
   // da tarefa não a traz), e só é pedida quando o orçamento é por veículo.
   const layoutPerVehicle = layoutScopeOf(task.quote as any) === "PER_VEHICLE";
@@ -206,11 +206,11 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
 
   // ─── AS FATURAS DESTE VEÍCULO ────────────────────────────────────────────────
   //
-  // Um orçamento pode cobrir sessenta caminhões, e esta seção mostra o orçamento
+  // Um orçamento pode cobrir sessenta implementos, e esta seção mostra o orçamento
   // de UM deles (a tela é a da tarefa). Numa cobrança veículo a veículo existe
-  // uma fatura POR CAMINHÃO, todas do mesmo cliente: sem filtrar, o caminhão 12
+  // uma fatura POR IMPLEMENTO, todas do mesmo cliente: sem filtrar, o implemento 12
   // exibia os sessenta blocos de parcelas, o seletor listava "Cliente" sessenta
-  // vezes com o mesmo nome, e o primeiro bloco — que é o do caminhão 1 — era lido
+  // vezes com o mesmo nome, e o primeiro bloco — que é o do implemento 1 — era lido
   // como se fosse o dele. Numa fatura conjunta a cobertura inclui este veículo e
   // a lista continua inteira, como sempre foi.
   const quote = {
@@ -222,9 +222,9 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
   // A FATURA DESTE VEÍCULO COBRA SÓ ELE?
   //
   // Pela COBERTURA, não pelo modo: um lote de vinte cobra vinte, e dizer "por
-  // veículo" ali afirmaria que o número na tela é o de um caminhão quando é o de
+  // veículo" ali afirmaria que o número na tela é o de um implemento quando é o de
   // vinte. O par de números abaixo mostra os DOIS quando diferem, para ninguém
-  // confundir "o que este caminhão custa" com "o que o cliente assinou".
+  // confundir "o que este implemento custa" com "o que o cliente assinou".
   const thisVehicleConfig = quote.customerConfigs?.[0];
   const coveredHere = coveredTaskCount(thisVehicleConfig as any);
   const isPerVehicleBilling = coveredHere > 0 && coveredHere < vehicleCount;
@@ -274,7 +274,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
         // A tabela é a MESMA de propósito. O que muda entre os cartões não é a
         // lista, é o recorte: `quote.customerConfigs` já vem filtrado para a
         // fatura DESTE veículo (`configsForTask`), então o resumo logo abaixo
-        // soma o que este caminhão paga, e não o contrato inteiro.
+        // soma o que este implemento paga, e não o contrato inteiro.
         const filteredServices = services.filter(
           (item) => !quoteCustomerFilter || item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId,
         );
@@ -333,7 +333,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
         // Group by customer when "Completo" with 2+ customers — 2-column layout
         // Use customerConfigs order to ensure consistent "Cliente N" numbering with billing section
         // Por CLIENTES distintos: com uma fatia por veículo, contar fatias abria
-        // um grupo por caminhão para o mesmo pagador.
+        // um grupo por implemento para o mesmo pagador.
         if (!quoteCustomerFilter && hasMultipleCustomers(quote.customerConfigs)) {
           const servicesByCustomer = new Map<string, typeof filteredServices>();
           for (const item of filteredServices) {
@@ -479,7 +479,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
           }
         } else {
           // Sem configuração de faturamento: os agregados do orçamento, divididos
-          // pelos veículos — o card é de UM caminhão, e `quote.total` é o contrato.
+          // pelos veículos — o card é de UM implemento, e `quote.total` é o contrato.
           displaySubtotal = perVehicleAmount(quote.subtotal, vehicleCount);
           displayTotal = perVehicleAmount(quote.total, vehicleCount);
         }
@@ -507,7 +507,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
             </div>
 
             {/* O OUTRO número, quando o orçamento cobre mais de um veículo: o valor
-                acima é o desta FATURA (um caminhão, ou um lote), e quem lê a tela
+                acima é o desta FATURA (um implemento, ou um lote), e quem lê a tela
                 de um veículo precisa do total do orçamento ao lado para não
                 confundir os dois. */}
             {isMultiVehicle && (
@@ -565,7 +565,7 @@ function QuoteBillingBreakdown({ task, part }: { task: Task; part: "budget" | "b
                 }
                 // SOBRE QUANTOS VEÍCULOS ESTA FATURA FALA. Sem a cobertura, a
                 // frase é montada como se o orçamento tivesse um veículo só: num
-                // `PER_TASK` de quatro caminhões ela anunciava "3 parcelas de
+                // `PER_TASK` de quatro implementos ela anunciava "3 parcelas de
                 // R$ 583,33" sem dizer que são por veículo e que haverá doze
                 // cobranças — exatamente a ambiguidade que o escopo existe para
                 // desfazer. O documento já dizia certo; esta tela, não.

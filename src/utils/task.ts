@@ -219,7 +219,7 @@ export function formatTaskSummary(task: Task): string {
  * Calculate task price from quote total (zero until the quote leaves PENDING).
  *
  * A FATIA DESTE VEÍCULO. `Budget.total` é o valor do CONTRATO (`preço por
- * veículo × N`) desde que um orçamento passou a cobrir N caminhões — devolver o
+ * veículo × N`) desde que um orçamento passou a cobrir N implementos — devolver o
  * total aqui daria o valor dos sessenta para cada um deles.
  */
 export function calculateTaskPrice(task: Task): number {

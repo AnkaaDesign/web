@@ -77,7 +77,7 @@ export function QuoteBillingBox({ customer, className }: QuoteBillingBoxProps) {
   // terços da folha em branco à direita de cada uma — duas linhas onde cabia uma.
   //
   // O NÚMERO DO PEDIDO saiu daqui: virou COLUNA da tabela de veículos, porque ele
-  // identifica a ENTREGA e um orçamento de quatro caminhões pode ter quatro
+  // identifica a ENTREGA e um orçamento de quatro implementos pode ter quatro
   // pedidos diferentes, que numa linha só não cabem.
   const rows: Array<Array<[string, string | null]>> = [
     [["Razão social", customer.corporateName || customer.fantasyName || null]],

@@ -8,7 +8,7 @@ import {
   persistedLayoutsKey,
 } from "./quote-layout-coverage";
 
-// O caso que abriu isto: orçamento 990, Carlotti, dois caminhões com o mesmo preço e
+// O caso que abriu isto: orçamento 990, Carlotti, dois implementos com o mesmo preço e
 // cada um com a sua arte.
 const T1 = "task-39088";
 const T2 = "task-39089";

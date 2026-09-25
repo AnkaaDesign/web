@@ -153,9 +153,9 @@ const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRI
 /**
  * A COBRANÇA QUE COBRE ESTE VEÍCULO.
  *
- * Um orçamento pode ter N faturamentos (um por caminhão, ou um por lote). A
+ * Um orçamento pode ter N faturamentos (um por implemento, ou um por lote). A
  * primeira fatia do orçamento não responde por este veículo — com `PER_TASK` ela
- * é a do caminhão 1, e a tela do 37 mostraria o estado do 1. Casa pela cobertura
+ * é a do implemento 1, e a tela do 37 mostraria o estado do 1. Casa pela cobertura
  * (`billing.tasks`) e só recua para a única cobrança quando ela é uma só.
  */
 function billingOfTask(task: Task): { id?: string; status?: string | null } | null {
@@ -376,7 +376,7 @@ function TaskDetailContent() {
 
   // Implement dimensions (width × height in cm) derived from any available side layout — shown as a
   // read-only overview field so non-leader PRODUCTION (who can't see the gated layout section) still
-  // get the vehicle size. Faithful port of the legacy `implementDimensions`/"Caminhão" overview row.
+  // get the vehicle size. Faithful port of the legacy `implementDimensions`/"Implemento" overview row.
   const { data: implementLayouts } = useImplementMeasuresByImplement(task?.implement?.id || "", { enabled: !!task?.implement?.id });
   const implementDimensions = useMemo(() => {
     type SideLayout = { height: number; sections?: { width: number }[] };
@@ -715,9 +715,9 @@ function TaskDetailContent() {
              * O PEDIDO DE COMPRA DO CLIENTE, deste veículo.
              *
              * Morava em `BudgetPayer.orderNumber`, por CLIENTE, e os N
-             * caminhões de um orçamento eram obrigados a citar o mesmo número na
+             * implementos de um orçamento eram obrigados a citar o mesmo número na
              * nota e no boleto. O pedido é por ENTREGA — e é aqui, na tela do
-             * caminhão, que se corrige UM sem mexer nos irmãos.
+             * implemento, que se corrige UM sem mexer nos irmãos.
              */
             id: "customerOrderNumber",
             label: "N° do Pedido",
@@ -1179,7 +1179,7 @@ function TaskDetailContent() {
               span: quoteSpan,
               // O título abre a cobrança QUE COBRE ESTE VEÍCULO — não a primeira
               // do orçamento. Num orçamento cobrado veículo a veículo há uma por
-              // caminhão, e a do vizinho não diz nada sobre este. Sem cobrança
+              // implemento, e a do vizinho não diz nada sobre este. Sem cobrança
               // ainda, não há para onde ir e o título não é clicável.
               onTitleClick: (t: Task) => {
                 const billingId = billingOfTask(t)?.id;
@@ -1198,7 +1198,7 @@ function TaskDetailContent() {
                   requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
                   // ESTE veículo, não o orçamento inteiro: ver
                   // `taskInvoiceCustomerLabel`. Listar todas as fatias repetia o
-                  // mesmo cliente uma vez por caminhão no detalhe de um só.
+                  // mesmo cliente uma vez por implemento no detalhe de um só.
                   accessor: (t: Task) => taskInvoiceCustomerLabel(t.quote?.customerConfigs, t.id) || null,
                   // Inline-editable ONLY for the single-customer (or unset) case: changing the customer
                   // reconciles the quote's lone customerConfig by upsert. Multi-customer billing splits
@@ -1260,7 +1260,7 @@ function TaskDetailContent() {
                   // cliente quatro vezes, um embaixo do outro.
                   //
                   // MÚLTIPLOS FATURAMENTOS DE UM ORÇAMENTO NÃO SÃO MÚLTIPLOS
-                  // PAGADORES. Quatro faturas de um caminhão cada, todas do mesmo
+                  // PAGADORES. Quatro faturas de um implemento cada, todas do mesmo
                   // cliente, são QUATRO `BudgetPayer` e UM pagador. A pergunta
                   // desta linha é "para quem vai a nota DESTE veículo?", e a
                   // resposta é um nome.
@@ -1301,7 +1301,7 @@ function TaskDetailContent() {
                    *
                    * Lê a cobrança que cobre ESTE veículo, não a primeira do
                    * orçamento: num orçamento cobrado veículo a veículo há uma por
-                   * caminhão, e a do vizinho não diz nada sobre este.
+                   * implemento, e a do vizinho não diz nada sobre este.
                    */
                   id: "billingStatus",
                   label: "Status do Faturamento",

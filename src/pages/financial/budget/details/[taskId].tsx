@@ -105,7 +105,7 @@ import { getApiBaseUrl } from "@/config/api";
  *
  * Decisão do dono (23/09/2026, caso Carlotti nº 990): mesmo orçamento é mesmo preço,
  * mesmo tamanho, mesma categoria e mesmo implemento, com os mesmos responsáveis e os
- * mesmos arquivos base; mas cada caminhão tem a sua identificação, a sua previsão, a
+ * mesmos arquivos base; mas cada implemento tem a sua identificação, a sua previsão, a
  * sua pintura geral, o seu layout e a sua aerografia.
  */
 interface VehicleFormValues {
@@ -147,7 +147,7 @@ function toVehicleFormValues(task: any, airbrushings: any[] | undefined): Vehicl
   };
 }
 
-/** Como o operador chama o caminhão: série, senão placa, senão a posição. */
+/** Como o operador chama o implemento: série, senão placa, senão a posição. */
 function vehicleLabelOf(values: Partial<VehicleFormValues> | undefined, index: number): string {
   return (values?.serialNumber || "").trim() || (values?.plate || "").trim() || `Veículo ${index + 1}`;
 }
@@ -312,7 +312,7 @@ const FinancialBudgetDetailPageInner = () => {
   // edita o orçamento INTEIRO: todos os veículos vivem no mesmo formulário, em
   // `vehicles[i]`, e um "Salvar" grava todos. Antes o passo 1 era só da tarefa
   // aberta, e os irmãos só se editavam por um desvio pela Agenda — foi assim que
-  // a Carlotti (nº 990) teve a pintura de cada caminhão acertada.
+  // a Carlotti (nº 990) teve a pintura de cada implemento acertada.
   //
   // Sem orçamento ainda (criando o orçamento de uma tarefa avulsa), o único
   // veículo é a própria tarefa.
@@ -342,7 +342,7 @@ const FinancialBudgetDetailPageInner = () => {
   const [formInitialized, setFormInitialized] = useState(false);
   // O layout aprovado COMPARTILHADO — o mesmo para todos os veículos (o de sempre).
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
-  // Um layout para CADA veículo? E, nesse modo, a escolha de cada caminhão.
+  // Um layout para CADA veículo? E, nesse modo, a escolha de cada implemento.
   const [layoutPerVehicle, setLayoutPerVehicle] = useState(false);
   const [vehicleLayoutFiles, setVehicleLayoutFiles] = useState<Record<string, FileWithPreview[]>>({});
   const customersCache = useRef<Map<string, any>>(new Map());
@@ -432,7 +432,7 @@ const FinancialBudgetDetailPageInner = () => {
     mode: "onChange",
     defaultValues: {
       // ─── Campos COMUNS a todos os veículos ────────────────────────────────
-      // Mesmo orçamento, mesmo preço, mesmo caminhão: logomarca, cliente,
+      // Mesmo orçamento, mesmo preço, mesmo implemento: logomarca, cliente,
       // categoria e implemento valem para os N veículos, e o save os grava em
       // todos (só quando mudaram — ou quando o operador pede para igualar).
       name: "" as string,
@@ -468,7 +468,7 @@ const FinancialBudgetDetailPageInner = () => {
       /**
        * Junto ou separado. Editável DEPOIS da criação porque a escolha errada
        * só se revela quando o faturamento chega: um orçamento de sessenta
-       * caminhões criado como `JOINT` que precisa fechar veículo a veículo
+       * implementos criado como `JOINT` que precisa fechar veículo a veículo
        * ficaria travado para sempre se este campo só existisse na criação.
        */
       billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
@@ -692,7 +692,7 @@ const FinancialBudgetDetailPageInner = () => {
       billingGroups: dedupeConfigsByCustomer(existingQuote.customerConfigs ?? [])
         .coverageGroups,
       // ⚠️ UM PASSO POR CLIENTE, não por FATURA. Num orçamento cobrado veículo a
-      // veículo há uma fatura por caminhão, todas do mesmo cliente: mapear 1:1
+      // veículo há uma fatura por implemento, todas do mesmo cliente: mapear 1:1
       // produzia "Cliente 1..4" com o mesmo nome quatro vezes, e o save
       // reenviava os quatro objetos — o último gravando por cima dos outros
       // três, levando desconto e condição de pagamento junto. A repartição dos
@@ -776,8 +776,8 @@ const FinancialBudgetDetailPageInner = () => {
     // keeps the source originalName but gets a generated filename, so matching on
     // filename would show it as a separate "orphan" tile instead of highlighting
     // its task-layout twin).
-    // Em `PER_VEHICLE` cada caminhão começa com as artes que o cobrem; em `SHARED`,
-    // a seleção compartilhada é a lista inteira — e cada caminhão começa com ela, para
+    // Em `PER_VEHICLE` cada implemento começa com as artes que o cobrem; em `SHARED`,
+    // a seleção compartilhada é a lista inteira — e cada implemento começa com ela, para
     // que ligar "um layout para cada veículo" parta do que já está valendo.
     const perVehicle = layoutScopeOf(existingQuote as any) === "PER_VEHICLE";
     setLayoutPerVehicle(perVehicle);
@@ -951,7 +951,7 @@ const FinancialBudgetDetailPageInner = () => {
   // As artes que podem virar "layout aprovado": as imagens APROVADAS de TODOS os
   // veículos, como estão AGORA no passo 1 (um layout removido ou reprovado ali some
   // daqui; um recém-adicionado já aparece), sem repetição — a mesma linha `Layout`
-  // costuma estar ligada a vários caminhões do orçamento.
+  // costuma estar ligada a vários implementos do orçamento.
   const layoutImageOptions = useMemo(() => {
     const persistedByFileId = new Map<string, any>();
     for (const t of vehicleTasks) {
@@ -1130,7 +1130,7 @@ const FinancialBudgetDetailPageInner = () => {
   const customerConfigs = form.watch("customerConfigs");
   const steps = useMemo(() => {
     const base = [
-      // Com N veículos o passo 1 tem o que é comum a todos e uma aba por caminhão.
+      // Com N veículos o passo 1 tem o que é comum a todos e uma aba por implemento.
       multiVehicle
         ? { id: 1, name: "Veículos", description: `Dados dos ${vehicleCount} veículos` }
         : { id: 1, name: "Tarefa", description: "Dados da tarefa" },
@@ -1506,7 +1506,7 @@ const FinancialBudgetDetailPageInner = () => {
       //
       // A raw File escolhido em VÁRIOS veículos ("Usar em todos") sobe uma vez só: o
       // mapa abaixo guarda o id que ele ganhou, e a mesma arte vira uma arte cobrindo
-      // os N caminhões — não N cópias.
+      // os N implementos — não N cópias.
       const uploadedRawLayoutIds = new Map<object, string>();
       let droppedStaleLayout = false;
       const resolveSelection = async (selection: FileWithPreview[]): Promise<string[]> => {
@@ -2179,7 +2179,7 @@ const FinancialBudgetDetailPageInner = () => {
         // ATUALIZAÇÃO (ali ela é um fantasma: a coluna mudou de lado, `Budget`
         // não a tem, e mandá-la derrubava qualquer gravação de orçamento com
         // cobrança aprovada). A remoção foi aplicada aos dois ramos, e no de
-        // criação ela é obrigatória: é a ÚNICA coisa que diz de qual caminhão é o
+        // criação ela é obrigatória: é a ÚNICA coisa que diz de qual implemento é o
         // orçamento que está nascendo.
         quoteData.taskIds = [taskId];
         await createQuoteMutation.mutateAsync(quoteData);
@@ -2245,7 +2245,7 @@ const FinancialBudgetDetailPageInner = () => {
   const watchedVehicles =
     (useWatch({ control: form.control, name: "vehicles" }) as VehicleFormValues[] | undefined) ?? [];
 
-  // A pintura geral de cada caminhão, pelo nome e pela cor. A gravada vem com a tarefa;
+  // A pintura geral de cada implemento, pelo nome e pela cor. A gravada vem com a tarefa;
   // uma trocada agora é buscada (e fica no cache do react-query).
   const knownPaints = useMemo(() => {
     const map = new Map<string, { name: string; hex: string | null }>();
@@ -2342,7 +2342,7 @@ const FinancialBudgetDetailPageInner = () => {
   const handleLayoutPerVehicleChange = useCallback(
     (perVehicle: boolean) => {
       if (perVehicle) {
-        // Liga: cada caminhão parte do que vale hoje para todos — a menos que o
+        // Liga: cada implemento parte do que vale hoje para todos — a menos que o
         // operador já tenha escolhido algo diferente por veículo antes de desligar.
         setVehicleLayoutFiles((prev) => {
           const keyOf = (list: FileWithPreview[] | undefined) =>
@@ -2453,7 +2453,7 @@ const FinancialBudgetDetailPageInner = () => {
   const taskDisplayName = [taskName, task?.implement?.serialNumber || task?.implement?.plate]
     .filter(Boolean)
     .join(" - ");
-  // Com N veículos o título é do ORÇAMENTO: a série de um caminhão ali parecia
+  // Com N veículos o título é do ORÇAMENTO: a série de um implemento ali parecia
   // identificar o orçamento inteiro.
   const budgetNumber = (existingQuote as any)?.budgetNumber as number | undefined;
   const pageTitle =
@@ -2624,7 +2624,7 @@ const FinancialBudgetDetailPageInner = () => {
               task={task}
               variant={requestVariant}
               // OS VEÍCULOS vêm do ORÇAMENTO, não de `task`: a tela é aberta
-              // pelo id de UM caminhão e o orçamento cobre N. `quoteTasks`
+              // pelo id de UM implemento e o orçamento cobre N. `quoteTasks`
               // também cobre a forma legada (`quote.task` singular).
               vehicles={quoteTasks(existingQuote)}
             />

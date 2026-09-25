@@ -27,7 +27,7 @@ interface GeneralPaintingSelectorProps {
   quickCreateDescription?: string;
   /**
    * O campo do formulário que guarda a tinta. `paintId` na tarefa; no orçamento de N
-   * veículos, `vehicles.<i>.paintId` — cada caminhão tem a sua pintura geral.
+   * veículos, `vehicles.<i>.paintId` — cada implemento tem a sua pintura geral.
    */
   name?: string;
 }

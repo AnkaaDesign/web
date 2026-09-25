@@ -36,7 +36,7 @@ export function BillingStepInfo({
   // ═══════════════════════════════════════════════════════════════════════════
   //
   // `customerConfigs` é a lista do ORÇAMENTO INTEIRO. Numa cobrança por veículo,
-  // três caminhões do mesmo cliente são TRÊS pagadores — um por cobrança — e
+  // três implementos do mesmo cliente são TRÊS pagadores — um por cobrança — e
   // esta tela, que é de UMA delas, mostrava "3 selecionados" com o mesmo CNPJ
   // repetido três vezes, e três blocos de responsável, um por veículo do
   // orçamento. Nenhuma dessas três linhas é uma escolha desta página.

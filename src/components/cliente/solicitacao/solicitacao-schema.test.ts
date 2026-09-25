@@ -12,7 +12,7 @@
 //
 // E, desde a queixa do dono de 20/09, a sexta:
 //
-//  · MEDIDA POR VEÍCULO onde a medida é do LOTE. Quem pede dez caminhões pede
+//  · MEDIDA POR VEÍCULO onde a medida é do LOTE. Quem pede dez implementos pede
 //    dez do mesmo modelo; digitar os mesmos números dez vezes é trabalho
 //    inventado e divergência garantida. O formulário guarda UMA medida e é o
 //    construtor do payload que a copia para cada veículo.
@@ -279,7 +279,7 @@ describe("buildSolicitacaoPayload — o que sai na linha", () => {
 
 describe("as medidas são do LOTE, e não da linha", () => {
   it("TODO veículo recebe a MESMA medida, e nenhum recebe a sua própria", () => {
-    // ⛔ A queixa do dono: pedir dez caminhões do mesmo modelo e ter de digitar
+    // ⛔ A queixa do dono: pedir dez implementos do mesmo modelo e ter de digitar
     // altura e comprimento dez vezes. A medida é UMA no formulário, e é aqui
     // que ela vira N.
     const payload = buildSolicitacaoPayload(

@@ -50,7 +50,7 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
   const filteredLayouts = useMemo<LayoutLike[]>(() => getVisibleLayouts(task, canViewBadges), [task, canViewBadges]);
 
   /**
-   * Quem cota é a API, e ela resolve as medidas pelo CAMINHÃO.
+   * Quem cota é a API, e ela resolve as medidas pelo IMPLEMENTO.
    *
    * Este arquivo já montou os painéis à mão — e com eles a conversão de metro
    * para centímetro que `ImplementMeasure` obriga. Duas telas fazendo essa

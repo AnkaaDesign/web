@@ -256,7 +256,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
    * um orçamento por tarefa que o traz. Cinco números de série viravam cinco
    * orçamentos: cinco números, cinco PDFs, cinco cerimônias de assinatura e
    * cinco cobranças para o mesmo trabalho, que o cliente recebe como cinco
-   * propostas de um caminhão em vez de uma de cinco.
+   * propostas de um implemento em vez de uma de cinco.
    *
    * Agora o orçamento é montado UMA vez, aqui, e viaja no topo do corpo de
    * `POST /tasks/batch-with-quote` — o mesmo caminho que a tela de criação de

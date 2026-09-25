@@ -8,7 +8,7 @@
  * de perguntar "este orçamento tem mais de um cliente?".
  *
  * Com `billingSplit = PER_TASK` existe uma fatia POR VEÍCULO. O orçamento nº
- * 0976 (4 caminhões, 1 cliente) tinha QUATRO configurações, e onze leituras
+ * 0976 (4 implementos, 1 cliente) tinha QUATRO configurações, e onze leituras
  * passaram a afirmar que havia quatro clientes. O pior efeito estava na página
  * pública, a tela em que o cliente ASSINA: os cinco serviços eram filtrados para
  * fora da lista — nenhum tem `invoiceToCustomerId`, e num orçamento de um
@@ -22,7 +22,7 @@ import { customerCount, distinctCustomerIds, hasMultipleCustomers } from "./quot
 const CLIENTE_A = "b593f440-9f00-4c85-93ef-54bf5a9eef37";
 const CLIENTE_B = "0f723f76-f3b6-41c9-ae1f-3c1209955f58";
 
-/** As quatro faturas do orçamento nº 0976: um cliente, um caminhão cada. */
+/** As quatro faturas do orçamento nº 0976: um cliente, um implemento cada. */
 const perTaskUmCliente = [
   { customerId: CLIENTE_A, tasks: [{ taskId: "t1" }] },
   { customerId: CLIENTE_A, tasks: [{ taskId: "t2" }] },

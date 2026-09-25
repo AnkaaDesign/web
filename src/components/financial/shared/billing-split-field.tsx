@@ -76,12 +76,12 @@ export function normalizeGroups(
   // O número do lote é posicional — "Lote 1" é só o primeiro da lista —, e antes
   // ele herdava a ordem em que as FATURAS voltaram da API. O resultado era um
   // painel que parecia embaralhado: trocar um orçamento `PER_TASK` de quatro
-  // caminhões para lotes abria com 8101 no Lote 4 e 8104 no Lote 1, de trás para
+  // implementos para lotes abria com 8101 no Lote 4 e 8104 no Lote 1, de trás para
   // frente, e cada mudança renumerava tudo de novo debaixo da mão do operador —
   // ele escolhia "Lote 4" e a linha passava a exibir "Lote 3".
   //
   // Ancorando no PRIMEIRO veículo de cada lote, o número passa a derivar da
-  // mesma ordem que a tela já mostra: o lote do primeiro caminhão é sempre o
+  // mesma ordem que a tela já mostra: o lote do primeiro implemento é sempre o
   // Lote 1, e juntar dois veículos não mexe no rótulo de quem ficou de fora.
   //
   // Só rótulo e ordem de exibição: a identidade de um agrupamento é QUEM está
@@ -144,7 +144,7 @@ interface BillingSplitFieldProps {
    * para agrupar. Nesse caso o controle oferece só "junto" e "separado" — montar
    * lotes sobre veículos que ainda não existem exigiria identidades provisórias
    * que o save teria de reconciliar, e o ganho não paga o risco: quem cria um
-   * orçamento de sessenta caminhões agrupa depois, quando sabe quais entregou.
+   * orçamento de sessenta implementos agrupa depois, quando sabe quais entregou.
    */
   vehicles: BillingSplitVehicle[];
   /** Contagem quando `vehicles` está vazio (criação). Default: `vehicles.length`. */
@@ -158,7 +158,7 @@ interface BillingSplitFieldProps {
    *
    * Maior que zero trava o controle: a cobertura de uma fatura aprovada sustenta
    * uma nota fiscal autorizada e boletos registrados, e mudá-la alteraria
-   * retroativamente de quais caminhões é um documento fiscal que já saiu. A API
+   * retroativamente de quais implementos é um documento fiscal que já saiu. A API
    * recusa; a tela diz antes, em vez de deixar o operador tentar.
    */
   approvedCount?: number;
@@ -210,7 +210,7 @@ export function BillingSplitField({
   };
 
   // Com um veículo a pergunta não existe, e um seletor dizendo "Fatura única"
-  // num orçamento de um caminhão é ruído que o operador aprende a ignorar.
+  // num orçamento de um implemento é ruído que o operador aprende a ignorar.
   if (count <= 1) return null;
 
   const lotOptions = [

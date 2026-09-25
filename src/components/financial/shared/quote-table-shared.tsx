@@ -59,7 +59,7 @@ export const MutedDash = () => <span className="text-muted-foreground">-</span>;
 // O QUE UMA COBRANÇA COBRA
 //
 // A lista de Faturamento passou a ter UMA LINHA POR `Billing`. Um orçamento
-// `JOINT` de quatro caminhões é UMA linha; um `PER_TASK` de quatro são quatro.
+// `JOINT` de quatro implementos é UMA linha; um `PER_TASK` de quatro são quatro.
 // Com isso some a divisão `quote.total ÷ N`, que existia só para EXPLICAR por que
 // o mesmo contrato aparecia N vezes: a linha não é mais uma fatia de um contrato,
 // é a cobrança inteira de um recorte, e o número que ela mostra é o que essa
@@ -103,7 +103,7 @@ export function sumConfigMoney(
  * Cobertura vazia cai em "cobre o orçamento inteiro", e é deliberado que caia aí
  * e não em um: uma lista vazia significa "a consulta não pediu a relação" ou "a
  * fatia acabou de nascer", nunca "esta cobrança é de um veículo" — responder um
- * faria uma cobrança de sessenta caminhões ser lida como de um. É a mesma regra
+ * faria uma cobrança de sessenta implementos ser lida como de um. É a mesma regra
  * de `computeQuoteMoney.coveredTaskCount`.
  */
 export function billingCoveredVehicles(billing: Billing): number {
@@ -159,7 +159,7 @@ export const dateExportValue = (date: Date | string | null | undefined) => (date
  * Invoice-to customers de uma lista de PAGADORES, na ordem deles, brancos fora.
  *
  * ⚠️ Recebe os pagadores, não a linha. Enquanto a lista era de veículos, a
- * função tinha de RECORTAR: num orçamento `PER_TASK` de sessenta caminhões há
+ * função tinha de RECORTAR: num orçamento `PER_TASK` de sessenta implementos há
  * sessenta configurações do MESMO cliente, e a lista crua fazia a célula
  * anunciar "Marquespan / Marquespan +58" — um tomador lido como sessenta. Com a
  * linha sendo a COBRANÇA o recorte já veio pronto (`billing.customerConfigs` é,
@@ -242,7 +242,7 @@ export function PaymentMethodCell({ configs }: { configs?: readonly BudgetPayer[
  *
  * ⚠️ Recebe os pagadores, não a linha, pelo mesmo motivo de
  * `invoiceToCustomerNames`: enquanto a linha era um veículo, somar os sessenta
- * planos de um `PER_TASK` fazia a linha do caminhão 12 anunciar "3/180". A
+ * planos de um `PER_TASK` fazia a linha do implemento 12 anunciar "3/180". A
  * cobrança já é o recorte, então a soma dela é exata.
  */
 export function installmentProgress(
@@ -440,7 +440,7 @@ export function orderNumberPresenceWhere(value: unknown): Record<string, unknown
   const lacks = value === false || value === "false";
   if (!has && !lacks) return undefined;
   // O NÚMERO DO PEDIDO É DA TAREFA (`Task.customerOrderNumber`) desde que um
-  // orçamento passou a cobrir N caminhões — o pedido é por ENTREGA. As condições
+  // orçamento passou a cobrir N implementos — o pedido é por ENTREGA. As condições
   // aqui são sobre o registro da TAREFA, e não mais um `some` sobre as
   // configurações de faturamento do orçamento (a coluna antiga foi removida:
   // mandá-la agora derruba a consulta inteira).

@@ -3,7 +3,7 @@ import { TRUCK_MANUFACTURER } from "../constants";
 
 /**
  * Rótulo da montadora do cavalo (TRUCK_MANUFACTURER fica: é a montadora do
- * caminhão que leva o implemento, não o implemento — NOMENCLATURA.md §4).
+ * veículo que leva o implemento, não o implemento — NOMENCLATURA.md §4).
  */
 export function getTruckManufacturerLabel(manufacturer: TRUCK_MANUFACTURER): string {
   return TRUCK_MANUFACTURER_LABELS[manufacturer] || manufacturer;

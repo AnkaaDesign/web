@@ -75,7 +75,7 @@ export function useInvoicesByTask(taskId: string, options?: { refetchInterval?: 
  * pergunta vai pelo FATURAMENTO, que sempre existe.
  *
  * Continua havendo a por tarefa: numa cobrança veículo a veículo ela é mais
- * específica e é o que a tela de um caminhão quer.
+ * específica e é o que a tela de um implemento quer.
  */
 export function useInvoicesByQuote(
   quoteId: string | undefined,
@@ -96,10 +96,10 @@ export function useInvoicesByQuote(
  *
  *   · `Invoice.taskId` só existe quando a fatura é de UM veículo. Numa fatura
  *     conjunta ele é NULO, então `/invoices/task/:id` devolvia VAZIO — o
- *     orçamento de sessenta caminhões faturado junto mostrava "nenhuma fatura"
+ *     orçamento de sessenta implementos faturado junto mostrava "nenhuma fatura"
  *     sobre uma cobrança de R$ 730.224,00 já emitida, em três telas.
  *   · A rota por ORÇAMENTO enxerga todas, e a COBERTURA diz quais cobram este
- *     caminhão. É a única leitura que acerta nos três modos.
+ *     implemento. É a única leitura que acerta nos três modos.
  *
  * Sem `quoteId` (tarefa sem orçamento) cai na rota por tarefa, que é o que
  * existia e continua certo ali.

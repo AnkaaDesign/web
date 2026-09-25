@@ -327,7 +327,7 @@ export function VeiculoIdentidadeCard({
         />
 
         {/* ── CATEGORIA E IMPLEMENTO ───────────────────────────────────────
-            São do cliente tanto quanto a placa: quem sabe se o caminhão é um
+            São do cliente tanto quanto a placa: quem sabe se o implemento é um
             bitrem e se o baú é frigorífico é quem opera a frota. O portal os
             MOSTRAVA sem deixar corrigir — o erro ficava à vista do dono do dado
             e o conserto dependia de ligar para o comercial.
@@ -401,18 +401,18 @@ export function VeiculoIdentidadeCard({
         ) : null}
 
         {/* ⚠️ ESTA DATA É DO CLIENTE, e ele a edita aqui.
-            `Task.forecastDate` é quando o caminhão SAI DA FROTA DELE e fica
+            `Task.forecastDate` é quando o veículo SAI DA FROTA DELE e fica
             disponível para a Ankaa — não é a previsão de entrega do serviço
             pronto. O rótulo antigo ("Previsão de entrega") dizia o oposto, e a
             data chegava por telefone ao comercial, que a digitava do lado de cá.
 
             ⚠️ POR VEÍCULO, e não uma para o lote: é coluna de `Task`, e a rota
-            é `/veiculos/:taskId/identificacao`. Dois caminhões do mesmo
+            é `/veiculos/:taskId/identificacao`. Dois implementos do mesmo
             orçamento podem ser liberados em semanas diferentes — é o normal numa
             frota que não pode parar inteira.
 
             ⚠️ E VEM ANTES DA ENTRADA, que é a ordem dos fatos: primeiro o
-            cliente libera o caminhão, depois ele entra no pátio. */}
+            cliente libera o veículo, depois ele entra no pátio. */}
         <PortalInlineField
           label="Liberação do veículo"
           value={progress?.forecastDate ?? ""}

@@ -59,7 +59,7 @@ function missingOrderNumber(task: { customerOrderNumber?: string | null }): bool
  * O desempate espelha o `tasks: { some: { status: COMPLETED } }` que a regra usa
  * na API: entre as tarefas do orçamento, vence uma que já esteja COMPLETED, se
  * houver. A regra pergunta "algum veículo já ficou pronto?" — porque num
- * orçamento de sessenta caminhões o dinheiro já está parado quando o primeiro
+ * orçamento de sessenta implementos o dinheiro já está parado quando o primeiro
  * sai —, e o avaliador do cliente lê `task.status`, um campo só. Escolher aqui a
  * tarefa que satisfaz a regra é o que faz os dois avaliadores concordarem.
  */
@@ -122,7 +122,7 @@ export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<Budget>
     // O desempate espelha o `tasks: { some: { status: COMPLETED } }` que a regra
     // usa na API: entre os veículos, vence um que já esteja COMPLETED, se houver.
     // A regra pergunta "algum veículo já ficou pronto?" — porque num orçamento de
-    // sessenta caminhões o dinheiro já está parado quando o primeiro sai — e o
+    // sessenta implementos o dinheiro já está parado quando o primeiro sai — e o
     // avaliador do cliente lê `task.status`, um campo só. Escolher aqui o veículo
     // que satisfaz a regra é o que faz os dois avaliadores concordarem.
     const anchor = vehicles.find((t) => t.status === TASK_STATUS.COMPLETED) ?? vehicles[0] ?? null;
@@ -187,7 +187,7 @@ export function toAttentionQuoteEntitiesFromBillings(billings: ReadonlyArray<Bil
     // O desempate espelha o `tasks: { some: { status: COMPLETED } }` da regra no
     // servidor: entre os veículos, vence um que já esteja COMPLETED. A regra
     // pergunta "algum veículo já ficou pronto?" — num orçamento de sessenta
-    // caminhões o dinheiro já está parado quando o primeiro sai — e o avaliador
+    // implementos o dinheiro já está parado quando o primeiro sai — e o avaliador
     // do cliente lê `task.status`, um campo só.
     //
     // ⚠️ O status vem da COBERTURA DA COBRANÇA, que é a única parte do payload que

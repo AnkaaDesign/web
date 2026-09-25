@@ -162,7 +162,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
     label: "Valor Total",
     // A fatia DESTE veículo: `quote.total` é o valor do contrato inteiro desde o
     // orçamento multitarefa, e cada linha exportada é uma tarefa. Sem dividir, uma
-    // exportação de sessenta caminhões somava sessenta vezes o mesmo contrato.
+    // exportação de sessenta implementos somava sessenta vezes o mesmo contrato.
     getValue: (task: Task) => {
       const value = quotePerVehicleTotal(task.quote);
       return value != null ? formatCurrency(value) : "";

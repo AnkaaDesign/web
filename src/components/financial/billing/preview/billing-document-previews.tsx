@@ -66,7 +66,7 @@ interface BillingDocumentPreviewsProps {
   /**
    * OS VEÍCULOS do orçamento por id — o que a discriminação da nota nomeia.
    *
-   * Uma fatura cobre um caminhão, um lote ou os sessenta, e a nota fala dos que
+   * Uma fatura cobre um implemento, um lote ou os sessenta, e a nota fala dos que
    * ELA cobre. Sem esta relação a prévia só conhecia o veículo ABERTO e
    * mostrava, numa nota conjunta de quatro, a discriminação de um.
    */
@@ -428,7 +428,7 @@ export function BillingDocumentPreviews({
     const configs = customerConfigs || [];
     if (configs.length === 0) return [];
     // ⚠️ UM CLIENTE, não UMA FATURA. Num orçamento cobrado veículo a veículo há
-    // uma fatura por caminhão, todas do mesmo cliente: contar faturas fazia o
+    // uma fatura por implemento, todas do mesmo cliente: contar faturas fazia o
     // filtro por `invoiceToCustomerId` rodar, e como ninguém preenche esse campo
     // num orçamento de um cliente só, as faturas 2..N saíam com ZERO serviços —
     // a pré-visualização da nota fiscal e do boleto mostrando um documento vazio
@@ -445,7 +445,7 @@ export function BillingDocumentPreviews({
       if (willEmit) nfseSeq += 1;
 
       // O PEDIDO DE COMPRA que ESTE documento vai citar — o dos veículos que ESTA
-      // fatura cobre: o de um caminhão quando ela cobra um, os do lote quando
+      // fatura cobre: o de um implemento quando ela cobra um, os do lote quando
       // cobra vinte. É a mesma leitura que `orderNumberLabel` recebe no servidor.
       //
       // Era `config.taskId`, coluna removida em `20260913120000_billing_coverage`:

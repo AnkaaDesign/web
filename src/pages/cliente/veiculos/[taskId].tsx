@@ -291,7 +291,7 @@ export function ClientePortalVeiculoDetalhePage() {
       />
 
       {/* AS MEDIDAS, embaixo da faixa e de largura inteira.
-          É a ordem do trabalho do cliente: ele identifica o caminhão, acompanha
+          É a ordem do trabalho do cliente: ele identifica o implemento, acompanha
           o andamento, e confere o que mediu. O card some sozinho quando nenhuma
           face foi informada — e some inteiro sem a seção `VEHICLE`, porque
           medida é dado de veículo e segue o mesmo recorte da identidade. */}

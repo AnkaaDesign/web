@@ -2,7 +2,7 @@
 //
 // OS VEÍCULOS — seção `VEHICLE`.
 //
-// Um orçamento cobre N caminhões, e é por eles que o cliente reconhece o
+// Um orçamento cobre N implementos, e é por eles que o cliente reconhece o
 // documento. Daqui se chega à tela do veículo, que é onde moram a plaqueta, as
 // medidas, a arte e a linha do tempo.
 //
@@ -21,7 +21,7 @@
 //     passa a ter de três a oito linhas rótulo/valor, que é a mesma contagem da
 //     Proposta ao lado, e o vão de ~400px que o dono viu embaixo dele some.
 //     A navegação vira o botão "Abrir veículo" do canto do cabeçalho
-//     (`PortalCard.actions`), porque com um caminhão só existe UM destino.
+//     (`PortalCard.actions`), porque com um implemento só existe UM destino.
 //   • COM VÁRIOS, um bloco por veículo: a linha-link (`PortalRowLink`) com o
 //     rótulo que o cliente usa ao telefone — SÉRIE · PLACA —, e sob ela as três
 //     linhas de identidade. A linha-link continua sendo `<a>` porque ali o que
@@ -45,13 +45,13 @@
 //
 // ⚠️ A IDENTIDADE É UM GRUPO, NÃO CAMPOS SOLTOS. `vehicle.identity` é
 // `undefined` quando o contato não tem a seção `VEHICLE` — e essa é a diferença
-// entre "este caminhão não tem placa" e "você não vê placa nenhuma". SEM o
+// entre "este implemento não tem placa" e "você não vê placa nenhuma". SEM o
 // grupo não se desenha linha vazia nenhuma: o card mostra o que puder (o marco,
 // a previsão) e nada mais. Inventar três traços ali transformaria um recorte de
 // privilégio num relatório de pendências falso.
 //
 // ⚠️ ANDAMENTO e PREVISÃO são da seção `DELIVERY`, não da `VEHICLE`: quem vê o
-// caminhão não necessariamente vê o prazo. `milestoneLabel` vem pronto do
+// implemento não necessariamente vê o prazo. `milestoneLabel` vem pronto do
 // servidor e é PROJEÇÃO MONOTÔNICA — um marco atingido não regride, ainda que o
 // carimbo de produção seja apagado (O.S. → `PENDING` zera datas, e
 // `COMPLETED → PREPARATION` é transição legal). A tela nunca recalcula isso.
@@ -226,7 +226,7 @@ export function OrcamentoVeiculosCard({
 }) {
   const list = vehicles ?? [];
 
-  // ⛔ SEM CAMINHÃO E SEM NOTÍCIA, SEM CARD — o sistema não desenha seção vazia.
+  // ⛔ SEM IMPLEMENTO E SEM NOTÍCIA, SEM CARD — o sistema não desenha seção vazia.
   // A EXCEÇÃO é a requisição recém-aberta: ali "ainda não foram cadastrados" é
   // a resposta honesta, e calá-la deixaria a tela parecendo incompleta.
   if (list.length === 0 && status !== "REQUESTED") return null;
@@ -273,7 +273,7 @@ export function OrcamentoVeiculosCard({
           const { implemento, categoria } = implementoECategoria(vehicle);
           const pedido = pedidoDe(vehicle);
           const previsao = vehicle.progress?.forecastDate ?? null;
-          // A linha de contexto do bloco: o que o caminhão É e o número que o
+          // A linha de contexto do bloco: o que o implemento É e o número que o
           // cliente mesmo emitiu. Série, placa e chassi estão nas linhas de
           // baixo — aqui elas só repetiriam.
           const contexto = [implemento, categoria, pedido ? `Pedido ${pedido}` : null].filter(

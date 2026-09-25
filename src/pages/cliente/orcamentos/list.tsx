@@ -4,7 +4,7 @@
 //
 // ⚠️ A LINHA É UM ORÇAMENTO, não um veículo — `GET /cliente/me/orcamentos`
 // devolve orçamentos, e o rodapé conta orçamentos. A lista interna levou meses
-// para chegar nisso: um orçamento de quatro caminhões ocupava quatro linhas com
+// para chegar nisso: um orçamento de quatro implementos ocupava quatro linhas com
 // o mesmo número e o dono lia quatro contratos onde havia um.
 //
 // ── A ORDEM ────────────────────────────────────────────────────────────────

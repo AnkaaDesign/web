@@ -40,7 +40,7 @@ interface Props {
  * Era verdade, e era estrutural. A tela abria por UM veículo e o passo "Tarefa"
  * editava aquele; os outros três da mesma fatura não tinham onde ser corrigidos
  * — mas placa, chassi e número do pedido dos QUATRO vão sair na MESMA nota
- * fiscal. Quem vai emiti-la precisava sair da tela, abrir cada caminhão pelo
+ * fiscal. Quem vai emiti-la precisava sair da tela, abrir cada implemento pelo
  * módulo de produção e voltar.
  *
  * Então o recorte deste bloco é exatamente o recorte do documento: os veículos
@@ -52,25 +52,25 @@ interface Props {
  * Os três campos chegam TARDE por natureza. O número do pedido de compra é o caso
  * puro: a API o deixou de fora de `enforceNestedQuoteGuards` justamente porque ele
  * aparece depois de o orçamento fechar — travá-lo na tela desfaz de propósito o que
- * o servidor abriu de propósito. Placa e chassi são a identidade do caminhão: um
+ * o servidor abriu de propósito. Placa e chassi são a identidade do implemento: um
  * chassi digitado errado continua errado no cadastro depois da aprovação, e o
  * conserto é aqui.
  *
  * O que a aprovação muda é o AVISO, não o direito: a nota autorizada e o boleto
  * registrado não se reescrevem, e o cartão passa a dizer isso. Trocar o aviso por
  * um `disabled` não protegia documento nenhum — só obrigava quem emite a sair da
- * tela, abrir cada caminhão em Produção e voltar.
+ * tela, abrir cada implemento em Produção e voltar.
  *
  * GRAVA CAMPO A CAMPO, ao sair do campo. Não entra no formulário da página: o
  * `PUT /tasks/:id` da gravação principal é do veículo ABERTO, e pendurar os
- * irmãos ali faria um "Salvar" da cobrança 1 escrever em caminhões que ela nem
+ * irmãos ali faria um "Salvar" da cobrança 1 escrever em implementos que ela nem
  * mostra. Uma linha, uma escrita, um alvo.
  */
 /**
  * ONDE CADA CAMPO MORA NO CORPO DO `PUT /tasks/:id` — e por que isso não é detalhe.
  *
  * `customerOrderNumber` é campo de PRIMEIRO NÍVEL da tarefa. `plate` e
- * `chassisNumber` **não são**: pertencem ao caminhão, e o zod da API os declara
+ * `chassisNumber` **não são**: pertencem ao implemento, e o zod da API os declara
  * dentro de `implement` (`api/src/schemas/task.ts`, `taskImplementSchema`).
  *
  * ⚠️ O defeito que isto conserta: a grade mandava os três no topo, com um `as any`
@@ -94,7 +94,7 @@ export function BillingCoveredVehicles({ vehicles, disabled, approved }: Props) 
   // Vale TAMBÉM com um veículo só. Esta grade é o único lugar da tela de
   // cobrança onde placa, chassi e pedido se editam — o formulário de tarefa que
   // duplicava esses campos foi removido, e some-la aqui deixaria o caso simples
-  // (um orçamento, um caminhão) sem onde corrigir o que vai na nota.
+  // (um orçamento, um implemento) sem onde corrigir o que vai na nota.
   if (vehicles.length === 0) return null;
 
   const commit = async (

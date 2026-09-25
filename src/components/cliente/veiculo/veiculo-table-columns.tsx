@@ -9,7 +9,7 @@
 //
 // ⚠️ OS DADOS MORAM EM GRUPOS RECORTÁVEIS. `row.identity` é `undefined` quando o
 // contato não tem a seção `VEHICLE`; `row.progress` é `undefined` sem `DELIVERY`.
-// Essa é a diferença entre "este caminhão não tem placa" e "você não vê placa
+// Essa é a diferença entre "este implemento não tem placa" e "você não vê placa
 // nenhuma" — e é por isso que as colunas de identidade só existem quando o
 // recorte as libera (a página decide, ver `createPortalVeiculoColumns`). Ler
 // `row.plate` (a forma plana antiga) devolvia `undefined` nos dois casos e a
@@ -150,7 +150,7 @@ export function createPortalVeiculoColumns({
    * mesmo campo que o sistema interno imprime sob o cabeçalho "Logomarca" na
    * lista de Orçamentos, na de Faturamento, nos recebíveis e nas quatro listas
    * do painel inicial, sempre no par "Logomarca | Cliente". É o que a Ankaa
-   * PINTA naquele caminhão ("Belo BOI 9,50", "Masterboi LTDA."), e é por ele
+   * PINTA naquele implemento ("Belo BOI 9,50", "Masterboi LTDA."), e é por ele
    * que o cliente chama o serviço ao telefone.
    *
    * ⚠️ E NÃO É DADO DE LAYOUT. O §2 do contrato lista "logomarca" sob a seção
@@ -195,7 +195,7 @@ export function createPortalVeiculoColumns({
          * Não é redundante com a empresa do contato, e a frota do vendedor da
          * Ibiporã prova: 100 veículos, 11 da própria Ibiporã e o resto de
          * Framento, Luxafit, Masterboi, Transgênio, RKO. É a intermediação do
-         * §3.1 — quem emite o pedido não é quem recebe o caminhão —, e sem esta
+         * §3.1 — quem emite o pedido não é quem recebe o implemento —, e sem esta
          * coluna as linhas dos outros clientes são indistinguíveis.
          *
          * ⚠️ Mora em `identity`, que é a seção `VEHICLE`: por isso está DENTRO
@@ -449,7 +449,7 @@ export function createPortalVeiculoColumns({
  * A linha inteira fica âmbar quando falta identidade.
  *
  * Só a célula não basta: a lista é rolável e o contato chega nela para achar
- * "quais dos meus 30 caminhões ainda me devem alguma coisa". A cor responde
+ * "quais dos meus 30 implementos ainda me devem alguma coisa". A cor responde
  * isso de longe; a célula responde QUAL.
  *
  * ⚠️ DERIVADO, e só quando há identidade a ler. O servidor não manda booleano de

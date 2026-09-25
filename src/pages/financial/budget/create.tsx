@@ -161,7 +161,7 @@ export const FinancialBudgetCreatePage = () => {
        *
        * Fica no passo 1, ao lado da placa e da série, porque é disso que ele é
        * irmão: identifica a ENTREGA. O caso comum é o cliente comprar os quatro
-       * caminhões num pedido só; quando os pedidos diferem, cada tarefa se
+       * implementos num pedido só; quando os pedidos diferem, cada tarefa se
        * corrige depois na tela dela.
        */
       customerOrderNumber: null as string | null,
@@ -237,7 +237,7 @@ export const FinancialBudgetCreatePage = () => {
        *
        * `JOINT` (padrão): uma fatura para os N veículos, um plano de parcelas,
        * uma NFS-e. `PER_TASK`: uma fatura por veículo, e o financeiro aprova
-       * veículo a veículo — o que os sessenta caminhões do Marquespan pedem, já
+       * veículo a veículo — o que os sessenta implementos do Marquespan pedem, já
        * que não terminam no mesmo dia.
        */
       billingSplit: "JOINT" as "JOINT" | "PER_TASK" | "CUSTOM",
@@ -246,7 +246,7 @@ export const FinancialBudgetCreatePage = () => {
        *
        * Sempre VAZIA na criação: as tarefas nascem no save (produto placas ×
        * séries) e não há id para agrupar. O controle de faturamento sabe disso e
-       * não oferece lotes aqui — quem cria um orçamento de sessenta caminhões
+       * não oferece lotes aqui — quem cria um orçamento de sessenta implementos
        * agrupa depois, quando sabe quais entregou.
        */
       billingGroups: [] as string[][],
@@ -771,7 +771,7 @@ export const FinancialBudgetCreatePage = () => {
       // A série é SÓ do implemento (NOMENCLATURA.md §5): vai em `implement.serialNumber`,
       // nunca no topo do corpo (o schema da API é estrito e responde 400).
       const buildImplementData = (plate?: string, serialNumber?: string) => {
-        // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), como nascia
+        // Sem nenhum campo, o implemento nasce VAZIO (objeto vazio), como nascia
         // quando o tipo tinha "Refrigerado" de padrão (antes do D-25): cada
         // tarefa tem exatamente um implemento (DD1); só o tipo não se inventa.
         return {
@@ -791,7 +791,7 @@ export const FinancialBudgetCreatePage = () => {
       //
       // A MESMA função que o passo de faturamento usou para montar a tabela de
       // pedidos de compra (`vehicleCombinations`). Duas cópias da regra
-      // deslizariam no primeiro ajuste, e o sintoma — o pedido de um caminhão
+      // deslizariam no primeiro ajuste, e o sintoma — o pedido de um implemento
       // gravado noutro — só apareceria na nota fiscal.
       const combinations = vehicleCombinations(plates, data.serialNumbers);
       // O PEDIDO DE COMPRA vale para TODOS os veículos deste orçamento: o campo
@@ -866,7 +866,7 @@ export const FinancialBudgetCreatePage = () => {
       // dois números de série produziam quatro tarefas e QUATRO orçamentos, com
       // quatro números, quatro PDFs e quatro cerimônias de assinatura para o
       // mesmo trabalho. O Marquespan de 02/09 saiu assim: orçamentos 642 a 701,
-      // sessenta números para sessenta caminhões idênticos.
+      // sessenta números para sessenta implementos idênticos.
       //
       // Depois virou um só — mas em N+1 requisições, e a falha da última deixava
       // as N tarefas órfãs. Agora é uma requisição: `POST /tasks/batch-with-quote`
@@ -906,7 +906,7 @@ export const FinancialBudgetCreatePage = () => {
         // ═══════════════════════════════════════════════════════════════════
         //
         // Os dados fiscais são do CLIENTE, não da tarefa: gravá-los dentro do
-        // laço repetia a mesma escrita uma vez por caminhão.
+        // laço repetia a mesma escrita uma vez por implemento.
         //
         // E vêm DEPOIS da criação de propósito. Enquanto vinham antes, uma falha
         // na criação deixava o cadastro do cliente já alterado e a tela mostrava

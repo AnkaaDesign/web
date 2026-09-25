@@ -30,7 +30,7 @@ import { BILLING_DEFAULT_PAGE_SIZE, buildBillingQuery, createBillingFilterDefs }
  * A LINHA É UMA COBRANÇA.
  *
  * Era uma TAREFA (`useTasks` + `getRowId = t.id`), e um orçamento `JOINT` de
- * quatro caminhões virava quatro linhas com o mesmo número 984: o rodapé dizia
+ * quatro implementos virava quatro linhas com o mesmo número 984: o rodapé dizia
  * "4 resultado(s)", o pager do detalhe dizia "1 / 4" e o dono leu quatro
  * faturamentos porque a tela desenhou quatro. Há UMA cobrança ali — uma fatura,
  * um plano de parcelas, uma NFS-e. Num `PER_TASK` de quatro, as quatro linhas

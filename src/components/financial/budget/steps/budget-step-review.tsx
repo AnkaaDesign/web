@@ -123,7 +123,7 @@ interface BudgetStepReviewProps {
   isCreateMode?: boolean;
   /**
    * Orçamento de N veículos: a pintura geral e as miniaturas do layout de cada um,
-   * para a relação de veículos mostrar o que muda de caminhão para caminhão.
+   * para a relação de veículos mostrar o que muda de implemento para implemento.
    */
   vehicleExtras?: Record<
     string,
@@ -188,7 +188,7 @@ export function BudgetStepReview({
   //
   // O preço dos serviços é POR VEÍCULO (ver `utils/quote-money.ts`). Sem o "× N"
   // e o total geral, esta tela mostra R$ 12.170,40 como TOTAL de um orçamento de
-  // sessenta caminhões que vale R$ 730.224,00 — e é ESTA a tela em que o
+  // sessenta implementos que vale R$ 730.224,00 — e é ESTA a tela em que o
   // operador confere antes de mandar criar. O documento assinado já imprime as
   // duas linhas; a conferência tem de ver o mesmo número que o cliente verá.
   const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
@@ -257,7 +257,7 @@ export function BudgetStepReview({
     // é também o que o save faz quando `billingGroups` chega vazio.
     if (groups.length === 0) return uniform(vehicleCount);
     const sizes = [...new Set(groups.map((g) => g.length))];
-    // LOTES IGUAIS são um plano só: sessenta faturas de um caminhão produzem
+    // LOTES IGUAIS são um plano só: sessenta faturas de um implemento produzem
     // UMA frase ("para cada um dos 60 veículos… 240 cobranças"), não sessenta
     // parágrafos. É o que o documento faz, e o que mantém o acervo byte a byte
     // igual ao de antes da feature.
@@ -297,7 +297,7 @@ export function BudgetStepReview({
   // vão nascer). Os irmãos vêm do registro — é o que o documento vai imprimir.
   const formOrderNumber = useWatch({ control, name: "customerOrderNumber" }) as string | null | undefined;
   const openTaskId = (task as { id?: string } | null | undefined)?.id ?? null;
-  // Na edição de um orçamento de N veículos, cada caminhão está no formulário
+  // Na edição de um orçamento de N veículos, cada implemento está no formulário
   // (`vehicles[i]`) — o que acabou de ser digitado em QUALQUER aba, não só na aberta.
   const formVehicles = useWatch({ control, name: "vehicles" }) as
     | Array<{
@@ -348,7 +348,7 @@ export function BudgetStepReview({
         };
       });
     }
-    // Na CRIAÇÃO os caminhões ainda não existem: categoria e implemento são os
+    // Na CRIAÇÃO os implementos ainda não existem: categoria e implemento são os
     // do formulário e valem para todos os que vão nascer, como o nº do pedido.
     const typed = (formOrderNumber ?? "").trim() || null;
     const category = label(IMPLEMENT_CATEGORY_LABELS as any, formCategory);
@@ -482,7 +482,7 @@ export function BudgetStepReview({
   );
 
   // ⚠️ CLIENTES distintos, não fatias: sem isto um orçamento `PER_TASK` de
-  // quatro caminhões para um cliente abria um filtro "Completo / Cliente 1 /
+  // quatro implementos para um cliente abria um filtro "Completo / Cliente 1 /
   // Cliente 2 / Cliente 3 / Cliente 4" com o MESMO cliente quatro vezes.
   const hasMultipleCustomers = hasMultipleCustomersOf(customerConfigs);
 
@@ -644,13 +644,13 @@ export function BudgetStepReview({
 
                 Com um veículo, as linhas de sempre: placa, série, chassi.
 
-                Com N, elas dariam a identidade de UM caminhão no resumo de um
+                Com N, elas dariam a identidade de UM implemento no resumo de um
                 orçamento que cobre quatro — e o Resumo é exatamente a tela em
                 que se confere o conjunto antes de mandar ao cliente. Então vira
                 a MESMA tabela do documento e da página pública.
 
                 O passo 1 continua sendo o da tarefa ABERTA: é lá que se define
-                aquele caminhão, e nada do que se grava lá alcança os irmãos.
+                aquele implemento, e nada do que se grava lá alcança os irmãos.
                 ═══════════════════════════════════════════════════════════ */}
             {vehicleRows.length > 1 ? (
               <div className="rounded-lg bg-muted/50 px-4 py-3">
@@ -780,7 +780,7 @@ export function BudgetStepReview({
                 porque o pedido é da ENTREGA e não do pagador. */}
             {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderRow}
             {/* Plaqueta — é uma FOTO (implement.vinPlate -> File), não texto. Só aparece quando
-                existe: no create ainda não há caminhão gravado. */}
+                existe: no create ainda não há implemento gravado. */}
             {resolvedTask?.implement?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Plaqueta</span>
@@ -1036,7 +1036,7 @@ export function BudgetStepReview({
               // Mesma leitura do cartão de cliente único logo abaixo: o valor do
               // formulário é POR VEÍCULO, e a frase precisa falar do que a fatura
               // daquele plano cobra. Sem `vehicleCount`/`coveredVehicleCount` a
-              // cláusula saía como se o orçamento fosse de um caminhão só.
+              // cláusula saía como se o orçamento fosse de um implemento só.
               const configPaymentTexts = paymentPlans
                 .map(({ covered, prefix }) => {
                   const text = generatePaymentText({
@@ -1154,7 +1154,7 @@ export function BudgetStepReview({
           // `config.total` neste formulário é o valor de UM veículo (ver o
           // `form.reset` da tela de detalhe, que semeia com `perVehicleAmount`),
           // então o total da fatura é `por veículo × cobertos` — a mesma conta do
-          // documento. Sem isso a frase saía sobre o valor de um caminhão: um
+          // documento. Sem isso a frase saía sobre o valor de um implemento: um
           // orçamento conjunto de 4 veículos a R$ 1.750 anunciava "3 parcelas de
           // R$ 583,33" quando a fatura é de R$ 7.000 e a parcela, R$ 2.333,33.
           const paymentTexts = paymentPlans
@@ -1222,7 +1222,7 @@ export function BudgetStepReview({
         </div>
       )}
 
-      {/* Layout por veículo: as artes agrupadas pelos caminhões que as usam. */}
+      {/* Layout por veículo: as artes agrupadas pelos implementos que as usam. */}
       {layoutGroups && layoutGroups.length > 0 && (
         <div className="bg-muted/30 rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

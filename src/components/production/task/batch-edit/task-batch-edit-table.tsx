@@ -46,7 +46,7 @@ const taskBatchEditSchema = z.object({
             .nullable()
             .optional(),
           // O pedido de compra do cliente, por VEÍCULO (`Task.customerOrderNumber`).
-          // Livre: os N caminhões de um orçamento podem vir num pedido só, em
+          // Livre: os N implementos de um orçamento podem vir num pedido só, em
           // pedidos diferentes ou em blocos — e esta tela é justamente onde se
           // resolve "estes doze são do pedido 4471".
           customerOrderNumber: z.string().max(100, "Máximo de 100 caracteres").nullable().optional(),
@@ -199,7 +199,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
    *
    * Irmão de `handleFillSerialNumbers`, e deliberadamente SEM a sequência: um
    * número de série é uma contagem, um pedido de compra é um documento — doze
-   * caminhões do pedido 4471 citam todos o 4471, e incrementar daria 4472 ao
+   * implementos do pedido 4471 citam todos o 4471, e incrementar daria 4472 ao
    * segundo, que é um pedido que existe e é de outra coisa.
    */
   const handleFillOrderNumbers = () => {
@@ -265,14 +265,14 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         //
         // A grade os montava no primeiro nível de `data`. O schema de update só os
         // conhece dentro de `implement` e NÃO é `.strict()`: o zod APAGA a chave que
-        // não reconhece, sem erro. O operador editava a placa de doze caminhões,
+        // não reconhece, sem erro. O operador editava a placa de doze implementos,
         // lia "12 tarefas atualizadas com sucesso" e nada mudava. (Só
         // `customerOrderNumber` é de primeiro nível — é da TAREFA, não do veículo.)
         //
         // ⚠️ E SÓ QUANDO MUDOU. A grade manda a LINHA INTEIRA, então `plate` e
         // `chassisNumber` nunca são `undefined` — montar `implement` sempre faria
         // toda tarefa carregar um bloco de veículo, e o repositório faz `upsert`:
-        // tarefa que NÃO tem caminhão ganharia um, criado do nada e com `spot`
+        // tarefa que NÃO tem implemento ganharia um, criado do nada e com `spot`
         // forçado a nulo contra o `@default(YARD_WAIT)` — um veículo nascido fora
         // do mapa do pátio, em cada gravação de lote.
         const original = tasks.find((t: any) => t.id === task.id);

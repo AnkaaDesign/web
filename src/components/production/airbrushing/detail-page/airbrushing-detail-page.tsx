@@ -751,7 +751,7 @@ export function AirbrushingDetailPage() {
           { id: "taskName", label: "Nome da Tarefa", icon: IconClipboardList, accessor: (a) => a.task?.name ?? null },
           {
             // "Identificador", não "Número de Série": a tarefa é identificada pelo
-            // número de série OU, quando não tem, pela placa do caminhão — é assim
+            // número de série OU, quando não tem, pela placa do implemento — é assim
             // que a agenda, o histórico e a exportação de tarefas já a rotulam.
             // Mostrar só o serialNumber deixava carreta identificada por placa
             // aparecendo como se não tivesse identificação nenhuma.

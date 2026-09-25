@@ -34,7 +34,7 @@ export const invoiceService = {
    *
    * `Invoice.taskId` só existe quando a fatura é de UM veículo. Numa fatura
    * conjunta ele é NULO, e perguntar pela rota `/task/:taskId` devolve lista
-   * VAZIA — que é o que acontecia num orçamento de sessenta caminhões faturado
+   * VAZIA — que é o que acontecia num orçamento de sessenta implementos faturado
    * junto: a tela de Faturamento, o cartão de faturas e a seção da tarefa
    * mostravam "nenhuma fatura" sobre uma cobrança de R$ 730.224,00 emitida.
    */
@@ -46,7 +46,7 @@ export const invoiceService = {
           nfseDocuments: true,
           customer: true,
           // A COBERTURA vem junto (a API a injeta em `customerConfig`): é ela
-          // que permite à tela de UM caminhão filtrar, das faturas do orçamento,
+          // que permite à tela de UM implemento filtrar, das faturas do orçamento,
           // as que o cobram.
           customerConfig: true,
         },

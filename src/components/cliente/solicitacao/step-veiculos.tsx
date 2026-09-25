@@ -18,7 +18,7 @@
 // ⛔ E A MEDIDA DO IMPLEMENTO NÃO MORA NA LINHA.
 //
 // Ela morava: cada veículo tinha altura e três comprimentos, e quem pedia dez
-// caminhões do mesmo modelo digitava os mesmos quatro números dez vezes. É a
+// implementos do mesmo modelo digitava os mesmos quatro números dez vezes. É a
 // segunda metade da mesma armadilha do produto cartesiano, pelo avesso — ali o
 // perigo era COMBINAR o que é de linhas diferentes; aqui era REPETIR o que é do
 // lote inteiro, e cada repetição é uma chance de duas linhas divergirem sem
@@ -396,12 +396,12 @@ function primeiraMensagem(no: unknown, profundidade = 0): string | null {
  * AS MEDIDAS DO IMPLEMENTO — UMAS SÓ, PARA A REQUISIÇÃO INTEIRA.
  *
  * ⛔ NÃO HÁ ESCAPE POR VEÍCULO, e isso é decisão, não esquecimento. Um seletor
- * "este caminhão é diferente" reintroduziria exatamente o estado ambíguo que
+ * "este implemento é diferente" reintroduziria exatamente o estado ambíguo que
  * esta mudança extingue — a tela passaria a ter duas verdades sobre o mesmo
  * lote, e a linha que ninguém abriu guardaria uma medida que ninguém conferiu.
  * Quem tem implementos de modelos diferentes abre DUAS requisições, que é o que
  * o comercial vai fazer com elas de qualquer forma (orçamentos distintos), e o
- * ajuste fino por caminhão continua existindo do lado da Ankaa, na tarefa.
+ * ajuste fino por implemento continua existindo do lado da Ankaa, na tarefa.
  *
  * ⚠️ O INTERRUPTOR É O ATO AFIRMATIVO. Sem ele, `medidas` é `null` e nenhum
  * veículo recebe medida. Não dá para deixar o componente montado e "vazio": o

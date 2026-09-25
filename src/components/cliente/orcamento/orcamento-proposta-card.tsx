@@ -100,7 +100,7 @@ export function OrcamentoPropostaCard({
 
   // O CLIENTE não é campo do orçamento: o `select` o pendura em cada TAREFA
   // (`identity.customer`), porque o escopo do veículo vale dentro do orçamento e
-  // um contato pode receber só os caminhões que lhe dizem respeito. O primeiro
+  // um contato pode receber só os implementos que lhe dizem respeito. O primeiro
   // veículo com identidade responde a pergunta "de quem é este documento?".
   const cliente = budget.vehicles?.map((v) => v.identity?.customer).find((c) => !!c)?.name ?? null;
 
@@ -123,7 +123,7 @@ export function OrcamentoPropostaCard({
 
         {/* ── ANDAMENTO DO CONTRATO — seção `DELIVERY` ──────────────────────
             O marco do orçamento é o MENOR entre os veículos vivos: o contrato
-            só está concluído quando o último caminhão saiu. Vem pronto do
+            só está concluído quando o último implemento saiu. Vem pronto do
             servidor e é PROJEÇÃO MONOTÔNICA — a tela nunca o recalcula. */}
         {budget.milestoneLabel ? (
           <DetailRow label="Andamento" value={budget.milestoneLabel} />

@@ -299,7 +299,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     // Include previewConfig from the generator settings (exclude baseColor and finish)
     /* `previewConfig` tem DOIS autores: os quatro campos abaixo são do gerador
        da amostra 2D, e o `paint-lab.html` grava no MESMO objeto a receita PBR
-       que o Truck Studio lê para pintar o caminhão em 3D (`pearlFlip`,
+       que o Truck Studio lê para pintar o veículo em 3D (`pearlFlip`,
        `pearlMid`, `flakeDensity`, `peelScale`, …).
 
        Por isso o que já está gravado entra POR BAIXO em vez de o objeto ser

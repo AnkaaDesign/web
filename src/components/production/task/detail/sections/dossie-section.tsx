@@ -72,7 +72,7 @@ export async function exportTaskDossiePdf(task: Task, customerId?: string | null
     // nomeia é o cliente do recorte — e `task.customer` é sempre o da tarefa, o
     // que faria os dois dossiês de um faturamento de dois clientes chegarem com
     // o mesmo nome. (Antes daqui já se usou o nome de EXIBIÇÃO da tarefa, que cai
-    // na placa do caminhão e não tem número nenhum.)
+    // na placa do implemento e não tem número nenhum.)
     a.download =
       filenameFromDisposition(res?.headers?.["content-disposition"]) ??
       dossierPdfFilename(task.customer, task.quote?.budgetNumber);

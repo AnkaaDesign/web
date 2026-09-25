@@ -2,17 +2,17 @@
 //
 // OS VEÍCULOS DE UM ORÇAMENTO, EM ETIQUETAS.
 //
-// O cliente não procura orçamento por número: procura pelo CAMINHÃO. "O 1042" e
+// O cliente não procura orçamento por número: procura pelo IMPLEMENTO. "O 1042" e
 // "o da placa ABC1D23" são as duas formas que ele usa, e são exatamente série e
 // placa. Por isso a coluna de veículos é uma fileira de etiquetas legíveis, e
 // não um número solto de quantidade.
 //
 // ⚠️ A quantidade continua sendo dita por extenso quando as etiquetas não cabem
-// (ou não vieram): um orçamento de sessenta caminhões não pode virar sessenta
+// (ou não vieram): um orçamento de sessenta implementos não pode virar sessenta
 // etiquetas dentro de uma linha de tabela.
 //
 // ⚠️ SEM `identity` (o contato não tem a seção `VEHICLE`) a etiqueta cai no NOME
-// do serviço, e não em "sem identificação": o caminhão tem placa, quem não a vê
+// do serviço, e não em "sem identificação": o implemento tem placa, quem não a vê
 // é esta pessoa, e dizer "sem identificação" transformaria um recorte de
 // privilégio num relatório de pendências falso.
 import type { PortalVehicle } from "@/api-client/portal";
@@ -28,7 +28,7 @@ const LIST_CHIP_LIMIT = 3;
  *
  * Nunca devolve string vazia — um veículo ainda sem identificação (o caso normal
  * de uma requisição recém-aberta) tem de aparecer, senão a linha mente sobre
- * quantos caminhões o orçamento cobre.
+ * quantos implementos o orçamento cobre.
  */
 export function vehicleChipLabel(vehicle: PortalVehicle): string {
   const identity = portalIdentityOf(vehicle);
@@ -45,7 +45,7 @@ export function vehicleChipLabel(vehicle: PortalVehicle): string {
  * completo ("90201 · RKO7A01") não cabe e o `truncate` produzia três etiquetas
  * cortadas no MEIO — "90201 · RK(", "90202 · RK(" —, que é o pior dos dois
  * mundos: ocupa o espaço da placa e não mostra placa nenhuma. A série sozinha
- * cabe inteira e é justamente o token que identifica o caminhão na conversa do
+ * cabe inteira e é justamente o token que identifica o implemento na conversa do
  * cliente ("o 90201"). A placa continua no `title` e na tela do veículo.
  *
  * Com UM veículo o rótulo completo cabe, e aí mostrar os dois é melhor: quem
@@ -68,7 +68,7 @@ export function VehicleChips({
    * `Budget.vehicleCount` — a verdade sobre QUANTOS são.
    *
    * ⚠️ Não é `vehicles.length`: o `select` das tarefas dentro do orçamento é
-   * ESCOPADO (`taskScopeWhere`), então num orçamento `PER_TASK` de dez caminhões
+   * ESCOPADO (`taskScopeWhere`), então num orçamento `PER_TASK` de dez implementos
    * quem paga o terceiro recebe UM veículo e o contador continua dizendo dez. As
    * duas informações são verdadeiras e diferentes.
    */
@@ -93,7 +93,7 @@ export function VehicleChips({
   return (
     // ⛔ `flex-nowrap`, NUNCA `flex-wrap`.
     //
-    // Com quebra de linha, um orçamento de três caminhões desenhava três
+    // Com quebra de linha, um orçamento de três implementos desenhava três
     // etiquetas EMPILHADAS e a linha da tabela ficava três vezes mais alta que
     // as vizinhas — a lista perdia o ritmo e a varredura com o olho, que é a
     // única coisa que uma tabela oferece. Agora a fileira é sempre de UMA

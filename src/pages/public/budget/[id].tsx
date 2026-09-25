@@ -212,7 +212,7 @@ export function PublicBudgetPage() {
     if (!quote?.services) return [];
     if (!selectedCustomerId) return quote.services;
     // ⚠️ CLIENTES DISTINTOS, não fatias. Num orçamento `PER_TASK` de quatro
-    // caminhões para UM cliente há quatro fatias — e contá-las fazia todo
+    // implementos para UM cliente há quatro fatias — e contá-las fazia todo
     // serviço sem `invoiceToCustomerId` (que são todos, num orçamento de um
     // cliente só) ser filtrado para fora. O cliente abria a página em que
     // ASSINA e via "Serviços" vazio e "Total geral R$ 0,00".
@@ -317,7 +317,7 @@ export function PublicBudgetPage() {
   // Agrupar por TERMOS + TAMANHO DA COBERTURA é o que mantém `PER_TASK` numa
   // frase só (sessenta faturas iguais não viram sessenta parágrafos) e, ao mesmo
   // tempo, impede que lotes DESIGUAIS — vinte e quarenta — sejam descritos pelo
-  // primeiro, com a página calando sobre os outros quarenta caminhões.
+  // primeiro, com a página calando sobre os outros quarenta implementos.
   const vehicleTotal = Math.max(1, taskCount(quote));
   const clauseFor = (config: any, groupVehicleCount: number): string =>
     generatePaymentText({
@@ -392,7 +392,7 @@ export function PublicBudgetPage() {
 
   // Use serve endpoint for full quality images (layoutFiles array).
   //
-  // Com UM LAYOUT PARA CADA VEÍCULO, cada arte sai com a legenda dos caminhões que
+  // Com UM LAYOUT PARA CADA VEÍCULO, cada arte sai com a legenda dos implementos que
   // ela cobre ("Veículo 39088"), na ordem dos veículos — a mesma do documento
   // assinado. No compartilhado, sem legenda: igual ao de sempre.
   const layoutPerVehicle = layoutScopeOf(quote as any) === "PER_VEHICLE";
@@ -462,7 +462,7 @@ export function PublicBudgetPage() {
 
   // Recalculate discount and total based on active filter
   // ⚠️ CLIENTES DISTINTOS, nunca faturas. Num orçamento cobrado veículo a
-  // veículo há uma fatura por caminhão, todas do mesmo cliente: contar faturas
+  // veículo há uma fatura por implemento, todas do mesmo cliente: contar faturas
   // fazia esta tela — a que o cliente ASSINA — entrar no modo "completo" e
   // filtrar os serviços para fora da lista, anunciando "Serviços" vazio e
   // "Total geral R$ 0,00".
@@ -474,7 +474,7 @@ export function PublicBudgetPage() {
   // A lista de serviços acima mostra o preço de UM veículo, e
   // `activeConfig.total` é o que a FATURA cobra — que em `JOINT` já vem
   // multiplicado. Exibir os dois lado a lado sem a linha de multiplicação faria
-  // a lista não fechar com o total: num orçamento de sessenta caminhões, por um
+  // a lista não fechar com o total: num orçamento de sessenta implementos, por um
   // fator de sessenta.
   //
   // A conta é refeita a partir dos serviços com a MESMA fórmula da API
@@ -955,7 +955,7 @@ export function PublicBudgetPage() {
                         });
                         if (!configPaymentText && !config.customer) return null;
                         const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
-                        // DE QUAIS CAMINHÕES É ESTA FATURA. Com lotes o mesmo
+                        // DE QUAIS IMPLEMENTOS É ESTA FATURA. Com lotes o mesmo
                         // cliente aparece K vezes aqui, e sem isto os blocos
                         // ficam indistinguíveis — o cliente lê duas condições de
                         // pagamento sob o mesmo nome, sem saber a qual veículo
@@ -1006,7 +1006,7 @@ export function PublicBudgetPage() {
                   {/* UMA CLÁUSULA POR FATURA. Com uma fatia — o acervo inteiro,
                       `JOINT` e `PER_TASK` — é um parágrafo só, sem rótulo,
                       exatamente como antes. Com lotes são K, cada um dizendo de
-                      quais caminhões fala: duas condições de pagamento
+                      quais implementos fala: duas condições de pagamento
                       diferentes uma sob a outra, sem distinção, seriam lidas
                       como se a primeira valesse por todos. Espelha o
                       `quote-html.builder.ts`. */}

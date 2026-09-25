@@ -6,7 +6,7 @@
  * Os assistentes tinham UM PASSO POR FATURA e chamavam todos de "Cliente N". Num
  * orçamento cobrado veículo a veículo as N faturas são do MESMO cliente, então a
  * tela mostrava "Cliente 1", "Cliente 2", "Cliente 3", "Cliente 4" — o mesmo
- * nome quatro vezes, sem dizer de qual caminhão era cada passo. O operador
+ * nome quatro vezes, sem dizer de qual implemento era cada passo. O operador
  * editava o segundo achando que era o segundo veículo.
  *
  * Pior: o save reenviava as quatro SEM a cobertura, o servidor entendia "decida
@@ -255,7 +255,7 @@ describe('"Faturar Para" numa linha de TAREFA', () => {
   ];
 
   it("o mesmo cliente NÃO se repete uma vez por veículo", () => {
-    // Era isto que a tela imprimia: o nome quatro vezes no detalhe de UM caminhão.
+    // Era isto que a tela imprimia: o nome quatro vezes no detalhe de UM implemento.
     expect(taskInvoiceCustomerNames(porVeiculo, "t1")).toEqual([nomeA]);
     expect(taskInvoiceCustomerLabel(porVeiculo, "t3")).toBe(nomeA);
   });
@@ -302,7 +302,7 @@ describe('"Faturar Para" numa linha de TAREFA', () => {
  * O NÚMERO DO LOTE SAI DA LISTA DE VEÍCULOS, NÃO DA ORDEM DAS FATURAS.
  *
  * "Lote 1" é só a posição na lista, e ela herdava a ordem em que as faturas
- * voltavam da API. O painel abria de trás para frente — o primeiro caminhão no
+ * voltavam da API. O painel abria de trás para frente — o primeiro implemento no
  * Lote 4, o último no Lote 1 — e cada mudança renumerava tudo debaixo da mão do
  * operador: ele escolhia "Lote 4" e a linha passava a exibir "Lote 3".
  *

@@ -60,7 +60,7 @@ interface BudgetStepTaskProps {
   onLayoutsChange: (files: FileWithPreview[]) => void;
   onLayoutStatusChange: (fileId: string, status: string) => void;
   onPaintCreated?: (paint: any) => void;
-  /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. Edit mode only. */
+  /** Foto da plaqueta (VIN) já anexada ao implemento, se houver. Edit mode only. */
   vinPlateFiles?: FileWithPreview[];
   onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
 
@@ -68,7 +68,7 @@ interface BudgetStepTaskProps {
   //
   // O passo tem duas metades. COMUM a todos: logomarca, cliente, categoria,
   // implemento, tamanho, responsáveis e arquivos base — mesmo orçamento, mesmo
-  // preço, mesmo caminhão. DE CADA veículo: série, placa, pedido, chassi, plaqueta,
+  // preço, mesmo implemento. DE CADA veículo: série, placa, pedido, chassi, plaqueta,
   // previsão, prazo, detalhes, pintura geral e aerografia. Decisão do dono,
   // 23/09/2026, a partir do caso Carlotti (nº 990).
 
@@ -394,10 +394,10 @@ export function BudgetStepTask({
                         Aqui, no passo da identificação, e não no de faturamento:
                         o pedido identifica a ENTREGA, como a série e a placa, e é
                         por isso que ele mora em `Task.customerOrderNumber` e não
-                        na configuração de faturamento (onde os N caminhões de um
+                        na configuração de faturamento (onde os N implementos de um
                         orçamento eram obrigados a citar o mesmo número).
 
-                        Em EDIÇÃO o campo é só deste caminhão: é assim que se
+                        Em EDIÇÃO o campo é só deste implemento: é assim que se
                         corrige um dos quatro sem tocar nos outros três. Na
                         criação (abaixo) ele vale para todos os que nascerem. */}
                     <FormField
@@ -450,9 +450,9 @@ export function BudgetStepTask({
                     />
                     {/* Plaqueta — FOTO da plaqueta de identificação (VIN), imagem única. Mesmo
                         campo do formulário de Tarefa e do Faturamento: quem monta o orçamento é
-                        quem está com o caminhão à vista, e mandar abrir outra tela para anexar a
+                        quem está com o implemento à vista, e mandar abrir outra tela para anexar a
                         foto é como ela deixa de ser anexada. Só no modo edição: no create ainda
-                        não existe caminhão gravado (e uma única foto não serve para N tarefas). */}
+                        não existe implemento gravado (e uma única foto não serve para N tarefas). */}
                     {onVinPlateFilesChange && (
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
@@ -490,7 +490,7 @@ export function BudgetStepTask({
                       disabled={disabled || serialNumbers.length > 1}
                     />
                     {/* N° DO PEDIDO — UM campo para os N veículos que vão nascer.
-                        O caso comum é o cliente comprar os quatro caminhões num
+                        O caso comum é o cliente comprar os quatro implementos num
                         pedido só, e pedir quatro vezes o mesmo número seria o
                         tipo de trabalho que faz o operador deixar tudo em branco.
                         Quando os pedidos diferem, cada tarefa se corrige depois,

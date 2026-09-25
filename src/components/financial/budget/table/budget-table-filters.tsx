@@ -225,9 +225,9 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
 
   // --- o que é do VEÍCULO ---------------------------------------------------
   // Um único nó `some`: as condições valem para O MESMO veículo, que é a
-  // leitura que o operador espera ("tem algum caminhão em produção com prazo
+  // leitura que o operador espera ("tem algum implemento em produção com prazo
   // nesta semana?"). Espalhá-las em `some` separados responderia a outra
-  // pergunta — um caminhão em produção E outro, qualquer, com aquele prazo.
+  // pergunta — um implemento em produção E outro, qualquer, com aquele prazo.
   const vehicle: Record<string, unknown> = {};
 
   const taskStatuses = stringList(filters.taskStatuses);
@@ -258,14 +258,14 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
   // veículo satisfaz o status, o prazo E a falta de pedido", que é mais estrito
   // e muda em silêncio o que os outros filtros querem dizer. A semântica de
   // `orderNumberPresenceWhere` (`some` em vez de `none` — um orçamento em que só
-  // UM caminhão está sem pedido ainda é um orçamento a cobrar) sobe um nível e
+  // UM implemento está sem pedido ainda é um orçamento a cobrar) sobe um nível e
   // continua certa.
   const orderNumberWhere = orderNumberPresenceWhere(filters.hasOrderNumber);
   if (orderNumberWhere) and.push({ tasks: { some: orderNumberWhere } });
 
   // ── SÓ ORÇAMENTO COM VEÍCULO: regra da lista, não filtro ─────────────────
   //
-  // Orçamento é de caminhão. A API recusa criar um sem tarefa e cancela o
+  // Orçamento é de implemento. A API recusa criar um sem tarefa e cancela o
   // orçamento quando o último veículo é excluído; os órfãos antigos foram
   // apagados. A condição fica mesmo assim, fixa, para que um resto de dado
   // nunca volte a ocupar a primeira página.

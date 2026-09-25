@@ -34,7 +34,7 @@ export interface Task extends BaseEntity {
    * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
    *
    * Morava em `BudgetPayer.orderNumber` — por CLIENTE — e isso
-   * obrigava os N caminhões de um mesmo orçamento a citarem o mesmo número na
+   * obrigava os N implementos de um mesmo orçamento a citarem o mesmo número na
    * nota e no boleto. O pedido é por ENTREGA: cada veículo tem o seu.
    */
   customerOrderNumber: string | null;

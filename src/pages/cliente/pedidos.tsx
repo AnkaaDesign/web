@@ -5,7 +5,7 @@
 // ── Por que esta tela existe ────────────────────────────────────────────────
 //
 // O número do pedido de compra morava numa coluna de TEXTO LIVRE do orçamento.
-// Cabia uma string e não cabia a relação: não dava para dizer quais caminhões
+// Cabia uma string e não cabia a relação: não dava para dizer quais implementos
 // daquele orçamento entravam em qual pedido, nem para um pedido atravessar dois
 // orçamentos, nem para saber quais veículos ainda estão sem número — que é
 // exatamente a pergunta que o ⛔ PORTÃO DO COMPRAS faz na hora de assinar.
@@ -126,7 +126,7 @@ const COLUMNS: DataTableColumnDef<PortalPurchaseOrder>[] = [
       if (veiculos.length === 0) return <span className="text-sm text-muted-foreground">—</span>;
       return (
         // A contagem serve para varrer a lista; os identificadores, para
-        // CONFERIR. Quem abre um pedido de compra quer saber quais caminhões
+        // CONFERIR. Quem abre um pedido de compra quer saber quais implementos
         // entraram nele, e só o número não responde isso.
         <span className="flex min-w-0 items-center gap-1.5">
           <Badge variant="secondary" className="shrink-0">

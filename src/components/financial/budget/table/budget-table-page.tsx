@@ -24,7 +24,7 @@ import { BUDGET_DEFAULT_PAGE_SIZE, BUDGET_QUOTE_INCLUDE, buildBudgetQuery, creat
  * A LINHA É UM ORÇAMENTO.
  *
  * Era uma TAREFA (`useTasks` + `getRowId = t.id`), e um orçamento de quatro
- * caminhões virava quatro linhas com o mesmo número 984, `meta.totalRecords = 4`
+ * implementos virava quatro linhas com o mesmo número 984, `meta.totalRecords = 4`
  * e um rodapé anunciando "4 resultado(s)". O dono leu quatro orçamentos porque a
  * tela desenhou quatro. A unidade da consulta mudou para `GET /budgets`, e
  * com ela o rodapé, a seleção múltipla (marcar "tudo" deixou de marcar quatro

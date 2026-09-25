@@ -3,7 +3,7 @@
 // PASSO 1 — DE QUEM É O SERVIÇO, E PARA QUEM VAI A FATURA.
 //
 // São DUAS perguntas e não uma, e o caso que prova isso é a Furgões: o
-// implementador manda pintar o furgão e paga a pintura; o dono do caminhão
+// implementador manda pintar o furgão e paga a pintura; o dono do veículo
 // manda aplicar a logomarca e paga a logomarca. Cliente do serviço e pagador
 // são pessoas diferentes, e o orçamento precisa dos dois — `Task.customerId` de
 // um lado, `BudgetPayer.customerId` ("Faturar Para") do outro.

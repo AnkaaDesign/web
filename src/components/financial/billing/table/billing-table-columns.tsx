@@ -26,7 +26,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // A LINHA É UMA COBRANÇA (`Billing`), NÃO UM VEÍCULO
 //
-// Era uma TAREFA, e um orçamento `JOINT` de quatro caminhões ocupava QUATRO
+// Era uma TAREFA, e um orçamento `JOINT` de quatro implementos ocupava QUATRO
 // linhas com o mesmo número 984, o rodapé dizia "4 resultado(s)" e o pager do
 // detalhe dizia "1 / 4" — quatro linhas para UMA cobrança, que é uma coisa só:
 // uma fatura, um plano de parcelas, uma NFS-e. Com `PER_TASK` as quatro linhas
@@ -274,7 +274,7 @@ export function createBillingColumns({ lens = [] }: BillingColumnsOptions = {}):
     },
     {
       // A logomarca dos veículos COBERTOS, deduplicada. No caso normal é um nome
-      // só (a mesma arte nos N caminhões); divergindo, "a, b +N".
+      // só (a mesma arte nos N implementos); divergindo, "a, b +N".
       id: "name",
       header: "Logomarca",
       accessorFn: (b) => distinct(coveredTasks(b).map((t) => t.name)).join(", "),
@@ -447,7 +447,7 @@ export function createBillingColumns({ lens = [] }: BillingColumnsOptions = {}):
       // O QUE ESTA COBRANÇA COBRA — `Σ customerConfigs[].total`, já gravado.
       //
       // ⚠️ SOME o "/veíc." e a divisão `quote.total ÷ N`. Aquilo existia porque a
-      // linha era um veículo de um contrato: num orçamento de sessenta caminhões a
+      // linha era um veículo de um contrato: num orçamento de sessenta implementos a
       // coluna afirmava R$ 730.224,00 sessenta vezes, e a divisão era o remendo. A
       // linha agora é a cobrança, e o valor dela é o que ela cobra — a soma das
       // linhas de um orçamento reconstrói o contrato por construção.

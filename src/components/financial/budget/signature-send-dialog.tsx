@@ -472,7 +472,7 @@ export function SignatureSendDialog({
 
 {/* ---- Identificação do veículo ----
                    Com um veículo, a frase de sempre. Com N, o aviso diz em
-                   QUANTOS falta: um orçamento de sessenta caminhões em que só o
+                   QUANTOS falta: um orçamento de sessenta implementos em que só o
                    de nº 40 está sem placa não pode ser anunciado como "este
                    orçamento está sem placa do veículo" — nem o inverso, um em
                    que faltam cinquenta e nove como se fosse um.

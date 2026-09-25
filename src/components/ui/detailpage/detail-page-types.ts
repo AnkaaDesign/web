@@ -132,7 +132,7 @@ export interface DetailFieldDef<TData = any> {
    *
    * Existe para campos que são ALVO de uma regra de atenção mas não têm widget de
    * edição inline: a foto da plaqueta (`vinPlate`) sumia quando não preenchida, e a
-   * regra R3c — "o caminhão chegou e ninguém fotografou a plaqueta" — ficava sem
+   * regra R3c — "o veículo chegou e ninguém fotografou a plaqueta" — ficava sem
    * nenhuma linha para piscar, justamente no único estado em que ela importa.
    */
   keepWhenEmpty?: boolean;

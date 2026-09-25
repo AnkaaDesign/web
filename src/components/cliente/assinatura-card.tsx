@@ -152,7 +152,7 @@ export function AssinaturaCard({
       <>
         {/* ── Os veículos ─────────────────────────────────────────────────
             Aparecem SEMPRE que o recorte os libera, e não só quando o portão
-            fecha: é aqui que a pessoa confere que está assinando pelo caminhão
+            fecha: é aqui que a pessoa confere que está assinando pelo implemento
             certo, e é a mesma lista que o número do pedido vai carimbar. */}
         {veiculos.length > 0 && (
           // ⚠️ `bg-muted/50` SEM BORDA — a superfície do `DetailRow` da casa

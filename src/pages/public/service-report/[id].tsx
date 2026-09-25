@@ -241,7 +241,7 @@ export function PublicServiceReportPage() {
   // reunited with the rest in Completo.
   const serviceCustomerId = (svc: any): string | undefined => svc?.invoiceToCustomerId || svc?.invoiceToCustomer?.id;
   // CLIENTES DISTINTOS, nunca faturas — ver a nota gêmea na página pública do
-  // orçamento. Um orçamento de quatro caminhões de um cliente só tem quatro
+  // orçamento. Um orçamento de quatro implementos de um cliente só tem quatro
   // faturas e UM cliente.
   const isMultiCustomerQuote = hasMultipleCustomers(quote.customerConfigs);
   const services = (quote.services || []).filter((s: any) => {
@@ -306,10 +306,10 @@ export function PublicServiceReportPage() {
   // ═══════════════════════════════════════════════════════════════════════════
   //
   // Era `relevantConfigs.map(...)`: um bloco por fatia de faturamento. Num
-  // orçamento `PER_TASK` de quatro caminhões do MESMO cliente isso rendia quatro
+  // orçamento `PER_TASK` de quatro implementos do MESMO cliente isso rendia quatro
   // quadros do tomador idênticos — mesma razão social, mesmo CNPJ, mesmas
   // inscrições, mesmo endereço — cada um seguido da mesma cláusula, palavra por
-  // palavra. Com sessenta caminhões seriam sessenta. O documento repetia a
+  // palavra. Com sessenta implementos seriam sessenta. O documento repetia a
   // mesma informação e não acrescentava nada em nenhuma repetição.
   //
   // O PDF do dossiê nunca fez isso: ele agrupa as fatias por TERMOS + TAMANHO DA
@@ -408,7 +408,7 @@ export function PublicServiceReportPage() {
           // A COBERTURA, como na página do orçamento e no documento. O dossiê é
           // peça que vai ao CLIENTE: sem ela, um orçamento cobrado veículo a
           // veículo prometia "3 parcelas de R$ 583,33" sobre um contrato de
-          // R$ 7.000, sem dizer que são por caminhão nem quantas cobranças
+          // R$ 7.000, sem dizer que são por implemento nem quantas cobranças
           // existem no total — a mesma ambiguidade que o PDF já desfazia.
           vehicleCount: quoteVehicleCount(quote as any),
           coveredVehicleCount: coveredTaskIds(config).length || undefined,
@@ -416,9 +416,9 @@ export function PublicServiceReportPage() {
         // ⚠️ O Nº DO PEDIDO SAIU DAQUI, como já saíra do PDF.
         //
         // Ele identifica a ENTREGA, não a cobrança, e mora na TAREFA desde
-        // `20260909170000` — um orçamento de quatro caminhões pode ter quatro
+        // `20260909170000` — um orçamento de quatro implementos pode ter quatro
         // pedidos diferentes. A tabela de veículos, no alto desta mesma página,
-        // tem coluna própria para ele e mostra qual pedido é de qual caminhão.
+        // tem coluna própria para ele e mostra qual pedido é de qual implemento.
         // Repeti-lo aqui, achatado num rótulo só, dizia menos e sugeria que
         // fosse do faturamento.
         // AS PARCELAS EMITIDAS, com data e valor — e a conta que as recebe.
@@ -505,15 +505,15 @@ export function PublicServiceReportPage() {
 
   // AS ORDENS DE SERVIÇO DE TODOS OS VEÍCULOS.
   //
-  // Era só as da primeira tarefa. Num orçamento de sessenta caminhões isso
+  // Era só as da primeira tarefa. Num orçamento de sessenta implementos isso
   // mostraria as fotos de um e omitiria as dos outros cinquenta e nove — um
   // dossiê que parece completo e não é, que é o pior formato possível para uma
   // peça que existe para provar o que foi feito.
   //
   // Cada ordem carrega o veículo a que pertence (`_vehicle`), porque com sessenta
-  // caminhões há sessenta blocos "Logomarca Laterais" e o número de série é a
+  // implementos há sessenta blocos "Logomarca Laterais" e o número de série é a
   // única coisa que os distingue. Agrupado por VEÍCULO antes de por posição: o
-  // dossiê fotográfico se lê caminhão a caminhão.
+  // dossiê fotográfico se lê implemento a implemento.
   const quoteTaskRows = quoteTasks<any>(quote);
   const multiVehicleDossier = quoteTaskRows.length > 1;
   const serviceOrders = quoteTaskRows.flatMap((task: any) =>
@@ -1023,7 +1023,7 @@ export function PublicServiceReportPage() {
                       {block.schedules.map((sched, si) => (
                         <div key={sched.id || si} className="mt-3">
                           {/* O rótulo só existe quando a cláusula cobre mais de
-                              uma fatura: ele diz DE QUAIS caminhões são estas
+                              uma fatura: ele diz DE QUAIS implementos são estas
                               datas. Com uma só, a tabela sai sem título. */}
                           {sched.label && (
                             <p className="mb-1 text-sm font-semibold text-gray-800">{sched.label}</p>
@@ -1204,7 +1204,7 @@ export function PublicServiceReportPage() {
                           <span className="ml-2 font-normal text-xs opacity-80">{so.observation}</span>
                         )}
                         {/* DE QUE VEÍCULO É ESTE BLOCO. Só sai quando o orçamento
-                            cobre mais de um: com sessenta caminhões há sessenta
+                            cobre mais de um: com sessenta implementos há sessenta
                             blocos "Logomarca Laterais", e o número de série é a
                             única coisa que os distingue. */}
                         {so._vehicle && (

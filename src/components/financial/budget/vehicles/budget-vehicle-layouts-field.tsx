@@ -44,14 +44,14 @@ const withPreview = (picked: File[]): FileWithPreview[] =>
  *
  * Dois modos, numa chave só:
  *   • o mesmo layout para todos — o de sempre, e o que o orçamento de sessenta
- *     caminhões iguais quer;
- *   • um layout para cada veículo — o da Carlotti: mesmo preço, cada caminhão com a
- *     sua arte. A API aprova cada arte SÓ no caminhão dela, e o documento a mostra com
+ *     implementos iguais quer;
+ *   • um layout para cada veículo — o da Carlotti: mesmo preço, cada implemento com a
+ *     sua arte. A API aprova cada arte SÓ no implemento dela, e o documento a mostra com
  *     a legenda do veículo.
  *
  * As opções são as artes aprovadas de TODOS os veículos (a equipe de arte sobe o layout
- * na tarefa de cada caminhão). A mesma arte escolhida em dois caminhões é uma arte só
- * cobrindo os dois. Subir uma arte nova aqui a aprova no(s) caminhão(ões) em que ela
+ * na tarefa de cada implemento). A mesma arte escolhida em dois implementos é uma arte só
+ * cobrindo os dois. Subir uma arte nova aqui a aprova no(s) implemento(ões) em que ela
  * foi escolhida.
  */
 export function BudgetVehicleLayoutsField({

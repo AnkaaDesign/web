@@ -4,8 +4,8 @@ import type { QuoteLayoutFile, QuoteLayoutScope } from "../types/budget";
 /**
  * O LAYOUT APROVADO DE CADA VEÍCULO.
  *
- * Um orçamento cobre N caminhões com UM preço, mas cada um pode ter a sua arte — o
- * caso que abriu isto foi o da Carlotti (nº 990): dois caminhões, mesmo valor, cada
+ * Um orçamento cobre N implementos com UM preço, mas cada um pode ter a sua arte — o
+ * caso que abriu isto foi o da Carlotti (nº 990): dois implementos, mesmo valor, cada
  * um com pintura geral e layout próprios. Até então o "layout aprovado" era uma
  * lista só do orçamento, e a API o aprovava em TODOS os veículos e reprovava em
  * todos o que ficava de fora: trocar a arte pela segunda tarefa reprovava a da
@@ -58,7 +58,7 @@ export function sharedLayoutsPayload(fileIds: string[]): QuoteLayoutEntry[] {
 }
 
 /**
- * O layout por veículo: parte da seleção de cada caminhão e junta, por arte, os
+ * O layout por veículo: parte da seleção de cada implemento e junta, por arte, os
  * veículos que a escolheram. A ordem das artes é a do primeiro veículo que as cita
  * (a ordem canônica das tarefas), que é a ordem em que o documento as mostra.
  */

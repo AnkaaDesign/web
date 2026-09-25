@@ -6,7 +6,7 @@
 //
 // O caso real é "os 20 primeiros no pedido 8842". Antes, o número do pedido era
 // TEXTO LIVRE numa coluna do orçamento: cabia uma string e não cabia a relação —
-// não dava para dizer quais caminhões daquele orçamento entravam em qual pedido,
+// não dava para dizer quais implementos daquele orçamento entravam em qual pedido,
 // nem para um pedido atravessar dois orçamentos. `PurchaseOrder` existe para
 // expressar isso, e esta tela só é útil se deixar marcar vinte de uma vez.
 //

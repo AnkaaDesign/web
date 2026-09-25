@@ -1284,7 +1284,7 @@ export const paintTypeBatchDeleteSchema = z.object({
    `flakeAmount`, `flakeDensity`, `flakeTilt`, `flakeGloss`, `peel`, `peelScale`,
    `peelDetail`, `metalness`, `roughness`, `gloss` —, que é o que o Truck Studio
    lê em paintEffectFrom() (pages/tools/truck-studio/index.tsx) para pintar o
-   caminhão em 3D.
+   veículo em 3D.
 
    Um `z.object()` fechado descarta chave não declarada EM SILÊNCIO, então
    qualquer PUT de tinta que passasse por aqui apagava a receita inteira e a cor

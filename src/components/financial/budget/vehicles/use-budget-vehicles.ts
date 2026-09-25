@@ -9,10 +9,10 @@ import type { Task } from "@/types";
 /**
  * O que a tela de orçamento precisa de CADA veículo para editá-lo.
  *
- * É o `include` que a página já usava para a tarefa aberta — cliente, caminhão com a
+ * É o `include` que a página já usava para a tarefa aberta — cliente, implemento com a
  * foto da plaqueta (relação de File: um `implement: true` deixaria a Plaqueta sempre vazia
  * e um save apagaria a foto), layouts com o arquivo, arquivos base, responsáveis — mais
- * a pintura geral, que agora aparece na aba e no Resumo de cada caminhão.
+ * a pintura geral, que agora aparece na aba e no Resumo de cada implemento.
  *
  * Uma constante só, para que a tarefa aberta e as irmãs caiam na MESMA chave de cache
  * de `useTaskDetail`.
@@ -39,7 +39,7 @@ const AIRBRUSHING_INCLUDE = {
  * (a canônica, de `quoteTasks`).
  *
  * A tela era aberta por UMA tarefa e só carregava ela; os irmãos existiam só como
- * linhas do Resumo (série, placa, pedido). Para editar cada caminhão no mesmo lugar é
+ * linhas do Resumo (série, placa, pedido). Para editar cada implemento no mesmo lugar é
  * preciso o registro inteiro de cada um — e as aerografias, que moram noutra tabela.
  *
  * As aerografias vêm num pedido só para os N veículos (a API filtra por `taskIds`) e

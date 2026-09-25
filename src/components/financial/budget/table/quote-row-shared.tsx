@@ -46,7 +46,7 @@ export function quoteVehiclesLoadedCount(quote: Budget): number {
  * placas × números de série, e nada garante que as séries sejam contíguas:
  * escrever "78000–78003" afirmaria a existência do 78001 e do 78002 sem tê-los
  * visto. A contagem sozinha também não serve — ela joga fora justamente o número
- * que o operador está lendo no caminhão à frente dele.
+ * que o operador está lendo no implemento à frente dele.
  *
  * Mesma forma de `orderNumberLabel`, que já resolve este problema para o pedido
  * de compra.
@@ -84,7 +84,7 @@ export function quoteIdentifierLabel(quote: Budget): string | null {
  * Os nomes DISTINTOS das tarefas.
  *
  * Num orçamento multitarefa a logomarca é a mesma nos N veículos — é ela que o
- * orçamento vende, e os N caminhões recebem a mesma arte. Listar os N nomes
+ * orçamento vende, e os N implementos recebem a mesma arte. Listar os N nomes
  * imprimiria "Marquespan / Marquespan +58" numa coluna cuja resposta é uma
  * palavra. Sobra mais de um nome só quando os veículos foram batizados
  * diferente, e aí a divergência É a informação.
@@ -133,7 +133,7 @@ export function quoteCustomerLabel(quote: Budget): string | null {
  *
  * ✖ Some o recorte por tarefa (`configsForTask`): ele existia porque a linha era
  * UM veículo e, com `billingSplit = PER_TASK`, um orçamento de sessenta
- * caminhões tem sessenta fatias do MESMO cliente — a célula da linha do caminhão
+ * implementos tem sessenta fatias do MESMO cliente — a célula da linha do implemento
  * 12 tinha de achar a dele. Com a linha valendo o contrato, a pergunta certa é
  * "quem paga este orçamento?", e a resposta é a lista deduplicada por CLIENTE.
  */
@@ -189,7 +189,7 @@ type QuoteTaskDateField = "term" | "forecastDate" | "entryDate";
  * A data MAIS CEDO entre os veículos, nulos ignorados.
  *
  * O prazo é uma PROMESSA, e a primeira a vencer é a que cobra. Mostrar a maior
- * data faria a lista anunciar folga num orçamento cujo primeiro caminhão já está
+ * data faria a lista anunciar folga num orçamento cujo primeiro implemento já está
  * atrasado — e é exatamente nessa linha que alguém precisaria bater o olho.
  * Mesma regra para a previsão e para a entrada, para que as três colunas contem
  * a história do mesmo veículo: o mais adiantado no relógio.
@@ -221,7 +221,7 @@ export function taskDateSpread(quote: Budget, field: QuoteTaskDateField): number
  * O status de MENOR `statusOrder` entre os veículos.
  *
  * Mesma doutrina de `taskBillingStatus`: vence o que pede ação mais cedo. Num
- * orçamento de quatro caminhões com três prontos e um ainda em produção, o
+ * orçamento de quatro implementos com três prontos e um ainda em produção, o
  * orçamento não está pronto — e escolher o status do primeiro veículo da ordem
  * canônica faria a resposta depender de qual placa foi digitada primeiro.
  *

@@ -99,7 +99,7 @@ interface ApprovedLayoutPickerProps {
   horizontal?: boolean;
   /**
    * O título do cartão. No orçamento de N veículos com layout por veículo há um
-   * seletor por caminhão, e cada um precisa dizer DE QUAL caminhão é.
+   * seletor por implemento, e cada um precisa dizer DE QUAL implemento é.
    */
   title?: ReactNode;
   /** Ação no cabeçalho do cartão (p.ex. "Usar em todos os veículos"). */

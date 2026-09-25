@@ -33,7 +33,7 @@ interface MultiAirbrushingSelectorProps {
   showStatus?: boolean;
   /**
    * O campo do formulário que guarda a lista. `airbrushings` na tarefa; no orçamento de N
-   * veículos, `vehicles.<i>.airbrushings` — a aerografia é de cada caminhão.
+   * veículos, `vehicles.<i>.airbrushings` — a aerografia é de cada implemento.
    */
   name?: string;
 }

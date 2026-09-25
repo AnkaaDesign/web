@@ -6,7 +6,7 @@
  * cada combinação; o orçamento cobre todas. Esta função é a ÚNICA definição
  * dessa regra: o passo 1 a usa para dizer quantas tarefas nascerão, e o submit
  * a usa para montá-las. Duas cópias deslizariam no primeiro ajuste — e o
- * sintoma (um dado gravado no caminhão errado) só apareceria na nota fiscal.
+ * sintoma (um dado gravado no implemento errado) só apareceria na nota fiscal.
  */
 
 export interface VehicleCombination {

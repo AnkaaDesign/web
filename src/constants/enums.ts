@@ -1308,25 +1308,25 @@ export enum TRUCK_MANUFACTURER {
 
 /**
  * Implement categories. Os valores (TRUCK, BITRUCK, RIGID…) são o TIPO do
- * caminhão que leva o implemento — vocabulário do mercado, não o nome da
+ * veículo que leva o implemento — vocabulário do mercado, não o nome da
  * entidade (NOMENCLATURA.md §4) — e ficam.
  */
 export enum IMPLEMENT_CATEGORY {
   MINI = 'MINI', // Mini (entrega urbana pequena)
   VUC = 'VUC', // VUC - Veículo Urbano de Carga (Urban Cargo Vehicle)
   THREE_QUARTER = 'THREE_QUARTER', // 3/4 (comercial leve)
-  RIGID = 'RIGID', // Toco - caminhão rígido, um eixo traseiro
-  TRUCK = 'TRUCK', // caminhão rígido padrão (valor de mercado, §4)
+  RIGID = 'RIGID', // Toco - veículo rígido, um eixo traseiro
+  TRUCK = 'TRUCK', // veículo rígido padrão (valor de mercado, §4)
   SEMI_TRAILER = 'SEMI_TRAILER', // Carreta - semirreboque
   SEMI_TRAILER_2_AXLES = 'SEMI_TRAILER_2_AXLES', // Semirreboque 2 Eixos
   B_DOUBLE_FRONT = 'B_DOUBLE_FRONT', // Bitrem Composição Dianteira - front compartment of B-Double trailer
   B_DOUBLE_REAR = 'B_DOUBLE_REAR', // Bitrem Composição Traseira - rear compartment of B-Double trailer
-  BITRUCK = 'BITRUCK', // Bitruck - caminhão rígido com dois eixos direcionais
+  BITRUCK = 'BITRUCK', // Bitruck - veículo rígido com dois eixos direcionais
 }
 
 /**
  * Implement types
- * O tipo de carroceria/implemento montado sobre o caminhão
+ * O tipo de carroceria/implemento montado sobre o veículo
  */
 export enum IMPLEMENT_TYPE {
   DRY_CARGO = 'DRY_CARGO', // Carga Seca - Dry cargo body

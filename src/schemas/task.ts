@@ -1204,7 +1204,7 @@ export const taskCreateSchema = z
     /**
      * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
      *
-     * Livre e não único: os N caminhões de um orçamento podem vir num pedido só,
+     * Livre e não único: os N implementos de um orçamento podem vir num pedido só,
      * em pedidos diferentes ou em blocos. Morava na configuração de faturamento
      * (por cliente), o que obrigava todos a citarem o mesmo número.
      */
@@ -1345,7 +1345,7 @@ export const taskUpdateSchema = z
     /**
      * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
      *
-     * Livre e não único: os N caminhões de um orçamento podem vir num pedido só,
+     * Livre e não único: os N implementos de um orçamento podem vir num pedido só,
      * em pedidos diferentes ou em blocos. Morava na configuração de faturamento
      * (por cliente), o que obrigava todos a citarem o mesmo número.
      */

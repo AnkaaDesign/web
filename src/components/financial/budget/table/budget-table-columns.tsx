@@ -31,7 +31,7 @@ import {
  *
  * ⚠️ A LINHA É UM ORÇAMENTO — o contrato, não um veículo.
  *
- * Era uma tarefa: um orçamento de quatro caminhões ocupava quatro linhas com o
+ * Era uma tarefa: um orçamento de quatro implementos ocupava quatro linhas com o
  * MESMO número 984, o rodapé dizia "4 resultado(s)", e o dono leu quatro
  * orçamentos onde há um. A lista passou a consultar `GET /budgets`, e com
  * isso cai todo o andaime que existia só para EXPLICAR a repetição: a marca
@@ -77,7 +77,7 @@ const perVehicleHint = (quote: Budget, total: number | null): string | undefined
 /**
  * Data agregada: o `title` diz que o número é um resumo dos N veículos.
  *
- * Sem ele a coluna afirma um prazo único num orçamento cujos quatro caminhões
+ * Sem ele a coluna afirma um prazo único num orçamento cujos quatro implementos
  * têm quatro prazos — e quem lê não tem como saber que está vendo o mais cedo.
  */
 const renderEarliestDate = (quote: Budget, field: "term" | "forecastDate" | "entryDate") => {
@@ -147,7 +147,7 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
       },
       // ⚠️ UMA LINHA, ALTURA FIXA. As séries de um orçamento multiveículo NÃO
       // viram uma etiqueta por veículo empilhada na célula: a linha da tabela
-      // passaria a ter altura variável (um orçamento de sessenta caminhões
+      // passaria a ter altura variável (um orçamento de sessenta implementos
       // esticaria a linha para fora da tela) e a lista deixaria de ser
       // varrível. A contração é `contractedLabel` — "90201, 90202 +1" —, a
       // mesma forma do nº do pedido, e o conjunto INTEIRO fica no hover.

@@ -167,7 +167,7 @@ export function FilePreviewModal({
    * O que o motor tem a dizer quando algo não fecha.
    *
    * Sem isto o cotador falha calado: se nenhuma face é reconhecida, ou se a
-   * proporção do desenho diverge da medida informada do caminhão, a tela fica
+   * proporção do desenho diverge da medida informada do implemento, a tela fica
    * simplesmente vazia e o operador conclui que não há nada a medir. Um número
    * errado é ruim; um silêncio que parece um acerto é pior.
    */

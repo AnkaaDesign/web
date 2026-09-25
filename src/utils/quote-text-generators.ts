@@ -160,7 +160,7 @@ interface PaymentTextData {
   /**
    * QUANTOS VEÍCULOS A FATURA DESTA CLÁUSULA COBRE.
    *
-   * É o que decide se `total` é o valor de um caminhão, de um lote ou do
+   * É o que decide se `total` é o valor de um implemento, de um lote ou do
    * orçamento inteiro. Omitido = cobre todos (fatura conjunta), que é o padrão e
    * o comportamento de sempre.
    */

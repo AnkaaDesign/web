@@ -35,7 +35,7 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
    *
    * Cada veículo é cobrado por exatamente uma fatia daquele cliente (índice
    * único `(taskId, customerId)`), então a união das fatias de um cliente é a
-   * frota inteira. Somar as coberturas de DOIS clientes contaria cada caminhão
+   * frota inteira. Somar as coberturas de DOIS clientes contaria cada implemento
    * duas vezes, que é o mesmo erro de contar fatias como clientes.
    */
   const stepVehicleCount = useMemo(() => {

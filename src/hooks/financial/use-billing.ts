@@ -50,7 +50,7 @@ export function useBillingsByQuote(quoteId: string | undefined, options?: { enab
  * A FILA — "o que entreguei e ainda não cobrei?".
  *
  * Uma pergunta que a lista de faturamento não sabia fazer: as linhas eram
- * TAREFAS, e um orçamento de sessenta caminhões cobrado junto aparecia sessenta
+ * TAREFAS, e um orçamento de sessenta implementos cobrado junto aparecia sessenta
  * vezes, cada linha repetindo o mesmo contrato. Aqui cada linha é uma COBRANÇA.
  *
  * ⚠️ AS OPÇÕES DE REACT-QUERY VÃO NO SEGUNDO ARGUMENTO, e é uma separação que

@@ -71,7 +71,7 @@ interface BudgetStepCustomerPaymentProps {
    * Na criação a contagem sai de placas × números de série do passo 1 — é o
    * mesmo produto cartesiano que vira `taskIds`. Na edição esse cálculo não
    * serve: o formulário carrega os campos de UMA tarefa, daria 1, e o seletor
-   * de faturamento sumiria de um orçamento de sessenta caminhões — sem jeito de
+   * de faturamento sumiria de um orçamento de sessenta implementos — sem jeito de
    * trocar `JOINT` por `PER_TASK` depois que o erro aparece no faturamento.
    */
   existingVehicleCount?: number;
@@ -170,7 +170,7 @@ export function BudgetStepCustomerPayment({
   // O N° DO PEDIDO NÃO MORA MAIS AQUI. Ele é da ENTREGA
   // (`Task.customerOrderNumber`), não do cliente, e vive no passo 1, ao lado da
   // placa e do número de série: na criação um valor para os N veículos que vão
-  // nascer, e depois um por caminhão, editável abrindo a tarefa (ou o orçamento
+  // nascer, e depois um por implemento, editável abrindo a tarefa (ou o orçamento
   // por ela). Aqui o campo aparecia uma vez POR CLIENTE, e num orçamento de dois
   // clientes a segunda cópia sobrescrevia a primeira sem que ninguém notasse.
 
@@ -246,10 +246,10 @@ export function BudgetStepCustomerPayment({
 
   // ─── O DINHEIRO DESTE PASSO É POR VEÍCULO ────────────────────────────────
   //
-  // `services[].amount` é o preço de UM caminhão (ver `utils/quote-money.ts`) e
+  // `services[].amount` é o preço de UM implemento (ver `utils/quote-money.ts`) e
   // o formulário guarda o total na mesma escala — é o que o Resumo depois
   // apresenta como "TOTAL POR VEÍCULO · × N · TOTAL GERAL". Aqui os dois campos
-  // diziam só "Subtotal" e "Total", e num orçamento de quatro caminhões esse
+  // diziam só "Subtotal" e "Total", e num orçamento de quatro implementos esse
   // "Total" é um quarto do que o cliente vai pagar.
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
   const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
