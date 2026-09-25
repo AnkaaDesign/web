@@ -25,7 +25,7 @@ import {
   sectorKeys,
   paintKeys,
   layoutKeys,
-  truckKeys,
+  implementKeys,
   garageKeys,
   changeLogKeys,
   cutKeys,
@@ -188,7 +188,7 @@ export function useTaskMutations() {
       queryKey: airbrushingKeys.all,
     });
     queryClient.invalidateQueries({
-      queryKey: truckKeys.all,
+      queryKey: implementKeys.all,
     });
     queryClient.invalidateQueries({
       queryKey: changeLogKeys.all,
@@ -370,7 +370,7 @@ export function useTaskBatchMutations() {
       queryKey: airbrushingKeys.all,
     });
     queryClient.invalidateQueries({
-      queryKey: truckKeys.all,
+      queryKey: implementKeys.all,
     });
     queryClient.invalidateQueries({
       queryKey: changeLogKeys.all,

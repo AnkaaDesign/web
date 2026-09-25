@@ -60,9 +60,9 @@ import { QuoteStatusBadge } from "@/components/production/task/quote/quote-statu
 import { routes } from "@/constants/routes";
 import {
   IMPLEMENT_TYPE_LABELS,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   type IMPLEMENT_TYPE,
-  type TRUCK_CATEGORY,
+  type IMPLEMENT_CATEGORY,
 } from "@/constants";
 import {
   CHASSIS_FORBIDDEN_LETTERS,
@@ -97,7 +97,7 @@ import { portalVinPlateThumbUrl, portalVinPlateUrl } from "./portal-file-url";
  * entrasse: o `Object.entries` garante que a tela ofereça exatamente o que o
  * servidor aceita.
  */
-const CATEGORIA_OPCOES = Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({
+const CATEGORIA_OPCOES = Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({
   value,
   label,
 }));
@@ -341,7 +341,7 @@ export function VeiculoIdentidadeCard({
           display={
             identity?.category ? (
               <span>
-                {TRUCK_CATEGORY_LABELS[identity.category as TRUCK_CATEGORY] ?? identity.category}
+                {IMPLEMENT_CATEGORY_LABELS[identity.category as IMPLEMENT_CATEGORY] ?? identity.category}
               </span>
             ) : (
               <ValorFaltando label="não informada" />

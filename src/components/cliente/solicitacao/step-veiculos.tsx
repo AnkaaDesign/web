@@ -53,7 +53,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { IMPLEMENT_TYPE_LABELS, TRUCK_CATEGORY_LABELS } from "@/constants";
+import { IMPLEMENT_TYPE_LABELS, IMPLEMENT_CATEGORY_LABELS } from "@/constants";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
@@ -416,7 +416,7 @@ function primeiraMensagem(no: unknown, profundidade = 0): string | null {
  * classe de defeito que esta tela inteira evita.
  */
 /** Derivadas do mapa de rótulos — ver a nota em `veiculo-identidade-card.tsx`. */
-const CATEGORIA_OPCOES = Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({
+const CATEGORIA_OPCOES = Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({
   value,
   label,
 }));

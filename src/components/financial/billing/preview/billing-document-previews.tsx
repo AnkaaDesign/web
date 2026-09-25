@@ -6,7 +6,7 @@ import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 import { buildDiscriminacao } from "@/utils/nfse-discriminacao";
-import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, IMPLEMENT_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
 import {
   coveredTaskIds,
   orderNumberLabel,
@@ -30,9 +30,9 @@ import {
 // diz "Carga seca"/"Isotérmico"/"Prancha/Plataforma"; o informativo do boleto
 // diz "Carga Seca"/"Isoplastic"/"Carroceria". A prévia usava as da NFS-e nos
 // dois documentos, e o boleto mostrado não era o boleto registrado.
-const NFSE_CATEGORY_LABELS: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.nfseTask;
+const NFSE_CATEGORY_LABELS: Record<string, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.nfseTask;
 const NFSE_IMPLEMENT_LABELS: Record<string, string> = IMPLEMENT_TYPE_PROFILE_LABELS.nfseTask;
-const BOLETO_CATEGORY_LABELS: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.invoice;
+const BOLETO_CATEGORY_LABELS: Record<string, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.invoice;
 const BOLETO_IMPLEMENT_LABELS: Record<string, string> = IMPLEMENT_TYPE_PROFILE_LABELS.invoice;
 
 interface TaskVehicle {

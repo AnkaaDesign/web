@@ -7,7 +7,7 @@ import {
   PAINT_FINISH,
   PAINT_FINISH_LABELS,
   TRUCK_MANUFACTURER_LABELS,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   BONIFICATION_STATUS,
   BONIFICATION_STATUS_LABELS,
@@ -379,7 +379,7 @@ export const createTaskHistoryColumns = (options?: {
       if (!row.truck?.category) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="outline" className="truncate">
-          {TRUCK_CATEGORY_LABELS[row.truck.category]}
+          {IMPLEMENT_CATEGORY_LABELS[row.truck.category]}
         </Badge>
       );
     },

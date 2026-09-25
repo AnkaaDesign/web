@@ -12,7 +12,7 @@ import {
   SERVICE_ORDER_TYPE_LABELS,
   TASK_QUOTE_STATUS_LABELS,
   BONIFICATION_STATUS_LABELS,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   TASK_STATUS,
   TASK_STATUS_LABELS,
@@ -532,12 +532,12 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       meta: {
         defaultVisible: false,
         headerLabel: "Categoria",
-        exportValue: (row) => (row.truck?.category ? TRUCK_CATEGORY_LABELS[row.truck.category] : ""),
+        exportValue: (row) => (row.truck?.category ? IMPLEMENT_CATEGORY_LABELS[row.truck.category] : ""),
       },
       cell: ({ row }) =>
         row.original.truck?.category ? (
           <Badge variant="outline" className="truncate">
-            {TRUCK_CATEGORY_LABELS[row.original.truck.category]}
+            {IMPLEMENT_CATEGORY_LABELS[row.original.truck.category]}
           </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>

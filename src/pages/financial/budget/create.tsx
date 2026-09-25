@@ -767,14 +767,14 @@ export const FinancialBudgetCreatePage = () => {
 
       // 6. Build truck data
       const { plates, category, implementType } = data;
-      const hasTruckFields = (plates && plates.length > 0) || category || implementType;
-      const buildTruckData = (plate?: string) => {
+      const hasImplementFields = (plates && plates.length > 0) || category || implementType;
+      const buildImplementData = (plate?: string) => {
         // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), como nascia
         // quando o tipo tinha "Refrigerado" de padrão (antes do D-25): cada
         // tarefa tem exatamente um implemento (DD1); só o tipo não se inventa.
         return {
           truck:
-            hasTruckFields || plate
+            hasImplementFields || plate
               ? {
                   ...(plate && { plate }),
                   category: category || undefined,
@@ -815,7 +815,7 @@ export const FinancialBudgetCreatePage = () => {
 
       for (let i = 0; i < combinations.length; i++) {
         const { plate, serialNumber } = combinations[i];
-        const truckData = buildTruckData(plate);
+        const implementData = buildImplementData(plate);
 
         const taskData: any = {
           status: data.status,
@@ -839,7 +839,7 @@ export const FinancialBudgetCreatePage = () => {
             startedAt: so.status === SERVICE_ORDER_STATUS.IN_PROGRESS ? new Date() : null,
           })) : undefined,
           ...(serialNumber && { serialNumber }),
-          ...truckData,
+          ...implementData,
         };
 
         if (customerOrderNumber) taskData.customerOrderNumber = customerOrderNumber;

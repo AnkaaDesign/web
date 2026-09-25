@@ -17,19 +17,19 @@
  */
 import { describe, expect, it } from "vitest";
 import * as ENUMS from "./enums";
-import { IMPLEMENT_TYPE, TRUCK_CATEGORY } from "./enums";
+import { IMPLEMENT_TYPE, IMPLEMENT_CATEGORY } from "./enums";
 import * as ENUM_LABELS from "./enum-labels";
-import { IMPLEMENT_TYPE_LABELS, TRUCK_CATEGORY_LABELS } from "./enum-labels";
+import { IMPLEMENT_TYPE_LABELS, IMPLEMENT_CATEGORY_LABELS } from "./enum-labels";
 import {
   IMPLEMENT_TYPE_PROFILE_LABELS,
   LABEL_PROFILES,
-  TRUCK_CATEGORY_PROFILE_LABELS,
+  IMPLEMENT_CATEGORY_PROFILE_LABELS,
 } from "./document-labels";
 import contractEnums from "@/generated/contracts/enums.json";
 import { buildDiscriminacao } from "@/utils/nfse-discriminacao";
 import { formatFieldValue } from "@/utils/changelog-fields";
 
-const categorias = Object.values(TRUCK_CATEGORY) as string[];
+const categorias = Object.values(IMPLEMENT_CATEGORY) as string[];
 const implementos = Object.values(IMPLEMENT_TYPE) as string[];
 
 function lacunas(values: string[], map: Readonly<Record<string, string>>) {
@@ -47,7 +47,7 @@ describe("rótulos por documento (contrato da API)", () => {
   });
 
   it.each(LABEL_PROFILES)("perfil %s rotula toda categoria e todo implemento", perfil => {
-    expect(lacunas(categorias, TRUCK_CATEGORY_PROFILE_LABELS[perfil])).toEqual({ faltam: [], sobram: [] });
+    expect(lacunas(categorias, IMPLEMENT_CATEGORY_PROFILE_LABELS[perfil])).toEqual({ faltam: [], sobram: [] });
     expect(lacunas(implementos, IMPLEMENT_TYPE_PROFILE_LABELS[perfil])).toEqual({ faltam: [], sobram: [] });
   });
 
@@ -57,7 +57,7 @@ describe("rótulos por documento (contrato da API)", () => {
   });
 
   it("os mapas de tela SÃO o perfil screen", () => {
-    expect(TRUCK_CATEGORY_LABELS).toBe(TRUCK_CATEGORY_PROFILE_LABELS.screen);
+    expect(IMPLEMENT_CATEGORY_LABELS).toBe(IMPLEMENT_CATEGORY_PROFILE_LABELS.screen);
     expect(IMPLEMENT_TYPE_LABELS).toBe(IMPLEMENT_TYPE_PROFILE_LABELS.screen);
   });
 
@@ -101,7 +101,7 @@ describe("as palavras de hoje, documento a documento (D-18)", () => {
       TANK: "Tanque",
       FLATBED: "Prancha/Plataforma",
     });
-    expect(TRUCK_CATEGORY_PROFILE_LABELS.nfseTask).toEqual({
+    expect(IMPLEMENT_CATEGORY_PROFILE_LABELS.nfseTask).toEqual({
       MINI: "Mini",
       VUC: "VUC",
       THREE_QUARTER: "3/4",
@@ -118,7 +118,7 @@ describe("as palavras de hoje, documento a documento (D-18)", () => {
   it("informativo do boleto (prévia do boleto)", () => {
     expect(IMPLEMENT_TYPE_PROFILE_LABELS.invoice).toEqual(IMPLEMENT_TYPE_PROFILE_LABELS.screen);
     expect(IMPLEMENT_TYPE_PROFILE_LABELS.boleto).toEqual(IMPLEMENT_TYPE_PROFILE_LABELS.invoice);
-    expect(TRUCK_CATEGORY_PROFILE_LABELS.invoice).toEqual(TRUCK_CATEGORY_PROFILE_LABELS.nfseTask);
+    expect(IMPLEMENT_CATEGORY_PROFILE_LABELS.invoice).toEqual(IMPLEMENT_CATEGORY_PROFILE_LABELS.nfseTask);
   });
 
   it("a discriminação sem mapas fala a língua da NFS-e da tarefa", () => {

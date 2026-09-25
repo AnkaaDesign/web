@@ -43,7 +43,7 @@ import type {
   AirbrushingGetManyFormData,
   CutGetManyFormData,
 } from "../../schemas";
-import type { SectorGetManyFormData, TruckGetManyFormData as TruckGetManyFormDataType, GoalGetManyFormData } from "../../types";
+import type { SectorGetManyFormData, ImplementGetManyFormData as ImplementGetManyFormDataType, GoalGetManyFormData } from "../../types";
 
 // =====================================================
 // Query Key Factory Pattern
@@ -758,7 +758,7 @@ export const taskKeys = {
 // Truck Query Keys
 // =====================================================
 
-export const truckKeys = createQueryKeyStore<TruckGetManyFormDataType>("trucks");
+export const implementKeys = createQueryKeyStore<ImplementGetManyFormDataType>("trucks");
 
 // =====================================================
 // User Query Keys

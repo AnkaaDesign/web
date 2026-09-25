@@ -4,13 +4,13 @@ import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreate
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { ImplementMeasure, ImplementMeasureIncludes } from "./implementMeasure";
 import type { File } from "./file";
-import type { ORDER_BY_DIRECTION, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
+import type { ORDER_BY_DIRECTION, IMPLEMENT_CATEGORY, IMPLEMENT_TYPE, IMPLEMENT_SPOT } from "../constants";
 
 // =====================
 // Main Entity Interface
 // =====================
 
-export interface Truck extends BaseEntity {
+export interface Implement extends BaseEntity {
   // Identification
   plate: string | null;
   chassisNumber: string | null;
@@ -18,11 +18,11 @@ export interface Truck extends BaseEntity {
   vinPlateId: string | null;
 
   // Truck specifications
-  category: TRUCK_CATEGORY | null;
+  category: IMPLEMENT_CATEGORY | null;
   implementType: IMPLEMENT_TYPE | null;
 
   // Spot (garage location)
-  spot: TRUCK_SPOT | null;
+  spot: IMPLEMENT_SPOT | null;
 
   // Relations
   taskId: string;
@@ -41,7 +41,7 @@ export interface Truck extends BaseEntity {
 // Include Types
 // =====================
 
-export interface TruckIncludes {
+export interface ImplementIncludes {
   task?:
     | boolean
     | {
@@ -70,7 +70,7 @@ export interface TruckIncludes {
 // Order By Types
 // =====================
 
-export interface TruckOrderBy {
+export interface ImplementOrderBy {
   id?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   chassisNumber?: ORDER_BY_DIRECTION;
@@ -88,84 +88,84 @@ export interface TruckOrderBy {
 // Response Interfaces
 // =====================
 
-export interface TruckGetUniqueResponse extends BaseGetUniqueResponse<Truck> {}
-export interface TruckGetManyResponse extends BaseGetManyResponse<Truck> {}
-export interface TruckCreateResponse extends BaseCreateResponse<Truck> {}
-export interface TruckUpdateResponse extends BaseUpdateResponse<Truck> {}
-export interface TruckDeleteResponse extends BaseDeleteResponse {}
+export interface ImplementGetUniqueResponse extends BaseGetUniqueResponse<Implement> {}
+export interface ImplementGetManyResponse extends BaseGetManyResponse<Implement> {}
+export interface ImplementCreateResponse extends BaseCreateResponse<Implement> {}
+export interface ImplementUpdateResponse extends BaseUpdateResponse<Implement> {}
+export interface ImplementDeleteResponse extends BaseDeleteResponse {}
 
 // =====================
 // Batch Operation Responses
 // =====================
 
-export interface TruckBatchCreateResponse<T> extends BaseBatchResponse<Truck, T> {}
-export interface TruckBatchUpdateResponse<T> extends BaseBatchResponse<Truck, T & { id: string }> {}
-export interface TruckBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+export interface ImplementBatchCreateResponse<T> extends BaseBatchResponse<Implement, T> {}
+export interface ImplementBatchUpdateResponse<T> extends BaseBatchResponse<Implement, T & { id: string }> {}
+export interface ImplementBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
 
 // =====================
 // Form Data Types
 // =====================
 
-export interface TruckGetManyFormData {
+export interface ImplementGetManyFormData {
   page?: number;
   limit?: number;
   take?: number;
   skip?: number;
   where?: any;
-  orderBy?: TruckOrderBy;
-  include?: TruckIncludes;
+  orderBy?: ImplementOrderBy;
+  include?: ImplementIncludes;
   searchingFor?: string;
   plate?: string;
-  category?: TRUCK_CATEGORY;
-  spot?: TRUCK_SPOT;
+  category?: IMPLEMENT_CATEGORY;
+  spot?: IMPLEMENT_SPOT;
 }
 
-export interface TruckGetByIdFormData {
+export interface ImplementGetByIdFormData {
   id: string;
-  include?: TruckIncludes;
+  include?: ImplementIncludes;
 }
 
-export interface TruckCreateFormData {
+export interface ImplementCreateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
   vinPlateId?: string | null;
-  category?: TRUCK_CATEGORY | null;
+  category?: IMPLEMENT_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
-  spot?: TRUCK_SPOT | null;
+  spot?: IMPLEMENT_SPOT | null;
   taskId?: string;
   leftSideMeasureId?: string | null;
   rightSideMeasureId?: string | null;
   backSideMeasureId?: string | null;
 }
 
-export interface TruckUpdateFormData {
+export interface ImplementUpdateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
   vinPlateId?: string | null;
-  category?: TRUCK_CATEGORY | null;
+  category?: IMPLEMENT_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
-  spot?: TRUCK_SPOT | null;
+  spot?: IMPLEMENT_SPOT | null;
   taskId?: string;
   leftSideMeasureId?: string | null;
   rightSideMeasureId?: string | null;
   backSideMeasureId?: string | null;
 }
 
-export interface TruckQueryFormData {
-  include?: TruckIncludes;
+export interface ImplementQueryFormData {
+  include?: ImplementIncludes;
 }
 
-export interface TruckBatchCreateFormData {
-  trucks: TruckCreateFormData[];
+export interface ImplementBatchCreateFormData {
+  trucks: ImplementCreateFormData[];
 }
 
-export interface TruckBatchUpdateFormData {
+export interface ImplementBatchUpdateFormData {
   trucks: {
     id: string;
-    data: TruckUpdateFormData;
+    data: ImplementUpdateFormData;
   }[];
 }
 
-export interface TruckBatchDeleteFormData {
+export interface ImplementBatchDeleteFormData {
   truckIds: string[];
 }

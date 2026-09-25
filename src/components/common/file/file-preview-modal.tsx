@@ -107,7 +107,7 @@ export function FilePreviewModal({
   showThumbnailStrip = true,
   showImageCounter = true,
   layoutStatusByFileId,
-  layoutTruckId,
+  layoutTruckId: layoutImplementId,
 }: FilePreviewModalProps) {
   // State management
   const [currentIndex, setCurrentIndex] = React.useState(initialFileIndex);
@@ -159,7 +159,7 @@ export function FilePreviewModal({
   // --- Cotador de layout -------------------------------------------------
   // Só existe quando o chamador entrega as medidas do implemento: num boleto ou
   // numa nota fiscal não há face para achar, e varrer o vetor à toa custa caro.
-  const canDimension = Boolean(layoutTruckId);
+  const canDimension = Boolean(layoutImplementId);
   const [layoutTool, setLayoutTool] = React.useState<LayoutTool>("off");
   const [selectedItem, setSelectedItem] = React.useState<number | null>(null);
   const [measurements, setMeasurements] = React.useState<CommittedMeasurement[]>([]);
@@ -1210,7 +1210,7 @@ export function FilePreviewModal({
                       scale={pdfScale}
                       pageNumber={pdfPageNumber}
                       maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
-                      layoutTruckId={layoutTruckId}
+                      layoutTruckId={layoutImplementId}
                       fileId={currentFile.id}
                       layoutTool={layoutTool}
                       onLayoutResult={setLayoutResult}

@@ -4,7 +4,7 @@ import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 // Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
 import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrencyUnmasked as formatCurrency, formatTaskMeasures } from "../../../../utils";
-import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
+import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 
 import { BRAND_ASSETS } from '@/config/assets';
@@ -134,7 +134,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   {
     id: "truckCategory",
     label: "Categoria do Caminhão",
-    getValue: (task: Task) => (task.truck?.category ? TRUCK_CATEGORY_LABELS[task.truck.category] || task.truck.category : ""),
+    getValue: (task: Task) => (task.truck?.category ? IMPLEMENT_CATEGORY_LABELS[task.truck.category] || task.truck.category : ""),
   },
   {
     id: "implementType",

@@ -41,7 +41,7 @@ import {
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole, getResponsibleRoles } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, IMPLEMENT_CATEGORY, IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
 import { useAuth } from "../../../../contexts/auth-context";
@@ -76,8 +76,8 @@ import { toTitleCase } from "../../../../utils";
 // Quote is now accessed via context menu, not from the edit form
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { SpotSelector } from "./spot-selector";
-import { useImplementMeasuresByTruck, useImplementMeasureMutations } from "../../../../hooks";
-import { TRUCK_SPOT } from "../../../../constants";
+import { useImplementMeasuresByImplement, useImplementMeasureMutations } from "../../../../hooks";
+import { IMPLEMENT_SPOT } from "../../../../constants";
 import { useOtherEditors } from "@/lib/attention";
 import { IconEdit } from "@tabler/icons-react";
 import type { ImplementFace } from "@/constants/implement-faces";
@@ -155,7 +155,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     privilege, isTeamLeader,
     canViewRestrictedFields,
     canViewBonification: canViewBonificationField,
-    canViewDates, canViewServices, canViewMeasures, canViewTruckSpot,
+    canViewDates, canViewServices, canViewMeasures, canViewTruckSpot: canViewImplementSpot,
     canViewPaint, canViewLogoPaint, canViewCuts,
     canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
@@ -649,16 +649,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const initialLayoutStateEmittedRef = useRef<Set<ImplementFace>>(new Set());
 
   // Get truck ID from task - with safety check
-  const truckId = task.truck?.id;
+  const implementId = task.truck?.id;
 
   // Safety mechanism: If task doesn't have a truck yet, trigger a refetch
   // This shouldn't happen because backend auto-creates it, but it's a safety net
   useEffect(() => {
-    if (!truckId && task.id) {
+    if (!implementId && task.id) {
       // The useTaskDetail query will handle refetching automatically
       // since the backend ensures truck exists in findById
     }
-  }, [truckId, task.id]);
+  }, [implementId, task.id]);
 
   // Initialize accordion scroll hook with proper timing and offset calculation
   const { scrollToAccordion } = useAccordionScroll();
@@ -671,14 +671,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     }
   }, [openAccordion, scrollToAccordion]);
 
-  const { data: measuresData } = useImplementMeasuresByTruck(truckId || "", { enabled: !!truckId });
+  const { data: measuresData } = useImplementMeasuresByImplement(implementId || "", { enabled: !!implementId });
 
   // Calculate truck length from layout sections for spot selector
   // Uses the same two-tier cabin logic as garage view and API:
   // < 7m body: 2.0m cabin (small trucks)
   // 7-10m body: 2.4m cabin (larger trucks)
   // >= 10m body: no cabin (semi-trailers)
-  const truckLength = useMemo(() => {
+  const implementLength = useMemo(() => {
     const layout = measuresData?.leftSideMeasure || measuresData?.rightSideMeasure;
     if (!layout?.sections || layout.sections.length === 0) {
       return null;
@@ -703,8 +703,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // Debug logging for layouts
   useEffect(() => {
     
-  }, [measuresData, truckId, truckLength]);
-  const { createOrUpdateTruckMeasure: _createOrUpdateTruckMeasure, delete: deleteMeasure } = useImplementMeasureMutations();
+  }, [measuresData, implementId, implementLength]);
+  const { createOrUpdateTruckMeasure: _createOrUpdateImplementMeasure, delete: deleteMeasure } = useImplementMeasureMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
@@ -1064,15 +1064,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
         // Ensure truck sections are arrays
         if (changedData.truck) {
-          const truck = changedData.truck as any;
-          if (truck.leftSideMeasure?.sections) {
-            truck.leftSideMeasure.sections = ensureArray(truck.leftSideMeasure.sections);
+          const implement = changedData.truck as any;
+          if (implement.leftSideMeasure?.sections) {
+            implement.leftSideMeasure.sections = ensureArray(implement.leftSideMeasure.sections);
           }
-          if (truck.rightSideMeasure?.sections) {
-            truck.rightSideMeasure.sections = ensureArray(truck.rightSideMeasure.sections);
+          if (implement.rightSideMeasure?.sections) {
+            implement.rightSideMeasure.sections = ensureArray(implement.rightSideMeasure.sections);
           }
-          if (truck.backSideMeasure?.sections) {
-            truck.backSideMeasure.sections = ensureArray(truck.backSideMeasure.sections);
+          if (implement.backSideMeasure?.sections) {
+            implement.backSideMeasure.sections = ensureArray(implement.backSideMeasure.sections);
           }
         }
 
@@ -1259,7 +1259,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         if (hasLayoutChanges && !shouldDeleteLayouts) {
 
           // Start with existing truck data from form
-          const consolidatedTruck: any = changedData.truck || {};
+          const consolidatedImplement: any = changedData.truck || {};
 
           // Add ONLY the sides that were actually modified by the user
           for (const side of modifiedLayoutSides) {
@@ -1277,7 +1277,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                 layoutPhotoFiles.push({ side: sideName, file: sideData.photoFile });
               }
 
-              consolidatedTruck[layoutFieldName] = {
+              consolidatedImplement[layoutFieldName] = {
                 height: sideData.height,
                 sections: sideData.sections,
                 photoId: sideData.photoId || null,
@@ -1289,7 +1289,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           }
 
           // Merge consolidated truck back into changedData
-          changedData.truck = consolidatedTruck;
+          changedData.truck = consolidatedImplement;
 
         }
 
@@ -2990,9 +2990,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               onValueChange={field.onChange}
                               options={[
                                 { value: "", label: "Nenhuma" },
-                                ...Object.values(TRUCK_CATEGORY).map((cat) => ({
+                                ...Object.values(IMPLEMENT_CATEGORY).map((cat) => ({
                                   value: cat,
-                                  label: TRUCK_CATEGORY_LABELS[cat],
+                                  label: IMPLEMENT_CATEGORY_LABELS[cat],
                                 })),
                               ]}
                               placeholder="Selecione a categoria"
@@ -3633,7 +3633,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                 )}
 
                 {/* Truck Spot - Only visible to ADMIN and LOGISTIC users */}
-                {truckId && canViewTruckSpot && (
+                {implementId && canViewImplementSpot && (
           <AccordionItem
             value="spot"
             id="accordion-item-spot"
@@ -3651,9 +3651,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <AccordionContent>
                       <CardContent className="pt-0">
                       <SpotSelector
-                        truckLength={truckLength}
-                        currentSpot={form.watch("truck.spot") as TRUCK_SPOT | null}
-                        truckId={truckId}
+                        truckLength={implementLength}
+                        currentSpot={form.watch("truck.spot") as IMPLEMENT_SPOT | null}
+                        truckId={implementId}
                         onSpotChange={(spot) => {
                           form.setValue("truck.spot", spot, { shouldDirty: true });
                         }}

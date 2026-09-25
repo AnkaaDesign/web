@@ -70,7 +70,7 @@ import {
   FAVORITE_PAGES,
   TASK_STATUS,
   SECTOR_PRIVILEGES,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
 } from "@/constants";
 import type { Task } from "@/types";
@@ -949,7 +949,7 @@ export function TaskPreparationPage() {
         key: "truckCategory",
         label: "Categoria",
         type: "multiselect",
-        options: Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
+        options: Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
         accessor: (r) => r.truck?.category ?? "",
       },
       {

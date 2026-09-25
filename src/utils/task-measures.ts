@@ -11,10 +11,10 @@ import type { Task } from "../types";
 export function calculateTaskMeasures(task: Task): number | null {
   if (!task.truck) return null;
 
-  const { truck } = task;
+  const { truck: implement } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
-  const layout = truck.leftSideMeasure || truck.rightSideMeasure;
+  const layout = implement.leftSideMeasure || implement.rightSideMeasure;
 
   if (!layout?.sections || layout.sections.length === 0) {
     return null;
@@ -41,10 +41,10 @@ export function calculateTaskMeasures(task: Task): number | null {
 export function getTaskDimensions(task: Task): { width: number; height: number } | null {
   if (!task.truck) return null;
 
-  const { truck } = task;
+  const { truck: implement } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
-  const layout = truck.leftSideMeasure || truck.rightSideMeasure;
+  const layout = implement.leftSideMeasure || implement.rightSideMeasure;
 
   if (!layout?.sections || layout.sections.length === 0) {
     return null;

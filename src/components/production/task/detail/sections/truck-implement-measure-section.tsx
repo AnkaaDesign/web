@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "@/contexts/theme-context";
-import { useImplementMeasuresByTruck } from "@/hooks";
+import { useImplementMeasuresByImplement } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { getApiBaseUrl } from "@/utils/file";
 import {
@@ -14,8 +14,8 @@ import {
 import type { ImplementFace } from "@/constants/implement-faces";
 
 // Component to display truck layout SVG preview
-const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
-  const { data: layouts } = useImplementMeasuresByTruck(truckId, { includePhoto: true });
+const ImplementLayoutPreview = ({ truckId: implementId, taskName }: { truckId: string; taskName?: string }) => {
+  const { data: layouts } = useImplementMeasuresByImplement(implementId, { includePhoto: true });
   const [selectedSide, setSelectedSide] = useState<ImplementFace>('left');
 
   // Theme detection for SVG colors (matching mobile version)
@@ -606,6 +606,6 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
  * SVG layout preview (side selector, zoom controls, download buttons). The host provides
  * the Card chrome + the "Medidas do Implemento" title, so this returns no outer Card.
  */
-export function TruckImplementMeasureSection({ truckId, taskName }: { truckId: string; taskName?: string }): React.ReactNode {
-  return <TruckLayoutPreview truckId={truckId} taskName={taskName} />;
+export function ImplementMeasuresSection({ truckId: implementId, taskName }: { truckId: string; taskName?: string }): React.ReactNode {
+  return <ImplementLayoutPreview truckId={implementId} taskName={taskName} />;
 }

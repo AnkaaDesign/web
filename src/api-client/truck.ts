@@ -40,13 +40,13 @@ export interface GaragesAvailabilityResponse {
 // =====================
 
 export const getGaragesAvailability = async (
-  truckLength: number,
-  excludeTruckId?: string,
+  implementLength: number,
+  excludeImplementId?: string,
 ): Promise<GaragesAvailabilityResponse> => {
   const response = await apiClient.get<GaragesAvailabilityResponse>(
     `/trucks/garages-availability`,
     {
-      params: { truckLength, excludeTruckId },
+      params: { truckLength: implementLength, excludeTruckId: excludeImplementId },
     },
   );
   return response.data;

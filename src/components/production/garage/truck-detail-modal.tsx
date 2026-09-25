@@ -34,14 +34,14 @@ import { getServiceOrderStatusColor } from '@/utils/serviceOrder';
 import { hasPrivilege } from '@/utils/user';
 import { getApiBaseUrl } from '@/config/api';
 
-interface TruckDetailModalProps {
+interface ImplementDetailModalProps {
   taskId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 
-export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModalProps) {
+export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDetailModalProps) {
   const { data: currentUser } = useCurrentUser();
 
   // File preview state
@@ -97,8 +97,8 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   // Get layout dimensions (both sides have the same measures)
   const layoutDimensions = useMemo(() => {
     if (!task?.truck) return null;
-    const truck = task.truck as any;
-    const layout = truck?.leftSideMeasure || truck?.rightSideMeasure;
+    const implement = task.truck as any;
+    const layout = implement?.leftSideMeasure || implement?.rightSideMeasure;
     if (!layout || !layout.sections || layout.sections.length === 0) return null;
     const totalLength = layout.sections.reduce(
       (sum: number, section: { width: number }) => sum + (section.width || 0),

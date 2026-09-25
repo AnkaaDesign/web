@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPhone, formatPaidInstallmentLabel, formatInstallmentPaymentForm } from "@/utils";
 import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
-import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
+import { IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
+import type { IMPLEMENT_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { generatePaymentText } from "@/utils/quote-text-generators";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
@@ -393,7 +393,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const vehicleTypeLabelOf = (v: any): string =>
     [
       v?.truck?.category
-        ? TRUCK_CATEGORY_LABELS[v.truck.category as TRUCK_CATEGORY] || v.truck.category
+        ? IMPLEMENT_CATEGORY_LABELS[v.truck.category as IMPLEMENT_CATEGORY] || v.truck.category
         : "",
       v?.truck?.implementType
         ? IMPLEMENT_TYPE_LABELS[v.truck.implementType as IMPLEMENT_TYPE] || v.truck.implementType
@@ -978,7 +978,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>
                 <span className="text-sm font-medium">
-                  {TRUCK_CATEGORY_LABELS[vehicleFacts.category as TRUCK_CATEGORY] || vehicleFacts.category}
+                  {IMPLEMENT_CATEGORY_LABELS[vehicleFacts.category as IMPLEMENT_CATEGORY] || vehicleFacts.category}
                 </span>
               </div>
             )}

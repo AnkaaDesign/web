@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema, createDescriptionSchema, nullableDate } from "./common";
 import type { Task } from "../types";
-import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, TRUCK_CATEGORY, IMPLEMENT_TYPE } from "../constants";
+import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, IMPLEMENT_CATEGORY, IMPLEMENT_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { budgetCreateNestedSchema } from "./budget";
@@ -995,7 +995,7 @@ export const taskGetManySchema = z
         },
       )
       .optional(),
-    truckCategories: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+    truckCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
     implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
     createdAtRange: z
       .object({
@@ -1151,7 +1151,7 @@ const measureSideSchema = z
   .optional();
 
 // Consolidated truck schema with basic fields AND implement measures
-const taskTruckCreateSchema = z.object({
+const taskImplementCreateSchema = z.object({
   // Basic truck fields
   plate: optionalPlateSchema,
   chassisNumber: optionalChassisSchema,
@@ -1245,7 +1245,7 @@ export const taskCreateSchema = z
         checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
       })
     ).optional(),
-    truck: taskTruckCreateSchema.nullable().optional(),
+    truck: taskImplementCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
@@ -1406,7 +1406,7 @@ export const taskUpdateSchema = z
         checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
       })
     ).optional(),
-    truck: taskTruckCreateSchema.nullable().optional(),
+    truck: taskImplementCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings

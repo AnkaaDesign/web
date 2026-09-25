@@ -41,7 +41,7 @@ import { useEditLock } from "@/lib/attention";
 import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
-import { useImplementMeasuresByTruck } from "@/hooks/administration/use-implement-measure";
+import { useImplementMeasuresByImplement } from "@/hooks/administration/use-implement-measure";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -59,7 +59,7 @@ import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCan
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { isTeamLeader } from "@/utils/user";
-import { formatChassis, formatPlate, cleanChassis, cleanPlate, formatTruckSpot } from "@/utils";
+import { formatChassis, formatPlate, cleanChassis, cleanPlate, formatImplementSpot } from "@/utils";
 import { ForecastHistoryTimeline } from "@/components/production/task/form/forecast-history-timeline";
 import {
   routes,
@@ -70,8 +70,8 @@ import {
   TASK_QUOTE_STATUS_LABELS,
   BONIFICATION_STATUS,
   BONIFICATION_STATUS_LABELS,
-  TRUCK_CATEGORY,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE,
   IMPLEMENT_TYPE_LABELS,
   SERVICE_ORDER_TYPE_DISPLAY_ORDER,
@@ -85,7 +85,7 @@ import { TaskServiceOrderGroup } from "./service-orders-section";
 import { BudgetBreakdown, BillingBreakdown } from "./sections/quote-billing-section";
 import { PaintsSection } from "./sections/paints-section";
 import { ResponsiblesSection } from "./sections/responsibles-section";
-import { TruckImplementMeasureSection } from "./sections/truck-implement-measure-section";
+import { ImplementMeasuresSection } from "./sections/truck-implement-measure-section";
 import { LayoutsSection, getVisibleLayouts, downloadAllLayouts } from "./sections/layouts-section";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
 import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
@@ -377,16 +377,16 @@ function TaskDetailContent() {
   // Truck dimensions (width × height in cm) derived from any available side layout — shown as a
   // read-only overview field so non-leader PRODUCTION (who can't see the gated layout section) still
   // get the vehicle size. Faithful port of the legacy `truckDimensions`/"Caminhão" overview row.
-  const { data: truckLayouts } = useImplementMeasuresByTruck(task?.truck?.id || "", { enabled: !!task?.truck?.id });
-  const truckDimensions = useMemo(() => {
+  const { data: implementLayouts } = useImplementMeasuresByImplement(task?.truck?.id || "", { enabled: !!task?.truck?.id });
+  const implementDimensions = useMemo(() => {
     type SideLayout = { height: number; sections?: { width: number }[] };
-    const sides = truckLayouts as { leftSideMeasure?: SideLayout; rightSideMeasure?: SideLayout; backSideMeasure?: SideLayout } | undefined;
+    const sides = implementLayouts as { leftSideMeasure?: SideLayout; rightSideMeasure?: SideLayout; backSideMeasure?: SideLayout } | undefined;
     const layout = sides?.leftSideMeasure || sides?.rightSideMeasure || sides?.backSideMeasure;
     if (!layout) return null;
     const height = Math.round(layout.height * 100);
     const totalWidth = Math.round((layout.sections ?? []).reduce((sum, s) => sum + s.width * 100, 0));
     return { width: totalWidth, height };
-  }, [truckLayouts]);
+  }, [implementLayouts]);
 
   const { updateAsync } = useTaskMutations();
   const role = ((user as { sector?: { privileges?: string } } | undefined)?.sector?.privileges ?? "") as SECTOR_PRIVILEGES;
@@ -784,12 +784,12 @@ function TaskDetailContent() {
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.category || null,
-            render: (t) => (t.truck?.category ? <span>{TRUCK_CATEGORY_LABELS[t.truck.category]}</span> : <span className="text-muted-foreground">—</span>),
+            render: (t) => (t.truck?.category ? <span>{IMPLEMENT_CATEGORY_LABELS[t.truck.category]}</span> : <span className="text-muted-foreground">—</span>),
             edit:
               canEdit && task?.truck
                 ? {
                     get: (t) => t.truck?.category ?? null,
-                    enum: { values: Object.values(TRUCK_CATEGORY), labels: TRUCK_CATEGORY_LABELS },
+                    enum: { values: Object.values(IMPLEMENT_CATEGORY), labels: IMPLEMENT_CATEGORY_LABELS },
                     onCommit: (v) => setTaskField({ truck: { category: v } }),
                   }
                 : undefined,
@@ -817,7 +817,7 @@ function TaskDetailContent() {
             // Read-only vehicle size (cm) from the truck's layout — available even to sectors that
             // can't open the gated layout section.
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: () => (truckDimensions ? `${truckDimensions.width}cm × ${truckDimensions.height}cm` : null),
+            accessor: () => (implementDimensions ? `${implementDimensions.width}cm × ${implementDimensions.height}cm` : null),
           },
           {
             id: "truckSpot",
@@ -826,7 +826,7 @@ function TaskDetailContent() {
             accessor: (t) => (t.truck as { spot?: string } | undefined)?.spot || null,
             render: (t) => {
               const spot = (t.truck as { spot?: string } | undefined)?.spot;
-              return spot ? <span>{formatTruckSpot(spot)}</span> : <span className="text-muted-foreground">—</span>;
+              return spot ? <span>{formatImplementSpot(spot)}</span> : <span className="text-muted-foreground">—</span>;
             },
           },
           {
@@ -1332,7 +1332,7 @@ function TaskDetailContent() {
               label: "Medidas do Implemento",
               icon: IconRulerMeasure,
               span: 2 as const,
-              render: (t: Task) => <TruckImplementMeasureSection truckId={t.truck!.id} taskName={t.name} />,
+              render: (t: Task) => <ImplementMeasuresSection truckId={t.truck!.id} taskName={t.name} />,
             } as DetailSectionDef<Task>,
           ]
         : []),
@@ -1555,7 +1555,7 @@ function TaskDetailContent() {
     task?.quote?.customerConfigs?.length,
     task?.observation?.id,
     task?.truck?.id,
-    truckDimensions,
+    implementDimensions,
     task?.serviceOrders?.length,
     // SO statuses gate the inline "Concluída" transition (areAllServiceOrdersComplete) — the array ref
     // changes on refetch (e.g. after an SO is completed), so recompute the closure then.

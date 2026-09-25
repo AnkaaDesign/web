@@ -24,11 +24,11 @@ import {
   isYardArea,
   parseSpot,
   calculateAreaLayout,
-  TruckElement,
+  ImplementElement,
 } from './garage-view';
 import type {
-  GarageTruck,
-  PositionedTruck,
+  GarageImplement,
+  PositionedImplement,
   AreaId,
   GarageId,
   LaneId,
@@ -58,34 +58,34 @@ function formatDayHeader(date: Date): string {
 function calculateLaneAvailability(
   garageId: GarageId,
   laneId: LaneId,
-  trucks: GarageTruck[],
-  newTruckLength: number,
-  excludeTruckId?: string,
+  implementList: GarageImplement[],
+  newImplementLength: number,
+  excludeImplementId?: string,
 ): { canFit: boolean; availableSpace: number; requiredSpace: number } {
   const config = GARAGE_CONFIGS[garageId];
   const laneLength = config.laneLength;
-  const trucksInLane = trucks.filter((t) => {
-    if (!t.spot || t.id === excludeTruckId) return false;
+  const implementsInLane = implementList.filter((t) => {
+    if (!t.spot || t.id === excludeImplementId) return false;
     const parsed = parseSpot(t.spot);
     return parsed.garage === garageId && parsed.lane === laneId;
   });
-  const currentTruckLengths = trucksInLane.reduce((sum, t) => sum + t.length, 0);
+  const currentImplementLengths = implementsInLane.reduce((sum, t) => sum + t.length, 0);
   const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
-  const truckCount = trucksInLane.length;
-  let gapsBetweenTrucks = 0;
-  if (truckCount === 2) gapsBetweenTrucks = COMMON_CONFIG.TRUCK_MIN_SPACING;
-  else if (truckCount >= 3) return { canFit: false, availableSpace: 0, requiredSpace: newTruckLength };
-  const usedSpace = margins + currentTruckLengths + gapsBetweenTrucks;
+  const implementCount = implementsInLane.length;
+  let gapsBetweenImplements = 0;
+  if (implementCount === 2) gapsBetweenImplements = COMMON_CONFIG.TRUCK_MIN_SPACING;
+  else if (implementCount >= 3) return { canFit: false, availableSpace: 0, requiredSpace: newImplementLength };
+  const usedSpace = margins + currentImplementLengths + gapsBetweenImplements;
   const availableSpace = laneLength - usedSpace;
-  const totalRequiredSpace = margins + currentTruckLengths + gapsBetweenTrucks + newTruckLength + (truckCount > 0 ? COMMON_CONFIG.TRUCK_MIN_SPACING : 0);
-  return { canFit: totalRequiredSpace <= laneLength && truckCount < 3, availableSpace, requiredSpace: newTruckLength };
+  const totalRequiredSpace = margins + currentImplementLengths + gapsBetweenImplements + newImplementLength + (implementCount > 0 ? COMMON_CONFIG.TRUCK_MIN_SPACING : 0);
+  return { canFit: totalRequiredSpace <= laneLength && implementCount < 3, availableSpace, requiredSpace: newImplementLength };
 }
 
 // =====================
 // Filter trucks for a specific date
 // =====================
 
-function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date): GarageTruck[] {
+function filterImplementsForDate(implementList: GarageImplement[], areaId: AreaId, date: Date): GarageImplement[] {
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
 
@@ -95,14 +95,14 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
 
   const isYard = isYardArea(areaId);
 
-  return trucks.filter((truck) => {
-    if (!truck.spot) return false;
+  return implementList.filter((implement) => {
+    if (!implement.spot) return false;
 
     // Match area
     if (isYard) {
-      if (truck.spot !== areaId) return false;
+      if (implement.spot !== areaId) return false;
     } else {
-      const parsed = parseSpot(truck.spot);
+      const parsed = parseSpot(implement.spot);
       if (parsed.garage !== areaId) return false;
     }
 
@@ -116,8 +116,8 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
 
     // Term check: if term has passed, don't show
     // For future dates, this applies to ALL trucks (garage and yard)
-    if (truck.term) {
-      const term = new Date(truck.term);
+    if (implement.term) {
+      const term = new Date(implement.term);
       term.setHours(0, 0, 0, 0);
       if (checkDate > term) return false;
     }
@@ -130,7 +130,7 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
     // Arrival date check: don't show before forecast/entry date
     // (trucks without explicit DB spots are defaulted to YARD_WAIT and
     // should only appear from their forecast/entry date onwards)
-    const arrivalDateStr = truck.entryDate || truck.forecastDate;
+    const arrivalDateStr = implement.entryDate || implement.forecastDate;
     if (arrivalDateStr) {
       const arrivalDate = new Date(arrivalDateStr);
       arrivalDate.setHours(0, 0, 0, 0);
@@ -138,8 +138,8 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
     }
 
     // Completed check: if finished before this date, don't show
-    if (truck.finishedAt) {
-      const finished = new Date(truck.finishedAt);
+    if (implement.finishedAt) {
+      const finished = new Date(implement.finishedAt);
       finished.setHours(0, 0, 0, 0);
       if (finished < checkDate) return false;
     }
@@ -199,18 +199,18 @@ function DroppableLane({
 // Draggable truck wrapper for today's column
 // =====================
 
-function DraggableTruckWrapper({
-  truck,
+function DraggableImplementWrapper({
+  truck: implement,
   scale,
   onClick,
 }: {
-  truck: PositionedTruck;
+  truck: PositionedImplement;
   scale: number;
   onClick?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: truck.id,
-    data: { truck },
+    id: implement.id,
+    data: { truck: implement },
   });
 
   return (
@@ -220,7 +220,7 @@ function DraggableTruckWrapper({
       {...attributes}
       style={{ cursor: 'grab', opacity: isDragging ? 0.3 : 1, touchAction: 'none' }}
     >
-      <TruckElement truck={truck} scale={scale} isDragging={isDragging} onClick={onClick} />
+      <ImplementElement truck={implement} scale={scale} isDragging={isDragging} onClick={onClick} />
     </g>
   );
 }
@@ -232,21 +232,21 @@ function DraggableTruckWrapper({
 function DayColumn({
   areaId,
   date,
-  trucks,
+  trucks: implementList,
   patioColumns: patioColumnsProp,
   scale,
   svgWidth,
   svgHeight,
   isToday,
   enableDragDrop,
-  onTruckClick,
-  activeTruck,
+  onTruckClick: onImplementClick,
+  activeTruck: activeImplement,
   laneAvailability,
   dimmed,
 }: {
   areaId: AreaId;
   date: Date;
-  trucks: GarageTruck[];
+  trucks: GarageImplement[];
   patioColumns?: number;
   scale: number;
   svgWidth: number;
@@ -254,22 +254,22 @@ function DayColumn({
   isToday: boolean;
   enableDragDrop: boolean;
   onTruckClick?: (taskId: string) => void;
-  activeTruck: PositionedTruck | null;
+  activeTruck: PositionedImplement | null;
   laneAvailability: Record<string, { canFit: boolean }> | null;
   dimmed: boolean;
 }) {
   const isPatio = isYardArea(areaId);
   const patioColumns = patioColumnsProp || (isPatio
-    ? Math.max(PATIO_CONFIG.MIN_LANES, Math.ceil(trucks.filter(t => t.spot === areaId).length / 3))
+    ? Math.max(PATIO_CONFIG.MIN_LANES, Math.ceil(implementList.filter(t => t.spot === areaId).length / 3))
     : 0);
   const layout = useMemo(
-    () => calculateAreaLayout(areaId, trucks, patioColumns),
-    [areaId, trucks, patioColumns],
+    () => calculateAreaLayout(areaId, implementList, patioColumns),
+    [areaId, implementList, patioColumns],
   );
 
-  const truckCount = isPatio
-    ? trucks.filter(t => t.spot === areaId).length
-    : trucks.filter(t => { if (!t.spot) return false; const p = parseSpot(t.spot); return p.garage === areaId; }).length;
+  const implementCount = isPatio
+    ? implementList.filter(t => t.spot === areaId).length
+    : implementList.filter(t => { if (!t.spot) return false; const p = parseSpot(t.spot); return p.garage === areaId; }).length;
 
   return (
     <div className="flex flex-col items-center gap-2 shrink-0">
@@ -289,7 +289,7 @@ function DayColumn({
               ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100'
               : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
         )}>
-          {truckCount}
+          {implementCount}
         </span>
       </div>
 
@@ -341,12 +341,12 @@ function DayColumn({
                 });
               })()}
               {/* Trucks */}
-              {layout.patioTrucks?.map((truck) => (
-                <TruckElement
-                  key={truck.id}
-                  truck={truck}
+              {layout.patioTrucks?.map((implement) => (
+                <ImplementElement
+                  key={implement.id}
+                  truck={implement}
                   scale={scale}
-                  onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
+                  onClick={onImplementClick ? () => onImplementClick(implement.id) : undefined}
                 />
               ))}
             </>
@@ -366,7 +366,7 @@ function DayColumn({
                 const laneY = config.paddingTop;
                 const laneKey = `${areaId}_${lane.id}`;
                 const availability = laneAvailability?.[laneKey];
-                const isDragging = !!activeTruck;
+                const isDragging = !!activeImplement;
 
                 if (isToday && enableDragDrop) {
                   return (
@@ -380,12 +380,12 @@ function DayColumn({
                         canFit={availability?.canFit}
                         isDragging={isDragging}
                       >
-                        {lane.trucks.map((truck) => (
-                          <DraggableTruckWrapper
-                            key={truck.id}
-                            truck={truck}
+                        {lane.trucks.map((implement) => (
+                          <DraggableImplementWrapper
+                            key={implement.id}
+                            truck={implement}
                             scale={scale}
-                            onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
+                            onClick={onImplementClick ? () => onImplementClick(implement.id) : undefined}
                           />
                         ))}
                       </DroppableLane>
@@ -406,12 +406,12 @@ function DayColumn({
                       rx={2}
                     />
                     <g transform={`translate(0, ${laneY * scale})`}>
-                      {lane.trucks.map((truck) => (
-                        <TruckElement
-                          key={truck.id}
-                          truck={truck}
+                      {lane.trucks.map((implement) => (
+                        <ImplementElement
+                          key={implement.id}
+                          truck={implement}
                           scale={scale}
-                          onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
+                          onClick={onImplementClick ? () => onImplementClick(implement.id) : undefined}
                         />
                       ))}
                     </g>
@@ -432,9 +432,9 @@ function DayColumn({
 
 export interface SingleGarageViewProps {
   garageId: AreaId;
-  trucks: GarageTruck[];
-  onTruckMove?: (truckId: string, newSpot: string | null) => void;
-  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
+  trucks: GarageImplement[];
+  onTruckMove?: (implementId: string, newSpot: string | null) => void;
+  onTruckSwap?: (implement1Id: string, spot1: string, implement2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
   readOnly?: boolean;
   className?: string;
@@ -442,16 +442,16 @@ export interface SingleGarageViewProps {
 
 export function SingleGarageView({
   garageId,
-  trucks,
-  onTruckMove,
-  onTruckSwap,
-  onTruckClick,
+  trucks: implementList,
+  onTruckMove: onImplementMove,
+  onTruckSwap: onImplementSwap,
+  onTruckClick: onImplementClick,
   readOnly = false,
   className,
 }: SingleGarageViewProps) {
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
+  const [activeImplement, setActiveImplement] = useState<PositionedImplement | null>(null);
   const lastDragPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   const today = useMemo(() => {
@@ -463,7 +463,7 @@ export function SingleGarageView({
   const forecastDays = useMemo(() => getNextDaysForForecast(today, 5), [today]);
 
   const isYard = isYardArea(garageId as AreaId);
-  const enableDragDrop = !readOnly && !!onTruckMove && !isYard;
+  const enableDragDrop = !readOnly && !!onImplementMove && !isYard;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -485,13 +485,13 @@ export function SingleGarageView({
   }, []);
 
   // Filter trucks per day
-  const trucksPerDay = useMemo(() => {
+  const implementsPerDay = useMemo(() => {
     return forecastDays.map((date) => ({
       date,
-      trucks: filterTrucksForDate(trucks, garageId as AreaId, date),
+      trucks: filterImplementsForDate(implementList, garageId as AreaId, date),
       isToday: isSameDay(date, today),
     }));
-  }, [forecastDays, trucks, garageId, today]);
+  }, [forecastDays, implementList, garageId, today]);
 
   // Calculate area dimensions — optimized for single-garage view
   // Finds the column count that maximizes rendering scale by balancing
@@ -501,26 +501,26 @@ export function SingleGarageView({
       const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
       const laneSpacing = PATIO_CONFIG.LANE_SPACING;
       const padding = PATIO_CONFIG.PADDING;
-      const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
+      const implementMargin = PATIO_CONFIG.TRUCK_MARGIN;
 
       // Sorted truck lists per day (for height calculation)
-      const dayTruckLists = trucksPerDay.map(d =>
+      const dayImplementLists = implementsPerDay.map(d =>
         d.trucks.filter(t => t.spot === garageId).sort((a, b) => b.length - a.length)
       );
-      const maxTrucks = Math.max(...dayTruckLists.map(d => d.length), 1);
+      const maxImplements = Math.max(...dayImplementLists.map(d => d.length), 1);
 
       const calcWidth = (cols: number) =>
         padding * 2 + cols * laneWidth + (cols - 1) * laneSpacing;
 
       const calcHeight = (cols: number) => {
         let maxH = 0;
-        for (const dayTrucks of dayTruckLists) {
-          if (dayTrucks.length === 0) continue;
-          const colHeights: number[] = Array(cols).fill(truckMargin);
-          dayTrucks.forEach((truck, i) => {
-            colHeights[i % cols] += truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+        for (const dayImplements of dayImplementLists) {
+          if (dayImplements.length === 0) continue;
+          const colHeights: number[] = Array(cols).fill(implementMargin);
+          dayImplements.forEach((implement, i) => {
+            colHeights[i % cols] += implement.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
           });
-          const tallest = Math.max(...colHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + truckMargin;
+          const tallest = Math.max(...colHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + implementMargin;
           if (tallest > maxH) maxH = tallest;
         }
         return Math.max(maxH, PATIO_CONFIG.MIN_LANE_LENGTH) + padding * 2;
@@ -533,10 +533,10 @@ export function SingleGarageView({
       const availW = Math.max(1, containerSize.width - OUTER_PADDING - 4 * GAP - 5 * COL_OVERHEAD);
       const availH = Math.max(1, containerSize.height - OUTER_PADDING - 60);
 
-      let bestCols = Math.max(3, Math.ceil(maxTrucks / 4));
+      let bestCols = Math.max(3, Math.ceil(maxImplements / 4));
       let bestScale = 0;
       const minCols = 2;
-      const maxCols = Math.min(maxTrucks, 12);
+      const maxCols = Math.min(maxImplements, 12);
       for (let cols = minCols; cols <= maxCols; cols++) {
         const w = Math.max(calcWidth(cols), PATIO_CONFIG.MIN_WIDTH);
         const h = Math.max(calcHeight(cols), PATIO_CONFIG.MIN_HEIGHT);
@@ -562,7 +562,7 @@ export function SingleGarageView({
       const config = GARAGE_CONFIGS[garageId as GarageId];
       return { columns: 0, width: config.width, height: config.length };
     }
-  }, [isYard, garageId, trucksPerDay, containerSize.width, containerSize.height]);
+  }, [isYard, garageId, implementsPerDay, containerSize.width, containerSize.height]);
 
   // Calculate scale to fit 5 areas horizontally
   // Account for: outer padding (p-6 = 24px each side), gaps (gap-6 = 24px × 4),
@@ -583,23 +583,23 @@ export function SingleGarageView({
 
   // Lane availability for drag feedback (garage areas only)
   const laneAvailability = useMemo(() => {
-    if (!activeTruck || !enableDragDrop || isYard) return null;
+    if (!activeImplement || !enableDragDrop || isYard) return null;
     const avail: Record<string, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {};
     LANES.forEach((laneId) => {
       const key = `${garageId}_${laneId}`;
-      const todayTrucks = filterTrucksForDate(trucks, garageId as AreaId, today);
-      avail[key] = calculateLaneAvailability(garageId as GarageId, laneId, todayTrucks, activeTruck.length, activeTruck.id);
+      const todayImplements = filterImplementsForDate(implementList, garageId as AreaId, today);
+      avail[key] = calculateLaneAvailability(garageId as GarageId, laneId, todayImplements, activeImplement.length, activeImplement.id);
     });
     return avail;
-  }, [activeTruck, enableDragDrop, isYard, garageId, trucks, today]);
+  }, [activeImplement, enableDragDrop, isYard, garageId, implementList, today]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const truck = event.active.data.current?.truck as PositionedTruck;
-    setActiveTruck(truck);
+    const implement = event.active.data.current?.truck as PositionedImplement;
+    setActiveImplement(implement);
   }, []);
 
   const handleDragCancel = useCallback(() => {
-    setActiveTruck(null);
+    setActiveImplement(null);
     lastDragPositionRef.current = null;
   }, []);
 
@@ -619,14 +619,14 @@ export function SingleGarageView({
     (event: DragEndEvent) => {
       const { active, over } = event;
       const lastPosition = lastDragPositionRef.current;
-      setActiveTruck(null);
+      setActiveImplement(null);
       lastDragPositionRef.current = null;
 
-      if (!over || !onTruckMove) return;
+      if (!over || !onImplementMove) return;
 
-      const truckId = active.id as string;
-      const draggedTruck = trucks.find((t) => t.id === truckId);
-      if (!draggedTruck) return;
+      const implementId = active.id as string;
+      const draggedImplement = implementList.find((t) => t.id === implementId);
+      if (!draggedImplement) return;
 
       const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId } | undefined;
       if (!dropData?.garageId || !dropData?.laneId) return;
@@ -638,9 +638,9 @@ export function SingleGarageView({
       const overRect = over.rect;
 
       if (activeRect && overRect) {
-        const truckCenterY = activeRect.top + activeRect.height / 2;
+        const implementCenterY = activeRect.top + activeRect.height / 2;
         const laneCenterY = overRect.top + overRect.height / 2;
-        isDroppedInTopHalf = truckCenterY < laneCenterY;
+        isDroppedInTopHalf = implementCenterY < laneCenterY;
       } else if (lastPosition && overRect) {
         const dropY = lastPosition.y;
         const laneCenterY = overRect.top + overRect.height / 2;
@@ -649,51 +649,51 @@ export function SingleGarageView({
 
       let preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
 
-      const draggedTruckParsed = draggedTruck.spot ? parseSpot(draggedTruck.spot) : null;
-      const draggedTruckCurrentSpot = draggedTruck.spot;
+      const draggedImplementParsed = draggedImplement.spot ? parseSpot(draggedImplement.spot) : null;
+      const draggedImplementCurrentSpot = draggedImplement.spot;
 
-      const todayTrucks = filterTrucksForDate(trucks, garageId as AreaId, today);
-      const spotToTruck = new Map<number, GarageTruck>();
-      todayTrucks.forEach((t) => {
-        if (!t.spot || t.id === truckId) return;
+      const todayImplements = filterImplementsForDate(implementList, garageId as AreaId, today);
+      const spotToImplement = new Map<number, GarageImplement>();
+      todayImplements.forEach((t) => {
+        if (!t.spot || t.id === implementId) return;
         const parsed = parseSpot(t.spot);
         if (parsed.garage === garageId && parsed.lane === targetLaneId && parsed.spotNumber) {
-          spotToTruck.set(parsed.spotNumber, t);
+          spotToImplement.set(parsed.spotNumber, t);
         }
       });
 
       // V3 ADD: Use three-zone detection when room for 3 trucks
-      const truckAtV1 = spotToTruck.get(1);
-      const truckAtV2 = spotToTruck.get(2);
-      const truckAtV3 = spotToTruck.get(3);
+      const implementAtV1 = spotToImplement.get(1);
+      const implementAtV2 = spotToImplement.get(2);
+      const implementAtV3 = spotToImplement.get(3);
 
       // V1-only lane + room for V3: three-zone detection only for small trucks
-      if (truckAtV1 && !truckAtV2 && !truckAtV3) {
+      if (implementAtV1 && !implementAtV2 && !implementAtV3) {
         const singleConfig = GARAGE_CONFIGS[garageId as GarageId];
-        const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + draggedTruck.length + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + implementAtV1.length + draggedImplement.length + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
         if (usedWithV2 < singleConfig.laneLength) {
           // Check if both V2+V3 indicators fit (same condition as preview)
-          const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+          const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + implementAtV1.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
           const laneBottom = singleConfig.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP;
-          const v3ZoneTop = laneBottom - draggedTruck.length;
-          const canShowBothIndicators = (v3ZoneTop - v1WithSpacing) >= draggedTruck.length;
+          const v3ZoneTop = laneBottom - draggedImplement.length;
+          const canShowBothIndicators = (v3ZoneTop - v1WithSpacing) >= draggedImplement.length;
 
           if (canShowBothIndicators) {
             // Small truck: three-zone (V1 swap top, V2 middle, V3 bottom)
             let dropFraction = 0.5;
             if (activeRect && overRect) {
-              const truckCenterY = activeRect.top + activeRect.height / 2;
-              dropFraction = (truckCenterY - overRect.top) / overRect.height;
+              const implementCenterY = activeRect.top + activeRect.height / 2;
+              dropFraction = (implementCenterY - overRect.top) / overRect.height;
             } else if (lastPosition && overRect) {
               dropFraction = (lastPosition.y - overRect.top) / overRect.height;
             }
 
             if (dropFraction > 2 / 3) {
               // Bottom third → V3
-              const isAlreadyAtV3 = draggedTruckParsed?.garage === garageId &&
-                draggedTruckParsed?.lane === targetLaneId && draggedTruckParsed?.spotNumber === 3;
+              const isAlreadyAtV3 = draggedImplementParsed?.garage === garageId &&
+                draggedImplementParsed?.lane === targetLaneId && draggedImplementParsed?.spotNumber === 3;
               if (isAlreadyAtV3) return;
-              onTruckMove(truckId, `${garageId}_${targetLaneId}_V3`);
+              onImplementMove(implementId, `${garageId}_${targetLaneId}_V3`);
               return;
             }
             // Middle third → V2, Top third → V1 swap
@@ -704,11 +704,11 @@ export function SingleGarageView({
       }
 
       // V1+V3 occupied (V2 being dragged): allow V2↔V3 swap via bottom drop
-      if (truckAtV1 && !truckAtV2 && truckAtV3) {
+      if (implementAtV1 && !implementAtV2 && implementAtV3) {
         let dropFraction = 0.5;
         if (activeRect && overRect) {
-          const truckCenterY = activeRect.top + activeRect.height / 2;
-          dropFraction = (truckCenterY - overRect.top) / overRect.height;
+          const implementCenterY = activeRect.top + activeRect.height / 2;
+          dropFraction = (implementCenterY - overRect.top) / overRect.height;
         } else if (lastPosition && overRect) {
           dropFraction = (lastPosition.y - overRect.top) / overRect.height;
         }
@@ -724,37 +724,37 @@ export function SingleGarageView({
       }
 
       // V1+V2 both occupied: three-zone detection
-      if (truckAtV1 && truckAtV2 && !truckAtV3) {
-        const todayTrucksForCheck = filterTrucksForDate(trucks, garageId as AreaId, today);
+      if (implementAtV1 && implementAtV2 && !implementAtV3) {
+        const todayImplementsForCheck = filterImplementsForDate(implementList, garageId as AreaId, today);
         const v3Availability = calculateLaneAvailability(
-          garageId as GarageId, targetLaneId, todayTrucksForCheck, draggedTruck.length, truckId
+          garageId as GarageId, targetLaneId, todayImplementsForCheck, draggedImplement.length, implementId
         );
         if (v3Availability.canFit) {
           // V3 feasible: split lane into thirds (top=V1 swap, middle=V2 swap, bottom=V3 add)
           let dropFraction = 0.5;
           if (activeRect && overRect) {
-            const truckCenterY = activeRect.top + activeRect.height / 2;
-            dropFraction = (truckCenterY - overRect.top) / overRect.height;
+            const implementCenterY = activeRect.top + activeRect.height / 2;
+            dropFraction = (implementCenterY - overRect.top) / overRect.height;
           } else if (lastPosition && overRect) {
             dropFraction = (lastPosition.y - overRect.top) / overRect.height;
           }
 
           if (dropFraction > 2 / 3) {
             // Bottom third - add/stay at V3
-            const isAlreadyAtV3 = draggedTruckParsed?.garage === garageId &&
-              draggedTruckParsed?.lane === targetLaneId && draggedTruckParsed?.spotNumber === 3;
+            const isAlreadyAtV3 = draggedImplementParsed?.garage === garageId &&
+              draggedImplementParsed?.lane === targetLaneId && draggedImplementParsed?.spotNumber === 3;
             if (isAlreadyAtV3) return;
-            onTruckMove(truckId, `${garageId}_${targetLaneId}_V3`);
+            onImplementMove(implementId, `${garageId}_${targetLaneId}_V3`);
             return;
           } else if (dropFraction > 1 / 3) {
             // Middle third - push: dragged truck → V2, existing V2 → V3
             const newSpotForDragged = `${garageId}_${targetLaneId}_V2`;
-            const newSpotForV2Truck = `${garageId}_${targetLaneId}_V3`;
-            if (onTruckSwap) {
-              onTruckSwap(truckId, newSpotForDragged, truckAtV2.id, newSpotForV2Truck);
+            const newSpotForV2Implement = `${garageId}_${targetLaneId}_V3`;
+            if (onImplementSwap) {
+              onImplementSwap(implementId, newSpotForDragged, implementAtV2.id, newSpotForV2Implement);
             } else {
-              onTruckMove(truckId, newSpotForDragged);
-              onTruckMove(truckAtV2.id, newSpotForV2Truck);
+              onImplementMove(implementId, newSpotForDragged);
+              onImplementMove(implementAtV2.id, newSpotForV2Implement);
             }
             return;
           }
@@ -764,76 +764,76 @@ export function SingleGarageView({
       }
 
       if (
-        draggedTruckParsed?.garage === garageId &&
-        draggedTruckParsed?.lane === targetLaneId &&
-        draggedTruckParsed?.spotNumber === preferredSpotNum
+        draggedImplementParsed?.garage === garageId &&
+        draggedImplementParsed?.lane === targetLaneId &&
+        draggedImplementParsed?.spotNumber === preferredSpotNum
       ) {
         return;
       }
 
-      const truckAtPreferredSpot = spotToTruck.get(preferredSpotNum);
+      const implementAtPreferredSpot = spotToImplement.get(preferredSpotNum);
 
-      if (truckAtPreferredSpot) {
+      if (implementAtPreferredSpot) {
         const newSpotForDragged = `${garageId}_${targetLaneId}_V${preferredSpotNum}`;
-        const swapTargetSpot = draggedTruckCurrentSpot || null;
+        const swapTargetSpot = draggedImplementCurrentSpot || null;
 
         const canSwap = calculateLaneAvailability(
           garageId as GarageId,
           targetLaneId,
-          todayTrucks.filter((t) => t.id !== truckId && t.id !== truckAtPreferredSpot.id),
-          draggedTruck.length,
+          todayImplements.filter((t) => t.id !== implementId && t.id !== implementAtPreferredSpot.id),
+          draggedImplement.length,
         );
 
         if (!canSwap.canFit) return;
 
         // Reverse validation: check if swapped truck fits in dragged truck's original lane
-        if (draggedTruckParsed && (draggedTruckParsed.garage !== garageId || draggedTruckParsed.lane !== targetLaneId)) {
-          const origConfig = GARAGE_CONFIGS[draggedTruckParsed.garage as keyof typeof GARAGE_CONFIGS];
+        if (draggedImplementParsed && (draggedImplementParsed.garage !== garageId || draggedImplementParsed.lane !== targetLaneId)) {
+          const origConfig = GARAGE_CONFIGS[draggedImplementParsed.garage as keyof typeof GARAGE_CONFIGS];
           if (origConfig) {
             const reverseCheck = calculateLaneAvailability(
-              draggedTruckParsed.garage as GarageId,
-              draggedTruckParsed.lane as LaneId,
-              todayTrucks.filter((t) => t.id !== truckId && t.id !== truckAtPreferredSpot.id),
-              truckAtPreferredSpot.length,
+              draggedImplementParsed.garage as GarageId,
+              draggedImplementParsed.lane as LaneId,
+              todayImplements.filter((t) => t.id !== implementId && t.id !== implementAtPreferredSpot.id),
+              implementAtPreferredSpot.length,
             );
             if (!reverseCheck.canFit) return;
           }
         }
 
-        if (onTruckSwap) {
-          onTruckSwap(truckId, newSpotForDragged, truckAtPreferredSpot.id, swapTargetSpot);
+        if (onImplementSwap) {
+          onImplementSwap(implementId, newSpotForDragged, implementAtPreferredSpot.id, swapTargetSpot);
         } else {
-          onTruckMove(truckId, newSpotForDragged);
-          onTruckMove(truckAtPreferredSpot.id, swapTargetSpot);
+          onImplementMove(implementId, newSpotForDragged);
+          onImplementMove(implementAtPreferredSpot.id, swapTargetSpot);
         }
         return;
       }
 
-      const availability = calculateLaneAvailability(garageId as GarageId, targetLaneId, todayTrucks, draggedTruck.length, truckId);
+      const availability = calculateLaneAvailability(garageId as GarageId, targetLaneId, todayImplements, draggedImplement.length, implementId);
       if (!availability.canFit) return;
 
       const newSpot = `${garageId}_${targetLaneId}_V${preferredSpotNum}`;
-      onTruckMove(truckId, newSpot);
+      onImplementMove(implementId, newSpot);
     },
-    [trucks, garageId, today, onTruckMove, onTruckSwap],
+    [implementList, garageId, today, onImplementMove, onImplementSwap],
   );
 
   const content = (
     <div className="flex items-start justify-center gap-6 p-6">
-      {trucksPerDay.map(({ date, trucks: dayTrucks, isToday: isDayToday }) => (
+      {implementsPerDay.map(({ date, trucks: dayImplements, isToday: isDayToday }) => (
         <DayColumn
           key={date.toISOString()}
           areaId={garageId as AreaId}
           date={date}
-          trucks={dayTrucks}
+          trucks={dayImplements}
           patioColumns={areaDimensions.columns}
           scale={scale}
           svgWidth={svgWidth}
           svgHeight={svgHeight}
           isToday={isDayToday}
           enableDragDrop={isDayToday && enableDragDrop}
-          onTruckClick={onTruckClick}
-          activeTruck={activeTruck}
+          onTruckClick={onImplementClick}
+          activeTruck={activeImplement}
           laneAvailability={isDayToday ? laneAvailability : null}
           dimmed={!isDayToday}
         />
@@ -853,13 +853,13 @@ export function SingleGarageView({
         >
           {content}
           <DragOverlay>
-            {activeTruck ? (
+            {activeImplement ? (
               <div style={{ opacity: 0.8, cursor: 'grabbing' }}>
                 <svg
                   width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale}
-                  height={activeTruck.length * scale}
+                  height={activeImplement.length * scale}
                 >
-                  <TruckElement truck={{ ...activeTruck, xPosition: 0, yPosition: 0 }} scale={scale} />
+                  <ImplementElement truck={{ ...activeImplement, xPosition: 0, yPosition: 0 }} scale={scale} />
                 </svg>
               </div>
             ) : null}

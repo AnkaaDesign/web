@@ -1260,7 +1260,7 @@ export enum PAINT_BASE_TYPE {
  * - Each lane can have up to 3 spots (V1, V2, V3)
  * - Minimum spacing between trucks: 2m
  */
-export enum TRUCK_SPOT {
+export enum IMPLEMENT_SPOT {
   // Yard (Patio)
   YARD_WAIT = 'YARD_WAIT',
   YARD_EXIT = 'YARD_EXIT',
@@ -1310,7 +1310,7 @@ export enum TRUCK_MANUFACTURER {
  * Truck categories/types
  * Categories define the size and configuration of the truck
  */
-export enum TRUCK_CATEGORY {
+export enum IMPLEMENT_CATEGORY {
   MINI = 'MINI', // Mini truck (small urban delivery)
   VUC = 'VUC', // VUC - Veículo Urbano de Carga (Urban Cargo Vehicle)
   THREE_QUARTER = 'THREE_QUARTER', // 3/4 truck (light commercial)

@@ -11,7 +11,7 @@ import type { ImplementFace } from "@/constants/implement-faces";
 export const implementMeasureQueryKeys = {
   all: ["implementMeasures"] as const,
   detail: (id: string) => ["implementMeasures", "detail", id] as const,
-  byTruck: (truckId: string) => ["implementMeasures", "truck", truckId] as const,
+  byTruck: (implementId: string) => ["implementMeasures", "truck", implementId] as const,
 };
 
 // Get implement measure by ID
@@ -35,11 +35,11 @@ export const useImplementMeasureDetail = (
   });
 };
 
-type MeasuresByTruck = { leftSideMeasure: any; rightSideMeasure: any; backSideMeasure: any };
+type MeasuresByImplement = { leftSideMeasure: any; rightSideMeasure: any; backSideMeasure: any };
 
 // Get implement measures by truck ID
-export const useImplementMeasuresByTruck = (
-  truckId: string,
+export const useImplementMeasuresByImplement = (
+  implementId: string,
   options?: {
     enabled?: boolean;
     includePhoto?: boolean;  // Only include photo when needed (e.g., library view)
@@ -49,11 +49,11 @@ export const useImplementMeasuresByTruck = (
   const includePhoto = options?.includePhoto ?? false;
 
   return useQuery({
-    queryKey: [...implementMeasureQueryKeys.byTruck(truckId), { includePhoto }],
+    queryKey: [...implementMeasureQueryKeys.byTruck(implementId), { includePhoto }],
     queryFn: async () => {
       // Single API call - backend now returns everything needed for previews
       // Only includes photo if explicitly requested
-      const response = await implementMeasureService.getByTruckId(truckId, { includePhoto });
+      const response = await implementMeasureService.getByTruckId(implementId, { includePhoto });
       // A API sempre devolve as seções de cada face (o repositório as inclui) e
       // `null` na face sem medida. Havia aqui um recuo para uma "versão antiga da
       // API" que buscava as seções medida a medida e remontava a resposta só com
@@ -62,9 +62,9 @@ export const useImplementMeasuresByTruck = (
       // O tipo continua o que os consumidores sempre enxergaram: o recuo devolvia
       // `any` por face, e a prévia/edição leem `sections` e `photo` sem checar
       // (a API os manda). Retipar com o tipo da resposta é do P20.
-      return response.data.data as MeasuresByTruck;
+      return response.data.data as MeasuresByImplement;
     },
-    enabled: enabled && !!truckId,
+    enabled: enabled && !!implementId,
     staleTime: 5 * 60 * 1000,
   });
 };
@@ -108,9 +108,9 @@ export const useImplementMeasureMutations = () => {
     },
   });
 
-  const createOrUpdateTruckMeasureMutation = useMutation({
-    mutationFn: ({ truckId, side, data }: { truckId: string; side: ImplementFace; data: ImplementMeasureCreateFormData }) =>
-      implementMeasureService.createOrUpdateTruckMeasure(truckId, side, data),
+  const createOrUpdateImplementMeasureMutation = useMutation({
+    mutationFn: ({ truckId: implementId, side, data }: { truckId: string; side: ImplementFace; data: ImplementMeasureCreateFormData }) =>
+      implementMeasureService.createOrUpdateTruckMeasure(implementId, side, data),
     onSuccess: async (response, variables) => {
       // Use refetchQueries to immediately refetch and get fresh data
       await queryClient.refetchQueries({
@@ -131,11 +131,11 @@ export const useImplementMeasureMutations = () => {
     create: createMutation.mutateAsync,
     update: updateMutation.mutateAsync,
     delete: deleteMutation.mutateAsync,
-    createOrUpdateTruckMeasure: createOrUpdateTruckMeasureMutation.mutateAsync,
+    createOrUpdateTruckMeasure: createOrUpdateImplementMeasureMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
-    isSavingTruckMeasure: createOrUpdateTruckMeasureMutation.isPending,
+    isSavingTruckMeasure: createOrUpdateImplementMeasureMutation.isPending,
   };
 };
 

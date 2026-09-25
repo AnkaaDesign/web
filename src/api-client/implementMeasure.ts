@@ -12,7 +12,7 @@ type ImplementMeasureCreateResponse = BaseCreateResponse<ImplementMeasure>;
 type ImplementMeasureUpdateResponse = BaseUpdateResponse<ImplementMeasure>;
 type ImplementMeasureDeleteResponse = BaseDeleteResponse;
 
-interface ImplementMeasuresByTruckResponse {
+interface ImplementMeasuresByImplementResponse {
   success: boolean;
   message: string;
   data: {
@@ -63,8 +63,8 @@ export const implementMeasureService = {
     apiClient.post<ImplementMeasureAssignResponse>(`/implement-measure/${implementMeasureId}/assign-to-truck`, data),
 
   // Get implement measures by truck ID
-  getByTruckId: (truckId: string, options?: { includePhoto?: boolean }) =>
-    apiClient.get<ImplementMeasuresByTruckResponse>(`/implement-measure/truck/${truckId}`, {
+  getByTruckId: (implementId: string, options?: { includePhoto?: boolean }) =>
+    apiClient.get<ImplementMeasuresByImplementResponse>(`/implement-measure/truck/${implementId}`, {
       params: options?.includePhoto ? { includePhoto: 'true' } : undefined,
     }),
 
@@ -78,8 +78,8 @@ export const implementMeasureService = {
   delete: (id: string) => apiClient.delete<ImplementMeasureDeleteResponse>(`/implement-measure/${id}`),
 
   // Create or update truck implement measure for specific side
-  createOrUpdateTruckMeasure: (truckId: string, side: ImplementFace, data: ImplementMeasureCreateFormData) =>
-    apiClient.post<ImplementMeasureCreateResponse>(`/implement-measure/truck/${truckId}/${side}`, data),
+  createOrUpdateTruckMeasure: (implementId: string, side: ImplementFace, data: ImplementMeasureCreateFormData) =>
+    apiClient.post<ImplementMeasureCreateResponse>(`/implement-measure/truck/${implementId}/${side}`, data),
 
   // Generate SVG for implement measure
   generateSVG: (id: string) => apiClient.get(`/implement-measure/${id}/svg`, { responseType: "blob" }),
@@ -102,7 +102,7 @@ export type {
   ImplementMeasureCreateResponse,
   ImplementMeasureUpdateResponse,
   ImplementMeasureDeleteResponse,
-  ImplementMeasuresByTruckResponse,
+  ImplementMeasuresByImplementResponse as ImplementMeasuresByTruckResponse,
   ImplementMeasureListResponse,
   ImplementMeasureUsageResponse,
   ImplementMeasureAssignResponse,

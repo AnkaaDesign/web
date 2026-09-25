@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import type { GarageTruck } from './garage-view';
+import type { GarageImplement } from './garage-view';
 
 // =====================
 // Constants
@@ -20,13 +20,13 @@ const PATIO_CONFIG = {
 // Types
 // =====================
 
-interface PositionedTruck extends GarageTruck {
+interface PositionedImplement extends GarageImplement {
   xPosition: number;
   yPosition: number;
 }
 
 interface PatioLayout {
-  trucks: PositionedTruck[];
+  trucks: PositionedImplement[];
   width: number;
   height: number;
   columns: number;
@@ -37,8 +37,8 @@ interface PatioLayout {
 // Layout Calculation
 // =====================
 
-function calculatePatioLayout(trucks: GarageTruck[]): PatioLayout {
-  if (trucks.length === 0) {
+function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
+  if (implementList.length === 0) {
     return {
       trucks: [],
       width: 0,
@@ -48,34 +48,34 @@ function calculatePatioLayout(trucks: GarageTruck[]): PatioLayout {
     };
   }
 
-  const avgTruckLength =
-    trucks.reduce((sum, t) => sum + t.length, 0) / trucks.length;
-  const truckWidth = PATIO_CONFIG.TRUCK_WIDTH;
+  const avgImplementLength =
+    implementList.reduce((sum, t) => sum + t.length, 0) / implementList.length;
+  const implementWidth = PATIO_CONFIG.TRUCK_WIDTH;
   const spacing = PATIO_CONFIG.TRUCK_MIN_SPACING;
 
   // Calculate columns to fit in a reasonable width
   const columns = Math.max(
     1,
-    Math.floor(PATIO_CONFIG.TARGET_WIDTH / (truckWidth + spacing))
+    Math.floor(PATIO_CONFIG.TARGET_WIDTH / (implementWidth + spacing))
   );
-  const rows = Math.ceil(trucks.length / columns);
+  const rows = Math.ceil(implementList.length / columns);
 
   // Position trucks in grid
-  const positionedTrucks: PositionedTruck[] = trucks.map((truck, index) => {
+  const positionedImplements: PositionedImplement[] = implementList.map((implement, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
     return {
-      ...truck,
-      xPosition: col * (truckWidth + spacing) + spacing,
-      yPosition: row * (avgTruckLength + spacing) + spacing,
+      ...implement,
+      xPosition: col * (implementWidth + spacing) + spacing,
+      yPosition: row * (avgImplementLength + spacing) + spacing,
     };
   });
 
-  const totalWidth = columns * (truckWidth + spacing) + spacing;
-  const totalHeight = rows * (avgTruckLength + spacing) + spacing;
+  const totalWidth = columns * (implementWidth + spacing) + spacing;
+  const totalHeight = rows * (avgImplementLength + spacing) + spacing;
 
   return {
-    trucks: positionedTrucks,
+    trucks: positionedImplements,
     width: totalWidth,
     height: totalHeight,
     columns,
@@ -87,18 +87,18 @@ function calculatePatioLayout(trucks: GarageTruck[]): PatioLayout {
 // Sub-components
 // =====================
 
-interface TruckElementProps {
-  truck: PositionedTruck;
+interface ImplementElementProps {
+  truck: PositionedImplement;
   scale: number;
   avgLength: number;
 }
 
-function TruckElement({ truck, scale, avgLength }: TruckElementProps) {
+function ImplementElement({ truck: implement, scale, avgLength }: ImplementElementProps) {
   const width = PATIO_CONFIG.TRUCK_WIDTH * scale;
   const height = avgLength * scale;
-  const x = truck.xPosition * scale;
-  const y = truck.yPosition * scale;
-  const bgColor = truck.paintHex || '#ffffff';
+  const x = implement.xPosition * scale;
+  const y = implement.yPosition * scale;
+  const bgColor = implement.paintHex || '#ffffff';
 
   // Determine text color based on background brightness
   const getBrightness = (hex: string) => {
@@ -133,7 +133,7 @@ function TruckElement({ truck, scale, avgLength }: TruckElementProps) {
         transform={`rotate(-90, ${width / 2}, ${height / 2})`}
         style={{ pointerEvents: 'none' }}
       >
-        {truck.taskName?.slice(0, 20) || 'N/A'}
+        {implement.taskName?.slice(0, 20) || 'N/A'}
       </text>
       {/* Length label at top */}
       <text
@@ -144,10 +144,10 @@ function TruckElement({ truck, scale, avgLength }: TruckElementProps) {
         fontSize={10}
         style={{ pointerEvents: 'none' }}
       >
-        {truck.length.toFixed(1).replace('.', ',')}m
+        {implement.length.toFixed(1).replace('.', ',')}m
       </text>
       {/* Serial number at bottom */}
-      {truck.serialNumber && (
+      {implement.serialNumber && (
         <text
           x={width / 2}
           y={height - 6}
@@ -156,7 +156,7 @@ function TruckElement({ truck, scale, avgLength }: TruckElementProps) {
           fontSize={8}
           style={{ pointerEvents: 'none' }}
         >
-          {truck.serialNumber}
+          {implement.serialNumber}
         </text>
       )}
     </g>
@@ -168,15 +168,15 @@ function TruckElement({ truck, scale, avgLength }: TruckElementProps) {
 // =====================
 
 interface PatioViewProps {
-  trucks: GarageTruck[];
-  onTruckSelect?: (truckId: string) => void;
+  trucks: GarageImplement[];
+  onTruckSelect?: (implementId: string) => void;
   className?: string;
 }
 
-export function PatioView({ trucks, onTruckSelect, className }: PatioViewProps) {
-  const patioLayout = useMemo(() => calculatePatioLayout(trucks), [trucks]);
+export function PatioView({ trucks: implementList, onTruckSelect: onImplementSelect, className }: PatioViewProps) {
+  const patioLayout = useMemo(() => calculatePatioLayout(implementList), [implementList]);
 
-  if (trucks.length === 0) {
+  if (implementList.length === 0) {
     return (
       <div className={cn('flex flex-col items-center gap-4 p-8', className)}>
         <h2 className="text-xl font-bold">Pátio</h2>
@@ -198,7 +198,7 @@ export function PatioView({ trucks, onTruckSelect, className }: PatioViewProps) 
   const scale = Math.min(scaleX, scaleY, 15); // Cap scale to prevent too large trucks
 
   const avgLength =
-    trucks.reduce((sum, t) => sum + t.length, 0) / trucks.length;
+    implementList.reduce((sum, t) => sum + t.length, 0) / implementList.length;
 
   const svgWidth = patioLayout.width * scale + padding * 2;
   const svgHeight = patioLayout.height * scale + padding * 2;
@@ -209,7 +209,7 @@ export function PatioView({ trucks, onTruckSelect, className }: PatioViewProps) 
       <div className="flex items-center gap-4">
         <h2 className="text-xl font-bold">Pátio</h2>
         <span className="text-sm text-muted-foreground">
-          ({trucks.length} caminhão{trucks.length !== 1 ? 'ões' : ''})
+          ({implementList.length} caminhão{implementList.length !== 1 ? 'ões' : ''})
         </span>
       </div>
 
@@ -230,13 +230,13 @@ export function PatioView({ trucks, onTruckSelect, className }: PatioViewProps) 
             />
 
             {/* Trucks */}
-            {patioLayout.trucks.map((truck) => (
+            {patioLayout.trucks.map((implement) => (
               <g
-                key={truck.id}
-                onClick={() => onTruckSelect?.(truck.id)}
-                style={{ cursor: onTruckSelect ? 'pointer' : 'default' }}
+                key={implement.id}
+                onClick={() => onImplementSelect?.(implement.id)}
+                style={{ cursor: onImplementSelect ? 'pointer' : 'default' }}
               >
-                <TruckElement truck={truck} scale={scale} avgLength={avgLength} />
+                <ImplementElement truck={implement} scale={scale} avgLength={avgLength} />
               </g>
             ))}
 
@@ -248,7 +248,7 @@ export function PatioView({ trucks, onTruckSelect, className }: PatioViewProps) 
               fontSize={10}
               fill="#666"
             >
-              {patioLayout.columns} x {patioLayout.rows} ({trucks.length} total)
+              {patioLayout.columns} x {patioLayout.rows} ({implementList.length} total)
             </text>
           </g>
         </svg>

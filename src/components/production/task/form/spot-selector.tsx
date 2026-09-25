@@ -7,7 +7,7 @@ import {
   type GarageAvailability,
   type LaneAvailability,
 } from '../../../../api-client/truck';
-import { TRUCK_SPOT } from '../../../../constants';
+import { IMPLEMENT_SPOT } from '../../../../constants';
 
 type GarageId = 'B1' | 'B2' | 'B3';
 type LaneId = 'F1' | 'F2' | 'F3';
@@ -15,9 +15,9 @@ type SpotNumber = 1 | 2 | 3;
 
 interface SpotSelectorProps {
   truckLength: number | null;
-  currentSpot: TRUCK_SPOT | null;
+  currentSpot: IMPLEMENT_SPOT | null;
   truckId?: string;
-  onSpotChange: (spot: TRUCK_SPOT | null) => void;
+  onSpotChange: (spot: IMPLEMENT_SPOT | null) => void;
   disabled?: boolean;
   className?: string;
 }
@@ -40,7 +40,7 @@ const SPOT_LABELS: Record<SpotNumber, string> = {
   3: 'Vaga 3',
 };
 
-function parseSpot(spot: TRUCK_SPOT | null): {
+function parseSpot(spot: IMPLEMENT_SPOT | null): {
   garage: GarageId | null;
   lane: LaneId | null;
   spotNumber: SpotNumber | null;
@@ -61,22 +61,22 @@ function parseSpot(spot: TRUCK_SPOT | null): {
   };
 }
 
-function buildSpot(garage: GarageId, lane: LaneId, spotNumber: SpotNumber): TRUCK_SPOT {
-  const key = `${garage}_${lane}_V${spotNumber}` as keyof typeof TRUCK_SPOT;
-  return TRUCK_SPOT[key];
+function buildSpot(garage: GarageId, lane: LaneId, spotNumber: SpotNumber): IMPLEMENT_SPOT {
+  const key = `${garage}_${lane}_V${spotNumber}` as keyof typeof IMPLEMENT_SPOT;
+  return IMPLEMENT_SPOT[key];
 }
 
 export function SpotSelector({
-  truckLength,
+  truckLength: implementLength,
   currentSpot,
-  truckId,
+  truckId: implementId,
   onSpotChange,
   disabled = false,
   className,
 }: SpotSelectorProps) {
   // Parse current spot to initialize state
   const parsedSpot = useMemo(() => parseSpot(currentSpot), [currentSpot]);
-  const isYardSpot = currentSpot === TRUCK_SPOT.YARD_WAIT || currentSpot === TRUCK_SPOT.YARD_EXIT;
+  const isYardSpot = currentSpot === IMPLEMENT_SPOT.YARD_WAIT || currentSpot === IMPLEMENT_SPOT.YARD_EXIT;
 
   const [selectedGarage, setSelectedGarage] = useState<GarageId | 'YARD_WAIT' | 'YARD_EXIT' | null>(
     isYardSpot ? (currentSpot as 'YARD_WAIT' | 'YARD_EXIT') : parsedSpot.garage
@@ -86,9 +86,9 @@ export function SpotSelector({
 
   // Fetch garage availability when truck length is available
   const { data: garagesAvailability, isLoading } = useQuery({
-    queryKey: ['garages-availability', truckLength, truckId],
-    queryFn: () => getGaragesAvailability(truckLength!, truckId),
-    enabled: !!truckLength && truckLength > 0,
+    queryKey: ['garages-availability', implementLength, implementId],
+    queryFn: () => getGaragesAvailability(implementLength!, implementId),
+    enabled: !!implementLength && implementLength > 0,
   });
 
   // Get availability data
@@ -200,7 +200,7 @@ export function SpotSelector({
     const isCurrentAtV3 = parsedSpot.spotNumber === 3 && parsedSpot.lane === selectedLane && parsedSpot.garage === selectedGarage;
     const v1Occupied = selectedLaneData.occupiedSpots.includes(1);
     const v2Occupied = selectedLaneData.occupiedSpots.includes(2);
-    const hasEnoughSpace = !!truckLength && selectedLaneData.availableSpace >= truckLength + 2;
+    const hasEnoughSpace = !!implementLength && selectedLaneData.availableSpace >= implementLength + 2;
     const v3IsOccupied = selectedLaneData.occupiedSpots.includes(3);
 
     if (isCurrentAtV3) {
@@ -226,7 +226,7 @@ export function SpotSelector({
     }
 
     return spots;
-  }, [selectedLaneData, selectedGarage, selectedLane, parsedSpot, truckLength]);
+  }, [selectedLaneData, selectedGarage, selectedLane, parsedSpot, implementLength]);
 
   // Handle garage change
   const handleGarageChange = useCallback((value: string | null) => {
@@ -234,7 +234,7 @@ export function SpotSelector({
       setSelectedGarage(value);
       setSelectedLane(null);
       setSelectedSpotNumber(null);
-      onSpotChange(value as TRUCK_SPOT); // Set yard spot value
+      onSpotChange(value as IMPLEMENT_SPOT); // Set yard spot value
     } else if (value) {
       setSelectedGarage(value as GarageId);
       setSelectedLane(null);
@@ -271,7 +271,7 @@ export function SpotSelector({
 
   // Sync state when currentSpot changes externally
   useEffect(() => {
-    if (currentSpot === TRUCK_SPOT.YARD_WAIT || currentSpot === TRUCK_SPOT.YARD_EXIT) {
+    if (currentSpot === IMPLEMENT_SPOT.YARD_WAIT || currentSpot === IMPLEMENT_SPOT.YARD_EXIT) {
       setSelectedGarage(currentSpot as 'YARD_WAIT' | 'YARD_EXIT');
       setSelectedLane(null);
       setSelectedSpotNumber(null);
@@ -285,11 +285,11 @@ export function SpotSelector({
     }
   }, [currentSpot]);
 
-  const isDisabled = disabled || !truckLength || truckLength <= 0;
+  const isDisabled = disabled || !implementLength || implementLength <= 0;
 
   return (
     <div className={cn('space-y-2', className)}>
-      {!truckLength || truckLength <= 0 ? (
+      {!implementLength || implementLength <= 0 ? (
         <p className="text-sm text-muted-foreground italic">
           Preencha o layout do caminhão para selecionar o local
         </p>

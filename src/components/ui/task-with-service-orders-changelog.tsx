@@ -23,7 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { rollbackFieldChange } from "@/api-client/task";
 import { useQueryClient } from "@tanstack/react-query";
-import { taskKeys, serviceOrderKeys, truckKeys, changeLogKeys } from "../../hooks/common/query-keys";
+import { taskKeys, serviceOrderKeys, implementKeys, changeLogKeys } from "../../hooks/common/query-keys";
 import { budgetKeys } from "../../hooks/production/use-budget";
 import type { ChangeLog, File as AnkaaFile } from "../../types";
 import {
@@ -3007,7 +3007,7 @@ export function TaskWithServiceOrdersChangelog({
   taskName,
   taskCreatedAt: _taskCreatedAt,
   serviceOrderIds,
-  truckId,
+  truckId: implementId,
   layoutIds = [],
   quoteId,
   className,
@@ -3038,13 +3038,13 @@ export function TaskWithServiceOrdersChangelog({
       await Promise.all([
         refetchTaskChangelogs(),
         refetchServiceOrderChangelogs(),
-        refetchTruckChangelogs(),
+        refetchImplementChangelogs(),
         refetchLayoutChangelogs(),
         refetchQuoteChangelogs(),
         refetchQuoteItemChangelogs(),
         queryClient.invalidateQueries({ queryKey: taskKeys.all }),
         queryClient.invalidateQueries({ queryKey: serviceOrderKeys.all }),
-        queryClient.invalidateQueries({ queryKey: truckKeys.all }),
+        queryClient.invalidateQueries({ queryKey: implementKeys.all }),
         queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
         queryClient.invalidateQueries({ queryKey: changeLogKeys.all }),
       ]);
@@ -3099,14 +3099,14 @@ export function TaskWithServiceOrdersChangelog({
 
   // Fetch truck changelogs
   const {
-    data: truckChangelogsResponse,
-    isLoading: truckLoading,
-    error: truckError,
-    refetch: refetchTruckChangelogs,
+    data: implementChangelogsResponse,
+    isLoading: implementLoading,
+    error: implementError,
+    refetch: refetchImplementChangelogs,
   } = useChangeLogs({
     where: {
       entityType: CHANGE_LOG_ENTITY_TYPE.TRUCK,
-      entityId: truckId || undefined,
+      entityId: implementId || undefined,
     },
     include: {
       user: true,
@@ -3115,7 +3115,7 @@ export function TaskWithServiceOrdersChangelog({
       createdAt: "desc",
     },
     take: limit,
-    enabled: !!truckId,
+    enabled: !!implementId,
   });
 
   // Fetch layout changelogs
@@ -3198,7 +3198,7 @@ export function TaskWithServiceOrdersChangelog({
         ? serviceOrderChangelogsResponse?.data || []
         : [];
     // Only include truck logs if the query is enabled (has truck ID)
-    const truckLogs = truckId ? truckChangelogsResponse?.data || [] : [];
+    const implementLogs = implementId ? implementChangelogsResponse?.data || [] : [];
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs =
       layoutIds.length > 0 ? layoutChangelogsResponse?.data || [] : [];
@@ -3255,7 +3255,7 @@ export function TaskWithServiceOrdersChangelog({
     const allLogs = [
       ...taskLogs,
       ...filteredServiceLogs,
-      ...truckLogs,
+      ...implementLogs,
       ...layoutLogs,
       ...quoteLogs,
       ...quoteItemLogs,
@@ -3330,12 +3330,12 @@ export function TaskWithServiceOrdersChangelog({
   }, [
     taskChangelogsResponse,
     serviceOrderChangelogsResponse,
-    truckChangelogsResponse,
+    implementChangelogsResponse,
     layoutChangelogsResponse,
     quoteChangelogsResponse,
     quoteItemChangelogsResponse,
     serviceOrderIds,
-    truckId,
+    implementId,
     layoutIds,
     quoteId,
     visibleServiceOrderTypes,
@@ -3551,8 +3551,8 @@ export function TaskWithServiceOrdersChangelog({
   }, [combinedChangelogs]);
 
   const isLoading =
-    taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading || quoteLoading || quoteItemLoading;
-  const error = taskError || serviceOrdersError || truckError || layoutsError || quoteError || quoteItemError;
+    taskLoading || serviceOrdersLoading || implementLoading || layoutsLoading || quoteLoading || quoteItemLoading;
+  const error = taskError || serviceOrdersError || implementError || layoutsError || quoteError || quoteItemError;
 
   // Error state — bare (embedded) or carded.
   if (error) {

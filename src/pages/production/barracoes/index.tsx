@@ -159,7 +159,7 @@ export function GaragesPage() {
   });
 
   // Update truck spots mutation - uses batch API for single transaction
-  const updateTruckMutation = useMutation({
+  const updateImplementMutation = useMutation({
     mutationFn: async (updates: PendingChange[]) => {
       // Convert to batch format and update all trucks in single API call
       const batchUpdates = updates.map((change) => ({
@@ -184,7 +184,7 @@ export function GaragesPage() {
   // Display logic:
   // - Has spot → display in that spot (garage) - can be completed or not
   // - No spot AND forecastDate <= today AND not completed → display in patio
-  const garageTrucks = useMemo(() => {
+  const garageImplements = useMemo(() => {
     if (!tasksResponse?.data) {
       return [];
     }
@@ -208,8 +208,8 @@ export function GaragesPage() {
       // Must have a truck
       if (!task.truck) return false;
 
-      const truck = task.truck as any;
-      const spot = truck?.spot as string | null;
+      const implement = task.truck as any;
+      const spot = implement?.spot as string | null;
 
       // If truck has a garage spot (B1_F1_V1, etc.), always include it
       // (even if completed or without layout — use default length)
@@ -249,8 +249,8 @@ export function GaragesPage() {
     const demotedTaskIds = new Set<string>();
 
     for (const task of filtered) {
-      const truck = task.truck as any;
-      const spot = truck?.spot;
+      const implement = task.truck as any;
+      const spot = implement?.spot;
       // Skip deduplication for null spots and yard spots (multiple trucks allowed)
       if (!spot || spot === 'YARD_WAIT' || spot === 'YARD_EXIT') continue;
 
@@ -273,10 +273,10 @@ export function GaragesPage() {
     }
 
     return filtered.map((task): GarageTruck => {
-      const truck = task.truck as any;
+      const implement = task.truck as any;
 
       // Get layout sections from leftSideMeasure or rightSideMeasure
-      const layout = truck?.leftSideMeasure || truck?.rightSideMeasure;
+      const layout = implement?.leftSideMeasure || implement?.rightSideMeasure;
       const sections = layout?.sections || [];
 
       // Calculate truck length from layout sections
@@ -293,23 +293,23 @@ export function GaragesPage() {
       const CABIN_THRESHOLD_LARGE = 10;
       const CABIN_LENGTH_SMALL = 2.0;
       const CABIN_LENGTH_LARGE = 2.4;
-      let truckLength = 10; // Default 10m if no sections
+      let implementLength = 10; // Default 10m if no sections
       if (sectionsSum > 0) {
         if (sectionsSum < CABIN_THRESHOLD_SMALL) {
-          truckLength = sectionsSum + CABIN_LENGTH_SMALL;
+          implementLength = sectionsSum + CABIN_LENGTH_SMALL;
         } else if (sectionsSum < CABIN_THRESHOLD_LARGE) {
-          truckLength = sectionsSum + CABIN_LENGTH_LARGE;
+          implementLength = sectionsSum + CABIN_LENGTH_LARGE;
         } else {
-          truckLength = sectionsSum;
+          implementLength = sectionsSum;
         }
       }
 
       // Check if there's a pending change for this truck
-      const pendingChange = pendingChanges.get(truck?.id);
+      const pendingChange = pendingChanges.get(implement?.id);
       // Demoted trucks (duplicates at same spot) go to yard wait
       const isDemoted = demotedTaskIds.has(task.id);
       // Trucks with null spot are shown in YARD_WAIT (virtual display for forecasted/cleared trucks)
-      const dbSpot = truck?.spot || 'YARD_WAIT';
+      const dbSpot = implement?.spot || 'YARD_WAIT';
       const currentSpot = pendingChange
         ? pendingChange.newSpot
         : isDemoted
@@ -318,20 +318,20 @@ export function GaragesPage() {
 
       return {
         id: task.id,
-        truckId: truck?.id,
+        truckId: implement?.id,
         spot: currentSpot,
         taskName: task.name,
         serialNumber: (task as any).serialNumber || null,
-        plate: truck?.plate || null,
-        chassisNumber: truck?.chassisNumber || null,
+        plate: implement?.plate || null,
+        chassisNumber: implement?.chassisNumber || null,
         paintHex: (task.generalPainting as any)?.hex || null,
-        length: truckLength,
+        length: implementLength,
         originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
         entryDate: (task as any).entryDate || null,
         term: (task as any).term || null,
         forecastDate: (task as any).forecastDate || null,
         cleared: !!(task as any).cleared,
-      spotIsExplicit: !!(truck?.spot), // true when truck has an actual DB spot (not defaulted)
+      spotIsExplicit: !!(implement?.spot), // true when truck has an actual DB spot (not defaulted)
         finishedAt: (task as any).finishedAt || null,
         layoutInfo: sections.length > 0 ? `${sections.length} seções` : null,
         artworkInfo: null, // Can be enhanced later with artwork file count
@@ -343,21 +343,21 @@ export function GaragesPage() {
   }, [tasksResponse, pendingChanges]);
 
   // Handle truck movement (add to pending changes, don't save yet)
-  const handleTruckMove = useCallback(
+  const handleImplementMove = useCallback(
     (taskId: string, newSpot: string | null) => {
       // Find the task to get truck data
       const task = tasksResponse?.data?.find((t) => t.id === taskId);
       if (!task?.truck) return;
 
-      const truck = task.truck as any;
-      const truckId = truck.id;
-      const originalSpot = truck.spot || null;
+      const implement = task.truck as any;
+      const implementId = implement.id;
+      const originalSpot = implement.spot || null;
 
       // Production managers can only request movement, not directly move
       if (canRequestMovement) {
         setMovementRequest({
           taskId,
-          truckId,
+          truckId: implementId,
           taskName: task.name || '',
           fromSpot: originalSpot,
           toSpot: newSpot,
@@ -369,7 +369,7 @@ export function GaragesPage() {
       if (originalSpot === newSpot) {
         setPendingChanges((prev) => {
           const newMap = new Map(prev);
-          newMap.delete(truckId);
+          newMap.delete(implementId);
           return newMap;
         });
         return;
@@ -378,8 +378,8 @@ export function GaragesPage() {
       // Add to pending changes
       setPendingChanges((prev) => {
         const newMap = new Map(prev);
-        newMap.set(truckId, {
-          truckId,
+        newMap.set(implementId, {
+          truckId: implementId,
           taskId,
           oldSpot: originalSpot,
           newSpot,
@@ -391,7 +391,7 @@ export function GaragesPage() {
   );
 
   // Handle truck swap (both trucks in a single state update)
-  const handleTruckSwap = useCallback(
+  const handleImplementSwap = useCallback(
     (task1Id: string, spot1: string, task2Id: string, spot2: string | null) => {
       // Find both tasks
       const task1 = tasksResponse?.data?.find((t) => t.id === task1Id);
@@ -399,37 +399,37 @@ export function GaragesPage() {
 
       if (!task1?.truck || !task2?.truck) return;
 
-      const truck1 = task1.truck as any;
-      const truck2 = task2.truck as any;
+      const implement1 = task1.truck as any;
+      const implement2 = task2.truck as any;
 
       // Update both in a single state update
       setPendingChanges((prev) => {
         const newMap = new Map(prev);
 
         // Add truck1 change (always add for swap, comparing with original DB spot)
-        if (truck1.spot !== spot1) {
-          newMap.set(truck1.id, {
-            truckId: truck1.id,
+        if (implement1.spot !== spot1) {
+          newMap.set(implement1.id, {
+            truckId: implement1.id,
             taskId: task1Id,
-            oldSpot: truck1.spot || null,
+            oldSpot: implement1.spot || null,
             newSpot: spot1,
           });
         } else {
           // New spot matches original, so no change needed
-          newMap.delete(truck1.id);
+          newMap.delete(implement1.id);
         }
 
         // Add truck2 change (always add for swap, comparing with original DB spot)
-        if (truck2.spot !== spot2) {
-          newMap.set(truck2.id, {
-            truckId: truck2.id,
+        if (implement2.spot !== spot2) {
+          newMap.set(implement2.id, {
+            truckId: implement2.id,
             taskId: task2Id,
-            oldSpot: truck2.spot || null,
+            oldSpot: implement2.spot || null,
             newSpot: spot2,
           });
         } else {
           // New spot matches original, so no change needed
-          newMap.delete(truck2.id);
+          newMap.delete(implement2.id);
         }
 
         return newMap;
@@ -442,8 +442,8 @@ export function GaragesPage() {
   const handleSaveChanges = useCallback(() => {
     if (pendingChanges.size === 0) return;
     const updates = Array.from(pendingChanges.values());
-    updateTruckMutation.mutate(updates);
-  }, [pendingChanges, updateTruckMutation]);
+    updateImplementMutation.mutate(updates);
+  }, [pendingChanges, updateImplementMutation]);
 
   // Restore all pending changes
   const handleRestoreChanges = useCallback(() => {
@@ -464,7 +464,7 @@ export function GaragesPage() {
   }, []);
 
   // Handle truck click to open detail modal
-  const handleTruckClick = useCallback((taskId: string) => {
+  const handleImplementClick = useCallback((taskId: string) => {
     setSelectedTaskId(taskId);
     setIsDetailModalOpen(true);
   }, []);
@@ -491,7 +491,7 @@ export function GaragesPage() {
   }, [movementRequest, toast]);
 
   const hasPendingChanges = pendingChanges.size > 0;
-  const isUpdating = updateTruckMutation.isPending;
+  const isUpdating = updateImplementMutation.isPending;
 
   if (isLoading) {
     return (
@@ -659,10 +659,10 @@ export function GaragesPage() {
             <div className="bg-card rounded-lg shadow-sm border border-border p-2 h-full overflow-hidden">
               {viewMode === 'overview' ? (
                 <GarageView
-                  trucks={garageTrucks}
-                  onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
-                  onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
-                  onTruckClick={handleTruckClick}
+                  trucks={garageImplements}
+                  onTruckMove={canEditGaragePositions ? handleImplementMove : undefined}
+                  onTruckSwap={canEditGaragePositions ? handleImplementSwap : undefined}
+                  onTruckClick={handleImplementClick}
                   onGarageSelect={handleGarageSelect}
                   onMoveRejected={handleMoveRejected}
                   className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
@@ -673,10 +673,10 @@ export function GaragesPage() {
               ) : (
                 <SingleGarageView
                   garageId={selectedGarage}
-                  trucks={garageTrucks}
-                  onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
-                  onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
-                  onTruckClick={handleTruckClick}
+                  trucks={garageImplements}
+                  onTruckMove={canEditGaragePositions ? handleImplementMove : undefined}
+                  onTruckSwap={canEditGaragePositions ? handleImplementSwap : undefined}
+                  onTruckClick={handleImplementClick}
                   className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
                   readOnly={!canEditGaragePositions}
                 />

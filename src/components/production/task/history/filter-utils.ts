@@ -1,6 +1,6 @@
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { TASK_STATUS, TASK_STATUS_LABELS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -183,7 +183,7 @@ export function extractActiveFilters(
   // Truck category filter (individual badges)
   if ((filters as any).truckCategories && Array.isArray((filters as any).truckCategories) && (filters as any).truckCategories.length > 0) {
     (filters as any).truckCategories.forEach((category: string) => {
-      const label = (TRUCK_CATEGORY_LABELS as any)[category];
+      const label = (IMPLEMENT_CATEGORY_LABELS as any)[category];
       activeFilters.push({
         key: `truckCategories-${category}`,
         label: "Categoria",

@@ -107,7 +107,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       measurements,
       onMeasurementCommit,
       onScaleDetected,
-      layoutTruckId,
+      layoutTruckId: layoutImplementId,
       fileId,
       layoutTool = "off",
       onLayoutResult,
@@ -413,13 +413,13 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           setGeometry(geo);
           setDetection(found);
           onScaleDetected?.(found);
-          if (!layoutTruckId || !fileId) {
+          if (!layoutImplementId || !fileId) {
             setLayout(null);
             onLayoutResultRef.current?.(null);
             return;
           }
           const dto = await layoutDimensionsService.get(fileId, {
-            truckId: layoutTruckId,
+            truckId: layoutImplementId,
             page: pageNumber,
             rotation,
           });
@@ -445,7 +445,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       return () => {
         cancelled = true;
       };
-    }, [layoutTruckId, fileId, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
+    }, [layoutImplementId, fileId, layoutTool, pageNumber, rotation, loading, onScaleDetected]);
 
     /**
      * Um item, um plano de cotas.

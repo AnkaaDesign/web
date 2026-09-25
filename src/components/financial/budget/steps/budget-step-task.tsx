@@ -18,9 +18,9 @@ import {
   IconAlertTriangle,
 } from "@tabler/icons-react";
 import {
-  TRUCK_CATEGORY,
+  IMPLEMENT_CATEGORY,
   IMPLEMENT_TYPE,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   SECTOR_PRIVILEGES,
 } from "@/constants";
@@ -244,9 +244,9 @@ export function BudgetStepTask({
                           onValueChange={field.onChange}
                           options={[
                             { value: "", label: "Nenhuma" },
-                            ...Object.values(TRUCK_CATEGORY).map((cat) => ({
+                            ...Object.values(IMPLEMENT_CATEGORY).map((cat) => ({
                               value: cat,
-                              label: TRUCK_CATEGORY_LABELS[cat],
+                              label: IMPLEMENT_CATEGORY_LABELS[cat],
                             })),
                           ]}
                           placeholder="Selecione a categoria"

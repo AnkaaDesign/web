@@ -6,7 +6,7 @@ import {
   TRUCK_MANUFACTURER_LABELS,
   SERVICE_ORDER_TYPE,
 } from "../../../../constants";
-import { formatDate, isDateInPast, calculateTaskMeasures, formatTaskMeasures, formatTruckSpot } from "../../../../utils";
+import { formatDate, isDateInPast, calculateTaskMeasures, formatTaskMeasures, formatImplementSpot } from "../../../../utils";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { Badge } from "@/components/ui/badge";
 import { IsEditingBadge } from "@/lib/attention";
@@ -153,11 +153,11 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
       enableSorting: true,
       size: 120,
       minSize: 90,
-      meta: { headerLabel: "Local", exportValue: (row) => (row.truck?.spot ? formatTruckSpot(row.truck.spot) : "") },
+      meta: { headerLabel: "Local", exportValue: (row) => (row.truck?.spot ? formatImplementSpot(row.truck.spot) : "") },
       cell: ({ row }) =>
         row.original.truck?.spot ? (
           <Badge variant="default" className="font-mono">
-            {formatTruckSpot(row.original.truck.spot)}
+            {formatImplementSpot(row.original.truck.spot)}
           </Badge>
         ) : (
           muted("-")

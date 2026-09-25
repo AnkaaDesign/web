@@ -73,9 +73,9 @@ import { portalIdentityOf } from "@/api-client/portal";
 import { routes } from "@/constants/routes";
 import {
   IMPLEMENT_TYPE_LABELS,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   type IMPLEMENT_TYPE,
-  type TRUCK_CATEGORY,
+  type IMPLEMENT_CATEGORY,
 } from "@/constants";
 import { formatDate } from "@/utils";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +99,7 @@ function implementoECategoria(vehicle: PortalVehicle): { implemento: string | nu
       ? (IMPLEMENT_TYPE_LABELS[identity.implementType as IMPLEMENT_TYPE] ?? identity.implementType)
       : null,
     categoria: identity?.category
-      ? (TRUCK_CATEGORY_LABELS[identity.category as TRUCK_CATEGORY] ?? identity.category)
+      ? (IMPLEMENT_CATEGORY_LABELS[identity.category as IMPLEMENT_CATEGORY] ?? identity.category)
       : null,
   };
 }

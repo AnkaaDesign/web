@@ -3,7 +3,7 @@ import { useTasks } from "../../../../hooks";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { cn } from "@/lib/utils";
 import { DataTable, type DataTableFilterDef } from "@/components/ui/datatable";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 import { createTaskPreparationColumns } from "@/components/production/task/preparation/task-prep-columns";
 import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import type { Task } from "../../../../types";
@@ -143,7 +143,7 @@ export const TaskSelector = ({
         key: "truckCategory",
         label: "Categoria",
         type: "multiselect",
-        options: Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
+        options: Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
         accessor: (r) => r.truck?.category ?? "",
       },
       {

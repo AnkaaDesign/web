@@ -31,7 +31,7 @@ import {
   PAINT_FINISH,
   PAINT_TYPE_ENUM,
   TRUCK_MANUFACTURER,
-  TRUCK_CATEGORY,
+  IMPLEMENT_CATEGORY,
   IMPLEMENT_TYPE,
   WARNING_SEVERITY,
   WARNING_CATEGORY,
@@ -187,7 +187,7 @@ import {
   WORK_ACCIDENT_REPORT_TYPE,
   PAYROLL_DISCOUNT_TYPE,
 } from "./enums";
-import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "./document-labels";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, IMPLEMENT_CATEGORY_PROFILE_LABELS } from "./document-labels";
 
 // =====================
 // Status Labels
@@ -573,7 +573,7 @@ export const TRUCK_MANUFACTURER_LABELS: Record<TRUCK_MANUFACTURER, string> = {
 // Os rótulos de TELA de categoria e implemento vêm do contrato da API (perfil
 // `screen` de `document-labels.ts`, D-18). A nota, o boleto e o changelog têm
 // os SEUS perfis lá; mexer na tela não muda documento nenhum.
-export const TRUCK_CATEGORY_LABELS: Record<TRUCK_CATEGORY, string> = TRUCK_CATEGORY_PROFILE_LABELS.screen;
+export const IMPLEMENT_CATEGORY_LABELS: Record<IMPLEMENT_CATEGORY, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.screen;
 
 export const IMPLEMENT_TYPE_LABELS: Record<IMPLEMENT_TYPE, string> = IMPLEMENT_TYPE_PROFILE_LABELS.screen;
 

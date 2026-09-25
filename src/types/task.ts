@@ -14,7 +14,7 @@ export type { BONIFICATION_STATUS as Bonification } from "../constants";
 import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
-import type { Truck, TruckIncludes } from "./truck";
+import type { Implement, ImplementIncludes } from "./truck";
 import type { Bonus } from "./bonus";
 import type { BonusDiscount } from "./bonusDiscount";
 import type { Budget } from "./budget";
@@ -87,7 +87,7 @@ export interface Task extends BaseEntity {
   serviceOrders?: ServiceOrder[];
   airbrushings?: Airbrushing[];
   cuts?: Cut[];
-  truck?: Truck;
+  truck?: Implement;
   relatedTasks?: Task[];
   relatedTo?: Task[];
   forecastHistory?: TaskForecastHistory[];
@@ -201,7 +201,7 @@ export interface TaskIncludes {
   truck?:
     | boolean
     | {
-        include?: TruckIncludes;
+        include?: ImplementIncludes;
       };
   relatedTasks?:
     | boolean

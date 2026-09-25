@@ -28,7 +28,7 @@ import {
   ADMISSION_DOCUMENT_TYPE_LABELS,
   ADMISSION_DOCUMENT_STATUS_LABELS,
 } from '@constants';
-import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, IMPLEMENT_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
 import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis, formatPixKey } from "./formatters";
@@ -1727,8 +1727,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   if ((field === "category" || field === "truck.category") && typeof value === "string") {
     // Perfil `webChangelog` do contrato da API: o histórico tem palavras
     // próprias ("VUC (Veículo Urbano de Carga)", "Caminhão"), diferentes da tela.
-    const truckCategoryLabels: Record<string, string> = TRUCK_CATEGORY_PROFILE_LABELS.webChangelog;
-    return truckCategoryLabels[value] || value;
+    const implementCategoryLabels: Record<string, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.webChangelog;
+    return implementCategoryLabels[value] || value;
   }
 
   // Handle truck implement type

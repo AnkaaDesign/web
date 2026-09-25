@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 // `BRAND_COLORS` e não um token de tema: as páginas públicas rodam em
 // `force-light`, e um token aqui renderiza branco sobre branco.
 import { BRAND_COLORS } from "@/config/company";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants";
+import { IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants";
 import { quoteTasks } from "@/utils/quote-tasks";
 
 /**
@@ -53,7 +53,7 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   const labelOf = (map: Record<string, string>, value?: string | null) =>
     value ? (map[value as keyof typeof map] ?? value) : null;
 
-  const anyCategory = tasks.some((t) => !!labelOf(TRUCK_CATEGORY_LABELS as any, t?.truck?.category));
+  const anyCategory = tasks.some((t) => !!labelOf(IMPLEMENT_CATEGORY_LABELS as any, t?.truck?.category));
   const anyImplement = tasks.some(
     (t) => !!labelOf(IMPLEMENT_TYPE_LABELS as any, t?.truck?.implementType),
   );
@@ -100,7 +100,7 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
         return value ? <strong>{value}</strong> : <ARegistrar />;
       }
       case "category": {
-        const label = labelOf(TRUCK_CATEGORY_LABELS as any, task?.truck?.category);
+        const label = labelOf(IMPLEMENT_CATEGORY_LABELS as any, task?.truck?.category);
         return label ? <strong>{label}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;
       }
       case "implement": {

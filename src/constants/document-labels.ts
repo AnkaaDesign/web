@@ -19,14 +19,14 @@
  * descarta do pacote as outras chaves do JSON (os 174 mapas de tela da API).
  */
 import { perfis } from "@/generated/contracts/labels.json";
-import type { IMPLEMENT_TYPE, TRUCK_CATEGORY } from "./enums";
+import type { IMPLEMENT_TYPE, IMPLEMENT_CATEGORY } from "./enums";
 
 export type LabelProfile = keyof typeof perfis.TRUCK_CATEGORY;
 
 export const LABEL_PROFILES = Object.keys(perfis.TRUCK_CATEGORY) as LabelProfile[];
 
-export const TRUCK_CATEGORY_PROFILE_LABELS = perfis.TRUCK_CATEGORY as Readonly<
-  Record<LabelProfile, Readonly<Record<TRUCK_CATEGORY, string>>>
+export const IMPLEMENT_CATEGORY_PROFILE_LABELS = perfis.TRUCK_CATEGORY as Readonly<
+  Record<LabelProfile, Readonly<Record<IMPLEMENT_CATEGORY, string>>>
 >;
 
 export const IMPLEMENT_TYPE_PROFILE_LABELS = perfis.IMPLEMENT_TYPE as Readonly<

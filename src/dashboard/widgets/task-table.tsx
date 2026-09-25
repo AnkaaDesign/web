@@ -40,8 +40,8 @@ import {
   TASK_QUOTE_STATUS_LABELS,
   TASK_STATUS,
   TASK_STATUS_LABELS,
-  TRUCK_CATEGORY,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY,
+  IMPLEMENT_CATEGORY_LABELS,
 } from "../../constants";
 import type { Task } from "../../types";
 import { useTasks, useTaskMutations } from "../../hooks/production/use-task";
@@ -906,11 +906,11 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Categoria",
       track: "minmax(0, 1fr)",
       render: (t) => {
-        const c = (t.truck as any)?.category as TRUCK_CATEGORY | undefined;
+        const c = (t.truck as any)?.category as IMPLEMENT_CATEGORY | undefined;
         if (!c) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 truncate">
-            {TRUCK_CATEGORY_LABELS[c] ?? c}
+            {IMPLEMENT_CATEGORY_LABELS[c] ?? c}
           </Badge>
         );
       },
@@ -1332,7 +1332,7 @@ const taskTableConfigSchemaInner = z.object({
       sectorIds: z.array(z.string().uuid()).default([]),
       customerIds: z.array(z.string().uuid()).default([]),
       assigneeIds: z.array(z.string().uuid()).default([]),
-      truckCategories: z.array(z.nativeEnum(TRUCK_CATEGORY)).default([]),
+      truckCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).default([]),
       implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).default([]),
       bonifications: z.array(z.nativeEnum(BONIFICATION_STATUS)).default([]),
       hasTruck: z.enum(TRI_STATE).default("any"),
@@ -2797,11 +2797,11 @@ function TaskTableConfigComponent({
       })),
     [],
   );
-  const truckCategoryOptions = useMemo(
+  const implementCategoryOptions = useMemo(
     () =>
-      (Object.values(TRUCK_CATEGORY) as TRUCK_CATEGORY[]).map((tc) => ({
+      (Object.values(IMPLEMENT_CATEGORY) as IMPLEMENT_CATEGORY[]).map((tc) => ({
         value: tc,
-        label: TRUCK_CATEGORY_LABELS[tc] ?? tc,
+        label: IMPLEMENT_CATEGORY_LABELS[tc] ?? tc,
       })),
     [],
   );
@@ -3099,9 +3099,9 @@ function TaskTableConfigComponent({
               mode="multiple"
               value={c.filters.truckCategories}
               onValueChange={(v) =>
-                setFilter("truckCategories", asArray(v) as TRUCK_CATEGORY[])
+                setFilter("truckCategories", asArray(v) as IMPLEMENT_CATEGORY[])
               }
-              options={truckCategoryOptions}
+              options={implementCategoryOptions}
               placeholder="Qualquer categoria"
               searchPlaceholder="Buscar categoria..."
             />

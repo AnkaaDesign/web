@@ -37,10 +37,10 @@
  * pela API (`@/constants/document-labels`, D-18). Quem não passa mapas recebe
  * esse perfil — como no módulo da API.
  */
-import { IMPLEMENT_TYPE_PROFILE_LABELS, TRUCK_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
+import { IMPLEMENT_TYPE_PROFILE_LABELS, IMPLEMENT_CATEGORY_PROFILE_LABELS } from "@/constants/document-labels";
 
 /** Os rótulos da NFS-e da tarefa (perfil `nfseTask`). */
-export const NFSE_CATEGORY_LABELS: Readonly<Record<string, string>> = TRUCK_CATEGORY_PROFILE_LABELS.nfseTask;
+export const NFSE_CATEGORY_LABELS: Readonly<Record<string, string>> = IMPLEMENT_CATEGORY_PROFILE_LABELS.nfseTask;
 export const NFSE_IMPLEMENT_LABELS: Readonly<Record<string, string>> = IMPLEMENT_TYPE_PROFILE_LABELS.nfseTask;
 
 export const DISCRIMINACAO_MAX_LINES = 11;

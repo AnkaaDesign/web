@@ -22,9 +22,9 @@ import type { TaskCreateFormData } from "../../../../schemas";
 import { useTaskMutations } from "../../../../hooks";
 import {
   TASK_STATUS,
-  TRUCK_CATEGORY,
+  IMPLEMENT_CATEGORY,
   IMPLEMENT_TYPE,
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE,
@@ -516,15 +516,15 @@ export const TaskCreateForm = () => {
         };
 
         // Build truck object with layout data (each task gets its own individual layout)
-        const buildTruckData = (plate?: string) => {
+        const buildImplementData = (plate?: string) => {
           const layoutSectionData = buildLayoutSectionData();
-          const hasTruckFields = plate || category || implementType || hasLayoutChanges;
+          const hasImplementFields = plate || category || implementType || hasLayoutChanges;
           // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), e não
           // deixa de nascer: com o tipo "Refrigerado" de padrão (antes do
           // D-25) toda tarefa criada aqui tinha caminhão, e cada tarefa tem
           // exatamente um implemento (DD1). O que não se inventa é o tipo.
           return {
-            truck: hasTruckFields
+            truck: hasImplementFields
               ? {
                   ...(plate && { plate }),
                   category: category || undefined,
@@ -578,10 +578,10 @@ export const TaskCreateForm = () => {
 
         for (let i = 0; i < combinations.length; i++) {
           const { plate, serialNumber } = combinations[i];
-          const truckData = buildTruckData(plate);
+          const implementData = buildImplementData(plate);
           const task = buildTaskData({
             ...(serialNumber && { serialNumber }),
-            ...truckData,
+            ...implementData,
           });
 
           // Os responsáveis NOVOS viajam UMA vez. O servidor os cria uma vez
@@ -783,9 +783,9 @@ export const TaskCreateForm = () => {
                                   onValueChange={field.onChange}
                                   options={[
                                     { value: "", label: "Nenhuma" },
-                                    ...Object.values(TRUCK_CATEGORY).map((cat) => ({
+                                    ...Object.values(IMPLEMENT_CATEGORY).map((cat) => ({
                                       value: cat,
-                                      label: TRUCK_CATEGORY_LABELS[cat],
+                                      label: IMPLEMENT_CATEGORY_LABELS[cat],
                                     })),
                                   ]}
                                   placeholder="Selecione a categoria"

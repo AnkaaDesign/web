@@ -13,7 +13,7 @@ export function getTruckManufacturerLabel(manufacturer: TRUCK_MANUFACTURER): str
  * @param spot - Truck spot value (e.g., "B1_F2_V3")
  * @returns Formatted string (e.g., "Barracão 1 - Faixa 2 - Vaga 3")
  */
-export function formatTruckSpot(spot: string | null | undefined): string {
+export function formatImplementSpot(spot: string | null | undefined): string {
   if (!spot) return "-";
 
   if (spot === "YARD_WAIT") return "Pátio de Espera";

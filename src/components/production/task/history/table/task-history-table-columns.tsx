@@ -7,7 +7,7 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { ServiceOrderCell } from "../service-order-cell";
 import { QuoteStatusBadge } from "../../quote/quote-status-badge";
 import {
-  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   BONIFICATION_STATUS,
   BONIFICATION_STATUS_LABELS,
@@ -259,19 +259,19 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "truckCategory",
       header: "Categoria",
-      accessorFn: (t) => (t.truck?.category ? TRUCK_CATEGORY_LABELS[t.truck.category] : ""),
+      accessorFn: (t) => (t.truck?.category ? IMPLEMENT_CATEGORY_LABELS[t.truck.category] : ""),
       enableSorting: false,
       size: 150,
       meta: {
         defaultVisible: false,
         headerLabel: "Categoria",
         exportHeader: "Categoria",
-        exportValue: (t) => (t.truck?.category ? TRUCK_CATEGORY_LABELS[t.truck.category] : ""),
+        exportValue: (t) => (t.truck?.category ? IMPLEMENT_CATEGORY_LABELS[t.truck.category] : ""),
       },
       cell: ({ row }) =>
         row.original.truck?.category ? (
           <Badge variant="outline" className="truncate">
-            {TRUCK_CATEGORY_LABELS[row.original.truck.category]}
+            {IMPLEMENT_CATEGORY_LABELS[row.original.truck.category]}
           </Badge>
         ) : (
           <MutedDash />

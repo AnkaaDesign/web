@@ -95,7 +95,7 @@ import {
   applyAirbrushingPlan,
   airbrushingsToFormValue,
 } from "@/utils/airbrushing-reconcile";
-import { useImplementMeasuresByTruck } from "@/hooks";
+import { useImplementMeasuresByImplement } from "@/hooks";
 import { airbrushingKeys } from "@/hooks/common/query-keys";
 import { formatTaskMeasures } from "@/utils/task-measures";
 import { getApiBaseUrl } from "@/config/api";
@@ -1615,7 +1615,7 @@ const FinancialBudgetDetailPageInner = () => {
         const payload: Record<string, any> = {};
         const vData = (vehicleValues[index] ?? {}) as Partial<VehicleFormValues>;
         const vDirty = (dirtyVehicles[index] ?? {}) as Record<string, unknown>;
-        const truckPayload: Record<string, unknown> = {};
+        const implementPayload: Record<string, unknown> = {};
 
         // ── Comuns ──
         if (writeCommon("name") && (vehicleTask.name || "") !== (data.name || ""))
@@ -1623,12 +1623,12 @@ const FinancialBudgetDetailPageInner = () => {
         if (writeCommon("customerId") && (vehicleTask.customerId || "") !== (data.customerId || ""))
           payload.customerId = data.customerId || undefined;
         if (writeCommon("category") && (vehicleTask.truck?.category || "") !== (data.category || ""))
-          truckPayload.category = data.category || undefined;
+          implementPayload.category = data.category || undefined;
         if (
           writeCommon("implementType") &&
           (vehicleTask.truck?.implementType || "") !== (data.implementType || "")
         )
-          truckPayload.implementType = data.implementType || undefined;
+          implementPayload.implementType = data.implementType || undefined;
         if (writeBaseFiles) {
           const current = ((vehicleTask.baseFiles || []) as any[]).map((f) => f.id);
           // Na tarefa aberta vale a comparação de sempre (inclui reordenar); nos irmãos,
@@ -1659,15 +1659,15 @@ const FinancialBudgetDetailPageInner = () => {
         if (nextOrderNumber !== savedOrderNumber) payload.customerOrderNumber = nextOrderNumber;
         // Placa e chassi limpos vão como null EXPLÍCITO, nunca undefined: undefined
         // é como se diz "não mexe" à API, então apagar o campo mantinha o valor antigo.
-        if (vDirty.plate) truckPayload.plate = vData.plate || null;
-        if (vDirty.chassisNumber) truckPayload.chassisNumber = vData.chassisNumber || null;
+        if (vDirty.plate) implementPayload.plate = vData.plate || null;
+        if (vDirty.chassisNumber) implementPayload.chassisNumber = vData.chassisNumber || null;
         // Plaqueta: send an EXPLICIT null when the photo was cleared. `vDirty.vinPlateId`
         // misses the pick-a-brand-new-photo case — setValue writes null there, which
         // equals the default when there was no photo before — hence the pending arm.
         if (vDirty.vinPlateId || pendingVinPlateByTask[vehicleTask.id]) {
-          truckPayload.vinPlateId = vinPlateIdByTask[vehicleTask.id] ?? null;
+          implementPayload.vinPlateId = vinPlateIdByTask[vehicleTask.id] ?? null;
         }
-        if (Object.keys(truckPayload).length > 0) payload.truck = truckPayload;
+        if (Object.keys(implementPayload).length > 0) payload.truck = implementPayload;
 
         // Layout Referência deste veículo: só quando o conjunto ou os status mudaram.
         const loadedLayoutIds = loadedLayoutIdsByTaskRef.current[vehicleTask.id] ?? [];
@@ -2324,13 +2324,13 @@ const FinancialBudgetDetailPageInner = () => {
 
   // O TAMANHO do implemento — comum, lançado pela Logística na tarefa e replicado aos
   // irmãos pela API. Aqui só se lê.
-  const openTruckId = ((task?.truck as any)?.id as string | undefined) ?? "";
-  const { data: measuresData } = useImplementMeasuresByTruck(openTruckId, { enabled: !!openTruckId });
+  const openImplementId = ((task?.truck as any)?.id as string | undefined) ?? "";
+  const { data: measuresData } = useImplementMeasuresByImplement(openImplementId, { enabled: !!openImplementId });
   const measuresSummary = useMemo(() => {
-    if (!openTruckId) return null;
+    if (!openImplementId) return null;
     const formatted = formatTaskMeasures({ truck: (measuresData as any) ?? {} } as any);
     return formatted === "-" ? "ainda não medido" : `${formatted} cm`;
-  }, [openTruckId, measuresData]);
+  }, [openImplementId, measuresData]);
 
   // ─── O LAYOUT POR VEÍCULO (passo 2) ────────────────────────────────────
   const markLayoutCoverageEdited = useCallback(() => {

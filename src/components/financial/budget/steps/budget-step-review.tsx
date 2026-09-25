@@ -29,7 +29,7 @@ import {
 } from "@tabler/icons-react";
 import { FileThumbnail, FileViewerContext } from "@/components/common/file";
 import { formatCurrency, formatDate, formatChassis } from "@/utils";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
+import { IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
@@ -343,7 +343,7 @@ export function BudgetStepReview({
             : t.id === openTaskId
               ? ((formOrderNumber ?? "").trim() || null)
               : ((t.customerOrderNumber ?? "").trim() || null),
-          category: label(TRUCK_CATEGORY_LABELS as any, t.truck?.category),
+          category: label(IMPLEMENT_CATEGORY_LABELS as any, t.truck?.category),
           implement: label(IMPLEMENT_TYPE_LABELS as any, t.truck?.implementType),
         };
       });
@@ -351,7 +351,7 @@ export function BudgetStepReview({
     // Na CRIAÇÃO os caminhões ainda não existem: categoria e implemento são os
     // do formulário e valem para todos os que vão nascer, como o nº do pedido.
     const typed = (formOrderNumber ?? "").trim() || null;
-    const category = label(TRUCK_CATEGORY_LABELS as any, formCategory);
+    const category = label(IMPLEMENT_CATEGORY_LABELS as any, formCategory);
     const implement = label(IMPLEMENT_TYPE_LABELS as any, formImplementType);
     return vehicleCombinations(platesWatch, serialNumbersWatch as (string | number)[]).map(
       (combo, i) => ({
@@ -787,7 +787,7 @@ export function BudgetStepReview({
             {vehicleRows.length <= 1 && resolvedTask?.truck?.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>
-                <span className="text-sm font-medium">{TRUCK_CATEGORY_LABELS[resolvedTask.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || resolvedTask.truck.category}</span>
+                <span className="text-sm font-medium">{IMPLEMENT_CATEGORY_LABELS[resolvedTask.truck.category as keyof typeof IMPLEMENT_CATEGORY_LABELS] || resolvedTask.truck.category}</span>
               </div>
             )}
             {vehicleRows.length <= 1 && resolvedTask?.truck?.implementType && (

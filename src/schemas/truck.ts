@@ -2,8 +2,8 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
-import type { Truck } from "../types";
-import { TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
+import type { Implement } from "../types";
+import { IMPLEMENT_CATEGORY, IMPLEMENT_TYPE, IMPLEMENT_SPOT } from "../constants";
 import {
   cleanPlate,
   cleanChassis,
@@ -106,7 +106,7 @@ const normalizePlateFilter = (value: PlateFilterValue): PlateFilterValue => {
 // Include Schema Based on Prisma Schema (Second Level Only)
 // =====================
 
-export const truckIncludeSchema = z
+export const implementIncludeSchema = z
   .object({
     // Direct Truck relations
     task: z
@@ -178,7 +178,7 @@ export const truckIncludeSchema = z
 // OrderBy Schema Based on Prisma Schema Fields
 // =====================
 
-export const truckOrderBySchema = z.union([
+export const implementOrderBySchema = z.union([
   // Single ordering object
   z
     .object({
@@ -236,13 +236,13 @@ export const truckOrderBySchema = z.union([
 // Where Schema Based on Prisma Schema
 // =====================
 
-export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
+export const implementWhereSchema: z.ZodSchema = z.lazy(() =>
   z
     .object({
       // Boolean operators
-      AND: z.union([truckWhereSchema, z.array(truckWhereSchema)]).optional(),
-      OR: z.array(truckWhereSchema).optional(),
-      NOT: z.union([truckWhereSchema, z.array(truckWhereSchema)]).optional(),
+      AND: z.union([implementWhereSchema, z.array(implementWhereSchema)]).optional(),
+      OR: z.array(implementWhereSchema).optional(),
+      NOT: z.union([implementWhereSchema, z.array(implementWhereSchema)]).optional(),
 
       // UUID fields
       id: z
@@ -326,13 +326,13 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
       // Spot enum field
       spot: z
         .union([
-          z.nativeEnum(TRUCK_SPOT),
+          z.nativeEnum(IMPLEMENT_SPOT),
           z.null(),
           z.object({
-            equals: z.union([z.nativeEnum(TRUCK_SPOT), z.null()]).optional(),
-            not: z.union([z.nativeEnum(TRUCK_SPOT), z.null()]).optional(),
-            in: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
-            notIn: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
+            equals: z.union([z.nativeEnum(IMPLEMENT_SPOT), z.null()]).optional(),
+            not: z.union([z.nativeEnum(IMPLEMENT_SPOT), z.null()]).optional(),
+            in: z.array(z.nativeEnum(IMPLEMENT_SPOT)).optional(),
+            notIn: z.array(z.nativeEnum(IMPLEMENT_SPOT)).optional(),
           }),
         ])
         .optional(),
@@ -340,13 +340,13 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
       // Truck specification enum fields
       category: z
         .union([
-          z.nativeEnum(TRUCK_CATEGORY),
+          z.nativeEnum(IMPLEMENT_CATEGORY),
           z.null(),
           z.object({
-            equals: z.union([z.nativeEnum(TRUCK_CATEGORY), z.null()]).optional(),
-            not: z.union([z.nativeEnum(TRUCK_CATEGORY), z.null()]).optional(),
-            in: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
-            notIn: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+            equals: z.union([z.nativeEnum(IMPLEMENT_CATEGORY), z.null()]).optional(),
+            not: z.union([z.nativeEnum(IMPLEMENT_CATEGORY), z.null()]).optional(),
+            in: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
+            notIn: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
           }),
         ])
         .optional(),
@@ -412,7 +412,7 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
 // Convenience Filters
 // =====================
 
-const truckFilters = {
+const implementFilters = {
   // Search and filtering
   searchingFor: z.string().optional(),
   taskIds: z.array(z.string()).optional(),
@@ -421,8 +421,8 @@ const truckFilters = {
     .optional()
     // Idem: "ABC-1234" digitado precisa virar "ABC1234" para casar com a coluna.
     .transform((val) => (val ? val.map((plate) => cleanPlate(plate)).filter((plate) => plate !== "") : val)),
-  spots: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
-  categories: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+  spots: z.array(z.nativeEnum(IMPLEMENT_SPOT)).optional(),
+  categories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
   implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
   hasSpot: z.boolean().optional(),
 };
@@ -431,7 +431,7 @@ const truckFilters = {
 // Transform Function
 // =====================
 
-const truckTransform = (data: any) => {
+const implementTransform = (data: any) => {
   // Normalize orderBy to Prisma format
   if (data.orderBy) {
     data.orderBy = normalizeOrderBy(data.orderBy);
@@ -534,7 +534,7 @@ const truckTransform = (data: any) => {
 // Query Schema
 // =====================
 
-export const truckGetManySchema = z
+export const implementGetManySchema = z
   .object({
     // Pagination
     page: z.coerce.number().int().min(0).default(1).optional(),
@@ -543,9 +543,9 @@ export const truckGetManySchema = z
     skip: z.coerce.number().int().min(0).optional(),
 
     // Direct Prisma clauses with proper validation
-    where: truckWhereSchema.optional(),
-    orderBy: truckOrderBySchema.optional(),
-    include: truckIncludeSchema.optional(),
+    where: implementWhereSchema.optional(),
+    orderBy: implementOrderBySchema.optional(),
+    include: implementIncludeSchema.optional(),
 
     // Date filters (handled by where schema)
     createdAt: z
@@ -562,26 +562,26 @@ export const truckGetManySchema = z
       .optional(),
 
     // Convenience filters (will be transformed to where)
-    ...truckFilters,
+    ...implementFilters,
   })
-  .transform(truckTransform);
+  .transform(implementTransform);
 
 // =====================
 // CRUD Schemas
 // =====================
 
-export const truckCreateSchema = z.object({
+export const implementCreateSchema = z.object({
   // Optional identification fields
   plate: optionalPlateSchema,
   chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications
-  category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
+  category: z.nativeEnum(IMPLEMENT_CATEGORY).nullable().optional(),
   implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
 
   // Spot/position field
-  spot: z.nativeEnum(TRUCK_SPOT).nullable().optional(),
+  spot: z.nativeEnum(IMPLEMENT_SPOT).nullable().optional(),
 
   // Required relation
   taskId: z.string().uuid("Tarefa inválida"),
@@ -592,18 +592,18 @@ export const truckCreateSchema = z.object({
   backSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
 });
 
-export const truckUpdateSchema = z.object({
+export const implementUpdateSchema = z.object({
   // Optional identification fields
   plate: optionalPlateSchema,
   chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications
-  category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
+  category: z.nativeEnum(IMPLEMENT_CATEGORY).nullable().optional(),
   implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
 
   // Spot/position field
-  spot: z.nativeEnum(TRUCK_SPOT).nullable().optional(),
+  spot: z.nativeEnum(IMPLEMENT_SPOT).nullable().optional(),
 
   // Optional relations
   taskId: z.string().uuid("Tarefa inválida").optional(),
@@ -616,41 +616,41 @@ export const truckUpdateSchema = z.object({
 // Batch Operations Schemas
 // =====================
 
-export const truckBatchCreateSchema = z.object({
-  trucks: z.array(truckCreateSchema).min(1, "Pelo menos um caminhão deve ser fornecido"),
+export const implementBatchCreateSchema = z.object({
+  trucks: z.array(implementCreateSchema).min(1, "Pelo menos um caminhão deve ser fornecido"),
 });
 
-export const truckBatchUpdateSchema = z.object({
+export const implementBatchUpdateSchema = z.object({
   trucks: z
     .array(
       z.object({
         id: z.string().uuid("Caminhão inválido"),
-        data: truckUpdateSchema,
+        data: implementUpdateSchema,
       }),
     )
     .min(1, "Pelo menos um caminhão deve ser fornecido"),
 });
 
-export const truckBatchDeleteSchema = z.object({
+export const implementBatchDeleteSchema = z.object({
   truckIds: z.array(z.string().uuid("Caminhão inválido")).min(1, "Pelo menos um ID deve ser fornecido"),
 });
 
 // Query schema for include parameter
-export const truckQuerySchema = z.object({
-  include: truckIncludeSchema.optional(),
+export const implementQuerySchema = z.object({
+  include: implementIncludeSchema.optional(),
 });
 
 // Batch query schema for include parameter
-export const truckBatchQuerySchema = z.object({
-  include: truckIncludeSchema.optional(),
+export const implementBatchQuerySchema = z.object({
+  include: implementIncludeSchema.optional(),
 });
 
 // =====================
 // Additional Query Schemas
 // =====================
 
-export const truckGetByIdSchema = z.object({
-  include: truckIncludeSchema.optional(),
+export const implementGetByIdSchema = z.object({
+  include: implementIncludeSchema.optional(),
   id: z.string().uuid("Caminhão inválido"),
 });
 
@@ -658,34 +658,34 @@ export const truckGetByIdSchema = z.object({
 // Type Inference
 // =====================
 
-export type TruckGetManyFormData = z.infer<typeof truckGetManySchema>;
-export type TruckGetByIdFormData = z.infer<typeof truckGetByIdSchema>;
-export type TruckCreateFormData = z.infer<typeof truckCreateSchema>;
-export type TruckUpdateFormData = z.infer<typeof truckUpdateSchema>;
-export type TruckBatchCreateFormData = z.infer<typeof truckBatchCreateSchema>;
-export type TruckBatchUpdateFormData = z.infer<typeof truckBatchUpdateSchema>;
-export type TruckBatchDeleteFormData = z.infer<typeof truckBatchDeleteSchema>;
+export type ImplementGetManyFormData = z.infer<typeof implementGetManySchema>;
+export type ImplementGetByIdFormData = z.infer<typeof implementGetByIdSchema>;
+export type ImplementCreateFormData = z.infer<typeof implementCreateSchema>;
+export type ImplementUpdateFormData = z.infer<typeof implementUpdateSchema>;
+export type ImplementBatchCreateFormData = z.infer<typeof implementBatchCreateSchema>;
+export type ImplementBatchUpdateFormData = z.infer<typeof implementBatchUpdateSchema>;
+export type ImplementBatchDeleteFormData = z.infer<typeof implementBatchDeleteSchema>;
 
-export type TruckInclude = z.infer<typeof truckIncludeSchema>;
-export type TruckOrderBy = z.infer<typeof truckOrderBySchema>;
-export type TruckWhere = z.infer<typeof truckWhereSchema>;
+export type ImplementInclude = z.infer<typeof implementIncludeSchema>;
+export type ImplementOrderBy = z.infer<typeof implementOrderBySchema>;
+export type ImplementWhere = z.infer<typeof implementWhereSchema>;
 
-export type TruckQueryFormData = z.infer<typeof truckQuerySchema>;
-export type TruckBatchQueryFormData = z.infer<typeof truckBatchQuerySchema>;
+export type ImplementQueryFormData = z.infer<typeof implementQuerySchema>;
+export type ImplementBatchQueryFormData = z.infer<typeof implementBatchQuerySchema>;
 
 // =====================
 // Helper Functions
 // =====================
 
-export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFormData>((truck) => ({
-  plate: truck.plate || undefined,
-  chassisNumber: truck.chassisNumber || undefined,
-  vinPlateId: truck.vinPlateId || undefined,
-  category: truck.category || undefined,
-  implementType: truck.implementType || undefined,
-  spot: truck.spot || undefined,
-  taskId: truck.taskId,
-  leftSideMeasureId: truck.leftSideMeasureId || undefined,
-  rightSideMeasureId: truck.rightSideMeasureId || undefined,
-  backSideMeasureId: truck.backSideMeasureId || undefined,
+export const mapImplementToFormData = createMapToFormDataHelper<Implement, ImplementUpdateFormData>((implement) => ({
+  plate: implement.plate || undefined,
+  chassisNumber: implement.chassisNumber || undefined,
+  vinPlateId: implement.vinPlateId || undefined,
+  category: implement.category || undefined,
+  implementType: implement.implementType || undefined,
+  spot: implement.spot || undefined,
+  taskId: implement.taskId,
+  leftSideMeasureId: implement.leftSideMeasureId || undefined,
+  rightSideMeasureId: implement.rightSideMeasureId || undefined,
+  backSideMeasureId: implement.backSideMeasureId || undefined,
 }));

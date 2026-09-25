@@ -57,7 +57,7 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
    * conversão é uma a mais do que o necessário para errá-la; a partir daqui só
    * o `truckId` viaja, e a conversão mora num lugar só, no servidor.
    */
-  const layoutTruckId = task.truck?.id;
+  const layoutImplementId = task.truck?.id;
 
 
   /**
@@ -83,10 +83,10 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
       const index = layouts.findIndex((f) => f.id === file.id);
       fileViewer.actions.viewFiles(layouts, index >= 0 ? index : 0, {
         layoutStatusByFileId,
-        layoutTruckId,
+        layoutTruckId: layoutImplementId,
       });
     },
-    [filteredLayouts, fileViewer, layoutTruckId],
+    [filteredLayouts, fileViewer, layoutImplementId],
   );
 
   const handleDownload = useCallback(

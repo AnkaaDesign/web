@@ -29,7 +29,7 @@ import type { Task } from "../../types";
 import { Combobox } from "../../components/ui/combobox";
 import type { ComboboxOption } from "../../components/ui/combobox";
 import { Label } from "../../components/ui/label";
-import { TruckDetailModal } from "../../components/production/garage/truck-detail-modal";
+import { ImplementDetailModal } from "../../components/production/garage/truck-detail-modal";
 import {
   Tabs,
   TabsContent,
@@ -511,7 +511,7 @@ function ProductionCalendarRender({
       </div>
 
       {/* Click-to-open task modal (reuses the garage feature's task detail modal). */}
-      <TruckDetailModal
+      <ImplementDetailModal
         taskId={modalTaskId}
         open={modalOpen}
         onOpenChange={(open) => {
