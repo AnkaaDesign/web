@@ -801,9 +801,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     parking_position: "Posição de Estacionamento",
     // Related task fields
     "task.name": "Nome da Tarefa",
-    "task.serialNumber": "Número de Série",
     "task.status": "Status da Tarefa",
     // Implement fields (accessed via implement relation)
+    serialNumber: "Número de Série",
     plate: "Placa",
     chassisNumber: "Número do Chassi",
     vinPlateId: "Foto da Plaqueta",
@@ -864,7 +864,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     completedAt: "Concluído em",
     // Nested relationship fields
     "file.filename": "Nome do Arquivo",
-    "task.serialNumber": "Número de Série da Tarefa",
+    "task.implement.serialNumber": "Número de Série",
     "task.title": "Título da Tarefa",
     "parentCut.id": "ID do Corte Pai",
   },
@@ -946,7 +946,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     notes: "Observações",
     // Nested relationship fields
     "task.name": "Nome da Tarefa",
-    "task.serialNumber": "Número de Série da Tarefa",
+    "task.implement.serialNumber": "Número de Série",
     "user.name": "Nome do Responsável",
     "assignedTo.name": "Nome do Responsável",
     "createdBy.name": "Nome do Criador",
