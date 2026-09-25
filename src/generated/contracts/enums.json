@@ -2494,6 +2494,7 @@
     "external_operation.liquidated",
     "external_operation.returned",
     "fispq.expiring",
+    "implement.movement_request",
     "invoice.cancelled",
     "item.low_stock",
     "item.out_of_stock",
@@ -2614,6 +2615,15 @@
     "task.field.entryDate",
     "task.field.finishedAt",
     "task.field.forecastDate",
+    "task.field.implement.backSideMeasureId",
+    "task.field.implement.category",
+    "task.field.implement.chassisNumber",
+    "task.field.implement.leftSideMeasureId",
+    "task.field.implement.measures",
+    "task.field.implement.plate",
+    "task.field.implement.rightSideMeasureId",
+    "task.field.implement.spot",
+    "task.field.implement.type",
     "task.field.invoiceReimbursements",
     "task.field.invoices",
     "task.field.layouts",
@@ -2630,15 +2640,6 @@
     "task.field.startedAt",
     "task.field.status",
     "task.field.term",
-    "task.field.truck.backSideMeasureId",
-    "task.field.truck.category",
-    "task.field.truck.chassisNumber",
-    "task.field.truck.implementMeasure",
-    "task.field.truck.implementType",
-    "task.field.truck.leftSideMeasureId",
-    "task.field.truck.plate",
-    "task.field.truck.rightSideMeasureId",
-    "task.field.truck.spot",
     "task.forecast_10days",
     "task.forecast_1day",
     "task.forecast_3days",
@@ -2662,7 +2663,6 @@
     "timeentry.due",
     "timeentry.missing.escalation",
     "timeentry.reminder",
-    "truck.movement_request",
     "vacation.concessive_expired",
     "vacation.concessive_expiring",
     "vacation.planning_conflict",
@@ -3184,10 +3184,6 @@
           "maxCount": 20
         },
         {
-          "nome": "truckVinPlate",
-          "maxCount": 1
-        },
-        {
           "nome": "implementVinPlate",
           "maxCount": 1
         },
@@ -3359,10 +3355,6 @@
           "maxCount": 20
         },
         {
-          "nome": "truckVinPlate",
-          "maxCount": 1
-        },
-        {
           "nome": "implementVinPlate",
           "maxCount": 1
         },
@@ -3447,10 +3439,6 @@
         {
           "nome": "observationFiles",
           "maxCount": 10
-        },
-        {
-          "nome": "truckVinPlate",
-          "maxCount": 1
         },
         {
           "nome": "implementVinPlate",
@@ -3682,7 +3670,6 @@
     "observations",
     "warning",
     "implementMeasurePhotos",
-    "truckVinPlate",
     "implementVinPlate",
     "quote-layouts",
     "plotterEspovo",
