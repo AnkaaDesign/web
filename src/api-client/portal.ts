@@ -672,8 +672,8 @@ export interface PortalBudget {
   sections: PortalSection[];
   /** As capacidades DESTE contato (§2.1). União dos papéis, nunca interseção. */
   capabilities: string[];
-  /** `true` só quando há capacidade `PRE_APPROVE` **e** o estado é `IN_NEGOTIATION`. */
-  canPreApprove: boolean;
+  /** `true` só quando há capacidade `APPROVE_VALUE` **e** o estado é `IN_NEGOTIATION`. */
+  canApproveValue: boolean;
   /** O marco do CONTRATO: o MENOR entre os veículos vivos. `null` sem `DELIVERY`. */
   milestone: PortalMilestoneKey | null;
   milestoneLabel: string | null;
@@ -799,7 +799,7 @@ export interface PortalSummary {
     byStatus: Record<string, number>;
   };
   waitingOnMe: {
-    preApproval: { available: boolean; total: number; budgets: PortalSummaryBudget[] };
+    valueApproval: { available: boolean; total: number; budgets: PortalSummaryBudget[] };
     signatures: { available: boolean; total: number; envelopes: PortalSummaryEnvelope[] };
     inProduction: { available: boolean; total: number; vehicles: PortalSummaryVehicle[] };
   };
@@ -942,7 +942,7 @@ export interface PortalCharge {
 // ── AS DECISÕES ─────────────────────────────────────────────────────────────
 
 /**
- * O que `PUT …/pre-aprovar` e `PUT …/recusar` devolvem.
+ * O que `PUT …/aprovar-valor` e `PUT …/recusar` devolvem.
  *
  * ⚠️ NÃO é o orçamento inteiro — é o recibo do ato. A tela relê o orçamento pela
  * invalidação do cache, que é o caminho que também conserta a lista e o resumo.
@@ -950,7 +950,7 @@ export interface PortalCharge {
 export interface PortalDecisionResult {
   id: string;
   status: PortalBudgetStatus;
-  decision: "PRE_APPROVE" | "REFUSE";
+  decision: "APPROVE_VALUE" | "REFUSE";
   decidedAt: string;
   decidedByResponsibleId: string;
   decisionNote: string | null;
@@ -1632,20 +1632,20 @@ export class PortalService {
   }
 
   /**
-   * `PUT …/pre-aprovar` — `IN_NEGOTIATION → PRE_APPROVED`. Capacidade `PRE_APPROVE`.
+   * `PUT …/aprovar-valor` — `IN_NEGOTIATION → PRE_APPROVED`. Capacidade `APPROVE_VALUE`.
    *
    * ⚠️ O corpo é `.strict()` no servidor: a única chave aceita é `nota`.
    */
-  async preApproveBudget(id: string, nota?: string): Promise<PortalResponse<PortalDecisionResult>> {
+  async approveBudgetValue(id: string, nota?: string): Promise<PortalResponse<PortalDecisionResult>> {
     const response = await responsibleAuthClient.put<PortalResponse<PortalDecisionResult>>(
-      `${BASE}/orcamentos/${id}/pre-aprovar`,
+      `${BASE}/orcamentos/${id}/aprovar-valor`,
       nota ? { nota } : {},
     );
     return response.data;
   }
 
   /**
-   * `PUT …/recusar` — `IN_NEGOTIATION → REQUESTED`. Capacidade `PRE_APPROVE`.
+   * `PUT …/recusar` — `IN_NEGOTIATION → REQUESTED`. Capacidade `APPROVE_VALUE`.
    *
    * ⚠️ `motivo` é OBRIGATÓRIO: recusar sem dizer por quê devolve o orçamento ao
    * comercial sem nada para ele corrigir. O corpo é `.strict()` — mandar
@@ -1809,7 +1809,7 @@ export const getPortalBudgets = (params?: PortalBudgetListParams) => portalServi
 export const getPortalBudget = (id: string) => portalService.getBudget(id);
 export const requestPortalBudget = (data: PortalBudgetRequestInput, baseFiles?: File[]) =>
   portalService.requestBudget(data, baseFiles);
-export const preApprovePortalBudget = (id: string, nota?: string) => portalService.preApproveBudget(id, nota);
+export const approvePortalBudgetValue = (id: string, nota?: string) => portalService.approveBudgetValue(id, nota);
 export const refusePortalBudget = (id: string, motivo: string) => portalService.refuseBudget(id, motivo);
 export const getPortalVehicles = (params?: PortalVehicleListParams) => portalService.getVehicles(params);
 export const getPortalVehicle = (taskId: string) => portalService.getVehicle(taskId);
@@ -2018,10 +2018,10 @@ export function usePortalRequestBudget() {
   });
 }
 
-export function usePortalPreApproveBudget() {
+export function usePortalApproveBudgetValue() {
   const invalidate = useInvalidatePortal();
   return useMutation({
-    mutationFn: ({ id, nota }: { id: string; nota?: string }) => preApprovePortalBudget(id, nota),
+    mutationFn: ({ id, nota }: { id: string; nota?: string }) => approvePortalBudgetValue(id, nota),
     onSuccess: invalidate,
   });
 }

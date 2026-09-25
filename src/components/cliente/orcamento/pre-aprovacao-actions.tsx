@@ -25,7 +25,7 @@
 import { useState } from "react";
 import { IconAlertTriangle, IconCheck, IconX } from "@tabler/icons-react";
 
-import { usePortalPreApproveBudget, usePortalRefuseBudget } from "@/api-client/portal";
+import { usePortalApproveBudgetValue, usePortalRefuseBudget } from "@/api-client/portal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,7 +55,7 @@ export interface PreAprovacaoActionsProps {
    * `false` EXPLÍCITO manda: o servidor sabe coisas que a tela não sabe (a
    * decisão já tomada, o CHECK de pré-aprovado-e-recusado, o escopo do dado).
    */
-  canPreApprove?: boolean;
+  canApproveValue?: boolean;
   /** Chamado depois de uma decisão aceita — para a tela voltar para a lista, por exemplo. */
   onDecided?: () => void;
   className?: string;
@@ -65,29 +65,29 @@ export interface PreAprovacaoActionsProps {
  * Este contato pode decidir ESTE orçamento AGORA?
  *
  * Três perguntas, e todas as três têm de dar sim. O estado, porque só
- * `IN_NEGOTIATION` tem as transições; a capacidade, porque `PRE_APPROVE` é de
+ * `IN_NEGOTIATION` tem as transições; a capacidade, porque `APPROVE_VALUE` é de
  * Comercial/Vendedor/Representante/Coordenador e de mais ninguém (o Compras do
  * cliente escreve pedido, não decide preço); e o servidor, que é quem manda.
  */
 export function canDecideBudget({
   status,
   roles,
-  canPreApprove,
+  canApproveValue,
 }: {
   status: TASK_QUOTE_STATUS;
   roles: readonly string[] | null | undefined;
-  canPreApprove?: boolean;
+  canApproveValue?: boolean;
 }): boolean {
   if (status !== "IN_NEGOTIATION") return false;
-  if (!hasPortalCapability(roles ? [...roles] : [], PORTAL_CAPABILITY.PRE_APPROVE)) return false;
-  return canPreApprove !== false;
+  if (!hasPortalCapability(roles ? [...roles] : [], PORTAL_CAPABILITY.APPROVE_VALUE)) return false;
+  return canApproveValue !== false;
 }
 
 export function PreAprovacaoActions({
   budgetId,
   status,
   roles,
-  canPreApprove,
+  canApproveValue,
   onDecided,
   className,
 }: PreAprovacaoActionsProps) {
@@ -98,14 +98,14 @@ export function PreAprovacaoActions({
   /** O aviso do motivo só aparece DEPOIS da primeira tentativa — não recebe quem ainda nem digitou. */
   const [motivoTouched, setMotivoTouched] = useState(false);
 
-  const preApprove = usePortalPreApproveBudget();
+  const approveValue = usePortalApproveBudgetValue();
   const refuse = usePortalRefuseBudget();
 
-  if (!canDecideBudget({ status, roles, canPreApprove })) return null;
+  if (!canDecideBudget({ status, roles, canApproveValue })) return null;
 
   const motivoTrimmed = motivo.trim();
   const motivoInvalid = motivoTrimmed.length === 0;
-  const busy = preApprove.isPending || refuse.isPending;
+  const busy = approveValue.isPending || refuse.isPending;
 
   const closeApprove = (open: boolean) => {
     if (busy) return;
@@ -125,7 +125,7 @@ export function PreAprovacaoActions({
   const submitApprove = async () => {
     const trimmed = nota.trim();
     try {
-      await preApprove.mutateAsync({ id: budgetId, nota: trimmed || undefined });
+      await approveValue.mutateAsync({ id: budgetId, nota: trimmed || undefined });
       setApproveOpen(false);
       setNota("");
       onDecided?.();
@@ -177,11 +177,11 @@ export function PreAprovacaoActions({
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="portal-pre-aprovar-nota" className="text-sm">
+            <Label htmlFor="portal-aprovar-valor-nota" className="text-sm">
               Observação (opcional)
             </Label>
             <Textarea
-              id="portal-pre-aprovar-nota"
+              id="portal-aprovar-valor-nota"
               value={nota}
               maxLength={MOTIVO_MAX}
               placeholder="Algo que o comercial precise saber junto da aprovação."
@@ -198,7 +198,7 @@ export function PreAprovacaoActions({
               Cancelar
             </Button>
             <Button type="button" onClick={() => void submitApprove()} disabled={busy}>
-              {preApprove.isPending ? "Aprovando..." : "Aprovar"}
+              {approveValue.isPending ? "Aprovando..." : "Aprovar"}
             </Button>
           </DialogFooter>
         </DialogContent>

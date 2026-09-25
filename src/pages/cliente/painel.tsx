@@ -10,7 +10,7 @@
 // ── O recorte ───────────────────────────────────────────────────────────────
 //
 // O que aparece depende do PAPEL, por `capabilitiesForRoles`. O servidor já
-// recorta (`GET /cliente/me/resumo` devolve `preApprovals: []` a quem não
+// recorta (`GET /cliente/me/resumo` devolve `valueApproval.budgets: []` a quem não
 // pré-aprova), e a tela confere de novo — não por desconfiança, mas porque um
 // card com título e lista vazia é pior do que card nenhum: ele afirma que existe
 // um trabalho que aquela pessoa nunca poderá fazer.
@@ -159,17 +159,17 @@ export default function ClientePainelPage() {
    * Início dizia "nada esperando por você" para quem tinha decisão parada.
    *
    * ⛔ E NÃO HÁ GRUPO DE "VEÍCULOS SEM IDENTIFICAÇÃO". O servidor não o calcula:
-   * `resumo` tem `preApproval`, `signatures` e `inProduction`, e mais nada. O
+   * `resumo` tem `valueApproval`, `signatures` e `inProduction`, e mais nada. O
    * card que existia aqui nunca desenhou uma linha. Quem responde "o que falta
    * identificar?" é a tela de Veículos, que é onde o conserto acontece — e é
    * para lá que o rodapé aponta. Relatado como lacuna da API.
    */
-  const preApprovalGroup = summary?.waitingOnMe?.preApproval;
+  const valueApprovalGroup = summary?.waitingOnMe?.valueApproval;
   const signatureGroup = summary?.waitingOnMe?.signatures;
   const inProductionGroup = summary?.waitingOnMe?.inProduction;
 
-  const preApprovals: PortalSummaryBudget[] = preApprovalGroup?.available
-    ? (preApprovalGroup.budgets ?? [])
+  const valueApprovals: PortalSummaryBudget[] = valueApprovalGroup?.available
+    ? (valueApprovalGroup.budgets ?? [])
     : [];
   const signatures: PortalSummaryEnvelope[] = signatureGroup?.available
     ? (signatureGroup.envelopes ?? [])
@@ -178,7 +178,7 @@ export default function ClientePainelPage() {
     ? (inProductionGroup.vehicles ?? [])
     : [];
 
-  const waitingCount = preApprovals.length + signatures.length;
+  const waitingCount = valueApprovals.length + signatures.length;
 
   return (
     <div className="space-y-4">
@@ -307,7 +307,7 @@ export default function ClientePainelPage() {
                 action={
                   canWriteVehicleIdentity ? (
                     // ⛔ O servidor NÃO manda um grupo de "veículos sem
-                    // identificação" no resumo — só `preApproval`,
+                    // identificação" no resumo — só `valueApproval`,
                     // `signatures` e `inProduction`. Quem responde "o que
                     // falta identificar?" é a tela de Veículos, que é onde o
                     // conserto acontece. Apontar para lá é honesto; desenhar
@@ -322,13 +322,13 @@ export default function ClientePainelPage() {
               />
             ) : (
               <div className="space-y-5">
-                {preApprovals.length > 0 && (
+                {valueApprovals.length > 0 && (
                   <div className="space-y-2">
                     <PortalSubheading>Orçamentos para sua decisão</PortalSubheading>
                     <p className="text-sm text-muted-foreground">
                       Em negociação: você pode pré-aprovar para seguir, ou recusar com o motivo.
                     </p>
-                    {preApprovals.map((budget) => (
+                    {valueApprovals.map((budget) => (
                       <PortalRowLink
                         key={budget.id}
                         to={routes.customer.portal.orcamento(budget.id)}

@@ -72,7 +72,7 @@
 //
 // ── A decisão ──────────────────────────────────────────────────────────────
 //
-// Em `IN_NEGOTIATION`, quem tem `PRE_APPROVE` decide: aprovar (vai a
+// Em `IN_NEGOTIATION`, quem tem `APPROVE_VALUE` decide: aprovar (vai a
 // `PRE_APPROVED`) ou recusar (VOLTA a `REQUESTED`, para o comercial refazer).
 // Os botões vivem no cabeçalho do card da Proposta — e NÃO no da página, porque
 // o `headerExtra` do `PageHeader` mora dentro de um `hidden sm:flex` e sumiria
@@ -293,7 +293,7 @@ export function ClientePortalOrcamentoDetalhePage() {
                     budgetId={budget.id}
                     status={budget.status}
                     roles={roles}
-                    canPreApprove={budget.canPreApprove}
+                    canApproveValue={budget.canApproveValue}
                     // Decidido: a lista é o lugar certo para voltar — o orçamento saiu
                     // de "esperando por você" e a próxima pergunta é "o que mais falta?".
                     onDecided={backToList}
