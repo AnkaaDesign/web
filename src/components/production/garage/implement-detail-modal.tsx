@@ -214,14 +214,14 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
             )}
 
             {/* Serial Number */}
-            {task.serialNumber && (
+            {task.implement?.serialNumber && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconHash className="h-4 w-4" />
                   Número de Série
                 </span>
                 <span className="text-sm font-semibold text-foreground">
-                  {task.serialNumber}
+                  {task.implement?.serialNumber}
                 </span>
               </div>
             )}

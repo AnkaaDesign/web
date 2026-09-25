@@ -242,7 +242,7 @@ const observationTransform = (data: any) => {
       OR: [
         { description: { contains: searchingFor, mode: "insensitive" } },
         { task: { name: { contains: searchingFor, mode: "insensitive" } } },
-        { task: { serialNumber: { contains: searchingFor, mode: "insensitive" } } },
+        { task: { implement: { serialNumber: { contains: searchingFor, mode: "insensitive" } } } },
       ],
     });
   }

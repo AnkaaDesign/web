@@ -701,8 +701,14 @@ function TaskDetailContent() {
             label: "Número de Série",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.serialNumber,
-            edit: canEdit ? { get: (t) => t.serialNumber, onCommit: (v) => setTaskField({ serialNumber: (v as string) || null }) } : undefined,
+            // A série é do implemento (NOMENCLATURA.md §5): lê e grava em `implement.serialNumber`.
+            accessor: (t) => t.implement?.serialNumber ?? null,
+            edit: canEdit
+              ? {
+                  get: (t) => t.implement?.serialNumber ?? null,
+                  onCommit: (v) => setTaskField({ implement: { serialNumber: (v as string) || null } }),
+                }
+              : undefined,
           },
           {
             /**
@@ -1518,7 +1524,7 @@ function TaskDetailContent() {
           <TaskWithServiceOrdersChangelog
             embedded
             taskId={t.id}
-            taskName={`${t.name}${t.serialNumber ? ` — ${t.serialNumber}` : ""}`}
+            taskName={`${t.name}${t.implement?.serialNumber ? ` — ${t.implement.serialNumber}` : ""}`}
             taskCreatedAt={t.createdAt}
             serviceOrderIds={(t.serviceOrders ?? []).map((s) => s.id)}
             implementId={t.implement?.id}
@@ -1624,11 +1630,11 @@ function TaskDetailContent() {
   const taskDisplayName = task
     ? task.name ||
       task.customer?.corporateName ||
-      (task.serialNumber ? `Série ${task.serialNumber}` : "") ||
+      (task.implement?.serialNumber ? `Série ${task.implement.serialNumber}` : "") ||
       task.implement?.plate ||
       "Sem nome"
     : "Tarefa";
-  const taskName = task ? `${taskDisplayName}${task.name && task.serialNumber ? ` — ${task.serialNumber}` : ""}` : "Tarefa";
+  const taskName = task ? `${taskDisplayName}${task.name && task.implement?.serialNumber ? ` — ${task.implement.serialNumber}` : ""}` : "Tarefa";
 
   return (
     <>

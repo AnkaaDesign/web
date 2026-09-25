@@ -51,7 +51,8 @@ const PAGE_PRIVILEGES = [
 
 export const DETAIL_INCLUDE = {
   file: true,
-  task: { include: { customer: true, sector: true } },
+  // A série é do implemento (NOMENCLATURA.md §5).
+  task: { include: { customer: true, sector: true, implement: { select: { serialNumber: true } } } },
   parentCut: { include: { file: true } },
   childCuts: { include: { file: true } },
 } as const;
@@ -179,7 +180,7 @@ function CuttingDetailsContent() {
         onTitleClick: (c) => c.task && navigate(routes.production.schedule.details(c.task.id)),
         fields: [
           { id: "taskName", label: "Nome da Tarefa", icon: IconClipboardList, accessor: (c) => c.task?.name ?? null },
-          { id: "serialNumber", label: "Número de Série", icon: IconHash, accessor: (c) => c.task?.serialNumber ?? null },
+          { id: "serialNumber", label: "Número de Série", icon: IconHash, accessor: (c) => c.task?.implement?.serialNumber ?? null },
           { id: "customer", label: "Cliente", icon: IconUser, accessor: (c) => c.task?.customer?.fantasyName ?? null },
           { id: "sector", label: "Setor", icon: IconBuildingFactory, accessor: (c) => c.task?.sector?.name ?? null },
         ],

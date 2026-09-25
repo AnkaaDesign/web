@@ -100,6 +100,8 @@ export const LIST_INCLUDE = {
   implement: {
     select: {
       id: true,
+      // A série é do implemento (NOMENCLATURA.md §5): identificador, busca e a regra R3b.
+      serialNumber: true,
       plate: true,
       category: true,
       chassisNumber: true,
@@ -161,7 +163,7 @@ function defaultOrder(a: Task, b: Task): number {
   if (af !== bf) return af - bf;
   const an = (a.name || "").localeCompare(b.name || "");
   if (an !== 0) return an;
-  return (a.serialNumber || a.implement?.plate || "").localeCompare(b.serialNumber || b.implement?.plate || "");
+  return (a.implement?.serialNumber || a.implement?.plate || "").localeCompare(b.implement?.serialNumber || b.implement?.plate || "");
 }
 
 /** One trimmed bucket query. The API caps `limit` at 1000, so each status-bucket gets its own query

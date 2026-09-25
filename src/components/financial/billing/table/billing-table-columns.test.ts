@@ -26,7 +26,7 @@ const b269 = {
   statusOrder: 1,
   approvedAt: "2026-09-01T12:00:00.000Z",
   quote: { id: "quote-269", budgetNumber: 269, vehicleCount: 1, total: 28156.6, subtotal: 30605 },
-  tasks: [{ taskId: "t1", task: { id: "t1", name: "RKO Alimentos", serialNumber: "78000", finishedAt: "2026-08-30T12:00:00.000Z" } }],
+  tasks: [{ taskId: "t1", task: { id: "t1", name: "RKO Alimentos", implement: { serialNumber: "78000" }, finishedAt: "2026-08-30T12:00:00.000Z" } }],
   customerConfigs: [
     {
       id: "cfg-ibipora",

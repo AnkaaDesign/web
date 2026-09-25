@@ -134,7 +134,7 @@ interface VehicleFormValues {
 function toVehicleFormValues(task: any, airbrushings: any[] | undefined): VehicleFormValues {
   return {
     taskId: task.id,
-    serialNumber: task.serialNumber || "",
+    serialNumber: task.implement?.serialNumber || "",
     plate: task.implement?.plate || "",
     chassisNumber: task.implement?.chassisNumber || "",
     customerOrderNumber: task.customerOrderNumber || null,
@@ -535,7 +535,7 @@ const FinancialBudgetDetailPageInner = () => {
       quoteTasks(existingQuote as any).map((t: any) => ({
         id: t.id,
         name: t.name ?? null,
-        serialNumber: t.serialNumber ?? null,
+        serialNumber: t.implement?.serialNumber ?? null,
         plate: t.implement?.plate ?? null,
         customerOrderNumber: t.customerOrderNumber ?? null,
       })),
@@ -1650,15 +1650,16 @@ const FinancialBudgetDetailPageInner = () => {
         if (vDirty.forecastDate) payload.forecastDate = vData.forecastDate || undefined;
         if (vDirty.term) payload.term = vData.term || undefined;
         if (vDirty.paintId) payload.paintId = vData.paintId || null;
-        if (vDirty.serialNumber) payload.serialNumber = vData.serialNumber || null;
         // O PEDIDO DE COMPRA — deste veículo. Enviado sempre que MUDOU, inclusive
         // vazio (`null`): limpar o campo tem de persistir, não deixar o número antigo
         // de pé num pedido cancelado.
         const nextOrderNumber = (vData.customerOrderNumber ?? "").trim() || null;
         const savedOrderNumber = (vehicleTask.customerOrderNumber ?? "").trim() || null;
         if (nextOrderNumber !== savedOrderNumber) payload.customerOrderNumber = nextOrderNumber;
-        // Placa e chassi limpos vão como null EXPLÍCITO, nunca undefined: undefined
+        // Série, placa e chassi limpos vão como null EXPLÍCITO, nunca undefined: undefined
         // é como se diz "não mexe" à API, então apagar o campo mantinha o valor antigo.
+        // A série é SÓ do implemento (NOMENCLATURA.md §5): vai em `implement.serialNumber`.
+        if (vDirty.serialNumber) implementPayload.serialNumber = vData.serialNumber || null;
         if (vDirty.plate) implementPayload.plate = vData.plate || null;
         if (vDirty.chassisNumber) implementPayload.chassisNumber = vData.chassisNumber || null;
         // Plaqueta: send an EXPLICIT null when the photo was cleared. `vDirty.vinPlateId`
@@ -2449,7 +2450,7 @@ const FinancialBudgetDetailPageInner = () => {
 
   // Build header info
   const taskName = task?.name || task?.implement?.plate || "Tarefa";
-  const taskDisplayName = [taskName, task?.serialNumber || task?.implement?.plate]
+  const taskDisplayName = [taskName, task?.implement?.serialNumber || task?.implement?.plate]
     .filter(Boolean)
     .join(" - ");
   // Com N veículos o título é do ORÇAMENTO: a série de um caminhão ali parecia

@@ -1,7 +1,7 @@
 import type { Task } from "../../../../types";
 import type { TaskColumn } from "./types";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatDateTime, formatCurrency, getTaskStatusLabel, getTaskStatusColor, isDateInPast } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, getTaskStatusLabel, getTaskStatusColor, isDateInPast, taskSerial } from "../../../../utils";
 import {
   TASK_STATUS,
   PAINT_FINISH,
@@ -89,7 +89,7 @@ const createAllTaskColumns = (): TaskColumn[] => [
     formatter: (value: string, row: Task) => (
       <div className="flex flex-col gap-0.5">
         <TruncatedTextWithTooltip text={value} className="font-medium" />
-        {row.serialNumber && <span className="text-xs text-muted-foreground">SN: {row.serialNumber}</span>}
+        {taskSerial(row) && <span className="text-xs text-muted-foreground">SN: {taskSerial(row)}</span>}
       </div>
     ),
   },
@@ -168,7 +168,7 @@ const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "serialNumber",
     header: "Nº SÉRIE",
-    accessorKey: "serialNumber",
+    accessorFn: (row) => taskSerial(row),
     sortable: true,
     filterable: true,
     defaultVisible: false,

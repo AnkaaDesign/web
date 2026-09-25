@@ -211,7 +211,7 @@ export function BudgetStepReview({
     const existing = existingQuote?.tasks ?? [];
     if (existing.length > 0) {
       return sortQuoteTasks(existing).map(
-        (t) => t.serialNumber || (t as any).implement?.plate || "—",
+        (t) => t.implement?.serialNumber || (t as any).implement?.plate || "—",
       );
     }
     const plates = platesWatch.filter(Boolean);
@@ -274,7 +274,7 @@ export function BudgetStepReview({
     const labelOf = (taskId: string) => {
       const t = byId.get(taskId);
       return (
-        (t?.serialNumber || undefined) ??
+        (t?.implement?.serialNumber || undefined) ??
         (t?.implement?.plate || undefined) ??
         (t?.name || undefined) ??
         taskId.slice(0, 8)
@@ -335,7 +335,7 @@ export function BudgetStepReview({
         const live = formVehicleById.get(t.id);
         return {
           key: t.id,
-          serialNumber: (live ? live.serialNumber : t.serialNumber) || null,
+          serialNumber: (live ? live.serialNumber : t.implement?.serialNumber) || null,
           plate: (live ? live.plate : t.implement?.plate) || null,
           chassis: (live ? live.chassisNumber : t.implement?.chassisNumber) || null,
           orderNumber: live
@@ -458,8 +458,15 @@ export function BudgetStepReview({
     return {
       ...task,
       name: task?.name || formName || undefined,
-      serialNumber: task?.serialNumber || (serialNumbers.length > 0 ? serialNumbers.join(", ") : undefined),
-      implement: task?.implement || (plates.length > 0 ? { plate: plates.join(", ") } : undefined),
+      // A série é do implemento (NOMENCLATURA.md §5); na criação, a do formulário.
+      implement:
+        task?.implement ||
+        (plates.length > 0 || serialNumbers.length > 0
+          ? {
+              ...(plates.length > 0 && { plate: plates.join(", ") }),
+              ...(serialNumbers.length > 0 && { serialNumber: serialNumbers.join(", ") }),
+            }
+          : undefined),
     };
   }, [isCreateMode, task, formPlates, formSerialNumbers, formName]);
 
@@ -752,10 +759,10 @@ export function BudgetStepReview({
                     <span className="text-sm font-medium">{resolvedTask.implement.plate}</span>
                   </div>
                 )}
-                {resolvedTask?.serialNumber && (
+                {resolvedTask?.implement?.serialNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Nº de Série</span>
-                    <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
+                    <span className="text-sm font-medium">{resolvedTask.implement.serialNumber}</span>
                   </div>
                 )}
                 {resolvedTask?.implement?.chassisNumber && (

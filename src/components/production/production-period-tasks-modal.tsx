@@ -125,7 +125,7 @@ export function ProductionPeriodTasksModal({
     task.customer?.fantasyName ?? task.customer?.name ?? '';
 
   const indicator = (task: any) =>
-    task.serialNumber ?? task.implement?.plate ?? task.implement?.chassisNumber ?? '—';
+    task.implement?.serialNumber ?? task.implement?.plate ?? task.implement?.chassisNumber ?? '—';
 
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -99,6 +99,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             },
           },
           sector: true,
+          // A série é do implemento (NOMENCLATURA.md §5).
+          implement: { select: { serialNumber: true } },
         },
       },
       files: true,
@@ -484,13 +486,13 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                   )}
 
                   {/* Serial Number */}
-                  {observation.task.serialNumber && (
+                  {observation.task.implement?.serialNumber && (
                     <div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
                         <IconHash className="h-3.5 w-3.5" />
                         <span>Número de Série</span>
                       </div>
-                      <div className="font-medium text-sm">{observation.task.serialNumber}</div>
+                      <div className="font-medium text-sm">{observation.task.implement?.serialNumber}</div>
                     </div>
                   )}
                 </div>

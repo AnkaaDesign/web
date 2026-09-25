@@ -61,7 +61,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
             </DialogTitle>
             <DialogDescription>
               {invoice.customer?.fantasyName || 'Cliente'}
-              {invoice.task?.serialNumber && ` - OS #${invoice.task.serialNumber}`}
+              {invoice.task?.implement?.serialNumber && ` - OS #${invoice.task.implement?.serialNumber}`}
             </DialogDescription>
           </DialogHeader>
 

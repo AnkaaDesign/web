@@ -34,7 +34,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
       return parts.join(" - ");
     },
   },
-  { id: "serialNumberOrPlate", label: "Nº Série/Placa", getValue: (task: Task) => task.serialNumber || task.implement?.plate || "" },
+  { id: "serialNumberOrPlate", label: "Nº Série/Placa", getValue: (task: Task) => task.implement?.serialNumber || task.implement?.plate || "" },
   { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.implement?.chassisNumber || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   { id: "entryDate", label: "Entrada", getValue: (task: Task) => (task.entryDate ? formatDate(task.entryDate) : "") },

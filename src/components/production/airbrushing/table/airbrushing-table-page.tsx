@@ -78,10 +78,10 @@ const EMPTY_PARAMS: { search: string; filters: DataTableFilterValues } = { searc
 /** column id → API orderBy entry. Columns without a server-sortable field are omitted (sort ignored). */
 const AIRBRUSHING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Record<string, unknown>> = {
   taskName: (d) => ({ task: { name: d } }),
-  // Server sort can't COALESCE(serialNumber, implement.plate) the way the client-mode task-prep table
+  // Server sort can't COALESCE(implement.serialNumber, implement.plate) the way the client-mode task-prep table
   // does, so sort on the serial and push plate-only rows (NULL serial) to the bottom in BOTH
   // directions — Postgres otherwise puts NULLS FIRST on DESC.
-  taskSerialNumber: (d) => ({ task: { serialNumber: { sort: d, nulls: "last" } } }),
+  taskSerialNumber: (d) => ({ task: { implement: { serialNumber: { sort: d, nulls: "last" } } } }),
   customer: (d) => ({ task: { customer: { fantasyName: d } } }),
   painter: (d) => ({ painter: { name: d } }),
   description: (d) => ({ description: d }),

@@ -339,11 +339,11 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "identificador",
       header: "Identificador",
-      accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
+      accessorFn: (row) => row.implement?.serialNumber || row.implement?.plate || "",
       size: 150,
       // A plate exports with the canonical display mask (`ABC-1234`, Mercosul unhyphenated); a
       // serial number is free-form and goes out as stored.
-      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || (row.implement?.plate ? formatPlate(row.implement.plate) : "") },
+      meta: { headerLabel: "Identificador", exportValue: (row) => row.implement?.serialNumber || (row.implement?.plate ? formatPlate(row.implement.plate) : "") },
       cell: ({ getValue }) => {
         const v = getValue() as string;
         return v ? <span className="truncate">{v}</span> : <span className="text-muted-foreground">-</span>;

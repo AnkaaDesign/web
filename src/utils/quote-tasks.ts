@@ -34,8 +34,9 @@ import type { BILLING_STATUS } from "../types/budget";
 export interface QuoteTaskLike {
   id: string;
   createdAt?: Date | string | null;
-  serialNumber?: string | null;
   name?: string | null;
+  /** A série é do implemento (NOMENCLATURA.md §5): a consulta pede `implement.serialNumber`. */
+  implement?: { serialNumber?: string | null } | null;
 }
 
 interface QuoteWithTasksLike<T> {
@@ -119,7 +120,8 @@ export function describeQuoteVehicles(
   if (tasks.length === 0) return null;
   if (tasks.length === 1) {
     const t = tasks[0];
-    return t.serialNumber ? `#${t.serialNumber}` : (t.name ?? null);
+    const serial = t.implement?.serialNumber;
+    return serial ? `#${serial}` : (t.name ?? null);
   }
   return `${tasks.length} veículos`;
 }
@@ -224,9 +226,8 @@ export interface BillingCoverageLike {
     task?: {
       id?: string;
       name?: string | null;
-      serialNumber?: string | null;
       customerOrderNumber?: string | null;
-      implement?: { plate?: string | null } | null;
+      implement?: { serialNumber?: string | null; plate?: string | null } | null;
     } | null;
   }> | null;
 }
@@ -362,7 +363,7 @@ export function coverageLabels(
       | (QuoteTaskLike & { implement?: { plate?: string | null } | null })
       | null;
     return (
-      (t?.serialNumber || undefined) ??
+      (t?.implement?.serialNumber || undefined) ??
       (t?.implement?.plate || undefined) ??
       (t?.name || undefined) ??
       row.taskId.slice(0, 8)
@@ -637,15 +638,14 @@ export function orderNumberLabel(
  */
 export function vehicleRowLabel(
   task: {
-    serialNumber?: string | null;
     name?: string | null;
-    implement?: { plate?: string | null } | null;
+    implement?: { serialNumber?: string | null; plate?: string | null } | null;
   } | null
   | undefined,
   index: number,
 ): string {
   const parts: string[] = [];
-  const serial = (task?.serialNumber ?? "").trim();
+  const serial = (task?.implement?.serialNumber ?? "").trim();
   const plate = (task?.implement?.plate ?? "").trim();
   if (serial) parts.push(`#${serial}`);
   if (plate) parts.push(plate.toUpperCase());

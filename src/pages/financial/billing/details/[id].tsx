@@ -314,7 +314,6 @@ const BillingDetailPageInner = ({
             select: {
               id: true,
               name: true,
-              serialNumber: true,
               createdAt: true,
               customerOrderNumber: true,
               // Data de conclusão de CADA veículo: numa cobrança de quatro eles
@@ -327,6 +326,8 @@ const BillingDetailPageInner = ({
               implement: {
                 select: {
                   id: true,
+                  // A série é do implemento (NOMENCLATURA.md §5).
+                  serialNumber: true,
                   plate: true,
                   chassisNumber: true,
                   // Categoria e implemento: é assim que a discriminação da NFS-e
@@ -407,10 +408,10 @@ const BillingDetailPageInner = ({
     const fromQuote = quoteTasks(quote as any) as Array<{
       id: string;
       name?: string | null;
-      serialNumber?: string | null;
       customerOrderNumber?: string | null;
       finishedAt?: Date | string | null;
       implement?: {
+        serialNumber?: string | null;
         plate?: string | null;
         chassisNumber?: string | null;
         category?: string | null;
@@ -423,11 +424,11 @@ const BillingDetailPageInner = ({
           {
             id: task.id,
             name: task.name,
-            serialNumber: task.serialNumber,
             customerOrderNumber: task.customerOrderNumber ?? null,
             finishedAt: task.finishedAt ?? null,
             implement: task.implement
               ? {
+                  serialNumber: task.implement.serialNumber,
                   plate: task.implement.plate,
                   chassisNumber: task.implement.chassisNumber,
                   category: task.implement.category,
@@ -465,7 +466,7 @@ const BillingDetailPageInner = ({
       quoteVehicleRows.map((v: any) => ({
         id: v.id,
         name: v.name ?? null,
-        serialNumber: v.serialNumber ?? null,
+        serialNumber: v.implement?.serialNumber ?? null,
         plate: v.implement?.plate ?? null,
         customerOrderNumber: v.customerOrderNumber ?? null,
       })),
@@ -756,7 +757,7 @@ const BillingDetailPageInner = ({
       name: task.name || "",
       customerId: task.customerId || "",
       plate: task.implement?.plate || "",
-      serialNumber: task.serialNumber || "",
+      serialNumber: task.implement?.serialNumber || "",
       // O pedido de compra DESTE veículo — ver os defaults do formulário.
       customerOrderNumber: task.customerOrderNumber || null,
       chassisNumber: task.implement?.chassisNumber || "",
@@ -1749,7 +1750,7 @@ const BillingDetailPageInner = ({
   const taskDisplayName =
     coveredVehicleRows.length > 1
       ? [task.name, `${coveredVehicleRows.length} veículos`].filter(Boolean).join(" - ")
-      : [task.name, task.serialNumber || task.implement?.plate].filter(Boolean).join(" - ");
+      : [task.name, task.implement?.serialNumber || task.implement?.plate].filter(Boolean).join(" - ");
 
   return (
     <PrivilegeRoute
@@ -2039,7 +2040,7 @@ const BillingDetailPageInner = ({
                 quoteVehicleRows.map((t: any) => [
                   t.id,
                   {
-                    serialNumber: t.serialNumber ?? null,
+                    serialNumber: t.implement?.serialNumber ?? null,
                     plate: t.implement?.plate ?? null,
                     chassisNumber: t.implement?.chassisNumber ?? null,
                     category: t.implement?.category ?? null,

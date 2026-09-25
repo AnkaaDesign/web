@@ -545,7 +545,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     customerId: "basic-information",
     "implement.category": "basic-information",
     "implement.type": "basic-information",
-    serialNumber: "basic-information",
+    "implement.serialNumber": "basic-information",
     customerOrderNumber: "basic-information",
     "implement.plate": "basic-information",
     "implement.chassisNumber": "basic-information",
@@ -866,7 +866,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     return {
       name: taskData.name || "",
       status: taskData.status || TASK_STATUS.PREPARATION,
-      serialNumber: taskData.serialNumber || null,
       customerOrderNumber: taskData.customerOrderNumber || null,
       details: taskData.details || null,
       bonification: taskData.bonification || null,
@@ -921,6 +920,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       layoutIds: taskData.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
       implement: {
+        // A série é do implemento (NOMENCLATURA.md §5): vai em `implement.serialNumber`.
+        serialNumber: taskData.implement?.serialNumber || null,
         plate: taskData.implement?.plate || null,
         chassisNumber: taskData.implement?.chassisNumber || null,
         vinPlateId: taskData.implement?.vinPlateId || null,
@@ -1453,7 +1454,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'customerId',
             'sectorId',
             'paintId',
-            'serialNumber',
             // O pedido de compra do cliente, DESTE veículo. Livre e não único:
             // os N veículos de um orçamento podem vir num pedido só ou em
             // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
@@ -1858,7 +1858,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'customerId',
             'sectorId',
             'paintId',
-            'serialNumber',
             // O pedido de compra do cliente, DESTE veículo. Livre e não único:
             // os N veículos de um orçamento podem vir num pedido só ou em
             // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
@@ -3038,7 +3037,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       {/* Serial Number - 1/4 */}
                       <FormField
                         control={form.control}
-                        name="serialNumber"
+                        name="implement.serialNumber"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">

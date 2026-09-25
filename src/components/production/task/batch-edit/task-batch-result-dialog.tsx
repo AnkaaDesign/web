@@ -35,8 +35,8 @@ export function TaskBatchResultDialog({ result, onClose }: TaskBatchResultDialog
               {task.sector.name}
             </Badge>
           )}
-          {task.serialNumber && (
-            <span className="text-xs text-muted-foreground">Série: {task.serialNumber}</span>
+          {task.implement?.serialNumber && (
+            <span className="text-xs text-muted-foreground">Série: {task.implement?.serialNumber}</span>
           )}
         </div>
       </div>

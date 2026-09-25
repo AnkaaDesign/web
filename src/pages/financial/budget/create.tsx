@@ -768,14 +768,17 @@ export const FinancialBudgetCreatePage = () => {
       // 6. Build implement data
       const { plates, category, implementType } = data;
       const hasImplementFields = (plates && plates.length > 0) || category || implementType;
-      const buildImplementData = (plate?: string) => {
+      // A série é SÓ do implemento (NOMENCLATURA.md §5): vai em `implement.serialNumber`,
+      // nunca no topo do corpo (o schema da API é estrito e responde 400).
+      const buildImplementData = (plate?: string, serialNumber?: string) => {
         // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), como nascia
         // quando o tipo tinha "Refrigerado" de padrão (antes do D-25): cada
         // tarefa tem exatamente um implemento (DD1); só o tipo não se inventa.
         return {
           implement:
-            hasImplementFields || plate
+            hasImplementFields || plate || serialNumber
               ? {
+                  ...(serialNumber && { serialNumber }),
                   ...(plate && { plate }),
                   category: category || undefined,
                   type: implementType || undefined,
@@ -815,7 +818,7 @@ export const FinancialBudgetCreatePage = () => {
 
       for (let i = 0; i < combinations.length; i++) {
         const { plate, serialNumber } = combinations[i];
-        const implementData = buildImplementData(plate);
+        const implementData = buildImplementData(plate, serialNumber);
 
         const taskData: any = {
           status: data.status,
@@ -838,7 +841,6 @@ export const FinancialBudgetCreatePage = () => {
             assignedToId: so.assignedToId || null,
             startedAt: so.status === SERVICE_ORDER_STATUS.IN_PROGRESS ? new Date() : null,
           })) : undefined,
-          ...(serialNumber && { serialNumber }),
           ...implementData,
         };
 

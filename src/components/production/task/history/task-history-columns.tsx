@@ -344,7 +344,7 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "identificador",
     header: "IDENTIFICADOR",
-    accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
+    accessorFn: (row) => row.implement?.serialNumber || row.implement?.plate || "",
     sortable: true,
     filterable: true,
     defaultVisible: true,

@@ -273,7 +273,8 @@ export const taskOrderBySchema = z
       name: orderByDirectionSchema.optional(),
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
-      serialNumber: orderByDirectionSchema.optional(),
+      // A série é do implemento (NOMENCLATURA.md §5): ordena-se por `implement.serialNumber`.
+      implement: z.object({ serialNumber: orderByDirectionSchema.optional() }).optional(),
       customerOrderNumber: orderByDirectionSchema.optional(),
       bonificationOrder: orderByDirectionSchema.optional(),
       entryDate: orderByDirectionSchema.optional(),
@@ -290,7 +291,7 @@ export const taskOrderBySchema = z
         name: orderByDirectionSchema.optional(),
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
-        serialNumber: orderByDirectionSchema.optional(),
+        implement: z.object({ serialNumber: orderByDirectionSchema.optional() }).optional(),
         customerOrderNumber: orderByDirectionSchema.optional(),
         bonificationOrder: orderByDirectionSchema.optional(),
         entryDate: orderByDirectionSchema.optional(),
@@ -319,7 +320,6 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       name: z.union([z.string(), z.object({ contains: z.string().optional(), startsWith: z.string().optional(), endsWith: z.string().optional() })]).optional(),
       status: z.union([z.nativeEnum(TASK_STATUS), z.object({ in: z.array(z.nativeEnum(TASK_STATUS)).optional() })]).optional(),
       statusOrder: z.union([z.number(), z.object({ gte: z.number().optional(), lte: z.number().optional() })]).optional(),
-      serialNumber: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
       // Pedido de compra do cliente, por VEÍCULO — o filtro "sem pedido" da lista
       // de Faturamento pergunta por ele (`null` OU string vazia).
       customerOrderNumber: z
@@ -446,7 +446,7 @@ const taskTransform = (data: any): any => {
       OR: [
         // Direct task fields
         { name: { contains: searchTerm, mode: "insensitive" } },
-        { serialNumber: { contains: searchTerm, mode: "insensitive" } },
+        { implement: { serialNumber: { contains: searchTerm, mode: "insensitive" } } },
         { details: { contains: searchTerm, mode: "insensitive" } },
         // Related entities
         { customer: { fantasyName: { contains: searchTerm, mode: "insensitive" } } },
@@ -1155,7 +1155,16 @@ const measureSideSchema = z
 
 // Consolidated implement schema with basic fields AND implement measures
 const taskImplementCreateSchema = z.object({
-  // Basic implement fields
+  // Basic implement fields. A série é SÓ do implemento (NOMENCLATURA.md §5):
+  // o corpo da tarefa a manda em `implement.serialNumber`, nunca no topo.
+  serialNumber: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => (val === "" ? null : val))
+    .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
+      message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
+    }),
   plate: optionalPlateSchema,
   chassisNumber: optionalChassisSchema,
   // Foto da plaqueta (VIN). Id de um File já enviado; o upload multipart vai no campo `implementVinPlate`.
@@ -1192,14 +1201,6 @@ export const taskCreateSchema = z
         errorMap: () => ({ message: "status inválido" }),
       })
       .default(TASK_STATUS.PREPARATION),
-    serialNumber: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((val) => (val === "" ? null : val))
-      .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
-        message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
-      }),
     /**
      * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
      *
@@ -1255,9 +1256,9 @@ export const taskCreateSchema = z
     quote: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
-    // Require at least one of: customer, serialNumber, plate, or name
+    // Require at least one of: customer, implement.serialNumber, plate, or name
     const hasCustomer = !!data.customerId;
-    const hasSerialNumber = !!data.serialNumber;
+    const hasSerialNumber = !!data.implement?.serialNumber;
     const hasPlate = !!data.implement?.plate;
     const hasName = !!data.name;
 
@@ -1341,14 +1342,6 @@ export const taskUpdateSchema = z
         errorMap: () => ({ message: "status inválido" }),
       })
       .optional(),
-    serialNumber: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((val) => (val === "" ? null : val))
-      .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
-        message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
-      }),
     /**
      * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
      *
@@ -1550,7 +1543,8 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   name: task.name,
   status: task.status,
   statusOrder: task.statusOrder || undefined,
-  serialNumber: task.serialNumber,
+  // A série é do implemento (NOMENCLATURA.md §5).
+  ...(task.implement ? { implement: { serialNumber: task.implement.serialNumber } } : {}),
   customerOrderNumber: task.customerOrderNumber,
   details: task.details,
   entryDate: task.entryDate,

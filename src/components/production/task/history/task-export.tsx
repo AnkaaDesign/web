@@ -129,7 +129,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "measures", label: "Medidas", getValue: (task: Task) => formatTaskMeasures(task) },
   { id: "generalPainting", label: "Pintura Geral", getValue: (task: Task) => task.generalPainting?.name || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
-  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.implement?.plate || "" },
+  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.implement?.serialNumber || task.implement?.plate || "" },
   { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.implement?.chassisNumber || "" },
   {
     id: "implementCategory",

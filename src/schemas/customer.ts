@@ -527,7 +527,7 @@ const customerTransform = (data: any) => {
       { neighborhood: { contains: searchingFor, mode: "insensitive" } },
       { address: { contains: searchingFor, mode: "insensitive" } },
       { tasks: { some: { plate: { contains: searchingFor, mode: "insensitive" } } } },
-      { tasks: { some: { serialNumber: { contains: searchingFor, mode: "insensitive" } } } },
+      { tasks: { some: { implement: { serialNumber: { contains: searchingFor, mode: "insensitive" } } } } },
     ];
 
     // Add CNPJ search conditions - search both with original input and cleaned version

@@ -394,7 +394,7 @@ function flattenTasksToInstallments(tasks: any[] | undefined): FlatInstallment[]
 
           taskId: task.id,
           taskName: task.name ?? "—",
-          taskSerial: task.serialNumber ?? null,
+          taskSerial: task.implement?.serialNumber ?? null,
 
           billingStatus: (billingStatusOf(cfg) ?? null) as BILLING_STATUS | null,
 
@@ -504,6 +504,8 @@ function applySort(
 
 export const TASK_INCLUDE = {
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
+  // A série é do implemento (NOMENCLATURA.md §5).
+  implement: { select: { serialNumber: true } },
   quote: {
     select: {
       id: true,

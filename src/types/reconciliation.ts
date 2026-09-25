@@ -241,7 +241,7 @@ export interface ReconciliationMatch {
   airbrushing?: {
     id: string;
     price: number | null;
-    task?: { id: string; name: string | null; serialNumber: string | null } | null;
+    task?: { id: string; name: string | null; implement?: { serialNumber: string | null } | null } | null;
   } | null;
   /** Payroll month settled by this debit. */
   payrollMonthSettlement?: {
@@ -349,7 +349,7 @@ export interface ReconciliationMatchInstallment {
     totalAmount: number;
     status: string;
     customer?: { id: string; fantasyName: string; corporateName: string | null; cnpj: string | null } | null;
-    task?: { id: string; name: string | null; serialNumber: string | null } | null;
+    task?: { id: string; name: string | null; implement?: { serialNumber: string | null } | null } | null;
     installmentsCount: number;
   } | null;
 }

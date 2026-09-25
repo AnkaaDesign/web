@@ -184,6 +184,7 @@ export const implementOrderBySchema = z.union([
     .object({
       // Implement direct fields
       id: orderByDirectionSchema.optional(),
+      serialNumber: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
       chassisNumber: orderByDirectionSchema.optional(),
       vinPlateId: orderByDirectionSchema.optional(),
@@ -200,7 +201,6 @@ export const implementOrderBySchema = z.union([
           id: orderByDirectionSchema.optional(),
           name: orderByDirectionSchema.optional(),
           status: orderByDirectionSchema.optional(),
-          serialNumber: orderByDirectionSchema.optional(),
           entryDate: orderByDirectionSchema.optional(),
           term: orderByDirectionSchema.optional(),
           startedAt: orderByDirectionSchema.optional(),
@@ -455,7 +455,7 @@ const implementTransform = (data: any) => {
         { plate: { contains: data.searchingFor.trim(), mode: "insensitive" } },
         ...(searchPlate && searchPlate !== data.searchingFor.trim().toUpperCase() ? [{ plate: { contains: searchPlate, mode: "insensitive" } }] : []),
         { task: { name: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
-        { task: { serialNumber: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
+        { serialNumber: { contains: data.searchingFor.trim(), mode: "insensitive" } },
         { task: { customer: { fantasyName: { contains: data.searchingFor.trim(), mode: "insensitive" } } } },
         { task: { customer: { corporateName: { contains: data.searchingFor.trim(), mode: "insensitive" } } } },
       ],

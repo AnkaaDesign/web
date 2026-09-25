@@ -516,9 +516,11 @@ export const TaskCreateForm = () => {
         };
 
         // Build implement object with layout data (each task gets its own individual layout)
-        const buildImplementData = (plate?: string) => {
+        // A série é SÓ do implemento (NOMENCLATURA.md §5): vai em `implement.serialNumber`,
+        // nunca no topo do corpo (o schema da API é estrito e responde 400).
+        const buildImplementData = (plate?: string, serialNumber?: string) => {
           const layoutSectionData = buildLayoutSectionData();
-          const hasImplementFields = plate || category || implementType || hasLayoutChanges;
+          const hasImplementFields = serialNumber || plate || category || implementType || hasLayoutChanges;
           // Sem nenhum campo, o caminhão nasce VAZIO (objeto vazio), e não
           // deixa de nascer: com o tipo "Refrigerado" de padrão (antes do
           // D-25) toda tarefa criada aqui tinha caminhão, e cada tarefa tem
@@ -526,6 +528,7 @@ export const TaskCreateForm = () => {
           return {
             implement: hasImplementFields
               ? {
+                  ...(serialNumber && { serialNumber }),
                   ...(plate && { plate }),
                   category: category || undefined,
                   type: implementType || undefined,
@@ -578,9 +581,8 @@ export const TaskCreateForm = () => {
 
         for (let i = 0; i < combinations.length; i++) {
           const { plate, serialNumber } = combinations[i];
-          const implementData = buildImplementData(plate);
+          const implementData = buildImplementData(plate, serialNumber);
           const task = buildTaskData({
-            ...(serialNumber && { serialNumber }),
             ...implementData,
           });
 

@@ -33,6 +33,8 @@ export const LIST_INCLUDE = {
   implement: {
     select: {
       id: true,
+      // A série é do implemento (NOMENCLATURA.md §5).
+      serialNumber: true,
       plate: true,
       category: true,
       chassisNumber: true,

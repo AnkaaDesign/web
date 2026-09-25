@@ -29,7 +29,7 @@ export interface Invoice {
   installments?: Installment[];
   nfseDocuments?: NfseDocument[];
   customer?: { id: string; fantasyName: string; cnpj?: string | null; state?: string | null };
-  task?: { id: string; name?: string | null; serialNumber?: string | null };
+  task?: { id: string; name?: string | null; implement?: { serialNumber?: string | null } | null };
   createdBy?: { id: string; name: string } | null;
   createdAt: Date;
   updatedAt: Date;

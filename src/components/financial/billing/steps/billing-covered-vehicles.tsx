@@ -17,9 +17,8 @@ import { toast } from "@/components/ui/sonner";
 export interface CoveredVehicle {
   id: string;
   name?: string | null;
-  serialNumber?: string | null;
   customerOrderNumber?: string | null;
-  implement?: { plate?: string | null; chassisNumber?: string | null } | null;
+  implement?: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null } | null;
 }
 
 interface Props {
@@ -182,7 +181,7 @@ export function BillingCoveredVehicles({ vehicles, disabled, approved }: Props) 
               {vehicles.map((v) => (
                 <TableRow key={v.id}>
                   <TableCell className="whitespace-nowrap font-medium tabular-nums">
-                    {v.serialNumber || v.implement?.plate || v.name || v.id.slice(0, 8)}
+                    {v.implement?.serialNumber || v.implement?.plate || v.name || v.id.slice(0, 8)}
                   </TableCell>
                   <TableCell>{cell(v, "plate", v.implement?.plate ?? "", "ABC-1D23")}</TableCell>
                   <TableCell>

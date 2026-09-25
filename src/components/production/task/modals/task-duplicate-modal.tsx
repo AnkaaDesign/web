@@ -177,7 +177,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       // Basic fields
       name: sourceTask.name,
       status: TASK_STATUS.PREPARATION,
-      serialNumber: copyData.serialNumber || null,
       details: sourceTask.details,
       // All dates reset — duplicates start fresh
       entryDate: null,
@@ -225,10 +224,12 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
           finishedAt: null,
         })) || [],
 
-      // Implement - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
+      // Implement - copy all fields, use form values for serial/plate/chassis (no fallback to avoid duplicates).
+      // A série é SÓ do implemento (NOMENCLATURA.md §5): vai aqui, nunca no topo.
       // Layouts are SHARED (connect to existing layout IDs)
-      implement: (copyData.plate || copyData.chassisNumber || implementData)
+      implement: (copyData.serialNumber || copyData.plate || copyData.chassisNumber || implementData)
         ? {
+            serialNumber: copyData.serialNumber || null,
             plate: copyData.plate || null,
             chassisNumber: copyData.chassisNumber || null,
             // Spot is a UNIQUE physical garage location — never copy it to a duplicate

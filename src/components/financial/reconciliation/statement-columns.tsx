@@ -39,7 +39,7 @@ const linkedText = (t: BankTransaction): string => {
   if (inst) {
     const task = inst.invoice?.task;
     return (
-      [task?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
+      [task?.implement?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
       inst.invoice?.customer?.fantasyName ||
       `Parcela ${inst.number}`
     );

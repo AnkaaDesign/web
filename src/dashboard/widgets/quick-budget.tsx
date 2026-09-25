@@ -9,7 +9,7 @@
 //
 // Submits in two calls (matching the wizard):
 //   1. createTaskAsync({ status: PREPARATION, customerId, name, details,
-//                        term, forecastDate, serialNumber })
+//                        term, forecastDate, implement: { serialNumber } })
 //   2. useCreateBudget().mutateAsync({
 //        taskId, expiresAt, status: PENDING,
 //        subtotal, total,
@@ -172,7 +172,8 @@ function Render({ config }: WidgetRenderProps<Config>) {
         status: TASK_STATUS.PREPARATION,
         customerId,
         name: taskName || undefined,
-        serialNumber: serialNumber || undefined,
+        // A série é SÓ do implemento (NOMENCLATURA.md §5).
+        ...(serialNumber ? { implement: { serialNumber } } : {}),
         term: canEditTerm && term ? new Date(term) : undefined,
         forecastDate: forecastDate ? new Date(forecastDate) : undefined,
         details: details || undefined,

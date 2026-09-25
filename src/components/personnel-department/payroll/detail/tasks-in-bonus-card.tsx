@@ -23,6 +23,8 @@ import type { Task } from "../../../../types";
 
 // Extended task interface for display with bonification data
 interface TaskInBonusRow extends Omit<Task, 'bonification'> {
+  /** DTO do bônus: a série vem achatada (NOMENCLATURA.md §5 — chave do DTO). */
+  serialNumber?: string | null;
   bonification?: BONIFICATION_STATUS | null;
   bonificationStatus?: BONIFICATION_STATUS;
   bonificationValue?: number;

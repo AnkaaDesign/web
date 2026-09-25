@@ -162,7 +162,7 @@ export function LinkedDocCell({ tx }: { tx: BankTransaction }) {
   if (firstInst) {
     const task = firstInst.invoice?.task;
     const label =
-      [task?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
+      [task?.implement?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
       firstInst.invoice?.customer?.fantasyName ||
       `Parcela ${firstInst.number}`;
     const to = task?.id

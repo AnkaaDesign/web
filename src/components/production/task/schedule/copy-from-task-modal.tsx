@@ -82,7 +82,7 @@ function TaskMiniTable({
         {task.name || "-"}
       </div>
       <div className="text-muted-foreground truncate text-center">
-        {task.serialNumber || task.implement?.plate || "-"}
+        {task.implement?.serialNumber || task.implement?.plate || "-"}
       </div>
       <div className="text-muted-foreground truncate text-right">
         {task.sector?.name || "-"}

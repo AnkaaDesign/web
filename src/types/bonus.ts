@@ -14,6 +14,13 @@ import type { BonusExtra, BonusExtraIncludes } from "./bonusExtra";
 // Main Entity Interfaces
 // =====================
 
+/**
+ * Tarefa como o bônus a devolve: DTO montado pela API (`bonus.service`), com a série
+ * ACHATADA em `serialNumber` — chave do DTO, que não muda (NOMENCLATURA.md §5); na
+ * tarefa do Prisma a série é `implement.serialNumber`.
+ */
+export type BonusTask = Task & { serialNumber?: string | null };
+
 export interface Bonus extends BaseEntity {
   userId: string;
   payrollId?: string | null;
@@ -91,7 +98,7 @@ export interface Bonus extends BaseEntity {
   // Relations (optional, populated based on query)
   user?: User;
   users?: User[]; // All users receiving bonuses in the same period (many-to-many)
-  tasks?: Task[];
+  tasks?: BonusTask[];
   bonusDiscounts?: BonusDiscount[];
   bonusExtras?: BonusExtra[];
   payroll?: any; // Payroll type would need to be imported if available
@@ -310,7 +317,7 @@ export interface LiveBonus {
   currentlyEmployed?: boolean;
   /** false = sem apuração de ponto ⇒ sem desconto de falta nem extra de assiduidade. */
   hasSecullumId?: boolean;
-  tasks?: Task[];
+  tasks?: BonusTask[];
   users?: User[];
   bonusDiscounts?: BonusDiscount[];
   bonusExtras?: BonusExtra[];

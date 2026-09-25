@@ -83,7 +83,7 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   const cell = (task: any, column: string): ReactNode => {
     switch (column) {
       case "serialNumber":
-        return task?.serialNumber ? <strong>{task.serialNumber}</strong> : <ARegistrar />;
+        return task?.implement?.serialNumber ? <strong>{task.implement?.serialNumber}</strong> : <ARegistrar />;
       case "plate":
         return task?.implement?.plate ? <strong>{task.implement.plate}</strong> : <ARegistrar />;
       case "chassis":

@@ -163,6 +163,8 @@ export const TaskSelector = ({
         files: true,
         observation: true,
         bonifications: true,
+        // A série é do implemento (NOMENCLATURA.md §5).
+        implement: { select: { serialNumber: true } },
       },
     };
 
@@ -484,7 +486,7 @@ export const TaskSelector = ({
                         </div>
                       </TableCell>
                       <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">{task.serialNumber || <span className="text-muted-foreground">-</span>}</div>
+                        <div className="px-4 py-2">{task.implement?.serialNumber || <span className="text-muted-foreground">-</span>}</div>
                       </TableCell>
                       <TableCell className="p-0 !border-r-0">
                         <div className="px-4 py-2">

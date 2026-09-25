@@ -149,8 +149,8 @@ export const TaskEditPage = () => {
     const taskName = task.name || task.customer?.fantasyName || "Sem nome";
 
     // Append serial number if available
-    if (task.serialNumber) {
-      return `${taskName} - ${task.serialNumber}`;
+    if (task.implement?.serialNumber) {
+      return `${taskName} - ${task.implement?.serialNumber}`;
     }
 
     // Otherwise append plate if available

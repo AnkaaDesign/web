@@ -53,7 +53,6 @@ const getFileServeUrl = (file: { id: string } | null | undefined): string => {
 interface PublicQuoteVehicle {
   id: string;
   name?: string;
-  serialNumber?: string;
   term?: Date;
   createdAt?: Date | string;
   responsibles?: { id: string; name?: string; role?: string }[];
@@ -63,10 +62,12 @@ interface PublicQuoteVehicle {
     fantasyName?: string;
   };
   implement?: {
+    /** A série é do implemento (NOMENCLATURA.md §5). */
+    serialNumber?: string | null;
     plate?: string;
     chassisNumber?: string;
     category?: string | null;
-    implementType?: string | null;
+    type?: string | null;
   };
 }
 
@@ -290,7 +291,7 @@ export function PublicBudgetPage() {
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = quote.budgetNumber
     ? String(quote.budgetNumber).padStart(4, '0')
-    : primaryTask<any>(quote)?.serialNumber || "0000";
+    : primaryTask<any>(quote)?.implement?.serialNumber || "0000";
   /**
    * Validade como DATA ABSOLUTA, igual ao documento assinado.
    *
@@ -399,7 +400,7 @@ export function PublicBudgetPage() {
   const publicVehicleLabel = (taskId: string) => {
     const index = publicVehicles.findIndex((t: any) => t.id === taskId);
     const t = publicVehicles[index];
-    return t?.serialNumber || t?.implement?.plate || `${index + 1}`;
+    return t?.implement?.serialNumber || t?.implement?.plate || `${index + 1}`;
   };
   const layoutImages: Array<{ url: string; caption: string | null; order: number }> = (quote.layoutFiles || [])
     .filter((f: any) => f?.id)

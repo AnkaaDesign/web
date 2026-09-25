@@ -9,8 +9,9 @@
 // when the source flips from code to DB.
 //
 // Field names are the REAL task fields (verified): Task.cleared:boolean,
-// Task.entryDate, Task.forecastDate, Task.serialNumber; chassis/plate/plaqueta live
-// on the related implement (implement.chassisNumber / implement.plate / implement.vinPlateId). Field
+// Task.entryDate, Task.forecastDate; série/chassis/plate/plaqueta live on the related
+// implement (implement.serialNumber / implement.chassisNumber / implement.plate /
+// implement.vinPlateId — a série é SÓ do implemento, NOMENCLATURA.md §5). Field
 // targets name the DetailFieldDef id / DataTable column id so the exact field blinks.
 //
 // A plaqueta voltou a ter regra (R3c) porque deixou de ser TEXTO e virou FOTO: o
@@ -242,7 +243,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
-        { op: "isNull", field: "serialNumber" },
+        { op: "isNull", field: "implement.serialNumber" },
         { op: "isNull", field: "implement.plate" },
       ],
     }),

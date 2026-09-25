@@ -133,16 +133,16 @@ interface BillingStepReviewProps {
   vehicles?: Array<{
     id: string;
     name?: string | null;
-    serialNumber?: string | null;
     customerOrderNumber?: string | null;
     /** Conclusão DESTE veículo: numa cobrança de quatro elas divergem. */
     finishedAt?: Date | string | null;
     implement?: {
+      serialNumber?: string | null;
       plate?: string | null;
       chassisNumber?: string | null;
       /** Categoria e implemento são POR VEÍCULO — um lote pode misturar tipos. */
       category?: string | null;
-      implementType?: string | null;
+      type?: string | null;
     } | null;
   }>;
   /**
@@ -220,8 +220,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       quoteTasks(task?.quote as any).map((t: any) => ({
         id: t.id,
         name: t.name ?? null,
-        serialNumber: t.serialNumber ?? null,
-        implement: t.implement ? { plate: t.implement.plate } : null,
+        implement: t.implement ? { serialNumber: t.implement.serialNumber, plate: t.implement.plate } : null,
       })),
     [task?.quote],
   );
@@ -370,7 +369,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           {
             id: task.id,
             name: task.name ?? null,
-            serialNumber: task.serialNumber ?? null,
             customerOrderNumber: task.customerOrderNumber ?? null,
             finishedAt: task.finishedAt ?? null,
             implement: task.implement ?? null,
@@ -900,7 +898,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               <td className="px-4 py-2 text-sm">{vehicleTypeLabelOf(v) || "—"}</td>
                             )}
                             <td className="px-4 py-2 text-sm font-medium tabular-nums">
-                              {v.serialNumber || v.name || "—"}
+                              {v.implement?.serialNumber || v.name || "—"}
                             </td>
                             <td className="px-4 py-2 text-sm">{v.implement?.plate || "—"}</td>
                             <td className="px-4 py-2 text-sm tabular-nums">
@@ -924,10 +922,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     <span className="text-sm font-medium">{task.implement.plate}</span>
                   </div>
                 )}
-                {task.serialNumber && (
+                {task.implement?.serialNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Nº de Série</span>
-                    <span className="text-sm font-medium">{task.serialNumber}</span>
+                    <span className="text-sm font-medium">{task.implement.serialNumber}</span>
                   </div>
                 )}
                 {task.implement?.chassisNumber && (
@@ -1986,7 +1984,7 @@ function sanitizeFilenamePart(value: string): string {
  */
 function buildReceiptFilename(task: any): string {
   const corporateName = task?.customer?.corporateName ?? task?.customer?.fantasyName ?? "Cliente";
-  const serialOrPlate = task?.serialNumber ?? task?.implement?.plate ?? "";
+  const serialOrPlate = task?.implement?.serialNumber ?? task?.implement?.plate ?? "";
   const parts = ["Recibo", sanitizeFilenamePart(corporateName)];
   if (serialOrPlate) parts.push(sanitizeFilenamePart(String(serialOrPlate)));
   return `${parts.join(" - ")}.pdf`;

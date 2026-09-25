@@ -758,9 +758,9 @@ export function AirbrushingDetailPage() {
             id: "identifier",
             label: "Identificador",
             icon: IconHash,
-            accessor: (a) => a.task?.serialNumber ?? a.task?.implement?.plate ?? null,
+            accessor: (a) => a.task?.implement?.serialNumber ?? a.task?.implement?.plate ?? null,
             render: (a) => {
-              const identifier = a.task?.serialNumber ?? a.task?.implement?.plate ?? null;
+              const identifier = a.task?.implement?.serialNumber ?? a.task?.implement?.plate ?? null;
               return identifier ? <span className="font-mono">{identifier}</span> : muted;
             },
           },

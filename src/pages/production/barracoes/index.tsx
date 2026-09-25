@@ -104,7 +104,6 @@ export function GaragesPage() {
       id: true,
       name: true,
       status: true,
-      serialNumber: true,
       forecastDate: true,
       finishedAt: true,
       entryDate: true,
@@ -113,6 +112,8 @@ export function GaragesPage() {
       implement: {
         select: {
           id: true,
+          // A série é do implemento (NOMENCLATURA.md §5).
+          serialNumber: true,
           spot: true,
           plate: true,
           chassisNumber: true,
@@ -321,7 +322,7 @@ export function GaragesPage() {
         implementId: implement?.id,
         spot: currentSpot,
         taskName: task.name,
-        serialNumber: (task as any).serialNumber || null,
+        serialNumber: implement?.serialNumber || null,
         plate: implement?.plate || null,
         chassisNumber: implement?.chassisNumber || null,
         paintHex: (task.generalPainting as any)?.hex || null,

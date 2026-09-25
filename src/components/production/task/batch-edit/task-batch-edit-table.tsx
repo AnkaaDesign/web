@@ -110,7 +110,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
               data: {
                 name: task.name || "",
                 status: task.status,
-                serialNumber: task.serialNumber || "",
+                serialNumber: task.implement?.serialNumber || "",
                 customerOrderNumber: task.customerOrderNumber || "",
                 plate: task.implement?.plate || "",
                 chassisNumber: task.implement?.chassisNumber || "",
@@ -142,7 +142,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         data: {
           name: task.name || "",
           status: task.status,
-          serialNumber: task.serialNumber || "",
+          serialNumber: task.implement?.serialNumber || "",
           customerOrderNumber: task.customerOrderNumber || "",
           plate: task.implement?.plate || "",
           chassisNumber: task.implement?.chassisNumber || "",
@@ -225,7 +225,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         const hasChanges =
           task.data.name !== originalTask.name ||
           task.data.status !== originalTask.status ||
-          task.data.serialNumber !== originalTask.serialNumber ||
+          (task.data.serialNumber || "") !== (originalTask.implement?.serialNumber || "") ||
           (task.data.customerOrderNumber || "") !== (originalTask.customerOrderNumber || "") ||
           task.data.plate !== originalTask.implement?.plate ||
           task.data.chassisNumber !== originalTask.implement?.chassisNumber ||
@@ -258,7 +258,10 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         if (!canEditTerm) delete transformed.data.term;
         if (!canEditOrderNumber) delete transformed.data.customerOrderNumber;
 
-        // ── PLACA E CHASSI MORAM EM `implement`, NÃO NO TOPO ──────────────────────
+        // ── SÉRIE, PLACA E CHASSI MORAM EM `implement`, NÃO NO TOPO ───────────────
+        //
+        // A série é SÓ do implemento (NOMENCLATURA.md §5): no topo do corpo a API
+        // responde 400 (o schema é estrito).
         //
         // A grade os montava no primeiro nível de `data`. O schema de update só os
         // conhece dentro de `implement` e NÃO é `.strict()`: o zod APAGA a chave que
@@ -273,15 +276,17 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         // forçado a nulo contra o `@default(YARD_WAIT)` — um veículo nascido fora
         // do mapa do pátio, em cada gravação de lote.
         const original = tasks.find((t: any) => t.id === task.id);
-        const { plate, chassisNumber, ...semVeiculo } = transformed.data;
+        const { serialNumber, plate, chassisNumber, ...semVeiculo } = transformed.data;
+        const serieMudou = (serialNumber || "") !== (original?.implement?.serialNumber || "");
         const placaMudou = (plate || "") !== (original?.implement?.plate || "");
         const chassiMudou = (chassisNumber || "") !== (original?.implement?.chassisNumber || "");
         transformed.data = semVeiculo;
-        if (placaMudou || chassiMudou) {
+        if (serieMudou || placaMudou || chassiMudou) {
           transformed.data = {
             ...semVeiculo,
             implement: {
               ...(semVeiculo.implement ?? {}),
+              ...(serieMudou ? { serialNumber: serialNumber || null } : {}),
               ...(placaMudou ? { plate: plate || null } : {}),
               ...(chassiMudou ? { chassisNumber: chassisNumber || null } : {}),
             },

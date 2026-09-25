@@ -197,7 +197,8 @@ export const airbrushingOrderBySchema = z
             id: orderByDirectionSchema.optional(),
             name: orderByDirectionSchema.optional(),
             // "Identificador" sorts on the serial with NULLS LAST in both directions.
-            serialNumber: orderByWithNullsSchema.optional(),
+            // A série é do implemento (NOMENCLATURA.md §5).
+            implement: z.object({ serialNumber: orderByWithNullsSchema.optional() }).optional(),
             status: orderByDirectionSchema.optional(),
             createdAt: orderByDirectionSchema.optional(),
             updatedAt: orderByDirectionSchema.optional(),
@@ -240,7 +241,7 @@ export const airbrushingOrderBySchema = z
             .object({
               id: orderByDirectionSchema.optional(),
               name: orderByDirectionSchema.optional(),
-              serialNumber: orderByWithNullsSchema.optional(),
+              implement: z.object({ serialNumber: orderByWithNullsSchema.optional() }).optional(),
               status: orderByDirectionSchema.optional(),
               createdAt: orderByDirectionSchema.optional(),
               updatedAt: orderByDirectionSchema.optional(),

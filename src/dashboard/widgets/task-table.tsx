@@ -609,7 +609,7 @@ function LayoutsCell({ task }: { task: Task }) {
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>
-            <DialogTitle>Layouts — {task.name ?? task.serialNumber ?? ""}</DialogTitle>
+            <DialogTitle>Layouts — {task.name ?? task.implement?.serialNumber ?? ""}</DialogTitle>
             <DialogDescription>
               {count} {count === 1 ? "layout" : "layouts"} ·{" "}
               {(Object.keys(counts) as LAYOUT_STATUS[])
@@ -711,7 +711,7 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Identificador",
       track: "minmax(0, 1fr)",
       render: (t) => (
-        <span className="text-sm font-mono truncate">{t.serialNumber || "—"}</span>
+        <span className="text-sm font-mono truncate">{t.implement?.serialNumber || "—"}</span>
       ),
     },
     {
@@ -1619,6 +1619,8 @@ const ORDER_BY_PATH_MAP: Partial<Record<ColumnKey, readonly string[]>> = {
   customerName: ["customer", "fantasyName"],
   sector: ["sector", "name"],
   generalPainting: ["generalPainting", "name"],
+  // A série é do implemento (NOMENCLATURA.md §5); o id da coluna, gravado, continua "serialNumber".
+  serialNumber: ["implement", "serialNumber"],
   plate: ["implement", "plate"],
   chassisNumber: ["implement", "chassisNumber"],
 };
@@ -2349,8 +2351,8 @@ function TaskTableRender({
       tabIndex={0}
       aria-label={
         selectingSource
-          ? `Copiar de ${task.name ?? task.serialNumber ?? task.id}`
-          : `Abrir tarefa ${task.name ?? task.serialNumber ?? task.id}`
+          ? `Copiar de ${task.name ?? task.implement?.serialNumber ?? task.id}`
+          : `Abrir tarefa ${task.name ?? task.implement?.serialNumber ?? task.id}`
       }
       className={`grid gap-x-3 items-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${dens.row} ${rowBorder} ${rowHover} ${
         i % 2 === 1 ? "bg-muted/20" : ""

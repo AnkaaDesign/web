@@ -70,7 +70,7 @@ export function RelatedTasksCard({
 
     return tasks.filter((task) => {
       const taskName = task.name?.toLowerCase() || "";
-      const serialNumber = task.serialNumber?.toLowerCase() || "";
+      const serialNumber = task.implement?.serialNumber?.toLowerCase() || "";
       const normalizedSerialNumber = serialNumber.replace(/[\s\-_./]/g, "");
       const plate = task.implement?.plate?.toLowerCase() || "";
       const normalizedPlate = plate.replace(/[\s\-_./]/g, "");
@@ -196,10 +196,10 @@ export function RelatedTasksCard({
       accessor: (task) => (
         <div className="space-y-1">
           <div className="font-medium text-sm truncate">{getTaskTitle(task)}</div>
-          {(task.serialNumber || task.implement?.plate) && (
+          {(task.implement?.serialNumber || task.implement?.plate) && (
             <div className="text-xs text-muted-foreground">
-              {task.serialNumber && <span>S/N: {task.serialNumber}</span>}
-              {task.serialNumber && task.implement?.plate && <span className="mx-1">•</span>}
+              {task.implement?.serialNumber && <span>S/N: {task.implement?.serialNumber}</span>}
+              {task.implement?.serialNumber && task.implement?.plate && <span className="mx-1">•</span>}
               {task.implement?.plate && <span>Placa: {task.implement.plate}</span>}
             </div>
           )}

@@ -65,7 +65,7 @@ function contractedLabel(values: readonly string[], maxVisible = 2): string | nu
 export function quoteIdentifiers(quote: Budget): string[] {
   const seen = new Set<string>();
   for (const task of vehiclesOf(quote)) {
-    const value = (task.serialNumber || task.implement?.plate || "").trim();
+    const value = (task.implement?.serialNumber || task.implement?.plate || "").trim();
     if (value) seen.add(value);
   }
   return [...seen];

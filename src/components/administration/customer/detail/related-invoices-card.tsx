@@ -51,7 +51,7 @@ export function RelatedInvoicesCard({ customer }: RelatedInvoicesCardProps) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">
-                        {invoice.task?.serialNumber ? `OS #${invoice.task.serialNumber}` : 'Fatura'}
+                        {invoice.task?.implement?.serialNumber ? `OS #${invoice.task.implement?.serialNumber}` : 'Fatura'}
                       </span>
                       <InvoiceStatusBadge status={invoice.status} size="sm" />
                       <span className="text-sm text-muted-foreground">

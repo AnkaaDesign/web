@@ -111,8 +111,7 @@ function briefingPreview(briefing: string | null | undefined): string {
 /** O recorte de veículo que a listagem usa — o mesmo trio do documento. */
 export interface RequestVehicle {
   id: string;
-  serialNumber?: string | null;
-  implement?: { plate?: string | null; chassisNumber?: string | null } | null;
+  implement?: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null } | null;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

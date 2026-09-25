@@ -37,10 +37,9 @@ const overdueTask = {
   status: TASK_STATUS.IN_PRODUCTION,
   cleared: false,
   entryDate: null,
-  serialNumber: "SN-1",
   // R2 "Previsão vencida sem liberação" — harsh, ack: onExitCooldown, target: forecastDate
   forecastDate: new Date("2026-01-01T00:00:00Z"),
-  implement: { chassisNumber: "CH", plate: "ABC1D23" },
+  implement: { serialNumber: "SN-1", chassisNumber: "CH", plate: "ABC1D23" },
 };
 
 /** R0 "Recorte pendente" — harsh, ack: onView, target: row */
@@ -122,19 +121,17 @@ describe("TASK — R3b, plate only when there is no serial number", () => {
    * can fire. `vinPlateId` starts FILLED so these cases isolate the plate rule; R3c has its
    * own describe below.
    */
-  const arrived = (over: Record<string, unknown>) => ({
+  const arrived = (serialNumber: string | null) => ({
     id: "task-3",
     status: TASK_STATUS.IN_PRODUCTION,
     cleared: false,
     entryDate: new Date("2026-07-01T00:00:00Z"),
     forecastDate: new Date("2026-12-01T00:00:00Z"), // not overdue → R2 silent
-    serialNumber: null as string | null,
-    implement: { chassisNumber: "CH", plate: null as string | null, vinPlateId: "file-1" as string | null },
-    ...over,
+    implement: { serialNumber, chassisNumber: "CH", plate: null as string | null, vinPlateId: "file-1" as string | null },
   });
 
   it("blinks the plate field when the task has no serial number", async () => {
-    setEntities("TASK", [arrived({ serialNumber: null })]);
+    setEntities("TASK", [arrived(null)]);
     await settle();
     expect(field("TASK", "task-3", "plate")).toEqual(ARMED);
   });
@@ -142,7 +139,7 @@ describe("TASK — R3b, plate only when there is no serial number", () => {
   it("stays silent when the task carries a serial number", async () => {
     // The serial and the plate identify the same vehicle; a task with a serial is identified,
     // so a missing plate is not work anyone has to do.
-    setEntities("TASK", [arrived({ serialNumber: "SN-3" })]);
+    setEntities("TASK", [arrived("SN-3")]);
     await settle();
     expect(row("TASK", "task-3")).toBeNull();
   });
@@ -156,8 +153,7 @@ describe("TASK — R3c, plaqueta photo", () => {
     cleared: false,
     entryDate: new Date("2026-07-01T00:00:00Z"),
     forecastDate: new Date("2026-12-01T00:00:00Z"),
-    serialNumber: "SN-4",
-    implement: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: null as string | null },
+    implement: { serialNumber: "SN-4", chassisNumber: "CH", plate: "ABC1D23", vinPlateId: null as string | null },
     ...over,
   });
 
@@ -241,8 +237,7 @@ describe("nav projection — getAttentionSnapshot", () => {
       ...overdueTask,
       id: "task-2",
       entryDate: new Date("2026-07-01T00:00:00Z"),
-      serialNumber: null,
-      implement: { chassisNumber: null, plate: null },
+      implement: { serialNumber: null, chassisNumber: null, plate: null },
     };
     setEntities("TASK", [task]);
     await settle();
@@ -330,7 +325,7 @@ describe("sound — one slot, app-wide", () => {
 
   it("prefers the harsher, higher-priority rule when both are waiting", async () => {
     // R2 (forecast overdue, priority 30, harsh) vs R3a (missing chassis, priority 20, soft).
-    setEntities("TASK", [overdueTask, { id: "task-2", status: TASK_STATUS.IN_PRODUCTION, cleared: false, entryDate: new Date("2026-07-01"), serialNumber: "SN-2", forecastDate: null, implement: { chassisNumber: null, plate: "XYZ", vinPlateId: "f1" } }]);
+    setEntities("TASK", [overdueTask, { id: "task-2", status: TASK_STATUS.IN_PRODUCTION, cleared: false, entryDate: new Date("2026-07-01"), forecastDate: null, implement: { serialNumber: "SN-2", chassisNumber: null, plate: "XYZ", vinPlateId: "f1" } }]);
     await settle();
     expect(playAttentionBeep).toHaveBeenCalledWith("harsh");
     expect(playAttentionBeep).not.toHaveBeenCalledWith("soft");

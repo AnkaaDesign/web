@@ -12,6 +12,11 @@ import type { ORDER_BY_DIRECTION, IMPLEMENT_CATEGORY, IMPLEMENT_TYPE, IMPLEMENT_
 
 export interface Implement extends BaseEntity {
   // Identification
+  /**
+   * A série é SÓ do implemento (NOMENCLATURA.md §5): a tarefa não a guarda. Quem
+   * lê a série de uma tarefa pede o implemento na consulta e lê `taskSerial(t)`.
+   */
+  serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
   /** Foto da plaqueta de identificação (VIN). Imagem, não texto — a relação é `vinPlate`. */
@@ -72,6 +77,7 @@ export interface ImplementIncludes {
 
 export interface ImplementOrderBy {
   id?: ORDER_BY_DIRECTION;
+  serialNumber?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   chassisNumber?: ORDER_BY_DIRECTION;
   vinPlateId?: ORDER_BY_DIRECTION;
@@ -118,6 +124,7 @@ export interface ImplementGetByIdFormData {
 }
 
 export interface ImplementCreateFormData {
+  serialNumber?: string | null;
   plate?: string | null;
   chassisNumber?: string | null;
   vinPlateId?: string | null;
@@ -131,6 +138,7 @@ export interface ImplementCreateFormData {
 }
 
 export interface ImplementUpdateFormData {
+  serialNumber?: string | null;
   plate?: string | null;
   chassisNumber?: string | null;
   vinPlateId?: string | null;

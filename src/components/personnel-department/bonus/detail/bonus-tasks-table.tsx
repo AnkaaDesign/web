@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Task } from "../../../../types";
+import type { BonusTask } from "../../../../types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -15,13 +15,13 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { IconChevronUp, IconChevronDown, IconSelector, IconHistory } from "@tabler/icons-react";
 
 interface BonusTasksTableProps {
-  tasks: Task[];
+  tasks: BonusTask[];
   visibleColumns: Set<string>;
   className?: string;
   searchQuery?: string;
   showSelectedOnly?: boolean;
   selectedIds?: string[];
-  onDataChange?: (data: { items: Task[]; totalRecords: number }) => void;
+  onDataChange?: (data: { items: BonusTask[]; totalRecords: number }) => void;
 }
 
 export function BonusTasksTable({
@@ -215,12 +215,12 @@ export function BonusTasksTable({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    tasks: Task[];
+    tasks: BonusTask[];
     isBulk: boolean;
   } | null>(null);
 
   // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, task: Task) => {
+  const handleContextMenu = (e: React.MouseEvent, task: BonusTask) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -364,12 +364,12 @@ export function BonusTasksTable({
                             ? column.formatter(
                                 column.accessorFn
                                   ? column.accessorFn(task)
-                                  : task[column.accessorKey as keyof Task],
+                                  : task[column.accessorKey as keyof BonusTask],
                                 task
                               )
                             : column.accessorFn
                             ? column.accessorFn(task)
-                            : task[column.accessorKey as keyof Task]}
+                            : task[column.accessorKey as keyof BonusTask]}
                         </div>
                       </TableCell>
                     ))}

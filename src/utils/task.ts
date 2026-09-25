@@ -187,8 +187,20 @@ export function getDaysUntilDeadline(task: Task): number | null {
 /**
  * Format task identifier
  */
+/**
+ * A série de uma TAREFA vinda do Prisma: mora no implemento (NOMENCLATURA.md §5).
+ * A consulta tem de pedir o implemento com a série (`implement: true` ou
+ * `implement: { select: { serialNumber: true } }`) — sem isso a série vem vazia
+ * em silêncio. DTO montado pela API (portal, faturamento, NFS-e) NÃO passa aqui:
+ * lá a chave `serialNumber` continua a do DTO.
+ */
+export function taskSerial(task: { implement?: { serialNumber?: string | null } | null } | null | undefined): string | null {
+  return task?.implement?.serialNumber ?? null;
+}
+
 export function formatTaskIdentifier(task: Task): string {
-  if (task.serialNumber) return task.serialNumber;
+  const serial = taskSerial(task);
+  if (serial) return serial;
   if (task.implement?.plate) return task.implement.plate;
   return `#${task.id.slice(-6).toUpperCase()}`;
 }

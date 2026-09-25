@@ -139,12 +139,12 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
     {
       id: "serialNumberOrPlate",
       header: "IDENTIFICADOR",
-      accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
+      accessorFn: (row) => row.implement?.serialNumber || row.implement?.plate || "",
       enableSorting: true,
       size: 140,
       minSize: 110,
-      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || row.implement?.plate || "" },
-      cell: ({ row }) => <span className="block truncate">{row.original.serialNumber || row.original.implement?.plate || "-"}</span>,
+      meta: { headerLabel: "Identificador", exportValue: (row) => row.implement?.serialNumber || row.implement?.plate || "" },
+      cell: ({ row }) => <span className="block truncate">{row.original.implement?.serialNumber || row.original.implement?.plate || "-"}</span>,
     },
     {
       id: "spot",

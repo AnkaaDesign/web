@@ -106,15 +106,22 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       if (fieldPath[0] === "bonification") {
         return { bonificationOrder: config.direction };
       }
-      // Special case: identificador is a computed field (serialNumber || implement.plate)
-      // Sort by serialNumber as the primary identifier
+      // Special case: identificador is a computed field (implement.serialNumber || implement.plate)
+      // Sort by the serial as the primary identifier. A série é do implemento
+      // (NOMENCLATURA.md §5): a coluna "serialNumber" das tabelas de tarefa também
+      // ordena por `implement.serialNumber` (o id da coluna, gravado, não muda).
       if (fieldPath[0] === "identificador") {
         return {
-          serialNumber: {
-            sort: config.direction,
-            nulls: "last" as const
+          implement: {
+            serialNumber: {
+              sort: config.direction,
+              nulls: "last" as const
+            }
           }
         };
+      }
+      if (fieldPath[0] === "serialNumber") {
+        return { implement: { serialNumber: config.direction } };
       }
       // Handle null values for forecastDate - put nulls at the end
       if (fieldPath[0] === "forecastDate") {

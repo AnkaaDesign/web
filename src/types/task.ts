@@ -14,7 +14,7 @@ export type { BONIFICATION_STATUS as Bonification } from "../constants";
 import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
-import type { Implement, ImplementIncludes } from "./implement";
+import type { Implement, ImplementIncludes, ImplementOrderBy } from "./implement";
 import type { Bonus } from "./bonus";
 import type { BonusDiscount } from "./bonusDiscount";
 import type { Budget } from "./budget";
@@ -30,7 +30,6 @@ export interface Task extends BaseEntity {
   statusOrder: number;
   bonification: BONIFICATION_STATUS | null;
   bonificationOrder: number;
-  serialNumber: string | null;
   /**
    * O NÚMERO DO PEDIDO DE COMPRA DO CLIENTE, deste veículo.
    *
@@ -226,9 +225,9 @@ export interface TaskOrderBy {
   statusOrder?: ORDER_BY_DIRECTION;
   bonification?: ORDER_BY_DIRECTION;
   bonificationOrder?: ORDER_BY_DIRECTION;
-  serialNumber?: ORDER_BY_DIRECTION;
   details?: ORDER_BY_DIRECTION;
-  // Note: chassisNumber and plate are now on Implement, use implement.chassisNumber / implement.plate
+  // Série, chassi e placa são do implemento: `implement: { serialNumber | plate | chassisNumber }`.
+  implement?: ImplementOrderBy;
   entryDate?: ORDER_BY_DIRECTION;
   term?: ORDER_BY_DIRECTION;
   startedAt?: ORDER_BY_DIRECTION;

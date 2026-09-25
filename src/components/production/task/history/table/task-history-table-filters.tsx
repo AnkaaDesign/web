@@ -157,7 +157,8 @@ export const TASK_HISTORY_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") =
   name: (d) => ({ name: d }),
   customer: (d) => ({ customer: { fantasyName: d } }),
   sector: (d) => ({ sector: { name: d } }),
-  identificador: (d) => ({ serialNumber: d }),
+  // A série é do implemento (NOMENCLATURA.md §5).
+  identificador: (d) => ({ implement: { serialNumber: d } }),
   status: (d) => ({ status: d }),
   bonification: (d) => ({ bonificationOrder: d }),
   forecastDate: (d) => ({ forecastDate: d }),

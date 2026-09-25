@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import type { Task } from "../../../../types";
+import type { BonusTask } from "../../../../types";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -15,12 +15,12 @@ import { BONIFICATION_STATUS, getBadgeVariant } from "../../../../constants";
 
 interface BonusTasksListProps {
   className?: string;
-  tasks: Task[];
+  tasks: BonusTask[];
   title?: string;
 }
 
 // Bonification stats helper
-const getBonificationStats = (tasks: Task[]) => {
+const getBonificationStats = (tasks: BonusTask[]) => {
   const fullBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.FULL_BONIFICATION).length;
   const partialBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION).length;
   const noBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.NO_BONIFICATION).length;
@@ -72,7 +72,7 @@ export function BonusTasksList({
   );
 
   // Table data for tracking
-  const [_tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
+  const [_tableData, setTableData] = useState<{ items: BonusTask[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });
@@ -81,7 +81,7 @@ export function BonusTasksList({
   const allColumns = useMemo(() => createTaskHistoryColumns(), []);
 
   // Handle table data changes
-  const handleTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
+  const handleTableDataChange = useCallback((data: { items: BonusTask[]; totalRecords: number }) => {
     setTableData(data);
   }, []);
 

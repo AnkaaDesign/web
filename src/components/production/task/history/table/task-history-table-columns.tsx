@@ -216,16 +216,16 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "identificador",
       header: "Identificador",
-      accessorFn: (t) => t.serialNumber || t.implement?.plate || "",
+      accessorFn: (t) => t.implement?.serialNumber || t.implement?.plate || "",
       enableSorting: true,
       size: 150,
       meta: {
         headerLabel: "Identificador",
         exportHeader: "Identificador",
-        exportValue: (t) => t.serialNumber || t.implement?.plate || "",
+        exportValue: (t) => t.implement?.serialNumber || t.implement?.plate || "",
       },
       cell: ({ row }) => {
-        const v = row.original.serialNumber || row.original.implement?.plate || "";
+        const v = row.original.implement?.serialNumber || row.original.implement?.plate || "";
         return v ? <span className="truncate">{v}</span> : <MutedDash />;
       },
     },

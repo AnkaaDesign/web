@@ -466,7 +466,7 @@ function LinkedInstallmentsTable({
             const customerName = customer?.corporateName || customer?.fantasyName;
             const task = invoice?.task;
             const taskLabel = task
-              ? [task.serialNumber, task.name].filter(Boolean).join(" · ")
+              ? [task.implement?.serialNumber, task.name].filter(Boolean).join(" · ")
               : null;
             const status = INSTALLMENT_STATUS[i.status];
             return (
