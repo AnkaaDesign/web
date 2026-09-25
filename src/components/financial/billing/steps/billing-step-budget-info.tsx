@@ -11,13 +11,7 @@ import {
 } from "@/components/financial/common/approved-layout-picker";
 import { IconCalendar } from "@tabler/icons-react";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
-
-const VALIDITY_PERIOD_OPTIONS = [
-  { label: "15 dias", value: "15" },
-  { label: "30 dias", value: "30" },
-  { label: "60 dias", value: "60" },
-  { label: "90 dias", value: "90" },
-];
+import { ValidityField } from "@/components/financial/budget/validity";
 
 const GUARANTEE_OPTIONS = [
   { value: "5", label: "5 anos" },
@@ -53,31 +47,12 @@ export function BillingStepBudgetInfo({
   layoutNotice,
 }: BillingStepBudgetInfoProps) {
   const { control, setValue } = useFormContext();
-  const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
 
   const quoteExpiresAt = useWatch({ control, name: "expiresAt" });
   const guaranteeYears = useWatch({ control, name: "guaranteeYears" });
   const customGuaranteeText = useWatch({ control, name: "customGuaranteeText" });
 
-  // Sync validity period display when form data loads
-  useEffect(() => {
-    if (!quoteExpiresAt) return;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const expiryDate = new Date(quoteExpiresAt);
-    expiryDate.setHours(0, 0, 0, 0);
-    const diffInDays = Math.round(
-      (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    for (const period of [15, 30, 60, 90]) {
-      if (Math.abs(diffInDays - period) <= 1) {
-        setValidityPeriod(period);
-        return;
-      }
-    }
-    setValidityPeriod(30);
-  }, [quoteExpiresAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (customGuaranteeText) setShowCustomGuarantee(true);
@@ -103,15 +78,11 @@ export function BillingStepBudgetInfo({
     [setValue],
   );
 
-  const handleValidityPeriodChange = useCallback(
-    (period: string) => {
-      const days = Number(period);
-      setValidityPeriod(days);
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + days);
-      expiryDate.setHours(23, 59, 59, 999);
-      setValue("expiresAt", expiryDate);
-    },
+  // `shouldDirty`: o Salvar grava pelo `dirtyFields`, e sem ele trocar SÓ a
+  // validade não mandava nada — zero prorrogações registradas em 120 dias (até
+  // 25/09/2026).
+  const handleValidityChange = useCallback(
+    (next: Date) => setValue("expiresAt", next, { shouldDirty: true }),
     [setValue],
   );
 
@@ -145,15 +116,9 @@ export function BillingStepBudgetInfo({
                 <FormItem>
                   <FormLabel>Validade da Proposta</FormLabel>
                   <FormControl>
-                    <Combobox
-                      value={validityPeriod?.toString() || ""}
-                      onValueChange={(value) => {
-                        if (typeof value === "string")
-                          handleValidityPeriodChange(value);
-                      }}
-                      options={VALIDITY_PERIOD_OPTIONS}
-                      placeholder="Selecione"
-                      emptyText="Nenhum período encontrado"
+                    <ValidityField
+                      value={quoteExpiresAt}
+                      onChange={handleValidityChange}
                       disabled={disabled}
                     />
                   </FormControl>

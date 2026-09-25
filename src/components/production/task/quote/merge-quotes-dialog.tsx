@@ -9,6 +9,10 @@ import { budgetService } from "@/api-client/budget";
 import { budgetKeys } from "@/hooks/production/use-budget";
 import { taskKeys } from "@/hooks";
 import { toast } from "@/components/ui/sonner";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { QUOTE_VALIDITY_OPTIONS, quoteValidityEnd } from "@/components/financial/budget/validity";
+import { formatDate } from "@/utils";
 
 interface MergeVerdict {
   survivor: { id: string; budgetNumber: number } | null;
@@ -45,8 +49,9 @@ const pad = (n: number) => String(n).padStart(4, "0");
  *
  * A separação impedimento × aviso é a mesma do servidor, e é a que importa para
  * quem lê: impedimento é o que a união DESTRUIRIA (listas de serviço diferentes,
- * dinheiro já emitido, assinatura coletada); aviso é o que ela apenas DECIDE (a
- * validade que prevalece, os números que somem).
+ * dinheiro já emitido, assinatura coletada); aviso é o que ela apenas DECIDE (os
+ * números que somem). A validade é escolha de quem une: recomeça hoje, pelo prazo
+ * do seletor.
  */
 export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: MergeQuotesDialogProps) {
   const queryClient = useQueryClient();
@@ -54,6 +59,9 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
   const [loading, setLoading] = useState(false);
   const [merging, setMerging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A validade RECOMEÇA na união — o documento é outro e vai ser reemitido.
+  // Herdar a validade antiga dava a um grupo de maio uma data já vencida.
+  const [validityDays, setValidityDays] = useState(30);
 
   useEffect(() => {
     if (!open || taskIds.length === 0) return;
@@ -80,7 +88,7 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
   const handleMerge = useCallback(async () => {
     setMerging(true);
     try {
-      const res: any = await budgetService.merge(taskIds);
+      const res: any = await budgetService.merge(taskIds, { validityDays });
       // As duas chaves, e não só a do orçamento: a lista de Orçamentos, a de
       // Faturamento, a Agenda e o Cronograma são todas consultas de TAREFA, e é
       // nelas que a união aparece (N linhas viram N linhas do mesmo número).
@@ -98,7 +106,7 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
     } finally {
       setMerging(false);
     }
-  }, [taskIds, queryClient, onMerged, onOpenChange]);
+  }, [taskIds, validityDays, queryClient, onMerged, onOpenChange]);
 
   const blocked = !!verdict?.blockers.length || !!error;
   const total = verdict ? verdict.absorbed.length + 1 : 0;
@@ -153,6 +161,29 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
               </div>
             )}
 
+            {verdict.survivor && !verdict.blockers.length && (
+              <div className="flex flex-wrap items-center gap-3">
+                <Label htmlFor="merge-validity" className="text-sm">
+                  Validade a partir de hoje
+                </Label>
+                <Select value={String(validityDays)} onValueChange={(v) => setValidityDays(Number(v))}>
+                  <SelectTrigger id="merge-validity" className="h-8 w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUOTE_VALIDITY_OPTIONS.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d} dias
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground">
+                  vale até {formatDate(quoteValidityEnd(validityDays))}
+                </span>
+              </div>
+            )}
+
             {verdict.blockers.length > 0 && (
               <div className="space-y-2">
                 {verdict.blockers.map((b) => (
@@ -166,7 +197,10 @@ export function MergeQuotesDialog({ open, onOpenChange, taskIds, onMerged }: Mer
 
             {!verdict.blockers.length && verdict.warnings.length > 0 && (
               <div className="space-y-1.5">
-                {verdict.warnings.map((w) => (
+                {/* `VALIDITY_RESET` fica de fora: o seletor acima já diz a data, e
+                    com o prazo que o usuário escolheu — o aviso do servidor fala
+                    dos 30 dias padrão. */}
+                {verdict.warnings.filter((w) => w.code !== "VALIDITY_RESET").map((w) => (
                   <div key={w.code} className="flex gap-2 text-xs text-muted-foreground">
                     <IconInfoCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <span>{w.message}</span>

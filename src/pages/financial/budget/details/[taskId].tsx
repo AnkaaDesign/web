@@ -8,6 +8,7 @@ import {
   IconCheck,
   IconExternalLink,
 } from "@tabler/icons-react";
+import { isQuoteValidityExpired } from "@/components/financial/budget/validity";
 import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
@@ -2028,7 +2029,22 @@ const FinancialBudgetDetailPageInner = () => {
         // página: a gravação de valores acima pode ter acabado de devolver o
         // orçamento a PENDING pelo auto-revert, e pedir o caminho a partir de
         // APPROVED faria o servidor recusar um salto que já não parte de lá.
-        const targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
+        let targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
+
+        // VALIDADE NOVA TIRA DE "AGUARDANDO REANÁLISE". O vencimento é o que
+        // levou o orçamento a EXPIRED; dar a ele uma validade futura é o comercial
+        // dizendo que a proposta continua de pé. Mesma regra do
+        // `PUT /budgets/:id/validity`. Só quando o seletor de status não foi
+        // mexido: uma escolha explícita (cancelar, por exemplo) prevalece.
+        if (
+          statusAfterSave === "EXPIRED" &&
+          dirty.expiresAt &&
+          data.expiresAt &&
+          !isQuoteValidityExpired(data.expiresAt) &&
+          (!targetStatus || targetStatus === "EXPIRED")
+        ) {
+          targetStatus = "PENDING" as TASK_QUOTE_STATUS;
+        }
 
         // ── O SERVIDOR MOVEU O ESTADO? ENTÃO O ALVO ESTÁ VELHO ─────────────────
         //
