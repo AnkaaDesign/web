@@ -133,7 +133,7 @@ export const TaskEditPage = () => {
         },
       },
       createdBy: true,
-      truck: true,
+      implement: true,
       observation: {
         include: {
           files: true,
@@ -154,8 +154,8 @@ export const TaskEditPage = () => {
     }
 
     // Otherwise append plate if available
-    if (task.truck?.plate) {
-      return `${taskName} - ${task.truck.plate}`;
+    if (task.implement?.plate) {
+      return `${taskName} - ${task.implement.plate}`;
     }
 
     // Just the task name if neither are available

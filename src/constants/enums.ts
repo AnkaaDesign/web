@@ -1311,16 +1311,16 @@ export enum TRUCK_MANUFACTURER {
  * Categories define the size and configuration of the truck
  */
 export enum IMPLEMENT_CATEGORY {
-  MINI = 'MINI', // Mini truck (small urban delivery)
+  MINI = 'MINI', // Mini (entrega urbana pequena)
   VUC = 'VUC', // VUC - Veículo Urbano de Carga (Urban Cargo Vehicle)
-  THREE_QUARTER = 'THREE_QUARTER', // 3/4 truck (light commercial)
-  RIGID = 'RIGID', // Toco - Rigid truck with single rear axle
-  TRUCK = 'TRUCK', // Standard truck
-  SEMI_TRAILER = 'SEMI_TRAILER', // Carreta - Semi-trailer truck
+  THREE_QUARTER = 'THREE_QUARTER', // 3/4 (comercial leve)
+  RIGID = 'RIGID', // Toco - caminhão rígido, um eixo traseiro
+  TRUCK = 'TRUCK', // caminhão rígido padrão (valor de mercado, §4)
+  SEMI_TRAILER = 'SEMI_TRAILER', // Carreta - semirreboque
   SEMI_TRAILER_2_AXLES = 'SEMI_TRAILER_2_AXLES', // Semirreboque 2 Eixos
   B_DOUBLE_FRONT = 'B_DOUBLE_FRONT', // Bitrem Composição Dianteira - front compartment of B-Double trailer
   B_DOUBLE_REAR = 'B_DOUBLE_REAR', // Bitrem Composição Traseira - rear compartment of B-Double trailer
-  BITRUCK = 'BITRUCK', // Bitruck - Rigid truck with dual steering axle
+  BITRUCK = 'BITRUCK', // Bitruck - caminhão rígido com dois eixos direcionais
 }
 
 /**
@@ -1332,7 +1332,7 @@ export enum IMPLEMENT_TYPE {
   REFRIGERATED = 'REFRIGERATED', // Refrigerado - Refrigerated body
   INSULATED = 'INSULATED', // Isoplastic - Insulated body
   CURTAIN_SIDE = 'CURTAIN_SIDE', // Sider - Curtain-side body
-  TANK = 'TANK', // Tanque - Tank truck
+  TANK = 'TANK', // Tanque
   FLATBED = 'FLATBED', // Carroceria - Open flatbed/stake body
 }
 
@@ -1416,7 +1416,7 @@ export enum ENTITY_TYPE {
   SUPPLIER = "SUPPLIER",
   TASK = "TASK",
   TIME_CLOCK_ENTRY = "TIME_CLOCK_ENTRY",
-  TRUCK = "TRUCK",
+  IMPLEMENT = "IMPLEMENT",
   USER = "USER",
   VACATION = "VACATION",
   THIRTEENTH = "THIRTEENTH",
@@ -2058,7 +2058,7 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   TASK_QUOTE = "TASK_QUOTE",
   TASK_QUOTE_ITEM = "TASK_QUOTE_ITEM",
   TIME_CLOCK_ENTRY = "TIME_CLOCK_ENTRY",
-  TRUCK = "TRUCK",
+  IMPLEMENT = "IMPLEMENT",
   USER = "USER",
   VACATION = "VACATION",
   THIRTEENTH = "THIRTEENTH",

@@ -107,7 +107,7 @@ export interface BudgetPayer extends BaseEntity {
         name?: string | null;
         serialNumber?: string | null;
         customerOrderNumber?: string | null;
-        truck?: { plate?: string | null; chassisNumber?: string | null } | null;
+        implement?: { plate?: string | null; chassisNumber?: string | null } | null;
       } | null;
     }>;
   } | null;

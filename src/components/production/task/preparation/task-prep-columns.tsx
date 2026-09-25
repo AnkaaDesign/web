@@ -261,7 +261,7 @@ const ALL_TASK_PREP_COLUMN_IDS = [
   "soCommercial", "soLogistic", "soArtwork", "soProduction",
   "forecastDate", "term", "total", "invoiceToCustomers", "paymentStatus", "bonification",
   "status", "pintura", "sector", "responsibles",
-  "truckCategory", "implementType", "chassisNumber", "measures",
+  "implementCategory", "implementType", "chassisNumber", "measures",
   "entryDate", "startedAt", "finishedAt", "createdAt", "duration", "details",
 ] as const;
 
@@ -339,11 +339,11 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "identificador",
       header: "Identificador",
-      accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
+      accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
       size: 150,
       // A plate exports with the canonical display mask (`ABC-1234`, Mercosul unhyphenated); a
       // serial number is free-form and goes out as stored.
-      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || (row.truck?.plate ? formatPlate(row.truck.plate) : "") },
+      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || (row.implement?.plate ? formatPlate(row.implement.plate) : "") },
       cell: ({ getValue }) => {
         const v = getValue() as string;
         return v ? <span className="truncate">{v}</span> : <span className="text-muted-foreground">-</span>;
@@ -525,19 +525,19 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       },
     },
     {
-      id: "truckCategory",
+      id: "implementCategory",
       header: "Categoria",
-      accessorFn: (row) => row.truck?.category || "",
+      accessorFn: (row) => row.implement?.category || "",
       size: 150,
       meta: {
         defaultVisible: false,
         headerLabel: "Categoria",
-        exportValue: (row) => (row.truck?.category ? IMPLEMENT_CATEGORY_LABELS[row.truck.category] : ""),
+        exportValue: (row) => (row.implement?.category ? IMPLEMENT_CATEGORY_LABELS[row.implement.category] : ""),
       },
       cell: ({ row }) =>
-        row.original.truck?.category ? (
+        row.original.implement?.category ? (
           <Badge variant="outline" className="truncate">
-            {IMPLEMENT_CATEGORY_LABELS[row.original.truck.category]}
+            {IMPLEMENT_CATEGORY_LABELS[row.original.implement.category]}
           </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>
@@ -546,17 +546,17 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "implementType",
       header: "Tipo de Implemento",
-      accessorFn: (row) => row.truck?.implementType || "",
+      accessorFn: (row) => row.implement?.type || "",
       size: 160,
       meta: {
         defaultVisible: false,
         headerLabel: "Tipo de Implemento",
-        exportValue: (row) => (row.truck?.implementType ? IMPLEMENT_TYPE_LABELS[row.truck.implementType] : ""),
+        exportValue: (row) => (row.implement?.type ? IMPLEMENT_TYPE_LABELS[row.implement.type] : ""),
       },
       cell: ({ row }) =>
-        row.original.truck?.implementType ? (
+        row.original.implement?.type ? (
           <Badge variant="outline" className="truncate">
-            {IMPLEMENT_TYPE_LABELS[row.original.truck.implementType]}
+            {IMPLEMENT_TYPE_LABELS[row.original.implement.type]}
           </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>
@@ -565,16 +565,16 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "chassisNumber",
       header: "Nº Chassi",
-      accessorFn: (row) => row.truck?.chassisNumber || "",
+      accessorFn: (row) => row.implement?.chassisNumber || "",
       size: 150,
       meta: {
         defaultVisible: false,
         headerLabel: "Nº Chassi",
-        exportValue: (row) => (row.truck?.chassisNumber ? formatChassis(row.truck.chassisNumber) : ""),
+        exportValue: (row) => (row.implement?.chassisNumber ? formatChassis(row.implement.chassisNumber) : ""),
       },
       cell: ({ row }) =>
-        row.original.truck?.chassisNumber ? (
-          <span className="truncate">{formatChassis(row.original.truck.chassisNumber)}</span>
+        row.original.implement?.chassisNumber ? (
+          <span className="truncate">{formatChassis(row.original.implement.chassisNumber)}</span>
         ) : (
           <span className="text-muted-foreground">-</span>
         ),

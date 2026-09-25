@@ -21,11 +21,11 @@
 import { perfis } from "@/generated/contracts/labels.json";
 import type { IMPLEMENT_TYPE, IMPLEMENT_CATEGORY } from "./enums";
 
-export type LabelProfile = keyof typeof perfis.TRUCK_CATEGORY;
+export type LabelProfile = keyof typeof perfis.IMPLEMENT_CATEGORY;
 
-export const LABEL_PROFILES = Object.keys(perfis.TRUCK_CATEGORY) as LabelProfile[];
+export const LABEL_PROFILES = Object.keys(perfis.IMPLEMENT_CATEGORY) as LabelProfile[];
 
-export const IMPLEMENT_CATEGORY_PROFILE_LABELS = perfis.TRUCK_CATEGORY as Readonly<
+export const IMPLEMENT_CATEGORY_PROFILE_LABELS = perfis.IMPLEMENT_CATEGORY as Readonly<
   Record<LabelProfile, Readonly<Record<IMPLEMENT_CATEGORY, string>>>
 >;
 

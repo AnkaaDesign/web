@@ -29,7 +29,7 @@ export const customerIncludeSchema = z
               files: z.boolean().optional(),
               logoPaints: z.boolean().optional(),
               services: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              implement: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
             })
             .optional(),

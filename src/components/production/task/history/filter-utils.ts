@@ -180,17 +180,17 @@ export function extractActiveFilters(
     });
   }
 
-  // Truck category filter (individual badges)
-  if ((filters as any).truckCategories && Array.isArray((filters as any).truckCategories) && (filters as any).truckCategories.length > 0) {
-    (filters as any).truckCategories.forEach((category: string) => {
+  // Implement category filter (individual badges)
+  if ((filters as any).implementCategories && Array.isArray((filters as any).implementCategories) && (filters as any).implementCategories.length > 0) {
+    (filters as any).implementCategories.forEach((category: string) => {
       const label = (IMPLEMENT_CATEGORY_LABELS as any)[category];
       activeFilters.push({
-        key: `truckCategories-${category}`,
+        key: `implementCategories-${category}`,
         label: "Categoria",
         value: label || category,
-        iconType: "truck",
+        iconType: "implement",
         itemId: category,
-        onRemove: () => onRemoveFilter("truckCategories", category),
+        onRemove: () => onRemoveFilter("implementCategories", category),
       });
     });
   }
@@ -203,7 +203,7 @@ export function extractActiveFilters(
         key: `implementTypes-${type}`,
         label: "Implemento",
         value: label || type,
-        iconType: "truck",
+        iconType: "implement",
         itemId: type,
         onRemove: () => onRemoveFilter("implementTypes", type),
       });
@@ -255,13 +255,13 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.hasTruck) {
+  if (filters.implementIdentified) {
     activeFilters.push({
-      key: "hasTruck",
-      label: "Tem Caminhão",
+      key: "implementIdentified",
+      label: "Implemento identificado",
       value: "Sim",
-      iconType: "truck",
-      onRemove: () => onRemoveFilter("hasTruck"),
+      iconType: "implement",
+      onRemove: () => onRemoveFilter("implementIdentified"),
     });
   }
 
@@ -398,16 +398,16 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "forecastDateRange":
         delete (newFilters as any).forecastDateRange;
         break;
-      case "truckCategories":
-        if (itemId && Array.isArray((newFilters as any).truckCategories)) {
-          const filtered = (newFilters as any).truckCategories.filter((c: string) => c !== itemId);
+      case "implementCategories":
+        if (itemId && Array.isArray((newFilters as any).implementCategories)) {
+          const filtered = (newFilters as any).implementCategories.filter((c: string) => c !== itemId);
           if (filtered.length > 0) {
-            (newFilters as any).truckCategories = filtered;
+            (newFilters as any).implementCategories = filtered;
           } else {
-            delete (newFilters as any).truckCategories;
+            delete (newFilters as any).implementCategories;
           }
         } else {
-          delete (newFilters as any).truckCategories;
+          delete (newFilters as any).implementCategories;
         }
         break;
       case "implementTypes":
@@ -434,8 +434,8 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "hasAssignee":
         delete newFilters.hasAssignee;
         break;
-      case "hasTruck":
-        delete newFilters.hasTruck;
+      case "implementIdentified":
+        delete newFilters.implementIdentified;
         break;
       case "hasObservation":
         delete newFilters.hasObservation;

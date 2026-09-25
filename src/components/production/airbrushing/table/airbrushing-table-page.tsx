@@ -41,7 +41,7 @@ export const LIST_INCLUDE = {
   task: {
     include: {
       customer: true,
-      truck: {
+      implement: {
         include: {
           leftSideMeasure: { include: { sections: true } },
           rightSideMeasure: { include: { sections: true } },

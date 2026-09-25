@@ -116,7 +116,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           paintBrand: true,
         },
       },
-      truck: {
+      implement: {
         include: {
           leftSideMeasure: {
             include: {
@@ -205,7 +205,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
-          truck: {
+          implement: {
             include: {
               leftSideMeasure: { include: { sections: true, photo: true } },
               rightSideMeasure: { include: { sections: true, photo: true } },
@@ -343,7 +343,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
         task.customer?.fantasyName?.toLowerCase().includes(searchLower) ||
         task.customer?.corporateName?.toLowerCase().includes(searchLower) ||
         task.serialNumber?.toLowerCase().includes(searchLower) ||
-        task.truck?.plate?.toLowerCase().includes(searchLower) ||
+        task.implement?.plate?.toLowerCase().includes(searchLower) ||
         task.sector?.name?.toLowerCase().includes(searchLower)
       );
     });

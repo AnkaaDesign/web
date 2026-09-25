@@ -8,7 +8,7 @@ import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { budgetCreateNestedSchema } from "./budget";
 import { responsibleCreateInlineSchema } from "./responsible";
-import { optionalPlateSchema, optionalChassisSchema } from "./truck";
+import { optionalPlateSchema, optionalChassisSchema } from "./implement";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -170,7 +170,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
-      truck: z
+      implement: z
         .union([
           z.boolean(),
           z.object({
@@ -393,7 +393,7 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
           none: z.any().optional(),
         })
         .optional(),
-      truck: z.any().optional(),
+      implement: z.any().optional(),
       airbrushings: z
         .object({
           some: z.any().optional(),
@@ -494,12 +494,15 @@ const taskTransform = (data: any): any => {
     delete data.hasCustomer;
   }
 
-  if (data.hasTruck === true) {
-    andConditions.push({ truck: { isNot: null } });
-    delete data.hasTruck;
-  } else if (data.hasTruck === false) {
-    andConditions.push({ truck: { is: null } });
-    delete data.hasTruck;
+  // "Implemento identificado" (série ∨ placa ∨ chassi) — espelho do filtro da API.
+  if (data.implementIdentified === true || data.implementIdentified === false) {
+    const identified = {
+      implement: {
+        OR: [{ serialNumber: { not: null } }, { plate: { not: null } }, { chassisNumber: { not: null } }],
+      },
+    };
+    andConditions.push(data.implementIdentified ? identified : { NOT: identified });
+    delete data.implementIdentified;
   }
 
   if (data.hasObservation === true) {
@@ -643,9 +646,9 @@ const taskTransform = (data: any): any => {
     delete data.createdByIds;
   }
 
-  if (data.truckIds && Array.isArray(data.truckIds) && data.truckIds.length > 0) {
-    andConditions.push({ truck: { id: { in: data.truckIds } } });
-    delete data.truckIds;
+  if (data.implementIds && Array.isArray(data.implementIds) && data.implementIds.length > 0) {
+    andConditions.push({ implement: { id: { in: data.implementIds } } });
+    delete data.implementIds;
   }
 
   // Date range filters
@@ -843,7 +846,7 @@ export const taskGetManySchema = z
     hasSector: z.boolean().optional(),
     hasCustomer: z.boolean().optional(),
     hasAssignee: z.boolean().optional(),
-    hasTruck: z.boolean().optional(),
+    implementIdentified: z.boolean().optional(),
     hasObservation: z.boolean().optional(),
     hasLayouts: z.boolean().optional(),
     hasPaints: z.boolean().optional(),
@@ -874,7 +877,7 @@ export const taskGetManySchema = z
     customerIds: z.array(z.string()).optional(),
     assigneeIds: z.array(z.string()).optional(),
     createdByIds: z.array(z.string()).optional(),
-    truckIds: z.array(z.string()).optional(),
+    implementIds: z.array(z.string()).optional(),
     // Numeric range filters
     progressRange: z
       .object({
@@ -995,7 +998,7 @@ export const taskGetManySchema = z
         },
       )
       .optional(),
-    truckCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
+    implementCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).optional(),
     implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
     createdAtRange: z
       .object({
@@ -1161,7 +1164,7 @@ const taskImplementCreateSchema = z.object({
   spot: z.string().nullable().optional(),
   // Truck specifications
   category: z.string().nullable().optional(),
-  implementType: z.string().nullable().optional(),
+  type: z.string().nullable().optional(),
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
@@ -1245,7 +1248,7 @@ export const taskCreateSchema = z
         checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
       })
     ).optional(),
-    truck: taskImplementCreateSchema.nullable().optional(),
+    implement: taskImplementCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
@@ -1255,7 +1258,7 @@ export const taskCreateSchema = z
     // Require at least one of: customer, serialNumber, plate, or name
     const hasCustomer = !!data.customerId;
     const hasSerialNumber = !!data.serialNumber;
-    const hasPlate = !!data.truck?.plate;
+    const hasPlate = !!data.implement?.plate;
     const hasName = !!data.name;
 
     if (!hasCustomer && !hasSerialNumber && !hasPlate && !hasName) {
@@ -1406,7 +1409,7 @@ export const taskUpdateSchema = z
         checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
       })
     ).optional(),
-    truck: taskImplementCreateSchema.nullable().optional(),
+    implement: taskImplementCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings

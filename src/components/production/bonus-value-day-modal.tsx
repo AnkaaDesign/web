@@ -93,7 +93,7 @@ export function BonusValueDayModal({
         ...(sectorIds?.length ? { sectorIds } : {}),
         limit: 500,
         include: {
-          truck: true,
+          implement: true,
           customer: true,
         },
       } as any),

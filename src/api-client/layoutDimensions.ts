@@ -87,7 +87,7 @@ export const layoutDimensionsService = {
   /** O plano de cotas do arquivo. Dezenas de KB — é o que todo mundo abre. */
   async get(
     fileId: string,
-    params: { truckId: string; page?: number; rotation?: number },
+    params: { implementId: string; page?: number; rotation?: number },
   ): Promise<LayoutDimensionsDto> {
     const response = await apiClient.get<Envelope<LayoutDimensionsDto>>(
       `/layout-dimensions/${fileId}`,

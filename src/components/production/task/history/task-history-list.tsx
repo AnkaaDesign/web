@@ -211,7 +211,7 @@ export function TaskHistoryList({
       if (params.get("hasCustomer") === "true") filters.hasCustomer = true;
       if (params.get("hasSector") === "true") filters.hasSector = true;
       if (params.get("hasAssignee") === "true") filters.hasAssignee = true;
-      if (params.get("hasTruck") === "true") filters.hasTruck = true;
+      if (params.get("implementIdentified") === "true") filters.implementIdentified = true;
       if (params.get("hasObservation") === "true") filters.hasObservation = true;
       if (params.get("hasLayouts") === "true") filters.hasLayouts = true;
       if (params.get("hasPaints") === "true") filters.hasPaints = true;
@@ -255,7 +255,7 @@ export function TaskHistoryList({
     if (filters.hasCustomer) params.hasCustomer = "true";
     if (filters.hasSector) params.hasSector = "true";
     if (filters.hasAssignee) params.hasAssignee = "true";
-    if (filters.hasTruck) params.hasTruck = "true";
+    if (filters.implementIdentified) params.implementIdentified = "true";
     if (filters.hasObservation) params.hasObservation = "true";
     if (filters.hasLayouts) params.hasLayouts = "true";
     if (filters.hasPaints) params.hasPaints = "true";
@@ -451,7 +451,7 @@ export function TaskHistoryList({
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
-          truck: {
+          implement: {
             include: {
               leftSideMeasure: { include: { sections: true, photo: true } },
               rightSideMeasure: { include: { sections: true, photo: true } },

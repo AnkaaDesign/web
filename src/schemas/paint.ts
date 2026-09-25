@@ -316,7 +316,7 @@ export const paintIncludeSchema = z
               logoPaints: z.boolean().optional(),
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              implement: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
             })
             .optional(),
@@ -344,7 +344,7 @@ export const paintIncludeSchema = z
               logoPaints: z.boolean().optional(),
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              implement: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
             })
             .optional(),

@@ -162,7 +162,7 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
   const expandedCuts = useMemo(() => {
     const out: Array<{ key: string; fileName: string; type: CUT_TYPE; taskName: string; identifier: string }> = [];
     for (const t of selectedTaskRows) {
-      const identifier = [t.serialNumber, t.truck?.plate].filter(Boolean).join(" · ");
+      const identifier = [t.serialNumber, t.implement?.plate].filter(Boolean).join(" · ");
       for (const c of reviewCuts) {
         const q = Math.max(1, c.quantity || 1);
         for (let i = 0; i < q; i++) {

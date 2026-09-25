@@ -36,7 +36,7 @@ function renderFilterIcon(iconType?: string) {
       return <IconUser {...iconProps} />;
     case "building-warehouse":
       return <IconBuildingWarehouse {...iconProps} />;
-    case "truck-delivery":
+    case "implement":
       return <IconTruckDelivery {...iconProps} />;
     case "checks":
       return <IconChecks {...iconProps} />;
@@ -124,8 +124,8 @@ function getIconForFilter(key: string, value: any): React.ReactNode | undefined 
       return renderFilterIcon("user");
     case "assigneeIds":
       return renderFilterIcon("user");
-    case "truckIds":
-      return renderFilterIcon("truck-delivery");
+    case "implementIds":
+      return renderFilterIcon("implement");
     case "isOverdue":
       return renderFilterIcon("alert-triangle");
     case "hasObservation":

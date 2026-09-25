@@ -711,7 +711,7 @@ const ChangelogTimelineItem = ({
     items: Map<string, string>;
     files: Map<string, string>;
     observations: Map<string, string>;
-    trucks: Map<string, string>;
+    implementList: Map<string, string>;
     serviceOrders: Map<string, any>;
   };
   onRollback?: (changeLogId: string, fieldName: string) => void;
@@ -829,7 +829,7 @@ const ChangelogTimelineItem = ({
       )
         return "Arquivo (carregando...)";
       if (field === "observationId") return "Observação (carregando...)";
-      if (field === "truckId") return "Caminhão (carregando...)";
+      if (field === "implementId") return "Implemento (carregando...)";
     }
 
     // Special handling for logoId fields - render as images
@@ -975,8 +975,8 @@ const ChangelogTimelineItem = ({
                 </div>
               )}
 
-            {/* Truck Details */}
-            {entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK && entityDetails && (
+            {/* Implement Details */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT && entityDetails && (
               <div className="space-y-2 mb-3">
                 {entityDetails.plate && (
                   <div className="text-sm">
@@ -1631,7 +1631,7 @@ const ChangelogTimelineItem = ({
                             changelog.oldValue !== null &&
                             onRollback &&
                             (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
-                              entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
+                              entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT ||
                               entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
                               entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM) && (
                               <Button
@@ -2148,10 +2148,10 @@ const ChangelogTimelineItem = ({
                                   );
                                 })()}
                               </>
-                            ) : changelog.field === "truck.leftSideMeasureId" ||
-                              changelog.field === "truck.rightSideMeasureId" ||
-                              changelog.field === "truck.backSideMeasureId" ? (
-                              // Special handling for truck layout fields - show SVG visualization
+                            ) : changelog.field === "implement.leftSideMeasureId" ||
+                              changelog.field === "implement.rightSideMeasureId" ||
+                              changelog.field === "implement.backSideMeasureId" ? (
+                              // Special handling for implement layout fields - show SVG visualization
                               (() => {
                                 const parseLayoutValue = (val: any) => {
                                   if (!val) return null;

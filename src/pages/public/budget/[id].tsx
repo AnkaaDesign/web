@@ -62,7 +62,7 @@ interface PublicQuoteVehicle {
     corporateName?: string;
     fantasyName?: string;
   };
-  truck?: {
+  implement?: {
     plate?: string;
     chassisNumber?: string;
     category?: string | null;
@@ -399,7 +399,7 @@ export function PublicBudgetPage() {
   const publicVehicleLabel = (taskId: string) => {
     const index = publicVehicles.findIndex((t: any) => t.id === taskId);
     const t = publicVehicles[index];
-    return t?.serialNumber || t?.truck?.plate || `${index + 1}`;
+    return t?.serialNumber || t?.implement?.plate || `${index + 1}`;
   };
   const layoutImages: Array<{ url: string; caption: string | null; order: number }> = (quote.layoutFiles || [])
     .filter((f: any) => f?.id)

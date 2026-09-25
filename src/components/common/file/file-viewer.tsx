@@ -24,7 +24,7 @@ export interface FileViewerOptions {
    * arquivo (de cima para baixo). Quando vêm, o visualizador cota o layout
    * sozinho e o clique num adesivo mostra as medidas dele.
    */
-  layoutTruckId?: string;
+  layoutImplementId?: string;
 }
 
 export interface FileViewerState {
@@ -40,7 +40,7 @@ export interface FileViewerState {
   /** Status de layout dos arquivos abertos agora (ver `FileViewerOptions`). */
   layoutStatusByFileId?: Record<string, string | null | undefined>;
   /** Caminhão da tarefa aberta agora (ver `FileViewerOptions`). */
-  layoutTruckId?: string;
+  layoutImplementId?: string;
 }
 
 export interface FileViewerProps {
@@ -101,7 +101,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
       currentFiles: files,
       currentFileIndex: initialIndex,
       layoutStatusByFileId: options?.layoutStatusByFileId,
-      layoutTruckId: options?.layoutTruckId,
+      layoutImplementId: options?.layoutImplementId,
     }));
   }, []);
 
@@ -114,7 +114,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
       // Zerado junto com a lista: o mapa é da ABERTURA, não do provider. Mantê-lo
       // faria a próxima galeria (recibos, notas) herdar a faixa da anterior.
       layoutStatusByFileId: undefined,
-      layoutTruckId: undefined,
+      layoutImplementId: undefined,
     }));
   }, []);
 
@@ -270,7 +270,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
           }}
           baseUrl={viewerConfig.baseUrl}
           layoutStatusByFileId={state.layoutStatusByFileId}
-          layoutTruckId={state.layoutTruckId}
+          layoutImplementId={state.layoutImplementId}
         />
       )}
 

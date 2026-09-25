@@ -524,11 +524,11 @@ export const TaskCreateForm = () => {
           // D-25) toda tarefa criada aqui tinha caminhão, e cada tarefa tem
           // exatamente um implemento (DD1). O que não se inventa é o tipo.
           return {
-            truck: hasImplementFields
+            implement: hasImplementFields
               ? {
                   ...(plate && { plate }),
                   category: category || undefined,
-                  implementType: implementType || undefined,
+                  type: implementType || undefined,
                   ...layoutSectionData,
                 }
               : {},

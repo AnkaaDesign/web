@@ -141,7 +141,7 @@ export function useTaskPermissions() {
     canViewDates,
     canViewServices,
     canViewMeasures,
-    canViewTruckSpot: canViewImplementSpot,
+    canViewImplementSpot,
     canViewPaint,
     canViewLogoPaint,
     canViewCuts,

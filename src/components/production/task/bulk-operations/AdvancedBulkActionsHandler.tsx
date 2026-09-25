@@ -222,7 +222,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             cuts: { include: { file: true } },
             logoPaints: PAINT_DISPLAY_SELECT,
             generalPainting: PAINT_DISPLAY_SELECT,
-            truck: {
+            implement: {
               include: {
                 leftSideMeasure: { include: { sections: true } },
                 rightSideMeasure: { include: { sections: true } },
@@ -519,7 +519,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             // Since layouts are individual (each task has its own layout record),
             // we compare layout content (height + sections) to determine if all tasks
             // share the same measurements per side
-            const tasksWithImplements = tasks.filter((t: any) => t.truck);
+            const tasksWithImplements = tasks.filter((t: any) => t.implement);
 
             if (tasksWithImplements.length > 0) {
               const convertLayoutToFormState = (layout: any) => {
@@ -554,20 +554,20 @@ export const AdvancedBulkActionsHandler = forwardRef<
               };
 
               const firstTaskWithImplement = tasksWithImplements[0];
-              if (firstTaskWithImplement?.truck) {
-                const firstLeft = firstTaskWithImplement.truck.leftSideMeasure;
-                const firstRight = firstTaskWithImplement.truck.rightSideMeasure;
-                const firstBack = firstTaskWithImplement.truck.backSideMeasure;
+              if (firstTaskWithImplement?.implement) {
+                const firstLeft = firstTaskWithImplement.implement.leftSideMeasure;
+                const firstRight = firstTaskWithImplement.implement.rightSideMeasure;
+                const firstBack = firstTaskWithImplement.implement.backSideMeasure;
 
                 // Check if all tasks share the same layout content per side
                 const allShareLeft = firstLeft && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.truck?.leftSideMeasure, firstLeft)
+                  (t: any) => layoutsMatch(t.implement?.leftSideMeasure, firstLeft)
                 );
                 const allShareRight = firstRight && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.truck?.rightSideMeasure, firstRight)
+                  (t: any) => layoutsMatch(t.implement?.rightSideMeasure, firstRight)
                 );
                 const allShareBack = firstBack && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.truck?.backSideMeasure, firstBack)
+                  (t: any) => layoutsMatch(t.implement?.backSideMeasure, firstBack)
                 );
 
                 const preloadedLayouts = {
@@ -988,7 +988,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 }
               });
 
-              updateData._perTaskTruckUpdates = implementLayoutUpdates;
+              updateData._perTaskImplementUpdates = implementLayoutUpdates;
 
               // Store layout photo files for later use in FormData
               if (layoutPhotoFiles.length > 0) {
@@ -1116,7 +1116,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       // Extract per-task data and internal flags
       const perTaskLayoutIds = updateData._perTaskLayoutIds;
       const perTaskBaseFileIds = updateData._perTaskBaseFileIds;
-      const perTaskImplementUpdates = updateData._perTaskTruckUpdates;
+      const perTaskImplementUpdates = updateData._perTaskImplementUpdates;
       const hasNewLayouts = updateData._hasNewLayouts;
       const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
@@ -1125,7 +1125,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       delete updateData._perTaskLayoutIds;
       delete updateData._perTaskBaseFileIds;
-      delete updateData._perTaskTruckUpdates;
+      delete updateData._perTaskImplementUpdates;
       delete updateData._hasNewLayouts;
       delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
@@ -1134,7 +1134,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       const hasPerTaskData = perTaskLayoutIds || perTaskBaseFileIds || perTaskImplementUpdates;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || layoutStatusesMap || hasNewLayouts;
-      console.log('[BulkActions] hasPerTaskData:', hasPerTaskData, 'hasData:', hasData, 'updateData keys:', Object.keys(updateData), 'perTaskTruckUpdates:', perTaskImplementUpdates);
+      console.log('[BulkActions] hasPerTaskData:', hasPerTaskData, 'hasData:', hasData, 'updateData keys:', Object.keys(updateData), 'perTaskImplementUpdates:', perTaskImplementUpdates);
 
       if (!hasData) {
         toast.info("Nenhuma alteração para aplicar");
@@ -1166,7 +1166,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Add per-task truck layout updates if available
           const implementUpdate = perTaskImplementUpdates?.[id];
           if (perTaskImplementUpdates && implementUpdate) {
-            taskData.truck = implementUpdate;
+            taskData.implement = implementUpdate;
           }
 
           // Add artwork statuses for status changes

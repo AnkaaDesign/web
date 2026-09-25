@@ -115,7 +115,7 @@ export function PerformancePeriodModal({
         status: [TASK_STATUS.COMPLETED],
         ...(sectorIds?.length ? { sectorIds } : {}),
         limit: 100,
-        include: { truck: true, customer: true, sector: true },
+        include: { implement: true, customer: true, sector: true },
       } as any),
     enabled: open && showTasks,
   });

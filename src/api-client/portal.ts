@@ -1016,7 +1016,7 @@ export interface PortalBudgetRequestResult {
   customerReused?: PortalReusedCustomer | null;
   vehicles: Array<{
     taskId: string;
-    truckId: string | null;
+    implementId: string | null;
     serialNumber: string | null;
     plate: string | null;
     chassisNumber: string | null;
@@ -1703,7 +1703,7 @@ export class PortalService {
     if (vinPlateFile) {
       const response = await responsibleAuthClient.patch<PortalResponse<PortalVehicleDetail>>(
         `${BASE}/veiculos/${taskId}/identificacao`,
-        multipart(data, { truckVinPlate: [vinPlateFile] }),
+        multipart(data, { implementVinPlate: [vinPlateFile] }),
         MULTIPART,
       );
       return response.data;

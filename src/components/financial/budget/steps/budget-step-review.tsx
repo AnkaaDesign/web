@@ -211,7 +211,7 @@ export function BudgetStepReview({
     const existing = existingQuote?.tasks ?? [];
     if (existing.length > 0) {
       return sortQuoteTasks(existing).map(
-        (t) => t.serialNumber || (t as any).truck?.plate || "—",
+        (t) => t.serialNumber || (t as any).implement?.plate || "—",
       );
     }
     const plates = platesWatch.filter(Boolean);
@@ -275,7 +275,7 @@ export function BudgetStepReview({
       const t = byId.get(taskId);
       return (
         (t?.serialNumber || undefined) ??
-        (t?.truck?.plate || undefined) ??
+        (t?.implement?.plate || undefined) ??
         (t?.name || undefined) ??
         taskId.slice(0, 8)
       );
@@ -336,15 +336,15 @@ export function BudgetStepReview({
         return {
           key: t.id,
           serialNumber: (live ? live.serialNumber : t.serialNumber) || null,
-          plate: (live ? live.plate : t.truck?.plate) || null,
-          chassis: (live ? live.chassisNumber : t.truck?.chassisNumber) || null,
+          plate: (live ? live.plate : t.implement?.plate) || null,
+          chassis: (live ? live.chassisNumber : t.implement?.chassisNumber) || null,
           orderNumber: live
             ? ((live.customerOrderNumber ?? "").trim() || null)
             : t.id === openTaskId
               ? ((formOrderNumber ?? "").trim() || null)
               : ((t.customerOrderNumber ?? "").trim() || null),
-          category: label(IMPLEMENT_CATEGORY_LABELS as any, t.truck?.category),
-          implement: label(IMPLEMENT_TYPE_LABELS as any, t.truck?.implementType),
+          category: label(IMPLEMENT_CATEGORY_LABELS as any, t.implement?.category),
+          implement: label(IMPLEMENT_TYPE_LABELS as any, t.implement?.type),
         };
       });
     }
@@ -459,7 +459,7 @@ export function BudgetStepReview({
       ...task,
       name: task?.name || formName || undefined,
       serialNumber: task?.serialNumber || (serialNumbers.length > 0 ? serialNumbers.join(", ") : undefined),
-      truck: task?.truck || (plates.length > 0 ? { plate: plates.join(", ") } : undefined),
+      implement: task?.implement || (plates.length > 0 ? { plate: plates.join(", ") } : undefined),
     };
   }, [isCreateMode, task, formPlates, formSerialNumbers, formName]);
 
@@ -746,10 +746,10 @@ export function BudgetStepReview({
               </div>
             ) : (
               <>
-                {resolvedTask?.truck?.plate && (
+                {resolvedTask?.implement?.plate && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Placa</span>
-                    <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
+                    <span className="text-sm font-medium">{resolvedTask.implement.plate}</span>
                   </div>
                 )}
                 {resolvedTask?.serialNumber && (
@@ -758,10 +758,10 @@ export function BudgetStepReview({
                     <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
                   </div>
                 )}
-                {resolvedTask?.truck?.chassisNumber && (
+                {resolvedTask?.implement?.chassisNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Chassi</span>
-                    <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
+                    <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.implement.chassisNumber)}</span>
                   </div>
                 )}
               </>
@@ -774,26 +774,26 @@ export function BudgetStepReview({
             {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderRow}
             {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
                 existe: no create ainda não há caminhão gravado. */}
-            {resolvedTask?.truck?.vinPlate && (
+            {resolvedTask?.implement?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Plaqueta</span>
-                <FileThumbnail file={resolvedTask.truck.vinPlate} size="sm" onClick={() => fileViewer?.actions?.viewFiles?.([resolvedTask.truck!.vinPlate!] as never, 0)} />
+                <FileThumbnail file={resolvedTask.implement.vinPlate} size="sm" onClick={() => fileViewer?.actions?.viewFiles?.([resolvedTask.implement!.vinPlate!] as never, 0)} />
               </div>
             )}
             {/* Categoria e implemento: linha própria com UM veículo, COLUNA da
                 tabela com vários — repetir "Toco / Refrigerado" abaixo de uma
                 tabela que já traz as duas em cada linha é dizer a mesma coisa
                 duas vezes na mesma tela. */}
-            {vehicleRows.length <= 1 && resolvedTask?.truck?.category && (
+            {vehicleRows.length <= 1 && resolvedTask?.implement?.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>
-                <span className="text-sm font-medium">{IMPLEMENT_CATEGORY_LABELS[resolvedTask.truck.category as keyof typeof IMPLEMENT_CATEGORY_LABELS] || resolvedTask.truck.category}</span>
+                <span className="text-sm font-medium">{IMPLEMENT_CATEGORY_LABELS[resolvedTask.implement.category as keyof typeof IMPLEMENT_CATEGORY_LABELS] || resolvedTask.implement.category}</span>
               </div>
             )}
-            {vehicleRows.length <= 1 && resolvedTask?.truck?.implementType && (
+            {vehicleRows.length <= 1 && resolvedTask?.implement?.type && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Implemento</span>
-                <span className="text-sm font-medium">{IMPLEMENT_TYPE_LABELS[resolvedTask.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || resolvedTask.truck.implementType}</span>
+                <span className="text-sm font-medium">{IMPLEMENT_TYPE_LABELS[resolvedTask.implement.type as keyof typeof IMPLEMENT_TYPE_LABELS] || resolvedTask.implement.type}</span>
               </div>
             )}
             {resolvedTask?.finishedAt && (

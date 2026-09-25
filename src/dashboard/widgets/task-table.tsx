@@ -392,8 +392,8 @@ type ColumnKey =
   | "generalPainting"
   | "logoPaints"
   | "paintFinish"
-  // truck
-  | "truckCategory"
+  // implement
+  | "implementCategory"
   | "implementType"
   // money
   | "quoteTotal"
@@ -441,7 +441,7 @@ const COLUMN_KEY_VALUES = [
   "generalPainting",
   "logoPaints",
   "paintFinish",
-  "truckCategory",
+  "implementCategory",
   "implementType",
   "quoteTotal",
   "quoteStatus",
@@ -720,7 +720,7 @@ function buildColumnCatalog(): ColumnDef[] {
       track: "minmax(0, 1fr)",
       render: (t) => (
         <span className="text-sm font-mono truncate">
-          {(t.truck as any)?.chassisNumber || "—"}
+          {(t.implement as any)?.chassisNumber || "—"}
         </span>
       ),
     },
@@ -729,9 +729,9 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Placa",
       track: "minmax(0, 0.8fr)",
       render: (t) =>
-        t.truck?.plate ? (
+        t.implement?.plate ? (
           <Badge variant="default" className="text-[10px] py-0 px-1.5 font-mono">
-            {t.truck.plate}
+            {t.implement.plate}
           </Badge>
         ) : (
           <span className="text-muted-foreground text-sm">—</span>
@@ -742,7 +742,7 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Local",
       track: "minmax(0, 0.7fr)",
       render: (t) => {
-        const spot = (t.truck as any)?.spot as string | null | undefined;
+        const spot = (t.implement as any)?.spot as string | null | undefined;
         if (!spot) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <Badge variant="default" className="text-[10px] py-0 px-1.5 font-mono">
@@ -902,11 +902,11 @@ function buildColumnCatalog(): ColumnDef[] {
       },
     },
     {
-      key: "truckCategory",
+      key: "implementCategory",
       label: "Categoria",
       track: "minmax(0, 1fr)",
       render: (t) => {
-        const c = (t.truck as any)?.category as IMPLEMENT_CATEGORY | undefined;
+        const c = (t.implement as any)?.category as IMPLEMENT_CATEGORY | undefined;
         if (!c) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 truncate">
@@ -920,7 +920,7 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Implemento",
       track: "minmax(0, 1fr)",
       render: (t) => {
-        const i = (t.truck as any)?.implementType as IMPLEMENT_TYPE | undefined;
+        const i = (t.implement as any)?.type as IMPLEMENT_TYPE | undefined;
         if (!i) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 truncate">
@@ -1213,7 +1213,7 @@ const taskTableConfigSchemaInner = z.object({
           "Flag",
           "Star",
           "Bolt",
-          "Truck",
+          "Truck", // resíduo-ok: glifo do Tabler gravado no painel, não é o implemento
           "Package",
           "Brush",
           "Palette",
@@ -1332,10 +1332,10 @@ const taskTableConfigSchemaInner = z.object({
       sectorIds: z.array(z.string().uuid()).default([]),
       customerIds: z.array(z.string().uuid()).default([]),
       assigneeIds: z.array(z.string().uuid()).default([]),
-      truckCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).default([]),
+      implementCategories: z.array(z.nativeEnum(IMPLEMENT_CATEGORY)).default([]),
       implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).default([]),
       bonifications: z.array(z.nativeEnum(BONIFICATION_STATUS)).default([]),
-      hasTruck: z.enum(TRI_STATE).default("any"),
+      implementIdentified: z.enum(TRI_STATE).default("any"),
       termPreset: z.enum(TERM_PRESETS).default("any"),
       forecastPreset: z.enum(FORECAST_PRESETS).default("any"),
       finishedPreset: z.enum(FINISHED_PRESETS).default("any"),
@@ -1372,10 +1372,10 @@ const taskTableConfigSchemaInner = z.object({
       sectorIds: [],
       customerIds: [],
       assigneeIds: [],
-      truckCategories: [],
+      implementCategories: [],
       implementTypes: [],
       bonifications: [],
-      hasTruck: "any",
+      implementIdentified: "any",
       termPreset: "any",
       forecastPreset: "any",
       finishedPreset: "any",
@@ -1502,6 +1502,7 @@ type TaskQueryParams = {
   searchingFor?: string;
   createdByIds?: string[];
   isOverdue?: boolean;
+  implementIdentified?: boolean;
 };
 
 function buildQueryParams(
@@ -1536,13 +1537,15 @@ function buildQueryParams(
   const entry = rangeFromCalendar(f.entryRange);
   if (entry) where.entryDate = entry;
 
-  // Truck filters
-  if (f.hasTruck === "yes") ANDs.push({ truck: { isNot: null as any } });
-  if (f.hasTruck === "no") ANDs.push({ truck: null as any });
-  if (f.truckCategories.length > 0)
-    ANDs.push({ truck: { category: { in: f.truckCategories } } });
+  // Implement filters. "Implemento identificado" (série ∨ placa ∨ chassi) é filtro
+  // da API (`implementIdentified`), não um `where`: "tem implemento", com um
+  // implemento por tarefa (DD1), seria sempre verdadeiro.
+  const implementIdentifiedParam =
+    f.implementIdentified === "yes" ? true : f.implementIdentified === "no" ? false : undefined;
+  if (f.implementCategories.length > 0)
+    ANDs.push({ implement: { category: { in: f.implementCategories } } });
   if (f.implementTypes.length > 0)
-    ANDs.push({ truck: { implementType: { in: f.implementTypes } } });
+    ANDs.push({ implement: { type: { in: f.implementTypes } } });
 
   // SO / artwork / observation / budget
   if (f.hasOpenSO === "yes") {
@@ -1602,6 +1605,7 @@ function buildQueryParams(
     searchingFor: search || undefined,
     createdByIds: f.assigneeIds.length > 0 ? f.assigneeIds : undefined,
     isOverdue: isOverdueParam,
+    implementIdentified: implementIdentifiedParam,
   };
 }
 
@@ -1615,8 +1619,8 @@ const ORDER_BY_PATH_MAP: Partial<Record<ColumnKey, readonly string[]>> = {
   customerName: ["customer", "fantasyName"],
   sector: ["sector", "name"],
   generalPainting: ["generalPainting", "name"],
-  plate: ["truck", "plate"],
-  chassisNumber: ["truck", "chassisNumber"],
+  plate: ["implement", "plate"],
+  chassisNumber: ["implement", "chassisNumber"],
 };
 
 function orderByEntry(key: string, direction: "asc" | "desc"): Record<string, any> {
@@ -1648,7 +1652,7 @@ export const TASK_INCLUDE = {
   logoPaints: true,
   serviceOrders: true,
   observation: true,
-  truck: true,
+  implement: true,
   // The API's base task include already hydrates `quote.customerConfigs.installments`.
   // Don't override with `{ include: { installments: true } }` — `installments`
   // is not a direct relation on Budget, only on BudgetPayer,
@@ -1808,6 +1812,7 @@ function TaskTableRender({
     searchingFor: queryParams.searchingFor,
     createdByIds: queryParams.createdByIds,
     isOverdue: queryParams.isOverdue,
+    implementIdentified: queryParams.implementIdentified,
     orderBy: orderBy as any,
     take: config.limit,
     include: TASK_INCLUDE as any,
@@ -2102,7 +2107,7 @@ function TaskTableRender({
             logoPaints: true,
             cuts: true,
             serviceOrders: true,
-            truck: {
+            implement: {
               include: {
                 leftSideMeasure: { include: { sections: true, photo: true } },
                 rightSideMeasure: { include: { sections: true, photo: true } },
@@ -3097,9 +3102,9 @@ function TaskTableConfigComponent({
             <Label className="text-xs">Categoria do caminhão</Label>
             <Combobox
               mode="multiple"
-              value={c.filters.truckCategories}
+              value={c.filters.implementCategories}
               onValueChange={(v) =>
-                setFilter("truckCategories", asArray(v) as IMPLEMENT_CATEGORY[])
+                setFilter("implementCategories", asArray(v) as IMPLEMENT_CATEGORY[])
               }
               options={implementCategoryOptions}
               placeholder="Qualquer categoria"
@@ -3593,10 +3598,10 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
       sectorIds: [],
       customerIds: [],
       assigneeIds: [],
-      truckCategories: [],
+      implementCategories: [],
       implementTypes: [],
       bonifications: [],
-      hasTruck: "any",
+      implementIdentified: "any",
       termPreset: "any",
       forecastPreset: "any",
       finishedPreset: "any",

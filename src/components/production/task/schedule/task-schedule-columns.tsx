@@ -139,25 +139,25 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
     {
       id: "serialNumberOrPlate",
       header: "IDENTIFICADOR",
-      accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
+      accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
       enableSorting: true,
       size: 140,
       minSize: 110,
-      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || row.truck?.plate || "" },
-      cell: ({ row }) => <span className="block truncate">{row.original.serialNumber || row.original.truck?.plate || "-"}</span>,
+      meta: { headerLabel: "Identificador", exportValue: (row) => row.serialNumber || row.implement?.plate || "" },
+      cell: ({ row }) => <span className="block truncate">{row.original.serialNumber || row.original.implement?.plate || "-"}</span>,
     },
     {
       id: "spot",
       header: "LOCAL",
-      accessorFn: (row) => row.truck?.spot || "",
+      accessorFn: (row) => row.implement?.spot || "",
       enableSorting: true,
       size: 120,
       minSize: 90,
-      meta: { headerLabel: "Local", exportValue: (row) => (row.truck?.spot ? formatImplementSpot(row.truck.spot) : "") },
+      meta: { headerLabel: "Local", exportValue: (row) => (row.implement?.spot ? formatImplementSpot(row.implement.spot) : "") },
       cell: ({ row }) =>
-        row.original.truck?.spot ? (
+        row.original.implement?.spot ? (
           <Badge variant="default" className="font-mono">
-            {formatImplementSpot(row.original.truck.spot)}
+            {formatImplementSpot(row.original.implement.spot)}
           </Badge>
         ) : (
           muted("-")
@@ -166,12 +166,12 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
     {
       id: "chassisNumber",
       header: "Nº CHASSI",
-      accessorFn: (row) => row.truck?.chassisNumber || "",
+      accessorFn: (row) => row.implement?.chassisNumber || "",
       enableSorting: true,
       size: 140,
       minSize: 110,
-      meta: { headerLabel: "Nº Chassi", exportValue: (row) => row.truck?.chassisNumber || "" },
-      cell: ({ row }) => <span className="block truncate font-mono">{row.original.truck?.chassisNumber || "-"}</span>,
+      meta: { headerLabel: "Nº Chassi", exportValue: (row) => row.implement?.chassisNumber || "" },
+      cell: ({ row }) => <span className="block truncate font-mono">{row.original.implement?.chassisNumber || "-"}</span>,
     },
     {
       id: "sectorName",

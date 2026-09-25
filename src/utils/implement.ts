@@ -2,15 +2,16 @@ import { TRUCK_MANUFACTURER_LABELS } from "../constants";
 import { TRUCK_MANUFACTURER } from "../constants";
 
 /**
- * Get human-readable label for truck manufacturer
+ * Rótulo da montadora do cavalo (TRUCK_MANUFACTURER fica: é a montadora do
+ * caminhão que leva o implemento, não o implemento — NOMENCLATURA.md §4).
  */
 export function getTruckManufacturerLabel(manufacturer: TRUCK_MANUFACTURER): string {
   return TRUCK_MANUFACTURER_LABELS[manufacturer] || manufacturer;
 }
 
 /**
- * Format truck spot to full descriptive format
- * @param spot - Truck spot value (e.g., "B1_F2_V3")
+ * Format implement spot to full descriptive format
+ * @param spot - Implement spot value (e.g., "B1_F2_V3")
  * @returns Formatted string (e.g., "Barracão 1 - Faixa 2 - Vaga 3")
  */
 export function formatImplementSpot(spot: string | null | undefined): string {
@@ -32,7 +33,7 @@ export function formatImplementSpot(spot: string | null | undefined): string {
 }
 
 // =====================================================================
-// Placa e chassi — fonte única de verdade (espelho de api/src/utils/truck.ts)
+// Placa e chassi — fonte única de verdade (espelho de api/src/utils/implement-manufacturer.ts)
 // =====================================================================
 // Placa antiga:   AAA9999 → exibida ABC-1234 (com hífen)
 // Placa Mercosul: AAA9A99 → exibida ABC1D23  (sem hífen)

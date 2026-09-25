@@ -13,8 +13,8 @@ import {
 } from "@tabler/icons-react";
 import type { ImplementFace } from "@/constants/implement-faces";
 
-// Component to display truck layout SVG preview
-const ImplementLayoutPreview = ({ truckId: implementId, taskName }: { truckId: string; taskName?: string }) => {
+// Component to display implement layout SVG preview
+const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string; taskName?: string }) => {
   const { data: layouts } = useImplementMeasuresByImplement(implementId, { includePhoto: true });
   const [selectedSide, setSelectedSide] = useState<ImplementFace>('left');
 
@@ -602,10 +602,10 @@ const ImplementLayoutPreview = ({ truckId: implementId, taskName }: { truckId: s
 };
 
 /**
- * Bare-body section for the generic DetailPage: renders the truck "Medidas do Implemento"
+ * Bare-body section for the generic DetailPage: renders the implement "Medidas do Implemento"
  * SVG layout preview (side selector, zoom controls, download buttons). The host provides
  * the Card chrome + the "Medidas do Implemento" title, so this returns no outer Card.
  */
-export function ImplementMeasuresSection({ truckId: implementId, taskName }: { truckId: string; taskName?: string }): React.ReactNode {
-  return <ImplementLayoutPreview truckId={implementId} taskName={taskName} />;
+export function ImplementMeasuresSection({ implementId, taskName }: { implementId: string; taskName?: string }): React.ReactNode {
+  return <ImplementLayoutPreview implementId={implementId} taskName={taskName} />;
 }

@@ -1,4 +1,4 @@
-// packages/schemas/src/truck.ts
+// packages/schemas/src/implement.ts
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
@@ -16,7 +16,7 @@ import {
 } from "../utils";
 
 // =====================================================================
-// Placa e chassi — regra canônica (ver utils/truck.ts e utils/cleaners.ts)
+// Placa e chassi — regra canônica (ver utils/implement.ts e utils/cleaners.ts)
 // =====================================================================
 // Ordem obrigatória, sempre nesta sequência:
 //   1. normaliza com cleanPlate/cleanChassis (maiúsculas, só [A-Z0-9]) — ANTES
@@ -108,7 +108,7 @@ const normalizePlateFilter = (value: PlateFilterValue): PlateFilterValue => {
 
 export const implementIncludeSchema = z
   .object({
-    // Direct Truck relations
+    // Direct Implement relations
     task: z
       .union([
         z.boolean(),
@@ -127,7 +127,7 @@ export const implementIncludeSchema = z
               logoPaints: z.boolean().optional(),
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              implement: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
             })
             .optional(),
@@ -182,13 +182,13 @@ export const implementOrderBySchema = z.union([
   // Single ordering object
   z
     .object({
-      // Truck direct fields
+      // Implement direct fields
       id: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
       chassisNumber: orderByDirectionSchema.optional(),
       vinPlateId: orderByDirectionSchema.optional(),
       category: orderByDirectionSchema.optional(),
-      implementType: orderByDirectionSchema.optional(),
+      type: orderByDirectionSchema.optional(),
       spot: orderByDirectionSchema.optional(),
       taskId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
@@ -222,7 +222,7 @@ export const implementOrderBySchema = z.union([
         chassisNumber: orderByDirectionSchema.optional(),
         vinPlateId: orderByDirectionSchema.optional(),
         category: orderByDirectionSchema.optional(),
-        implementType: orderByDirectionSchema.optional(),
+        type: orderByDirectionSchema.optional(),
         spot: orderByDirectionSchema.optional(),
         taskId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
@@ -337,7 +337,7 @@ export const implementWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      // Truck specification enum fields
+      // Implement specification enum fields
       category: z
         .union([
           z.nativeEnum(IMPLEMENT_CATEGORY),
@@ -351,7 +351,7 @@ export const implementWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      implementType: z
+      type: z
         .union([
           z.nativeEnum(IMPLEMENT_TYPE),
           z.null(),
@@ -576,9 +576,9 @@ export const implementCreateSchema = z.object({
   chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
-  // Truck specifications
+  // Implement specifications
   category: z.nativeEnum(IMPLEMENT_CATEGORY).nullable().optional(),
-  implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
+  type: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
 
   // Spot/position field
   spot: z.nativeEnum(IMPLEMENT_SPOT).nullable().optional(),
@@ -598,9 +598,9 @@ export const implementUpdateSchema = z.object({
   chassisNumber: optionalChassisSchema,
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
-  // Truck specifications
+  // Implement specifications
   category: z.nativeEnum(IMPLEMENT_CATEGORY).nullable().optional(),
-  implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
+  type: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
 
   // Spot/position field
   spot: z.nativeEnum(IMPLEMENT_SPOT).nullable().optional(),
@@ -612,36 +612,8 @@ export const implementUpdateSchema = z.object({
   backSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
 });
 
-// =====================
-// Batch Operations Schemas
-// =====================
-
-export const implementBatchCreateSchema = z.object({
-  trucks: z.array(implementCreateSchema).min(1, "Pelo menos um caminhão deve ser fornecido"),
-});
-
-export const implementBatchUpdateSchema = z.object({
-  trucks: z
-    .array(
-      z.object({
-        id: z.string().uuid("Caminhão inválido"),
-        data: implementUpdateSchema,
-      }),
-    )
-    .min(1, "Pelo menos um caminhão deve ser fornecido"),
-});
-
-export const implementBatchDeleteSchema = z.object({
-  truckIds: z.array(z.string().uuid("Caminhão inválido")).min(1, "Pelo menos um ID deve ser fornecido"),
-});
-
 // Query schema for include parameter
 export const implementQuerySchema = z.object({
-  include: implementIncludeSchema.optional(),
-});
-
-// Batch query schema for include parameter
-export const implementBatchQuerySchema = z.object({
   include: implementIncludeSchema.optional(),
 });
 
@@ -651,7 +623,7 @@ export const implementBatchQuerySchema = z.object({
 
 export const implementGetByIdSchema = z.object({
   include: implementIncludeSchema.optional(),
-  id: z.string().uuid("Caminhão inválido"),
+  id: z.string().uuid("Implemento inválido"),
 });
 
 // =====================
@@ -662,16 +634,12 @@ export type ImplementGetManyFormData = z.infer<typeof implementGetManySchema>;
 export type ImplementGetByIdFormData = z.infer<typeof implementGetByIdSchema>;
 export type ImplementCreateFormData = z.infer<typeof implementCreateSchema>;
 export type ImplementUpdateFormData = z.infer<typeof implementUpdateSchema>;
-export type ImplementBatchCreateFormData = z.infer<typeof implementBatchCreateSchema>;
-export type ImplementBatchUpdateFormData = z.infer<typeof implementBatchUpdateSchema>;
-export type ImplementBatchDeleteFormData = z.infer<typeof implementBatchDeleteSchema>;
 
 export type ImplementInclude = z.infer<typeof implementIncludeSchema>;
 export type ImplementOrderBy = z.infer<typeof implementOrderBySchema>;
 export type ImplementWhere = z.infer<typeof implementWhereSchema>;
 
 export type ImplementQueryFormData = z.infer<typeof implementQuerySchema>;
-export type ImplementBatchQueryFormData = z.infer<typeof implementBatchQuerySchema>;
 
 // =====================
 // Helper Functions
@@ -682,7 +650,7 @@ export const mapImplementToFormData = createMapToFormDataHelper<Implement, Imple
   chassisNumber: implement.chassisNumber || undefined,
   vinPlateId: implement.vinPlateId || undefined,
   category: implement.category || undefined,
-  implementType: implement.implementType || undefined,
+  type: implement.type || undefined,
   spot: implement.spot || undefined,
   taskId: implement.taskId,
   leftSideMeasureId: implement.leftSideMeasureId || undefined,

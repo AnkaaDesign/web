@@ -69,7 +69,7 @@ export const ProductionRootPage = () => {
     includeServiceOrders: true,
     includeCuts: true,
     includeAirbrush: true,
-    includeTrucks: true,
+    includeImplements: true,
   });
 
   // Transform recent activities from real data
@@ -481,7 +481,7 @@ export const ProductionRootPage = () => {
                     {
                       item: `${dashboard?.data?.garageUtilization?.occupiedSpots?.value || 0}/${dashboard?.data?.garageUtilization?.totalParkingSpots?.value || 18}`,
                       info: "Vagas ocupadas",
-                      quantity: `${dashboard?.data?.truckMetrics?.trucksInProduction?.value || 0} em produção`,
+                      quantity: `${dashboard?.data?.implementMetrics?.implementsInProduction?.value || 0} em produção`,
                       time: `Utilização: ${Math.round(dashboard?.data?.garageUtilization?.utilizationRate?.value || 0)}%`,
                     },
                   ]}

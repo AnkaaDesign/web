@@ -53,10 +53,10 @@ export const createFilterRemover = (filters: Partial<TaskGetManyFormData>, onFil
         }
         break;
 
-      case "truckIds":
-        if (newFilters.truckIds && value) {
-          newFilters.truckIds = newFilters.truckIds.filter((id: string) => id !== value);
-          if (newFilters.truckIds.length === 0) delete newFilters.truckIds;
+      case "implementIds":
+        if (newFilters.implementIds && value) {
+          newFilters.implementIds = newFilters.implementIds.filter((id: string) => id !== value);
+          if (newFilters.implementIds.length === 0) delete newFilters.implementIds;
         }
         break;
 
@@ -70,7 +70,7 @@ export const createFilterRemover = (filters: Partial<TaskGetManyFormData>, onFil
       case "isCancelled":
       case "hasSector":
       case "hasCustomer":
-      case "hasTruck":
+      case "implementIdentified":
       case "hasObservation":
       case "hasLayouts":
       case "hasPaints":
@@ -210,7 +210,7 @@ export const extractActiveFilters = (
     { key: "isCancelled", label: "Canceladas" },
     { key: "hasSector", label: "Com setor" },
     { key: "hasCustomer", label: "Com cliente" },
-    { key: "hasTruck", label: "Com caminhão" },
+    { key: "implementIdentified", label: "Implemento identificado" },
     { key: "hasObservation", label: "Com observação" },
     { key: "hasLayouts", label: "Com layouts" },
     { key: "hasPaints", label: "Com tintas" },

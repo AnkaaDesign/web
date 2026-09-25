@@ -525,7 +525,7 @@ export function PublicServiceReportPage() {
         _vehicle: multiVehicleDossier
           ? [
               task?.serialNumber ? `nº ${task.serialNumber}` : null,
-              task?.truck?.plate ?? null,
+              task?.implement?.plate ?? null,
             ]
               .filter(Boolean)
               .join(" · ") || null

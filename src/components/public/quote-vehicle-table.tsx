@@ -53,9 +53,9 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
   const labelOf = (map: Record<string, string>, value?: string | null) =>
     value ? (map[value as keyof typeof map] ?? value) : null;
 
-  const anyCategory = tasks.some((t) => !!labelOf(IMPLEMENT_CATEGORY_LABELS as any, t?.truck?.category));
+  const anyCategory = tasks.some((t) => !!labelOf(IMPLEMENT_CATEGORY_LABELS as any, t?.implement?.category));
   const anyImplement = tasks.some(
-    (t) => !!labelOf(IMPLEMENT_TYPE_LABELS as any, t?.truck?.implementType),
+    (t) => !!labelOf(IMPLEMENT_TYPE_LABELS as any, t?.implement?.type),
   );
 
   // Série, placa e chassi saem SEMPRE — com valor, ou com o espaço reservado
@@ -85,10 +85,10 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
       case "serialNumber":
         return task?.serialNumber ? <strong>{task.serialNumber}</strong> : <ARegistrar />;
       case "plate":
-        return task?.truck?.plate ? <strong>{task.truck.plate}</strong> : <ARegistrar />;
+        return task?.implement?.plate ? <strong>{task.implement.plate}</strong> : <ARegistrar />;
       case "chassis":
-        return task?.truck?.chassisNumber ? (
-          <strong>{task.truck.chassisNumber}</strong>
+        return task?.implement?.chassisNumber ? (
+          <strong>{task.implement.chassisNumber}</strong>
         ) : (
           <ARegistrar />
         );
@@ -100,11 +100,11 @@ export function QuoteVehicleTable({ quote, className }: QuoteVehicleTableProps) 
         return value ? <strong>{value}</strong> : <ARegistrar />;
       }
       case "category": {
-        const label = labelOf(IMPLEMENT_CATEGORY_LABELS as any, task?.truck?.category);
+        const label = labelOf(IMPLEMENT_CATEGORY_LABELS as any, task?.implement?.category);
         return label ? <strong>{label}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;
       }
       case "implement": {
-        const label = labelOf(IMPLEMENT_TYPE_LABELS as any, task?.truck?.implementType);
+        const label = labelOf(IMPLEMENT_TYPE_LABELS as any, task?.implement?.type);
         return label ? <strong>{label}</strong> : <span style={{ color: BRAND_COLORS.textGray }}>—</span>;
       }
       default:

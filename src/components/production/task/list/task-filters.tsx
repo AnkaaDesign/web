@@ -176,7 +176,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
       "isCompleted",
       "hasSector",
       "hasCustomer",
-      "hasTruck",
+      "implementIdentified",
       "hasObservation",
       "hasLayouts",
       "hasPaints",
@@ -754,7 +754,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                   {[
                     { key: "hasSector", label: "Tem setor" },
                     { key: "hasCustomer", label: "Tem cliente" },
-                    { key: "hasTruck", label: "Tem caminhão" },
+                    { key: "implementIdentified", label: "Implemento identificado" },
                     { key: "hasObservation", label: "Tem observação" },
                     { key: "hasLayouts", label: "Tem layouts" },
                     { key: "hasPaints", label: "Tem tintas" },

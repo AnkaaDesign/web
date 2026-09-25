@@ -83,7 +83,7 @@ export function ProductionPeriodTasksModal({
         ...(userIds?.length ? { assigneeIds: userIds } : {}),
         limit: 300,
         include: {
-          truck: true,
+          implement: true,
           customer: true,
           sector: true,
         },
@@ -125,7 +125,7 @@ export function ProductionPeriodTasksModal({
     task.customer?.fantasyName ?? task.customer?.name ?? '';
 
   const indicator = (task: any) =>
-    task.serialNumber ?? task.truck?.plate ?? task.truck?.chassisNumber ?? '—';
+    task.serialNumber ?? task.implement?.plate ?? task.implement?.chassisNumber ?? '—';
 
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -129,17 +129,17 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "measures", label: "Medidas", getValue: (task: Task) => formatTaskMeasures(task) },
   { id: "generalPainting", label: "Pintura Geral", getValue: (task: Task) => task.generalPainting?.name || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
-  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
-  { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.truck?.chassisNumber || "" },
+  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.implement?.plate || "" },
+  { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.implement?.chassisNumber || "" },
   {
-    id: "truckCategory",
-    label: "Categoria do Caminhão",
-    getValue: (task: Task) => (task.truck?.category ? IMPLEMENT_CATEGORY_LABELS[task.truck.category] || task.truck.category : ""),
+    id: "implementCategory",
+    label: "Categoria do Implemento",
+    getValue: (task: Task) => (task.implement?.category ? IMPLEMENT_CATEGORY_LABELS[task.implement.category] || task.implement.category : ""),
   },
   {
     id: "implementType",
     label: "Tipo de Implemento",
-    getValue: (task: Task) => (task.truck?.implementType ? IMPLEMENT_TYPE_LABELS[task.truck.implementType] || task.truck.implementType : ""),
+    getValue: (task: Task) => (task.implement?.type ? IMPLEMENT_TYPE_LABELS[task.implement.type] || task.implement.type : ""),
   },
   { id: "forecastDate", label: "Previsão", getValue: (task: Task) => (task.forecastDate ? formatDateTime(new Date(task.forecastDate)) : "") },
   { id: "entryDate", label: "Data de Entrada", getValue: (task: Task) => (task.entryDate ? formatDateTime(new Date(task.entryDate)) : "") },
@@ -213,8 +213,8 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
           createdBy: true,
           generalPainting: true,
           // A coluna "Medidas" (formatTaskMeasures) lê as seções da lateral; com
-          // `truck: true` elas não vinham e a coluna saía "-" em toda linha.
-          truck: {
+          // `implement: true` elas não vinham e a coluna saía "-" em toda linha.
+          implement: {
             include: {
               leftSideMeasure: { include: { sections: true } },
               rightSideMeasure: { include: { sections: true } },

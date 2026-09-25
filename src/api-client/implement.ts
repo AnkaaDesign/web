@@ -6,15 +6,15 @@ import { apiClient } from "./axiosClient";
 
 export interface SpotOccupant {
   spotNumber: 1 | 2 | 3;
-  truckId: string;
+  implementId: string;
   taskName: string | null;
-  truckLength: number;
+  implementLength: number;
 }
 
 export interface LaneAvailability {
   laneId: 'F1' | 'F2' | 'F3';
   availableSpace: number;
-  currentTrucks: number;
+  currentImplements: number;
   canFit: boolean;
   nextSpotNumber: 1 | 2 | 3 | null;
   occupiedSpots: (1 | 2 | 3)[];
@@ -44,9 +44,9 @@ export const getGaragesAvailability = async (
   excludeImplementId?: string,
 ): Promise<GaragesAvailabilityResponse> => {
   const response = await apiClient.get<GaragesAvailabilityResponse>(
-    `/trucks/garages-availability`,
+    `/implements/garages-availability`,
     {
-      params: { truckLength: implementLength, excludeTruckId: excludeImplementId },
+      params: { implementLength, excludeImplementId },
     },
   );
   return response.data;
@@ -57,7 +57,7 @@ export const getGaragesAvailability = async (
 // =====================
 
 export interface BatchUpdateSpotsRequest {
-  updates: Array<{ truckId: string; spot: string | null }>;
+  updates: Array<{ implementId: string; spot: string | null }>;
 }
 
 export interface BatchUpdateSpotsResponse {
@@ -70,10 +70,10 @@ export interface BatchUpdateSpotsResponse {
 }
 
 export const batchUpdateSpots = async (
-  updates: Array<{ truckId: string; spot: string | null }>,
+  updates: Array<{ implementId: string; spot: string | null }>,
 ): Promise<BatchUpdateSpotsResponse> => {
   const response = await apiClient.post<BatchUpdateSpotsResponse>(
-    `/trucks/batch-update-spots`,
+    `/implements/batch-update-spots`,
     { updates },
   );
   return response.data;
@@ -85,7 +85,7 @@ export const batchUpdateSpots = async (
 
 export interface MovementRequestData {
   taskId: string;
-  truckId: string;
+  implementId: string;
   taskName: string;
   fromSpot: string | null;
   toSpot: string | null;
@@ -95,7 +95,7 @@ export const requestMovement = async (
   data: MovementRequestData,
 ): Promise<{ success: boolean; message: string }> => {
   const response = await apiClient.post<{ success: boolean; message: string }>(
-    `/trucks/request-movement`,
+    `/implements/request-movement`,
     data,
   );
   return response.data;

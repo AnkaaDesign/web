@@ -343,7 +343,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     receiptIds: "Recibos",
     generalPainting: "Pintura Geral",
     observationId: "Observação",
-    truckId: "Caminhão",
+    implementId: "Implemento",
     negotiatingWith: "Negociando Com", // DEPRECATED - kept for historical changelog records
     responsibles: "Responsáveis",
     // Relationship fields
@@ -354,7 +354,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     receipt: "Recibo",
     paint: "Tinta",
     observation: "Observação",
-    truck: "Caminhão",
+    implement: "Implemento",
     createdBy: "Criado por",
     layouts: "Layouts",
     layoutIds: "Layouts",
@@ -376,14 +376,14 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     cutPlan: "Planos de Corte",
     relatedTasks: "Tarefas Relacionadas",
     relatedTo: "Relacionado a",
-    trucks: "Caminhões",
+    implements: "Implementos",
     responsibleIds: "Responsáveis",
-    // Direct truck fields (when truck data is embedded in task changelog)
-    category: "Categoria do Caminhão",
+    // Direct implement fields (when implement data is embedded in task changelog)
+    category: "Categoria do Implemento",
     implementType: "Tipo de Implemento",
-    "truck.leftSideMeasureId": "Medidas Lado Motorista",
-    "truck.rightSideMeasureId": "Medidas Lado Sapo",
-    "truck.backSideMeasureId": "Medidas Traseira",
+    "implement.leftSideMeasureId": "Medidas Lado Motorista",
+    "implement.rightSideMeasureId": "Medidas Lado Sapo",
+    "implement.backSideMeasureId": "Medidas Traseira",
     // Nested relationship fields
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
@@ -398,9 +398,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "paint.name": "Nome da Tinta",
     "observation.content": "Conteúdo da Observação",
     "observation.type": "Tipo da Observação",
-    "truck.plate": "Placa do Caminhão",
-    "truck.model": "Modelo do Caminhão",
-    "truck.manufacturer": "Fabricante do Caminhão",
+    "implement.plate": "Placa do Implemento",
   },
   [CHANGE_LOG_ENTITY_TYPE.SUPPLIER]: {
     // Basic information
@@ -607,7 +605,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
   },
   [CHANGE_LOG_ENTITY_TYPE.MAINTENANCE]: {
     type: "Tipo",
-    truckId: "Caminhão",
     mechanicId: "Mecânico",
     scheduledFor: "Agendado para",
     startedAt: "Iniciado em",
@@ -618,14 +615,10 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     maintenanceScheduleId: "Cronograma de Manutenção",
     itemId: "Equipamento",
     item: "Equipamento",
-    truck: "Caminhão",
     mechanic: "Mecânico",
     maintenanceSchedule: "Cronograma",
     itemsNeeded: "Itens necessários",
     // Nested fields
-    "truck.plate": "Placa do Caminhão",
-    "truck.model": "Modelo do Caminhão",
-    "truck.manufacturer": "Fabricante do Caminhão",
     "mechanic.name": "Nome do Mecânico",
     "item.name": "Nome do Equipamento",
     "maintenanceSchedule.name": "Nome do Cronograma",
@@ -793,7 +786,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "formula.paint.name": "Nome da Tinta",
     "formula.paint.code": "Código da Tinta",
   },
-  [CHANGE_LOG_ENTITY_TYPE.TRUCK]: {
+  [CHANGE_LOG_ENTITY_TYPE.IMPLEMENT]: {
     width: "Largura",
     height: "Altura",
     length: "Comprimento",
@@ -803,7 +796,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     garageId: "Garagem",
     spot: "Localização",
     category: "Categoria",
-    implementType: "Tipo de Implemento",
+    type: "Tipo de Implemento",
     vehicle_movement: "Movimentação de Veículo",
     parking_position: "Posição de Estacionamento",
     // Related task fields
@@ -1723,16 +1716,20 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return cutTypeLabels[value] || value;
   }
 
-  // Handle truck category (for both TRUCK entity and truck.category in TASK entity)
-  if ((field === "category" || field === "truck.category") && typeof value === "string") {
+  // Handle implement category (for both IMPLEMENT entity and implement.category in TASK entity)
+  if ((field === "category" || field === "implement.category") && typeof value === "string") {
     // Perfil `webChangelog` do contrato da API: o histórico tem palavras
     // próprias ("VUC (Veículo Urbano de Carga)", "Caminhão"), diferentes da tela.
     const implementCategoryLabels: Record<string, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.webChangelog;
     return implementCategoryLabels[value] || value;
   }
 
-  // Handle truck implement type
-  if ((field === "implementType" || field === "truck.implementType") && typeof value === "string") {
+  // Handle implement type: `implement.type` (TASK), `type` (IMPLEMENT) e `implementType`
+  // (linhas de TASK anteriores ao rename, que a migração não reescreve — só as de IMPLEMENT).
+  if (
+    (field === "implementType" || field === "implement.type" || (field === "type" && entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT)) &&
+    typeof value === "string"
+  ) {
     const implementTypeLabels: Record<string, string> = {
       ...IMPLEMENT_TYPE_PROFILE_LABELS.webChangelog,
       // Valor fora do enum, só em linhas antigas do histórico (migrado para REFRIGERATED).
@@ -1741,8 +1738,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return implementTypeLabels[value] || value;
   }
 
-  // Handle truck spot
-  if (field === "spot" || field === "truck.spot") {
+  // Handle implement spot
+  if (field === "spot" || field === "implement.spot") {
     // Handle empty/null case
     if (!value || value === "" || value === null) return "Pátio";
 
@@ -2318,7 +2315,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         field === "invoiceIds" ||
         field === "receiptIds" ||
         field === "observationId" ||
-        field === "truckId" ||
+        field === "implementId" ||
         field === "userId" ||
         field === "itemId" ||
         field === "reviewedBy" ||
@@ -2585,7 +2582,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
 
     // Handle individual truck layout fields
     if (
-      (field === "truck.leftSideMeasureId" || field === "truck.rightSideMeasureId" || field === "truck.backSideMeasureId") &&
+      (field === "implement.leftSideMeasureId" || field === "implement.rightSideMeasureId" || field === "implement.backSideMeasureId") &&
       entityType === CHANGE_LOG_ENTITY_TYPE.TASK
     ) {
       const layout = value as any;

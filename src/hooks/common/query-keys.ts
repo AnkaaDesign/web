@@ -758,7 +758,7 @@ export const taskKeys = {
 // Truck Query Keys
 // =====================================================
 
-export const implementKeys = createQueryKeyStore<ImplementGetManyFormDataType>("trucks");
+export const implementKeys = createQueryKeyStore<ImplementGetManyFormDataType>("implements");
 
 // =====================================================
 // User Query Keys

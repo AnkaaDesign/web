@@ -17,7 +17,7 @@ const labelClass = "text-sm text-muted-foreground flex items-center gap-2 flex-s
 const valueClass = "text-sm font-semibold text-foreground truncate text-right min-w-0";
 
 const customerNameOf = (t: ClusteredTask): string => t.customer?.fantasyName || t.customer?.corporateName || "-";
-const identifierOf = (t: ClusteredTask): string => [t.serialNumber, t.truck?.plate].filter(Boolean).join(" · ") || "-";
+const identifierOf = (t: ClusteredTask): string => [t.serialNumber, t.implement?.plate].filter(Boolean).join(" · ") || "-";
 
 /** The labeled detail rows for a single task (Tarefa · Cliente · Identificador · Previsão). */
 export const TaskReviewRows = ({ task }: { task?: ClusteredTask | null }) => {

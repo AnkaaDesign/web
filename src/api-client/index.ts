@@ -76,7 +76,7 @@ export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";
 export * from "./throttler";
-export * from "./truck";
+export * from "./implement";
 export * from "./warehouse-location";
 export * from "./implementMeasure";
 export * from "./services/team-staff";

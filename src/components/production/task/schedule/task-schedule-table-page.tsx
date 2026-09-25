@@ -89,7 +89,7 @@ export const SCHEDULE_LIST_INCLUDE = {
   sector: true,
   customer: true,
   generalPainting: { include: { paintType: true, paintBrand: true } },
-  truck: true,
+  implement: true,
   serviceOrders: true,
   quote: true,
   createdBy: true,
@@ -481,7 +481,7 @@ export function TaskScheduleTablePage() {
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
-          truck: {
+          implement: {
             include: {
               leftSideMeasure: { include: { sections: true, photo: true } },
               rightSideMeasure: { include: { sections: true, photo: true } },
@@ -682,7 +682,7 @@ export function TaskScheduleTablePage() {
         onClick: (r) => openAdvanced("serviceOrder", r),
       },
       {
-        key: "adv-truck-layout",
+        key: "adv-implement-layout",
         label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
         group: ADVANCED_GROUP,

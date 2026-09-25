@@ -37,7 +37,7 @@ const INVALIDATION_KEYS: Partial<Record<string, string>> = {
   OBSERVATION: "observations",
   SERVICE_ORDER: "serviceOrders",
   TASK_QUOTE: "taskQuotes",
-  TRUCK: "trucks",
+  IMPLEMENT: "implements",
   CUSTOMER: "customers",
   SUPPLIER: "suppliers",
   PAINT: "paints",

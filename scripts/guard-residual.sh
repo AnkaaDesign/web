@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # G6a / G6b — PORTÃO DE RESÍDUO COM CATRACA (web).
 #
-# Cópia do api/scripts/guard-residual.sh (mesmo padrão, mesmos modos),
+# Cópia do api/scripts/guard-residual.sh (mesmos modos; o padrão G6a tem as
+# exceções deste web, descritas abaixo),
 # varrendo `src/`. JSX solto (`<span>Truck do</span>`) não está
 # em literal e o G6b não o vê.
 #
@@ -26,10 +27,21 @@
 # nome velho sair dele.
 #
 # O G6a enxerga, além de `truck`/`trucks` e `TruckAlgo`, o camelCase
-# (`truckId`, `truckData`…) e o tipo sozinho (`Truck`, `Trucks`). Exceções
-# nomeadas no próprio padrão: `truckSpot` (a vaga do pátio), `truck-studio` e
-# "Truck Studio" (a ferramenta 3D), `TRUCK_MANUFACTURER*`, `TRUCK_SPOT`.
-# `IconTruck`/`GarageTruck` não casam (sem fronteira de palavra antes do T).
+# (`truckId`, `truckData`…) e o tipo sozinho (`Truck`, `Trucks`). Desde a
+# migração completa de nomenclatura (NOMENCLATURA.md, DD13, 24/09/2026) o alvo
+# é ZERO: `truckSpot` e `TRUCK_SPOT` deixaram de ser exceção (viraram
+# `implementSpot`/`IMPLEMENT_SPOT`). Exceções nomeadas no próprio padrão, todas
+# da §4 do contrato ou nomes que não são o implemento:
+#   - o Truck Studio: `truck-studio`, "Truck Studio", `truckStudio`, `TruckStudio…`;
+#   - a montadora do cavalo: `TRUCK_MANUFACTURER*`, `TruckManufacturer…`;
+#   - os glifos do Tabler: `IconTruck…`, a chave de ícone `icon: "truck"` e o
+#     mapa `truck: "IconTruck"`;
+#   - os diretórios de assets das montadoras e dos renders do estúdio
+#     (`brands/trucks/`, `renders/trucks/`, `truckBrandsDir`);
+#   - a linha marcada com `resíduo-ok` e o motivo (hoje: o glifo "Truck" nas
+#     listas de ícone dos widgets, valor gravado no painel do usuário).
+# `BITRUCK`/`Bitruck` e o valor `TRUCK` da categoria não casam (sem `_`, sem
+# fronteira de palavra antes do t).
 #
 # O G6b pega o identificador em inglês colado a texto de tela dos DOIS lados
 # ("ImplementMeasure do…", "Medida do ImplementMeasure"), o nome separado
@@ -52,7 +64,7 @@ BASELINE=".residual-baseline.json"
 ALLOWLIST=".residual-allowlist"
 MODE="${1:-check}"
 
-G6A_PATTERN='\btrucks?\b(?!-studio)|\btrucks?(?!Spot)[A-Z]\w*|\bTrucks?\b(?! Studio)|Truck[A-Z]|TRUCK_(?!MANUFACTURER|SPOT)'
+G6A_PATTERN='(?<!Icon)(?<!icon: ")(?<!brands/)(?<!renders/)(?:\btrucks?\b(?!-studio|: "IconTruck")|\btrucks?(?!Studio|BrandsDir)[A-Z]\w*|\bTrucks?\b(?! Studio)|Truck(?!Studio|Manufacturer)[A-Z]|TRUCK_(?!MANUFACTURER))(?![^\n]*resíduo-ok)'
 G6B_PATTERN='["'"'"'`][^"'"'"'`\n]*(ImplementMeasure [a-zçã]|Implement [a-z]|Truck [a-z]|[a-zçãõéêíóú:]\s+(ImplementMeasure|Implement|Truck)\b(?! Studio)|Implement Measure|\b(ImplementMeasure|Implement|Truck) ["'"'"'`])'
 
 globs=()

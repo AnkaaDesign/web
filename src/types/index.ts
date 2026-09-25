@@ -39,7 +39,7 @@ export * from "./summary";
 export * from "./supplier";
 export * from "./task";
 export * from "./timeClockEntry";
-export * from "./truck";
+export * from "./implement";
 export * from "./warehouse-location";
 export * from "./implementMeasure";
 export * from "./implementMeasureSection";

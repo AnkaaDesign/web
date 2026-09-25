@@ -57,7 +57,7 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
           logo: true,
         },
       },
-      truck: {
+      implement: {
         include: {
           // Foto da plaqueta (VIN) — sem isto o `include` devolve só os escalares.
           vinPlate: true,
@@ -96,8 +96,8 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
 
   // Get layout dimensions (both sides have the same measures)
   const layoutDimensions = useMemo(() => {
-    if (!task?.truck) return null;
-    const implement = task.truck as any;
+    if (!task?.implement) return null;
+    const implement = task.implement as any;
     const layout = implement?.leftSideMeasure || implement?.rightSideMeasure;
     if (!layout || !layout.sections || layout.sections.length === 0) return null;
     const totalLength = layout.sections.reduce(
@@ -227,42 +227,42 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
             )}
 
             {/* Plate */}
-            {(task.truck as any)?.plate && (
+            {(task.implement as any)?.plate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconCar className="h-4 w-4" />
                   Placa
                 </span>
                 <span className="text-sm font-semibold text-foreground uppercase">
-                  {(task.truck as any).plate}
+                  {(task.implement as any).plate}
                 </span>
               </div>
             )}
 
             {/* Chassis Number */}
-            {(task.truck as any)?.chassisNumber && (
+            {(task.implement as any)?.chassisNumber && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconBarcode className="h-4 w-4" />
                   Chassi
                 </span>
                 <span className="text-sm font-semibold text-foreground uppercase">
-                  {(task.truck as any).chassisNumber}
+                  {(task.implement as any).chassisNumber}
                 </span>
               </div>
             )}
 
             {/* Plaqueta — foto da plaqueta de identificação (VIN), não texto. */}
-            {(task.truck as any)?.vinPlate && (
+            {(task.implement as any)?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconBarcode className="h-4 w-4" />
                   Plaqueta
                 </span>
                 <FileThumbnail
-                  file={(task.truck as any).vinPlate}
+                  file={(task.implement as any).vinPlate}
                   size="sm"
-                  onClick={() => window.open(`${getApiBaseUrl()}/files/${(task.truck as any).vinPlate.id}/download`, '_blank')}
+                  onClick={() => window.open(`${getApiBaseUrl()}/files/${(task.implement as any).vinPlate.id}/download`, '_blank')}
                 />
               </div>
             )}

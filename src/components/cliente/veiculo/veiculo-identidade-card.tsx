@@ -333,7 +333,7 @@ export function VeiculoIdentidadeCard({
             e o conserto dependia de ligar para o comercial.
 
             ⚠️ O valor gravado é o do ENUM; o que aparece é o rótulo da casa
-            (`TRUCK_CATEGORY_LABELS`), o mesmo do lado funcionário e o mesmo que
+            (`IMPLEMENT_CATEGORY_LABELS`), o mesmo do lado funcionário e o mesmo que
             o documento imprime. */}
         <PortalInlineField
           label="Categoria"

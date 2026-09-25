@@ -1,6 +1,6 @@
-// packages/interfaces/src/truck.ts
+// packages/interfaces/src/implement.ts
 
-import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
+import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse } from "./common";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { ImplementMeasure, ImplementMeasureIncludes } from "./implementMeasure";
 import type { File } from "./file";
@@ -17,9 +17,9 @@ export interface Implement extends BaseEntity {
   /** Foto da plaqueta de identificação (VIN). Imagem, não texto — a relação é `vinPlate`. */
   vinPlateId: string | null;
 
-  // Truck specifications
+  // Implement specifications
   category: IMPLEMENT_CATEGORY | null;
-  implementType: IMPLEMENT_TYPE | null;
+  type: IMPLEMENT_TYPE | null;
 
   // Spot (garage location)
   spot: IMPLEMENT_SPOT | null;
@@ -76,7 +76,7 @@ export interface ImplementOrderBy {
   chassisNumber?: ORDER_BY_DIRECTION;
   vinPlateId?: ORDER_BY_DIRECTION;
   category?: ORDER_BY_DIRECTION;
-  implementType?: ORDER_BY_DIRECTION;
+  type?: ORDER_BY_DIRECTION;
   spot?: ORDER_BY_DIRECTION;
   taskId?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
@@ -93,14 +93,6 @@ export interface ImplementGetManyResponse extends BaseGetManyResponse<Implement>
 export interface ImplementCreateResponse extends BaseCreateResponse<Implement> {}
 export interface ImplementUpdateResponse extends BaseUpdateResponse<Implement> {}
 export interface ImplementDeleteResponse extends BaseDeleteResponse {}
-
-// =====================
-// Batch Operation Responses
-// =====================
-
-export interface ImplementBatchCreateResponse<T> extends BaseBatchResponse<Implement, T> {}
-export interface ImplementBatchUpdateResponse<T> extends BaseBatchResponse<Implement, T & { id: string }> {}
-export interface ImplementBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
 
 // =====================
 // Form Data Types
@@ -130,7 +122,7 @@ export interface ImplementCreateFormData {
   chassisNumber?: string | null;
   vinPlateId?: string | null;
   category?: IMPLEMENT_CATEGORY | null;
-  implementType?: IMPLEMENT_TYPE | null;
+  type?: IMPLEMENT_TYPE | null;
   spot?: IMPLEMENT_SPOT | null;
   taskId?: string;
   leftSideMeasureId?: string | null;
@@ -143,7 +135,7 @@ export interface ImplementUpdateFormData {
   chassisNumber?: string | null;
   vinPlateId?: string | null;
   category?: IMPLEMENT_CATEGORY | null;
-  implementType?: IMPLEMENT_TYPE | null;
+  type?: IMPLEMENT_TYPE | null;
   spot?: IMPLEMENT_SPOT | null;
   taskId?: string;
   leftSideMeasureId?: string | null;
@@ -153,19 +145,4 @@ export interface ImplementUpdateFormData {
 
 export interface ImplementQueryFormData {
   include?: ImplementIncludes;
-}
-
-export interface ImplementBatchCreateFormData {
-  trucks: ImplementCreateFormData[];
-}
-
-export interface ImplementBatchUpdateFormData {
-  trucks: {
-    id: string;
-    data: ImplementUpdateFormData;
-  }[];
-}
-
-export interface ImplementBatchDeleteFormData {
-  truckIds: string[];
 }

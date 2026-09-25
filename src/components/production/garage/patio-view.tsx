@@ -10,9 +10,9 @@ import type { GarageImplement } from './garage-view';
 // =====================
 
 const PATIO_CONFIG = {
-  TRUCK_WIDTH: 2.8,
-  TRUCK_MIN_SPACING: 2,
-  DEFAULT_TRUCK_LENGTH: 12,
+  IMPLEMENT_WIDTH: 2.8,
+  IMPLEMENT_MIN_SPACING: 2,
+  DEFAULT_IMPLEMENT_LENGTH: 12,
   TARGET_WIDTH: 25,
 } as const;
 
@@ -26,7 +26,7 @@ interface PositionedImplement extends GarageImplement {
 }
 
 interface PatioLayout {
-  trucks: PositionedImplement[];
+  implementList: PositionedImplement[];
   width: number;
   height: number;
   columns: number;
@@ -40,7 +40,7 @@ interface PatioLayout {
 function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
   if (implementList.length === 0) {
     return {
-      trucks: [],
+      implementList: [],
       width: 0,
       height: 0,
       columns: 0,
@@ -50,8 +50,8 @@ function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
 
   const avgImplementLength =
     implementList.reduce((sum, t) => sum + t.length, 0) / implementList.length;
-  const implementWidth = PATIO_CONFIG.TRUCK_WIDTH;
-  const spacing = PATIO_CONFIG.TRUCK_MIN_SPACING;
+  const implementWidth = PATIO_CONFIG.IMPLEMENT_WIDTH;
+  const spacing = PATIO_CONFIG.IMPLEMENT_MIN_SPACING;
 
   // Calculate columns to fit in a reasonable width
   const columns = Math.max(
@@ -75,7 +75,7 @@ function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
   const totalHeight = rows * (avgImplementLength + spacing) + spacing;
 
   return {
-    trucks: positionedImplements,
+    implementList: positionedImplements,
     width: totalWidth,
     height: totalHeight,
     columns,
@@ -88,13 +88,13 @@ function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
 // =====================
 
 interface ImplementElementProps {
-  truck: PositionedImplement;
+  implement: PositionedImplement;
   scale: number;
   avgLength: number;
 }
 
-function ImplementElement({ truck: implement, scale, avgLength }: ImplementElementProps) {
-  const width = PATIO_CONFIG.TRUCK_WIDTH * scale;
+function ImplementElement({ implement, scale, avgLength }: ImplementElementProps) {
+  const width = PATIO_CONFIG.IMPLEMENT_WIDTH * scale;
   const height = avgLength * scale;
   const x = implement.xPosition * scale;
   const y = implement.yPosition * scale;
@@ -168,12 +168,12 @@ function ImplementElement({ truck: implement, scale, avgLength }: ImplementEleme
 // =====================
 
 interface PatioViewProps {
-  trucks: GarageImplement[];
-  onTruckSelect?: (implementId: string) => void;
+  implementList: GarageImplement[];
+  onImplementSelect?: (implementId: string) => void;
   className?: string;
 }
 
-export function PatioView({ trucks: implementList, onTruckSelect: onImplementSelect, className }: PatioViewProps) {
+export function PatioView({ implementList, onImplementSelect, className }: PatioViewProps) {
   const patioLayout = useMemo(() => calculatePatioLayout(implementList), [implementList]);
 
   if (implementList.length === 0) {
@@ -195,7 +195,7 @@ export function PatioView({ trucks: implementList, onTruckSelect: onImplementSel
   const padding = 40;
   const scaleX = (containerWidth - padding * 2) / patioLayout.width;
   const scaleY = (containerHeight - padding * 2) / patioLayout.height;
-  const scale = Math.min(scaleX, scaleY, 15); // Cap scale to prevent too large trucks
+  const scale = Math.min(scaleX, scaleY, 15); // Cap scale to prevent too large implements
 
   const avgLength =
     implementList.reduce((sum, t) => sum + t.length, 0) / implementList.length;
@@ -209,7 +209,7 @@ export function PatioView({ trucks: implementList, onTruckSelect: onImplementSel
       <div className="flex items-center gap-4">
         <h2 className="text-xl font-bold">Pátio</h2>
         <span className="text-sm text-muted-foreground">
-          ({implementList.length} caminhão{implementList.length !== 1 ? 'ões' : ''})
+          ({implementList.length} implemento{implementList.length !== 1 ? 's' : ''})
         </span>
       </div>
 
@@ -229,14 +229,14 @@ export function PatioView({ trucks: implementList, onTruckSelect: onImplementSel
               strokeDasharray="8"
             />
 
-            {/* Trucks */}
-            {patioLayout.trucks.map((implement) => (
+            {/* Implements */}
+            {patioLayout.implementList.map((implement) => (
               <g
                 key={implement.id}
                 onClick={() => onImplementSelect?.(implement.id)}
                 style={{ cursor: onImplementSelect ? 'pointer' : 'default' }}
               >
-                <ImplementElement truck={implement} scale={scale} avgLength={avgLength} />
+                <ImplementElement implement={implement} scale={scale} avgLength={avgLength} />
               </g>
             ))}
 

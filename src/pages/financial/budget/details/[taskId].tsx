@@ -135,10 +135,10 @@ function toVehicleFormValues(task: any, airbrushings: any[] | undefined): Vehicl
   return {
     taskId: task.id,
     serialNumber: task.serialNumber || "",
-    plate: task.truck?.plate || "",
-    chassisNumber: task.truck?.chassisNumber || "",
+    plate: task.implement?.plate || "",
+    chassisNumber: task.implement?.chassisNumber || "",
     customerOrderNumber: task.customerOrderNumber || null,
-    vinPlateId: task.truck?.vinPlateId || null,
+    vinPlateId: task.implement?.vinPlateId || null,
     forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
     term: task.term ? new Date(task.term) : null,
     details: task.details || "",
@@ -154,7 +154,7 @@ function vehicleLabelOf(values: Partial<VehicleFormValues> | undefined, index: n
 
 /** A foto de plaqueta gravada, na forma do campo de upload. */
 function vinPlateFilesOf(task: any): FileWithPreview[] {
-  const persisted = task?.truck?.vinPlate;
+  const persisted = task?.implement?.vinPlate;
   return persisted
     ? [
         {
@@ -536,7 +536,7 @@ const FinancialBudgetDetailPageInner = () => {
         id: t.id,
         name: t.name ?? null,
         serialNumber: t.serialNumber ?? null,
-        plate: t.truck?.plate ?? null,
+        plate: t.implement?.plate ?? null,
         customerOrderNumber: t.customerOrderNumber ?? null,
       })),
     [existingQuote],
@@ -621,11 +621,11 @@ const FinancialBudgetDetailPageInner = () => {
     const taskFields = {
       name: task.name || "",
       customerId: task.customerId || "",
-      category: task.truck?.category || "",
-      // Seed from the loaded truck; leave empty when absent. NEVER default to a
-      // concrete enum here — that silently rewrites the truck's implementType to
+      category: task.implement?.category || "",
+      // Seed from the loaded implement; leave empty when absent. NEVER default to a
+      // concrete enum here — that silently rewrites the implement's implementType to
       // REFRIGERATED on every save (finding I39).
-      implementType: task.truck?.implementType || "",
+      implementType: task.implement?.type || "",
       vehicles: loadedVehicles.map((t) =>
         toVehicleFormValues(t, vehicles.airbrushingsByTask[t.id]),
       ),
@@ -1312,8 +1312,8 @@ const FinancialBudgetDetailPageInner = () => {
     const checks: Array<[string, string, (t: any) => string]> = [
       ["name", "Logomarca", (t) => t.name || ""],
       ["customerId", "Cliente", (t) => t.customerId || ""],
-      ["category", "Categoria", (t) => t.truck?.category || ""],
-      ["implementType", "Implemento", (t) => t.truck?.implementType || ""],
+      ["category", "Categoria", (t) => t.implement?.category || ""],
+      ["implementType", "Implemento", (t) => t.implement?.type || ""],
       ["responsibles", "Responsáveis", (t) => idsOf(t.responsibles)],
       ["baseFiles", "Arquivos base", (t) => idsOf(t.baseFiles)],
     ];
@@ -1423,7 +1423,7 @@ const FinancialBudgetDetailPageInner = () => {
         if (!pendingVinPlate) continue;
         pendingVinPlateByTask[vehicleId] = true;
         try {
-          const response = await uploadSingleFile(pendingVinPlate, { fileContext: "truckVinPlate" });
+          const response = await uploadSingleFile(pendingVinPlate, { fileContext: "implementVinPlate" });
           if (response.success && response.data) {
             vinPlateIdByTask[vehicleId] = response.data.id;
             // Keep the File instance (blob intact) but mark it uploaded, so a retry after a
@@ -1622,13 +1622,13 @@ const FinancialBudgetDetailPageInner = () => {
           payload.name = data.name || undefined;
         if (writeCommon("customerId") && (vehicleTask.customerId || "") !== (data.customerId || ""))
           payload.customerId = data.customerId || undefined;
-        if (writeCommon("category") && (vehicleTask.truck?.category || "") !== (data.category || ""))
+        if (writeCommon("category") && (vehicleTask.implement?.category || "") !== (data.category || ""))
           implementPayload.category = data.category || undefined;
         if (
           writeCommon("implementType") &&
-          (vehicleTask.truck?.implementType || "") !== (data.implementType || "")
+          (vehicleTask.implement?.type || "") !== (data.implementType || "")
         )
-          implementPayload.implementType = data.implementType || undefined;
+          implementPayload.type = data.implementType || undefined;
         if (writeBaseFiles) {
           const current = ((vehicleTask.baseFiles || []) as any[]).map((f) => f.id);
           // Na tarefa aberta vale a comparação de sempre (inclui reordenar); nos irmãos,
@@ -1667,7 +1667,7 @@ const FinancialBudgetDetailPageInner = () => {
         if (vDirty.vinPlateId || pendingVinPlateByTask[vehicleTask.id]) {
           implementPayload.vinPlateId = vinPlateIdByTask[vehicleTask.id] ?? null;
         }
-        if (Object.keys(implementPayload).length > 0) payload.truck = implementPayload;
+        if (Object.keys(implementPayload).length > 0) payload.implement = implementPayload;
 
         // Layout Referência deste veículo: só quando o conjunto ou os status mudaram.
         const loadedLayoutIds = loadedLayoutIdsByTaskRef.current[vehicleTask.id] ?? [];
@@ -2324,11 +2324,11 @@ const FinancialBudgetDetailPageInner = () => {
 
   // O TAMANHO do implemento — comum, lançado pela Logística na tarefa e replicado aos
   // irmãos pela API. Aqui só se lê.
-  const openImplementId = ((task?.truck as any)?.id as string | undefined) ?? "";
+  const openImplementId = ((task?.implement as any)?.id as string | undefined) ?? "";
   const { data: measuresData } = useImplementMeasuresByImplement(openImplementId, { enabled: !!openImplementId });
   const measuresSummary = useMemo(() => {
     if (!openImplementId) return null;
-    const formatted = formatTaskMeasures({ truck: (measuresData as any) ?? {} } as any);
+    const formatted = formatTaskMeasures({ implement: (measuresData as any) ?? {} } as any);
     return formatted === "-" ? "ainda não medido" : `${formatted} cm`;
   }, [openImplementId, measuresData]);
 
@@ -2448,8 +2448,8 @@ const FinancialBudgetDetailPageInner = () => {
   }, []);
 
   // Build header info
-  const taskName = task?.name || task?.truck?.plate || "Tarefa";
-  const taskDisplayName = [taskName, task?.serialNumber || task?.truck?.plate]
+  const taskName = task?.name || task?.implement?.plate || "Tarefa";
+  const taskDisplayName = [taskName, task?.serialNumber || task?.implement?.plate]
     .filter(Boolean)
     .join(" - ");
   // Com N veículos o título é do ORÇAMENTO: a série de um caminhão ali parecia

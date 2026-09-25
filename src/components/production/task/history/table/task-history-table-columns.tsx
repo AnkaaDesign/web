@@ -216,16 +216,16 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "identificador",
       header: "Identificador",
-      accessorFn: (t) => t.serialNumber || t.truck?.plate || "",
+      accessorFn: (t) => t.serialNumber || t.implement?.plate || "",
       enableSorting: true,
       size: 150,
       meta: {
         headerLabel: "Identificador",
         exportHeader: "Identificador",
-        exportValue: (t) => t.serialNumber || t.truck?.plate || "",
+        exportValue: (t) => t.serialNumber || t.implement?.plate || "",
       },
       cell: ({ row }) => {
-        const v = row.original.serialNumber || row.original.truck?.plate || "";
+        const v = row.original.serialNumber || row.original.implement?.plate || "";
         return v ? <span className="truncate">{v}</span> : <MutedDash />;
       },
     },
@@ -250,28 +250,28 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "chassisNumber",
       header: "Nº Chassi",
-      accessorFn: (t) => t.truck?.chassisNumber || "",
+      accessorFn: (t) => t.implement?.chassisNumber || "",
       enableSorting: false,
       size: 150,
-      meta: { defaultVisible: false, headerLabel: "Nº Chassi", exportHeader: "Nº Chassi", exportValue: (t) => t.truck?.chassisNumber || "" },
-      cell: ({ row }) => (row.original.truck?.chassisNumber ? <span className="truncate">{row.original.truck.chassisNumber}</span> : <MutedDash />),
+      meta: { defaultVisible: false, headerLabel: "Nº Chassi", exportHeader: "Nº Chassi", exportValue: (t) => t.implement?.chassisNumber || "" },
+      cell: ({ row }) => (row.original.implement?.chassisNumber ? <span className="truncate">{row.original.implement.chassisNumber}</span> : <MutedDash />),
     },
     {
-      id: "truckCategory",
+      id: "implementCategory",
       header: "Categoria",
-      accessorFn: (t) => (t.truck?.category ? IMPLEMENT_CATEGORY_LABELS[t.truck.category] : ""),
+      accessorFn: (t) => (t.implement?.category ? IMPLEMENT_CATEGORY_LABELS[t.implement.category] : ""),
       enableSorting: false,
       size: 150,
       meta: {
         defaultVisible: false,
         headerLabel: "Categoria",
         exportHeader: "Categoria",
-        exportValue: (t) => (t.truck?.category ? IMPLEMENT_CATEGORY_LABELS[t.truck.category] : ""),
+        exportValue: (t) => (t.implement?.category ? IMPLEMENT_CATEGORY_LABELS[t.implement.category] : ""),
       },
       cell: ({ row }) =>
-        row.original.truck?.category ? (
+        row.original.implement?.category ? (
           <Badge variant="outline" className="truncate">
-            {IMPLEMENT_CATEGORY_LABELS[row.original.truck.category]}
+            {IMPLEMENT_CATEGORY_LABELS[row.original.implement.category]}
           </Badge>
         ) : (
           <MutedDash />
@@ -280,19 +280,19 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
     {
       id: "implementType",
       header: "Tipo de Implemento",
-      accessorFn: (t) => (t.truck?.implementType ? IMPLEMENT_TYPE_LABELS[t.truck.implementType] : ""),
+      accessorFn: (t) => (t.implement?.type ? IMPLEMENT_TYPE_LABELS[t.implement.type] : ""),
       enableSorting: false,
       size: 160,
       meta: {
         defaultVisible: false,
         headerLabel: "Tipo de Implemento",
         exportHeader: "Tipo de Implemento",
-        exportValue: (t) => (t.truck?.implementType ? IMPLEMENT_TYPE_LABELS[t.truck.implementType] : ""),
+        exportValue: (t) => (t.implement?.type ? IMPLEMENT_TYPE_LABELS[t.implement.type] : ""),
       },
       cell: ({ row }) =>
-        row.original.truck?.implementType ? (
+        row.original.implement?.type ? (
           <Badge variant="outline" className="truncate">
-            {IMPLEMENT_TYPE_LABELS[row.original.truck.implementType]}
+            {IMPLEMENT_TYPE_LABELS[row.original.implement.type]}
           </Badge>
         ) : (
           <MutedDash />

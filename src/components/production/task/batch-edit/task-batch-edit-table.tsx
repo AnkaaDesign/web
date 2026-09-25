@@ -26,7 +26,7 @@ import { useTaskPermissions } from "@/hooks/common/use-task-permissions";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { createNameSchema, createDescriptionSchema, nullableDate } from "../../../../schemas";
-import { optionalPlateSchema, optionalChassisSchema } from "../../../../schemas/truck";
+import { optionalPlateSchema, optionalChassisSchema } from "../../../../schemas/implement";
 
 // Task batch edit schema for UI form
 const taskBatchEditSchema = z.object({
@@ -112,8 +112,8 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 status: task.status,
                 serialNumber: task.serialNumber || "",
                 customerOrderNumber: task.customerOrderNumber || "",
-                plate: task.truck?.plate || "",
-                chassisNumber: task.truck?.chassisNumber || "",
+                plate: task.implement?.plate || "",
+                chassisNumber: task.implement?.chassisNumber || "",
                 details: task.details || "",
                 forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
                 term: task.term ? new Date(task.term) : null,
@@ -144,8 +144,8 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           status: task.status,
           serialNumber: task.serialNumber || "",
           customerOrderNumber: task.customerOrderNumber || "",
-          plate: task.truck?.plate || "",
-          chassisNumber: task.truck?.chassisNumber || "",
+          plate: task.implement?.plate || "",
+          chassisNumber: task.implement?.chassisNumber || "",
           details: task.details || "",
           forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
           term: task.term ? new Date(task.term) : null,
@@ -227,8 +227,8 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           task.data.status !== originalTask.status ||
           task.data.serialNumber !== originalTask.serialNumber ||
           (task.data.customerOrderNumber || "") !== (originalTask.customerOrderNumber || "") ||
-          task.data.plate !== originalTask.truck?.plate ||
-          task.data.chassisNumber !== originalTask.truck?.chassisNumber ||
+          task.data.plate !== originalTask.implement?.plate ||
+          task.data.chassisNumber !== originalTask.implement?.chassisNumber ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.paintId !== originalTask.generalPainting?.id ||
@@ -274,14 +274,14 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         // do mapa do pátio, em cada gravação de lote.
         const original = tasks.find((t: any) => t.id === task.id);
         const { plate, chassisNumber, ...semVeiculo } = transformed.data;
-        const placaMudou = (plate || "") !== (original?.truck?.plate || "");
-        const chassiMudou = (chassisNumber || "") !== (original?.truck?.chassisNumber || "");
+        const placaMudou = (plate || "") !== (original?.implement?.plate || "");
+        const chassiMudou = (chassisNumber || "") !== (original?.implement?.chassisNumber || "");
         transformed.data = semVeiculo;
         if (placaMudou || chassiMudou) {
           transformed.data = {
             ...semVeiculo,
-            truck: {
-              ...(semVeiculo.truck ?? {}),
+            implement: {
+              ...(semVeiculo.implement ?? {}),
               ...(placaMudou ? { plate: plate || null } : {}),
               ...(chassiMudou ? { chassisNumber: chassisNumber || null } : {}),
             },

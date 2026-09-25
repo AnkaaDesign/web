@@ -19,7 +19,7 @@ import type { Task } from "@/types";
  */
 export const BUDGET_VEHICLE_TASK_INCLUDE = {
   customer: true,
-  truck: { include: { vinPlate: true } },
+  implement: { include: { vinPlate: true } },
   layouts: { include: { file: true } },
   baseFiles: true,
   responsibles: true,

@@ -73,7 +73,7 @@ export * from "./stock-level";
 export * from "./storage";
 export * from "./supplier";
 export * from "./task";
-export * from "./truck";
+export * from "./implement";
 export * from "./uiStateEnumGetters";
 export * from "./user";
 export * from "./verification-code";

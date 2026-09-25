@@ -285,7 +285,7 @@ const BillingDetailPageInner = ({
       customer: { include: { logo: true } },
       // `vinPlate` is a File relation, so a boolean `truck: true` would leave the Plaqueta field
       // permanently empty and let a save wipe a photo that was already there.
-      truck: { include: { vinPlate: true } },
+      implement: { include: { vinPlate: true } },
       serviceOrders: {
         include: {
           checkinFiles: true,
@@ -324,7 +324,7 @@ const BillingDetailPageInner = ({
               // Chassi junto: a tabela de veículos do passo 1 mostra as mesmas
               // colunas do documento, e um chassi ausente ali leria como "a
               // registrar" num caminhão que já o tem.
-              truck: {
+              implement: {
                 select: {
                   id: true,
                   plate: true,
@@ -334,7 +334,7 @@ const BillingDetailPageInner = ({
                   // eles a prévia descreveria um caminhão sem tipo, diferente da
                   // nota que vai sair.
                   category: true,
-                  implementType: true,
+                  type: true,
                 },
               },
             },
@@ -410,11 +410,11 @@ const BillingDetailPageInner = ({
       serialNumber?: string | null;
       customerOrderNumber?: string | null;
       finishedAt?: Date | string | null;
-      truck?: {
+      implement?: {
         plate?: string | null;
         chassisNumber?: string | null;
         category?: string | null;
-        implementType?: string | null;
+        type?: string | null;
       } | null;
     }>;
     if (fromQuote.length > 0) return fromQuote;
@@ -426,12 +426,12 @@ const BillingDetailPageInner = ({
             serialNumber: task.serialNumber,
             customerOrderNumber: task.customerOrderNumber ?? null,
             finishedAt: task.finishedAt ?? null,
-            truck: task.truck
+            implement: task.implement
               ? {
-                  plate: task.truck.plate,
-                  chassisNumber: task.truck.chassisNumber,
-                  category: task.truck.category,
-                  implementType: task.truck.implementType,
+                  plate: task.implement.plate,
+                  chassisNumber: task.implement.chassisNumber,
+                  category: task.implement.category,
+                  type: task.implement.type,
                 }
               : null,
           },
@@ -466,7 +466,7 @@ const BillingDetailPageInner = ({
         id: v.id,
         name: v.name ?? null,
         serialNumber: v.serialNumber ?? null,
-        plate: v.truck?.plate ?? null,
+        plate: v.implement?.plate ?? null,
         customerOrderNumber: v.customerOrderNumber ?? null,
       })),
     [quoteVehicleRows],
@@ -732,8 +732,8 @@ const BillingDetailPageInner = ({
     if (!task) return;
 
     // Seed the Plaqueta photo. Above the `!quote` early return on purpose: a task without a quote
-    // still has a truck, and the field is on the Tarefa step either way.
-    const persistedVinPlate = (task.truck as any)?.vinPlate;
+    // still has an implement, and the field is on the Tarefa step either way.
+    const persistedVinPlate = (task.implement as any)?.vinPlate;
     setVinPlateFiles(
       persistedVinPlate
         ? [
@@ -755,15 +755,15 @@ const BillingDetailPageInner = ({
     const taskFields = {
       name: task.name || "",
       customerId: task.customerId || "",
-      plate: task.truck?.plate || "",
+      plate: task.implement?.plate || "",
       serialNumber: task.serialNumber || "",
       // O pedido de compra DESTE veículo — ver os defaults do formulário.
       customerOrderNumber: task.customerOrderNumber || null,
-      chassisNumber: task.truck?.chassisNumber || "",
-      vinPlateId: task.truck?.vinPlateId || null,
-      category: task.truck?.category || "",
+      chassisNumber: task.implement?.chassisNumber || "",
+      vinPlateId: task.implement?.vinPlateId || null,
+      category: task.implement?.category || "",
       // Sem tipo gravado a prévia mostra nada — antes ela inventava "Refrigerado" (D-25).
-      implementType: task.truck?.implementType || "",
+      implementType: task.implement?.type || "",
       details: task.details || "",
       finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
     };
@@ -1749,7 +1749,7 @@ const BillingDetailPageInner = ({
   const taskDisplayName =
     coveredVehicleRows.length > 1
       ? [task.name, `${coveredVehicleRows.length} veículos`].filter(Boolean).join(" - ")
-      : [task.name, task.serialNumber || task.truck?.plate].filter(Boolean).join(" - ");
+      : [task.name, task.serialNumber || task.implement?.plate].filter(Boolean).join(" - ");
 
   return (
     <PrivilegeRoute
@@ -2040,10 +2040,10 @@ const BillingDetailPageInner = ({
                   t.id,
                   {
                     serialNumber: t.serialNumber ?? null,
-                    plate: t.truck?.plate ?? null,
-                    chassisNumber: t.truck?.chassisNumber ?? null,
-                    category: t.truck?.category ?? null,
-                    implementType: t.truck?.implementType ?? null,
+                    plate: t.implement?.plate ?? null,
+                    chassisNumber: t.implement?.chassisNumber ?? null,
+                    category: t.implement?.category ?? null,
+                    implementType: t.implement?.type ?? null,
                   },
                 ]),
               )}

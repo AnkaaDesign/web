@@ -114,7 +114,7 @@ export function TaskTable({
       observation: true,
       generalPainting: true,
       logoPaints: true,
-      truck: true,
+      implement: true,
     }),
     [],
   );

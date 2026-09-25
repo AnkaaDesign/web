@@ -773,12 +773,12 @@ export const FinancialBudgetCreatePage = () => {
         // quando o tipo tinha "Refrigerado" de padrão (antes do D-25): cada
         // tarefa tem exatamente um implemento (DD1); só o tipo não se inventa.
         return {
-          truck:
+          implement:
             hasImplementFields || plate
               ? {
                   ...(plate && { plate }),
                   category: category || undefined,
-                  implementType: implementType || undefined,
+                  type: implementType || undefined,
                 }
               : {},
         };

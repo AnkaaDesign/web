@@ -1,6 +1,6 @@
 // packages/utils/src/formatters.ts
 
-import { PLATE_OLD_REGEX, PLATE_REGEX } from "./truck";
+import { PLATE_OLD_REGEX, PLATE_REGEX } from "./implement";
 import { cleanChassis, cleanPlate } from "./cleaners";
 
 /**

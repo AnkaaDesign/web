@@ -92,7 +92,7 @@ import type {
   MaintenanceScheduleBatchUpdateResponse,
   MaintenanceScheduleBatchDeleteResponse,
 } from "../../types";
-import { maintenanceKeys, maintenanceItemKeys, maintenanceScheduleKeys, implementKeys, itemKeys, changeLogKeys } from "../common/query-keys";
+import { maintenanceKeys, maintenanceItemKeys, maintenanceScheduleKeys, itemKeys, changeLogKeys } from "../common/query-keys";
 import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
 
 // =====================================================
@@ -133,7 +133,7 @@ const baseHooks = createEntityHooks<
   queryKeys: maintenanceKeys,
   service: maintenanceService,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [implementKeys, itemKeys, maintenanceItemKeys, changeLogKeys], // Maintenances affect trucks, items, their items, and change logs
+  relatedQueryKeys: [itemKeys, maintenanceItemKeys, changeLogKeys], // Maintenances affect items, their items, and change logs
 });
 
 // Export base hooks with standard names
@@ -207,13 +207,6 @@ export const useOverdueMaintenances = createSpecializedQueryHook<Partial<Mainten
   queryKeyFn: (filters) => maintenanceKeys.overdue(filters),
   queryFn: (filters) => getMaintenances({ ...filters, isLate: true }),
   staleTime: 1000 * 60 * 3, // 3 minutes - overdue maintenances are critical
-});
-
-// Hook for maintenances by truck
-export const useMaintenancesByImplement = createSpecializedQueryHook<{ truckId: string; filters?: Partial<MaintenanceGetManyFormData> }, MaintenanceGetManyResponse>({
-  queryKeyFn: ({ truckId: implementId, filters }) => ["maintenances", "byTruck", implementId, filters] as const,
-  queryFn: ({ truckId: implementId, filters }) => getMaintenances({ ...filters, where: { truckId: implementId } }),
-  staleTime: 1000 * 60 * 5,
 });
 
 // Hook for maintenances by item

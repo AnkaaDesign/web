@@ -187,7 +187,7 @@ export function TaskHistoryTable({
           name: true,
         },
       },
-      truck: {
+      implement: {
         include: {
           leftSideMeasure: {
             include: {

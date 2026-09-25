@@ -137,7 +137,7 @@ interface BillingStepReviewProps {
     customerOrderNumber?: string | null;
     /** Conclusão DESTE veículo: numa cobrança de quatro elas divergem. */
     finishedAt?: Date | string | null;
-    truck?: {
+    implement?: {
       plate?: string | null;
       chassisNumber?: string | null;
       /** Categoria e implemento são POR VEÍCULO — um lote pode misturar tipos. */
@@ -221,7 +221,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
         id: t.id,
         name: t.name ?? null,
         serialNumber: t.serialNumber ?? null,
-        truck: t.truck ? { plate: t.truck.plate } : null,
+        implement: t.implement ? { plate: t.implement.plate } : null,
       })),
     [task?.quote],
   );
@@ -373,7 +373,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             serialNumber: task.serialNumber ?? null,
             customerOrderNumber: task.customerOrderNumber ?? null,
             finishedAt: task.finishedAt ?? null,
-            truck: task.truck ?? null,
+            implement: task.implement ?? null,
           },
         ]
       : [];
@@ -392,11 +392,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
    */
   const vehicleTypeLabelOf = (v: any): string =>
     [
-      v?.truck?.category
-        ? IMPLEMENT_CATEGORY_LABELS[v.truck.category as IMPLEMENT_CATEGORY] || v.truck.category
+      v?.implement?.category
+        ? IMPLEMENT_CATEGORY_LABELS[v.implement.category as IMPLEMENT_CATEGORY] || v.implement.category
         : "",
-      v?.truck?.implementType
-        ? IMPLEMENT_TYPE_LABELS[v.truck.implementType as IMPLEMENT_TYPE] || v.truck.implementType
+      v?.implement?.type
+        ? IMPLEMENT_TYPE_LABELS[v.implement.type as IMPLEMENT_TYPE] || v.implement.type
         : "",
     ]
       .filter(Boolean)
@@ -415,8 +415,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return {
       names,
       /** Categoria e implemento SÃO DA COBERTURA (só valem quando uniformes). */
-      category: (first?.truck?.category ?? null) as string | null,
-      implementType: (first?.truck?.implementType ?? null) as string | null,
+      category: (first?.implement?.category ?? null) as string | null,
+      implementType: (first?.implement?.type ?? null) as string | null,
       /** Todos do mesmo tipo (ou tipo nenhum declarado). */
       sameType: types.length <= 1,
       finishedFirst: finishedTimes.length > 0 ? new Date(finishedTimes[0]) : null,
@@ -902,9 +902,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                             <td className="px-4 py-2 text-sm font-medium tabular-nums">
                               {v.serialNumber || v.name || "—"}
                             </td>
-                            <td className="px-4 py-2 text-sm">{v.truck?.plate || "—"}</td>
+                            <td className="px-4 py-2 text-sm">{v.implement?.plate || "—"}</td>
                             <td className="px-4 py-2 text-sm tabular-nums">
-                              {v.truck?.chassisNumber ? formatChassis(v.truck.chassisNumber) : "—"}
+                              {v.implement?.chassisNumber ? formatChassis(v.implement.chassisNumber) : "—"}
                             </td>
                             <td className={cn("px-4 py-2 text-sm", !pedido && "text-muted-foreground")}>
                               {pedido || "Pendente"}
@@ -918,10 +918,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               </div>
             ) : (
               <>
-                {task.truck?.plate && (
+                {task.implement?.plate && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Placa</span>
-                    <span className="text-sm font-medium">{task.truck.plate}</span>
+                    <span className="text-sm font-medium">{task.implement.plate}</span>
                   </div>
                 )}
                 {task.serialNumber && (
@@ -930,10 +930,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     <span className="text-sm font-medium">{task.serialNumber}</span>
                   </div>
                 )}
-                {task.truck?.chassisNumber && (
+                {task.implement?.chassisNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">Chassi</span>
-                    <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+                    <span className="text-sm font-medium">{formatChassis(task.implement.chassisNumber)}</span>
                   </div>
                 )}
                 {/* O PEDIDO DE COMPRA — daqui, e não do cartão do pagador: ele
@@ -965,10 +965,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 caso de UM veículo: a foto é de um caminhão, e exibi-la sozinha
                 sob uma relação de quatro é o mesmo defeito que esta correção
                 desfez. */}
-            {coveredVehicles.length <= 1 && task.truck?.vinPlate && (
+            {coveredVehicles.length <= 1 && task.implement?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Plaqueta</span>
-                <FileThumbnail file={task.truck.vinPlate} size="sm" onClick={() => fileViewerContext?.actions.viewFiles([task.truck!.vinPlate!] as never, 0)} />
+                <FileThumbnail file={task.implement.vinPlate} size="sm" onClick={() => fileViewerContext?.actions.viewFiles([task.implement!.vinPlate!] as never, 0)} />
               </div>
             )}
             {/* O portão é da COBERTURA e o valor também tem de ser: ler o tipo da
@@ -1986,7 +1986,7 @@ function sanitizeFilenamePart(value: string): string {
  */
 function buildReceiptFilename(task: any): string {
   const corporateName = task?.customer?.corporateName ?? task?.customer?.fantasyName ?? "Cliente";
-  const serialOrPlate = task?.serialNumber ?? task?.truck?.plate ?? "";
+  const serialOrPlate = task?.serialNumber ?? task?.implement?.plate ?? "";
   const parts = ["Recibo", sanitizeFilenamePart(corporateName)];
   if (serialOrPlate) parts.push(sanitizeFilenamePart(String(serialOrPlate)));
   return `${parts.join(" - ")}.pdf`;

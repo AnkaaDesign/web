@@ -72,7 +72,7 @@ export function RelatedTasksCard({
       const taskName = task.name?.toLowerCase() || "";
       const serialNumber = task.serialNumber?.toLowerCase() || "";
       const normalizedSerialNumber = serialNumber.replace(/[\s\-_./]/g, "");
-      const plate = task.truck?.plate?.toLowerCase() || "";
+      const plate = task.implement?.plate?.toLowerCase() || "";
       const normalizedPlate = plate.replace(/[\s\-_./]/g, "");
       const customerName = task.customer?.fantasyName?.toLowerCase() || "";
       // Support both user and createdBy fields for compatibility
@@ -196,11 +196,11 @@ export function RelatedTasksCard({
       accessor: (task) => (
         <div className="space-y-1">
           <div className="font-medium text-sm truncate">{getTaskTitle(task)}</div>
-          {(task.serialNumber || task.truck?.plate) && (
+          {(task.serialNumber || task.implement?.plate) && (
             <div className="text-xs text-muted-foreground">
               {task.serialNumber && <span>S/N: {task.serialNumber}</span>}
-              {task.serialNumber && task.truck?.plate && <span className="mx-1">•</span>}
-              {task.truck?.plate && <span>Placa: {task.truck.plate}</span>}
+              {task.serialNumber && task.implement?.plate && <span className="mx-1">•</span>}
+              {task.implement?.plate && <span>Placa: {task.implement.plate}</span>}
             </div>
           )}
         </div>

@@ -73,7 +73,7 @@ export const sectorIncludeSchema = z
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              implement: z.boolean().optional(),
               relatedTasks: z.boolean().optional(),
               relatedTo: z.boolean().optional(),
             })

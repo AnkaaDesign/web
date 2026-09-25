@@ -51,7 +51,7 @@ export const DUPLICATE_TASK_INCLUDE = {
   reimbursementInvoices: true,
   generalPainting: true,
   logoPaints: true,
-  truck: {
+  implement: {
     include: {
       leftSideMeasure: {
         include: { sections: true },
@@ -171,7 +171,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   const buildTaskData = (copyData: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null }) => {
     if (!sourceTask) return null;
 
-    const implementData = sourceTask.truck;
+    const implementData = sourceTask.implement;
 
     return {
       // Basic fields
@@ -227,14 +227,14 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
       // Truck - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
       // Layouts are SHARED (connect to existing layout IDs)
-      truck: (copyData.plate || copyData.chassisNumber || implementData)
+      implement: (copyData.plate || copyData.chassisNumber || implementData)
         ? {
             plate: copyData.plate || null,
             chassisNumber: copyData.chassisNumber || null,
             // Spot is a UNIQUE physical garage location — never copy it to a duplicate
             spot: null,
             category: implementData?.category || null,
-            implementType: implementData?.implementType || null,
+            type: implementData?.type || null,
             // Share existing layouts (connect to same layout records)
             leftSideMeasureId: implementData?.leftSideMeasure?.id || implementData?.leftSideMeasureId || null,
             rightSideMeasureId: implementData?.rightSideMeasure?.id || implementData?.rightSideMeasureId || null,

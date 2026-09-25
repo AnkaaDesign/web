@@ -92,7 +92,7 @@ export interface FilePreviewModalProps {
    * Medidas do implemento, uma por face. Quando vêm, o PDF abre já cotado: um
    * clique num adesivo mostra as medidas dele, sem botão nenhum a apertar.
    */
-  layoutTruckId?: string;
+  layoutImplementId?: string;
 }
 
 export function FilePreviewModal({
@@ -107,7 +107,7 @@ export function FilePreviewModal({
   showThumbnailStrip = true,
   showImageCounter = true,
   layoutStatusByFileId,
-  layoutTruckId: layoutImplementId,
+  layoutImplementId,
 }: FilePreviewModalProps) {
   // State management
   const [currentIndex, setCurrentIndex] = React.useState(initialFileIndex);
@@ -1210,7 +1210,7 @@ export function FilePreviewModal({
                       scale={pdfScale}
                       pageNumber={pdfPageNumber}
                       maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
-                      layoutTruckId={layoutImplementId}
+                      layoutImplementId={layoutImplementId}
                       fileId={currentFile.id}
                       layoutTool={layoutTool}
                       onLayoutResult={setLayoutResult}

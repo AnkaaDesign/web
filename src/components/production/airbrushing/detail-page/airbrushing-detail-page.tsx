@@ -315,7 +315,7 @@ export function AirbrushingDetailPage() {
     include: {
       // truck entra por causa do Identificador: sem número de série, a tarefa é
       // identificada pela placa.
-      task: { include: { customer: { include: { logo: true } }, sector: true, truck: true } },
+      task: { include: { customer: { include: { logo: true } }, sector: true, implement: true } },
       painter: true,
       // Layouts are Layout wrappers; the backing File (id/path) lives on the nested
       // `file` relation. Without this include the grid would fall back to the Layout's
@@ -758,9 +758,9 @@ export function AirbrushingDetailPage() {
             id: "identifier",
             label: "Identificador",
             icon: IconHash,
-            accessor: (a) => a.task?.serialNumber ?? a.task?.truck?.plate ?? null,
+            accessor: (a) => a.task?.serialNumber ?? a.task?.implement?.plate ?? null,
             render: (a) => {
-              const identifier = a.task?.serialNumber ?? a.task?.truck?.plate ?? null;
+              const identifier = a.task?.serialNumber ?? a.task?.implement?.plate ?? null;
               return identifier ? <span className="font-mono">{identifier}</span> : muted;
             },
           },

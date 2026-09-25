@@ -2,7 +2,7 @@
 
 import type { BaseEntity } from "./common";
 import type { File } from "./file";
-import type { Implement } from "./truck";
+import type { Implement } from "./implement";
 import type { ImplementMeasureSection } from "./implementMeasureSection";
 
 // =====================
@@ -20,9 +20,9 @@ export interface ImplementMeasure extends BaseEntity {
   photo?: File;
 
   // Inverse relations (one-to-many with specific sides)
-  trucksLeftSide?: Implement[];
-  trucksRightSide?: Implement[];
-  trucksBackSide?: Implement[];
+  implementsLeftSide?: Implement[];
+  implementsRightSide?: Implement[];
+  implementsBackSide?: Implement[];
 
   // UI display fields
   usageCount?: number;
@@ -35,7 +35,7 @@ export interface ImplementMeasure extends BaseEntity {
 export interface ImplementMeasureIncludes {
   photo?: boolean;
   sections?: boolean;
-  trucksLeftSide?: boolean;
-  trucksRightSide?: boolean;
-  trucksBackSide?: boolean;
+  implementsLeftSide?: boolean;
+  implementsRightSide?: boolean;
+  implementsBackSide?: boolean;
 }

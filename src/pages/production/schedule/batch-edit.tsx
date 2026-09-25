@@ -51,7 +51,7 @@ export const TaskBatchEditPage = () => {
           paintBrand: true,
         },
       },
-      truck: true,
+      implement: true,
     },
     take: taskIds.length,
     enabled: taskIds.length > 0,

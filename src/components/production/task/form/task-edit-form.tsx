@@ -155,7 +155,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     privilege, isTeamLeader,
     canViewRestrictedFields,
     canViewBonification: canViewBonificationField,
-    canViewDates, canViewServices, canViewMeasures, canViewTruckSpot: canViewImplementSpot,
+    canViewDates, canViewServices, canViewMeasures, canViewImplementSpot,
     canViewPaint, canViewLogoPaint, canViewCuts,
     canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
@@ -379,7 +379,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // Segue o mesmo desenho dos outros campos de arquivo: o estado guarda o que está na tela,
   // arquivos novos vão por multipart (`truckVinPlate`) e os já existentes viajam como id.
   const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).truck?.vinPlate),
+    convertToFileWithPreview((task as any).implement?.vinPlate),
   );
 
   // Initialize checkin/checkout files per service order from existing task data
@@ -543,18 +543,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // Basic Information
     name: "basic-information",
     customerId: "basic-information",
-    "truck.category": "basic-information",
-    "truck.implementType": "basic-information",
+    "implement.category": "basic-information",
+    "implement.type": "basic-information",
     serialNumber: "basic-information",
     customerOrderNumber: "basic-information",
-    "truck.plate": "basic-information",
-    "truck.chassisNumber": "basic-information",
-    "truck.vinPlateId": "basic-information",
+    "implement.plate": "basic-information",
+    "implement.chassisNumber": "basic-information",
+    "implement.vinPlateId": "basic-information",
     sectorId: "basic-information",
     status: "basic-information",
     bonification: "basic-information",
     details: "basic-information",
-    truck: "basic-information",
+    implement: "basic-information",
     // Responsibles
     responsibles: "responsibles",
     // Dates
@@ -648,8 +648,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // Track which sides have emitted their initial state (to avoid marking as "modified" on first render)
   const initialLayoutStateEmittedRef = useRef<Set<ImplementFace>>(new Set());
 
-  // Get truck ID from task - with safety check
-  const implementId = task.truck?.id;
+  // Get implement ID from task - with safety check
+  const implementId = task.implement?.id;
 
   // Safety mechanism: If task doesn't have a truck yet, trigger a refetch
   // This shouldn't happen because backend auto-creates it, but it's a safety net
@@ -704,7 +704,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   useEffect(() => {
     
   }, [measuresData, implementId, implementLength]);
-  const { createOrUpdateTruckMeasure: _createOrUpdateImplementMeasure, delete: deleteMeasure } = useImplementMeasureMutations();
+  const { createOrUpdateImplementMeasure: _createOrUpdateImplementMeasure, delete: deleteMeasure } = useImplementMeasureMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
@@ -920,13 +920,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
       layoutIds: taskData.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
-      truck: {
-        plate: taskData.truck?.plate || null,
-        chassisNumber: taskData.truck?.chassisNumber || null,
-        vinPlateId: taskData.truck?.vinPlateId || null,
-        category: taskData.truck?.category || null,
-        implementType: taskData.truck?.implementType || null,
-        spot: taskData.truck?.spot || null,
+      implement: {
+        plate: taskData.implement?.plate || null,
+        chassisNumber: taskData.implement?.chassisNumber || null,
+        vinPlateId: taskData.implement?.vinPlateId || null,
+        category: taskData.implement?.category || null,
+        type: taskData.implement?.type || null,
+        spot: taskData.implement?.spot || null,
       },
       // Initialize cuts with default row - part of initial state
       cuts: groupedCuts.length > 0
@@ -1062,9 +1062,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
         // (Airbrushings are stripped from changedData below and reconciled separately.)
 
-        // Ensure truck sections are arrays
-        if (changedData.truck) {
-          const implement = changedData.truck as any;
+        // Ensure implement sections are arrays
+        if (changedData.implement) {
+          const implement = changedData.implement as any;
           if (implement.leftSideMeasure?.sections) {
             implement.leftSideMeasure.sections = ensureArray(implement.leftSideMeasure.sections);
           }
@@ -1258,8 +1258,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         // Consolidate truck data with layouts into single truck object
         if (hasLayoutChanges && !shouldDeleteLayouts) {
 
-          // Start with existing truck data from form
-          const consolidatedImplement: any = changedData.truck || {};
+          // Start with existing implement data from form
+          const consolidatedImplement: any = changedData.implement || {};
 
           // Add ONLY the sides that were actually modified by the user
           for (const side of modifiedLayoutSides) {
@@ -1288,8 +1288,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             }
           }
 
-          // Merge consolidated truck back into changedData
-          changedData.truck = consolidatedImplement;
+          // Merge consolidated implement back into changedData
+          changedData.implement = consolidatedImplement;
 
         }
 
@@ -1388,7 +1388,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             files.projectFiles = newProjectFiles.filter(f => f instanceof File) as File[];
           }
           if (newVinPlateFile) {
-            files.truckVinPlate = [newVinPlateFile];
+            files.implementVinPlate = [newVinPlateFile];
           }
           // Add new checkin/checkout files as flat arrays + mapping metadata
           if (allNewCheckinFiles.length > 0) {
@@ -2460,7 +2460,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     setHasFileChanges(true);
 
     const existing = picked.find((f) => f.uploaded);
-    form.setValue("truck.vinPlateId" as never, (existing?.uploadedFileId || existing?.id || null) as never, {
+    form.setValue("implement.vinPlateId" as never, (existing?.uploadedFileId || existing?.id || null) as never, {
       shouldDirty: true,
     });
   };
@@ -2981,7 +2981,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       {/* Truck Category */}
                       <FormField
                         control={form.control}
-                        name="truck.category"
+                        name="implement.category"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
                             <FormLabel>Categoria do Caminhão</FormLabel>
@@ -3008,7 +3008,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       {/* Truck Implement Type */}
                       <FormField
                         control={form.control}
-                        name="truck.implementType"
+                        name="implement.type"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
                             <FormLabel>Tipo de Implemento</FormLabel>
@@ -3064,7 +3064,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       {/* Plate - 1/4 */}
                       <FormField
                         control={form.control}
-                        name="truck.plate"
+                        name="implement.plate"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
@@ -3091,7 +3091,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       {/* Chassis - 2/4 (col-span-2) */}
                       <FormField
                         control={form.control}
-                        name="truck.chassisNumber"
+                        name="implement.chassisNumber"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
@@ -3651,11 +3651,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <AccordionContent>
                       <CardContent className="pt-0">
                       <SpotSelector
-                        truckLength={implementLength}
-                        currentSpot={form.watch("truck.spot") as IMPLEMENT_SPOT | null}
-                        truckId={implementId}
+                        implementLength={implementLength}
+                        currentSpot={form.watch("implement.spot") as IMPLEMENT_SPOT | null}
+                        implementId={implementId}
                         onSpotChange={(spot) => {
-                          form.setValue("truck.spot", spot, { shouldDirty: true });
+                          form.setValue("implement.spot", spot, { shouldDirty: true });
                         }}
                         disabled={isSubmitting || !canEditServices}
                       />

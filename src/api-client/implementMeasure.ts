@@ -28,15 +28,21 @@ interface ImplementMeasureListResponse {
   data: ImplementMeasure[];
 }
 
+/** Quem usa a medida, por face (`GET /implement-measure/:id/usage`). */
+interface ImplementMeasureUser {
+  implementId: string;
+  taskId: string;
+  plate: string | null;
+}
+
 interface ImplementMeasureUsageResponse {
   success: boolean;
   message: string;
   data: {
-    implementMeasureId: string;
-    trucks: Array<{
-      truckId: string;
-      side: ImplementFace;
-    }>;
+    backSide: ImplementMeasureUser[];
+    leftSide: ImplementMeasureUser[];
+    rightSide: ImplementMeasureUser[];
+    totalCount: number;
   };
 }
 
@@ -58,13 +64,13 @@ export const implementMeasureService = {
   // Get implement measure usage
   getImplementMeasureUsage: (implementMeasureId: string) => apiClient.get<ImplementMeasureUsageResponse>(`/implement-measure/${implementMeasureId}/usage`),
 
-  // Assign implement measure to truck
-  assignImplementMeasureToTruck: (implementMeasureId: string, data: { truckId: string; side: ImplementFace }) =>
-    apiClient.post<ImplementMeasureAssignResponse>(`/implement-measure/${implementMeasureId}/assign-to-truck`, data),
+  // Assign implement measure to implement
+  assignImplementMeasureToImplement: (implementMeasureId: string, data: { implementId: string; side: ImplementFace }) =>
+    apiClient.post<ImplementMeasureAssignResponse>(`/implement-measure/${implementMeasureId}/assign-to-implement`, data),
 
-  // Get implement measures by truck ID
-  getByTruckId: (implementId: string, options?: { includePhoto?: boolean }) =>
-    apiClient.get<ImplementMeasuresByImplementResponse>(`/implement-measure/truck/${implementId}`, {
+  // Get implement measures by implement ID
+  getByImplementId: (implementId: string, options?: { includePhoto?: boolean }) =>
+    apiClient.get<ImplementMeasuresByImplementResponse>(`/implement-measure/implement/${implementId}`, {
       params: options?.includePhoto ? { includePhoto: 'true' } : undefined,
     }),
 
@@ -77,9 +83,9 @@ export const implementMeasureService = {
   // Delete implement measure
   delete: (id: string) => apiClient.delete<ImplementMeasureDeleteResponse>(`/implement-measure/${id}`),
 
-  // Create or update truck implement measure for specific side
-  createOrUpdateTruckMeasure: (implementId: string, side: ImplementFace, data: ImplementMeasureCreateFormData) =>
-    apiClient.post<ImplementMeasureCreateResponse>(`/implement-measure/truck/${implementId}/${side}`, data),
+  // Create or update implement measure for specific side
+  createOrUpdateImplementMeasure: (implementId: string, side: ImplementFace, data: ImplementMeasureCreateFormData) =>
+    apiClient.post<ImplementMeasureCreateResponse>(`/implement-measure/implement/${implementId}/${side}`, data),
 
   // Generate SVG for implement measure
   generateSVG: (id: string) => apiClient.get(`/implement-measure/${id}/svg`, { responseType: "blob" }),
@@ -102,7 +108,7 @@ export type {
   ImplementMeasureCreateResponse,
   ImplementMeasureUpdateResponse,
   ImplementMeasureDeleteResponse,
-  ImplementMeasuresByImplementResponse as ImplementMeasuresByTruckResponse,
+  ImplementMeasuresByImplementResponse,
   ImplementMeasureListResponse,
   ImplementMeasureUsageResponse,
   ImplementMeasureAssignResponse,

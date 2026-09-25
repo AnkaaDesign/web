@@ -54,14 +54,14 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       // directions so the plate-fallback rows never jump to the top on DESC.
       id: "taskSerialNumber",
       header: "Identificador",
-      accessorFn: (row) => row.task?.serialNumber || row.task?.truck?.plate || "",
+      accessorFn: (row) => row.task?.serialNumber || row.task?.implement?.plate || "",
       enableSorting: true,
       size: 150,
       minSize: 120,
       meta: {
         defaultVisible: false,
         headerLabel: "Identificador",
-        exportValue: (row) => row.task?.serialNumber || row.task?.truck?.plate || "",
+        exportValue: (row) => row.task?.serialNumber || row.task?.implement?.plate || "",
       },
       cell: ({ getValue }) => {
         const v = getValue() as string;

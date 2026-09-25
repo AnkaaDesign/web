@@ -52,7 +52,7 @@ describe("rótulos por documento (contrato da API)", () => {
   });
 
   it("os enums do web são os do contrato da API", () => {
-    expect(categorias).toEqual(contractEnums.enums.TRUCK_CATEGORY);
+    expect(categorias).toEqual(contractEnums.enums.IMPLEMENT_CATEGORY);
     expect(implementos).toEqual(contractEnums.enums.IMPLEMENT_TYPE);
   });
 
@@ -140,9 +140,9 @@ describe("as palavras de hoje, documento a documento (D-18)", () => {
   });
 
   it("o histórico de alterações mantém as suas palavras", () => {
-    expect(formatFieldValue("VUC", "truck.category")).toBe("VUC (Veículo Urbano de Carga)");
+    expect(formatFieldValue("VUC", "implement.category")).toBe("VUC (Veículo Urbano de Carga)");
     expect(formatFieldValue("TRUCK", "category")).toBe("Caminhão");
-    expect(formatFieldValue("INSULATED", "truck.implementType")).toBe("Isoplastic");
+    expect(formatFieldValue("INSULATED", "implement.type")).toBe("Isoplastic");
     expect(formatFieldValue("CORRUGATED", "implementType")).toBe("Baú (Legado)");
     expect(formatFieldValue("VALOR_NOVO", "implementType")).toBe("VALOR_NOVO");
   });

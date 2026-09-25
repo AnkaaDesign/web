@@ -380,7 +380,7 @@ export const itemTableConfigSchema = z.object({
           "Flag",
           "Star",
           "Bolt",
-          "Truck",
+          "Truck", // resíduo-ok: glifo do Tabler gravado no painel, não é o implemento
           "Package",
           "Brush",
           "Palette",

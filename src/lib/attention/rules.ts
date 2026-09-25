@@ -217,7 +217,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
-        { op: "isNull", field: "truck.chassisNumber" },
+        { op: "isNull", field: "implement.chassisNumber" },
       ],
     }),
     target: { level: "field", field: "chassisNumber" },
@@ -243,7 +243,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       nodes: [
         { op: "notNull", field: "entryDate" },
         { op: "isNull", field: "serialNumber" },
-        { op: "isNull", field: "truck.plate" },
+        { op: "isNull", field: "implement.plate" },
       ],
     }),
     target: { level: "field", field: "plate" },
@@ -268,7 +268,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
-        { op: "isNull", field: "truck.vinPlateId" },
+        { op: "isNull", field: "implement.vinPlateId" },
       ],
     }),
     target: { level: "field", field: "vinPlate" },

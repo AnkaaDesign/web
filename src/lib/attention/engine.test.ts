@@ -40,7 +40,7 @@ const overdueTask = {
   serialNumber: "SN-1",
   // R2 "Previsão vencida sem liberação" — harsh, ack: onExitCooldown, target: forecastDate
   forecastDate: new Date("2026-01-01T00:00:00Z"),
-  truck: { chassisNumber: "CH", plate: "ABC1D23" },
+  implement: { chassisNumber: "CH", plate: "ABC1D23" },
 };
 
 /** R0 "Recorte pendente" — harsh, ack: onView, target: row */
@@ -129,7 +129,7 @@ describe("TASK — R3b, plate only when there is no serial number", () => {
     entryDate: new Date("2026-07-01T00:00:00Z"),
     forecastDate: new Date("2026-12-01T00:00:00Z"), // not overdue → R2 silent
     serialNumber: null as string | null,
-    truck: { chassisNumber: "CH", plate: null as string | null, vinPlateId: "file-1" as string | null },
+    implement: { chassisNumber: "CH", plate: null as string | null, vinPlateId: "file-1" as string | null },
     ...over,
   });
 
@@ -157,7 +157,7 @@ describe("TASK — R3c, plaqueta photo", () => {
     entryDate: new Date("2026-07-01T00:00:00Z"),
     forecastDate: new Date("2026-12-01T00:00:00Z"),
     serialNumber: "SN-4",
-    truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: null as string | null },
+    implement: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: null as string | null },
     ...over,
   });
 
@@ -168,12 +168,12 @@ describe("TASK — R3c, plaqueta photo", () => {
   });
 
   it("stays silent once the photo is attached", async () => {
-    setEntities("TASK", [arrived({ truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-9" } })]);
+    setEntities("TASK", [arrived({ implement: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-9" } })]);
     await settle();
     expect(row("TASK", "task-4")).toBeNull();
   });
 
-  it("stays silent before the truck arrives", async () => {
+  it("stays silent before the vehicle arrives", async () => {
     // Sem data de entrada o veículo ainda não está aqui — não há plaqueta para fotografar.
     setEntities("TASK", [arrived({ entryDate: null })]);
     await settle();
@@ -242,7 +242,7 @@ describe("nav projection — getAttentionSnapshot", () => {
       id: "task-2",
       entryDate: new Date("2026-07-01T00:00:00Z"),
       serialNumber: null,
-      truck: { chassisNumber: null, plate: null },
+      implement: { chassisNumber: null, plate: null },
     };
     setEntities("TASK", [task]);
     await settle();
@@ -330,7 +330,7 @@ describe("sound — one slot, app-wide", () => {
 
   it("prefers the harsher, higher-priority rule when both are waiting", async () => {
     // R2 (forecast overdue, priority 30, harsh) vs R3a (missing chassis, priority 20, soft).
-    setEntities("TASK", [overdueTask, { id: "task-2", status: TASK_STATUS.IN_PRODUCTION, cleared: false, entryDate: new Date("2026-07-01"), serialNumber: "SN-2", forecastDate: null, truck: { chassisNumber: null, plate: "XYZ", vinPlateId: "f1" } }]);
+    setEntities("TASK", [overdueTask, { id: "task-2", status: TASK_STATUS.IN_PRODUCTION, cleared: false, entryDate: new Date("2026-07-01"), serialNumber: "SN-2", forecastDate: null, implement: { chassisNumber: null, plate: "XYZ", vinPlateId: "f1" } }]);
     await settle();
     expect(playAttentionBeep).toHaveBeenCalledWith("harsh");
     expect(playAttentionBeep).not.toHaveBeenCalledWith("soft");
@@ -378,7 +378,7 @@ describe("remote matches — the server's half of the match set", () => {
   it("yields to the LOCAL evaluation once the record is on screen", async () => {
     // A poll is up to a minute old. An inline edit that resolves the rule has to stop the blink
     // now, not when the next fetch lands — so a loaded record is always evaluated locally.
-    const fixed = { ...overdueTask, cleared: true, entryDate: new Date("2026-07-20"), truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-1" } };
+    const fixed = { ...overdueTask, cleared: true, entryDate: new Date("2026-07-20"), implement: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-1" } };
     setRemoteMatches([{ ruleId: "task.forecast-overdue-not-cleared", entityType: "TASK", entityId: overdueTask.id }], ALL_EVALUATED);
     await settle();
     expect(row("TASK", overdueTask.id)).toEqual(ARMED);

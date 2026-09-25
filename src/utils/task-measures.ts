@@ -9,9 +9,9 @@ import type { Task } from "../types";
  * @returns Measures in square meters, or null if no layout data exists
  */
 export function calculateTaskMeasures(task: Task): number | null {
-  if (!task.truck) return null;
+  if (!task.implement) return null;
 
-  const { truck: implement } = task;
+  const { implement } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
   const layout = implement.leftSideMeasure || implement.rightSideMeasure;
@@ -39,9 +39,9 @@ export function calculateTaskMeasures(task: Task): number | null {
  * @returns Object with width and height, or null if no layout data exists
  */
 export function getTaskDimensions(task: Task): { width: number; height: number } | null {
-  if (!task.truck) return null;
+  if (!task.implement) return null;
 
-  const { truck: implement } = task;
+  const { implement } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
   const layout = implement.leftSideMeasure || implement.rightSideMeasure;

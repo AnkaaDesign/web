@@ -473,7 +473,7 @@ interface TaskWithServiceOrdersChangelogProps {
   taskName?: string;
   taskCreatedAt?: Date;
   serviceOrderIds: string[];
-  truckId?: string;
+  implementId?: string;
   layoutIds?: string[];
   quoteId?: string;
   className?: string;
@@ -585,7 +585,7 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
         changelog.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
       (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
         changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
-        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
+        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT ||
         changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
         changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM);
 
@@ -728,7 +728,7 @@ const formatValueWithEntity = (
     if (field === "sectorId") return "Setor (carregando...)";
     if (field === "paintId") return "Tinta (carregando...)";
     if (field === "invoiceToId") return "Cliente (carregando...)";
-    if (field === "truckId") return "Caminhão (carregando...)";
+    if (field === "implementId") return "Implemento (carregando...)";
     if (field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "assignedToUserId" || field === "createdById") return "Usuário (carregando...)";
   }
 
@@ -801,8 +801,8 @@ const ChangelogTimelineItem = ({
       ? "Tarefa"
       : entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER
         ? "Ordem de Serviço"
-        : entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK
-          ? "Caminhão"
+        : entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT
+          ? "Implemento"
           : entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE
             ? "Medidas do Implemento"
             : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE
@@ -916,8 +916,8 @@ const ChangelogTimelineItem = ({
                   </>
                 )}
 
-                {/* Truck Details */}
-                {entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK && (
+                {/* Implement Details */}
+                {entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT && (
                   <>
                     {createdEntityData.plate && (
                       <div className="text-sm">
@@ -1812,7 +1812,7 @@ const ChangelogTimelineItem = ({
                           onRollback &&
                           (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
                             entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
-                            entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
+                            entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT ||
                             entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
                             entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM) && (
                             <Button
@@ -3007,7 +3007,7 @@ export function TaskWithServiceOrdersChangelog({
   taskName,
   taskCreatedAt: _taskCreatedAt,
   serviceOrderIds,
-  truckId: implementId,
+  implementId,
   layoutIds = [],
   quoteId,
   className,
@@ -3105,7 +3105,7 @@ export function TaskWithServiceOrdersChangelog({
     refetch: refetchImplementChangelogs,
   } = useChangeLogs({
     where: {
-      entityType: CHANGE_LOG_ENTITY_TYPE.TRUCK,
+      entityType: CHANGE_LOG_ENTITY_TYPE.IMPLEMENT,
       entityId: implementId || undefined,
     },
     include: {

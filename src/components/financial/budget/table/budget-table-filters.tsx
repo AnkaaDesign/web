@@ -55,7 +55,7 @@ const TASK_STATUS_OPTIONS = (Object.values(TASK_STATUS) as TASK_STATUS[]).map((v
  * aceitar `select` nas tarefas) fica para outra mudança.
  */
 export const BUDGET_QUOTE_INCLUDE = {
-  tasks: { include: { truck: true, customer: true } },
+  tasks: { include: { implement: true, customer: true } },
   customerConfigs: true,
 } as const;
 

@@ -41,10 +41,10 @@ const CLIENTE_A = "b593f440-9f00-4c85-93ef-54bf5a9eef37";
 const CLIENTE_B = "0f723f76-f3b6-41c9-ae1f-3c1209955f58";
 
 const VEICULOS = [
-  { id: "t1", serialNumber: "16677", truck: { plate: "ABC1D23" } },
-  { id: "t2", serialNumber: "16678", truck: { plate: "ABC1D24" } },
-  { id: "t3", serialNumber: "16679", truck: { plate: "ABC1D25" } },
-  { id: "t4", serialNumber: "16680", truck: { plate: "ABC1D26" } },
+  { id: "t1", serialNumber: "16677", implement: { plate: "ABC1D23" } },
+  { id: "t2", serialNumber: "16678", implement: { plate: "ABC1D24" } },
+  { id: "t3", serialNumber: "16679", implement: { plate: "ABC1D25" } },
+  { id: "t4", serialNumber: "16680", implement: { plate: "ABC1D26" } },
 ];
 
 const cov = (...ids: string[]) => ids.map((taskId) => ({ taskId }));

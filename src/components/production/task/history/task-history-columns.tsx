@@ -344,7 +344,7 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "identificador",
     header: "IDENTIFICADOR",
-    accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
+    accessorFn: (row) => row.serialNumber || row.implement?.plate || "",
     sortable: true,
     filterable: true,
     defaultVisible: true,
@@ -357,7 +357,7 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "chassisNumber",
     header: "Nº CHASSI",
-    accessorFn: (row) => row.truck?.chassisNumber || "",
+    accessorFn: (row) => row.implement?.chassisNumber || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -368,18 +368,18 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "truckCategory",
-    header: "CATEGORIA DO CAMINHÃO",
-    accessorFn: (row) => row.truck?.category || "",
+    id: "implementCategory",
+    header: "CATEGORIA DO IMPLEMENTO",
+    accessorFn: (row) => row.implement?.category || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
     width: "160px",
     formatter: (_value: string | null, row: Task) => {
-      if (!row.truck?.category) return <span className="text-muted-foreground">-</span>;
+      if (!row.implement?.category) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="outline" className="truncate">
-          {IMPLEMENT_CATEGORY_LABELS[row.truck.category]}
+          {IMPLEMENT_CATEGORY_LABELS[row.implement.category]}
         </Badge>
       );
     },
@@ -387,16 +387,16 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "implementType",
     header: "TIPO DE IMPLEMENTO",
-    accessorFn: (row) => row.truck?.implementType || "",
+    accessorFn: (row) => row.implement?.type || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
     width: "140px",
     formatter: (_value: string | null, row: Task) => {
-      if (!row.truck?.implementType) return <span className="text-muted-foreground">-</span>;
+      if (!row.implement?.type) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="outline" className="truncate">
-          {IMPLEMENT_TYPE_LABELS[row.truck.implementType]}
+          {IMPLEMENT_TYPE_LABELS[row.implement.type]}
         </Badge>
       );
     },

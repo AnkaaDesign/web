@@ -6,7 +6,7 @@ import {
   getGaragesAvailability,
   type GarageAvailability,
   type LaneAvailability,
-} from '../../../../api-client/truck';
+} from '../../../../api-client/implement';
 import { IMPLEMENT_SPOT } from '../../../../constants';
 
 type GarageId = 'B1' | 'B2' | 'B3';
@@ -14,9 +14,9 @@ type LaneId = 'F1' | 'F2' | 'F3';
 type SpotNumber = 1 | 2 | 3;
 
 interface SpotSelectorProps {
-  truckLength: number | null;
+  implementLength: number | null;
   currentSpot: IMPLEMENT_SPOT | null;
-  truckId?: string;
+  implementId?: string;
   onSpotChange: (spot: IMPLEMENT_SPOT | null) => void;
   disabled?: boolean;
   className?: string;
@@ -67,9 +67,9 @@ function buildSpot(garage: GarageId, lane: LaneId, spotNumber: SpotNumber): IMPL
 }
 
 export function SpotSelector({
-  truckLength: implementLength,
+  implementLength,
   currentSpot,
-  truckId: implementId,
+  implementId,
   onSpotChange,
   disabled = false,
   className,

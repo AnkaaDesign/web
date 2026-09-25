@@ -85,7 +85,7 @@ import { TaskServiceOrderGroup } from "./service-orders-section";
 import { BudgetBreakdown, BillingBreakdown } from "./sections/quote-billing-section";
 import { PaintsSection } from "./sections/paints-section";
 import { ResponsiblesSection } from "./sections/responsibles-section";
-import { ImplementMeasuresSection } from "./sections/truck-implement-measure-section";
+import { ImplementMeasuresSection } from "./sections/implement-measures-section";
 import { LayoutsSection, getVisibleLayouts, downloadAllLayouts } from "./sections/layouts-section";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
 import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
@@ -203,7 +203,7 @@ export const DETAIL_INCLUDE = {
   customer: { include: { logo: true } },
   sector: true,
   responsibles: true,
-  truck: true,
+  implement: true,
   createdBy: true,
   serviceOrders: { include: { assignedTo: true, checkinFiles: true, checkoutFiles: true } },
   baseFiles: true,
@@ -376,8 +376,8 @@ function TaskDetailContent() {
 
   // Truck dimensions (width × height in cm) derived from any available side layout — shown as a
   // read-only overview field so non-leader PRODUCTION (who can't see the gated layout section) still
-  // get the vehicle size. Faithful port of the legacy `truckDimensions`/"Caminhão" overview row.
-  const { data: implementLayouts } = useImplementMeasuresByImplement(task?.truck?.id || "", { enabled: !!task?.truck?.id });
+  // get the vehicle size. Faithful port of the legacy `implementDimensions`/"Caminhão" overview row.
+  const { data: implementLayouts } = useImplementMeasuresByImplement(task?.implement?.id || "", { enabled: !!task?.implement?.id });
   const implementDimensions = useMemo(() => {
     type SideLayout = { height: number; sections?: { width: number }[] };
     const sides = implementLayouts as { leftSideMeasure?: SideLayout; rightSideMeasure?: SideLayout; backSideMeasure?: SideLayout } | undefined;
@@ -508,10 +508,10 @@ function TaskDetailContent() {
   }, [task?.layouts, canViewLayoutBadges]);
 
   const hasLayout = !!(
-    task?.truck &&
-    ((task.truck as { leftSideMeasureId?: string }).leftSideMeasureId ||
-      (task.truck as { rightSideMeasureId?: string }).rightSideMeasureId ||
-      (task.truck as { backSideMeasureId?: string }).backSideMeasureId)
+    task?.implement &&
+    ((task.implement as { leftSideMeasureId?: string }).leftSideMeasureId ||
+      (task.implement as { rightSideMeasureId?: string }).rightSideMeasureId ||
+      (task.implement as { backSideMeasureId?: string }).backSideMeasureId)
   );
   const hasDossie = useMemo(
     () =>
@@ -734,11 +734,11 @@ function TaskDetailContent() {
             dataType: "plate",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.truck?.plate || null,
-            render: (t) => <span>{t.truck?.plate ? formatPlate(t.truck.plate) : "—"}</span>,
+            accessor: (t) => t.implement?.plate || null,
+            render: (t) => <span>{t.implement?.plate ? formatPlate(t.implement.plate) : "—"}</span>,
             edit:
-              canEdit && task?.truck
-                ? { get: (t) => t.truck?.plate ?? "", onCommit: (v) => setTaskField({ truck: { plate: cleanPlate(String(v ?? "")) || null } }) }
+              canEdit && task?.implement
+                ? { get: (t) => t.implement?.plate ?? "", onCommit: (v) => setTaskField({ implement: { plate: cleanPlate(String(v ?? "")) || null } }) }
                 : undefined,
           },
           {
@@ -747,11 +747,11 @@ function TaskDetailContent() {
             dataType: "chassis",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.truck?.chassisNumber || null,
-            render: (t) => <span>{t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}</span>,
+            accessor: (t) => t.implement?.chassisNumber || null,
+            render: (t) => <span>{t.implement?.chassisNumber ? formatChassis(t.implement.chassisNumber) : "—"}</span>,
             edit:
-              canEdit && task?.truck
-                ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: cleanChassis(String(v ?? "")) || null } }) }
+              canEdit && task?.implement
+                ? { get: (t) => t.implement?.chassisNumber ?? "", onCommit: (v) => setTaskField({ implement: { chassisNumber: cleanChassis(String(v ?? "")) || null } }) }
                 : undefined,
           },
           {
@@ -765,32 +765,32 @@ function TaskDetailContent() {
             // Sem edição inline (é foto), então o filtro de campos vazios apagaria a linha
             // exatamente quando a regra R3c precisa piscar nela. Ver `keepWhenEmpty`.
             keepWhenEmpty: true,
-            accessor: (t) => t.truck?.vinPlateId || null,
+            accessor: (t) => t.implement?.vinPlateId || null,
             render: (t) =>
-              t.truck?.vinPlate ? (
+              t.implement?.vinPlate ? (
                 <FileThumbnail
-                  file={t.truck.vinPlate}
+                  file={t.implement.vinPlate}
                   size="sm"
-                  onClick={() => fileViewer.actions?.viewFiles?.([t.truck!.vinPlate!] as never, 0)}
+                  onClick={() => fileViewer.actions?.viewFiles?.([t.implement!.vinPlate!] as never, 0)}
                 />
               ) : (
                 <span className="text-muted-foreground">—</span>
               ),
           },
           {
-            id: "truckCategory",
+            id: "implementCategory",
             label: "Categoria",
             dataType: "enum",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.truck?.category || null,
-            render: (t) => (t.truck?.category ? <span>{IMPLEMENT_CATEGORY_LABELS[t.truck.category]}</span> : <span className="text-muted-foreground">—</span>),
+            accessor: (t) => t.implement?.category || null,
+            render: (t) => (t.implement?.category ? <span>{IMPLEMENT_CATEGORY_LABELS[t.implement.category]}</span> : <span className="text-muted-foreground">—</span>),
             edit:
-              canEdit && task?.truck
+              canEdit && task?.implement
                 ? {
-                    get: (t) => t.truck?.category ?? null,
+                    get: (t) => t.implement?.category ?? null,
                     enum: { values: Object.values(IMPLEMENT_CATEGORY), labels: IMPLEMENT_CATEGORY_LABELS },
-                    onCommit: (v) => setTaskField({ truck: { category: v } }),
+                    onCommit: (v) => setTaskField({ implement: { category: v } }),
                   }
                 : undefined,
           },
@@ -800,32 +800,32 @@ function TaskDetailContent() {
             dataType: "enum",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.truck?.implementType || null,
-            render: (t) => (t.truck?.implementType ? <span>{IMPLEMENT_TYPE_LABELS[t.truck.implementType]}</span> : <span className="text-muted-foreground">—</span>),
+            accessor: (t) => t.implement?.type || null,
+            render: (t) => (t.implement?.type ? <span>{IMPLEMENT_TYPE_LABELS[t.implement.type]}</span> : <span className="text-muted-foreground">—</span>),
             edit:
-              canEdit && task?.truck
+              canEdit && task?.implement
                 ? {
-                    get: (t) => t.truck?.implementType ?? null,
+                    get: (t) => t.implement?.type ?? null,
                     enum: { values: Object.values(IMPLEMENT_TYPE), labels: IMPLEMENT_TYPE_LABELS },
-                    onCommit: (v) => setTaskField({ truck: { implementType: v } }),
+                    onCommit: (v) => setTaskField({ implement: { type: v } }),
                   }
                 : undefined,
           },
           {
             id: "vehicle",
-            label: "Caminhão",
-            // Read-only vehicle size (cm) from the truck's layout — available even to sectors that
+            label: "Implemento",
+            // Read-only vehicle size (cm) from the implement's layout — available even to sectors that
             // can't open the gated layout section.
             attention: { entityType: "TASK", sendWarning: true },
             accessor: () => (implementDimensions ? `${implementDimensions.width}cm × ${implementDimensions.height}cm` : null),
           },
           {
-            id: "truckSpot",
+            id: "implementSpot",
             label: "Local",
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => (t.truck as { spot?: string } | undefined)?.spot || null,
+            accessor: (t) => (t.implement as { spot?: string } | undefined)?.spot || null,
             render: (t) => {
-              const spot = (t.truck as { spot?: string } | undefined)?.spot;
+              const spot = (t.implement as { spot?: string } | undefined)?.spot;
               return spot ? <span>{formatImplementSpot(spot)}</span> : <span className="text-muted-foreground">—</span>;
             },
           },
@@ -1332,7 +1332,7 @@ function TaskDetailContent() {
               label: "Medidas do Implemento",
               icon: IconRulerMeasure,
               span: 2 as const,
-              render: (t: Task) => <ImplementMeasuresSection truckId={t.truck!.id} taskName={t.name} />,
+              render: (t: Task) => <ImplementMeasuresSection implementId={t.implement!.id} taskName={t.name} />,
             } as DetailSectionDef<Task>,
           ]
         : []),
@@ -1521,12 +1521,12 @@ function TaskDetailContent() {
             taskName={`${t.name}${t.serialNumber ? ` — ${t.serialNumber}` : ""}`}
             taskCreatedAt={t.createdAt}
             serviceOrderIds={(t.serviceOrders ?? []).map((s) => s.id)}
-            truckId={t.truck?.id}
+            implementId={t.implement?.id}
             layoutIds={
               [
-                (t.truck as { leftSideMeasureId?: string } | undefined)?.leftSideMeasureId,
-                (t.truck as { rightSideMeasureId?: string } | undefined)?.rightSideMeasureId,
-                (t.truck as { backSideMeasureId?: string } | undefined)?.backSideMeasureId,
+                (t.implement as { leftSideMeasureId?: string } | undefined)?.leftSideMeasureId,
+                (t.implement as { rightSideMeasureId?: string } | undefined)?.rightSideMeasureId,
+                (t.implement as { backSideMeasureId?: string } | undefined)?.backSideMeasureId,
               ].filter(Boolean) as string[]
             }
             quoteId={showQuote ? t.quote?.id : undefined}
@@ -1554,7 +1554,7 @@ function TaskDetailContent() {
     task?.quote?.services?.length,
     task?.quote?.customerConfigs?.length,
     task?.observation?.id,
-    task?.truck?.id,
+    task?.implement?.id,
     implementDimensions,
     task?.serviceOrders?.length,
     // SO statuses gate the inline "Concluída" transition (areAllServiceOrdersComplete) — the array ref
@@ -1625,7 +1625,7 @@ function TaskDetailContent() {
     ? task.name ||
       task.customer?.corporateName ||
       (task.serialNumber ? `Série ${task.serialNumber}` : "") ||
-      task.truck?.plate ||
+      task.implement?.plate ||
       "Sem nome"
     : "Tarefa";
   const taskName = task ? `${taskDisplayName}${task.name && task.serialNumber ? ` — ${task.serialNumber}` : ""}` : "Tarefa";

@@ -97,7 +97,7 @@ export const LIST_INCLUDE = {
     take: 1,
   },
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
-  truck: {
+  implement: {
     select: {
       id: true,
       plate: true,
@@ -105,7 +105,7 @@ export const LIST_INCLUDE = {
       chassisNumber: true,
       // Necessário para a regra de atenção R3c (foto da plaqueta).
       vinPlateId: true,
-      implementType: true,
+      type: true,
       // Layouts power the (default-hidden) "Medidas" column — formatTaskMeasures reads
       // height + the sections' widths off the left/right side. Keep the nested select
       // minimal (just those fields) so the payload stays lean.
@@ -161,7 +161,7 @@ function defaultOrder(a: Task, b: Task): number {
   if (af !== bf) return af - bf;
   const an = (a.name || "").localeCompare(b.name || "");
   if (an !== 0) return an;
-  return (a.serialNumber || a.truck?.plate || "").localeCompare(b.serialNumber || b.truck?.plate || "");
+  return (a.serialNumber || a.implement?.plate || "").localeCompare(b.serialNumber || b.implement?.plate || "");
 }
 
 /** One trimmed bucket query. The API caps `limit` at 1000, so each status-bucket gets its own query
@@ -361,7 +361,7 @@ export function TaskPreparationPage() {
             logoPaints: true,
             cuts: true,
             serviceOrders: true,
-            truck: {
+            implement: {
               include: {
                 leftSideMeasure: { include: { sections: true, photo: true } },
                 rightSideMeasure: { include: { sections: true, photo: true } },
@@ -946,18 +946,18 @@ export function TaskPreparationPage() {
         accessor: (r) => r.customer?.id ?? "",
       },
       {
-        key: "truckCategory",
+        key: "implementCategory",
         label: "Categoria",
         type: "multiselect",
         options: Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
-        accessor: (r) => r.truck?.category ?? "",
+        accessor: (r) => r.implement?.category ?? "",
       },
       {
         key: "implementType",
         label: "Tipo de Implemento",
         type: "multiselect",
         options: Object.entries(IMPLEMENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-        accessor: (r) => r.truck?.implementType ?? "",
+        accessor: (r) => r.implement?.type ?? "",
       },
     ];
   }, [tasks]);

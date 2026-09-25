@@ -515,10 +515,10 @@ export function useTaskBatchMutations() {
             queryKey: layoutKeys.byEntity("task", task.id),
           });
 
-          // Invalidate layout queries for this task's truck
-          if ((task as any).truck?.id) {
+          // Invalidate layout queries for this task's implement
+          if ((task as any).implement?.id) {
             queryClient.invalidateQueries({
-              queryKey: implementMeasureQueryKeys.byTruck((task as any).truck.id),
+              queryKey: implementMeasureQueryKeys.byImplement((task as any).implement.id),
             });
           }
 

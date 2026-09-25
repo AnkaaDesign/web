@@ -8,3 +8,14 @@ src/pages/tools/truck-studio/**
 # Cópia GERADA do contrato da api (export-contracts.ts --irmaos): o nome do
 # enum vem de lá e muda lá.
 src/generated/**
+
+# Rótulos da CATEGORIA `TRUCK` ("Truck", "1) Truck Isotérmico…"): é o tipo do
+# caminhão que leva o implemento (NOMENCLATURA.md §4), e este teste trava as
+# palavras de cada documento.
+src/constants/document-labels.test.ts
+# Catálogo de ícones do Tabler dos widgets: "Truck" é o NOME DO GLIFO, gravado
+# no painel de quem o escolheu (Preferences.dashboardLayoutWeb) — não é o
+# implemento, e renomeá-lo apagaria o ícone escolhido.
+src/dashboard/components/widget-accent.tsx
+# Mapa rota → glifo do Tabler ("truck" é o ícone das entregas de EPI).
+src/utils/page-icons.ts

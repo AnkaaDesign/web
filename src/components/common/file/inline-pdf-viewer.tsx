@@ -63,7 +63,7 @@ export interface InlinePdfViewerProps {
    * `ImplementMeasure` guarda METRO e o cotador trabalha em centímetro, e essa
    * conversão passou a existir num lugar só.
    */
-  layoutTruckId?: string;
+  layoutImplementId?: string;
   /** Id do arquivo aberto — a API cota pelo arquivo, não pela URL. */
   fileId?: string;
   /** Ferramenta ativa sobre o desenho. */
@@ -107,7 +107,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       measurements,
       onMeasurementCommit,
       onScaleDetected,
-      layoutTruckId: layoutImplementId,
+      layoutImplementId,
       fileId,
       layoutTool = "off",
       onLayoutResult,
@@ -419,7 +419,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
             return;
           }
           const dto = await layoutDimensionsService.get(fileId, {
-            truckId: layoutImplementId,
+            implementId: layoutImplementId,
             page: pageNumber,
             rotation,
           });

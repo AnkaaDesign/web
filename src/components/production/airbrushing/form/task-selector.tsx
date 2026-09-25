@@ -30,13 +30,13 @@ export const LIST_INCLUDE = {
     take: 1,
   },
   customer: { select: { id: true, fantasyName: true, corporateName: true, logo: true } },
-  truck: {
+  implement: {
     select: {
       id: true,
       plate: true,
       category: true,
       chassisNumber: true,
-      implementType: true,
+      type: true,
       leftSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
       rightSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
     },
@@ -140,18 +140,18 @@ export const TaskSelector = ({
       { key: "createdAt", label: "Data de Criação", type: "date-range", accessor: (r) => r.createdAt },
       { key: "customerId", label: "Razão Social", type: "multiselect", options: customerOptions, accessor: (r) => r.customer?.id ?? "" },
       {
-        key: "truckCategory",
+        key: "implementCategory",
         label: "Categoria",
         type: "multiselect",
         options: Object.entries(IMPLEMENT_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
-        accessor: (r) => r.truck?.category ?? "",
+        accessor: (r) => r.implement?.category ?? "",
       },
       {
         key: "implementType",
         label: "Tipo de Implemento",
         type: "multiselect",
         options: Object.entries(IMPLEMENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-        accessor: (r) => r.truck?.implementType ?? "",
+        accessor: (r) => r.implement?.type ?? "",
       },
     ];
   }, [tasks]);

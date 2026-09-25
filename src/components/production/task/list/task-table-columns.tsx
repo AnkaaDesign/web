@@ -136,7 +136,7 @@ const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "plate",
     header: "PLACA",
-    accessorFn: (row) => row.truck?.plate || "",
+    accessorFn: (row) => row.implement?.plate || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -149,7 +149,7 @@ const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "spot",
     header: "LOCAL",
-    accessorFn: (row) => row.truck?.spot || "",
+    accessorFn: (row) => row.implement?.spot || "",
     sortable: true,
     filterable: true,
     defaultVisible: true,
@@ -181,7 +181,7 @@ const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "chassisNumber",
     header: "Nº CHASSI",
-    accessorFn: (row) => row.truck?.chassisNumber || "",
+    accessorFn: (row) => row.implement?.chassisNumber || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,

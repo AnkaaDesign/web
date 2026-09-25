@@ -408,7 +408,7 @@ export function TaskHistoryTablePage() {
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
-          truck: {
+          implement: {
             include: {
               leftSideMeasure: { include: { sections: true, photo: true } },
               rightSideMeasure: { include: { sections: true, photo: true } },
@@ -607,7 +607,7 @@ export function TaskHistoryTablePage() {
         onClick: (r) => openAdvanced("serviceOrder", r),
       },
       {
-        key: "adv-truck-layout",
+        key: "adv-implement-layout",
         label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
         group: ADVANCED_GROUP,

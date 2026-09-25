@@ -19,7 +19,7 @@ export interface CoveredVehicle {
   name?: string | null;
   serialNumber?: string | null;
   customerOrderNumber?: string | null;
-  truck?: { plate?: string | null; chassisNumber?: string | null } | null;
+  implement?: { plate?: string | null; chassisNumber?: string | null } | null;
 }
 
 interface Props {
@@ -85,7 +85,7 @@ const payloadFor = (
   field: "plate" | "chassisNumber" | "customerOrderNumber",
   value: string | null,
 ): Record<string, unknown> =>
-  field === "customerOrderNumber" ? { customerOrderNumber: value } : { truck: { [field]: value } };
+  field === "customerOrderNumber" ? { customerOrderNumber: value } : { implement: { [field]: value } };
 
 export function BillingCoveredVehicles({ vehicles, disabled, approved }: Props) {
   const { updateAsync } = useTaskMutations();
@@ -182,11 +182,11 @@ export function BillingCoveredVehicles({ vehicles, disabled, approved }: Props) 
               {vehicles.map((v) => (
                 <TableRow key={v.id}>
                   <TableCell className="whitespace-nowrap font-medium tabular-nums">
-                    {v.serialNumber || v.truck?.plate || v.name || v.id.slice(0, 8)}
+                    {v.serialNumber || v.implement?.plate || v.name || v.id.slice(0, 8)}
                   </TableCell>
-                  <TableCell>{cell(v, "plate", v.truck?.plate ?? "", "ABC-1D23")}</TableCell>
+                  <TableCell>{cell(v, "plate", v.implement?.plate ?? "", "ABC-1D23")}</TableCell>
                   <TableCell>
-                    {cell(v, "chassisNumber", v.truck?.chassisNumber ?? "", "17 caracteres")}
+                    {cell(v, "chassisNumber", v.implement?.chassisNumber ?? "", "17 caracteres")}
                   </TableCell>
                   <TableCell>
                     {cell(v, "customerOrderNumber", v.customerOrderNumber ?? "", "PED-0000")}

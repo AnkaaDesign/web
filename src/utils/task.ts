@@ -189,7 +189,7 @@ export function getDaysUntilDeadline(task: Task): number | null {
  */
 export function formatTaskIdentifier(task: Task): string {
   if (task.serialNumber) return task.serialNumber;
-  if (task.truck?.plate) return task.truck.plate;
+  if (task.implement?.plate) return task.implement.plate;
   return `#${task.id.slice(-6).toUpperCase()}`;
 }
 

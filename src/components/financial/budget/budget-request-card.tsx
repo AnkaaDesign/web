@@ -112,7 +112,7 @@ function briefingPreview(briefing: string | null | undefined): string {
 export interface RequestVehicle {
   id: string;
   serialNumber?: string | null;
-  truck?: { plate?: string | null; chassisNumber?: string | null } | null;
+  implement?: { plate?: string | null; chassisNumber?: string | null } | null;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

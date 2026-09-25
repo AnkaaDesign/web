@@ -27,7 +27,7 @@ export const TASK_HISTORY_LIST_INCLUDE = {
   serviceOrders: {
     select: { id: true, status: true, type: true, description: true, assignedToId: true, assignedTo: { select: { id: true, name: true } } },
   },
-  truck: {
+  implement: {
     include: {
       leftSideMeasure: { include: { sections: true } },
       rightSideMeasure: { include: { sections: true } },

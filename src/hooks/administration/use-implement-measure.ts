@@ -4,14 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { implementMeasureService } from "../../api-client";
 import type { ImplementMeasureCreateFormData, ImplementMeasureUpdateFormData } from "../../schemas";
-import { taskKeys } from "../common/query-keys";
+import { implementKeys, taskKeys } from "../common/query-keys";
 import type { ImplementFace } from "@/constants/implement-faces";
 
 // Query keys
 export const implementMeasureQueryKeys = {
   all: ["implementMeasures"] as const,
   detail: (id: string) => ["implementMeasures", "detail", id] as const,
-  byTruck: (implementId: string) => ["implementMeasures", "truck", implementId] as const,
+  byImplement: (implementId: string) => ["implementMeasures", "implement", implementId] as const,
 };
 
 // Get implement measure by ID
@@ -49,11 +49,11 @@ export const useImplementMeasuresByImplement = (
   const includePhoto = options?.includePhoto ?? false;
 
   return useQuery({
-    queryKey: [...implementMeasureQueryKeys.byTruck(implementId), { includePhoto }],
+    queryKey: [...implementMeasureQueryKeys.byImplement(implementId), { includePhoto }],
     queryFn: async () => {
       // Single API call - backend now returns everything needed for previews
       // Only includes photo if explicitly requested
-      const response = await implementMeasureService.getByTruckId(implementId, { includePhoto });
+      const response = await implementMeasureService.getByImplementId(implementId, { includePhoto });
       // A API sempre devolve as seções de cada face (o repositório as inclui) e
       // `null` na face sem medida. Havia aqui um recuo para uma "versão antiga da
       // API" que buscava as seções medida a medida e remontava a resposta só com
@@ -109,17 +109,17 @@ export const useImplementMeasureMutations = () => {
   });
 
   const createOrUpdateImplementMeasureMutation = useMutation({
-    mutationFn: ({ truckId: implementId, side, data }: { truckId: string; side: ImplementFace; data: ImplementMeasureCreateFormData }) =>
-      implementMeasureService.createOrUpdateTruckMeasure(implementId, side, data),
+    mutationFn: ({ implementId, side, data }: { implementId: string; side: ImplementFace; data: ImplementMeasureCreateFormData }) =>
+      implementMeasureService.createOrUpdateImplementMeasure(implementId, side, data),
     onSuccess: async (response, variables) => {
       // Use refetchQueries to immediately refetch and get fresh data
       await queryClient.refetchQueries({
-        queryKey: implementMeasureQueryKeys.byTruck(variables.truckId),
+        queryKey: implementMeasureQueryKeys.byImplement(variables.implementId),
         exact: true
       });
       queryClient.invalidateQueries({ queryKey: implementMeasureQueryKeys.all });
       queryClient.invalidateQueries({
-        queryKey: ["trucks", "detail", variables.truckId],
+        queryKey: implementKeys.detail(variables.implementId),
       });
       // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -131,11 +131,11 @@ export const useImplementMeasureMutations = () => {
     create: createMutation.mutateAsync,
     update: updateMutation.mutateAsync,
     delete: deleteMutation.mutateAsync,
-    createOrUpdateTruckMeasure: createOrUpdateImplementMeasureMutation.mutateAsync,
+    createOrUpdateImplementMeasure: createOrUpdateImplementMeasureMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
-    isSavingTruckMeasure: createOrUpdateImplementMeasureMutation.isPending,
+    isSavingImplementMeasure: createOrUpdateImplementMeasureMutation.isPending,
   };
 };
 

@@ -29,7 +29,7 @@ import type { Task } from "../../types";
 import { Combobox } from "../../components/ui/combobox";
 import type { ComboboxOption } from "../../components/ui/combobox";
 import { Label } from "../../components/ui/label";
-import { ImplementDetailModal } from "../../components/production/garage/truck-detail-modal";
+import { ImplementDetailModal } from "../../components/production/garage/implement-detail-modal";
 import {
   Tabs,
   TabsContent,

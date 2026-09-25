@@ -226,7 +226,7 @@ export interface BillingCoverageLike {
       name?: string | null;
       serialNumber?: string | null;
       customerOrderNumber?: string | null;
-      truck?: { plate?: string | null } | null;
+      implement?: { plate?: string | null } | null;
     } | null;
   }> | null;
 }
@@ -354,16 +354,16 @@ export function coversTask(
  */
 export function coverageLabels(
   config: BillingConfigLike | null | undefined,
-  tasks?: ReadonlyArray<QuoteTaskLike & { truck?: { plate?: string | null } | null }> | null,
+  tasks?: ReadonlyArray<QuoteTaskLike & { implement?: { plate?: string | null } | null }> | null,
 ): string[] {
   const byId = new Map((tasks ?? []).map((t) => [t.id, t]));
   return coverageRows(config).map((row) => {
     const t = (row.task ?? byId.get(row.taskId) ?? null) as
-      | (QuoteTaskLike & { truck?: { plate?: string | null } | null })
+      | (QuoteTaskLike & { implement?: { plate?: string | null } | null })
       | null;
     return (
       (t?.serialNumber || undefined) ??
-      (t?.truck?.plate || undefined) ??
+      (t?.implement?.plate || undefined) ??
       (t?.name || undefined) ??
       row.taskId.slice(0, 8)
     );
@@ -380,7 +380,7 @@ export function coverageLabels(
 export function coverageSummary(
   config: BillingConfigLike | null | undefined,
   total: number,
-  tasks?: ReadonlyArray<QuoteTaskLike & { truck?: { plate?: string | null } | null }> | null,
+  tasks?: ReadonlyArray<QuoteTaskLike & { implement?: { plate?: string | null } | null }> | null,
 ): string {
   const labels = coverageLabels(config, tasks);
   if (labels.length === 0) return total > 1 ? `Todos os ${total} veículos` : "Veículo único";
@@ -639,14 +639,14 @@ export function vehicleRowLabel(
   task: {
     serialNumber?: string | null;
     name?: string | null;
-    truck?: { plate?: string | null } | null;
+    implement?: { plate?: string | null } | null;
   } | null
   | undefined,
   index: number,
 ): string {
   const parts: string[] = [];
   const serial = (task?.serialNumber ?? "").trim();
-  const plate = (task?.truck?.plate ?? "").trim();
+  const plate = (task?.implement?.plate ?? "").trim();
   if (serial) parts.push(`#${serial}`);
   if (plate) parts.push(plate.toUpperCase());
   if (parts.length > 0) return parts.join(" · ");

@@ -78,7 +78,7 @@ export function BonusTasksTable({
           task.customer?.fantasyName,
           task.sector?.name,
           task.serialNumber,
-          task.truck?.plate,
+          task.implement?.plate,
         ];
         return searchableFields.some((field) =>
           field?.toLowerCase().includes(query)
