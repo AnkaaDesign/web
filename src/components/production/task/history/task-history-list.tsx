@@ -213,7 +213,7 @@ export function TaskHistoryList({
       if (params.get("hasAssignee") === "true") filters.hasAssignee = true;
       if (params.get("implementIdentified") === "true") filters.implementIdentified = true;
       if (params.get("hasObservation") === "true") filters.hasObservation = true;
-      if (params.get("hasLayouts") === "true") filters.hasLayouts = true;
+      if (params.get("hasArt") === "true") filters.hasArt = true;
       if (params.get("hasPaints") === "true") filters.hasPaints = true;
       if (params.get("hasBonifications") === "true") filters.hasBonifications = true;
       if (params.get("hasServiceOrders") === "true") filters.hasServiceOrders = true;
@@ -257,7 +257,7 @@ export function TaskHistoryList({
     if (filters.hasAssignee) params.hasAssignee = "true";
     if (filters.implementIdentified) params.implementIdentified = "true";
     if (filters.hasObservation) params.hasObservation = "true";
-    if (filters.hasLayouts) params.hasLayouts = "true";
+    if (filters.hasArt) params.hasArt = "true";
     if (filters.hasPaints) params.hasPaints = "true";
     if (filters.hasBonifications) params.hasBonifications = "true";
     if (filters.hasServiceOrders) params.hasServiceOrders = "true";

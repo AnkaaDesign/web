@@ -130,7 +130,7 @@ function getIconForFilter(key: string, value: any): React.ReactNode | undefined 
       return renderFilterIcon("alert-triangle");
     case "hasObservation":
       return renderFilterIcon("file-text");
-    case "hasLayouts":
+    case "hasArt":
       return renderFilterIcon("palette");
     case "hasPaints":
       return renderFilterIcon("brush");

@@ -72,7 +72,7 @@ export const createFilterRemover = (filters: Partial<TaskGetManyFormData>, onFil
       case "hasCustomer":
       case "implementIdentified":
       case "hasObservation":
-      case "hasLayouts":
+      case "hasArt":
       case "hasPaints":
       case "hasBonifications":
       case "hasServices":
@@ -212,7 +212,7 @@ export const extractActiveFilters = (
     { key: "hasCustomer", label: "Com cliente" },
     { key: "implementIdentified", label: "Implemento identificado" },
     { key: "hasObservation", label: "Com observação" },
-    { key: "hasLayouts", label: "Com layouts" },
+    { key: "hasArt", label: "Com arte aprovada" },
     { key: "hasPaints", label: "Com tintas" },
     { key: "hasBonifications", label: "Com bonificações" },
     { key: "hasServices", label: "Com serviços" },

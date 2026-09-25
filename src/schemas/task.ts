@@ -513,12 +513,13 @@ const taskTransform = (data: any): any => {
     delete data.hasObservation;
   }
 
-  if (data.hasLayouts === true) {
-    andConditions.push({ layouts: { some: {} } });
-    delete data.hasLayouts;
-  } else if (data.hasLayouts === false) {
-    andConditions.push({ layouts: { none: {} } });
-    delete data.hasLayouts;
+  // "Com arte" = o implemento tem arte APROVADA (espelho da API, P12).
+  if (data.hasArt === true) {
+    andConditions.push({ implement: { layouts: { some: { status: "APPROVED" } } } });
+    delete data.hasArt;
+  } else if (data.hasArt === false) {
+    andConditions.push({ implement: { layouts: { none: { status: "APPROVED" } } } });
+    delete data.hasArt;
   }
 
   if (data.hasPaints === true) {
@@ -848,7 +849,7 @@ export const taskGetManySchema = z
     hasAssignee: z.boolean().optional(),
     implementIdentified: z.boolean().optional(),
     hasObservation: z.boolean().optional(),
-    hasLayouts: z.boolean().optional(),
+    hasArt: z.boolean().optional(),
     hasPaints: z.boolean().optional(),
     hasServiceOrders: z.boolean().optional(),
     hasAirbrushing: z.boolean().optional(),
