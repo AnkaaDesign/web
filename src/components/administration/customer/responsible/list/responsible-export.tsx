@@ -24,7 +24,9 @@ const EXPORT_COLUMNS: ExportColumn<Responsible>[] = [
   { id: "phone", label: "TELEFONE", getValue: (resp: Responsible) => formatBrazilianPhone(resp.phone || "") },
   { id: "cpf", label: "CPF", getValue: (resp: Responsible) => (resp.cpf ? formatCPF(resp.cpf) : "") },
   { id: "email", label: "E-MAIL", getValue: (resp: Responsible) => resp.email || "" },
-  { id: "access", label: "ACESSO", getValue: (resp: Responsible) => (resp.email && resp.password ? "Com acesso" : "Sem acesso") },
+  // Mesma coluna PORTAL da tabela: quem já entrou no portal do cliente. Não há
+  // mais "com/sem acesso" — sem senha, todo contato ativo pode entrar.
+  { id: "verified", label: "PORTAL", getValue: (resp: Responsible) => (resp.verified ? "Já entrou" : "") },
   { id: "isActive", label: "STATUS", getValue: (resp: Responsible) => (resp.isActive ? "Ativo" : "Inativo") },
   { id: "createdAt", label: "CRIADO EM", getValue: (resp: Responsible) => resp.createdAt ? formatDate(new Date(resp.createdAt)) : "" },
 ];

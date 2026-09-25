@@ -1,6 +1,6 @@
 // airbrushing-nfse-section.tsx
 //
-// Corpo da seção "NFS-e do Aerografista" da página de detalhes da aerografia. A nota sai
+// Corpo da seção "NFS-e" da página de detalhes da aerografia. A nota sai
 // com o PINTOR como prestador (MEI, certificado A1 dele) e a empresa como tomadora — por
 // isso o CNPJ exibido é o do pintor, não o da Ankaa.
 //

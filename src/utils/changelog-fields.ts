@@ -93,6 +93,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     isBorrowable: "Emprestável",
     stockModel: "Modelo de Estoque",
     fixedTargetQuantity: "Quantidade Alvo",
+    targetCoverageDays: "Cobertura Alvo (dias)",
+    minStockQuantity: "Estoque Mínimo",
 
     // Stock management
     leadTime: "Tempo de Entrega",

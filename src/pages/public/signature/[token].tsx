@@ -224,25 +224,39 @@ export default function PublicSignaturePage() {
   );
 
   /**
-   * Largura do PDF medida no container.
+   * Largura do PDF medida no container — a folha cabe INTEIRA na tela.
    *
    * Era fixa em 840px — num iPhone (390px de viewport) isso empurrava a PÁGINA
-   * INTEIRA para 863px de rolagem horizontal: os cartões saíam do lugar e o
-   * signatário tinha que arrastar de lado para ler qualquer coisa. E o celular é
-   * onde a assinatura acontece, porque o link chega por WhatsApp.
+   * INTEIRA para 863px de rolagem horizontal. Depois ganhou um piso de 560px
+   * "de legibilidade", que só trocou o lugar da rolagem: no celular — e o link
+   * chega por WhatsApp, então é quase sempre no navegador embutido dele — a
+   * folha continuava cortada, com metade do documento fora do quadro e o
+   * signatário arrastando de lado sem saber que havia mais.
+   *
+   * Agora a folha tem a largura do quadro, sempre, e a legibilidade vem de dois
+   * lugares que não escondem nada: o canvas é desenhado em alta resolução
+   * (`PAGE_PIXELS`, abaixo), então a pinça do navegador amplia sem borrar; e o
+   * "Abrir em tela cheia" continua ao lado do título.
+   *
+   * A medida é a da CAIXA DE CONTEÚDO (sem o padding). `clientWidth` inclui o
+   * padding, e usá-lo cru fazia a folha 24px mais larga que o quadro em toda
+   * tela abaixo de 840px — outra fonte do mesmo transbordo.
    */
   const documentBoxRef = useRef<HTMLDivElement | null>(null);
-  const [documentWidth, setDocumentWidth] = useState(840);
+  const [documentWidth, setDocumentWidth] = useState(0);
 
   useEffect(() => {
     const el = documentBoxRef.current;
     if (!el) return;
-    // PISO DE LEGIBILIDADE. Acompanhar o container cegamente resolvia a rolagem
-    // da página, mas num iPhone rendia uma folha A4 com ~345px de largura — corpo
-    // de texto em torno de 5px, ilegível. Ninguém assina o que não consegue ler.
-    // Abaixo de 560px o documento passa a rolar DENTRO do quadro (que já tem
-    // overflow-x-auto), e a página continua sem rolagem horizontal.
-    const measure = () => setDocumentWidth(Math.max(560, Math.min(840, el.clientWidth)));
+    const measure = () => {
+      const style = window.getComputedStyle(el);
+      const inner =
+        el.clientWidth -
+        (parseFloat(style.paddingLeft) || 0) -
+        (parseFloat(style.paddingRight) || 0);
+      // `floor`: meio pixel a mais já basta para o navegador criar a rolagem.
+      setDocumentWidth(Math.max(0, Math.floor(Math.min(840, inner))));
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
@@ -558,7 +572,7 @@ export default function PublicSignaturePage() {
             /* force-light também aqui: o Radix monta o modal num portal preso
                ao <body>, fora do wrapper da página, então ele não herdaria o
                escopo claro. */
-            className="force-light max-h-[90vh] max-w-2xl overflow-y-auto"
+            className="force-light max-h-[90vh] max-w-2xl overflow-y-auto supports-[height:100dvh]:max-h-[90dvh]"
           >
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -981,10 +995,15 @@ export default function PublicSignaturePage() {
                 Safari iOS; por isso o link "abrir em nova aba" fica sempre à mão. */}
             {/* Renderização inline: todas as páginas empilhadas, sem scroll
                 interno e sem a barra do visualizador do navegador. */}
-            {/* overflow-x-auto é cinto e suspensório: se a medição falhar, quem
-                rola é ESTE quadro, nunca a página. */}
-            <div ref={documentBoxRef} className="overflow-x-auto p-3">
-              <InlineDocumentPages url={documentUrl} width={documentWidth} />
+            {/* `overflow-hidden`, não `overflow-x-auto`: a folha é medida para
+                caber, e o que passasse da borda seria a camada de texto do
+                pdf.js (spans posicionados por cima do bitmap), não documento —
+                rolar de lado para ver aquilo só confundia. Padding menor no
+                celular: cada pixel de margem é um pixel a menos de folha. */}
+            <div ref={documentBoxRef} className="overflow-hidden px-1.5 pb-2 pt-1 sm:p-3">
+              {documentWidth > 0 && (
+                <InlineDocumentPages url={documentUrl} width={documentWidth} sharpZoom />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1106,11 +1125,51 @@ export default function PublicSignaturePage() {
           </Card>
         )}
 
+        {/* BARRA DE AÇÃO FIXA — só no celular.
+            No celular o documento ocupa duas ou três telas de altura, e o
+            botão de assinar ficava DEPOIS dele: quem abria o link pelo WhatsApp
+            via uma folha atrás da outra sem saber onde estava a ação. A barra
+            mantém o próximo passo sempre à mão sem esconder o documento — ele
+            continua inteiro logo acima, e os cartões de identificação abaixo
+            seguem existindo para quem rolar até eles. No desktop some: ali o
+            cartão cabe à vista. */}
+        {state.canSign && (step === "review" || step === "code") && (
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-3 pt-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur sm:hidden"
+            style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
+          >
+            {step === "review" ? (
+              <Button
+                className="w-full"
+                size="lg"
+                disabled={busy}
+                onClick={() => {
+                  setRefusing(false);
+                  setIdentityOpen(true);
+                }}
+              >
+                {isWhatsApp ? (
+                  <IconBrandWhatsapp className="mr-2 h-4 w-4" />
+                ) : (
+                  <IconDeviceMobileMessage className="mr-2 h-4 w-4" />
+                )}
+                Assinar orçamento
+              </Button>
+            ) : (
+              <Button className="w-full" size="lg" onClick={() => setTermsOpen(true)}>
+                Continuar assinatura
+                <IconChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* A cláusula de aceitação aparece SOMENTE no modal de "Li e concordo",
             na abertura da página. Repeti-la aqui em 11px era ruído: ninguém lê
             letra miúda de rodapé, e o aceite já é registrado com data, hora e IP
             na trilha de auditoria. */}
-        <div className="pb-8" />
+        {/* No celular, espaço para a barra fixa não cobrir o fim da página. */}
+        <div className="pb-24 sm:pb-8" />
       </div>
     </Shell>
   );

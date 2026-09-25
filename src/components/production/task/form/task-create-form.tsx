@@ -55,6 +55,7 @@ import { FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/co
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
 import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
@@ -93,6 +94,8 @@ export const TaskCreateForm = () => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
+  // "Já aprovada" exige aerografista (as linhas são z.any() no schema, então a trava roda no envio).
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
 
   // Sector-based visibility
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
@@ -349,6 +352,7 @@ export const TaskCreateForm = () => {
       // (file uploads + task create + nested airbrushing/cut fan-out), so a second pass would create
       // a duplicate set. The REF is what blocks — state updates are async.
       if (isSubmittingRef.current) return;
+      if (!guardAirbrushingCreation(form, ["airbrushings"])) return;
       isSubmittingRef.current = true;
       setIsSubmitting(true);
 
@@ -680,7 +684,7 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, layoutStatuses, allowNavigation],
+    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, layoutStatuses, allowNavigation, form, guardAirbrushingCreation],
   );
 
   // Get form state

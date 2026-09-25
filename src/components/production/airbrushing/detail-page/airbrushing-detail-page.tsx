@@ -10,6 +10,7 @@ import {
   IconHistory,
   IconCalendar,
   IconCalendarEvent,
+  IconHourglass,
   IconUser,
   IconCircleDot,
   IconCreditCard,
@@ -28,6 +29,8 @@ import {
   IconEye,
   IconPaperclip,
   IconLoader2,
+  IconUsersGroup,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
@@ -78,11 +81,13 @@ import {
   TASK_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
-import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS } from "@/utils/airbrushing";
+import { AIRBRUSHING_DEFAULT_PAYMENT_TERM_DAYS, computeExpectedFinishDate, formatExecutionTime, formatExpectedFinishDate } from "@/utils/airbrushing";
 import { formatDate } from "@/utils";
 import { formatFileSize, getFileDownloadUrl } from "@/utils/file";
 import type { Airbrushing, File as AnkaaFile } from "../../../../types";
 import { AirbrushingFilesSection } from "./airbrushing-files-section";
+import { AirbrushingQuotationSection } from "./airbrushing-quotation-section";
+import { useReopenAirbrushingQuotation } from "../../../../hooks/production/use-airbrushing-quote";
 import { AirbrushingNfseSection, AirbrushingNfseHeaderBadges, DocumentRow, SubBlock } from "./airbrushing-nfse-section";
 // Resolve each Layout wrapper to its backing File (id/filename/path) — shared with the
 // task-detail airbrushing section so both download the real File, not the Layout id.
@@ -92,10 +97,18 @@ import { getAirbrushingLayouts } from "@/components/production/task/detail/secti
 // `PrivilegeGate` (SECTOR_PRIVILEGES[]) shape used by requiredPrivilege/editablePrivilege.
 const MONEY_GATE: SECTOR_PRIVILEGES[] = [...AIRBRUSHING_FINANCE_PRIVILEGES];
 
+// Cotação: ver é de quem a API deixa ler (GET /airbrushing-quotes/airbrushing/:id);
+// contrapropor, selecionar e reabrir, só ADMIN/COMMERCIAL. Todos já estão no MONEY_GATE —
+// a seção é feita de valores.
+const QUOTE_VIEW_GATE: SECTOR_PRIVILEGES[] = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL];
+const QUOTE_ACT_GATE: SECTOR_PRIVILEGES[] = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL];
+
 // Valid transitions for inline status edits (the current value is always kept by the editor).
 // Mirrors the task lifecycle: Em Preparação → Aguardando Produção → Em Produção → Concluído,
 // with a step back at every stage and Cancelado reachable until the job is concluded.
 const AIRBRUSHING_STATUS_TRANSITIONS: Record<string, AIRBRUSHING_STATUS[]> = {
+  // Em cotação só se cancela por aqui: seguir adiante é selecionar uma proposta.
+  [AIRBRUSHING_STATUS.QUOTING]: [AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.PREPARATION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.WAITING_PRODUCTION]: [AIRBRUSHING_STATUS.PREPARATION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.IN_PRODUCTION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED, AIRBRUSHING_STATUS.CANCELLED],
@@ -236,10 +249,17 @@ export function AirbrushingDetailPage() {
   // servidor, que ignora em SILÊNCIO (200, sem mudança) quem não pode. Esconder o
   // controle aqui é o que evita o clique que parece funcionar e não faz nada.
   const canApproveLayouts = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]);
-  // VER a nota segue o gate de dinheiro (MONEY_GATE, que inclui COMMERCIAL), mas EMITIR /
-  // CANCELAR é mais estreito no servidor — ADMIN/Contabilidade/Financeiro. Sem esse recorte
-  // o comercial veria botões que só devolvem 403.
-  const canManageNfse = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL]);
+  // EMITIR / CANCELAR a nota espelha o FISCAL_ADMIN do servidor (painter-nfse.controller):
+  // ADMIN/Contabilidade/Financeiro e o Comercial, dono do sistema de aerografia.
+  const canManageNfse = hasAnyPrivilegeAccess([
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.ACCOUNTING,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+  ]);
+  const canActOnQuotes = hasAnyPrivilegeAccess(QUOTE_ACT_GATE);
+  const reopenMutation = useReopenAirbrushingQuotation();
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
 
   /**
    * fileId → LayoutStatus. A seção de layouts trabalha com os Files (é o File que baixa e
@@ -308,6 +328,8 @@ export function AirbrushingDetailPage() {
   });
 
   const airbrushing = response?.data as Airbrushing | undefined;
+  // Em cotação, pintor e valor só nascem da seleção de uma proposta — nada de edição inline.
+  const isQuoting = airbrushing?.status === AIRBRUSHING_STATUS.QUOTING;
 
   /**
    * A nota também é lida AQUI — não só dentro da seção — porque a página precisa de
@@ -382,6 +404,20 @@ export function AirbrushingDetailPage() {
   const sections = useMemo<DetailSectionDef<Airbrushing>[]>(() => {
     const list: DetailSectionDef<Airbrushing>[] = [];
 
+    // --- Cotação ---
+    // Enquanto aberta é o coração da página; encerrada, fica como histórico da escolha.
+    // Só existe para aerografia que passou por cotação (`quotationOpenedAt`).
+    if (isQuoting || airbrushing?.quotationOpenedAt) {
+      list.push({
+        id: "quotation",
+        label: "Cotação",
+        icon: IconUsersGroup,
+        span: 2,
+        requiredPrivilege: QUOTE_VIEW_GATE,
+        render: (a) => <AirbrushingQuotationSection airbrushing={a} canAct={canActOnQuotes} />,
+      });
+    }
+
     // --- Informações da Aerografia ---
     list.push({
       id: "info",
@@ -423,7 +459,9 @@ export function AirbrushingDetailPage() {
           icon: IconUser,
           dataType: "relation",
           accessor: (a) => a.painter?.name ?? null,
-          edit: canEdit
+          render: isQuoting ? () => <span className="text-muted-foreground">Definido na cotação</span> : undefined,
+          keepWhenEmpty: isQuoting,
+          edit: canEdit && !isQuoting
             ? {
                 get: (a) => a.painterId ?? null,
                 loadOptions: loadPainters,
@@ -467,20 +505,35 @@ export function AirbrushingDetailPage() {
               }
             : undefined,
         },
+        // Tempo de execução: é ele (com o início) que define o término — editado no formulário,
+        // onde a prévia do término acompanha. Em cotação ele vem da proposta selecionada.
+        {
+          id: "executionTime",
+          label: "Tempo de Execução",
+          icon: IconHourglass,
+          dataType: "text",
+          accessor: (a) => formatExecutionTime(a.executionTime, a.executionTimeUnit) || null,
+          render: (a) => {
+            const text = formatExecutionTime(a.executionTime, a.executionTimeUnit);
+            if (text) return <span>{text}</span>;
+            return <span className="text-muted-foreground">{isQuoting ? "Definido na cotação" : "—"}</span>;
+          },
+          keepWhenEmpty: isQuoting,
+        },
+        // Término previsto: CALCULADO (início + tempo, mesma regra da API). Aerografia antiga,
+        // sem tempo, mostra o término que foi gravado.
         {
           id: "finishDate",
           label: "Término Previsto",
           icon: IconCalendarEvent,
           dataType: "date",
-          accessor: (a) => a.finishDate ?? null,
-          edit: canEdit
-            ? {
-                get: (a) => a.finishDate ?? null,
-                onCommit: async (v, a) => {
-                  await updateAsync({ id: a.id, data: { finishDate: (v as Date) ?? null } });
-                },
-              }
-            : undefined,
+          accessor: (a) => computeExpectedFinishDate(a.startDate, a.executionTime, a.executionTimeUnit) ?? a.finishDate ?? null,
+          render: (a) => {
+            const computed = formatExpectedFinishDate(a.startDate, a.executionTime, a.executionTimeUnit);
+            if (computed) return <span>{computed}</span>;
+            if (a.finishDate) return <span>{formatDate(a.finishDate)}</span>;
+            return <span className="text-muted-foreground">{a.executionTime ? "Informe o início previsto" : "—"}</span>;
+          },
         },
         // Actual timestamps are stamped by the production floor (start/finish) — read-only here.
         { id: "startedAt", label: "Iniciado em", icon: IconCalendar, dataType: "datetime", accessor: (a) => a.startedAt ?? null },
@@ -513,7 +566,9 @@ export function AirbrushingDetailPage() {
           requiredPrivilege: MONEY_GATE,
           editablePrivilege: MONEY_GATE,
           accessor: (a) => a.price ?? null,
-          edit: canEdit
+          render: isQuoting ? () => <span className="text-muted-foreground">Definido na cotação</span> : undefined,
+          keepWhenEmpty: isQuoting,
+          edit: canEdit && !isQuoting
             ? {
                 get: (a) => a.price ?? null,
                 placeholder: "0,00",
@@ -684,25 +739,6 @@ export function AirbrushingDetailPage() {
       ),
     });
 
-    // --- NFS-e do Aerografista (financial-only) ---
-    // O id é "nfse" e NÃO "invoices": este último já pertence à galeria de notas fiscais
-    // ANEXADAS (arquivos), que é outra coisa — colidir apagaria uma das duas seções.
-    //
-    // Esta é a seção ÚNICA do documento fiscal: DANFSe (PDF) e XML autorizado ficam juntos
-    // no bloco "Documentos da nota". `invoices` entra porque é lá que o servidor conecta o
-    // File do DANFSe — é de onde sai nome/tamanho/miniatura sem uma segunda busca.
-    // `span: 2` porque o corpo agora tem três blocos + documentos e ficava espremido em
-    // meia largura (quem já personalizou a largura desta seção mantém a escolha dele).
-    list.push({
-      id: "nfse",
-      label: "NFS-e do Aerografista",
-      icon: IconReceiptTax,
-      span: 2,
-      requiredPrivilege: MONEY_GATE,
-      headerActions: () => <AirbrushingNfseHeaderBadges nfse={nfse} />,
-      render: (a) => <AirbrushingNfseSection airbrushingId={a.id} canManage={canManageNfse} invoices={a.invoices ?? []} />,
-    });
-
     // --- Tarefa Relacionada (read-only; belongs to the Task) ---
     if (airbrushing?.task) {
       list.push({
@@ -747,6 +783,7 @@ export function AirbrushingDetailPage() {
           {
             id: "taskStatus",
             label: "Status da Tarefa",
+            icon: IconCircleDot,
             accessor: (a) => a.task?.status ?? null,
             render: (a) =>
               a.task ? (
@@ -802,34 +839,49 @@ export function AirbrushingDetailPage() {
       });
     }
 
-    // --- Notas Fiscais Anexadas (financial-only) ---
-    // O DANFSe gerado pelo sistema é conectado pelo servidor na MESMA relação
-    // (AIRBRUSHING_INVOICES) em que caem os anexos manuais. Aqui ele sai da lista: seu lugar
-    // é a seção "NFS-e do Aerografista", junto do XML. O filtro é por `pdfFileId` e nada
-    // mais — em notas antigas (pdfFileId nulo) o PDF simplesmente continua entre os anexos,
-    // que é melhor do que adivinhar por nome de arquivo e esconder o anexo errado.
+    // --- NFS-e (financial-only) — depois de Tarefa e Layouts ---
+    // O id continua "nfse" (e não "invoices", que era a antiga seção de anexos) para que
+    // o layout que cada usuário personalizou continue apontando para esta seção.
     //
-    // A seção continua existindo mesmo com a subtração: há arquivos que usuários anexaram à
-    // mão e sumir com eles seria perda de dado visível.
-    const attachedInvoices = (airbrushing?.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId);
-    if (attachedInvoices.length > 0) {
-      list.push({
-        id: "invoices",
-        label: "Notas Fiscais Anexadas",
-        icon: IconFileInvoice,
-        span: 1,
-        requiredPrivilege: MONEY_GATE,
-        headerActions: (a) => <Badge variant="secondary">{(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId).length}</Badge>,
-        render: (a) => (
-          <AirbrushingFilesSection
-            files={(a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId)}
-            emptyIcon={IconFileInvoice}
-            emptyTitle="Nenhuma nota fiscal cadastrada"
-            emptyDescription="Esta aerografia não possui notas fiscais anexadas."
-          />
-        ),
-      });
-    }
+    // Esta é a seção ÚNICA do documento fiscal: DANFSe (PDF) e XML autorizado ficam juntos
+    // no bloco "Documentos da nota". `invoices` entra porque é lá que o servidor conecta o
+    // File do DANFSe — é de onde sai nome/tamanho/miniatura sem uma segunda busca.
+    // `span: 2` porque o corpo agora tem três blocos + documentos e ficava espremido em
+    // meia largura (quem já personalizou a largura desta seção mantém a escolha dele).
+    //
+    // As notas fiscais ANEXADAS à mão também moram aqui, num bloco próprio abaixo da nota
+    // emitida: documento fiscal da aerografia é um assunto só, com uma seção só.
+    list.push({
+      id: "nfse",
+      label: "NFS-e",
+      icon: IconReceiptTax,
+      span: 2,
+      requiredPrivilege: MONEY_GATE,
+      headerActions: () => <AirbrushingNfseHeaderBadges nfse={nfse} />,
+      render: (a) => {
+        // O DANFSe gerado pelo sistema é conectado pelo servidor na MESMA relação
+        // (AIRBRUSHING_INVOICES) em que caem os anexos manuais; ele já aparece em
+        // "Documentos da nota", então sai da lista de anexos. O filtro é por `pdfFileId` e
+        // nada mais — em notas antigas (pdfFileId nulo) o PDF continua entre os anexos, que
+        // é melhor do que adivinhar por nome de arquivo e esconder o anexo errado.
+        const attachedInvoices = (a.invoices ?? []).filter((f) => f.id !== nfse?.pdfFileId);
+        return (
+          <div className="space-y-3">
+            <AirbrushingNfseSection airbrushingId={a.id} canManage={canManageNfse} invoices={a.invoices ?? []} />
+            {attachedInvoices.length > 0 && (
+              <SubBlock title={`Notas fiscais anexadas (${attachedInvoices.length})`}>
+                <AirbrushingFilesSection
+                  files={attachedInvoices}
+                  emptyIcon={IconFileInvoice}
+                  emptyTitle="Nenhuma nota fiscal cadastrada"
+                  emptyDescription="Esta aerografia não possui notas fiscais anexadas."
+                />
+              </SubBlock>
+            )}
+          </div>
+        );
+      },
+    });
 
     // --- Recibos: NÃO há seção própria ---
     // Os recibos são exibidos dentro de "Preço & Pagamento" (o comprovante pertence ao
@@ -864,6 +916,9 @@ export function AirbrushingDetailPage() {
     // A nota entra nas deps porque o `pdfFileId` decide o que sobra na galeria de anexos
     // (e alimenta os badges do cabeçalho da seção fiscal).
     nfse,
+    isQuoting,
+    airbrushing?.quotationOpenedAt,
+    canActOnQuotes,
     canEdit,
     canSettlePayment,
     canManageNfse,
@@ -908,11 +963,33 @@ export function AirbrushingDetailPage() {
       });
     }
 
+    // Reabrir: tira aerografista e valor e devolve para cotação. Só antes da produção e do
+    // pagamento — a API recusa o resto.
+    if (
+      canActOnQuotes &&
+      (airbrushing.status === AIRBRUSHING_STATUS.PREPARATION || airbrushing.status === AIRBRUSHING_STATUS.WAITING_PRODUCTION) &&
+      (airbrushing.paymentStatus ?? AIRBRUSHING_PAYMENT_STATUS.PENDING) === AIRBRUSHING_PAYMENT_STATUS.PENDING
+    ) {
+      list.push({ key: "reopen-quotation", label: "Reabrir cotação", icon: IconArrowBackUp, onClick: () => setShowReopenDialog(true) });
+    }
+
     if (canEdit) list.push({ key: "edit", label: "Editar", icon: IconEdit, variant: "default", onClick: () => navigate(routes.production.airbrushings.edit(airbrushing.id)) });
     if (canDelete) list.push({ key: "delete", label: "Excluir", icon: IconTrash, onClick: () => setShowDeleteDialog(true) });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [airbrushing, canEdit, canDelete, canRelease, updateAsync, navigate]);
+  }, [airbrushing, canEdit, canDelete, canRelease, canActOnQuotes, updateAsync, navigate]);
+
+  const handleReopen = async (e: React.MouseEvent) => {
+    // Mantém o diálogo aberto até a resposta — o AlertDialogAction fecharia no clique.
+    e.preventDefault();
+    if (!airbrushing) return;
+    try {
+      await reopenMutation.mutateAsync({ airbrushingId: airbrushing.id });
+      setShowReopenDialog(false);
+    } catch {
+      // O interceptor global já mostra o erro.
+    }
+  };
 
   return (
     <>
@@ -962,6 +1039,36 @@ export function AirbrushingDetailPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reabrir cotação */}
+      <AlertDialog open={showReopenDialog} onOpenChange={(o) => !o && !reopenMutation.isPending && setShowReopenDialog(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir cotação?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  A aerografia volta para Em Cotação
+                  {airbrushing?.painter?.name ? (
+                    <>
+                      {" "}e deixa de ter <span className="font-semibold text-foreground">{airbrushing.painter.name}</span> como aerografista
+                    </>
+                  ) : null}
+                  . O aerografista e o valor são removidos.
+                </p>
+                <p>Todos os aerografistas serão avisados novamente para enviar o seu valor.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reopenMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopen} disabled={reopenMutation.isPending}>
+              {reopenMutation.isPending && <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Reabrir cotação
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

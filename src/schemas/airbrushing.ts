@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, nullableDate, toFormData } from "./common";
 import type { Airbrushing } from "../types";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, PAYMENT_METHOD } from "../constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, EXECUTION_TIME_UNIT, PAYMENT_METHOD } from "../constants";
 
 // =====================
 // Include Schema Based on Prisma Schema
@@ -141,6 +141,21 @@ export const airbrushingIncludeSchema = z
               sector: z.boolean().optional(),
               position: z.boolean().optional(),
               avatar: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
+    // Negociações da cotação. A API transforma qualquer forma no mesmo include
+    // seguro (painter id/nome/avatar + events em ordem cronológica).
+    quotes: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z
+            .object({
+              painter: z.boolean().optional(),
+              events: z.boolean().optional(),
             })
             .optional(),
         }),
@@ -653,6 +668,25 @@ const airbrushingPaymentConfigShape = {
   dueDate: nullableDate.optional(),
 };
 
+/**
+ * Tempo de execução e orçamento de abertura — espelha `airbrushingExecutionShape` na API.
+ * Com tempo + unidade, a API DERIVA `finishDate` do `startDate`; `quotationOffer*` só é
+ * aceito com a aerografia em cotação (fora disso a API descarta).
+ */
+export const airbrushingExecutionTimeSchema = z
+  .number({ invalid_type_error: "Tempo de execução inválido" })
+  .int("O tempo de execução deve ser um número inteiro")
+  .min(1, "O tempo de execução deve ser maior que zero")
+  .max(999, "Tempo de execução acima do permitido");
+
+const airbrushingExecutionShape = {
+  executionTime: airbrushingExecutionTimeSchema.nullable().optional(),
+  executionTimeUnit: z.nativeEnum(EXECUTION_TIME_UNIT).nullable().optional(),
+  quotationOfferAmount: z.number({ invalid_type_error: "Orçamento inválido" }).positive("O orçamento deve ser maior que zero").nullable().optional(),
+  quotationOfferExecutionTime: airbrushingExecutionTimeSchema.nullable().optional(),
+  quotationOfferExecutionTimeUnit: z.nativeEnum(EXECUTION_TIME_UNIT).nullable().optional(),
+};
+
 export const airbrushingCreateSchema = z
   .object({
     startDate: nullableDate.optional(),
@@ -678,6 +712,7 @@ export const airbrushingCreateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).default(AIRBRUSHING_PAYMENT_STATUS.PENDING),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     taskId: z.string().uuid("Tarefa inválida"),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
@@ -716,6 +751,7 @@ export const airbrushingUpdateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).optional(),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     taskId: z.string().uuid("Tarefa inválida").optional(),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
@@ -815,6 +851,7 @@ export const airbrushingCreateNestedSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     ...airbrushingPaymentConfigShape,
+    ...airbrushingExecutionShape,
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
@@ -842,6 +879,11 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   paymentTermDays: airbrushing.paymentTermDays,
   dueDayOfMonth: airbrushing.dueDayOfMonth,
   dueDate: airbrushing.dueDate,
+  executionTime: airbrushing.executionTime ?? null,
+  executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+  quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+  quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+  quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
   taskId: airbrushing.taskId,
   painterId: airbrushing.painterId,
   receiptIds: airbrushing.receipts?.map((file) => file.id),
@@ -849,3 +891,53 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
   layoutIds: airbrushing.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
 }));
+
+// =====================
+// Creation mode (UI only — never sent to the API)
+// =====================
+
+/**
+ * Como uma aerografia NOVA entra no sistema:
+ *   • QUOTATION — vai para cotação: sem aerografista e sem valor; a API a grava Em Cotação e
+ *     avisa todos os aerografistas.
+ *   • APPROVED  — já foi combinada fora do sistema: o aerografista é escolhido aqui (e avisado
+ *     como designado), o valor é opcional e o status é o escolhido (Em Preparação por padrão).
+ *
+ * É só um campo de formulário: `buildAirbrushingPayload` monta o payload por lista fechada de
+ * campos, então `creationMode` nunca chega à API — quem decide lá é a presença de `painterId`.
+ */
+export const AIRBRUSHING_CREATION_MODE = {
+  QUOTATION: "QUOTATION",
+  APPROVED: "APPROVED",
+} as const;
+
+export type AirbrushingCreationMode = (typeof AIRBRUSHING_CREATION_MODE)[keyof typeof AIRBRUSHING_CREATION_MODE];
+
+export const AIRBRUSHING_CREATION_MODE_LABELS: Record<AirbrushingCreationMode, string> = {
+  QUOTATION: "Enviar para cotação",
+  APPROVED: "Já aprovada (definir aerografista)",
+};
+
+export const AIRBRUSHING_APPROVED_PAINTER_REQUIRED_MESSAGE = "Selecione o aerografista da aerografia já aprovada";
+
+/**
+ * Uma linha de aerografia de um formulário de criação (assistente, tarefa ou orçamento).
+ * Linha já gravada (`persistedStatus`) não passa por aqui: o modo só existe no nascimento.
+ * `passthrough` porque a linha carrega arquivos e o resto da configuração, que não são
+ * validados aqui.
+ */
+export const airbrushingCreationRowSchema = z
+  .object({
+    creationMode: z.enum([AIRBRUSHING_CREATION_MODE.QUOTATION, AIRBRUSHING_CREATION_MODE.APPROVED]).nullable().optional(),
+    persistedStatus: z.string().nullable().optional(),
+    painterId: z.string().nullable().optional(),
+  })
+  .passthrough()
+  .superRefine((row, ctx) => {
+    if (row.persistedStatus) return;
+    if (row.creationMode === AIRBRUSHING_CREATION_MODE.APPROVED && !row.painterId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["painterId"], message: AIRBRUSHING_APPROVED_PAINTER_REQUIRED_MESSAGE });
+    }
+  });
+
+export const airbrushingCreationRowsSchema = z.array(airbrushingCreationRowSchema);

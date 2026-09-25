@@ -4,6 +4,7 @@ export * from "./activity";
 export * from "./consumption-analytics";
 export * from "./airbrushing";
 export * from "./airbrushing-nfse";
+export * from "./airbrushing-quote";
 export * from "./auth";
 export {
   apiClient,

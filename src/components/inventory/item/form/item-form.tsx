@@ -31,6 +31,7 @@ import { AssignToUserToggle } from "./assign-to-user-toggle";
 import { BorrowableToggle } from "./borrowable-toggle";
 import { StockModelSelector } from "./stock-model-selector";
 import { FixedTargetQuantityInput } from "./fixed-target-quantity-input";
+import { ReplenishmentTargetInputs } from "./replenishment-target-inputs";
 import { PpeConfigSection } from "./ppe-config-section";
 import { FispqItemCard, type FispqCardSaveFn } from "./fispq-item-card";
 
@@ -93,6 +94,8 @@ export function ItemForm(props: ItemFormProps) {
     isBorrowable: defaultValues?.isBorrowable ?? false,
     stockModel: defaultValues?.stockModel ?? STOCK_MODEL.CONSUMPTION,
     fixedTargetQuantity: defaultValues?.fixedTargetQuantity ?? null,
+    targetCoverageDays: defaultValues?.targetCoverageDays ?? null,
+    minStockQuantity: defaultValues?.minStockQuantity ?? null,
     abcCategory: defaultValues?.abcCategory ?? null,
     xyzCategory: defaultValues?.xyzCategory ?? null,
     brandIds: defaultValues?.brandIds ?? [],
@@ -384,6 +387,7 @@ export function ItemForm(props: ItemFormProps) {
                 <LeadTimeInput disabled={isSubmitting} />
                 <StockModelSelector disabled={isSubmitting} />
                 {watchedStockModel === STOCK_MODEL.FIXED_TARGET && <FixedTargetQuantityInput disabled={isSubmitting} />}
+                {watchedStockModel !== STOCK_MODEL.FIXED_TARGET && <ReplenishmentTargetInputs disabled={isSubmitting} />}
               </div>
             </CardContent>
           </Card>

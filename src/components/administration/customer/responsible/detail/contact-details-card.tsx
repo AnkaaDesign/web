@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconPhone, IconMail, IconPhoneCall, IconBrandWhatsapp, IconId, IconLock, IconLockOpen } from "@tabler/icons-react";
+import { IconPhone, IconMail, IconPhoneCall, IconBrandWhatsapp, IconId, IconLogin, IconClock } from "@tabler/icons-react";
 import type { Responsible } from "@/types/responsible";
 import { cn } from "@/lib/utils";
-import { formatBrazilianPhone, formatCPF } from "@/utils";
+import { formatBrazilianPhone, formatCPF, formatDateTime } from "@/utils";
 
 interface ContactDetailsCardProps {
   responsible: Responsible;
@@ -10,7 +10,12 @@ interface ContactDetailsCardProps {
 }
 
 export function ContactDetailsCard({ responsible, className }: ContactDetailsCardProps) {
-  const hasSystemAccess = !!responsible.email && !!responsible.password;
+  // Portal do cliente — o que antes era "Acesso ao sistema" (e-mail + senha).
+  // Não há mais credencial: o contato entra por código de uso único e todo
+  // contato ATIVO pode entrar, então "sem acesso" deixou de existir. O único
+  // fato que sobra é se ele JÁ entrou (`verified`, carimbado no primeiro login
+  // concluído) e quando foi a última vez (`lastLoginAt`).
+  const hasEnteredPortal = !!responsible.verified;
 
   // Clean phone number for WhatsApp (remove non-digits and add country code if needed)
   const cleanPhone = responsible.phone.replace(/\D/g, "");
@@ -91,24 +96,33 @@ export function ContactDetailsCard({ responsible, className }: ContactDetailsCar
             </div>
           )}
 
-          {/* System Access Section */}
+          {/* Portal do cliente */}
           <div className="pt-6 border-t border-border">
-            <h3 className="text-base font-semibold mb-4 text-foreground">Acesso ao Sistema</h3>
-            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                {hasSystemAccess ? (
-                  <IconLockOpen className="h-4 w-4 text-green-600" />
-                ) : (
-                  <IconLock className="h-4 w-4" />
-                )}
-                Status de Acesso
-              </span>
-              <span className={cn(
-                "text-sm font-semibold",
-                hasSystemAccess ? "text-green-600" : "text-muted-foreground"
-              )}>
-                {hasSystemAccess ? "Com acesso ao sistema" : "Sem acesso ao sistema"}
-              </span>
+            <h3 className="text-base font-semibold mb-4 text-foreground">Portal do Cliente</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconLogin className={cn("h-4 w-4", hasEnteredPortal && "text-green-600")} />
+                  Situação
+                </span>
+                <span className={cn(
+                  "text-sm font-semibold",
+                  hasEnteredPortal ? "text-green-600" : "text-muted-foreground"
+                )}>
+                  {hasEnteredPortal ? "Já entrou no portal" : "Ainda não entrou no portal"}
+                </span>
+              </div>
+              {responsible.lastLoginAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconClock className="h-4 w-4" />
+                    Último acesso
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatDateTime(responsible.lastLoginAt)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -4,13 +4,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAirbrushing, useAirbrushingMutations, useTaskDetail, useUsers } from "../../../../hooks";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
-import { airbrushingCreateSchema, airbrushingUpdateSchema } from "../../../../schemas";
+import { airbrushingCreateSchema, airbrushingUpdateSchema, AIRBRUSHING_CREATION_MODE } from "../../../../schemas";
+import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import {
   routes,
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
   AIRBRUSHING_DUE_DATE_RULE,
   FAVORITE_PAGES,
+  EXECUTION_TIME_UNIT,
 } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -42,7 +44,7 @@ import { FileSuggestions, type FileWithPreview } from "@/components/common/file"
 // mesmo uploader do layout de tarefa mais o seletor de status por arquivo.
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
-import { createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
+import { buildAirbrushingPayload, createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
 import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import { useAuth } from "@/contexts/auth-context";
 import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
@@ -64,7 +66,10 @@ const makeEmptyAirbrushing = () => ({
   // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share an id,
   // and `updateAirbrushing` matches on id — so editing one row would silently write into both.
   id: `airbrushing-${crypto.randomUUID()}`,
-  status: AIRBRUSHING_STATUS.PREPARATION,
+  // Toda aerografia nova nasce em cotação — sem pintor e sem valor (a API garante o mesmo).
+  status: AIRBRUSHING_STATUS.QUOTING,
+  // "Enviar para cotação" é o padrão; "Já aprovada" é escolha explícita na própria linha.
+  creationMode: AIRBRUSHING_CREATION_MODE.QUOTATION,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
   // Mesmos padrões da linha que o `MultiAirbrushingSelector` cria — assim a linha semeada e
   // a adicionada pelo botão nascem idênticas.
@@ -77,6 +82,11 @@ const makeEmptyAirbrushing = () => ({
   description: null,
   startDate: null,
   finishDate: null,
+  executionTime: null,
+  executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+  quotationOfferAmount: null,
+  quotationOfferExecutionTime: null,
+  quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
   startedAt: null,
   finishedAt: null,
   painterId: null,
@@ -103,6 +113,11 @@ const VALIDATED_FIELDS = [
   "paymentStatus",
   "startDate",
   "finishDate",
+  "executionTime",
+  "executionTimeUnit",
+  "quotationOfferAmount",
+  "quotationOfferExecutionTime",
+  "quotationOfferExecutionTimeUnit",
   "startedAt",
   "finishedAt",
   "price",
@@ -141,6 +156,8 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const canViewFinancials = canViewAirbrushingFinancials(user);
 
   const isEdit = mode === "edit";
+  // "Já aprovada" exige aerografista — mesma trava da tarefa e do orçamento.
+  const guardAirbrushingCreation = useAirbrushingCreationGuard();
 
   // Wizard step state (URL-backed).
   const [currentStep, setCurrentStep] = useState<number>(() => getStepFromUrl(searchParams));
@@ -210,6 +227,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     defaultValues: {
       startDate: null,
       finishDate: null,
+      executionTime: null,
+      executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+      quotationOfferAmount: null,
+      quotationOfferExecutionTime: null,
+      quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
       startedAt: null,
       finishedAt: null,
       price: null,
@@ -238,6 +260,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     form.reset({
       startDate: airbrushing.startDate ?? null,
       finishDate: airbrushing.finishDate ?? null,
+      executionTime: airbrushing.executionTime ?? null,
+      executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+      quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+      quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+      quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
       // startedAt/finishedAt are server-managed timestamps — keep them in state so
       // an update does not wipe them, but they have no form UI.
       startedAt: airbrushing.startedAt ?? null,
@@ -394,10 +421,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
         if (mode === "create") {
           const configs = (form.getValues("airbrushings" as any) ?? []) as any[];
           if (!configs.some(isMeaningfulAirbrushing)) {
-            toast.error("Preencha ao menos uma aerografia (pintor, preço, datas ou layouts).");
+            toast.error("Preencha ao menos uma aerografia (descrição, datas ou layouts).");
             return false;
           }
-          return true;
+          return guardAirbrushingCreation(form, ["airbrushings"]);
         }
         // Edit — all fields optional; only fail on malformed values.
         const ok = await form.trigger(VALIDATED_FIELDS as any);
@@ -438,7 +465,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       default:
         return true;
     }
-  }, [mode, form, selectedTasks]);
+  }, [mode, form, selectedTasks, guardAirbrushingCreation]);
 
   const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
@@ -496,7 +523,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       // `receiptIds`/`invoiceIds` NUNCA saem daqui: o backend traduz um array vazio em
       // `receipts: { set: [] }`, ou seja, desanexa tudo. Como este formulário não gerencia
       // recibos nem notas fiscais, omitir os campos é o que preserva os anexos existentes.
-      const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...data } = form.getValues() as Record<string, any>;
+      const { receiptIds: _receiptIds, invoiceIds: _invoiceIds, ...rawData } = form.getValues() as Record<string, any>;
+      // Na edição, os escalares passam pela MESMA normalização do cadastro: término derivado de
+      // início + tempo, unidade só junto do número, orçamento sem valor = sem orçamento.
+      const data = mode === "create" ? rawData : { ...rawData, ...buildAirbrushingPayload(rawData) };
 
       // `instanceof File` além de `!uploaded`: é exatamente o que o helper de FormData
       // anexa como blob, e `newLayoutStatuses` abaixo casa por ÍNDICE com essa lista —
@@ -803,6 +833,9 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               disabled={isSubmitting}
                               initialPainter={airbrushing?.painter ?? undefined}
                               canViewFinancials={canViewFinancials}
+                              // Status GRAVADO (não o do formulário): cancelar pelo combobox não
+                              // pode destravar pintor e valor antes de salvar.
+                              quoting={airbrushing?.status === AIRBRUSHING_STATUS.QUOTING}
                               layoutsSlot={
                                 <LayoutFileUploadField
                                   onFilesChange={handleLayoutsChange}
@@ -967,7 +1000,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2">
                                   <IconCreditCard className="h-5 w-5" />
-                                  Pagamento
+                                  {reviewItems.every((item) => item.values.status === AIRBRUSHING_STATUS.QUOTING) ? "Orçamento" : "Pagamento"}
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="pt-0">

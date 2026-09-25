@@ -210,16 +210,18 @@ export function SignatureSendDialog({
     setOverrides(prev => ({ ...prev, [responsibleId]: next }));
   };
 
-  /** Quantos PDFs a coleta vai congelar com as escolhas atuais. */
+  /**
+   * Quantos PDFs a coleta vai congelar com as escolhas atuais.
+   *
+   * UM POR RESPONSÁVEL QUE ASSINA — cada um recebe o seu documento, só com a
+   * linha dele e a da Ankaa, e não vê quem mais assina (a API faz assim desde
+   * 24/09/2026). Mais o completo só com a Ankaa quando ninguém recebe tudo: é o
+   * instrumento que ela contra-assina.
+   */
   const variantCount = useMemo(() => {
-    const keys = new Set<string>();
-    for (const r of preflight?.recipients ?? []) {
-      const sections = sectionsOf(r);
-      if (sections.length) keys.add(sections.join("+"));
-    }
-    // O recorte COMPLETO existe sempre — é o que a Ankaa contra-assina.
-    keys.add(QUOTE_SECTIONS.join("+"));
-    return keys.size;
+    const signing = (preflight?.recipients ?? []).map(sectionsOf).filter(s => s.length > 0);
+    const someoneGetsAll = signing.some(s => s.length === QUOTE_SECTIONS.length);
+    return signing.length + (someoneGetsAll ? 0 : 1);
   }, [preflight, sectionsOf]);
 
   const signingCount = (preflight?.recipients ?? []).filter(r => sectionsOf(r).length > 0).length;
@@ -273,9 +275,10 @@ export function SignatureSendDialog({
             {mode === "create" ? "Enviar para assinatura" : "Reenviar para assinatura"}
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed">
-            O documento é congelado como está e cada responsável recebe um link
-            pessoal para revisar e assinar. Cada um recebe apenas as seções da
-            função dele — abaixo dá para mudar contato a contato.
+            O documento é congelado como está e cada responsável recebe o seu
+            próprio documento, por link pessoal, sem ver quem mais assina. Cada
+            um recebe apenas as seções da função dele — abaixo dá para mudar
+            contato a contato.
           </DialogDescription>
         </DialogHeader>
 
@@ -474,9 +477,6 @@ export function SignatureSendDialog({
                    orçamento está sem placa do veículo" — nem o inverso, um em
                    que faltam cinquenta e nove como se fosse um.
 
-                   `vehicles` é a fonte; `vehicle` (o primeiro) é o recuo para
-                   uma API anterior a esta feature.
-
                    O TEXTO deixou de anunciar uma perda: desde as lacunas de
                    cadastro tardio, o dado é carimbado na lacuna quando chega,
                    sem tocar nos bytes assinados, e o aditivo de identificação
@@ -484,10 +484,9 @@ export function SignatureSendDialog({
               {(() => {
                 const vehicles = preflight?.vehicles ?? [];
                 const withGaps = vehicles.filter((v) => v.missing.length > 0);
-                const legacyMissing = preflight?.vehicle?.missing ?? [];
-                if (withGaps.length === 0 && legacyMissing.length === 0) return null;
+                if (withGaps.length === 0) return null;
                 const multi = vehicles.length > 1;
-                const missing = withGaps[0]?.missing ?? legacyMissing;
+                const missing = withGaps[0].missing;
                 const plural = multi || missing.length > 1;
                 return (
                   <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">

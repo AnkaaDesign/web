@@ -137,6 +137,14 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   // Payroll routes (list/root page)
   PAYROLL: "/departamento-pessoal/folha-de-pagamento",
   Payroll: "/departamento-pessoal/folha-de-pagamento",
+
+  // Airbrushing + its quotation (entityId is the airbrushingId in both). Fallback only:
+  // the API sends actionUrl.web pointing at the airbrushing detail, whose "Cotação"
+  // section is where proposals are compared and selected.
+  AIRBRUSHING: "/producao/aerografia/detalhes",
+  Airbrushing: "/producao/aerografia/detalhes",
+  AIRBRUSHING_QUOTE: "/producao/aerografia/detalhes",
+  AirbrushingQuote: "/producao/aerografia/detalhes",
 };
 
 /**

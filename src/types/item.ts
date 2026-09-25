@@ -70,6 +70,8 @@ export interface Item extends BaseEntity {
   isBorrowable: boolean;
   stockModel: STOCK_MODEL;
   fixedTargetQuantity: number | null;
+  targetCoverageDays: number | null;
+  minStockQuantity: number | null;
   categoryId?: string;
   supplierId: string | null;
   warehouseLocationId: string | null;
@@ -417,6 +419,8 @@ export interface ItemOrderBy {
   isBorrowable?: ORDER_BY_DIRECTION;
   stockModel?: ORDER_BY_DIRECTION;
   fixedTargetQuantity?: ORDER_BY_DIRECTION;
+  targetCoverageDays?: ORDER_BY_DIRECTION;
+  minStockQuantity?: ORDER_BY_DIRECTION;
   estimatedLeadTime?: ORDER_BY_DIRECTION;
   isActive?: ORDER_BY_DIRECTION;
   abcCategory?: ORDER_BY_DIRECTION;

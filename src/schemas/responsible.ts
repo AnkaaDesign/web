@@ -50,12 +50,9 @@ const emailSchema = z.preprocess(
   z.string().email('E-mail inválido').nullable().optional(),
 );
 
-// Password validation (min 6 chars when provided)
-const passwordSchema = z
-  .string()
-  .min(6, 'Senha deve ter no mínimo 6 caracteres')
-  .optional()
-  .or(z.literal(''));
+// Sem `password` em nenhum schema de escrita: a coluna foi apagada da API
+// (o portal entra por código de uso único). A API ainda aceita e DESCARTA o
+// campo no create só por clientes antigos — e vai deixar de aceitar.
 
 // Responsible create schema
 export const responsibleCreateSchema = z.object({
@@ -69,7 +66,6 @@ export const responsibleCreateSchema = z.object({
     .min(1, 'Nome é obrigatório')
     .min(3, 'Nome deve ter no mínimo 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  password: passwordSchema,
   companyId: z
     .string()
     .uuid('ID da empresa inválido')
@@ -83,9 +79,8 @@ export const responsibleCreateSchema = z.object({
 });
 
 // Responsible inline create schema (companyId is optional for inline context).
-// Senha e e-mail são opcionais: o acesso ao sistema e a assinatura eletrônica
-// podem ser configurados depois — a exigência de e-mail fica no envio do
-// envelope de assinatura, não no cadastro.
+// E-mail é opcional: a exigência de e-mail fica no envio do envelope de
+// assinatura, não no cadastro.
 export const responsibleCreateInlineSchema = z.object({
   email: emailSchema,
   phone: z
@@ -97,12 +92,6 @@ export const responsibleCreateInlineSchema = z.object({
     .min(1, 'Nome é obrigatório')
     .min(3, 'Nome deve ter no mínimo 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  password: z
-    .string()
-    .min(6, 'Senha deve ter no mínimo 6 caracteres')
-    .optional()
-    .or(z.literal(''))
-    .transform(val => val === '' ? undefined : val),
   companyId: z
     .string()
     .uuid('ID da empresa inválido')
@@ -127,7 +116,6 @@ export const responsibleUpdateSchema = z.object({
     .min(3, 'Nome deve ter no mínimo 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .optional(),
-  password: passwordSchema,
   roles: rolesSchema.optional(),
   isActive: z
     .boolean()

@@ -6,6 +6,7 @@ import {
   PAYMENT_METHOD_LABELS,
   NFSE_STATUS_LABELS,
   ENTITY_BADGE_CONFIG,
+  AIRBRUSHING_STATUS,
 } from "../../../../constants";
 import type { NFSE_STATUS } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
@@ -107,9 +108,11 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       size: 150,
       minSize: 120,
       meta: { headerLabel: "Pintor", exportValue: (row) => row.painter?.name || "" },
-      cell: ({ getValue }) => {
+      cell: ({ getValue, row }) => {
         const v = getValue() as string;
-        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("—");
+        if (v) return <TruncatedTextWithTooltip text={v} className="text-sm" />;
+        // Sem pintor ainda porque está em cotação — ele nasce da proposta selecionada.
+        return row.original.status === AIRBRUSHING_STATUS.QUOTING ? muted("Em cotação") : muted("—");
       },
     },
     {

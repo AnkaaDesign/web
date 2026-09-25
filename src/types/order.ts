@@ -701,6 +701,11 @@ export interface OrderScheduleProjectionItem {
   totalGapPlusCycle: number;
   reasonGapPlusCycle: string | null;
   skippedGapPlusCycle: boolean;
+  // Next AUTOMATIC order (cron fires on nextRun) — matches the list's "Preço esperado".
+  quantityScheduled: number;
+  totalScheduled: number;
+  reasonScheduled: string | null;
+  skippedScheduled: boolean;
 }
 
 export interface OrderScheduleProjectionMeta {

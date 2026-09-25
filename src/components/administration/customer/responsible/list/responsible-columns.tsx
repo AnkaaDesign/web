@@ -123,20 +123,23 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
       align: "left",
     },
     {
-      key: "access",
-      header: "ACESSO",
-      accessor: (responsible) => {
-        const hasSystemAccess = !!responsible.email && !!responsible.password;
-        return (
-          <div className="text-sm">
-            {hasSystemAccess ? (
-              <span className="text-green-600">Com acesso</span>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </div>
-        );
-      },
+      // Sem senha desde 18/09 (o portal entra por código de uso único), não há
+      // mais "com acesso": todo contato ativo entra. O que a coluna diz agora é
+      // quem JÁ entrou (`verified`, carimbado no primeiro login concluído).
+      key: "verified",
+      header: "PORTAL",
+      accessor: (responsible) =>
+        responsible.verified ? (
+          <Badge
+            variant="success"
+            className="text-xs"
+            title={responsible.lastLoginAt ? `Último acesso: ${formatDateTime(responsible.lastLoginAt)}` : undefined}
+          >
+            Já entrou
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        ),
       sortable: false,
       className: "min-w-[100px]",
       align: "left",

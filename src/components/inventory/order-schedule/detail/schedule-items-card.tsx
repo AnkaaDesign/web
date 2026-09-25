@@ -27,6 +27,10 @@ interface ScheduleProjectionItem {
   totalGapPlusCycle: number;
   reasonGapOnly?: string | null;
   reasonGapPlusCycle?: string | null;
+  // Next automatic order (cron on nextRun) — same numbers as the list's "Preço esperado".
+  quantityScheduled?: number;
+  totalScheduled?: number;
+  reasonScheduled?: string | null;
 }
 
 interface ScheduleProjectionMeta {
@@ -61,6 +65,13 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
+  const scheduledDateLabel = useMemo(() => {
+    const d = projectionMeta?.scheduledDate ? new Date(projectionMeta.scheduledDate) : null;
+    return d && !isNaN(d.getTime())
+      ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
+      : null;
+  }, [projectionMeta?.scheduledDate]);
+
   const projectionByItem = useMemo(
     () => new Map((projection || []).map((p) => [p.itemId, p])),
     [projection],
@@ -92,11 +103,59 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
 
     const projectionColumns: ScheduleColumn[] = [];
 
+    // Headline columns: the order the schedule will actually create on its next
+    // run (stock rolled forward to that date). Same figure as the list's
+    // "Preço esperado". Falls back to the gap+cycle projection for old APIs.
+    const scheduledQty = (p?: ScheduleProjectionItem) => p?.quantityScheduled ?? p?.quantityGapPlusCycle ?? 0;
+    const scheduledTotal = (p?: ScheduleProjectionItem) => p?.totalScheduled ?? p?.totalGapPlusCycle ?? 0;
+    const scheduledReason = (p?: ScheduleProjectionItem) => p?.reasonScheduled ?? p?.reasonGapPlusCycle;
+    const runLabel = scheduledDateLabel ? ` EM ${scheduledDateLabel}` : "";
+    projectionColumns.push(
+      {
+        key: "expectedQty",
+        header: `QTD. PREVISTA${runLabel}`,
+        sortable: true,
+        align: "right",
+        className: "w-36",
+        accessor: (item) => {
+          const p = projectionByItem.get(item.id);
+          return (
+            <div className="tabular-nums">
+              {renderSkippableCell(p && scheduledQty(p) > 0 ? formatNumber(scheduledQty(p)) : null, scheduledReason(p))}
+            </div>
+          );
+        },
+        sortAccessor: (item) => {
+          const p = projectionByItem.get(item.id);
+          return p ? scheduledQty(p) : -1;
+        },
+      },
+      {
+        key: "expectedPrice",
+        header: `PREÇO PREVISTO${runLabel}`,
+        sortable: true,
+        align: "right",
+        className: "w-36",
+        accessor: (item) => {
+          const p = projectionByItem.get(item.id);
+          return (
+            <div className="tabular-nums">
+              {renderSkippableCell(p && scheduledQty(p) > 0 ? formatCurrency(scheduledTotal(p)) : null, scheduledReason(p))}
+            </div>
+          );
+        },
+        sortAccessor: (item) => {
+          const p = projectionByItem.get(item.id);
+          return p ? scheduledTotal(p) : -1;
+        },
+      },
+    );
+
     if (hasGapOption) {
       projectionColumns.push(
         {
           key: "gapOnlyQty",
-          header: "QTD. ATÉ A PRÓXIMA",
+          header: "QTD. SE PEDIR HOJE",
           sortable: true,
           align: "right",
           className: "w-36",
@@ -112,7 +171,7 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
         },
         {
           key: "gapOnlyPrice",
-          header: "PREÇO ATÉ A PRÓXIMA",
+          header: "PREÇO SE PEDIR HOJE",
           sortable: true,
           align: "right",
           className: "w-36",
@@ -129,54 +188,19 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
       );
     }
 
-    projectionColumns.push(
-      {
-        key: "expectedQty",
-        header: "QUANTIDADE ESPERADA",
-        sortable: true,
-        align: "right",
-        className: "w-36",
-        accessor: (item) => {
-          const p = projectionByItem.get(item.id);
-          return (
-            <div className="tabular-nums">
-              {renderSkippableCell(p && p.quantityGapPlusCycle > 0 ? formatNumber(p.quantityGapPlusCycle) : null, p?.reasonGapPlusCycle)}
-            </div>
-          );
-        },
-        sortAccessor: (item) => projectionByItem.get(item.id)?.quantityGapPlusCycle ?? -1,
-      },
-      {
-        key: "expectedPrice",
-        header: "PREÇO ESPERADO",
-        sortable: true,
-        align: "right",
-        className: "w-36",
-        accessor: (item) => {
-          const p = projectionByItem.get(item.id);
-          return (
-            <div className="tabular-nums">
-              {renderSkippableCell(p && p.quantityGapPlusCycle > 0 ? formatCurrency(p.totalGapPlusCycle) : null, p?.reasonGapPlusCycle)}
-            </div>
-          );
-        },
-        sortAccessor: (item) => projectionByItem.get(item.id)?.totalGapPlusCycle ?? -1,
-      },
-    );
-
     const merged = [...base, ...projectionColumns];
 
     // Warehouse users can't see prices: drop every price-bearing column.
     if (canViewPrices) return merged;
     const priceKeys = new Set(["price", "totalPrice", "gapOnlyPrice", "expectedPrice"]);
     return merged.filter((col) => !priceKeys.has(col.key));
-  }, [hasGapOption, canViewPrices, projectionByItem]);
+  }, [hasGapOption, canViewPrices, projectionByItem, scheduledDateLabel]);
 
   // Default visible: the original schedule columns + the projection columns.
   const defaultColumns = useMemo(() => {
     const keys = ["uniCode", "name", "brand.name", "category.name", "quantity", "price", "measures"];
-    if (hasGapOption) keys.push("gapOnlyQty", "gapOnlyPrice");
     keys.push("expectedQty", "expectedPrice");
+    if (hasGapOption) keys.push("gapOnlyQty", "gapOnlyPrice");
     return new Set(canViewPrices ? keys : keys.filter((k) => k !== "price" && k !== "gapOnlyPrice" && k !== "expectedPrice"));
   }, [hasGapOption, canViewPrices]);
 
@@ -382,7 +406,7 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
                     {displayColumns.map((column, index) => {
                       let content: React.ReactNode = "";
                       if (column.key === "gapOnlyPrice") content = formatCurrency(projectionMeta!.gapOnlyTotal);
-                      else if (column.key === "expectedPrice") content = formatCurrency(projectionMeta!.gapPlusCycleTotal);
+                      else if (column.key === "expectedPrice") content = formatCurrency(projectionMeta!.scheduledTotal ?? projectionMeta!.gapPlusCycleTotal);
                       else if (index === 0) content = "Total";
                       return (
                         <TableCell

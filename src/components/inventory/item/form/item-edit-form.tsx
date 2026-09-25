@@ -36,6 +36,8 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       isBorrowable: item.isBorrowable,
       stockModel: item.stockModel,
       fixedTargetQuantity: item.fixedTargetQuantity,
+      targetCoverageDays: item.targetCoverageDays ?? null,
+      minStockQuantity: item.minStockQuantity ?? null,
       abcCategory: item.abcCategory,
       xyzCategory: item.xyzCategory,
       brandIds: item.brands?.map((b) => b.id) ?? [],

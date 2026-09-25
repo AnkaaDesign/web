@@ -6,8 +6,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FileSuggestions } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE } from "../../../../constants";
+import { Badge } from "@/components/ui/badge";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_DUE_DATE_RULE, EXECUTION_TIME_UNIT } from "../../../../constants";
 import { AirbrushingFields, type AirbrushingFieldValues } from "@/components/production/airbrushing/form/airbrushing-fields";
+import { AIRBRUSHING_CREATION_MODE } from "@/schemas/airbrushing";
 
 interface MultiAirbrushingSelectorProps {
   control: any;
@@ -51,6 +53,12 @@ interface AirbrushingItem extends AirbrushingFieldValues {
   layoutIds?: string[];
   /** fileId → LayoutStatus, para os layouts já enviados desta configuração. */
   layoutStatuses?: Record<string, string>;
+  /**
+   * Status GRAVADO no servidor; `null` numa linha nova. É ele — e não o `status` que o
+   * usuário pode estar trocando — que decide se a linha é nova (vai para cotação) ou se
+   * está em cotação (pintor e valor travados). Ver `airbrushingToFormRow`.
+   */
+  persistedStatus?: string | null;
   uploading?: boolean;
   error?: string;
 }
@@ -120,12 +128,21 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
     paymentTermDays: airbrushing.paymentTermDays ?? null,
     dueDayOfMonth: airbrushing.dueDayOfMonth ?? null,
     dueDate: airbrushing.dueDate ?? null,
-    status: airbrushing.status || AIRBRUSHING_STATUS.PREPARATION,
+    persistedStatus: airbrushing.persistedStatus ?? null,
+    // Só a linha nova escolhe o modo; sem escolha registrada, vai para cotação.
+    creationMode: airbrushing.persistedStatus ? null : (airbrushing.creationMode ?? AIRBRUSHING_CREATION_MODE.QUOTATION),
+    // Linha nova nasce em cotação; uma gravada sem status (não deveria existir) cai em Preparação.
+    status: airbrushing.status || (airbrushing.persistedStatus ? AIRBRUSHING_STATUS.PREPARATION : AIRBRUSHING_STATUS.QUOTING),
     paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
     price: airbrushing.price || null,
     description: airbrushing.description ?? null,
     startDate: airbrushing.startDate || null,
     finishDate: airbrushing.finishDate || null,
+    executionTime: airbrushing.executionTime ?? null,
+    executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+    quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+    quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+    quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
     startedAt: airbrushing.startedAt || null,
     finishedAt: airbrushing.finishedAt || null,
     painterId: airbrushing.painterId || null,
@@ -161,7 +178,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     const statusVisible = showStatus ?? isEditMode;
 
     // Use controller to properly manage form field
-    const { field } = useController({
+    // `fieldState.error` traz os erros por linha publicados por `useAirbrushingCreationGuard`
+    // (`<name>.<i>.painterId`).
+    const { field, fieldState } = useController({
       name: name as any,
       control,
     });
@@ -222,6 +241,10 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       const formValue = airbrushings.map((airbrushing) => {
         return {
           id: airbrushing.id, // Preserve ID for sync back
+          // Viaja junto para que um re-map form → local não perca a origem da linha.
+          persistedStatus: airbrushing.persistedStatus ?? null,
+          // Campo de formulário (cotação × já aprovada) — `buildAirbrushingPayload` não o envia.
+          creationMode: airbrushing.creationMode ?? null,
           status: airbrushing.status,
           paymentStatus: airbrushing.paymentStatus,
           paymentMethod: airbrushing.paymentMethod ?? null,
@@ -233,6 +256,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           description: airbrushing.description,
           startDate: airbrushing.startDate,
           finishDate: airbrushing.finishDate,
+          executionTime: airbrushing.executionTime ?? null,
+          executionTimeUnit: airbrushing.executionTimeUnit ?? null,
+          quotationOfferAmount: airbrushing.quotationOfferAmount ?? null,
+          quotationOfferExecutionTime: airbrushing.quotationOfferExecutionTime ?? null,
+          quotationOfferExecutionTimeUnit: airbrushing.quotationOfferExecutionTimeUnit ?? null,
           startedAt: airbrushing.startedAt,
           finishedAt: airbrushing.finishedAt,
           painterId: airbrushing.painterId,
@@ -266,7 +294,10 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share
         // an id, and `updateAirbrushing` matches on id — editing one would silently write into both.
         id: `airbrushing-${crypto.randomUUID()}`,
-        status: AIRBRUSHING_STATUS.PREPARATION,
+        // Toda aerografia nova nasce em cotação — sem pintor e sem valor (a API garante o mesmo).
+        status: AIRBRUSHING_STATUS.QUOTING,
+        persistedStatus: null,
+        creationMode: AIRBRUSHING_CREATION_MODE.QUOTATION,
         paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
         paymentMethod: null,
         dueDateRule: AIRBRUSHING_DUE_DATE_RULE.DAYS_AFTER_FINISH,
@@ -277,6 +308,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         description: null,
         startDate: null,
         finishDate: null,
+        executionTime: null,
+        executionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
+        quotationOfferAmount: null,
+        quotationOfferExecutionTime: null,
+        quotationOfferExecutionTimeUnit: EXECUTION_TIME_UNIT.DAYS,
         startedAt: null,
         finishedAt: null,
         painterId: null,
@@ -356,12 +392,28 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       <div className="space-y-4">
         {/* Airbrushings List */}
         <div className="space-y-3">
-          {airbrushings.map((airbrushing, index) => (
+          {airbrushings.map((airbrushing, index) => {
+            const isNew = !airbrushing.persistedStatus;
+            const quoting = airbrushing.persistedStatus === AIRBRUSHING_STATUS.QUOTING;
+            // O erro do envio só vale enquanto a linha continua "já aprovada" e sem pintor — sem
+            // resolver cobrindo as linhas, é isto que o apaga assim que o pintor é escolhido.
+            const painterError =
+              isNew && airbrushing.creationMode === AIRBRUSHING_CREATION_MODE.APPROVED && !airbrushing.painterId
+                ? ((fieldState.error as any)?.[index]?.painterId?.message as string | undefined)
+                : undefined;
+            return (
               <div key={airbrushing.id} className="border border-border rounded-lg p-4 space-y-4">
                 {/* Cabeçalho da linha: identificação + remover. A lixeira mora aqui (e não
                     grudada num campo) para que a ordem dos campos seja idêntica à da edição. */}
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">Aerografia {index + 1}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Aerografia {index + 1}</p>
+                    {quoting && (
+                      <Badge variant="indigo" className="text-xs">
+                        {AIRBRUSHING_STATUS_LABELS[AIRBRUSHING_STATUS.QUOTING]}
+                      </Badge>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     onClick={() => removeAirbrushing(airbrushing.id)}
@@ -386,6 +438,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   showStatus={statusVisible}
                   initialPainter={airbrushing.painter ?? undefined}
                   idPrefix={`airbrushing-${airbrushing.id}`}
+                  isNew={isNew}
+                  quoting={quoting}
+                  errors={painterError ? { painterId: painterError } : undefined}
                   /* Layouts — same uploader as the main task layout (card look, PDF/EPS/AI
                      accepted), COM o seletor de status: um layout de aerografia carrega o
                      mesmo fluxo Rascunho/Aprovado/Reprovado do layout de tarefa, e é ele que
@@ -440,7 +495,8 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   </Alert>
                 )}
               </div>
-            ))}
+            );
+          })}
         </div>
 
         <Button

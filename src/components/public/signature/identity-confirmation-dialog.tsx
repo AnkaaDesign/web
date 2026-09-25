@@ -401,7 +401,7 @@ export function IdentityConfirmationDialog({
       <DialogContent
         /* force-light: o Radix monta o conteúdo num portal preso ao <body>, fora
            do wrapper claro da página, então ele não herdaria o escopo. */
-        className="force-light max-h-[90vh] max-w-3xl overflow-y-auto"
+        className="force-light max-h-[90vh] max-w-3xl overflow-y-auto supports-[height:100dvh]:max-h-[90dvh]"
         onPointerDownOutside={e => submitting && e.preventDefault()}
         onEscapeKeyDown={e => submitting && e.preventDefault()}
       >

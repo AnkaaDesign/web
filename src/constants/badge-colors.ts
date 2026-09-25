@@ -23,6 +23,7 @@ import {
   EXTERNAL_OPERATION_STATUS,
   SERVICE_ORDER_STATUS,
   AIRBRUSHING_STATUS,
+  AIRBRUSHING_QUOTE_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
   CUT_STATUS,
   CUT_ORIGIN,
@@ -458,11 +459,22 @@ export const ENTITY_BADGE_CONFIG = {
   AIRBRUSHING: {
     // Mirrors ENTITY_BADGE_CONFIG.TASK: orange while being prepared, gray once
     // released to the floor and waiting on a painter, blue in progress.
+    [AIRBRUSHING_STATUS.QUOTING]: "indigo" as BadgeVariant,       // Indigo - collecting painters' proposals
     [AIRBRUSHING_STATUS.PREPARATION]: "orange" as BadgeVariant,    // Orange - in preparation
     [AIRBRUSHING_STATUS.WAITING_PRODUCTION]: "gray" as BadgeVariant, // Gray - released, waiting for a painter
     [AIRBRUSHING_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,    // Blue - in progress
     [AIRBRUSHING_STATUS.COMPLETED]: "completed" as BadgeVariant,   // Green - completed
     [AIRBRUSHING_STATUS.CANCELLED]: "cancelled" as BadgeVariant,   // Red - cancelled
+  },
+
+  // Airbrushing Quote (one painter's negotiation)
+  AIRBRUSHING_QUOTE: {
+    [AIRBRUSHING_QUOTE_STATUS.PROPOSED]: "amber" as BadgeVariant,      // Amber - commercial's turn
+    [AIRBRUSHING_QUOTE_STATUS.COUNTERED]: "blue" as BadgeVariant,      // Blue - painter's turn
+    [AIRBRUSHING_QUOTE_STATUS.ACCEPTED]: "teal" as BadgeVariant,       // Teal - agreed, still NOT selected
+    [AIRBRUSHING_QUOTE_STATUS.DECLINED]: "red" as BadgeVariant,        // Red - painter declined
+    [AIRBRUSHING_QUOTE_STATUS.SELECTED]: "green" as BadgeVariant,      // Green - selected
+    [AIRBRUSHING_QUOTE_STATUS.NOT_SELECTED]: "gray" as BadgeVariant,   // Gray - closed without this one
   },
 
   // Airbrushing Payment Status

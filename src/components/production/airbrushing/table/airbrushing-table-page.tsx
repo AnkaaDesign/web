@@ -290,7 +290,9 @@ export function AirbrushingTablePage() {
 
   const confirmStatus = useCallback(
     async (status: AIRBRUSHING_STATUS) => {
-      const rows = statusDialog;
+      // Em cotação não muda de status por aqui (a API recusa com 400): segue adiante pela
+      // seleção de uma proposta, no detalhe. As demais linhas da seleção seguem normalmente.
+      const rows = statusDialog?.filter((a) => a.status !== AIRBRUSHING_STATUS.QUOTING);
       if (rows?.length) await applyStatus(rows, status);
       setStatusDialog(null);
     },
@@ -348,7 +350,7 @@ export function AirbrushingTablePage() {
         icon: <IconProgressCheck className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: AIRBRUSHING_MANAGE_PRIVILEGES,
-        hidden: (rows) => rows.length === 0,
+        hidden: (rows) => rows.length === 0 || rows.every((a) => a.status === AIRBRUSHING_STATUS.QUOTING),
         onClick: (rows) => setStatusDialog(rows),
       },
       {
