@@ -10,14 +10,14 @@
 //
 // Field names are the REAL task fields (verified): Task.cleared:boolean,
 // Task.entryDate, Task.forecastDate, Task.serialNumber; chassis/plate/plaqueta live
-// on the related truck (truck.chassisNumber / truck.plate / truck.vinPlateId). Field
+// on the related implement (implement.chassisNumber / implement.plate / implement.vinPlateId). Field
 // targets name the DetailFieldDef id / DataTable column id so the exact field blinks.
 //
 // A plaqueta voltou a ter regra (R3c) porque deixou de ser TEXTO e virou FOTO: o
 // motivo de a regra antiga ter caído era ser irresolvível na prática — ninguém
 // digitava o número. Fotografar a plaqueta é uma ação concreta, então o alerta
-// agora aponta para algo que dá para resolver. O teste é sobre `truck.vinPlateId`
-// (o escalar), não sobre a relação `truck.vinPlate`, que só vem quando incluída.
+// agora aponta para algo que dá para resolver. O teste é sobre `implement.vinPlateId`
+// (o escalar), não sobre a relação `implement.vinPlate`, que só vem quando incluída.
 
 import {
   SECTOR_PRIVILEGES,
@@ -203,7 +203,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "harsh" }),
   },
 
-  // R3a — truck is here (entry given) but the CHASSIS is missing → blink the chassis field.
+  // R3a — the vehicle is here (entry given) but the CHASSIS is missing → blink the chassis field.
   // Split from the plate rule so each blinks the field that is ACTUALLY empty (blinking a
   // filled chassis just because the plate is missing is misleading).
   {
@@ -225,7 +225,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "soft" }),
   },
 
-  // R3b — truck is here but the PLATE (truck.plate) is missing → blink the plate field.
+  // R3b — the vehicle is here but the PLATE (implement.plate) is missing → blink the plate field.
   //
   // Gated on the task having NO serial number: the serial and the plate are two ways of
   // identifying the same vehicle, and a task that already carries a serial is identified.
@@ -251,7 +251,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "soft" }),
   },
 
-  // R3c — truck is here but nobody fotografou a PLAQUETA (truck.vinPlateId) → blink the
+  // R3c — the vehicle is here but nobody fotografou a PLAQUETA (implement.vinPlateId) → blink the
   // plaqueta field.
   //
   // Diferente de R3b, esta NÃO é condicionada a série/placa: a plaqueta é a identificação
@@ -433,7 +433,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
         //
         // A fatia de faturamento diz DE QUEM é a cobrança; o número do pedido
         // mora na TAREFA (`Task.customerOrderNumber`) desde que um orçamento
-        // passou a cobrir N caminhões — o pedido é por ENTREGA. Enquanto esta
+        // passou a cobrir N veículos — o pedido é por ENTREGA. Enquanto esta
         // condição perguntava `isNull orderNumber` DENTRO da fatia, perguntava
         // por uma coluna que já não existe: a guarda do `notNull id` logo abaixo
         // fazia a regra ler "caminho ausente" e nunca acender.

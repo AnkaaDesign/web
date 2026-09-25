@@ -359,7 +359,7 @@ export const layoutKeys = fileKeys;
 // Garage Query Keys
 // =====================================================
 
-// Note: Garage is not a real entity - it's a visualization of truck spots
+// Note: Garage is not a real entity - it's a visualization of implement spots
 // Using a simple Record<string, any> placeholder for query key typing
 export const garageKeys = createQueryKeyStore<Record<string, any>>("garages");
 
@@ -755,7 +755,7 @@ export const taskKeys = {
 };
 
 // =====================================================
-// Truck Query Keys
+// Implement Query Keys
 // =====================================================
 
 export const implementKeys = createQueryKeyStore<ImplementGetManyFormDataType>("implements");

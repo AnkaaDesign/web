@@ -48,7 +48,7 @@ export function portalThumbnailUrl(
   return portalFileUrl(file);
 }
 
-/** A plaqueta — `Truck.vinPlate`, que chega como `PortalFile` dentro da identidade. */
+/** A plaqueta — `Implement.vinPlate`, que chega como `PortalFile` dentro da identidade. */
 export function portalVinPlateUrl(fileId: string | null | undefined): string {
   return fileId ? `${getApiBaseUrl()}/files/serve/${fileId}` : "";
 }

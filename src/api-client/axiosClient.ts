@@ -388,7 +388,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
         // Pre-process params: JSON-stringify complex nested objects
         // This matches the mobile's approach and ensures null values inside nested
-        // objects (like where.truck.isNot=null) are preserved instead of being
+        // objects (like where.implement.isNot=null) are preserved instead of being
         // stripped by qs.stringify's skipNulls option
         const processedParams: Record<string, any> = {};
 

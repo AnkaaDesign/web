@@ -37,7 +37,7 @@ export const useImplementMeasureDetail = (
 
 type MeasuresByImplement = { leftSideMeasure: any; rightSideMeasure: any; backSideMeasure: any };
 
-// Get implement measures by truck ID
+// Get implement measures by implement ID
 export const useImplementMeasuresByImplement = (
   implementId: string,
   options?: {
@@ -77,7 +77,7 @@ export const useImplementMeasureMutations = () => {
     mutationFn: implementMeasureService.create,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: implementMeasureQueryKeys.all });
-      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      // Implement measures are embedded in the task detail (implement measures) — refresh tasks too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },
@@ -90,7 +90,7 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: implementMeasureQueryKeys.detail(variables.id),
       });
-      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      // Implement measures are embedded in the task detail (implement measures) — refresh tasks too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },
@@ -103,7 +103,7 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: implementMeasureQueryKeys.detail(id),
       });
-      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      // Implement measures are embedded in the task detail (implement measures) — refresh tasks too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
@@ -121,7 +121,7 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: implementKeys.detail(variables.implementId),
       });
-      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      // Implement measures are embedded in the task detail (implement measures) — refresh tasks too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },

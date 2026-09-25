@@ -961,7 +961,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 })()}
               </>
             )}
-            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só no
+            {/* Plaqueta — é uma FOTO (implement.vinPlate -> File), não texto. Só no
                 caso de UM veículo: a foto é de um caminhão, e exibi-la sozinha
                 sob uma relação de quatro é o mesmo defeito que esta correção
                 desfez. */}

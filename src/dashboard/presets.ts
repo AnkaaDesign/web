@@ -3,7 +3,7 @@
 // The default layout shown to a user who has not customized their dashboard
 // yet is determined by their sector privilege. Each preset below was hand-
 // designed for a specific role's daily reality at Ankaa Design — a vehicle /
-// truck graphics shop where work flows COMMERCIAL → DESIGNER → PLOTTING →
+// implement graphics shop where work flows COMMERCIAL → DESIGNER → PLOTTING →
 // PRODUCTION → LOGISTIC, supported by WAREHOUSE / MAINTENANCE / FINANCIAL /
 // HR / ADMIN.
 //
@@ -152,7 +152,7 @@ const lowStockSnapshot = (): WidgetInstance =>
 // ============================================================
 // PRODUCTION
 // ----------------------------------------------------------------
-// Workflow: workers paint/apply graphics on trucks. They want to see
+// Workflow: workers paint/apply graphics on implements. They want to see
 // the active production queue (what's in front of them now), what's
 // next up, and any tasks that are running late. Their personal hours
 // matter for ponto compliance.
@@ -503,7 +503,7 @@ function warehouseLayout(): DashboardLayout {
 // ============================================================
 // DESIGNER
 // ----------------------------------------------------------------
-// Workflow: creates the artwork/layout for each truck. Their queue is
+// Workflow: creates the artwork/layout for each implement. Their queue is
 // "tasks in PREPARATION that don't have layouts yet" — those are the
 // ones that need their hands. After upload they'd want to see what's
 // recently approved (their delivered work).

@@ -84,7 +84,7 @@ export function SpotSelector({
   const [selectedLane, setSelectedLane] = useState<LaneId | null>(parsedSpot.lane);
   const [selectedSpotNumber, setSelectedSpotNumber] = useState<SpotNumber | null>(parsedSpot.spotNumber);
 
-  // Fetch garage availability when truck length is available
+  // Fetch garage availability when implement length is available
   const { data: garagesAvailability, isLoading } = useQuery({
     queryKey: ['garages-availability', implementLength, implementId],
     queryFn: () => getGaragesAvailability(implementLength!, implementId),
@@ -126,7 +126,7 @@ export function SpotSelector({
       const garageData = garages.find((g: GarageAvailability) => g.garageId === garageId);
       const canFit = garageData?.canFit ?? true;
 
-      // Count lanes that can fit this truck
+      // Count lanes that can fit this implement
       const availableLanes = garageData?.lanes.filter((l: LaneAvailability) => l.canFit).length ?? 0;
 
       // Build descriptive label
@@ -163,7 +163,7 @@ export function SpotSelector({
   }, [selectedGarageData, parsedSpot.lane]);
 
   // Spot options for selected lane
-  // Only show V1 and V2 by default (typical usage is 2 trucks per lane)
+  // Only show V1 and V2 by default (typical usage is 2 implements per lane)
   // Show V3 when: current task is at V3, OR (V1 and V2 are occupied AND at least 6m available)
   const spotOptions = useMemo(() => {
     if (!selectedLaneData || !selectedGarage || selectedGarage === 'YARD_WAIT' || selectedGarage === 'YARD_EXIT') return [];

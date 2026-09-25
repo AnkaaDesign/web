@@ -1,7 +1,7 @@
 // Shared task review card used by BOTH the cut and airbrushing wizards' review steps (create AND
 // edit), so the two forms stay visually identical. Renders the labeled detail rows the edit review
 // already used — Tarefa · Cliente · Identificador · Previsão — where "Identificador" is the task's
-// serial number and/or truck plate, and "Previsão" is the forecast date (Setor is intentionally
+// serial number and/or implement plate, and "Previsão" is the forecast date (Setor is intentionally
 // dropped in favor of the forecast).
 
 import { IconClipboardList, IconUser, IconId, IconCalendar } from "@tabler/icons-react";

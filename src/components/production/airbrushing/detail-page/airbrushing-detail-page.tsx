@@ -313,7 +313,7 @@ export function AirbrushingDetailPage() {
 
   const { data: response, isLoading, error } = useAirbrushing(id!, {
     include: {
-      // truck entra por causa do Identificador: sem número de série, a tarefa é
+      // implement entra por causa do Identificador: sem número de série, a tarefa é
       // identificada pela placa.
       task: { include: { customer: { include: { logo: true } }, sector: true, implement: true } },
       painter: true,

@@ -772,7 +772,7 @@ export function BudgetStepReview({
                 mesma tela —, e quando o Resumo está filtrado por um cliente,
                 porque o pedido é da ENTREGA e não do pagador. */}
             {customerFilter === "all" && !anyVehicleOrderNumber && purchaseOrderRow}
-            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
+            {/* Plaqueta — é uma FOTO (implement.vinPlate -> File), não texto. Só aparece quando
                 existe: no create ainda não há caminhão gravado. */}
             {resolvedTask?.implement?.vinPlate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">

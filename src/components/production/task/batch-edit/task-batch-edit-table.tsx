@@ -50,7 +50,7 @@ const taskBatchEditSchema = z.object({
           // pedidos diferentes ou em blocos — e esta tela é justamente onde se
           // resolve "estes doze são do pedido 4471".
           customerOrderNumber: z.string().max(100, "Máximo de 100 caracteres").nullable().optional(),
-          // Regra canônica: normaliza antes de validar (ver schemas/truck.ts).
+          // Regra canônica: normaliza antes de validar (ver schemas/implement.ts).
           plate: optionalPlateSchema,
           chassisNumber: optionalChassisSchema,
           details: createDescriptionSchema(1, 1000, false).nullable().optional(),
@@ -258,16 +258,16 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         if (!canEditTerm) delete transformed.data.term;
         if (!canEditOrderNumber) delete transformed.data.customerOrderNumber;
 
-        // ── PLACA E CHASSI MORAM EM `truck`, NÃO NO TOPO ──────────────────────
+        // ── PLACA E CHASSI MORAM EM `implement`, NÃO NO TOPO ──────────────────────
         //
         // A grade os montava no primeiro nível de `data`. O schema de update só os
-        // conhece dentro de `truck` e NÃO é `.strict()`: o zod APAGA a chave que
+        // conhece dentro de `implement` e NÃO é `.strict()`: o zod APAGA a chave que
         // não reconhece, sem erro. O operador editava a placa de doze caminhões,
         // lia "12 tarefas atualizadas com sucesso" e nada mudava. (Só
         // `customerOrderNumber` é de primeiro nível — é da TAREFA, não do veículo.)
         //
         // ⚠️ E SÓ QUANDO MUDOU. A grade manda a LINHA INTEIRA, então `plate` e
-        // `chassisNumber` nunca são `undefined` — montar `truck` sempre faria
+        // `chassisNumber` nunca são `undefined` — montar `implement` sempre faria
         // toda tarefa carregar um bloco de veículo, e o repositório faz `upsert`:
         // tarefa que NÃO tem caminhão ganharia um, criado do nada e com `spot`
         // forçado a nulo contra o `@default(YARD_WAIT)` — um veículo nascido fora

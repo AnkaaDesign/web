@@ -17,13 +17,13 @@ import { quoteTasks } from "@/utils/quote-tasks";
  * POR QUE TABELA E NÃO PROSA
  *   A identificação vinha escrita dentro do parágrafo de abertura: "…no veículo
  *   nº de série: 39239, placa: a registrar, chassi: 953677TGXTR031467,
- *   categoria: Truck, implemento: Refrigerado." Dois problemas, e o segundo já
+ *   categoria: Toco, implemento: Refrigerado." Dois problemas, e o segundo já
  *   valia antes de existir orçamento multitarefa:
  *
- *     1. Um orçamento pode cobrir sessenta caminhões, e a prosa viraria um
+ *     1. Um orçamento pode cobrir sessenta veículos, e a prosa viraria um
  *        parágrafo de vinte linhas em que ninguém acha nada.
  *     2. O que o leitor FAZ com esses campos é conferi-los um a um contra o
- *        documento do caminhão. Em prosa, as lacunas "a registrar" caem em
+ *        documento do veículo. Em prosa, as lacunas "a registrar" caem em
  *        posições diferentes a cada orçamento e o olho precisa varrer a frase
  *        para achar o chassi. Em coluna, ele desce.
  *

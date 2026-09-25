@@ -33,7 +33,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { createAirbrushingColumns, AIRBRUSHING_MONEY_VIEWERS } from "./airbrushing-table-columns";
 import { SetStatusModal } from "./set-status-modal";
 
-// Trimmed include — only what the columns render: task name + customer, the truck plate behind
+// Trimmed include — only what the columns render: task name + customer, the implement plate behind
 // "Identificador", the side measures behind "Medidas", painter name. NOTE: the layouts count column
 // is intentionally omitted (the API include has no `_count`, so counting would require fetching
 // every layouts File[] — a heavy payload for a single number).
@@ -78,7 +78,7 @@ const EMPTY_PARAMS: { search: string; filters: DataTableFilterValues } = { searc
 /** column id → API orderBy entry. Columns without a server-sortable field are omitted (sort ignored). */
 const AIRBRUSHING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Record<string, unknown>> = {
   taskName: (d) => ({ task: { name: d } }),
-  // Server sort can't COALESCE(serialNumber, truck.plate) the way the client-mode task-prep table
+  // Server sort can't COALESCE(serialNumber, implement.plate) the way the client-mode task-prep table
   // does, so sort on the serial and push plate-only rows (NULL serial) to the bottom in BOTH
   // directions — Postgres otherwise puts NULLS FIRST on DESC.
   taskSerialNumber: (d) => ({ task: { serialNumber: { sort: d, nulls: "last" } } }),

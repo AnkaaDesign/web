@@ -10,7 +10,7 @@ import type { Task } from "@/types";
  * O que a tela de orçamento precisa de CADA veículo para editá-lo.
  *
  * É o `include` que a página já usava para a tarefa aberta — cliente, caminhão com a
- * foto da plaqueta (relação de File: um `truck: true` deixaria a Plaqueta sempre vazia
+ * foto da plaqueta (relação de File: um `implement: true` deixaria a Plaqueta sempre vazia
  * e um save apagaria a foto), layouts com o arquivo, arquivos base, responsáveis — mais
  * a pintura geral, que agora aparece na aba e no Resumo de cada caminhão.
  *

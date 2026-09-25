@@ -11,7 +11,7 @@
  *   boleto       informativo do boleto (varredura);
  *   invoice      informativo do boleto (registro na aprovação);
  *   webChangelog histórico de alterações deste web ("VUC (Veículo Urbano de
- *                Carga)", "Caminhão").
+ *                Carga)" e, para a categoria TRUCK, "Caminhão").
  *
  * `src/generated/contracts/labels.json` é GERADO pela API
  * (`npx tsx scripts/export-contracts.ts --out ../web/src/generated/contracts`);

@@ -55,7 +55,7 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
    * Este arquivo já montou os painéis à mão — e com eles a conversão de metro
    * para centímetro que `ImplementMeasure` obriga. Duas telas fazendo essa
    * conversão é uma a mais do que o necessário para errá-la; a partir daqui só
-   * o `truckId` viaja, e a conversão mora num lugar só, no servidor.
+   * o `implementId` viaja, e a conversão mora num lugar só, no servidor.
    */
   const layoutImplementId = task.implement?.id;
 

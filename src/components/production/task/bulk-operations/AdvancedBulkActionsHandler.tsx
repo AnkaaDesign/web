@@ -515,7 +515,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             // Cuts are handled by form.reset above
             setCutsCount(computed.cuts.length);
           } else if (type === 'layout') {
-            // Pre-load existing layouts from the first task's truck
+            // Pre-load existing layouts from the first task's implement
             // Since layouts are individual (each task has its own layout record),
             // we compare layout content (height + sections) to determine if all tasks
             // share the same measurements per side
@@ -895,10 +895,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
           break;
 
         case "layout":
-          // Pass layout data embedded in truck object for ALL tasks
+          // Pass layout data embedded in implement object for ALL tasks
           // This works for both:
-          // - Tasks WITH trucks: truck is updated with new layouts
-          // - Tasks WITHOUT trucks: truck is created with embedded layouts
+          // - Tasks WITH implements: implement is updated with new layouts
+          // - Tasks WITHOUT implements: implement is created with embedded layouts
           console.log('[BulkActions] layout case - layoutStates:', JSON.stringify({ left: layoutStates.left, right: layoutStates.right, back: layoutStates.back }));
           const hasAnyLayoutState =
             (layoutStates.left?.sections?.length && layoutStates.left.sections.length > 0) ||
@@ -907,7 +907,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
           console.log('[BulkActions] hasAnyLayoutState:', hasAnyLayoutState, 'currentTasks:', currentTasks.length);
           if (hasAnyLayoutState) {
-            // Build truck object with embedded layout data (following taskTruckCreateSchema)
+            // Build implement object with embedded layout data (following taskImplementCreateSchema)
             const implementWithLayouts: any = {};
             // Collect layout photo files for upload
             const layoutPhotoFiles: Array<{ side: string; file: File }> = [];
@@ -975,15 +975,15 @@ export const AdvancedBulkActionsHandler = forwardRef<
               }
             }
 
-            // Set truck data for ALL tasks - this will create truck if missing
-            // or update existing truck with new layout data
+            // Set implement data for ALL tasks - this will create implement if missing
+            // or update existing implement with new layout data
             if (Object.keys(implementWithLayouts).length > 0) {
               const implementLayoutUpdates: Record<string, any> = {};
 
               currentTasks.forEach(task => {
                 if (task.id) {
                   // Pass the same layout data to all tasks
-                  // Backend will handle creating/updating trucks and layouts
+                  // Backend will handle creating/updating implements and layouts
                   implementLayoutUpdates[task.id] = implementWithLayouts;
                 }
               });
@@ -1163,7 +1163,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             taskData.baseFileIds = perTaskBaseFileIds[id];
           }
 
-          // Add per-task truck layout updates if available
+          // Add per-task implement layout updates if available
           const implementUpdate = perTaskImplementUpdates?.[id];
           if (perTaskImplementUpdates && implementUpdate) {
             taskData.implement = implementUpdate;

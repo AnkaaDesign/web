@@ -439,7 +439,7 @@ const FinancialBudgetDetailPageInner = () => {
       customerId: "" as string,
       category: "" as string,
       // Do NOT default to a concrete enum — an unset implementType must stay
-      // empty so an untouched budget save never clobbers the truck's real value
+      // empty so an untouched budget save never clobbers the implement's real value
       // (the load effect below seeds it from the task; submit only sends it when
       // the user actually changed it). See findings I39/I40.
       implementType: "" as string,
@@ -496,7 +496,7 @@ const FinancialBudgetDetailPageInner = () => {
    * Foto da plaqueta — imagem única, só o ÚLTIMO arquivo vale (`maxFiles={1}` já limita a seleção,
    * mas o estado é normalizado aqui de qualquer forma).
    *
-   * Um arquivo JÁ ENVIADO viaja como `truck.vinPlateId`; um arquivo novo ainda não tem id, então
+   * Um arquivo JÁ ENVIADO viaja como `implement.vinPlateId`; um arquivo novo ainda não tem id, então
    * `vinPlateId` fica `null` até o submit fazer o upload e preencher. Limpar o campo manda `null`
    * explícito — é assim que a foto é removida.
    */
@@ -611,7 +611,7 @@ const FinancialBudgetDetailPageInner = () => {
     if (!task || !vehiclesReady || quoteLoading) return;
     const loadedVehicles = vehicleTasks.filter(Boolean) as any[];
 
-    // Seed each vehicle's Plaqueta photo from its persisted truck relation.
+    // Seed each vehicle's Plaqueta photo from its persisted implement relation.
     setVinPlateFilesByTask(
       Object.fromEntries(loadedVehicles.map((t) => [t.id, vinPlateFilesOf(t)])),
     );
@@ -1411,7 +1411,7 @@ const FinancialBudgetDetailPageInner = () => {
         remappedLayoutStatusesByTask[vehicleId] = remapped;
       }
 
-      // 1a. Upload each newly picked Plaqueta photo, so the truck payload below can send
+      // 1a. Upload each newly picked Plaqueta photo, so the implement payload below can send
       // its id. A failure here must NOT abort the save: the rest of the orçamento is what
       // the user came for, and the interceptor already toasted. `vinPlateId` then stays at
       // whatever it was.
@@ -1940,7 +1940,7 @@ const FinancialBudgetDetailPageInner = () => {
 
       if (existingQuote?.id) {
         // Short-circuit: skip the quote update entirely when no quote-form
-        // field is dirty. Prevents Task-only edits (e.g. truck plate) from
+        // field is dirty. Prevents Task-only edits (e.g. implement plate) from
         // round-tripping through the quote endpoint. The API also filters
         // no-ops defensively, but skipping the call is cheaper.
         const dirty = form.formState.dirtyFields as Record<string, unknown>;

@@ -48,7 +48,7 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       },
     },
     {
-      // "Identificador" = the task serial number, falling back to the truck plate — the same
+      // "Identificador" = the task serial number, falling back to the implement plate — the same
       // canonical pairing the task-prep / task-history tables render. Available-but-hidden.
       // Server sort is on the serial only (Prisma can't COALESCE), with NULLS LAST in both
       // directions so the plate-fallback rows never jump to the top on DESC.
@@ -69,7 +69,7 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       },
     },
     {
-      // Truck dimensions (largura × altura, cm) off the task's truck — same helper as task-prep.
+      // Implement dimensions (largura × altura, cm) off the task's implement — same helper as task-prep.
       // Not sortable: the value is a computed area and this table sorts server-side.
       id: "measures",
       header: "Medidas",

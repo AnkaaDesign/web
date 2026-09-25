@@ -283,7 +283,7 @@ const BillingDetailPageInner = ({
     enabled: !!id,
     include: {
       customer: { include: { logo: true } },
-      // `vinPlate` is a File relation, so a boolean `truck: true` would leave the Plaqueta field
+      // `vinPlate` is a File relation, so a boolean `implement: true` would leave the Plaqueta field
       // permanently empty and let a save wipe a photo that was already there.
       implement: { include: { vinPlate: true } },
       serviceOrders: {
@@ -330,7 +330,7 @@ const BillingDetailPageInner = ({
                   plate: true,
                   chassisNumber: true,
                   // Categoria e implemento: é assim que a discriminação da NFS-e
-                  // nomeia o veículo ("Truck Refrigerado de n série: X"). Sem
+                  // nomeia o veículo ("Toco Refrigerado de n série: X"). Sem
                   // eles a prévia descreveria um caminhão sem tipo, diferente da
                   // nota que vai sair.
                   category: true,

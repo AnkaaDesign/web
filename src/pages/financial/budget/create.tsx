@@ -765,7 +765,7 @@ export const FinancialBudgetCreatePage = () => {
         });
       }
 
-      // 6. Build truck data
+      // 6. Build implement data
       const { plates, category, implementType } = data;
       const hasImplementFields = (plates && plates.length > 0) || category || implementType;
       const buildImplementData = (plate?: string) => {

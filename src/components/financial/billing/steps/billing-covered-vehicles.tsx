@@ -72,7 +72,7 @@ interface Props {
  *
  * `customerOrderNumber` é campo de PRIMEIRO NÍVEL da tarefa. `plate` e
  * `chassisNumber` **não são**: pertencem ao caminhão, e o zod da API os declara
- * dentro de `truck` (`api/src/schemas/task.ts`, `taskTruckSchema`).
+ * dentro de `implement` (`api/src/schemas/task.ts`, `taskImplementSchema`).
  *
  * ⚠️ O defeito que isto conserta: a grade mandava os três no topo, com um `as any`
  * calando o compilador. `taskUpdateSchema` não é `.strict()`, então o zod

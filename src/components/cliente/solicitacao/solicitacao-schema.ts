@@ -4,7 +4,7 @@
 //
 // Três regras deste arquivo valem mais que o resto dele:
 //
-//  1. ⛔ NUNCA existe produto cartesiano. `Task.serialNumber` e `Truck.plate`
+//  1. ⛔ NUNCA existe produto cartesiano. `Task.serialNumber` e `Implement.plate`
 //     são `@unique` GLOBAIS: N placas × 1 série viraria N tarefas com a MESMA
 //     série e o servidor devolve 400 na primeira. Cada veículo é uma tupla
 //     EXPLÍCITA (série, placa, chassi). A faixa de série ("1001 1005") expande
@@ -25,7 +25,7 @@
 //     ninguém perceber. O que continua por linha é o que de fato muda de
 //     caminhão para caminhão: série, placa e chassi.
 //     O payload de §5 segue tendo `medidas` DENTRO de cada veículo (é assim que
-//     o servidor grava, uma medida por `Truck`) — quem replica é
+//     o servidor grava, uma medida por `Implement`) — quem replica é
 //     `buildSolicitacaoPayload`, e cada veículo recebe uma CÓPIA própria.
 import { z } from "zod";
 import {
@@ -663,7 +663,7 @@ function medidasParaPayload(
  *
  * Tudo que é vazio SAI do objeto em vez de virar `""` ou `null`: nada na API é
  * `.strict()` (contrato §10), então uma chave vazia não é recusada — ela é
- * GRAVADA, e uma placa `""` no `Truck` é tão `@unique` quanto uma placa de
+ * GRAVADA, e uma placa `""` no `Implement` é tão `@unique` quanto uma placa de
  * verdade, o que reprova o segundo veículo do mesmo lote.
  */
 export function buildSolicitacaoPayload(values: SolicitacaoFormData): PortalBudgetRequestInput {
@@ -681,7 +681,7 @@ export function buildSolicitacaoPayload(values: SolicitacaoFormData): PortalBudg
       const chassis = cleanChassis(row.chassisNumber ?? "");
       if (chassis) veiculo.chassisNumber = chassis;
       // ⛔ AS MESMAS MEDIDAS EM TODOS OS VEÍCULOS. O formulário guarda uma só
-      // (regra 4 do cabeçalho); o servidor grava uma por `Truck`. É aqui, e só
+      // (regra 4 do cabeçalho); o servidor grava uma por `Implement`. É aqui, e só
       // aqui, que uma vira N — em cópias independentes.
       const medidas = medidasParaPayload(values.medidas);
       if (medidas) veiculo.medidas = medidas;

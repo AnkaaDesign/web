@@ -580,7 +580,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         ),
     },
     {
-      // Truck dimensions (width × height in cm). Default-hidden — toggleable only, as in the legacy
+      // Implement dimensions (width × height in cm). Default-hidden — toggleable only, as in the legacy
       // Agenda. Sorts by total area (m²); displays + exports/searches the "L × A" string.
       id: "measures",
       header: "Medidas",
@@ -590,7 +590,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       meta: {
         defaultVisible: false,
         headerLabel: "Medidas",
-        // formatTaskMeasures() returns "-" for a truck with no dimensions — an empty cell reads
+        // formatTaskMeasures() returns "-" for an implement with no dimensions — an empty cell reads
         // better in a spreadsheet than a literal dash.
         exportValue: (row) => {
           const m = formatTaskMeasures(row);

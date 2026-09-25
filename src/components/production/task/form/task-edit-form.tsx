@@ -375,9 +375,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   );
   const [hasProjectFileChanges, setHasProjectFileChanges] = useState(false);
 
-  // Foto da plaqueta de identificação (VIN) — imagem ÚNICA gravada no caminhão.
+  // Foto da plaqueta de identificação (VIN) — imagem ÚNICA gravada no implemento.
   // Segue o mesmo desenho dos outros campos de arquivo: o estado guarda o que está na tela,
-  // arquivos novos vão por multipart (`truckVinPlate`) e os já existentes viajam como id.
+  // arquivos novos vão por multipart (`implementVinPlate`) e os já existentes viajam como id.
   const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview((task as any).implement?.vinPlate),
   );
@@ -651,12 +651,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // Get implement ID from task - with safety check
   const implementId = task.implement?.id;
 
-  // Safety mechanism: If task doesn't have a truck yet, trigger a refetch
+  // Safety mechanism: If task doesn't have an implement yet, trigger a refetch
   // This shouldn't happen because backend auto-creates it, but it's a safety net
   useEffect(() => {
     if (!implementId && task.id) {
       // The useTaskDetail query will handle refetching automatically
-      // since the backend ensures truck exists in findById
+      // since the backend ensures implement exists in findById
     }
   }, [implementId, task.id]);
 
@@ -673,10 +673,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
   const { data: measuresData } = useImplementMeasuresByImplement(implementId || "", { enabled: !!implementId });
 
-  // Calculate truck length from layout sections for spot selector
+  // Calculate implement length from layout sections for spot selector
   // Uses the same two-tier cabin logic as garage view and API:
-  // < 7m body: 2.0m cabin (small trucks)
-  // 7-10m body: 2.4m cabin (larger trucks)
+  // < 7m body: 2.0m cabin (small implements)
+  // 7-10m body: 2.4m cabin (larger implements)
   // >= 10m body: no cabin (semi-trailers)
   const implementLength = useMemo(() => {
     const layout = measuresData?.leftSideMeasure || measuresData?.rightSideMeasure;
@@ -1255,7 +1255,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           setShouldDeleteLayouts(false);
         }
 
-        // Consolidate truck data with layouts into single truck object
+        // Consolidate implement data with layouts into single implement object
         if (hasLayoutChanges && !shouldDeleteLayouts) {
 
           // Start with existing implement data from form
@@ -1455,7 +1455,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'paintId',
             'serialNumber',
             // O pedido de compra do cliente, DESTE veículo. Livre e não único:
-            // os N caminhões de um orçamento podem vir num pedido só ou em
+            // os N veículos de um orçamento podem vir num pedido só ou em
             // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
             // deixar o número antigo de pé — daí entrar nesta lista.
             'customerOrderNumber',
@@ -1860,7 +1860,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'paintId',
             'serialNumber',
             // O pedido de compra do cliente, DESTE veículo. Livre e não único:
-            // os N caminhões de um orçamento podem vir num pedido só ou em
+            // os N veículos de um orçamento podem vir num pedido só ou em
             // pedidos diferentes. Limpar o campo tem de gravar `null`, e não
             // deixar o número antigo de pé — daí entrar nesta lista.
             'customerOrderNumber',
@@ -2449,8 +2449,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
    * Foto da plaqueta — imagem única. Só o ÚLTIMO arquivo vale (maxFiles={1} já limita a
    * seleção, mas o estado é normalizado aqui de qualquer forma).
    *
-   * Um arquivo já existente (ou escolhido nas sugestões) viaja como `truck.vinPlateId`;
-   * um arquivo novo vai por multipart em `truckVinPlate` e a API grava o id. Limpar o campo
+   * Um arquivo já existente (ou escolhido nas sugestões) viaja como `implement.vinPlateId`;
+   * um arquivo novo vai por multipart em `implementVinPlate` e a API grava o id. Limpar o campo
    * manda `null` explícito — é assim que a foto é removida.
    */
   const handleVinPlateFilesChange = (files: FileWithPreview[]) => {
@@ -2976,9 +2976,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       <CustomerSelector control={form.control} disabled={isSubmitting || !canEditIdentity} initialCustomer={task.customer} />
                     </div>
 
-                    {/* Truck Category and Implement Type - Side by Side */}
+                    {/* Implement Category and Implement Type - Side by Side */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Truck Category */}
+                      {/* Implement Category */}
                       <FormField
                         control={form.control}
                         name="implement.category"
@@ -3005,7 +3005,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         )}
                       />
 
-                      {/* Truck Implement Type */}
+                      {/* Implement Type */}
                       <FormField
                         control={form.control}
                         name="implement.type"
@@ -3144,7 +3144,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           orçamento, por CLIENTE, e isso obrigava os N veículos de
                           um mesmo orçamento a citarem o mesmo número na nota e no
                           boleto. O pedido é por ENTREGA: aqui é onde se corrige um
-                          caminhão sem mexer nos irmãos. */}
+                          veículo sem mexer nos irmãos. */}
                       {canEditOrderNumber && (
                       <FormField
                         control={form.control}
@@ -3632,7 +3632,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           </AccordionItem>
                 )}
 
-                {/* Truck Spot - Only visible to ADMIN and LOGISTIC users */}
+                {/* Implement Spot - Only visible to ADMIN and LOGISTIC users */}
                 {implementId && canViewImplementSpot && (
           <AccordionItem
             value="spot"

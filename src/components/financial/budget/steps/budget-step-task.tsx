@@ -228,7 +228,7 @@ export function BudgetStepTask({
                 {/* Customer */}
                 <CustomerSelector control={control} disabled={disabled} />
 
-                {/* Truck Category and Implement Type */}
+                {/* Implement Category and Implement Type */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={control}

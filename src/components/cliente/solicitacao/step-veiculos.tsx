@@ -6,7 +6,7 @@
 //
 // O formulário interno de orçamento pede "placas" e "números de série" em dois
 // campos separados e cria o PRODUTO dos dois (`vehicleCombinations`). No portal
-// isso é 400 na cara do cliente: `Task.serialNumber` e `Truck.plate` são
+// isso é 400 na cara do cliente: `Task.serialNumber` e `Implement.plate` são
 // `@unique` GLOBAIS, então 3 placas × 1 série produz três tarefas disputando a
 // mesma série e o servidor recusa a primeira colisão.
 //

@@ -28,7 +28,7 @@ export const airbrushingIncludeSchema = z
               logoPaints: z.boolean().optional(),
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
-              // `truck` is a KNOWN key, so a nested include is an invalid_type error (a 400 on the
+              // `implement` is a KNOWN key, so a nested include is an invalid_type error (a 400 on the
               // whole list), not a silent strip. The "Medidas" column needs the side measures.
               implement: z
                 .union([

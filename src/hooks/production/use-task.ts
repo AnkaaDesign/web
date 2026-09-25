@@ -309,7 +309,7 @@ export function useTaskMutations() {
     onSuccess: () => {
       invalidateTasks();
 
-      // Invalidate garage queries since trucks might be affected
+      // Invalidate garage queries since implements might be affected
       queryClient.invalidateQueries({
         queryKey: garageKeys.all,
       });
@@ -576,7 +576,7 @@ export function useTaskBatchMutations() {
     onSuccess: () => {
       invalidateTasks();
 
-      // Invalidate garage queries since trucks might be affected
+      // Invalidate garage queries since implements might be affected
       queryClient.invalidateQueries({
         queryKey: garageKeys.all,
       });

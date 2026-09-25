@@ -1248,17 +1248,17 @@ export enum PAINT_BASE_TYPE {
 
 
 // =====================
-// Truck & Fleet Enums
+// Implement & Fleet Enums
 // =====================
 
 /**
- * Truck spot positions in garage
+ * Implement spot positions in garage
  * Format: B{garage}_F{lane}_V{spot}
  * - B1, B2, B3: Barracão 1, 2, 3
  * - F1, F2, F3: Faixa (Lane) 1, 2, 3
  * - V1, V2, V3: Vaga (Spot) 1, 2, 3
  * - Each lane can have up to 3 spots (V1, V2, V3)
- * - Minimum spacing between trucks: 2m
+ * - Minimum spacing between implements: 2m
  */
 export enum IMPLEMENT_SPOT {
   // Yard (Patio)
@@ -1307,8 +1307,9 @@ export enum TRUCK_MANUFACTURER {
 }
 
 /**
- * Truck categories/types
- * Categories define the size and configuration of the truck
+ * Implement categories. Os valores (TRUCK, BITRUCK, RIGID…) são o TIPO do
+ * caminhão que leva o implemento — vocabulário do mercado, não o nome da
+ * entidade (NOMENCLATURA.md §4) — e ficam.
  */
 export enum IMPLEMENT_CATEGORY {
   MINI = 'MINI', // Mini (entrega urbana pequena)
@@ -1324,8 +1325,8 @@ export enum IMPLEMENT_CATEGORY {
 }
 
 /**
- * Truck body/implement types
- * Defines the type of body or implement mounted on the truck
+ * Implement types
+ * O tipo de carroceria/implemento montado sobre o caminhão
  */
 export enum IMPLEMENT_TYPE {
   DRY_CARGO = 'DRY_CARGO', // Carga Seca - Dry cargo body

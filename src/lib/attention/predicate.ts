@@ -19,7 +19,7 @@
 import type { PredicateNode, PredicatePrimitive } from "./types";
 import { NOW_SENTINEL } from "./types";
 
-/** Read a dotted path (`truck.chassisNumber`) off an object; missing → undefined. */
+/** Read a dotted path (`implement.chassisNumber`) off an object; missing → undefined. */
 export function getFieldValue(entity: unknown, path: string): unknown {
   if (entity == null) return undefined;
   // A node with no `field` is unreachable from TypeScript-defined rules, but the file's contract is

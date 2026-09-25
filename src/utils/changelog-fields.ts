@@ -803,7 +803,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "task.name": "Nome da Tarefa",
     "task.serialNumber": "Número de Série",
     "task.status": "Status da Tarefa",
-    // Truck fields (accessed via truck relation)
+    // Implement fields (accessed via implement relation)
     plate: "Placa",
     chassisNumber: "Número do Chassi",
     vinPlateId: "Foto da Plaqueta",
@@ -1719,7 +1719,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle implement category (for both IMPLEMENT entity and implement.category in TASK entity)
   if ((field === "category" || field === "implement.category") && typeof value === "string") {
     // Perfil `webChangelog` do contrato da API: o histórico tem palavras
-    // próprias ("VUC (Veículo Urbano de Carga)", "Caminhão"), diferentes da tela.
+    // próprias ("VUC (Veículo Urbano de Carga)"; "Caminhão" para a categoria TRUCK), diferentes da tela.
     const implementCategoryLabels: Record<string, string> = IMPLEMENT_CATEGORY_PROFILE_LABELS.webChangelog;
     return implementCategoryLabels[value] || value;
   }
@@ -2580,7 +2580,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return statusLabel[data.status] || data.status || "Desconhecido";
     }
 
-    // Handle individual truck layout fields
+    // Handle individual implement measure fields
     if (
       (field === "implement.leftSideMeasureId" || field === "implement.rightSideMeasureId" || field === "implement.backSideMeasureId") &&
       entityType === CHANGE_LOG_ENTITY_TYPE.TASK
@@ -2596,7 +2596,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return "Definido";
     }
 
-    // Handle implementMeasures object (truck implement measures) - format as readable summary
+    // Handle implementMeasures object (implement measures) - format as readable summary
     if (field === "implementMeasures" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
       const layoutSides = [
         { key: "leftSideMeasureId", label: "Lado Motorista" },

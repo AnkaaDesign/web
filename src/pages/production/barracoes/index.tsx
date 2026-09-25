@@ -70,9 +70,9 @@ export function GaragesPage() {
     toSpot: string | null;
   } | null>(null);
 
-  // Fetch tasks with trucks for garage display
-  // OR logic: include tasks where truck has a spot (any status), OR not completed with forecastDate <= maxCalendarDate
-  // Max calendar date: last day shown in the date tabs (for fetching future forecast trucks)
+  // Fetch tasks with implements for garage display
+  // OR logic: include tasks where implement has a spot (any status), OR not completed with forecastDate <= maxCalendarDate
+  // Max calendar date: last day shown in the date tabs (for fetching future forecast implements)
   const maxCalendarDateStr = useMemo(() => {
     const lastDay = next5Days[next5Days.length - 1];
     const d = new Date(lastDay);
@@ -93,7 +93,7 @@ export function GaragesPage() {
           cleared: true,
           status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
         },
-        // Non-completed trucks with forecastDate <= maxCalendarDate (virtual yard for future days)
+        // Non-completed implements with forecastDate <= maxCalendarDate (virtual yard for future days)
         {
           status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
           forecastDate: { lte: maxCalendarDateStr },
@@ -158,10 +158,10 @@ export function GaragesPage() {
     },
   });
 
-  // Update truck spots mutation - uses batch API for single transaction
+  // Update implement spots mutation - uses batch API for single transaction
   const updateImplementMutation = useMutation({
     mutationFn: async (updates: PendingChange[]) => {
-      // Convert to batch format and update all trucks in single API call
+      // Convert to batch format and update all implements in single API call
       const batchUpdates = updates.map((change) => ({
         implementId: change.implementId,
         spot: change.newSpot,
@@ -171,7 +171,7 @@ export function GaragesPage() {
     onSuccess: async () => {
       // Toast is already shown by api client
       // Wait for refetch to complete BEFORE clearing pending changes
-      // This prevents flicker where trucks briefly show original positions
+      // This prevents flicker where implements briefly show original positions
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
       await refetch();
       // Only clear pending changes after fresh data is loaded
@@ -179,8 +179,8 @@ export function GaragesPage() {
     },
   });
 
-  // Transform tasks to garage trucks format with CORRECT length calculation
-  // Filter tasks that have a truck with a layout defined
+  // Transform tasks to garage implements format with CORRECT length calculation
+  // Filter tasks that have an implement with a layout defined
   // Display logic:
   // - Has spot → display in that spot (garage) - can be completed or not
   // - No spot AND forecastDate <= today AND not completed → display in patio
@@ -211,25 +211,25 @@ export function GaragesPage() {
       const implement = task.implement as any;
       const spot = implement?.spot as string | null;
 
-      // If truck has a garage spot (B1_F1_V1, etc.), always include it
+      // If implement has a garage spot (B1_F1_V1, etc.), always include it
       // (even if completed or without layout — use default length)
       if (isGarageSpot(spot)) {
         return true;
       }
 
-      // YARD_EXIT trucks are physically in the exit yard — always include
+      // YARD_EXIT implements are physically in the exit yard — always include
       // (show regardless of status or dates, until physically removed)
       if (spot === 'YARD_EXIT') {
         return true;
       }
 
-      // For trucks with YARD_WAIT spot (cleared trucks) — always include
+      // For implements with YARD_WAIT spot (cleared implements) — always include
       if (spot === 'YARD_WAIT') {
         if (task.status === TASK_STATUS.COMPLETED) return false;
         return true;
       }
 
-      // For trucks with null spot — include for virtual yard display based on forecastDate
+      // For implements with null spot — include for virtual yard display based on forecastDate
       // These are not yet cleared, but we show them on future days where forecastDate matches
       if (task.status === TASK_STATUS.COMPLETED) return false;
 
@@ -243,7 +243,7 @@ export function GaragesPage() {
       return forecast <= maxDay;
     });
 
-    // Deduplicate: when multiple trucks share the same spot (stale data from old logic),
+    // Deduplicate: when multiple implements share the same spot (stale data from old logic),
     // keep only the most active task and move others to patio (null spot)
     const spotOwners = new Map<string, typeof filtered[0]>();
     const demotedTaskIds = new Set<string>();
@@ -251,7 +251,7 @@ export function GaragesPage() {
     for (const task of filtered) {
       const implement = task.implement as any;
       const spot = implement?.spot;
-      // Skip deduplication for null spots and yard spots (multiple trucks allowed)
+      // Skip deduplication for null spots and yard spots (multiple implements allowed)
       if (!spot || spot === 'YARD_WAIT' || spot === 'YARD_EXIT') continue;
 
       const existing = spotOwners.get(spot);
@@ -279,15 +279,15 @@ export function GaragesPage() {
       const layout = implement?.leftSideMeasure || implement?.rightSideMeasure;
       const sections = layout?.sections || [];
 
-      // Calculate truck length from layout sections
+      // Calculate implement length from layout sections
       const sectionsSum = sections.reduce(
         (sum: number, section: { width: number }) => sum + (section.width || 0),
         0
       );
 
-      // Add cabin if needed - two-tier system based on truck body length
-      // < 7m body: 2.0m cabin (small trucks)
-      // 7-10m body: 2.4m cabin (larger trucks)
+      // Add cabin if needed - two-tier system based on implement body length
+      // < 7m body: 2.0m cabin (small implements)
+      // 7-10m body: 2.4m cabin (larger implements)
       // >= 10m body: no cabin (semi-trailers)
       const CABIN_THRESHOLD_SMALL = 7;
       const CABIN_THRESHOLD_LARGE = 10;
@@ -304,11 +304,11 @@ export function GaragesPage() {
         }
       }
 
-      // Check if there's a pending change for this truck
+      // Check if there's a pending change for this implement
       const pendingChange = pendingChanges.get(implement?.id);
-      // Demoted trucks (duplicates at same spot) go to yard wait
+      // Demoted implements (duplicates at same spot) go to yard wait
       const isDemoted = demotedTaskIds.has(task.id);
-      // Trucks with null spot are shown in YARD_WAIT (virtual display for forecasted/cleared trucks)
+      // Implements with null spot are shown in YARD_WAIT (virtual display for forecasted/cleared implements)
       const dbSpot = implement?.spot || 'YARD_WAIT';
       const currentSpot = pendingChange
         ? pendingChange.newSpot
@@ -342,10 +342,10 @@ export function GaragesPage() {
     });
   }, [tasksResponse, pendingChanges]);
 
-  // Handle truck movement (add to pending changes, don't save yet)
+  // Handle implement movement (add to pending changes, don't save yet)
   const handleImplementMove = useCallback(
     (taskId: string, newSpot: string | null) => {
-      // Find the task to get truck data
+      // Find the task to get implement data
       const task = tasksResponse?.data?.find((t) => t.id === taskId);
       if (!task?.implement) return;
 
@@ -390,7 +390,7 @@ export function GaragesPage() {
     [tasksResponse, canRequestMovement]
   );
 
-  // Handle truck swap (both trucks in a single state update)
+  // Handle implement swap (both implements in a single state update)
   const handleImplementSwap = useCallback(
     (task1Id: string, spot1: string, task2Id: string, spot2: string | null) => {
       // Find both tasks
@@ -463,7 +463,7 @@ export function GaragesPage() {
     setViewMode('overview');
   }, []);
 
-  // Handle truck click to open detail modal
+  // Handle implement click to open detail modal
   const handleImplementClick = useCallback((taskId: string) => {
     setSelectedTaskId(taskId);
     setIsDetailModalOpen(true);
@@ -483,7 +483,7 @@ export function GaragesPage() {
     if (!movementRequest) return;
     try {
       await requestMovement(movementRequest);
-      // Success/error toasts are emitted by the axios interceptor (POST /trucks/request-movement).
+      // Success/error toasts are emitted by the axios interceptor (POST /implements/request-movement).
     } catch {
       // Error toast emitted by the axios error interceptor.
     }

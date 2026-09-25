@@ -225,7 +225,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
           finishedAt: null,
         })) || [],
 
-      // Truck - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
+      // Implement - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
       // Layouts are SHARED (connect to existing layout IDs)
       implement: (copyData.plate || copyData.chassisNumber || implementData)
         ? {

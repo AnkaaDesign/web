@@ -82,7 +82,7 @@ function calculateLaneAvailability(
 }
 
 // =====================
-// Filter trucks for a specific date
+// Filter implements for a specific date
 // =====================
 
 function filterImplementsForDate(implementList: GarageImplement[], areaId: AreaId, date: Date): GarageImplement[] {
@@ -106,29 +106,29 @@ function filterImplementsForDate(implementList: GarageImplement[], areaId: AreaI
       if (parsed.garage !== areaId) return false;
     }
 
-    // YARD_EXIT trucks are physically in the exit yard — always show
+    // YARD_EXIT implements are physically in the exit yard — always show
     // (even when completed, until physically removed)
     if (areaId === 'YARD_EXIT') return true;
 
-    // Garage trucks on TODAY are always shown (physically placed)
+    // Garage implements on TODAY are always shown (physically placed)
     // even if their term has passed
     if (!isYard && isToday) return true;
 
     // Term check: if term has passed, don't show
-    // For future dates, this applies to ALL trucks (garage and yard)
+    // For future dates, this applies to ALL implements (garage and yard)
     if (implement.term) {
       const term = new Date(implement.term);
       term.setHours(0, 0, 0, 0);
       if (checkDate > term) return false;
     }
 
-    // Garage trucks on future dates pass term check, show them
+    // Garage implements on future dates pass term check, show them
     if (!isYard) return true;
 
-    // --- Yard trucks (YARD_WAIT) below ---
+    // --- Yard implements (YARD_WAIT) below ---
 
     // Arrival date check: don't show before forecast/entry date
-    // (trucks without explicit DB spots are defaulted to YARD_WAIT and
+    // (implements without explicit DB spots are defaulted to YARD_WAIT and
     // should only appear from their forecast/entry date onwards)
     const arrivalDateStr = implement.entryDate || implement.forecastDate;
     if (arrivalDateStr) {
@@ -196,7 +196,7 @@ function DroppableLane({
 }
 
 // =====================
-// Draggable truck wrapper for today's column
+// Draggable implement wrapper for today's column
 // =====================
 
 function DraggableImplementWrapper({
@@ -301,7 +301,7 @@ function DayColumn({
       )}>
         <svg width={svgWidth} height={svgHeight} className="rounded">
           {isPatio ? (
-            // Patio rendering — blue background with truck columns
+            // Patio rendering — blue background with implement columns
             <>
               {/* Patio background — inset by 1px so the 2px stroke isn't clipped by SVG viewport */}
               <rect
@@ -484,7 +484,7 @@ export function SingleGarageView({
     return () => observer.disconnect();
   }, []);
 
-  // Filter trucks per day
+  // Filter implements per day
   const implementsPerDay = useMemo(() => {
     return forecastDays.map((date) => ({
       date,
@@ -503,7 +503,7 @@ export function SingleGarageView({
       const padding = PATIO_CONFIG.PADDING;
       const implementMargin = PATIO_CONFIG.IMPLEMENT_MARGIN;
 
-      // Sorted truck lists per day (for height calculation)
+      // Sorted implement lists per day (for height calculation)
       const dayImplementLists = implementsPerDay.map(d =>
         d.implementList.filter(t => t.spot === garageId).sort((a, b) => b.length - a.length)
       );
@@ -662,12 +662,12 @@ export function SingleGarageView({
         }
       });
 
-      // V3 ADD: Use three-zone detection when room for 3 trucks
+      // V3 ADD: Use three-zone detection when room for 3 implements
       const implementAtV1 = spotToImplement.get(1);
       const implementAtV2 = spotToImplement.get(2);
       const implementAtV3 = spotToImplement.get(3);
 
-      // V1-only lane + room for V3: three-zone detection only for small trucks
+      // V1-only lane + room for V3: three-zone detection only for small implements
       if (implementAtV1 && !implementAtV2 && !implementAtV3) {
         const singleConfig = GARAGE_CONFIGS[garageId as GarageId];
         const usedWithV2 = 2 * COMMON_CONFIG.IMPLEMENT_MARGIN_TOP + implementAtV1.length + draggedImplement.length + 2 * COMMON_CONFIG.IMPLEMENT_MIN_SPACING;
@@ -679,7 +679,7 @@ export function SingleGarageView({
           const canShowBothIndicators = (v3ZoneTop - v1WithSpacing) >= draggedImplement.length;
 
           if (canShowBothIndicators) {
-            // Small truck: three-zone (V1 swap top, V2 middle, V3 bottom)
+            // Small implement: three-zone (V1 swap top, V2 middle, V3 bottom)
             let dropFraction = 0.5;
             if (activeRect && overRect) {
               const implementCenterY = activeRect.top + activeRect.height / 2;
@@ -699,7 +699,7 @@ export function SingleGarageView({
             // Middle third → V2, Top third → V1 swap
             preferredSpotNum = dropFraction < 1 / 3 ? 1 : 2;
           }
-          // Large truck: fall through to two-zone detection (top=V1 swap, bottom=V2)
+          // Large implement: fall through to two-zone detection (top=V1 swap, bottom=V2)
         }
       }
 
@@ -747,7 +747,7 @@ export function SingleGarageView({
             onImplementMove(implementId, `${garageId}_${targetLaneId}_V3`);
             return;
           } else if (dropFraction > 1 / 3) {
-            // Middle third - push: dragged truck → V2, existing V2 → V3
+            // Middle third - push: dragged implement → V2, existing V2 → V3
             const newSpotForDragged = `${garageId}_${targetLaneId}_V2`;
             const newSpotForV2Implement = `${garageId}_${targetLaneId}_V3`;
             if (onImplementSwap) {
@@ -786,7 +786,7 @@ export function SingleGarageView({
 
         if (!canSwap.canFit) return;
 
-        // Reverse validation: check if swapped truck fits in dragged truck's original lane
+        // Reverse validation: check if swapped implement fits in dragged implement's original lane
         if (draggedImplementParsed && (draggedImplementParsed.garage !== garageId || draggedImplementParsed.lane !== targetLaneId)) {
           const origConfig = GARAGE_CONFIGS[draggedImplementParsed.garage as keyof typeof GARAGE_CONFIGS];
           if (origConfig) {

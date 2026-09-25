@@ -1153,22 +1153,22 @@ const measureSideSchema = z
   .nullable()
   .optional();
 
-// Consolidated truck schema with basic fields AND implement measures
+// Consolidated implement schema with basic fields AND implement measures
 const taskImplementCreateSchema = z.object({
-  // Basic truck fields
+  // Basic implement fields
   plate: optionalPlateSchema,
   chassisNumber: optionalChassisSchema,
-  // Foto da plaqueta (VIN). Id de um File já enviado; o upload multipart vai no campo `truckVinPlate`.
+  // Foto da plaqueta (VIN). Id de um File já enviado; o upload multipart vai no campo `implementVinPlate`.
   vinPlateId: z.string().uuid("Foto da plaqueta inválida").optional().nullable(),
-  // Truck spot in garage (e.g., "B1_F1_V1", "B2_F2_V3") — null means patio
+  // Implement spot in garage (e.g., "B1_F1_V1", "B2_F2_V3") — null means patio
   spot: z.string().nullable().optional(),
-  // Truck specifications
+  // Implement specifications
   category: z.string().nullable().optional(),
   type: z.string().nullable().optional(),
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
-  // Implement measure data - embedded in truck for single payload (new measures)
+  // Implement measure data - embedded in implement for single payload (new measures)
   leftSideMeasure: measureSideSchema,
   rightSideMeasure: measureSideSchema,
   backSideMeasure: measureSideSchema,

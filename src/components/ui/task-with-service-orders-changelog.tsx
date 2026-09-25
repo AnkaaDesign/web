@@ -2991,13 +2991,13 @@ const ChangelogTimelineItem = ({
 };
 
 /**
- * Combined Changelog Display for Tasks, Service Orders, Trucks, and Layouts
+ * Combined Changelog Display for Tasks, Service Orders, Implements, and Layouts
  *
  * This component fetches and displays changelogs for:
  * 1. The task itself (TASK entity type)
  * 2. All service orders belonging to the task (SERVICE_ORDER entity type)
- * 3. The truck associated with the task (TRUCK entity type)
- * 4. All layouts belonging to the truck (LAYOUT entity type)
+ * 3. The implement associated with the task (TRUCK entity type)
+ * 4. All layouts belonging to the implement (LAYOUT entity type)
  *
  * Changelogs are merged, sorted by date, and displayed in a unified timeline
  * matching the design of the standard ChangelogHistory component.
@@ -3097,7 +3097,7 @@ export function TaskWithServiceOrdersChangelog({
     enabled: serviceOrderIds.length > 0,
   });
 
-  // Fetch truck changelogs
+  // Fetch implement changelogs
   const {
     data: implementChangelogsResponse,
     isLoading: implementLoading,
@@ -3197,7 +3197,7 @@ export function TaskWithServiceOrdersChangelog({
       serviceOrderIds.length > 0
         ? serviceOrderChangelogsResponse?.data || []
         : [];
-    // Only include truck logs if the query is enabled (has truck ID)
+    // Only include implement logs if the query is enabled (has implement ID)
     const implementLogs = implementId ? implementChangelogsResponse?.data || [] : [];
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs =

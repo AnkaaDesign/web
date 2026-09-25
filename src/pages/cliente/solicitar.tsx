@@ -174,7 +174,7 @@ export const ClientePortalSolicitarPage = () => {
       // uma medida que ninguém tirou. Quem cria os lados é o interruptor
       // "Informar medidas" do passo 3.
       medidas: null,
-      // ⛔ `null` e não um valor de partida: "Truck" ou "Sider" escolhidos por
+      // ⛔ `null` e não um valor de partida: "Toco" ou "Sider" escolhidos por
       // omissão entrariam no orçamento como se o cliente os tivesse dito.
       category: null,
       implementType: null,

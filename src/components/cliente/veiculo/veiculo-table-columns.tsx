@@ -3,9 +3,9 @@
 // AS COLUNAS DA FROTA DO CLIENTE.
 //
 // ⚠️ `id` SEM PONTO. O motor da DataTable transforma o id em custom property CSS
-// (`--col-<id>-size`) e em chave de persistência; um `truck.plate` viraria uma
+// (`--col-<id>-size`) e em chave de persistência; um `implement.plate` viraria uma
 // variável que o navegador descarta em silêncio e a coluna perderia a largura
-// salva. Por isso `plate`, e não `truck.plate`.
+// salva. Por isso `plate`, e não `implement.plate`.
 //
 // ⚠️ OS DADOS MORAM EM GRUPOS RECORTÁVEIS. `row.identity` é `undefined` quando o
 // contato não tem a seção `VEHICLE`; `row.progress` é `undefined` sem `DELIVERY`.
@@ -77,7 +77,7 @@ export const PORTAL_VEICULOS_DEFAULT_SORTING: Array<{ id: string; desc: boolean 
  * não conhece.
  *
  * ⛔ **NUNCA um objeto do Prisma.** Uma rodada anterior mandou
- * `{ truck: { plate: 'asc' } }` para um `orderBy` que era um enum de duas
+ * `{ implement: { plate: 'asc' } }` para um `orderBy` que era um enum de duas
  * palavras, e TODO clique de cabeçalho voltava 400.
  *
  * O que NÃO está aqui, e por quê:
@@ -286,7 +286,7 @@ export function createPortalVeiculoColumns({
         size: 200,
       },
       {
-        // A plaqueta é uma FOTO (`Truck.vinPlate → File`). A coluna não desenha a
+        // A plaqueta é uma FOTO (`Implement.vinPlate → File`). A coluna não desenha a
         // imagem — diz se ela existe, que é a única pergunta que se responde de
         // uma lista. A foto em si está no detalhe.
         //

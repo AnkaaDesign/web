@@ -228,7 +228,7 @@ export interface TaskOrderBy {
   bonificationOrder?: ORDER_BY_DIRECTION;
   serialNumber?: ORDER_BY_DIRECTION;
   details?: ORDER_BY_DIRECTION;
-  // Note: chassisNumber and plate are now on Truck, use truck.chassisNumber / truck.plate
+  // Note: chassisNumber and plate are now on Implement, use implement.chassisNumber / implement.plate
   entryDate?: ORDER_BY_DIRECTION;
   term?: ORDER_BY_DIRECTION;
   startedAt?: ORDER_BY_DIRECTION;

@@ -1,11 +1,11 @@
 import type { Task } from "../types";
 
 /**
- * Calculates the measures for a task based on its truck layout.
+ * Calculates the measures for a task based on its implement layout.
  * Formula: (sum of section widths) × layout height
  * Takes either left or right side layout (both sides have the same dimensions).
  *
- * @param task - The task object with truck and layout data
+ * @param task - The task object with implement and layout data
  * @returns Measures in square meters, or null if no layout data exists
  */
 export function calculateTaskMeasures(task: Task): number | null {
@@ -35,7 +35,7 @@ export function calculateTaskMeasures(task: Task): number | null {
 /**
  * Gets the width and height dimensions for a task.
  *
- * @param task - The task object with truck and layout data
+ * @param task - The task object with implement and layout data
  * @returns Object with width and height, or null if no layout data exists
  */
 export function getTaskDimensions(task: Task): { width: number; height: number } | null {
@@ -65,7 +65,7 @@ export function getTaskDimensions(task: Task): { width: number; height: number }
 /**
  * Formats the measures for display as "W x H" in centimeters.
  *
- * @param task - The task object with truck and layout data
+ * @param task - The task object with implement and layout data
  * @returns Formatted string (e.g., "850 x 244")
  */
 export function formatTaskMeasures(task: Task): string {

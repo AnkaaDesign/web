@@ -1098,7 +1098,7 @@ export interface PortalMeasureSideInput {
  * Um veículo da requisição.
  *
  * ⛔ PAR EXPLÍCITO (série, placa), NUNCA produto cartesiano. `Task.serialNumber`
- * e `Truck.plate` são `@unique` GLOBAIS: N placas × 1 série produz N tarefas com
+ * e `Implement.plate` são `@unique` GLOBAIS: N placas × 1 série produz N tarefas com
  * a mesma série e o servidor devolve 400. Faixa de série ("1001 a 1005") expande
  * no CLIENTE, em 5 linhas editáveis, ANTES de enviar.
  */
@@ -1114,7 +1114,7 @@ export interface PortalBudgetRequestVehicleInput {
    *
    * ⚠️ O formulário pergunta UMA vez (o lote inteiro é o mesmo modelo de
    * implemento, como as medidas) e `buildSolicitacaoPayload` copia para cada
-   * veículo — a mesma mecânica de `medidas`. O servidor grava um por `Truck`.
+   * veículo — a mesma mecânica de `medidas`. O servidor grava um por `Implement`.
    */
   category?: string | null;
   implementType?: string | null;
@@ -1202,13 +1202,13 @@ export interface PortalVehicleIdentityInput {
   /**
    * CATEGORIA E IMPLEMENTO — dado do cliente, e é ele quem corrige.
    *
-   * ⚠️ Valor de ENUM (`TRUCK_CATEGORY` / `IMPLEMENT_TYPE`), nunca o rótulo em
+   * ⚠️ Valor de ENUM (`IMPLEMENT_CATEGORY` / `IMPLEMENT_TYPE`), nunca o rótulo em
    * português: a coluna no banco é enum e o servidor recusa o que não for um
    * dos valores. `null` apaga a escolha, que é legítimo — o cadastro nasce sem
    * os dois.
    *
    * ⛔ Os dois passam pela guarda do DOCUMENTO CONGELADO como a placa: a folha
-   * assinada imprime "Truck · Frigorífico", então trocá-los depois da
+   * assinada imprime "Toco · Refrigerado", então trocá-los depois da
    * assinatura devolve 409.
    */
   category?: string | null;
@@ -1234,7 +1234,7 @@ export interface PortalVehicleIdentityInput {
 /**
  * UMA COLISÃO DE UNICIDADE, como o servidor a nomeia.
  *
- * `Task.serialNumber` e `Truck.plate` são `@unique` GLOBAIS, e o servidor recusa
+ * `Task.serialNumber` e `Implement.plate` são `@unique` GLOBAIS, e o servidor recusa
  * ANTES de escrever com `400 { message, errors[], conflicts[] }` — o mesmo
  * contrato de erro da requisição de orçamento. `conflicts[]` existe exatamente
  * para que o formulário marque O CAMPO em vermelho sem fazer parsing de frase:
@@ -1692,7 +1692,7 @@ export class PortalService {
    * ✅ **NO AR desde 20/09.** Ver `PortalVehicleIdentityInput`.
    *
    * `vinPlateFile` é a FOTO da plaqueta; com ela a chamada vira multipart, no
-   * campo `truckVinPlate` — o mesmo par (`vinPlateId` no corpo × arquivo novo no
+   * campo `implementVinPlate` — o mesmo par (`vinPlateId` no corpo × arquivo novo no
    * multipart) que o `task-edit-form` do sistema interno já usa.
    */
   async updateVehicleIdentity(

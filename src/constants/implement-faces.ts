@@ -27,7 +27,7 @@ export const FACE_LABEL: Record<ImplementFace, string> = {
   back: "Traseira",
 };
 
-/** O campo da medida de cada face no implemento (`truck.*SideMeasure` na API de hoje). */
+/** O campo da medida de cada face no implemento (`implement.*SideMeasure` na API de hoje). */
 export const FACE_MEASURE_FIELD = {
   left: "leftSideMeasure",
   right: "rightSideMeasure",

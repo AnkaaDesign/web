@@ -118,7 +118,7 @@ describe("TASK — ack: onExitCooldown", () => {
 
 describe("TASK — R3b, plate only when there is no serial number", () => {
   /**
-   * Truck already on site (entryDate given), forecast still in the future → only R3a/R3b/R3c
+   * Vehicle already on site (entryDate given), forecast still in the future → only R3a/R3b/R3c
    * can fire. `vinPlateId` starts FILLED so these cases isolate the plate rule; R3c has its
    * own describe below.
    */
@@ -486,7 +486,7 @@ describe("resolution", () => {
 // a to-many relation (`some` over customerConfigs).
 //
 // O PEDIDO DE COMPRA É DO VEÍCULO (`Task.customerOrderNumber`) desde que um
-// orçamento passou a cobrir N caminhões. A regra virou duas condições irmãs —
+// orçamento passou a cobrir N veículos. A regra virou duas condições irmãs —
 // existe fatia da Ibiporã que emite nota, E existe veículo sem pedido —, e a
 // segunda chega ao motor como `anyVehicleMissingOrderNumber`, derivado em
 // `quote-attention.ts` a partir das linhas do orçamento.
@@ -526,7 +526,7 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
-  // Um orçamento de sessenta caminhões: o veículo concluído TEM pedido e os
+  // Um orçamento de sessenta veículos: o veículo concluído TEM pedido e os
   // outros cinquenta e nove estão em branco. A nota de cada um sai sem o pedido
   // que a Ibiporã exige, então a regra acende.
   it("fires when only some of the vehicles have a number", async () => {

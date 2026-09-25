@@ -557,7 +557,7 @@ export const PAINT_TYPE_ENUM_LABELS: Record<PAINT_TYPE_ENUM, string> = {
 
 
 // =====================
-// Truck Labels
+// Implement Labels (e a montadora do cavalo, TRUCK_MANUFACTURER — §4)
 // =====================
 
 export const TRUCK_MANUFACTURER_LABELS: Record<TRUCK_MANUFACTURER, string> = {

@@ -515,7 +515,7 @@ export const TaskCreateForm = () => {
           return taskData;
         };
 
-        // Build truck object with layout data (each task gets its own individual layout)
+        // Build implement object with layout data (each task gets its own individual layout)
         const buildImplementData = (plate?: string) => {
           const layoutSectionData = buildLayoutSectionData();
           const hasImplementFields = plate || category || implementType || hasLayoutChanges;
@@ -767,7 +767,7 @@ export const TaskCreateForm = () => {
                         {/* Customer */}
                         <CustomerSelector control={form.control} disabled={isSubmitting} />
 
-                        {/* Truck Category and Implement Type */}
+                        {/* Implement Category and Implement Type */}
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={form.control}

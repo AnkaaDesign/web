@@ -1397,7 +1397,7 @@ export const ImplementMeasureForm = ({
 
               {/* Layout and Width Inputs Container */}
               <div className="flex flex-col">
-                {/* Door height inputs above the truck layout */}
+                {/* Door height inputs above the implement layout */}
                 <div className="mb-2 relative" style={{ width: `${currentState.totalWidth * scale}px`, height: '30px' }}>
                   {currentState.doors.map(door => (
                     <div

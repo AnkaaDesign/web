@@ -26,7 +26,7 @@
 //     pendente, que é a resposta errada mais crível possível. Os dois filtros
 //     saíram: filtro novo aqui só depois de existir lá (era a doutrina escrita
 //     neste arquivo, e ela valia);
-//   · `orderBy` no formato do PRISMA (`{ truck: { plate: 'asc' } }`) → o zod
+//   · `orderBy` no formato do PRISMA (`{ implement: { plate: 'asc' } }`) → o zod
 //     esperava um enum de duas palavras e devolvia 400 no primeiro clique de
 //     cabeçalho.
 //

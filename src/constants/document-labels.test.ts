@@ -6,7 +6,7 @@
  * (`src/generated/contracts/labels.json`, perfis por documento, D-18). Este
  * arquivo trava:
  *
- *   1. todo perfil rotula todo valor de `TRUCK_CATEGORY` e `IMPLEMENT_TYPE`
+ *   1. todo perfil rotula todo valor de `IMPLEMENT_CATEGORY` e `IMPLEMENT_TYPE`
  *      DESTE web (um valor novo no enum sem rótulo sai cru na tela ou na
  *      prévia da nota);
  *   2. os enums do web são os do contrato (o espelho à mão não divergiu);

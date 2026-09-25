@@ -18,7 +18,7 @@ const getTaskRowId = (t: ClusteredTask) => t.id;
 
 /**
  * Rich include mirroring the task-preparation table (`task-prep-page` LIST_INCLUDE) so every reused
- * prep column has the data it renders — service-order progress, forecast reschedule flag, the truck
+ * prep column has the data it renders — service-order progress, forecast reschedule flag, the implement
  * measures behind "Medidas", the quote billing customers ("Faturar Para"), painting, sector, etc.
  */
 export const LIST_INCLUDE = {

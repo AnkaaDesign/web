@@ -106,7 +106,7 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       if (fieldPath[0] === "bonification") {
         return { bonificationOrder: config.direction };
       }
-      // Special case: identificador is a computed field (serialNumber || truck.plate)
+      // Special case: identificador is a computed field (serialNumber || implement.plate)
       // Sort by serialNumber as the primary identifier
       if (fieldPath[0] === "identificador") {
         return {

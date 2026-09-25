@@ -81,7 +81,7 @@ import { cn } from "@/lib/utils";
 import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
 
-// Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No truck layouts
+// Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No implement layouts
 // beyond the minimal Medidas fields. The only nested billing data is the quote's customerConfigs
 // customer names (the FINANCIAL "Faturar Para" column). `assignedToId` is the one extra scalar we keep
 // so the progress cell can flag "pending assigned to you".
@@ -840,7 +840,7 @@ export function TaskPreparationPage() {
         key: "adv-layout",
         label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
-        // `truck` field-domain (api task.permissions.ts) = FIN/COM/LOG/PM (NOT DESIGNER, who'd 400).
+        // `implement` field-domain (api task.permissions.ts) = FIN/COM/LOG/PM (NOT DESIGNER, who'd 400).
         requiredPrivilege: [
           SECTOR_PRIVILEGES.FINANCIAL,
           SECTOR_PRIVILEGES.LOGISTIC,
@@ -851,7 +851,7 @@ export function TaskPreparationPage() {
       },
       {
         // COMMERCIAL sets the quote's approved layout files (Budget.layoutFiles) — distinct from the
-        // truck "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
+        // implement "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
         key: "adv-quote-layout",
         label: "Adicionar Layout Aprovados",
         icon: <IconPhoto className="h-4 w-4" />,

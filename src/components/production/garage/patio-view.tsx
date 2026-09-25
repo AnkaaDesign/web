@@ -1,5 +1,5 @@
-// Patio visualization component for trucks without assigned spots
-// Displays trucks in a grid layout that have entered but not yet assigned to a garage
+// Patio visualization component for implements without assigned spots
+// Displays implements in a grid layout that have entered but not yet assigned to a garage
 
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -60,7 +60,7 @@ function calculatePatioLayout(implementList: GarageImplement[]): PatioLayout {
   );
   const rows = Math.ceil(implementList.length / columns);
 
-  // Position trucks in grid
+  // Position implements in grid
   const positionedImplements: PositionedImplement[] = implementList.map((implement, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
@@ -112,7 +112,7 @@ function ImplementElement({ implement, scale, avgLength }: ImplementElementProps
 
   return (
     <g transform={`translate(${x}, ${y})`} className="cursor-pointer">
-      {/* Truck body */}
+      {/* Implement body */}
       <rect
         width={width}
         height={height}

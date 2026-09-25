@@ -55,7 +55,7 @@ export const NOW_SENTINEL = "$now" as const;
 
 /**
  * A serializable predicate over an entity. Field paths are dotted
- * (`truck.chassisNumber`) so related-record fields work. Date/`$now`
+ * (`implement.chassisNumber`) so related-record fields work. Date/`$now`
  * comparisons coerce both sides to epoch ms.
  */
 export type PredicateNode =

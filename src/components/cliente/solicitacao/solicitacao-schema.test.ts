@@ -128,7 +128,7 @@ describe("buildSolicitacaoPayload — o que sai na linha", () => {
 
   it("OMITE o que está vazio em vez de mandar string vazia", () => {
     // ⚠️ Armadilha 4: nada na API é `.strict()`. Uma placa `""` seria GRAVADA, e
-    // `Truck.plate` é `@unique` global — o segundo veículo do lote levaria 400.
+    // `Implement.plate` é `@unique` global — o segundo veículo do lote levaria 400.
     const payload = buildSolicitacaoPayload(
       base({ veiculos: [linha({ serialNumber: "1001" })], logoName: "  " }),
     );

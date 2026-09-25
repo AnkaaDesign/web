@@ -196,9 +196,9 @@ function ViewToggle({ view, onChange }: { view: FileViewMode; onChange: (v: File
   );
 }
 
-// Heavier than the list include, but matched to what the detail page actually renders. Truck layout
-// objects are NOT pulled here — `useImplementMeasuresByTruck` (used by the layout section) fetches them, and the
-// changelog only needs the scalar `*SideMeasureId` FKs that come with `truck: true`.
+// Heavier than the list include, but matched to what the detail page actually renders. Implement layout
+// objects are NOT pulled here — `useImplementMeasuresByImplement` (used by the layout section) fetches them, and the
+// changelog only needs the scalar `*SideMeasureId` FKs that come with `implement: true`.
 export const DETAIL_INCLUDE = {
   customer: { include: { logo: true } },
   sector: true,
@@ -374,7 +374,7 @@ function TaskDetailContent() {
   );
   const airbrushings = ((airbrushingsResponse as { data?: unknown[] } | undefined)?.data ?? []) as never[];
 
-  // Truck dimensions (width × height in cm) derived from any available side layout — shown as a
+  // Implement dimensions (width × height in cm) derived from any available side layout — shown as a
   // read-only overview field so non-leader PRODUCTION (who can't see the gated layout section) still
   // get the vehicle size. Faithful port of the legacy `implementDimensions`/"Caminhão" overview row.
   const { data: implementLayouts } = useImplementMeasuresByImplement(task?.implement?.id || "", { enabled: !!task?.implement?.id });
@@ -755,7 +755,7 @@ function TaskDetailContent() {
                 : undefined,
           },
           {
-            // A plaqueta é uma FOTO (truck.vinPlate -> File), não um texto — por isso não
+            // A plaqueta é uma FOTO (implement.vinPlate -> File), não um texto — por isso não
             // tem `edit` inline: a imagem é enviada pelo formulário de edição da tarefa.
             // O id continua "vinPlate" porque é o alvo do blink da regra R3c.
             id: "vinPlate",
