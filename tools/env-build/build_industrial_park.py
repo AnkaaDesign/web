@@ -404,17 +404,121 @@ def road_cx(x):
     return None
 
 
-def road_z(x, cx=None):
+def road_z(x, cx=None, y=None):
     """A carriageway is CROWNED, and the crown is not decoration: it is why the
     channel is the low point, why the gutter can be flush and still drain, and
     why a marking laid at a fixed z sinks into the asphalt near the kerb. Every
-    mark on a road samples this."""
+    mark on a road samples this.
+
+    Com `y`, soma o RELEVO DE USO (ver road_relief). Sem `y` devolve so o
+    abaulamento de projeto — e e isso que as bordas pedem: o relevo e zero nos
+    ultimos 25 cm antes da canaleta, entao sarjeta, guia e rampa de
+    entroncamento continuam a ler o numero de sempre."""
     if cx is None:
         cx = road_cx(x)
         if cx is None:
             return 0.0
     t = min(1.0, abs(x - cx) / (ROAD_W / 2.0))
-    return -ROAD_CROWN * t * t
+    z = -ROAD_CROWN * t * t
+    if y is None:
+        return z
+    z += road_relief(x, y, cx)
+    p = truck_pad(x, y)
+    return z * (1.0 - p)
+
+
+# ---------------------------------------------------------------------------
+# RELEVO DE USO DA PISTA (2026-09-26).
+#
+# "nao ter nenhuma ondulacao, ou volumes nas ruas, patios e etc tambem nao
+# ajuda". A pista era um cilindro perfeito: abaulamento de projeto e mais nada.
+# Asfalto que recebe caminhao nao e assim, e o que ele tem e sempre o mesmo, na
+# mesma ordem de grandeza:
+#
+#   trilha de roda  7 a 29 mm de afundamento, ~70 cm de largura, uma por roda,
+#                   com o material EMPURRADO para os dois lados (o cordao que
+#                   torna a trilha legivel com sol rasante);
+#   ondulacao       +-9 mm em 4 a 7 m, que so aparece no brilho e na chuva;
+#   recalque        bacias de ate 3,4 cm, 2 a 4 m, onde a agua para.
+#
+# Os numeros sao os de um patio de carreta, nao os de rua de bairro: a primeira
+# passada (5 a 17 mm) era correta e nao se lia na tela.
+#
+# TRES LUGARES FICAM FORA, e e isso que torna o relevo seguro:
+#
+#   * os ultimos EDGE_PIN antes da canaleta — a borda do pavimento e o nivel de
+#     projeto que sarjeta, meio-fio e rampa de entroncamento leem (road_z sem
+#     `y`). O relevo morre nela em vez de abrir fresta contra a sarjeta;
+#   * as duas pontas da pista (balao e rodovia), onde outras superficies se
+#     casam com esta pela cota de projeto;
+#   * a pegada do conjunto (truck_pad): o app pousa o veiculo em z=0, e o
+#     abaulamento sozinho ja deixava a roda esquerda 2,6 cm no ar — a trilha
+#     aumentaria isso para 4 cm.
+# ---------------------------------------------------------------------------
+EDGE_PIN = 0.25
+RELIEF_Y0 = ROAD_Y0 + 8.0
+RELIEF_Y1 = ROAD_Y1 - 14.0
+# A pegada do conjunto em Blender (x, y): medida no app, o RIG vai de x -1,50 a
+# 1,49 e de y -17,2 a 0,9. A folga cobre os implementos mais longos (bitrem) e a
+# ruga do pneu; o raio de concordancia e o que impede um "tapete" plano de ler.
+TRUCK_PAD = (-1.75, 1.75, -30.0, 2.6)
+TRUCK_PAD_BLEND = 1.8
+# Onde a camera vive: o centro do conjunto. A malha fina da pista e o meio-fio
+# detalhado existem num raio disto, e o resto do sitio usa a versao leve.
+TRUCK_C = (0.0, -8.0)
+# o relevo vive a menos disto (mais 12 m de rampa) do conjunto, ao longo da via
+RELIEF_NEAR = 50.0
+
+
+def _sm01(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def truck_pad(x, y):
+    """Peso 1 debaixo do conjunto, 0 a TRUCK_PAD_BLEND fora dele."""
+    x0, x1, y0, y1 = TRUCK_PAD
+    dx = max(x0 - x, 0.0, x - x1)
+    dy = max(y0 - y, 0.0, y - y1)
+    return 1.0 - _sm01(math.hypot(dx, dy) / TRUCK_PAD_BLEND)
+
+
+# As trilhas ficam a +-WHEELPATH do centro de cada faixa. A pista tem duas
+# faixas de ROAD_W/2, entao os centros estao a +-ROAD_W/4 do eixo. O shader do
+# asfalto (scene/ground-detail.ts) le a MESMA regra, e e por isso que o
+# escurecimento de pneu cai em cima do sulco.
+WHEELPATH = 0.86
+
+
+def road_relief(x, y, cx, hw=ROAD_W / 2.0):
+    a = x - cx
+    w = _sm01((hw - abs(a)) / EDGE_PIN)
+    w *= _sm01((y - RELIEF_Y0) / 8.0) * _sm01((RELIEF_Y1 - y) / 8.0)
+    # SO ONDE A MALHA E FINA. add_road_strip adensa a +-55 m do conjunto e dali
+    # as linhas crescem ate 7,9 m; o relevo por baixo de uma linha de 7,9 m
+    # seria amostrado a esmo, e a tinta (a cada 0,75 m, pela FUNCAO) afundaria
+    # no asfalto (pela MALHA) onde os dois discordassem. Longe, o que le como
+    # uso e o shader, que nao tem malha.
+    w *= 1.0 - _sm01((abs(y - TRUCK_C[1]) - RELIEF_NEAR) / 12.0)
+    if w <= 0.0:
+        return 0.0
+    z = 0.0
+    for lc in (-hw * 0.5, hw * 0.5):
+        for k, off in enumerate((-WHEELPATH, WHEELPATH)):
+            c = lc + off
+            # a trilha de FORA (a do lado da guia) afunda mais — e a roda que
+            # carrega o bordo menos confinado da faixa
+            outer = 1.0 if (c * lc) > 0 and abs(c) > abs(lc) else 0.0
+            dep = (0.007 + 0.010 * outer
+                   + 0.012 * fbm(y / 29.0, (cx + c) / 5.0, 211 + k, 3))
+            d = (a - c) / 0.36
+            z -= dep * math.exp(-d * d)
+            for s in (-1.0, 1.0):
+                d2 = (a - c - s * 0.60) / 0.22
+                z += dep * 0.24 * math.exp(-d2 * d2)
+    z += 0.009 * 2.0 * (fbm(x / 4.5, y / 6.5, 223, 3) - 0.5)
+    z -= 0.034 * _sm01((fbm_org(x / 3.6, y / 5.2, 229, 3) - 0.56) / 0.22)
+    return z * w
 
 
 def on_service_road(x, y, pad=0.0):
@@ -574,7 +678,7 @@ def surface_z(x, y):
     """
     cx = road_cx(x)
     if cx is not None:
-        return road_z(x, cx)
+        return road_z(x, cx, y)
     if on_service_paving(x, y):
         return svc_surface_z(x, y)
     if ROAD_B_X + _EDGE <= x <= ROAD_A_X - _EDGE:
@@ -1691,6 +1795,104 @@ def reuv(ob, uv_scale=8.0):
     me.update()
 
 
+def _gv(v):
+    """O V que o shader vai LER, escrito do jeito que o exportador quer.
+
+    ⚠️ O EXPORTADOR DE glTF DO BLENDER INVERTE O V DE TODA CAMADA DE UV
+    (`uvs[:, 1] = 1 - uvs[:, 1]`, primitive_extract.py), e nao so da UVMap: a
+    convencao de imagem do glTF tem a origem em cima. Para a UV do mapa isso e
+    o que se quer; para uma camada que carrega DADO (o referencial da via, o
+    atravessado da tinta, a altura sobre o chao da guia) e um espelho
+    silencioso. A primeira versao escreveu os dados crus e mediu no .glb: o
+    atravessado da tinta chegava 0..2 em vez de -1..1 — toda faixa era
+    desenhada com 40 % da largura, encostada num dos lados, e onde duas marcas
+    de sentidos opostos se encontravam a linha dava um degrau de lado; a guia e
+    a sarjeta, com a altura negativa, nunca passavam do teste de "tem dado" e o
+    detalhe delas nunca rodou."""
+    return 1.0 - v
+
+
+def write_frame(ob, fn, layers=("RoadFrame", "RoadInfo")):
+    """Escreve o REFERENCIAL DA VIA em duas UV extras (TEXCOORD_1 e _2).
+
+    `fn(x, y)` devolve (A, S, HW): afastamento do eixo em metros (com sinal),
+    abscissa ao longo da via em metros e meia largura do pavimento. O shader do
+    asfalto (scene/ground-detail.ts) le dali onde ficam as trilhas de roda, o
+    eixo, a borda e para que lado corre uma trinca — as coisas que so fazem
+    sentido em relacao a VIA e nao ao mundo. HW = 0 quer dizer "sem via": o
+    shader desliga tudo o que depende de faixa.
+
+    A ORDEM DAS CAMADAS E O NUMERO DO TEXCOORD: o exportador escreve todas as
+    `uv_layers` em ordem, e a primeira tem de continuar a ser a UVMap do mapa.
+    """
+    me = ob.data
+    if me.uv_layers.get(layers[0]) is None:
+        me.uv_layers.new(name=layers[0])
+    if me.uv_layers.get(layers[1]) is None:
+        me.uv_layers.new(name=layers[1])
+    fr = me.uv_layers[layers[0]].data
+    inf = me.uv_layers[layers[1]].data
+    cache = {}
+    for li, loop in enumerate(me.loops):
+        vi = loop.vertex_index
+        r = cache.get(vi)
+        if r is None:
+            co = me.vertices[vi].co
+            r = fn(co.x, co.y)
+            cache[vi] = r
+        fr[li].uv = (r[0], _gv(r[1]))
+        inf[li].uv = (r[2], _gv(0.0))
+    me.update()
+
+
+def add_road_strip(name, material, cx, y0, y1, z_fn, dx_near=0.325,
+                   dy_near=0.5, near_r=RELIEF_NEAR + 12.0, dy_far=7.9):
+    """A pista, com a malha FINA onde a camera anda e grossa no resto.
+
+    ELA ERA UMA GRELHA UNIFORME DE 1,3 x 7,9 m — 451 vertices em 322 m. Nao
+    havia onde por um sulco de roda: o relevo mais fino que ela carregava era o
+    abaulamento. O relevo de uso (road_relief) precisa de ~33 cm atravessado e
+    50 cm ao longo, mas so onde se ve de perto: as linhas crescem em progressao
+    a partir de `near_r` do conjunto, ate aos 7,9 m de sempre.
+
+    AS COLUNAS SAO AS MESMAS EM TODO O COMPRIMENTO, e isso nao e desperdicio: a
+    grelha tem de ser de quadrilateros, e uma coluna que acabasse a meio abriria
+    um T sem vertice — fresta.
+    """
+    hw = ROAD_W / 2.0
+    ncol = max(10, int(round(ROAD_W / dx_near)))
+    xs = [cx - hw + ROAD_W * i / float(ncol) for i in range(ncol + 1)]
+    ys = [y0]
+    y = y0
+    while y < y1 - 1e-6:
+        d = abs(y - TRUCK_C[1])
+        step = dy_near if d < near_r else min(dy_far, dy_near + (d - near_r) * 0.12)
+        y = min(y1, y + step)
+        if y1 - y < step * 0.35:
+            y = y1
+        ys.append(y)
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    grid = [[bm.verts.new((x, yy, z_fn(x, yy))) for x in xs] for yy in ys]
+    for j in range(len(ys) - 1):
+        for i in range(ncol):
+            f = bm.faces.new((grid[j][i], grid[j][i + 1],
+                              grid[j + 1][i + 1], grid[j + 1][i]))
+            for l in f.loops:
+                l[uv].uv = (l.vert.co.x / 8.0, l.vert.co.y / 8.0)
+    me = bpy.data.meshes.new(name)
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    me.materials.append(material)
+    write_frame(ob, lambda x, yy: (x - cx, yy, hw))
+    log("    %-9s %d x %d vertices (%.0f m)" % (name, len(xs), len(ys), y1 - y0))
+    return ob
+
+
 def _corridor_tail(name, cw0, cw1, y0, material, uv_scale, z_fn, seed):
     """A laje que fecha o corredor viario a SUL do balao.
 
@@ -1818,7 +2020,20 @@ def add_slab(name, x0, x1, y0, y1, material, cell=4.5, uv_scale=8.0, z_fn=None,
     return out
 
 
-def paint_variation(ob, seed=0.0, road_wear=False, cx=0.0):
+def _activate_color(me, name="Col"):
+    """Torna ATIVA a camada de cor que o bmesh criou — ver paint_variation: o
+    exportador so escreve a camada ativa, e uma nova nao nasce ativa."""
+    attr = me.color_attributes.get(name)
+    if attr is None:
+        return
+    try:
+        me.color_attributes.active_color = attr
+        me.color_attributes.render_color_index = me.color_attributes.find(name)
+    except Exception as e:
+        log("    could not set active colour attribute: %s" % e)
+
+
+def paint_variation(ob, seed=0.0, road_wear=False, cx=0.0, cell=None):
     """Bake large-scale patchiness into the ground's vertex colours.
 
     A tiled PBR set repeated 200 times across a kilometre reads as one flat tone
@@ -1871,7 +2086,8 @@ def paint_variation(ob, seed=0.0, road_wear=False, cx=0.0):
         if len(el) >= 4000:
             break
     el.sort()
-    cell = el[int(0.9 * (len(el) - 1))] if el else 1.0
+    if cell is None:
+        cell = el[int(0.9 * (len(el) - 1))] if el else 1.0
     w_b, w_m, w_f = 0.56, 0.30, 0.14
     # CINCO AMOSTRAS POR PERIODO, NAO DUAS E MEIA — e este numero foi MEDIDO
     # contra o defeito, num A/B de tres renders do mesmo enquadramento:
@@ -2034,20 +2250,56 @@ MARK_DZ_K = 1.0e-7
 MARK_MAX_R = 240.0
 
 
+def _mark_wear(x, y, health):
+    """Quanto da tinta ja se foi neste ponto: 0 nova, 1 nenhuma.
+
+    Tres fontes, todas em ESPACO DE MUNDO para que marcas vizinhas concordem:
+    o campo largo (o trecho do patio que ninguem repinta), a trilha de roda
+    (que come a tinta primeiro — WHEELPATH a partir do centro de cada faixa) e
+    a saude da propria marca.
+    """
+    n = 0.62 * fbm(x / 17.0, y / 17.0, 401, 4) + 0.38 * fbm(x / 3.1, y / 3.1, 457, 3)
+    k = 0.30 + 1.05 * n
+    cx = road_cx(x)
+    if cx is not None:
+        a = abs(x - cx)
+        for c in (ROAD_W / 4.0 - WHEELPATH, ROAD_W / 4.0 + WHEELPATH):
+            k *= 1.0 - 0.45 * math.exp(-((a - c) ** 2) / 0.25)
+    k *= 0.30 + 0.75 * health
+    return max(0.0, min(0.95, 1.0 - k))
+
+
 def add_marks(name, material, marks, seg_len=0.75, dz=0.012, z_fn=None):
     """`marks` is a list of (cx, cy, w, d, rot_deg, health).
 
     `health` 1.0 is fresh paint, 0.0 is gone. Everything else is measured off
     the world position, so the same yard looks the same from mark to mark.
+
+    O DESGASTE DEIXOU DE SER COR DE VERTICE, e isso e o "as faixas sem nenhum
+    desgaste". Ele escurecia a tinta de 0,75 em 0,75 m — a esse passo a tinta
+    gasta vira tinta SUJA, uniforme, com borda de regua. Tinta gasta de verdade
+    e tinta que FALTA: some aos bocados, deixa o asfalto aparecer por baixo,
+    sobra nos poros e morde a borda.
+
+    Entao a marca carrega o que o shader precisa para apagar pixel a pixel
+    (scene/ground-detail.ts, tipo `paint`):
+
+        TEXCOORD_1  (ao longo, em m desde o inicio da marca;  atravessado -1..1)
+        TEXCOORD_2  (desgaste 0..1 deste vertice;  semente da marca 0..1)
+
+    e o COLOR_0 fica so com a sujeira larga, que e o que ele sempre fez bem.
     """
     me = bpy.data.meshes.new(name)
     ob = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(ob)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new("UVMap")
+    pf = bm.loops.layers.uv.new("PaintFrame")
+    pi = bm.loops.layers.uv.new("PaintInfo")
+    col = bm.loops.layers.float_color.new("Col")
     zf = z_fn or (lambda x, y: surface_z(x, y))
-    health_of = {}
-    for m in marks:
+    lo_k, hi_k = 1e9, -1e9
+    for mi, m in enumerate(marks):
         cx, cy, w, d, rot, health = m
         rot = math.radians(rot)
         c, s = math.cos(rot), math.sin(rot)
@@ -2056,6 +2308,8 @@ def add_marks(name, material, marks, seg_len=0.75, dz=0.012, z_fn=None):
         # the whole failure being fixed
         n = max(1, int(round(max(w, d) / seg_len)))
         along_y = d >= w
+        ln = max(w, d)
+        seed = _hash01(mi, int(cx * 7.0 + cy * 3.0), 881)
         # A LADDER, NOT A PILE OF QUADS. Built as independent quads, a 5 m bay
         # line was 7 segments x 4 unstitched vertices = 28; as shared
         # cross-sections it is 16, and the seam between two segments stops being
@@ -2070,50 +2324,30 @@ def add_marks(name, material, marks, seg_len=0.75, dz=0.012, z_fn=None):
                 y = cy + lx * s + ly * c
                 lift = dz + MARK_DZ_K * (x * x + y * y)
                 v = bm.verts.new((x, y, zf(x, y) + lift))
-                health_of[v] = health
-                pair.append(v)
+                wear = _mark_wear(x, y, health)
+                lo_k, hi_k = min(lo_k, wear), max(hi_k, wear)
+                pair.append((v, (t + 0.5) * ln, e * 2.0, wear))
             sections.append(pair)
         for k in range(n):
             a0, a1 = sections[k]
             b0, b1 = sections[k + 1]
-            f = bm.faces.new((a0, a1, b1, b0))
+            f = bm.faces.new((a0[0], a1[0], b1[0], b0[0]))
+            # LISA: sobre a trilha de roda as secoes nao sao coplanares, e com
+            # normal por face cada quadrilatero exportava os seus quatro
+            # vertices — 5 588 viravam 9 782.
+            f.smooth = True
+            info = {a0[0]: a0, a1[0]: a1, b0[0]: b0, b1[0]: b1}
             for l in f.loops:
+                _v, along, across, wear = info[l.vert]
                 l[uv].uv = (l.vert.co.x, l.vert.co.y)
-    bm.verts.index_update()
-    hv = {}
-    for v, h in health_of.items():
-        hv[v.index] = h
+                l[pf].uv = (along, _gv(across))
+                l[pi].uv = (wear, _gv(seed))
+                # sujeira larga: tinta velha amarela e acinzenta, nao escurece
+                g = 1.0 - 0.22 * wear
+                l[col] = (g, g * 0.985, g * 0.93, 1.0)
     bm.to_mesh(me)
     bm.free()
-
-    attr = me.color_attributes.new(name="Col", type="FLOAT_COLOR", domain="CORNER")
-    try:
-        me.color_attributes.active_color = attr
-        me.color_attributes.render_color_index = me.color_attributes.find("Col")
-    except Exception:
-        pass
-    lo_k, hi_k = 1e9, -1e9
-    for li, loop in enumerate(me.loops):
-        vi = loop.vertex_index
-        p = me.vertices[vi].co
-        x, y = p.x, p.y
-        health = hv.get(vi, 1.0)
-        # broad + fine wear, in WORLD space so it crosses mark boundaries
-        n = 0.62 * fbm(x / 17.0, y / 17.0, 401, 4) + 0.38 * fbm(x / 3.1, y / 3.1, 457, 3)
-        k = 0.30 + 1.05 * n
-        cx = road_cx(x)
-        if cx is not None:
-            for lane in (cx - 3.1, cx + 3.1):
-                k *= 1.0 - 0.42 * math.exp(-((x - lane) ** 2) / 2.6)
-        k *= 0.30 + 0.75 * health
-        k = max(0.10, min(1.0, k))
-        lo_k = min(lo_k, k)
-        hi_k = max(hi_k, k)
-        # Worn paint does not go grey, it goes the colour of what is under it,
-        # so the ramp is warmed very slightly toward the asphalt rather than
-        # desaturated toward black.
-        attr.data[li].color = (k, k * 0.985, k * 0.95, 1.0)
-    me.update()
+    _activate_color(me)
     me.materials.append(material)
     log("    %-10s %d marks -> %d faces, wear %.2f..%.2f"
         % (name, len(marks), len(me.polygons), lo_k, hi_k))
@@ -2186,16 +2420,25 @@ def mouth_edge_marks(q):
             ty = -sgn_y
             steps = 12
             arc = r * math.pi / 2.0
-            for k in range(steps):
-                u = (k + 0.5) / steps
+            # CORDAS, e nao retangulos tangentes. Um retangulo tangente no
+            # meio do seu trecho sai da curva nas duas pontas pela flecha
+            # (~1,4 cm aqui), e a primeira ponta e justamente onde a linha reta
+            # da pista termina: a linha branca dava um degrau de lado ali. Com
+            # a corda, cada trecho comeca e acaba EM CIMA do arco, e o primeiro
+            # comeca no ponto exato em que a reta acaba.
+            def arc_pt(u):
                 a = u * math.pi / 2.0
-                px = c[0] - side * r * math.cos(a)
-                py = c[1] + ty * r * math.sin(a)
-                # o eixo local +y da marca aponta na tangente do arco
-                rot = math.degrees(math.atan2(-side * math.sin(a),
-                                              ty * math.cos(a)))
+                return (c[0] - side * r * math.cos(a), c[1] + ty * r * math.sin(a))
+
+            for k in range(steps):
+                p0, p1 = arc_pt(k / float(steps)), arc_pt((k + 1) / float(steps))
+                dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+                ln = math.hypot(dx, dy)
+                px, py = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
+                # o eixo local +y da marca vira (-sen, cos) de `rot` em add_marks
+                rot = math.degrees(math.atan2(-dx / ln, dy / ln))
                 h = 0.35 + 0.65 * fbm(px / 30.0, py / 30.0, 977, 3)
-                q.append((px, py, 0.14, arc / steps + 0.02, rot, h))
+                q.append((px, py, 0.14, ln + 0.004, rot, h))
                 n += 1
             # o prolongamento reto pela borda da via interna, ate a linha que
             # build_service_roads retoma
@@ -2411,51 +2654,283 @@ def _channel_runs(cx, side, lo=None, hi=None):
     return [(p, q) for p, q in runs if q - p > 0.3]
 
 
-def _kerb_block(bm, uv, a0, a1, b0, b1, top_a, top_b, lo_a, lo_b, s_a, s_b):
+# ---------------------------------------------------------------------------
+# A PEDRA DE MEIO-FIO (2026-09-26) — "os rodapes / meio fios muito quadradinhos".
+#
+# Era uma caixa de oito vertices, e a caixa tinha dois defeitos que nenhuma
+# textura esconde: a quina viva (uma guia pre-moldada tem a quina da frente
+# BOLEADA e a face INCLINADA, que e o que a deixa subir pneu sem lascar) e a
+# perfeicao (1 330 pedras exatamente iguais, exatamente alinhadas, na mesma
+# cota ao milimetro — o olho le isso como extrusao, com ou sem junta).
+#
+# A secao agora e a de uma guia de concreto de verdade, do dorso para a frente:
+#
+#        chanfro 1 cm   dorso      boleado r 2,2 cm
+#            _______________________
+#           /                       \__
+#          |                            \   face inclinada (2 cm em ~13 cm)
+#   laje   |                             \
+#          |                              |__________ sarjeta
+#          |                              |
+#
+# e as pontas RECOLHEM 7 mm nos ultimos 3 cm, que e o que transforma a junta
+# num sulco em V com sombra propria em vez de um risco.
+#
+# CADA PEDRA E ASSENTADA COM O ERRO DE UMA PEDRA ASSENTADA A MAO — +-4 mm de
+# cota, +-3 mm de desnivel entre as pontas, +-3 mm de alinhamento, um pouco de
+# giro e de tombamento. Uma em trinta afundou e tombou para a rua; uma em cinco,
+# perto da camera, tem a quina lascada. O tom de cada pedra e o do lote dela
+# (+-11 %), e o pe da face escurece com a sujeira da sarjeta.
+#
+# DUAS RESOLUCOES. A secao completa custa ~80 vertices por pedra; so as que
+# ficam a menos de KERB_NEAR_R do conjunto a recebem (a orbita nunca passa dos
+# ~31 m). As outras levam uma secao de seis pontos, com o chanfro da frente —
+# a 60 m o boleado e um pixel e o que sobra dele e a quina nao estar viva.
+# ---------------------------------------------------------------------------
+KERB_NEAR_R = 42.0
+KERB_ROUND = 0.022
+KERB_CHAMFER = 0.010
+KERB_BATTER = 0.020
+KERB_END = 0.007
+KERB_END_LEN = 0.03
+# A sarjeta CAI 1,2 cm em direcao a guia — e o lado baixo dela e o pe da face.
+# Subia 2 cm, ao contrario de toda sarjeta: a agua correria para a pista.
+GUTTER_FALL = 0.012
+
+
+def _kerb_profile(W, T, G, L, near):
+    """Pontos (u, z, sombra) da secao, do dorso (u=0) para a frente (u=W).
+
+    `T` topo, `G` o chao na frente (onde a face encontra a sarjeta), `L` o pe
+    enterrado. `sombra` multiplica a cor do vertice: o dorso encostado na terra
+    e o pe junto da sarjeta sao sempre mais sujos que o topo."""
+    e = max(0.03, T - G)
+    bat = min(KERB_BATTER, e * 0.2)
+    if near:
+        r = min(KERB_ROUND, e * 0.3)
+        x0 = W - bat - r
+        a30, a60 = math.radians(30.0), math.radians(60.0)
+        return [(0.0, L, 0.50),
+                (0.0, T - KERB_CHAMFER, 0.66),
+                (KERB_CHAMFER, T, 0.84),
+                (x0, T, 0.98),
+                (x0 + r * math.sin(a30), T - r * (1.0 - math.cos(a30)), 0.99),
+                (x0 + r * math.sin(a60), T - r * (1.0 - math.cos(a60)), 0.96),
+                (W - bat, T - r, 0.90),
+                (W, G, 0.60),
+                (W, L, 0.50)]
+    return [(0.0, L, 0.50), (0.0, T, 0.74), (W - bat - 0.012, T, 0.97),
+            (W - bat, T - 0.012, 0.93), (W, G, 0.62), (W, L, 0.50)]
+
+
+def _kerb_block(bm, uv, a0, a1, b0, b1, top_a, top_b, lo_a, lo_b, s_a, s_b,
+                foot_a=None, foot_b=None):
     """Uma pedra de meio-fio entre duas secoes transversais.
 
     `a0/a1` e a secao inicial (dorso, frente) e `b0/b1` a final. `s` e a
     ABSCISSA CURVILINEA e nao o y: e ela que faz a textura do meio-fio correr
     junto com a peca em vez de encolher no arco, onde y quase nao anda.
+    `foot` e a cota do chao na FRENTE da pedra; sem ela, 13 cm abaixo do topo.
+
+    A UV DO DORSO ERA (s, z) — e z e CONSTANTE no dorso. A textura inteira era
+    esticada numa linha so ao longo da pedra: o "codigo de barras" claro e
+    escuro no topo de toda guia do sitio. A UV agora corre (s, comprimento de
+    perfil), entao cada face tem a textura na escala dela.
     """
-    vs = [bm.verts.new((a0[0], a0[1], lo_a)),
-          bm.verts.new((a1[0], a1[1], lo_a)),
-          bm.verts.new((b1[0], b1[1], lo_b)),
-          bm.verts.new((b0[0], b0[1], lo_b)),
-          bm.verts.new((a0[0], a0[1], top_a)),
-          bm.verts.new((a1[0], a1[1], top_a)),
-          bm.verts.new((b1[0], b1[1], top_b)),
-          bm.verts.new((b0[0], b0[1], top_b))]
-    s_of = {}
-    for k in (0, 1, 4, 5):
-        s_of[vs[k]] = s_a
-    for k in (2, 3, 6, 7):
-        s_of[vs[k]] = s_b
-    for quad in ((0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1),
-                 (3, 2, 6, 7), (0, 3, 7, 4), (1, 5, 6, 2)):
+    kf = bm.loops.layers.uv.get("KerbFrame") or bm.loops.layers.uv.new("KerbFrame")
+    col = bm.loops.layers.float_color.get("Col") or bm.loops.layers.float_color.new("Col")
+    foot_a = top_a - 0.13 if foot_a is None else foot_a
+    foot_b = top_b - 0.13 if foot_b is None else foot_b
+    # a grama de fora do patio ondula +-8 cm e pode subir ate o dorso da guia
+    # de jardim: a face nunca tem menos de 3 cm
+    foot_a = min(foot_a, top_a - 0.03)
+    foot_b = min(foot_b, top_b - 0.03)
+    mx = (a0[0] + a1[0] + b0[0] + b1[0]) / 4.0
+    my = (a0[1] + a1[1] + b0[1] + b1[1]) / 4.0
+    ix, iy = int(round(mx * 37.0)), int(round(my * 37.0))
+
+    def hk(k):
+        return _hash01(ix, iy, 900 + k)
+
+    length = max(0.05, math.hypot((b0[0] + b1[0] - a0[0] - a1[0]) / 2.0,
+                                  (b0[1] + b1[1] - a0[1] - a1[1]) / 2.0))
+    near = math.hypot(mx - TRUCK_C[0], my - TRUCK_C[1]) < KERB_NEAR_R
+    dz = (hk(1) - 0.5) * 0.008
+    tilt = (hk(2) - 0.5) * 0.006
+    lat = (hk(3) - 0.5) * 0.006
+    yaw = (hk(4) - 0.5) * 0.004
+    lean = (hk(5) - 0.5) * 0.006
+    if hk(6) < 0.03:                        # a que afundou e tombou para a rua
+        dz -= 0.006 + 0.008 * hk(7)
+        lean += 0.005
+    tone = 0.84 + 0.22 * hk(8)
+    warm = (hk(9) - 0.5) * 0.06
+    chip = near and length > 0.3 and hk(10) < 0.2
+    chip_end = 0.0 if hk(11) < 0.5 else 1.0
+    chip_d = 0.012 + 0.02 * hk(12)
+    if near and length > 2.0 * KERB_END_LEN + 0.05:
+        j = KERB_END_LEN / length
+        ts = [0.0, j, 1.0 - j, 1.0]
+    else:
+        ts = [0.0, 1.0]
+    # O SENTIDO DAS FACES E DECIDIDO AQUI, e nao por recalc_face_normals: a pedra
+    # de longe nao fecha (sem fundo e sem pontas, que ninguem ve a 40 m), e
+    # recalcular normais num solido aberto pode virar o lote inteiro para
+    # dentro. O perfil corre do dorso para a frente (+n) e a pedra ao longo de
+    # +t; o topo tem de olhar para cima.
+    tx = (b0[0] + b1[0] - a0[0] - a1[0]) / 2.0
+    ty = (b0[1] + b1[1] - a0[1] - a1[1]) / 2.0
+    nx0, ny0 = a1[0] - a0[0], a1[1] - a0[1]
+    flip = (nx0 * ty - ny0 * tx) < 0.0
+
+    secs = []
+    for t in ts:
+        bx = a0[0] + (b0[0] - a0[0]) * t
+        by = a0[1] + (b0[1] - a0[1]) * t
+        fx = a1[0] + (b1[0] - a1[0]) * t
+        fy = a1[1] + (b1[1] - a1[1]) * t
+        W = math.hypot(fx - bx, fy - by)
+        nx, ny = (fx - bx) / max(W, 1e-6), (fy - by) / max(W, 1e-6)
+        T = top_a + (top_b - top_a) * t
+        G = foot_a + (foot_b - foot_a) * t
+        L = lo_a + (lo_b - lo_a) * t
+        prof = _kerb_profile(W, T, G, L, near)
+        e = max(0.03, T - G)
+        dzt = dz + tilt * (t - 0.5)
+        shift = lat + yaw * (t - 0.5)
+        at_end = t <= 1e-9 or t >= 1.0 - 1e-9
+        chip_w = 0.0
+        if chip:
+            dist_end = t if chip_end == 0.0 else 1.0 - t
+            chip_w = 1.0 if dist_end < 1e-9 else (0.6 if len(ts) > 2 and dist_end <= ts[1] + 1e-9 else 0.0)
+        sec = []
+        for pi_, (u, z, shade) in enumerate(prof):
+            above = max(0.0, z - G)
+            if at_end and len(ts) > 2 and z > G:
+                # a ponta recolhe: a junta vira V
+                u -= KERB_END * (u / max(W, 1e-6))
+                z -= KERB_END * min(1.0, above / 0.03)
+            if chip_w > 0.0 and 3 <= pi_ <= 6 and len(prof) == 9:
+                u -= chip_d * chip_w * 0.8
+                z -= chip_d * chip_w * 0.7
+                shade *= 1.08
+            u += shift + lean * (above / e)
+            px = bx + nx * u
+            py = by + ny * u
+            v = bm.verts.new((px, py, z + dzt))
+            sec.append((v, u, z + dzt, above, shade))
+        secs.append((sec, s_a + (s_b - s_a) * t))
+
+    # comprimento acumulado de perfil, para a UV das faces laterais
+    def plen(sec):
+        acc = [0.0]
+        for i in range(1, len(sec)):
+            du = sec[i][1] - sec[i - 1][1]
+            dzz = sec[i][2] - sec[i - 1][2]
+            acc.append(acc[-1] + math.hypot(du, dzz))
+        return acc
+
+    npts = len(secs[0][0])
+    # a de longe perde o fundo e a face abaixo da sarjeta (ultimas duas arestas
+    # do perfil); a de perto so o fundo — a face baixa aparece quando a pedra
+    # fica mais alta que a sarjeta pelo erro de assentamento.
+    edges = range(npts - 1) if near else range(npts - 2)
+    for i in range(len(secs) - 1):
+        sa, ssa = secs[i]
+        sb, ssb = secs[i + 1]
+        pa, pb = plen(sa), plen(sb)
+        for k in edges:
+            k2 = k + 1
+            quad = (sa[k][0], sa[k2][0], sb[k2][0], sb[k][0])
+            if flip:
+                quad = tuple(reversed(quad))
+            try:
+                f = bm.faces.new(quad)
+            except ValueError:
+                continue
+            f.smooth = True
+            # (s, comprimento de perfil, altura sobre o chao, sombra)
+            info = {
+                sa[k][0]: (ssa, pa[k], sa[k][3], sa[k][4]),
+                sa[k2][0]: (ssa, pa[k2], sa[k2][3], sa[k2][4]),
+                sb[k][0]: (ssb, pb[k], sb[k][3], sb[k][4]),
+                sb[k2][0]: (ssb, pb[k2], sb[k2][3], sb[k2][4]),
+            }
+            for l in f.loops:
+                ss, pu, above, shade = info[l.vert]
+                l[uv].uv = (ss / 1.2, pu / 1.2)
+                l[kf].uv = (ss, _gv(above + 1.0))
+                # risco de pneu na face, em faixas ao longo — so onde o pneu
+                # encosta, entre o pe e ~9 cm
+                scuff = 0.0
+                if 0.004 < above < 0.09:
+                    scuff = 0.28 * max(0.0, fbm(ss / 1.7, mx * 0.1, 991, 2) - 0.52) / 0.48
+                g = tone * shade * (1.0 - scuff)
+                l[col] = (min(1.0, g * (1.0 + warm)), g, min(1.0, g * (1.0 - warm)), 1.0)
+    # as duas pontas — so perto, onde a junta se le
+    if not near:
+        return
+    for ci, (sec, ss) in enumerate((secs[0], secs[-1])):
+        ring = [p[0] for p in sec]
+        # a ponta inicial olha para -t e a final para +t; com o perfil no
+        # sentido dorso->frente, uma das duas sai invertida por construcao
+        if (ci == 0) != flip:
+            ring = list(reversed(ring))
         try:
-            f = bm.faces.new([vs[k] for k in quad])
+            f = bm.faces.new(ring)
         except ValueError:
             continue
+        f.smooth = False
         for l in f.loops:
-            l[uv].uv = (s_of[l.vert] / 1.2, l.vert.co.z / 1.2)
+            p = next(q for q in sec if q[0] is l.vert)
+            l[uv].uv = (p[1] / 1.2, p[2] / 1.2)
+            l[kf].uv = (ss, _gv(p[3] + 1.0))
+            g = tone * p[4] * 0.9
+            l[col] = (min(1.0, g * (1.0 + warm)), g, min(1.0, g * (1.0 - warm)), 1.0)
 
 
-def _gutter_quad(bm, uv, pts):
-    """`pts` = [(x, y, z)] x4. O sentido e normalizado pela area com sinal, para
-    que toda sarjeta olhe para cima — a fiada oeste de cada pista saia com o
-    sentido invertido, o que so nao aparecia porque o exportador do Blender
-    escreve doubleSided por padrao."""
+def _gutter_quad(bm, uv, pts, s=None):
+    """`pts` = [(x, y, z)] x4, na ordem (borda0, fundo0, fundo1, borda1): os de
+    indice 0 e 3 na borda do asfalto, 1 e 2 no pe da guia. O sentido e
+    normalizado pela area com sinal, para que toda sarjeta olhe para cima — a
+    fiada oeste de cada pista saia com o sentido invertido, o que so nao
+    aparecia porque o exportador do Blender escreve doubleSided por padrao.
+
+    `s` = (s0, s1), a abscissa da sarjeta nas duas pontas: vai para a
+    `GutterFrame` (TEXCOORD_1) junto com o atravessado, que e por onde o shader
+    poe a junta de dilatacao e a areia que se junta contra a guia. O atravessado
+    vai de 1 (asfalto) a 2 (guia) e nao de 0 a 1: uma malha SEM esta camada le
+    (0, 0) no shader, e o 0 tem de querer dizer "sem dado"."""
+    gf = bm.loops.layers.uv.get("GutterFrame") or bm.loops.layers.uv.new("GutterFrame")
+    s0, s1 = s if s is not None else (pts[0][1], pts[3][1])
+    frame = [(s0, _gv(1.0)), (s0, _gv(2.0)), (s1, _gv(2.0)), (s1, _gv(1.0))]
     ar = 0.0
     for i in range(4):
         x0, y0, _ = pts[i]
         x1, y1, _ = pts[(i + 1) % 4]
         ar += x0 * y1 - x1 * y0
+    order = [0, 1, 2, 3]
     if ar < 0:
-        pts = list(reversed(pts))
-    f = bm.faces.new([bm.verts.new(p) for p in pts])
+        order = list(reversed(order))
+    vs = [bm.verts.new(pts[i]) for i in order]
+    f = bm.faces.new(vs)
+    fr = {vs[k]: frame[order[k]] for k in range(4)}
     for l in f.loops:
         l[uv].uv = (l.vert.co.x / 2.0, l.vert.co.y / 2.0)
+        l[gf].uv = fr[l.vert]
+
+
+def _kerb_normals(me):
+    """Normais de pedra: o boleado LISO, as quinas de 45 graus ou mais VIVAS.
+
+    As faces laterais nascem `smooth` e as pontas nao; o que separa o boleado
+    (tres degraus de 30 graus, que tem de ler como curva) do chanfro do dorso e
+    da ponta recolhida e o angulo. O exportador escreve as normais de canto, que
+    respeitam a aresta viva."""
+    try:
+        me.set_sharp_from_angle(angle=math.radians(40.0))
+    except Exception as e:
+        log("    set_sharp_from_angle indisponivel (%s) — normais lisas" % e)
 
 
 def svc_kerb_top(x, y_road, y_back):
@@ -2521,20 +2996,21 @@ def _corner_arc(kerbs, kuv, gutters, guv, side, e, yc, sgn_y, tag, r, back_z):
         uj = u1 - 0.015 / arc_len
         p0, p1 = pt(r, u0), pt(r, u1)
         zs0, zs1 = svc_surface_z(*p0), svc_surface_z(*p1)
+        g0, g1 = zs0 + 0.002 - GUTTER_FALL, zs1 + 0.002 - GUTTER_FALL
         _gutter_quad(gutters, guv,
                      [(p0[0], p0[1], zs0 + 0.002),
-                      pt(r_gut, u0) + (zs0 + 0.020,),
-                      pt(r_gut, u1) + (zs1 + 0.020,),
-                      (p1[0], p1[1], zs1 + 0.002)])
+                      pt(r_gut, u0) + (g0,),
+                      pt(r_gut, u1) + (g1,),
+                      (p1[0], p1[1], zs1 + 0.002)],
+                     s=(u0 * arc_len, u1 * arc_len))
         b0, b1 = pt(r_bak, u0), pt(r_bak, uj)
-        j = 0.012 * (_hash01(k, tag, 53) - 0.5)
-        t0 = max(zs0, back_z(*b0)) + 0.035 + j
-        t1 = max(zs1, back_z(*b1)) + 0.035 + j
+        t0 = max(zs0, back_z(*b0)) + 0.035
+        t1 = max(zs1, back_z(*b1)) + 0.035
         _kerb_block(kerbs, kuv,
                     pt(r_bak, u0), pt(r_gut, u0),
                     pt(r_bak, uj), pt(r_gut, uj),
                     t0, t1, zs0 - 0.22, zs1 - 0.22,
-                    u0 * arc_len, uj * arc_len)
+                    u0 * arc_len, uj * arc_len, g0, g1)
     return steps
 
 
@@ -2590,14 +3066,16 @@ def build_service_kerbs(kerbs, kuv, gutters, guv):
             x0 = xa + span * (k / float(steps))
             x1 = xa + span * ((k + 1) / float(steps))
             z0, z1 = svc_surface_z(x0, yc), svc_surface_z(x1, yc)
+            g0, g1 = z0 + 0.002 - GUTTER_FALL, z1 + 0.002 - GUTTER_FALL
             _gutter_quad(gutters, guv,
-                         [(x0, yc, z0 + 0.002), (x0, yg, z0 + 0.020),
-                          (x1, yg, z1 + 0.020), (x1, yc, z1 + 0.002)])
+                         [(x0, yc, z0 + 0.002), (x0, yg, g0),
+                          (x1, yg, g1), (x1, yc, z1 + 0.002)],
+                         s=(abs(x0 - xa), abs(x1 - xa)))
             _kerb_block(kerbs, kuv,
                         (x0, yb), (x0, yg),
                         (x1 - sgn_x * 0.015, yb), (x1 - sgn_x * 0.015, yg),
                         top_at(x0), top_at(x1), z0 - 0.22, z1 - 0.22,
-                        abs(x0 - xa), abs(x1 - xa))
+                        abs(x0 - xa), abs(x1 - xa), g0, g1)
             out += 1
         return out
 
@@ -2692,15 +3170,15 @@ def build_median_noses(kerbs, kuv, gutters, guv):
                 # transversal ainda esta descendo, e um nariz na cota da laje
                 # ali seria o degrau de volta.
                 z0, z1 = svc_surface_z(x, yc), svc_surface_z(b, yc)
+                g0, g1 = z0 + 0.002 - GUTTER_FALL, z1 + 0.002 - GUTTER_FALL
                 _gutter_quad(gutters, guv,
-                             [(x, yc, z0 + 0.002), (x, yg, z0 + 0.020),
-                              (b, yg, z1 + 0.020), (b, yc, z1 + 0.002)])
-                j = 0.012 * (_hash01(i, int(yc), 59) - 0.5)
+                             [(x, yc, z0 + 0.002), (x, yg, g0),
+                              (b, yg, g1), (b, yc, z1 + 0.002)], s=(x, b))
                 _kerb_block(kerbs, kuv, (x, yb), (x, yg),
                             (b - 0.015, yb), (b - 0.015, yg),
-                            max(z0, median_z(x, yb)) + 0.035 + j,
-                            max(z1, median_z(b, yb)) + 0.035 + j,
-                            z0 - 0.22, z1 - 0.22, x, b)
+                            max(z0, median_z(x, yb)) + 0.035,
+                            max(z1, median_z(b, yb)) + 0.035,
+                            z0 - 0.22, z1 - 0.22, x, b, g0, g1)
                 n += 1
                 x, i = b, i + 1
     return n
@@ -2742,11 +3220,12 @@ def build_kerbs(m_kerb, m_gutter):
             for a0, a1 in _channel_runs(cx, side):
                 # ---- gutter: a flat strip from the asphalt edge to the kerb --
                 y = a0
+                gz = za + 0.002 - GUTTER_FALL
                 while y < a1 - 0.05:
                     b = min(a1, y + 6.0)
                     _gutter_quad(gutters, guv,
-                                 [(xe, y, za + 0.002), (xg, y, za + 0.020),
-                                  (xg, b, za + 0.020), (xe, b, za + 0.002)])
+                                 [(xe, y, za + 0.002), (xg, y, gz),
+                                  (xg, b, gz), (xe, b, za + 0.002)], s=(y, b))
                     y = b
                 # ---- kerbstones ---------------------------------------------
                 y = a0
@@ -2777,11 +3256,12 @@ def build_kerbs(m_kerb, m_gutter):
                     back = (median_z(xk, (y + b) / 2.0)
                             if ROAD_B_X + _EDGE <= xk <= ROAD_A_X - _EDGE
                             else yard_z(xk, (y + b) / 2.0))
-                    top = max(za, back) + KERB_REVEAL \
-                        + 0.012 * (_hash01(i, int(cx * 7), 53) - 0.5)
+                    # o erro de assentamento de cada pedra mora agora em
+                    # _kerb_block (cota, desnivel, alinhamento, tombamento)
+                    top = max(za, back) + KERB_REVEAL
                     lo_z = za - 0.22
                     _kerb_block(kerbs, kuv, (xk, y), (xg, y), (xk, b), (xg, b),
-                                top, top, lo_z, lo_z, y, b)
+                                top, top, lo_z, lo_z, y, b, gz, gz)
                     n += 1
                     y += seg
                     i += 1
@@ -2791,7 +3271,6 @@ def build_kerbs(m_kerb, m_gutter):
     # O SOLIDO E FECHADO, entao as normais podem ser recalculadas com seguranca —
     # e no arco elas nao sao deriváveis de "x cresce, y cresce" como eram na
     # fiada reta.
-    bmesh.ops.recalc_face_normals(kerbs, faces=kerbs.faces)
 
     for bm, mm, nm in ((kerbs, m_kerb, "kerbs"), (gutters, m_gutter, "gutters")):
         me = bpy.data.meshes.new(nm)
@@ -2800,6 +3279,9 @@ def build_kerbs(m_kerb, m_gutter):
         bm.to_mesh(me)
         bm.free()
         me.materials.append(mm)
+        _activate_color(me)
+        if nm == "kerbs":
+            _kerb_normals(me)
     log("  kerbs: %d stones on 4 channels + %d contornando %d bocas"
         % (n, m, len(get_mouths())))
 
@@ -2904,7 +3386,7 @@ def build_ground():
     JOIN_BLEND = 12.0
 
     def _road_join_z(x, y, c):
-        z = road_z(x, c)
+        z = road_z(x, c, y)
         d = ROAD_Y1 - y
         if d >= JOIN_BLEND:
             return z
@@ -2912,12 +3394,21 @@ def build_ground():
         t = t * t * (3.0 - 2.0 * t)
         return z + (-ROAD_CROWN - z) * t
 
-    for nm, cx in (("road_a", ROAD_A_X), ("road_b", ROAD_B_X)):
-        r = add_grid(nm, ROAD_W, _road_len, m_road, cx=cx, cy=_road_cy,
-                     cuts=10, cuts_y=max(2, int(_road_len / 7.9)),
-                     uv_scale=8.0, z_fn=lambda x, y, c=cx: _road_join_z(x, y, c))
-        paint_variation(r, seed=2.2 if cx == ROAD_A_X else 2.7,
-                        road_wear=True, cx=cx)
+    # A PISTA A E A DO CAMINHAO e ganha a malha fina; a B fica a 22 m dele e
+    # recebe metade da densidade, que ainda carrega a trilha de roda.
+    #
+    # O COLOR_0 CONTINUA SO COM A MANCHA LARGA (`cell` forcado): a malha agora e
+    # fina perto e grossa longe, e a medida automatica da celula pegaria a parte
+    # fina e soltaria a oitava de 5 m sobre as linhas de 7,9 m — o mosaico de
+    # quadrilateros que paint_variation documenta. As trilhas escuras que o
+    # `road_wear` desenhava por vertice passaram para o shader, que as poe onde
+    # o sulco esta (WHEELPATH) e com borda que um vertice nao tem.
+    for nm, cx, dxn, dyn in (("road_a", ROAD_A_X, 0.325, 0.5),
+                             ("road_b", ROAD_B_X, 0.5, 0.8)):
+        r = add_road_strip(nm, m_road, cx, ROAD_Y0, ROAD_Y1,
+                           lambda x, y, c=cx: _road_join_z(x, y, c),
+                           dx_near=dxn, dy_near=dyn)
+        paint_variation(r, seed=2.2 if cx == ROAD_A_X else 2.7, cell=7.9)
 
     # ---- the median ------------------------------------------------------
     # O CANTEIRO ABRE ONDE UMA TRANSVERSAL CRUZA. Ele corre os 1180 m inteiros;
@@ -3265,7 +3756,7 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
                 # fora; assentar o leque numa das duas leis deixaria um degrau
                 # de ate 5,5 cm na outra ponta, que e a altura de uma sarjeta.
                 cx = road_cx(x)
-                z_road = road_z(x, cx) if cx is not None else -ROAD_CROWN
+                z_road = road_z(x, cx, y) if cx is not None else -ROAD_CROWN
                 z = z_road + (roundabout_z(x, y) - z_road) * t
                 col.append(bm.verts.new((x, y, z)))
             grid.append(col)
@@ -3286,6 +3777,9 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
         bm.free()
         me.materials.append(m_road)
         paint_variation(ob, seed=12.9 + ai * 0.6)
+        # o leque continua a pista dele: mesmo eixo, mesma abscissa
+        _acx = (ax0 + ax1) / 2.0
+        write_frame(ob, lambda x, y, _c=_acx: (x - _c, y, ROAD_W / 2.0))
 
     # ---- 3. a ilha central: grama por cima, retida por guia ---------------
     bm = bmesh.new()
@@ -3321,40 +3815,28 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
     paint_variation(ob, seed=13.4)
 
     # ---- a guia da ilha, em pedras, como todas as outras do sitio ---------
+    #
+    # A MESMA PEDRA de toda guia do sitio (_kerb_block): ate aqui o balao
+    # desenhava a dele a mao, com duas faces (dorso e frente) e sem ponta, que
+    # era a unica guia do cenario sem nem a junta em V. O dorso fica do lado do
+    # que ela retem; a frente, do lado da pista circulatoria.
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new("UVMap")
     n_stone = max(24, int(2.0 * math.pi * ROUNDABOUT_RI / KERB_SEG))
+
+    def ring_pt(r, a):
+        return (ROUNDABOUT_CX + r * math.cos(a), ROUNDABOUT_CY + r * math.sin(a))
+
     for i in range(n_stone):
         a0 = 2.0 * math.pi * i / n_stone
         a1 = 2.0 * math.pi * (i + 1) / n_stone - 0.012      # a junta
-        pts = []
-        for a in (a0, a1):
-            ca, sa = math.cos(a), math.sin(a)
-            back = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RI) * ca,
-                           ROUNDABOUT_CY + (ROUNDABOUT_RI) * sa, 0.0))
-            front = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RI + KERB_W) * ca,
-                            ROUNDABOUT_CY + (ROUNDABOUT_RI + KERB_W) * sa, 0.0))
-            top = median_z(back.x, back.y) + KERB_REVEAL
-            low = roundabout_z(front.x, front.y) - 0.02
-            pts.append((back, front, top, low))
-        (b0, f0, t0, l0), (b1, f1, t1, l1) = pts
-        vs = [bm.verts.new((b0.x, b0.y, t0)), bm.verts.new((f0.x, f0.y, t0)),
-              bm.verts.new((f0.x, f0.y, l0)), bm.verts.new((b1.x, b1.y, t1)),
-              bm.verts.new((f1.x, f1.y, t1)), bm.verts.new((f1.x, f1.y, l1))]
-        f_top = bm.faces.new((vs[0], vs[1], vs[4], vs[3]))   # dorso
-        f_face = bm.faces.new((vs[1], vs[2], vs[5], vs[4]))  # face vista
-        s0 = ROUNDABOUT_RI * a0
-        s1 = ROUNDABOUT_RI * a1
-        # As faces sao guardadas na hora em que nascem. `bm.faces[-1]` exige a
-        # tabela de indices actualizada e levanta "outdated internal index
-        # table" — e reconstruir a tabela por pedra num anel de 68 seria pagar
-        # por uma referencia que ja se tem.
-        for f, coords in ((f_top, ((s0, 0.0), (s0, KERB_W),
-                                   (s1, KERB_W), (s1, 0.0))),
-                          (f_face, ((s0, 0.0), (s0, 0.14),
-                                    (s1, 0.14), (s1, 0.0)))):
-            for l, c in zip(f.loops, coords):
-                l[uv].uv = c
+        b0, f0 = ring_pt(ROUNDABOUT_RI, a0), ring_pt(ROUNDABOUT_RI + KERB_W, a0)
+        b1, f1 = ring_pt(ROUNDABOUT_RI, a1), ring_pt(ROUNDABOUT_RI + KERB_W, a1)
+        t0 = median_z(*b0) + KERB_REVEAL
+        t1 = median_z(*b1) + KERB_REVEAL
+        g0, g1 = roundabout_z(*f0), roundabout_z(*f1)
+        _kerb_block(bm, uv, b0, f0, b1, f1, t0, t1, g0 - 0.22, g1 - 0.22,
+                    ROUNDABOUT_RI * a0, ROUNDABOUT_RI * a1, g0, g1)
     # ---- E A GUIA DE FORA, que faltava ------------------------------------
     #
     # "na rotatoria voce colocou os meio fios, mas na parte do patio nao e ficou
@@ -3378,35 +3860,23 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
         am = (a0 + a1) / 2.0
         if rb_in_mouth(rb_rel(am)):
             continue
-        pts = []
+        ends = []
         for a in (a0, a1):
-            ca, sa = math.cos(a), math.sin(a)
-            front = Vector((ROUNDABOUT_CX + ROUNDABOUT_RO * ca,
-                            ROUNDABOUT_CY + ROUNDABOUT_RO * sa, 0.0))
-            back = Vector((ROUNDABOUT_CX + (ROUNDABOUT_RO + KERB_W) * ca,
-                           ROUNDABOUT_CY + (ROUNDABOUT_RO + KERB_W) * sa, 0.0))
+            front = ring_pt(ROUNDABOUT_RO, a)
+            back = ring_pt(ROUNDABOUT_RO + KERB_W, a)
             # O QUE ESTA PEDRA RETEM DEPENDE DE ONDE ELA ESTA. Em quase todo o
             # anel e a laje; na frente da ilha divisoria e o CANTEIRO, que corre
             # 5 cm mais alto e com outro relevo. Ler a laje ali poria o dorso
             # abaixo da grama que ele contem — a guia desaparecia exactamente no
             # trecho que esta correcao existe para acrescentar.
-            top = (median_z(back.x, back.y)
-                   if ROAD_B_X + _EDGE <= back.x <= ROAD_A_X - _EDGE
-                   and back.y > ROUNDABOUT_CY
-                   else yard_surface(back.x, back.y)) + KERB_REVEAL
-            low = roundabout_z(front.x, front.y) - 0.02
-            pts.append((back, front, top, low))
-        (b0, f0, t0, l0), (b1, f1, t1, l1) = pts
-        vs = [bm.verts.new((b0.x, b0.y, t0)), bm.verts.new((f0.x, f0.y, t0)),
-              bm.verts.new((f0.x, f0.y, l0)), bm.verts.new((b1.x, b1.y, t1)),
-              bm.verts.new((f1.x, f1.y, t1)), bm.verts.new((f1.x, f1.y, l1))]
-        f_top = bm.faces.new((vs[0], vs[1], vs[4], vs[3]))
-        f_face = bm.faces.new((vs[1], vs[2], vs[5], vs[4]))
-        s0, s1 = ROUNDABOUT_RO * a0, ROUNDABOUT_RO * a1
-        for f, coords in ((f_top, ((s0, 0.0), (s0, KERB_W), (s1, KERB_W), (s1, 0.0))),
-                          (f_face, ((s0, 0.0), (s0, 0.14), (s1, 0.14), (s1, 0.0)))):
-            for l, c in zip(f.loops, coords):
-                l[uv].uv = c
+            top = (median_z(*back)
+                   if ROAD_B_X + _EDGE <= back[0] <= ROAD_A_X - _EDGE
+                   and back[1] > ROUNDABOUT_CY
+                   else yard_surface(*back)) + KERB_REVEAL
+            ends.append((back, front, top, roundabout_z(*front)))
+        (b0, f0, t0, g0), (b1, f1, t1, g1) = ends
+        _kerb_block(bm, uv, b0, f0, b1, f1, t0, t1, g0 - 0.22, g1 - 0.22,
+                    ROUNDABOUT_RO * a0, ROUNDABOUT_RO * a1, g0, g1)
 
     me = bpy.data.meshes.new("rb_kerb")
     ob = bpy.data.objects.new("rb_kerb", me)
@@ -3414,6 +3884,8 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
     bm.to_mesh(me)
     bm.free()
     me.materials.append(m_kerb)
+    _activate_color(me)
+    _kerb_normals(me)
 
     # ---- a marcacao: DUAS voltas, e as duas CIRCULAM ----------------------
     #
@@ -3472,7 +3944,7 @@ def build_roundabout(m_road, m_near, m_kerb, m_line):
     if marks:
         add_marks("rb_markings", m_line, marks, seg_len=0.8, dz=0.012,
                   z_fn=lambda x, y: (roundabout_z(x, y) if in_roundabout(x, y)
-                                     else road_z(x, road_cx(x) or 0.0)))
+                                     else road_z(x, road_cx(x) or 0.0, y)))
     _mo = rb_mouths()
     log("  balao: r %.1f m (ilha %.1f, circulatoria %.1f), 2 bocas de %.0f m, "
         "guia aberta em %.0f de 360 graus, %d pedras na ilha"
@@ -3500,7 +3972,8 @@ def build_highway(m_road, m_gravel, m_line):
 
     r = add_grid("highway", GROUND, HIGHWAY_W, m_road, cx=0.0, cy=HIGHWAY_Y,
                  cuts=150, cuts_y=10, uv_scale=8.0, z_fn=hz)
-    paint_variation(r, seed=14.2, road_wear=True, cx=0.0)
+    paint_variation(r, seed=14.2)
+    write_frame(r, lambda x, y: (y - HIGHWAY_Y, x, half))
 
     # Acostamento de brita, e ele TALUDA ATE O CAMPO em vez de acabar em degrau.
     #
@@ -4190,6 +4663,11 @@ def build_service_roads(m_road, m_line):
             # escala do ladrilho em toda a curva.
             reuv(ob, 8.0)
             paint_variation(ob, seed=9.1 + n)
+            # O referencial da via interna: ela corre em X, o eixo e o meio de
+            # [y0, y1]. Na boca o vertice sai alem de HW, e o shader le isso
+            # como "borda" — que e o que a concordancia e.
+            write_frame(ob, lambda x, y, _c=(y0 + y1) / 2.0, _h=d / 2.0:
+                        (y - _c, x, _h))
             n += 1
 
         # ---- linha de bordo, parando antes de cada cruzamento -------------
@@ -4213,8 +4691,12 @@ def build_service_roads(m_road, m_line):
                     return True
             return False
 
+        # EDGE_INSET, e nao 0,45: o arco da boca (mouth_edge_marks) e o
+        # prolongamento dele correm a 42 cm da borda, e esta linha continua a
+        # partir do fim do prolongamento. Com 45 cm havia um degrau de 3 cm
+        # na linha branca exactamente onde uma encontra a outra.
         if (x1 - x0) > d:
-            for sy in (y0 + 0.45, y1 - 0.45):
+            for sy in (y0 + EDGE_INSET, y1 - EDGE_INSET):
                 t = x0
                 while t < x1:
                     seg = 16.0
@@ -4223,7 +4705,7 @@ def build_service_roads(m_road, m_line):
                         q.append((t + seg / 2, sy, seg, 0.12, 0.0, h))
                     t += seg
         else:
-            for sx in (x0 + 0.45, x1 - 0.45):
+            for sx in (x0 + EDGE_INSET, x1 - EDGE_INSET):
                 t = y0
                 while t < y1:
                     seg = 16.0
@@ -4249,11 +4731,17 @@ def build_yard_edge(m_kerb):
 
     Skipped where the carriageways and the service roads cross, because a kerb
     across a road is a kerb no lorry could climb.
+
+    A MESMA PEDRA de toda guia (_kerb_block), com o dorso para o patio e a face
+    para a grama, que e o lado baixo. Eram caixas de 9 m e 26 cm; agora sao
+    guias de jardim de 3 m — o sitio inteiro fica a mais de 60 m da camera,
+    onde a junta de 1 m ja nao se le e so custaria vertices.
     """
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new("UVMap")
     n = 0
-    step = 9.0
+    step = 3.0
+    half = 0.13
 
     def crosses(x, y):
         if ROAD_B_X - _EDGE - 1.0 <= x <= ROAD_A_X + _EDGE + 1.0:
@@ -4263,47 +4751,43 @@ def build_yard_edge(m_kerb):
                 return True
         return False
 
-    edges = [("s", YARD_X0, YARD_X1, YARD_Y0, True), ("n", YARD_X0, YARD_X1, YARD_Y1, True),
-             ("w", YARD_Y0, YARD_Y1, YARD_X0, False), ("e", YARD_Y0, YARD_Y1, YARD_X1, False)]
-    for _nm, a0, a1, fixed, along_x in edges:
+    # (nome, a0, a1, cota fixa, corre em x, sinal da grama)
+    edges = [("s", YARD_X0, YARD_X1, YARD_Y0, True, -1.0),
+             ("n", YARD_X0, YARD_X1, YARD_Y1, True, 1.0),
+             ("w", YARD_Y0, YARD_Y1, YARD_X0, False, -1.0),
+             ("e", YARD_Y0, YARD_Y1, YARD_X1, False, 1.0)]
+    for _nm, a0, a1, fixed, along_x, sg in edges:
         t = a0
-        while t < a1:
+        while t < a1 - 0.2:
             b = min(a1, t + step)
+            b_j = b - 0.012 if b < a1 else b
             x0, y0 = (t, fixed) if along_x else (fixed, t)
-            x1, y1 = (b, fixed) if along_x else (fixed, b)
+            x1, y1 = (b_j, fixed) if along_x else (fixed, b_j)
             if crosses((x0 + x1) / 2.0, (y0 + y1) / 2.0):
-                t += step
+                t = b
                 continue
-            zt = yard_z((x0 + x1) / 2.0, (y0 + y1) / 2.0) + 0.03
-            half = 0.13
-            if along_x:
-                corners = ((x0, y0 - half), (x1, y1 - half), (x1, y1 + half), (x0, y0 + half))
-            else:
-                corners = ((x0 - half, y0), (x1 - half, y1), (x1 + half, y1), (x0 + half, y0))
-            lo_z = zt - 0.40
-            vb = [bm.verts.new((cxx, cyy, lo_z)) for cxx, cyy in corners]
-            vt = [bm.verts.new((cxx, cyy, zt)) for cxx, cyy in corners]
-            for quad in ((vt[0], vt[1], vt[2], vt[3]),
-                         (vb[0], vb[3], vb[2], vb[1]),
-                         (vb[0], vb[1], vt[1], vt[0]),
-                         (vb[2], vb[3], vt[3], vt[2]),
-                         (vb[1], vb[2], vt[2], vt[1]),
-                         (vb[3], vb[0], vt[0], vt[3])):
-                try:
-                    f = bm.faces.new(quad)
-                except ValueError:
-                    continue
-                for l in f.loops:
-                    l[uv].uv = (l.vert.co.x / 1.2 + l.vert.co.y / 1.2, l.vert.co.z / 1.2)
+
+            def off(x, y, d):
+                return (x, y + d) if along_x else (x + d, y)
+
+            bk0, fr0 = off(x0, y0, -sg * half), off(x0, y0, sg * half)
+            bk1, fr1 = off(x1, y1, -sg * half), off(x1, y1, sg * half)
+            zt0 = yard_z(x0, y0) + 0.03
+            zt1 = yard_z(x1, y1) + 0.03
+            g0, g1 = grass_z(*fr0), grass_z(*fr1)
+            _kerb_block(bm, uv, bk0, fr0, bk1, fr1, zt0, zt1,
+                        zt0 - 0.40, zt1 - 0.40, t, b_j, g0, g1)
             n += 1
-            t += step
+            t = b
     me = bpy.data.meshes.new("yard_edge")
     ob = bpy.data.objects.new("yard_edge", me)
     bpy.context.collection.objects.link(ob)
     bm.to_mesh(me)
     bm.free()
     me.materials.append(m_kerb)
-    log("  yard edge: %d kerb runs bounding the planting" % n)
+    _activate_color(me)
+    _kerb_normals(me)
+    log("  yard edge: %d kerb stones bounding the planting" % n)
 
 
 # ---------------------------------------------------------------------------
@@ -5413,8 +5897,23 @@ def main():
         # passou de 200/98/38/1/0 para 626/322/92/57/..., ou seja quatro
         # passagens deixavam 57 faces por tratar. Uma passagem que nao acha nada
         # sai do laco, entao o custo de pedir oito e zero quando quatro chegam.
+        # O CHAO FICA DE FORA. A rede procura a peca pequena pousada no plano
+        # de uma grande DENTRO DA MESMA MALHA, e e quadratica por balde de
+        # normal: com o meio-fio de pedras (2026-09-26) sao milhares de dorsos
+        # quase iguais no mesmo balde, e a passagem que levava segundos passou
+        # de 15 minutos. Nenhuma malha de chao tem decalque para separar — a
+        # tinta e malha propria e levantada por MARK_DZ_K, e o resto e superficie.
+        _chao = {"GROUND_CONCRETE", "ASPHALT_ROAD", "CONCRETE_APRON",
+                 "KERB_CONCRETE", "LINE_PAINT", "GRASS_VERGE", "GRASS_NEAR",
+                 "GRAVEL_SHOULDER", "CROP_FIELD"}
+
+        def _de_chao(o):
+            ms = [m.name for m in o.data.materials if m]
+            return bool(ms) and all(m in _chao for m in ms)
+
         _n = _dec.sweep([o for o in bpy.data.objects
-                         if o.type == "MESH" and o.data and o.data.polygons],
+                         if o.type == "MESH" and o.data and o.data.polygons
+                         and not _de_chao(o)],
                         log=lambda m: log("  " + m), rounds=8)
         log("  %d faces coplanares afastadas" % _n)
     except Exception as e:

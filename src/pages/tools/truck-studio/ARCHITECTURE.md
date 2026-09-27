@@ -7552,3 +7552,56 @@ Os dois portões que traziam o chassi na mão foram acertados —
 > Os outros dois 6x4 do catálogo (`daf/daf-xd/6x4t-sl` e `daf/daf-xg-2021/6x4t`)
 > **ficaram**: são CAVALOS, estão no ar desde muito antes desta rodada, e a
 > decisão foi sobre o rígido.
+
+## 51. 2026-09-26 — o chão do distrito: uso, desgaste e a guia de verdade
+
+Relato: *"não está realista, ao menos no que foi criado por nós — faixas, rua,
+pátio… as texturas continuam muito organizadas e parecendo um padrão, não ter
+nenhuma ondulação ou volume nas ruas e pátios também não ajuda, as faixas sem
+nenhum desgaste, os rodapés / meio-fios muito quadradinhos"*.
+
+**⚠️ A CAUSA MAIOR DO "PADRÃO" ERA UMA LISTA BRANCA.** `resolveSet()`
+(scene/environment.ts) recriava o `macro` de cada material só com `scale` e
+`amount`. O `break` do manifesto — o ladrilhamento estocástico que set.ts
+implementa desde 11/08 — morria ali, e com ele `cell`, `roughnessFloor` e
+`surface`. Medido na chave de cache: TODO programa de chão compilava
+`ts-set-macro-v6:0`. O ladrilho repetia no app desde agosto. Mesmo modo de falha
+do `envIntensity` já registrado naquela função.
+
+**Geometria (tools/env-build/build_industrial_park.py):**
+- `road_relief`: trilha de roda (7–29 mm, com o cordão empurrado dos lados),
+  ondulação ±9 mm e bacias de recalque até 3,4 cm. Zero nos 25 cm da borda
+  (sarjeta, guia e rampa leem o nível de projeto), nas pontas da via e sob o
+  conjunto (`truck_pad` — o abaulamento sozinho já deixava a roda esquerda
+  2,6 cm no ar). `add_road_strip` adensa a pista (0,33 × 0,5 m) só a ±62 m do
+  conjunto; o relevo morre onde a malha engrossa.
+- `_kerb_block` é uma PEDRA: perfil boleado + face inclinada + chanfro do dorso,
+  pontas recolhidas (junta em V), erro de assentamento por pedra, tom de lote e
+  sujeira no COLOR_0. Duas resoluções (`KERB_NEAR_R`). O balão e a guia do pátio
+  passaram a usar a mesma pedra. A UV do dorso era (s, z) com z constante — o
+  "código de barras" no topo de toda guia.
+- A sarjeta CAI 1,2 cm para a guia (subia 2 cm, ao contrário da drenagem).
+- Referencial da via/tinta/guia/sarjeta em TEXCOORD_1/2 (`write_frame`,
+  `add_marks`). **⚠️ o exportador inverte o V de TODA camada de UV** (`1 - v`);
+  camada de DADO passa por `_gv()`. A primeira versão não passava: a tinta
+  chegava com o atravessado 0..2 e a guia nunca passava do teste "tem dado".
+- A rede de decalques (`audit_decals.sweep`) deixou de varrer o chão: com as
+  pedras ela ia de segundos a 15 min, e chão não tem decalque.
+
+**Shader (scene/ground-detail.ts, `detail` no manifesto):** asfalto (trilha,
+óleo, poeira de borda, junta longitudinal, trincas transversais abertas ou
+seladas, couro de jacaré, remendos, tampões, manchas), laje (junta serrada de
+5 m alinhada ao dorso da guia, tom/degrau por placa, lasca, trinca, pneu de
+manobra, capim na junta), sarjeta, guia, grama e tinta que FALTA (recorte por
+pixel com orla fantasma; longe vira média em vez de tracejado). Toda linha
+passa por `gdLine` (filtro-caixa contra o pixel) e todo detalhe de centímetro
+fica em `gdNear`.
+
+**Custo, medido** (RX 570, 1440×900, conjunto oculto, `checks-parque-custo-0926`):
+herói 9,0 → 13,1 ms · rasante 7,7 → 10,6 · alto 7,5 → 11,1. Quase tudo é o
+ladrilhamento estocástico que voltou a ligar (16 leituras por fragmento, ~+3 ms);
+o detalhe em si é +0,5 a +1,1 ms.
+
+Bancada: `checks-parque-realismo-0926.mjs` (15 poses, `--tag`/`--only`) e
+`checks-rotatoria.mjs` sem regressão. `set.glb` 18,1 → 20,3 MB; as 4 imagens do
+texopt de 13/08 foram reaplicadas (`texopt.py --image 2=256 22=128 23=64 29=64`).

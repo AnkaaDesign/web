@@ -86,6 +86,7 @@ import { setCyclorama } from './cyclorama';
 import { setSkyPair, disposeSkyBlend } from './skyblend';
 import { disposeLampSiteLenses } from './lamps';
 import type { SetDef, SetMaterialDef } from './set';
+import { isGroundDetail } from './ground-detail';
 import { loadGLB } from '../vehicle/models';
 import { prefetch } from '../core/prefetch';
 import { assetUrl } from '../catalog/catalog';
@@ -581,12 +582,31 @@ function resolveSet(envDef: EnvironmentDef): SetDef | null {
       if (typeof m.normalScale === 'number' && isFinite(m.normalScale)) {
         def.normalScale = m.normalScale;
       }
+      /* ⚠️ 2026-09-26 — `break`, `cell`, `roughnessFloor` e `surface` MORRIAM
+         AQUI, pelo mesmo modo de falha do `envIntensity` acima. O manifesto
+         ligava o ladrilhamento estocástico (`macro.break`) desde 11/08 e o
+         set.ts o implementa inteiro — mas o `macro` era recriado só com
+         `scale` e `amount`, então TODO programa de chão compilava com
+         `uBreakOn = 0` (medido: a chave de cache de todos os materiais era
+         `ts-set-macro-v6:0`). O ladrilho nunca deixou de repetir no app, e o
+         "as texturas continuam muito organizadas e parecendo um padrão" era,
+         em boa parte, isto. O piso de rugosidade da laje ("o pátio reflete
+         muita luz") também nunca chegou. */
       const mac = m.macro as RawBlock | undefined;
       if (mac && typeof mac === 'object'
         && typeof mac.scale === 'number' && mac.scale > 0
         && typeof mac.amount === 'number') {
         def.macro = { scale: mac.scale, amount: Math.min(1, Math.max(0, mac.amount)) };
+        if (typeof mac.break === 'number' && isFinite(mac.break)) def.macro.break = mac.break;
+        if (typeof mac.cell === 'number' && mac.cell > 0) def.macro.cell = mac.cell;
       }
+      if (typeof m.roughnessFloor === 'number' && isFinite(m.roughnessFloor)) {
+        def.roughnessFloor = Math.min(1, Math.max(0, m.roughnessFloor));
+      }
+      if (typeof m.surface === 'string') def.surface = m.surface as SetMaterialDef['surface'];
+      /* O detalhe de superfície (scene/ground-detail.ts). Validado lá — um
+         `kind` desconhecido não passa. */
+      if (isGroundDetail(m.detail)) def.detail = m.detail;
       bound[name] = def;
     }
     if (Object.keys(bound).length) out.materials = bound;
