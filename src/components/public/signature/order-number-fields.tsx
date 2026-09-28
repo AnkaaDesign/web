@@ -4,7 +4,9 @@
  * Só aparece para quem assina pelo setor de COMPRAS do cliente: o servidor
  * manda `orderNumber` apenas para esse signatário, e só aceita a assinatura
  * dele quando cada veículo do orçamento tem o pedido — o que já estava na
- * tarefa, ou o que ele informa aqui. A regra de verdade é a do servidor
+ * tarefa, ou o que ele informa aqui. O pedido é UM SÓ para o orçamento: um
+ * campo único vale para todos os veículos, e quando algum veículo já tem o
+ * número registrado os demais o herdam no servidor — não há o que digitar. A regra de verdade é a do servidor
  * (`api/.../signature/order-number-gate.ts`); esta tela a espelha para que a
  * exigência apareça ANTES do botão, e não como um erro depois do código.
  *
@@ -12,9 +14,7 @@
  * numa nota emitida, e trocá-lo não é assunto de uma página pública.
  */
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { PublicOrderNumberGate } from "@/api-client/signature";
 
 /** Mesmo teto e mesmos caracteres do servidor (`orderNumberProblem`). */
@@ -32,64 +32,52 @@ function problemOf(value: string, maxLength: number): string | null {
   return null;
 }
 
-/** Veículos que o signatário precisa preencher. */
+/** Veículos que ainda estão sem número. */
 export function missingOrderVehicles(gate: PublicOrderNumberGate | null | undefined) {
   return (gate?.vehicles ?? []).filter(v => !normalizeOrderNumber(v.value));
 }
 
-/** O que vai no corpo do `sign` — só os veículos que estão sem número. */
+/**
+ * O que vai no corpo do `sign`: o MESMO número em cada veículo sem número.
+ * Vazio quando nada precisa ser digitado (tudo registrado, ou herança do
+ * número já registrado — o servidor replica sozinho).
+ */
 export function orderNumberPayload(
   gate: PublicOrderNumberGate | null | undefined,
-  values: Record<string, string>,
-  sameForAll: boolean,
+  value: string,
 ): Array<{ taskId: string; value: string }> {
-  const missing = missingOrderVehicles(gate);
-  const shared = normalizeOrderNumber(values.__all);
-  return missing.map(v => ({
-    taskId: v.taskId,
-    value: sameForAll && missing.length > 1 ? shared : normalizeOrderNumber(values[v.taskId]),
-  }));
+  if (!gate?.required) return [];
+  const typed = normalizeOrderNumber(value);
+  return missingOrderVehicles(gate).map(v => ({ taskId: v.taskId, value: typed }));
 }
 
-/** Primeira pendência, na mesma linguagem da recusa do servidor; `null` quando pronto. */
+/** Pendência na mesma linguagem da recusa do servidor; `null` quando pronto. */
 export function orderNumberClientProblem(
   gate: PublicOrderNumberGate | null | undefined,
-  values: Record<string, string>,
-  sameForAll: boolean,
+  value: string,
 ): string | null {
   if (!gate?.required) return null;
-  const missing = missingOrderVehicles(gate);
-  const payload = orderNumberPayload(gate, values, sameForAll);
-  for (const row of payload) {
-    const problem = problemOf(row.value, gate.maxLength);
-    if (!problem) continue;
-    if (missing.length > 1 && !sameForAll) {
-      const label = missing.find(v => v.taskId === row.taskId)?.label ?? "Veículo";
-      return `${label}: ${problem}`;
-    }
-    return problem;
-  }
-  return null;
+  return problemOf(normalizeOrderNumber(value), gate.maxLength);
 }
 
 export function OrderNumberFields({
   gate,
-  values,
+  value,
   onChange,
-  sameForAll,
-  onSameForAllChange,
   disabled,
 }: {
   gate: PublicOrderNumberGate;
-  values: Record<string, string>;
-  onChange: (key: string, value: string) => void;
-  sameForAll: boolean;
-  onSameForAllChange: (value: boolean) => void;
+  value: string;
+  onChange: (value: string) => void;
   disabled?: boolean;
 }) {
   const missing = missingOrderVehicles(gate);
-  const registered = gate.vehicles.filter(v => normalizeOrderNumber(v.value));
-  const multi = missing.length > 1;
+  const total = gate.vehicles.length;
+  const registered = Array.from(
+    new Set(gate.vehicles.map(v => normalizeOrderNumber(v.value)).filter(Boolean)),
+  );
+  // Número único já registrado: é o pedido do orçamento; nada a digitar.
+  const shown = gate.inherited ?? (missing.length === 0 && registered.length === 1 ? registered[0] : null);
 
   return (
     <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-left">
@@ -100,70 +88,42 @@ export function OrderNumberFields({
         {gate.required ? (
           <p className="text-xs leading-relaxed text-muted-foreground">
             Como você assina pelo setor de compras, a assinatura só é concluída com o nº do
-            pedido de compra{multi ? " de cada veículo" : ""}. Ele sai impresso na nota fiscal e
-            no boleto.
+            pedido de compra{total > 1 ? `, que vale para os ${total} veículos` : ""}. Ele sai
+            impresso na nota fiscal e no boleto.
           </p>
         ) : null}
       </div>
 
-      {registered.length > 0 && (
+      {shown ? (
+        <p className="flex flex-wrap justify-between gap-x-3 text-xs text-muted-foreground">
+          <span>{total > 1 ? `Registrado para os ${total} veículos` : "Registrado"}</span>
+          <span className="font-medium text-foreground">{shown}</span>
+        </p>
+      ) : registered.length > 0 ? (
         <ul className="space-y-1 text-xs text-muted-foreground">
-          {registered.map(v => (
-            <li key={v.taskId} className="flex flex-wrap justify-between gap-x-3">
-              <span>{gate.vehicles.length > 1 ? v.label : "Registrado"}</span>
-              <span className="font-medium text-foreground">{v.value}</span>
-            </li>
-          ))}
+          {gate.vehicles
+            .filter(v => normalizeOrderNumber(v.value))
+            .map(v => (
+              <li key={v.taskId} className="flex flex-wrap justify-between gap-x-3">
+                <span>{v.label}</span>
+                <span className="font-medium text-foreground">{v.value}</span>
+              </li>
+            ))}
         </ul>
-      )}
+      ) : null}
 
-      {missing.length > 0 && (
-        <>
-          {multi && (
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <Checkbox
-                checked={sameForAll}
-                onCheckedChange={v => onSameForAllChange(v === true)}
-                disabled={disabled}
-              />
-              <span>Mesmo pedido para os {missing.length} veículos</span>
-            </label>
-          )}
-
-          {multi && !sameForAll ? (
-            <div className="space-y-2">
-              {missing.map(v => (
-                <div key={v.taskId} className="space-y-1">
-                  <Label htmlFor={`order-${v.taskId}`} className="text-xs">
-                    {v.label}
-                  </Label>
-                  <Input
-                    id={`order-${v.taskId}`}
-                    className="h-11 text-base"
-                    placeholder="Ex.: 4500123456"
-                    maxLength={gate.maxLength}
-                    autoComplete="off"
-                    value={values[v.taskId] ?? ""}
-                    onChange={next => onChange(v.taskId, String(next ?? ""))}
-                    disabled={disabled}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Input
-              id="order-all"
-              aria-label="Nº do pedido de compra"
-              className="h-11 text-base"
-              placeholder="Ex.: 4500123456"
-              maxLength={gate.maxLength}
-              autoComplete="off"
-              value={(multi ? values.__all : values[missing[0].taskId]) ?? ""}
-              onChange={next => onChange(multi ? "__all" : missing[0].taskId, String(next ?? ""))}
-              disabled={disabled}
-            />
-          )}
-        </>
+      {gate.required && (
+        <Input
+          id="order-number"
+          aria-label="Nº do pedido de compra"
+          className="h-11 text-base"
+          placeholder="Ex.: 4500123456"
+          maxLength={gate.maxLength}
+          autoComplete="off"
+          value={value}
+          onChange={next => onChange(String(next ?? ""))}
+          disabled={disabled}
+        />
       )}
     </div>
   );

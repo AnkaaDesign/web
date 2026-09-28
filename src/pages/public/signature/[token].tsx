@@ -123,11 +123,10 @@ export default function PublicSignaturePage() {
   /** Termo + declarações. Abre sozinho quando o código é enviado. */
   const [termsOpen, setTermsOpen] = useState(false);
   /**
-   * Nº do pedido por veículo (chave `__all` = "mesmo pedido para todos"). Só
-   * usado quando o signatário é de Compras — ver `OrderNumberFields`.
+   * Nº do pedido — um só para todos os veículos. Só usado quando o signatário
+   * é de Compras — ver `OrderNumberFields`.
    */
-  const [orderValues, setOrderValues] = useState<Record<string, string>>({});
-  const [orderSameForAll, setOrderSameForAll] = useState(true);
+  const [orderValue, setOrderValue] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -168,8 +167,8 @@ export default function PublicSignaturePage() {
 
   /** O que ainda falta do nº do pedido; `null` quando não há exigência ou já está pronto. */
   const orderProblem = useMemo(
-    () => orderNumberClientProblem(state?.orderNumber, orderValues, orderSameForAll),
-    [state?.orderNumber, orderValues, orderSameForAll],
+    () => orderNumberClientProblem(state?.orderNumber, orderValue),
+    [state?.orderNumber, orderValue],
   );
 
   /**
@@ -351,7 +350,7 @@ export default function PublicSignaturePage() {
     try {
       const geo = await collectGeo();
       const orderNumbers = state?.orderNumber?.required
-        ? orderNumberPayload(state.orderNumber, orderValues, orderSameForAll)
+        ? orderNumberPayload(state.orderNumber, orderValue)
         : undefined;
       await signatureService.sign(token, {
         challengeId,
@@ -643,13 +642,11 @@ export default function PublicSignaturePage() {
             {!refusing && state.orderNumber && (
               <OrderNumberFields
                 gate={state.orderNumber}
-                values={orderValues}
-                onChange={(key, value) => {
+                value={orderValue}
+                onChange={value => {
                   setStepError(null);
-                  setOrderValues(prev => ({ ...prev, [key]: value }));
+                  setOrderValue(value);
                 }}
-                sameForAll={orderSameForAll}
-                onSameForAllChange={setOrderSameForAll}
                 disabled={busy}
               />
             )}
@@ -1050,7 +1047,7 @@ export default function PublicSignaturePage() {
                   <Alert>
                     <AlertDescription>
                       Tenha em mãos o <strong>nº do pedido de compra</strong>
-                      {missingCount > 1 ? ` dos ${missingCount} veículos` : ""}: como você assina
+                      {missingCount > 1 ? ` (um só, vale para os ${missingCount} veículos)` : ""}: como você assina
                       pelo setor de compras, ele será pedido para concluir a assinatura.
                     </AlertDescription>
                   </Alert>

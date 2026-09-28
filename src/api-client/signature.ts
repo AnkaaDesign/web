@@ -291,6 +291,8 @@ export interface PublicSignerState {
 export interface PublicOrderNumberGate {
   required: boolean;
   maxLength: number;
+  /** Número já registrado e único: os veículos sem número o herdam na assinatura. */
+  inherited?: string | null;
   vehicles: Array<{ taskId: string; label: string; value: string | null }>;
 }
 
@@ -305,7 +307,9 @@ export interface EnvelopeDocumentSummary {
   finalSha256: string | null;
   padesLevel: string | null;
   sealedAt: string | null;
-  /** Nomes dos signatários amarrados a este recorte. */
+  /** "Orçamento nº 448 - Marquespan 5,20 - Rafael Capobianco" (API nova). */
+  title?: string;
+  /** Quem assina este documento: os contatos amarrados a ele e a Ankaa. */
   signers: string[];
 }
 
