@@ -1335,15 +1335,18 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         // Format responsibles with name, role, and phone
         if (value.length > 0 && typeof value[0] === "object" && value[0].name) {
           const ROLE_LABELS: Record<string, string> = {
-            COMMERCIAL: "Comercial",
+            PRODUCTION_PLANNING: "PCP",
             PURCHASING: "Compras",
-            SELLER: "Vendedor",
-            REPRESENTATIVE: "Representante",
-            MARKETING: "Marketing",
             COORDINATOR: "Coordenador",
+            REPRESENTATIVE: "Representante",
+            SELLER: "Vendedor",
             FINANCIAL: "Financeiro",
+            MARKETING: "Marketing",
+            SHIPPING: "Expedição",
+            LOGISTICS: "Logística",
             FLEET_MANAGER: "Gestor de Frota",
             DRIVER: "Motorista",
+            COMMERCIAL: "Comercial",
           };
           const labelFor = (role: string) => ROLE_LABELS[role] || role;
           return value.map((rep: { name?: string; phone?: string; roles?: string[]; role?: string }) => {

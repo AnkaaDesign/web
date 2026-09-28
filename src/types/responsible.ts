@@ -2,20 +2,25 @@ import type { Customer } from './customer';
 import type { Task } from './task';
 
 /**
- * Ordem de declaração = ordem do enum do banco. Ela é a ordem canônica em que a
- * API grava `roles`, e agrupa as funções pela fatia do orçamento que cada uma
- * recebe na assinatura eletrônica. `OWNER` saiu em 2026-09-01.
+ * Ordem de declaração = ordem do enum do banco = ORDEM DE EXIBIÇÃO definida pela
+ * empresa em 2026-09-28 (PCP primeiro, Comercial por último). É a ordem canônica
+ * em que a API grava `roles` e a das opções nos formulários e filtros, que iteram
+ * este enum e `RESPONSIBLE_ROLE_LABELS`. `OWNER` saiu em 2026-09-01; PCP,
+ * Expedição e Logística entraram em 2026-09-28.
  */
 export enum ResponsibleRole {
-  COMMERCIAL = 'COMMERCIAL',
-  SELLER = 'SELLER',
-  REPRESENTATIVE = 'REPRESENTATIVE',
-  COORDINATOR = 'COORDINATOR',
+  PRODUCTION_PLANNING = 'PRODUCTION_PLANNING',
   PURCHASING = 'PURCHASING',
-  MARKETING = 'MARKETING',
+  COORDINATOR = 'COORDINATOR',
+  REPRESENTATIVE = 'REPRESENTATIVE',
+  SELLER = 'SELLER',
   FINANCIAL = 'FINANCIAL',
+  MARKETING = 'MARKETING',
+  SHIPPING = 'SHIPPING',
+  LOGISTICS = 'LOGISTICS',
   FLEET_MANAGER = 'FLEET_MANAGER',
   DRIVER = 'DRIVER',
+  COMMERCIAL = 'COMMERCIAL',
 }
 
 export interface Responsible {
@@ -151,28 +156,34 @@ export interface ResponsibleDisplay {
 
 // Responsible role labels for display
 export const RESPONSIBLE_ROLE_LABELS: Record<ResponsibleRole, string> = {
-  [ResponsibleRole.COMMERCIAL]: 'Comercial',
-  [ResponsibleRole.SELLER]: 'Vendedor',
-  [ResponsibleRole.REPRESENTATIVE]: 'Representante',
-  [ResponsibleRole.COORDINATOR]: 'Coordenador',
+  [ResponsibleRole.PRODUCTION_PLANNING]: 'PCP',
   [ResponsibleRole.PURCHASING]: 'Compras',
-  [ResponsibleRole.MARKETING]: 'Marketing',
+  [ResponsibleRole.COORDINATOR]: 'Coordenador',
+  [ResponsibleRole.REPRESENTATIVE]: 'Representante',
+  [ResponsibleRole.SELLER]: 'Vendedor',
   [ResponsibleRole.FINANCIAL]: 'Financeiro',
+  [ResponsibleRole.MARKETING]: 'Marketing',
+  [ResponsibleRole.SHIPPING]: 'Expedição',
+  [ResponsibleRole.LOGISTICS]: 'Logística',
   [ResponsibleRole.FLEET_MANAGER]: 'Gestor de Frota',
   [ResponsibleRole.DRIVER]: 'Motorista',
+  [ResponsibleRole.COMMERCIAL]: 'Comercial',
 };
 
 // Responsible role colors for UI
 export const RESPONSIBLE_ROLE_COLORS: Record<ResponsibleRole, string> = {
-  [ResponsibleRole.COMMERCIAL]: 'blue',
-  [ResponsibleRole.SELLER]: 'teal',
-  [ResponsibleRole.REPRESENTATIVE]: 'indigo',
-  [ResponsibleRole.COORDINATOR]: 'green',
+  [ResponsibleRole.PRODUCTION_PLANNING]: 'pink',
   [ResponsibleRole.PURCHASING]: 'cyan',
-  [ResponsibleRole.MARKETING]: 'purple',
+  [ResponsibleRole.COORDINATOR]: 'green',
+  [ResponsibleRole.REPRESENTATIVE]: 'indigo',
+  [ResponsibleRole.SELLER]: 'teal',
   [ResponsibleRole.FINANCIAL]: 'orange',
+  [ResponsibleRole.MARKETING]: 'purple',
+  [ResponsibleRole.SHIPPING]: 'amber',
+  [ResponsibleRole.LOGISTICS]: 'red',
   [ResponsibleRole.FLEET_MANAGER]: 'gray',
   [ResponsibleRole.DRIVER]: 'yellow',
+  [ResponsibleRole.COMMERCIAL]: 'blue',
 };
 
 /** Enum declaration order — the canonical order the API sorts `roles` by. */
@@ -217,6 +228,9 @@ export const RESPONSIBLE_ROLE_PRIMARY_PRIORITY: readonly ResponsibleRole[] = [
   ResponsibleRole.SELLER,
   ResponsibleRole.FINANCIAL,
   ResponsibleRole.MARKETING,
+  ResponsibleRole.PRODUCTION_PLANNING,
+  ResponsibleRole.SHIPPING,
+  ResponsibleRole.LOGISTICS,
   ResponsibleRole.FLEET_MANAGER,
   ResponsibleRole.DRIVER,
 ];

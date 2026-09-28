@@ -18,15 +18,18 @@ import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
  * mapa precisa ser conferido quando o enum mudar.
  */
 const ROLE_LABELS: Record<string, string> = {
-  COMMERCIAL: "Comercial",
-  SELLER: "Vendedor",
-  REPRESENTATIVE: "Representante",
-  COORDINATOR: "Coordenador",
+  PRODUCTION_PLANNING: "PCP",
   PURCHASING: "Compras",
-  MARKETING: "Marketing",
+  COORDINATOR: "Coordenador",
+  REPRESENTATIVE: "Representante",
+  SELLER: "Vendedor",
   FINANCIAL: "Financeiro",
+  MARKETING: "Marketing",
+  SHIPPING: "Expedição",
+  LOGISTICS: "Logística",
   FLEET_MANAGER: "Gestor de Frota",
   DRIVER: "Motorista",
+  COMMERCIAL: "Comercial",
 };
 
 export default function ClientePainelPage() {

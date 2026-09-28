@@ -2833,25 +2833,28 @@ export enum DISCOUNT_TYPE {
 /**
  * Funções de um contato do cliente.
  *
- * A ORDEM É A DO ENUM DO BANCO e é significativa: a API ordena `roles` por ela
- * para manter estável o diff do changelog, e ela agrupa as funções pela FATIA do
- * orçamento que cada uma recebe na assinatura eletrônica — primeiro as que
- * recebem tudo, depois as que recebem um recorte, por último as que por padrão
- * não assinam.
+ * A ORDEM É A DO ENUM DO BANCO e é a ORDEM DE EXIBIÇÃO definida pela empresa em
+ * 2026-09-28: a API ordena `roles` por ela para manter estável o diff do
+ * changelog, e as telas listam as funções nela.
  *
  * `OWNER` foi removida em 2026-09-01. Os contatos que a tinham receberam
- * COMMERCIAL + MARKETING + FINANCIAL + FLEET_MANAGER na migração.
+ * COMMERCIAL + MARKETING + FINANCIAL + FLEET_MANAGER na migração. PCP
+ * (PRODUCTION_PLANNING), Expedição (SHIPPING) e Logística (LOGISTICS) entraram
+ * em 2026-09-28.
  */
 export enum RESPONSIBLE_ROLE {
-  COMMERCIAL = "COMMERCIAL",
-  SELLER = "SELLER",
-  REPRESENTATIVE = "REPRESENTATIVE",
-  COORDINATOR = "COORDINATOR",
+  PRODUCTION_PLANNING = "PRODUCTION_PLANNING",
   PURCHASING = "PURCHASING",
-  MARKETING = "MARKETING",
+  COORDINATOR = "COORDINATOR",
+  REPRESENTATIVE = "REPRESENTATIVE",
+  SELLER = "SELLER",
   FINANCIAL = "FINANCIAL",
+  MARKETING = "MARKETING",
+  SHIPPING = "SHIPPING",
+  LOGISTICS = "LOGISTICS",
   FLEET_MANAGER = "FLEET_MANAGER",
   DRIVER = "DRIVER",
+  COMMERCIAL = "COMMERCIAL",
 }
 
 // Payment condition enum - controls payment structure

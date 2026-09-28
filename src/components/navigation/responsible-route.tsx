@@ -31,7 +31,8 @@ interface ResponsibleRouteProps {
    *   COMMERCIAL, SELLER, REPRESENTATIVE, COORDINATOR, PURCHASING → tudo
    *   FINANCIAL   → tudo menos a arte (vê preço, prazo, pagamento, garantia)
    *   MARKETING   → só a arte, NÃO vê preço
-   *   FLEET_MANAGER, DRIVER → contato operacional do veículo, não vê valor
+   *   PRODUCTION_PLANNING, SHIPPING, LOGISTICS, FLEET_MANAGER, DRIVER
+   *               → contato operacional da produção e do veículo, não vê valor
    */
   roles?: string[];
 }
