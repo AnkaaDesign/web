@@ -238,6 +238,10 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Organizational fields
     position: "Cargo",
     positionId: "Cargo",
+    // Cargo gravado no VÍNCULO (EmploymentContract). Campo próprio para não
+    // contaminar `positionId`, que a bonificação rebobina; valores já vêm
+    // como nomes de cargo.
+    contractPositionId: "Cargo do Vínculo",
     sector: "Setor",
     sectorId: "Setor",
     ledSector: "Setor Liderado",

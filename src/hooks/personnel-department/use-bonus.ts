@@ -382,16 +382,32 @@ export interface SimulateResponseUser {
   sectorName?: string;
   salary: number;
   performanceLevel: number;
+  /** Igual a `grossBonus` (bruto da pessoa). */
   bonus: number;
   baseBonus: number;
-  /** Peso do período (0–1) que o servidor aplicou. */
+  /**
+   * Peso do período (0–1, temporal × afastamento). Desde a v5 é SÓ exibição:
+   * o tempo já está no B1 da janela da pessoa e o valor não é multiplicado
+   * por ele.
+   */
   eligibilityWeight: number;
-  /** Bruto já prorrateado pelo peso — é o que a folha teria como base. */
+  /** Fator de afastamento médico — o único que multiplica o valor. */
+  absenceFactor?: number;
+  /**
+   * Bruto da pessoa: curva(B1 da janela dela, suspensa valendo 1) ×
+   * `absenceFactor`. Sem "e se", igual ao `baseBonus` da tela de Bônus.
+   */
   grossBonus: number;
+  /** Desconto "Tarefas Suspensas" recalculado sobre a base simulada (uma vez só). */
+  suspendedTasksDiscount?: number;
   /** Bruto + extras − descontos do período, pela mesma conta da lista. */
   netBonus: number;
   /** `netBonus − grossBonus`: positivo é extra, negativo é desconto. */
   adjustments: number;
+  /** B1 desta pessoa (ponderado e bruto) — o da janela dela, ou o do período. */
+  averageTasksPerUser?: number;
+  rawAverageTasksPerUser?: number;
+  b1Source?: "window" | "period";
   ratio: number;
   x: number;
   anchor: number;
@@ -404,7 +420,7 @@ export interface SimulateResponse {
   config: { k: number; x0: number; piso: number; pscale: number; ceil: number; adjustment: number };
   anchor: number;
   users: SimulateResponseUser[];
-  totals: { totalBonus: number; userCount: number; eligibleCount: number };
+  totals: { totalBonus: number; totalNetBonus?: number; userCount: number; eligibleCount: number };
   b1Curve?: Array<{ b1: number; bonus: number }>;
 }
 

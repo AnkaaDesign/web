@@ -172,9 +172,13 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const rowOverridesRef = useRef(rowOverrides);
   rowOverridesRef.current = rowOverrides;
 
-  // Get current bonus period for task counting
-  // Get current payroll period (26th-25th cycle) - centralized utility
-  // If today is Sept 26th or later, this returns October
+  // Período simulado = período CORRENTE da API (`getCurrentPeriod` em
+  // api/src/utils/bonus.ts): até o dia 5 ainda é o mês anterior, do dia 6 em
+  // diante é o mês corrente. `getCurrentPayrollPeriod` aplica exatamente essa
+  // regra — NÃO é o período de negócio (`getCurrentBusinessPeriod`, que vira
+  // no dia 26). Do dia 26 ao dia 5 o período que fechou no dia 25 ainda está
+  // em apuração, e é ele que o RH simula; trocar para o de negócio aqui faria
+  // o simulador abrir um período recém-começado, com 2 dias de tarefas.
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
   const periodKey = `${periodYear}-${periodMonth}`;
 
@@ -441,9 +445,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               positionName: u.position,
               sectorName: u.sectorName ?? undefined,
               performanceLevel: u.performanceLevel,
-              // O peso vai JUNTO: é o servidor que prorrateia e depois aplica
-              // extras e descontos do período sobre a base já prorrateada —
-              // a mesma ordem da folha.
+              // O peso vai só como informação. Desde a v5 o servidor NÃO
+              // multiplica o valor por ele: o B1 de cada pessoa é medido na
+              // janela dela (o tempo já está no numerador) e só o fator de
+              // afastamento multiplica — a mesma conta da tela de Bônus.
               eligibilityWeight: u.eligibilityWeight,
             })),
             // Send the period so the API injects the saved reajuste — the
@@ -461,9 +466,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     if (simulation?.users) {
       for (const u of simulation.users) {
         if (!u.id) continue;
-        // `grossBonus` já vem prorrateado pelo peso que mandamos; os campos
-        // novos só faltam se a API for antiga, e aí o cliente prorrateia como
-        // antes e fica sem ajustes.
+        // `grossBonus` é o bruto da pessoa (B1 da janela × afastamento) e
+        // `netBonus` já desconta as tarefas suspensas UMA vez — o campo
+        // "Tarefas" desta tela é ponderado (suspensa = 0) e o servidor sabe
+        // disso. Os campos só faltam se a API for antiga.
         const gross = u.grossBonus ?? u.bonus;
         const net = u.netBonus ?? gross;
         map.set(u.id, { gross, adjustments: u.adjustments ?? net - gross, net });
@@ -477,9 +483,8 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     if (!simulation?.users) return;
     setSimulatedUsers(prev => {
       const next = prev.map(u => {
-        // O prorrateio (o mesmo `weight` que entra no divisor da média) e os
-        // lançamentos do período são aplicados NO SERVIDOR, na ordem da folha:
-        // primeiro o peso, depois extras e descontos. Aqui só se copia.
+        // B1 da janela, fator de afastamento e lançamentos do período são
+        // aplicados NO SERVIDOR, na ordem da folha. Aqui só se copia.
         const s = settlementByUserId.get(u.id);
         const newBonus = s?.gross ?? 0;
         const newNet = s?.net ?? 0;
