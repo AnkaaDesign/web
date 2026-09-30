@@ -96,14 +96,69 @@ Draco passa intacto.
 não têm o material de origem, a contagem dá zero e ele reprova. Para repetir,
 volte o `.bak-graft-*` primeiro.
 
+## Passo 4 (2026-09-29) — `variants.mjs`: as VARIANTES, trocando peças entre os dois bakes
+
+Seis produtos, dois bakes. Os quatro que faltavam saem de uma troca de peças:
+
+| arquivo | base | o que muda |
+| --- | --- | --- |
+| `semirreboque_frigorifico_gancheiro_v1.glb` | `trailer_v2.glb` | perfil superior do gancheiro (Z), +2 fileiras de friso, teto estreito |
+| `sobrechassi_frigorifico_paleteiro_v1.glb` | `sobrechassi_frigorifico_gancheiro.glb` | perfil superior do paleteiro (banda), −2 fileiras, teto largo, sem gancheira |
+| `sobrechassi_isotermico_paleteiro_v1.glb` | `sobrechassi_frigorifico_gancheiro.glb` | banda do paleteiro, pele de FIBRA contínua, sem gancheira, com Thermo King |
+| `sobrechassi_isotermico_gancheiro_v1.glb` | `sobrechassi_frigorifico_gancheiro.glb` | pele de FIBRA contínua; Z, gancheira e Thermo King ficam |
+
+```bash
+node tools/implement-bake/variants.mjs --dry            # mede, confere os portões, não grava
+node tools/implement-bake/variants.mjs                  # as três, já na receita da §6
+node tools/implement-bake/variants.mjs --only isotermico-paleteiro
+```
+
+**O que difere entre gancheiro e paleteiro é UMA peça**, medida por censo e por
+corte de seção: o PERFIL EXTERNO SUPERIOR (duas laterais + testeira). Banda
+galvanizada de 210 mm com três nervuras no paleteiro; Z de 103 mm em barras de
+3 m com rebite modelado no gancheiro. Todo o resto do canto de cima — cantoneira
+50 × 60, travessa dianteira, portal traseiro — é a mesma peça na mesma cota em
+relação ao teto. Três coisas trocam junto porque são função do perfil: as 4 fitas
+3M horizontais que moram NA face dele, a largura e a borda dianteira do teto, e
+as fileiras de friso do alto da chapa (a banda desce 130 mm mais que o Z: 2
+fileiras de 53 mm). O porquê de cada número está no cabeçalho do script.
+
+Tudo é medido nos próprios arquivos (`regua()`), cada seleção tem portão de
+contagem, e o Z do gancheiro é LADRILHADO com as barras de fábrica em vez de
+esticado — 2 580 + 4 × 3 000 fecha os 14 580 mm do semirreboque sem corte.
+
+⚠️ **O engine precisou de duas marcas novas no `implements.json`**, e sem elas
+as variantes carregam mas saem erradas em silêncio:
+
+- `topRailMaterial` — o perfil de CIMA passou a ter material diferente do de
+  baixo. Sem ela `measureTopRail()` não acha o perfil novo e a coluna de rebites
+  para no lugar errado (122 mm abaixo do Z, ou por cima da banda).
+- `skin: "fibra"` — no isotérmico. Sem ela `buildLiveryPanels()` inventa a
+  grade de emendas de 1 m, o remonte e os rebites da chapa corrida em cima do
+  painel liso.
+- `railSkirt` — no isotérmico: a saia da chapa que saiu (a linha "saia da
+  chapa" do relatório do script). Sem friso, o trilho de piso perde a régua e
+  desce ~120 mm, e os rebites da ferragem inferior ficam no painel liso.
+
+⚠️ **A UV do painel de fibra é a do bake, escrita, não ajustada**: 100 UV por
+metro, projeção por face. Um ajuste por mínimos quadrados sobre a folha frisada
+(1ª versão) esticou o mapa por metros e o painel saiu com faixas de brilho.
+
+E as marcas se dividem em DUAS famílias: as do PERFIL (`stainlessTopRail`,
+`topRailDressing`, `topRailMaterial`) vêm de quem DOOU o perfil; as do CORPO
+(porta de fábrica, trilho de piso, mangueira, fita de canto, pino, rodagem)
+vêm da BASE. Ver os `_note` de cada entrada.
+
+Verificação no engine: `tools/studio-bench/checks-variantes-0929.mjs`.
+
 ## Convenção de nome de arquivo
 
 Três eixos, nesta ordem, separados por `_`:
 
 ```
-<montagem>_<carroceria>_<arranjo de carga>.glb
-   │            │              └── gancheiro | paleteiro | (nada, na carga seca)
-   │            └── frigorifico | carga_seca
+<montagem>_<carroceria>_<arranjo de carga>[_vN].glb
+   │            │              └── gancheiro | paleteiro | (nada, na carga seca e no isotérmico)
+   │            └── frigorifico | isotermico | carga_seca
    └── semirreboque | sobrechassi
 ```
 

@@ -7605,3 +7605,384 @@ o detalhe em si é +0,5 a +1,1 ms.
 Bancada: `checks-parque-realismo-0926.mjs` (15 poses, `--tag`/`--only`) e
 `checks-rotatoria.mjs` sem regressão. `set.glb` 18,1 → 20,3 MB; as 4 imagens do
 texopt de 13/08 foram reaplicadas (`texopt.py --image 2=256 22=128 23=64 29=64`).
+
+## 52. 2026-09-29 — as VARIANTES do implemento: cinco produtos a partir de dois bakes
+
+Pedido: *"crie agora as variações que possuímos de implementos — refrigerado
+gancheiro semirreboque, refrigerado gancheiro sobrechassi, refrigerado
+paleteiro semirreboque, refrigerado paleteiro sobrechassi, isotérmico
+sobrechassi (…) o que muda neles basicamente é o frame metálico superior (…) e
+o isotérmico, em vez de chapas, é formado por uma fibra contínua"*.
+
+### 52.1 O que difere entre gancheiro e paleteiro — MEDIDO, e é uma peça
+
+Censo malha a malha dos dois bakes + corte de seção a meio baú (fatia dos
+triângulos pelo plano z, desenhada por material). No canto de cima do flanco os
+dois têm as MESMAS peças na MESMA cota em relação ao teto — cantoneira 50 × 60
+em barras de 3 m (teto −65…−5 mm nos dois; no semirreboque ela é `inox-ferragem`,
+no sobrechassi `metal-estrutura-principal-padrao`), travessa dianteira de
+2 485 × 70 × 50, portal traseiro de 2 610 × 12 × 102 — e diferem numa só:
+
+| | paleteiro (semirreboque) | gancheiro (sobrechassi) |
+| --- | --- | --- |
+| perfil externo superior | banda de 210 mm, 3 nervuras, peça única | Z de 103 mm, aba acima do teto, barras de 3 m |
+| material | `metal-galvanizado-mantido` | `metal-estrutura-principal-padrao` (inox por `stainlessTopRail`) |
+| cota (do teto) | −207,5 … +2,6 mm | −78 … +25 mm |
+| rebite | nenhum ("lisa") | modelado, rebaixo de 2 mm a cada ~97 mm |
+| na testeira | banda de 2 490 mm | Z de 2 535 mm |
+
+Três coisas trocam junto porque são FUNÇÃO do perfil:
+
+1. **As 4 fitas 3M horizontais de topo** (300 mm, nas pontas do flanco): moram
+   na face do perfil — chatas em x 1,3035 sobre a banda, inclinadas na rampa do
+   Z —, na mesma cota nos dois (teto −78…−28 mm). A fita VERTICAL de canto não
+   troca: `fixCornerTape()` já a ancora na régua do semirreboque nos dois bakes.
+2. **O teto**: a chapa do paleteiro corre até |x| 1,2948 (a banda a cobre por
+   cima) e 42 mm à frente da pele; a do gancheiro para em 1,2413, dentro da aba
+   do Z, rente à pele na frente.
+3. **As fileiras de friso do alto da chapa**: no paleteiro a última fileira
+   fica 9,1 mm abaixo da banda; no gancheiro, 34,7 mm abaixo do Z. Trocar só o
+   perfil deixaria no semirreboque gancheiro um VÃO de 79 mm entre o topo da
+   chapa (4,012) e o pé do Z (4,091), e no sobrechassi paleteiro as duas cristas
+   de cima atravessando a banda (3,8 mm fora da face interna dela). A conta dá
+   1,96 × o passo de 53 mm → **2 fileiras**: o semirreboque ganha, o
+   sobrechassi perde. É a operação de `TrailerBody.sliceRibbed()` (saia /
+   unidade / arremate), feita uma vez no asset.
+
+### 52.2 Os três bakes novos — `tools/implement-bake/variants.mjs`
+
+| arquivo | base | perfil | pele | extra |
+| --- | --- | --- | --- | --- |
+| `semirreboque_frigorifico_gancheiro_v1.glb` (21,1 MB) | `trailer_v2.glb` | Z | +2 fileiras | teto 1 294,8 → 1 241,3 mm |
+| `sobrechassi_frigorifico_paleteiro_v1.glb` (8,7 MB) | sobrechassi gancheiro | banda | −2 fileiras | teto 1 241,3 → 1 294,8; sem gancheira |
+| `sobrechassi_isotermico_paleteiro_v1.glb` (8,7 MB) | sobrechassi gancheiro | banda | painel de FIBRA | teto largo; sem gancheira; COM Thermo King |
+| `sobrechassi_isotermico_gancheiro_v1.glb` (8,8 MB) | sobrechassi gancheiro | Z (o da base) | painel de FIBRA | gancheira e Thermo King ficam |
+
+- **Âncoras, não números**: y pelo teto, x pelo centro da pele (o sobrechassi
+  está 4 mm fora de centro), z pela ponta da pele a que a peça pertence
+  (`traseira`/`dianteira`) ou pela pele inteira (`vao`, só para a banda, que é
+  UMA extrusão — esticá-la 0,5748× no próprio eixo é exato).
+- **O Z não estica, ladrilha.** Esticá-lo 1,74× poria rebite a cada 170 mm. As
+  barras de fábrica fecham os 14 580 mm do semirreboque sem corte:
+  direita 2 580 + 4 × 3 000, esquerda 4 × 3 000 + 2 580 — a MESMA paginação das
+  cantoneiras 50 × 60 do próprio semirreboque, então as emendas coincidem. O
+  lado esquerdo do sobrechassi é o direito girado 180° (matriz com −0,01 em x e
+  z), então a barra curta vira esquerda por rotação: sem espelho, sem inverter
+  enrolamento.
+- **A gancheira sai do paleteiro e do isotérmico** (139 peças de
+  `metal-galvanizado-polido` sob o teto, 501 896 triângulos — 29 % do
+  sobrechassi). Não entra no semirreboque gancheiro: é peça de dentro e o bake
+  `_v2` tirou o kit interno de propósito.
+- **O isotérmico** é o `INSULATED` da API ("Isotérmico (Isoplastic)") e é uma
+  CARROCERIA, com os dois arranjos e COM Thermo King (2ª versão, ver 52.5): as
+  17 folhas frisadas saem e entra UM painel liso por flanco, no PLANO LISO da
+  chapa que ele substitui (ver 52.6). Perfil, gancheira, testeira, evaporador
+  e Thermo King são os do frigorífico do mesmo arranjo.
+- **Portão de contagem em toda seleção** (a doutrina de `graft-materials.mjs`):
+  3 peças de banda, 7 de Z, 4 fitas, 139 de gancheira (e, para a carga seca,
+  6 travessas do vão do Thermo King e 1 evaporador — `testeiraFechada()`, que
+  nenhuma receita usa hoje). Um bake que mude e faça uma seleção pegar peça a mais ou a menos
+  recusa a receita antes de gravar.
+
+**GOTCHA — a fileira de friso é um PAR de alturas.** O fim do arco e o vale
+ficam a 0,9 mm (3,9513 e 3,9522 no semirreboque), e o vértice seguinte do arco
+está a 4,45 mm. Tolerância de 0,6 mm reprovou a classificação (triângulo do
+arremate "atravessando" a fileira); 1,2 mm separa os dois e uma trava aborta se
+algum vértice cair entre 1,2 e 3,6 mm da fileira.
+
+**GOTCHA — a pele não é só o que é branco, fino e alto.** O forro interno do
+semirreboque (|x| 1,238, topo 4,046) passa nos três testes e o topo dele
+passaria pelo topo da pele. Só conta o plano MAIS EXTERNO de cada lado (4 mm),
+a mesma regra de `SKIN_PLANE_TOL` no engine.
+
+### 52.3 O que o engine precisou
+
+- **`topRailMaterial`** (`ImplementDef` → `TrailerBodyOptions`): o perfil de
+  CIMA passou a ter material diferente do de baixo. `measureTopRail()` usava o
+  `frameMaterial`, que é o nome do quadro de BAIXO. No semirreboque gancheiro
+  não acharia nada (volta à margem de 200 mm da banda e a coluna de rebites
+  para 122 mm abaixo do Z); no sobrechassi paleteiro acharia a cantoneira
+  50 × 60 escondida atrás da banda (teto −65 mm) e a coluna subiria 142 mm por
+  dentro dela, com a calota atravessando a face.
+
+  **GOTCHA — o Z chega à medida com OUTRO NOME.** `splitTrailerHardware()`
+  roda antes de `buildTrailerRig()` e, com `stainlessTopRail`, clona o material
+  do Z para `metal-estrutura-principal-padrao__polido`. `^…padrao$` não casa o
+  clone. Por isso o semirreboque gancheiro declara
+  `^metal-estrutura-principal-padrao(__polido)?$`. (O sobrechassi gancheiro de
+  fábrica tem o mesmo desencontro no `frameMaterial` e a medida dele se prende
+  às peças de beirada do teto — 7,6 mm do teto, na bancada; os rebites que
+  sobram ficam atrás do Z e não se veem. Não foi mexido.)
+
+  **GOTCHA — a banda do paleteiro não se mede por célula.** Ela é UMA
+  extrusão, com vértice só nas duas pontas; a votação por célula de 250 mm não
+  junta 4 células e a medida volta nula. Cai na margem constante de 200 mm, que
+  é a própria banda (207,5 mm) — no semirreboque de fábrica é assim desde
+  sempre, e no sobrechassi paleteiro fica igual.
+- **`skin: 'fibra'`**: sem ela o painel liso cai no ramo da chapa CORRIDA de
+  `buildLiveryPanels()` e ganha a grade inventada de 1 m, o remonte de 2,2 mm e
+  os rebites. Com ela a grade sai vazia e `addPlateRivets()` não põe nada.
+- **As marcas se dividem em duas famílias**: as do PERFIL (`stainlessTopRail`,
+  `topRailDressing`, `topRailMaterial`) vêm de quem doou o perfil; as do CORPO
+  (porta de fábrica, trilho de piso, mangueira, fita de canto, conduítes, pino,
+  rodagem) vêm da base. Travado em `vehicle/implements.test.ts`, que lê o
+  manifesto de verdade.
+- **`Choice.implementId`** + seção **Implemento** no card de Configurações. Até
+  aqui não havia seletor: o tipo segue o chassi e cada tipo tinha um. Agora o
+  card lista as variantes do TIPO EM CENA (rótulo = `short`); o clique chama
+  `applyChoice()` com a escolha corrente e outro `implementId` — `sameRig()`
+  passou a comparar o campo, então a troca pega a orquestração inteira (fusão,
+  cortina, montagem) e só o implemento é rebaixado. O id é uma PREFERÊNCIA: um
+  id de outro tipo cai no primeiro do tipo e fica guardado para a volta, e ele
+  atravessa a troca de caminhão pelo seletor (que não sabe de implemento).
+  Opcional como `trim`/`measures`/`paintTarget`: quem nunca escolheu grava byte
+  a byte o que gravava.
+
+### 52.4 Verificação
+
+- `vehicle/implements.test.ts` — 8 testes sobre o manifesto de verdade (Node 24).
+- `tools/studio-bench/checks-variantes-0929.mjs --gpu --geometry` — as cinco,
+  trocadas pelo MESMO `applyChoice({…, implementId})` que o card chama:
+
+  | variante | fileiras | arremate | pé do perfil (do teto) | frisadas | TK |
+  | --- | --- | --- | --- | --- | --- |
+  | semi paleteiro (fábrica) | 45 | 216,7 mm | nulo → margem 200 | 2 | sim |
+  | semi gancheiro | 47 | 110,7 mm | 70,5 mm | 2 | sim |
+  | sobre gancheiro (fábrica) | 48 | 112,7 mm | 7,6 mm | 2 | sim |
+  | sobre paleteiro | 46 | 218,7 mm | nulo → margem 200 | 2 | sim |
+  | isotérmico (1ª versão, sem TK) | 0 | — | nulo | 0 | não |
+
+  O arremate de cada variante nova é o do bake que DOOU o perfil (110,7 × 112,7;
+  218,7 × 216,7) — a prova numérica de que as ±2 fileiras recompuseram a
+  relação friso/perfil. Fotos: conjunto, perfil, os dois cantos e a testeira.
+
+  **GOTCHA — close pela órbita não funciona.** A mira tem coleira
+  (`FOCUS_PAN_F` = 0,28 · r) e a câmera é expulsa da caixa do veículo: posta
+  num canto a 7 m do centro, a mira volta e a câmera acaba DENTRO do baú (tela
+  branca). O perfil sai por zoom óptico (longe, FOV 7°); os cantos e a testeira
+  por `renderer.render(S.scene, câmera própria)` lido no mesmo quadro.
+
+  **GOTCHA — a espera da bancada não reprova sozinha.** `B.until()` devolve
+  quando o prazo estoura; a primeira rodada mediu cinco vezes os bakes de
+  fábrica e disse "tudo certo". Por isso o booleano `trocou para …`.
+
+### 52.5 A 2ª volta — o que o dono viu na tela (2026-09-29, tarde)
+
+Relato, com três prints no Scania P 8x2: *"isotérmico está quebrado, a chapa do
+isotérmico parece estar sangrando, além disso veja a placa da traseira
+flutuando, e deve-se ter isotérmico paleteiro e gancheiro, e o isotérmico deve
+ter thermo king também"*. Três defeitos e uma decisão de produto, cada um com
+a causa medida antes do conserto.
+
+**1. "Sangrando" = UV esticada.** O mapa de rugosidade/metalicidade do branco
+é uma nuvem (verde 0,55…0,79) em `REPEAT`, e a folha frisada o projeta POR FACE
+EM CENTÍMETROS (`u = z` local em cm: 100 repetições por metro). O painel de
+fibra tinha UV de um ajuste por mínimos quadrados sobre a folha, em que as faces
+de ponta dominaram e inverteram os eixos: **0,7 repetição em 8,4 m** na
+horizontal. A nuvem esticada por metros virou faixas verticais de brilho e o
+tom azulado de céu dos prints. Agora `caixa()` escreve a projeção por face a
+100 UV/m — a do bake —, sem ajuste nenhum.
+
+**2. Os pontos pretos no pé do painel = a fileira de rebites da ferragem
+inferior, na pele.** Identificados por RAIO DE PIXEL na bancada: `RIVET_LOW_L[2…6]`,
+5 a 7 mm fora da face do painel, um por corte do trilho (a cada 1 002 mm). Duas
+causas, uma sobre a outra:
+
+- *O trilho de piso descia na fibra.* `fixLowFrameRail()` põe o topo do
+  trilho 47,8 mm abaixo da PRIMEIRA FILEIRA DE FRISO; a fibra não tem fileira,
+  `skirtHeight` = 0, o alvo caía abaixo do piso e o trilho DESCIA. Conserto:
+  `railSkirt` (0,1203 m, a saia da chapa que saiu, medida pela receita) vira a
+  régua do trilho quando declarada. Medido depois: "topo a 72,5 mm do piso"
+  no isotérmico, 72,4 no gancheiro de chapa.
+- *A fileira já saía ACIMA do trilho no sobrechassi, desde sempre.*
+  `lowerRivets()` tira a altura da média das bordas de corte (inox
+  13 × 94 × 13 mm), medida no semirreboque, onde ela mora 32,4 mm abaixo do
+  topo de um trilho de 210 mm. No sobrechassi as bordas que casam a assinatura
+  ficam acima do trilho (topo a 72,4 mm do piso), e a fileira ia parar 60 a
+  130 mm acima dele — na pele. Na chapa frisada ela se passava pelo rebite de
+  baixo da coluna da emenda; no painel liso, não. Conserto (`trailer-assembly.ts`,
+  bloco 3b): a fileira nunca passa de `RIVET_LOW_UNDER_TOP` (32,4 mm) abaixo do
+  topo do trilho do seu flanco — identidade no semirreboque, e a fileira volta
+  para o trilho em TODOS os sobrechassis.
+
+**3. A placa flutuando = a chapa Ankaa corrompia o KIT.** Não era do
+isotérmico: o sobrechassi gancheiro de FÁBRICA tinha o mesmo defeito, a partir
+da SEGUNDA carga de sobrechassi na sessão. `attachBrandPlate()` criava a malha
+com a geometria do `porta_kit_v1.glb`, que é carregado uma vez e reaproveitado;
+a chapa entra antes de `buildTrailerRig()` e `TrailerAssembly` REESCREVE os
+vértices de toda peça não branca ao esticar o baú (8,38 → 9,5 m no 8x2).
+`markShared()` só vê compartilhamento dentro da raiz — ali a chapa tem um
+usuário só — e a escrita caía na geometria do kit. Medido: mesma geometria
+(uuid `7c281e3c`) em quatro cargas seguidas e a chapa a −0,002, −1,048, −2,053
+e −3,132 m da traseira. Conserto: `geometry.clone()`. Com as variantes a troca
+de implemento virou rotina, e o defeito saiu do canto.
+
+**3b. O Thermo King descia na troca de variante = a fusão de pé.** Não
+estava no relato — apareceu na bancada da 2ª volta, comparando a testeira do
+MESMO sobrechassi gancheiro na 1ª e na 7ª carga: unidade em y 1,953 cobrindo o
+vão, e depois em 1,582 com o vão e o evaporador à mostra. O console dizia a
+causa: *"a travessa da testeira foi medida com a FUSÃO DE PÉ — 7 balde(s) de
+ferragem no caminho"*. `runApply()` soltava a fusão só com cabine nova
+(`needCab`), e o bloco A FUSÃO SAI DE PÉ ANTES DA CABINE explica por quê; com o
+seletor de variante a troca mais comum passou a ser implemento SEM cabine.
+Conserto: `needCab || needTrailer`. Portões novos: nenhum aviso de "FUSÃO DE
+PÉ" em carga nenhuma, e o Thermo King no MESMO `position` na 1ª e na 2ª carga
+do mesmo implemento.
+
+**4. O isotérmico tem Thermo King e os dois arranjos.** A 1ª versão fazia um
+isotérmico só, sem máquina e com a testeira fechada — decisão minha, corrigida.
+Agora são `sobrechassi-isotermico-paleteiro` e `…-gancheiro`; a testeira, o
+evaporador e o Thermo King ficam. `testeiraFechada()` continua no script para a
+carga seca.
+
+**5. O seletor ganhou dois eixos.** Quatro variantes no sobrechassi numa
+fileira só não cabiam no card. `ImplementDef.body` (frigorifico · isotermico ·
+carga_seca) × `ImplementDef.arrangement` (paleteiro · gancheiro) são as duas
+fileiras; trocar uma mantém a outra quando a combinação existe. A carga seca
+entra como carroceria sem arranjo e a segunda fileira some sozinha.
+
+**Portões novos em `checks-variantes-0929.mjs`**: a chapa Ankaa a menos de
+80 mm da traseira em TODA carga (a lista volta ao gancheiro no fim, a quarta
+carga de sobrechassi), e cada rebite da ferragem inferior abaixo do topo do
+trilho NO z DELE — o topo como a reta entre as pontas, porque o trilho é
+extrusão (vértice só nas pontas: a 1ª versão do portão, por fatia de z, não
+achava trilho nenhum e reprovou com "Infinity") e o conjunto é inclinado ~8 cm.
+
+⚠️ `trailer-assembly.ts` também é ESPELHADO com `truck-studio-desktop` — o
+bloco 3b de `lowerRivets()` vai junto com o `topRailMaterial`/`railSkirt` de
+`trailer-geometry.ts`.
+
+### 52.6 A 3ª volta — "a chapa está sangrando sobre os frames"
+
+Relato com print do canto traseiro do isotérmico gancheiro: *"ainda está
+errado os frames metálicos do isotérmico, veja só, a chapa está sangrando sobre
+eles"*. E estava: o painel de fibra tinha a face de fora na CRISTA do friso
+(x 1,3075 à direita) e a de dentro no vale interno — 6 mm de casca. Os quadros
+foram modelados contra a parte LISA da chapa (o arremate de cima e a saia de
+baixo, no plano do VALE, 1,3015…1,3023), e o corte de seção mostrou o painel
+engolindo a perna do perfil Z (1,3020…1,3044) e a da cantoneira 50 × 60
+inteiras, e o pé da banda do paleteiro (face interna 1,3037).
+
+Conserto: o painel ocupa as DUAS faces da parte lisa da chapa, medidas nas
+próprias folhas no arremate de cima (0,8 mm: 1,3015…1,3023 à direita,
+−1,2942…−1,2934 à esquerda). A relação de cada quadro com a pele volta a ser
+exatamente a da chapa de fábrica.
+
+**E embaixo, o mesmo defeito por outro caminho.** Com o painel no plano liso,
+o trilho de piso passou a ficar 1,4 mm ATRÁS dele (raio de pixel na bancada:
+face do trilho em x −1,2928 contra o painel em −1,2942; na chapa, o trilho fica
+3,8 mm à FRENTE da parte lisa). `fixLowFrameRail()` põe o trilho `RAIL_PROUD`
+à frente do ponto mais saliente da pele — na chapa, a CRISTA, 5,2 mm à frente
+da parte lisa; na fibra, o próprio painel. Conserto: `railRelief` (0,0052 m, o
+relevo parte lisa → crista da chapa que saiu, medido pela receita) entra como
+`skinOut` do alvo do trilho — o trilho vai para onde iria com a chapa, e o
+quadro de baixo do isotérmico fica igual ao do frigorífico.
+
+**Portão novo na bancada (PORTÃO 3)**: raios HORIZONTAIS contra o flanco, 20
+pontos ao longo do baú, a 12 e 35 mm para dentro de cada quadro (acima do pé
+do perfil de cima, abaixo do topo do trilho de piso), no referencial da raiz:
+o primeiro objeto atingido tem de ser metal, nunca o branco. É a pergunta "o
+quadro aparece?" feita direto, sem depender de foto.
+
+**Portão novo no bake (`portaoEngolidas()`)**: nenhuma peça metálica que cruze
+a área do painel pode ter a face de fora COPLANAR com a dele (±0,2…0,3 mm) —
+aparece e some, disputando profundidade. Atrás (inclusive encostada, como o
+marco da porta de fábrica e os montantes internos da traseira, 0,3 mm atrás da
+parte lisa já na chapa original) ou na frente, passa. E um relatório do
+inverso: o que ficava entre o vale e a crista, escondido pelas ondas, e que o
+painel liso agora expõe — hoje só a banda de baixo do quadro, que é para
+aparecer.
+
+**GOTCHA — `resolveChoice()` (studio.ts) reconstrói a escolha com SEIS
+campos.** Cenário, montadora, modelo, chassi, cor e película; o resto morre no
+literal. O `implementId` morreu ali na primeira rodada da bancada, que mediu
+cinco vezes os dois bakes de fábrica e disse "tudo certo" (a espera estourava
+calada) — daí o booleano `trocou para …` no `checks-variantes-0929.mjs`. O
+campo passou a ser carregado. ⚠️ **`trim`, `measures` e `paintTarget` têm o
+MESMO destino e NÃO foram mexidos aqui**: `runApply()` chama
+`trim.setTrimChoice(choice.trim)` e `applySavedMeasures(choice.measures)` com a
+escolha já resolvida, ou seja com `undefined` — o que ZERA os acabamentos.
+**Confirmado na bancada** (sonda descartável, 2026-09-29): uma escolha entregue
+a `applyChoice()` com paralama `#c8102e` e medidas 2,5 × 13 m, trocando de
+cavalo para forçar `runApply()`, sai com o paralama nulo e o baú em
+2,79 × 14,70 m, e `S.choice.trim` nulo. O F5 entrega a escolha gravada pelo
+mesmo caminho. Não foi consertado aqui — é pré-existente e mexe na restauração
+do documento de projeto (`project/document.ts` hidrata o `trim` por fora).
+
+⚠️ `trailer-geometry.ts` é ESPELHADO com `truck-studio-desktop` — a opção
+`topRailMaterial` e a pele lisa com porta (§52.7: `SMOOTH_SKIN_*`,
+`smoothSkin`, o segmento único em `doorsOf()`) precisam ser levadas para lá (o
+repositório não está nesta máquina).
+
+⚠️ **Deploy**: o manifesto é lido da ÁRVORE DE ASSETS (`fetchJSON(VEHICLES_DIR +
+'implements.json')`), não do bundle do web. Então os três `_v1.glb` e o
+`implements.json` sobem JUNTOS para `/studio-assets/v1/models/vehicles/`
+(árvore `immutable`, `--delete` proibido) — os GLBs ANTES do manifesto: um
+manifesto novo sobre GLBs ausentes mostra as variantes no card e a troca dá 404
+mudo. O web sozinho (com o manifesto velho no servidor) continua com um
+implemento por tipo e o card sem a seção, que é o comportamento de antes.
+
+### 52.7 A 4ª volta — "a porta continua quebrada": o painel liso não abria o vão
+
+Relato com print da porta lateral do isotérmico: *"a porta continua quebrada,
+analise melhor os níveis z dos elementos"*. Na tela, a moldura galvanizada e a
+ferragem apareciam soltas na frente de um painel inteiro.
+
+**Causa.** `TrailerBody` só dava `face` à chapa FRISADA (`findRows()` com
+`MIN_RIB_ROWS`). O painel de fibra não tem friso, caía em `span` sem `face`, e
+`emit()` sem `face` escreve o triângulo inteiro: nem o vão (`subtractGap`) nem
+a folha (`intersectRect` + `LEAF_INSET`). E como não há grade de friso,
+`snapFlatSegments()` caía nas frações cruas de `LEAF_FLAT_BANDS` e emitia os
+quatro quads das faixas lisas a −10,3 mm, ESCONDIDOS atrás do painel inteiro.
+
+**A pilha, medida por raio antes e depois** (`checks-porta-fibra-0929.mjs`, mm
+para fora de `skinX`; a pele da fibra é o próprio `skinX`, 0,0):
+
+| região (raio de fora)        | fibra ANTES      | fibra DEPOIS       | chapa (referência)       |
+|------------------------------|------------------|--------------------|--------------------------|
+| folha                        | painel @ 0,0     | folha @ −5,1       | friso −5,1…−10,3         |
+| vão (entre folha e moldura)  | painel @ 0,0     | marco @ −6,0       | marco @ −6,0             |
+| moldura                      | moldura @ +5,0   | moldura @ +5,0     | moldura @ +5,0           |
+| pele ao lado                 | painel @ 0,0     | painel @ 0,0       | crista/vale 0…−4,4       |
+
+**Conserto** (`trailer-geometry.ts`):
+
+1. **A pele LISA ganha `face`** — casca que atravessa o vão, com espessura
+   < `SMOOTH_SKIN_THICK` (3 mm; o painel tem 0,8) e a face de fora a menos de
+   `SMOOTH_SKIN_FACE_TOL` (1 mm) do limite do corpo. Segue `span` com
+   `stretchY` (plana: esticar em Y é exato). As duas condições juntas não pegam
+   o forro (57…62 mm para dentro) nem os perfis de arremate (95…205 mm).
+2. **Na pele lisa a folha é lisa**: um segmento só, `flat: false`, recortado
+   e levado `LEAF_INSET` para dentro como a folha frisada — sem as faixas
+   rebaixadas, que são "a chapa sem o vinco" e não têm sentido sem vinco.
+
+`skinX` não precisou mudar: na fibra o limite do corpo JÁ é a face do painel
+(−1,2982 / +1,2983, a 5,3 mm da crista da chapa −1,3035), e a porta inteira —
+moldura, folha, borracha, marco, ferragem — é montada contra ele.
+
+**A ferragem, peça a peça.** Cada instância medida em profundidade (costas e
+frente) e contra a superfície em que se apoia. Na fibra: nenhuma enterrada;
+todas na MESMA profundidade da chapa (±0,00 mm — a porta é montada contra
+`skinX` nas duas); e as bases parafusadas na folha (tala, cabeçote, guia e
+suporte, manípulo, alavanca, trinco) assentadas a 0,5…1,0 mm da folha lisa.
+
+⚠️ **GOTCHA de bancada — a pele lateral NÃO está em `body.mesh`.**
+`buildLiveryPanels()` tira os triângulos do flanco para `SIDE_L`/`SIDE_R`
+(material `…__parametric`, mesmo nome); `body.mesh` fica com forro e
+acabamento. Raio só contra `body.mesh` "atravessa" a folha e acha o forro — a
+primeira versão da medida da ferragem acusou 5,2 mm de diferença que era só o
+forro visto de outro `skinX`. E a SOBREPOSIÇÃO da arte (`userData.liveryOverlay`,
+filha do painel, mesma geometria) é coplanar por construção: sai da contagem de
+pares colados.
+
+⚠️ **GOTCHA de bancada — as coordenadas do corpo não são as do mundo.** O
+grupo do `TrailerBody` desfaz a matriz do implemento, e o conjunto é levado ao
+chassi depois: `skinX`, `doorHoles` e `profile` estão no espaço de
+`body.mesh`. Raio montado direto com eles passa ao lado do baú — e a primeira
+rodada disse "tudo certo" com 200/200 raios em "nada". O portão agora reprova
+região sem acerto.
+
+Observação, não mexida (pré-existente na CHAPA): a ferragem que cai numa faixa
+lisa da folha frisada fica ~6 mm acima dela — o inventário mede `w` da face da
+folha (a crista), e a faixa está 5,2 mm atrás. Na fibra a folha é a crista e a
+folga é a do inventário.

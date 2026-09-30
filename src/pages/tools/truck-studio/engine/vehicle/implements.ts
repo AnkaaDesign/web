@@ -43,6 +43,13 @@ export type ImplementKind =
   /** Aparafusado no chassi de um caminhão rígido. */
   | 'sobrechassi';
 
+/** A carroceria — ver `ImplementDef.body`. */
+export type ImplementBody = 'frigorifico' | 'isotermico' | 'carga_seca';
+/** O arranjo de carga — ver `ImplementDef.arrangement`. */
+export type ImplementArrangement = 'paleteiro' | 'gancheiro';
+const BODIES: readonly ImplementBody[] = ['frigorifico', 'isotermico', 'carga_seca'];
+const ARRANGEMENTS: readonly ImplementArrangement[] = ['paleteiro', 'gancheiro'];
+
 /** As peças que este implemento tem — o que é `false` não é sequer baixado. */
 export interface ImplementParts {
   /** Rodagem própria (e portanto a troca por `wheel_fh16_v2.glb`). */
@@ -115,6 +122,50 @@ export interface ImplementDef {
    * usar o mesmo nome dos dois punha o batente a 250,5 mm em vez de 122,5.
    */
   sillMaterial?: string;
+  /**
+   * O perfil de CIMA, quando ele não é o mesmo do de baixo. Padrão:
+   * `frameMaterial`. Ver `TrailerBodyOptions.topRailMaterial` — nasceu com as
+   * VARIANTES, em que o perfil de topo é trocado entre os dois bakes e o de
+   * baixo não (`tools/implement-bake/variants.mjs`).
+   */
+  topRailMaterial?: string;
+  /**
+   * De que é feita a PELE do flanco. Padrão: `'chapa'`.
+   *
+   * `'chapa'` é a chapa frisada de alumínio, em folhas — e é por ela que
+   * `buildLiveryPanels()` põe emenda, remonte e coluna de rebites (inventando a
+   * grade quando o bake traz a chapa corrida, como o semirreboque).
+   *
+   * `'fibra'` é o painel contínuo do ISOTÉRMICO ("Isoplastic" na API): liso, de
+   * ponta a ponta, sem emenda nem rebite. Sem esta marca o painel ganharia a
+   * grade inventada de 1 m com remonte de 2,2 mm e rebite — chapa desenhada em
+   * cima de fibra.
+   */
+  skin?: 'chapa' | 'fibra';
+  /**
+   * A saia da chapa que o painel de FIBRA substituiu — ver
+   * `TrailerBodyOptions.railSkirt`. Só faz sentido com `skin: 'fibra'`; é
+   * medida no bake de origem por `tools/implement-bake/variants.mjs` (a linha
+   * "saia da chapa" do relatório).
+   */
+  railSkirt?: number;
+  /**
+   * O relevo (vale → crista) da chapa que o painel de FIBRA substituiu — ver
+   * `TrailerBodyOptions.railRelief`. Medido pela receita (a linha "relevo da
+   * chapa" do relatório de `variants.mjs`).
+   */
+  railRelief?: number;
+  /**
+   * A CARROCERIA e o ARRANJO DE CARGA — os dois eixos do seletor do card de
+   * Configurações. O tipo (`kind`) não entra: quem o decide é o chassi.
+   *
+   *   carroceria  frigorifico · isotermico · (carga_seca, a próxima)
+   *   arranjo     paleteiro · gancheiro · (nenhum, na carga seca)
+   *
+   * Ausentes = o card cai na lista simples pelo `short`, como antes.
+   */
+  body?: ImplementBody;
+  arrangement?: ImplementArrangement;
   /**
    * Este bake traz uma PORTA LATERAL de fábrica, e ela tem de sair.
    *
@@ -296,6 +347,16 @@ function parseOne(raw: unknown): ImplementDef | null {
       ? o.frameMaterial : undefined,
     sillMaterial: typeof o.sillMaterial === 'string' && o.sillMaterial
       ? o.sillMaterial : undefined,
+    topRailMaterial: typeof o.topRailMaterial === 'string' && o.topRailMaterial
+      ? o.topRailMaterial : undefined,
+    skin: o.skin === 'fibra' ? 'fibra' : 'chapa',
+    railSkirt: typeof o.railSkirt === 'number' && o.railSkirt > 0 && o.railSkirt < 1
+      ? o.railSkirt : undefined,
+    railRelief: typeof o.railRelief === 'number' && o.railRelief > 0 && o.railRelief < 0.02
+      ? o.railRelief : undefined,
+    body: BODIES.includes(o.body as ImplementBody) ? o.body as ImplementBody : undefined,
+    arrangement: ARRANGEMENTS.includes(o.arrangement as ImplementArrangement)
+      ? o.arrangement as ImplementArrangement : undefined,
     bakedSideDoor: bool(o.bakedSideDoor, false),
     makerBranding: bool(o.makerBranding, false),
     lowFrameSkin: bool(o.lowFrameSkin, false),
@@ -338,6 +399,8 @@ function reOf(src: string | undefined, campo: string, id: string): RegExp | unde
 export const frameRegexOf = (d: ImplementDef) => reOf(d.frameMaterial, 'frameMaterial', d.id);
 /** O perfil de BAIXO, quando ele tem material próprio. */
 export const sillRegexOf = (d: ImplementDef) => reOf(d.sillMaterial, 'sillMaterial', d.id);
+/** O perfil de CIMA, quando ele tem material próprio. */
+export const topRailRegexOf = (d: ImplementDef) => reOf(d.topRailMaterial, 'topRailMaterial', d.id);
 
 /**
  * Instala o manifesto. `null` (ou um manifesto inútil) mantém o padrão de

@@ -403,6 +403,27 @@ export interface Choice {
    * vizinhos: gravar o padrão faria `sameRig()` ver diferença onde não há.
    */
   paintTarget?: 'both';
+  /**
+   * QUAL IMPLEMENTO — o id em `models/vehicles/implements.json`.
+   *
+   * Até as VARIANTES (2026-09-29) não havia o que escolher: o TIPO do
+   * implemento segue o chassi (cavalo → semirreboque, rígido → sobrechassi) e
+   * cada tipo tinha um só. Agora cada tipo tem mais de um — frigorífico
+   * paleteiro e gancheiro nos dois, e o isotérmico no sobrechassi — e o card
+   * de Configurações escolhe entre os do tipo em cena.
+   *
+   * É uma PREFERÊNCIA, não uma ordem: quem decide o tipo continua sendo o
+   * chassi. Um id de semirreboque gravado numa escolha de caminhão rígido não
+   * invalida nada — `runApply()` cai no primeiro sobrechassi do catálogo e o id
+   * fica guardado para quando o cavalo voltar.
+   *
+   * Mesma disciplina de `trim`, `measures` e `paintTarget`: opcional, AUSENTE
+   * enquanto ninguém escolher (a escolha gravada de quem nunca abriu o seletor
+   * continua byte a byte a de antes), e descartado em silêncio quando vem
+   * estranho. `catalog.ts` não conhece o catálogo de implementos — quem valida
+   * o id contra ele é `runApply()`.
+   */
+  implementId?: string;
 }
 
 /**
@@ -1405,6 +1426,10 @@ function normalizeChoice(choice: unknown): ResolvedChoice | null {
     /* Só `'both'` é gravável: qualquer outra coisa (inclusive `'cab'`, que é o
        padrão) some da chave pela mesma regra dos dois vizinhos acima. */
     ...(c.paintTarget === 'both' ? { paintTarget: 'both' as const } : {}),
+    /* O id é validado contra o catálogo de implementos em `runApply()`; aqui só
+       se recusa o que não é texto — ver `Choice.implementId`. */
+    ...(typeof c.implementId === 'string' && c.implementId.trim()
+      ? { implementId: c.implementId.trim() } : {}),
   };
 }
 

@@ -243,7 +243,10 @@ export class TrailerRig {
     /* O TRILHO DE PISO, na MESMA janela e pela mesma razão: ele precisa do
        `floorY` que só `TrailerBody` mede, e precisa acontecer antes de
        `TrailerAssembly` congelar `piece.base`. Ver `fixLowFrameRail()`. */
-    if (opts.lowFrameRail) fixLowFrameRail(root, p.floorY, p.floorY + p.skirtHeight);
+    if (opts.lowFrameRail) {
+      fixLowFrameRail(root, p.floorY, p.floorY + (opts.railSkirt ?? p.skirtHeight),
+        opts.railRelief ?? 0);
+    }
     /* A ESTAÇÃO DE ENCOSTO DA PORTA assenta na faixa lisa do friso, e por isso
        ela precisa da FASE do perfil — que só existe depois de `TrailerBody`. A
        janela é a mesma das duas acima e pela mesma razão: antes de

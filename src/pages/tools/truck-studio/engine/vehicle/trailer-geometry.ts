@@ -150,6 +150,28 @@ const NOMINAL_PITCH = 0.053;
 const MIN_RIB_ROWS = 20;
 
 /**
+ * A PELE LISA — o painel de fibra do isotérmico (`skin: "fibra"` no
+ * `implements.json`, assado por `tools/implement-bake/variants.mjs`).
+ *
+ * *"a porta continua quebrada"* — Kennedy, 2026-09-29, com print da porta do
+ * isotérmico. Só a chapa FRISADA ganhava `face`, e sem `face` o `emit()` escreve
+ * o triângulo inteiro: o painel não abria o vão nem destacava a folha. Medido
+ * por raio: folha e vão batiam no painel a 0,0 mm; a moldura (+5,0 mm) e a
+ * ferragem ficavam soltas na frente dele, e o marco (−6,0 mm) sumia atrás. As
+ * faixas lisas da folha ainda saíam, a −10,3 mm, escondidas atrás do painel
+ * inteiro.
+ *
+ * O painel é uma caixa de 0,8 mm com a face de fora no plano liso da chapa que
+ * ele substitui: fina, atravessando o vão, e com a face de fora EXATAMENTE no
+ * limite do corpo (`skinX` é esse limite, e é contra ele que a porta inteira é
+ * montada). As duas condições juntas não pegam o forro (57…62 mm para dentro)
+ * nem os perfis de arremate (95…205 mm de espessura).
+ */
+const SMOOTH_SKIN_THICK = 0.003;
+/** Quanto a face de fora da pele lisa pode ficar aquém do limite do corpo. */
+const SMOOTH_SKIN_FACE_TOL = 0.001;
+
+/**
  * Espessura máxima, em X, de uma FOLHA de chapa de pele.
  *
  * O semirreboque tem UMA casca por lateral, de ponta a ponta: a chapa é uma
@@ -1600,6 +1622,21 @@ export interface TrailerBodyOptions {
    */
   sillMaterial?: RegExp;
   /**
+   * O material do perfil de CIMA, quando ele não é o mesmo do de baixo.
+   * Padrão: `frameMaterial`.
+   *
+   * Existe desde as VARIANTES (2026-09-29, `tools/implement-bake/variants.mjs`):
+   * o perfil de topo passou a ser trocável entre os dois bakes, e o de baixo
+   * não. O semirreboque GANCHEIRO tem o Z do gancheiro
+   * (`metal-estrutura-principal-padrao`) em cima e o galvanizado de sempre em
+   * baixo; o sobrechassi PALETEIRO tem a banda galvanizada em cima e o
+   * esqueleto estrutural embaixo. Com um nome só, `measureTopRail()` não acha o
+   * perfil — no semirreboque gancheiro volta à margem de 200 mm (a da banda) e
+   * a coluna de rebites para 122 mm abaixo do Z; no sobrechassi paleteiro acha
+   * a cantoneira 50 × 60 escondida atrás da banda e a coluna SOBE por cima dela.
+   */
+  topRailMaterial?: RegExp;
+  /**
    * O KIT DA PORTA já pronto, vindo de `models/vehicles/porta_kit_v1.glb`.
    *
    * Sem ele, `extractDoorKit()` monta a porta com as peças da porta TRASEIRA do
@@ -1634,6 +1671,32 @@ export interface TrailerBodyOptions {
    * mesma peça em dois comprimentos.
    */
   lowFrameRail?: boolean;
+  /**
+   * A SAIA DA CHAPA (piso → primeira fileira de friso), em metros, quando a
+   * pele NÃO TEM friso. É a régua do trilho de piso (`fixLowFrameRail()` para
+   * o topo dele 47,8 mm abaixo da primeira fileira).
+   *
+   * Existe pelo ISOTÉRMICO (2026-09-29): a pele é um painel de fibra liso, sem
+   * fileira nenhuma, e `profile.skirtHeight` sai ZERO — o alvo do trilho caía
+   * abaixo do piso e ele DESCIA ~120 mm em vez de subir, deixando a fileira de
+   * rebites da ferragem inferior (`RIVET_LOW_*`) sobre o painel liso: os
+   * "pontos" do relato. O painel substitui a chapa do MESMO baú, então o
+   * trilho tem de ficar onde fica no sobrechassi de chapa — e é essa saia,
+   * medida na chapa que saiu (120,3 mm no sobrechassi), que o põe lá.
+   * Ausente = a saia medida (`profile.skirtHeight`).
+   */
+  railSkirt?: number;
+  /**
+   * O RELEVO DA CHAPA (vale → crista), em metros, quando a pele NÃO TEM friso.
+   * É a outra metade da régua do trilho de piso: `fixLowFrameRail()` põe o
+   * perfil `RAIL_PROUD` à frente do ponto MAIS SALIENTE da pele, que na chapa
+   * é a crista do friso. O painel de fibra do isotérmico ocupa o plano LISO da
+   * chapa (5,2 mm atrás da crista) — sem este relevo o trilho ia 5,2 mm mais
+   * para dentro que o do sobrechassi de chapa e ficava 1,4 mm ATRÁS do painel,
+   * com o branco cobrindo o terço de cima dele (*"a chapa está sangrando sobre
+   * os frames"*, 2026-09-29). Ausente = 0.
+   */
+  railRelief?: number;
   /** Assentar a estação de encosto da porta na faixa lisa do friso — ver
    *  `seatFlankCatches()`. */
   flankCatchOnFlat?: boolean;
@@ -1691,6 +1754,10 @@ export class TrailerBody {
   /** A grade do friso de cada lateral, para ancorar as faixas lisas da folha
    *  no VALE (`snapFlatSegments`). Medida na malha, como tudo aqui. */
   private ribGrid: Partial<Record<'left' | 'right', RibGrid>> = {};
+  /** As laterais cuja pele é LISA (o painel de fibra) — ver
+   *  `SMOOTH_SKIN_THICK`. A folha da porta delas é lisa também: um segmento
+   *  só, sem faixa rebaixada. */
+  private smoothSkin = new Set<'left' | 'right'>();
   /** As emendas que o BAKE já traz, em distância da parede dianteira e na
    *  medida DE FÁBRICA. Vazio quando a pele é chapa corrida. Ver
    *  `mergeSkinSheets()` e `sheetSeamsFromFront()`. */
@@ -1710,11 +1777,14 @@ export class TrailerBody {
   private readonly frameRe: RegExp;
   /** Ver `TrailerBodyOptions.sillMaterial`. */
   private readonly sillRe: RegExp;
+  /** Ver `TrailerBodyOptions.topRailMaterial`. */
+  private readonly topRailRe: RegExp;
   /** O kit compartilhado, quando há um. Ver `TrailerBodyOptions.kit`. */
   private readonly kitAsset: THREE.Object3D | null;
   constructor(root: THREE.Object3D, opts: TrailerBodyOptions = {}) {
     this.frameRe = opts.frameMaterial ?? FRAME_MAT_RE;
     this.sillRe = opts.sillMaterial ?? this.frameRe;
+    this.topRailRe = opts.topRailMaterial ?? this.frameRe;
     this.kitAsset = opts.kit ?? null;
     const { tris, meshes, material } = collect(root);
     if (!tris.length) throw new Error('TrailerBody: nenhuma malha branca encontrada');
@@ -1783,6 +1853,17 @@ export class TrailerBody {
           this.shells.push(sh);
           continue;
         }
+        /* Sem friso: a pele LISA ainda é a pele da face, e é ela quem abre o
+           vão e dá a folha da porta. Ver `SMOOTH_SKIN_THICK`. Ela segue como
+           `span` com `stretchY` — é plana, esticar em Y é exato. */
+        const lado = (b.min.x + b.max.x) / 2 > cx ? 'right' : 'left';
+        const rente = lado === 'right'
+          ? body.max.x - b.max.x < SMOOTH_SKIN_FACE_TOL
+          : b.min.x - body.min.x < SMOOTH_SKIN_FACE_TOL;
+        if (rente && b.max.x - b.min.x < SMOOTH_SKIN_THICK) {
+          sh.face = lado;
+          this.smoothSkin.add(lado);
+        }
       }
 
       if (spanZ > bodyL * 0.5) sh.behaviour = 'span';
@@ -1811,7 +1892,7 @@ export class TrailerBody {
       sillY: measureSill(root, cx, half, body.min.y, this.sillRe) + SILL_CLEARANCE,
       /* MEDIDO, não constante — ver `measureTopRail()`. `null` quando o perfil
          não aparece, e aí `measureValeRows()` volta à margem antiga. */
-      topRailY: measureTopRail(root, cx, half, body.max.y, this.frameRe),
+      topRailY: measureTopRail(root, cx, half, body.max.y, this.topRailRe),
       z0, z1,
       width: body.max.x - body.min.x,
       base: { width: body.max.x - body.min.x, height: baseHeight, length: bodyL },
@@ -2141,7 +2222,17 @@ export class TrailerBody {
            continua a descida do friso". */
         const grid = face === 'left' || face === 'right'
           ? this.ribGrid[face] : undefined;
-        out.push({ leaf, hole: holeOf(leaf), segs: snapFlatSegments(leaf, grid) });
+        /* NA PELE LISA A FOLHA É LISA — um segmento só, recortado e levado
+           `LEAF_INSET` para dentro como a folha frisada. As faixas lisas são a
+           chapa SEM o vinco, rebaixadas ao plano do vale; num painel sem vinco
+           elas não têm o que rebaixar, e sem grade `snapFlatSegments()` cairia
+           nas frações cruas e emitiria quatro quads a −10,3 mm atrás de uma
+           folha que não tem friso nenhum. */
+        const lisa = (face === 'left' || face === 'right') && this.smoothSkin.has(face);
+        out.push({
+          leaf, hole: holeOf(leaf),
+          segs: lisa ? [{ lo: leaf.y0, hi: leaf.y1, flat: false }] : snapFlatSegments(leaf, grid),
+        });
       }
       return out;
     };

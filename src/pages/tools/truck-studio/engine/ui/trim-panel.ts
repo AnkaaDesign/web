@@ -68,8 +68,10 @@ import {
 } from '../vehicle/trim';
 import type { TrimKey } from '../vehicle/trim';
 import {
-  state, getVehicleView, setVehicleView, onPaintTargetApplied, type VehicleView,
+  state, getVehicleView, setVehicleView, onPaintTargetApplied, getImplements,
+  type VehicleView, type ImplementDef,
 } from '../vehicle/models';
+import type { ImplementBody, ImplementArrangement } from '../vehicle/implements';
 import { setStatus } from './chrome';
 import { buildQualitySection } from './hud';
 
@@ -379,6 +381,121 @@ function viewControl(): HTMLElement {
   return wrap;
 }
 
+/* ---------------- implemento ----------------
+   AS VARIANTES DO TIPO EM CENA — 2026-09-29, junto com os três bakes novos de
+   `tools/implement-bake/variants.mjs`.
+
+   O TIPO não se escolhe aqui, e não é omissão: quem decide se o implemento é
+   semirreboque ou sobrechassi é o CHASSI (um rígido não engata semirreboque —
+   ver o bloco "O IMPLEMENTO SEGUE O CHASSI" em studio.ts). O que se escolhe é
+   a variante DENTRO do tipo: frigorífico paleteiro ou gancheiro, e o isotérmico
+   no sobrechassi. Por isso a lista é filtrada pelo tipo do implemento em cena e
+   o rótulo é o `short` do catálogo — "Paleteiro", "Gancheiro", "Isotérmico" —,
+   que só precisa ser único dentro do tipo.
+
+   Quem RECARREGA não é este card. A troca de implemento tem de passar pela
+   orquestração de `applyChoice()` — soltar a fusão, baixar a cortina, refazer a
+   montagem —, e é por isso que o clique chama um gancho que `studio.ts`
+   instala, em vez de mexer no catálogo daqui (o ⚠️ de `setCurrentImplement()`). */
+let switchImplement: ((id: string) => void) | null = null;
+
+/** `studio.ts` instala quem troca de implemento. Ver a nota acima. */
+export function onImplementSwitch(fn: (id: string) => void) { switchImplement = fn; }
+
+/** Os rótulos dos dois eixos, na ordem em que aparecem — fixa, e não a do
+ *  manifesto: o semirreboque lista o paleteiro primeiro e o sobrechassi o
+ *  gancheiro, e um controle que troca a ordem dos botões conforme o veículo
+ *  faz o dedo errar. */
+const BODY_LABEL: Record<ImplementBody, string> = {
+  frigorifico: 'Frigorífico', isotermico: 'Isotérmico', carga_seca: 'Carga seca',
+};
+const ARRANGEMENT_LABEL: Record<ImplementArrangement, string> = {
+  paleteiro: 'Paleteiro', gancheiro: 'Gancheiro',
+};
+
+/** Uma fileira de botões segmentados. `null` quando só há uma opção — um
+ *  controle de uma posição é ruído. */
+function segRow<T extends string>(
+  aria: string, opcoes: readonly T[], rotulo: (o: T) => string, atual: T | undefined,
+  habilitado: (o: T) => boolean, titulo: (o: T) => string, escolher: (o: T) => void,
+): HTMLElement | null {
+  if (opcoes.length < 2) return null;
+  const wrap = el('div', 'ts-cfg__seg');
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', aria);
+  for (const o of opcoes) {
+    const on = o === atual;
+    const btn = el('button', 'ts-cfg__segbtn' + (on ? ' is-on' : ''));
+    btn.type = 'button';
+    btn.id = `ts-cfg-impl-${aria.toLowerCase()}-${o}`;
+    btn.textContent = rotulo(o);
+    btn.title = titulo(o);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    /* Sem gancho ainda (o boot não terminou) o controle aparece, mas não
+       dispara nada — mesma regra de "desabilitar em vez de sumir". */
+    btn.disabled = !switchImplement || !habilitado(o);
+    btn.addEventListener('click', () => { if (!on) escolher(o); });
+    wrap.appendChild(btn);
+  }
+  return wrap;
+}
+
+/**
+ * O seletor do implemento, em DOIS EIXOS: carroceria (frigorífico,
+ * isotérmico) × arranjo de carga (paleteiro, gancheiro).
+ *
+ * Numa fileira só eram QUATRO botões no sobrechassi — "Gancheiro, Paleteiro,
+ * Isotérmico gancheiro, Isotérmico paleteiro" — num card de 280 px, e o nome
+ * do produto já é composto assim (*"refrigerado gancheiro sobrechassi"*): o
+ * dono pensa nos dois eixos, o controle também. E a carga seca, que é a
+ * próxima, entra como uma carroceria SEM arranjo — a segunda fileira some
+ * sozinha quando ela é escolhida.
+ *
+ * Trocar a carroceria mantém o arranjo quando a combinação existe; trocar o
+ * arranjo mantém a carroceria. Combinação que não existe fica desabilitada.
+ * Um catálogo sem os dois campos cai na fileira simples pelo `short`.
+ */
+function implementControl(): HTMLElement | null {
+  const now = state.implement;
+  const doTipo = getImplements().filter((d) => d.kind === now.kind);
+  if (doTipo.length < 2) return null;
+  const pedir = (d: ImplementDef | undefined) => {
+    if (!d || d.id === now.id || !switchImplement) return;
+    setStatus(`Implemento · ${d.label}`);
+    switchImplement(d.id);
+  };
+
+  if (!doTipo.every((d) => d.body)) {
+    return segRow('Variante', doTipo.map((d) => d.id), (id) => doTipo.find((d) => d.id === id)?.short ?? id,
+      now.id, () => true, (id) => doTipo.find((d) => d.id === id)?.label ?? id,
+      (id) => pedir(doTipo.find((d) => d.id === id)));
+  }
+
+  const corpos = (Object.keys(BODY_LABEL) as ImplementBody[])
+    .filter((b) => doTipo.some((d) => d.body === b));
+  const arranjosDe = (b: ImplementBody | undefined) => (Object.keys(ARRANGEMENT_LABEL) as ImplementArrangement[])
+    .filter((a) => doTipo.some((d) => d.body === b && d.arrangement === a));
+  const achar = (b: ImplementBody | undefined, a: ImplementArrangement | undefined) =>
+    doTipo.find((d) => d.body === b && d.arrangement === a);
+
+  const box = el('div', 'ts-cfg__list');
+  const linhaCorpo = segRow('Carroceria', corpos, (b) => BODY_LABEL[b], now.body, () => true,
+    (b) => BODY_LABEL[b],
+    (b) => pedir(achar(b, now.arrangement) ?? doTipo.find((d) => d.body === b)));
+  if (linhaCorpo) box.appendChild(linhaCorpo);
+  const arranjos = (Object.keys(ARRANGEMENT_LABEL) as ImplementArrangement[])
+    .filter((a) => doTipo.some((d) => d.arrangement === a));
+  const possiveis = arranjosDe(now.body);
+  if (possiveis.length) {
+    const linhaArranjo = segRow('Arranjo', arranjos, (a) => ARRANGEMENT_LABEL[a], now.arrangement,
+      (a) => possiveis.includes(a),
+      (a) => achar(now.body, a)?.label ?? `${BODY_LABEL[now.body as ImplementBody]} ${ARRANGEMENT_LABEL[a].toLowerCase()} não existe neste tipo`,
+      (a) => pedir(achar(now.body, a)));
+    if (linhaArranjo) box.appendChild(linhaArranjo);
+  }
+  return box.childElementCount ? box : null;
+}
+
 /* ---------------- montagem ---------------- */
 
 /** Um bloco do card: título curto e conteúdo. Seções SEPARADAS e não uma lista
@@ -413,6 +530,12 @@ function paint() {
   if (cab) colors.appendChild(cab);
   for (const key of CARD_PAINT_KEYS) colors.appendChild(colorRow(key));
   body.appendChild(section('Cores', colors));
+
+  /* A VARIANTE VEM ANTES DE "EM CENA": ela decide QUAL implemento existe, e
+     "Em cena" decide se ele aparece — o controle que muda o significado do
+     de baixo vem primeiro, a mesma regra da "Cor do cavalo" nas Cores. */
+  const impl = implementControl();
+  if (impl) body.appendChild(section('Implemento', impl));
 
   body.appendChild(section('Em cena', viewControl()));
 
