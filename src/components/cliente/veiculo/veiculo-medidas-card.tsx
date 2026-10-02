@@ -25,16 +25,33 @@
 //
 // ⚠️ A CHAVE DA TRASEIRA É `back`, NUNCA `rear`. Está assim no servidor e no
 // cliente tipado; inventar `rear` não dá erro de compilação, dá uma face vazia.
+//
+// ── A FRENTE E A PORTA TRASEIRA ─────────────────────────────────────────────
+//
+// As medidas vêm de `veiculo.implement` (são do implemento, PLANO §7.4), com a
+// FRENTE e a PORTA TRASEIRA. As três faces de sempre seguem no desenho; a
+// frente (altura × largura) e a porta (abertura, varões, portinholas) ficam em
+// campos próprios logo abaixo — `frente-porta-fields.tsx` explica por quê.
 import { useCallback, useRef, useState } from "react";
 import { IconRuler } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 
-import type { PortalMeasure } from "@/api-client/portal";
+import type { PortalMeasure, PortalRearDoorInput, PortalVehicleImplement } from "@/api-client/portal";
 import type { ImplementFace } from "@/constants/implement-faces";
 import { usePortalUpdateVehicleIdentity } from "@/api-client/portal";
+import { Separator } from "@/components/ui/separator";
 import { PortalCard } from "../portal-detail";
+import {
+  ABERTURA_OPCOES,
+  FrenteFields,
+  PortaTraseiraFields,
+  aberturaDaLeitura,
+  frenteParaPayload,
+  portaParaPayload,
+  type FrenteCm,
+} from "./frente-porta-fields";
 
 const FACES: Array<{ chave: keyof Medidas; rotulo: string }> = [
   // A ordem é a do formulário, e a do implemento visto de trás para a frente:
@@ -50,26 +67,56 @@ interface Medidas {
   back: PortalMeasure | null;
 }
 
+/** A frente do implemento em centímetros, a partir dos METROS do servidor. */
+function frenteDaLeitura(m: PortalMeasure | null | undefined): FrenteCm | null {
+  if (!m) return null;
+  const largura = (m.sections ?? []).reduce((soma, secao) => soma + (secao.width ?? 0), 0);
+  return {
+    heightCm: m.height ? Math.round(m.height * 100) : null,
+    widthCm: largura ? Math.round(largura * 100) : null,
+  };
+}
+
+function portaDaLeitura(implement: PortalVehicleImplement | null | undefined): PortalRearDoorInput | null {
+  const porta = implement?.rearDoor;
+  if (!porta) return null;
+  return {
+    abertura: aberturaDaLeitura(porta.leaves),
+    varoes: porta.barCount,
+    portinholas: porta.hatchCount,
+  };
+}
+
 export function VeiculoMedidasCard({
   taskId,
-  measures,
+  implement,
   canWrite,
 }: {
   taskId: string;
-  measures: Medidas | null | undefined;
+  implement: PortalVehicleImplement | null | undefined;
   canWrite: boolean;
 }) {
+  const measures: Medidas | null = implement
+    ? { left: implement.measures.left, right: implement.measures.right, back: implement.measures.back }
+    : null;
   const mutation = usePortalUpdateVehicleIdentity();
   const [lado, setLado] = useState<keyof Medidas>("left");
   const [erro, setErro] = useState<string | null>(null);
+  // A frente e a porta são campos: o estado local segura a digitação e a gravação
+  // sai 700 ms depois da última tecla, como o desenho.
+  const [frente, setFrente] = useState<FrenteCm | null>(() => frenteDaLeitura(implement?.measures.front));
+  const [porta, setPorta] = useState<PortalRearDoorInput | null>(() => portaDaLeitura(implement));
 
   // ⛔ SEM NENHUMA FACE, o card não existe para quem só LÊ — "medidas vazias"
   // leria como "medimos e deu zero". Para quem ESCREVE ele existe mesmo vazio:
   // é ali que a medida que falta vai ser desenhada.
-  const temAlguma = FACES.some((f) => {
-    const m = measures?.[f.chave];
-    return !!m && (m.height !== null || (m.sections ?? []).length > 0);
-  });
+  const temAlguma =
+    FACES.some((f) => {
+      const m = measures?.[f.chave];
+      return !!m && (m.height !== null || (m.sections ?? []).length > 0);
+    }) ||
+    !!implement?.measures.front ||
+    !!implement?.rearDoor;
   if (!temAlguma && !canWrite) return null;
 
   /**
@@ -157,6 +204,35 @@ export function VeiculoMedidasCard({
     [canWrite, mutation, taskId],
   );
 
+  /** Grava a frente ou a porta, 700 ms depois da última mudança. */
+  const timerCampos = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gravarCampos = (data: { medidas?: { frente: ReturnType<typeof frenteParaPayload> }; portaTraseira?: PortalRearDoorInput | null }) => {
+    if (!canWrite) return;
+    if (timerCampos.current) clearTimeout(timerCampos.current);
+    timerCampos.current = setTimeout(() => {
+      setErro(null);
+      mutation
+        .mutateAsync({ taskId, data })
+        .catch(() => setErro("Não foi possível salvar. Tente de novo."));
+    }, 700);
+  };
+
+  const frenteTexto = (() => {
+    const f = frenteDaLeitura(implement?.measures.front);
+    return f?.heightCm && f?.widthCm ? `${f.heightCm} × ${f.widthCm} cm` : null;
+  })();
+  const portaTexto = (() => {
+    const p = portaDaLeitura(implement);
+    if (!p) return null;
+    return [
+      p.abertura ? ABERTURA_OPCOES.find((o) => o.value === p.abertura)?.label : null,
+      p.varoes != null ? `${p.varoes} varões` : null,
+      p.portinholas != null ? `${p.portinholas} portinholas` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  })();
+
   return (
     <PortalCard
       icon={IconRuler}
@@ -178,8 +254,8 @@ export function VeiculoMedidasCard({
             <Button
               key={f.chave}
               type="button"
-              size="sm"
               variant={f.chave === lado ? "default" : "outline"}
+              className="h-11"
               onClick={() => setLado(f.chave)}
             >
               {f.rotulo}
@@ -211,6 +287,40 @@ export function VeiculoMedidasCard({
           showPhoto={false}
           disabled={!canWrite}
         />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Frente</p>
+          {canWrite ? (
+            <FrenteFields
+              idPrefix={`medidas-${taskId}`}
+              value={frente}
+              onChange={(next) => {
+                setFrente(next);
+                const payload = frenteParaPayload(next);
+                if (payload) gravarCampos({ medidas: { frente: payload } });
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{frenteTexto ?? "Não informada"}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Porta traseira</p>
+          {canWrite ? (
+            <PortaTraseiraFields
+              value={porta}
+              onChange={(next) => {
+                setPorta(next);
+                gravarCampos({ portaTraseira: portaParaPayload(next) });
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{portaTexto || "Não informada"}</p>
+          )}
         </div>
 
         {erro ? (

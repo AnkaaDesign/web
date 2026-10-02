@@ -109,6 +109,59 @@ describe("expandSerialRange — a faixa vira LINHAS, nunca um multiplicador", ()
 });
 
 describe("buildSolicitacaoPayload — o que sai na linha", () => {
+  it("manda o tipo do implemento na chave `type` — o corpo é `.strict()` no servidor", () => {
+    const payload = buildSolicitacaoPayload(
+      base({
+        veiculos: [linha({ uid: "a", serialNumber: "1001" })],
+        category: "RIGID",
+        implementType: "REFRIGERATED",
+      }),
+    );
+    expect(payload.veiculos[0]).toEqual({ serialNumber: "1001", category: "RIGID", type: "REFRIGERATED" });
+    expect(payload.veiculos[0]).not.toHaveProperty("implementType");
+  });
+
+  it("manda a FRENTE dentro de `medidas.frente`, em centímetros, mesmo sem o desenho", () => {
+    const payload = buildSolicitacaoPayload(
+      base({
+        veiculos: [linha({ uid: "a", serialNumber: "1001" }), linha({ uid: "b", serialNumber: "1002" })],
+        frente: { heightCm: 260, widthCm: 248 },
+      }),
+    );
+    for (const veiculo of payload.veiculos) {
+      expect(veiculo.medidas).toEqual({
+        frente: { height: 260, sections: [{ width: 248, isDoor: false, doorHeight: null, position: 0 }] },
+      });
+    }
+  });
+
+  it("frente incompleta (sem largura) não viaja", () => {
+    const payload = buildSolicitacaoPayload(
+      base({ veiculos: [linha({ uid: "a", serialNumber: "1001" })], frente: { heightCm: 260, widthCm: null } }),
+    );
+    expect(payload.veiculos[0]).not.toHaveProperty("medidas");
+  });
+
+  it("copia a PORTA TRASEIRA para cada veículo, e não manda porta vazia", () => {
+    const com = buildSolicitacaoPayload(
+      base({
+        veiculos: [linha({ uid: "a", serialNumber: "1001" }), linha({ uid: "b", serialNumber: "1002" })],
+        portaTraseira: { abertura: "TRIPARTIDA", varoes: 3, portinholas: 2 },
+      }),
+    );
+    expect(com.veiculos.map((v) => v.portaTraseira)).toEqual([
+      { abertura: "TRIPARTIDA", varoes: 3, portinholas: 2 },
+      { abertura: "TRIPARTIDA", varoes: 3, portinholas: 2 },
+    ]);
+    const sem = buildSolicitacaoPayload(
+      base({
+        veiculos: [linha({ uid: "a", serialNumber: "1001" })],
+        portaTraseira: { abertura: null, varoes: null, portinholas: null },
+      }),
+    );
+    expect(sem.veiculos[0]).not.toHaveProperty("portaTraseira");
+  });
+
   it("manda uma entrada por veículo, com a tupla (série, placa) da PRÓPRIA linha", () => {
     // ⛔ A armadilha 1: três placas com uma série NÃO podem virar três tarefas
     // com a mesma série. Aqui cada linha carrega o seu par.

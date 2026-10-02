@@ -59,6 +59,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
 import { formatPlate } from "@/utils";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
+import { FrenteFields, PortaTraseiraFields } from "@/components/cliente/veiculo/frente-porta-fields";
 import {
   LADO_DO_IMPLEMENTO,
   MAX_VEICULOS,
@@ -650,6 +651,43 @@ function MedidasDoImplemento({
               disabled={disabled}
               validationError={erroDasMedidas}
             />
+
+            {/* A FRENTE e a PORTA TRASEIRA — campos, não desenho: a frente é um
+                painel só (altura × largura) e a porta é escolha. Valem para todos
+                os veículos do lote, como as medidas acima. */}
+            <div className="grid gap-6 border-t border-border/50 pt-4 md:grid-cols-2">
+              <FormField
+                control={control}
+                name="frente"
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormLabel>Frente</FormLabel>
+                    <FrenteFields
+                      idPrefix="requisicao"
+                      value={f.value ?? null}
+                      onChange={(next) => f.onChange(next)}
+                      disabled={disabled}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="portaTraseira"
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormLabel>Porta traseira</FormLabel>
+                    <PortaTraseiraFields
+                      value={f.value ?? null}
+                      onChange={(next) => f.onChange(next)}
+                      disabled={disabled}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
         </>
       </CardContent>
     </Card>

@@ -63,6 +63,8 @@ import { PortalBand, PortalBandSkeleton, portalEst } from "@/components/cliente/
 import { VeiculoAndamentoCard } from "@/components/cliente/veiculo/veiculo-andamento-card";
 import { VeiculoIdentidadeCard } from "@/components/cliente/veiculo/veiculo-identidade-card";
 import { VeiculoMedidasCard } from "@/components/cliente/veiculo/veiculo-medidas-card";
+import { VeiculoArteCard } from "@/components/cliente/veiculo/veiculo-arte-card";
+import { VeiculoProjetoCard } from "@/components/cliente/veiculo/veiculo-projeto-card";
 
 /**
  * ⚠️ Espelha a GRADE FINAL — faixa de duas colunas, faixa cheia.
@@ -295,10 +297,22 @@ export function ClientePortalVeiculoDetalhePage() {
           o andamento, e confere o que mediu. O card some sozinho quando nenhuma
           face foi informada — e some inteiro sem a seção `VEHICLE`, porque
           medida é dado de veículo e segue o mesmo recorte da identidade. */}
-      {identity && (
+      {/* A ARTE DO IMPLEMENTO — a decisão do cliente, veículo a veículo. Some
+          sem a seção `LAYOUT` (`artworks` vem `undefined`). */}
+      <VeiculoArteCard taskId={veiculo.id} artworks={veiculo.artworks} />
+
+      {veiculo.implement && (
         <VeiculoMedidasCard
           taskId={veiculo.id}
-          measures={identity.measures}
+          implement={veiculo.implement}
+          canWrite={canWrite}
+        />
+      )}
+
+      {veiculo.implement && (
+        <VeiculoProjetoCard
+          taskId={veiculo.id}
+          files={veiculo.implement.projectFiles ?? []}
           canWrite={canWrite}
         />
       )}

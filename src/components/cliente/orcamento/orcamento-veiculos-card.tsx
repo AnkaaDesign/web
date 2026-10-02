@@ -93,13 +93,14 @@ import { vehicleChipLabel } from "./vehicle-chips";
 
 /** O implemento e a categoria, já com o rótulo humano da casa. */
 function implementoECategoria(vehicle: PortalVehicle): { implemento: string | null; categoria: string | null } {
-  const identity = portalIdentityOf(vehicle);
+  // Tipo e categoria são do IMPLEMENTO, não da identidade (PLANO §7.4).
+  const implement = vehicle.implement;
   return {
-    implemento: identity?.implementType
-      ? (IMPLEMENT_TYPE_LABELS[identity.implementType as IMPLEMENT_TYPE] ?? identity.implementType)
+    implemento: implement?.type
+      ? (IMPLEMENT_TYPE_LABELS[implement.type as IMPLEMENT_TYPE] ?? implement.type)
       : null,
-    categoria: identity?.category
-      ? (IMPLEMENT_CATEGORY_LABELS[identity.category as IMPLEMENT_CATEGORY] ?? identity.category)
+    categoria: implement?.category
+      ? (IMPLEMENT_CATEGORY_LABELS[implement.category as IMPLEMENT_CATEGORY] ?? implement.category)
       : null,
   };
 }

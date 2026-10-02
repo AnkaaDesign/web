@@ -178,6 +178,8 @@ export const ClientePortalSolicitarPage = () => {
       // omissão entrariam no orçamento como se o cliente os tivesse dito.
       category: null,
       implementType: null,
+      frente: null,
+      portaTraseira: null,
     },
   });
 

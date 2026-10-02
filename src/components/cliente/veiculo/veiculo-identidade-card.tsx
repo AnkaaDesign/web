@@ -129,6 +129,8 @@ export function VeiculoIdentidadeCard({
   const mutation = usePortalUpdateVehicleIdentity();
 
   const identity = veiculo.identity ?? null;
+  // Tipo e categoria são do IMPLEMENTO (`veiculo.implement`), não da identidade.
+  const implement = veiculo.implement ?? null;
   const pedidoAtual = pedidoDe(identity);
 
   /**
@@ -145,7 +147,7 @@ export function VeiculoIdentidadeCard({
         | "chassisNumber"
         | "purchaseOrderNumber"
         | "category"
-        | "implementType"
+        | "type"
         | "forecastDate",
       valor: string,
     ) => {
@@ -337,11 +339,11 @@ export function VeiculoIdentidadeCard({
             o documento imprime. */}
         <PortalInlineField
           label="Categoria"
-          value={identity?.category ?? ""}
+          value={implement?.category ?? ""}
           display={
-            identity?.category ? (
+            implement?.category ? (
               <span>
-                {IMPLEMENT_CATEGORY_LABELS[identity.category as IMPLEMENT_CATEGORY] ?? identity.category}
+                {IMPLEMENT_CATEGORY_LABELS[implement.category as IMPLEMENT_CATEGORY] ?? implement.category}
               </span>
             ) : (
               <ValorFaltando label="não informada" />
@@ -355,12 +357,11 @@ export function VeiculoIdentidadeCard({
 
         <PortalInlineField
           label="Implemento"
-          value={identity?.implementType ?? ""}
+          value={implement?.type ?? ""}
           display={
-            identity?.implementType ? (
+            implement?.type ? (
               <span>
-                {IMPLEMENT_TYPE_LABELS[identity.implementType as IMPLEMENT_TYPE] ??
-                  identity.implementType}
+                {IMPLEMENT_TYPE_LABELS[implement.type as IMPLEMENT_TYPE] ?? implement.type}
               </span>
             ) : (
               <ValorFaltando label="não informado" />
@@ -369,7 +370,7 @@ export function VeiculoIdentidadeCard({
           canEdit={canWrite}
           options={IMPLEMENTO_OPCOES}
           placeholder="Escolher implemento"
-          onCommit={(v) => gravar("implementType", v)}
+          onCommit={(v) => gravar("type", v)}
         />
 
         <PlaquetaLeitura identity={identity} />

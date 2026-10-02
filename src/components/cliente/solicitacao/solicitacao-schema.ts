@@ -27,6 +27,7 @@
 //     O payload de §5 segue tendo `medidas` DENTRO de cada veículo (é assim que
 //     o servidor grava, uma medida por `Implement`) — quem replica é
 //     `buildSolicitacaoPayload`, e cada veículo recebe uma CÓPIA própria.
+import { frenteParaPayload, portaParaPayload } from "@/components/cliente/veiculo/frente-porta-fields";
 import { z } from "zod";
 import {
   CHASSIS_FORBIDDEN_LETTERS,
@@ -411,6 +412,23 @@ export const solicitacaoSchema = z
      */
     category: z.string().trim().nullable().optional(),
     implementType: z.string().trim().nullable().optional(),
+    /**
+     * A FRENTE do implemento — altura × largura em CENTÍMETROS, um painel só.
+     * Perguntada uma vez, como as outras medidas; `null` é "não sei".
+     */
+    frente: z
+      .object({ heightCm: z.number().positive().nullable(), widthCm: z.number().positive().nullable() })
+      .nullable()
+      .optional(),
+    /** A PORTA TRASEIRA — abertura, varões (2–4) e portinholas (0–6). */
+    portaTraseira: z
+      .object({
+        abertura: z.enum(["BIPARTIDA", "TRIPARTIDA"]).nullable().optional(),
+        varoes: z.number().int().min(2).max(4).nullable().optional(),
+        portinholas: z.number().int().min(0).max(6).nullable().optional(),
+      })
+      .nullable()
+      .optional(),
   })
   .superRefine((data, ctx) => {
     const temExistente = !!data.customerId && data.customerId !== NOVO_CLIENTE_VALUE;
@@ -684,12 +702,18 @@ export function buildSolicitacaoPayload(values: SolicitacaoFormData): PortalBudg
       // (regra 4 do cabeçalho); o servidor grava uma por `Implement`. É aqui, e só
       // aqui, que uma vira N — em cópias independentes.
       const medidas = medidasParaPayload(values.medidas);
-      if (medidas) veiculo.medidas = medidas;
+      // A FRENTE entra nas medidas com a chave da borda (`frente`), mesmo quando
+      // as três faces do desenho ficaram intocadas.
+      const frente = frenteParaPayload(values.frente);
+      if (medidas || frente) veiculo.medidas = { ...(medidas ?? {}), ...(frente ? { frente } : {}) };
       // A MESMA cópia-para-todos das medidas, e pela mesma razão.
       const categoria = trimOrUndefined(values.category ?? undefined);
       if (categoria) veiculo.category = categoria;
+      // ⛔ `type`, e não `implementType`: o corpo é `.strict()` no servidor.
       const implemento = trimOrUndefined(values.implementType ?? undefined);
-      if (implemento) veiculo.implementType = implemento;
+      if (implemento) veiculo.type = implemento;
+      const porta = portaParaPayload(values.portaTraseira);
+      if (porta) veiculo.portaTraseira = porta;
       return veiculo;
     }),
   };

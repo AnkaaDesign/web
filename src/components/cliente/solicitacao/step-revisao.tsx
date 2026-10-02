@@ -316,6 +316,36 @@ export function SolicitacaoStepRevisao({ customers, paints, baseFiles }: StepRev
               })}
             </div>
           )}
+          {/* A frente e a porta traseira, informadas em campos próprios. */}
+          {values.frente?.heightCm && values.frente?.widthCm ? (
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border/60 py-2">
+              <span className="text-sm text-muted-foreground">Frente</span>
+              <span className="text-sm font-medium">
+                Altura {emMetros(values.frente.heightCm)} · Largura {emMetros(values.frente.widthCm)}
+              </span>
+            </div>
+          ) : null}
+          {values.portaTraseira &&
+          (values.portaTraseira.abertura || values.portaTraseira.varoes != null || values.portaTraseira.portinholas != null) ? (
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border/60 py-2">
+              <span className="text-sm text-muted-foreground">Porta traseira</span>
+              <span className="text-sm font-medium">
+                {[
+                  values.portaTraseira.abertura === "TRIPARTIDA"
+                    ? "Tripartida"
+                    : values.portaTraseira.abertura === "BIPARTIDA"
+                      ? "Bipartida"
+                      : null,
+                  values.portaTraseira.varoes != null ? `${values.portaTraseira.varoes} varões` : null,
+                  values.portaTraseira.portinholas != null
+                    ? `${values.portaTraseira.portinholas} portinholas`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

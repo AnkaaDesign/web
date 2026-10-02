@@ -67,7 +67,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import { toast } from "@/components/ui/sonner";
 import type { PaymentConfig, TASK_QUOTE_STATUS } from "@/types/budget";
-import type { QuoteSection } from "./signature";
+import type { PublicOrderNumberGate, QuoteSection } from "./signature";
 import { responsibleAuthClient } from "./responsible-auth";
 
 // =====================================================
@@ -415,24 +415,78 @@ export interface PortalVehicleProgress {
   checkoutFiles: PortalFile[];
 }
 
-/** A IDENTIDADE — seção `VEHICLE`. */
+/**
+ * A IDENTIDADE — seção `VEHICLE`: o ENDEREÇO do veículo (série, placa, chassi,
+ * plaqueta, pedido, cliente).
+ *
+ * ⚠️ Tipo, categoria e medidas NÃO moram mais aqui: são do IMPLEMENTO
+ * (`PortalVehicle.implement`, PLANO §7.4). O servidor parou de mandá-los em
+ * `identity`, e uma tela que ainda os lesse daqui desenharia o veículo sem
+ * categoria, sem tipo e sem medida — sem erro nenhum.
+ */
 export interface PortalVehicleIdentity {
   serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
-  category: string | null;
-  implementType: string | null;
   /** A plaqueta é IMAGEM, não texto, desde `20260727150000_truck_vin_plate_image`. */
   vinPlate: PortalFile | null;
-  /** ⚠️ METROS. Ver `PortalMeasure`. A chave traseira é `back`, não `rear`. */
-  measures: {
-    left: PortalMeasure | null;
-    right: PortalMeasure | null;
-    back: PortalMeasure | null;
-  };
   customerOrderNumber: string | null;
   purchaseOrder: { id: string; number: string | null; issuedAt: string | null } | null;
   customer: PortalNamedRef | null;
+}
+
+/** As quatro faces do implemento, na ordem do contrato (`faces.todas`). */
+export type PortalImplementFace = "left" | "right" | "back" | "front";
+
+/** A porta traseira, como o cliente a informou. `null` = nada informado. */
+export interface PortalRearDoor {
+  /** `RearDoorLeaves` do contrato (`portaTraseira.folhas`). */
+  leaves: string | null;
+  barCount: number | null;
+  hatchCount: number | null;
+}
+
+/**
+ * O IMPLEMENTO — seção `VEHICLE`: o que é da carroceria (PLANO §7.4).
+ *
+ * ⚠️ METROS, como no banco. A chave traseira é `back`, nunca `rear`; a frente
+ * (`front`) entrou com a porta traseira e vale para todo implemento.
+ */
+export interface PortalVehicleImplement {
+  id: string | null;
+  type: string | null;
+  category: string | null;
+  measures: Record<PortalImplementFace, PortalMeasure | null>;
+  rearDoor: PortalRearDoor | null;
+  /** O projeto do IMPLEMENTO (PDF da carroceria), não o da tarefa. */
+  projectFiles: PortalFile[];
+}
+
+/** Os estados da arte que o cliente vê. `DRAFT` e `SUPERSEDED` nunca saem. */
+export type PortalArtworkStatus = "PENDING_APPROVAL" | "APPROVED" | "REPROVED";
+
+/**
+ * UMA ARTE DO IMPLEMENTO, como o cliente a decide (PLANO §7.4).
+ *
+ * `canDecide` é o veredito do servidor: pendente ∧ capacidade `APPROVE_ARTWORK`
+ * ∧ escopo comercial. A tela não recalcula — esconde o botão quando é `false`.
+ */
+export interface PortalArtwork {
+  id: string;
+  fileId: string | null;
+  file: PortalFile | null;
+  status: PortalArtworkStatus;
+  statusLabel: string | null;
+  version: number | null;
+  sentAt: string | null;
+  decidedAt: string | null;
+  source: string | null;
+  sourceLabel: string | null;
+  /** O contato pelo nome; a Ankaa como "Ankaa" — nunca o funcionário. */
+  decidedBy: { name: string } | null;
+  /** Motivo da reprovação, ou a nota da aprovação "em nome do cliente". */
+  note: string | null;
+  canDecide: boolean;
 }
 
 /** O LAYOUT DO VEÍCULO — seção `LAYOUT`. */
@@ -440,7 +494,7 @@ export interface PortalVehicleLayout {
   generalPainting: PortalPaint | null;
   logoPaints: PortalPaint[];
   baseFiles: PortalFile[];
-  /** Só os `Layout` APROVADOS. Layout em revisão é conversa interna. */
+  /** Os ARQUIVOS da arte APROVADA. A arte com estado é `PortalVehicle.artworks`. */
   artworks: PortalFile[];
 }
 
@@ -474,8 +528,14 @@ export interface PortalVehicleBudgetRef {
 export interface PortalVehicle {
   id: string;
   name: string | null;
+  /** `DELIVERY` — a previsão no topo, para a coluna da lista. */
+  forecastDate?: string | null;
   identity?: PortalVehicleIdentity;
+  /** `VEHICLE` — tipo, categoria, medidas das 4 faces, porta traseira, projeto. */
+  implement?: PortalVehicleImplement;
   layout?: PortalVehicleLayout;
+  /** `LAYOUT` — as artes com estado (pendentes, aprovadas, reprovadas), por versão. */
+  artworks?: PortalArtwork[];
   progress?: PortalVehicleProgress;
   /** `null` quando o contato não tem a seção `DELIVERY`. */
   milestone: PortalMilestoneKey | null;
@@ -629,6 +689,67 @@ export interface PortalBudgetLayout {
 }
 
 /**
+ * O estado da arte de UM veículo, para os contadores:
+ *  · `AWAITING_CUSTOMER` — há arte esperando a decisão do cliente;
+ *  · `APPROVED` — nenhuma pendente e alguma aprovada;
+ *  · `AT_ANKAA` — sem arte, só rascunho ou só reprovada: a Ankaa está preparando.
+ */
+export type PortalVehicleArtworkState = "AWAITING_CUSTOMER" | "APPROVED" | "AT_ANKAA";
+
+/**
+ * A ARTE DO ORÇAMENTO PELOS IMPLEMENTOS — seção `LAYOUT`.
+ *
+ * `groups` junta as artes por ARQUIVO: um arquivo mandado aos N veículos é UM
+ * grupo com N linhas, e `pendingLayoutIds` é exatamente o corpo de
+ * `PUT /cliente/me/artes/aprovar` ("Aprovar para os N veículos").
+ */
+export interface PortalBudgetArtwork {
+  total: number;
+  approved: number;
+  awaitingCustomer: number;
+  /** Dos que aguardam o cliente, os que ESTE contato pode decidir. */
+  awaitingMe: number;
+  atAnkaa: number;
+  groups: Array<{
+    fileId: string;
+    file: PortalFile | null;
+    vehicles: Array<{
+      taskId: string;
+      layoutId: string;
+      status: PortalArtworkStatus;
+      statusLabel: string | null;
+      version: number | null;
+      canDecide: boolean;
+    }>;
+    pendingLayoutIds: string[];
+  }>;
+}
+
+/** A APROVAÇÃO DO VALOR vigente (`BudgetValueApproval`). */
+export interface PortalValueApproval {
+  decidedAt: string | null;
+  /** `PORTAL`, `ON_BEHALF`, `SIGNATURE`, `LEGACY_APP`, `MIGRATED`. */
+  source: string | null;
+  sourceLabel: string | null;
+  decidedBy: { name: string } | null;
+  note: string | null;
+  /** `PRICING` — `null` para quem não vê preço. */
+  total: number | null;
+}
+
+/**
+ * O QUE FALTA PARA EMITIR O DOCUMENTO, em língua de cliente
+ * (`portal-emission.ts`). Só no DETALHE; `null` quando já há documento emitido
+ * ou quando a bola ainda é da Ankaa (o estado já diz isso).
+ */
+export interface PortalEmission {
+  ready: boolean;
+  missing: string[];
+  /** "Para emitir falta: …" pronta — `null` quando nada falta. */
+  label: string | null;
+}
+
+/**
  * A REQUISIÇÃO, quando o orçamento nasceu no portal.
  *
  * Não tem seção própria, e é de propósito: briefing e nome de logomarca são o
@@ -692,13 +813,24 @@ export interface PortalBudget {
    * mesmo produto se contradizendo — e a que mentia era a mais visível.
    */
   signature: { emitted: boolean; awaitingMe: boolean };
+  /** O EIXO DA ASSINATURA (`BudgetSignatureStatus`) e o rótulo pronto. */
+  signatureStatus: string | null;
+  signatureStatusLabel: string | null;
+  /** A aprovação do valor vigente, ou `null`. */
+  valueApproval: PortalValueApproval | null;
+  /** Só no DETALHE. Ver `PortalEmission`. */
+  emission?: PortalEmission | null;
   services?: PortalBudgetService[];
   pricing?: PortalBudgetPricing;
   delivery?: PortalBudgetDelivery;
   payment?: PortalBudgetPayment;
   guarantee?: PortalBudgetGuarantee;
   layout?: PortalBudgetLayout;
+  /** `LAYOUT` — os contadores por veículo e as artes agrupadas por arquivo. */
+  artwork?: PortalBudgetArtwork;
   request?: PortalBudgetRequestInfo;
+  /** `VEHICLE` — série/placa por linha, para a lista buscar pelo implemento. */
+  vehicleChips?: Array<{ taskId: string; serialNumber: string | null; plate: string | null }>;
   vehicles: PortalVehicle[];
 }
 
@@ -759,6 +891,19 @@ export interface PortalSummaryVehicle {
   budget: { id: string; budgetNumber: number | null } | null;
 }
 
+/** Um veículo com arte esperando a decisão DESTE contato. */
+export interface PortalSummaryArtworkVehicle {
+  taskId: string;
+  name: string | null;
+  serialNumber: string | null;
+  plate: string | null;
+  /** O corpo de `PUT /cliente/me/artes/aprovar` para este veículo. */
+  pendingLayoutIds: string[];
+  /** A mais antiga ainda sem resposta. */
+  sentAt: string | null;
+  budget: { id: string; budgetNumber: number | null } | null;
+}
+
 /**
  * Um grupo de "o que espera por mim".
  *
@@ -801,6 +946,8 @@ export interface PortalSummary {
   };
   waitingOnMe: {
     valueApproval: { available: boolean; total: number; budgets: PortalSummaryBudget[] };
+    /** Artes esperando a decisão — só para quem tem `APPROVE_ARTWORK`. */
+    artworks: { available: boolean; total: number; vehicles: PortalSummaryArtworkVehicle[] };
     signatures: { available: boolean; total: number; envelopes: PortalSummaryEnvelope[] };
     inProduction: { available: boolean; total: number; vehicles: PortalSummaryVehicle[] };
   };
@@ -1116,9 +1263,13 @@ export interface PortalBudgetRequestVehicleInput {
    * ⚠️ O formulário pergunta UMA vez (o lote inteiro é o mesmo modelo de
    * implemento, como as medidas) e `buildSolicitacaoPayload` copia para cada
    * veículo — a mesma mecânica de `medidas`. O servidor grava um por `Implement`.
+   *
+   * ⛔ A CHAVE É `type`, NÃO `implementType`. O corpo é `.strict()` no servidor
+   * (`portalVeiculoSchema`): `implementType` devolvia 400 em toda requisição em
+   * que o cliente escolhesse o tipo do implemento.
    */
   category?: string | null;
-  implementType?: string | null;
+  type?: string | null;
   /**
    * ⚠️ CENTÍMETROS na borda; o servidor divide por 100 antes de gravar.
    *
@@ -1127,11 +1278,29 @@ export interface PortalBudgetRequestVehicleInput {
    * `{ esquerda?: number }`, e um número onde o zod espera objeto vira
    * `invalid_type` na primeira requisição com medida.
    */
-  medidas?: {
-    esquerda?: PortalMeasureSideInput | null;
-    direita?: PortalMeasureSideInput | null;
-    traseira?: PortalMeasureSideInput | null;
-  } | null;
+  medidas?: PortalMeasuresInput | null;
+  /** A porta traseira (folhas, varões, portinholas). `null` = não informada. */
+  portaTraseira?: PortalRearDoorInput | null;
+}
+
+/** As medidas das 4 faces, em CENTÍMETROS, com as chaves da borda do portal. */
+export interface PortalMeasuresInput {
+  esquerda?: PortalMeasureSideInput | null;
+  direita?: PortalMeasureSideInput | null;
+  traseira?: PortalMeasureSideInput | null;
+  frente?: PortalMeasureSideInput | null;
+}
+
+/**
+ * A porta traseira na borda do portal (`portalPortaTraseiraSchema`).
+ *
+ * `abertura`: `BIPARTIDA` | `TRIPARTIDA` (o servidor traduz para
+ * `RearDoorLeaves`); `varoes` 2–4; `portinholas` 0–6, só a quantidade.
+ */
+export interface PortalRearDoorInput {
+  abertura?: "BIPARTIDA" | "TRIPARTIDA" | null;
+  varoes?: number | null;
+  portinholas?: number | null;
 }
 
 /**
@@ -1211,9 +1380,11 @@ export interface PortalVehicleIdentityInput {
    * ⛔ Os dois passam pela guarda do DOCUMENTO CONGELADO como a placa: a folha
    * assinada imprime "Toco · Refrigerado", então trocá-los depois da
    * assinatura devolve 409.
+   *
+   * ⛔ A chave é `type` (corpo `.strict()` no servidor), não `implementType`.
    */
   category?: string | null;
-  implementType?: string | null;
+  type?: string | null;
   /**
    * O número do pedido de compra do cliente.
    *
@@ -1230,6 +1401,11 @@ export interface PortalVehicleIdentityInput {
   purchaseOrderNumber?: string | null;
   /** `File.id` de uma plaqueta já enviada. Para enviar a IMAGEM, use o 3º argumento. */
   vinPlateFileId?: string | null;
+  /** A previsão de liberação (ISO); `null` apaga. */
+  forecastDate?: string | null;
+  /** Só as faces mandadas mudam — em CENTÍMETROS, como na requisição. */
+  medidas?: PortalMeasuresInput | null;
+  portaTraseira?: PortalRearDoorInput | null;
 }
 
 /**
@@ -1321,6 +1497,8 @@ export interface PortalSignInput {
   declarations: string[];
   clientTimestamp?: string;
   geo?: { lat: number; lon: number; accuracy?: number } | null;
+  /** DD12.1: o nº do pedido de cada veículo sem pedido — o mesmo valor em todos. */
+  orderNumbers?: Array<{ taskId: string; value: string }>;
 }
 
 /**
@@ -1492,14 +1670,15 @@ export interface PortalPendingSignature {
   /** Os veículos cobertos. Vazio sem a seção `VEHICLE` — ver `PortalSignatureVehicle`. */
   veiculos: PortalSignatureVehicle[];
   /**
-   * ⛔ O PORTÃO DO PEDIDO DE COMPRA, JÁ JULGADO PELO SERVIDOR.
+   * ⛔ O Nº DO PEDIDO DE COMPRA NA CERIMÔNIA (DD12.1), JÁ JULGADO PELO SERVIDOR.
    *
-   * Quem tem `PURCHASING` como ÚNICO papel (`exigido`) só assina com o número do
-   * pedido na mão; sem ele o `POST …/assinar` devolve 403 com a frase de
-   * `mensagem`. `pendente` é o veredito sobre TODOS os veículos do envelope —
-   * inclusive os que este recorte não deixa a tela listar.
+   * `null` quando este signatário não tem a função Compras. Com ela, `required`
+   * diz se falta pedido E não há um número único registrado para herdar
+   * (`inherited`). O número é UM SÓ para o orçamento: um campo, o mesmo valor
+   * para todos os veículos sem pedido, mandado em `orderNumbers` no próprio ato
+   * de assinar — é a MESMA forma da página pública (`OrderNumberFields`).
    */
-  pedidoDeCompra: { exigido: boolean; pendente: boolean; mensagem: string | null };
+  orderNumber: PublicOrderNumberGate | null;
   /**
    * As declarações que a cerimônia exige aceitar, na ordem de exibição, com o
    * TEXTO renderizado no servidor.
@@ -1713,6 +1892,56 @@ export class PortalService {
       `${BASE}/veiculos/${taskId}/identificacao`,
       data,
     );
+    return response.data;
+  }
+
+  /**
+   * `POST …/veiculos/:taskId/projeto` — o PROJETO DO IMPLEMENTO (PDF da
+   * carroceria), multipart no campo `implementProject`, até 10 arquivos.
+   * Capacidade `WRITE_VEHICLE_IDENTITY`.
+   */
+  async uploadImplementProject(taskId: string, files: File[]): Promise<PortalResponse<PortalVehicleDetail>> {
+    const form = new FormData();
+    for (const file of files) form.append("implementProject", file);
+    const response = await responsibleAuthClient.post<PortalResponse<PortalVehicleDetail>>(
+      `${BASE}/veiculos/${taskId}/projeto`,
+      form,
+      MULTIPART,
+    );
+    return response.data;
+  }
+
+  // ---- Arte do implemento ----
+
+  /** `PUT …/veiculos/:taskId/artes/:layoutId/aprovar`. Capacidade `APPROVE_ARTWORK`. */
+  async approveArtwork(taskId: string, layoutId: string): Promise<PortalResponse<unknown>> {
+    const response = await responsibleAuthClient.put<PortalResponse<unknown>>(
+      `${BASE}/veiculos/${taskId}/artes/${layoutId}/aprovar`,
+      {},
+    );
+    return response.data;
+  }
+
+  /**
+   * `PUT …/veiculos/:taskId/artes/:layoutId/reprovar` — `motivo` obrigatório
+   * (≥ 3 caracteres; corpo `.strict()`).
+   */
+  async reproveArtwork(taskId: string, layoutId: string, motivo: string): Promise<PortalResponse<unknown>> {
+    const response = await responsibleAuthClient.put<PortalResponse<unknown>>(
+      `${BASE}/veiculos/${taskId}/artes/${layoutId}/reprovar`,
+      { motivo },
+    );
+    return response.data;
+  }
+
+  /**
+   * `PUT /cliente/me/artes/aprovar` — o LOTE ATÔMICO: "Aprovar para os N
+   * veículos". `layoutIds` é o `pendingLayoutIds` do grupo (até 100).
+   */
+  async approveArtworks(layoutIds: string[]): Promise<PortalResponse<unknown>> {
+    const response = await responsibleAuthClient.put<PortalResponse<unknown>>(`${BASE}/artes/aprovar`, {
+      layoutIds,
+    });
     return response.data;
   }
 
@@ -2047,6 +2276,42 @@ export function usePortalUpdateVehicleIdentity() {
       data: PortalVehicleIdentityInput;
       vinPlateFile?: File | null;
     }) => updatePortalVehicleIdentity(taskId, data, vinPlateFile),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePortalUploadImplementProject() {
+  const invalidate = useInvalidatePortal();
+  return useMutation({
+    mutationFn: ({ taskId, files }: { taskId: string; files: File[] }) =>
+      portalService.uploadImplementProject(taskId, files),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePortalApproveArtwork() {
+  const invalidate = useInvalidatePortal();
+  return useMutation({
+    mutationFn: ({ taskId, layoutId }: { taskId: string; layoutId: string }) =>
+      portalService.approveArtwork(taskId, layoutId),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePortalReproveArtwork() {
+  const invalidate = useInvalidatePortal();
+  return useMutation({
+    mutationFn: ({ taskId, layoutId, motivo }: { taskId: string; layoutId: string; motivo: string }) =>
+      portalService.reproveArtwork(taskId, layoutId, motivo),
+    onSuccess: invalidate,
+  });
+}
+
+/** O lote atômico — "Aprovar para os N veículos". */
+export function usePortalApproveArtworks() {
+  const invalidate = useInvalidatePortal();
+  return useMutation({
+    mutationFn: (layoutIds: string[]) => portalService.approveArtworks(layoutIds),
     onSuccess: invalidate,
   });
 }
