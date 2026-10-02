@@ -7,6 +7,7 @@ import {
   IconPlus,
   IconExternalLink,
   IconBellPlus,
+  IconPrinter,
   IconEdit,
   IconCalendarCheck,
   IconDoorEnter,
@@ -47,6 +48,7 @@ import { SetSectorModal } from "@/components/production/task/schedule/set-sector
 import { SetTermModal } from "@/components/production/task/schedule/set-term-modal";
 import { SetStatusModal } from "@/components/production/task/schedule/set-status-modal";
 import { SetQuoteLayoutModal } from "@/components/production/task/schedule/set-quote-layout-modal";
+import { TaskLabelPrintModal } from "@/components/production/task/labels/task-label-print-modal";
 import { MergeQuotesDialog } from "@/components/production/task/quote/merge-quotes-dialog";
 import { AdvancedBulkActionsHandler } from "@/components/production/task/bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "@/components/production/task/schedule/copy-from-task-modal";
@@ -144,7 +146,7 @@ const ADVANCED_GROUP = { id: "advanced", label: "Avançados", icon: <IconSetting
 //   • ADMIN       → does everything → keep only the workflow essentials top-level, rest in Avançados.
 //   • DESIGNER    → ~no task-field edits → arts/cuts live in Avançados.
 const SECTOR_PRIMARY: Partial<Record<SECTOR_PRIVILEGES, string[]>> = {
-  [SECTOR_PRIVILEGES.ADMIN]: ["open-new-tab", "edit", "disponibilizar", "iniciar", "finalizar", "liberar", "dar-entrada", "definir-setor", "definir-prazo"],
+  [SECTOR_PRIVILEGES.ADMIN]: ["open-new-tab", "edit", "disponibilizar", "iniciar", "finalizar", "liberar", "dar-entrada", "definir-setor", "definir-prazo", "imprimir-etiqueta"],
   [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: ["open-new-tab", "edit", "disponibilizar", "iniciar", "finalizar", "definir-setor", "definir-prazo", "liberar", "dar-entrada"],
   [SECTOR_PRIVILEGES.PRODUCTION]: ["open-new-tab", "disponibilizar", "iniciar", "finalizar", "liberar"],
   [SECTOR_PRIVILEGES.LOGISTIC]: ["open-new-tab", "edit", "dar-entrada", "liberar", "adv-layout", "adv-base-files"],
@@ -552,6 +554,7 @@ export function TaskPreparationPage() {
   const [quoteLayoutModal, setQuoteLayoutModal] = useState<ModalState>(CLOSED_MODAL);
   const [mergeModal, setMergeModal] = useState<ModalState>(CLOSED_MODAL);
   const [deleteModal, setDeleteModal] = useState<ModalState>(CLOSED_MODAL);
+  const [labelModal, setLabelModal] = useState<ModalState>(CLOSED_MODAL);
 
   // Ids currently held by an open "Avançados" bulk modal. Tracked in state (rather than
   // fired-and-forgotten through the ref) so the same bulk action announces presence here
@@ -880,6 +883,15 @@ export function TaskPreparationPage() {
     });
 
     actions.push({
+      key: "imprimir-etiqueta",
+      label: "Imprimir Etiquetas",
+      icon: <IconPrinter className="h-4 w-4" />,
+      // truck-body labels go to the office printer + ScanNCut: ADMIN only
+      requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      onClick: (rows) => setLabelModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
+    });
+
+    actions.push({
       key: "enviar-aviso",
       label: "Enviar aviso",
       icon: <IconBellPlus className="h-4 w-4" />,
@@ -1116,6 +1128,12 @@ export function TaskPreparationPage() {
         open={quoteLayoutModal.open}
         onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))}
         tasks={rowsFor(quoteLayoutModal.taskIds)}
+      />
+
+      <TaskLabelPrintModal
+        open={labelModal.open}
+        onOpenChange={(open) => setLabelModal((s) => ({ ...s, open }))}
+        tasks={rowsFor(labelModal.taskIds)}
       />
 
       <MergeQuotesDialog
