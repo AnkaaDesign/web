@@ -66,10 +66,11 @@ describe("winner resolution with recorded nav context", () => {
     for (const menu of [ACCOUNTING, ADMIN]) {
       const active = resolveActiveNav(menu, "/departamento-pessoal/bonus", recorded);
       expect(active.id).toBe("dp-gratificacoes");
+      // Gratificações lives under Departamento Pessoal › Salários e Cargos.
+      expect(active.trail.map((t) => t.id)).toEqual(["departamento-pessoal", "dp-salarios-e-cargos"]);
       const expanded = computeExpandedFromActive(menu, active);
+      // One chain only: Departamento Pessoal opens, nothing else.
       expect(expandedTopLevel(menu, expanded)).toEqual(["departamento-pessoal"]);
-      // ADMIN also has RH > Bônus at this exact path — it must NOT yank open
-      expect(expanded["departamento-pessoal"] ?? false).toBe(false);
     }
   });
 
@@ -105,8 +106,8 @@ describe("winner resolution with recorded nav context", () => {
     const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
     const active = resolveActiveNav(ACCOUNTING, "/financeiro/contas-a-pagar", recorded);
     expect(active.id).toBe("contas-a-pagar");
-    // Contas a Pagar now lives under Conciliação Bancária, so the trail nests it.
-    expect(active.trail.map((t) => t.id)).toEqual(["financeiro", "conciliacao-bancaria"]);
+    // Contas a Pagar is a top-level Financeiro page.
+    expect(active.trail.map((t) => t.id)).toEqual(["financeiro"]);
   });
 });
 
@@ -208,51 +209,46 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     ]);
   });
 
-  it("Medicina do Trabalho: Agendamentos/Tamanhos nested under Entrega de EPIs", () => {
+  it("Medicina do Trabalho: FISPQ/FDS at top level; Agendamentos nested under Entrega de EPIs", () => {
     const mt = byId(ACCOUNTING, "medicina-do-trabalho")!;
-    expect((mt.children || []).map((c) => c.title)).toEqual(["Afastamentos", "ASO", "CAT", "Entrega de EPIs", "Exames Periódicos"]);
+    expect((mt.children || []).map((c) => c.title)).toEqual([
+      "Afastamentos",
+      "ASO",
+      "CAT",
+      "Entrega de EPIs",
+      "Exames Periódicos",
+      "FISPQ/FDS",
+    ]);
     const entregas = (mt.children || []).find((c) => c.id === "mt-epi-entregas")!;
     const childTitles = (entregas.children || []).map((c) => c.title);
     expect(childTitles).toContain("Agendamentos");
-    expect(childTitles).toContain("Tamanhos");
   });
 
-  it("Financeiro (ACCOUNTING): Notas Fiscais + Contas a Pagar/Receber at top level; Extrato/Recorrentes/Categorias under Conciliação", () => {
+  it("Financeiro (ACCOUNTING): Contas a Pagar/Receber at top level; Extrato/Notas Fiscais/Recorrentes/Categorias under Conciliação", () => {
     const fin = byId(ACCOUNTING, "financeiro")!;
-    // Notas Fiscais is a single top-level entry (Emitidas+Recebidas toggle).
-    // Contas a Pagar / a Receber are top-level Financeiro pages (moved OUT of
-    // Conciliação Bancária); only Extrato/Recorrentes/Categorias stay under it.
+    // Contas a Pagar / a Receber are top-level Financeiro pages; Notas Fiscais
+    // (Emitidas+Recebidas toggle) lives under Conciliação Bancária.
     // Top-level children are sorted alphabetically.
     expect((fin.children || []).map((c) => c.title)).toEqual([
       "Conciliação Bancária",
       "Contas a Pagar",
       "Contas a Receber",
       "Faturamento",
-      "Notas Fiscais",
     ]);
     const conc = (fin.children || []).find((c) => c.id === "conciliacao-bancaria")!;
-    // Ordered by the `order` field; "Recorrentes (categorias)" ([ADMIN,FINANCIAL])
-    // is hidden from ACCOUNTING.
+    // Ordered by the `order` field.
     expect((conc.children || []).map((c) => ({ title: c.title, path: c.path }))).toEqual([
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
+      { title: "Notas Fiscais", path: "/financeiro/conciliacao/notas" },
       { title: "Recorrentes", path: "/financeiro/contas-recorrentes" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
     ]);
   });
 
-  it("ADMIN sees the legacy Recorrentes (categorias) view; ACCOUNTING does not", () => {
-    // NOTE: FINANCIAL has a flat per-role nav and was never in the "Financeiro"
-    // SECTION audience — it keeps page ACCESS via ROUTE_PRIVILEGES.
+  it("Conciliação Bancária is the same for ADMIN and ACCOUNTING; the legacy Recorrentes (categorias) view is retired", () => {
     const conc = (byId(ADMIN, "financeiro")!.children || []).find((c: MenuItem) => c.id === "conciliacao-bancaria")!;
     const titles = (conc.children || []).map((c: MenuItem) => c.title);
-    expect(titles).toEqual([
-      "Extrato",
-      "Contas a Receber",
-      "Contas a Pagar",
-      "Contas Recorrentes",
-      "Recorrentes (categorias)",
-      "Categorias",
-    ]);
+    expect(titles).toEqual(["Extrato", "Notas Fiscais", "Recorrentes", "Categorias"]);
 
     const accConc = (byId(ACCOUNTING, "financeiro")!.children || []).find((c) => c.id === "conciliacao-bancaria")!;
     const accTitles = (accConc.children || []).map((c) => c.title);
@@ -276,19 +272,18 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(calendario.path).toBe("/departamento-pessoal/calendario");
   });
 
-  it("HR/ADMIN: legacy Departamento Pessoal section is gone; Calendário lives under Ferramentas; Feriados/EPI under Departamento Pessoal", () => {
+  it("HR/ADMIN: Calendário lives under Ferramentas; Feriados under the consolidated Departamento Pessoal", () => {
     for (const privilege of [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]) {
       const menu = menuFor(privilege);
-      // The duplicate "Departamento Pessoal" section was retired entirely.
-      expect(byId(menu, "departamento-pessoal")).toBeUndefined();
-      // Calendário now lives under Ferramentas for HR/ADMIN (same as ACCOUNTING).
+      // Calendário lives under Ferramentas for HR/ADMIN (same as ACCOUNTING).
       const tools = byId(menu, "ferramentas")!;
       expect((tools.children || []).some((c) => c.id === "ferramentas-calendario")).toBe(true);
-      // Feriados and EPI fold into the consolidated Departamento Pessoal area.
+      // Departamento Pessoal is the one consolidated area; EPI lives in
+      // Medicina do Trabalho (Entrega de EPIs), not here.
       const dp = byId(menu, "departamento-pessoal")!;
       const dpTitles = (dp.children || []).map((c) => c.title);
       expect(dpTitles).toContain("Feriados");
-      expect(dpTitles).toContain("EPI");
+      expect(dpTitles).not.toContain("EPI");
       // Integração Secullum is ADMIN-only: present for ADMIN, absent for HR.
       const hasSecullum = (dp.children || []).some((c) => c.id === "dp-integracao-secullum");
       expect(hasSecullum).toBe(privilege === SECTOR_PRIVILEGES.ADMIN);
