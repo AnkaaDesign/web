@@ -871,32 +871,26 @@ export const routes = {
       customerId ? `/cliente/${customerId}/orcamento/${budgetId}` : `/cliente/orcamento/${budgetId}`,
     serviceReport: (customerId: string | null | undefined, quoteId: string) =>
       customerId ? `/cliente/${customerId}/dossie/${quoteId}` : `/cliente/dossie/${quoteId}`,
-    /** Assinatura eletrônica do orçamento. Precisa ficar sob /cliente: o
-        MobileUsageGuard redireciona para /install qualquer rota móvel fora da
-        allowlist, e é no celular que o cliente assina. */
+    /** Assinatura eletrônica do orçamento, sob /cliente com o resto do que o
+        contato do cliente abre — quase sempre no celular. */
     signature: (token: string) => `/cliente/assinar/${token}`,
     /** Portal público de verificação. O código é impresso no rodapé de todas as
         páginas do PDF assinado. Fica fora de /cliente porque precisa ser curto e
-        ditável — por isso o MobileUsageGuard também o allowlista. */
+        ditável. */
     signatureVerify: (code: string) => `/v/${code}`,
     /** Ponte para o WhatsApp do comercial — o destino do botão "Falar com o
         comercial" do template `orcamento_vencido`. A Meta recusa `wa.me` em
         botão ("Direct links to WhatsApp aren't allowed for buttons"), então o
-        botão aponta para cá e o salto é nosso. Fica sob /cliente pela mesma
-        razão da assinatura: é no CELULAR que se toca esse botão, e o
-        MobileUsageGuard mandaria para /install qualquer rota móvel fora da
-        allowlist. */
+        botão aponta para cá e o salto é nosso. Fica sob /cliente com o resto do
+        que o contato do cliente abre no celular. */
     commercial: "/cliente/comercial",
     root: "/cliente",
 
     /**
      * PORTAL DO CLIENTE — a área LOGADA do responsável.
      *
-     * Fica sob /cliente pelo mesmo motivo que a assinatura: o
-     * `MobileUsageGuard` casa por PREFIXO (`mobile-usage-guard.tsx`), então
-     * `/cliente/*` inteiro já está isento, e é no celular que o contato do
-     * cliente abre estas telas. Uma área em `/portal` ou `/minha-area` seria
-     * silenciosamente redirecionada para `/install`.
+     * Fica sob /cliente com a assinatura e os links públicos: é tudo o que o
+     * contato do cliente abre, e quase sempre no celular.
      *
      * Não confundir com as rotas acima: aquelas são PÚBLICAS, abertas por
      * capability (UUID do orçamento ou token do signatário). Estas exigem
@@ -940,7 +934,8 @@ export const routes = {
   privacyPolicy: "/politica-de-privacidade",
 
   // Public app-install landing page (no authentication required).
-  // Mobile browsers hitting the web app are redirected here (see MobileUsageGuard).
+  // Reached by link (e.g. Administração → Distribuição do app), never by an
+  // automatic redirect: the responsible's portal is used on the phone's browser.
   install: "/install",
 } as const;
 

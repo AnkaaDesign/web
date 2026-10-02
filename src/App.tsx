@@ -17,7 +17,6 @@ import { MessageModalProvider } from "@/components/common/message-modal";
 import { PrinterProvider } from "@/components/common/printer";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { DeepLinkRedirect } from "@/components/navigation/deep-link-redirect";
-import { MobileUsageGuard } from "@/components/navigation/mobile-usage-guard";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
@@ -576,10 +575,6 @@ function App() {
 
   return (
     <Router>
-      {/* Mobile browsers are steered to the public /install page (see guard).
-          Mounted at the router root so it covers every route; it exempts /install,
-          auth callbacks and public share links, and never affects desktop. */}
-      <MobileUsageGuard />
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <TooltipProvider skipDelayDuration={0}>
           <ErrorBoundary>
