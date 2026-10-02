@@ -368,33 +368,32 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
               {printError && <p className="text-destructive">{printError}</p>}
             </div>
 
-            {/* a fresh sheet frees every slot FOR EVERYBODY: ask once more */}
+            <p className="mt-auto text-xs text-muted-foreground">
+              Papel fotográfico A4 na bandeja de trás, lado de imprimir para a frente. A folha nova sai com "▲ TOPO" nos cantos: recoloque-a
+              sempre com o TOPO entrando primeiro.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:items-center sm:space-x-0">
+          {/* a fresh sheet frees every slot FOR EVERYBODY: ask once more, in place */}
+          <div className="flex flex-wrap items-center gap-2 sm:mr-auto">
             {confirmNewSheet ? (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span>Começar uma folha nova? Todos os espaços voltam a ficar livres.</span>
-                <Button type="button" size="sm" onClick={startNewSheet} disabled={busy}>
+              <>
+                <span className="text-sm">Liberar todos os espaços da folha?</span>
+                <Button type="button" size="sm" variant="destructive" onClick={startNewSheet} disabled={busy}>
                   Sim, folha nova
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmNewSheet(false)}>
                   Não
                 </Button>
-              </div>
+              </>
             ) : (
-              <div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmNewSheet(true)} disabled={busy || usedSlots.size === 0}>
-                  Folha nova
-                </Button>
-              </div>
+              <Button type="button" variant="outline" onClick={() => setConfirmNewSheet(true)} disabled={busy || usedSlots.size === 0}>
+                Folha nova
+              </Button>
             )}
-
-            <p className="text-xs text-muted-foreground">
-              Coloque papel fotográfico A4 na impressora. O servidor imprime em qualidade alta, escala 100%. Na primeira impressão de uma folha
-              sai a marca "TOPO": recoloque a folha sempre com ela entrando primeiro.
-            </p>
           </div>
-        </div>
-
-        <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancelar
           </Button>
