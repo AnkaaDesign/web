@@ -1,4 +1,4 @@
-import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, IconFileText, IconHash, IconProgressCheck, IconReceipt2, IconUserDollar } from "@tabler/icons-react";
+import { IconCalendar, IconCalendarCheck, IconCalendarClock, IconCurrencyReal, IconFileText, IconHash, IconProgressCheck, IconReceipt2, IconSignature, IconUserDollar } from "@tabler/icons-react";
 
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import type { Customer } from "@/types";
@@ -14,6 +14,8 @@ import {
   toPrismaDateRange,
 } from "@/components/financial/shared/quote-table-shared";
 import { BUDGET_QUOTE_STATUSES, buildBudgetOrderBy } from "./budget-table-columns";
+import { BUDGET_SIGNATURE_STATUS_LABELS } from "@/constants/budget-contract";
+import { BUDGET_SIGNATURE_STATUS } from "@/constants/enums";
 
 export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 
@@ -24,6 +26,12 @@ export const BUDGET_DEFAULT_PAGE_SIZE = 40;
 export { BUDGET_QUOTE_STATUSES } from "./budget-table-columns";
 
 const BUDGET_QUOTE_STATUS_OPTIONS = BUDGET_QUOTE_STATUSES.map((value) => ({ value, label: TASK_QUOTE_STATUS_LABELS[value] }));
+
+/** O eixo da assinatura (Modelo C), com os rótulos do contrato. */
+const BUDGET_SIGNATURE_STATUS_OPTIONS = (Object.values(BUDGET_SIGNATURE_STATUS) as BUDGET_SIGNATURE_STATUS[]).map((value) => ({
+  value,
+  label: BUDGET_SIGNATURE_STATUS_LABELS[value] ?? value,
+}));
 
 /** Task statuses a budget can legitimately sit on. CANCELLED is included — a cancelled task with a
  * live quote is exactly the kind of thing someone needs to find and close out. */
@@ -78,6 +86,14 @@ export function createBudgetFilterDefs(opts: { invoiceCustomers: Customer[]; tas
       icon: <IconReceipt2 className="h-4 w-4" />,
       placeholder: "Selecione o status...",
       options: BUDGET_QUOTE_STATUS_OPTIONS,
+    },
+    {
+      key: "signatureStatuses",
+      label: "Assinatura",
+      type: "multiselect",
+      icon: <IconSignature className="h-4 w-4" />,
+      placeholder: "Selecione a situação...",
+      options: BUDGET_SIGNATURE_STATUS_OPTIONS,
     },
     {
       key: "taskStatuses",
@@ -207,6 +223,9 @@ export function buildBudgetQuery(filters: DataTableFilterValues, search: string)
     // `statusOrder` de `REQUESTED` é 1 e a ordenação padrão é por ele).
     status: { in: quoteStatuses.length > 0 ? quoteStatuses : BUDGET_QUOTE_STATUSES },
   };
+
+  const signatureStatuses = stringList(filters.signatureStatuses);
+  if (signatureStatuses.length > 0) where.signatureStatus = { in: signatureStatuses };
 
   const budgetNumber = toPositiveInt(filters.budgetNumber);
   if (budgetNumber != null) where.budgetNumber = budgetNumber;

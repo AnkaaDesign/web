@@ -449,12 +449,11 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
     {
       // O EIXO DA ASSINATURA (Modelo C), ao lado do eixo do valor: "Aprovado" diz
       // só que o VALOR foi aprovado; se já dá para cobrar depende desta coluna.
-      // Sem ordenação nem filtro: o `where`/`orderBy` da API ainda não aceitam
-      // `signatureStatus`.
+      // Ordena e filtra pelo `signatureStatus` do orçamento (a API aceita a chave
+      // no `where` e no `orderBy` desde 02/10).
       id: "signatureStatus",
       header: "Assinatura",
       accessorFn: (q) => (q as Budget).signatureStatus ?? null,
-      enableSorting: false,
       size: 170,
       minSize: 130,
       meta: {
@@ -544,6 +543,7 @@ export const BUDGET_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Reco
   quoteSubtotal: (d) => ({ subtotal: d }),
   quoteTotal: (d) => ({ total: d }),
   quoteStatus: (d) => ({ statusOrder: d }),
+  signatureStatus: (d) => ({ signatureStatus: d }),
   createdAt: (d) => ({ createdAt: d }),
 };
 
