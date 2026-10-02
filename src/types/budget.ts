@@ -69,6 +69,15 @@ export interface BudgetPayer extends BaseEntity {
    * "cobre zero".
    */
   billingId?: string;
+  /**
+   * QUANDO ESTE PAGADOR FOI FATURADO. Nulo = ainda não.
+   *
+   * Dois pagadores do mesmo recorte (RKO + Ibiporã sobre o mesmo caminhão) são
+   * aprovados em momentos diferentes; `billing.approvedAt` é a PRIMEIRA
+   * aprovação da cobrança (a trava), isto é a de cada um. `billingApprovedAtOf`
+   * lê este campo primeiro.
+   */
+  approvedAt?: Date | string | null;
   billing?: {
     id: string;
     quoteId?: string;

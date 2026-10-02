@@ -440,7 +440,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     return m ? { year: Number(m[1]), month: Number(m[2]) } : null;
   };
 
-  // Click-to-copy helper for the Chave Pix cell (mirrors the order detail copy UX).
+  // Click-to-copy helper for the Valor and Chave Pix cells (mirrors the order detail copy UX).
   // Stops row-click propagation so copying never navigates.
   const copyText = useCallback(
     (text: string, label: string) => (e: React.MouseEvent) => {

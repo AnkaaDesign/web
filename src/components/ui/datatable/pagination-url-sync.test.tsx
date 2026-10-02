@@ -305,6 +305,36 @@ describe("o rodapé enquanto a próxima página viaja", () => {
     expect(next()).not.toBeDisabled();
   });
 
+  it("clicar na página 2 com o total inalterado redesenha o rodapé", async () => {
+    // Produtos: a lista mantém os dados anteriores enquanto a próxima página
+    // viaja, então `rowCount` não muda entre a 1 e a 2. O rodapé é `memo` e o
+    // `table` é referência estável — se a página não for prop, nada muda e o
+    // rodapé fica na 1 enquanto a tabela já mostra a 2.
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={["/x"]}>
+          <DataTable<Row>
+            tableId="bench-click"
+            data={ROWS}
+            columns={COLUMNS}
+            getRowId={(r) => r.id}
+            mode="server"
+            rowCount={200}
+            defaultPageSize={20}
+            persist={false}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText(/Mostrando 1 até 20/)).toBeInTheDocument();
+
+    await act(async () => {
+      screen.getByRole("button", { name: "2" }).click();
+    });
+
+    expect(screen.getByText(/Mostrando 21 até 40/)).toBeInTheDocument();
+  });
+
   it("mas um zero de verdade (busca sem resultado) desabilita", () => {
     render(<Bench rowCount={0} isLoading={false} />);
     expect(screen.getByRole("button", { name: /pr[óo]xima p[áa]gina/i })).toBeDisabled();

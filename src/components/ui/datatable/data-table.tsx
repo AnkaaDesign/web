@@ -1211,7 +1211,13 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
                   // `-mt-px` lets this divider overlap (not stack on top of) the last row's bottom border
                   // when content fills and scrolls flush; over empty space (short content) it's invisible.
                   <div className="-mt-px border-t border-border bg-muted/40 px-4">
-                    <DataTablePagination table={table} totalItems={totalItems} pageSizeOptions={dt.pageSizeOptions} />
+                    <DataTablePagination
+                      table={table}
+                      pageIndex={table.getState().pagination.pageIndex}
+                      pageSize={table.getState().pagination.pageSize}
+                      totalItems={totalItems}
+                      pageSizeOptions={dt.pageSizeOptions}
+                    />
                   </div>
                 )}
               </div>

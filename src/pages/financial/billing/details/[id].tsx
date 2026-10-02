@@ -368,7 +368,9 @@ const BillingDetailPageInner = ({
               statusOrder: true,
               createdAt: true,
               tasks: { select: { taskId: true } },
-              customerConfigs: { select: { id: true, customerId: true } },
+              // `approvedAt` do PAGADOR: com RKO e Ibiporã na mesma cobrança, cada
+              // um é faturado quando for — a tela precisa saber quem já saiu.
+              customerConfigs: { select: { id: true, customerId: true, approvedAt: true } },
             },
           },
         },
@@ -495,14 +497,23 @@ const BillingDetailPageInner = ({
     queryKey: ["signature-envelopes", "quote", quote?.id],
     queryFn: async () => {
       const res: any = await signatureService.listForQuote(quote!.id);
-      return (res?.data?.data ?? res?.data ?? []) as Array<{ status?: string }>;
+      return (res?.data?.data ?? res?.data ?? []) as Array<{
+        status?: string;
+        supplements?: Array<{ status?: string }>;
+      }>;
     },
     enabled: !!quote?.id,
     retry: false,
     staleTime: 30_000,
   });
   const hasRunningSignature = useMemo(
-    () => (quoteEnvelopes ?? []).some((e) => String(e?.status ?? "") === "RUNNING"),
+    // A assinatura complementar vem DENTRO do contrato, não solta na lista.
+    () =>
+      (quoteEnvelopes ?? []).some(
+        (e) =>
+          String(e?.status ?? "") === "RUNNING" ||
+          (e?.supplements ?? []).some((sp) => String(sp?.status ?? "") === "RUNNING"),
+      ),
     [quoteEnvelopes],
   );
 
@@ -615,33 +626,46 @@ const BillingDetailPageInner = ({
     },
   });
 
-  /** As configurações do FORMULÁRIO — a prévia mostra o que acabou de ser digitado. */
-  const formConfigsForPreview = form.watch("customerConfigs") as any[];
+  /**
+   * O RETRATO DO FORMULÁRIO NO INSTANTE EM QUE A CONFIRMAÇÃO ABRE.
+   *
+   * A prévia lia `form.watch("customerConfigs")` dentro de um `useMemo`. O
+   * react-hook-form grava um campo aninhado (`customerConfigs.0.generateBankSlip`)
+   * MUDANDO o objeto no lugar: o array devolvido pelo `watch` é o mesmo de antes,
+   * o memo nunca recalculava, e desligar "Gerar Boleto" e aprovar em seguida —
+   * sem salvar antes — mostrava os boletos que não iam sair. Quem aprova confere
+   * o documento errado logo antes do ato irreversível.
+   *
+   * Tirar uma CÓPIA ao abrir resolve pela raiz: a prévia passa a ser exatamente o
+   * que está na tela naquele momento — e é isso que `executeSave` grava antes de
+   * aprovar.
+   */
+  const [approvalSnapshot, setApprovalSnapshot] = useState<{
+    configs: any[];
+    services: any[];
+    /** As posições, no formulário, dos pagadores que ESTA aprovação vai faturar. */
+    targetIdx: number[];
+    /**
+     * Os ids deles, para a rota. `null` quando algum alvo ainda não tem id
+     * (pagador acrescentado agora, que a gravação logo antes da aprovação cria):
+     * aí a aprovação vai sem recorte e fatura todos os pendentes da cobrança.
+     */
+    targetIds: string[] | null;
+  } | null>(null);
 
   /**
    * AS FATURAS QUE ESTA APROVAÇÃO VAI GERAR — o que a confirmação pré-visualiza.
    *
-   * Espelha `internalApprove.targetConfigs` no servidor: as fatias ainda não
-   * aprovadas e, quando a cobrança é fatiada, só as que cobrem o veículo ABERTO.
-   * Sem o filtro o diálogo dizia "serão gerados apenas os documentos deste
-   * veículo" logo acima das prévias das QUATRO notas e dos QUATRO boletos do
-   * orçamento inteiro — e depois de aprovar o primeiro caminhão ele ainda
-   * mostrava a nota dele, já emitida, como se fosse sair de novo.
+   * São os pagadores escolhidos no seletor do cabeçalho ("Completo" = todos os
+   * desta cobrança que ainda não foram faturados; um cliente = só ele), no
+   * retrato tirado ao abrir. Espelha o que `PUT /billings/:id/approve` recebe.
    */
   const configsForApprovalPreview = useMemo(() => {
-    const configs = ((formConfigsForPreview ?? []) as any[]).filter(
-      (c) => !billingApprovedAtOf(c as any),
-    );
-    if (!isPerVehicleBilling || !task?.id) return configs;
-    const covering = configs.filter((c) => {
-      const ids: string[] =
-        (Array.isArray(c?.taskIds) && c.taskIds.length > 0
-          ? c.taskIds
-          : coveredTaskIds(c as any)) ?? [];
-      return ids.length === 0 || ids.includes(task.id);
-    });
-    return covering.length > 0 ? covering : configs;
-  }, [formConfigsForPreview, isPerVehicleBilling, task?.id]);
+    if (!approvalSnapshot) return [];
+    return approvalSnapshot.targetIdx
+      .map((i) => approvalSnapshot.configs[i])
+      .filter(Boolean);
+  }, [approvalSnapshot]);
 
   /**
    * AS MESMAS FATURAS, COM O VALOR QUE ELAS COBRAM.
@@ -829,6 +853,12 @@ const BillingDetailPageInner = ({
         // Quando ESTA fatura foi aprovada. Fatura aprovada tem a cobertura
         // congelada e não se refatia — a tela precisa saber para não oferecer.
         billingApprovedAt: billingApprovedAtOf(config as any),
+        // E quando ESTE PAGADOR foi faturado — o que decide se ele ainda é alvo
+        // de aprovação. Precisa estar no formulário com o nome da coluna: sem ele
+        // `billingApprovedAtOf` recai em `billing.approvedAt`, que com RKO e
+        // Ibiporã na mesma cobrança é a data da PRIMEIRA a sair, e daria a
+        // Ibiporã por faturada quando só a RKO foi.
+        approvedAt: (config as any).approvedAt ?? null,
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
         discountType: config.discountType || "NONE",
@@ -882,6 +912,34 @@ const BillingDetailPageInner = ({
     setLayoutFiles((quote.layoutFiles || []).map(toLayoutFile));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, quote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
+
+  // ── A APROVAÇÃO DE CADA PAGADOR ACOMPANHA O SERVIDOR ─────────────────────
+  //
+  // A hidratação acima roda só quando muda o veículo ou o orçamento (de
+  // propósito: um refetch não pode apagar o que o operador está digitando).
+  // Mas a aprovação é um fato do SERVIDOR, e muda sem trocar de tela: faturar
+  // a RKO e continuar na página deixava o formulário dizendo que a RKO não
+  // estava faturada — o seletor voltava a oferecer "Aprovar" para ela e a rota
+  // respondia que já estava. Só estes dois campos são sincronizados, sem sujar
+  // o formulário; o resto continua sendo do operador.
+  useEffect(() => {
+    const doServidor = ((quote?.customerConfigs ?? []) as any[]);
+    if (doServidor.length === 0) return;
+    const porId = new Map(doServidor.map((c: any) => [c.id, c]));
+    const atuais = (form.getValues("customerConfigs") || []) as any[];
+    atuais.forEach((c: any, i: number) => {
+      const srv = c?.id ? porId.get(c.id) : null;
+      if (!srv) return;
+      const aprovado = srv.approvedAt ?? null;
+      if (String(c.approvedAt ?? "") === String(aprovado ?? "")) return;
+      form.setValue(`customerConfigs.${i}.approvedAt` as any, aprovado, { shouldDirty: false });
+      form.setValue(
+        `customerConfigs.${i}.billingApprovedAt` as any,
+        billingApprovedAtOf(srv as any),
+        { shouldDirty: false },
+      );
+    });
+  }, [quote?.customerConfigs, form]);
 
   // Dynamic steps: Tarefa → Serviços → Cliente(s) → [Proposta] → Resumo
   const customerConfigs = form.watch("customerConfigs") || [];
@@ -966,6 +1024,44 @@ const BillingDetailPageInner = ({
       .map(({ i }: any) => i);
     return covering.length > 0 ? covering : todos;
   }, [customerConfigs, task?.id, currentBilling]);
+
+  /**
+   * QUEM ESTA APROVAÇÃO FATURA — os índices, no formulário, dos pagadores alvo.
+   *
+   * O seletor do cabeçalho ("Completo" / um cliente) era só o recorte do dossiê e
+   * do Resumo; aprovar ignorava a escolha e faturava TODOS os pagadores da
+   * cobrança. Com RKO e Ibiporã sobre o mesmo caminhão isso obrigava as duas notas
+   * a sair juntas. Agora a escolha vale para o ato:
+   *
+   *   · "Completo"   → todos os pagadores DESTA cobrança ainda não faturados;
+   *   · um cliente   → só ele, se ainda não foi faturado.
+   *
+   * Lido do formulário na hora (não de um memo): `customerConfigs` é mutado no
+   * lugar pelo react-hook-form — ver `approvalSnapshot`.
+   */
+  const resolveApprovalTargetIdx = useCallback((): number[] => {
+    const configs = (form.getValues("customerConfigs") || []) as any[];
+    const escopo = visibleConfigIdx.length > 0 ? visibleConfigIdx : configs.map((_: any, i: number) => i);
+    return escopo.filter((i: number) => {
+      const c = configs[i];
+      if (!c) return false;
+      if (billingApprovedAtOf(c as any)) return false;
+      if (dossieCustomerId !== "all" && c.customerId !== dossieCustomerId) return false;
+      return true;
+    });
+  }, [form, visibleConfigIdx, dossieCustomerId]);
+
+  /** O nome de um pagador, como o seletor do cabeçalho o mostra. */
+  const payerName = useCallback((config: any, i: number): string => {
+    const cached = customersCache.current.get(config?.customerId);
+    return (
+      cached?.fantasyName ||
+      cached?.corporateName ||
+      config?.customerData?.fantasyName ||
+      config?.customerData?.corporateName ||
+      `Cliente ${i + 1}`
+    );
+  }, []);
 
   // ── AS COBRANÇAS IRMÃS NÃO APARECEM AQUI ────────────────────────────────
   //
@@ -1213,7 +1309,7 @@ const BillingDetailPageInner = ({
    * Chamada só no caminho de aprovar — era disparada por `status === "BILLING_APPROVED"`, um
    * estado do orçamento que deixou de existir. O ato é o mesmo; o gatilho agora é o ato em si.
    */
-  const validateCustomerData = useCallback((): boolean => {
+  const validateCustomerData = useCallback((onlyIdx?: number[]): boolean => {
     const configs = form.getValues("customerConfigs") || [];
     const services = form.getValues("services") || [];
     const validServices = services.filter((s: any) => s.description?.trim());
@@ -1252,11 +1348,21 @@ const BillingDetailPageInner = ({
     // partir de `visibleConfigIdx`, então `firstCustomerStepIdx + i` com `i` GLOBAL aponta para
     // fora). Aprovar uma cobrança não pode depender das outras; é a mesma regra que fez a rota
     // deixar de ser do orçamento.
+    //
+    // E, dentro desta cobrança, SÓ OS PAGADORES QUE ESTA APROVAÇÃO FATURA
+    // (`onlyIdx`): aprovar a RKO não pode ser recusado porque o cadastro da
+    // Ibiporã, que fica para depois, está incompleto.
     const scoped =
-      visibleConfigIdx.length > 0 ? visibleConfigIdx : configs.map((_: any, i: number) => i);
+      onlyIdx && onlyIdx.length > 0
+        ? onlyIdx
+        : visibleConfigIdx.length > 0
+          ? visibleConfigIdx
+          : configs.map((_: any, i: number) => i);
 
-    for (let pos = 0; pos < scoped.length; pos++) {
-      const i = scoped[pos];
+    for (let k = 0; k < scoped.length; k++) {
+      const i = scoped[k];
+      // O PASSO é a posição entre as cobranças VISÍVEIS, não dentro do recorte.
+      const pos = Math.max(0, visibleConfigIdx.indexOf(i));
       const config = configs[i];
       if (!config) continue;
       const data = config.customerData || {};
@@ -1328,7 +1434,11 @@ const BillingDetailPageInner = ({
 
 
   // Core save logic
-  const executeSave = useCallback(async (options?: { approveBilling?: boolean }) => {
+  const executeSave = useCallback(async (options?: {
+    approveBilling?: boolean;
+    /** Os pagadores a faturar. Ausente/`null` = todos os pendentes desta cobrança. */
+    customerConfigIds?: string[] | null;
+  }) => {
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
@@ -1533,6 +1643,44 @@ const BillingDetailPageInner = ({
       await budgetService.update(quote.id, quotePayload);
 
       // ═══════════════════════════════════════════════════════════════════════
+      // ORÇAMENTO TRAVADO, MAS COM PAGADOR AINDA NÃO FATURADO
+      // ═══════════════════════════════════════════════════════════════════════
+      //
+      // Travado, o corpo acima não leva `customerConfigs` — o servidor recusaria
+      // qualquer campo de dinheiro. Isso era certo quando a cobrança saía
+      // inteira. Com a aprovação por pagador, a RKO faturada trava o orçamento e
+      // a Ibiporã do mesmo caminhão, que ainda NÃO saiu, perdia em silêncio a
+      // troca de boleto por PIX que o operador acabou de fazer — e a aprovação
+      // logo em seguida emitia com as condições antigas.
+      //
+      // Os termos de cobrança de quem ainda não foi faturado vão pela porta
+      // própria (`PUT /billings/:id/payers/:payerId`), um por um, e só quando
+      // mudaram. Uma recusa aqui interrompe a gravação — e a aprovação junto.
+      if (isQuoteLocked) {
+        const persistidos = new Map(
+          ((quote.customerConfigs ?? []) as any[]).map((c: any) => [c.id, c]),
+        );
+        const termosDe = (c: any) => ({
+          paymentCondition: c?.paymentCondition || null,
+          paymentConfig: c?.paymentConfig ?? null,
+          customPaymentText: c?.customPaymentText || null,
+          generateInvoice: c?.generateInvoice !== false,
+          generateBankSlip: c?.generateBankSlip !== false,
+        });
+        for (const i of visibleConfigIdx) {
+          const c: any = (formData.customerConfigs as any[])[i];
+          if (!c?.id || billingApprovedAtOf(c)) continue;
+          const antes = persistidos.get(c.id);
+          if (!antes) continue;
+          const termos = termosDe(c);
+          if (JSON.stringify(termos) === JSON.stringify(termosDe(antes))) continue;
+          const cobranca = c.billingId ?? currentBilling?.id;
+          if (!cobranca) continue;
+          await billingService.updatePayerTerms(cobranca, c.id, termos);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
       // O PEDIDO DE COMPRA NÃO PASSA MAIS POR AQUI
       // ═══════════════════════════════════════════════════════════════════════
       //
@@ -1552,7 +1700,9 @@ const BillingDetailPageInner = ({
         // NFS-e e os boletos DELA. Endereçar por id é a diferença que faz: os sessenta caminhões
         // do Marquespan não terminam no mesmo dia, e cada aprovação conta o vencimento a partir
         // dela; o orçamento só grava `billingApprovedAt` quando a última fecha.
-        await billingService.approve(currentBilling.id);
+        // O RECORTE DE PAGADORES vai junto: sem ele a rota fatura todos os que
+        // faltam na cobrança, que é o "Completo" do seletor.
+        await billingService.approve(currentBilling.id, options?.customerConfigIds ?? null);
       }
 
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -1591,6 +1741,7 @@ const BillingDetailPageInner = ({
     // ANTERIOR depois de o operador trocar de página pelo paginador de irmãs.
     currentBilling?.id,
     approvedBillingCount,
+    visibleConfigIdx,
     task?.id,
     form,
     queryClient,
@@ -1640,9 +1791,30 @@ const BillingDetailPageInner = ({
       toast.error("Esta cobrança ainda não foi criada. Salve antes de aprovar.");
       return;
     }
-    if (!validateCustomerData()) return;
+    // O RECORTE: o que o seletor do cabeçalho diz. "Completo" fatura todos os
+    // pagadores pendentes desta cobrança; um cliente, só ele.
+    const alvo = resolveApprovalTargetIdx();
+    if (alvo.length === 0) {
+      toast.error(
+        dossieCustomerId !== "all"
+          ? "Este cliente já teve o faturamento aprovado."
+          : "Todos os clientes desta cobrança já foram faturados.",
+      );
+      return;
+    }
+    if (!validateCustomerData(alvo)) return;
+    // O RETRATO — ver `approvalSnapshot`. Tirado aqui, depois das guardas, para
+    // que a prévia mostre exatamente o que está na tela agora, gravado ou não.
+    const configs = (form.getValues("customerConfigs") || []) as any[];
+    const ids = alvo.map((i) => configs[i]?.id as string | undefined);
+    setApprovalSnapshot({
+      configs: structuredClone(configs),
+      services: structuredClone(form.getValues("services") || []),
+      targetIdx: alvo,
+      targetIds: ids.every(Boolean) ? (ids as string[]) : null,
+    });
     setBillingApprovalDialogOpen(true);
-  }, [currentBilling?.id, validateCustomerData]);
+  }, [currentBilling?.id, validateCustomerData, resolveApprovalTargetIdx, dossieCustomerId, form]);
 
   /** LIQUIDAR À MÃO — `PUT /billings/:id/settle`, o orçamento direto pago à vista. */
   const handleSettleBilling = useCallback(async () => {
@@ -1736,6 +1908,31 @@ const BillingDetailPageInner = ({
    * veículo por onde se entrou. Com mais de um veículo coberto o título diz a
    * cobertura; com um só, segue exatamente como sempre foi.
    */
+  /** O que a aprovação aberta vai emitir — lido dos alvos do retrato. */
+  const approvalEmits = {
+    nfse: configsForApprovalPreview.some((c: any) => c?.generateInvoice !== false),
+    boleto: configsForApprovalPreview.some((c: any) => c?.generateBankSlip !== false),
+  };
+  /**
+   * "Faturando agora: RKO Alimentos" — só quando a cobrança tem mais de um
+   * cliente. Com um só não há o que desambiguar.
+   */
+  const approvalPayerSummary = (() => {
+    if (!approvalSnapshot || !hasMultipleCustomersOf(approvalSnapshot.configs as any)) return null;
+    const nomes = approvalSnapshot.targetIdx.map((i) => payerName(approvalSnapshot.configs[i], i));
+    const visiveis = visibleConfigIdx.filter((i) => approvalSnapshot.configs[i]);
+    const ficam = visiveis
+      .filter((i) => !approvalSnapshot.targetIdx.includes(i))
+      .filter((i) => !billingApprovedAtOf(approvalSnapshot.configs[i] as any))
+      .map((i) => payerName(approvalSnapshot.configs[i], i));
+    return (
+      `Faturando agora: ${nomes.join(" e ")}.` +
+      (ficam.length > 0
+        ? ` ${ficam.join(" e ")} ${ficam.length > 1 ? "continuam" : "continua"} aguardando a própria aprovação.`
+        : "")
+    );
+  })();
+
   const taskDisplayName =
     coveredVehicleRows.length > 1
       ? [task.name, `${coveredVehicleRows.length} veículos`].filter(Boolean).join(" - ")
@@ -2000,6 +2197,13 @@ const BillingDetailPageInner = ({
 
           {/* Faithful previews of the NFS-e + boletos that will be generated */}
           <div className="my-2">
+            {/* QUEM ESTA APROVAÇÃO FATURA — com dois clientes na cobrança, aprovar
+                um não aprova o outro, e a confirmação tem de dizer qual sai agora. */}
+            {approvalPayerSummary && (
+              <p className="mb-2 text-sm font-semibold text-foreground">
+                {approvalPayerSummary}
+              </p>
+            )}
             <p className="mb-2 text-sm font-medium text-foreground">
               Confira os documentos que serão gerados automaticamente:
             </p>
@@ -2016,7 +2220,10 @@ const BillingDetailPageInner = ({
             )}
             <BillingDocumentPreviews
               customerConfigs={configsForPreviewAtInvoiceScale}
-              services={form.watch("services")}
+              services={approvalSnapshot?.services ?? []}
+              // Do ORÇAMENTO, não dos alvos: faturando só a Ibiporã, a nota dela
+              // continua recortando os serviços dela.
+              multipleCustomers={hasMultipleCustomersOf((approvalSnapshot?.configs ?? []) as any)}
               nextNfseNumber={nextNfse?.nextNumber ?? null}
               orderNumbersByTask={{
                 ...Object.fromEntries(
@@ -2063,13 +2270,23 @@ const BillingDetailPageInner = ({
                     {isPerVehicleBilling ? " veículo" : " orçamento"}
                   </span>
                 </li>
+                {/* O QUE DE FATO SAI — lido dos alvos, não afirmado para todos. Com
+                    "Gerar Boleto" desligado a lista dizia que haveria boleto. */}
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 font-bold">2.</span>
-                  <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
+                  {approvalEmits.boleto ? (
+                    <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
+                  ) : (
+                    <span><strong>Nenhum boleto</strong> será emitido (geração de boleto desligada)</span>
+                  )}
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 font-bold">3.</span>
-                  <span><strong>Notas Fiscais (NFS-e)</strong> serão emitidas automaticamente para cada fatura</span>
+                  {approvalEmits.nfse ? (
+                    <span><strong>Notas Fiscais (NFS-e)</strong> serão emitidas automaticamente para cada fatura</span>
+                  ) : (
+                    <span><strong>Nenhuma nota fiscal</strong> será emitida (emissão de NFS-e desligada)</span>
+                  )}
                 </li>
               </ul>
             </div>
@@ -2098,7 +2315,10 @@ const BillingDetailPageInner = ({
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={async () => {
                 setBillingApprovalDialogOpen(false);
-                await executeSave({ approveBilling: true });
+                await executeSave({
+                  approveBilling: true,
+                  customerConfigIds: approvalSnapshot?.targetIds ?? null,
+                });
               }}
             >
               {isSaving

@@ -23,6 +23,7 @@ import {
   hasMultipleCustomers,
   coveredTaskCount,
   coverageSummary,
+  contactsForSegment,
 } from "@/utils/quote-tasks";
 import { computeQuoteMoney } from "@/utils/quote-money";
 import { QuoteBillingBox } from "@/components/public/quote-billing-box";
@@ -276,8 +277,16 @@ export function PublicBudgetPage() {
   // carries its own (which went stale after duplicating a task + changing its responsible).
   // O responsável PRINCIPAL sai da união das tarefas — o mesmo conjunto que
   // assina o documento.
-  const contactName =
-    quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? [])[0]?.name || "";
+  //
+  // No recorte de um cliente do faturamento dividido, só os contatos DELE — e
+  // podem não existir: aí não há "À fulano" nem linha do cliente, como no PDF
+  // (`contactsForSegment`).
+  const segmentContacts = contactsForSegment<any>(
+    quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? []),
+    quote.customerConfigs as any,
+    selectedCustomerId,
+  );
+  const contactName = segmentContacts[0]?.name || "";
   // Invoice-to customer (woven into the intro): corporate/fantasy name + CNPJ or CPF
   // when present. Prefer the active config's customer, fall back to the task's.
   const billCustomer: any = activeConfig?.customer || primaryTask<any>(quote)?.customer;
@@ -1032,6 +1041,7 @@ export function PublicBudgetPage() {
               <BudgetSignaturePanel
                 quoteId={id!}
                 customerName={invoiceName || undefined}
+                customerSigners={segmentContacts.map((r: any) => r.name).filter(Boolean)}
                 onEnvelope={handleEnvelope}
                 preloaded={sigSummary}
               />
@@ -1107,6 +1117,7 @@ export function PublicBudgetPage() {
             <BudgetSignaturePanel
               quoteId={id!}
               customerName={invoiceName || undefined}
+              customerSigners={segmentContacts.map((r: any) => r.name).filter(Boolean)}
               onEnvelope={handleEnvelope}
               preloaded={sigSummary}
             />

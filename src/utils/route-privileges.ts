@@ -344,6 +344,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // COMMERCIAL vê o item via a seção Ferramentas hierárquica; LOGISTIC via item
   // flat próprio; PM via o grupo "ferramentas-production-manager" (navigation.ts).
   "/ferramentas/estudio-3D": ["ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"],
+  // Validador de Documentos (assinatura eletrônica do orçamento) — ADMIN + COMMERCIAL.
+  // Precisa ficar explícito: sem esta linha o wildcard "/ferramentas/*" abriria a
+  // página para PM, RH, Contabilidade, Financeiro e Logística.
+  "/ferramentas/validador-de-documentos": ["ADMIN", "COMMERCIAL"],
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",

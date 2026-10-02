@@ -60,6 +60,8 @@ export interface Summary {
    * `drawSeal` em `api/.../document/quote-assembler.service.ts`. O resumo
    * público os devolve mascarados, e só para quem de fato assinou.
    */
+  /** Há uma assinatura complementar sendo colhida sobre o contrato já assinado. */
+  supplementRunning?: boolean;
   signers?: Array<{
     name: string;
     cargo: string | null;
@@ -144,6 +146,7 @@ const EMPTY_SEAL: SealLines = {
 export function BudgetSignaturePanel({
   quoteId,
   customerName,
+  customerSigners,
   onEnvelope,
   preloaded,
 }: {
@@ -168,6 +171,14 @@ export function BudgetSignaturePanel({
    * já o tem em mãos.
    */
   customerName?: string;
+  /**
+   * Quem assina pelo cliente quando ainda não há coleta — os MESMOS nomes que o
+   * PDF imprime (`renderUnsignedQuoteDocument`), já recortados pelo cliente
+   * (`contactsForSegment`). Lista vazia = nenhuma linha do cliente: no recorte
+   * de um pagador sem contato próprio, a linha seria de outra empresa.
+   * `undefined` mantém o marcador genérico "Responsável — Cliente".
+   */
+  customerSigners?: string[];
 }) {
   const [fetched, setFetched] = useState<Summary | null>(null);
   const data = preloaded !== undefined ? preloaded : fetched;
@@ -227,13 +238,13 @@ export function BudgetSignaturePanel({
         },
       }))
     : [
-        {
-          name: "Responsável — Cliente",
+        ...(customerSigners ?? ["Responsável — Cliente"]).map(name => ({
+          name,
           subtitle: customerName ?? "",
-          state: "BLANK",
+          state: "BLANK" as const,
           signedAt: null,
           seal: EMPTY_SEAL,
-        },
+        })),
         {
           name: COMPANY_INFO.directorName,
           subtitle: ankaaSubtitle,
@@ -276,6 +287,11 @@ export function BudgetSignaturePanel({
             <span className="flex items-center gap-1 text-xs" style={{ color: GRAY }}>
               <IconShieldCheck className="h-3.5 w-3.5" />
               Selo ICP-Brasil {data.padesLevel}
+            </span>
+          )}
+          {completed && data?.supplementRunning && (
+            <span className="text-xs" style={{ color: GRAY }}>
+              · Aguardando a assinatura de um responsável incluído depois
             </span>
           )}
           {!completed && !bad && data?.deadlineAt && (

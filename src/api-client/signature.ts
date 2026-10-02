@@ -144,6 +144,50 @@ export interface PreflightRecipient {
    */
   sections?: QuoteSection[];
   sectionsLabel?: string;
+  /** Só no preflight da assinatura COMPLEMENTAR: em que pé ele está no contrato. */
+  state?: SupplementResponsibleState;
+  /** Só na complementar: a última tentativa que terminou sem a assinatura dele. */
+  lastAttempt?: { status: string; at: string } | null;
+}
+
+/**
+ * Em que pé está cada responsável da tarefa em relação ao contrato assinado.
+ * Só `MISSING` é pendência; `EXCLUDED` (tirado da coleta de propósito) e
+ * `NOT_SIGNER` (não assina pela função) podem ser incluídos, mas não são cobrados.
+ */
+export type SupplementResponsibleState =
+  | "SIGNED"
+  | "PENDING"
+  | "MISSING"
+  | "EXCLUDED"
+  | "NOT_SIGNER";
+
+/**
+ * Quem da tarefa já assinou o contrato e quem falta — vem dentro da coleta
+ * principal CONCLUÍDA mais recente (`GET /signature-envelopes/quote/:id`).
+ */
+export interface SupplementCoverage {
+  baseEnvelopeId: string;
+  baseVersion: number;
+  responsibles: Array<{
+    id: string;
+    name: string;
+    roles: string[];
+    rolesLabel: string;
+    state: SupplementResponsibleState;
+    signedIn: "PRIMARY" | "SUPPLEMENT" | null;
+    signedAt: string | null;
+    sections: QuoteSection[];
+    sectionsLabel: string;
+    lastAttempt: { status: string; at: string } | null;
+  }>;
+  /** Quantos em MISSING — a pendência anunciada na faixa. */
+  missing: number;
+  /** Quantos ainda podem ser incluídos (MISSING, EXCLUDED, NOT_SIGNER). */
+  candidates: number;
+  /** O que impede pedir a assinatura complementar agora. */
+  blockers: string[];
+  canIssue: boolean;
 }
 
 export interface PreflightChannelStatus {
@@ -406,8 +450,10 @@ export const signatureService = {
    * Chamado ao abrir o modal, não no carregamento da página: é uma leitura do
    * grafo da tarefa e só interessa a quem vai de fato enviar.
    */
-  getDeliveryPreflight: (quoteId: string) =>
-    apiClient.get(`/signature-envelopes/quote/${quoteId}/delivery-preflight`),
+  getDeliveryPreflight: (quoteId: string, opts?: { supplement?: boolean }) =>
+    apiClient.get(`/signature-envelopes/quote/${quoteId}/delivery-preflight`, {
+      ...(opts?.supplement ? { params: { complementar: "true" } } : {}),
+    }),
 
   /**
    * Emite a coleta. `channel` só é honrado quando o servidor está em `both`;
@@ -429,6 +475,22 @@ export const signatureService = {
       signers?: Array<{ responsibleId: string; sections: QuoteSection[] }>;
     },
   ) => apiClient.post(`/signature-envelopes/quote/${quoteId}`, data ?? {}),
+
+  /**
+   * ASSINATURA COMPLEMENTAR — quem entrou na tarefa depois de o contrato ser
+   * assinado assina o SEU documento, sem anular ninguém. O orçamento volta para
+   * pendente até ela concluir.
+   *
+   * Aqui `signers` é a LISTA de quem assina (só os escolhidos), não um mapa de
+   * exceções. `sections` vazio = o padrão das funções do contato.
+   */
+  createSupplement: (
+    quoteId: string,
+    data: {
+      channel?: DeliveryChannel | null;
+      signers: Array<{ responsibleId: string; sections: QuoteSection[] }>;
+    },
+  ) => apiClient.post(`/signature-envelopes/quote/${quoteId}/complementar`, data),
 
   /**
    * Contra-assinatura da Ankaa — um POST, sem código.

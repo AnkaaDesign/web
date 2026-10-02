@@ -12,6 +12,7 @@ import {
   IconNote,
   IconLayoutGrid,
   IconTruck,
+  IconFileCertificate,
 } from "@tabler/icons-react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 
@@ -57,6 +58,20 @@ const toolGroups: ToolGroup[] = [
         route: routes.tools.wasteCertificate.root,
         icon: IconRecycle,
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
+      },
+    ],
+  },
+  {
+    title: "Documentos",
+    description: "Verificação de documentos assinados eletronicamente",
+    icon: IconFileCertificate,
+    links: [
+      {
+        label: "Validador de Documentos",
+        description: "Confira a autenticidade de um orçamento assinado pelo código ou pelo PDF",
+        route: routes.tools.documentValidator.root,
+        icon: IconFileCertificate,
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
       },
     ],
   },

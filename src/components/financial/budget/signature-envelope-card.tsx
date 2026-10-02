@@ -16,6 +16,7 @@ import {
   signatureService,
   type DeliveryChannel,
   type DeliverySettings,
+  type SupplementCoverage,
 } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -38,6 +39,7 @@ import {
   IconPencilExclamation,
   IconSend,
   IconSignature,
+  IconUserPlus,
   IconX,
 } from "@tabler/icons-react";
 import { SignatureSendDialog } from "./signature-send-dialog";
@@ -161,6 +163,20 @@ interface Envelope {
    * assinatura.
    */
   addendum?: { sha256: string | null; sealedAt: string | null; padesLevel: string | null } | null;
+  /** PRIMARY = o contrato; SUPPLEMENT = assinatura de quem entrou depois. */
+  kind?: "PRIMARY" | "SUPPLEMENT";
+  baseEnvelopeId?: string | null;
+  /**
+   * As ASSINATURAS COMPLEMENTARES deste contrato, a mais recente primeiro. Vêm
+   * DENTRO da coleta principal: não são versão nova de nada — acrescentam
+   * assinantes a ela, sem anular quem já assinou.
+   */
+  supplements?: Envelope[];
+  /**
+   * Quem da tarefa já assinou e quem falta. Só na coleta principal CONCLUÍDA
+   * mais recente; é dela que sai a faixa "falta a assinatura de fulano".
+   */
+  coverage?: SupplementCoverage | null;
 }
 
 type Tone = "ok" | "warn" | "bad" | "muted";
@@ -362,7 +378,7 @@ export function SignatureEnvelopeCard({
    * palavra no título e a mensagem de sucesso. Duplicar o modal para isso
    * garantiria que um dos dois envelhecesse.
    */
-  const [sendDialog, setSendDialog] = useState<"create" | "reissue" | null>(null);
+  const [sendDialog, setSendDialog] = useState<"create" | "reissue" | "supplement" | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -430,9 +446,11 @@ export function SignatureEnvelopeCard({
    */
   useEffect(() => {
     const current = envelopes[0];
-    if (!current || current.status !== "RUNNING") return;
-    const pending = current.signers.some(
-      s => s.status !== "SIGNED" && s.status !== "REFUSED" && !s.inviteState,
+    if (!current) return;
+    // A coleta viva pode ser o contrato OU uma assinatura complementar dele.
+    const live = [current, ...(current.supplements ?? [])].filter(e => e.status === "RUNNING");
+    const pending = live.some(e =>
+      e.signers.some(s => s.status !== "SIGNED" && s.status !== "REFUSED" && !s.inviteState),
     );
     if (!pending) return;
 
@@ -589,6 +607,44 @@ export function SignatureEnvelopeCard({
     customerPending === 0;
   const label = current ? ENVELOPE_LABEL[current.status] ?? { text: current.status, tone: "muted" as Tone } : null;
 
+  /**
+   * As ASSINATURAS COMPLEMENTARES do contrato e quem ainda falta.
+   *
+   * O contrato continua sendo `current`, sempre: a complementar não o
+   * substitui, só acrescenta quem entrou na tarefa depois.
+   */
+  const supplements = current?.supplements ?? [];
+  const liveSupplements = supplements.filter(sp => sp.status === "RUNNING" || sp.status === "COMPLETED");
+  const endedSupplements = supplements.filter(sp => sp.status !== "RUNNING" && sp.status !== "COMPLETED");
+  const supplementRunning = supplements.some(sp => sp.status === "RUNNING");
+  const coverage = current?.status === "COMPLETED" ? (current.coverage ?? null) : null;
+  const missingPeople = coverage?.responsibles.filter(r => r.state === "MISSING") ?? [];
+
+  /** A contra-assinatura de uma coleta — a mesma regra do contrato, para a complementar. */
+  const countersignOf = (env: Envelope) => {
+    const ankaa =
+      env.signers.find(
+        s => (s.ceremony ?? (s.side === "ANKAA" ? "INTERNAL" : "OTP")) === "INTERNAL",
+      ) ?? null;
+    const pendingCustomer = env.signers.filter(
+      s => s.side === "CUSTOMER" && s.status !== "SIGNED",
+    ).length;
+    const mine =
+      ankaa?.podeContraAssinar ??
+      (ankaa?.userId != null ? ankaa.userId === user?.id || souOAdmin : true);
+    return {
+      ankaa,
+      can:
+        canManage &&
+        env.status === "RUNNING" &&
+        !!ankaa &&
+        ankaa.status !== "SIGNED" &&
+        ankaa.ceremony === "INTERNAL" &&
+        mine &&
+        pendingCustomer === 0,
+    };
+  };
+
   const titleInner = (
     <>
       <IconSignature className="h-4 w-4 text-muted-foreground" />
@@ -596,6 +652,11 @@ export function SignatureEnvelopeCard({
       {current && (
         <Badge variant="outline" className={`ml-1 ${toneClass[label!.tone]}`}>
           {label!.text}
+        </Badge>
+      )}
+      {current?.status === "COMPLETED" && (supplementRunning || missingPeople.length > 0) && (
+        <Badge variant="outline" className={toneClass.warn}>
+          {supplementRunning ? "Assinatura complementar pendente" : "Falta assinatura"}
         </Badge>
       )}
     </>
@@ -658,6 +719,199 @@ export function SignatureEnvelopeCard({
     </div>
   );
 
+  /** Uma linha de signatário — a mesma no contrato e nas assinaturas complementares. */
+  const renderSignerRow = (env: Envelope, s: EnvelopeSigner) => {
+    const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
+    const ceremony = s.ceremony ?? (s.side === "ANKAA" ? "INTERNAL" : "OTP");
+    // O recorte deste signatário, quando a coleta congelou mais de um.
+    // Com um só não há o que distinguir, e o rótulo "Documento completo"
+    // repetido em toda linha só faria ruído.
+    const variant =
+      (env.documents?.length ?? 0) > 1
+        ? (env.documents ?? []).find(d => d.id === s.documentId) ?? null
+        : null;
+    // `cargoList` vem pronto do servidor. O fallback para `cargo` cobre
+    // envelopes lidos antes desta versão da API, sem quebrar a linha.
+    const roleList = s.cargoList?.length ? s.cargoList : s.cargo ? [s.cargo] : [];
+    const shownRoles = roleList.slice(0, 2);
+    const extraRoles = Math.max(0, roleList.length - 2);
+    return (
+      <div key={s.id} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-2.5">
+        {s.status === "SIGNED" ? (
+          <IconCircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+        ) : s.status === "REFUSED" || s.status === "VOIDED" ? (
+          <IconX className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        ) : s.timesViewed > 0 ? (
+          <IconEye className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+        ) : (
+          <IconClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-medium">{s.name}</span>
+            {/* Divergência entre o CPF que a Ankaa cadastrou e o que o
+                signatário informou é fato auditável, não bloqueio. */}
+            {s.cpfMatch === false && (
+              <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass.bad}`}>
+                CPF diverge
+              </Badge>
+            )}
+            {variant && (
+              // O que ESTA pessoa recebeu. Sem isto o painel dizia
+              // "3 de 4 assinaram" sem dizer o que cada um assinou — e
+              // numa coleta diversificada essa é a pergunta.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={`h-5 cursor-default px-1.5 text-[10px] ${variant.isFull ? toneClass.muted : toneClass.warn}`}
+                  >
+                    {variant.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[260px]">
+                  Recebeu um PDF com {variant.isFull ? "todas as seções" : "apenas essas seções"} do
+                  orçamento.
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          {/* Um contato pode acumular nove funções ("Comercial,
+              Proprietário, Vendedor, ..."), o que empurrava o e-mail
+              para fora da linha. Mostra as duas primeiras e conta o
+              resto num "+N", como a seção de responsáveis da tarefa. */}
+          <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+            {shownRoles.length > 0 && (
+              <span className="truncate" title={s.cargo ?? undefined}>
+                {shownRoles.join(", ")}
+              </span>
+            )}
+            {extraRoles > 0 && (
+              // O "+N" precisa dizer o que esconde: o mouse abre o resto.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="shrink-0 cursor-default rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                    +{extraRoles}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[240px]">
+                  <div className="flex flex-col gap-0.5">
+                    {roleList.slice(2).map(role => (
+                      <span key={role}>{role}</span>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {shownRoles.length > 0 && <span className="shrink-0">·</span>}
+            {/* Contato do CANAL da coleta. Mostrar o e-mail numa coleta
+                por WhatsApp fazia o operador conferir o endereço errado
+                quando o convite não chegava. */}
+            <span className="truncate">
+              {s.channel === "WHATSAPP" ? s.phoneMasked : s.emailMasked}
+            </span>
+          </p>
+          {/* Sem o IP. Ele é PROVA, não estado: vive na trilha de
+              auditoria, no selo impresso no PDF e no dossiê — os
+              lugares a que se recorre para demonstrar autoria. Aqui a
+              pergunta é só "já assinou?", e o endereço empurrava a data
+              para fora da linha. */}
+          <p className="text-xs text-muted-foreground">
+            {s.signedAt
+              ? `Assinou em ${fmtDateTime(s.signedAt)}`
+              : // O MOTIVO só enquanto a recusa É o estado.
+                //
+                // `refusalReason` é HISTÓRICO e fica gravado de
+                // propósito — reabrir um recusante preserva o motivo,
+                // que é o que permite ao comercial lembrar por que
+                // pediu de novo. Mas a linha lia o histórico ANTES do
+                // estado, então depois de "Pedir novamente" o contato
+                // aparecia com o selo "Pendente" e a frase "Recusou:
+                // …" ao mesmo tempo, e o operador deixava de ver se ele
+                // chegou a abrir o convite novo — que é justamente a
+                // pergunta que ele passa a ter.
+                s.status === "REFUSED" && s.refusalReason
+                ? `Recusou: ${s.refusalReason}`
+                : s.timesViewed > 0
+                  ? `Abriu o link ${s.timesViewed}× · último em ${fmtDateTime(s.lastViewedAt)}`
+                  : s.inviteState === "INVITATION_FAILED"
+                    ? "Convite não entregue — envie o link manualmente"
+                    : s.inviteState === "INVITATION_SENT"
+                      ? "Convite enviado · ainda não abriu"
+                      : "Aguardando envio do convite"}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {/* O lado da Ankaa não tem link para copiar nem convite para
+              reenviar: ele não assina por link. O ato dele é o botão do
+              painel acima, e oferecer aqui as três ações do cliente
+              convidaria a distribuir uma capability que já não existe. */}
+          {/* REFUSED entra: recusar deixou de ser terminal. O reenvio a
+              quem recusou é o gesto de PEDIR DE NOVO — o servidor
+              reabre a vez dele (ver `resendInvitation`), e é por isso
+              que o botão muda de rótulo abaixo em vez de sumir. */}
+          {canManage && ceremony === "OTP" && s.status !== "SIGNED" && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                title="Copiar link de assinatura"
+                onClick={() => copyLink(s)}
+              >
+                <IconLink className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                title={
+                  s.channel === "WHATSAPP"
+                    ? "Abrir WhatsApp com a mensagem pronta"
+                    : "Abrir e-mail com a mensagem pronta"
+                }
+                onClick={() => openManualFallback(s)}
+                disabled={s.channel === "WHATSAPP" ? !s.phone : !s.email}
+              >
+                {s.channel === "WHATSAPP" ? (
+                  <IconBrandWhatsapp className="h-3.5 w-3.5" />
+                ) : (
+                  <IconMail className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                title={
+                  s.status === "REFUSED"
+                    ? `Pedir novamente por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"} — reabre a assinatura deste contato`
+                    : `Reenviar convite por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"}`
+                }
+                disabled={busy}
+                onClick={() =>
+                  run(
+                    () => signatureService.resendInvitation(s.id),
+                    s.status === "REFUSED"
+                      ? "Pedido reenviado — a assinatura deste contato foi reaberta."
+                      : "Convite reenviado.",
+                  )
+                }
+              >
+                <IconSend className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
+          <Badge variant="outline" className={toneClass[st.tone]}>
+            {st.text}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
+
   const body = loading ? (
       <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
         <IconLoader2 className="h-4 w-4 animate-spin" />
@@ -692,6 +946,62 @@ export function SignatureEnvelopeCard({
     ) : (
       <div className="space-y-3">
         <ChangePanel envelope={current} />
+
+        {/* ---- Quem entrou depois ----
+            O contrato está assinado, mas há responsável na tarefa que não o
+            assinou. Acrescentar alguém não anula nada — e por isso mesmo nada
+            avisava: o painel mostrava um documento e a tarefa dois
+            responsáveis. A assinatura complementar colhe a dele sem tocar na
+            de quem já assinou; o orçamento volta para pendente até ela concluir. */}
+        {coverage && !supplementRunning && (missingPeople.length > 0 || (canManage && coverage.canIssue)) && (
+          <div
+            className={
+              missingPeople.length > 0
+                ? "flex flex-col items-start justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center"
+                : "flex flex-col items-start justify-between gap-3 rounded-lg bg-muted/50 px-4 py-2.5 sm:flex-row sm:items-center"
+            }
+          >
+            <div className="min-w-0 space-y-1">
+              {missingPeople.length > 0 ? (
+                <>
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <IconAlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                    {coverage.responsibles.length} responsáveis na tarefa,{" "}
+                    {coverage.responsibles.filter(r => r.state === "SIGNED").length} assinaram. Falta:{" "}
+                    {missingPeople.map(r => r.name).join(", ")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {missingPeople.length === 1 ? "Entrou" : "Entraram"} na tarefa depois que o
+                    contrato foi assinado. Quem já assinou continua assinado.
+                    {missingPeople.some(r => r.lastAttempt)
+                      ? " O último pedido terminou sem a assinatura."
+                      : ""}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Todos os responsáveis que assinam por padrão já assinaram. Para incluir
+                  mais alguém da tarefa, peça uma assinatura complementar.
+                </p>
+              )}
+              {canManage && !coverage.canIssue && coverage.blockers.length > 0 && (
+                <p className="text-xs text-muted-foreground">{coverage.blockers.join(" ")}</p>
+              )}
+            </div>
+            {canManage && coverage.canIssue && (
+              <Button
+                size="sm"
+                variant={missingPeople.length > 0 ? "default" : "outline"}
+                className="shrink-0 gap-1.5"
+                disabled={busy}
+                onClick={() => setSendDialog("supplement")}
+              >
+                <IconUserPlus className="h-4 w-4" />
+                Pedir assinatura complementar
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* ---- Contra-assinatura da Ankaa ----
             Um botão. Sem CPF, sem cargo e sem código: quem chega aqui já está
@@ -817,198 +1127,123 @@ export function SignatureEnvelopeCard({
 
         {/* Signatários */}
         <div className="space-y-1.5">
-          {current.signers.map(s => {
-            const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
-            const ceremony = s.ceremony ?? (s.side === "ANKAA" ? "INTERNAL" : "OTP");
-            // O recorte deste signatário, quando a coleta congelou mais de um.
-            // Com um só não há o que distinguir, e o rótulo "Documento completo"
-            // repetido em toda linha só faria ruído.
-            const variant =
-              (current.documents?.length ?? 0) > 1
-                ? (current.documents ?? []).find(d => d.id === s.documentId) ?? null
-                : null;
-            // `cargoList` vem pronto do servidor. O fallback para `cargo` cobre
-            // envelopes lidos antes desta versão da API, sem quebrar a linha.
-            const roleList = s.cargoList?.length ? s.cargoList : s.cargo ? [s.cargo] : [];
-            const shownRoles = roleList.slice(0, 2);
-            const extraRoles = Math.max(0, roleList.length - 2);
-            return (
-              <div key={s.id} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-2.5">
-                {s.status === "SIGNED" ? (
-                  <IconCircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                ) : s.status === "REFUSED" || s.status === "VOIDED" ? (
-                  <IconX className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                ) : s.timesViewed > 0 ? (
-                  <IconEye className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
-                ) : (
-                  <IconClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
+          {current.signers.map(s => renderSignerRow(current, s))}
+        </div>
 
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium">{s.name}</span>
-                    {/* Divergência entre o CPF que a Ankaa cadastrou e o que o
-                        signatário informou é fato auditável, não bloqueio. */}
-                    {s.cpfMatch === false && (
-                      <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass.bad}`}>
-                        CPF diverge
-                      </Badge>
-                    )}
-                    {variant && (
-                      // O que ESTA pessoa recebeu. Sem isto o painel dizia
-                      // "3 de 4 assinaram" sem dizer o que cada um assinou — e
-                      // numa coleta diversificada essa é a pergunta.
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge
-                            variant="outline"
-                            className={`h-5 cursor-default px-1.5 text-[10px] ${variant.isFull ? toneClass.muted : toneClass.warn}`}
-                          >
-                            {variant.label}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[260px]">
-                          Recebeu um PDF com {variant.isFull ? "todas as seções" : "apenas essas seções"} do
-                          orçamento.
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                  {/* Um contato pode acumular nove funções ("Comercial,
-                      Proprietário, Vendedor, ..."), o que empurrava o e-mail
-                      para fora da linha. Mostra as duas primeiras e conta o
-                      resto num "+N", como a seção de responsáveis da tarefa. */}
-                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-                    {shownRoles.length > 0 && (
-                      <span className="truncate" title={s.cargo ?? undefined}>
-                        {shownRoles.join(", ")}
-                      </span>
-                    )}
-                    {extraRoles > 0 && (
-                      // O "+N" precisa dizer o que esconde: o mouse abre o resto.
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="shrink-0 cursor-default rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
-                            +{extraRoles}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[240px]">
-                          <div className="flex flex-col gap-0.5">
-                            {roleList.slice(2).map(role => (
-                              <span key={role}>{role}</span>
-                            ))}
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {shownRoles.length > 0 && <span className="shrink-0">·</span>}
-                    {/* Contato do CANAL da coleta. Mostrar o e-mail numa coleta
-                        por WhatsApp fazia o operador conferir o endereço errado
-                        quando o convite não chegava. */}
-                    <span className="truncate">
-                      {s.channel === "WHATSAPP" ? s.phoneMasked : s.emailMasked}
-                    </span>
-                  </p>
-                  {/* Sem o IP. Ele é PROVA, não estado: vive na trilha de
-                      auditoria, no selo impresso no PDF e no dossiê — os
-                      lugares a que se recorre para demonstrar autoria. Aqui a
-                      pergunta é só "já assinou?", e o endereço empurrava a data
-                      para fora da linha. */}
-                  <p className="text-xs text-muted-foreground">
-                    {s.signedAt
-                      ? `Assinou em ${fmtDateTime(s.signedAt)}`
-                      : // O MOTIVO só enquanto a recusa É o estado.
-                        //
-                        // `refusalReason` é HISTÓRICO e fica gravado de
-                        // propósito — reabrir um recusante preserva o motivo,
-                        // que é o que permite ao comercial lembrar por que
-                        // pediu de novo. Mas a linha lia o histórico ANTES do
-                        // estado, então depois de "Pedir novamente" o contato
-                        // aparecia com o selo "Pendente" e a frase "Recusou:
-                        // …" ao mesmo tempo, e o operador deixava de ver se ele
-                        // chegou a abrir o convite novo — que é justamente a
-                        // pergunta que ele passa a ter.
-                        s.status === "REFUSED" && s.refusalReason
-                        ? `Recusou: ${s.refusalReason}`
-                        : s.timesViewed > 0
-                          ? `Abriu o link ${s.timesViewed}× · último em ${fmtDateTime(s.lastViewedAt)}`
-                          : s.inviteState === "INVITATION_FAILED"
-                            ? "Convite não entregue — envie o link manualmente"
-                            : s.inviteState === "INVITATION_SENT"
-                              ? "Convite enviado · ainda não abriu"
-                              : "Aguardando envio do convite"}
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1">
-                  {/* O lado da Ankaa não tem link para copiar nem convite para
-                      reenviar: ele não assina por link. O ato dele é o botão do
-                      painel acima, e oferecer aqui as três ações do cliente
-                      convidaria a distribuir uma capability que já não existe. */}
-                  {/* REFUSED entra: recusar deixou de ser terminal. O reenvio a
-                      quem recusou é o gesto de PEDIR DE NOVO — o servidor
-                      reabre a vez dele (ver `resendInvitation`), e é por isso
-                      que o botão muda de rótulo abaixo em vez de sumir. */}
-                  {canManage && ceremony === "OTP" && s.status !== "SIGNED" && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title="Copiar link de assinatura"
-                        onClick={() => copyLink(s)}
-                      >
-                        <IconLink className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title={
-                          s.channel === "WHATSAPP"
-                            ? "Abrir WhatsApp com a mensagem pronta"
-                            : "Abrir e-mail com a mensagem pronta"
-                        }
-                        onClick={() => openManualFallback(s)}
-                        disabled={s.channel === "WHATSAPP" ? !s.phone : !s.email}
-                      >
-                        {s.channel === "WHATSAPP" ? (
-                          <IconBrandWhatsapp className="h-3.5 w-3.5" />
-                        ) : (
-                          <IconMail className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title={
-                          s.status === "REFUSED"
-                            ? `Pedir novamente por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"} — reabre a assinatura deste contato`
-                            : `Reenviar convite por ${s.channel === "WHATSAPP" ? "WhatsApp" : "e-mail"}`
-                        }
-                        disabled={busy}
-                        onClick={() =>
-                          run(
-                            () => signatureService.resendInvitation(s.id),
-                            s.status === "REFUSED"
-                              ? "Pedido reenviado — a assinatura deste contato foi reaberta."
-                              : "Convite reenviado.",
-                          )
-                        }
-                      >
-                        <IconSend className="h-3.5 w-3.5" />
-                      </Button>
-                    </>
-                  )}
-                  <Badge variant="outline" className={toneClass[st.tone]}>
-                    {st.text}
+        {/* ---- Assinaturas complementares ----
+            Cada uma é uma coleta própria (documento, código e trilha próprios)
+            sobre o MESMO contrato. As vivas e concluídas aparecem inteiras; as
+            que terminaram sem assinatura, numa linha. */}
+        {liveSupplements.map(sp => {
+          const sl = ENVELOPE_LABEL[sp.status] ?? { text: sp.status, tone: "muted" as Tone };
+          const cs = countersignOf(sp);
+          return (
+            <div key={sp.id} className="space-y-1.5 rounded-lg border border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <IconUserPlus className="h-4 w-4 text-muted-foreground" />
+                  Assinatura complementar
+                  <Badge variant="outline" className={toneClass[sl.tone]}>
+                    {sl.text}
                   </Badge>
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5"
+                    onClick={() => openPdf(sp.id)}
+                  >
+                    <IconFileTypePdf className="h-3.5 w-3.5" />
+                    PDF
+                  </Button>
+                  {canManage && sp.status === "RUNNING" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => signatureService.cancel(sp.id),
+                          "Assinatura complementar cancelada. O orçamento continua pendente.",
+                        )
+                      }
+                    >
+                      <IconX className="h-3.5 w-3.5" />
+                      Cancelar
+                    </Button>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+              {cs.can && (
+                <div className="flex flex-col items-start justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 sm:flex-row sm:items-center">
+                  <p className="text-xs text-muted-foreground">
+                    O responsável já assinou. Falta a contra-assinatura da Ankaa (
+                    {cs.ankaa!.name}); ao confirmar, o orçamento volta a ser aprovado.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5"
+                    disabled={busy}
+                    onClick={() =>
+                      run(
+                        () => signatureService.countersign(sp.id),
+                        "Assinatura complementar contra-assinada.",
+                      )
+                    }
+                  >
+                    {busy ? (
+                      <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <IconSignature className="h-3.5 w-3.5" />
+                    )}
+                    Contra-assinar
+                  </Button>
+                </div>
+              )}
+              {sp.signers.map(s => renderSignerRow(sp, s))}
+              <p className="text-[11px] text-muted-foreground">
+                Enviada em {fmtDateTime(sp.sentAt)} · código {sp.verificationCode}
+                {sp.status === "RUNNING"
+                  ? ` · prazo ${new Date(sp.deadlineAt).toLocaleDateString("pt-BR")}`
+                  : ""}
+              </p>
+            </div>
+          );
+        })}
+        {endedSupplements.length > 0 && (
+          <div className="space-y-1">
+            {endedSupplements.map(sp => {
+              const sl = ENVELOPE_LABEL[sp.status] ?? { text: sp.status, tone: "muted" as Tone };
+              const names = sp.signers.filter(s => s.side === "CUSTOMER").map(s => s.name);
+              return (
+                <div
+                  key={sp.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 px-4 py-2 text-xs"
+                >
+                  <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass[sl.tone]}`}>
+                      {sl.text}
+                    </Badge>
+                    Assinatura complementar de {names.join(", ") || "—"} ·{" "}
+                    {fmtDateTime(sp.sentAt)}
+                    {sp.invalidatedReason ? ` · ${sp.invalidatedReason}` : ""}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5"
+                    onClick={() => openPdf(sp.id)}
+                  >
+                    <IconFileTypePdf className="h-3.5 w-3.5" />
+                    PDF
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Metadados — grade legível em vez da tira de 11px que exigia zoom. */}
         <div className="grid gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 sm:grid-cols-2">
@@ -1223,12 +1458,18 @@ export function SignatureEnvelopeCard({
           mode={sendDialog ?? "create"}
           busy={busy}
           onSend={async (ch, signers) => {
+            const kind = sendDialog;
             setSendDialog(null);
             await run(
-              () => signatureService.createEnvelope(quoteId, { channel: ch, signers }),
-              sendDialog === "reissue"
-                ? "Reenviado para assinatura."
-                : "Enviado para assinatura.",
+              () =>
+                kind === "supplement"
+                  ? signatureService.createSupplement(quoteId, { channel: ch, signers })
+                  : signatureService.createEnvelope(quoteId, { channel: ch, signers }),
+              kind === "supplement"
+                ? "Assinatura complementar enviada. O orçamento fica pendente até ela ser concluída."
+                : kind === "reissue"
+                  ? "Reenviado para assinatura."
+                  : "Enviado para assinatura.",
             );
           }}
         />
@@ -1249,12 +1490,18 @@ export function SignatureEnvelopeCard({
           mode={sendDialog ?? "create"}
           busy={busy}
           onSend={async (ch, signers) => {
+            const kind = sendDialog;
             setSendDialog(null);
             await run(
-              () => signatureService.createEnvelope(quoteId, { channel: ch, signers }),
-              sendDialog === "reissue"
-                ? "Reenviado para assinatura."
-                : "Enviado para assinatura.",
+              () =>
+                kind === "supplement"
+                  ? signatureService.createSupplement(quoteId, { channel: ch, signers })
+                  : signatureService.createEnvelope(quoteId, { channel: ch, signers }),
+              kind === "supplement"
+                ? "Assinatura complementar enviada. O orçamento fica pendente até ela ser concluída."
+                : kind === "reissue"
+                  ? "Reenviado para assinatura."
+                  : "Enviado para assinatura.",
             );
           }}
         />

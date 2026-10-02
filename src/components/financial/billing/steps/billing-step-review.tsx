@@ -57,6 +57,7 @@ import {
   coverageLabels,
   coveredTaskCount,
   coveredTaskIds,
+  billingApprovedAtOf,
 } from "@/utils/quote-tasks";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -493,6 +494,47 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     return customerConfigs.filter((c: any) => c.customerId === filterCustomerId);
   }, [customerConfigs, filterCustomerId]);
 
+  /**
+   * QUEM "APROVAR" FATURA AGORA — os pagadores desta cobrança ainda não
+   * faturados, no recorte do seletor do cabeçalho.
+   *
+   * O seletor ("Completo" / um cliente) só recortava o que se VIA; aprovar
+   * faturava a cobrança inteira. Com RKO e Ibiporã sobre o mesmo caminhão, a
+   * escolha agora vale para o ato: "Completo" fatura os pendentes, um cliente
+   * fatura só ele. A página calcula o mesmo recorte (`resolveApprovalTargetIdx`)
+   * e é ela quem chama a rota.
+   */
+  const approvalTargets = useMemo(
+    () => (filteredCustomerConfigs as any[]).filter((c: any) => !billingApprovedAtOf(c)),
+    [filteredCustomerConfigs],
+  );
+  /** Quantos pagadores desta cobrança já foram faturados — para o "1 de 2". */
+  const approvedPayerCount = useMemo(
+    () => (customerConfigs as any[]).filter((c: any) => !!billingApprovedAtOf(c)).length,
+    [customerConfigs],
+  );
+  const payerLabel = useCallback(
+    (c: any) => {
+      const cached = customersCache.current.get(c?.customerId);
+      return (
+        cached?.fantasyName ||
+        cached?.corporateName ||
+        c?.customerData?.fantasyName ||
+        c?.customerData?.corporateName ||
+        "Cliente"
+      );
+    },
+    [customersCache],
+  );
+  const multiPayer = hasMultipleCustomersOf(customerConfigs);
+  const approveOptionLabel = (() => {
+    if (multiPayer && (filterCustomerId || approvedPayerCount > 0)) {
+      return `Aprovar Faturamento — ${approvalTargets.map(payerLabel).join(" e ")}`;
+    }
+    if (multiPayer) return "Aprovar Faturamento (todos os clientes)";
+    return isPerVehicleBilling ? "Aprovar Faturamento (esta cobrança)" : "Aprovar Faturamento";
+  })();
+
   const filteredInvoices = useMemo(() => {
     if (!filterCustomerId) return invoices;
     return invoices.filter((inv: any) => inv.customerId === filterCustomerId);
@@ -666,8 +708,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
    * fazia este diálogo liberar o que a página então recusava.
    */
   const validateCustomerDataForBilling = useCallback((): boolean => {
-    for (let i = 0; i < customerConfigs.length; i++) {
-      const config = customerConfigs[i];
+    // Só os pagadores que ESTA aprovação fatura: aprovar a RKO não pode ser
+    // recusado pelo cadastro incompleto da Ibiporã, que fica para depois.
+    for (let i = 0; i < approvalTargets.length; i++) {
+      const config = approvalTargets[i];
       const data = config.customerData || {};
       // From the SHARED list, not transcribed. This block used to spell all nine requirements out
       // by hand — a fourth copy alongside the rule, the page's gate and the badges, which happened
@@ -701,7 +745,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     }
 
     return true;
-  }, [customerConfigs, validServices]);
+  }, [customerConfigs, approvalTargets, validServices]);
 
   return (
     <div className="space-y-6">
@@ -753,6 +797,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 rotulado e outro não, competem pela mesma leitura e poluem o
                 cabeçalho. Esta tela é a do faturamento; o estado do orçamento se
                 vê no orçamento. */}
+            {/* APROVAÇÃO PARCIAL: com dois clientes na cobrança, um pode estar
+                faturado e o outro não. O estado da cobrança sozinho ("Aprovado")
+                esconderia que ainda falta alguém. */}
+            {multiPayer && approvedPayerCount > 0 && approvedPayerCount < customerConfigs.length && (
+              <Badge
+                variant="outline"
+                className="h-9 px-3 text-xs font-medium whitespace-nowrap"
+                title={(customerConfigs as any[])
+                  .map((c: any) => `${payerLabel(c)}: ${billingApprovedAtOf(c) ? "faturado" : "aguardando aprovação"}`)
+                  .join(" · ")}
+              >
+                {approvedPayerCount} de {customerConfigs.length} clientes faturados
+              </Badge>
+            )}
             {canActOnBilling ? (
               <Combobox
                 value={billingStatus}
@@ -801,11 +859,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   // "Aprovar" — que a rota recusa com "não é possível faturar um
                   // orçamento em Cancelado". "Liquidar", logo abaixo, já tinha a
                   // guarda; esta não tinha.
-                  if (!billingApprovedAt && billingStatus !== "CANCELLED") {
-                    opts.push({
-                      value: APPROVE_OPTION_VALUE,
-                      label: isPerVehicleBilling ? "Aprovar Faturamento (esta cobrança)" : "Aprovar Faturamento",
-                    });
+                  //
+                  // ⚠️ A PERGUNTA É POR PAGADOR. Era `!billingApprovedAt` — a
+                  // cobrança inteira —, e depois de faturar a RKO não havia como
+                  // faturar a Ibiporã do mesmo caminhão. Agora a opção existe
+                  // enquanto houver pagador pendente no recorte do seletor.
+                  if (approvalTargets.length > 0 && billingStatus !== "CANCELLED") {
+                    opts.push({ value: APPROVE_OPTION_VALUE, label: approveOptionLabel });
                   }
 
                   // LIQUIDAR À MÃO — o orçamento direto, pago à vista, sem boleto a conciliar.
@@ -1788,8 +1848,13 @@ function UnifiedInstallmentBadge({ installment }: { installment: any }) {
     return <Badge variant="cancelled" size="sm" className="font-medium whitespace-nowrap">Cancelada</Badge>;
   }
 
-  // Bank slip cancelled but installment not paid — cancelled
-  if (bankSlip?.status === 'CANCELLED') {
+  // Bank slip cancelled but installment not paid — cancelled.
+  //
+  // ⚠️ SALVO QUANDO A PARCELA TROCOU DE TRILHO: boleto baixado e cobrança
+  // passada para PIX (ou outro meio) deixam a parcela VIVA, com o boleto morto
+  // ainda pendurado nela. O estado é da parcela, não do instrumento antigo —
+  // mostrar "Cancelado" ali fazia uma dívida em aberto parecer extinta.
+  if (bankSlip?.status === 'CANCELLED' && (installment.paymentMethod ?? 'BANK_SLIP') === 'BANK_SLIP') {
     return <Badge variant="cancelled" size="sm" className="font-medium whitespace-nowrap">Cancelado</Badge>;
   }
 

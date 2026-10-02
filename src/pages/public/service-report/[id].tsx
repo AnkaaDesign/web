@@ -23,10 +23,10 @@ import {
   primaryTask,
   hasMultipleCustomers,
   coveredTaskIds,
-  coverageSummary,
   quoteVehicleCount,
+  contactsForSegment,
 } from "@/utils/quote-tasks";
-import { COMPANY_INFO, BRAND_COLORS, BILLING_CONTACT, receivingAccountFor, whatsappLinkFor } from "@/config/company";
+import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel, type Summary } from "@/components/public/budget-signature-panel";
 
@@ -196,9 +196,15 @@ export function PublicServiceReportPage() {
   // O principal segue a ordem de preferência de funções (COMERCIAL primeiro): a
   // função PROPRIETÁRIO, que era o critério aqui, deixou de existir. Ver
   // `pickPrimaryResponsible`.
-  const primaryResponsible = pickPrimaryResponsible<any>(
+  //
+  // No recorte de um cliente do faturamento dividido, só os contatos DELE — e
+  // podem não existir: aí não há "À fulano" nem linha do cliente, como no PDF.
+  const segmentContacts = contactsForSegment<any>(
     quoteTasks<any>(quote).flatMap((t: any) => t?.responsibles ?? []),
+    quote.customerConfigs,
+    selectedCustomerId,
   );
+  const primaryResponsible = pickPrimaryResponsible<any>(segmentContacts);
   const contactName = primaryResponsible?.name || "";
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
@@ -421,49 +427,10 @@ export function PublicServiceReportPage() {
         // tem coluna própria para ele e mostra qual pedido é de qual caminhão.
         // Repeti-lo aqui, achatado num rótulo só, dizia menos e sugeria que
         // fosse do faturamento.
-        // AS PARCELAS EMITIDAS, com data e valor — e a conta que as recebe.
-        //
-        // ⚠️ Esta página dizia explicitamente "No parcela-by-parcela table: the
-        // boletos themselves are appended further down and carry the real
-        // dates". O argumento vale para BOLETO e só para ele: quando o pagamento
-        // é Pix não há boleto anexado nenhum, e a página terminava na frase — o
-        // cliente que abria o link não tinha uma única data de vencimento nem
-        // para onde pagar. O PDF do dossiê passou a trazer os dois blocos; esta
-        // página é o MESMO documento noutro meio, e divergir dela é pior do que
-        // não ter nenhum dos dois.
-        //
-        // Nada é projetado: sai das parcelas que EXISTEM. Sem faturamento
-        // aprovado a tabela não aparece e a frase continua sozinha, como sempre.
-        // UMA TABELA POR FATIA — ver a nota do agrupamento acima. O rótulo só
-        // aparece quando há mais de uma: com uma só, a tabela sai sem título,
-        // como sempre saiu.
-        schedules: group
-          .map((slice: any) => {
-            const rows = ((slice?.installments || []) as any[])
-              .slice()
-              .sort((a: any, b: any) => a.number - b.number)
-              .map((inst: any) => ({
-                number: inst.number,
-                dueDate: inst.dueDate,
-                amount: Number(inst.amount ?? 0),
-                paid: inst.status === "PAID",
-              }));
-            if (rows.length === 0) return null;
-            return {
-              id: slice?.id,
-              label:
-                group.length > 1
-                  ? coverageSummary(slice, quoteVehicleCount(quote as any), quoteTasks<any>(quote))
-                  : null,
-              installments: rows,
-            };
-          })
-          .filter((b): b is NonNullable<typeof b> => b !== null),
-        // A conta sai da forma REAL da parcela — a mesma fonte da frase logo
-        // acima (`paymentMethod`), para que o documento não se contradiga: o
-        // dossiê do nº 0915 chegou a dizer "via boleto" na frase e "Pagamento via
-        // Pix" três linhas abaixo, porque os dois liam fontes diferentes.
-        pix: receivingAccountFor(paymentMethod),
+        // ⚠️ SEM parcelas e SEM chave Pix: o dossiê termina na cláusula
+        // ("Pagamento à vista no valor de R$ X via Pix, com vencimento em …").
+        // Os dois blocos saíram a pedido (30/09/2026), aqui e no PDF do dossiê
+        // (`renderQuoteDocument(..., withPaymentSchedule: false)` na API).
         // O QUADRO DO TOMADOR — o cadastro que a prefeitura exige na NFS-e.
         //
         // É o que abre a seção "Faturamento" no PDF, e faltava inteiro aqui: a
@@ -486,7 +453,7 @@ export function PublicServiceReportPage() {
         })(),
       };
     })
-    .filter((block: { paymentText: string; schedules: unknown[] }) => block.paymentText || block.schedules.length > 0);
+    .filter((block: { paymentText: string }) => !!block.paymentText);
 
   // All installments that have a bank slip
   const bankSlipInstallments = installments
@@ -962,12 +929,6 @@ export function PublicServiceReportPage() {
                     id?: string;
                     customerName: string | null;
                     paymentText: string;
-                    schedules: Array<{
-                      id?: string;
-                      label: string | null;
-                      installments: Array<{ number: number; dueDate: string | Date; amount: number; paid: boolean }>;
-                    }>;
-                    pix: { key: string; keyKind: string; holder: string } | null;
                     billing: {
                       corporateName: string | null;
                       documentFormatted: string | null;
@@ -1020,64 +981,6 @@ export function PublicServiceReportPage() {
                       {block.paymentText && (
                         <p className="border-t border-gray-200 pt-3 text-gray-700">{block.paymentText}</p>
                       )}
-                      {block.schedules.map((sched, si) => (
-                        <div key={sched.id || si} className="mt-3">
-                          {/* O rótulo só existe quando a cláusula cobre mais de
-                              uma fatura: ele diz DE QUAIS caminhões são estas
-                              datas. Com uma só, a tabela sai sem título. */}
-                          {sched.label && (
-                            <p className="mb-1 text-sm font-semibold text-gray-800">{sched.label}</p>
-                          )}
-                          <table className="w-full border-collapse text-sm">
-                          <tbody>
-                            {sched.installments.map((inst) => (
-                              <tr key={inst.number} className="border-b border-dotted border-gray-300 last:border-0">
-                                <td className="py-1.5 pr-4 text-gray-700">
-                                  Parcela {inst.number}/{sched.installments.length} – vencimento em{" "}
-                                  {formatDate(inst.dueDate)}
-                                  {inst.paid && (
-                                    <span className="ml-1.5 text-xs font-semibold" style={{ color: COMPANY.primaryGreen }}>
-                                      · paga
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-1.5 whitespace-nowrap text-right font-semibold tabular-nums text-gray-900">
-                                  {formatCurrency(inst.amount)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        </div>
-                      ))}
-
-                      {block.pix && (
-                        <div className="mt-4 border-t border-gray-200 pt-3">
-                          <h4 className="mb-1.5 font-bold" style={{ color: COMPANY.primaryGreen }}>
-                            Pagamento via Pix
-                          </h4>
-                          <p className="text-gray-700">
-                            <span className="font-semibold">Chave Pix ({block.pix.keyKind}):</span>{" "}
-                            <span className="whitespace-nowrap">{block.pix.key}</span>
-                            <br />
-                            <span className="font-semibold">Favorecido:</span> {block.pix.holder}
-                          </p>
-                          <p className="mt-2 text-sm text-gray-600">
-                            Ao pagar, informe o orçamento Nº {String(quote.budgetNumber ?? "").padStart(4, "0")} na
-                            descrição e encaminhe o comprovante para o {BILLING_CONTACT.role} – {BILLING_CONTACT.name},{" "}
-                            <a
-                              href={whatsappLinkFor(BILLING_CONTACT.phoneClean)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-semibold whitespace-nowrap hover:underline"
-                              style={{ color: COMPANY.primaryGreen }}
-                            >
-                              {BILLING_CONTACT.phone}
-                            </a>
-                            .
-                          </p>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -1093,6 +996,7 @@ export function PublicServiceReportPage() {
               <BudgetSignaturePanel
                 quoteId={quote.id}
                 customerName={invoiceCustomers[0]?.name || undefined}
+                customerSigners={segmentContacts.map((r: any) => r.name).filter(Boolean)}
                 preloaded={sigSummary}
               />
             )}
@@ -1149,6 +1053,7 @@ export function PublicServiceReportPage() {
             <BudgetSignaturePanel
               quoteId={quote.id}
               customerName={invoiceCustomers[0]?.name || undefined}
+              customerSigners={segmentContacts.map((r: any) => r.name).filter(Boolean)}
               preloaded={sigSummary}
             />
 

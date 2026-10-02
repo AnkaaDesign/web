@@ -130,7 +130,34 @@ export const billingService = {
    * veículo a veículo isso emitia os sessenta de uma vez. O endpoint antigo hoje
    * RECUSA o valor (ele não existe mais no enum).
    */
-  approve: (billingId: string) => apiClient.put(`/billings/${billingId}/approve`),
+  approve: (billingId: string, customerConfigIds?: string[] | null) =>
+    apiClient.put(
+      `/billings/${billingId}/approve`,
+      // OS PAGADORES a faturar. Ausente = todos os que faltam nesta cobrança
+      // (o seletor em "Completo"); presente = só estes (um cliente escolhido).
+      customerConfigIds && customerConfigIds.length > 0 ? { customerConfigIds } : {},
+    ),
+
+  /**
+   * AS CONDIÇÕES DE UM PAGADOR AINDA NÃO FATURADO — condição de pagamento, texto
+   * livre, gerar NF, gerar boleto.
+   *
+   * Existe porque `PUT /budgets/:id` recusa campo de dinheiro assim que QUALQUER
+   * pagador do orçamento é faturado: com a RKO já faturada, a Ibiporã do mesmo
+   * caminhão não tinha como trocar boleto por PIX antes de sair. Pagador já
+   * faturado é recusado pelo servidor (reverta primeiro).
+   */
+  updatePayerTerms: (
+    billingId: string,
+    payerId: string,
+    terms: {
+      paymentCondition?: string | null;
+      paymentConfig?: Record<string, unknown> | null;
+      customPaymentText?: string | null;
+      generateInvoice?: boolean;
+      generateBankSlip?: boolean;
+    },
+  ) => apiClient.put(`/billings/${billingId}/payers/${payerId}`, terms),
 
   /**
    * LIQUIDAÇÃO MANUAL desta cobrança — o orçamento direto, pago à vista sem

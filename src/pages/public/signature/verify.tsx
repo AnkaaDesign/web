@@ -39,79 +39,13 @@ import {
 import { COMPANY_INFO } from "@/config/company";
 
 import { BRAND_ASSETS } from '@/config/assets';
-interface VerificationData {
-  verificationCode: string;
-  status: string;
-  budgetNumber: number;
-  issuer: { name: string; cnpj: string };
-  customer: { name: string | null; cnpj: string | null };
-  originalSha256: string;
-  finalSha256: string | null;
-  sealedAt: string | null;
-  padesLevel: string | null;
-  certSerialNumber: string | null;
-  auditChain: { valid: boolean; events: number; reason: string | null };
-  /**
-   * Os RECORTES desta coleta — um PDF cada, com hash próprio.
-   *
-   * Sem esta lista o portal só conhecia o hash do documento completo e diria
-   * "não confere" para o artefato legítimo de um signatário que recebeu um
-   * recorte — o pior resultado possível numa página cuja única função é dizer se
-   * um documento é verdadeiro. Ausente em envelopes servidos por uma API
-   * anterior ao recurso.
-   */
-  /**
-   * O ADITIVO de identificação do veículo, quando existe.
-   *
-   * Entra no portal porque ele É parte do instrumento: quem confere o orçamento
-   * assinado de um implemento 0 km encontra "a registrar" no lugar do chassi, e
-   * precisa saber que existe uma folha selada declarando qual é.
-   */
-  addendum?: {
-    sha256: string | null;
-    sealedAt: string | null;
-    padesLevel: string | null;
-  } | null;
-  documents?: Array<{
-    label: string;
-    isFull: boolean;
-    originalSha256: string;
-    finalSha256: string | null;
-    padesLevel: string | null;
-    sealedAt: string | null;
-  }>;
-  signers: Array<{
-    name: string;
-    cargo: string | null;
-    cpfMasked: string | null;
-    status: string;
-    signedAt: string | null;
-    authMethod: string;
-  }>;
-}
-
-/** Rótulos legíveis — não vaze o enum cru para quem verifica o documento. */
-const AUTH_LABEL: Record<string, string> = {
-  EMAIL_OTP: "Código de uso único via e-mail",
-  // WHATSAPP_OTP e SMS_OTP ficam para sempre: documentos assinados antes da
-  // troca de canal precisam continuar exibindo o método que de fato os autenticou.
-  WHATSAPP_OTP: "Código de uso único via WhatsApp",
-  SMS_OTP: "Código de uso único via SMS",
-  INTERNAL_SESSION: "Sessão autenticada Ankaa",
-};
-
-type Tone = "ok" | "warn" | "bad";
-
-const STATUS_LABEL: Record<string, { text: string; tone: Tone }> = {
-  COMPLETED: { text: "Assinado e selado", tone: "ok" },
-  RUNNING: { text: "Aguardando assinaturas", tone: "warn" },
-  INVALIDATED: { text: "Invalidado por alteração do orçamento", tone: "bad" },
-  REFUSED: { text: "Recusado por um signatário", tone: "bad" },
-  EXPIRED: { text: "Prazo expirado", tone: "bad" },
-  CANCELLED: { text: "Cancelado", tone: "bad" },
-  SUPERSEDED: { text: "Substituído por versão mais recente", tone: "warn" },
-  DRAFT: { text: "Rascunho", tone: "warn" },
-};
+import {
+  AUTH_LABEL,
+  SIGNER_STATE,
+  STATUS_LABEL,
+  type Tone,
+  type VerificationData,
+} from "@/components/public/signature/verification";
 
 /** Faixa do veredito: fundo tênue de página inteira, nunca uma caixa dentro da folha. */
 const TONE_BAND: Record<Tone, string> = {
@@ -124,19 +58,6 @@ const TONE_TEXT: Record<Tone, string> = {
   ok: "text-green-800",
   warn: "text-amber-800",
   bad: "text-red-800",
-};
-
-/**
- * Estado de cada signatário no roster. Sem isto, um signatário que RECUSOU
- * aparecia como "Pendente" — a página dizia "Recusado por um signatário" no
- * veredito e, logo abaixo, mostrava todo mundo como pendente, sem apontar quem.
- */
-const SIGNER_STATE: Record<string, { label: string; icon: "ok" | "bad" | "wait" }> = {
-  SIGNED: { label: "Assinado", icon: "ok" },
-  REFUSED: { label: "Recusou", icon: "bad" },
-  VOIDED: { label: "Anulado", icon: "bad" },
-  EXPIRED: { label: "Expirado", icon: "wait" },
-  VIEWED: { label: "Visualizado", icon: "wait" },
 };
 
 export default function PublicSignatureVerifyPage() {

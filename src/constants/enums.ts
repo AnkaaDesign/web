@@ -2775,6 +2775,7 @@ export enum FAVORITE_PAGES {
   FERRAMENTAS_CUSTO_HORAS_EXTRAS = "/ferramentas/custo-horas-extras",
   FERRAMENTAS_CERTIFICADO_RESIDUOS = "/ferramentas/certificado-residuos",
   FERRAMENTAS_ESTUDIO_3D = "/ferramentas/estudio-3D",
+  FERRAMENTAS_VALIDADOR_DOCUMENTOS = "/ferramentas/validador-de-documentos",
 
   // Servidor
   SERVIDOR_BACKUP = "/servidor/backup",

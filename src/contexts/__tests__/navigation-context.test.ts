@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import { MENU_ITEMS, SECTOR_PRIVILEGES } from "../../constants";
 import type { MenuItem } from "../../constants";
 import { getFilteredMenuForUser } from "../../utils";
+import { getRequiredPrivilegeForRoute } from "../../utils/route-privileges";
 import { resolveActiveNav, computeExpandedFromActive, buildNavBreadcrumbs } from "../navigation-context";
 
 const menuFor = (privilege: string): MenuItem[] =>
@@ -66,10 +67,15 @@ describe("winner resolution with recorded nav context", () => {
     for (const menu of [ACCOUNTING, ADMIN]) {
       const active = resolveActiveNav(menu, "/departamento-pessoal/bonus", recorded);
       expect(active.id).toBe("dp-gratificacoes");
+      expect(active.trail.map((t) => t.id)).toEqual(["departamento-pessoal", "dp-salarios-e-cargos"]);
       const expanded = computeExpandedFromActive(menu, active);
       expect(expandedTopLevel(menu, expanded)).toEqual(["departamento-pessoal"]);
-      // ADMIN also has RH > Bônus at this exact path — it must NOT yank open
-      expect(expanded["departamento-pessoal"] ?? false).toBe(false);
+      // A antiga seção "Recursos Humanos" tinha um "Bônus" neste MESMO path e
+      // abria junto. A migração RH → DP (429fd8c9) trocou o id por sed também
+      // nesta asserção, que passou a exigir DP fechado logo após exigi-lo aberto.
+      // A intenção original: a seção antiga não existe e não abre.
+      expect(menu.some((m) => m.id === "recursos-humanos")).toBe(false);
+      expect(expanded["recursos-humanos"] ?? false).toBe(false);
     }
   });
 
@@ -105,8 +111,9 @@ describe("winner resolution with recorded nav context", () => {
     const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
     const active = resolveActiveNav(ACCOUNTING, "/financeiro/contas-a-pagar", recorded);
     expect(active.id).toBe("contas-a-pagar");
-    // Contas a Pagar now lives under Conciliação Bancária, so the trail nests it.
-    expect(active.trail.map((t) => t.id)).toEqual(["financeiro", "conciliacao-bancaria"]);
+    // Contas a Pagar é página de 1º nível do Financeiro (saiu da Conciliação
+    // Bancária — ver o comentário do item em navigation.ts).
+    expect(active.trail.map((t) => t.id)).toEqual(["financeiro"]);
   });
 });
 
@@ -208,60 +215,96 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     ]);
   });
 
-  it("Medicina do Trabalho: Agendamentos/Tamanhos nested under Entrega de EPIs", () => {
+  it("Medicina do Trabalho: Agendamentos nested under Entrega de EPIs", () => {
     const mt = byId(ACCOUNTING, "medicina-do-trabalho")!;
-    expect((mt.children || []).map((c) => c.title)).toEqual(["Afastamentos", "ASO", "CAT", "Entrega de EPIs", "Exames Periódicos"]);
+    // FISPQ/FDS entrou em 293965c9, liberado para ACCOUNTING/HR/ADMIN.
+    expect((mt.children || []).map((c) => c.title)).toEqual(["Afastamentos", "ASO", "CAT", "Entrega de EPIs", "Exames Periódicos", "FISPQ/FDS"]);
     const entregas = (mt.children || []).find((c) => c.id === "mt-epi-entregas")!;
     const childTitles = (entregas.children || []).map((c) => c.title);
     expect(childTitles).toContain("Agendamentos");
-    expect(childTitles).toContain("Tamanhos");
+    // "Tamanhos" saiu em 293965c9: as páginas de cadastro/tamanhos de EPI foram removidas.
   });
 
-  it("Financeiro (ACCOUNTING): Notas Fiscais + Contas a Pagar/Receber at top level; Extrato/Recorrentes/Categorias under Conciliação", () => {
+  it("Financeiro (ACCOUNTING): Contas a Pagar/Receber no 1º nível; Extrato/Notas Fiscais/Recorrentes/Categorias sob Conciliação", () => {
     const fin = byId(ACCOUNTING, "financeiro")!;
-    // Notas Fiscais is a single top-level entry (Emitidas+Recebidas toggle).
-    // Contas a Pagar / a Receber are top-level Financeiro pages (moved OUT of
-    // Conciliação Bancária); only Extrato/Recorrentes/Categorias stay under it.
-    // Top-level children are sorted alphabetically.
+    // Contas a Pagar / a Receber são páginas de 1º nível (saíram da Conciliação
+    // Bancária). A Notas Fiscais de 1º nível é a das EMITIDAS, só para
+    // FINANCIAL/COMMERCIAL; ACCOUNTING concilia as RECEBIDAS dentro da
+    // Conciliação. Filhos de 1º nível em ordem alfabética.
     expect((fin.children || []).map((c) => c.title)).toEqual([
       "Conciliação Bancária",
       "Contas a Pagar",
       "Contas a Receber",
       "Faturamento",
-      "Notas Fiscais",
     ]);
     const conc = (fin.children || []).find((c) => c.id === "conciliacao-bancaria")!;
-    // Ordered by the `order` field; "Recorrentes (categorias)" ([ADMIN,FINANCIAL])
-    // is hidden from ACCOUNTING.
+    // Ordenados pelo campo `order`.
     expect((conc.children || []).map((c) => ({ title: c.title, path: c.path }))).toEqual([
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
+      { title: "Notas Fiscais", path: "/financeiro/conciliacao/notas" },
       { title: "Recorrentes", path: "/financeiro/contas-recorrentes" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
     ]);
   });
 
-  it("ADMIN sees the legacy Recorrentes (categorias) view; ACCOUNTING does not", () => {
-    // NOTE: FINANCIAL has a flat per-role nav and was never in the "Financeiro"
-    // SECTION audience — it keeps page ACCESS via ROUTE_PRIVILEGES.
-    const conc = (byId(ADMIN, "financeiro")!.children || []).find((c: MenuItem) => c.id === "conciliacao-bancaria")!;
-    const titles = (conc.children || []).map((c: MenuItem) => c.title);
-    expect(titles).toEqual([
-      "Extrato",
+  it("Notas Fiscais: recebidas na Conciliação (ADMIN/ACCOUNTING), emitidas no 1º nível (COMMERCIAL) — nunca as duas", () => {
+    // Substitui o teste da view "Recorrentes (categorias)", que foi absorvida
+    // pela "Recorrentes" e não existe mais em menu nenhum.
+    const nfPlacements = (menu: MenuItem[]) => {
+      const out: string[] = [];
+      const walk = (items: MenuItem[], trail: string[]) =>
+        items.forEach((i) => {
+          if (i.title === "Notas Fiscais") out.push([...trail, i.id].join(">"));
+          if (i.children) walk(i.children, [...trail, i.id]);
+        });
+      walk(menu, []);
+      return out;
+    };
+    const RECEBIDAS = "financeiro>conciliacao-bancaria>conciliacao-notas";
+    expect(nfPlacements(ADMIN)).toEqual([RECEBIDAS]);
+    expect(nfPlacements(ACCOUNTING)).toEqual([RECEBIDAS]);
+    expect(nfPlacements(menuFor(SECTOR_PRIVILEGES.COMMERCIAL))).toEqual(["financeiro>notas-fiscais"]);
+
+    // ADMIN vê a mesma Conciliação que ACCOUNTING.
+    const conc = (byId(ADMIN, "financeiro")!.children || []).find((c) => c.id === "conciliacao-bancaria")!;
+    expect((conc.children || []).map((c) => c.title)).toEqual(["Extrato", "Notas Fiscais", "Recorrentes", "Categorias"]);
+
+    for (const privilege of Object.values(SECTOR_PRIVILEGES)) {
+      expect(JSON.stringify(menuFor(privilege)).includes("Recorrentes (categorias)")).toBe(false);
+    }
+
+  });
+
+  it("FINANCIAL: só o menu plano — sem a seção Financeiro, sem Aerografia, nenhuma página duas vezes", () => {
+    const FIN = menuFor(SECTOR_PRIVILEGES.FINANCIAL);
+    expect(FIN.map((m) => m.title)).toEqual([
+      "Início",
+      "Clientes",
       "Contas a Receber",
-      "Contas a Pagar",
-      "Contas Recorrentes",
-      "Recorrentes (categorias)",
-      "Categorias",
+      "Faturamento",
+      "Histórico",
+      "Minhas Mensagens",
+      "Notas",
+      "Notas Fiscais",
+      "Orçamentos",
     ]);
+    // A seção agrupada repetia Contas a Receber e Notas Fiscais, e só somava
+    // Contas a Pagar, que o setor não usa.
+    expect(byId(FIN, "financeiro")).toBeUndefined();
 
-    const accConc = (byId(ACCOUNTING, "financeiro")!.children || []).find((c) => c.id === "conciliacao-bancaria")!;
-    const accTitles = (accConc.children || []).map((c) => c.title);
-    expect(accTitles).not.toContain("Recorrentes (categorias)");
+    const seen = new Map<string, number>();
+    const walk = (items: MenuItem[]) =>
+      items.forEach((i) => {
+        if (i.path && !i.isDynamic) seen.set(i.path, (seen.get(i.path) ?? 0) + 1);
+        if (i.children) walk(i.children);
+      });
+    walk(FIN);
+    expect([...seen].filter(([, n]) => n > 1)).toEqual([]);
 
-    // FINANCIAL was previously locked out of the Financeiro section (its parent
-    // privilege omitted FINANCIAL); it is now included, so the section shows.
-    const FINANCIAL = menuFor(SECTOR_PRIVILEGES.FINANCIAL);
-    expect(byId(FINANCIAL, "financeiro")).toBeDefined();
+    // O detalhe da nota emitida continua destacando Notas Fiscais.
+    const active = resolveActiveNav(FIN, "/financeiro/notas-fiscais/abc-123", null);
+    expect(active.id).toBe("notas-fiscais-financeiro-detalhes");
+    expect(active.trail.map((t) => t.id)).toEqual(["notas-fiscais-financeiro"]);
   });
 
   it("Ferramentas (ACCOUNTING): Calendário, Certificado de Resíduos, Custo de Horas Extras, Notas; no QR Code/Paleta/Mistura/Custo de Colaborador", () => {
@@ -276,19 +319,24 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(calendario.path).toBe("/departamento-pessoal/calendario");
   });
 
-  it("HR/ADMIN: legacy Departamento Pessoal section is gone; Calendário lives under Ferramentas; Feriados/EPI under Departamento Pessoal", () => {
+  it("HR/ADMIN: legacy Recursos Humanos section is gone; Calendário lives under Ferramentas; Feriados under Departamento Pessoal", () => {
     for (const privilege of [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]) {
       const menu = menuFor(privilege);
-      // The duplicate "Departamento Pessoal" section was retired entirely.
-      expect(byId(menu, "departamento-pessoal")).toBeUndefined();
+      // A seção antiga "Recursos Humanos" foi aposentada (virou Departamento
+      // Pessoal). A migração 429fd8c9 trocou o id por sed também aqui, e o
+      // teste passou a exigir que o Departamento Pessoal NÃO existisse.
+      expect(byId(menu, "recursos-humanos")).toBeUndefined();
       // Calendário now lives under Ferramentas for HR/ADMIN (same as ACCOUNTING).
       const tools = byId(menu, "ferramentas")!;
       expect((tools.children || []).some((c) => c.id === "ferramentas-calendario")).toBe(true);
-      // Feriados and EPI fold into the consolidated Departamento Pessoal area.
+      // Feriados fold into the consolidated Departamento Pessoal area.
+      // EPI saiu do DP em 293965c9 e foi para Medicina do Trabalho, seção que é
+      // só da ACCOUNTING — HR/ADMIN ficaram sem item de menu para Entrega de
+      // EPIs, embora a rota (/medicina-do-trabalho/*) os aceite. Pendente de
+      // decisão; não afirmamos nem a presença nem a ausência aqui.
       const dp = byId(menu, "departamento-pessoal")!;
       const dpTitles = (dp.children || []).map((c) => c.title);
       expect(dpTitles).toContain("Feriados");
-      expect(dpTitles).toContain("EPI");
       // Integração Secullum is ADMIN-only: present for ADMIN, absent for HR.
       const hasSecullum = (dp.children || []).some((c) => c.id === "dp-integracao-secullum");
       expect(hasSecullum).toBe(privilege === SECTOR_PRIVILEGES.ADMIN);
@@ -306,5 +354,17 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect((tools.children || []).some((c) => c.id === "ferramentas-calendario-pm")).toBe(true);
     // Secullum is ADMIN-only — PM must not see it anywhere.
     expect(JSON.stringify(PM).includes("dp-integracao-secullum")).toBe(false);
+  });
+
+  it("Validador de Documentos: só ADMIN e COMMERCIAL veem o item; nenhum outro setor, e a rota acompanha", () => {
+    const VALIDATOR = "/ferramentas/validador-de-documentos";
+    const allowed = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL];
+    for (const privilege of Object.values(SECTOR_PRIVILEGES)) {
+      const menu = JSON.stringify(menuFor(privilege));
+      const count = menu.split(`"path":"${VALIDATOR}"`).length - 1;
+      // Exatamente UM item para quem pode (nada de duplicata no menu), zero para o resto.
+      expect({ privilege, count }).toEqual({ privilege, count: allowed.includes(privilege) ? 1 : 0 });
+    }
+    expect(getRequiredPrivilegeForRoute(VALIDATOR)).toEqual(["ADMIN", "COMMERCIAL"]);
   });
 });

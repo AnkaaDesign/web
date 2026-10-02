@@ -841,6 +841,11 @@ export const routes = {
     truckStudio: {
       root: "/ferramentas/estudio-3D",
     },
+    // Validador de documentos — versão interna do portal público /v/:code.
+    // ADMIN + COMMERCIAL (gate em route-privileges).
+    documentValidator: {
+      root: "/ferramentas/validador-de-documentos",
+    },
   },
 
   // Users - Alias for administration users (collaborators) for backward compatibility

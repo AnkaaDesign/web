@@ -538,6 +538,8 @@ const CollaboratorCostCalculatorPage = lazy(() => import("@/pages/tools/collabor
 const NotesPage = lazy(() => import("@/pages/tools/notes"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
+// Validador de Documentos — ADMIN/COMMERCIAL (gate em route-privileges)
+const DocumentValidatorPage = lazy(() => import("@/pages/tools/document-validator"));
 // Truck Studio — ADMIN/COMMERCIAL/LOGISTIC/PRODUCTION_MANAGER (gate em route-privileges)
 const TruckStudioPage = lazy(() => import("@/pages/tools/truck-studio").then((module) => ({ default: module.TruckStudioPage })));
 
@@ -3836,6 +3838,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <TruckStudioPage />
+                    </Suspense>
+                  }
+                />
+                {/* Validador de Documentos — ADMIN/COMMERCIAL (o gate está em route-privileges) */}
+                <Route
+                  path={routes.tools.documentValidator.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <DocumentValidatorPage />
                     </Suspense>
                   }
                 />

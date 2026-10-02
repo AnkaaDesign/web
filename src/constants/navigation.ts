@@ -680,9 +680,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Financeiro",
     icon: "financial",
     path: "/financeiro",
-    // FINANCIAL must be here or the menu filter (which prunes a failed parent
-    // before its children) hides the entire group from FINANCIAL users.
-    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
+    // FINANCIAL fica FORA desta seção (2026-09-29). O menu dele é a lista
+    // plana "FINANCEIRO - Direct menu items" mais abaixo; com a seção junto,
+    // Contas a Receber e Notas Fiscais apareciam duas vezes, e a seção só
+    // acrescentava Contas a Pagar, que o setor não usa. O ACESSO às rotas não
+    // mudou (route-privileges) — só o menu.
+    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
         id: "clientes-financeiro-menu",
@@ -716,7 +719,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
       {
         // Notas Fiscais — the ISSUED-side surface: NFS-e we emit via Elotech
         // (Emitidas). Owned by FINANCIAL + COMMERCIAL, who bill customers. They
-        // have NO Conciliação Bancária access, so this is their NF entry. The
+        // have NO Conciliação Bancária access, so this is their NF entry
+        // (FINANCIAL reaches it via its flat "notas-fiscais-financeiro"). The
         // RECEIVED (supplier) side lives under "Conciliação Bancária → Notas
         // Fiscais" for ADMIN + ACCOUNTING — keeping the two directions in
         // separate menus for separate sectors, so neither sees a duplicate.
@@ -724,7 +728,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Notas Fiscais",
         icon: "receipt",
         path: "/financeiro/notas-fiscais",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
+        requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL],
         children: [
           // Emitidas detail (/notas-fiscais/:id). The recebidas/reconciliation
           // detail (/conciliacao/notas/:id) is registered under Conciliação
@@ -745,22 +749,24 @@ export const NAVIGATION_MENU: MenuItem[] = [
       {
         // Outflow ledger — unified payables (orders + airbrushing + payroll +
         // taxes + recurrents). Top-level Financeiro page (moved out of Conciliação
-        // Bancária). ACCOUNTING emphasis; FINANCIAL also manages cash.
+        // Bancária). ACCOUNTING emphasis. FINANCIAL não tem item de menu para
+        // esta página (não a usa), embora a rota ainda o aceite.
         id: "contas-a-pagar",
         title: "Contas a Pagar",
         icon: "receipt",
         path: "/financeiro/contas-a-pagar",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         // Inflow ledger — open/overdue/received receivable installments
         // (task-quotes + external operations + invoices). Top-level Financeiro page
-        // (moved out of Conciliação Bancária). FINANCIAL emphasis.
+        // (moved out of Conciliação Bancária). FINANCIAL emphasis — mas o
+        // FINANCIAL chega por "contas-a-receber-financeiro" (menu plano).
         id: "contas-a-receber",
         title: "Contas a Receber",
         icon: "receipt",
         path: "/financeiro/contas-a-receber",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "conciliacao-bancaria",
@@ -1152,13 +1158,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
 
   // FINANCEIRO - Direct menu items (flat structure, sorted alphabetically)
   {
-    id: "aerografia-financeiro",
-    title: "Aerografia",
-    icon: "paintBrush",
-    path: "/producao/aerografia",
-    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
-  },
-  {
     id: "clientes-financeiro",
     title: "Clientes",
     icon: "users",
@@ -1166,10 +1165,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {
-    // Contas a Receber existe no grupo "Financeiro" (que o FINANCIAL enxerga),
-    // mas o menu do FINANCIAL é plano — é nessa lista que ele procura as
-    // páginas do dia a dia, e a cobrança é trabalho dele. Entrada plana,
-    // igual às demais deste bloco.
+    // O menu do FINANCIAL é só esta lista plana (a seção "Financeiro" não o
+    // inclui) — a cobrança é trabalho dele.
     id: "contas-a-receber-financeiro",
     title: "Contas a Receber",
     icon: "receipt",
@@ -1203,6 +1200,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "receipt",
     path: "/financeiro/notas-fiscais",
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+    // Antes vinha da seção "Financeiro"; sem ele o detalhe da nota não
+    // destacaria Notas Fiscais no menu.
+    children: [{ id: "notas-fiscais-financeiro-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/notas-fiscais/:id", isDynamic: true }],
   },
   {
     id: "orcamento-financeiro",
@@ -2246,6 +2246,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Estúdio 3D",
         icon: "truck",
         path: "/ferramentas/estudio-3D",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+      },
+      {
+        // Validador de Documentos. Gate real em route-privileges
+        // (`/ferramentas/validador-de-documentos`); manter os dois em sincronia.
+        id: "ferramentas-validador-documentos",
+        title: "Validador de Documentos",
+        icon: "verify",
+        path: "/ferramentas/validador-de-documentos",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
       },
       {

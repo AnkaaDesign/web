@@ -713,3 +713,36 @@ export function dedupeConfigsByCustomer<T extends BillingConfigLike>(
     coverageGroups: first.map((c) => coveredTaskIds(c)).filter((g) => g.length > 0),
   };
 }
+
+/**
+ * Os contatos que falam por UM cliente num documento recortado para ele — a
+ * mesma regra de `contactsForSegment` na API, que monta o PDF.
+ *
+ * Com dois ou mais pagadores, só quem tem `companyId` igual ao cliente do
+ * recorte, e a lista pode sair VAZIA: sem contato daquele cliente não há linha
+ * de assinatura do cliente nem "À fulano". A regra antiga caía na lista
+ * inteira e punha o contato de um pagador assinando pelo outro (nº 0269: o
+ * Robert Leme, da RKO, sob a razão social da Ibiporã).
+ *
+ * Com um pagador só (ou sem recorte), a lista entra inteira.
+ */
+export function contactsForSegment<T extends { id?: string; companyId?: string | null }>(
+  contacts: readonly T[],
+  configs: readonly BillingConfigLike[] | null | undefined,
+  segmentCustomerId: string | null | undefined,
+): T[] {
+  // Deduplicado por id: com N tarefas o mesmo contato vem N vezes, e cada
+  // repetição seria mais uma linha de assinatura com o mesmo nome.
+  const seen = new Set<string>();
+  const unique = contacts.filter(r => {
+    if (!r.id) return true;
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+  const payers = new Set(
+    (configs ?? []).map((c: any) => c?.customerId ?? c?.customer?.id).filter(Boolean),
+  );
+  if (!segmentCustomerId || payers.size < 2) return unique;
+  return unique.filter(r => r.companyId === segmentCustomerId);
+}

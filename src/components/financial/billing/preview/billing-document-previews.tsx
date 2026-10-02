@@ -61,6 +61,15 @@ interface TaskVehicle {
 interface BillingDocumentPreviewsProps {
   customerConfigs: any[];
   services: any[];
+  /**
+   * O ORÇAMENTO tem mais de um cliente pagador?
+   *
+   * Sem a prop a resposta sai de `customerConfigs` — e está certa quando a
+   * prévia recebe todos os pagadores. A aprovação por pagador passa SÓ os que
+   * vão ser faturados agora: com a Ibiporã sozinha na lista a conta concluía
+   * "cliente único" e a nota dela saía com os serviços da RKO também.
+   */
+  multipleCustomers?: boolean;
   task: TaskVehicle;
   /** Predicted next NFS-e number (last emitted + 1); null if unknown. */
   nextNfseNumber?: number | null;
@@ -430,6 +439,7 @@ function renderDoc(entry: DocEntry) {
 export function BillingDocumentPreviews({
   customerConfigs,
   services,
+  multipleCustomers,
   task,
   nextNfseNumber,
   orderNumbersByTask,
@@ -446,7 +456,8 @@ export function BillingDocumentPreviews({
     // num orçamento de um cliente só, as faturas 2..N saíam com ZERO serviços —
     // a pré-visualização da nota fiscal e do boleto mostrando um documento vazio
     // logo antes de emitir.
-    const single = !hasMultipleCustomersOf(configs);
+    const single =
+      multipleCustomers !== undefined ? !multipleCustomers : !hasMultipleCustomersOf(configs);
     const entries: DocEntry[] = [];
     let nfseSeq = 0; // sequential offset per generated NFS-e
     configs.forEach((config, idx) => {
@@ -507,6 +518,7 @@ export function BillingDocumentPreviews({
   }, [
     customerConfigs,
     services,
+    multipleCustomers,
     task,
     nextNfseNumber,
     orderNumbersByTask,

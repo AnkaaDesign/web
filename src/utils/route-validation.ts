@@ -282,9 +282,10 @@ const VALID_ROUTES = [
   routes.occupationalHealth.workAccidents.details(":id"),
   routes.occupationalHealth.workAccidents.edit(":id"),
 
-  // Tools (Ferramentas) - Collaborator Cost & Notas routes
+  // Tools (Ferramentas) - Collaborator Cost, Notas & Validador de Documentos routes
   routes.tools.collaboratorCost.root,
   routes.tools.notes.root,
+  routes.tools.documentValidator.root,
 ];
 
 /**

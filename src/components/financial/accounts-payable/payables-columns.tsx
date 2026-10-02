@@ -166,8 +166,13 @@ function payeeText(row: PayableRow): string {
   return [row.payeeName, row.payeeCnpj ? formatCNPJ(row.payeeCnpj) : ""].filter(Boolean).join(" ");
 }
 
+/** Amount as bank apps expect it pasted: "1234,56". */
+function bankAmountText(amount: number): string {
+  return Math.abs(Number(amount) || 0).toFixed(2).replace(".", ",");
+}
+
 interface PayableColumnsOptions {
-  /** Click-to-copy handler for the Chave Pix cell (stops row-click propagation). */
+  /** Click-to-copy handler for the Valor and Chave Pix cells (stops row-click propagation). */
   onCopy: (text: string, label: string) => (e: React.MouseEvent) => void;
 }
 
@@ -242,7 +247,22 @@ export function buildPayableColumns({ onCopy }: PayableColumnsOptions): DataTabl
       size: 132,
       accessorFn: (row) => row.amount,
       meta: { align: "right", headerLabel: "Valor", exportValue: (row) => row.amount },
-      cell: ({ row }) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.original.amount)}</span>,
+      // Click-to-copy in the shape bank "Valor" fields accept on paste:
+      // "1234,56" — no "R$", no thousands dot, comma decimal, always 2 places.
+      // Masks that keep only digits read "123456" → 1.234,56; pt-BR parsers
+      // read the comma as decimal. "1.234,56" or "1234.56" break one or the other.
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="group h-7 px-2 -mr-2 font-medium tabular-nums"
+          onClick={onCopy(bankAmountText(row.original.amount), "Valor copiado!")}
+          title="Copiar valor"
+        >
+          <IconCopy className="h-3.5 w-3.5 mr-1 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+          <span className="text-sm">{formatCurrency(row.original.amount)}</span>
+        </Button>
+      ),
     },
     {
       id: "payment",

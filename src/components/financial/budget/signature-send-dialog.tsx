@@ -65,6 +65,14 @@ const CHANNEL_ICON: Record<DeliveryChannel, typeof IconMail> = {
   EMAIL: IconMail,
 };
 
+/** Como terminou o último pedido de assinatura complementar a este contato. */
+const LAST_ATTEMPT_LABEL: Record<string, string> = {
+  REFUSED: "recusado",
+  EXPIRED: "vencido",
+  CANCELLED: "cancelado",
+  INVALIDATED: "anulado",
+};
+
 const CHANNEL_REQUIREMENT: Record<DeliveryChannel, string> = {
   WHATSAPP: "telefone com DDD no cadastro",
   EMAIL: "e-mail no cadastro",
@@ -81,18 +89,27 @@ export function SignatureSendDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quoteId: string;
-  /** "create" = primeira coleta; "reissue" = reemissão depois de uma coleta encerrada. */
-  mode: "create" | "reissue";
+  /**
+   * "create" = primeira coleta; "reissue" = reemissão depois de uma coleta
+   * encerrada; "supplement" = assinatura COMPLEMENTAR de quem entrou na tarefa
+   * depois de o contrato ser assinado (ninguém é anulado; o orçamento volta
+   * para pendente até ela concluir).
+   */
+  mode: "create" | "reissue" | "supplement";
   busy: boolean;
   onSend: (
     channel: DeliveryChannel | null,
     /**
-     * MAPA DE EXCEÇÕES: só os contatos cujo recorte foi alterado aqui. Quem não
-     * vem cai no padrão das funções, no servidor. Ver `createEnvelope`.
+     * Na coleta normal, MAPA DE EXCEÇÕES: só os contatos cujo recorte foi
+     * alterado aqui — quem não vem cai no padrão das funções, no servidor.
+     *
+     * Na COMPLEMENTAR, a LISTA de quem assina: só os marcados, cada um com o
+     * seu recorte. Ver `createEnvelope({ supplement })`.
      */
     signers: Array<{ responsibleId: string; sections: QuoteSection[] }>,
   ) => Promise<void> | void;
 }) {
+  const supplement = mode === "supplement";
   const [preflight, setPreflight] = useState<DeliveryPreflight | null>(null);
   const [loading, setLoading] = useState(false);
   const [channel, setChannel] = useState<DeliveryChannel | null>(null);
@@ -112,7 +129,7 @@ export function SignatureSendDialog({
     setLoading(true);
     setFailed(false);
     try {
-      const res: any = await signatureService.getDeliveryPreflight(quoteId);
+      const res: any = await signatureService.getDeliveryPreflight(quoteId, { supplement });
       const data: DeliveryPreflight | undefined = res?.data?.data ?? res?.data;
       if (!data) throw new Error("resposta vazia");
       setPreflight(data);
@@ -134,7 +151,7 @@ export function SignatureSendDialog({
     } finally {
       setLoading(false);
     }
-  }, [quoteId]);
+  }, [quoteId, supplement]);
 
   useEffect(() => {
     if (open) void load();
@@ -170,13 +187,20 @@ export function SignatureSendDialog({
    * Sem essa distinção a tela quebrava lendo `.length` de `undefined`.
    */
   const sectionsOf = useCallback(
-    (r: Pick<PreflightRecipient, "id" | "sections">): QuoteSection[] =>
+    (r: Pick<PreflightRecipient, "id" | "sections" | "state">): QuoteSection[] =>
       // `effectiveSections` aplica as MESMAS duas regras do servidor: a
       // obrigatória entra em quem assina, e quem decide se assina são as
       // recortáveis. Sem isso a tela e a emissão discordariam sobre quem entra
       // na coleta — e a tela é onde a decisão é tomada.
-      effectiveSections(overrides[r.id] ?? r.sections ?? [...QUOTE_SECTIONS]),
-    [overrides],
+      //
+      // Na COMPLEMENTAR só quem está FALTANDO nasce marcado. Quem foi tirado da
+      // coleta original de propósito, ou não assina pela função, aparece
+      // desmarcado: incluí-lo é uma decisão, não um padrão.
+      effectiveSections(
+        overrides[r.id] ??
+          (supplement && r.state !== "MISSING" ? [] : (r.sections ?? [...QUOTE_SECTIONS])),
+      ),
+    [overrides, supplement],
   );
 
   const toggleSection = (responsibleId: string, current: QuoteSection[], section: QuoteSection) => {
@@ -210,7 +234,12 @@ export function SignatureSendDialog({
   const signingCount = (preflight?.recipients ?? []).filter(r => sectionsOf(r).length > 0).length;
 
   const overridePayload = () =>
-    Object.entries(overrides).map(([responsibleId, sections]) => ({ responsibleId, sections }));
+    supplement
+      ? // Na complementar o corpo é a LISTA de quem assina, com o recorte de cada um.
+        (preflight?.recipients ?? [])
+          .map(r => ({ responsibleId: r.id, sections: sectionsOf(r) }))
+          .filter(r => r.sections.length > 0)
+      : Object.entries(overrides).map(([responsibleId, sections]) => ({ responsibleId, sections }));
 
   /**
    * Quem, entre os que DE FATO vão assinar, está sem o contato do canal.
@@ -255,14 +284,30 @@ export function SignatureSendDialog({
         <DialogHeader className="space-y-1 border-b border-border px-4 py-3.5 sm:px-5">
           <DialogTitle className="flex items-center gap-2 text-base">
             <IconSend className="h-4 w-4 text-muted-foreground" />
-            {mode === "create" ? "Enviar para assinatura" : "Reenviar para assinatura"}
+            {supplement
+              ? "Pedir assinatura complementar"
+              : mode === "create"
+                ? "Enviar para assinatura"
+                : "Reenviar para assinatura"}
           </DialogTitle>
-          <DialogDescription className="text-xs leading-relaxed">
-            O documento é congelado como está e cada responsável recebe o seu
-            próprio documento, por link pessoal, sem ver quem mais assina. Cada
-            um recebe apenas as seções da função dele — abaixo dá para mudar
-            contato a contato.
-          </DialogDescription>
+          {supplement ? (
+            <DialogDescription className="text-xs leading-relaxed">
+              Quem já assinou continua assinado — nada é anulado. Cada responsável
+              marcado recebe o seu próprio documento, com as mesmas condições do
+              contrato, e a Ankaa contra-assina depois.{" "}
+              <strong className="text-foreground">
+                Até a assinatura ser concluída o orçamento volta para Pendente
+              </strong>
+              : a Em Negociação reabre e o orçamento sai da fila do faturamento.
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="text-xs leading-relaxed">
+              O documento é congelado como está e cada responsável recebe o seu
+              próprio documento, por link pessoal, sem ver quem mais assina. Cada
+              um recebe apenas as seções da função dele — abaixo dá para mudar
+              contato a contato.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="max-h-[55vh] space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
@@ -498,6 +543,11 @@ export function SignatureSendDialog({
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5">
                               <span className="truncate text-sm">{r.name}</span>
+                              {supplement && r.state && r.state !== "MISSING" && (
+                                <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
+                                  {r.state === "EXCLUDED" ? "fora da coleta original" : "não assina por padrão"}
+                                </span>
+                              )}
                               {edited && (
                                 <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 text-[9px] font-medium uppercase text-primary">
                                   editado
@@ -513,7 +563,12 @@ export function SignatureSendDialog({
                                 ? full
                                   ? "recebe tudo"
                                   : describeSections(sections)
-                                : "não assina"}
+                                : supplement
+                                  ? "não incluído — abra para marcar as seções"
+                                  : "não assina"}
+                              {supplement && r.lastAttempt
+                                ? ` · último pedido ${LAST_ATTEMPT_LABEL[r.lastAttempt.status] ?? "encerrado"}`
+                                : ""}
                             </span>
                           </span>
                           <span
@@ -603,8 +658,9 @@ export function SignatureSendDialog({
                     <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs">
                       <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                       <span className="text-foreground">
-                        Nenhum responsável está marcado para assinar. Marque ao menos
-                        uma seção para alguém.
+                        {supplement
+                          ? "Ninguém está marcado. Abra o responsável e marque as seções que ele deve receber."
+                          : "Nenhum responsável está marcado para assinar. Marque ao menos uma seção para alguém."}
                       </span>
                     </div>
                   )}
