@@ -9,7 +9,7 @@ import { BRAND_ASSETS } from "@/config/assets";
 import { taskLabelService, type LabelSheet } from "@/api-client/task-label";
 import type { Task } from "../../../../types";
 import { LABEL_HEIGHT, LABEL_WIDTH, taskLabelCardMarkup } from "./task-label-card";
-import { CAPTION_BASELINE, CAPTION_SIZE, LABEL_SLOTS, SHEET_HEIGHT, SHEET_WIDTH, orientationMarkSvg, taskLabelCaption, type PlacedLabel } from "./task-label-sheet";
+import { CAPTION_BASELINE, CAPTION_SIZE, GUIDE_INK, LABEL_SLOTS, SHEET_HEIGHT, SHEET_WIDTH, orientationMarkSvg, taskLabelCaption, type PlacedLabel } from "./task-label-sheet";
 
 // Right-click → "Imprimir Etiquetas": picks the A4 slots for this print and has the SERVER print the
 // sheet on the office Epson (photo paper, high quality, 100% — fixed there, nobody touches a dialog).
@@ -39,7 +39,7 @@ const PAPER = {
   extraFill: "#FEF3C7",
   extraStroke: "#F59E0B",
   pickedStroke: "#E5E7EB",
-  caption: "#6B7280",
+  caption: GUIDE_INK, // same light grey the printer gets
 };
 
 type Step = { kind: "pick" } | { kind: "sending" } | { kind: "printing"; jobId: number; messages: string[] };

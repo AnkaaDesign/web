@@ -20,6 +20,11 @@ export const ROW_GAP = 6;
 const COLUMNS = 2;
 const ROWS = 8;
 
+// Ink for everything printed OUTSIDE the cards (caption + "TOPO"): a light grey that still reads up
+// close but stays under the contrast the ScanNCut's Direct Cut traces, so it never offers them as
+// shapes to cut — only the black rings are picked up.
+export const GUIDE_INK = "#BCC1C8";
+
 export const CAPTION_SIZE = 3;
 // above the card edge: descenders clear the cut ring (~0.6 mm) and caps clear the card above (~1.4 mm)
 export const CAPTION_BASELINE = 1.9;
@@ -79,9 +84,9 @@ export function orientationMarkSvg(): string {
   const f = (v: number) => v.toFixed(2);
   // the triangle sits on the text's baseline and reaches its cap height, so "▲ TOPO" reads as one line
   const triangle = (x: number) =>
-    `<path d="M${f(x + width / 2)} ${f(baseline - capHeight)}L${f(x + width)} ${f(baseline)}H${f(x)}Z" fill="#9CA3AF"/>`;
+    `<path d="M${f(x + width / 2)} ${f(baseline - capHeight)}L${f(x + width)} ${f(baseline)}H${f(x)}Z" fill="${GUIDE_INK}"/>`;
   const label = (x: number, anchor: "start" | "end") =>
-    `<text x="${f(x)}" y="${f(baseline)}" font-family="Manrope, Helvetica, Arial, sans-serif" font-weight="700" font-size="${fontSize}" fill="#9CA3AF" text-anchor="${anchor}">TOPO</text>`;
+    `<text x="${f(x)}" y="${f(baseline)}" font-family="Manrope, Helvetica, Arial, sans-serif" font-weight="700" font-size="${fontSize}" fill="${GUIDE_INK}" text-anchor="${anchor}">TOPO</text>`;
   return (
     triangle(edge) +
     label(edge + width + gap, "start") +
