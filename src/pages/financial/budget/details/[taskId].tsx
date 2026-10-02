@@ -1950,8 +1950,11 @@ const FinancialBudgetDetailPageInner = () => {
         detail: tab.detail,
         dirty: tab.dirty,
         art: artVehicles[index],
+        status: (vehicles.tasks[index] as any)?.status ?? null,
+        purchaseOrderId: (vehicles.tasks[index] as any)?.purchaseOrderId ?? null,
+        purchaseOrder: (vehicles.tasks[index] as any)?.purchaseOrder ?? null,
       })),
-    [vehicleTabs, artVehicles],
+    [vehicleTabs, artVehicles, vehicles.tasks],
   );
 
   // Build header info

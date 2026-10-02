@@ -78,6 +78,10 @@ export interface BudgetVehicleCard {
   detail: string | null;
   dirty: boolean;
   art: ImplementArtVehicle;
+  /** Para a faixa do pedido (DD12.1): status da tarefa e pedido do portal. */
+  status?: string | null;
+  purchaseOrderId?: string | null;
+  purchaseOrder?: { number?: string | null } | null;
 }
 
 interface BudgetWizardStepVehiclesProps {
@@ -143,7 +147,16 @@ export function BudgetWizardStepVehicles({
 
   // DD12.1 — o pedido do orçamento e quem o herda.
   const orderNumbers = useMemo(
-    () => orderNumberInheritance(vehicles.map((_, index) => watchedVehicles[index] ?? null)),
+    () =>
+      orderNumberInheritance(
+        vehicles.map((vehicle, index) => ({
+          // O número DIGITADO vem do formulário (pode estar sujo); o resto, da tarefa.
+          customerOrderNumber: watchedVehicles[index]?.customerOrderNumber ?? null,
+          status: vehicle.status ?? null,
+          purchaseOrderId: vehicle.purchaseOrderId ?? null,
+          purchaseOrder: vehicle.purchaseOrder ?? null,
+        })),
+      ),
     [vehicles, watchedVehicles],
   );
 
