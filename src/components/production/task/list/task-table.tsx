@@ -29,6 +29,7 @@ import { TaskSetSectorModal } from "../modals/task-set-sector-modal";
 import { IconCopy, IconBuildingFactory2 } from "@tabler/icons-react";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { IMPLEMENT_APPROVED_ART_COUNT_INCLUDE } from "@/utils/implement-art";
 
 interface TaskTableProps {
   visibleColumns: Set<string>;
@@ -114,7 +115,8 @@ export function TaskTable({
       observation: true,
       generalPainting: true,
       logoPaints: true,
-      implement: true,
+      // A coluna "ARTES" conta a arte APROVADA do implemento (Modelo C).
+      implement: { include: { layouts: IMPLEMENT_APPROVED_ART_COUNT_INCLUDE } },
     }),
     [],
   );

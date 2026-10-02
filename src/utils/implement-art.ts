@@ -19,6 +19,20 @@ export const IMPLEMENT_ART_LAYOUTS_INCLUDE = {
   include: { file: true },
 } as const;
 
+/**
+ * A forma LEVE para listas: só a arte APROVADA do implemento, e só id e estado —
+ * o que a coluna "ARTES" e a exportação contam. Sem o arquivo.
+ */
+export const IMPLEMENT_APPROVED_ART_COUNT_INCLUDE = {
+  where: { status: LAYOUT_STATUS.APPROVED },
+  select: { id: true, status: true },
+} as const;
+
+/** Quantas artes APROVADAS o implemento da tarefa tem (o que as listas mostram). */
+export function approvedArtCountOf(task: TaskWithImplementArt | null | undefined): number {
+  return implementArtOf(task).filter((layout) => layout.status === LAYOUT_STATUS.APPROVED).length;
+}
+
 export interface ImplementArtFile {
   id: string;
   filename?: string | null;

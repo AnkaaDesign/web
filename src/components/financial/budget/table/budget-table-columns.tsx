@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { BUDGET_LIST_STATUSES, BUDGET_STATUS_ORDER, TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, getBadgeVariant } from "@/constants";
 import type { TASK_STATUS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
+import { BILLABLE_SIGNATURE_STATUSES, BUDGET_SIGNATURE_STATUS_LABELS } from "@/constants/budget-contract";
+import type { BUDGET_SIGNATURE_STATUS } from "@/constants/enums";
 import { formatCurrency } from "@/utils";
 import { MutedDash, dateExportValue, renderDateCell } from "@/components/financial/shared/quote-table-shared";
 import {
@@ -442,6 +444,35 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
         // `BUDGET_APPROVED`, por exemplo): desenhar um badge sem rótulo é pior que a ausência.
         if (!status || !BUDGET_QUOTE_STATUSES.includes(status as TASK_QUOTE_STATUS)) return <MutedDash />;
         return <QuoteStatusBadge status={status as TASK_QUOTE_STATUS} size="sm" />;
+      },
+    },
+    {
+      // O EIXO DA ASSINATURA (Modelo C), ao lado do eixo do valor: "Aprovado" diz
+      // só que o VALOR foi aprovado; se já dá para cobrar depende desta coluna.
+      // Sem ordenação nem filtro: o `where`/`orderBy` da API ainda não aceitam
+      // `signatureStatus`.
+      id: "signatureStatus",
+      header: "Assinatura",
+      accessorFn: (q) => (q as Budget).signatureStatus ?? null,
+      enableSorting: false,
+      size: 170,
+      minSize: 130,
+      meta: {
+        headerLabel: "Assinatura",
+        exportHeader: "Assinatura",
+        defaultVisible: false,
+        exportValue: (q) =>
+          q.signatureStatus ? BUDGET_SIGNATURE_STATUS_LABELS[q.signatureStatus as BUDGET_SIGNATURE_STATUS] ?? "" : "",
+      },
+      cell: ({ row }) => {
+        const status = row.original.signatureStatus as BUDGET_SIGNATURE_STATUS | undefined;
+        if (!status) return <MutedDash />;
+        const resolved = (BILLABLE_SIGNATURE_STATUSES as readonly string[]).includes(status);
+        return (
+          <Badge variant={resolved ? "completed" : status === "NOT_ISSUED" ? "outline" : "amber"} className="whitespace-nowrap">
+            {BUDGET_SIGNATURE_STATUS_LABELS[status] ?? status}
+          </Badge>
+        );
       },
     },
     {

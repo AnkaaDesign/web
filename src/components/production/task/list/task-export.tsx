@@ -11,6 +11,7 @@ import type { TaskGetManyFormData } from "../../../../schemas";
 import { taskService } from "../../../../api-client";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { createTaskColumns } from "./task-table-columns";
+import { IMPLEMENT_APPROVED_ART_COUNT_INCLUDE, approvedArtCountOf } from "@/utils/implement-art";
 
 interface TaskExportProps {
   filters: Partial<TaskGetManyFormData>;
@@ -70,7 +71,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasLayouts":
-              row[headerKey] = (task.implement?.layouts?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = approvedArtCountOf(task as any) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";
@@ -133,6 +134,8 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             serviceOrders: true,
             files: true,
             observation: true,
+            // "ARTES": a arte APROVADA do implemento (Modelo C).
+            implement: { include: { layouts: IMPLEMENT_APPROVED_ART_COUNT_INCLUDE } },
           },
         });
 
@@ -183,7 +186,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasLayouts":
-              row[headerKey] = (task.implement?.layouts?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = approvedArtCountOf(task as any) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";
