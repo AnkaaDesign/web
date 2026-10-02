@@ -26,8 +26,8 @@ export interface File extends BaseEntity {
   thumbnailUrl?: string | null; // URL for PDF thumbnails or image thumbnails
 
   // Relations
-  layouts?: Layout[];
-  tasksLayouts?: Task[];
+  /** A arte de implemento que usa este arquivo (`File.artLayouts`). */
+  artLayouts?: Layout[];
   customerLogo?: Customer[];
   supplierLogo?: Supplier[];
   observations?: Observation[];
@@ -52,11 +52,7 @@ export interface File extends BaseEntity {
 // =====================
 
 export interface FileIncludes {
-  tasksLayouts?:
-    | boolean
-    | {
-        include?: TaskIncludes;
-      };
+  artLayouts?: boolean;
   customerLogo?:
     | boolean
     | {

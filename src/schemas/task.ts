@@ -110,32 +110,6 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
-      layouts: z
-        .union([
-          z.boolean(),
-          z.object({
-            include: z
-              .object({
-                tasksLayouts: z.boolean().optional(),
-                customerLogo: z.boolean().optional(),
-                taskBudget: z.boolean().optional(),
-                taskNfe: z.boolean().optional(),
-                supplierLogo: z.boolean().optional(),
-                orderNfe: z.boolean().optional(),
-                orderBudget: z.boolean().optional(),
-                orderReceipt: z.boolean().optional(),
-                observations: z.boolean().optional(),
-                reprimand: z.boolean().optional(),
-                airbrushingReceipts: z.boolean().optional(),
-                airbrushingInvoices: z.boolean().optional(),
-                externalOperationBudget: z.boolean().optional(),
-                externalOperationNfe: z.boolean().optional(),
-                externalOperationReceipt: z.boolean().optional(),
-              })
-              .optional(),
-          }),
-        ])
-        .optional(),
       projectFiles: z.boolean().optional(),
       checkinFiles: z.boolean().optional(),
       checkoutFiles: z.boolean().optional(),
@@ -365,13 +339,6 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       observation: z.any().optional(),
       generalPainting: z.any().optional(),
       createdBy: z.any().optional(),
-      layouts: z
-        .object({
-          some: z.any().optional(),
-          every: z.any().optional(),
-          none: z.any().optional(),
-        })
-        .optional(),
       logoPaints: z
         .object({
           some: z.any().optional(),
@@ -1233,7 +1200,6 @@ export const taskCreateSchema = z
     // Relations - Many-to-many file relations (arrays)
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    layoutIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to layouts
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
     checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
@@ -1372,7 +1338,6 @@ export const taskUpdateSchema = z
     // Relations - Many-to-many file relations (arrays)
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    layoutIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to layouts
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
     checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
@@ -1562,8 +1527,6 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   // Many-to-many relations (arrays)
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),
-  // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
-  layoutIds: task.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
   baseFileIds: task.baseFiles?.map((baseFile) => baseFile.id),
   projectFileIds: task.projectFiles?.map((f) => f.id),
   checkinFileIds: task.checkinFiles?.map((f) => f.id),

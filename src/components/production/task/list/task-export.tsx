@@ -70,7 +70,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasLayouts":
-              row[headerKey] = (task.layouts?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = (task.implement?.layouts?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";
@@ -183,7 +183,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasLayouts":
-              row[headerKey] = (task.layouts?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = (task.implement?.layouts?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";

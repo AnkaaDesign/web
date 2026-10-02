@@ -357,7 +357,6 @@ export function TaskPreparationPage() {
       try {
         const full = await taskService.getTaskById(source.id, {
           include: {
-            layouts: { include: { file: true } },
             budgets: true,
             invoices: true,
             receipts: true,

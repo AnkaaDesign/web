@@ -1,5 +1,6 @@
 // packages/interfaces/src/implement.ts
 
+import type { Layout } from './layout';
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse } from "./common";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { ImplementMeasure, ImplementMeasureIncludes } from "./implementMeasure";
@@ -40,6 +41,8 @@ export interface Implement extends BaseEntity {
   leftSideMeasure?: ImplementMeasure;
   rightSideMeasure?: ImplementMeasure;
   backSideMeasure?: ImplementMeasure;
+  /** A ARTE do implemento (Modelo C) — vem quando o `include` pede `layouts`. */
+  layouts?: Layout[];
 }
 
 // =====================
@@ -47,6 +50,8 @@ export interface Implement extends BaseEntity {
 // =====================
 
 export interface ImplementIncludes {
+  /** A arte do implemento (com `where`/`orderBy`/`include` do Prisma). */
+  layouts?: boolean | Record<string, unknown>;
   task?:
     | boolean
     | {

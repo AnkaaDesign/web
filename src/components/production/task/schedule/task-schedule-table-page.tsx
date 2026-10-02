@@ -471,7 +471,6 @@ export function TaskScheduleTablePage() {
     try {
       const full = await getTaskById(sourceTask.id, {
         include: {
-          layouts: { include: { file: true } },
           budgets: true,
           invoices: true,
           receipts: true,

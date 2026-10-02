@@ -181,7 +181,6 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   const handleSourceTaskSelected = useCallback(async (sourceTask: Task) => {
     console.log('[CopyFromTask] ========== handleSourceTaskSelected CALLED ==========');
     console.log('[CopyFromTask] Source task ID:', sourceTask?.id);
-    console.log('[CopyFromTask] Source task layouts:', sourceTask?.layouts);
 
     // Copying a task onto itself deletes its own quote server-side (the API also
     // refuses it with 400) — stop here so the user can pick a different source.
@@ -197,7 +196,6 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
-          layouts: { include: { file: true } },  // ✅ Include file relationship
           budgets: true,
           invoices: true,
           receipts: true,
@@ -219,10 +217,6 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
         throw new Error('Failed to fetch source task details');
       }
 
-      console.log(
-        `[CopyFromTask] Fetched source task with ${fullSourceTask.data.layouts?.length || 0} layouts`,
-        fullSourceTask.data.layouts
-      );
 
       // Move to confirming step with fully loaded source task
       setCopyFromTaskState((prev): CopyFromTaskState => ({

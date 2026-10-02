@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,8 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
         include: {
           // Foto da plaqueta (VIN) — sem isto o `include` devolve só os escalares.
           vinPlate: true,
+          // A arte do implemento (Modelo C): a da tarefa não existe mais.
+          layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE,
           leftSideMeasure: {
             include: {
               sections: true,
@@ -74,11 +77,6 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
         },
       },
       sector: true,
-      layouts: {
-        include: {
-          file: true,
-        },
-      },
       serviceOrders: true,
     },
   });
@@ -120,9 +118,9 @@ export function ImplementDetailModal({ taskId, open, onOpenChange }: ImplementDe
   // Filter layouts: show all if user can view badges, otherwise only approved
   // Note: artwork can have file data nested in .file OR directly on artwork object
   const filteredLayouts = useMemo(() => {
-    if (!task?.layouts) return [];
 
-    return (task.layouts as any[]).filter((artwork) => {
+    // A arte é do IMPLEMENTO (Modelo C).
+    return (((task?.implement as any)?.layouts ?? []) as any[]).filter((artwork) => {
       // Check if artwork has file data - either nested in .file or directly on artwork
       const hasFileData = artwork.file || artwork.filename || artwork.path;
       return hasFileData && (canViewLayoutBadges || artwork.status === 'APPROVED');

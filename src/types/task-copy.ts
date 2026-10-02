@@ -1,6 +1,6 @@
 // Types and constants for task copy functionality
 
-// CopyableTaskField uses API schema field names (e.g., baseFileIds, layoutIds)
+// CopyableTaskField uses API schema field names (e.g., baseFileIds, implementLayouts)
 // to match the backend validation schema for the copy-from endpoint
 export type CopyableTaskField =
   | 'all'
@@ -14,7 +14,7 @@ export type CopyableTaskField =
   | 'customerId'
   | 'quoteId'
   | 'paintId'
-  | 'layoutIds'
+  | 'implementLayouts'
   | 'baseFileIds'
   | 'projectFileIds'
   | 'logoPaintIds'
@@ -27,6 +27,8 @@ export type CopyableTaskField =
   | 'implementType'
   | 'category'
   | 'implementMeasures'
+  | 'rearDoor'
+  | 'implementProjectFiles'
   | 'observation';
 
 export interface CopyableFieldMetadata {
@@ -47,7 +49,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'customerId',
   'quoteId',
   'paintId',
-  'layoutIds',
+  'implementLayouts',
   'baseFileIds',
   'projectFileIds',
   'logoPaintIds',
@@ -60,6 +62,8 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'implementType',
   'category',
   'implementMeasures',
+  'rearDoor',
+  'implementProjectFiles',
   'observation',
 ];
 
@@ -92,8 +96,8 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   // Logo paints (Cores da Logomarca) - hidden for Commercial users
   logoPaintIds: ['ADMIN', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Layouts (Layouts files) - hidden for Warehouse, Financial, Logistic
-  layoutIds: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // A arte do implemento (linhas NOVAS, em rascunho, no implemento de destino) - hidden for Warehouse, Financial, Logistic
+  implementLayouts: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Base files - accessible by most sectors
   baseFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -119,6 +123,10 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
 
   // Medidas do Implemento - hidden for Warehouse, Financial, Designer, Commercial
   implementMeasures: ['ADMIN', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // Porta traseira (as três colunas juntas) — o domínio da API.
+  rearDoor: ['ADMIN', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // O projeto do implemento — o mesmo domínio da rota `PUT /implements/:id/project-files`.
+  implementProjectFiles: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'DESIGNER'],
 
   // Observation - hidden for Warehouse, Financial, Designer, Logistic, Commercial
   observation: ['ADMIN', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -226,9 +234,9 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     description: 'Configurações de cores da logomarca',
     category: 'Pintura',
   },
-  layoutIds: {
-    label: 'Layouts',
-    description: 'Arquivos de layout',
+  implementLayouts: {
+    label: 'Arte do implemento',
+    description: 'A arte entra como rascunho no implemento de destino',
     category: 'Arquivos',
   },
   baseFileIds: {
@@ -285,6 +293,16 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     label: 'Medidas do Implemento',
     description: 'Medidas do implemento (esquerda, direita, traseira)',
     category: 'Veículo',
+  },
+  rearDoor: {
+    label: 'Porta traseira',
+    description: 'Folhas, varões e portinholas da porta traseira',
+    category: 'Veículo',
+  },
+  implementProjectFiles: {
+    label: 'Projeto do implemento',
+    description: 'Os PDFs do projeto do implemento',
+    category: 'Arquivos',
   },
   observation: {
     label: 'Observações',

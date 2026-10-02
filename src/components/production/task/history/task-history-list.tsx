@@ -443,7 +443,6 @@ export function TaskHistoryList({
     try {
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
-          layouts: { include: { file: true } },
           budgets: true,
           invoices: true,
           receipts: true,

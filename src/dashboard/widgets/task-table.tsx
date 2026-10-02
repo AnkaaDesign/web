@@ -8,6 +8,7 @@
 // File is organized in clearly labeled sections. The catalog and config UI
 // are intentionally co-located so adding a new column means touching one file.
 
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
@@ -532,7 +533,8 @@ type TaskLayout = {
 };
 
 function LayoutsCell({ task }: { task: Task }) {
-  const layouts = ((task as any).layouts ?? []) as TaskLayout[];
+  // A arte é do IMPLEMENTO (Modelo C): `task.implement.layouts` (viva, sem as substituídas).
+  const layouts = (((task.implement as any)?.layouts ?? []) as TaskLayout[]);
   const count = layouts.length;
   const [listOpen, setListOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -1051,7 +1053,7 @@ function buildColumnCatalog(): ColumnDef[] {
     // (which render as count when `cellModes.serviceOrder === "count"`).
     {
       key: "hasLayouts",
-      label: "Layouts",
+      label: "Artes",
       track: "minmax(0, 0.6fr)",
       render: (t) => <LayoutsCell task={t} />,
     },
@@ -1563,8 +1565,10 @@ function buildQueryParams(
     });
   }
 
-  if (f.hasLayouts === "yes") ANDs.push({ layouts: { some: {} } });
-  if (f.hasLayouts === "no") ANDs.push({ layouts: { none: {} } });
+  // "Tem arte aprovada" — a arte é do IMPLEMENTO; `where.layouts` da tarefa a API recusa.
+  // A chave salva continua `hasLayouts` (preferências gravadas), o significado é o da API (`hasArt`).
+  if (f.hasLayouts === "yes") ANDs.push({ implement: { layouts: { some: { status: "APPROVED" } } } });
+  if (f.hasLayouts === "no") ANDs.push({ implement: { layouts: { none: { status: "APPROVED" } } } });
 
   if (f.hasObservation === "yes") ANDs.push({ observation: { isNot: null as any } });
   if (f.hasObservation === "no") ANDs.push({ observation: null as any });
@@ -1654,13 +1658,13 @@ export const TASK_INCLUDE = {
   logoPaints: true,
   serviceOrders: true,
   observation: true,
-  implement: true,
+  // A arte vem pelo implemento (contador "Layouts" da tabela).
+  implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
   // The API's base task include already hydrates `quote.customerConfigs.installments`.
   // Don't override with `{ include: { installments: true } }` — `installments`
   // is not a direct relation on Budget, only on BudgetPayer,
   // and Prisma rejects the unknown field.
   quote: true,
-  layouts: true,
   responsibles: true,
 } as const;
 
@@ -2101,7 +2105,6 @@ function TaskTableRender({
       try {
         const full = await taskService.getTaskById(sourceTask.id, {
           include: {
-            layouts: { include: { file: true } },
             budgets: true,
             invoices: true,
             receipts: true,
@@ -3297,7 +3300,7 @@ function TaskTableConfigComponent({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Tem artes</Label>
+            <Label className="text-xs">Tem arte aprovada</Label>
             <Combobox
               mode="single"
               value={c.filters.hasLayouts}

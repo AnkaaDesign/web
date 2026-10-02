@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "react-router-dom";
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes } from "../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -108,7 +109,6 @@ export const TaskEditPage = () => {
         },
       },
       generalPainting: true,
-      layouts: true,
       budget: true,
       budgets: true,
       invoices: true,
@@ -133,7 +133,8 @@ export const TaskEditPage = () => {
         },
       },
       createdBy: true,
-      implement: true,
+      // A arte é do implemento (Modelo C): o formulário a mostra, só leitura.
+      implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
       observation: {
         include: {
           files: true,

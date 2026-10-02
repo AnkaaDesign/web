@@ -423,13 +423,13 @@ const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "hasLayouts",
     header: "ARTES",
-    accessorFn: (row) => (row.layouts?.length || 0) > 0,
+    accessorFn: (row) => (row.implement?.layouts?.length || 0) > 0,
     sortable: false,
     filterable: true,
     defaultVisible: false,
     width: "80px",
     formatter: (_value: boolean, row: Task) => {
-      const count = row.layouts?.length || 0;
+      const count = row.implement?.layouts?.length || 0;
       if (count === 0) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="secondary">
