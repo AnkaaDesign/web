@@ -62,9 +62,24 @@ interface VehiclesArtSectionProps {
   anchorId?: string;
   readOnly?: boolean;
   className?: string;
+  /**
+   * RESUMO: o estado de cada veículo e "uma imagem para todos", sem os painéis.
+   * É o que o passo Tarefa do orçamento mostra; o painel de cada veículo mora no
+   * cartão dele, no passo Veículos (`onOpenVehicle` leva até lá).
+   */
+  summary?: boolean;
+  onOpenVehicle?: (taskId: string) => void;
 }
 
-export function VehiclesArtSection({ vehicles, budgetId, anchorId, readOnly, className }: VehiclesArtSectionProps) {
+export function VehiclesArtSection({
+  vehicles,
+  budgetId,
+  anchorId,
+  readOnly,
+  className,
+  summary,
+  onOpenVehicle,
+}: VehiclesArtSectionProps) {
   const { user } = useAuth();
   const canEdit = !readOnly && canEditImplementArt(user as any);
   const applyToAll = useApplyArtToImplements();
@@ -110,7 +125,24 @@ export function VehiclesArtSection({ vehicles, budgetId, anchorId, readOnly, cla
         )}
       </div>
 
-      {single ? (
+      {summary ? (
+        <div className="flex flex-wrap gap-2">
+          {vehicles.map((vehicle, index) => (
+            <button
+              key={vehicle.taskId}
+              type="button"
+              disabled={!onOpenVehicle}
+              onClick={() => onOpenVehicle?.(vehicle.taskId)}
+              className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-left text-sm hover:bg-muted/40 disabled:cursor-default disabled:hover:bg-transparent"
+            >
+              <span className="max-w-[14rem] truncate font-medium">{vehicle.label}</span>
+              <Badge variant={STATE_VARIANT[states[index]] as any} className="shrink-0">
+                {STATE_LABEL[states[index]]}
+              </Badge>
+            </button>
+          ))}
+        </div>
+      ) : single ? (
         <ImplementArtPanel
           implementId={vehicles[0].implement?.id}
           vehicleLabel={vehicles[0].label}
@@ -138,6 +170,7 @@ export function VehiclesArtSection({ vehicles, budgetId, anchorId, readOnly, cla
 
       <p className="text-sm text-muted-foreground">
         Cada veículo carrega a sua arte, e o documento de assinatura mostra qual arte é de qual veículo.
+        {summary && onOpenVehicle ? " Ajuste a arte de cada um no passo Veículos." : ""}
       </p>
 
       <input
