@@ -39,9 +39,11 @@ html {
  * num telefone ela encolhe o texto e os alvos de toque, e o iOS DÁ ZOOM na
  * página ao focar um campo com fonte abaixo de 16 px — `text-base` a 90% é
  * 14,4 px. Abaixo de `md` (768 px), a raiz volta a 100%: o portal do
- * responsável é usado justamente ali.
+ * responsável é usado justamente ali. Só em TELA (`screen`): na impressão a
+ * largura é a da área útil da folha (A4 com margem de 20 mm ≈ 642 px), e sem o
+ * `screen` todo impresso do app sairia 11% maior.
  */
-@media (max-width: 767px) {
+@media screen and (max-width: 767px) {
   html {
     font-size: 100%;
   }
