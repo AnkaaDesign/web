@@ -65,7 +65,7 @@ import type { ServiceOrderData } from "./designar-service-order-dialog";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
-import { ImplementArtSummary } from "@/components/production/implement-art/implement-art-summary";
+import { ImplementArtPanel } from "@/components/production/implement-art/implement-art-panel";
 import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -3721,22 +3721,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           </AccordionItem>
                 )}
 
-                {/* A ARTE DO IMPLEMENTO — só leitura. Ela não se grava pela tarefa
-                    (Modelo C): tem rotas e decisão próprias no implemento. */}
+                {/* A ARTE DO IMPLEMENTO. Ela não se grava pela tarefa (Modelo C):
+                    tem rotas e decisão próprias no implemento, e cada ato do
+                    painel vale na hora, fora do Salvar deste formulário. */}
                 {canViewReimbursement && task.implement?.id && (
                   <Card className="border border-border rounded-lg">
                     <CardContent className="pt-4">
-                      <ImplementArtSummary
-                        vehicles={[
-                          {
-                            taskId: task.id,
-                            label: task.implement?.serialNumber
-                              ? `Série ${task.implement.serialNumber}`
-                              : task.implement?.plate || task.name || "Veículo",
-                            implement: task.implement as any,
-                          },
-                        ]}
-                      />
+                      <ImplementArtPanel implementId={task.implement.id} />
                     </CardContent>
                   </Card>
                 )}

@@ -81,7 +81,7 @@ import {
   BUDGET_VEHICLE_TASK_INCLUDE,
 } from "@/components/financial/budget/vehicles/use-budget-vehicles";
 import { BudgetVehicleTabs } from "@/components/financial/budget/vehicles/budget-vehicle-tabs";
-import type { ImplementArtVehicle } from "@/components/production/implement-art/implement-art-summary";
+import type { ImplementArtVehicle } from "@/components/production/implement-art/vehicles-art-section";
 import { approvedArtFilesOf } from "@/utils/implement-art";
 import {
   planAirbrushingReconciliation,

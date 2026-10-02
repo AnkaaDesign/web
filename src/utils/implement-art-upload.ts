@@ -25,20 +25,34 @@ async function implementIdsOf(taskIds: string[]): Promise<string[]> {
 }
 
 /**
- * Anexa `files` (imagens) como arte RASCUNHO no implemento de cada tarefa.
+ * "UMA IMAGEM PARA TODOS" — a MESMA arte, como rascunho, em cada implemento.
+ *
+ * O único ponto da web que faz isso: sobe no primeiro implemento e replica o
+ * mesmo arquivo nos demais pelo lote (`POST /implements/layouts/bulk`, uma
+ * transação por arquivo). Quando a API ganhar a rota atômica por orçamento
+ * (`bulk` com `budgetId`), só esta função muda.
+ *
  * Devolve quantos implementos receberam a arte.
  */
-export async function attachArtToTasks(taskIds: string[], files: File[]): Promise<number> {
-  if (taskIds.length === 0 || files.length === 0) return 0;
-  const implementIds = await implementIdsOf(taskIds);
-  if (implementIds.length === 0) return 0;
+export async function applyArtToImplements(implementIds: string[], files: File[]): Promise<number> {
+  const unique = [...new Set(implementIds.filter(Boolean))];
+  if (unique.length === 0 || files.length === 0) return 0;
 
-  const [first, ...rest] = implementIds;
+  const [first, ...rest] = unique;
   const uploaded = await uploadImplementLayouts(first, files);
   if (rest.length > 0) {
     for (const layout of uploaded.data ?? []) {
       await bulkImplementLayouts(rest, layout.fileId);
     }
   }
-  return implementIds.length;
+  return unique.length;
+}
+
+/**
+ * Anexa `files` (imagens) como arte RASCUNHO no implemento de cada tarefa.
+ * Devolve quantos implementos receberam a arte.
+ */
+export async function attachArtToTasks(taskIds: string[], files: File[]): Promise<number> {
+  if (taskIds.length === 0 || files.length === 0) return 0;
+  return applyArtToImplements(await implementIdsOf(taskIds), files);
 }

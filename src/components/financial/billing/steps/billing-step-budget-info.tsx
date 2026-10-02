@@ -5,9 +5,9 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
-  ImplementArtSummary,
+  VehiclesArtSection,
   type ImplementArtVehicle,
-} from "@/components/production/implement-art/implement-art-summary";
+} from "@/components/production/implement-art/vehicles-art-section";
 import { IconCalendar } from "@tabler/icons-react";
 import { ValidityField } from "@/components/financial/budget/validity";
 
@@ -200,7 +200,7 @@ export function BillingStepBudgetInfo({
       {artVehicles.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <ImplementArtSummary vehicles={artVehicles} />
+            <VehiclesArtSection vehicles={artVehicles} />
           </CardContent>
         </Card>
       )}

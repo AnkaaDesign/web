@@ -43,9 +43,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileCardUploadField, FileUploadField } from "@/components/common/file";
 import {
-  ImplementArtSummary,
+  VehiclesArtSection,
   type ImplementArtVehicle,
-} from "@/components/production/implement-art/implement-art-summary";
+} from "@/components/production/implement-art/vehicles-art-section";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
@@ -733,13 +733,14 @@ export function BudgetStepTask({
           </Card>
         </AccordionItem>
 
-        {/* 6. A ARTE DE CADA VEÍCULO — só leitura. Fora do acordeão de propósito:
-             é o que o operador confere antes de emitir, e o atalho "arte pendente"
-             da emissão rola até aqui. */}
+        {/* 6. A ARTE DE CADA VEÍCULO. Fora do acordeão de propósito: é o que o
+             operador confere antes de emitir, e o atalho "arte pendente" da faixa
+             dos eixos rola até aqui. Os atos da arte valem na hora (não passam
+             pelo Salvar). */}
         {showLayouts && artVehicles.length > 0 && (
           <Card className="border border-border rounded-lg">
             <CardContent className="pt-4">
-              <ImplementArtSummary vehicles={artVehicles} anchorId={artAnchorId} />
+              <VehiclesArtSection vehicles={artVehicles} anchorId={artAnchorId} />
             </CardContent>
           </Card>
         )}

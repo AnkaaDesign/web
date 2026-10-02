@@ -14,6 +14,7 @@ import { tela } from "@/generated/contracts/labels.json";
 import {
   BUDGET_SIGNATURE_STATUS,
   BUDGET_VALUE_APPROVAL_SOURCE,
+  LAYOUT_APPROVAL_SOURCE,
   LAYOUT_STATUS,
   TASK_QUOTE_STATUS,
 } from "./enums";
@@ -57,6 +58,11 @@ export const BUDGET_VALUE_APPROVAL_SOURCE_LABELS = tela.BUDGET_VALUE_APPROVAL_SO
 
 export const LAYOUT_STATUS_LABELS_FROM_CONTRACT = tela.LAYOUT_STATUS_LABELS.labels as Record<
   LAYOUT_STATUS,
+  string
+>;
+
+export const LAYOUT_APPROVAL_SOURCE_LABELS = tela.LAYOUT_APPROVAL_SOURCE_LABELS.labels as Record<
+  LAYOUT_APPROVAL_SOURCE,
   string
 >;
 
