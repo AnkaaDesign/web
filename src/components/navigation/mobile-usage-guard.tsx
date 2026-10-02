@@ -17,6 +17,7 @@ import { isMobile } from "@/utils/platform";
  *   - /autenticacao/*           (auth + password-reset callbacks opened from email)
  *   - /cliente/*                (customer-shared budget / service-report links)
  *   - /certificado-residuos/*   (public waste-certificate share links)
+ *   - /trabalhos/*              (QR on the truck-body labels — read with a phone)
  *   - /politica-de-privacidade  (public legal page, required by the stores)
  *
  * Desktop is never affected. The redirect is `replace` so the back button does
@@ -30,6 +31,8 @@ const MOBILE_ALLOWED_PREFIXES = [
   // rodapé do PDF assinado — precisa abrir no celular de quem recebeu o arquivo.
   "/v",
   "/certificado-residuos",
+  // QR das etiquetas coladas nos baús: quem lê é sempre um celular.
+  "/trabalhos",
   routes.privacyPolicy, // "/politica-de-privacidade"
 ];
 

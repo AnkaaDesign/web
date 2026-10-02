@@ -1,61 +1,44 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconAlertTriangle, IconCircleCheck, IconLoader2, IconMinus, IconPlus, IconPrinter } from "@tabler/icons-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { BRAND_ASSETS } from "@/config/assets";
-import { taskLabelService } from "@/api-client/task-label";
+import { taskLabelService, type LabelSheet } from "@/api-client/task-label";
 import type { Task } from "../../../../types";
 import { LABEL_HEIGHT, LABEL_WIDTH, taskLabelCardMarkup } from "./task-label-card";
-import { CAPTION_BASELINE, CAPTION_SIZE, LABEL_SLOTS, SHEET_HEIGHT, SHEET_WIDTH, taskLabelCaption, type PlacedLabel } from "./task-label-sheet";
+import { CAPTION_BASELINE, CAPTION_SIZE, LABEL_SLOTS, SHEET_HEIGHT, SHEET_WIDTH, orientationMarkSvg, taskLabelCaption, type PlacedLabel } from "./task-label-sheet";
 
 // Right-click → "Imprimir Etiquetas": picks the A4 slots for this print and has the SERVER print the
 // sheet on the office Epson (photo paper, high quality, 100% — fixed there, nobody touches a dialog).
-// A sheet is reused across prints (one truck at a time), so the slots already printed are remembered
-// on this computer and the next print pre-selects the free ones; clicking a printed slot frees it.
+// A sheet is reused across prints (one truck at a time). Which slots were already printed lives on the
+// SERVER — the sheet in the printer is the same for every user — and the next print pre-selects the
+// free ones; clicking a printed slot frees it, "Folha nova" frees them all.
 
 const DEFAULT_COPIES = 2; // one label per side of the truck body
 const MAX_COPIES = 4;
-const USED_SLOTS_KEY = "task-labels:used-slots";
 const JOB_POLL_MS = 2000;
 const JOB_GIVE_UP_MS = 5 * 60_000;
-
-function readUsedSlots(): Set<number> {
-  try {
-    const raw = localStorage.getItem(USED_SLOTS_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return new Set(Array.isArray(parsed) ? parsed.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < LABEL_SLOTS.length) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function writeUsedSlots(slots: Set<number>) {
-  try {
-    localStorage.setItem(USED_SLOTS_KEY, JSON.stringify([...slots].sort((a, b) => a - b)));
-  } catch {
-    // private window / blocked storage: the sheet state just isn't remembered
-  }
-}
+const SHEET_KEY = ["task-labels", "sheet"] as const;
 
 /** Serial number, else plate — what tells two trucks of the same customer apart. */
 const taskIdentifier = (t: Task) => t.serialNumber || t.truck?.plate || null;
 const taskShortLabel = (t: Task) => taskIdentifier(t) || t.name;
 
 // The preview is a sheet of paper: it stays white in dark mode, so its marks use fixed paper
-// colours instead of theme tokens (which would turn light-on-white). The picked cards are drawn
-// softened — the real art at reduced contrast with a grey outline — so the sheet reads as a preview.
+// colours instead of theme tokens (which would turn light-on-white). Outlines stay faint — the
+// empty slots and the picked cards' edges — so the cards themselves carry the sheet.
 const PAPER = {
-  slotStroke: "#9CA3AF",
+  slotStroke: "#D1D5DB",
   slotNumber: "#9CA3AF",
   usedFill: "#E5E7EB",
   usedStroke: "#D1D5DB",
   usedText: "#6B7280",
   extraFill: "#FEF3C7",
   extraStroke: "#F59E0B",
-  pickedStroke: "#9CA3AF",
+  pickedStroke: "#E5E7EB",
   caption: "#6B7280",
 };
 
@@ -73,12 +56,13 @@ interface TaskLabelPrintModalProps {
 }
 
 export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrintModalProps) {
-  const [usedSlots, setUsedSlots] = useState<Set<number>>(() => readUsedSlots());
+  const queryClient = useQueryClient();
   const [copies, setCopies] = useState<Record<string, number>>({});
   // null = automatic (first free slots); an array = the slots the user picked by hand
   const [manualSlots, setManualSlots] = useState<number[] | null>(null);
   const [step, setStep] = useState<Step>({ kind: "pick" });
   const [printError, setPrintError] = useState<string | null>(null);
+  const [confirmNewSheet, setConfirmNewSheet] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   // keyed on the ids, not the array: the page hands a freshly filtered array on every render
@@ -86,11 +70,11 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
   const taskKey = tasks.map((t) => t.id).join(",");
   useEffect(() => {
     if (!open) return;
-    setUsedSlots(readUsedSlots());
     setCopies(Object.fromEntries(taskKey.split(",").filter(Boolean).map((id) => [id, DEFAULT_COPIES])));
     setManualSlots(null);
     setStep({ kind: "pick" });
     setPrintError(null);
+    setConfirmNewSheet(false);
   }, [open, taskKey]);
 
   // stop polling a job when the dialog closes or unmounts
@@ -109,12 +93,24 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
     staleTime: 0,
   });
 
+  // shared with every user: refreshed while the dialog is open so a print from elsewhere shows up
+  const sheet = useQuery({
+    queryKey: SHEET_KEY,
+    queryFn: () => taskLabelService.getSheet(),
+    enabled: open,
+    refetchInterval: open ? 5000 : false,
+    staleTime: 0,
+  });
+  const usedSlots = useMemo(() => new Set(sheet.data?.usedSlots ?? []), [sheet.data]);
+  const setSheet = useCallback((next: LabelSheet) => queryClient.setQueryData(SHEET_KEY, next), [queryClient]);
+
   const totalLabels = useMemo(() => tasks.reduce((sum, t) => sum + (copies[t.id] ?? DEFAULT_COPIES), 0), [tasks, copies]);
   const freeSlots = useMemo(() => LABEL_SLOTS.map((s) => s.index).filter((i) => !usedSlots.has(i)), [usedSlots]);
 
   const chosenSlots = useMemo(
-    () => (manualSlots ? [...manualSlots].sort((a, b) => a - b) : freeSlots.slice(0, totalLabels)),
-    [manualSlots, freeSlots, totalLabels],
+    // a hand-picked slot someone else printed in the meantime drops out of the pick
+    () => (manualSlots ? manualSlots.filter((s) => !usedSlots.has(s)).sort((a, b) => a - b) : freeSlots.slice(0, totalLabels)),
+    [manualSlots, usedSlots, freeSlots, totalLabels],
   );
 
   // labels fill the chosen slots in reading order, each task's copies side by side
@@ -147,22 +143,24 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
   const mismatch = chosenSlots.length !== totalLabels;
   const notEnoughRoom = !manualSlots && freeSlots.length < totalLabels;
   const printerReady = printer.data?.ready === true;
+  // nothing printed yet on this sheet: the print carries the "TOPO" mark (server decides the same way)
+  const freshSheet = sheet.isSuccess && usedSlots.size === 0;
 
   const toggleSlot = useCallback(
     (index: number) => {
       if (busy) return;
       if (usedSlots.has(index)) {
-        // clicking a printed slot frees it (the sheet was swapped or the cut went wrong)
-        const next = new Set(usedSlots);
-        next.delete(index);
-        setUsedSlots(next);
-        writeUsedSlots(next);
+        // clicking a printed slot frees it for everybody (the cut went wrong, or it was marked by mistake)
+        taskLabelService
+          .releaseSlots([index])
+          .then(setSheet)
+          .catch((e) => toast.error(errorMessage(e)));
         return;
       }
       const current = manualSlots ?? chosenSlots;
       setManualSlots(current.includes(index) ? current.filter((s) => s !== index) : [...current, index]);
     },
-    [busy, usedSlots, manualSlots, chosenSlots],
+    [busy, usedSlots, manualSlots, chosenSlots, setSheet],
   );
 
   const changeCopies = (taskId: string, delta: number) => {
@@ -170,21 +168,25 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
     setManualSlots(null);
   };
 
-  const markPrinted = useCallback((slots: number[]) => {
-    const next = new Set(readUsedSlots());
-    slots.forEach((s) => next.add(s));
-    setUsedSlots(next);
-    writeUsedSlots(next);
-  }, []);
+  const startNewSheet = async () => {
+    try {
+      setSheet(await taskLabelService.startNewSheet());
+      setManualSlots(null);
+      setConfirmNewSheet(false);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
 
   const followJob = useCallback(
-    (jobId: number, slots: number[], startedAt: number) => {
+    (jobId: number, startedAt: number) => {
       pollRef.current = window.setTimeout(async () => {
         try {
           const job = await taskLabelService.getJob(jobId);
           if (job.done) {
+            // the server already marked the slots (and gives them back if the job failed)
+            void queryClient.invalidateQueries({ queryKey: SHEET_KEY });
             if (job.success) {
-              markPrinted(slots);
               toast.success("Etiquetas impressas.");
               onOpenChange(false);
             } else {
@@ -199,7 +201,7 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
             setStep({ kind: "pick" });
             return;
           }
-          followJob(jobId, slots, startedAt);
+          followJob(jobId, startedAt);
         } catch (e) {
           // the printer forgets finished jobs quickly: losing track after it was accepted is not a failure
           setPrintError(`Não deu para acompanhar a impressão (${errorMessage(e)}). Confira a folha antes de imprimir de novo.`);
@@ -207,21 +209,22 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
         }
       }, JOB_POLL_MS);
     },
-    [markPrinted, onOpenChange],
+    [queryClient, onOpenChange],
   );
 
   const handlePrint = async () => {
     setPrintError(null);
     setStep({ kind: "sending" });
-    const slots = placed.map((p) => p.slot);
     try {
       const { jobId } = await taskLabelService.print(placed.map(({ slot, taskId }) => ({ slot, taskId })));
       setStep({ kind: "printing", jobId, messages: [] });
-      followJob(jobId, slots, Date.now());
+      void queryClient.invalidateQueries({ queryKey: SHEET_KEY });
+      followJob(jobId, Date.now());
     } catch (e) {
       setPrintError(errorMessage(e));
       setStep({ kind: "pick" });
       void printer.refetch();
+      void sheet.refetch(); // e.g. a slot was taken by someone else meanwhile
     }
   };
 
@@ -231,18 +234,19 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
         <DialogHeader>
           <DialogTitle>Imprimir etiquetas</DialogTitle>
           <DialogDescription>
-            Escolha os espaços da folha A4. Os espaços já impressos ficam marcados neste computador; clique num deles para liberá-lo.
+            Escolha os espaços da folha A4. Os espaços já impressos valem para todos; clique num deles para liberá-lo.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="flex justify-center rounded-md border bg-muted/40 p-3">
+          <div className="flex justify-center rounded-md bg-muted/30 p-3">
             <svg
               viewBox={`0 0 ${SHEET_WIDTH} ${SHEET_HEIGHT}`}
-              className="h-[520px] max-h-[60vh] w-auto rounded-sm bg-white shadow-sm"
+              className="h-[520px] max-h-[60vh] w-auto rounded-sm bg-white ring-1 ring-black/5"
               role="group"
               aria-label="Folha A4 com os espaços das etiquetas"
             >
+              {freshSheet && placed.length > 0 && <g dangerouslySetInnerHTML={{ __html: orientationMarkSvg() }} />}
               {LABEL_SLOTS.map((slot) => {
                 const used = usedSlots.has(slot.index);
                 const label = placedBySlot.get(slot.index);
@@ -261,10 +265,10 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
                     className={cn("group cursor-pointer outline-none", busy && "cursor-default")}
                   >
                     {label && !used ? (
-                      // what will print, softened: the card art, a grey outline where the cut goes and the caption
+                      // what will print: the card, a faint outline where the cut goes, and the caption
                       <>
-                        <g opacity={0.55} transform={`translate(${slot.x} ${slot.y})`} dangerouslySetInnerHTML={{ __html: cardMarkup(label.taskId, slot.index) }} />
-                        <rect x={slot.x} y={slot.y} width={LABEL_WIDTH} height={LABEL_HEIGHT} rx={3} fill="none" stroke={PAPER.pickedStroke} strokeWidth={0.5} />
+                        <g transform={`translate(${slot.x} ${slot.y})`} dangerouslySetInnerHTML={{ __html: cardMarkup(label.taskId, slot.index) }} />
+                        <rect x={slot.x} y={slot.y} width={LABEL_WIDTH} height={LABEL_HEIGHT} rx={3} fill="none" stroke={PAPER.pickedStroke} strokeWidth={0.35} />
                         <text x={slot.x} y={slot.y - CAPTION_BASELINE} fontSize={CAPTION_SIZE} fontWeight={600} fill={PAPER.caption} className="pointer-events-none select-none">
                           {label.caption}
                         </text>
@@ -279,7 +283,7 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
                           rx={3}
                           fill={used ? PAPER.usedFill : chosen ? PAPER.extraFill : "#FFFFFF"}
                           stroke={used ? PAPER.usedStroke : chosen ? PAPER.extraStroke : PAPER.slotStroke}
-                          strokeWidth={0.6}
+                          strokeWidth={0.4}
                           strokeDasharray={!used && !chosen ? "2 1.5" : undefined}
                           className={cn(!used && !chosen && !busy && "group-hover:fill-[#F3F4F6]")}
                         />
@@ -364,9 +368,28 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
               {printError && <p className="text-destructive">{printError}</p>}
             </div>
 
+            {/* a fresh sheet frees every slot FOR EVERYBODY: ask once more */}
+            {confirmNewSheet ? (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span>Começar uma folha nova? Todos os espaços voltam a ficar livres.</span>
+                <Button type="button" size="sm" onClick={startNewSheet} disabled={busy}>
+                  Sim, folha nova
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmNewSheet(false)}>
+                  Não
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmNewSheet(true)} disabled={busy || usedSlots.size === 0}>
+                  Folha nova
+                </Button>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
-              Coloque papel fotográfico A4 na impressora. O servidor imprime em qualidade alta, escala 100%, e marca os espaços como impressos
-              quando a folha sair.
+              Coloque papel fotográfico A4 na impressora. O servidor imprime em qualidade alta, escala 100%. Na primeira impressão de uma folha
+              sai a marca "TOPO": recoloque a folha sempre com ela entrando primeiro.
             </p>
           </div>
         </div>
@@ -375,7 +398,7 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handlePrint} disabled={busy || totalLabels === 0 || mismatch || notEnoughRoom || !printerReady}>
+          <Button type="button" onClick={handlePrint} disabled={busy || !sheet.isSuccess || totalLabels === 0 || mismatch || notEnoughRoom || !printerReady}>
             {busy ? <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <IconPrinter className="mr-1.5 h-4 w-4" />}
             {step.kind === "sending" ? "Enviando…" : step.kind === "printing" ? "Imprimindo…" : "Imprimir"}
           </Button>

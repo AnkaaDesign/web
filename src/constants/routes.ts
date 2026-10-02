@@ -917,6 +917,9 @@ export const routes = {
   // Public certificate route (no authentication required)
   publicWasteCertificate: (id: string) => `/certificado-residuos/${id}`,
 
+  // Public work page — where the QR on the truck-body labels points (no authentication required)
+  publicWork: (id: string) => `/trabalhos/${id}`,
+
   // Public legal pages (no authentication required)
   privacyPolicy: "/politica-de-privacidade",
 

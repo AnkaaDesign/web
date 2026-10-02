@@ -20,6 +20,15 @@ export interface LabelPrintJobStatus {
   messages: string[];
 }
 
+/** The sheet loaded in the printer — shared by every user: which slots were already printed. */
+export interface LabelSheet {
+  /** changes when someone starts a new sheet */
+  sheetId: string;
+  startedAt: string;
+  usedSlots: number[];
+  updatedAt: string;
+}
+
 interface Envelope<T> {
   success: boolean;
   message: string;
@@ -36,6 +45,18 @@ export const taskLabelService = {
   },
   async print(labels: { slot: number; taskId: string }[]): Promise<{ jobId: number }> {
     const res = await apiClient.post<Envelope<{ jobId: number }>>("/task-labels/print", { labels }, quiet);
+    return res.data.data;
+  },
+  async getSheet(): Promise<LabelSheet> {
+    const res = await apiClient.get<Envelope<LabelSheet>>("/task-labels/sheet", quiet);
+    return res.data.data;
+  },
+  async startNewSheet(): Promise<LabelSheet> {
+    const res = await apiClient.post<Envelope<LabelSheet>>("/task-labels/sheet/new", {}, quiet);
+    return res.data.data;
+  },
+  async releaseSlots(slots: number[]): Promise<LabelSheet> {
+    const res = await apiClient.post<Envelope<LabelSheet>>("/task-labels/sheet/release", { slots }, quiet);
     return res.data.data;
   },
   async getJob(jobId: number): Promise<LabelPrintJobStatus> {

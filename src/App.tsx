@@ -224,6 +224,7 @@ const ClientePainelPage = lazy(() => import("@/pages/cliente/painel"));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
 const PrivacyPolicyPage = lazy(() => import("@/pages/public/privacy-policy").then((module) => ({ default: module.PrivacyPolicyPage })));
+const PublicWorkPage = lazy(() => import("@/pages/public/work").then((module) => ({ default: module.PublicWorkPage })));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -644,6 +645,16 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicWasteCertificatePage />
+                </Suspense>
+              }
+            />
+            {/* Destino do QR das etiquetas dos baús — lido no celular, por isso também
+                liberado no MobileUsageGuard. */}
+            <Route
+              path={routes.publicWork(":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicWorkPage />
                 </Suspense>
               }
             />
