@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   canEditPayerDocument,
   changedCustomerFieldLabels,
+  customerStillPays,
   customerUpdatePatch,
+  distinctPayerCustomerIds,
   duplicatePayerIndex,
   existingCustomerIdFromError,
   newPayerConfig,
@@ -51,6 +53,32 @@ describe("duplicatePayerIndex", () => {
     expect(duplicatePayerIndex(configs, "b")).toBe(1);
     expect(duplicatePayerIndex(configs, "b", 1)).toBe(-1);
     expect(duplicatePayerIndex(configs, "z")).toBe(-1);
+  });
+});
+
+describe("duplicatePayerIndex com o recorte de uma cobrança", () => {
+  const configs = [{ customerId: "A" }, { customerId: "A" }, { customerId: "B" }];
+  it("o mesmo cliente em faturas irmãs não é duplicidade dentro do recorte", () => {
+    expect(duplicatePayerIndex(configs, "A", 1, [1, 2])).toBe(-1);
+  });
+  it("o mesmo cliente duas vezes na mesma fatura é", () => {
+    expect(duplicatePayerIndex(configs, "B", -1, [1, 2])).toBe(2);
+  });
+  it("sem recorte, olha o orçamento inteiro", () => {
+    expect(duplicatePayerIndex(configs, "A", 1)).toBe(0);
+  });
+});
+
+describe("customerStillPays e distinctPayerCustomerIds", () => {
+  it("o cliente que continua em outra fatura ainda paga", () => {
+    expect(customerStillPays([{ customerId: "A" }, { customerId: "B" }], "A")).toBe(true);
+    expect(customerStillPays([{ customerId: "B" }], "A")).toBe(false);
+  });
+  it("clientes distintos, na ordem", () => {
+    expect(distinctPayerCustomerIds([{ customerId: "A" }, { customerId: "A" }, null, { customerId: "B" }])).toEqual([
+      "A",
+      "B",
+    ]);
   });
 });
 

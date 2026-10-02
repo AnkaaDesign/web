@@ -545,7 +545,7 @@ export const ATTENTION_RULES: AttentionRule[] = [
       ],
     },
     // Endereço de GRUPO: o alvo é o bloco "Dados do cliente" do passo do cliente, e o passo pinta
-    // individualmente cada input que está vazio (ver `billing-step-customer.tsx`). Um alvo único
+    // individualmente cada input que está vazio (ver `budget-payer-card.tsx`, o cartão do pagador nas duas telas). Um alvo único
     // por campo exigiria nove regras que sobem e descem juntas.
     target: { level: "field", field: "customerData" },
     ack: "onExitCooldown",

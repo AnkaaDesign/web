@@ -27,6 +27,8 @@ import {
 } from "@/components/financial/shared/billing-split-field";
 import { formatCurrency } from "@/utils";
 import {
+  customerStillPays,
+  distinctPayerCustomerIds,
   duplicatePayerIndex,
   newPayerConfig,
   remapServicesPayer,
@@ -40,7 +42,8 @@ import { WizardSection } from "./wizard-section";
 interface BudgetWizardStepBillingProps {
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
-  setSelectedCustomers: (customers: Map<string, any>) => void;
+  /** Espelho dos clientes escolhidos (o Orçamento o usa no Resumo). */
+  setSelectedCustomers?: (customers: Map<string, any>) => void;
   quoteId?: string;
   /** Quantos veículos o orçamento cobre (o dinheiro do passo é POR VEÍCULO). */
   vehicleCount: number;
@@ -48,6 +51,20 @@ interface BudgetWizardStepBillingProps {
   existingVehicles?: BillingSplitVehicle[];
   /** Faturas já aprovadas — travam a divisão. */
   approvedBillingCount?: number;
+  /** Há coleta de assinaturas rodando — refatiar a derruba, e o controle avisa. */
+  warnSignature?: boolean;
+  /**
+   * O RECORTE DE UMA COBRANÇA — as posições, na lista do orçamento, dos
+   * pagadores que a tela de Faturamento mostra. Ausente = a lista inteira (o
+   * Orçamento). As demais posições não são desenhadas: os valores delas ficam
+   * no formulário e a gravação as reenvia como vieram.
+   */
+  scopeIdx?: number[];
+  /**
+   * Cada pagador mostra de quais veículos é a fatura (`config.taskIds`) e o
+   * total da fatura — só na tela de Faturamento.
+   */
+  showCoverage?: boolean;
 }
 
 export function BudgetWizardStepBilling({
@@ -58,6 +75,9 @@ export function BudgetWizardStepBilling({
   vehicleCount,
   existingVehicles = [],
   approvedBillingCount = 0,
+  warnSignature,
+  scopeIdx,
+  showCoverage = false,
 }: BudgetWizardStepBillingProps) {
   const { control, getValues, setValue } = useFormContext();
   const configs = (useWatch({ control, name: "customerConfigs" }) as any[] | undefined) ?? [];
@@ -73,7 +93,7 @@ export function BudgetWizardStepBilling({
         if (!c?.customerId) continue;
         map.set(c.customerId, customersCache.current.get(c.customerId) ?? { id: c.customerId, ...(c.customerData ?? {}) });
       }
-      setSelectedCustomers(map);
+      setSelectedCustomers?.(map);
     },
     [customersCache, setSelectedCustomers],
   );
@@ -89,29 +109,32 @@ export function BudgetWizardStepBilling({
   const handleSwap = useCallback(
     (index: number, record: any) => {
       const current = (getValues("customerConfigs") as any[]) ?? [];
-      if (duplicatePayerIndex(current, record.id, index) >= 0) {
-        toast.warning("Este cliente já é pagador deste orçamento.");
+      if (duplicatePayerIndex(current, record.id, index, scopeIdx) >= 0) {
+        toast.warning(scopeIdx ? "Este cliente já é pagador desta cobrança." : "Este cliente já é pagador deste orçamento.");
         return;
       }
       const previousId = current[index]?.customerId as string | undefined;
       customersCache.current.set(record.id, record);
       const next = current.map((c, i) => (i === index ? swapPayerCustomer(c, record) : c));
       writeConfigs(next);
-      if (previousId && previousId !== record.id) {
+      // Os serviços só seguem o novo cliente se o anterior não paga mais NENHUMA
+      // fatura (numa cobrança veículo a veículo ele segue nas irmãs).
+      if (previousId && previousId !== record.id && !customerStillPays(next, previousId)) {
         setValue("services", remapServicesPayer((getValues("services") as any[]) ?? [], previousId, record.id), {
           shouldDirty: true,
         });
       }
     },
-    [getValues, setValue, writeConfigs, customersCache],
+    [getValues, setValue, writeConfigs, customersCache, scopeIdx],
   );
 
   const handleRemove = useCallback(
     (index: number) => {
       const current = (getValues("customerConfigs") as any[]) ?? [];
       const removedId = current[index]?.customerId as string | undefined;
-      writeConfigs(current.filter((_, i) => i !== index));
-      if (removedId) {
+      const next = current.filter((_, i) => i !== index);
+      writeConfigs(next);
+      if (removedId && !customerStillPays(next, removedId)) {
         setValue("services", remapServicesPayer((getValues("services") as any[]) ?? [], removedId, null), {
           shouldDirty: true,
         });
@@ -123,18 +146,33 @@ export function BudgetWizardStepBilling({
   const handleAdd = useCallback(
     (record: any) => {
       const current = (getValues("customerConfigs") as any[]) ?? [];
-      if (duplicatePayerIndex(current, record.id) >= 0) {
-        toast.warning("Este cliente já é pagador deste orçamento.");
+      if (duplicatePayerIndex(current, record.id, -1, scopeIdx) >= 0) {
+        toast.warning(scopeIdx ? "Este cliente já é pagador desta cobrança." : "Este cliente já é pagador deste orçamento.");
         return;
       }
       customersCache.current.set(record.id, record);
       writeConfigs([...current, newPayerConfig(record)]);
       setAdding(false);
     },
-    [getValues, writeConfigs, customersCache],
+    [getValues, writeConfigs, customersCache, scopeIdx],
   );
 
-  const payerIds = useMemo(() => configs.map((c) => c?.customerId).filter(Boolean) as string[], [configs]);
+  /**
+   * As posições DESENHADAS. No Faturamento, o recorte desta cobrança mais os
+   * pagadores recém-acrescentados (ainda sem posição na lista do servidor), que
+   * nascem no fim da lista — ver a página.
+   */
+  const visibleIdx = useMemo(
+    () => scopeIdx ?? configs.map((_, i) => i),
+    [scopeIdx, configs],
+  );
+  const visibleConfigs = useMemo(() => visibleIdx.map((i) => configs[i]).filter(Boolean), [visibleIdx, configs]);
+  const payerIds = useMemo(
+    () => visibleConfigs.map((c) => c?.customerId).filter(Boolean) as string[],
+    [visibleConfigs],
+  );
+  /** Quem pode receber serviço: os clientes DISTINTOS do orçamento inteiro. */
+  const serviceCustomerIds = useMemo(() => distinctPayerCustomerIds(configs), [configs]);
   const showSplit = existingVehicles.length > 1 || vehicleCount > 1;
   const validServiceRows = useMemo(
     () =>
@@ -145,16 +183,15 @@ export function BudgetWizardStepBilling({
   );
   const payerOptions = useMemo(
     () =>
-      configs
-        .filter((c) => c?.customerId)
-        .map((c) => {
-          const record = customersCache.current.get(c.customerId);
-          return {
-            value: c.customerId as string,
-            label: record?.fantasyName || record?.corporateName || c.customerData?.fantasyName || "Cliente",
-          };
-        }),
-    [configs, customersCache],
+      serviceCustomerIds.map((customerId) => {
+        const record = customersCache.current.get(customerId);
+        const config = configs.find((c) => c?.customerId === customerId);
+        return {
+          value: customerId,
+          label: record?.fantasyName || record?.corporateName || config?.customerData?.fantasyName || "Cliente",
+        };
+      }),
+    [serviceCustomerIds, configs, customersCache],
   );
 
   return (
@@ -172,6 +209,7 @@ export function BudgetWizardStepBilling({
             groups={billingGroups}
             disabled={disabled}
             approvedCount={approvedBillingCount}
+            warnSignature={warnSignature}
             onChange={({ billingSplit: nextSplit, billingGroups: nextGroups }) => {
               setValue("billingSplit", nextSplit, { shouldDirty: true });
               setValue("billingGroups", nextGroups, { shouldDirty: true });
@@ -180,26 +218,40 @@ export function BudgetWizardStepBilling({
         </WizardSection>
       )}
 
-      {configs.map((config, index) => (
-        <BudgetPayerCard
-          key={`${config?.customerId || "novo"}-${index}`}
-          configIndex={index}
-          record={config?.customerId ? customersCache.current.get(config.customerId) ?? null : null}
-          takenCustomerIds={payerIds.filter((id) => id !== config?.customerId)}
-          onSwapCustomer={(record) => handleSwap(index, record)}
-          onRemove={configs.length > 1 ? () => handleRemove(index) : undefined}
-          customersCache={customersCache}
-          disabled={disabled}
-          quoteId={quoteId}
-          vehicleCount={vehicleCount}
-        />
-      ))}
+      {visibleIdx.map((index, position) => {
+        const config = configs[index];
+        if (!config) return null;
+        return (
+          <BudgetPayerCard
+            // ⚠️ A chave é a FATURA (id), não o cliente: numa cobrança veículo a
+            // veículo o mesmo cliente está em N pagadores.
+            key={config?.id || `${config?.customerId || "novo"}-${index}`}
+            configIndex={index}
+            title={`Pagador ${position + 1}`}
+            record={config?.customerId ? customersCache.current.get(config.customerId) ?? null : null}
+            takenCustomerIds={payerIds.filter((id) => id !== config?.customerId)}
+            onSwapCustomer={(record) => handleSwap(index, record)}
+            onRemove={visibleIdx.length > 1 ? () => handleRemove(index) : undefined}
+            customersCache={customersCache}
+            disabled={disabled}
+            quoteId={quoteId}
+            vehicleCount={vehicleCount}
+            coverage={
+              showCoverage
+                ? { vehicles: existingVehicles, coveredIds: (config?.taskIds as string[] | undefined) ?? [] }
+                : undefined
+            }
+          />
+        );
+      })}
 
-      {adding || configs.length === 0 ? (
+      {adding || visibleIdx.length === 0 ? (
         <div className="space-y-2 rounded-lg border border-dashed border-border p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">{configs.length === 0 ? "Quem paga este orçamento?" : "Novo pagador"}</p>
-            {configs.length > 0 && (
+            <p className="text-sm font-medium">
+              {visibleIdx.length > 0 ? "Novo pagador" : scopeIdx ? "Quem paga esta cobrança?" : "Quem paga este orçamento?"}
+            </p>
+            {visibleIdx.length > 0 && (
               <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)} className="gap-1">
                 <IconX className="h-4 w-4" />
                 Cancelar
@@ -222,7 +274,7 @@ export function BudgetWizardStepBilling({
         </Button>
       )}
 
-      {configs.length > 1 && validServiceRows.length > 0 && (
+      {serviceCustomerIds.length > 1 && validServiceRows.length > 0 && (
         <WizardSection
           icon={<IconListCheck className="h-5 w-5" />}
           title="Quem paga cada serviço"
@@ -230,7 +282,8 @@ export function BudgetWizardStepBilling({
         >
           <div className="divide-y divide-border rounded-lg border border-border">
             {validServiceRows.map(({ service, index }) => {
-              const assigned = service.invoiceToCustomerId && payerIds.includes(service.invoiceToCustomerId);
+              const assigned =
+                service.invoiceToCustomerId && serviceCustomerIds.includes(service.invoiceToCustomerId);
               return (
                 <div key={service.id ?? index} className="flex flex-wrap items-center gap-3 px-3 py-2">
                   <div className="min-w-0 flex-1">

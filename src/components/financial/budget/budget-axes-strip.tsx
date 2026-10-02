@@ -17,6 +17,7 @@ import type { BudgetEmission } from "@/types/budget";
 import {
   budgetAxes,
   emissionBlockerItems,
+  type BudgetAxisKey,
   type BudgetAxisTarget,
   type BudgetAxisTone,
 } from "@/utils/budget-axes";
@@ -38,6 +39,14 @@ interface BudgetAxesStripProps {
   artStates: readonly ImplementArtState[];
   /** Leva até o lugar da tela que resolve (cartão do valor, arte, assinatura…). */
   onNavigate?: (target: BudgetAxisTarget) => void;
+  /**
+   * O eixo que ESTA tela resolve — destacado. No Faturamento é a Cobrança: os
+   * outros três aparecem como contexto (de onde a cobrança depende), não como
+   * tarefa da tela.
+   */
+  focus?: BudgetAxisKey;
+  /** Esconde "Para emitir, falta…" — a emissão não é assunto da tela (Faturamento). */
+  hideEmissionBlockers?: boolean;
   className?: string;
 }
 
@@ -48,18 +57,27 @@ export function BudgetAxesStrip({
   emission,
   artStates,
   onNavigate,
+  focus,
+  hideEmissionBlockers = false,
   className,
 }: BudgetAxesStripProps) {
   const axes = budgetAxes({ status, signatureStatus, billable, emission, artStates });
   const signatureDone = axes.find((axis) => axis.key === "signature")?.tone === "done";
   // Depois de assinado, o portão de emissão já não diz nada útil.
-  const blockers = signatureDone ? [] : emissionBlockerItems(emission);
+  const blockers = signatureDone || hideEmissionBlockers ? [] : emissionBlockerItems(emission);
 
   return (
     <div className={cn("space-y-3 rounded-lg border border-border bg-card p-3", className)}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {axes.map((axis) => (
-          <div key={axis.key} className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border p-3">
+          <div
+            key={axis.key}
+            className={cn(
+              "flex min-w-0 flex-col gap-1.5 rounded-md border border-border p-3",
+              focus && axis.key === focus && "border-primary ring-1 ring-primary",
+              focus && axis.key !== focus && "opacity-80",
+            )}
+          >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-muted-foreground">{axis.title}</span>
             </div>

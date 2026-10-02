@@ -99,13 +99,46 @@ export function newPayerConfig(record: CustomerRecord, carry?: Record<string, un
   };
 }
 
-/** O índice de outro pagador com o mesmo cliente (−1 se não há). */
+/**
+ * O índice de outro pagador com o mesmo cliente (−1 se não há).
+ *
+ * `scope` restringe a busca às posições de UMA cobrança (tela de Faturamento):
+ * numa cobrança veículo a veículo o orçamento tem um pagador por fatura, todos
+ * do mesmo cliente — duplicidade é o mesmo cliente duas vezes NA MESMA fatura,
+ * não em faturas irmãs.
+ */
 export function duplicatePayerIndex(
   configs: ReadonlyArray<{ customerId?: string | null } | null | undefined>,
   customerId: string,
   exceptIndex = -1,
+  scope?: readonly number[],
 ): number {
-  return configs.findIndex((c, i) => i !== exceptIndex && !!c && c.customerId === customerId);
+  const inScope = scope ? new Set(scope) : null;
+  return configs.findIndex(
+    (c, i) => i !== exceptIndex && (!inScope || inScope.has(i)) && !!c && c.customerId === customerId,
+  );
+}
+
+/**
+ * Os serviços de um cliente só são soltos (ou levados ao novo) quando ele deixa
+ * de pagar QUALQUER fatura do orçamento. Numa cobrança veículo a veículo o mesmo
+ * cliente está em N pagadores; tirá-lo de uma fatura não pode soltar os serviços
+ * que as outras N−1 ainda cobram dele.
+ */
+export function customerStillPays(
+  configs: ReadonlyArray<{ customerId?: string | null } | null | undefined>,
+  customerId: string,
+): boolean {
+  return configs.some((c) => !!c && c.customerId === customerId);
+}
+
+/** Os clientes distintos entre os pagadores, na ordem em que aparecem. */
+export function distinctPayerCustomerIds(
+  configs: ReadonlyArray<{ customerId?: string | null } | null | undefined>,
+): string[] {
+  const seen = new Set<string>();
+  for (const c of configs) if (c?.customerId) seen.add(c.customerId);
+  return [...seen];
 }
 
 /**

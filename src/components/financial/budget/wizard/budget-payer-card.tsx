@@ -34,6 +34,7 @@ import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";
 import { canEditPayerDocument, changedCustomerFieldLabels } from "@/utils/budget-payers";
+import { vehicleLabel, type BillingSplitVehicle } from "@/components/financial/shared/billing-split-field";
 import { PayerCustomerCombobox } from "./payer-customer-combobox";
 
 const STREET_TYPE_OPTIONS = [
@@ -86,6 +87,17 @@ interface BudgetPayerCardProps {
   quoteId?: string;
   /** Quantos veículos o orçamento cobre — o dinheiro do passo é POR VEÍCULO. */
   vehicleCount: number;
+  /** O rótulo do cartão; ausente = "Pagador N". */
+  title?: string;
+  /**
+   * A COBERTURA DESTA FATURA — só na tela de Faturamento, que é de UMA cobrança.
+   *
+   * Com ela o cartão diz de quais veículos é a fatura ("Esta fatura cobra 2
+   * veículos: Série 39088, Série 39089") e o total passa a ser o DA FATURA
+   * (por veículo × veículos cobertos), que é o número que sai no boleto. No
+   * Orçamento não há fatura ainda: o total é por veículo e o geral é × N.
+   */
+  coverage?: { vehicles: BillingSplitVehicle[]; coveredIds: string[] };
 }
 
 export function BudgetPayerCard({
@@ -98,6 +110,8 @@ export function BudgetPayerCard({
   disabled,
   quoteId,
   vehicleCount,
+  title,
+  coverage,
 }: BudgetPayerCardProps) {
   const customer = record;
   const { control, setValue: setFormValue } = useFormContext();
@@ -156,11 +170,12 @@ export function BudgetPayerCard({
   // por ela). Aqui o campo aparecia uma vez POR CLIENTE, e num orçamento de dois
   // clientes a segunda cópia sobrescrevia a primeira sem que ninguém notasse.
 
-  // Attention: `task-quote.billing-customer-incomplete`. Identical narrowing to the Faturamento
-  // step (see `billing-step-customer.tsx`) — one address for the whole cadastro, painted only on
-  // the inputs that are empty in the FORM, and only for configs that will produce a nota. The
-  // rule can be active here because an approved budget is reachable from BOTH lists, and the
-  // cadastro is fixed in the same place either way.
+  // Attention: `task-quote.billing-customer-incomplete` addresses the whole cadastro under one
+  // field id (`customerData`). Narrow it twice before painting anything: to configs that will
+  // actually produce a nota (`generateInvoice: false` needs no cadastro), and to the inputs that
+  // are empty in the FORM right now (`missingBillingCustomerKeys`, the same list the approval gate
+  // uses), so typing a CNPJ clears its own highlight at once. This card is the payer on BOTH
+  // screens — Orçamento and Faturamento — so the cadastro is fixed in the same place either way.
   const customerDataAttention = useAttentionField("TASK_QUOTE", quoteId, "customerData");
   const missingBillingKeys = useMemo(
     () =>
@@ -236,7 +251,22 @@ export function BudgetPayerCard({
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
   const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
   const showPerVehicleLabels = vehicleCount > 1;
-  const configGrandTotal = Math.round(configTotal * vehicleCount * 100) / 100;
+  const coveredVehicles = useMemo(() => {
+    if (!coverage) return [];
+    const ids = new Set(coverage.coveredIds);
+    return coverage.vehicles.filter((v) => ids.has(v.id));
+  }, [coverage]);
+  // Na fatura, o "geral" é o que ELA cobra: por veículo × veículos cobertos.
+  const grandTotalVehicles = coverage
+    ? Math.max(1, coveredVehicles.length || coverage.vehicles.length || 1)
+    : vehicleCount;
+  const configGrandTotal = Math.round(configTotal * grandTotalVehicles * 100) / 100;
+  const coverageText =
+    coverage && coverage.vehicles.length > 1 && coveredVehicles.length > 0
+      ? `Esta fatura cobra ${
+          coveredVehicles.length === 1 ? "o veículo" : `${coveredVehicles.length} veículos`
+        }: ${coveredVehicles.map(vehicleLabel).join(", ")}`
+      : null;
 
   const setCustomerField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
@@ -298,9 +328,11 @@ export function BudgetPayerCard({
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <IconBuilding className="h-5 w-5 text-muted-foreground" />
-                Pagador {configIndex + 1}
+                {title ?? `Pagador ${configIndex + 1}`}
               </CardTitle>
-              <CardDescription className="mt-1">Quem é faturado, com os dados que vão na nota.</CardDescription>
+              <CardDescription className="mt-1">
+                {coverageText ?? "Quem é faturado, com os dados que vão na nota."}
+              </CardDescription>
             </div>
             {onRemove && (
               <Button
@@ -590,7 +622,7 @@ export function BudgetPayerCard({
             {showPerVehicleLabels && (
               <div className="space-y-1.5 flex-1 min-w-[110px]">
                 <Label className="text-sm text-muted-foreground">
-                  Total geral ({vehicleCount} veíc.)
+                  {coverage ? `Total da fatura (${grandTotalVehicles} veíc.)` : `Total geral (${vehicleCount} veíc.)`}
                 </Label>
                 <Input value={formatCurrency(configGrandTotal)} disabled className="bg-muted" />
               </div>
