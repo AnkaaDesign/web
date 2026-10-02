@@ -11,7 +11,7 @@ import {
   IconZoomOut,
   IconZoomReset,
 } from "@tabler/icons-react";
-import type { ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, FACE_MEASURE_FIELD, IMPLEMENT_FACES, faceHasPhoto, isImplementFace, type ImplementFace } from "@/constants/implement-faces";
 
 // Component to display implement layout SVG preview
 const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string; taskName?: string }) => {
@@ -109,26 +109,19 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
 
   if (!layouts) return null;
 
-  const hasLayouts = layouts.leftSideMeasure || layouts.rightSideMeasure || layouts.backSideMeasure;
+  // A medida de cada face, da lista única (as quatro).
+  const measureOf = (face: ImplementFace): any => (layouts as any)[FACE_MEASURE_FIELD[face]] ?? null;
+  const hasLayouts = IMPLEMENT_FACES.some((face) => !!measureOf(face));
   if (!hasLayouts) return null;
 
   // Get current layout
-  const currentLayout = selectedSide === 'left' ? layouts.leftSideMeasure :
-                       selectedSide === 'right' ? layouts.rightSideMeasure :
-                       layouts.backSideMeasure;
+  const currentLayout = measureOf(selectedSide);
 
   if (!currentLayout) return null;
 
   // Generate SVG preview - uses theme colors for display, black for export
   const generatePreviewSVG = (layout: any, side: string, forExport: boolean = false) => {
-    const getSideLabel = (s: string) => {
-      switch (s) {
-        case 'left': return 'Motorista';
-        case 'right': return 'Sapo';
-        case 'back': return 'Traseira';
-        default: return s;
-      }
-    };
+    const getSideLabel = (s: string) => (isImplementFace(s) ? FACE_LABEL[s] : s);
 
     // Use theme colors for display, black for export
     const colors = forExport ? {
@@ -241,14 +234,7 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
   // Uses <path> instead of <line> and avoids transforms to prevent CorelDRAW locking
   // All values use cm values as mm (no scaling - 840cm becomes 840mm)
   const generateLayoutElement = (layout: any, side: string, offsetX: number, offsetY: number) => {
-    const getSideLabel = (s: string) => {
-      switch (s) {
-        case 'left': return 'Motorista';
-        case 'right': return 'Sapo';
-        case 'back': return 'Traseira';
-        default: return s;
-      }
-    };
+    const getSideLabel = (s: string) => (isImplementFace(s) ? FACE_LABEL[s] : s);
 
     // Export uses cm values as mm (no scaling)
     const height = layout.height * 100;
@@ -357,17 +343,20 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
     const leftDims = layouts.leftSideMeasure ? getLayoutDimensions(layouts.leftSideMeasure) : null;
     const rightDims = layouts.rightSideMeasure ? getLayoutDimensions(layouts.rightSideMeasure) : null;
     const backDims = layouts.backSideMeasure ? getLayoutDimensions(layouts.backSideMeasure) : null;
+    const frontMeasure = measureOf("front");
+    const frontDims = frontMeasure ? getLayoutDimensions(frontMeasure) : null;
 
     // Calculate total SVG dimensions
     // Left column: Motorista on top, Sapo below
     const leftColumnWidth = Math.max(leftDims?.width || 0, rightDims?.width || 0);
     const leftColumnHeight = (leftDims?.height || 0) + (rightDims ? gap + (rightDims?.height || 0) : 0);
 
-    // Right column: Traseira aligned with top
-    const rightColumnWidth = backDims?.width || 0;
-    const rightColumnHeight = backDims?.height || 0;
+    // Right column: Traseira aligned with top, Frente below it
+    const rightColumnWidth = Math.max(backDims?.width || 0, frontDims?.width || 0);
+    const rightColumnHeight =
+      (backDims?.height || 0) + (frontDims ? (backDims ? gap : 0) + frontDims.height : 0);
 
-    const totalWidth = margin * 2 + leftColumnWidth + (backDims ? gap + rightColumnWidth : 0);
+    const totalWidth = margin * 2 + leftColumnWidth + (backDims || frontDims ? gap + rightColumnWidth : 0);
     const totalHeight = margin * 2 + Math.max(leftColumnHeight, rightColumnHeight);
 
     let svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -390,6 +379,13 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
       svg += generateLayoutElement(layouts.backSideMeasure, 'back', offsetX, margin);
     }
 
+    // Add Frente (front) below Traseira, in the same column
+    if (frontMeasure) {
+      const offsetX = margin + leftColumnWidth + gap;
+      const offsetY = margin + (backDims ? backDims.height + gap : 0);
+      svg += generateLayoutElement(frontMeasure, 'front', offsetX, offsetY);
+    }
+
     svg += `
 </svg>`;
 
@@ -405,14 +401,7 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
     const link = document.createElement('a');
     link.href = url;
 
-    const getSideLabel = (s: string) => {
-      switch (s) {
-        case 'left': return 'motorista';
-        case 'right': return 'sapo';
-        case 'back': return 'traseira';
-        default: return s;
-      }
-    };
+    const getSideLabel = (s: string) => (isImplementFace(s) ? FACE_LABEL[s].toLowerCase() : s);
 
     const taskPrefix = taskName ? `${taskName}-` : '';
     const sections = currentLayout.sections;
@@ -440,38 +429,23 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
     <div className="space-y-3">
       {/* Side selector + download buttons share one row */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={selectedSide === 'left' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setSelectedSide('left'); handleResetZoom(); }}
-            disabled={!layouts.leftSideMeasure}
-          >
-            Motorista
-          </Button>
-          <Button
-            type="button"
-            variant={selectedSide === 'right' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setSelectedSide('right'); handleResetZoom(); }}
-            disabled={!layouts.rightSideMeasure}
-          >
-            Sapo
-          </Button>
-          <Button
-            type="button"
-            variant={selectedSide === 'back' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setSelectedSide('back'); handleResetZoom(); }}
-            disabled={!layouts.backSideMeasure}
-            className="gap-1"
-          >
-            Traseira
-            {(layouts.backSideMeasure as any)?.photo && (
-              <IconPhoto className="h-3.5 w-3.5" />
-            )}
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {IMPLEMENT_FACES.map((face) => (
+            <Button
+              key={face}
+              type="button"
+              variant={selectedSide === face ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setSelectedSide(face); handleResetZoom(); }}
+              disabled={!measureOf(face)}
+              className="gap-1"
+            >
+              {FACE_LABEL[face]}
+              {faceHasPhoto(face) && measureOf(face)?.photo && (
+                <IconPhoto className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          ))}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -479,23 +453,24 @@ const ImplementLayoutPreview = ({ implementId, taskName }: { implementId: string
               const apiUrl = getApiBaseUrl();
               const taskPrefix = taskName ? `${taskName}-` : '';
               const combinedSvgContent = generateCombinedSVG();
-              const hasBacksidePhoto = layouts.backSideMeasure?.photo;
-              if (hasBacksidePhoto) {
+              // As fotos das faces que levam foto (traseira e frente) vão no zip.
+              const photoFaces = IMPLEMENT_FACES.filter((face) => faceHasPhoto(face) && measureOf(face)?.photo?.id);
+              if (photoFaces.length > 0) {
                 const JSZip = (await import('jszip')).default;
                 const zip = new JSZip();
                 zip.file(`${taskPrefix}layouts.svg`, combinedSvgContent);
-                try {
-                  if (layouts.backSideMeasure?.photo?.id) {
-                    const photoUrl = `${apiUrl}/files/${layouts.backSideMeasure.photo.id}/download`;
-                    const response = await fetch(photoUrl);
+                for (const face of photoFaces) {
+                  const photo = measureOf(face).photo;
+                  try {
+                    const response = await fetch(`${apiUrl}/files/${photo.id}/download`);
                     if (response.ok) {
                       const blob = await response.blob();
-                      const extension = layouts.backSideMeasure.photo.mimeType?.split('/')[1] || 'jpg';
-                      zip.file(`${taskPrefix}layout-traseira-foto.${extension}`, blob);
+                      const extension = photo.mimeType?.split('/')[1] || 'jpg';
+                      zip.file(`${taskPrefix}layout-${FACE_LABEL[face].toLowerCase()}-foto.${extension}`, blob);
                     }
+                  } catch (error) {
+                    console.error(`Error downloading ${face} photo:`, error);
                   }
-                } catch (error) {
-                  console.error('Error downloading backside photo:', error);
                 }
                 const content = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(content);

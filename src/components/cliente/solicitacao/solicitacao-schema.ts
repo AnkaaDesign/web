@@ -50,7 +50,7 @@ import type {
   PortalMeasureSideInput,
   PortalNewCustomerInput,
 } from "@/api-client/portal";
-import type { ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, IMPLEMENT_FACES, type ImplementFace } from "@/constants/implement-faces";
 
 /**
  * O valor que o combobox de cliente carrega enquanto o cliente ainda NÃO existe
@@ -233,25 +233,30 @@ export function novasMedidas(): MedidasFormData {
 }
 
 /**
- * O lado do `ImplementMeasureForm` ↔ a chave das medidas da requisição.
- *
- * Cobre EXATAMENTE as faces de `IMPLEMENT_FACES` (G18): quando a frente entrar
- * lá, o `tsc` aponta este mapa, e a requisição do portal decide a sua chave.
+ * As faces DESENHADAS na requisição: todas menos a frente. A frente entrou no
+ * portal como CAMPO próprio (`frente`, com `frente-porta-fields`), não como
+ * mais uma aba do desenho — então aqui ela sai, explicitamente, da lista única
+ * (G18), em vez de uma cópia escrita à mão das outras três.
  */
+export type LadoImplemento = Exclude<ImplementFace, "front">;
+
+export const LADOS_DESENHADOS: readonly LadoImplemento[] = IMPLEMENT_FACES.filter(
+  (face): face is LadoImplemento => face !== "front",
+);
+
+export function isLadoDesenhado(face: ImplementFace): face is LadoImplemento {
+  return face !== "front";
+}
+
+/** O lado do `ImplementMeasureForm` ↔ a chave das medidas da requisição. */
 export const LADO_DO_IMPLEMENTO = {
   left: "esquerda",
   right: "direita",
   back: "traseira",
-} as const satisfies Record<ImplementFace, string>;
-
-export type LadoImplemento = ImplementFace;
+} as const satisfies Record<LadoImplemento, string>;
 
 /** Os rótulos do formulário INTERNO — "Motorista" e "Sapo" são os do chão. */
-export const ROTULO_DO_LADO: Record<ImplementFace, string> = {
-  left: "Motorista",
-  right: "Sapo",
-  back: "Traseira",
-};
+export const ROTULO_DO_LADO: Record<LadoImplemento, string> = FACE_LABEL;
 
 // ── A FRONTEIRA DE UNIDADE COM O `ImplementMeasureForm` ──────────────────────
 //

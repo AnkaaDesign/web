@@ -27,7 +27,17 @@ import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { bulkImplementLayouts } from "@/api-client/implement";
 import { attachArtToTasks } from "@/utils/implement-art-upload";
-import type { ImplementFace } from "@/constants/implement-faces";
+import {
+  FACE_LABEL,
+  FACE_MEASURE_FIELD,
+  FACE_PHOTO_FIELD,
+  IMPLEMENT_FACES,
+  type ImplementFace,
+} from "@/constants/implement-faces";
+
+/** Nenhuma face com medida — o estado inicial do editor do lote. */
+const emptyLayoutStates = (): Record<ImplementFace, any | null> =>
+  Object.fromEntries(IMPLEMENT_FACES.map((face) => [face, null])) as Record<ImplementFace, any | null>;
 
 // Type definitions for the operations
 type BulkOperationType = "arts" | "baseFiles" | "paints" | "cuttingPlans" | "layout" | "serviceOrder";
@@ -90,11 +100,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   // States for layout editing - visual editor like task edit form
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<ImplementFace>("left");
-  const [layoutStates, setLayoutStates] = useState<{
-    left: any | null;
-    right: any | null;
-    back: any | null;
-  }>({ left: null, right: null, back: null });
+  const [layoutStates, setLayoutStates] = useState<Record<ImplementFace, any | null>>(emptyLayoutStates);
 
   // States for service order form (legacy - for creating new ones)
   const [_serviceOrderType, setServiceOrderType] = useState<SERVICE_ORDER_TYPE>(SERVICE_ORDER_TYPE.PRODUCTION);
@@ -155,7 +161,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
     // Reset layout states
     setSelectedLayoutSide("left");
-    setLayoutStates({ left: null, right: null, back: null });
+    setLayoutStates(emptyLayoutStates());
 
     // Reset service order states
     setServiceOrderType(SERVICE_ORDER_TYPE.PRODUCTION);
@@ -495,26 +501,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
               const firstTaskWithImplement = tasksWithImplements[0];
               if (firstTaskWithImplement?.implement) {
-                const firstLeft = firstTaskWithImplement.implement.leftSideMeasure;
-                const firstRight = firstTaskWithImplement.implement.rightSideMeasure;
-                const firstBack = firstTaskWithImplement.implement.backSideMeasure;
-
-                // Check if all tasks share the same layout content per side
-                const allShareLeft = firstLeft && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.implement?.leftSideMeasure, firstLeft)
-                );
-                const allShareRight = firstRight && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.implement?.rightSideMeasure, firstRight)
-                );
-                const allShareBack = firstBack && tasksWithImplements.every(
-                  (t: any) => layoutsMatch(t.implement?.backSideMeasure, firstBack)
-                );
-
-                const preloadedLayouts = {
-                  left: allShareLeft ? convertLayoutToFormState(firstLeft) : null,
-                  right: allShareRight ? convertLayoutToFormState(firstRight) : null,
-                  back: allShareBack ? convertLayoutToFormState(firstBack) : null,
-                };
+                // Por face (as quatro, da lista única): pré-carrega a medida só
+                // quando TODAS as tarefas do lote têm a mesma.
+                const preloadedLayouts = emptyLayoutStates();
+                for (const face of IMPLEMENT_FACES) {
+                  const field = FACE_MEASURE_FIELD[face];
+                  const first = (firstTaskWithImplement.implement as any)[field];
+                  const allShare =
+                    first && tasksWithImplements.every((t: any) => layoutsMatch(t.implement?.[field], first));
+                  preloadedLayouts[face] = allShare ? convertLayoutToFormState(first) : null;
+                }
 
                 setLayoutStates(preloadedLayouts);
               }
@@ -789,25 +785,22 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // This works for both:
           // - Tasks WITH implements: implement is updated with new layouts
           // - Tasks WITHOUT implements: implement is created with embedded layouts
-          console.log('[BulkActions] layout case - layoutStates:', JSON.stringify({ left: layoutStates.left, right: layoutStates.right, back: layoutStates.back }));
-          const hasAnyLayoutState =
-            (layoutStates.left?.sections?.length && layoutStates.left.sections.length > 0) ||
-            (layoutStates.right?.sections?.length && layoutStates.right.sections.length > 0) ||
-            (layoutStates.back?.sections?.length && layoutStates.back.sections.length > 0);
+          const hasAnyLayoutState = IMPLEMENT_FACES.some(
+            (face) => (layoutStates[face]?.sections?.length ?? 0) > 0,
+          );
 
-          console.log('[BulkActions] hasAnyLayoutState:', hasAnyLayoutState, 'currentTasks:', currentTasks.length);
           if (hasAnyLayoutState) {
             // Build implement object with embedded layout data (following taskImplementCreateSchema)
             const implementWithLayouts: any = {};
             // Collect layout photo files for upload
             const layoutPhotoFiles: Array<{ side: string; file: File }> = [];
 
-            // Left side layout data
-            const leftLayout = layoutStates.left;
-            if (leftLayout?.sections?.length && leftLayout.sections.length > 0) {
-              implementWithLayouts.leftSideMeasure = {
-                height: leftLayout.height,
-                sections: leftLayout.sections.map((s: any, idx: number) => ({
+            for (const face of IMPLEMENT_FACES) {
+              const faceLayout = layoutStates[face];
+              if (!(faceLayout?.sections?.length > 0)) continue;
+              implementWithLayouts[FACE_MEASURE_FIELD[face]] = {
+                height: faceLayout.height,
+                sections: faceLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
@@ -815,53 +808,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
                   position: idx,
                 })),
-                photoId: leftLayout.photoId || null,
+                photoId: faceLayout.photoId || null,
               };
-              // Collect photo file if present
-              if (leftLayout.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'leftSide', file: leftLayout.photoFile });
-              }
-            }
-
-            // Right side layout data
-            const rightLayout = layoutStates.right;
-            if (rightLayout?.sections?.length && rightLayout.sections.length > 0) {
-              implementWithLayouts.rightSideMeasure = {
-                height: rightLayout.height,
-                sections: rightLayout.sections.map((s: any, idx: number) => ({
-                  width: s.width,
-                  isDoor: s.isDoor || false,
-                  // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
-                  // REJECTS undefined and would 400 the ENTIRE batch. Normalize to null.
-                  doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
-                  position: idx,
-                })),
-                photoId: rightLayout.photoId || null,
-              };
-              // Collect photo file if present
-              if (rightLayout.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'rightSide', file: rightLayout.photoFile });
-              }
-            }
-
-            // Back side layout data
-            const backLayout = layoutStates.back;
-            if (backLayout?.sections?.length && backLayout.sections.length > 0) {
-              implementWithLayouts.backSideMeasure = {
-                height: backLayout.height,
-                sections: backLayout.sections.map((s: any, idx: number) => ({
-                  width: s.width,
-                  isDoor: s.isDoor || false,
-                  // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
-                  // REJECTS undefined and would 400 the ENTIRE batch. Normalize to null.
-                  doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
-                  position: idx,
-                })),
-                photoId: backLayout.photoId || null,
-              };
-              // Collect photo file if present
-              if (backLayout.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'backSide', file: backLayout.photoFile });
+              if (faceLayout.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: FACE_PHOTO_FIELD[face], file: faceLayout.photoFile });
               }
             }
 
@@ -1277,48 +1227,23 @@ export const AdvancedBulkActionsHandler = forwardRef<
             {/* Layout Side Selector with Total Length - exactly like task edit form */}
             <div className="flex flex-wrap justify-between items-center gap-3">
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={selectedLayoutSide === "left" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedLayoutSide("left")}
-                  disabled={isSubmitting}
-                >
-                  Motorista
-                  {layoutStates.left?.sections?.length && layoutStates.left.sections.length > 0 && (
-                    <Badge variant="success" className="ml-2">
-                      Configurado
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant={selectedLayoutSide === "right" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedLayoutSide("right")}
-                  disabled={isSubmitting}
-                >
-                  Sapo
-                  {layoutStates.right?.sections?.length > 0 && (
-                    <Badge variant="success" className="ml-2">
-                      Configurado
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant={selectedLayoutSide === "back" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedLayoutSide("back")}
-                  disabled={isSubmitting}
-                >
-                  Traseira
-                  {layoutStates.back?.sections?.length > 0 && (
-                    <Badge variant="success" className="ml-2">
-                      Configurado
-                    </Badge>
-                  )}
-                </Button>
+                {IMPLEMENT_FACES.map((face) => (
+                  <Button
+                    key={face}
+                    type="button"
+                    variant={selectedLayoutSide === face ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedLayoutSide(face)}
+                    disabled={isSubmitting}
+                  >
+                    {FACE_LABEL[face]}
+                    {layoutStates[face]?.sections?.length > 0 && (
+                      <Badge variant="success" className="ml-2">
+                        Configurado
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
               </div>
 
               {/* Total Length Display - exactly like task edit form */}
@@ -1344,9 +1269,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             />
 
             {/* Info alert */}
-            {(layoutStates.left?.sections?.length > 0 ||
-              layoutStates.right?.sections?.length > 0 ||
-              layoutStates.back?.sections?.length > 0) && (
+            {IMPLEMENT_FACES.some((face) => layoutStates[face]?.sections?.length > 0) && (
               <Alert className="mt-2">
                 <AlertDescription>
                   Os layouts configurados serão aplicados a todos os implementos das {currentTaskIds.length} tarefas selecionadas.

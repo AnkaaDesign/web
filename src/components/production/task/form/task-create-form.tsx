@@ -63,7 +63,7 @@ import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
 import { batchCreateTasksWithQuote } from "../../../../api-client/task";
 import { attachArtToTasks } from "@/utils/implement-art-upload";
-import { FACE_LABEL, FACE_MEASURE_FIELD, type ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, FACE_MEASURE_FIELD, IMPLEMENT_FACES, faceHasPhoto, type ImplementFace } from "@/constants/implement-faces";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -245,6 +245,11 @@ export const TaskCreateForm = () => {
       photoId: null,
     },
     back: {
+      height: 1,
+      sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
+      photoId: null,
+    },
+    front: {
       height: 1,
       sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
       photoId: null,
@@ -986,19 +991,13 @@ export const TaskCreateForm = () => {
                         <CardContent className="pt-0">
                           <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                              <div className="flex gap-2">
-                                <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
-                                  Motorista
-                                  {modifiedLayoutSides.has("left") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
-                                </Button>
-                                <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
-                                  Sapo
-                                  {modifiedLayoutSides.has("right") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
-                                </Button>
-                                <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
-                                  Traseira
-                                  {modifiedLayoutSides.has("back") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
-                                </Button>
+                              <div className="flex flex-wrap gap-2">
+                                {IMPLEMENT_FACES.map((face) => (
+                                  <Button key={face} type="button" variant={selectedLayoutSide === face ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide(face)}>
+                                    {FACE_LABEL[face]}
+                                    {modifiedLayoutSides.has(face) && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
+                                  </Button>
+                                ))}
                               </div>
                               <div className="px-3 py-1 bg-primary/10 rounded-md">
                                 <span className="text-sm text-muted-foreground">Comprimento Total: </span>
@@ -1024,7 +1023,7 @@ export const TaskCreateForm = () => {
                                 setCurrentLayoutStates(prev => ({ ...prev, [side]: layoutData }));
                               }}
                               onSave={async (layoutData) => { if (layoutData) { setHasLayoutChanges(true); } }}
-                              showPhoto={selectedLayoutSide === "back"}
+                              showPhoto={faceHasPhoto(selectedLayoutSide)}
                               disabled={isSubmitting}
                             />
                           </div>

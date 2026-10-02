@@ -40,13 +40,13 @@ import type { FileWithPreview } from "@/components/common/file";
 import type { PortalCustomerOption, PortalPaintOption } from "./solicitacao-api";
 import {
   LADO_DO_IMPLEMENTO,
+  LADOS_DESENHADOS,
   NOVA_TINTA_VALUE,
   NOVO_CLIENTE_VALUE,
   ROTULO_DO_LADO,
   type LadoImplemento,
   type SolicitacaoFormData,
 } from "./solicitacao-schema";
-import { IMPLEMENT_FACES } from "@/constants/implement-faces";
 
 interface StepRevisaoProps {
   /** Nomes já vistos pelos comboboxes — ver `onOptionsSeen`. */
@@ -75,8 +75,8 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
 
 const vazio = <span className="font-normal text-muted-foreground">Não informado</span>;
 
-/** As faces vêm da lista única (G18): a frente, quando entrar, aparece aqui sozinha. */
-const LADOS: readonly LadoImplemento[] = IMPLEMENT_FACES;
+/** As faces desenhadas (todas menos a frente, que é campo próprio — ver `LADOS_DESENHADOS`). */
+const LADOS: readonly LadoImplemento[] = LADOS_DESENHADOS;
 
 /**
  * Centímetro inteiro → metro com vírgula, como o `ImplementMeasureForm` escreve.

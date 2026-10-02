@@ -58,10 +58,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
 import { formatPlate } from "@/utils";
+import type { ImplementFace } from "@/constants/implement-faces";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { FrenteFields, PortaTraseiraFields } from "@/components/cliente/veiculo/frente-porta-fields";
 import {
   LADO_DO_IMPLEMENTO,
+  LADOS_DESENHADOS,
+  isLadoDesenhado,
   MAX_VEICULOS,
   ROTULO_DO_LADO,
   expandSerialRange,
@@ -73,7 +76,6 @@ import {
   type MedidasFormData,
   type SolicitacaoFormData,
 } from "./solicitacao-schema";
-import { IMPLEMENT_FACES } from "@/constants/implement-faces";
 
 interface StepVeiculosProps {
   disabled?: boolean;
@@ -370,8 +372,8 @@ export function SolicitacaoStepVeiculos({ disabled }: StepVeiculosProps) {
   );
 }
 
-/** As faces vêm da lista única (G18): a frente, quando entrar, aparece aqui sozinha. */
-const LADOS: readonly LadoImplemento[] = IMPLEMENT_FACES;
+/** As faces desenhadas (todas menos a frente, que é campo próprio — ver `LADOS_DESENHADOS`). */
+const LADOS: readonly LadoImplemento[] = LADOS_DESENHADOS;
 
 /**
  * A primeira mensagem de erro que houver sob este nó, em qualquer profundidade.
@@ -461,7 +463,9 @@ function MedidasDoImplemento({
   const layout = useMemo(() => medidaLadoParaFormulario(ladoAtual), [ladoAtual]);
 
   const aplicar = useCallback(
-    (side: LadoImplemento, dados: { height?: number | null; sections?: unknown }) => {
+    (side: ImplementFace, dados: { height?: number | null; sections?: unknown }) => {
+      // A frente é campo próprio (abaixo do desenho), não aba dele.
+      if (!isLadoDesenhado(side)) return;
       const atual = getValues("medidas");
       // O interruptor foi desligado enquanto a emissão viajava. Escrever aqui
       // RESSUSCITARIA a medida que a pessoa acabou de dispensar.
@@ -495,7 +499,7 @@ function MedidasDoImplemento({
    * enxerga a primeira.
    */
   const aoMudar = useCallback(
-    (side: LadoImplemento, dados: { height?: number | null; sections?: unknown }) => {
+    (side: ImplementFace, dados: { height?: number | null; sections?: unknown }) => {
       queueMicrotask(() => aplicar(side, dados));
     },
     [aplicar],

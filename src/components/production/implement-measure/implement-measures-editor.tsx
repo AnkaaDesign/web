@@ -11,7 +11,7 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FACE_LABEL, IMPLEMENT_FACES, type ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, IMPLEMENT_FACES, faceHasPhoto, type ImplementFace } from "@/constants/implement-faces";
 import { defaultMeasureLayout, measureTotalWidthCm, type MeasureLayout } from "@/utils/implement-measures";
 import { ImplementMeasureForm } from "./implement-measure-form";
 
@@ -75,7 +75,7 @@ export function ImplementMeasuresEditor({
         layout={layout as any}
         validationError={validationError}
         onChange={(face, data) => onSideChange(face, data as MeasureLayout)}
-        showPhoto={side === "back"}
+        showPhoto={faceHasPhoto(side)}
         disabled={disabled}
       />
     </div>

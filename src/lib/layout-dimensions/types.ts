@@ -58,7 +58,12 @@ export interface Scale {
   panelPt: Rect;
 }
 
-export type PanelSide = "MOTORISTA" | "SAPO" | "TRASEIRA";
+/**
+ * A face no desenho — a mesma união da API (`layout-dimensions/engine/types.ts`).
+ * FRENTE (P11b) é SECUNDÁRIA no casamento: só disputa o retângulo que sobrou
+ * depois das outras três; o servidor já a manda.
+ */
+export type PanelSide = "MOTORISTA" | "SAPO" | "TRASEIRA" | "FRENTE";
 
 export interface PanelSection {
   widthCm: number;

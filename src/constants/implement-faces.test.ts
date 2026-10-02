@@ -11,14 +11,23 @@ import {
   FACE_MEASURE_FIELD,
   FACE_PHOTO_FIELD,
   IMPLEMENT_FACES,
+  IMPLEMENT_FACES_WITH_PHOTO,
   isImplementFace,
 } from "./implement-faces";
+import contrato from "@/generated/contracts/enums.json";
+
+const contratoFaces = (contrato as unknown as {
+  faces: { todas: string[]; comFoto: string[]; rotulos: Record<string, string> };
+}).faces;
 
 const sorted = (xs: readonly string[]) => [...xs].sort();
 
 describe("IMPLEMENT_FACES", () => {
-  it("tem as 3 faces de hoje, sem repetição", () => {
-    expect(IMPLEMENT_FACES).toEqual(["left", "right", "back"]);
+  it("tem as 4 faces do contrato da API, sem repetição", () => {
+    expect(IMPLEMENT_FACES).toEqual(["left", "right", "back", "front"]);
+    expect([...IMPLEMENT_FACES]).toEqual(contratoFaces.todas);
+    expect([...IMPLEMENT_FACES_WITH_PHOTO]).toEqual(contratoFaces.comFoto);
+    expect(FACE_LABEL).toEqual(contratoFaces.rotulos);
     expect(new Set(IMPLEMENT_FACES).size).toBe(IMPLEMENT_FACES.length);
   });
 
@@ -32,7 +41,7 @@ describe("IMPLEMENT_FACES", () => {
   });
 
   it("os rótulos de tela são os que o editor de medidas sempre mostrou", () => {
-    expect(FACE_LABEL).toEqual({ left: "Motorista", right: "Sapo", back: "Traseira" });
+    expect(FACE_LABEL).toEqual({ left: "Motorista", right: "Sapo", back: "Traseira", front: "Frente" });
   });
 
   it("os campos batem com os nomes que a API espera hoje", () => {
@@ -40,13 +49,14 @@ describe("IMPLEMENT_FACES", () => {
       left: "leftSideMeasure",
       right: "rightSideMeasure",
       back: "backSideMeasure",
+      front: "frontSideMeasure",
     });
-    expect(FACE_PHOTO_FIELD).toEqual({ left: "leftSide", right: "rightSide", back: "backSide" });
+    expect(FACE_PHOTO_FIELD).toEqual({ left: "leftSide", right: "rightSide", back: "backSide", front: "frontSide" });
   });
 
   it("isImplementFace aceita só as faces", () => {
     for (const face of IMPLEMENT_FACES) expect(isImplementFace(face)).toBe(true);
-    for (const outro of ["front", "LEFT", "", null, undefined, 1]) expect(isImplementFace(outro)).toBe(false);
+    for (const outro of ["FRONT", "LEFT", "", null, undefined, 1]) expect(isImplementFace(outro)).toBe(false);
   });
 });
 

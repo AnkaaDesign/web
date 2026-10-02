@@ -35,12 +35,14 @@ export interface Implement extends BaseEntity {
   leftSideMeasureId: string | null;
   rightSideMeasureId: string | null;
   backSideMeasureId: string | null;
+  frontSideMeasureId?: string | null;
   task?: Task;
   /** Foto da plaqueta de identificação (VIN). */
   vinPlate?: File | null;
   leftSideMeasure?: ImplementMeasure;
   rightSideMeasure?: ImplementMeasure;
   backSideMeasure?: ImplementMeasure;
+  frontSideMeasure?: ImplementMeasure;
   /** A ARTE do implemento (Modelo C) — vem quando o `include` pede `layouts`. */
   layouts?: Layout[];
 }
@@ -70,6 +72,11 @@ export interface ImplementIncludes {
   /** Foto da plaqueta de identificação (VIN). */
   vinPlate?: boolean;
   backSideMeasure?:
+    | boolean
+    | {
+        include?: ImplementMeasureIncludes;
+      };
+  frontSideMeasure?:
     | boolean
     | {
         include?: ImplementMeasureIncludes;
@@ -140,6 +147,7 @@ export interface ImplementCreateFormData {
   leftSideMeasureId?: string | null;
   rightSideMeasureId?: string | null;
   backSideMeasureId?: string | null;
+  frontSideMeasureId?: string | null;
 }
 
 export interface ImplementUpdateFormData {
@@ -154,6 +162,7 @@ export interface ImplementUpdateFormData {
   leftSideMeasureId?: string | null;
   rightSideMeasureId?: string | null;
   backSideMeasureId?: string | null;
+  frontSideMeasureId?: string | null;
 }
 
 export interface ImplementQueryFormData {

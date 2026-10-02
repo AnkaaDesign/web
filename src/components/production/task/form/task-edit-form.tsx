@@ -80,7 +80,7 @@ import { useImplementMeasuresByImplement, useImplementMeasureMutations } from ".
 import { IMPLEMENT_SPOT } from "../../../../constants";
 import { useOtherEditors } from "@/lib/attention";
 import { IconEdit } from "@tabler/icons-react";
-import type { ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, FACE_MEASURE_FIELD, FACE_PHOTO_FIELD, IMPLEMENT_FACES, faceHasPhoto, type ImplementFace } from "@/constants/implement-faces";
 
 interface TaskEditFormProps {
   task: Task;
@@ -447,6 +447,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     leftSideMeasure: "measures",
     rightSideMeasure: "measures",
     backSideMeasure: "measures",
+    frontSideMeasure: "measures",
     // Spot
     spot: "spot",
     // Paint
@@ -497,26 +498,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
   // Track current layout state during editing (not saved yet)
   // Initialize with default values to support validation before user edits
-  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<ImplementFace, any>>(() => {
-    const defaults = {
-      left: {
-        height: 1,
-        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
-        photoId: null,
-      },
-      right: {
-        height: 1,
-        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
-        photoId: null,
-      },
-      back: {
-        height: 1,
-        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
-        photoId: null,
-      },
-    };
-    return defaults;
-  });
+  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<ImplementFace, any>>(() =>
+    Object.fromEntries(
+      IMPLEMENT_FACES.map((face) => [
+        face,
+        {
+          height: 1,
+          sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
+          photoId: null,
+        },
+      ]),
+    ) as Record<ImplementFace, any>,
+  );
 
   // Track which sides were actually modified by the user
   const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<ImplementFace>>(new Set());
@@ -591,55 +584,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // This prevents overwriting user changes that haven't been saved yet
     if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && measuresData) {
 
-      const newStates: Record<ImplementFace, any> = {
-        left: currentLayoutStates.left,
-        right: currentLayoutStates.right,
-        back: currentLayoutStates.back,
-      };
-
-      // Sync left side
-      if (measuresData.leftSideMeasure?.sections) {
-        newStates.left = {
-          height: measuresData.leftSideMeasure.height,
-          sections: measuresData.leftSideMeasure.sections.map((s: any) => ({
+      const newStates = { ...currentLayoutStates } as Record<ImplementFace, any>;
+      // Cada face com medida salva entra no estado de edição (as quatro, da lista única).
+      for (const face of IMPLEMENT_FACES) {
+        const saved = (measuresData as any)[FACE_MEASURE_FIELD[face]];
+        if (!saved?.sections) continue;
+        newStates[face] = {
+          height: saved.height,
+          sections: saved.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: measuresData.leftSideMeasure.photoId,
+          photoId: saved.photoId,
         };
-        
-      }
-
-      // Sync right side
-      if (measuresData.rightSideMeasure?.sections) {
-        newStates.right = {
-          height: measuresData.rightSideMeasure.height,
-          sections: measuresData.rightSideMeasure.sections.map((s: any) => ({
-            width: s.width,
-            isDoor: s.isDoor,
-            doorHeight: s.doorHeight,
-            position: s.position,
-          })),
-          photoId: measuresData.rightSideMeasure.photoId,
-        };
-        
-      }
-
-      // Sync back side
-      if (measuresData.backSideMeasure?.sections) {
-        newStates.back = {
-          height: measuresData.backSideMeasure.height,
-          sections: measuresData.backSideMeasure.sections.map((s: any) => ({
-            width: s.width,
-            isDoor: s.isDoor,
-            doorHeight: s.doorHeight,
-            position: s.position,
-          })),
-          photoId: measuresData.backSideMeasure.photoId,
-        };
-        
       }
 
       setCurrentLayoutStates(newStates);
@@ -935,14 +894,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         // Ensure implement sections are arrays
         if (changedData.implement) {
           const implement = changedData.implement as any;
-          if (implement.leftSideMeasure?.sections) {
-            implement.leftSideMeasure.sections = ensureArray(implement.leftSideMeasure.sections);
-          }
-          if (implement.rightSideMeasure?.sections) {
-            implement.rightSideMeasure.sections = ensureArray(implement.rightSideMeasure.sections);
-          }
-          if (implement.backSideMeasure?.sections) {
-            implement.backSideMeasure.sections = ensureArray(implement.backSideMeasure.sections);
+          for (const face of IMPLEMENT_FACES) {
+            const measure = implement[FACE_MEASURE_FIELD[face]];
+            if (measure?.sections) measure.sections = ensureArray(measure.sections);
           }
         }
 
@@ -1099,17 +1053,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
           const deletePromises: Promise<any>[] = [];
 
-          if (measuresData.leftSideMeasure?.id) {
-            
-            deletePromises.push(deleteMeasure(measuresData.leftSideMeasure.id));
-          }
-          if (measuresData.rightSideMeasure?.id) {
-            
-            deletePromises.push(deleteMeasure(measuresData.rightSideMeasure.id));
-          }
-          if (measuresData.backSideMeasure?.id) {
-            
-            deletePromises.push(deleteMeasure(measuresData.backSideMeasure.id));
+          for (const face of IMPLEMENT_FACES) {
+            const saved = (measuresData as any)[FACE_MEASURE_FIELD[face]];
+            if (saved?.id) deletePromises.push(deleteMeasure(saved.id));
           }
 
           if (deletePromises.length > 0) {
@@ -1137,8 +1083,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
             if (sideData && sideData.sections && sideData.sections.length > 0) {
               // Map internal side names to API field names
-              const layoutFieldName = side === 'left' ? 'leftSideMeasure' : side === 'right' ? 'rightSideMeasure' : 'backSideMeasure';
-              const sideName = side === 'left' ? 'leftSide' : side === 'right' ? 'rightSide' : 'backSide';
+              const layoutFieldName = FACE_MEASURE_FIELD[side];
+              const sideName = FACE_PHOTO_FIELD[side];
 
               // Extract photo file if present
               if (sideData.photoFile && sideData.photoFile instanceof File) {
@@ -3178,31 +3124,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       <div className="space-y-4">
                         {/* Layout Side Selector with Total Length */}
                         <div className="flex justify-between items-center">
-                          <div className="flex gap-2">
-                            <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
-                              Motorista
-                              {measuresData?.leftSideMeasure && (
-                                <Badge variant="success" className="ml-2">
-                                  Configurado
-                                </Badge>
-                              )}
-                            </Button>
-                            <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
-                              Sapo
-                              {measuresData?.rightSideMeasure && (
-                                <Badge variant="success" className="ml-2">
-                                  Configurado
-                                </Badge>
-                              )}
-                            </Button>
-                            <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
-                              Traseira
-                              {measuresData?.backSideMeasure && (
-                                <Badge variant="success" className="ml-2">
-                                  Configurado
-                                </Badge>
-                              )}
-                            </Button>
+                          <div className="flex flex-wrap gap-2">
+                            {IMPLEMENT_FACES.map((face) => (
+                              <Button key={face} type="button" variant={selectedLayoutSide === face ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide(face)}>
+                                {FACE_LABEL[face]}
+                                {(measuresData as any)?.[FACE_MEASURE_FIELD[face]] && (
+                                  <Badge variant="success" className="ml-2">
+                                    Configurado
+                                  </Badge>
+                                )}
+                              </Button>
+                            ))}
                           </div>
 
                           {/* Total Length Display */}
@@ -3285,7 +3217,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               setHasLayoutChanges(true);
                             }
                           }}
-                          showPhoto={selectedLayoutSide === "back"}
+                          showPhoto={faceHasPhoto(selectedLayoutSide)}
                           disabled={isSubmitting || !canEditLayout}
                         />
                       </div>

@@ -40,6 +40,7 @@ import { ImplementMeasureForm } from "@/components/production/implement-measure/
 
 import type { PortalMeasure, PortalRearDoorInput, PortalVehicleImplement } from "@/api-client/portal";
 import type { ImplementFace } from "@/constants/implement-faces";
+import { isLadoDesenhado, type LadoImplemento } from "@/components/cliente/solicitacao/solicitacao-schema";
 import { usePortalUpdateVehicleIdentity } from "@/api-client/portal";
 import { Separator } from "@/components/ui/separator";
 import { PortalCard } from "../portal-detail";
@@ -178,7 +179,7 @@ export function VeiculoMedidasCard({
   const interagiu = useRef(false);
   const aoMudar = useCallback(
     (side: ImplementFace, dados: { height?: number | null; sections?: unknown }) => {
-      if (!canWrite || !interagiu.current) return;
+      if (!canWrite || !interagiu.current || !isLadoDesenhado(side)) return;
       const chave = LADO_PARA_PAYLOAD[side];
       const emCentimetros = {
         height: Math.round(((dados.height ?? 0) as number) * 100),
@@ -282,7 +283,10 @@ export function VeiculoMedidasCard({
         <ImplementMeasureForm
           selectedSide={lado}
           layouts={layouts as never}
-          onSideChange={setLado}
+          onSideChange={(side) => {
+            // A frente é campo próprio (abaixo), não aba do desenho.
+            if (isLadoDesenhado(side)) setLado(side);
+          }}
           onChange={canWrite ? (aoMudar as never) : undefined}
           showPhoto={false}
           disabled={!canWrite}
@@ -334,7 +338,7 @@ export function VeiculoMedidasCard({
 }
 
 /** A chave que a rota do portal espera para cada lado. */
-const LADO_PARA_PAYLOAD: Record<ImplementFace, "esquerda" | "direita" | "traseira"> = {
+const LADO_PARA_PAYLOAD: Record<LadoImplemento, "esquerda" | "direita" | "traseira"> = {
   left: "esquerda",
   right: "direita",
   back: "traseira",

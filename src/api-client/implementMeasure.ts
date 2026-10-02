@@ -19,6 +19,7 @@ interface ImplementMeasuresByImplementResponse {
     leftSideMeasure: ImplementMeasure | null;
     rightSideMeasure: ImplementMeasure | null;
     backSideMeasure: ImplementMeasure | null;
+    frontSideMeasure: ImplementMeasure | null;
   };
 }
 

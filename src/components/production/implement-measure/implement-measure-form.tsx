@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTheme } from "@/contexts/theme-context";
 import type { ImplementMeasureCreateFormData } from "../../../schemas";
 import { getApiBaseUrl } from "@/config/api";
-import { FACE_LABEL, type ImplementFace } from "@/constants/implement-faces";
+import { FACE_LABEL, faceHasPhoto, isLateralFace, type ImplementFace } from "@/constants/implement-faces";
 
 /**
  * Menor altura de porta que a GEOMETRIA aceita, em centímetros.
@@ -28,11 +28,7 @@ const MIN_DOOR_HEIGHT_CM = 90;
 
 interface ImplementMeasureFormProps {
   selectedSide?: ImplementFace;
-  layouts?: {
-    left: ImplementMeasureCreateFormData;
-    right: ImplementMeasureCreateFormData;
-    back: ImplementMeasureCreateFormData;
-  };
+  layouts?: Partial<Record<ImplementFace, ImplementMeasureCreateFormData>>;
   // Support for single layout prop (current usage)
   layout?: ImplementMeasureCreateFormData;
   onChange?: (side: ImplementFace, data: ImplementMeasureCreateFormData) => void;
@@ -438,6 +434,7 @@ export const ImplementMeasureForm = ({
     left: false,
     right: false,
     back: false,
+    front: false,
   });
 
   // Store state for all three sides
@@ -445,7 +442,8 @@ export const ImplementMeasureForm = ({
     const initialStates: Record<ImplementFace, SideState> = {
       left: { height: 200, totalWidth: 200, doors: [] },
       right: { height: 200, totalWidth: 200, doors: [] },
-      back: { height: 200, totalWidth: 200, doors: [] }  // Back side defaults to 2m x 2m
+      back: { height: 200, totalWidth: 200, doors: [] }, // Back side defaults to 2m x 2m
+      front: { height: 200, totalWidth: 200, doors: [] }, // Front, like the back: 2m x 2m
     };
 
     // Handle single layout prop (current usage pattern)
@@ -677,7 +675,7 @@ export const ImplementMeasureForm = ({
     }
 
     // For back side only, sync photo from layout
-    if (selectedSide !== 'back') {
+    if (!faceHasPhoto(selectedSide)) {
       return;
     }
 
@@ -813,7 +811,7 @@ export const ImplementMeasureForm = ({
       };
 
       // Sync height between left and right sides (not back)
-      if (updates.height !== undefined && selectedSide !== 'back') {
+      if (updates.height !== undefined && isLateralFace(selectedSide)) {
         const oppositeSide = selectedSide === 'left' ? 'right' : 'left';
         newState[oppositeSide] = {
           ...newState[oppositeSide],
@@ -848,7 +846,7 @@ export const ImplementMeasureForm = ({
         onChange(selectedSide, layoutData);
 
         // Also emit changes for the opposite side if height was synced
-        if (updates.height !== undefined && selectedSide !== 'back') {
+        if (updates.height !== undefined && isLateralFace(selectedSide)) {
           const oppositeSide = selectedSide === 'left' ? 'right' : 'left';
           const oppositeState = newState[oppositeSide];
           const oppositeSegments = calculateSegments(oppositeState.doors, oppositeState.totalWidth);
@@ -1430,7 +1428,7 @@ export const ImplementMeasureForm = ({
                   }}
                 >
                 {/* Photo background for back side */}
-                {selectedSide === 'back' && showPhoto && photoState.imageUrl && (
+                {faceHasPhoto(selectedSide) && showPhoto && photoState.imageUrl && (
                   <img
                     src={photoState.imageUrl}
                     alt="Layout background"
@@ -1438,7 +1436,7 @@ export const ImplementMeasureForm = ({
                   />
                 )}
                 {/* Render doors and their controls (only for sides, not back) */}
-                {selectedSide !== 'back' && currentState.doors.map(door => {
+                {isLateralFace(selectedSide) && currentState.doors.map(door => {
                   // doorHeight is measured from bottom to top of door opening
                   // So the door top position = layout height - door height
                   const doorTopPosition = currentState.height - door.doorHeight;
@@ -1537,7 +1535,7 @@ export const ImplementMeasureForm = ({
             {!previewMode && (
               <>
                 {/* Copy button - only between left and right sides */}
-                {selectedSide !== 'back' && (
+                {isLateralFace(selectedSide) && (
                   <Button
                     type="button"
                     size="sm"
@@ -1552,7 +1550,7 @@ export const ImplementMeasureForm = ({
                 )}
 
                 {/* Mirror button - only between left and right sides */}
-                {selectedSide !== 'back' && (
+                {isLateralFace(selectedSide) && (
                   <Button
                     type="button"
                     size="sm"
@@ -1571,16 +1569,16 @@ export const ImplementMeasureForm = ({
                     "Adicionar Porta": porta na traseira não é desenhada por
                     este componente (o laço de portas pula `back`), e oferecer
                     um botão que não produz nada visível é pior que não ter. */}
-                {(selectedSide !== 'back' || showPhoto) && (
+                {(isLateralFace(selectedSide) || showPhoto) && (
                   <Button
                     type="button"
-                    onClick={selectedSide === 'back' ? handlePhotoUpload : addDoor}
+                    onClick={faceHasPhoto(selectedSide) ? handlePhotoUpload : addDoor}
                     size="sm"
                     variant="default"
                     disabled={disabled}
                     className="flex-1"
                   >
-                    {selectedSide === 'back' ? (
+                    {faceHasPhoto(selectedSide) ? (
                       <>
                         <IconCamera className="h-4 w-4 mr-1" />
                         {photoState.imageUrl ? 'Substituir Foto' : 'Adicionar Foto'}
@@ -1613,7 +1611,7 @@ export const ImplementMeasureForm = ({
       </div>
 
       {/* Photo Status Indicator - only show for back side */}
-      {selectedSide === 'back' && showPhoto && photoState.imageUrl && (
+      {faceHasPhoto(selectedSide) && showPhoto && photoState.imageUrl && (
         <Alert className="mt-4">
           <AlertDescription className="flex items-center justify-between">
             <span className="flex items-center gap-2">
