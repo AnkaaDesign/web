@@ -22,7 +22,7 @@ const sola = { id: "c-sola", corporateName: "Sola Transportes", fantasyName: "So
 
 describe("swapPayerCustomer", () => {
   it("refaz a cópia do cadastro inteira: nada do anterior sobra, nem o editado", () => {
-    const config = {
+    const config: Record<string, any> = {
       ...newPayerConfig(ibipora),
       id: "payer-row-1",
       paymentConfig: { type: "CASH" },

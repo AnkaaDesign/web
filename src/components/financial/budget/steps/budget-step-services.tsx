@@ -130,9 +130,9 @@ export function BudgetStepServices({
   //
   // Driven by `customerConfigs` — the form's own source of truth for who is
   // being billed — NOT by `selectedCustomers`. That map is rebuilt from a
-  // best-effort search cache and silently DROPS any customer that was never
-  // returned by a search (`if (cached) newMap.set(...)` in budget-step-info),
-  // which on the edit screen is every customer loaded straight from the server.
+  // best-effort search cache and used to silently DROP any customer that was
+  // never returned by a search (the old "Informações" step), which on the edit
+  // screen was every customer loaded straight from the server.
   // A dropped customer had no option here, so its services could not be
   // assigned, and the multi-customer save guard then rejected the budget with
   // "Atribua um cliente a todos os serviços" and no way out through the UI.

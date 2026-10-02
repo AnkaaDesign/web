@@ -1,3 +1,14 @@
+/**
+ * UM PAGADOR do orçamento, no passo Faturamento: o cliente (combobox que aceita
+ * criar), a cópia editável do cadastro dele e as condições de faturamento e
+ * pagamento.
+ *
+ * Era o passo "Cliente N" — um passo inteiro por cliente, com o CNPJ digitado
+ * livre. Virou um cartão numa lista (decisão do dono, 02/10/2026), com as
+ * proteções de `utils/budget-payers.ts`: trocar o cliente refaz a cópia; o
+ * cartão diz o que o Salvar vai mudar no cadastro e de quem; o documento só se
+ * preenche em cadastro sem documento.
+ */
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,7 +19,8 @@ import { Switch } from "@/components/ui/switch";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { formatCurrency } from "@/utils";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
-import { IconCreditCard, IconBuilding, IconIdBadge2 } from "@tabler/icons-react";
+import { IconAlertTriangle, IconBuilding, IconCreditCard, IconIdBadge2, IconTrash } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import {
   legacyToConfig,
   configToTypeValue,
@@ -18,15 +30,11 @@ import {
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/budget";
-import {
-  BillingSplitField,
-  type BillingSplitValue,
-  type BillingSplitVehicle,
-} from "@/components/financial/shared/billing-split-field";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";
-import { vehicleCombinationCount } from "@/utils/vehicle-combinations";
+import { canEditPayerDocument, changedCustomerFieldLabels } from "@/utils/budget-payers";
+import { PayerCustomerCombobox } from "./payer-customer-combobox";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -59,44 +67,39 @@ const DOC_TYPE_OPTIONS = [
   { value: "cpf", label: "CPF" },
 ];
 
-interface BudgetStepCustomerPaymentProps {
+interface BudgetPayerCardProps {
   configIndex: number;
-  customer: any;
+  /**
+   * O cadastro do cliente COMO CARREGADO — a referência do que o Salvar vai
+   * alterar (`customerUpdatePatch`) e de se o documento pode ser preenchido.
+   */
+  record: any | null;
+  /** Clientes de OUTROS pagadores: não podem ser escolhidos de novo. */
+  takenCustomerIds: string[];
+  /** Troca o cliente deste pagador (a cópia do cadastro é refeita inteira). */
+  onSwapCustomer: (record: any) => void;
+  /** Tira este pagador do orçamento; ausente quando ele é o único. */
+  onRemove?: () => void;
+  customersCache: React.MutableRefObject<Map<string, any>>;
   disabled?: boolean;
   /** Attention entity id — the TASK_QUOTE this config belongs to. */
   quoteId?: string;
-  /**
-   * Quantos veículos o orçamento JÁ cobre, quando ele existe.
-   *
-   * Na criação a contagem sai de placas × números de série do passo 1 — é o
-   * mesmo produto cartesiano que vira `taskIds`. Na edição esse cálculo não
-   * serve: o formulário carrega os campos de UMA tarefa, daria 1, e o seletor
-   * de faturamento sumiria de um orçamento de sessenta implementos — sem jeito de
-   * trocar `JOINT` por `PER_TASK` depois que o erro aparece no faturamento.
-   */
-  existingVehicleCount?: number;
-  /**
-   * OS VEÍCULOS do orçamento existente, com id.
-   *
-   * Só existem na EDIÇÃO. É o que permite compor lotes — "os vinte primeiros
-   * numa fatura, os quarenta noutra" —, porque um lote é uma lista de ids. Na
-   * criação a lista é vazia e o controle oferece só junto/separado: agrupar
-   * veículos que ainda não existem exigiria identidades provisórias.
-   */
-  existingVehicles?: BillingSplitVehicle[];
-  /** Quantas faturas deste orçamento já foram aprovadas — trava o refatiamento. */
-  approvedBillingCount?: number;
+  /** Quantos veículos o orçamento cobre — o dinheiro do passo é POR VEÍCULO. */
+  vehicleCount: number;
 }
 
-export function BudgetStepCustomerPayment({
+export function BudgetPayerCard({
   configIndex,
-  customer,
+  record,
+  takenCustomerIds,
+  onSwapCustomer,
+  onRemove,
+  customersCache,
   disabled,
   quoteId,
-  existingVehicleCount,
-  existingVehicles,
-  approvedBillingCount = 0,
-}: BudgetStepCustomerPaymentProps) {
+  vehicleCount,
+}: BudgetPayerCardProps) {
+  const customer = record;
   const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
   const customerData = config?.customerData || {};
@@ -145,27 +148,6 @@ export function BudgetStepCustomerPayment({
   const setConfigField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
-
-  // ── QUANTOS VEÍCULOS ──────────────────────────────────────────────────────
-  //
-  // A MESMA conta do passo 1 (`vehicleCombinations`) e a mesma que a criação usa
-  // para montar `taskIds`. Duas fontes de verdade sobre esta contagem
-  // produziriam um seletor oferecendo "uma fatura por veículo" para um número de
-  // veículos que não é o que será criado.
-  const platesWatch = (useWatch({ control, name: "plates" }) as string[] | undefined) ?? [];
-  const serialNumbersWatch =
-    (useWatch({ control, name: "serialNumbers" }) as unknown[] | undefined) ?? [];
-  const billingSplit = useWatch({ control, name: "billingSplit" }) as string | undefined;
-  // A PARTIÇÃO dos veículos, só relevante em lotes. Vive num campo do orçamento
-  // (e não espalhada por `customerConfigs`) porque é a MESMA para todos os
-  // clientes: quem a transforma em `taskIds` por fatura é o save.
-  const billingGroups =
-    (useWatch({ control, name: "billingGroups" }) as string[][] | undefined) ?? [];
-  const vehicleCount = useMemo(() => {
-    // O orçamento já existe: quem manda é a contagem de tarefas dele.
-    if (existingVehicleCount && existingVehicleCount > 0) return existingVehicleCount;
-    return vehicleCombinationCount(platesWatch, serialNumbersWatch as (string | number)[]);
-  }, [existingVehicleCount, platesWatch, serialNumbersWatch]);
 
   // O N° DO PEDIDO NÃO MORA MAIS AQUI. Ele é da ENTREGA
   // (`Task.customerOrderNumber`), não do cliente, e vive no passo 1, ao lado da
@@ -260,14 +242,16 @@ export function BudgetStepCustomerPayment({
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
-  // Lock the CNPJ field once the linked customer already has one on record.
-  // Typing a CNPJ here fires a Brasil-API lookup that OVERWRITES corporateName,
-  // address, city, etc. on the shared master customer at save time — so entering
-  // a different company's CNPJ silently clobbers an existing customer's registry
-  // (this turned the "Ibiporã" customer into "Sola" on 2026-07-13). The lookup is
-  // only meant to fill in a customer that has no CNPJ yet; corrections to an
-  // existing CNPJ must be made in the customer registry, not in this step.
-  const customerHasCnpj = String(customer?.cnpj ?? "").replace(/\D/g, "").length > 0;
+  // O DOCUMENTO SÓ SE PREENCHE EM CADASTRO QUE NÃO TEM UM. Digitar um CNPJ aqui
+  // dispara a busca na Receita, que SOBRESCREVE razão social, endereço e cidade
+  // no cadastro do cliente ao salvar — e digitar o CNPJ de outra empresa num
+  // cliente que já tem o seu transformou o "Ibiporã" em "Sola" em 13/07/2026.
+  // Trocar de empresa é trocar o CLIENTE do pagador, no combobox acima.
+  const documentLocked = !canEditPayerDocument(record);
+  const customerHasCnpj = documentLocked;
+
+  // O QUE O SALVAR VAI MUDAR NO CADASTRO — dito antes, com o nome do dono.
+  const changedFields = useMemo(() => changedCustomerFieldLabels(record, customerData), [record, customerData]);
 
   const { lookupCnpj, isLoading: isLookingUpCnpj } = useCnpjLookup({
     onSuccess: (data) => {
@@ -307,15 +291,55 @@ export function BudgetStepCustomerPayment({
   const customerLabel = customerData.fantasyName || customerData.corporateName || customer?.fantasyName || customer?.corporateName || `Cliente ${configIndex + 1}`;
 
   return (
-    <div className="space-y-4">
-      {/* Customer Data Card */}
+    <div className="space-y-4" id={`pagador-${configIndex}`}>
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <IconBuilding className="h-5 w-5 text-muted-foreground" />
-            Dados {customerLabel}
-          </CardTitle>
-          <CardDescription>Informações do cliente para o orçamento</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <IconBuilding className="h-5 w-5 text-muted-foreground" />
+                Pagador {configIndex + 1}
+              </CardTitle>
+              <CardDescription className="mt-1">Quem é faturado, com os dados que vão na nota.</CardDescription>
+            </div>
+            {onRemove && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-destructive"
+                onClick={onRemove}
+                disabled={disabled}
+              >
+                <IconTrash className="h-4 w-4" />
+                Remover pagador
+              </Button>
+            )}
+          </div>
+          <div className="pt-2">
+            <Label className="mb-2 block text-sm font-medium">
+              Cliente <span className="text-destructive">*</span>
+            </Label>
+            <PayerCustomerCombobox
+              value={config?.customerId ?? null}
+              selected={record}
+              onSelect={onSwapCustomer}
+              takenCustomerIds={takenCustomerIds}
+              customersCache={customersCache}
+              disabled={disabled}
+              queryKey={`budget-payer-${configIndex}`}
+            />
+          </div>
+          {changedFields.length > 0 && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+              <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p>
+                Ao salvar, isto altera o cadastro de{" "}
+                <span className="font-semibold">{record?.fantasyName || record?.corporateName || customerLabel}</span>:{" "}
+                {changedFields.join(", ")}.
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Row 1: Documento + Situação Cadastral + Inscrição Estadual.
@@ -347,7 +371,7 @@ export function BudgetStepCustomerPayment({
                   searchable={false}
                   clearable={false}
                   className="w-[150px]"
-                  disabled={disabled}
+                  disabled={disabled || documentLocked}
                 />
                 {docType === "cnpj" ? (
                   <Input
@@ -366,7 +390,7 @@ export function BudgetStepCustomerPayment({
                     value={customerData.cpf ?? ""}
                     onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
                     placeholder="000.000.000-00"
-                    disabled={disabled}
+                    disabled={disabled || documentLocked}
                     transparent
                     className={cn("flex-1", customerFieldAttention(NFSE_DOCUMENT_KEY))}
                     title={customerFieldAttention(NFSE_DOCUMENT_KEY) ? customerFieldTitle : undefined}
@@ -378,9 +402,10 @@ export function BudgetStepCustomerPayment({
               {isLookingUpCnpj && (
                 <span className="block text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
               )}
-              {docType === "cnpj" && customerHasCnpj && !isLookingUpCnpj && (
+              {documentLocked && !isLookingUpCnpj && (
                 <span className="block text-xs text-muted-foreground">
-                  CNPJ já cadastrado — para corrigi-lo, edite o cliente no cadastro.
+                  Documento do cadastro — para outra empresa, troque o cliente acima; para corrigi-lo, edite o cliente
+                  no cadastro.
                 </span>
               )}
             </div>
@@ -546,19 +571,15 @@ export function BudgetStepCustomerPayment({
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Billing & Payment Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <IconCreditCard className="h-5 w-5 text-muted-foreground" />
-            Faturamento e Pagamento
-          </CardTitle>
-          <CardDescription>Condições de pagamento e faturamento</CardDescription>
-        </CardHeader>
-        <CardContent>
+          {/* FATURAMENTO E PAGAMENTO — no mesmo cartão do pagador: cadastro e
+              condições são a mesma pessoa, e cartões separados embaralhavam de
+              quem era cada condição numa lista de dois pagadores. */}
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+              Faturamento e Pagamento
+            </div>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 flex-1 min-w-[100px]">
               <Label className="text-sm text-muted-foreground">
@@ -606,44 +627,6 @@ export function BudgetStepCustomerPayment({
                 <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
-            {/* ═══════════════════════════════════════════════════════════════
-                JUNTO, SEPARADO OU EM LOTES
-
-                Mora aqui, e não no passo Informações, porque a escolha É sobre
-                faturamento: quantas faturas, quantas notas fiscais e quantos
-                planos de parcelas este cliente vai receber. Fica na mesma linha
-                da condição de pagamento, que é a outra metade da mesma decisão.
-
-                Só no PRIMEIRO cliente: a escolha é do ORÇAMENTO, não de cada
-                cliente (um lote é uma unidade de cobrança, não um negócio
-                diferente), e repeti-la por passo faria a segunda cópia
-                sobrescrever a primeira sem que ninguém notasse. Com um veículo
-                só o componente não renderiza nada — a pergunta não existe.
-
-                ⚠️ E A CONTAGEM ENTRA NA CONDIÇÃO, não só dentro do componente.
-                `BillingSplitField` devolve `null` com um veículo, mas o
-                INVÓLUCRO continuava sendo renderizado: um item de flex com
-                `flex-1 min-w-[260px]` e nada dentro, ou seja, um buraco de 260px
-                no meio da linha em todo orçamento de UM veículo — que é a
-                esmagadora maioria. Quem decide não renderizar tem de ser quem
-                ocupa o espaço. (Defeito gêmeo em `billing-step-customer`.)
-                ═════════════════════════════════════════════════════════════ */}
-            {configIndex === 0 && ((existingVehicles?.length ?? 0) > 1 || (vehicleCount ?? 0) > 1) && (
-              <div className="flex-1 min-w-[260px]">
-                <BillingSplitField
-                  vehicles={existingVehicles ?? []}
-                  vehicleCount={vehicleCount}
-                  value={(billingSplit ?? "JOINT") as BillingSplitValue}
-                  groups={billingGroups}
-                  disabled={disabled}
-                  approvedCount={approvedBillingCount}
-                  onChange={({ billingSplit: nextSplit, billingGroups: nextGroups }) => {
-                    setFormValue("billingSplit", nextSplit, { shouldDirty: true });
-                    setFormValue("billingGroups", nextGroups, { shouldDirty: true });
-                  }}
-                />
-              </div>
-            )}
             {/* ── Condição de Pagamento (type) ── */}
             <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">Condição de Pagamento</Label>
@@ -732,6 +715,7 @@ export function BudgetStepCustomerPayment({
                 />
               </div>
             )}
+          </div>
           </div>
         </CardContent>
       </Card>

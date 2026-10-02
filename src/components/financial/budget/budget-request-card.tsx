@@ -275,7 +275,7 @@ export function BudgetRequestCard({
               <p className="text-sm text-muted-foreground">
                 {vehicles.length === 1
                   ? "1 veículo neste orçamento."
-                  : `${vehicles.length} veículos neste orçamento — a relação está no passo Tarefa e no Resumo.`}
+                  : `${vehicles.length} veículos neste orçamento — a relação está no passo Veículos e no Resumo.`}
               </p>
             )}
 
@@ -290,17 +290,19 @@ export function BudgetRequestCard({
                 num relance. */}
 
             {/* ── ARQUIVOS-BASE ──────────────────────────────────────────────
-                São `Task.baseFiles`, os MESMOS que o passo 1 edita. Aqui eles
+                São `Task.baseFiles`, os MESMOS que o passo Tarefa edita. Aqui eles
                 aparecem só para olhar, ao lado do texto que os explica. */}
             {isFull && baseFiles.length > 0 && (
               <div className="rounded-lg bg-muted/50 px-4 py-3">
-                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                {/* `div`, não `p`: o Badge é um `div`, e `div` dentro de `p` é HTML
+                    inválido (o React avisa no console a cada render). */}
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <IconPaperclip className="h-3.5 w-3.5" />
                   Arquivos-base
                   <Badge variant="secondary" className="ml-1">
                     {baseFiles.length}
                   </Badge>
-                </p>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {baseFiles.map((file, index) => (
                     <FileThumbnail

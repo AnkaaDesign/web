@@ -12,7 +12,6 @@ import { isQuoteValidityExpired } from "@/components/financial/budget/validity";
 import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
-  useBudget,
   useBudgetByTask,
   useCreateBudget,
   useUpdateBudget,
@@ -34,7 +33,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
 import { useAirbrushingCreationGuard } from "@/hooks/production/use-airbrushing-creation-guard";
 import { uploadSingleFile } from "@/api-client/file";
-import { getCustomers, getPaintById, getTaskById } from "@/api-client";
+import { getCustomerById, getCustomers, getPaintById, getTaskById } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
@@ -43,12 +42,35 @@ import { readReturnTo } from "@/hooks/common/use-return-to";
 import type { FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { getResponsibleRoles } from "@/types/responsible";
-// Step components
-import { BudgetStepTask } from "@/components/financial/budget/steps/budget-step-task";
-import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-info";
+// Os passos — os MESMOS da criação (ver `utils/budget-wizard.ts`).
+import {
+  BudgetWizardStepTask,
+  BUDGET_TASK_ANCHORS,
+  type BudgetApplyField,
+} from "@/components/financial/budget/wizard/budget-wizard-step-task";
+import {
+  BudgetWizardStepVehicles,
+  BUDGET_VEHICLES_ART_ANCHOR,
+  type BudgetVehicleApplyField,
+} from "@/components/financial/budget/wizard/budget-wizard-step-vehicles";
+import { BudgetWizardStepBilling } from "@/components/financial/budget/wizard/budget-wizard-step-billing";
 import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
-import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
+import {
+  BUDGET_WIZARD_STEP,
+  budgetWizardSteps,
+  firstFailingStep,
+  resolveStepJump,
+  type BudgetWizardStep,
+} from "@/utils/budget-wizard";
+import { customerUpdatePatch } from "@/utils/budget-payers";
+import {
+  measureLayoutFromSaved,
+  measurePayloadOf,
+  measuresWidthError,
+  type MeasureLayout,
+} from "@/utils/implement-measures";
+import { FACE_LABEL, FACE_MEASURE_FIELD, IMPLEMENT_FACES, type ImplementFace } from "@/constants/implement-faces";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import { BudgetRequestCard } from "@/components/financial/budget/budget-request-card";
 import { BudgetStateActions } from "@/components/financial/budget/budget-state-actions";
@@ -95,7 +117,6 @@ import {
 } from "@/utils/airbrushing-reconcile";
 import { useImplementMeasuresByImplement } from "@/hooks";
 import { airbrushingKeys } from "@/hooks/common/query-keys";
-import { formatTaskMeasures } from "@/utils/task-measures";
 import { getApiBaseUrl } from "@/config/api";
 
 /**
@@ -180,17 +201,13 @@ const SIGNATURE_ANCHOR_ID = "assinatura-eletronica";
  * O PASSO E A ÂNCORA DA ARTE DO IMPLEMENTO.
  *
  * O orçamento não escolhe arte (Modelo C, P12): o documento leva a APROVADA de
- * cada implemento. Quando a emissão diz "arte pendente", o caminho é o veículo
- * sem arte, no passo 1.
+ * cada implemento. Quando a emissão diz "arte pendente", o caminho é o cartão do
+ * veículo, no passo Veículos.
  */
-const ARTWORK_STEP = 1;
-const ARTWORK_ANCHOR_ID = "arte-do-implemento";
+const ARTWORK_STEP = BUDGET_WIZARD_STEP.VEHICLES;
+const ARTWORK_ANCHOR_ID = BUDGET_VEHICLES_ART_ANCHOR;
 /** Os atos e o registro da aprovação do valor, no Resumo. */
 const VALUE_ANCHOR_ID = "valor-do-orcamento";
-/** Os pagadores: o primeiro passo de cliente. */
-const FIRST_CUSTOMER_STEP = 4;
-/** A validade da proposta mora no passo "Informações". */
-const INFO_STEP = 2;
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -290,7 +307,7 @@ const FinancialBudgetDetailPageInner = () => {
   const vehiclesReady = vehicles.tasksLoaded && vehicles.airbrushingsLoaded;
 
   // State
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<BudgetWizardStep>(BUDGET_WIZARD_STEP.TASK);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const guardAirbrushingCreation = useAirbrushingCreationGuard();
   // Tracks whether the form has received its first server-data reset.
@@ -306,8 +323,11 @@ const FinancialBudgetDetailPageInner = () => {
   // Task-specific state
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
   const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([]);
-  // O veículo mostrado no passo 1. Começa pelo da rota.
+  // O veículo de que falam detalhes, tinta e aerografia no passo Tarefa. Começa
+  // pelo da rota.
   const [activeVehicleId, setActiveVehicleId] = useState<string>(taskId ?? "");
+  // O cartão aberto no passo Veículos (com N veículos, um de cada vez).
+  const [openVehicleId, setOpenVehicleId] = useState<string | null>(taskId ?? null);
   const activeVehicleIndex = Math.max(0, vehicleTaskIds.indexOf(activeVehicleId));
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   // Foto da plaqueta (VIN) — imagem única POR VEÍCULO, espelhando o campo do formulário de Tarefa.
@@ -401,17 +421,19 @@ const FinancialBudgetDetailPageInner = () => {
    * explícito — é assim que a foto é removida.
    */
   const handleVinPlateFilesChange = useCallback(
-    (files: FileWithPreview[]) => {
+    (vehicleId: string, files: FileWithPreview[]) => {
+      const index = vehicleTaskIds.indexOf(vehicleId);
+      if (index < 0) return;
       const picked = files.slice(-1);
-      setVinPlateFilesByTask((prev) => ({ ...prev, [activeVehicleId]: picked }));
+      setVinPlateFilesByTask((prev) => ({ ...prev, [vehicleId]: picked }));
       const existing = picked.find((f) => f.uploaded);
       form.setValue(
-        `vehicles.${activeVehicleIndex}.vinPlateId` as never,
+        `vehicles.${index}.vinPlateId` as never,
         (existing?.uploadedFileId || existing?.id || null) as never,
         { shouldDirty: true },
       );
     },
-    [form, activeVehicleId, activeVehicleIndex],
+    [form, vehicleTaskIds],
   );
 
   // Unsaved changes guard — prevents losing edits on back/cancel/breadcrumb/refresh
@@ -843,50 +865,30 @@ const FinancialBudgetDetailPageInner = () => {
   }, []);
 
   /**
-   * O ORÇAMENTO COMO A API O LÊ POR ID — é a leitura que traz `emission`
-   * ("para emitir falta…") e `valueApproval` (quem aprovou o valor). A leitura
-   * por tarefa, que alimenta o formulário, não os traz.
+   * `emission` ("para emitir falta…") e `valueApproval` (quem aprovou o valor)
+   * vêm na MESMA leitura por tarefa que alimenta o formulário (desde 02/10 a API
+   * os traz em `GET /budgets/task/:taskId`) — a segunda leitura por id saiu.
    */
-  const { data: budgetDetailResponse } = useBudget(existingQuote?.id ?? "");
-  const budgetDetail = ((budgetDetailResponse as any)?.data?.data ?? null) as Budget | null;
+  const budgetDetail = existingQuote as Budget | null;
 
-  // Dynamic steps based on customer count
+  // ═══════════════════════════════════════════════════════════════════════
+  // OS CINCO PASSOS — Tarefa · Veículos · Serviços · Faturamento · Resumo
+  // ═══════════════════════════════════════════════════════════════════════
+  // O detalhe se navega LIVRE: o orçamento é revisitado várias vezes (precificar,
+  // enviar, arte, emitir, cobrar), e o Salvar confere todos os passos.
   const customerConfigs = form.watch("customerConfigs");
-  const steps = useMemo(() => {
-    const base = [
-      // Com N veículos o passo 1 tem o que é comum a todos e uma aba por implemento.
-      multiVehicle
-        ? { id: 1, name: "Veículos", description: `Dados dos ${vehicleCount} veículos` }
-        : { id: 1, name: "Tarefa", description: "Dados da tarefa" },
-      { id: 2, name: "Informações", description: "Prazos e clientes" },
-      { id: 3, name: "Serviços", description: "Serviços e preços" },
-    ];
-    if (Array.isArray(customerConfigs)) {
-      customerConfigs.forEach((config: any, i: number) => {
-        const customer = customersCache.current.get(config?.customerId);
-        base.push({
-          id: 4 + i,
-          name: `Cliente ${i + 1}`,
-          description: customer?.fantasyName || "Cliente",
-        });
-      });
-    }
-    base.push({
-      id: base.length + 1,
-      name: "Resumo",
-      description: "Revisão final",
-    });
-    return base;
-  }, [customerConfigs, multiVehicle, vehicleCount]);
-
-  const totalSteps = steps.length;
+  const steps = useMemo(
+    () => budgetWizardSteps({ vehicleCount, payerCount: (customerConfigs ?? []).length }),
+    [vehicleCount, customerConfigs],
+  );
+  const totalSteps = BUDGET_WIZARD_STEP.REVIEW;
 
   /**
    * DA FAIXA DOS EIXOS ATÉ O LUGAR DE RESOLVER. A faixa não age; ela leva ao
    * passo e ao cartão do ato (valor, arte, assinatura) — ou ao faturamento,
    * quando a cobrança está liberada.
    */
-  const goToStepAnchor = useCallback((step: number, anchorId?: string) => {
+  const goToStepAnchor = useCallback((step: BudgetWizardStep, anchorId?: string) => {
     setCurrentStep(step);
     if (!anchorId) return;
     // Mesmo atraso de `goToArtworkStep`: o passo só fica visível no commit seguinte.
@@ -909,25 +911,18 @@ const FinancialBudgetDetailPageInner = () => {
           return;
         case "billing":
           if (budgetDetail?.billable && taskId) navigate(routes.financial.billing.details(taskId));
-          else goToStepAnchor(Math.min(FIRST_CUSTOMER_STEP, totalSteps));
+          else goToStepAnchor(BUDGET_WIZARD_STEP.BILLING);
           return;
         case "validity":
-          goToStepAnchor(INFO_STEP);
+          goToStepAnchor(BUDGET_WIZARD_STEP.TASK, BUDGET_TASK_ANCHORS.terms);
           return;
         case "responsibles":
-          goToStepAnchor(1);
+          goToStepAnchor(BUDGET_WIZARD_STEP.TASK, BUDGET_TASK_ANCHORS.responsibles);
           return;
       }
     },
     [goToArtworkStep, goToStepAnchor, totalSteps, budgetDetail?.billable, taskId, navigate],
   );
-
-  // Clamp current step when customer count changes
-  useEffect(() => {
-    if (currentStep > totalSteps) {
-      setCurrentStep(totalSteps);
-    }
-  }, [totalSteps, currentStep]);
 
   // Attention: open on the customer step that a rule is asking about.
   //
@@ -964,12 +959,11 @@ const FinancialBudgetDetailPageInner = () => {
     // existe mais. Quem seguia a linha piscando chegava a um passo sem nada aceso
     // — e sair da tela dá quatro horas de silêncio à regra.
     //
-    // O passo 1 é onde o campo mora (a grade de veículos no faturamento, o passo
-    // Tarefa no orçamento), e é para lá que a regra manda agora. O passo do
-    // cliente continua sendo o destino da regra de CADASTRO do tomador, que é de
-    // fato da fatia.
+    // O campo mora no cartão de cada veículo (passo Veículos), e é para lá que
+    // a regra manda. O cartão do pagador (passo Faturamento) continua sendo o
+    // destino da regra de CADASTRO do tomador, que é de fato da fatia.
     if (orderNumberAttentionActive) {
-      setCurrentStep(1);
+      setCurrentStep(BUDGET_WIZARD_STEP.VEHICLES);
       return;
     }
     const idx = customerConfigs.findIndex((c: any) => {
@@ -977,86 +971,26 @@ const FinancialBudgetDetailPageInner = () => {
       return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
     });
     if (idx < 0) return;
-    // Customer steps start at 4 (Tarefa, Informações, Serviços, then one per customer).
-    setCurrentStep(4 + idx);
-  }, [orderNumberAttentionActive, customerDataAttentionActive, customerConfigs]);
-
-  // Step validation. Parameterized by step (not read off `currentStep`) so a
-  // jump can run every gate between here and the target — see handleStepClick.
-  const validateStep = useCallback((step: number): boolean => {
-    const data = form.getValues();
-    switch (step) {
-      case 1: {
-        const hasIdentifier =
-          data.name ||
-          data.customerId ||
-          (data.vehicles || []).some((v: VehicleFormValues) => v?.plate || v?.serialNumber);
-        if (!hasIdentifier) {
-          toast.error("Preencha: Nome, Cliente, Placa ou Nº de série.");
-          return false;
-        }
-        return true;
-      }
-      case 2: {
-        if (!data.customerConfigs || data.customerConfigs.length === 0) {
-          toast.error("Selecione pelo menos um cliente.");
-          return false;
-        }
-        if (!data.expiresAt) {
-          toast.error("A data de validade é obrigatória.");
-          return false;
-        }
-        return true;
-      }
-      case 3: {
-        const validServices = (data.services || []).filter(
-          (s: any) => s.description?.trim(),
-        );
-        if (validServices.length === 0) {
-          toast.error("Adicione pelo menos um serviço.");
-          return false;
-        }
-        return true;
-      }
-      default:
-        return true;
-    }
-  }, [form]);
-
-  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
+    // Os pagadores são cartões do passo Faturamento: abre nele, no cartão certo.
+    goToStepAnchor(BUDGET_WIZARD_STEP.BILLING, `pagador-${idx}`);
+  }, [orderNumberAttentionActive, customerDataAttentionActive, customerConfigs, goToStepAnchor]);
 
   const nextStep = useCallback(() => {
-    if (validateCurrentStep()) {
-      setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
-    }
-  }, [validateCurrentStep, totalSteps]);
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps) as BudgetWizardStep);
+  }, [totalSteps]);
 
   const prevStep = useCallback(() => {
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    setCurrentStep((prev) => Math.max(prev - 1, 1) as BudgetWizardStep);
   }, []);
 
-  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // EVERY gate between here and the target, exactly as pressing "Próximo" that
-  // many times would — the first refusal parks the user on the offending step,
-  // which already surfaced its own reason. That is what lets any marker be
-  // clickable: no jump can skip a validation the button enforces.
+  // Navegação LIVRE (ver `resolveStepJump`): nada se perde revisitando, e o Salvar
+  // confere tudo antes de gravar.
   const handleStepClick = useCallback(
     (step: number) => {
       if (step === currentStep) return;
-      if (step < currentStep) {
-        setCurrentStep(step);
-        return;
-      }
-      const target = Math.min(step, totalSteps);
-      for (let s = currentStep; s < target; s++) {
-        if (!validateStep(s)) {
-          setCurrentStep(s);
-          return;
-        }
-      }
-      setCurrentStep(target);
+      setCurrentStep(resolveStepJump(currentStep, step, {}, {}, "free").step);
     },
-    [currentStep, validateStep, totalSteps],
+    [currentStep],
   );
 
   /**
@@ -1094,10 +1028,52 @@ const FinancialBudgetDetailPageInner = () => {
     return { keys, labels };
   }, [multiVehicle, task, vehiclesReady, vehicleTasks]);
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // AS MEDIDAS DO IMPLEMENTO — comuns, no desenho estilizado do formulário de tarefa
+  // ═══════════════════════════════════════════════════════════════════════
+  // Mesmo orçamento, mesmo implemento: as medidas são gravadas no implemento da
+  // tarefa aberta e a API as replica aos irmãos do orçamento. Só as faces que o
+  // operador mexeu viajam no Salvar.
+  const openImplementId = ((task?.implement as any)?.id as string | undefined) ?? "";
+  const { data: measuresData } = useImplementMeasuresByImplement(openImplementId, { enabled: !!openImplementId });
+  const savedMeasureLayouts = useMemo(() => {
+    const saved: Partial<Record<ImplementFace, MeasureLayout>> = {};
+    for (const face of IMPLEMENT_FACES) {
+      const layout = measureLayoutFromSaved((measuresData as any)?.[FACE_MEASURE_FIELD[face]]);
+      if (layout) saved[face] = layout;
+    }
+    return saved;
+  }, [measuresData]);
+  const savedMeasureSides = useMemo(
+    () => new Set(Object.keys(savedMeasureLayouts) as ImplementFace[]),
+    [savedMeasureLayouts],
+  );
+  const [editedMeasureLayouts, setEditedMeasureLayouts] = useState<Partial<Record<ImplementFace, MeasureLayout>>>({});
+  const [modifiedMeasureSides, setModifiedMeasureSides] = useState<Set<ImplementFace>>(new Set());
+  const handleMeasureChange = useCallback((side: ImplementFace, layout: MeasureLayout) => {
+    setEditedMeasureLayouts((prev) => ({ ...prev, [side]: layout }));
+    setModifiedMeasureSides((prev) => (prev.has(side) ? prev : new Set(prev).add(side)));
+  }, []);
+  // O que o editor mostra: o editado por cima do gravado.
+  const measureLayouts = useMemo(
+    () => ({ ...savedMeasureLayouts, ...editedMeasureLayouts }),
+    [savedMeasureLayouts, editedMeasureLayouts],
+  );
+  const measuresError = useMemo(() => measuresWidthError(measureLayouts), [measureLayouts]);
+
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     const data = form.getValues();
     if (!taskId) return;
+
+    // 0. OS CINCO PASSOS — a navegação é livre, então é aqui que cada passo é
+    // conferido; o primeiro com problema é aberto, com o motivo.
+    const failing = firstFailingStep(data as any, { measuresError });
+    if (failing) {
+      setCurrentStep(failing.step);
+      toast.error(failing.message);
+      return;
+    }
 
     // 0a. Responsáveis: as demais telas (criar tarefa, editar tarefa, criar
     // orçamento) validam aqui e avisam. Esta não validava, então apagar todas as
@@ -1105,7 +1081,7 @@ const FinancialBudgetDetailPageInner = () => {
     // `syncResponsibleRoles` ignora linha sem função — e sem nenhuma mensagem.
     if (!validateResponsibleRows(responsibleRows)) {
       setShowResponsibleErrors(true);
-      setCurrentStep(1);
+      goToStepAnchor(BUDGET_WIZARD_STEP.TASK, BUDGET_TASK_ANCHORS.responsibles);
       toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis.");
       return;
     }
@@ -1163,6 +1139,19 @@ const FinancialBudgetDetailPageInner = () => {
           }
         } catch (error: any) {
           toast.error(`Erro ao enviar a foto da plaqueta: ${error.message}`);
+        }
+      }
+
+      // 1a'. As fotos das faces das medidas que mudaram (a da traseira, em geral).
+      const uploadedMeasurePhotoIds: Partial<Record<ImplementFace, string>> = {};
+      for (const side of modifiedMeasureSides) {
+        const photoFile = editedMeasureLayouts[side]?.photoFile;
+        if (!(photoFile instanceof File)) continue;
+        try {
+          const response = await uploadSingleFile(photoFile, { fileContext: "implementMeasurePhotos" });
+          if (response.success && response.data) uploadedMeasurePhotoIds[side] = response.data.id;
+        } catch (error: any) {
+          toast.error(`Erro ao enviar a foto da face ${FACE_LABEL[side]}: ${error.message}`);
         }
       }
 
@@ -1316,6 +1305,16 @@ const FinancialBudgetDetailPageInner = () => {
         if (vDirty.vinPlateId || pendingVinPlateByTask[vehicleTask.id]) {
           implementPayload.vinPlateId = vinPlateIdByTask[vehicleTask.id] ?? null;
         }
+        // AS MEDIDAS — só no implemento da tarefa aberta; a API as replica aos
+        // irmãos do orçamento (`implement-measure-replication`).
+        if (vehicleTask.id === taskId) {
+          for (const side of modifiedMeasureSides) {
+            const layout = editedMeasureLayouts[side];
+            if (layout?.sections?.length) {
+              implementPayload[FACE_MEASURE_FIELD[side]] = measurePayloadOf(layout, uploadedMeasurePhotoIds[side]);
+            }
+          }
+        }
         if (Object.keys(implementPayload).length > 0) payload.implement = implementPayload;
 
         return payload;
@@ -1399,38 +1398,31 @@ const FinancialBudgetDetailPageInner = () => {
         return;
       }
 
-      // 5. Update customer data (address, CNPJ, etc.)
+      // 5. O CADASTRO DOS PAGADORES — só o que mudou, e no cliente CERTO.
+      //
+      // A cópia editável (`customerData`) é comparada com o cadastro como foi
+      // carregado (`customerUpdatePatch`): nada mudou, nada se grava; documento só
+      // em cadastro sem documento. Antes o Salvar regravava todos os campos de
+      // todo pagador a cada gravação. Ver `utils/budget-payers.ts`.
       for (const config of data.customerConfigs || []) {
-        if (config.customerData && config.customerId) {
+        if (!config?.customerId || !config.customerData) continue;
+        let record = customersCache.current.get(config.customerId);
+        if (!record) {
           try {
-            await customerService.updateCustomer(config.customerId, {
-              // `fantasyName` is the FIRST entry of NFSE_REQUIRED_CUSTOMER_FIELDS and the step has
-              // always rendered an input for it — but it was never in this payload, so filling it
-              // was silently discarded and `billing-customer-incomplete` kept firing for a field
-              // the user had already typed. Same omission existed on the Faturamento wizard.
-              fantasyName: config.customerData.fantasyName || undefined,
-              corporateName: config.customerData.corporateName || undefined,
-              cnpj: config.customerData.cnpj || undefined,
-              cpf: config.customerData.cpf || undefined,
-              address: config.customerData.address || undefined,
-              addressNumber:
-                config.customerData.addressNumber || undefined,
-              addressComplement:
-                config.customerData.addressComplement || undefined,
-              neighborhood: config.customerData.neighborhood || undefined,
-              city: config.customerData.city || undefined,
-              state: config.customerData.state || undefined,
-              zipCode: config.customerData.zipCode || undefined,
-              stateRegistration:
-                config.customerData.stateRegistration || undefined,
-              municipalRegistration:
-                config.customerData.municipalRegistration || undefined,
-              streetType: config.customerData.streetType || undefined,
-              registrationStatus: config.customerData.registrationStatus ?? undefined,
-            });
+            record = ((await getCustomerById(config.customerId)) as any)?.data;
+            if (record) customersCache.current.set(record.id, record);
           } catch {
-            // Error toast is emitted by the axios error interceptor.
+            record = null;
           }
+        }
+        if (!record) continue;
+        const patch = customerUpdatePatch(record, config.customerData);
+        if (Object.keys(patch).length === 0) continue;
+        try {
+          await customerService.updateCustomer(config.customerId, patch as any);
+        } catch {
+          // Error toast is emitted by the axios error interceptor (o 409 do
+          // documento de outro cliente diz de quem é).
         }
       }
 
@@ -1760,6 +1752,10 @@ const FinancialBudgetDetailPageInner = () => {
   }, [
     form,
     guardAirbrushingCreation,
+    measuresError,
+    goToStepAnchor,
+    modifiedMeasureSides,
+    editedMeasureLayouts,
     taskId,
     task,
     existingQuote,
@@ -1854,12 +1850,12 @@ const FinancialBudgetDetailPageInner = () => {
     [vehicleTaskIds, watchedVehicles, paintById, dirtyVehicleFields],
   );
 
-  // "Aplicar aos demais" — copia o valor do veículo mostrado para todos os outros.
-  const applyToOtherVehicles = useCallback(
-    (field: "customerOrderNumber" | "forecastDate" | "paintId") => {
-      const value = form.getValues(`vehicles.${activeVehicleIndex}.${field}` as never) as unknown;
+  // "Aplicar aos demais" — copia o valor de um veículo para todos os outros.
+  const applyFromVehicle = useCallback(
+    (field: BudgetApplyField | BudgetVehicleApplyField, fromIndex: number) => {
+      const value = form.getValues(`vehicles.${fromIndex}.${field}` as never) as unknown;
       vehicleTaskIds.forEach((_, index) => {
-        if (index === activeVehicleIndex) return;
+        if (index === fromIndex) return;
         form.setValue(
           `vehicles.${index}.${field}` as never,
           (value instanceof Date ? new Date(value) : value) as never,
@@ -1869,18 +1865,13 @@ const FinancialBudgetDetailPageInner = () => {
       const others = vehicleTaskIds.length - 1;
       toast.success(`Aplicado ${others === 1 ? "ao outro veículo" : `aos outros ${others} veículos`}.`);
     },
-    [form, activeVehicleIndex, vehicleTaskIds],
+    [form, vehicleTaskIds],
   );
-
-  // O TAMANHO do implemento — comum, lançado pela Logística na tarefa e replicado aos
-  // irmãos pela API. Aqui só se lê.
-  const openImplementId = ((task?.implement as any)?.id as string | undefined) ?? "";
-  const { data: measuresData } = useImplementMeasuresByImplement(openImplementId, { enabled: !!openImplementId });
-  const measuresSummary = useMemo(() => {
-    if (!openImplementId) return null;
-    const formatted = formatTaskMeasures({ implement: (measuresData as any) ?? {} } as any);
-    return formatted === "-" ? "ainda não medido" : `${formatted} cm`;
-  }, [openImplementId, measuresData]);
+  // No passo Tarefa (detalhes, tinta): a partir do veículo escolhido nas abas.
+  const applyFromActiveVehicle = useCallback(
+    (field: BudgetApplyField) => applyFromVehicle(field, activeVehicleIndex),
+    [applyFromVehicle, activeVehicleIndex],
+  );
 
   // ─── A ARTE DE CADA VEÍCULO (só leitura) ───────────────────────────────
   //
@@ -1939,10 +1930,29 @@ const FinancialBudgetDetailPageInner = () => {
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artVehicles]);
-  const handleReviewVehicleSelect = useCallback((vehicleId: string) => {
-    setActiveVehicleId(vehicleId);
-    setCurrentStep(1);
-  }, []);
+  // Do Resumo (ou do resumo da arte no passo Tarefa) ao cartão do veículo.
+  const openVehicleCard = useCallback(
+    (vehicleId: string) => {
+      setActiveVehicleId(vehicleId);
+      setOpenVehicleId(vehicleId);
+      goToStepAnchor(BUDGET_WIZARD_STEP.VEHICLES, ARTWORK_ANCHOR_ID);
+    },
+    [goToStepAnchor],
+  );
+  const handleReviewVehicleSelect = openVehicleCard;
+
+  // Os cartões do passo Veículos.
+  const vehicleCards = useMemo(
+    () =>
+      vehicleTabs.map((tab, index) => ({
+        taskId: tab.taskId,
+        label: tab.label,
+        detail: tab.detail,
+        dirty: tab.dirty,
+        art: artVehicles[index],
+      })),
+    [vehicleTabs, artVehicles],
+  );
 
   // Build header info
   const taskName = task?.name || task?.implement?.plate || "Tarefa";
@@ -1999,20 +2009,16 @@ const FinancialBudgetDetailPageInner = () => {
   /**
    * QUANTO DA REQUISIÇÃO DESENHAR NESTE PASSO — `null` = nada.
    *
-   * Passo 1 e Resumo: ficha inteira (montar a tarefa a partir do pedido; e
-   * conferir o montado contra o pedido). Passo 3: faixa de uma linha, porque o
-   * briefing é o insumo de QUE serviços cobrar e tirá-lo dali seria perder o
-   * insumo — mas quem digita preço não precisa da ficha. Passo 2 e passos de
-   * Cliente: nada. Ver `budget-request-card.tsx`.
-   *
-   * ⚠️ O passo 3 é "Serviços" SEMPRE: os passos variáveis (um por cliente de
-   * faturamento) entram a partir do 4, e o Resumo é sempre o último.
+   * Tarefa e Resumo: ficha inteira (montar a tarefa a partir do pedido; e
+   * conferir o montado contra o pedido). Veículos e Serviços: faixa de uma
+   * linha — o pedido traz os veículos e o briefing é o insumo de QUE serviços
+   * cobrar, mas quem digita placa ou preço não precisa da ficha. Faturamento:
+   * nada. Ver `budget-request-card.tsx`.
    */
-  const requestVariant: "full" | "summary" | null = isLastStep
-    ? "full"
-    : currentStep === 1
+  const requestVariant: "full" | "summary" | null =
+    currentStep === BUDGET_WIZARD_STEP.TASK || currentStep === BUDGET_WIZARD_STEP.REVIEW
       ? "full"
-      : currentStep === 3
+      : currentStep === BUDGET_WIZARD_STEP.VEHICLES || currentStep === BUDGET_WIZARD_STEP.SERVICES
         ? "summary"
         : null;
 
@@ -2143,10 +2149,24 @@ const FinancialBudgetDetailPageInner = () => {
         )}
 
         <FormProvider {...form}>
-          {/* Steps 1–3 stay mounted (hidden via CSS) to preserve useFieldArray state */}
-          <div style={{ display: currentStep === 1 ? undefined : "none" }}>
-            <BudgetStepTask
-              isEditMode
+          {/* Os passos ficam MONTADOS (escondidos por CSS): o estado local de cada
+              um (useFieldArray, o CPF/CNPJ do pagador, a "Data específica") tem de
+              sobreviver ao vai e volta.
+
+              ⚠️ E só montam DEPOIS da primeira carga do formulário. Com as seções
+              abertas (sem acordeão), o seletor de aerografia montava com a lista
+              vazia e, quando o `form.reset` trazia as do servidor, devolvia-as ao
+              formulário como edição — o veículo abria "alterado" sem ninguém mexer,
+              e o aviso de alterações não salvas disparava ao sair. */}
+          {!formInitialized ? (
+            <div className="flex min-h-[200px] items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : (
+          <>
+          <div style={{ display: currentStep === BUDGET_WIZARD_STEP.TASK ? undefined : "none" }}>
+            <BudgetWizardStepTask
+              mode="edit"
               disabled={isSubmitting || !canEdit}
               responsibleRows={responsibleRows}
               onResponsibleRowsChange={handleResponsibleRowsChange}
@@ -2155,9 +2175,7 @@ const FinancialBudgetDetailPageInner = () => {
               onBaseFilesChange={handleBaseFilesChange}
               artVehicles={artVehicles}
               budgetId={existingQuote?.id}
-              artAnchorId={ARTWORK_ANCHOR_ID}
-              vinPlateFiles={vinPlateFilesByTask[activeVehicleId] ?? []}
-              onVinPlateFilesChange={handleVinPlateFilesChange}
+              onOpenVehicle={openVehicleCard}
               vehicleFieldPrefix={`vehicles.${activeVehicleIndex}.`}
               vehicleKey={activeVehicleId}
               vehicleCount={vehicleCount}
@@ -2171,8 +2189,7 @@ const FinancialBudgetDetailPageInner = () => {
                   />
                 ) : undefined
               }
-              onApplyToOtherVehicles={applyToOtherVehicles}
-              measuresSummary={measuresSummary}
+              onApplyToOtherVehicles={applyFromActiveVehicle}
               commonDivergence={
                 commonDivergence.labels.length > 0
                   ? {
@@ -2185,21 +2202,28 @@ const FinancialBudgetDetailPageInner = () => {
             />
           </div>
 
-          <div style={{ display: currentStep === 2 ? undefined : "none" }}>
-            <BudgetStepInfo
+          <div style={{ display: currentStep === BUDGET_WIZARD_STEP.VEHICLES ? undefined : "none" }}>
+            <BudgetWizardStepVehicles
+              mode="edit"
               disabled={isSubmitting || !canEdit}
-              // Em edição a contagem NÃO sai de placas × séries: o formulário
-              // carrega os campos de UMA tarefa, e a conta daria 1 mesmo num
-              // orçamento de sessenta — escondendo o seletor de faturamento
-              // justamente de quem precisa dele.
-
-              customersCache={customersCache}
-              selectedCustomers={selectedCustomers}
-              setSelectedCustomers={setSelectedCustomers}
+              canEditMeasures={canEdit}
+              measures={{
+                layouts: measureLayouts,
+                modifiedSides: modifiedMeasureSides,
+                savedSides: savedMeasureSides,
+                onSideChange: handleMeasureChange,
+                error: measuresError,
+              }}
+              vehicles={vehicleCards}
+              openVehicleId={openVehicleId}
+              onOpenVehicleChange={setOpenVehicleId}
+              vinPlateFilesByTask={vinPlateFilesByTask}
+              onVinPlateFilesChange={handleVinPlateFilesChange}
+              onApplyToOtherVehicles={applyFromVehicle}
             />
           </div>
 
-          <div style={{ display: currentStep === 3 ? undefined : "none" }}>
+          <div style={{ display: currentStep === BUDGET_WIZARD_STEP.SERVICES ? undefined : "none" }}>
             <BudgetStepServices
               task={task}
               disabled={isSubmitting || !canEdit}
@@ -2208,37 +2232,20 @@ const FinancialBudgetDetailPageInner = () => {
             />
           </div>
 
-          {/* Dynamic customer steps — kept MOUNTED (hidden via CSS), like steps 1-3,
-              so each step's local UI state (CPF/CNPJ toggle, "Data específica"
-              visibility) survives Next/Back navigation. A conditional mount dropped
-              that state on every step change because it isn't lifted into the form. */}
-          {(customerConfigs || []).map((config: any, configIndex: number) => {
-            const stepNumber = 4 + configIndex;
-            const customer = config
-              ? customersCache.current.get(config.customerId)
-              : null;
-            return (
-              <div
-                key={`customer-config-${config?.customerId ?? configIndex}`}
-                style={{ display: currentStep === stepNumber ? undefined : "none" }}
-              >
-                <BudgetStepCustomerPayment
-                  configIndex={configIndex}
-                  customer={customer}
-                  disabled={isSubmitting || !canEdit}
-                  quoteId={existingQuote?.id}
-                  existingVehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : undefined}
-                  // OS VEÍCULOS, com id — é o que permite compor lotes. Só
-                  // existem na edição; na criação a lista é vazia e o controle
-                  // oferece apenas junto/separado.
-                  existingVehicles={budgetSplitVehicles}
-                  approvedBillingCount={approvedBillingCount}
-                />
-              </div>
-            );
-          })}
+          <div style={{ display: currentStep === BUDGET_WIZARD_STEP.BILLING ? undefined : "none" }}>
+            <BudgetWizardStepBilling
+              disabled={isSubmitting || !canEdit}
+              customersCache={customersCache}
+              setSelectedCustomers={setSelectedCustomers}
+              quoteId={existingQuote?.id}
+              vehicleCount={existingQuote ? quoteVehicleCount(existingQuote) : vehicleCount}
+              // OS VEÍCULOS, com id — é o que permite compor lotes.
+              existingVehicles={budgetSplitVehicles}
+              approvedBillingCount={approvedBillingCount}
+            />
+          </div>
 
-          {currentStep === totalSteps && (
+          {currentStep === BUDGET_WIZARD_STEP.REVIEW && (
             <>
               {/* AS AÇÕES DE ESTADO, no passo em que a decisão se consuma — o
                   mesmo passo do "Salvar" do cabeçalho. Ver o cabeçalho de
@@ -2301,6 +2308,8 @@ const FinancialBudgetDetailPageInner = () => {
                 </div>
               )}
             </>
+          )}
+          </>
           )}
         </FormProvider>
       </div>
