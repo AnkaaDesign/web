@@ -26,7 +26,6 @@ import {
   IconCamera,
   IconCameraCheck,
   IconFolderOpen,
-  IconPhoto,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
@@ -164,7 +163,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   } = useTaskPermissions();
 
   // Sector-specific business logic (not permission checks)
-  const isFinancialUser = privilege === SECTOR_PRIVILEGES.FINANCIAL;
   const isCommercialUser = privilege === SECTOR_PRIVILEGES.COMMERCIAL;
   const isDesignerUser = privilege === SECTOR_PRIVILEGES.DESIGNER;
 

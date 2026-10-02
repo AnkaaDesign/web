@@ -11,7 +11,6 @@ import { signatureService } from "@/api-client/signature";
 import { budgetKeys } from "@/hooks/production/use-budget";
 import { budgetService } from "@/api-client/budget";
 import { customerService } from "@/api-client/customer";
-import { uploadSingleFile } from "@/api-client/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";

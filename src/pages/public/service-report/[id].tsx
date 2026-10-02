@@ -90,7 +90,7 @@ export function PublicServiceReportPage() {
    * arranjo é determinístico: havendo arte, ela e as assinaturas dividem a última
    * folha; não havendo, tudo fecha numa folha só. É a mesma regra do
    * `quote-renderer.service` (`if (!hasLayout) tryFusedRender`), aplicada aqui
-   * sobre `layoutFiles` — a lista CRUA do orçamento, não as URLs já validadas, que
+   * sobre `artwork` — a lista CRUA da arte, não as URLs já validadas, que
    * chegam depois e fariam o bloco pular de folha ao carregar.
    *
    * Resta um caso impreciso: sem envelope, sem layout e com orçamento longo demais
@@ -100,9 +100,9 @@ export function PublicServiceReportPage() {
    */
   const signaturesOnOwnSheet = sigSummary?.hasEnvelope
     ? (sigSummary.signaturesPage ?? 0) > 0
-    : (quote?.layoutFiles?.length ?? 0) > 0;
+    : (quote?.artwork?.length ?? 0) > 0;
 
-  // Validated layout image URLs (the layoutFiles array, those that load OK)
+  // Validated art image URLs (the approved art of each implement, those that load OK)
   const [layoutImageUrls, setLayoutImageUrls] = useState<string[]>([]);
 
   // A config's customer: the FK when the payload carries it, else the nested
@@ -137,10 +137,11 @@ export function PublicServiceReportPage() {
 
   useEffect(() => { fetchQuote(); }, [fetchQuote]);
 
-  // Validate layout images exist (avoid 404s) — the layoutFiles array, order preserved
-  const layoutFileUrls = ((quote?.layoutFiles || []) as any[])
-    .filter((f) => f?.id)
-    .map((f) => `${getApiBaseUrl()}/files/serve/${f.id}`);
+  // Validate art images exist (avoid 404s) — `artwork`: a arte APROVADA de cada
+  // implemento, que a rota pública devolve; o orçamento não escolhe arte.
+  const layoutFileUrls = ((quote?.artwork || []) as any[])
+    .filter((f) => f?.fileId)
+    .map((f) => `${getApiBaseUrl()}/files/serve/${f.fileId}`);
   const layoutFileUrlsKey = layoutFileUrls.join("|");
   useEffect(() => {
     const urls = layoutFileUrlsKey ? layoutFileUrlsKey.split("|") : [];

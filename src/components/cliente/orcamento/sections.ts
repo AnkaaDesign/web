@@ -54,7 +54,7 @@ const FULL: readonly QuoteSection[] = QUOTE_SECTIONS;
  * vazio depois de `effectiveSections`. É deliberado: eles não assinam orçamento.
  * O que eles VEEM é outra coisa, e sai de `portalSectionsForRoles`.
  */
-export const PORTAL_ROLE_SECTIONS: Record<string, readonly QuoteSection[]> = {
+export const PORTAL_ROLE_SECTIONS: Record<RESPONSIBLE_ROLE, readonly QuoteSection[]> = {
   [RESPONSIBLE_ROLE.COMMERCIAL]: FULL,
   [RESPONSIBLE_ROLE.SELLER]: FULL,
   [RESPONSIBLE_ROLE.REPRESENTATIVE]: FULL,
@@ -64,22 +64,30 @@ export const PORTAL_ROLE_SECTIONS: Record<string, readonly QuoteSection[]> = {
   [RESPONSIBLE_ROLE.MARKETING]: ["LAYOUT"],
   [RESPONSIBLE_ROLE.FLEET_MANAGER]: [],
   [RESPONSIBLE_ROLE.DRIVER]: [],
+  // PCP, Expedição e Logística não assinam orçamento (como a API, `quote-sections.ts`).
+  [RESPONSIBLE_ROLE.PRODUCTION_PLANNING]: [],
+  [RESPONSIBLE_ROLE.SHIPPING]: [],
+  [RESPONSIBLE_ROLE.LOGISTICS]: [],
 };
 
 /**
  * A seção que cada CAPACIDADE implica para quem a tem.
  *
  * ⚠️ Espelho de `SECTION_IMPLIED_BY_CAPABILITY`. A lógica de cada linha está
- * escrita lá, e vale repetir a que mais surpreende: `WRITE_PURCHASE_ORDER`
- * implica `PAYMENT` porque o número do pedido é dado FISCAL — sem ele a nota não
- * sai.
+ * escrita lá; a que mais surpreende: `WRITE_PURCHASE_ORDER` implica SÓ `VEHICLE`
+ * desde que a capacidade passou a valer para todos os papéis (o número do pedido
+ * mora na identidade do veículo; quem precisa de `PAYMENT` o recebe pelo papel).
  */
 export const PORTAL_SECTION_IMPLIED_BY_CAPABILITY: Record<PORTAL_CAPABILITY, readonly QuoteSection[]> = {
   [PORTAL_CAPABILITY.REQUEST_BUDGET]: ["VEHICLE", "LAYOUT"],
   [PORTAL_CAPABILITY.APPROVE_VALUE]: ["VEHICLE", "SERVICES", "PRICING"],
-  [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER]: ["VEHICLE", "PAYMENT"],
+  // Só `VEHICLE`: a capacidade vale para TODOS os papéis, e `PAYMENT` aqui
+  // entregaria parcelas e notas ao Marketing e ao Motorista (como a API).
+  [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER]: ["VEHICLE"],
   [PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY]: ["VEHICLE"],
   [PORTAL_CAPABILITY.TRACK]: ["VEHICLE", "DELIVERY"],
+  // Não se aprova uma arte que não se pode ver, nem sem saber de que veículo ela é.
+  [PORTAL_CAPABILITY.APPROVE_ARTWORK]: ["VEHICLE", "LAYOUT"],
 };
 
 /**
@@ -92,7 +100,7 @@ export const PORTAL_SECTION_IMPLIED_BY_CAPABILITY: Record<PORTAL_CAPABILITY, rea
 export function sectionsForResponsibleRoles(roles: readonly string[] | null | undefined): QuoteSection[] {
   const union = new Set<string>();
   for (const role of roles ?? []) {
-    for (const section of PORTAL_ROLE_SECTIONS[role] ?? []) union.add(section);
+    for (const section of PORTAL_ROLE_SECTIONS[role as RESPONSIBLE_ROLE] ?? []) union.add(section);
   }
   // Canonicaliza pela ordem de `QUOTE_SECTIONS` antes de entregar, porque
   // `effectiveSections` assume entrada já tipada como seção conhecida.

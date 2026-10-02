@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { layoutScopeOf, coveredTaskIdsOfLayout } from "@/utils/quote-layout-coverage";
 import { useParams } from "react-router-dom";
 import { budgetService } from "@/api-client/budget";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
@@ -120,7 +119,7 @@ export function PublicBudgetPage() {
    * arranjo é determinístico: havendo arte, ela e as assinaturas dividem a última
    * folha; não havendo, tudo fecha numa folha só. É a mesma regra do
    * `quote-renderer.service` (`if (!hasLayout) tryFusedRender`), aplicada aqui
-   * sobre `layoutFiles` — a lista CRUA do orçamento, não as URLs já validadas, que
+   * sobre `artwork` — a lista CRUA da arte, não as URLs já validadas, que
    * chegam depois e fariam o bloco pular de folha ao carregar.
    *
    * Resta um caso impreciso: sem envelope, sem layout e com orçamento longo demais
@@ -130,7 +129,7 @@ export function PublicBudgetPage() {
    */
   const signaturesOnOwnSheet = sigSummary?.hasEnvelope
     ? (sigSummary.signaturesPage ?? 0) > 0
-    : (quote?.layoutFiles?.length ?? 0) > 0;
+    : (quote?.artwork?.length ?? 0) > 0;
 
   /** Código do envelope, reportado pelo painel de assinaturas (ver onEnvelope). */
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
@@ -390,29 +389,29 @@ export function PublicBudgetPage() {
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
 
-  // Use serve endpoint for full quality images (layoutFiles array).
+  // A ARTE do documento: a APROVADA de cada implemento (`artwork`, que a rota
+  // pública já devolve com os veículos de cada arquivo). O orçamento não escolhe
+  // arte — ela é do implemento.
   //
-  // Com UM LAYOUT PARA CADA VEÍCULO, cada arte sai com a legenda dos implementos que
-  // ela cobre ("Veículo 39088"), na ordem dos veículos — a mesma do documento
-  // assinado. No compartilhado, sem legenda: igual ao de sempre.
-  const layoutPerVehicle = layoutScopeOf(quote as any) === "PER_VEHICLE";
+  // ⛔ CADA ARTE DIZ DE QUAL VEÍCULO É ("Veículo 39088", "Veículos 39088, 39089"),
+  // na ordem dos veículos — para ninguém pintar a arte de um no outro. Só quando
+  // a arte é a mesma em TODOS sai sem legenda, como sempre saiu.
   const publicVehicles = quoteTasks<any>(quote);
   const publicVehicleLabel = (taskId: string) => {
     const index = publicVehicles.findIndex((t: any) => t.id === taskId);
     const t = publicVehicles[index];
     return t?.implement?.serialNumber || t?.implement?.plate || `${index + 1}`;
   };
-  const layoutImages: Array<{ url: string; caption: string | null; order: number }> = (quote.layoutFiles || [])
-    .filter((f: any) => f?.id)
-    .map((f: any) => {
-      if (!layoutPerVehicle) return { url: getFileServeUrl(f), caption: null, order: 0 };
-      const covered = coveredTaskIdsOfLayout(f).filter((id) =>
-        publicVehicles.some((t: any) => t.id === id),
-      );
+  const layoutImages: Array<{ url: string; caption: string | null; order: number }> = (quote.artwork || [])
+    .filter((f) => f?.fileId)
+    .map((f) => {
+      const covered = f.taskIds.filter((id) => publicVehicles.some((t: any) => t.id === id));
+      const coversAll = publicVehicles.length <= 1 || covered.length === publicVehicles.length;
       const order = Math.min(
         ...covered.map((id) => publicVehicles.findIndex((t: any) => t.id === id)),
         Number.MAX_SAFE_INTEGER,
       );
+      if (coversAll) return { url: getFileServeUrl({ id: f.fileId }), caption: null, order };
       const labels = covered
         .sort(
           (a, b) =>
@@ -420,11 +419,8 @@ export function PublicBudgetPage() {
             publicVehicles.findIndex((t: any) => t.id === b),
         )
         .map(publicVehicleLabel);
-      const caption =
-        covered.length === publicVehicles.length
-          ? "Todos os veículos"
-          : `${labels.length === 1 ? "Veículo" : "Veículos"} ${labels.join(", ")}`;
-      return { url: getFileServeUrl(f), caption, order };
+      const caption = `${labels.length === 1 ? "Veículo" : "Veículos"} ${labels.join(", ")}`;
+      return { url: getFileServeUrl({ id: f.fileId }), caption, order };
     })
     .sort((a: { order: number }, b: { order: number }) => a.order - b.order);
   const layoutImageUrls: string[] = layoutImages.map((img) => img.url);

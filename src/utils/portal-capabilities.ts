@@ -31,6 +31,8 @@ export enum PORTAL_CAPABILITY {
   WRITE_VEHICLE_IDENTITY = "WRITE_VEHICLE_IDENTITY",
   /** Acompanhar o andamento do serviço. */
   TRACK = "TRACK",
+  /** Aprovar ou reprovar a ARTE do implemento (DD5: Compras não aprova arte). */
+  APPROVE_ARTWORK = "APPROVE_ARTWORK",
 }
 
 /**
@@ -54,13 +56,20 @@ export enum PORTAL_CAPABILITY {
  *    `['VEHICLE']`. Enquanto ela implicava `PAYMENT`, universalizá-la teria
  *    entregue parcelas e boletos ao Marketing e ao Motorista.
  */
-export const PORTAL_ROLE_CAPABILITIES: Record<string, PORTAL_CAPABILITY[]> = {
+/**
+ * ⚠️ ESPELHO de `ROLE_CAPABILITIES` da API (`portal-capabilities.ts`). Tipado
+ * `Record<RESPONSIBLE_ROLE, …>`: função nova no enum sem decisão aqui é ERRO DE
+ * COMPILAÇÃO — com `Record<string>` as três funções da main de 28/09 caíam em
+ * `undefined` e o portal abria em branco para elas.
+ */
+export const PORTAL_ROLE_CAPABILITIES: Record<RESPONSIBLE_ROLE, PORTAL_CAPABILITY[]> = {
   [RESPONSIBLE_ROLE.COMMERCIAL]: [
     PORTAL_CAPABILITY.REQUEST_BUDGET,
     PORTAL_CAPABILITY.APPROVE_VALUE,
     PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
+    PORTAL_CAPABILITY.APPROVE_ARTWORK,
   ],
   [RESPONSIBLE_ROLE.SELLER]: [
     PORTAL_CAPABILITY.REQUEST_BUDGET,
@@ -68,6 +77,7 @@ export const PORTAL_ROLE_CAPABILITIES: Record<string, PORTAL_CAPABILITY[]> = {
     PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
+    PORTAL_CAPABILITY.APPROVE_ARTWORK,
   ],
   [RESPONSIBLE_ROLE.REPRESENTATIVE]: [
     PORTAL_CAPABILITY.REQUEST_BUDGET,
@@ -75,6 +85,7 @@ export const PORTAL_ROLE_CAPABILITIES: Record<string, PORTAL_CAPABILITY[]> = {
     PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
+    PORTAL_CAPABILITY.APPROVE_ARTWORK,
   ],
   [RESPONSIBLE_ROLE.COORDINATOR]: [
     PORTAL_CAPABILITY.REQUEST_BUDGET,
@@ -82,17 +93,20 @@ export const PORTAL_ROLE_CAPABILITIES: Record<string, PORTAL_CAPABILITY[]> = {
     PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
+    PORTAL_CAPABILITY.APPROVE_ARTWORK,
   ],
+  // ⛔ Compras não aprova arte (DD5).
   [RESPONSIBLE_ROLE.PURCHASING]: [
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.TRACK,
   ],
-  // Marketing pede o serviço e NÃO vê preço — a seção `PRICING` não é dele.
+  // Marketing pede o serviço e aprova a arte, e NÃO vê preço — `PRICING` não é dele.
   [RESPONSIBLE_ROLE.MARKETING]: [
     PORTAL_CAPABILITY.REQUEST_BUDGET,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
+    PORTAL_CAPABILITY.APPROVE_ARTWORK,
   ],
   [RESPONSIBLE_ROLE.FINANCIAL]: [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER],
   [RESPONSIBLE_ROLE.FLEET_MANAGER]: [
@@ -100,10 +114,17 @@ export const PORTAL_ROLE_CAPABILITIES: Record<string, PORTAL_CAPABILITY[]> = {
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
   ],
-  [RESPONSIBLE_ROLE.DRIVER]: [
+  [RESPONSIBLE_ROLE.DRIVER]: [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER, PORTAL_CAPABILITY.TRACK],
+  // PCP, Expedição e Logística (decisão do dono, 02/10): o PCP confere a
+  // identidade do veículo, como o Gestor de Frota; Expedição e Logística
+  // acompanham, como o Motorista. Nenhum pede orçamento, aprova valor ou arte.
+  [RESPONSIBLE_ROLE.PRODUCTION_PLANNING]: [
+    PORTAL_CAPABILITY.WRITE_VEHICLE_IDENTITY,
     PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
     PORTAL_CAPABILITY.TRACK,
   ],
+  [RESPONSIBLE_ROLE.SHIPPING]: [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER, PORTAL_CAPABILITY.TRACK],
+  [RESPONSIBLE_ROLE.LOGISTICS]: [PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER, PORTAL_CAPABILITY.TRACK],
 };
 
 /**
@@ -114,7 +135,7 @@ export function capabilitiesForRoles(roles: string[] | undefined | null): PORTAL
   if (!roles?.length) return [];
   const out = new Set<PORTAL_CAPABILITY>();
   for (const role of roles) {
-    for (const cap of PORTAL_ROLE_CAPABILITIES[role] ?? []) out.add(cap);
+    for (const cap of PORTAL_ROLE_CAPABILITIES[role as RESPONSIBLE_ROLE] ?? []) out.add(cap);
   }
   return [...out];
 }
