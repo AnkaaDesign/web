@@ -8,8 +8,20 @@ import { cn } from "@/lib/utils";
 import { BRAND_ASSETS } from "@/config/assets";
 import { taskLabelService, type LabelSheet } from "@/api-client/task-label";
 import type { Task } from "../../../../types";
-import { LABEL_HEIGHT, LABEL_WIDTH, taskLabelCardMarkup } from "./task-label-card";
-import { CAPTION_BASELINE, CAPTION_SIZE, GUIDE_INK, LABEL_SLOTS, SHEET_HEIGHT, SHEET_WIDTH, orientationMarkSvg, taskLabelCaption, type PlacedLabel } from "./task-label-sheet";
+import { taskLabelCardMarkup } from "./task-label-card";
+import {
+  CAPTION_SIZE,
+  GUIDE_INK,
+  LABEL_SLOTS,
+  SHEET_HEIGHT,
+  SHEET_WIDTH,
+  SLOT_HEIGHT,
+  SLOT_WIDTH,
+  captionAnchor,
+  orientationMarkSvg,
+  taskLabelCaption,
+  type PlacedLabel,
+} from "./task-label-sheet";
 
 // Right-click → "Imprimir Etiquetas": picks the A4 slots for this print and has the SERVER print the
 // sheet on the office Epson (photo paper, high quality, 100% — fixed there, nobody touches a dialog).
@@ -252,8 +264,9 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
                 const label = placedBySlot.get(slot.index);
                 const chosen = chosenSlots.includes(slot.index);
                 const task = label ? taskById.get(label.taskId) : undefined;
-                const cx = slot.x + LABEL_WIDTH / 2;
-                const cy = slot.y + LABEL_HEIGHT / 2;
+                const cx = slot.x + SLOT_WIDTH / 2;
+                const cy = slot.y + SLOT_HEIGHT / 2;
+                const anchor = captionAnchor(slot);
                 return (
                   <g
                     key={slot.index}
@@ -267,9 +280,17 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
                     {label && !used ? (
                       // what will print: the card, a faint outline where the cut goes, and the caption
                       <>
-                        <g transform={`translate(${slot.x} ${slot.y})`} dangerouslySetInnerHTML={{ __html: cardMarkup(label.taskId, slot.index) }} />
-                        <rect x={slot.x} y={slot.y} width={LABEL_WIDTH} height={LABEL_HEIGHT} rx={3} fill="none" stroke={PAPER.pickedStroke} strokeWidth={0.35} />
-                        <text x={slot.x} y={slot.y - CAPTION_BASELINE} fontSize={CAPTION_SIZE} fontWeight={600} fill={PAPER.caption} className="pointer-events-none select-none">
+                        <g transform={`translate(${slot.x + SLOT_WIDTH} ${slot.y}) rotate(90)`} dangerouslySetInnerHTML={{ __html: cardMarkup(label.taskId, slot.index) }} />
+                        <rect x={slot.x} y={slot.y} width={SLOT_WIDTH} height={SLOT_HEIGHT} rx={3} fill="none" stroke={PAPER.pickedStroke} strokeWidth={0.35} />
+                        <text
+                          transform={`translate(${anchor.x} ${anchor.y}) rotate(90)`}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize={CAPTION_SIZE}
+                          fontWeight={600}
+                          fill={PAPER.caption}
+                          className="pointer-events-none select-none"
+                        >
                           {label.caption}
                         </text>
                       </>
@@ -278,8 +299,8 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
                         <rect
                           x={slot.x}
                           y={slot.y}
-                          width={LABEL_WIDTH}
-                          height={LABEL_HEIGHT}
+                          width={SLOT_WIDTH}
+                          height={SLOT_HEIGHT}
                           rx={3}
                           fill={used ? PAPER.usedFill : chosen ? PAPER.extraFill : "#FFFFFF"}
                           stroke={used ? PAPER.usedStroke : chosen ? PAPER.extraStroke : PAPER.slotStroke}
@@ -369,8 +390,8 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
             </div>
 
             <p className="mt-auto text-xs text-muted-foreground">
-              Papel fotográfico A4 na bandeja de trás, lado de imprimir para a frente. A folha sai como aparece aqui; na folha nova vem
-              "▲ TOPO" nos cantos — recoloque-a sempre com o TOPO para cima.
+              Papel fotográfico A4 na bandeja de trás, lado de imprimir para a frente. A folha sai como aparece aqui; a folha nova vem com
+              uma seta ▲ em cada margem — recoloque-a sempre com as setas para cima.
             </p>
           </div>
         </div>
