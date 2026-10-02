@@ -552,6 +552,47 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "soft", cooldownMs: 4 * 60 * 60 * 1000 }),
   },
 
+  // PRONTO PARA EMITIR — gêmeo de `budget.ready-to-emit` (attention.service.ts, P14).
+  //
+  // Valor aprovado, a arte de todo veículo vivo aprovada, e o eixo da assinatura
+  // num estado de onde se emite (não emitida, recusada, vencida ou invalidada). A
+  // emissão NÃO é automática — o operador escolhe canal, recorte e cerimônia —,
+  // por isso é atenção, e ela some no instante em que a coleta nasce.
+  //
+  // `WAIVED` (os aprovados sem coleta da migração) e os já assinados ficam de
+  // fora, como no servidor. A "aprovação do valor vigente" do servidor
+  // (`valueApprovals: { some: { revokedAt: null } }`) é o próprio APPROVED no
+  // Modelo C: aprovar grava o registro, reprovar o encerra e devolve a PENDING.
+  //
+  // Só o COMERCIAL: é ele quem emite.
+  {
+    id: "task-quote.ready-to-emit",
+    name: "Orçamento pronto para emitir para assinatura",
+    entityType: "TASK_QUOTE",
+    enabled: true,
+    priority: 24,
+    targetSectors: [SECTOR_PRIVILEGES.COMMERCIAL],
+    predicate: {
+      op: "and",
+      nodes: [
+        { op: "eq", field: "status", value: TASK_QUOTE_STATUS.APPROVED },
+        {
+          op: "or",
+          nodes: (["NOT_ISSUED", "REFUSED", "EXPIRED", "INVALIDATED"] as const).map(
+            (value) => ({ op: "eq", field: "signatureStatus", value }) as PredicateNode,
+          ),
+        },
+        // Derivado em `quote-attention.ts` (`allLiveVehiclesArtApproved`): `undefined`
+        // quando a consulta não trouxe a arte — e então a regra se cala.
+        { op: "isTrue", field: "allVehiclesArtApproved" },
+      ],
+    },
+    target: { level: "row" },
+    ack: "onExitCooldown",
+    // Soft e espaçado: é trabalho do dia, não emergência; quem resolve é a própria pessoa avisada.
+    cadence: cadence({ tone: "soft", cooldownMs: 4 * 60 * 60 * 1000 }),
+  },
+
   // ── Every sector ────────────────────────────────────────────────────────────
   // The one rule with an EMPTY audience, and the reason attention now reaches
   // every sector rather than three.

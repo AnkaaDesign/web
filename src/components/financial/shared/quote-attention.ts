@@ -38,7 +38,32 @@ export type AttentionQuoteEntity = Omit<Budget, "task"> & {
    * existe, e portanto NUNCA acendia.
    */
   anyVehicleMissingOrderNumber: boolean;
+  /**
+   * TODO VEÍCULO VIVO deste orçamento tem arte APROVADA no implemento — metade
+   * do "pronto para emitir" (`budget.ready-to-emit` na API).
+   *
+   * `undefined` quando a resposta não está à mão (a consulta não trouxe
+   * `tasks[].implement.layouts`): ausência de dado nunca é evidência, e `isTrue`
+   * sobre `undefined` é falso — a regra se cala, que é a direção segura. A
+   * contagem do menu vem do servidor, que vê tudo.
+   */
+  allVehiclesArtApproved?: boolean;
 };
+
+/**
+ * "Todo veículo vivo tem arte aprovada?" — `undefined` quando não dá para saber
+ * (sem veículos vivos, ou a arte não veio na consulta).
+ */
+export function allLiveVehiclesArtApproved(
+  tasks: ReadonlyArray<{ status?: string | null; implement?: { layouts?: Array<{ status?: string | null }> | null } | null }> | null | undefined,
+): boolean | undefined {
+  const live = (tasks ?? []).filter((t) => t.status !== TASK_STATUS.CANCELLED);
+  if (live.length === 0) return undefined;
+  // Arte não trazida pela consulta: sem resposta.
+  if (live.some((t) => t.implement && !Array.isArray(t.implement.layouts))) return undefined;
+  if (live.some((t) => !("implement" in t))) return undefined;
+  return live.every((t) => !!t.implement && (t.implement.layouts ?? []).some((l) => l.status === "APPROVED"));
+}
 
 /** `Task.customerOrderNumber` em branco — nulo e string vazia são a mesma coisa. */
 function missingOrderNumber(task: { customerOrderNumber?: string | null }): boolean {
@@ -130,6 +155,7 @@ export function toAttentionQuoteEntitiesFromQuotes(quotes: ReadonlyArray<Budget>
       ...(quote as Budget),
       task: anchor ? { id: anchor.id, status: anchor.status } : { id: "", status: "" },
       anyVehicleMissingOrderNumber: vehicles.some(missingOrderNumber),
+      allVehiclesArtApproved: allLiveVehiclesArtApproved(quote.tasks as any),
     });
   }
   return entities;
@@ -255,5 +281,6 @@ export function toAttentionQuoteEntityFromParts(
     task: { id: task.id, status: task.status },
     anyVehicleMissingOrderNumber:
       vehicles.length > 0 ? vehicles.some(missingOrderNumber) : missingOrderNumber(task),
+    allVehiclesArtApproved: allLiveVehiclesArtApproved((quote as Budget).tasks as any),
   };
 }

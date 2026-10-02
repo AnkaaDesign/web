@@ -55,7 +55,10 @@ const TASK_STATUS_OPTIONS = (Object.values(TASK_STATUS) as TASK_STATUS[]).map((v
  * aceitar `select` nas tarefas) fica para outra mudança.
  */
 export const BUDGET_QUOTE_INCLUDE = {
-  tasks: { include: { implement: true, customer: true } },
+  // `implement.layouts`: a arte de cada veículo, que a regra "pronto para emitir"
+  // (`task-quote.ready-to-emit`) lê. `true`, e não `{ where: … }`: o zod da API só
+  // aceita `boolean` ou `{ include: { file } }` ali e APAGARIA um `where` calado.
+  tasks: { include: { implement: { include: { layouts: true } }, customer: true } },
   customerConfigs: true,
 } as const;
 

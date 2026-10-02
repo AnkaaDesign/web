@@ -783,3 +783,64 @@ describe("TASK_QUOTE — cadastro do cliente incompleto", () => {
     expect(row("TASK_QUOTE", "quote-2")).toBeNull();
   });
 });
+
+// Gêmeo de `budget.ready-to-emit` (attention.service.ts): valor aprovado, arte de
+// todo veículo vivo aprovada e assinatura num estado de onde se emite.
+describe("TASK_QUOTE — pronto para emitir", () => {
+  const quote = (over: Record<string, unknown> = {}) => ({
+    id: "quote-3",
+    status: TASK_QUOTE_STATUS.APPROVED,
+    signatureStatus: "NOT_ISSUED",
+    task: { id: "task-11", status: TASK_STATUS.IN_PRODUCTION },
+    anyVehicleMissingOrderNumber: false,
+    allVehiclesArtApproved: true,
+    ...over,
+  });
+
+  beforeEach(async () => {
+    setUserPrivilege(SECTOR_PRIVILEGES.COMMERCIAL);
+    await settle();
+  });
+
+  it("acende a linha quando tudo está pronto para emitir", async () => {
+    setEntities("TASK_QUOTE", [quote()]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-3")).toEqual(ARMED);
+  });
+
+  it.each(["REFUSED", "EXPIRED", "INVALIDATED"])("acende também com a assinatura %s (reemitir)", async (signatureStatus) => {
+    setEntities("TASK_QUOTE", [quote({ signatureStatus })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-3")).toEqual(ARMED);
+  });
+
+  it.each(["AWAITING_CUSTOMER", "AWAITING_ANKAA", "SIGNED", "SIGNED_OFFLINE", "WAIVED"])(
+    "silencia com a assinatura %s",
+    async (signatureStatus) => {
+      setEntities("TASK_QUOTE", [quote({ signatureStatus })]);
+      await settle();
+      expect(row("TASK_QUOTE", "quote-3")).toBeNull();
+    },
+  );
+
+  it("silencia com o valor ainda não aprovado", async () => {
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.IN_NEGOTIATION })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-3")).toBeNull();
+  });
+
+  it("silencia com arte pendente — e quando a arte não veio na consulta", async () => {
+    setEntities("TASK_QUOTE", [quote({ allVehiclesArtApproved: false }), quote({ id: "quote-4", allVehiclesArtApproved: undefined })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-3")).toBeNull();
+    expect(row("TASK_QUOTE", "quote-4")).toBeNull();
+  });
+
+  it("não fala com o Financeiro: quem emite é o comercial", async () => {
+    setUserPrivilege(SECTOR_PRIVILEGES.FINANCIAL);
+    await settle();
+    setEntities("TASK_QUOTE", [quote()]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-3")).toBeNull();
+  });
+});
