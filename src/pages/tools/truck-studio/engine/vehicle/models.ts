@@ -4572,6 +4572,9 @@ export function setTrailerDims(patch: { height?: number; length?: number }): Tra
   const t = state.trailer;
   const base = state.trailerBase;
   if (!rig || !t || !base) return null;
+  /* só quem vem de FORA registra o pedido: as passadas internas (padrão da
+     configuração, teto legal) rodam com `cortandoBau` ligado */
+  if (!cortandoBau && typeof patch.length === 'number') bauPedido = patch.length;
 
   /* 0. QUEM DERIVOU DA MALHARIA SOLTA AGORA — ver O GUARDA DA GEOMETRIA. Tem de
         ser a PRIMEIRA linha do corpo: os passos 1 a 3 leem `.visible` e caixas
@@ -6081,6 +6084,12 @@ function moveKingpinTo(z: number): boolean {
 /** O guarda de recursão do teto de balanço traseiro — ver o bloco dentro de
  *  `placeTrailer()`. `setTrailerDims()` chama `placeTrailer()` de volta. */
 let cortandoBau = false;
+/** O comprimento que QUEM USA pediu (interface, console, bancada) para o
+ *  conjunto atual — `null` = nenhum, vale o padrão. A regra de mão dupla abaixo
+ *  devolve o baú até o padrão da configuração depois de um corte legal; sem
+ *  este teto ela desfazia também um encurtamento pedido de propósito (bitruck
+ *  com baú de 8,50 voltava a 9,50 no quadro seguinte). */
+let bauPedido: number | null = null;
 /**
  * ▶▶ O COMPRIMENTO PADRÃO DO BAÚ, por configuração de chassi. 2026-08-24.
  *
@@ -6226,6 +6235,8 @@ export function placeTrailer() {
          caminhão não comportar. */
       const padraoBau = BAU_PADRAO[mount.axles.config];
       const chaveBau = `${mount.id}|${state.implement.id}`;
+      /* conjunto novo = pedido velho não vale mais */
+      if (bauPadraoPara !== chaveBau) bauPedido = null;
       if (padraoBau && state.trailerRig && !cortandoBau && bauPadraoPara !== chaveBau) {
         bauPadraoPara = chaveBau;
         if (Math.abs(state.trailerRig.current.length - padraoBau) > 1e-3) {
@@ -6248,7 +6259,7 @@ export function placeTrailer() {
              comprimento do ASSET: com `BAU_PADRAO` o bitruck pede 9,50 m contra
              8,66 de fábrica, e devolver "até o de fábrica" desfaria o padrão no
              primeiro quadro. Sem padrão para a configuração, vale o asset. */
-          const fabrica = padraoBau ?? state.trailerRig.base.length;
+          const fabrica = Math.min(padraoBau ?? state.trailerRig.base.length, bauPedido ?? Infinity);
           let novo = atual;
           if (sobra < -1e-4) novo = atual + sobra;                    // encurta
           else if (atual < fabrica - 1e-4) novo = Math.min(fabrica, atual + sobra);
