@@ -5,17 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { QuoteStatusBadge, quoteStatusTriggerClass } from "@/components/production/task/quote/quote-status-badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import {
   IconFileInvoice,
   IconBuilding,
@@ -31,11 +21,7 @@ import { FileThumbnail, FileViewerContext } from "@/components/common/file";
 import { formatCurrency, formatDate, formatChassis } from "@/utils";
 import { IMPLEMENT_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
-import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
-import { TASK_QUOTE_STATUS_LABELS } from "@/constants/enum-labels";
-import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
-import { QUOTE_STATUS_OPTIONS_IN_ORDER, isQuoteRejection } from "@/utils/quote-status";
 import { cn } from "@/lib/utils";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { PINNED_CUSTOMERS } from "@/config/company";
@@ -49,68 +35,6 @@ import { round2 } from "@/utils/quote-money";
 import type { TASK_QUOTE_STATUS, Budget } from "@/types/budget";
 import { hasMultipleCustomers as hasMultipleCustomersOf, orderNumberLabel, sortQuoteTasks } from "@/utils/quote-tasks";
 import { vehicleCombinations } from "@/utils/vehicle-combinations";
-/**
- * Os destinos que ESTE passo oferece — O CICLO INTEIRO, na ordem de atenção.
- *
- * ⚠️ ERAM DOIS, escritos à mão: `{PENDING: "Pendente"}` e `{APPROVED: "Aprovado"}`.
- * A curadoria fazia sentido no enum de cinco, em que o passo de Orçamento de
- * fato só movia entre pendente e aprovado (os outros três eram escritos pela
- * cerimônia ou terminais). Com o portal deixou de fazer: `IN_NEGOTIATION` —
- * a transição que a feature inteira existe para permitir, e a que torna o VALOR
- * visível para quem requisitou — simplesmente não aparecia no menu, e o
- * comercial não tinha como mandar uma requisição ao vendedor do cliente por
- * tela nenhuma.
- *
- * Os dois rótulos à mão também já haviam envelhecido: "Pendente" virou
- * "Aguardando Assinatura" em 20/09/2026 e este combobox continuava dizendo
- * "Pendente" ao lado de uma tabela que dizia outra coisa. Derivar de
- * `TASK_QUOTE_STATUS_LABELS` resolve as duas coisas de uma vez.
- *
- * A CURADORIA REAL nunca esteve aqui: quem decide o que é clicável é
- * `getAvailableQuoteStatusTransitions` (papel + grafo), logo abaixo, e é ela que
- * continua desabilitando o que não é destino legal — `SIGNED` e `EXPIRED`
- * inclusive, que só a cerimônia escreve.
- */
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = QUOTE_STATUS_OPTIONS_IN_ORDER;
-
-/**
- * As opções MAIS o status atual, quando ele não é uma delas.
- *
- * A REDE DE SEGURANÇA continua valendo mesmo agora que a lista acima é o enum
- * inteiro: o Combobox rotula o gatilho procurando o valor ATUAL entre as opções,
- * e um estado gravado que a tela não conheça (um valor legado num changelog, um
- * membro novo do enum que ainda não chegou a este bundle) transformaria o badge
- * no placeholder "Selecione uma opção" — sem rótulo e sem cor, justamente na
- * tela onde se confere o que está faltando. Foi o que aconteceu com `SIGNED`
- * quando a lista era curada a dois valores.
- *
- * O atual entra só para o gatilho ter o que mostrar, e sai desabilitado (ninguém
- * transiciona para onde já está). Mesma forma de `billing-step-review`, que
- * também cura os destinos por fase e apenas garante a presença do atual.
- */
-const statusOptionsFor = (
-  current: string | null | undefined,
-): Array<{ value: string; label: string }> => {
-  if (!current || STATUS_OPTIONS.some((o) => o.value === current)) return STATUS_OPTIONS;
-  return [
-    {
-      value: current,
-      label: TASK_QUOTE_STATUS_LABELS[current as keyof typeof TASK_QUOTE_STATUS_LABELS] ?? current,
-    },
-    ...STATUS_OPTIONS,
-  ];
-};
-
-/**
- * A cor do gatilho vem de `quoteStatusTriggerClass`, a MESMA fonte do badge.
- *
- * ⚠️ Era uma tabela própria aqui, e divergiu: "Assinado" saía verde-água neste
- * combobox e verde no badge da tabela, e "Aprovado" saía verde aqui e azul lá.
- * Como o seletor aparece para quem PODE editar e o badge para quem não pode, a
- * mesma situação tinha duas cores conforme o usuário — que é exatamente o que a
- * duplicação sempre produz. Não recriar o mapa: trocar a variante em
- * `QUOTE_STATUS_CONFIG` troca as duas superfícies juntas.
- */
 
 interface BudgetStepReviewProps {
   task?: any;
@@ -118,8 +42,6 @@ interface BudgetStepReviewProps {
   existingQuote?: any;
   userRole?: string;
   selectedCustomers: Map<string, any>;
-  onStatusChange?: (status: string) => void;
-  layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string; preview?: string | null }>;
   isCreateMode?: boolean;
   /**
    * Orçamento de N veículos: a pintura geral e as miniaturas do layout de cada um,
@@ -132,8 +54,8 @@ interface BudgetStepReviewProps {
   /** Clicar numa linha da relação de veículos leva à aba dele no passo 1. */
   onVehicleSelect?: (taskId: string) => void;
   /**
-   * Layout por veículo: as artes agrupadas pelos veículos que as usam. Ausente = o
-   * layout compartilhado de sempre (`layoutFiles`).
+   * A arte APROVADA dos implementos, agrupada pelos veículos que a usam (rótulo
+   * vazio = a mesma para todos). É o que o documento de assinatura imprime.
    */
   layoutGroups?: Array<{ label: string; thumbs: string[] }>;
 }
@@ -141,18 +63,14 @@ interface BudgetStepReviewProps {
 export function BudgetStepReview({
   task,
   existingQuote,
-  userRole = "",
   selectedCustomers,
-  onStatusChange,
-  layoutFiles,
-  disabled,
   isCreateMode,
   vehicleExtras,
   onVehicleSelect,
   layoutGroups,
 }: BudgetStepReviewProps) {
   const navigate = useNavigate();
-  const { control, setValue } = useFormContext();
+  const { control } = useFormContext();
 
   // The form's status field is the single source of truth here: it reflects the
   // user's selection immediately, and the save always sends the status inline
@@ -182,7 +100,6 @@ export function BudgetStepReview({
     | string[][]
     | undefined;
   const expiresAt = useWatch({ control, name: "expiresAt" });
-  const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
 
   // QUANTOS VEÍCULOS — a mesma conta do passo 1 e do seletor de faturamento.
   //
@@ -539,21 +456,6 @@ export function BudgetStepReview({
     return { displaySubtotal: 0, displayTotal: 0, discountAmount: 0 };
   }, [customerFilter, hasMultipleCustomers, subtotalValue, totalValue, customerConfigs]);
 
-  const canChangeStatus = canUpdateQuoteStatus(userRole);
-
-  // Allowed next statuses for the current state + role.
-  const allowedNextStatuses = useMemo(() => {
-    if (!currentStatus) return [] as string[];
-    return getAvailableQuoteStatusTransitions(
-      currentStatus as TASK_QUOTE_STATUS,
-      userRole,
-    );
-  }, [currentStatus, userRole]);
-
-  // Reject-reason dialog: required when reverting from APPROVED to PENDING.
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [pendingRejectStatus, setPendingRejectStatus] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -582,45 +484,9 @@ export function BudgetStepReview({
                     Ver Tarefa
                   </Button>
                 )}
-                {canChangeStatus ? (
-                  <Combobox
-                    value={currentStatus}
-                    onValueChange={(v) => {
-                      if (v && typeof v === "string" && v !== currentStatus) {
-                        // Reject path — require a reason ONLY when PENDING is a step BACK.
-                        //
-                        // ⚠️ O teste era `v === "PENDING" && atual !== "PENDING"`, e o portal
-                        // abriu dois caminhos até PENDING que vêm de ANTES dele
-                        // (`REQUESTED` e `PRE_APPROVED`): mandar uma requisição para assinatura
-                        // abria um diálogo "Rejeitar Orçamento" pedindo o motivo da rejeição.
-                        // Ver `isQuoteRejection`.
-                        if (isQuoteRejection(currentStatus, v)) {
-                          setPendingRejectStatus(v);
-                          setRejectReason("");
-                          setRejectDialogOpen(true);
-                          return;
-                        }
-                        setValue("status", v, { shouldDirty: true });
-                        onStatusChange?.(v);
-                      }
-                    }}
-                    options={statusOptionsFor(currentStatus).map((s) => {
-                      const isCurrent = s.value === currentStatus;
-                      const allowed = isCurrent || allowedNextStatuses.includes(s.value as TASK_QUOTE_STATUS);
-                      return {
-                        ...s,
-                        disabled: isCurrent || !allowed,
-                      };
-                    })}
-                    searchable={false}
-                    clearable={false}
-                    disabled={disabled}
-                    className="w-[220px]"
-                    triggerClassName={cn("font-medium h-9", quoteStatusTriggerClass(currentStatus))}
-                  />
-                ) : (
-                  <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />
-                )}
+                {/* SÓ LEITURA: o estado do valor muda por ATOS (enviar ao cliente,
+                    aprovar em nome dele, reprovar), no card acima deste Resumo. */}
+                <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />
               </div>
             )}
           </div>
@@ -1222,22 +1088,25 @@ export function BudgetStepReview({
         </div>
       )}
 
-      {/* Layout por veículo: as artes agrupadas pelos implementos que as usam. */}
+      {/* A ARTE APROVADA de cada implemento — o que o documento imprime. Agrupada
+          pelos veículos que a usam; um grupo sem rótulo quando é a mesma em todos. */}
       {layoutGroups && layoutGroups.length > 0 && (
         <div className="bg-muted/30 rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <IconPhoto className="h-4 w-4 text-muted-foreground" />
-            Layout
+            Arte aprovada
           </div>
           {layoutGroups.map((group, g) => (
             <div key={g} className="space-y-2">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</div>
+              {group.label && (
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</div>
+              )}
               <div className={cn("grid gap-3", group.thumbs.length <= 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
                 {group.thumbs.map((src, i) => (
                   <img
                     key={i}
                     src={src}
-                    alt={`Layout — ${group.label}`}
+                    alt={group.label ? `Arte — ${group.label}` : "Arte aprovada"}
                     className="w-full max-h-[420px] rounded-lg bg-background object-contain shadow-sm"
                   />
                 ))}
@@ -1247,110 +1116,6 @@ export function BudgetStepReview({
         </div>
       )}
 
-      {/* Layout Preview (renders the layoutFiles array, up to 2) */}
-      {!layoutGroups && (() => {
-        // A persisted File id is a UUID; a not-yet-uploaded file carries a local temp
-        // id (`<timestamp>-<random>`) the thumbnail endpoint would 404 on (→ broken
-        // image). So resolve a local object-URL preview first, then a server
-        // thumbnailUrl, and only fall back to the thumbnail endpoint for a real UUID.
-        const isUuid = (id: string) =>
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        const thumbFor = (slotFileId: string | null | undefined, slot?: any) => {
-          if (slot?.preview) return slot.preview as string;
-          if (slot?.thumbnailUrl) return slot.thumbnailUrl as string;
-          const realId =
-            (slot?.uploadedFileId && isUuid(slot.uploadedFileId) && slot.uploadedFileId) ||
-            (slotFileId && isUuid(slotFileId) && slotFileId) ||
-            null;
-          if (realId) return `${getApiBaseUrl()}/files/thumbnail/${realId}`;
-          return null;
-        };
-        // Prefer the resolved layoutFiles array (has thumbnails); fall back to ids.
-        const count = Math.max(layoutFiles?.length || 0, layoutFileIds.length);
-        const slots = Array.from({ length: count })
-          .map((_, i) => thumbFor(layoutFileIds[i], layoutFiles?.[i]))
-          .filter(Boolean) as string[];
-        if (slots.length === 0) return null;
-        return (
-          <div className="bg-muted/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-              <IconPhoto className="h-4 w-4 text-muted-foreground" />
-              Layout
-            </div>
-            {/* Near full-width preview: a single layout spans the whole row; two split
-                into a responsive 2-up grid. object-contain keeps the wrap's aspect. */}
-            <div
-              className={cn(
-                "grid gap-3",
-                slots.length <= 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2",
-              )}
-            >
-              {slots.map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt="Layout referência"
-                  className="w-full max-h-[420px] rounded-lg bg-background object-contain shadow-sm"
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Reject reason dialog — required when reverting to PENDING.
-          NOTE: parent FinancialBudgetDetailPage submits via budgetService.update +
-          updateStatus on save; the reason is stored in form ("statusReason") and forwarded. */}
-      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rejeitar Orçamento</DialogTitle>
-            <DialogDescription>
-              Informe o motivo da rejeição. O status do orçamento voltará para Pendente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 space-y-2">
-            <Label htmlFor="budget-reject-reason" className="text-sm font-medium">
-              Motivo da rejeição <span className="text-destructive">*</span>
-            </Label>
-            <Textarea
-              id="budget-reject-reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Descreva o motivo (mínimo 5 caracteres)..."
-              rows={4}
-              className="resize-none"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRejectDialogOpen(false);
-                setPendingRejectStatus(null);
-                setRejectReason("");
-              }}
-            >
-              Voltar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={rejectReason.trim().length < 5}
-              onClick={() => {
-                if (rejectReason.trim().length < 5 || !pendingRejectStatus) return;
-                setValue("statusReason", rejectReason.trim(), { shouldDirty: true });
-                setValue("status", pendingRejectStatus, { shouldDirty: true });
-                onStatusChange?.(pendingRejectStatus);
-                setRejectDialogOpen(false);
-                setPendingRejectStatus(null);
-                setRejectReason("");
-              }}
-            >
-              Confirmar Rejeição
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

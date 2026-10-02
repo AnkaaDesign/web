@@ -18,8 +18,9 @@ type LayoutLike = File & { file?: File | null; status?: string | null };
  * the page-composed header actions (count badge + "Baixar Todos") so both stay in sync.
  */
 export function getVisibleLayouts(task: Task, canViewBadges: boolean): LayoutLike[] {
-  if (!task.layouts) return [];
-  return (task.layouts as LayoutLike[]).filter((artwork) => {
+  // A arte é do IMPLEMENTO (Modelo C): `task.implement.layouts`, não mais `task.layouts`.
+  const arts = ((task.implement as { layouts?: LayoutLike[] } | null | undefined)?.layouts ?? []) as LayoutLike[];
+  return arts.filter((artwork) => {
     const hasFileData = artwork.file || artwork.filename || artwork.path;
     return Boolean(hasFileData) && (canViewBadges || artwork.status === "APPROVED");
   });
@@ -64,7 +65,7 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
    * Preview abre a coleção de artes no visualizador da aplicação, no índice clicado.
    *
    * A galeria usa a MESMA lista visível dos cards (`filteredLayouts`): abrir a partir de
-   * `task.layouts` cru levava quem não pode aprovar a navegar, com as setas, até layouts
+   * a arte crua do implemento levava quem não pode aprovar a navegar, com as setas, até layouts
    * reprovados/rascunho que a seção justamente esconde dele.
    *
    * Vai junto o mapa `fileId → status`, senão a arte reprovada abre em tela cheia sem

@@ -128,33 +128,50 @@ export function useUpdateBudget() {
   });
 }
 
-// Approve quote
-export function useApproveQuote() {
+/**
+ * OS ATOS DO EIXO DO VALOR. Cada um chama a rota NA HORA (não passa pelo Salvar
+ * do formulário) e atualiza orçamentos e tarefas, que embutem o estado.
+ */
+function useBudgetAct<TArgs>(mutationFn: (args: TArgs) => Promise<unknown>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => budgetService.approve(id),
+    mutationFn,
     onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (PUT /budgets/:id/budget-approve).
+      // Success/error toasts are emitted by the axios interceptor.
       queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-      // Approving a quote flips task budget status — refresh task lists + details too.
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }
 
-// Reject quote
-export function useRejectQuote() {
-  const queryClient = useQueryClient();
+/** "Enviar para aprovação do cliente". */
+export function useSendBudgetToCustomer() {
+  return useBudgetAct((id: string) => budgetService.sendToCustomer(id));
+}
 
-  return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      budgetService.reject(id, reason),
-    onSuccess: () => {
-      // Success/error toasts are emitted by the axios interceptor (PUT /budgets/:id/status).
-      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-      // Rejecting a quote flips task budget status — refresh task lists + details too.
-      queryClient.invalidateQueries({ queryKey: taskKeys.all });
-    },
-  });
+/** "Retirar do cliente" (motivo opcional). */
+export function useWithdrawBudgetFromCustomer() {
+  return useBudgetAct(({ id, reason }: { id: string; reason?: string }) =>
+    budgetService.withdrawFromCustomer(id, reason),
+  );
+}
+
+/** "Aprovar valor em nome do cliente" (nota obrigatória). */
+export function useApproveBudgetValue() {
+  return useBudgetAct(({ id, note }: { id: string; note: string }) => budgetService.approveValue(id, note));
+}
+
+/** "Reprovar valor" (motivo obrigatório). */
+export function useRevokeBudgetValueApproval() {
+  return useBudgetAct(({ id, reason }: { id: string; reason: string }) =>
+    budgetService.revokeValueApproval(id, reason),
+  );
+}
+
+/** "Assinado fora do sistema" (prova + nota). */
+export function useRegisterOfflineSignature() {
+  return useBudgetAct(
+    ({ id, file, note, signedAt }: { id: string; file: File; note: string; signedAt?: string | null }) =>
+      budgetService.registerOfflineSignature(id, { file, note, signedAt }),
+  );
 }

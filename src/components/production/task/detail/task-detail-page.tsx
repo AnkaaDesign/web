@@ -86,6 +86,7 @@ import { BudgetBreakdown, BillingBreakdown } from "./sections/quote-billing-sect
 import { PaintsSection } from "./sections/paints-section";
 import { ResponsiblesSection } from "./sections/responsibles-section";
 import { ImplementMeasuresSection } from "./sections/implement-measures-section";
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import { LayoutsSection, getVisibleLayouts, downloadAllLayouts } from "./sections/layouts-section";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
 import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
@@ -203,12 +204,12 @@ export const DETAIL_INCLUDE = {
   customer: { include: { logo: true } },
   sector: true,
   responsibles: true,
-  implement: true,
+  // A ARTE é do implemento (Modelo C): `include.layouts` da tarefa a API não aceita.
+  implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
   createdBy: true,
   serviceOrders: { include: { assignedTo: true, checkinFiles: true, checkoutFiles: true } },
   baseFiles: true,
   projectFiles: true,
-  layouts: { include: { file: true } },
   observation: { include: { files: true } },
   generalPainting: {
     include: {
@@ -223,7 +224,6 @@ export const DETAIL_INCLUDE = {
       // `invoiceToCustomer` is needed to group line items per customer on multi-customer quotes —
       // a bare `services: true` overrides the API's default include and would blank those line items.
       services: { include: { invoiceToCustomer: true } },
-      layoutFiles: true,
       customerConfigs: {
         include: {
           customer: { include: { logo: true } },
@@ -503,9 +503,9 @@ function TaskDetailContent() {
 
   // Layouts the current user may see (badges-viewers see all; everyone else only APPROVED).
   const filteredLayouts = useMemo(() => {
-    const arts = (task?.layouts ?? []) as Array<{ file?: unknown; status?: string }>;
+    const arts = ((task?.implement as { layouts?: unknown[] } | null | undefined)?.layouts ?? []) as Array<{ file?: unknown; status?: string }>;
     return arts.filter((a) => (a.file || (a as { filename?: string }).filename) && (canViewLayoutBadges || a.status === "APPROVED"));
-  }, [task?.layouts, canViewLayoutBadges]);
+  }, [task?.implement, canViewLayoutBadges]);
 
   const hasLayout = !!(
     task?.implement &&
@@ -1116,39 +1116,52 @@ function TaskDetailContent() {
                           quoteReasonRef.current = undefined;
                           const next = v as TASK_QUOTE_STATUS;
                           const current = t.quote?.status;
-                          // ⚠️ NÃO HÁ MAIS "aprovar faturamento" aqui, nem estorno de pagamento.
-                          // Os dois eram transições deste seletor porque o ciclo do pagamento
-                          // morava no enum do orçamento; aprovar cobrança é
-                          // `PUT /billings/:id/approve`, na tela de Faturamento, onde se vê O QUE
-                          // vai ser cobrado antes de emitir nota — e não num dropdown de detalhe
-                          // de tarefa.
+                          // ⚠️ NÃO HÁ "aprovar faturamento" aqui: aprovar cobrança é
+                          // `PUT /billings/:id/approve`, na tela de Faturamento.
                           //
-                          // ⚠️ E O MOTIVO SÓ É PEDIDO QUANDO PENDING É UM PASSO ATRÁS.
-                          // O teste era `próximo === PENDING && atual !== PENDING`, verdadeiro
-                          // enquanto todo caminho até PENDING vinha de depois dele. O portal
-                          // abriu `REQUESTED → PENDING` e `PRE_APPROVED → PENDING`, que são o
-                          // caminho FELIZ — e mandar uma requisição para assinatura passou a
-                          // abrir um diálogo de REJEIÇÃO. Ver `isQuoteRejection`.
-                          if (isQuoteRejection(current, next)) {
-                            const reason = await askReason({
-                              title: "Rejeitar / reverter para Pendente",
-                              description: "Informe o motivo (mínimo 5 caracteres).",
-                              label: "Motivo",
-                              placeholder: "Motivo da rejeição...",
+                          // O VALOR MUDA POR ATOS (Modelo C): aprovar exige a NOTA de como o
+                          // cliente aprovou; reprovar exige o MOTIVO; retirar do cliente aceita
+                          // um motivo opcional. O seletor continua aqui como atalho, mas cada
+                          // destino chama o ato dele (ver `onCommit`).
+                          if (next === "APPROVED") {
+                            const note = await askReason({
+                              title: "Aprovar valor em nome do cliente",
+                              description: "Escreva como o cliente aprovou o valor — por onde, quem e quando.",
+                              label: "Nota",
+                              placeholder: "Ex.: aprovado por e-mail em 02/10, Fulano, Compras",
                               required: true,
-                              minLength: 5,
-                              confirmLabel: "Confirmar",
+                              minLength: 1,
+                              confirmLabel: "Aprovar valor",
                             });
-                            if (reason === null) return false;
-                            // Safety net — the dialog already blocks Confirm until the reason is ≥5 chars.
-                            if (reason.trim().length < 5) return false;
+                            if (note === null || !note.trim()) return false;
+                            quoteReasonRef.current = note.trim();
+                          } else if (isQuoteRejection(current, next)) {
+                            const reason = await askReason({
+                              title: "Reprovar valor",
+                              description: "O orçamento volta para Pendente. Informe o motivo.",
+                              label: "Motivo",
+                              placeholder: "Motivo da reprovação...",
+                              required: true,
+                              minLength: 1,
+                              confirmLabel: "Reprovar",
+                            });
+                            if (reason === null || !reason.trim()) return false;
                             quoteReasonRef.current = reason.trim();
                           }
                           return true;
                         },
                         onCommit: async (v: unknown, t: Task) => {
                           if (!t.quote) return;
-                          await budgetService.updateStatus(t.quote.id, v as string, quoteReasonRef.current);
+                          const next = v as string;
+                          const current = t.quote.status;
+                          const text = quoteReasonRef.current ?? "";
+                          if (next === "APPROVED") await budgetService.approveValue(t.quote.id, text);
+                          else if (next === "IN_NEGOTIATION") await budgetService.sendToCustomer(t.quote.id);
+                          else if (next === "PENDING" && current === "IN_NEGOTIATION")
+                            await budgetService.withdrawFromCustomer(t.quote.id);
+                          else if (next === "PENDING" && current === "APPROVED")
+                            await budgetService.revokeValueApproval(t.quote.id, text);
+                          else await budgetService.updateStatus(t.quote.id, next, text || undefined);
                           // A raw axios PUT bypasses react-query — invalidate the task detail, quote and
                           // invoice caches so the change is reflected instead of leaving the UI stale.
                           await Promise.all([
@@ -1347,7 +1360,7 @@ function TaskDetailContent() {
         ? [
             {
               id: "layouts",
-              label: titleWithCount("Layout Referência", filteredLayouts.length),
+              label: titleWithCount("Arte do implemento", filteredLayouts.length),
               icon: IconPhoto,
               span: 2 as const,
               headerActions: (t: Task) => {

@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { layoutScopeOf } from "@/utils/quote-layout-coverage";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +74,7 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toAttentionQuoteEntity } from "@/components/financial/shared/quote-attention";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import { useAttentionEntity, useAttentionField } from "@/lib/attention";
 import { hasCompleteBillingCustomerData, missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 
@@ -263,7 +263,6 @@ const BillingDetailPageInner = ({
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
-  const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   // Foto da plaqueta (VIN) — imagem única, espelhando o campo do formulário de Tarefa.
   const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
@@ -293,8 +292,6 @@ const BillingDetailPageInner = ({
         },
         orderBy: { position: "asc" },
       },
-      // Task layouts — the pool the billing "Layout Aprovado" picker chooses from.
-      layouts: { include: { file: true } },
       // OS RESPONSÁVEIS DO ORÇAMENTO (`Task.responsibles`, relação
       // `TaskResponsibles`) — a lista de onde saem os SIGNATÁRIOS do documento,
       // e a ÚNICA: `BudgetPayer.responsibleId`, o contato eleito por fatura, não
@@ -305,7 +302,6 @@ const BillingDetailPageInner = ({
       quote: {
         include: {
           services: true,
-          layoutFiles: true,
           // OS VEÍCULOS DO ORÇAMENTO. A tela é aberta por UM deles, mas o pedido
           // de compra é de cada um (`Task.customerOrderNumber`) e a nota conjunta
           // cita todos — sem esta lista o campo teria um único endereço possível,
@@ -336,6 +332,9 @@ const BillingDetailPageInner = ({
                   // nota que vai sair.
                   category: true,
                   type: true,
+                  // A ARTE de cada veículo (só leitura no passo de Informações):
+                  // é a aprovada de cada implemento que o documento leva.
+                  layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE,
                 },
               },
             },
@@ -522,27 +521,18 @@ const BillingDetailPageInner = ({
   const quoteAttentionEntity = useMemo(() => toAttentionQuoteEntity(task ?? null), [task]);
   useAttentionEntity("TASK_QUOTE", quote?.id, quoteAttentionEntity);
 
-  // The task's image layouts — the pool the "Layout Aprovado" picker chooses from
-  // (billing edits an existing task, so the candidates are its persisted layouts).
-  const layoutImageOptions = useMemo(() => {
-    const layouts = (task as any)?.layouts || [];
-    return layouts
-      .map((layout: any) => {
-        const file = layout.file || layout;
-        return {
-          id: file.id,
-          layoutId: layout.id,
-          filename: file.filename,
-          originalName: file.originalName,
-          thumbnailUrl: file.thumbnailUrl || null,
-          status: layout.status,
-          mimetype: file.mimetype,
-          path: file.path || null,
-          size: file.size,
-        };
-      })
-      .filter((o: any) => (o.mimetype || "").startsWith("image/"));
-  }, [task]);
+  // A arte de cada veículo do orçamento, só leitura (a arte é do implemento).
+  const artVehicles = useMemo(
+    () =>
+      ((quote as any)?.tasks ?? []).map((t: any, index: number) => ({
+        taskId: t.id,
+        label: t.implement?.serialNumber
+          ? `Série ${t.implement.serialNumber}`
+          : t.implement?.plate || t.name || `Veículo ${index + 1}`,
+        implement: t.implement ?? null,
+      })),
+    [quote],
+  );
 
   // Fetch invoices — polls every 3s during generation
   // AS FATURAS QUE COBRAM ESTE VEÍCULO — pela rota do ORÇAMENTO, filtradas pela
@@ -611,7 +601,6 @@ const BillingDetailPageInner = ({
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
       simultaneousTasks: null as number | null,
-      layoutFileIds: [] as string[],
       /**
        * JUNTO, SEPARADO OU EM LOTES — e a repartição dos veículos.
        *
@@ -803,7 +792,6 @@ const BillingDetailPageInner = ({
       customGuaranteeText: quote.customGuaranteeText,
       customForecastDays: quote.customForecastDays ?? null,
       simultaneousTasks: quote.simultaneousTasks ?? null,
-      layoutFileIds: (quote.layoutFiles || []).map((f: any) => f.id),
       billingSplit: ((quote as any).billingSplit ?? "JOINT") as "JOINT" | "PER_TASK" | "CUSTOM",
       // Os LOTES como estão gravados. Lidos das faturas do PRIMEIRO cliente: a
       // repartição é a mesma para todos (cada um cobra os mesmos veículos, pelos
@@ -874,23 +862,6 @@ const BillingDetailPageInner = ({
       })),
     }, { keepDirtyValues: true }); // preserve user edits on background refetch
 
-    // Load layout files from the included layoutFiles relation (array, up to 2)
-    // originalName so a quote layout (a private CLONE of a task layout — kept
-    // originalName, generated filename) matches its task-layout twin in the picker
-    // instead of rendering as a separate "orphan" tile.
-    const toLayoutFile = (file: any): FileWithPreview => ({
-      id: file.id,
-      name: file.originalName || file.filename || "layout",
-      size: file.size || 0,
-      type: file.mimetype || "application/octet-stream",
-      lastModified: Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview);
-
-    setLayoutFiles((quote.layoutFiles || []).map(toLayoutFile));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, quote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
@@ -1400,31 +1371,6 @@ const BillingDetailPageInner = ({
         }
       }
 
-      // 3. Upload new layout files if any (COMMERCIAL/ADMIN step). Up to 2 ordered
-      // File ids.
-      let layoutFileIds: string[] = (formData.layoutFileIds as string[]) || [];
-      if (canSeeBudgetInfoStep) {
-        const resolvedLayoutIds: string[] = [];
-        for (const lf of layoutFiles) {
-          if (!lf.uploaded) {
-            try {
-              const response = await uploadSingleFile(lf, {
-                fileContext: "quote-layouts",
-              });
-              if (response.success && response.data) {
-                resolvedLayoutIds.push(response.data.id);
-              }
-            } catch (error: any) {
-              toast.error(`Erro ao enviar layout: ${error.message}`);
-            }
-          } else {
-            const existingId = (lf as any).uploadedFileId || lf.id || null;
-            if (existingId) resolvedLayoutIds.push(existingId);
-          }
-        }
-        layoutFileIds = resolvedLayoutIds;
-      }
-
       // 4. Update quote data
       // TRAVADO POR DINHEIRO? — a pergunta é da COBRANÇA, não do status do orçamento.
       //
@@ -1503,7 +1449,6 @@ const BillingDetailPageInner = ({
             customGuaranteeText: formData.customGuaranteeText,
             customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
             simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
-            layoutFileIds: canSeeBudgetInfoStep ? layoutFileIds : undefined,
           }
         : {
             expiresAt: formData.expiresAt,
@@ -1513,7 +1458,6 @@ const BillingDetailPageInner = ({
             customGuaranteeText: formData.customGuaranteeText,
             customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
             simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
-            layoutFileIds: canSeeBudgetInfoStep ? layoutFileIds : undefined,
             services: formData.services
               .filter((s: any) => s.description?.trim())
               .map((s: any) => ({
@@ -1607,7 +1551,6 @@ const BillingDetailPageInner = ({
     queryClient,
     updateTaskAsync,
     navigate,
-    layoutFiles,
     vinPlateFiles,
     canSeeBudgetInfoStep,
     returnTo,
@@ -1867,20 +1810,7 @@ const BillingDetailPageInner = ({
                 </div>
 
                 {isProposalStep && (
-                  <BillingStepBudgetInfo
-                    disabled={!canEdit}
-                    layoutFiles={layoutFiles}
-                    onLayoutFilesChange={setLayoutFiles}
-                    layouts={layoutImageOptions}
-                    layoutNotice={
-                      layoutScopeOf(quote as any) === "PER_VEHICLE" ? (
-                        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                          Este orçamento tem <span className="font-medium text-foreground">um layout para cada veículo</span>.
-                          Para trocar a arte de algum implemento, use a tela do orçamento, no passo Informações.
-                        </div>
-                      ) : undefined
-                    }
-                  />
+                  <BillingStepBudgetInfo disabled={!canEdit} artVehicles={artVehicles} />
                 )}
 
                 <div style={{ display: isServicesStep ? undefined : "none" }}>

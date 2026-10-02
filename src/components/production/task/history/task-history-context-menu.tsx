@@ -14,7 +14,6 @@ import { taskCancelConfirmOpts } from "../cancel-confirmation";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
 import { SetTermModal } from "../schedule/set-term-modal";
-import { SetQuoteLayoutModal } from "../schedule/set-quote-layout-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
@@ -64,7 +63,6 @@ export function TaskHistoryContextMenu({
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
-  const [quoteLayoutModalOpen, setQuoteLayoutModalOpen] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(true);
   const openingModalRef = React.useRef(false);
@@ -88,10 +86,10 @@ export function TaskHistoryContextMenu({
   // affordances lock. Released automatically on close (and on unmount / tab close).
   const presenceActionIds = React.useMemo(
     () =>
-      setStatusModalOpen || setSectorModalOpen || setTermModalOpen || quoteLayoutModalOpen || duplicateModalOpen || deleteDialog.open
+      setStatusModalOpen || setSectorModalOpen || setTermModalOpen || duplicateModalOpen || deleteDialog.open
         ? selectedIds
         : [],
-    [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, quoteLayoutModalOpen, duplicateModalOpen, deleteDialog.open, selectedIds],
+    [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, duplicateModalOpen, deleteDialog.open, selectedIds],
   );
   useAnnouncePresenceForIds("TASK", presenceActionIds);
 
@@ -182,14 +180,14 @@ export function TaskHistoryContextMenu({
 
   // When a modal or dialog opens, close the dropdown
   React.useEffect(() => {
-    if (setStatusModalOpen || setSectorModalOpen || setTermModalOpen || quoteLayoutModalOpen || duplicateModalOpen || deleteDialog.open) {
+    if (setStatusModalOpen || setSectorModalOpen || setTermModalOpen || duplicateModalOpen || deleteDialog.open) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Modal/Dialog opened, closing dropdown');
       }
       openingModalRef.current = false;
       setDropdownOpen(false);
     }
-  }, [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, quoteLayoutModalOpen, duplicateModalOpen, deleteDialog.open]);
+  }, [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, duplicateModalOpen, deleteDialog.open]);
 
   // Close the entire component when dropdown closes and no modals/dialogs are open
   React.useEffect(() => {
@@ -206,13 +204,13 @@ export function TaskHistoryContextMenu({
     }
 
     // Don't close if we're in the process of opening a modal or if any dialog is open
-    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !setTermModalOpen && !quoteLayoutModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current) {
+    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !setTermModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Calling onClose()');
       }
       onClose();
     }
-  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, setTermModalOpen, quoteLayoutModalOpen, duplicateModalOpen, deleteDialog.open, onClose]);
+  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, setTermModalOpen, duplicateModalOpen, deleteDialog.open, onClose]);
 
   const handleView = () => {
     if (task && !isBulk) {
@@ -535,11 +533,6 @@ export function TaskHistoryContextMenu({
     setDropdownOpen(false);
   };
 
-  const handleQuoteLayout = () => {
-    openingModalRef.current = true;
-    setQuoteLayoutModalOpen(true);
-  };
-
   const handleBulkBaseFiles = () => {
     if (advancedActionsRef?.current) {
       advancedActionsRef.current.openModal("baseFiles", taskIds);
@@ -703,7 +696,7 @@ export function TaskHistoryContextMenu({
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />
-              <span className="truncate">{getBudgetDisplayLabel(task.quote?.status)}</span>
+              <span className="truncate">{getBudgetDisplayLabel(task.quote)}</span>
             </DropdownMenuItem>
           )}
 
@@ -754,13 +747,13 @@ export function TaskHistoryContextMenu({
                 {canAccessLayouts && (
                   <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">Adicionar Layout Referência</span>
+                    <span className="truncate">Adicionar arte</span>
                   </DropdownMenuItem>
                 )}
                 {isCommercial && (
-                  <DropdownMenuItem onClick={handleQuoteLayout} onSelect={(e) => e.preventDefault()}>
+                  <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">Adicionar Layout Aprovados</span>
+                    <span className="truncate">Adicionar arte</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>
@@ -856,13 +849,6 @@ export function TaskHistoryContextMenu({
         }}
         tasks={tasks}
         onConfirm={handleSetTermConfirm}
-      />
-
-      {/* Quote Layout Modal (COMMERCIAL) — edits Budget.layoutFileId */}
-      <SetQuoteLayoutModal
-        open={quoteLayoutModalOpen}
-        onOpenChange={setQuoteLayoutModalOpen}
-        tasks={tasks}
       />
 
       {/* Set Status Modal */}

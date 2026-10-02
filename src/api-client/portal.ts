@@ -641,6 +641,7 @@ export interface PortalBudgetRequestInfo {
   briefing: string | null;
   logoName: string | null;
   requestedAt: string | null;
+  /** O cliente APROVOU O VALOR (nome antigo da coluna; D-35). */
   preApprovedAt: string | null;
   refusedAt: string | null;
   decisionNote: string | null;
@@ -1632,7 +1633,7 @@ export class PortalService {
   }
 
   /**
-   * `PUT …/aprovar-valor` — `IN_NEGOTIATION → PRE_APPROVED`. Capacidade `APPROVE_VALUE`.
+   * `PUT …/aprovar-valor` — `IN_NEGOTIATION → APPROVED` (valor aprovado, D-35). Capacidade `APPROVE_VALUE`.
    *
    * ⚠️ O corpo é `.strict()` no servidor: a única chave aceita é `nota`.
    */
@@ -1997,7 +1998,7 @@ export function usePortalCharges(params?: PortalListParams, options?: PortalQuer
 /**
  * Invalida TODO o cache do portal.
  *
- * É grosso de propósito: pré-aprovar um orçamento muda o resumo, a lista, o
+ * É grosso de propósito: aprovar o valor de um orçamento muda o resumo, a lista, o
  * detalhe e — quando o comercial lança o envelope — a fila de assinaturas.
  * Invalidação cirúrgica aqui só produziria tela desatualizada.
  */

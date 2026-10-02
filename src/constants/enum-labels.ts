@@ -187,6 +187,7 @@ import {
   WORK_ACCIDENT_REPORT_TYPE,
   PAYROLL_DISCOUNT_TYPE,
 } from "./enums";
+import { BUDGET_STATUS_LABELS, LAYOUT_STATUS_LABELS_FROM_CONTRACT, isBudgetBillable } from "./budget-contract";
 import { IMPLEMENT_TYPE_PROFILE_LABELS, IMPLEMENT_CATEGORY_PROFILE_LABELS } from "./document-labels";
 
 // =====================
@@ -435,11 +436,8 @@ export const AIRBRUSHING_DUE_DATE_RULE_LABELS: Record<AIRBRUSHING_DUE_DATE_RULE,
   [AIRBRUSHING_DUE_DATE_RULE.FIXED_DATE]: "Data fixa (não recalcula)",
 };
 
-export const LAYOUT_STATUS_LABELS: Record<LAYOUT_STATUS, string> = {
-  [LAYOUT_STATUS.DRAFT]: "Rascunho",
-  [LAYOUT_STATUS.APPROVED]: "Aprovado",
-  [LAYOUT_STATUS.REPROVED]: "Reprovado",
-};
+/** O estado da arte do implemento, pelo contrato da API. */
+export const LAYOUT_STATUS_LABELS: Record<LAYOUT_STATUS, string> = LAYOUT_STATUS_LABELS_FROM_CONTRACT;
 
 export const CUT_TYPE_LABELS: Record<CUT_TYPE, string> = {
   [CUT_TYPE.VINYL]: "Vinil",
@@ -2485,25 +2483,12 @@ export const STATISTICS_PERIOD_LABELS: Record<STATISTICS_PERIOD, string> = {
 // Task Quote Labels
 // =====================
 
-export const TASK_QUOTE_STATUS_LABELS: Record<TASK_QUOTE_STATUS, string> = {
-  // NÃO é "Vencido": vencida é a PARCELA, e esse rótulo é do
-  // `BILLING_STATUS.OVERDUE`, noutra entidade. Este diz o que o comercial tem de
-  // FAZER com o orçamento.
-  [TASK_QUOTE_STATUS.EXPIRED]: "Aguardando Reanálise",
-  [TASK_QUOTE_STATUS.SIGNED]: "Assinado",
-  // Era "Pendente". Com `REQUESTED` ("Requisição") do outro lado, a palavra
-  // nomeava duas esperas opostas: lá a ANKAA deve um preço, aqui o CLIENTE deve
-  // uma assinatura. O valor do enum continua `"PENDING"`.
-  [TASK_QUOTE_STATUS.PENDING]: "Aguardando Assinatura",
-  [TASK_QUOTE_STATUS.REQUESTED]: "Requisição",
-  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: "Em Negociação",
-  [TASK_QUOTE_STATUS.PRE_APPROVED]: "Pré-aprovado",
-  // Sem o prefixo "Orçamento": a tela já se chama Orçamentos, e o estado de
-  // faturamento mudou de entidade. Repetir a palavra era desambiguar de algo que
-  // não mora mais aqui.
-  [TASK_QUOTE_STATUS.APPROVED]: "Aprovado",
-  [TASK_QUOTE_STATUS.CANCELLED]: "Cancelado",
-};
+/**
+ * Os rótulos do eixo do VALOR vêm do contrato da API (`budget-contract.ts`).
+ * "Aprovado" é só o valor; a assinatura tem rótulos próprios
+ * ({@link BUDGET_SIGNATURE_STATUS_LABELS}).
+ */
+export const TASK_QUOTE_STATUS_LABELS: Record<TASK_QUOTE_STATUS, string> = BUDGET_STATUS_LABELS;
 
 /**
  * Os rótulos do ciclo do FATURAMENTO. ⚠️ Não há "A Vencer": depois de aprovar, o
@@ -2519,25 +2504,35 @@ export const BILLING_STATUS_LABELS: Record<BILLING_STATUS, string> = {
   [BILLING_STATUS.CANCELLED]: "Cancelado",
 };
 
+/** O mínimo do orçamento para decidir por qual tela ele se abre. */
+export interface BudgetPhaseInput {
+  status?: TASK_QUOTE_STATUS | string | null;
+  signatureStatus?: string | null;
+  billable?: boolean;
+}
+
 /**
  * "Orçamento" ou "Faturamento"? — por qual das duas telas este registro se abre.
  *
- * ⚠️ O RECORTE É `APPROVED`, e tem de ser o MESMO de `getBudgetEditRoute`:
- * este texto rotula o item de menu que aquela função endereça, e divergir faz o
- * menu dizer "Orçamento" e abrir o assistente de faturar.
- *
- * Era "tudo que não é PENDING é Faturamento", o que só funcionava porque o enum
- * antigo carregava o ciclo do pagamento dentro dele: SIGNED, EXPIRED e CANCELLED
- * liam como Faturamento, e um orçamento vencido — que existe justamente para o
- * comercial reabrir — abria a tela de cobrança.
+ * ⚠️ O RECORTE É O MESMO de `getBudgetEditRoute`: este texto rotula o item de
+ * menu que aquela função endereça, e divergir faz o menu dizer "Orçamento" e
+ * abrir o assistente de faturar.
  */
-export function getBudgetDisplayLabel(status?: TASK_QUOTE_STATUS | string | null): string {
-  return isBudgetBillingPhase(status) ? 'Faturamento' : 'Orçamento';
+export function getBudgetDisplayLabel(quote?: BudgetPhaseInput | null): string {
+  return isBudgetBillingPhase(quote) ? 'Faturamento' : 'Orçamento';
 }
 
-/** O orçamento já passou pela aprovação comercial (e portanto é assunto do financeiro)? */
-export function isBudgetBillingPhase(status?: TASK_QUOTE_STATUS | string | null): boolean {
-  return status === TASK_QUOTE_STATUS.APPROVED;
+/**
+ * O orçamento já é assunto da COBRANÇA? — valor aprovado E assinatura resolvida
+ * (`billable` da API, DD7).
+ *
+ * Era só `status === APPROVED`. No Modelo C "Aprovado" é só o VALOR: um
+ * orçamento aprovado e ainda sem assinatura abria o Faturamento, onde "Aprovar
+ * cobrança" dá 400 ("só depois da assinatura"). Enquanto não é cobrável, ele se
+ * abre no Orçamento, que é onde se emite e registra a assinatura.
+ */
+export function isBudgetBillingPhase(quote?: BudgetPhaseInput | null): boolean {
+  return !!quote && isBudgetBillable(quote);
 }
 
 // =====================

@@ -63,8 +63,8 @@ const BILLING_STATUS_OPTIONS = (Object.values(BILLING_STATUS) as BILLING_STATUS[
  *  · `APPROVED` — vendido; é o que se fatura, e é a fila que o financeiro abre.
  *
  * Ficam de fora todos os estados anteriores à aprovação — `PENDING`, `SIGNED`,
- * `EXPIRED` e, desde 20/09/2026, os três do portal (`REQUESTED`,
- * `IN_NEGOTIATION`, `PRE_APPROVED`). O motivo está no schema antigo e continua
+ * `EXPIRED` e, desde 20/09/2026, os do portal (`REQUESTED`, `IN_NEGOTIATION`).
+ * O motivo está no schema antigo e continua
  * valendo, com mais força nos novos: "um orçamento vencido, à espera de
  * reanálise do valor, aparecendo na fila de faturar é pedir para alguém faturar
  * um preço que o comercial acabou de decidir rever" — e uma REQUISIÇÃO não tem

@@ -21,7 +21,6 @@ import { budgetService } from "@/api-client/budget";
 import {
   canViewQuote,
   canEditQuote,
-  getQuoteStatusPath,
 } from "@/utils/permissions/quote-permissions";
 import type { TASK_QUOTE_STATUS } from "@/types/budget";
 import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
@@ -82,15 +81,8 @@ import {
   BUDGET_VEHICLE_TASK_INCLUDE,
 } from "@/components/financial/budget/vehicles/use-budget-vehicles";
 import { BudgetVehicleTabs } from "@/components/financial/budget/vehicles/budget-vehicle-tabs";
-import { BudgetVehicleLayoutsField } from "@/components/financial/budget/vehicles/budget-vehicle-layouts-field";
-import {
-  layoutScopeOf,
-  layoutFilesForTask,
-  sharedLayoutsPayload,
-  perVehicleLayoutsPayload,
-  layoutsKey,
-  persistedLayoutsKey,
-} from "@/utils/quote-layout-coverage";
+import type { ImplementArtVehicle } from "@/components/production/implement-art/implement-art-summary";
+import { approvedArtFilesOf } from "@/utils/implement-art";
 import {
   planAirbrushingReconciliation,
   applyAirbrushingPlan,
@@ -173,67 +165,21 @@ function vinPlateFilesOf(task: any): FileWithPreview[] {
     : [];
 }
 
-/** Os layouts de uma tarefa (Layout Referência), na forma do campo de upload. */
-function taskLayoutFilesOf(task: any): FileWithPreview[] {
-  return (task?.layouts || []).map((artwork: any) => {
-    const file = artwork.file || artwork;
-    return {
-      id: file.id,
-      name: file.filename || file.originalName || "arquivo",
-      size: file.size || 0,
-      type: file.mimetype || "image/jpeg",
-      lastModified: Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-      // Carry the persisted status so the per-file dropdown shows the real
-      // value (APPROVED/REPROVED) instead of always defaulting to DRAFT.
-      status: artwork.status || "DRAFT",
-    } as FileWithPreview;
-  });
-}
-
 /**
- * Um arquivo de layout do ORÇAMENTO na forma do seletor. Use originalName: a quote
- * layout is a private CLONE of a task layout (it keeps the source originalName but
- * gets a generated filename), so matching on filename would show it as a separate
- * "orphan" tile instead of highlighting its task-layout twin.
- */
-function quoteLayoutFileOf(file: any): FileWithPreview {
-  return {
-    id: file.id,
-    name: file.originalName || file.filename || "layout",
-    size: file.size || 0,
-    type: file.mimetype || "application/octet-stream",
-    lastModified: Date.now(),
-    uploaded: true,
-    uploadProgress: 100,
-    uploadedFileId: file.id,
-    thumbnailUrl: file.thumbnailUrl,
-  } as FileWithPreview;
-}
-
-/**
- * A ÂNCORA DA ASSINATURA ELETRÔNICA, no fim do passo de Resumo.
- *
- * Existe para o estado `PRE_APPROVED`: ali a ação certa não é escrever um
- * status — a aresta `PRE_APPROVED → PENDING` é escrita pela EMISSÃO da coleta —
- * e sim descer até o card que a emite. Um id e não um ref porque quem rola é o
- * card de ações, que não conhece este componente.
+ * A ÂNCORA DA ASSINATURA ELETRÔNICA, no fim do passo de Resumo. Um id e não um
+ * ref porque quem rola é o card de ações, que não conhece este componente.
  */
 const SIGNATURE_ANCHOR_ID = "assinatura-eletronica";
 
 /**
- * O PASSO E A ÂNCORA DO LAYOUT APROVADO.
+ * O PASSO E A ÂNCORA DA ARTE DO IMPLEMENTO.
  *
- * ⚠️ É o passo 2 ("Informações"), e não o 1: o seletor (`ApprovedLayoutPicker`)
- * mora em `budget-step-info.tsx`, no fim dele. O passo 1 trata dos layouts DA
- * TAREFA (enviar, aprovar, reprovar); o que a assinatura cobra é o layout
- * escolhido para o ORÇAMENTO, que é este.
+ * O orçamento não escolhe arte (Modelo C, P12): o documento leva a APROVADA de
+ * cada implemento. Quando a emissão diz "arte pendente", o caminho é o veículo
+ * sem arte, no passo 1.
  */
-const LAYOUT_STEP = 2;
-const LAYOUT_PICKER_ANCHOR_ID = "layout-aprovado";
+const ARTWORK_STEP = 1;
+const ARTWORK_ANCHOR_ID = "arte-do-implemento";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -341,11 +287,6 @@ const FinancialBudgetDetailPageInner = () => {
   // State: signals child components that need to wait before running side-effects.
   const formInitializedRef = useRef(false);
   const [formInitialized, setFormInitialized] = useState(false);
-  // O layout aprovado COMPARTILHADO — o mesmo para todos os veículos (o de sempre).
-  const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
-  // Um layout para CADA veículo? E, nesse modo, a escolha de cada implemento.
-  const [layoutPerVehicle, setLayoutPerVehicle] = useState(false);
-  const [vehicleLayoutFiles, setVehicleLayoutFiles] = useState<Record<string, FileWithPreview[]>>({});
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
     new Map(),
@@ -357,13 +298,6 @@ const FinancialBudgetDetailPageInner = () => {
   // O veículo mostrado no passo 1. Começa pelo da rota.
   const [activeVehicleId, setActiveVehicleId] = useState<string>(taskId ?? "");
   const activeVehicleIndex = Math.max(0, vehicleTaskIds.indexOf(activeVehicleId));
-  // POR VEÍCULO: os layouts da tarefa (Layout Referência), seus status e a foto da plaqueta.
-  const [layoutsByTask, setLayoutsByTask] = useState<Record<string, FileWithPreview[]>>({});
-  // True once the vehicles' layouts have been seeded from the loaded tasks. Gates the
-  // quote-selection reconciliation so the initial-load transient (layouts still empty)
-  // can't wipe a valid persisted approved-layout selection.
-  const [layoutsInitialized, setLayoutsInitialized] = useState(false);
-  const [layoutStatusesByTask, setLayoutStatusesByTask] = useState<Record<string, Record<string, string>>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   // Foto da plaqueta (VIN) — imagem única POR VEÍCULO, espelhando o campo do formulário de Tarefa.
   const [vinPlateFilesByTask, setVinPlateFilesByTask] = useState<Record<string, FileWithPreview[]>>({});
@@ -374,49 +308,11 @@ const FinancialBudgetDetailPageInner = () => {
   // the API preserves it (absence = preserve). Sending an empty array would WIPE
   // the relation (finding I40).
   const loadedBaseFileIdsRef = useRef<string[]>([]);
-  const loadedLayoutIdsByTaskRef = useRef<Record<string, string[]>>({});
-  const loadedLayoutStatusesByTaskRef = useRef<Record<string, Record<string, string>>>({});
   const loadedResponsibleIdsRef = useRef<string[]>([]);
-
-  const handleLayoutsChange = useCallback(
-    (files: FileWithPreview[]) => {
-      setLayoutsByTask((prev) => ({ ...prev, [activeVehicleId]: files }));
-    },
-    [activeVehicleId],
-  );
 
   const handleBaseFilesChange = useCallback((files: FileWithPreview[]) => {
     setBaseFiles(files);
   }, []);
-
-  // Set a task-artwork's status (DRAFT/APPROVED/REPROVED) from the layout card's
-  // colored selector — on the vehicle being shown. Keyed by File id — same map the
-  // submit remap reads, so the change persists and shows in Step 1 on reload. Also
-  // mirror onto layouts so the Step-1 dropdown reflects it immediately. Last action wins.
-  const handleLayoutStatusChange = useCallback(
-    (fileId: string, status: string) => {
-      const vehicleId = activeVehicleId;
-      setLayoutStatusesByTask((prev) => ({
-        ...prev,
-        [vehicleId]: { ...(prev[vehicleId] ?? {}), [fileId]: status },
-      }));
-      setLayoutsByTask((prev) => ({
-        ...prev,
-        [vehicleId]: (prev[vehicleId] ?? []).map((f) => {
-          const fId = (f as any).uploadedFileId || f.id;
-          if (fId !== fileId) return f;
-          // Mutate status IN PLACE — a spread ({ ...f }) downgrades a freshly-dropped
-          // File instance to a plain object and DROPS the underlying blob, so the
-          // submit upload sends an empty body and the API rejects it ("Nenhum arquivo
-          // enviado."). Object.assign keeps the File instance (and its bytes) intact.
-          // `prev.map` still returns a new array, so React re-renders. Mirrors
-          // LayoutFileUploadField's own status-change pattern.
-          return Object.assign(f, { status }) as FileWithPreview;
-        }),
-      }));
-    },
-    [activeVehicleId],
-  );
 
   const handleResponsibleRowsChange = useCallback(
     (rows: ResponsibleRowData[]) => {
@@ -448,23 +344,15 @@ const FinancialBudgetDetailPageInner = () => {
       // Um item por tarefa, na ordem canônica do orçamento (`quoteTasks`). Ver
       // `VehicleFormValues`.
       vehicles: [] as VehicleFormValues[],
-      // Contador que só existe para o guarda de alterações não salvas: a escolha de
-      // layout por veículo mora fora do formulário, e sem isto sair da tela depois de
-      // mexer só nela não perguntaria nada.
-      layoutCoverageEdits: 0,
       serviceOrders: [] as any[],
       // Quote fields
       expiresAt: getDefaultExpiresAt(),
       status: "PENDING" as string,
-      // Captured by BudgetStepReview when rejecting a quote (status -> PENDING).
-      // Forwarded to budgetService.updateStatus on Save (see handleSubmit).
-      statusReason: "" as string,
       subtotal: 0,
       total: 0,
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
-      layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
       /**
        * Junto ou separado. Editável DEPOIS da criação porque a escolha errada
@@ -643,7 +531,6 @@ const FinancialBudgetDetailPageInner = () => {
         guaranteeYears: null,
         customGuaranteeText: null,
         customForecastDays: null,
-        layoutFileIds: [],
         simultaneousTasks: null,
         billingSplit: "JOINT",
         billingGroups: [],
@@ -683,7 +570,6 @@ const FinancialBudgetDetailPageInner = () => {
       guaranteeYears: existingQuote.guaranteeYears || null,
       customGuaranteeText: existingQuote.customGuaranteeText || null,
       customForecastDays: existingQuote.customForecastDays || null,
-      layoutFileIds: (existingQuote.layoutFiles || []).map((f: any) => f.id),
       simultaneousTasks: existingQuote.simultaneousTasks || null,
       billingSplit:
         ((existingQuote as any).billingSplit as "JOINT" | "PER_TASK" | "CUSTOM") || "JOINT",
@@ -772,28 +658,6 @@ const FinancialBudgetDetailPageInner = () => {
     formInitializedRef.current = true;
     setFormInitialized(true);
 
-    // Set layout files from the included layoutFiles relation (array, up to 2).
-    // Use originalName (a quote layout is a private CLONE of a task layout: it
-    // keeps the source originalName but gets a generated filename, so matching on
-    // filename would show it as a separate "orphan" tile instead of highlighting
-    // its task-layout twin).
-    // Em `PER_VEHICLE` cada implemento começa com as artes que o cobrem; em `SHARED`,
-    // a seleção compartilhada é a lista inteira — e cada implemento começa com ela, para
-    // que ligar "um layout para cada veículo" parta do que já está valendo.
-    const perVehicle = layoutScopeOf(existingQuote as any) === "PER_VEHICLE";
-    setLayoutPerVehicle(perVehicle);
-    if (!perVehicle && existingQuote.layoutFiles && existingQuote.layoutFiles.length > 0) {
-      setLayoutFiles(existingQuote.layoutFiles.map(quoteLayoutFileOf));
-    }
-    setVehicleLayoutFiles(
-      Object.fromEntries(
-        loadedVehicles.map((t) => [
-          t.id,
-          layoutFilesForTask(existingQuote as any, t.id).map(quoteLayoutFileOf),
-        ]),
-      ),
-    );
-
     // Initialize customers cache from existing configs, then fetch full data
     if (existingQuote.customerConfigs?.length > 0) {
       const partialCustomers = existingQuote.customerConfigs
@@ -865,11 +729,10 @@ const FinancialBudgetDetailPageInner = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, existingQuote?.id, vehiclesReady, quoteLoading]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
-  // Initialize the vehicles' own state (layouts) and the COMMON state that lives
-  // outside the form (responsáveis, arquivos base) once every vehicle has loaded.
+  // Initialize the COMMON state that lives outside the form (responsáveis,
+  // arquivos base) once every vehicle has loaded.
   useEffect(() => {
     if (!task || !vehiclesReady || quoteLoading) return;
-    const loadedVehicles = vehicleTasks.filter(Boolean) as any[];
 
     // Responsáveis — COMUNS ao orçamento; semeados da tarefa aberta.
     if (task.responsibles && task.responsibles.length > 0) {
@@ -896,30 +759,6 @@ const FinancialBudgetDetailPageInner = () => {
       (r: any) => r.id,
     );
 
-    // Layouts (Layout Referência) — de CADA veículo.
-    const layoutIds: Record<string, string[]> = {};
-    const layoutStatuses: Record<string, Record<string, string>> = {};
-    const layoutFilesByTask: Record<string, FileWithPreview[]> = {};
-    for (const t of loadedVehicles) {
-      layoutIds[t.id] = (t.layouts || []).map((artwork: any) => (artwork.file || artwork).id);
-      layoutStatuses[t.id] = (t.layouts || []).reduce(
-        (acc: Record<string, string>, artwork: any) => {
-          const fileId = (artwork.file || artwork).id;
-          if (artwork.status) acc[fileId] = artwork.status;
-          return acc;
-        },
-        {},
-      );
-      layoutFilesByTask[t.id] = taskLayoutFilesOf(t);
-    }
-    loadedLayoutIdsByTaskRef.current = layoutIds;
-    loadedLayoutStatusesByTaskRef.current = layoutStatuses;
-    setLayoutsByTask(layoutFilesByTask);
-    setLayoutStatusesByTask(layoutStatuses);
-    // Task layouts are now seeded (or the tasks genuinely have none) — reconciliation
-    // may run. Batched with the setLayoutsByTask above, so it commits with real layouts.
-    setLayoutsInitialized(true);
-
     // Base files — COMUNS; semeados da tarefa aberta.
     if ((task as any).baseFiles && (task as any).baseFiles.length > 0) {
       setBaseFiles(
@@ -943,119 +782,9 @@ const FinancialBudgetDetailPageInner = () => {
     );
     // Seed editable state by IDENTITY only — NOT the full task objects, which change
     // on every react-query background refetch. Re-running on a refetch called
-    // setLayouts/setBaseFiles and WIPED unsaved uploads the user had just added (and
-    // selected as a quote layout). That left the layout pointing at a local temp id
-    // with no file left to upload, so submit sent the temp id and the API rejected it
-    // ("Invalid uuid"). Mirrors the sibling effect's id-only guard.
+    // setBaseFiles and WIPED unsaved uploads the user had just added. Mirrors the
+    // sibling effect's id-only guard.
   }, [task?.id, vehiclesReady, quoteLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // As artes que podem virar "layout aprovado": as imagens APROVADAS de TODOS os
-  // veículos, como estão AGORA no passo 1 (um layout removido ou reprovado ali some
-  // daqui; um recém-adicionado já aparece), sem repetição — a mesma linha `Layout`
-  // costuma estar ligada a vários implementos do orçamento.
-  const layoutImageOptions = useMemo(() => {
-    const persistedByFileId = new Map<string, any>();
-    for (const t of vehicleTasks) {
-      for (const artwork of ((t as any)?.layouts || []) as any[]) {
-        const file = artwork.file || artwork;
-        if (!(file.mimetype || "").startsWith("image/")) continue;
-        persistedByFileId.set(file.id, { file, artwork });
-      }
-    }
-    const byId = new Map<string, any>();
-    const seenImages = new Set<string>();
-    for (const id of vehicleTaskIds) {
-      for (const file of (layoutsByTask[id] ?? []) as any[]) {
-        if (!(file.type || "").startsWith("image/")) continue;
-        const key = file.uploadedFileId || file.id;
-        if (byId.has(key)) continue;
-        const persisted = persistedByFileId.get(key);
-        const pf = persisted?.file;
-        // Only offer IMAGE layouts explicitly marked "Aprovado" as the approved layout.
-        const layoutStatus = file.status || persisted?.artwork?.status;
-        if (layoutStatus !== "APPROVED") continue;
-        const imageKey = `${(file.name || pf?.originalName || "").trim()}::${file.size ?? pf?.size ?? 0}`;
-        if (seenImages.has(imageKey)) continue;
-        seenImages.add(imageKey);
-        byId.set(key, {
-          id: key,
-          layoutId: persisted?.artwork?.layoutId || persisted?.artwork?.id,
-          filename: file.name || pf?.filename,
-          originalName: file.name || pf?.originalName,
-          thumbnailUrl: file.thumbnailUrl || pf?.thumbnailUrl || null,
-          // Object-URL preview for not-yet-uploaded local files (no server thumbnail).
-          preview: file.preview || null,
-          status: file.status || persisted?.artwork?.status,
-          mimetype: file.type || pf?.mimetype,
-          // Remote storage path (http) when present — lets the viewer serve the file.
-          path: pf?.path || null,
-          size: file.size ?? pf?.size,
-        });
-      }
-    }
-    return Array.from(byId.values());
-  }, [vehicleTasks, vehicleTaskIds, layoutsByTask]);
-
-  // Keep the quote's approved-layout selection in sync with the vehicles' layouts.
-  // When a layout is removed or marked non-APPROVED (Reprovado/Rascunho) in Step 1,
-  // it is automatically dropped from the selection (the shared one and each
-  // vehicle's) so Step 2 never shows a removed/reproved layout as the selected
-  // approved layout. A persisted quote layout is a private clone (its own File id),
-  // so match by File id OR filename+byte-size — mirroring the ApprovedLayoutPicker
-  // matcher so what it highlights and what we keep always agree. Gated on
-  // layoutsInitialized to avoid pruning a valid selection during the initial-load
-  // transient.
-  useEffect(() => {
-    if (!layoutsInitialized) return;
-    const keyOf = (f: any) => ({
-      id: f.uploadedFileId || f.id,
-      name: (f.name || f.originalName || f.filename || "").trim(),
-      size: f.size || 0,
-    });
-    const matches = (a: any, b: any) => {
-      const ka = keyOf(a);
-      const kb = keyOf(b);
-      return (
-        (!!ka.id && ka.id === kb.id) ||
-        (!!ka.name && ka.name === kb.name && ka.size === kb.size)
-      );
-    };
-    const approved = vehicleTaskIds.flatMap((id) =>
-      (layoutsByTask[id] ?? []).filter(
-        (f: any) =>
-          (f.type || "").startsWith("image/") &&
-          (f.status || "DRAFT") === "APPROVED",
-      ),
-    );
-    // Keep a raw File (a brand-new Step-2 upload not yet persisted) — it becomes
-    // an APPROVED task layout on Save, so it must survive this reconcile.
-    const keep = (list: FileWithPreview[]) =>
-      list.filter((lf) => lf instanceof File || approved.some((a) => matches(a, lf)));
-
-    if (layoutFiles.length > 0) {
-      const kept = keep(layoutFiles);
-      if (kept.length !== layoutFiles.length) {
-        setLayoutFiles(kept);
-        form.setValue(
-          "layoutFileIds",
-          kept
-            .map((f) => (f as any).uploadedFileId || f.id)
-            .filter(Boolean)
-            .slice(0, 2),
-          { shouldDirty: true },
-        );
-      }
-    }
-    let changed = false;
-    const nextByTask: Record<string, FileWithPreview[]> = {};
-    for (const [id, list] of Object.entries(vehicleLayoutFiles)) {
-      const kept = keep(list);
-      if (kept.length !== list.length) changed = true;
-      nextByTask[id] = kept;
-    }
-    if (changed) setVehicleLayoutFiles(nextByTask);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutsByTask, layoutFiles, vehicleLayoutFiles, layoutsInitialized]);
 
   // ── A REQUISIÇÃO DO PORTAL ───────────────────────────────────────────────
   //
@@ -1068,54 +797,29 @@ const FinancialBudgetDetailPageInner = () => {
   //
   // ⛔ O `status` do orçamento NÃO basta para decidir o que oferecer: há
   // orçamentos em `REQUESTED` com coleta `RUNNING` e assinaturas colhidas, e a
-  // tela oferecia "Enviar para pré-aprovação" a um documento já assinado. A
+  // tela oferecia "Enviar para aprovação do cliente" a um documento já assinado. A
   // MESMA consulta do `SignatureEnvelopeCard` (mesma chave, uma requisição só),
   // para que as duas metades desta página nunca discordem.
   const { data: quoteEnvelopes } = useQuoteEnvelopes(existingQuote?.id);
   const envelopeGlance = useMemo(() => envelopeGlanceOf(quoteEnvelopes), [quoteEnvelopes]);
 
-  // O estado do FORMULÁRIO, não o lido na abertura. Os botões do painel escrevem
-  // nele, e o painel precisa reler o que escreveu: senão continuaria oferecendo
-  // "enviar para pré-aprovação" depois de o usuário já ter escolhido, e o aviso
-  // de "ao salvar, o orçamento vai para …" nunca apareceria.
-  const watchedStatus = form.watch("status");
-
-  /**
-   * O avanço escolhido no painel da requisição.
-   *
-   * ⚠️ ESCREVE NO FORMULÁRIO, e não na API. O assistente tem um único caminho de
-   * gravação — `handleSubmit` grava os valores e só então replica o caminho de
-   * status pelo endpoint próprio, para que o servidor valide a transição contra
-   * o preço recém-gravado. Um botão que chamasse `PUT /budgets/:id/status` aqui
-   * correria com as edições abertas e poderia mandar para assinatura um
-   * orçamento cujos serviços ainda estão na tela, por digitar.
-   */
-  const handleRequestAdvance = useCallback(
-    (next: string) => {
-      form.setValue("status", next, { shouldDirty: true });
-    },
-    [form],
-  );
-
   /**
    * DO AVISO ATÉ O LUGAR DE RESOLVER.
    *
-   * "Selecione um layout aprovado antes de enviar o orçamento para assinatura"
-   * é o impedimento mais comum do modal de envio, e ele dizia o que falta sem
-   * dizer onde — o "passo sem saída". Leva ao passo do seletor e rola até ele.
+   * "Arte pendente" é o impedimento mais comum da emissão, e ele dizia o que
+   * falta sem dizer onde. Leva ao quadro da arte de cada veículo, no passo 1.
    *
    * `setCurrentStep` direto, e não `handleStepClick`: voltar é sempre livre (a
    * validação só barra quem PULA para a frente).
    */
-  const goToLayoutStep = useCallback(() => {
-    setCurrentStep(LAYOUT_STEP);
-    // O passo já está MONTADO (1–3 ficam no DOM, escondidos por CSS), mas só
-    // fica VISÍVEL no commit seguinte, e `scrollIntoView` num elemento com
-    // `display:none` não rola coisa alguma. Daí o atraso — sem ele o operador
-    // cai no topo do passo e tem de procurar o seletor.
+  const goToArtworkStep = useCallback(() => {
+    setCurrentStep(ARTWORK_STEP);
+    // O passo já está MONTADO (fica no DOM, escondido por CSS), mas só fica
+    // VISÍVEL no commit seguinte, e `scrollIntoView` num elemento com
+    // `display:none` não rola coisa alguma. Daí o atraso.
     window.setTimeout(() => {
       document
-        .getElementById(LAYOUT_PICKER_ANCHOR_ID)
+        .getElementById(ARTWORK_ANCHOR_ID)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 80);
   }, []);
@@ -1363,54 +1067,8 @@ const FinancialBudgetDetailPageInner = () => {
       const dirtyVehicles = (dirtyFields.vehicles || []) as Array<Record<string, unknown> | undefined>;
       const sameIdSet = (a: string[], b: string[]) =>
         a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
-      // A persisted File id is always a UUID; a not-yet-uploaded file carries a local
-      // temp id (`<timestamp>-<random>`). The API only accepts UUIDs, so a temp id must
-      // never be sent.
-      const isUuid = (id: string) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-      // 1. Upload new artwork files — the Layout Referência of EACH vehicle.
-      // Maps a freshly-uploaded file's LOCAL id -> its real server File id, so a
-      // layout the user selected from a brand-new Step-1 artwork (still a local id
-      // at selection time) can be remapped to the real File id below (see Bug 1).
-      // One map for every vehicle: local ids are unique across them.
-      const localIdToRealFileId: Record<string, string> = {};
-      const uploadedLayoutIdsByTask: Record<string, string[]> = {};
-      const remappedLayoutStatusesByTask: Record<string, Record<string, string>> = {};
-      for (const vehicleId of vehicleTaskIds) {
-        const statuses = layoutStatusesByTask[vehicleId] ?? {};
-        // The status dropdown keys onStatusChange by `uploadedFileId || id`, so a
-        // persisted artwork's status lands under its File id while a brand-new file's
-        // lands under its local id. Read BOTH so neither case is missed.
-        // `file.status` fecha o caso do arquivo recém-solto: o card grava a escolha no
-        // próprio objeto File, então ela sobrevive mesmo que o mapa acima não a tenha.
-        const statusForFile = (file: FileWithPreview): string | undefined =>
-          statuses[(file as any).uploadedFileId] ?? statuses[file.id] ?? file.status;
-        const uploadedIds: string[] = [];
-        const remapped: Record<string, string> = {};
-        for (const file of layoutsByTask[vehicleId] ?? []) {
-          if (file.uploaded && file.uploadedFileId) {
-            uploadedIds.push(file.uploadedFileId);
-            localIdToRealFileId[file.id] = file.uploadedFileId;
-            const status = statusForFile(file);
-            if (status) remapped[file.uploadedFileId] = status;
-          } else if (!file.error) {
-            try {
-              const response = await uploadSingleFile(file, { fileContext: "tasksLayouts" });
-              if (response.success && response.data) {
-                uploadedIds.push(response.data.id);
-                localIdToRealFileId[file.id] = response.data.id;
-                const status = statusForFile(file);
-                if (status) remapped[response.data.id] = status;
-              }
-            } catch (error: any) {
-              toast.error(`Erro ao enviar layout ${file.name}: ${error.message}`);
-            }
-          }
-        }
-        uploadedLayoutIdsByTask[vehicleId] = uploadedIds;
-        remappedLayoutStatusesByTask[vehicleId] = remapped;
-      }
+      // A ARTE NÃO SE GRAVA AQUI: ela é do IMPLEMENTO e tem rotas próprias
+      // (`/implements/:id/layouts`), com estado e decisão. O orçamento só a mostra.
 
       // 1a. Upload each newly picked Plaqueta photo, so the implement payload below can send
       // its id. A failure here must NOT abort the save: the rest of the orçamento is what
@@ -1489,78 +1147,7 @@ const FinancialBudgetDetailPageInner = () => {
           }
           return f;
         });
-      setLayoutsByTask((prev) =>
-        Object.fromEntries(
-          Object.entries(prev).map(([id, list]) => [id, markUploaded(list, localIdToRealFileId)]),
-        ),
-      );
       setBaseFiles((prev) => markUploaded(prev, baseLocalIdToRealFileId));
-
-      // 2. Resolve the ordered APPROVED-layout File ids (up to 2 per selection) — the
-      // shared selection, or each vehicle's. Upload any new files, preserve the
-      // connection for pre-existing ones. Always use FILE ids, never Layout ids.
-      //
-      // A layout may have been selected from a brand-new Step-1 artwork file that
-      // had no server File id yet at selection time (only a local id). Those Step-1
-      // files are uploaded in section 1 above, so remap any local id here to the
-      // real File id via localIdToRealFileId before sending it (Bug 1).
-      //
-      // A raw File escolhido em VÁRIOS veículos ("Usar em todos") sobe uma vez só: o
-      // mapa abaixo guarda o id que ele ganhou, e a mesma arte vira uma arte cobrindo
-      // os N implementos — não N cópias.
-      const uploadedRawLayoutIds = new Map<object, string>();
-      let droppedStaleLayout = false;
-      const resolveSelection = async (selection: FileWithPreview[]): Promise<string[]> => {
-        const resolved: string[] = [];
-        for (const lf of selection) {
-          const existingId = (lf as any).uploadedFileId || lf.id || null;
-          // Already uploaded by the Step-1 artwork pass? Use the real File id.
-          const remapped = existingId ? localIdToRealFileId[existingId] : null;
-          if (remapped) {
-            resolved.push(remapped);
-          } else if (!lf.uploaded) {
-            const already = uploadedRawLayoutIds.get(lf);
-            if (already) {
-              resolved.push(already);
-              continue;
-            }
-            try {
-              const response = await uploadSingleFile(lf, {
-                fileContext: "quote-layouts",
-              });
-              if (response.success && response.data) {
-                uploadedRawLayoutIds.set(lf, response.data.id);
-                resolved.push(response.data.id);
-              }
-            } catch (error: any) {
-              toast.error(`Erro ao enviar layout: ${error.message}`);
-            }
-          } else if (existingId && isUuid(existingId)) {
-            resolved.push(existingId);
-          } else if (existingId) {
-            // Marked uploaded but still a local temp id with no remap and no blob to
-            // re-upload — the source file was lost (e.g. wiped by a background refetch).
-            // Drop it rather than poison the request with a non-UUID.
-            droppedStaleLayout = true;
-          }
-        }
-        // Dedupe (a layout could resolve to the same File id as another slot) and
-        // clamp to the 2-slot maximum.
-        return [...new Set(resolved)].slice(0, 2);
-      };
-      const layoutsPerVehicle = multiVehicle && layoutPerVehicle;
-      const resolvedLayoutIds = layoutsPerVehicle ? [] : await resolveSelection(layoutFiles);
-      const resolvedLayoutIdsByTask: Record<string, string[]> = {};
-      if (layoutsPerVehicle) {
-        for (const vehicleId of vehicleTaskIds) {
-          resolvedLayoutIdsByTask[vehicleId] = await resolveSelection(vehicleLayoutFiles[vehicleId] ?? []);
-        }
-      }
-      if (droppedStaleLayout) {
-        toast.error(
-          "Um layout selecionado não pôde ser salvo. Reenvie o arquivo de layout e tente novamente.",
-        );
-      }
 
       // 3. Build responsible data — COMUNS a todos os veículos.
       const existingRepIds = responsibleRows
@@ -1671,28 +1258,6 @@ const FinancialBudgetDetailPageInner = () => {
         }
         if (Object.keys(implementPayload).length > 0) payload.implement = implementPayload;
 
-        // Layout Referência deste veículo: só quando o conjunto ou os status mudaram.
-        const loadedLayoutIds = loadedLayoutIdsByTaskRef.current[vehicleTask.id] ?? [];
-        const uploadedLayoutIds = uploadedLayoutIdsByTask[vehicleTask.id] ?? [];
-        const layoutIdsChanged =
-          uploadedLayoutIds.length !== loadedLayoutIds.length ||
-          uploadedLayoutIds.some((id, i) => id !== loadedLayoutIds[i]);
-        const loadedStatuses = loadedLayoutStatusesByTaskRef.current[vehicleTask.id] ?? {};
-        const remappedLayoutStatuses = remappedLayoutStatusesByTask[vehicleTask.id] ?? {};
-        const statusKeys = new Set([
-          ...Object.keys(remappedLayoutStatuses),
-          ...Object.keys(loadedStatuses),
-        ]);
-        const layoutStatusesChanged = Array.from(statusKeys).some(
-          (k) => remappedLayoutStatuses[k] !== loadedStatuses[k],
-        );
-        if (layoutIdsChanged || layoutStatusesChanged) {
-          // Send the full resolved set so adds AND removals persist.
-          payload.layoutIds = uploadedLayoutIds;
-          if (Object.keys(remappedLayoutStatuses).length > 0) {
-            payload.layoutStatuses = remappedLayoutStatuses;
-          }
-        }
         return payload;
       };
 
@@ -1856,32 +1421,6 @@ const FinancialBudgetDetailPageInner = () => {
       // (`billing/details/[id].tsx`) e que o app faz (`budget_form_screen.dart`).
       const isQuoteLocked = approvedBillingCount > 0;
 
-      // ─── O LAYOUT APROVADO: DE TODOS OU DE CADA VEÍCULO ─────────────────────
-      //
-      // Orçamento que é e continua COMPARTILHADO vai pelo caminho de sempre
-      // (`layoutFileIds`): é o caso de quase todo o acervo, e ele não muda em nada.
-      // Quando há layout por veículo — ou havia, e o operador está voltando ao
-      // compartilhado —, vai `layouts: [{ fileId, taskIds }]`, e só se mudou: a API
-      // recusa o `layoutFileIds` antigo sobre um orçamento por veículo, e mandar a
-      // cobertura igual à gravada seria uma troca de arte que não aconteceu (troca de
-      // arte derruba assinatura).
-      const persistedPerVehicle = layoutScopeOf(existingQuote as any) === "PER_VEHICLE";
-      const useLayoutsContract = multiVehicle && (layoutsPerVehicle || persistedPerVehicle);
-      const layoutEntries = useLayoutsContract
-        ? layoutsPerVehicle
-          ? perVehicleLayoutsPayload(vehicleTaskIds, resolvedLayoutIdsByTask)
-          : sharedLayoutsPayload(resolvedLayoutIds)
-        : null;
-      const layoutsCoverageChanged =
-        layoutEntries !== null &&
-        layoutsKey(layoutEntries, vehicleTaskIds) !==
-          persistedLayoutsKey(existingQuote as any, vehicleTaskIds);
-      const layoutFields: Record<string, unknown> = useLayoutsContract
-        ? layoutsCoverageChanged
-          ? { layouts: layoutEntries }
-          : {}
-        : { layoutFileIds: resolvedLayoutIds };
-
       /**
        * ⚠️ `taskId` NÃO VAI NO CORPO, travado ou não.
        *
@@ -1908,7 +1447,6 @@ const FinancialBudgetDetailPageInner = () => {
             guaranteeYears: data.guaranteeYears || null,
             customGuaranteeText: data.customGuaranteeText || null,
             customForecastDays: data.customForecastDays || null,
-            ...layoutFields,
             simultaneousTasks: data.simultaneousTasks || null,
           }
         : {
@@ -1918,7 +1456,6 @@ const FinancialBudgetDetailPageInner = () => {
             guaranteeYears: data.guaranteeYears || null,
             customGuaranteeText: data.customGuaranteeText || null,
             customForecastDays: data.customForecastDays || null,
-            ...layoutFields,
             simultaneousTasks: data.simultaneousTasks || null,
             billingSplit: data.billingSplit || "JOINT",
             // ─── OS LOTES VIRAM COBERTURA ────────────────────────────────────────
@@ -1946,20 +1483,10 @@ const FinancialBudgetDetailPageInner = () => {
         // round-tripping through the quote endpoint. The API also filters
         // no-ops defensively, but skipping the call is cheaper.
         const dirty = form.formState.dirtyFields as Record<string, unknown>;
-        // Detect layout change via ordered comparison of resolved File ids vs the
-        // persisted ones. Covers new uploads, removals, reordering AND selecting
-        // an EXISTING file (which a dirty-flag check alone would miss).
-        const persistedLayoutIds = (existingQuote.layoutFiles || []).map(
-          (f: any) => f.id,
-        ) as string[];
-        const layoutChanged = useLayoutsContract
-          ? layoutsCoverageChanged
-          : resolvedLayoutIds.length !== persistedLayoutIds.length ||
-            resolvedLayoutIds.some((id, i) => id !== persistedLayoutIds[i]);
         // Detect service reordering via ordered comparison of service ids vs the
         // persisted ones. A pure drag-reorder does not flip dirty.services (RHF
         // carries each item's dirty state along when it moves), so the dirty-flag
-        // check alone would miss it — mirror the layoutChanged approach.
+        // check alone would miss it.
         const persistedServiceIds = (existingQuote.services || []).map(
           (s: any) => s.id,
         ) as string[];
@@ -1969,7 +1496,7 @@ const FinancialBudgetDetailPageInner = () => {
           currentServiceIds.some((id: any, i: number) => id !== persistedServiceIds[i]);
         // ─── A RECOMPOSIÇÃO DE LOTES ────────────────────────────────────────
         //
-        // Comparação de CONTEÚDO, como `layoutChanged` logo acima, e não
+        // Comparação de CONTEÚDO, como a dos serviços logo acima, e não
         // `dirty.billingGroups`: o campo é `string[][]`, e o dirty de um array
         // aninhado no react-hook-form é uma estrutura que o `Boolean()` lê como
         // verdadeira até quando nada mudou — o gate passaria a disparar uma
@@ -2004,7 +1531,6 @@ const FinancialBudgetDetailPageInner = () => {
             dedupeConfigsByCustomer(existingQuote.customerConfigs ?? []).coverageGroups,
           );
         const quoteFieldDirty =
-          layoutChanged ||
           servicesReordered ||
           billingGroupsChanged ||
           Boolean(
@@ -2014,7 +1540,6 @@ const FinancialBudgetDetailPageInner = () => {
               dirty.guaranteeYears ||
               dirty.customGuaranteeText ||
               dirty.customForecastDays ||
-              dirty.layoutFileIds ||
               dirty.simultaneousTasks ||
               dirty.billingSplit ||
               dirty.customerConfigs ||
@@ -2113,77 +1638,30 @@ const FinancialBudgetDetailPageInner = () => {
           }
         }
 
-        // Apply the chosen status transition AFTER the value save, through the
-        // dedicated /status endpoint. This is the single, deterministic place
-        // status is committed (the dropdown no longer fires an immediate call
-        // that races unsaved edits). Running it post-save means the backend
-        // validates prerequisites (e.g. "total > 0") against the values we just
-        // persisted.
+        // O ESTADO NÃO SE ESCOLHE NO FORMULÁRIO (Modelo C). Enviar ao cliente,
+        // retirar, aprovar o valor em nome do cliente e reprovar são ATOS, com
+        // botão próprio que chama a rota na hora (`BudgetStateActions`). O Salvar
+        // grava só dados — com uma exceção, a de sempre:
         //
-        // The dropdown gates options by the FORM status, so the user can advance
-        // several steps in one session (e.g. APPROVED → PENDING → APPROVED).
-        // The server only accepts single legal hops, so we
-        // replay the whole path hop-by-hop — each validated by the backend.
-        //
-        // ⚠️ A ORIGEM É `statusAfterSave`, não o estado lido na abertura da
-        // página: a gravação de valores acima pode ter acabado de devolver o
-        // orçamento a PENDING pelo auto-revert, e pedir o caminho a partir de
-        // APPROVED faria o servidor recusar um salto que já não parte de lá.
-        let targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
-
         // VALIDADE NOVA TIRA DE "AGUARDANDO REANÁLISE". O vencimento é o que
         // levou o orçamento a EXPIRED; dar a ele uma validade futura é o comercial
         // dizendo que a proposta continua de pé. Mesma regra do
-        // `PUT /budgets/:id/validity`. Só quando o seletor de status não foi
-        // mexido: uma escolha explícita (cancelar, por exemplo) prevalece.
-        if (
-          statusAfterSave === "EXPIRED" &&
-          dirty.expiresAt &&
-          data.expiresAt &&
-          !isQuoteValidityExpired(data.expiresAt) &&
-          (!targetStatus || targetStatus === "EXPIRED")
-        ) {
-          targetStatus = "PENDING" as TASK_QUOTE_STATUS;
-        }
-
-        // ── O SERVIDOR MOVEU O ESTADO? ENTÃO O ALVO ESTÁ VELHO ─────────────────
-        //
-        // O comentário acima cuidou da ORIGEM e esqueceu o ALVO. `targetStatus`
-        // vem do seletor, que carrega o estado de quando a PÁGINA ABRIU — e o
-        // usuário não precisa ter tocado nele. Quando a gravação acima derruba as
-        // assinaturas, o servidor devolve o orçamento a PENDENTE; um instante
-        // depois este bloco calculava o caminho PENDENTE → APROVADO e o replicava,
-        // desfazendo a reversão que acabara de acontecer.
-        //
-        // Medido em produção (nº 984, 17/09): reversão às 20:05:32, reaprovação
-        // às 20:05:33. O servidor agora RECUSA aprovar sobre coleta invalidada —
-        // isto aqui evita que o usuário veja esse erro por um pedido que ele não
-        // fez, e explica o que aconteceu.
+        // `PUT /budgets/:id/validity`.
         const servidorMoveuOEstado = statusAfterSave !== (existingQuote.status as TASK_QUOTE_STATUS);
         if (servidorMoveuOEstado) {
+          // A gravação derrubou as assinaturas e o servidor devolveu o orçamento a
+          // Pendente (nº 984, 17/09). Dizer em voz alta o que aconteceu.
           toast.info(
             "O orçamento voltou para Pendente: a alteração invalidou as assinaturas já colhidas. " +
               "Reenvie para assinatura antes de aprovar de novo.",
           );
-        } else if (targetStatus && targetStatus !== statusAfterSave) {
-          const path = getQuoteStatusPath(statusAfterSave, targetStatus);
-          if (path.length === 0) {
-            throw new Error(
-              `Não há um caminho de status válido de "${statusAfterSave}" até "${targetStatus}".`,
-            );
-          }
-          const reason =
-            (form.getValues("statusReason" as any) as string | undefined)?.trim() ||
-            undefined;
-          for (const step of path) {
-            await budgetService.updateStatus(
-              existingQuote.id,
-              step as any,
-              // Reason only applies to a downgrade-to-PENDING step.
-              step === "PENDING" ? reason : undefined,
-            );
-          }
-          if (reason) form.setValue("statusReason" as any, "");
+        } else if (
+          statusAfterSave === "EXPIRED" &&
+          dirty.expiresAt &&
+          data.expiresAt &&
+          !isQuoteValidityExpired(data.expiresAt)
+        ) {
+          await budgetService.updateStatus(existingQuote.id, "PENDING");
         }
       } else {
         quoteData.status = "PENDING";
@@ -2225,12 +1703,7 @@ const FinancialBudgetDetailPageInner = () => {
     taskId,
     task,
     existingQuote,
-    layoutFiles,
-    layoutsByTask,
-    layoutStatusesByTask,
     vinPlateFilesByTask,
-    vehicleLayoutFiles,
-    layoutPerVehicle,
     vehicleTaskIds,
     vehicleTasks,
     vehicles.airbrushingsByTask,
@@ -2349,116 +1822,63 @@ const FinancialBudgetDetailPageInner = () => {
     return formatted === "-" ? "ainda não medido" : `${formatted} cm`;
   }, [openImplementId, measuresData]);
 
-  // ─── O LAYOUT POR VEÍCULO (passo 2) ────────────────────────────────────
-  const markLayoutCoverageEdited = useCallback(() => {
-    form.setValue("layoutCoverageEdits", (form.getValues("layoutCoverageEdits") || 0) + 1, {
-      shouldDirty: true,
-    });
-  }, [form]);
-  const handleLayoutPerVehicleChange = useCallback(
-    (perVehicle: boolean) => {
-      if (perVehicle) {
-        // Liga: cada implemento parte do que vale hoje para todos — a menos que o
-        // operador já tenha escolhido algo diferente por veículo antes de desligar.
-        setVehicleLayoutFiles((prev) => {
-          const keyOf = (list: FileWithPreview[] | undefined) =>
-            (list ?? []).map((f) => (f as any).uploadedFileId || f.id).join("|");
-          const uniform = new Set(vehicleTaskIds.map((id) => keyOf(prev[id]))).size <= 1;
-          if (!uniform) return prev;
-          return Object.fromEntries(vehicleTaskIds.map((id) => [id, [...layoutFiles]]));
-        });
-      } else {
-        // Desliga: o compartilhado fica com as artes escolhidas nos veículos, sem
-        // repetir, até o limite de 2 do documento.
-        const seen = new Set<string>();
-        const union: FileWithPreview[] = [];
-        for (const id of vehicleTaskIds) {
-          for (const f of vehicleLayoutFiles[id] ?? []) {
-            const key = (f as any).uploadedFileId || f.id || "";
-            if (seen.has(key)) continue;
-            seen.add(key);
-            union.push(f);
-          }
-        }
-        if (union.length > 2) {
-          toast.warning("O layout compartilhado aceita até 2 artes; ficaram as 2 primeiras.");
-        }
-        setLayoutFiles(union.slice(0, 2));
-      }
-      setLayoutPerVehicle(perVehicle);
-      markLayoutCoverageEdited();
-    },
-    [vehicleTaskIds, layoutFiles, vehicleLayoutFiles, markLayoutCoverageEdited],
-  );
-  const handleVehicleLayoutFilesChange = useCallback(
-    (vehicleId: string, files: FileWithPreview[]) => {
-      setVehicleLayoutFiles((prev) => ({ ...prev, [vehicleId]: files }));
-      markLayoutCoverageEdited();
-    },
-    [markLayoutCoverageEdited],
-  );
-  const handleUseLayoutForAll = useCallback(
-    (vehicleId: string) => {
-      setVehicleLayoutFiles((prev) =>
-        Object.fromEntries(vehicleTaskIds.map((id) => [id, [...(prev[vehicleId] ?? [])]])),
-      );
-      markLayoutCoverageEdited();
-    },
-    [vehicleTaskIds, markLayoutCoverageEdited],
-  );
-  const handleSharedLayoutFilesChange = useCallback(
-    (files: FileWithPreview[]) => {
-      setLayoutFiles(files);
-      markLayoutCoverageEdited();
-    },
-    [markLayoutCoverageEdited],
+  // ─── A ARTE DE CADA VEÍCULO (só leitura) ───────────────────────────────
+  //
+  // A arte é do IMPLEMENTO (Modelo C): o orçamento não a escolhe nem a grava, e o
+  // documento leva a APROVADA de cada veículo. Aqui só se lê o que o `include`
+  // trouxe (`implement.layouts`), para o passo 1 e para o Resumo.
+  const artVehicles = useMemo(
+    () =>
+      vehicleTabs.map((tab, index) => ({
+        taskId: tab.taskId,
+        label: tab.label,
+        implement: ((vehicleTasks[index] as any)?.implement ?? null) as ImplementArtVehicle["implement"],
+      })),
+    [vehicleTabs, vehicleTasks],
   );
 
-  // O que o Resumo mostra de cada veículo além da identificação: a pintura e o layout.
-  const layoutThumbOf = (f: any): string | null => {
-    if (f?.preview) return f.preview as string;
-    if (f?.thumbnailUrl) return f.thumbnailUrl as string;
-    const id = f?.uploadedFileId || f?.id;
-    return id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-      ? `${getApiBaseUrl()}/files/thumbnail/${id}`
-      : null;
-  };
+  // O que o Resumo mostra de cada veículo além da identificação: a pintura e a
+  // arte APROVADA do implemento.
+  const artThumbOf = (file: { id: string; thumbnailUrl?: string | null }): string =>
+    file.thumbnailUrl || `${getApiBaseUrl()}/files/thumbnail/${file.id}`;
   const reviewVehicleExtras = useMemo(
     () =>
       Object.fromEntries(
-        vehicleTabs.map((t) => [
+        vehicleTabs.map((t, index) => [
           t.taskId,
           {
             paintName: t.paintName,
             paintHex: t.paintHex,
-            layoutThumbs: ((multiVehicle && layoutPerVehicle ? vehicleLayoutFiles[t.taskId] : layoutFiles) ?? [])
-              .map(layoutThumbOf)
-              .filter(Boolean) as string[],
+            layoutThumbs: approvedArtFilesOf(artVehicles[index]).map(artThumbOf),
           },
         ]),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vehicleTabs, multiVehicle, layoutPerVehicle, vehicleLayoutFiles, layoutFiles],
+    [vehicleTabs, artVehicles],
   );
-  // Os layouts do Resumo agrupados pelos veículos que os usam (só no modo por veículo).
+  // A arte do Resumo agrupada pelos veículos que a usam — a mesma leitura do
+  // documento ("Veículos 39088, 39089"). Um grupo só quando todos têm a mesma.
   const reviewLayoutGroups = useMemo(() => {
-    if (!multiVehicle || !layoutPerVehicle) return undefined;
-    const groups = new Map<string, { labels: string[]; files: FileWithPreview[] }>();
-    vehicleTabs.forEach((t) => {
-      const files = vehicleLayoutFiles[t.taskId] ?? [];
+    const groups = new Map<string, { labels: string[]; thumbs: string[] }>();
+    artVehicles.forEach((vehicle) => {
+      const files = approvedArtFilesOf(vehicle);
       if (files.length === 0) return;
-      const key = files.map((f) => (f as any).uploadedFileId || f.id).join("|");
-      if (!groups.has(key)) groups.set(key, { labels: [], files });
-      groups.get(key)!.labels.push(t.label);
+      const key = files.map((f) => f.id).join("|");
+      if (!groups.has(key)) groups.set(key, { labels: [], thumbs: files.map(artThumbOf) });
+      groups.get(key)!.labels.push(vehicle.label);
     });
-    return Array.from(groups.values()).map((g) => ({
+    const list = Array.from(groups.values());
+    if (list.length === 1 && list[0].labels.length === artVehicles.length) {
+      return [{ label: "", thumbs: list[0].thumbs }];
+    }
+    return list.map((g) => ({
       label:
         (g.labels.length === 1 ? "Veículo " : "Veículos ") +
         (g.labels.length <= 3 ? g.labels.join(", ") : `${g.labels.slice(0, 2).join(", ")} +${g.labels.length - 2}`),
-      thumbs: g.files.map(layoutThumbOf).filter(Boolean) as string[],
+      thumbs: g.thumbs,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [multiVehicle, layoutPerVehicle, vehicleTabs, vehicleLayoutFiles]);
+  }, [artVehicles]);
   const handleReviewVehicleSelect = useCallback((vehicleId: string) => {
     setActiveVehicleId(vehicleId);
     setCurrentStep(1);
@@ -2636,7 +2056,7 @@ const FinancialBudgetDetailPageInner = () => {
           <div className="mb-4">
             <BudgetRequestCard
               request={budgetRequest}
-              status={watchedStatus || existingQuote?.status}
+              status={existingQuote?.status}
               task={task}
               variant={requestVariant}
               // OS VEÍCULOS vêm do ORÇAMENTO, não de `task`: a tela é aberta
@@ -2658,9 +2078,8 @@ const FinancialBudgetDetailPageInner = () => {
               showResponsibleErrors={showResponsibleErrors}
               baseFiles={baseFiles}
               onBaseFilesChange={handleBaseFilesChange}
-              layouts={layoutsByTask[activeVehicleId] ?? []}
-              onLayoutsChange={handleLayoutsChange}
-              onLayoutStatusChange={handleLayoutStatusChange}
+              artVehicles={artVehicles}
+              artAnchorId={ARTWORK_ANCHOR_ID}
               vinPlateFiles={vinPlateFilesByTask[activeVehicleId] ?? []}
               onVinPlateFilesChange={handleVinPlateFilesChange}
               vehicleFieldPrefix={`vehicles.${activeVehicleIndex}.`}
@@ -2698,28 +2117,9 @@ const FinancialBudgetDetailPageInner = () => {
               // orçamento de sessenta — escondendo o seletor de faturamento
               // justamente de quem precisa dele.
 
-              layoutFiles={layoutFiles}
-              onLayoutFilesChange={setLayoutFiles}
-              layouts={layoutImageOptions}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}
-              layoutSlot={
-                multiVehicle ? (
-                  <BudgetVehicleLayoutsField
-                    vehicles={vehicleTabs}
-                    perVehicle={layoutPerVehicle}
-                    onPerVehicleChange={handleLayoutPerVehicleChange}
-                    options={layoutImageOptions}
-                    sharedFiles={layoutFiles}
-                    onSharedFilesChange={handleSharedLayoutFilesChange}
-                    filesByTask={vehicleLayoutFiles}
-                    onTaskFilesChange={handleVehicleLayoutFilesChange}
-                    onUseForAll={handleUseLayoutForAll}
-                    disabled={isSubmitting || !canEdit}
-                  />
-                ) : undefined
-              }
             />
           </div>
 
@@ -2768,14 +2168,14 @@ const FinancialBudgetDetailPageInner = () => {
                   mesmo passo do "Salvar" do cabeçalho. Ver o cabeçalho de
                   `budget-state-actions.tsx`. */}
               <BudgetStateActions
-                status={watchedStatus || existingQuote?.status}
-                serverStatus={existingQuote?.status}
-                // ⛔ O SEGUNDO EIXO. Coleta viva cala os encaminhamentos: ver o
-                // cabeçalho de `budget-state-actions.tsx`.
+                budgetId={existingQuote?.id}
+                status={existingQuote?.status}
+                // ⛔ Coleta viva cala os atos: ver o cabeçalho de
+                // `budget-state-actions.tsx`.
                 envelope={envelopeGlance}
                 userRole={userRole}
                 disabled={isSubmitting || !canEdit}
-                onAdvance={handleRequestAdvance}
+                hasUnsavedChanges={form.formState.isDirty}
                 onGoToSignature={scrollToSignature}
               />
 
@@ -2785,7 +2185,6 @@ const FinancialBudgetDetailPageInner = () => {
                 existingQuote={existingQuote}
                 userRole={userRole}
                 selectedCustomers={selectedCustomers}
-                layoutFiles={layoutFiles}
                 vehicleExtras={multiVehicle ? reviewVehicleExtras : undefined}
                 onVehicleSelect={multiVehicle ? handleReviewVehicleSelect : undefined}
                 layoutGroups={reviewLayoutGroups}
@@ -2799,11 +2198,10 @@ const FinancialBudgetDetailPageInner = () => {
                   <SignatureEnvelopeCard
                     quoteId={existingQuote.id}
                     canManage={canEdit}
-                    // O IMPEDIMENTO DO LAYOUT TEM ENDEREÇO: o passo 2 deste
-                    // mesmo assistente, onde vive o seletor de layout aprovado.
-                    // Sem isto o modal de envio dizia o que falta e não dizia
-                    // onde resolver.
-                    onResolveLayout={goToLayoutStep}
+                    // O IMPEDIMENTO DA ARTE TEM ENDEREÇO: o quadro da arte de
+                    // cada veículo, no passo 1 deste mesmo assistente. Sem isto o
+                    // modal de envio dizia o que falta e não dizia onde resolver.
+                    onResolveLayout={goToArtworkStep}
                   />
                 </div>
               )}

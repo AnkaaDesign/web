@@ -71,9 +71,10 @@ function whileInFlight(node: PredicateNode): PredicateNode {
  * tela deixam de concordar.
  */
 const INVOICE_WINDOW: Record<TASK_QUOTE_STATUS, boolean> = {
-  // Envelope lançado: o preço está acertado e a nota vem a seguir.
+  // Em montagem pela Ankaa: o espelho da API (`NOT_YET_INVOICED`) ainda o põe
+  // na janela.
   [TASK_QUOTE_STATUS.PENDING]: true,
-  // Assinado pelo cliente é pré-faturamento — faltar o número do pedido trava.
+  // LEGADO (nenhuma linha desde a M3o-b); fica como na API.
   [TASK_QUOTE_STATUS.SIGNED]: true,
   [TASK_QUOTE_STATUS.APPROVED]: true,
 
@@ -83,15 +84,14 @@ const INVOICE_WINDOW: Record<TASK_QUOTE_STATUS, boolean> = {
   // pedido de compra é pedir um dado que talvez nem se use. Ele reentra sozinho
   // quando a reformulação o devolve a PENDING.
   [TASK_QUOTE_STATUS.EXPIRED]: false,
-  // ── E OS TRÊS DO PORTAL, pela MESMA razão e com mais força ─────────────────
+  // ── E OS DO PORTAL, pela MESMA razão e com mais força ──────────────────────
   //
-  // Requisição não tem serviço nem valor: não há nota para travar. "Em
-  // Negociação" é o preço em discussão com o vendedor do cliente, e
-  // "Pré-aprovado" espera a Ankaa LANÇAR o documento — nos três o que falta é o
-  // acordo, não o cadastro. Deixá-los de fora é o mesmo recorte de EXPIRED.
+  // Requisição não tem serviço nem valor: não há nota para travar. "Aguardando
+  // aprovação do cliente" é o preço ainda na mesa do cliente — nos dois o que
+  // falta é o acordo, não o cadastro. Deixá-los de fora é o mesmo recorte de
+  // EXPIRED.
   [TASK_QUOTE_STATUS.REQUESTED]: false,
   [TASK_QUOTE_STATUS.IN_NEGOTIATION]: false,
-  [TASK_QUOTE_STATUS.PRE_APPROVED]: false,
 
   [TASK_QUOTE_STATUS.CANCELLED]: false,
 };

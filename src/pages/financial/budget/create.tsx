@@ -88,7 +88,6 @@ export const FinancialBudgetCreatePage = () => {
   // stop a rapid second click, because the state update hasn't re-rendered the button yet.
   const isSubmittingRef = useRef<boolean>(false);
   const guardAirbrushingCreation = useAirbrushingCreationGuard();
-  const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
     new Map(),
@@ -111,22 +110,10 @@ export const FinancialBudgetCreatePage = () => {
   }]);
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [baseFileIds, setBaseFileIds] = useState<string[]>([]);
-  const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
-  const [layoutIds, setLayoutIds] = useState<string[]>([]);
-  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
 
   const handleBaseFilesChange = useCallback((files: FileWithPreview[]) => {
     setBaseFiles(files);
     setBaseFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
-  }, []);
-
-  const handleLayoutsChange = useCallback((files: FileWithPreview[]) => {
-    setLayouts(files);
-    setLayoutIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
-  }, []);
-
-  const handleLayoutStatusChange = useCallback((fileId: string, status: string) => {
-    setLayoutStatuses(prev => ({ ...prev, [fileId]: status }));
   }, []);
 
   const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
@@ -229,7 +216,6 @@ export const FinancialBudgetCreatePage = () => {
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
-      layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
       /**
        * Junto ou separado — só faz diferença quando o orçamento cobre mais de um
@@ -348,80 +334,6 @@ export const FinancialBudgetCreatePage = () => {
       fantasyName: reviewTaskCustomer.fantasyName,
     } : undefined,
   }), [reviewTaskCustomer]);
-
-  // Step-2 "Layout Aprovado" options come from the LIVE Step-1 layouts (layouts).
-  // A new budget has no persisted task.layouts, so without this the selection shows
-  // "Nenhum layout na tarefa" even after a layout was added in Step 1. Only IMAGE
-  // layouts marked "Aprovado" are offered. On CREATE the per-file status lives in the
-  // `layoutStatuses` map (keyed by uploadedFileId||id) — NOT on the layouts entries —
-  // so read it from there, else the just-approved image would never appear.
-  const layoutImageOptions = useMemo(
-    () =>
-      layouts
-        .filter((f) => {
-          const fid = (f as any).uploadedFileId || f.id;
-          const status = layoutStatuses[fid] ?? (f as any).status ?? "DRAFT";
-          return (f.type || "").startsWith("image/") && status === "APPROVED";
-        })
-        .map((f) => {
-          const id = (f as any).uploadedFileId || f.id;
-          return {
-            id,
-            filename: f.name,
-            originalName: f.name,
-            thumbnailUrl: f.thumbnailUrl || null,
-            preview: f.preview || null,
-            status: layoutStatuses[id] ?? (f as any).status,
-            mimetype: f.type,
-            size: f.size,
-          };
-        }),
-    [layouts, layoutStatuses],
-  );
-
-  // Keep the quote's approved-layout selection in sync with Step-1 layouts: a layout
-  // removed or marked non-APPROVED (Reprovado/Rascunho) in Step 1 is automatically
-  // dropped from the quote selection (layoutFiles). On CREATE the current status lives
-  // in the `layoutStatuses` map, so approval is read from there. No load gate is needed
-  // — a selection can only exist after its APPROVED image was picked in this session.
-  useEffect(() => {
-    if (layoutFiles.length === 0) return;
-    const keyOf = (f: any) => ({
-      id: f.uploadedFileId || f.id,
-      name: (f.name || f.originalName || f.filename || "").trim(),
-      size: f.size || 0,
-    });
-    const matches = (a: any, b: any) => {
-      const ka = keyOf(a);
-      const kb = keyOf(b);
-      return (
-        (!!ka.id && ka.id === kb.id) ||
-        (!!ka.name && ka.name === kb.name && ka.size === kb.size)
-      );
-    };
-    const approved = layouts.filter((f: any) => {
-      const fid = f.uploadedFileId || f.id;
-      const status = layoutStatuses[fid] ?? f.status ?? "DRAFT";
-      return (f.type || "").startsWith("image/") && status === "APPROVED";
-    });
-    // Keep a raw File (a brand-new Step-2 upload not yet persisted) — it becomes
-    // an APPROVED task layout on Save, so it must survive this reconcile.
-    const kept = layoutFiles.filter(
-      (lf) => lf instanceof File || approved.some((a) => matches(a, lf)),
-    );
-    if (kept.length !== layoutFiles.length) {
-      setLayoutFiles(kept);
-      form.setValue(
-        "layoutFileIds",
-        kept
-          .map((f) => (f as any).uploadedFileId || f.id)
-          .filter(Boolean)
-          .slice(0, 2),
-        { shouldDirty: true },
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layouts, layoutFiles, layoutStatuses]);
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
@@ -598,18 +510,8 @@ export const FinancialBudgetCreatePage = () => {
         return;
       }
 
-      // 1. Upload artwork files. Map each file's LOCAL id -> its real server File id so a
-      // layout selected from a Step-1 artwork (a local temp id at selection time) can be
-      // remapped to the real File id below — otherwise the temp id reaches the API and is
-      // rejected as a non-UUID.
-      const uploadedLayoutIds: string[] = [...layoutIds];
-      const remappedLayoutStatuses: Record<string, string> = {};
-      const localIdToRealFileId: Record<string, string> = {};
-      // O seletor chaveia por `uploadedFileId || id`, e grava a escolha também no próprio
-      // objeto File — ler os três cobre tanto o layout já enviado quanto o recém-solto,
-      // cujo status precisa sobreviver ao upload que acontece logo abaixo.
-      const statusForFile = (file: (typeof layouts)[number]): string | undefined =>
-        layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id] ?? file.status;
+      // A ARTE NÃO NASCE AQUI: ela é do IMPLEMENTO (Modelo C) e entra depois de o
+      // orçamento existir, pelo painel da arte, com estado e decisão próprios.
 
       // Every upload below runs INSIDE the submit, so each second one hangs is a
       // second the button sits at "Salvando..." saying nothing. One stalled
@@ -617,10 +519,7 @@ export const FinancialBudgetCreatePage = () => {
       // the user reloaded to escape — losing the whole form. Narrate the
       // progress and cap each file, so a dead connection surfaces as a message
       // instead of a frozen button.
-      const pendingUploads =
-        layouts.filter((f) => !(f.uploaded && f.uploadedFileId) && !f.error).length +
-        baseFiles.filter((f) => !f.uploaded && !f.error).length +
-        layoutFiles.filter((lf) => !lf.uploaded).length;
+      const pendingUploads = baseFiles.filter((f) => !f.uploaded && !f.error).length;
       let uploadIndex = 0;
       const narrateUpload = (name: string) => {
         uploadIndex += 1;
@@ -632,34 +531,7 @@ export const FinancialBudgetCreatePage = () => {
         }
       };
 
-      for (const file of layouts) {
-        const status = statusForFile(file);
-        if (file.uploaded && file.uploadedFileId) {
-          localIdToRealFileId[file.id] = file.uploadedFileId;
-          if (status) {
-            remappedLayoutStatuses[file.uploadedFileId] = status;
-          }
-        } else if (!file.error) {
-          try {
-            narrateUpload(file.name);
-            const response = await uploadSingleFile(file, {
-              fileContext: 'tasksLayouts',
-              timeout: UPLOAD_TIMEOUT_MS,
-            });
-            if (response.success && response.data) {
-              uploadedLayoutIds.push(response.data.id);
-              localIdToRealFileId[file.id] = response.data.id;
-              if (status) {
-                remappedLayoutStatuses[response.data.id] = status;
-              }
-            }
-          } catch (error: any) {
-            toast.error(`Erro ao enviar layout ${file.name}: ${describeUploadError(error)}`);
-          }
-        }
-      }
-
-      // 2. Upload base files
+      // 1. Upload base files
       const uploadedBaseFileIds: string[] = [...baseFileIds];
       for (const file of baseFiles) {
         if (!file.uploaded && !file.error) {
@@ -677,53 +549,6 @@ export const FinancialBudgetCreatePage = () => {
           }
         }
       }
-
-      // 3. Resolve layout File ids (up to 2 ordered slots) — ALWAYS real File UUIDs. A
-      // layout chosen from a Step-1 artwork carries that artwork's LOCAL id; remap it to
-      // the real File id uploaded above. The API only accepts UUIDs.
-      const isUuid = (id: string) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const resolvedLayoutIds: string[] = [];
-      let droppedStaleLayout = false;
-      for (const lf of layoutFiles) {
-        const existingId = (lf as any).uploadedFileId || lf.id || null;
-        const remapped = existingId ? localIdToRealFileId[existingId] : null;
-        if (remapped) {
-          resolvedLayoutIds.push(remapped);
-        } else if (!lf.uploaded) {
-          try {
-            narrateUpload(lf.name ?? "layout");
-            const response = await uploadSingleFile(lf, {
-              fileContext: "quote-layouts",
-              timeout: UPLOAD_TIMEOUT_MS,
-            });
-            if (response.success && response.data) {
-              resolvedLayoutIds.push(response.data.id);
-            }
-          } catch (error: any) {
-            toast.error(`Erro ao enviar layout: ${describeUploadError(error)}`);
-          }
-        } else if (existingId && isUuid(existingId)) {
-          resolvedLayoutIds.push(existingId);
-        } else if (existingId) {
-          // Marked uploaded but still a local temp id with no remap / blob — drop it
-          // rather than send a non-UUID the API would reject.
-          droppedStaleLayout = true;
-        }
-      }
-      if (droppedStaleLayout) {
-        toast.error(
-          "Um layout selecionado não pôde ser salvo. Reenvie o arquivo de layout e tente novamente.",
-        );
-      }
-      const seenLayoutIds = new Set<string>();
-      const layoutFileIds = resolvedLayoutIds
-        .filter((id) => {
-          if (seenLayoutIds.has(id)) return false;
-          seenLayoutIds.add(id);
-          return true;
-        })
-        .slice(0, 2);
 
       // 4. Build responsible data
       const existingRepIds = responsibleRows
@@ -829,8 +654,6 @@ export const FinancialBudgetCreatePage = () => {
           term: data.term || undefined,
           paintId: data.paintId || undefined,
           paintIds: data.paintIds && data.paintIds.length > 0 ? data.paintIds : undefined,
-          layoutIds: uploadedLayoutIds.length > 0 ? uploadedLayoutIds : undefined,
-          layoutStatuses: uploadedLayoutIds.length > 0 && Object.keys(remappedLayoutStatuses).length > 0 ? remappedLayoutStatuses : undefined,
           baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
           responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
           serviceOrders: serviceOrders.length > 0 ? serviceOrders.map((so: any) => ({
@@ -877,13 +700,12 @@ export const FinancialBudgetCreatePage = () => {
       const quoteData: any = {
         billingSplit: data.billingSplit ?? "JOINT",
         expiresAt: data.expiresAt,
-        status: "PENDING",
+        // Sem `status`: o servidor decide o nascimento (D-34) — sempre Pendente.
         subtotal: data.subtotal || 0,
         total: data.total || 0,
         guaranteeYears: data.guaranteeYears || null,
         customGuaranteeText: data.customGuaranteeText || null,
         customForecastDays: data.customForecastDays || null,
-        layoutFileIds,
         simultaneousTasks: data.simultaneousTasks || null,
         customerConfigs: data.customerConfigs || [],
         services: validServices.map((item: any) => ({
@@ -977,12 +799,8 @@ export const FinancialBudgetCreatePage = () => {
     form,
     guardAirbrushingCreation,
     responsibleRows,
-    layouts,
-    layoutIds,
-    layoutStatuses,
     baseFiles,
     baseFileIds,
-    layoutFiles,
     queryClient,
     navigate,
     allowNavigation,
@@ -1072,9 +890,6 @@ export const FinancialBudgetCreatePage = () => {
               showResponsibleErrors={showResponsibleErrors}
               baseFiles={baseFiles}
               onBaseFilesChange={handleBaseFilesChange}
-              layouts={layouts}
-              onLayoutsChange={handleLayoutsChange}
-              onLayoutStatusChange={handleLayoutStatusChange}
               onPaintCreated={handlePaintCreated}
             />
           </div>
@@ -1082,9 +897,6 @@ export const FinancialBudgetCreatePage = () => {
           <div style={{ display: currentStep === 2 ? undefined : 'none' }}>
             <BudgetStepInfo
               disabled={isSubmitting}
-              layoutFiles={layoutFiles}
-              onLayoutFilesChange={setLayoutFiles}
-              layouts={layoutImageOptions}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}
@@ -1129,7 +941,6 @@ export const FinancialBudgetCreatePage = () => {
               disabled={isSubmitting}
               userRole={userRole}
               selectedCustomers={selectedCustomers}
-              layoutFiles={layoutFiles}
               isCreateMode
             />
           )}

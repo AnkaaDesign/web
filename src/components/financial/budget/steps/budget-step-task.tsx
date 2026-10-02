@@ -6,7 +6,6 @@ import {
   IconBox,
   IconPalette,
   IconFileText,
-  IconPhoto,
   IconUser,
   IconNotes,
   IconInfoCircle,
@@ -43,9 +42,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileCardUploadField, FileUploadField } from "@/components/common/file";
-import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
+import {
+  ImplementArtSummary,
+  type ImplementArtVehicle,
+} from "@/components/production/implement-art/implement-art-summary";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
-import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
+import { type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 
 interface BudgetStepTaskProps {
@@ -56,9 +58,13 @@ interface BudgetStepTaskProps {
   showResponsibleErrors: boolean;
   baseFiles: FileWithPreview[];
   onBaseFilesChange: (files: FileWithPreview[]) => void;
-  layouts: FileWithPreview[];
-  onLayoutsChange: (files: FileWithPreview[]) => void;
-  onLayoutStatusChange: (fileId: string, status: string) => void;
+  /**
+   * A arte de cada veículo do orçamento, SÓ LEITURA. A arte é do implemento e
+   * tem rotas próprias; aqui só se vê em que pé ela está.
+   */
+  artVehicles?: ImplementArtVehicle[];
+  /** Âncora do quadro da arte (o atalho "arte pendente" da emissão rola até ele). */
+  artAnchorId?: string;
   onPaintCreated?: (paint: any) => void;
   /** Foto da plaqueta (VIN) já anexada ao implemento, se houver. Edit mode only. */
   vinPlateFiles?: FileWithPreview[];
@@ -105,9 +111,8 @@ export function BudgetStepTask({
   showResponsibleErrors,
   baseFiles,
   onBaseFilesChange,
-  layouts,
-  onLayoutsChange,
-  onLayoutStatusChange,
+  artVehicles = [],
+  artAnchorId,
   onPaintCreated,
   vinPlateFiles,
   onVinPlateFilesChange,
@@ -135,10 +140,6 @@ export function BudgetStepTask({
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
   const showLayouts = isAdminUser || isCommercialUser;
-  // Raw task-layout upload + status management (Step 1) is ADMIN-only: commercial
-  // does NOT upload task layouts or change their status here — they only pick (or
-  // upload a new, auto-approved) approved layout in Step 2 (Layout Aprovados).
-  const canManageTaskLayouts = isAdminUser;
 
   // Watch form values
   const plates = useWatch({ control, name: "plates" }) || [];
@@ -192,7 +193,7 @@ export function BudgetStepTask({
   }, [isEditMode, plates, serialNumbers]);
 
   return (
-    <div className={openAccordion === 'base-files' || openAccordion === 'layouts' ? 'pb-64' : ''}>
+    <div className={openAccordion === 'base-files' ? 'pb-64' : ''}>
       {multiVehicle && vehicleTabs && (
         <div className="sticky top-0 z-10 -mx-1 mb-4 bg-background/95 px-1 pb-2 pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           {vehicleTabs}
@@ -732,71 +733,15 @@ export function BudgetStepTask({
           </Card>
         </AccordionItem>
 
-        {/* 6. Layout Referência (task layouts) - ADMIN only. Commercial manages
-             the approved layout in Step 2, not the raw task layouts here. */}
-        {canManageTaskLayouts && (
-          <AccordionItem
-            value="layouts"
-            id="accordion-item-layouts"
-            className="border border-border rounded-lg"
-          >
-            <Card className="border-0">
-              <AccordionTrigger className="px-0 hover:no-underline">
-                <CardHeader className="flex-1 py-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconPhoto className="h-5 w-5" />
-                    Layout Referência{vehicleSuffix}
-                    {layouts.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {layouts.length}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </AccordionTrigger>
-              <AccordionContent>
-                <CardContent className="pt-0">
-                  <LayoutFileUploadField
-                    key={vk("layouts")}
-                    onFilesChange={onLayoutsChange}
-                    onStatusChange={onLayoutStatusChange}
-                    maxFiles={5}
-                    disabled={disabled}
-                    showPreview={true}
-                    existingFiles={layouts}
-                    placeholder="Adicione o layout referência relacionado à tarefa"
-                    label="Layout Referência anexado"
-                    variant="card"
-                  >
-                    {/* Reuse a layout already used for this customer (no re-upload). */}
-                    <FileSuggestions
-                      customerId={customerIdValue ?? undefined}
-                      fileContext="tasksLayouts"
-                      excludeFileIds={layouts
-                        .map((f) => (f as any).uploadedFileId || f.id)
-                        .filter(Boolean)}
-                      onSelect={(newFile) => {
-                        const fileWithPreview = {
-                          id: newFile.id,
-                          name: newFile.filename || newFile.originalName || "artwork",
-                          size: newFile.size || 0,
-                          type: newFile.mimetype || "application/octet-stream",
-                          lastModified: Date.now(),
-                          uploaded: true,
-                          uploadProgress: 100,
-                          uploadedFileId: newFile.id,
-                          thumbnailUrl: newFile.thumbnailUrl || undefined,
-                          status: "DRAFT",
-                        } as FileWithPreview;
-                        onLayoutsChange([...layouts, fileWithPreview]);
-                      }}
-                      disabled={disabled}
-                    />
-                  </LayoutFileUploadField>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
+        {/* 6. A ARTE DE CADA VEÍCULO — só leitura. Fora do acordeão de propósito:
+             é o que o operador confere antes de emitir, e o atalho "arte pendente"
+             da emissão rola até aqui. */}
+        {showLayouts && artVehicles.length > 0 && (
+          <Card className="border border-border rounded-lg">
+            <CardContent className="pt-4">
+              <ImplementArtSummary vehicles={artVehicles} anchorId={artAnchorId} />
+            </CardContent>
+          </Card>
         )}
 
         {/* Aerografias - COMMERCIAL/ADMIN (same audience as Layouts) */}

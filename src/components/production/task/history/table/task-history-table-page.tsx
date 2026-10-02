@@ -62,7 +62,6 @@ import { taskCancelConfirmOpts } from "../../cancel-confirmation";
 import { SetStatusModal } from "../../schedule/set-status-modal";
 import { SetSectorModal } from "../../schedule/set-sector-modal";
 import { SetTermModal } from "../../schedule/set-term-modal";
-import { SetQuoteLayoutModal } from "../../schedule/set-quote-layout-modal";
 import { CopyFromTaskModal } from "../../schedule/copy-from-task-modal";
 import { TaskDuplicateModal } from "../../modals/task-duplicate-modal";
 import { AdvancedBulkActionsHandler } from "../../bulk-operations/AdvancedBulkActionsHandler";
@@ -215,7 +214,6 @@ export function TaskHistoryTablePage() {
   const [sectorModal, setSectorModal] = useState<TaskModalState>(CLOSED);
   const [termModal, setTermModal] = useState<TaskModalState>(CLOSED);
   const [statusModal, setStatusModal] = useState<TaskModalState>(CLOSED);
-  const [quoteLayoutModal, setQuoteLayoutModal] = useState<TaskModalState>(CLOSED);
   const [duplicateModal, setDuplicateModal] = useState<TaskModalState>(CLOSED);
   const [deleteDialog, setDeleteDialog] = useState<TaskModalState>(CLOSED);
   const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
@@ -560,19 +558,20 @@ export function TaskHistoryTablePage() {
       // --- Avançados submenu ---
       {
         key: "adv-arts",
-        label: "Adicionar Layout Referência",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu || !canAccessLayouts,
         onClick: (r) => openAdvanced("arts", r),
       },
       {
+        // A arte do implemento para o COMERCIAL — o mesmo modal da "Arte em lote".
         key: "adv-quote-layout",
-        label: "Adicionar Layout Aprovados",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
-        hidden: () => !canAccessAdvancedMenu || !isCommercial,
-        onClick: (r) => setQuoteLayoutModal({ open: true, tasks: r }),
+        hidden: () => !canAccessAdvancedMenu || !isCommercial || canAccessLayouts,
+        onClick: (r) => openAdvanced("arts", r),
       },
       {
         key: "adv-base-files",
@@ -734,7 +733,6 @@ export function TaskHistoryTablePage() {
 
       <SetSectorModal open={sectorModal.open} onOpenChange={(open) => setSectorModal((s) => ({ ...s, open }))} tasks={sectorModal.tasks} onConfirm={confirmSetSector} />
       <SetTermModal open={termModal.open} onOpenChange={(open) => setTermModal((s) => ({ ...s, open }))} tasks={termModal.tasks} onConfirm={confirmSetTerm} />
-      <SetQuoteLayoutModal open={quoteLayoutModal.open} onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))} tasks={quoteLayoutModal.tasks} />
       <SetStatusModal
         open={statusModal.open}
         onOpenChange={(open) => setStatusModal((s) => ({ ...s, open }))}

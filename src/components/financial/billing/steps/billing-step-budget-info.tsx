@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +5,10 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
-  ApprovedLayoutPicker,
-  type LayoutOption,
-} from "@/components/financial/common/approved-layout-picker";
+  ImplementArtSummary,
+  type ImplementArtVehicle,
+} from "@/components/production/implement-art/implement-art-summary";
 import { IconCalendar } from "@tabler/icons-react";
-import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ValidityField } from "@/components/financial/budget/validity";
 
 const GUARANTEE_OPTIONS = [
@@ -27,24 +25,16 @@ const FORECAST_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
 
 interface BillingStepBudgetInfoProps {
   disabled?: boolean;
-  layoutFiles: FileWithPreview[];
-  onLayoutFilesChange: (files: FileWithPreview[]) => void;
-  // The task's layout files — the pool the approved layout is chosen from.
-  layouts?: LayoutOption[];
   /**
-   * Substitui o seletor quando o orçamento tem UM LAYOUT PARA CADA VEÍCULO: aqui o
-   * seletor só sabe o compartilhado, e a API recusa trocar o layout de um orçamento
-   * por veículo pelo caminho antigo. O aviso manda para a tela do orçamento.
+   * A arte de cada veículo, SÓ LEITURA: o orçamento não escolhe arte (Modelo C) —
+   * o documento leva a aprovada de cada implemento.
    */
-  layoutNotice?: ReactNode;
+  artVehicles?: ImplementArtVehicle[];
 }
 
 export function BillingStepBudgetInfo({
   disabled,
-  layoutFiles,
-  onLayoutFilesChange,
-  layouts,
-  layoutNotice,
+  artVehicles = [],
 }: BillingStepBudgetInfoProps) {
   const { control, setValue } = useFormContext();
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
@@ -86,17 +76,6 @@ export function BillingStepBudgetInfo({
     [setValue],
   );
 
-  const handleLayoutFileChange = useCallback(
-    (files: FileWithPreview[]) => {
-      onLayoutFilesChange(files);
-      const ids = files
-        .map((f) => (f as any).uploadedFileId || f.id)
-        .filter(Boolean)
-        .slice(0, 2);
-      setValue("layoutFileIds", ids, { shouldDirty: true });
-    },
-    [setValue, onLayoutFilesChange],
-  );
 
   return (
     <div className="space-y-4">
@@ -218,13 +197,12 @@ export function BillingStepBudgetInfo({
         </CardContent>
       </Card>
 
-      {layoutNotice ?? (
-        <ApprovedLayoutPicker
-          layouts={layouts}
-          layoutFiles={layoutFiles}
-          onChange={handleLayoutFileChange}
-          disabled={disabled}
-        />
+      {artVehicles.length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <ImplementArtSummary vehicles={artVehicles} />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

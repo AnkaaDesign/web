@@ -30,10 +30,9 @@ export const QUOTE_STATUS_OPTIONS_IN_ORDER: Array<{ value: string; label: string
  * ⚠️ O teste era `próximo === PENDING && atual !== PENDING`, em dois lugares
  * (a revisão do orçamento e o seletor do detalhe da tarefa). Era verdade
  * enquanto os únicos caminhos até `PENDING` vinham de DEPOIS dele. O portal abriu
- * dois que vêm de ANTES — `REQUESTED → PENDING` (requisição que vai direto para
- * assinatura, quando o cliente não tem vendedor intermediário) e
- * `PRE_APPROVED → PENDING` (o vendedor pré-aprovou e o documento sai) —, e os
- * dois são o caminho FELIZ. Com a forma antiga, mandar uma requisição para
+ * os que vêm de ANTES — `REQUESTED → PENDING` (o comercial assume a requisição
+ * por dentro) e `IN_NEGOTIATION → PENDING` ("Retirar do cliente", motivo
+ * opcional) —, e nenhum deles é rejeição. Com a forma antiga, mandar uma requisição para
  * assinatura abria um diálogo intitulado "Rejeitar Orçamento" exigindo o motivo
  * da rejeição, e gravava esse motivo no changelog do orçamento.
  *

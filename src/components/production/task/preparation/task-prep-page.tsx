@@ -46,7 +46,6 @@ import { TaskDuplicateModal } from "@/components/production/task/modals/task-dup
 import { SetSectorModal } from "@/components/production/task/schedule/set-sector-modal";
 import { SetTermModal } from "@/components/production/task/schedule/set-term-modal";
 import { SetStatusModal } from "@/components/production/task/schedule/set-status-modal";
-import { SetQuoteLayoutModal } from "@/components/production/task/schedule/set-quote-layout-modal";
 import { MergeQuotesDialog } from "@/components/production/task/quote/merge-quotes-dialog";
 import { AdvancedBulkActionsHandler } from "@/components/production/task/bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "@/components/production/task/schedule/copy-from-task-modal";
@@ -123,6 +122,9 @@ export const LIST_INCLUDE = {
       // de UMA tarefa. Ver `perVehicleAmount`.
       vehicleCount: true,
       status: true,
+      // O eixo da assinatura: com o `status`, decide se o clique abre o Orçamento
+      // ou o Faturamento (`getBudgetEditRoute` → `isBudgetBillingPhase`).
+      signatureStatus: true,
       // FINANCIAL "Faturar Para" column — the quote's billing customers (cheap nested select).
       customerConfigs: { select: { customer: { select: { corporateName: true, fantasyName: true } } } },
     },
@@ -551,7 +553,6 @@ export function TaskPreparationPage() {
   const [sectorModal, setSectorModal] = useState<ModalState>(CLOSED_MODAL);
   const [termModal, setTermModal] = useState<ModalState>(CLOSED_MODAL);
   const [statusModal, setStatusModal] = useState<ModalState>(CLOSED_MODAL);
-  const [quoteLayoutModal, setQuoteLayoutModal] = useState<ModalState>(CLOSED_MODAL);
   const [mergeModal, setMergeModal] = useState<ModalState>(CLOSED_MODAL);
   const [deleteModal, setDeleteModal] = useState<ModalState>(CLOSED_MODAL);
 
@@ -569,13 +570,13 @@ export function TaskPreparationPage() {
   // sector/term/status, quote layout, duplicate, copy-from, avançados) so other users see it.
   const editingActionIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const m of [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, mergeModal]) {
+    for (const m of [duplicateModal, sectorModal, termModal, statusModal, mergeModal]) {
       if (m.open) m.taskIds.forEach((id) => ids.add(id));
     }
     if (copyFrom.step !== "idle") copyFrom.targetTasks.forEach((t) => ids.add(t.id));
     advancedTaskIds.forEach((id) => ids.add(id));
     return [...ids];
-  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, mergeModal, copyFrom, advancedTaskIds]);
+  }, [duplicateModal, sectorModal, termModal, statusModal, mergeModal, copyFrom, advancedTaskIds]);
   useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
 
   // Resolve live Task objects for a set of ids: the schedule modals need `tasks` for their count and
@@ -800,7 +801,7 @@ export function TaskPreparationPage() {
     actions.push(
       {
         key: "adv-arts",
-        label: "Adicionar Layout Referência",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: ARTS,
@@ -852,17 +853,17 @@ export function TaskPreparationPage() {
         onClick: (rows) => openAdvanced("layout", expandClusterTaskIds(rows)),
       },
       {
-        // COMMERCIAL sets the quote's approved layout files (Budget.layoutFiles) — distinct from the
-        // implement "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
+        // A arte do implemento para o COMERCIAL — o mesmo modal da "Arte em lote" (rascunho no
+        // implemento de cada tarefa). Era o "layout aprovado do orçamento", que não existe mais.
         key: "adv-quote-layout",
-        label: "Adicionar Layout Aprovados",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
         // requiredPrivilege lets ADMIN through; the quote reference is a
         // COMMERCIAL-only tool (admins/designers use the task layout editor), so
         // hide it for any non-exact-COMMERCIAL privilege, ADMIN included.
         hidden: () => priv !== SECTOR_PRIVILEGES.COMMERCIAL,
-        onClick: (rows) => setQuoteLayoutModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
+        onClick: (rows) => openAdvanced("arts", expandClusterTaskIds(rows)),
       },
     );
 
@@ -1112,12 +1113,6 @@ export function TaskPreparationPage() {
           TASK_STATUS.COMPLETED,
           TASK_STATUS.CANCELLED,
         ]}
-      />
-
-      <SetQuoteLayoutModal
-        open={quoteLayoutModal.open}
-        onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))}
-        tasks={rowsFor(quoteLayoutModal.taskIds)}
       />
 
       <MergeQuotesDialog

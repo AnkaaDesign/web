@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { moneySchema } from './common';
+import { TASK_QUOTE_STATUS } from '../constants/enums';
 
 /**
  * Preprocess money values that might come as formatted strings (e.g., "R$ 6.230,00")
@@ -25,33 +26,11 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 };
 
 /**
- * O CICLO DO ORÇAMENTO — os OITO, e nada além.
- *
- * ⚠️ Escrito à mão e NÃO conferido pelo compilador contra `TASK_QUOTE_STATUS`:
- * o zod de `budgetCreateNestedSchema` valida `status`, e um valor fora do
- * enum é ERRO de validação — foi assim que o formulário passou a recusar um
- * orçamento assinado ou vencido por não saber que o estado existia. Estado novo
- * entra AQUI também, sempre.
- *
- * `CANCELLED` entrou junto com o encolhimento: ele sempre foi estado de
- * orçamento e faltava nesta lista.
- *
- * ⚠️ Os TRÊS DO PORTAL (`REQUESTED`, `IN_NEGOTIATION`, `PRE_APPROVED`) entraram
- * em 20/09/2026 e é exatamente o aviso acima repetindo-se: enquanto faltavam
- * aqui, uma tarefa cujo orçamento estivesse num deles era RECUSADA pelo
- * formulário de tarefa (`taskCreateSchema`/`taskUpdateSchema` embutem este
- * schema em `quote`), com um erro de campo que não fala de estado nenhum.
+ * O eixo do VALOR do orçamento, derivado do enum (que o teste
+ * `budget-contract.test.ts` amarra ao contrato da API). Era uma lista escrita à
+ * mão — e por isso o web ficou com `PRE_APPROVED` depois que a API o apagou.
  */
-export const budgetStatusSchema = z.enum([
-  'REQUESTED',
-  'EXPIRED',
-  'PRE_APPROVED',
-  'SIGNED',
-  'IN_NEGOTIATION',
-  'PENDING',
-  'APPROVED',
-  'CANCELLED',
-]);
+export const budgetStatusSchema = z.nativeEnum(TASK_QUOTE_STATUS);
 
 /**
  * O CICLO DO FATURAMENTO, que saiu do orçamento em 16/09/2026. Mesmo aviso da
@@ -187,7 +166,7 @@ export const budgetPayerSchema = z.object({
 export const budgetCreateNestedSchema = z
   .object({
     expiresAt: z.coerce.date().optional().nullable(),
-    status: budgetStatusSchema.optional().default('PENDING'),
+    status: budgetStatusSchema.optional().default(TASK_QUOTE_STATUS.PENDING),
     services: budgetItemsArraySchema, // Uses preprocessing to filter empty services
     // Aggregate totals (computed from customerConfigs)
     subtotal: z.preprocess(preprocessMoney, z.number().optional().nullable()),
@@ -205,9 +184,6 @@ export const budgetCreateNestedSchema = z
       (val) => val === '' || val === null || val === undefined ? null : Number(val),
       z.number().int().min(1).max(30).optional().nullable()
     ),
-
-    // Layout Files (max 2, ordered File ids)
-    layoutFileIds: z.array(z.string().uuid()).max(2).optional().nullable(),
 
     simultaneousTasks: z.preprocess(
       (val) => val === '' || val === null || val === undefined ? null : Number(val),

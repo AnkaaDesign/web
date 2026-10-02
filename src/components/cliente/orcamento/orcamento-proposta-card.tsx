@@ -20,13 +20,13 @@
 //
 // ⛔ O BRIEFING MUDOU DE CARD, e o dono nomeou o defeito: num orçamento em
 // REQUISIÇÃO o card "A requisição" tinha UMA linha — o briefing —, porque
-// logomarca, "Pré-aprovado em", "Por" e "Observação" só existem depois de uma
+// logomarca, "Valor aprovado em", "Por" e "Observação" só existem depois de uma
 // decisão. Um card inteiro, com cabeçalho e descrição, para uma linha de texto,
 // logo abaixo de "Proposta", que é o card do mesmo assunto.
 //
 // Agora o que o cliente PEDIU (briefing, logomarca) mora na Proposta, que é o
 // cabeçalho do documento, e o card de decisão só nasce QUANDO HÁ DECISÃO — com
-// um título que a nomeia ("Pré-aprovação" / "Devolvido para refazer"), em vez
+// um título que a nomeia ("Aprovação do valor" / "Devolvido para refazer"), em vez
 // de um rótulo genérico que valia para os dois e para nenhum.
 //
 // ⚠️ NENHUM `DetailRow` DAQUI TEM ÍCONE — ver a regra completa no cabeçalho de
@@ -89,7 +89,7 @@ export function OrcamentoPropostaCard({
    *
    * ⛔ FICAM AQUI, E NÃO NO CABEÇALHO DA PÁGINA. O `headerExtra` do `PageHeader`
    * mora dentro de um `hidden sm:flex` — no celular ele simplesmente não é
-   * desenhado, e metade das visitas do portal é de celular. Pré-aprovar é a
+   * desenhado, e metade das visitas do portal é de celular. Aprovar o valor é a
    * razão de o contato ter aberto a tela; sumir com o botão no telefone dele
    * seria o pior lugar possível para economizar uma linha.
    */
@@ -246,9 +246,9 @@ export function OrcamentoGarantiaCard({ budget }: { budget: PortalBudget }) {
  * sem conteúdo não vira carcaça), e é o que faz a faixa de duas colunas parar
  * de carregar um card que só tinha cabeçalho.
  *
- * ⚠️ A DECISÃO É UMA SÓ, nunca as duas: o banco tem CHECK contra pré-aprovado E
+ * ⚠️ A DECISÃO É UMA SÓ, nunca as duas: o banco tem CHECK contra aprovado E
  * recusado ao mesmo tempo, e toda gravação de decisão APAGA a oposta. Por isso o
- * título é derivado dela — "Pré-aprovação" ou "Devolvido para refazer" — em vez
+ * título é derivado dela — "Aprovação do valor" ou "Devolvido para refazer" — em vez
  * de um rótulo neutro que serviria aos dois e não nomearia nenhum.
  */
 export function orcamentoTemDecisao(budget: PortalBudget): boolean {
@@ -267,7 +267,7 @@ export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
   return (
     <PortalCard
       icon={recusado ? IconArrowBackUp : IconThumbUp}
-      title={recusado ? "Devolvido para refazer" : "Pré-aprovação"}
+      title={recusado ? "Devolvido para refazer" : "Aprovação do valor"}
       description={
         recusado
           ? "O que você registrou ao devolver este orçamento ao comercial."
@@ -276,7 +276,7 @@ export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
     >
       <PortalRows>
         {request.preApprovedAt ? (
-          <DetailRow label="Pré-aprovado em" value={data(request.preApprovedAt)} />
+          <DetailRow label="Valor aprovado em" value={data(request.preApprovedAt)} />
         ) : null}
         {request.refusedAt ? (
           <DetailRow label="Devolvido em" value={data(request.refusedAt)} />

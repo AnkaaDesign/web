@@ -671,10 +671,13 @@ export enum ORDER_INSTALLMENT_STATUS {
   CANCELLED = "CANCELLED",
 }
 
+/** O estado da ARTE do implemento (`Layout.status`). Reprovada só volta por versão nova. */
 export enum LAYOUT_STATUS {
   DRAFT = "DRAFT",
+  PENDING_APPROVAL = "PENDING_APPROVAL",
   APPROVED = "APPROVED",
   REPROVED = "REPROVED",
+  SUPERSEDED = "SUPERSEDED",
 }
 
 export enum CUT_TYPE {
@@ -2899,58 +2902,69 @@ export enum PAYROLL_MONTH {
 // =====================
 
 /**
- * O CICLO DO ORÇAMENTO — e só dele.
+ * O EIXO DO VALOR DO ORÇAMENTO (Modelo C, P14) — e só dele.
  *
- * Encolheu para cinco em 16/09/2026. Os cinco estados de cobrança que moravam
- * aqui (`BILLING_APPROVED`, `UPCOMING`, `DUE`, `PARTIAL`, `SETTLED`) descreviam
- * o pagamento, que é de outra entidade: o faturamento é `Billing`, e o ciclo
- * dele é {@link BILLING_STATUS}.
+ * O orçamento tem QUATRO eixos independentes: o valor (este), a arte de cada
+ * implemento ({@link LAYOUT_STATUS}), a assinatura ({@link BUDGET_SIGNATURE_STATUS})
+ * e a cobrança ({@link BILLING_STATUS}). "Aprovado" aqui quer dizer só que o
+ * VALOR foi aprovado — a assinatura vem depois, no eixo dela.
  *
- * ⚠️ ESPELHO de `api/src/constants/enums.ts`. Divergir aqui não dá erro de
- * compilação — dá filtro que não filtra e badge sem rótulo.
+ * ⚠️ ESPELHO do contrato gerado da API (`generated/contracts/enums.json →
+ * orcamento.status`); `budget-contract.test.ts` falha se divergir. Rótulos,
+ * ordem e transições NÃO moram aqui: vêm do contrato (`budget-contract.ts`).
  */
 export enum TASK_QUOTE_STATUS {
-  /**
-   * Passou da validade sem todas as assinaturas; volta ao comercial para
-   * reanálise do valor. O rótulo é "Aguardando Reanálise" e não "Vencido":
-   * vencida é a PARCELA, e isso é {@link BILLING_STATUS.OVERDUE}, noutra
-   * entidade.
-   */
+  /** A coleta LEGADA venceu ou foi recusada; volta ao comercial reanalisar o valor. */
   EXPIRED = "EXPIRED",
   /**
-   * Todos os responsáveis do CLIENTE assinaram; falta a contra-assinatura da
-   * Ankaa. Existe para que "o que depende de nós" seja visível numa lista.
+   * LEGADO: nenhum orçamento é gravado assim desde a M3o-b (a assinatura virou
+   * eixo próprio). Fica no enum porque filtros salvos e changelog o citam.
    */
   SIGNED = "SIGNED",
-  /**
-   * Envelope lançado, esperando as assinaturas do cliente.
-   *
-   * ⚠️ O VALOR continua `"PENDING"` de propósito — ele viaja em filtro salvo, no
-   * app Flutter em produção e em changelog gravado como string. Só o RÓTULO
-   * mudou, em 20/09/2026, para "Aguardando Assinatura".
-   */
+  /** Em montagem ou revisão pela Ankaa (nascimento interno). */
   PENDING = "PENDING",
-  /**
-   * O ÚLTIMO estado do orçamento. Era `BUDGET_APPROVED`; o prefixo existia só
-   * para desambiguar de `BILLING_APPROVED`, que morreu junto com a confusão.
-   */
+  /** O VALOR foi aprovado (pelo cliente, no portal, ou em nome dele com nota). */
   APPROVED = "APPROVED",
   CANCELLED = "CANCELLED",
-
-  /**
-   * O cliente pediu pelo PORTAL e ninguém precificou ainda. Nasce sem serviço e
-   * sem valor — só briefing, arquivos e veículos. Primeiro da fila.
-   */
+  /** O cliente pediu pelo portal e ninguém precificou ainda. */
   REQUESTED = "REQUESTED",
-  /**
-   * Com o VENDEDOR do cliente, para pré-aprovar ou recusar. É daqui que o valor
-   * passa a ser visível para quem requisitou.
-   *
-   * ⚠️ Substituiu a O.S. comercial "Em Negociação", removida em 20/09/2026.
-   */
+  /** Os valores estão com o cliente, esperando a aprovação dele. */
   IN_NEGOTIATION = "IN_NEGOTIATION",
-  /** O vendedor aprovou; espera a Ankaa LANÇAR as assinaturas. */
-  PRE_APPROVED = "PRE_APPROVED",
+}
+
+/**
+ * O EIXO DA ASSINATURA do orçamento (`Budget.signatureStatus`). A cobrança só
+ * pode ser aprovada com `SIGNED`, `SIGNED_OFFLINE` ou `WAIVED` (`billable`).
+ */
+export enum BUDGET_SIGNATURE_STATUS {
+  NOT_ISSUED = "NOT_ISSUED",
+  AWAITING_CUSTOMER = "AWAITING_CUSTOMER",
+  AWAITING_ANKAA = "AWAITING_ANKAA",
+  SIGNED = "SIGNED",
+  SIGNED_OFFLINE = "SIGNED_OFFLINE",
+  REFUSED = "REFUSED",
+  EXPIRED = "EXPIRED",
+  INVALIDATED = "INVALIDATED",
+  WAIVED = "WAIVED",
+}
+
+/** Por onde o valor foi aprovado (`BudgetValueApproval.source`). */
+export enum BUDGET_VALUE_APPROVAL_SOURCE {
+  PORTAL = "PORTAL",
+  ON_BEHALF = "ON_BEHALF",
+  SIGNATURE = "SIGNATURE",
+  LEGACY_APP = "LEGACY_APP",
+  MIGRATED = "MIGRATED",
+}
+
+/** Por onde a arte do implemento foi decidida (`Layout.approvalSource`). */
+export enum LAYOUT_APPROVAL_SOURCE {
+  PORTAL = "PORTAL",
+  ON_BEHALF = "ON_BEHALF",
+  MIGRATED_TASK = "MIGRATED_TASK",
+  MIGRATED_BUDGET = "MIGRATED_BUDGET",
+  MIGRATED_ENVELOPE = "MIGRATED_ENVELOPE",
+  INTERNAL = "INTERNAL",
 }
 
 /**

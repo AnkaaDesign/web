@@ -21,22 +21,10 @@ import { perVehicleAmount, quoteVehicleCount } from "./quote-tasks";
  */
 export function getBudgetEditRoute(task: Task): string {
   // ⚠️ A MESMA FUNÇÃO que rotula o item de menu, e não uma segunda lista com o
-  // mesmo recorte escrito à mão.
-  //
-  // Aqui morava um `PRE_BILLING` positivo — PENDING, SIGNED, EXPIRED, CANCELLED,
-  // `undefined` — e tudo fora dele abria o FATURAMENTO. A forma positiva foi
-  // escolhida para que "um estado novo nasça no assistente de orçamento", e é
-  // exatamente o oposto do que ela fazia: o que não está numa lista de
-  // PRÉ-faturamento é, por construção, PÓS-faturamento. Quando o portal
-  // acrescentou `REQUESTED`, `IN_NEGOTIATION` e `PRE_APPROVED`, esta função
-  // passou a mandar o comercial de uma requisição recém-nascida — sem um único
-  // serviço e com total zero — direto para o assistente de FATURAR.
-  //
-  // `isBudgetBillingPhase` é TOTAL (`status === APPROVED`) e não tem como
-  // envelhecer: só o último estado do orçamento abre a cobrança. Chamá-la também
-  // cumpre literalmente o aviso que já estava escrito acima — "o recorte tem de
-  // ser o mesmo" —, que duas cópias nunca puderam garantir.
-  return isBudgetBillingPhase(task.quote?.status)
+  // mesmo recorte escrito à mão. Só o orçamento COBRÁVEL (valor aprovado e
+  // assinatura resolvida) abre o Faturamento; o resto — inclusive o aprovado
+  // ainda sem assinatura — abre o Orçamento, onde se emite e assina.
+  return isBudgetBillingPhase(task.quote)
     ? routes.financial.billing.details(task.id)
     : routes.financial.budget.details(task.id);
 }

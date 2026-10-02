@@ -1,189 +1,218 @@
 /**
- * AS AÇÕES DE ESTADO DO ORÇAMENTO — no ÚLTIMO passo, junto do "Salvar".
+ * OS ATOS DO EIXO DO VALOR — no ÚLTIMO passo, junto do "Salvar".
  *
- * ⚠️ POR QUE SAÍRAM DA REQUISIÇÃO. Os dois botões ("Enviar para pré-aprovação"
- * e "Enviar para assinatura") moravam no card da requisição, que fica ACIMA do
- * assistente e portanto aparecia em TODOS os passos — na prática, no passo 3
- * (Serviços), que é onde o comercial passa o tempo. O card precisava avisar,
- * logo abaixo dos botões, que "o estado só muda quando você salvar — monte os
- * serviços e os preços antes": o aviso existia porque o botão estava no lugar
- * errado. Um botão que pede para ser clicado depois não é um botão, é uma nota.
+ * O orçamento tem quatro eixos independentes (valor, arte de cada implemento,
+ * assinatura, cobrança). Este card cuida do VALOR, e cada botão é um ATO que
+ * chama a rota NA HORA (Modelo C, P14):
  *
- * Aqui não há nota a dar: o Resumo é o passo em que o orçamento está montado, é
- * onde o "Salvar" do cabeçalho aparece, e o clique daqui é a última coisa que
- * acontece antes dele. A REQUISIÇÃO ficou onde ela decide alguma coisa (passo 1,
- * faixa no passo 3, Resumo — ver `budget-request-card.tsx`), e sem nada que mude
- * estado.
+ *  · "Enviar para aprovação do cliente" — `PUT /budgets/:id/send-to-customer`
+ *    (de Requisição, Pendente ou Aguardando Reanálise). Exige valor.
+ *  · "Retirar do cliente" — `PUT …/withdraw-from-customer` (motivo opcional).
+ *  · "Aprovar valor em nome do cliente" — `PUT …/value-approval`, com NOTA
+ *    obrigatória (como o cliente aprovou: e-mail, telefone, reunião).
+ *  · "Reprovar valor" — `DELETE …/value-approval`, com MOTIVO obrigatório.
  *
- * ⚠️ NÃO CHAMA A API. Escreve no formulário (`setValue("status", …)`) e o
- * assistente grava tudo de uma vez no Salvar — o mesmo contrato de antes. Um
- * botão que disparasse a transição na hora correria com os preços ainda na tela.
+ * Era um seletor que escrevia o estado no FORMULÁRIO para o Salvar replicar
+ * salto a salto — e a API passou a recusar `APPROVED` sem nota, o que deixava
+ * a aprovação em 400. Ato tem autor, origem e nota; campo não tem.
  *
- * ⛔ O `status` NÃO É A ÚNICA FONTE — e sozinho ele mente. Existem orçamentos
- * em `REQUESTED` com coleta de assinaturas `RUNNING` e assinaturas já colhidas
- * (a emissão do envelope não movia o estado no servidor). Decidindo só pelo
- * `status`, esta tela oferecia "Enviar para pré-aprovação" num orçamento que o
- * cliente JÁ tinha assinado — pedir de volta uma aprovação que já existe, e num
- * clique reabrir um documento selado. Por isso a COLETA entra na decisão: viva
- * a coleta (`RUNNING`/`COMPLETED`), nenhum encaminhamento é oferecido e o card
- * diz o que está acontecendo, apontando para a Assinatura eletrônica logo
- * abaixo. Ver `use-quote-envelopes.ts`.
+ * ⚠️ O ATO VALE SOBRE O QUE ESTÁ GRAVADO. Com alterações por salvar, os botões
+ * ficam desabilitados e o card pede para salvar antes — senão o cliente
+ * aprovaria um valor que não é o que está na tela.
+ *
+ * ⛔ COLETA VIVA CALA OS ATOS. Com a coleta de assinaturas em andamento ou
+ * concluída, o documento já saiu; o card diz onde ela está e leva até ela.
  */
 
+import { useState } from "react";
 import { IconArrowRight, IconClock, IconSignature } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { TASK_QUOTE_STATUS, TASK_QUOTE_STATUS_LABELS } from "@/constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { TASK_QUOTE_STATUS } from "@/constants";
+import {
+  useApproveBudgetValue,
+  useRevokeBudgetValueApproval,
+  useSendBudgetToCustomer,
+  useWithdrawBudgetFromCustomer,
+} from "@/hooks/production/use-budget";
 import type { TASK_QUOTE_STATUS as QuoteStatus } from "@/types/budget";
 import { getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import type { QuoteEnvelopeGlance } from "./use-quote-envelopes";
 
-interface Advance {
-  to: QuoteStatus;
+type ActKind = "send" | "withdraw" | "approve" | "revoke";
+
+interface ActConfig {
   label: string;
   hint: string;
+  /** O destino no grafo — é ele que o papel e as arestas do contrato liberam. */
+  to: QuoteStatus;
   primary?: boolean;
+  /** O texto pedido no diálogo; ausente = o ato não abre diálogo. */
+  text?: { title: string; description: string; placeholder: string; required: boolean; confirm: string };
 }
 
-/**
- * O QUE CADA ESTADO DO PORTAL OFERECE AQUI.
- *
- * ⚠️ `PRE_APPROVED` NÃO TEM BOTÃO DE ESTADO, e isso é regra e não esquecimento:
- * a aresta `PRE_APPROVED → PENDING` é escrita pela EMISSÃO DO ENVELOPE (ver
- * `validateStatusTransition` na api). Um botão que escrevesse "Aguardando
- * Assinatura" sem emitir coleta nenhuma anunciaria um documento que não existe.
- * O que esse estado oferece é o caminho até a coleta, logo abaixo nesta mesma
- * tela — ver `SIGNATURE_HINT`.
- *
- * `IN_NEGOTIATION` também não tem: quem decide dali é o vendedor do cliente, no
- * portal. Voltar atrás continua possível pelo seletor de status do Resumo, que
- * é o caminho geral e oferece todas as arestas legais.
- */
-const ADVANCES: Partial<Record<QuoteStatus, Advance[]>> = {
-  [TASK_QUOTE_STATUS.REQUESTED]: [
-    {
-      to: TASK_QUOTE_STATUS.IN_NEGOTIATION as QuoteStatus,
-      label: "Enviar para pré-aprovação",
-      hint: "O vendedor do cliente passa a ver os valores e decide aprovar ou recusar.",
-      primary: true,
+const ACTS: Record<ActKind, ActConfig> = {
+  send: {
+    label: "Enviar para aprovação do cliente",
+    hint: "Os valores aparecem no portal para o contato do cliente aprovar ou recusar.",
+    to: TASK_QUOTE_STATUS.IN_NEGOTIATION as QuoteStatus,
+    primary: true,
+  },
+  withdraw: {
+    label: "Retirar do cliente",
+    hint: "O orçamento volta para a sua mesa; o cliente deixa de ver os valores para aprovar.",
+    to: TASK_QUOTE_STATUS.PENDING as QuoteStatus,
+    text: {
+      title: "Retirar do cliente",
+      description: "O orçamento volta para Pendente. Se quiser, diga o motivo (fica no histórico).",
+      placeholder: "Motivo (opcional)",
+      required: false,
+      confirm: "Retirar",
     },
-    // ⛔ AQUI HAVIA UM SEGUNDO BOTÃO, "Enviar para assinatura", E ELE SAIU.
-    //
-    // Havia DOIS "Enviar para assinatura" nesta mesma tela, com o mesmo rótulo
-    // e atos DIFERENTES: este só trocava o ESTADO para Aguardando Assinatura; o
-    // da "Assinatura eletrônica", logo abaixo, EMITE o documento. Quem clicasse
-    // no de cima anunciava uma coleta que não existia.
-    //
-    // E desde que a EMISSÃO passou a escrever o estado no mesmo commit do
-    // envelope (`createEnvelope`, na api), este botão deixou de ter função:
-    // emitir já leva o orçamento para Aguardando Assinatura. O que ele produzia
-    // era a deriva INVERSA da que acabamos de consertar — estado dizendo
-    // "aguardando assinatura" sem documento nenhum emitido.
-    //
-    // A porta passa a ser uma só: a coleta. `SIGNATURE_HINT` leva até ela.
-  ],
+  },
+  approve: {
+    label: "Aprovar valor em nome do cliente",
+    hint: "Quando o cliente aprovou fora do portal. Exige a nota de como ele aprovou.",
+    to: TASK_QUOTE_STATUS.APPROVED as QuoteStatus,
+    text: {
+      title: "Aprovar valor em nome do cliente",
+      description:
+        "Escreva como o cliente aprovou o valor — por onde, quem e quando (ex.: \"aprovado por e-mail em 02/10, Fulano, Compras\").",
+      placeholder: "Como o cliente aprovou",
+      required: true,
+      confirm: "Aprovar valor",
+    },
+  },
+  revoke: {
+    label: "Reprovar valor",
+    hint: "Desfaz a aprovação do valor e devolve o orçamento a Pendente.",
+    to: TASK_QUOTE_STATUS.PENDING as QuoteStatus,
+    text: {
+      title: "Reprovar valor",
+      description: "O orçamento volta para Pendente e a aprovação do valor é encerrada. O motivo é obrigatório.",
+      placeholder: "Motivo da reprovação",
+      required: true,
+      confirm: "Reprovar",
+    },
+  },
 };
 
-/** O que dizer quando não há botão de estado a oferecer. */
+/** Que atos cada estado oferece, na ordem em que aparecem. */
+const ACTS_BY_STATUS: Partial<Record<QuoteStatus, ActKind[]>> = {
+  [TASK_QUOTE_STATUS.REQUESTED]: ["send", "approve"],
+  [TASK_QUOTE_STATUS.PENDING]: ["send", "approve"],
+  [TASK_QUOTE_STATUS.EXPIRED]: ["send"],
+  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: ["approve", "withdraw"],
+  [TASK_QUOTE_STATUS.APPROVED]: ["revoke"],
+};
+
 const WAITING_HINT: Partial<Record<QuoteStatus, string>> = {
   [TASK_QUOTE_STATUS.IN_NEGOTIATION]:
-    "Com o vendedor do cliente. Ele aprova ou recusa no portal — e recusar devolve o orçamento para você refazer, com o motivo escrito.",
-};
-
-const SIGNATURE_HINT: Partial<Record<QuoteStatus, string>> = {
-  [TASK_QUOTE_STATUS.PRE_APPROVED]:
-    "O cliente pré-aprovou os valores. Falta lançar as assinaturas: a coleta é emitida na Assinatura eletrônica, logo abaixo, e é ela que leva o orçamento para Aguardando Assinatura.",
-  // Requisição também aponta para a coleta — é o caminho de quem NÃO vai passar
-  // pelo vendedor do cliente (o botão de pré-aprovação, acima, é o outro).
-  [TASK_QUOTE_STATUS.REQUESTED]:
-    "Sem vendedor intermediário a consultar, vá direto ao documento: a coleta é emitida na Assinatura eletrônica, logo abaixo, e é ela que leva o orçamento para Aguardando Assinatura.",
+    "Com o cliente. O contato aprova ou recusa no portal — recusar devolve o orçamento para você refazer, com o motivo escrito.",
+  [TASK_QUOTE_STATUS.APPROVED]:
+    "Valor aprovado. O próximo passo é a assinatura: a coleta é emitida na Assinatura eletrônica, logo abaixo, quando a arte de todos os veículos estiver aprovada.",
 };
 
 interface BudgetStateActionsProps {
-  /** O estado do FORMULÁRIO — pode ter avanço escolhido e não salvo. */
+  budgetId?: string | null;
+  /** O estado GRAVADO do eixo do valor. */
   status?: QuoteStatus | string | null;
-  /** O estado GRAVADO, para dizer em uma linha o que o Salvar vai fazer. */
-  serverStatus?: QuoteStatus | string | null;
   /**
-   * A COLETA DE ASSINATURAS, quando existe — o segundo eixo da decisão.
-   *
-   * Vem da consulta compartilhada (`useQuoteEnvelopes` + `envelopeGlanceOf`),
-   * a mesma que alimenta o card da Assinatura eletrônica abaixo. `null`
-   * enquanto carrega ou quando nunca houve coleta.
+   * A COLETA DE ASSINATURAS, quando existe. Vem da consulta compartilhada
+   * (`useQuoteEnvelopes` + `envelopeGlanceOf`), a mesma do card da Assinatura
+   * eletrônica abaixo. `null` enquanto carrega ou quando nunca houve coleta.
    */
   envelope?: QuoteEnvelopeGlance | null;
   userRole?: string;
   disabled?: boolean;
-  /** Escreve o estado NO FORMULÁRIO. Nada aqui chama a API. */
-  onAdvance?: (next: QuoteStatus) => void;
+  /** Há alterações não salvas: os atos valem sobre o gravado, então pedem para salvar antes. */
+  hasUnsavedChanges?: boolean;
   /** Leva até o card de assinatura eletrônica, nesta mesma tela. */
   onGoToSignature?: () => void;
 }
 
 export function BudgetStateActions({
+  budgetId,
   status,
-  serverStatus,
   envelope,
   userRole = "",
   disabled,
-  onAdvance,
+  hasUnsavedChanges,
   onGoToSignature,
 }: BudgetStateActionsProps) {
   const current = (status || "") as QuoteStatus;
+  const [openAct, setOpenAct] = useState<ActKind | null>(null);
+  const [text, setText] = useState("");
 
-  // ⛔ A COLETA VIVA CALA TODO O RESTO. Ela é um fato do mundo (o documento já
-  // saiu, e pode já estar assinado); o `status` é, nesses casos, apenas o que
-  // ficou para trás. Ver o cabeçalho do arquivo.
+  const send = useSendBudgetToCustomer();
+  const withdraw = useWithdrawBudgetFromCustomer();
+  const approve = useApproveBudgetValue();
+  const revoke = useRevokeBudgetValueApproval();
+  const busy = send.isPending || withdraw.isPending || approve.isPending || revoke.isPending;
+
+  // ⛔ A COLETA VIVA CALA TODO O RESTO: o documento já saiu (e pode já estar
+  // assinado); o estado do valor é, nesses casos, só o que ficou para trás.
   const liveEnvelope = envelope?.live ? envelope : null;
 
-  // Só os avanços que o GRAFO e o PAPEL permitem a partir de onde o orçamento
-  // está agora — a mesma fonte que o seletor de status do Resumo consulta.
+  // Só os atos que o GRAFO do contrato e o PAPEL permitem a partir de onde o
+  // orçamento está gravado.
   const allowed = current ? getAvailableQuoteStatusTransitions(current, userRole) : [];
-  const advances = liveEnvelope ? [] : (ADVANCES[current] ?? []).filter((a) => allowed.includes(a.to));
+  const acts =
+    liveEnvelope || !budgetId ? [] : (ACTS_BY_STATUS[current] ?? []).filter((kind) => allowed.includes(ACTS[kind].to));
   const waiting = liveEnvelope ? undefined : WAITING_HINT[current];
-  const signature = liveEnvelope ? undefined : SIGNATURE_HINT[current];
+  const actsDisabled = disabled || busy || !!hasUnsavedChanges;
 
-  // O que o Salvar vai fazer, quando o formulário já carrega um estado
-  // diferente do gravado. Sem esta linha o clique no botão não devolve sinal
-  // nenhum: os botões somem (a condição deixou de valer) e o único outro lugar
-  // que mostra o estado escolhido é o seletor lá em cima.
-  const pendingAdvance =
-    serverStatus && status && status !== serverStatus
-      ? (TASK_QUOTE_STATUS_LABELS[status as QuoteStatus] ?? status)
-      : null;
+  if (acts.length === 0 && !waiting && !liveEnvelope) return null;
 
-  if (advances.length === 0 && !waiting && !signature && !pendingAdvance && !liveEnvelope) return null;
+  const run = async (kind: ActKind, value: string) => {
+    if (!budgetId) return;
+    if (kind === "send") await send.mutateAsync(budgetId);
+    else if (kind === "withdraw") await withdraw.mutateAsync({ id: budgetId, reason: value });
+    else if (kind === "approve") await approve.mutateAsync({ id: budgetId, note: value });
+    else await revoke.mutateAsync({ id: budgetId, reason: value });
+  };
+
+  const handleClick = (kind: ActKind) => {
+    if (ACTS[kind].text) {
+      setText("");
+      setOpenAct(kind);
+      return;
+    }
+    void run(kind, "").catch(() => undefined);
+  };
+
+  const dialog = openAct ? ACTS[openAct] : null;
+  const trimmed = text.trim();
+  const canConfirm = !!dialog?.text && (!dialog.text.required || trimmed.length > 0) && !busy;
 
   return (
     <Card className="mb-4 border border-border">
       <CardContent className="space-y-3 p-4">
-        {/* ── A COLETA JÁ EM CURSO ────────────────────────────────────────────
-            Ocupa o lugar dos botões, e não uma linha ao lado deles: o operador
-            que lê "já está assinado" com um "Enviar para pré-aprovação" logo
-            acima acredita no botão. Diz onde a coleta está e leva até ela. */}
         {liveEnvelope && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold">
-                {liveEnvelope.status === "COMPLETED"
-                  ? "Orçamento assinado"
-                  : "Coleta de assinaturas em andamento"}
+                {liveEnvelope.status === "COMPLETED" ? "Orçamento assinado" : "Coleta de assinaturas em andamento"}
               </p>
               <p className="flex items-start gap-2 text-sm text-muted-foreground">
                 <IconSignature className="mt-0.5 h-4 w-4 shrink-0" />
                 {liveEnvelope.status === "COMPLETED"
-                  ? `Todas as ${liveEnvelope.total} assinaturas foram colhidas. Não há encaminhamento a fazer: o documento está selado, e mexer no orçamento agora invalida a coleta.`
-                  : `${liveEnvelope.signed} de ${liveEnvelope.total} já assinaram. Não há o que encaminhar — o documento já está com o cliente. Acompanhe (ou cancele) na Assinatura eletrônica, logo abaixo.`}
+                  ? `Todas as ${liveEnvelope.total} assinaturas foram colhidas. O documento está selado, e mexer no orçamento agora invalida a coleta.`
+                  : `${liveEnvelope.signed} de ${liveEnvelope.total} já assinaram. O documento já está com o cliente — acompanhe (ou cancele) na Assinatura eletrônica, logo abaixo.`}
               </p>
             </div>
             {onGoToSignature && (
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0 gap-1.5"
-                onClick={onGoToSignature}
-              >
+              <Button type="button" variant="outline" className="shrink-0 gap-1.5" onClick={onGoToSignature}>
                 Ir para a assinatura
                 <IconArrowRight className="h-4 w-4" />
               </Button>
@@ -191,27 +220,30 @@ export function BudgetStateActions({
           </div>
         )}
 
-        {advances.length > 0 && (
+        {acts.length > 0 && (
           <>
-            <p className="text-sm font-semibold">Encaminhar este orçamento</p>
+            <p className="text-sm font-semibold">O valor deste orçamento</p>
             <div className="flex flex-col gap-3 sm:flex-row">
-              {advances.map((advance) => (
-                <div key={advance.to} className="flex-1 space-y-1">
+              {acts.map((kind) => (
+                <div key={kind} className="flex-1 space-y-1">
                   <Button
                     type="button"
-                    variant={advance.primary ? "default" : "outline"}
+                    variant={ACTS[kind].primary ? "default" : "outline"}
                     className="w-full"
-                    disabled={disabled || !onAdvance}
-                    onClick={() => onAdvance?.(advance.to)}
+                    disabled={actsDisabled}
+                    onClick={() => handleClick(kind)}
                   >
-                    {advance.label}
+                    {ACTS[kind].label}
                   </Button>
-                  {/* A CONSEQUÊNCIA escrita embaixo: a diferença entre os dois é
-                      quem passa a ver o valor, e ela não cabe num rótulo. */}
-                  <p className="text-sm text-muted-foreground">{advance.hint}</p>
+                  <p className="text-sm text-muted-foreground">{ACTS[kind].hint}</p>
                 </div>
               ))}
             </div>
+            {hasUnsavedChanges && (
+              <p className="rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
+                Há alterações não salvas. <strong>Salve</strong> antes: os atos valem sobre o orçamento gravado.
+              </p>
+            )}
           </>
         )}
 
@@ -221,33 +253,45 @@ export function BudgetStateActions({
             {waiting}
           </p>
         )}
-
-        {signature && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-start gap-2 text-sm text-muted-foreground">
-              <IconSignature className="mt-0.5 h-4 w-4 shrink-0" />
-              {signature}
-            </p>
-            {onGoToSignature && (
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0 gap-1.5"
-                onClick={onGoToSignature}
-              >
-                Ir para a assinatura
-                <IconArrowRight className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-
-        {pendingAdvance && (
-          <p className="rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
-            Ao <strong>salvar</strong>, o orçamento vai para <strong>{pendingAdvance}</strong>.
-          </p>
-        )}
       </CardContent>
+
+      <Dialog open={!!dialog} onOpenChange={(open) => !open && setOpenAct(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialog?.text?.title}</DialogTitle>
+            <DialogDescription>{dialog?.text?.description}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder={dialog?.text?.placeholder}
+            maxLength={2000}
+            rows={4}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpenAct(null)} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!canConfirm}
+              onClick={async () => {
+                if (!openAct) return;
+                try {
+                  await run(openAct, trimmed);
+                  setOpenAct(null);
+                } catch {
+                  // O interceptor do axios já mostrou o erro; o diálogo fica aberto
+                  // para o operador corrigir a nota.
+                }
+              }}
+            >
+              {dialog?.text?.confirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

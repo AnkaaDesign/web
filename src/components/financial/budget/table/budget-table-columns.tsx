@@ -3,7 +3,7 @@ import type { TASK_QUOTE_STATUS, Budget } from "@/types/budget";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
-import { TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, getBadgeVariant } from "@/constants";
+import { BUDGET_LIST_STATUSES, BUDGET_STATUS_ORDER, TASK_QUOTE_STATUS_LABELS, TASK_STATUS_LABELS, getBadgeVariant } from "@/constants";
 import type { TASK_STATUS } from "@/constants";
 import { MONEY_PRIVILEGES } from "@/utils/privilege";
 import { formatCurrency } from "@/utils";
@@ -462,40 +462,24 @@ export function createBudgetColumns(): DataTableColumnDef<Budget>[] {
 }
 
 /**
- * OS OITO ESTADOS DO ORÇAMENTO, na ordem de ATENÇÃO.
+ * OS ESTADOS DO EIXO DO VALOR que a lista mostra, na ordem de ATENÇÃO.
  *
- * Eram cinco até 20/09/2026, quando o portal do responsável acrescentou
- * `REQUESTED` (a requisição que o cliente abre), `IN_NEGOTIATION` (com o
- * vendedor do cliente) e `PRE_APPROVED` (ele aprovou; falta lançar as
- * assinaturas). `PENDING` continua sendo o mesmo VALOR e passou a se chamar
- * "Aguardando Assinatura".
+ * Vêm do contrato da API (`BUDGET_LIST_STATUSES`, ordenados por
+ * `BUDGET_STATUS_ORDER`): escrita à mão, esta lista ficou com `PRE_APPROVED`
+ * depois que a API o apagou, e a lista inteira passou a responder 400. O legado
+ * `SIGNED` fica de fora (nenhum orçamento é gravado assim desde a M3o-b).
  *
  * ⚠️ ESTA LISTA É TRÊS COISAS AO MESMO TEMPO: as opções do filtro, o
  * `where.status = { in: … }` PADRÃO da lista, e o guard da célula. Um estado
- * que não esteja aqui NÃO APARECE NA TELA de jeito nenhum — não some do
- * filtro, some da tabela.
+ * que não esteja aqui NÃO APARECE NA TELA de jeito nenhum.
  *
  * Mora AQUI, e não no arquivo de filtros, porque a coluna também precisa dela e
  * `budget-table-filters` já importa deste módulo — o caminho inverso seria um
  * ciclo.
  */
-export const BUDGET_QUOTE_STATUSES: TASK_QUOTE_STATUS[] = [
-  // ⚠️ Na ORDEM DE ATENÇÃO (`TASK_QUOTE_STATUS_ORDER`), não alfabética: esta lista
-  // também desenha o seletor de filtro, e o operador lê o seletor na mesma ordem
-  // em que lê a tabela.
-  //
-  // ⚠️ Status que NÃO estiver aqui não aparece na tela de jeito nenhum — a lista é
-  // ao mesmo tempo as opções do filtro, o `where.status = { in: … }` PADRÃO e o
-  // guard da célula.
-  "REQUESTED",
-  "EXPIRED",
-  "PRE_APPROVED",
-  "SIGNED",
-  "IN_NEGOTIATION",
-  "PENDING",
-  "APPROVED",
-  "CANCELLED",
-] as TASK_QUOTE_STATUS[];
+export const BUDGET_QUOTE_STATUSES: TASK_QUOTE_STATUS[] = [...BUDGET_LIST_STATUSES].sort(
+  (a, b) => BUDGET_STATUS_ORDER[a] - BUDGET_STATUS_ORDER[b],
+) as unknown as TASK_QUOTE_STATUS[];
 
 /**
  * Rótulos em texto puro para a exportação (a célula desenha um badge).

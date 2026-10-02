@@ -11,7 +11,7 @@
 //
 // O que aparece depende do PAPEL, por `capabilitiesForRoles`. O servidor já
 // recorta (`GET /cliente/me/resumo` devolve `valueApproval.budgets: []` a quem não
-// pré-aprova), e a tela confere de novo — não por desconfiança, mas porque um
+// aprova o valor), e a tela confere de novo — não por desconfiança, mas porque um
 // card com título e lista vazia é pior do que card nenhum: ele afirma que existe
 // um trabalho que aquela pessoa nunca poderá fazer.
 //
@@ -326,7 +326,7 @@ export default function ClientePainelPage() {
                   <div className="space-y-2">
                     <PortalSubheading>Orçamentos para sua decisão</PortalSubheading>
                     <p className="text-sm text-muted-foreground">
-                      Em negociação: você pode pré-aprovar para seguir, ou recusar com o motivo.
+                      Aguardando a sua aprovação: você pode aprovar o valor para seguir, ou recusar com o motivo.
                     </p>
                     {valueApprovals.map((budget) => (
                       <PortalRowLink

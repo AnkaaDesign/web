@@ -47,7 +47,6 @@ import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
 import { SetTermModal } from "./set-term-modal";
-import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
@@ -124,7 +123,6 @@ export function TaskScheduleTable({
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
-  const [quoteLayoutModalOpen, setQuoteLayoutModalOpen] = useState(false);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
 
   const internalAdvancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
@@ -248,8 +246,8 @@ export function TaskScheduleTable({
           setSetTermModalOpen(true);
           break;
         case "quoteLayout":
-          setTasksToUpdate(actionTasks);
-          setQuoteLayoutModalOpen(true);
+          // A arte é do IMPLEMENTO (Modelo C): o mesmo modal da "Arte em lote".
+          advancedActionsRef.current?.openModal("arts", actionTasks.map((t) => t.id));
           break;
         case "edit":
           if (actionTasks.length === 1) {
@@ -364,7 +362,7 @@ export function TaskScheduleTable({
       },
       {
         key: "quote",
-        label: getBudgetDisplayLabel(menuRows[0]?.quote?.status),
+        label: getBudgetDisplayLabel(menuRows[0]?.quote),
         icon: <IconReceipt className="mr-2 h-4 w-4" />,
         hidden: (rs) => !(userCanViewQuote && rs.length === 1 && !isCommercial),
         onClick: (rs) => handleAction("quote", rs),
@@ -387,7 +385,7 @@ export function TaskScheduleTable({
       },
       {
         key: "quoteLayout",
-        label: "Adicionar Layout Aprovados",
+        label: "Adicionar arte",
         icon: <IconPhoto className="mr-2 h-4 w-4" />,
         hidden: () => !isCommercial,
         onClick: (rs) => handleAction("quoteLayout", rs),
@@ -402,7 +400,7 @@ export function TaskScheduleTable({
       // --- "Avançados" submenu (ADMIN only) ---
       {
         key: "bulkArts",
-        label: "Adicionar Layout Referência",
+        label: "Adicionar arte",
         icon: <IconPhoto className="mr-2 h-4 w-4" />,
         separatorBefore: true,
         group: advancedGroup,
@@ -648,7 +646,6 @@ export function TaskScheduleTable({
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
       <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
       <SetTermModal open={setTermModalOpen} onOpenChange={setSetTermModalOpen} tasks={tasksToUpdate} onConfirm={handleSetTermConfirm} />
-      <SetQuoteLayoutModal open={quoteLayoutModalOpen} onOpenChange={setQuoteLayoutModalOpen} tasks={tasksToUpdate} />
 
       {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared with the content). */}
       {!externalAdvancedActionsRef && (

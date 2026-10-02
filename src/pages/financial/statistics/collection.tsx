@@ -132,8 +132,8 @@ const INVOICE_STATUS_OPTIONS = [
 // é o que sobrevive a uma mudança de enum sem ninguém notar.
 //
 // ⚠️ E A LISTA TAMBÉM PASSOU A SER DERIVADA, pela mesma razão uma camada acima: os cinco valores
-// estavam escritos à mão aqui, e quando o portal acrescentou `REQUESTED`, `IN_NEGOTIATION` e
-// `PRE_APPROVED` o funil de VENDAS ficou sem como filtrar justamente os três estágios novos —
+// estavam escritos à mão aqui, e quando o portal acrescentou `REQUESTED` e `IN_NEGOTIATION` o
+// funil de VENDAS ficou sem como filtrar justamente os estágios novos —
 // incluindo a requisição, que é a boca do funil. Uma lista literal de cinco strings continua
 // compilando depois de o enum crescer; o que quebra é a pergunta que a tela consegue fazer.
 const QUOTE_STATUS_OPTIONS = QUOTE_STATUS_OPTIONS_IN_ORDER;

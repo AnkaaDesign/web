@@ -599,14 +599,13 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
   // omissão passaria a afirmar deles o contrário do que são — sem uma linha de
   // erro de compilação, porque uma lista de `eq` continua bem-formada quando o
   // enum cresce. O recorte agora é um `Record` TOTAL (`INVOICE_WINDOW`), e é este
-  // teste que prova a classificação dos três.
+  // teste que prova a classificação dos dois.
   //
-  // Os três caem do mesmo lado de EXPIRED e pela mesma razão: o que segura a
+  // Os dois caem do mesmo lado de EXPIRED e pela mesma razão: o que segura a
   // nota ali é o PREÇO, não o cadastro. Uma requisição não tem sequer serviço.
   it.each([
     [TASK_QUOTE_STATUS.REQUESTED, "requisição: não há serviço, valor nem nota para travar"],
-    [TASK_QUOTE_STATUS.IN_NEGOTIATION, "em negociação: o preço está na mesa do vendedor do cliente"],
-    [TASK_QUOTE_STATUS.PRE_APPROVED, "pré-aprovado: espera a Ankaa lançar o documento"],
+    [TASK_QUOTE_STATUS.IN_NEGOTIATION, "aguardando o cliente: o preço está na mesa do cliente"],
   ])("silencia em %s — %s", async (status) => {
     setEntities("TASK_QUOTE", [quote({ status })]);
     await settle();

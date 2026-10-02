@@ -10,25 +10,47 @@ import type {
   BaseBatchResponse,
 } from './common';
 import type { File, FileIncludes } from './file';
-import type { Task, TaskIncludes } from './task';
 import type { Airbrushing, AirbrushingIncludes } from './airbrushing';
-import type { ORDER_BY_DIRECTION } from '@constants';
+import type { LAYOUT_APPROVAL_SOURCE, LAYOUT_STATUS, ORDER_BY_DIRECTION } from '@constants';
 
 // =====================
 // Main Entity Interface
 // =====================
 
+/**
+ * A ARTE DO IMPLEMENTO (Modelo C, P12). A arte é do IMPLEMENTO, não da tarefa
+ * nem do orçamento: o orçamento e o documento levam a aprovada de cada veículo.
+ * Reprovada só volta por VERSÃO NOVA (`supersedesId`); a anterior vira
+ * `SUPERSEDED`.
+ */
 export interface Layout extends BaseEntity {
   fileId: string;
-  status: 'DRAFT' | 'APPROVED' | 'REPROVED';
+  status: LAYOUT_STATUS;
+  implementId?: string | null;
   airbrushingId?: string | null;
+  version?: number;
+  supersedesId?: string | null;
+  sentAt?: Date | string | null;
+  decidedAt?: Date | string | null;
+  approvalSource?: LAYOUT_APPROVAL_SOURCE | null;
+  decidedByResponsibleId?: string | null;
+  decidedByUserId?: string | null;
+  /** A nota da decisão interna ("aprovado por WhatsApp em 23/09, contato Fulano"). */
+  decisionNote?: string | null;
 
-  // Relations (Many-to-Many: Layout can be shared across multiple Tasks)
+  // Relations
   file?: File;
-  tasks?: Task[]; // Layout is SHARED across tasks - status changes affect all
   airbrushing?: Airbrushing | null;
+  decisions?: LayoutDecision[];
 
   // Index signature for compatibility
+  [key: string]: unknown;
+}
+
+/** Uma decisão registrada sobre a arte (a mais recente vem na leitura). */
+export interface LayoutDecision {
+  id: string;
+  layoutId: string;
   [key: string]: unknown;
 }
 
@@ -38,7 +60,6 @@ export interface Layout extends BaseEntity {
 
 export interface LayoutIncludes {
   file?: boolean | { include?: FileIncludes };
-  tasks?: boolean | { include?: TaskIncludes }; // Many-to-many with Task
   airbrushing?: boolean | { include?: AirbrushingIncludes };
 }
 

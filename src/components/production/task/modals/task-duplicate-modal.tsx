@@ -31,15 +31,9 @@ export const DUPLICATE_TASK_INCLUDE = {
     },
   },
   baseFiles: true,
-  layouts: {
-    include: {
-      file: true,
-    },
-  },
   quote: {
     include: {
       services: true,
-      layoutFiles: true,
       customerConfigs: true,
     },
   },
@@ -200,8 +194,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       reimbursementIds: sourceTask.reimbursements?.map((r: any) => r.id) || [],
       reimbursementInvoiceIds: sourceTask.reimbursementInvoices?.map((r: any) => r.id) || [],
 
-      // Layouts (shared references - pass File IDs, API converts to Layout entity IDs)
-      layoutIds: sourceTask.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+      // A ARTE NÃO SE COPIA AQUI: ela é do IMPLEMENTO (Modelo C), com estado e
+      // decisão próprios. A cópia nasce sem arte e a arte entra pelo painel dela.
 
       // Base files (shared references - File IDs)
       baseFileIds: sourceTask.baseFiles?.map((f: any) => f.id) || [],
@@ -226,7 +220,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
       // Implement - copy all fields, use form values for serial/plate/chassis (no fallback to avoid duplicates).
       // A série é SÓ do implemento (NOMENCLATURA.md §5): vai aqui, nunca no topo.
-      // Layouts are SHARED (connect to existing layout IDs)
       implement: (copyData.serialNumber || copyData.plate || copyData.chassisNumber || implementData)
         ? {
             serialNumber: copyData.serialNumber || null,
@@ -236,7 +229,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
             spot: null,
             category: implementData?.category || null,
             type: implementData?.type || null,
-            // Share existing layouts (connect to same layout records)
             leftSideMeasureId: implementData?.leftSideMeasure?.id || implementData?.leftSideMeasureId || null,
             rightSideMeasureId: implementData?.rightSideMeasure?.id || implementData?.rightSideMeasureId || null,
             backSideMeasureId: implementData?.backSideMeasure?.id || implementData?.backSideMeasureId || null,
@@ -282,7 +274,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     const configVehicleCount = (config: any) => coveredTaskCount(config) || sourceVehicleCount;
 
     return {
-      status: 'PENDING' as const,
       billingSplit: (sourceTask.quote as any).billingSplit ?? 'JOINT',
       services: sourceTask.quote.services.map((item: any) => ({
         description: item.description,
@@ -298,7 +289,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
       simultaneousTasks:
         sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
-      layoutFileIds: (sourceTask.quote.layoutFiles || []).map((f: any) => f.id),
       customerConfigs:
         firstConfigPerCustomer(sourceTask.quote.customerConfigs)?.map((config: any) => ({
           customerId: config.customerId,

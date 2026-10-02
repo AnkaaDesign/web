@@ -5,13 +5,15 @@ import { airbrushingService } from "@/api-client/airbrushing";
 import { taskKeys } from "@/hooks";
 import { airbrushingKeys } from "@/hooks/common/query-keys";
 import type { Task } from "@/types";
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 
 /**
  * O que a tela de orçamento precisa de CADA veículo para editá-lo.
  *
  * É o `include` que a página já usava para a tarefa aberta — cliente, implemento com a
  * foto da plaqueta (relação de File: um `implement: true` deixaria a Plaqueta sempre vazia
- * e um save apagaria a foto), layouts com o arquivo, arquivos base, responsáveis — mais
+ * e um save apagaria a foto) e com a ARTE viva do implemento (a arte saiu da tarefa:
+ * `include.layouts` da tarefa a API não aceita mais), arquivos base, responsáveis — mais
  * a pintura geral, que agora aparece na aba e no Resumo de cada implemento.
  *
  * Uma constante só, para que a tarefa aberta e as irmãs caiam na MESMA chave de cache
@@ -19,8 +21,7 @@ import type { Task } from "@/types";
  */
 export const BUDGET_VEHICLE_TASK_INCLUDE = {
   customer: true,
-  implement: { include: { vinPlate: true } },
-  layouts: { include: { file: true } },
+  implement: { include: { vinPlate: true, layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
   baseFiles: true,
   responsibles: true,
   generalPainting: true,

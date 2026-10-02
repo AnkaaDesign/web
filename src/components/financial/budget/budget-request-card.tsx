@@ -96,7 +96,7 @@ interface BudgetRequestCardProps {
    * `full` é a ficha inteira (quem pediu, quando, tinta, briefing, veículos,
    * arquivos-base). `summary` é uma faixa de UMA linha com o começo do briefing,
    * que abre o briefing inteiro — e mais nada. A decisão do cliente (recusa ou
-   * pré-aprovação) aparece nas DUAS: ela é a informação que não pode sumir de
+   * aprovação do valor) aparece nas DUAS: ela é a informação que não pode sumir de
    * lugar nenhum.
    */
   variant?: "full" | "summary";
@@ -178,9 +178,9 @@ export function BudgetRequestCard({
                   Recusada
                 </Badge>
               )}
-              {decision === "preApproved" && (
-                <Badge variant="indigo" className="ml-1 shrink-0">
-                  Pré-aprovada
+              {decision === "valueApproved" && (
+                <Badge variant="processing" className="ml-1 shrink-0">
+                  Valor aprovado
                 </Badge>
               )}
               {/* O BRIEFING NA PRÓPRIA FAIXA. É o que faz dela um caminho e não
@@ -211,16 +211,16 @@ export function BudgetRequestCard({
                   {request.decisionNote?.trim() || "Sem motivo informado."}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Recusa não cancela: refaça o orçamento e reenvie para pré-aprovação.
+                  Recusa não cancela: refaça o orçamento e envie de novo para a aprovação do cliente.
                 </p>
               </div>
             )}
 
-            {decision === "preApproved" && (
-              <div className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-4 py-3">
+            {decision === "valueApproved" && (
+              <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <IconCircleCheck className="h-4 w-4 shrink-0" />
-                  Pré-aprovado por {request.preApprovedBy?.name ?? "contato do cliente"}
+                  Valor aprovado por {request.preApprovedBy?.name ?? "contato do cliente"}
                   {request.preApprovedAt ? ` em ${formatDateTime(request.preApprovedAt)}` : ""}
                 </div>
                 {request.decisionNote?.trim() ? (
@@ -315,7 +315,7 @@ export function BudgetRequestCard({
             )}
 
             {/* ── SEM AÇÃO DE ESTADO ─────────────────────────────────────────
-                "Enviar para pré-aprovação" e "Enviar para assinatura" estão no
+                "Enviar para aprovação do cliente" e "Enviar para assinatura" estão no
                 ÚLTIMO passo do assistente (`budget-state-actions.tsx`), ao lado
                 do Salvar — este card aparece em todos os passos e ali eles eram
                 um convite a decidir antes de haver serviço e preço. */}

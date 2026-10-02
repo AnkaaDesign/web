@@ -62,6 +62,7 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
 import { batchCreateTasksWithQuote } from "../../../../api-client/task";
+import { attachArtToTasks } from "@/utils/implement-art-upload";
 import { FACE_LABEL, FACE_MEASURE_FIELD, type ImplementFace } from "@/constants/implement-faces";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
@@ -284,15 +285,11 @@ export const TaskCreateForm = () => {
     setBaseFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
   }, []);
 
-  // File upload states - layouts
-  const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
-  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
-  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
-
-  const handleFilesChange = useCallback((files: FileWithPreview[]) => {
-    setUploadedFiles(files);
-    setUploadedFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
-  }, []);
+  // A ARTE DO IMPLEMENTO na criação: UMA imagem (ou mais) que vale para todos os
+  // veículos criados. Não vai no corpo da tarefa (a API recusa `layoutIds`): entra no
+  // implemento de cada tarefa DEPOIS de criada, como RASCUNHO — ver
+  // `attachArtToTasks`.
+  const [artFiles, setArtFiles] = useState<FileWithPreview[]>([]);
 
   // Submitting ref for form state
   const isSubmittingRef = useRef<boolean>(false);
@@ -377,36 +374,6 @@ export const TaskCreateForm = () => {
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 
-        // Upload artwork files that haven't been uploaded yet
-        const layoutIds: string[] = [...uploadedFileIds];
-        const remappedLayoutStatuses: Record<string, string> = {};
-        // O seletor chaveia por `uploadedFileId || id` e grava a escolha também no próprio
-        // objeto File — ler os três é o que faz o status de um layout RECÉM-ANEXADO
-        // sobreviver ao upload logo abaixo, em vez de exigir salvar e aprovar depois.
-        const statusForFile = (file: FileWithPreview): string | undefined =>
-          layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id] ?? file.status;
-        for (const file of uploadedFiles) {
-          const status = statusForFile(file);
-          if (file.uploaded && file.uploadedFileId) {
-            // Already uploaded - keep existing ID and remap status
-            if (status) {
-              remappedLayoutStatuses[file.uploadedFileId] = status;
-            }
-          } else if (!file.error) {
-            try {
-              const response = await uploadSingleFile(file, { fileContext: 'tasksLayouts' });
-              if (response.success && response.data) {
-                layoutIds.push(response.data.id);
-                // Remap artwork status from local file ID to backend File ID
-                if (status) {
-                  remappedLayoutStatuses[response.data.id] = status;
-                }
-              }
-            } catch (error: any) {
-              toast.error(`Erro ao enviar layout ${file.name}: ${error.message}`);
-            }
-          }
-        }
 
         // Upload base files that haven't been uploaded yet
         const uploadedBaseFileIds: string[] = [...baseFileIds];
@@ -497,8 +464,6 @@ export const TaskCreateForm = () => {
             term: term || undefined,
             paintId: paintId || undefined,
             paintIds: paintIds && paintIds.length > 0 ? paintIds : undefined,
-            layoutIds: layoutIds.length > 0 ? layoutIds : undefined,
-            layoutStatuses: layoutIds.length > 0 && Object.keys(remappedLayoutStatuses).length > 0 ? remappedLayoutStatuses : undefined,
             baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
             responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
             // Service orders are cloned per task (individual instances)
@@ -605,7 +570,6 @@ export const TaskCreateForm = () => {
         const quoteData =
           effectiveCustomerId && (isCommercialUser || isAdminUser)
             ? {
-                status: "PENDING" as const,
                 billingSplit: "JOINT" as const,
                 subtotal: 0,
                 total: 0,
@@ -661,6 +625,17 @@ export const TaskCreateForm = () => {
           }
         }
 
+        // A ARTE, depois das tarefas — no implemento de cada uma, como rascunho.
+        // Não bloqueante, como as aerografias.
+        const newArtFiles = artFiles.filter((f) => f instanceof File) as File[];
+        if (newArtFiles.length > 0 && createdTaskIds.length > 0) {
+          try {
+            await attachArtToTasks(createdTaskIds, newArtFiles);
+          } catch {
+            toast.warning("Tarefa criada, mas a arte não foi anexada. Envie-a pelo painel da arte do veículo.");
+          }
+        }
+
         // Show summary message
         if (successCount > 0 && errorCount === 0) {
           toast.success(
@@ -686,7 +661,7 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, layoutStatuses, allowNavigation, form, guardAirbrushingCreation],
+    [createAsync, responsibleRows, customerIdValue, baseFileIds, artFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, allowNavigation, form, guardAirbrushingCreation],
   );
 
   // Get form state
@@ -1140,7 +1115,9 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* Layouts/Layouts - COMMERCIAL/ADMIN */}
+                {/* A ARTE DO IMPLEMENTO - COMMERCIAL/ADMIN. Vale para TODOS os veículos
+                    criados e nasce RASCUNHO; depois, cada veículo é ajustado no painel da
+                    arte dele (enviar ao cliente, aprovar em nome, versão nova). */}
                 {showLayouts && (
                   <AccordionItem
                     value="layouts"
@@ -1152,53 +1129,28 @@ export const TaskCreateForm = () => {
                         <CardHeader className="flex-1 py-4">
                           <CardTitle className="flex items-center gap-2">
                             <IconPhoto className="h-5 w-5" />
-                            Layout Referência
+                            Arte do implemento
                           </CardTitle>
                         </CardHeader>
                       </AccordionTrigger>
                       <AccordionContent>
-                        <CardContent className="pt-0">
+                        <CardContent className="pt-0 space-y-2">
                           <LayoutFileUploadField
-                            onFilesChange={handleFilesChange}
-                            onStatusChange={(fileId, status) => {
-                              setLayoutStatuses(prev => ({
-                                ...prev,
-                                [fileId]: status,
-                              }));
-                            }}
+                            onFilesChange={setArtFiles}
+                            showStatus={false}
                             maxFiles={5}
                             disabled={isSubmitting}
                             showPreview={true}
-                            existingFiles={uploadedFiles}
-                            placeholder="Adicione o layout referência relacionado à tarefa"
-                            label="Layout Referência anexado"
+                            existingFiles={artFiles}
+                            placeholder="Adicione a arte (imagem) — vale para todos os veículos"
+                            label="Arte anexada"
                             variant="card"
-                          >
-                            {/* Reuse a layout already used for this customer (no re-upload). */}
-                            <FileSuggestions
-                              customerId={customerIdValue ?? undefined}
-                              fileContext="tasksLayouts"
-                              excludeFileIds={uploadedFiles
-                                .map((f) => (f as any).uploadedFileId || f.id)
-                                .filter(Boolean)}
-                              onSelect={(newFile) => {
-                                const fileWithPreview = {
-                                  id: newFile.id,
-                                  name: newFile.filename || newFile.originalName || "artwork",
-                                  size: newFile.size || 0,
-                                  type: newFile.mimetype || "application/octet-stream",
-                                  lastModified: Date.now(),
-                                  uploaded: true,
-                                  uploadProgress: 100,
-                                  uploadedFileId: newFile.id,
-                                  thumbnailUrl: newFile.thumbnailUrl || undefined,
-                                  status: "DRAFT",
-                                } as FileWithPreview;
-                                setUploadedFiles((prev) => [...prev, fileWithPreview]);
-                              }}
-                              disabled={isSubmitting}
-                            />
-                          </LayoutFileUploadField>
+                            acceptedFileTypes={{ "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] }}
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            A arte entra no implemento de cada veículo criado, como rascunho. Depois ela é
+                            enviada ao cliente e aprovada veículo a veículo.
+                          </p>
                         </CardContent>
                       </AccordionContent>
                     </Card>

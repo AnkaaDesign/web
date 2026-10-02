@@ -75,27 +75,45 @@ export const budgetService = {
   extendValidity: (id: string, days: number) =>
     apiClient.put(`/budgets/${id}/validity`, { days }),
 
-  // Update only the layout files — layoutFileIds is a safe-after-billing field, so
-  // this works on locked quotes too. Toast suppressed so batch callers can emit one
-  // summary. Sends the ordered File-id array (replaces the relation; [] clears).
-  updateLayoutFile: (id: string, layoutFileIds: string[]) =>
-    apiClient.put(
-      `/budgets/${id}`,
-      { layoutFileIds },
-      { metadata: { suppressToast: true } } as any,
-    ),
-
-  // Update status
+  /**
+   * Status pelo caminho genérico. A API DELEGA cada destino ao ato (aprovar o
+   * valor exige nota, reprovar exige motivo, enviar ao cliente exige valor);
+   * telas novas chamam os atos abaixo, que dizem o que pedem.
+   */
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.put(`/budgets/${id}/status`, { status, reason }),
 
-  // Aprovação COMERCIAL do orçamento (PENDING/SIGNED → APPROVED). É o último
-  // estado do orçamento; o que vem depois é cobrança, e cobrança tem rota
-  // própria (`billingService.approve`).
-  approve: (id: string) => apiClient.put(`/budgets/${id}/budget-approve`),
+  // ─── OS ATOS DO EIXO DO VALOR (Modelo C, P14) ───────────────────────────────
 
-  // Budget Approve (alias)
-  budgetApprove: (id: string) => apiClient.put(`/budgets/${id}/budget-approve`),
+  /** "Enviar para aprovação do cliente" (REQUESTED/PENDING/EXPIRED → IN_NEGOTIATION). Exige valor. */
+  sendToCustomer: (id: string) => apiClient.put(`/budgets/${id}/send-to-customer`),
+
+  /** "Retirar do cliente" (IN_NEGOTIATION → PENDING). Motivo opcional. */
+  withdrawFromCustomer: (id: string, reason?: string) =>
+    apiClient.put(`/budgets/${id}/withdraw-from-customer`, reason?.trim() ? { reason: reason.trim() } : {}),
+
+  /**
+   * "Aprovar valor em nome do cliente" (→ APPROVED, origem `ON_BEHALF`). A NOTA é
+   * obrigatória: como o cliente aprovou (e-mail, telefone, reunião).
+   */
+  approveValue: (id: string, note: string) => apiClient.put(`/budgets/${id}/value-approval`, { note }),
+
+  /** "Reprovar valor" (APPROVED → PENDING). Motivo obrigatório. */
+  revokeValueApproval: (id: string, reason: string) =>
+    apiClient.delete(`/budgets/${id}/value-approval`, { data: { reason } }),
+
+  /**
+   * "Assinado fora do sistema" (DD11): a prova (PDF ou imagem), a nota e, se
+   * quiser, a data em que foi assinado. O eixo da assinatura vai a
+   * `SIGNED_OFFLINE` e a cobrança passa a poder ser aprovada.
+   */
+  registerOfflineSignature: (id: string, args: { file: File; note: string; signedAt?: string | null }) => {
+    const form = new FormData();
+    form.append('offlineSignatureFile', args.file);
+    form.append('note', args.note);
+    if (args.signedAt) form.append('signedAt', args.signedAt);
+    return apiClient.post(`/budgets/${id}/offline-signature`, form);
+  },
 
   /**
    * ⚠️ APROVAR FATURAMENTO NÃO MORA MAIS AQUI.
@@ -128,12 +146,6 @@ export const budgetService = {
    */
   revertBilling: (id: string) => apiClient.put(`/budgets/${id}/revert-billing`),
 
-  // Reject (sends back to PENDING with a reason)
-  reject: (id: string, reason?: string) =>
-    apiClient.put(`/budgets/${id}/status`, { status: 'PENDING', reason }),
-
-  // Cancel (sends back to PENDING)
-  cancel: (id: string) => apiClient.put(`/budgets/${id}/status`, { status: 'PENDING' }),
 
   // Recibo de quitação (PDF) — só existe depois que a cobrança é liquidada
   // (`BILLING_STATUS.SETTLED`). O recibo é do orçamento porque é o contrato que

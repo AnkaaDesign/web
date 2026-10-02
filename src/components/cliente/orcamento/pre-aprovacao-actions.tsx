@@ -6,13 +6,14 @@
 // preço foi montado e alguém do lado de lá precisa dizer "segue" ou "refaz".
 // Daqui saem os dois caminhos:
 //
-//   pré-aprovar → `PRE_APPROVED`, e a Ankaa emite o documento para assinatura;
-//   recusar     → `REQUESTED`,    e o orçamento volta para o comercial refazer.
+//   aprovar o valor → `APPROVED` (valor aprovado), e a Ankaa cuida da arte e
+//                     emite o documento para assinatura;
+//   recusar         → `PENDING`, e o orçamento volta para o comercial refazer.
 //
 // ⛔ A RECUSA NÃO É UM CANCELAMENTO, e esta é a frase que o diálogo precisa
 // deixar impossível de ler errado. `CANCELLED` é um estado terminal do qual não
-// se sai (`CANCELLED → ∅` na tabela de transições). `REQUESTED` é o começo:
-// o orçamento continua vivo, volta para a mesa do comercial e é REFEITO. Quem
+// se sai (`CANCELLED → ∅` na tabela de transições). `PENDING` é a mesa da
+// Ankaa: o orçamento continua vivo, volta para a mesa do comercial e é REFEITO. Quem
 // clica em "Recusar" achando que está desistindo do serviço está errado por um
 // estado inteiro — e é a única ação do portal que parece irreversível.
 //
@@ -53,7 +54,7 @@ export interface PreAprovacaoActionsProps {
    *
    * `undefined` = a resposta não trouxe o campo; aí vale o recorte local. O
    * `false` EXPLÍCITO manda: o servidor sabe coisas que a tela não sabe (a
-   * decisão já tomada, o CHECK de pré-aprovado-e-recusado, o escopo do dado).
+   * decisão já tomada, o CHECK de aprovado-e-recusado, o escopo do dado).
    */
   canApproveValue?: boolean;
   /** Chamado depois de uma decisão aceita — para a tela voltar para a lista, por exemplo. */
@@ -171,8 +172,8 @@ export function PreAprovacaoActions({
           <DialogHeader>
             <DialogTitle>Aprovar este orçamento?</DialogTitle>
             <DialogDescription>
-              O orçamento passa a <strong>Pré-aprovado</strong> e volta para a Ankaa, que emite o documento para
-              assinatura. Você ainda vai assinar depois — aprovar aqui não é assinar.
+              O valor fica <strong>aprovado</strong> e o orçamento volta para a Ankaa, que emite o documento para
+              assinatura. Você ainda vai assinar depois — aprovar o valor não é assinar.
             </DialogDescription>
           </DialogHeader>
 

@@ -11,7 +11,7 @@
 //   1. createTaskAsync({ status: PREPARATION, customerId, name, details,
 //                        term, forecastDate, implement: { serialNumber } })
 //   2. useCreateBudget().mutateAsync({
-//        taskId, expiresAt, status: PENDING,
+//        taskId, expiresAt (o servidor decide o nascimento — D-34: Pendente),
 //        subtotal, total,
 //        customGuaranteeText, customForecastDays,
 //        customerConfigs: [{ customerId, subtotal, total }],
@@ -188,7 +188,6 @@ function Render({ config }: WidgetRenderProps<Config>) {
       await createQuote.mutateAsync({
         taskId,
         expiresAt: new Date(expiresAt) as any,
-        status: "PENDING",
         subtotal,
         total: subtotal,
         guaranteeYears: config.defaultGuaranteeYears ?? null,

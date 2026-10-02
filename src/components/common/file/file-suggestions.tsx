@@ -18,7 +18,8 @@ import { getApiBaseUrl } from "@/config/api";
 
 export interface FileSuggestionsProps {
   customerId?: string;
-  fileContext: "tasksLayouts" | "taskBaseFiles" | "taskProjectFiles" | "airbrushingLayouts";
+  /** `implementLayouts` = a arte dos implementos do cliente (a arte saiu da tarefa). */
+  fileContext: "implementLayouts" | "taskBaseFiles" | "taskProjectFiles" | "airbrushingLayouts";
   excludeFileIds: string[];
   onSelect: (newFile: AnkaaFile) => void;
   disabled?: boolean;

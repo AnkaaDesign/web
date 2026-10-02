@@ -3,7 +3,7 @@
 // "O QUE ESPERA POR MIM" — a coluna que o cliente lê primeiro.
 //
 // É DERIVADA do estado, não um campo. A máquina de estados do orçamento (§1 do
-// contrato, §4.2 do desenho) já responde "quem está devendo" em cada um dos oito
+// contrato, §4.2 do desenho) já responde "quem está devendo" em quase todos os
 // valores; guardar isso numa coluna criaria um segundo lugar onde a resposta
 // pode ficar velha.
 //
@@ -29,9 +29,9 @@ export interface PortalWaitingOn {
 
 /**
  * ⚠️ `IN_NEGOTIATION` é do CLIENTE, e é a razão de ser do portal: é nele que o
- * vendedor do cliente pré-aprova ou recusa. Foi o estado que o desenho chamou
- * de `PRE_APPROVAL`; `PRE_APPROVED` é o RESULTADO, e aí a bola volta para a
- * Ankaa emitir a coleta de assinatura.
+ * contato do cliente APROVA O VALOR ou recusa (D-35). Aprovado, a bola volta
+ * para a Ankaa: arte de cada veículo e emissão da coleta de assinatura — a
+ * assinatura é um eixo próprio, lido do segundo argumento de `portalWaitingOn`.
  */
 export const PORTAL_WAITING_BY_STATUS: Record<TASK_QUOTE_STATUS, PortalWaitingOn> = {
   REQUESTED: {
@@ -46,31 +46,26 @@ export const PORTAL_WAITING_BY_STATUS: Record<TASK_QUOTE_STATUS, PortalWaitingOn
   },
   IN_NEGOTIATION: {
     label: "Com você",
-    detail: "Aguardando sua pré-aprovação — ou a recusa, que devolve o orçamento para ser refeito.",
+    detail: "Aguardando a sua aprovação do valor — ou a recusa, que devolve o orçamento para ser refeito.",
     tone: "mine",
   },
-  PRE_APPROVED: {
+  // Em montagem ou revisão pela Ankaa (no Modelo C, PENDING não é mais "em coleta").
+  PENDING: {
     label: "Com a Ankaa",
-    detail: "Pré-aprovado. A Ankaa vai emitir o documento para assinatura.",
+    detail: "A Ankaa está montando ou revisando o orçamento.",
     tone: "ankaa",
   },
-  // ⚠️ ESTE É O ÚNICO ESTADO QUE A DEDUÇÃO NÃO RESOLVE — ver
-  // `portalWaitingOn` abaixo. O que está aqui é o caso em que a coleta foi
-  // emitida e a assinatura é de OUTRO responsável: o estado é do cliente, mas
-  // a vez não é desta pessoa.
-  PENDING: {
-    label: "Em coleta",
-    detail: "O documento está em coleta de assinaturas. Nada depende de você aqui.",
-    tone: "none",
-  },
+  // LEGADO: nenhum orçamento é gravado assim desde que a assinatura virou eixo próprio.
   SIGNED: {
     label: "Com a Ankaa",
-    detail: "Assinado. Falta a aprovação interna da Ankaa para o serviço entrar na fila.",
+    detail: "Assinado. Falta a Ankaa concluir.",
     tone: "ankaa",
   },
+  // ⚠️ O ÚNICO QUE A DEDUÇÃO NÃO RESOLVE SOZINHA — ver `portalWaitingOn` abaixo:
+  // valor aprovado, e a vez depende da ASSINATURA (emitida? falta a minha?).
   APPROVED: {
     label: "Em andamento",
-    detail: "Aprovado — daqui em diante quem anda é a produção e a cobrança.",
+    detail: "Valor aprovado — daqui em diante andam a arte, a assinatura, a produção e a cobrança.",
     tone: "none",
   },
   CANCELLED: {
@@ -89,31 +84,21 @@ const MINHA_ASSINATURA: PortalWaitingOn = {
   tone: "mine",
 };
 
-/** Emitido? Não: então a bola voltou para a Ankaa, por mais que o estado diga "Aguardando Assinatura". */
+/** Valor aprovado e documento ainda não emitido: a bola está com a Ankaa. */
 const NAO_EMITIDO: PortalWaitingOn = {
   label: "Com a Ankaa",
-  detail: "A Ankaa ainda não emitiu o documento para assinatura.",
+  detail: "Valor aprovado. A Ankaa vai emitir o documento para assinatura.",
   tone: "ankaa",
 };
 
 /**
  * De quem é a vez.
  *
- * ⛔ `PENDING` É A EXCEÇÃO, e foi ela que provou que a dedução pura não basta.
- * O estado responde "onde o orçamento está", e para sete dos oito valores isso
- * é suficiente. Para `PENDING` não é, de duas maneiras ao mesmo tempo:
- *
- *   1. "Aguardando a assinatura dos responsáveis" não quer dizer ESTE
- *      responsável — quem já assinou continuava lendo "Com você";
- *   2. e um orçamento pode estar em `PENDING` sem coleta nenhuma emitida. No
- *      acervo do dono eram **18 de 18** assim. A lista anunciava dezoito
- *      documentos esperando por ele, e a tela de Assinaturas — que olha a
- *      realidade, e não o estado — dizia, corretamente, "Nada para assinar".
- *
- * Por isso o segundo argumento. Ele é OPCIONAL de propósito: sem ele a função
- * devolve a leitura pelo estado, que é o que ela sempre fez e continua correto
- * para os outros sete. Quem tem o fato na mão (`budget.signature`, vindo do
- * servidor) passa e recebe a verdade.
+ * O estado do VALOR responde "onde o orçamento está", e para quase todos os
+ * valores isso basta. Para `APPROVED` não: o valor está aprovado, e a vez passa
+ * a depender da ASSINATURA — emitida e esperando a minha (`mine`), emitida e
+ * esperando outro (`none`), ou ainda não emitida (`ankaa`). Por isso o segundo
+ * argumento, OPCIONAL: sem ele a função devolve a leitura pelo estado.
  */
 export function portalWaitingOn(
   status: TASK_QUOTE_STATUS | string | null | undefined,
@@ -122,7 +107,7 @@ export function portalWaitingOn(
   if (!status) return UNKNOWN;
   const chave = String(status).toUpperCase() as TASK_QUOTE_STATUS;
 
-  if (chave === "PENDING" && signature) {
+  if (chave === "APPROVED" && signature) {
     if (signature.awaitingMe) return MINHA_ASSINATURA;
     if (!signature.emitted) return NAO_EMITIDO;
   }

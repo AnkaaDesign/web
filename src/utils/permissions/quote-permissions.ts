@@ -1,4 +1,4 @@
-import { SECTOR_PRIVILEGES } from '@/constants';
+import { BUDGET_MANUAL_TRANSITIONS, SECTOR_PRIVILEGES } from '@/constants';
 import type { SECTOR_PRIVILEGES as SECTOR_PRIVILEGES_TYPE } from '@/constants';
 import type { TASK_QUOTE_STATUS } from '@/types/budget';
 
@@ -47,61 +47,17 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
 }
 
 /**
- * O GRAFO DO ORÇAMENTO — quatro arestas, e nenhuma delas é de cobrança.
+ * O GRAFO DO EIXO DO VALOR — as arestas que uma pessoa pode pedir, lidas do
+ * contrato da API (`orcamento.transicoesManuais`). A API delega cada destino ao
+ * ATO correspondente: `→ APPROVED` exige nota (aprovar em nome do cliente),
+ * `APPROVED → PENDING` exige motivo (reprovar o valor), `→ IN_NEGOTIATION` exige
+ * valor (enviar ao cliente). Por isso as telas não "caminham" de estado em
+ * estado: chamam os atos (`budgetService.approveValue`, `sendToCustomer`, …).
  *
- * Fluxo: PENDING → APPROVED, com SIGNED e EXPIRED entrando pela CERIMÔNIA de
- * assinatura (por isso não são DESTINO de ninguém aqui: o que as linhas deles
- * declaram é como se SAI deles), e CANCELLED como terminal.
- *
- * ⚠️ O GRAFO ENCOLHEU EM 16/09/2026. Ele descrevia também o ciclo do pagamento —
- * BILLING_APPROVED → UPCOMING → PARTIAL/DUE → SETTLED, com as voltas de estorno.
- * Nada disso é transição de orçamento: é a cobrança andando, e a cobrança agora
- * é o `Billing`, cujo estado NINGUÉM digita (`BillingStatusCascadeService` o
- * deriva das parcelas). Some com isso uma classe inteira de defeito que este
- * grafo tinha por construção: um orçamento com duas cobranças, uma paga e outra
- * vencida, precisava escolher UMA aresta — escolhia a última que rodasse.
- *
- * ⚠️ ESPELHA `validateStatusTransition` em
- * `api/src/modules/production/task-quote/task-quote.service.ts`, byte a byte.
- * Divergir faz a tela oferecer uma transição que o servidor devolve em 400.
+ * Era um espelho escrito à mão — e ficou com `PRE_APPROVED` depois que a API o
+ * apagou.
  */
-const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
-  // Vencido sem todas as assinaturas. O comercial reanalisa o valor: reformula
-  // (o que já devolve o orçamento a PENDING pelo auto-revert do servidor),
-  // estende a validade, ou cancela. NÃO vai direto para APPROVED — aprovar sem
-  // assinatura é exatamente o que a cerimônia existe para impedir.
-  EXPIRED: ['PENDING', 'REQUESTED', 'CANCELLED'],
-  // De SIGNED não se vai para EXPIRED: aceita a proposta dentro do prazo, o
-  // relógio para de correr contra o cliente — o que falta é nosso.
-  SIGNED: ['APPROVED', 'PENDING', 'CANCELLED'],
-  PENDING: ['APPROVED', 'IN_NEGOTIATION', 'CANCELLED'],
-  // APPROVED é o ÚLTIMO estado do orçamento: dele só se volta ou se cancela.
-  // APPROVED → PENDING existe para o caminho de desistência mais comum, o
-  // cliente voltando atrás ANTES de haver cobrança. Depois que alguma cobrança
-  // foi aprovada o servidor barra a edição (`isQuoteMoneyLocked`) e o caminho é
-  // "Reverter Faturamento" — hoje `PUT /billings/:id/revert`, que desfaz AQUELA
-  // cobrança (baixa os boletos dela e deixa a NFS-e viva para ser substituída).
-  // `PUT /budgets/:id/revert-billing` continua de pé, mas desmonta o ciclo do
-  // orçamento INTEIRO e nenhuma tela o chama.
-  APPROVED: ['PENDING', 'CANCELLED'],
-  // Terminal: um orçamento cancelado não volta. Recotar cria um novo.
-  CANCELLED: [],
-
-  // ─── O CAMINHO DO PORTAL (20/09/2026) ─────────────────────────────────────
-  //
-  // A requisição nasce sem serviço e sem valor. O comercial monta, e daí saem
-  // dois caminhos: manda ao VENDEDOR do cliente pré-aprovar, ou vai direto para
-  // assinatura quando não há intermediário — cliente direto não tem vendedor.
-  //
-  // ⚠️ NÃO vai direto para APPROVED: requisição não tem documento nem valor
-  // acordado, e é APPROVED que destrava a cobrança.
-  REQUESTED: ['IN_NEGOTIATION', 'PENDING', 'CANCELLED'],
-  // Recusar devolve a REQUESTED — para o comercial refazer, não para o limbo.
-  IN_NEGOTIATION: ['PRE_APPROVED', 'REQUESTED', 'CANCELLED'],
-  // PENDING é escrito pela emissão do envelope; a volta existe para o vendedor
-  // que se retrata antes de o documento sair.
-  PRE_APPROVED: ['PENDING', 'IN_NEGOTIATION', 'CANCELLED'],
-};
+const VALID_TRANSITIONS = BUDGET_MANUAL_TRANSITIONS as Record<TASK_QUOTE_STATUS, readonly TASK_QUOTE_STATUS[]>;
 
 /**
  * Os destinos legais a partir de `currentStatus` para este setor.
@@ -116,7 +72,7 @@ export function getAvailableQuoteStatusTransitions(
   currentStatus: TASK_QUOTE_STATUS,
   userRole: string,
 ): TASK_QUOTE_STATUS[] {
-  const transitions = VALID_TRANSITIONS[currentStatus] || [];
+  const transitions = [...(VALID_TRANSITIONS[currentStatus] || [])];
 
   if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
     return transitions.filter((s) => s !== 'APPROVED');

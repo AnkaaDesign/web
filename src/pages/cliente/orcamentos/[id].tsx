@@ -72,8 +72,8 @@
 //
 // ── A decisão ──────────────────────────────────────────────────────────────
 //
-// Em `IN_NEGOTIATION`, quem tem `APPROVE_VALUE` decide: aprovar (vai a
-// `PRE_APPROVED`) ou recusar (VOLTA a `REQUESTED`, para o comercial refazer).
+// Em `IN_NEGOTIATION`, quem tem `APPROVE_VALUE` decide: aprovar o valor (vai a
+// `APPROVED`) ou recusar (VOLTA a `PENDING`, para o comercial refazer).
 // Os botões vivem no cabeçalho do card da Proposta — e NÃO no da página, porque
 // o `headerExtra` do `PageHeader` mora dentro de um `hidden sm:flex` e sumiria
 // no celular, que é metade das visitas do portal. Ver `pre-aprovacao-actions.tsx`

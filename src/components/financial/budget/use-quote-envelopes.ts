@@ -4,11 +4,11 @@
  * ⚠️ POR QUE ISTO EXISTE. O `SignatureEnvelopeCard` guardava os envelopes em
  * `useState` próprio, e era o ÚNICO lugar da página que sabia da coleta. O card
  * de encaminhamento (`budget-state-actions.tsx`), que decide se ainda faz
- * sentido oferecer "Enviar para pré-aprovação", ficava decidindo só pelo
+ * sentido oferecer "Enviar para aprovação do cliente", ficava decidindo só pelo
  * `status` do orçamento — e `status` MENTE: há orçamentos em `REQUESTED` com
  * coleta `RUNNING` e assinaturas já colhidas (o servidor não movia o estado ao
  * emitir o envelope). O resultado em tela era convidar a mandar para
- * pré-aprovação um orçamento que o cliente já tinha assinado.
+ * aprovação do cliente um orçamento que ele já tinha assinado.
  *
  * Uma consulta compartilhada é o conserto certo, e não um segundo `fetch`: com a
  * MESMA chave o react-query serve os dois consumidores com uma requisição só, e
@@ -29,7 +29,7 @@ export const quoteEnvelopeKeys = {
  * Uma coleta é VIVA quando já saiu para o cliente e não foi derrubada.
  *
  * `COMPLETED` entra junto de `RUNNING` de propósito: um orçamento assinado por
- * todos está ainda MENOS disponível para "enviar para pré-aprovação" do que um
+ * todos está ainda MENOS disponível para "enviar para aprovação do cliente" do que um
  * em coleta. `INVALIDATED` e `CANCELLED` ficam de fora — ali a coleta morreu e
  * refazer o caminho é exatamente o que se espera.
  */

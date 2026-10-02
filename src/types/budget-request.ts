@@ -6,7 +6,7 @@
  * `BudgetRequest`): o que está em `Budget` corre o risco de entrar na projeção
  * material da assinatura e derrubar uma coleta em curso, e briefing e nome de
  * logomarca são conversa comercial, não cláusula do instrumento. Aqui também
- * ficam as DECISÕES do lado do cliente — pré-aprovação e recusa —, que são atos
+ * ficam as DECISÕES do lado do cliente — aprovação do valor e recusa —, que são atos
  * de pessoas do cliente e não da Ankaa.
  *
  * Ausente = orçamento criado por dentro, pelo comercial. É o caso da imensa
@@ -34,20 +34,25 @@ export interface BudgetRequest {
    */
   logoName?: string | null;
 
-  /** PRÉ-APROVAÇÃO: o vendedor do cliente clicou em Aprovar. */
+  /**
+   * O CLIENTE APROVOU O VALOR pelo portal (D-35). O nome da coluna é o antigo
+   * (`preApproved*`) e a API ainda o devolve assim; o significado, desde o P14,
+   * é "aprovou o valor". A fonte da verdade da aprovação é `Budget.valueApproval`
+   * (inclusive a feita em nome do cliente, que não passa por aqui).
+   */
   preApprovedAt?: Date | string | null;
   preApprovedByResponsibleId?: string | null;
   preApprovedBy?: BudgetRequestActor | null;
 
   /**
-   * RECUSA na pré-aprovação. NÃO é cancelamento: o orçamento volta para o
+   * RECUSA do valor. NÃO é cancelamento: o orçamento volta para o
    * comercial refazer, e o motivo é o que ele precisa ler.
    */
   refusedAt?: Date | string | null;
   refusedByResponsibleId?: string | null;
   refusedBy?: BudgetRequestActor | null;
 
-  /** Justificativa da decisão — preenchida na pré-aprovação OU na recusa. */
+  /** Justificativa da decisão — preenchida na aprovação do valor OU na recusa. */
   decisionNote?: string | null;
 
   createdAt?: Date | string;
@@ -90,15 +95,15 @@ export function budgetRequestOf(budget: unknown): BudgetRequest | null {
 /**
  * O estado da decisão do cliente sobre a requisição.
  *
- * ⚠️ `refused` vem ANTES de `preApproved` na leitura, espelhando o CHECK do
- * banco (pré-aprovado E recusado ao mesmo tempo é recusado pelo banco): se um
+ * ⚠️ `refused` vem ANTES de `valueApproved` na leitura, espelhando o CHECK do
+ * banco (aprovado E recusado ao mesmo tempo é recusado pelo banco): se um
  * dia os dois carimbos coexistirem por algum caminho não previsto, a tela
  * mostra a RECUSA — que é o lado que faz o comercial agir.
  */
-export type BudgetRequestDecision = 'refused' | 'preApproved' | 'pending';
+export type BudgetRequestDecision = 'refused' | 'valueApproved' | 'pending';
 
 export function budgetRequestDecision(request: BudgetRequest): BudgetRequestDecision {
   if (request.refusedAt) return 'refused';
-  if (request.preApprovedAt) return 'preApproved';
+  if (request.preApprovedAt) return 'valueApproved';
   return 'pending';
 }

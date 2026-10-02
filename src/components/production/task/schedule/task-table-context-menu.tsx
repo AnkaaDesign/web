@@ -113,7 +113,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {canViewQuote(user?.sector?.privileges || "") && !isMultiSelection && !isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quote")}>
             <IconReceipt className="mr-2 h-4 w-4" />
-            {getBudgetDisplayLabel(tasks[0]?.quote?.status)}
+            {getBudgetDisplayLabel(tasks[0]?.quote)}
           </DropdownMenuItem>
         )}
 
@@ -133,12 +133,12 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {/* Quote layout - COMMERCIAL only. Counterpart of the admin "Adicionar Layouts"
-            (layouts) bulk form: edits the quote's approved layout (layoutFileId) instead. */}
+        {/* A arte do implemento - COMMERCIAL. Abre o mesmo modal da "Arte em lote"
+            (rascunho no implemento de cada tarefa). */}
         {isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quoteLayout")}>
             <IconPhoto className="mr-2 h-4 w-4" />
-            Adicionar Layout Aprovados
+            Adicionar arte
           </DropdownMenuItem>
         )}
 

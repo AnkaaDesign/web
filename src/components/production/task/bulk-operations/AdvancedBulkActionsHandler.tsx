@@ -25,6 +25,8 @@ import { z } from "zod";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
+import { bulkImplementLayouts } from "@/api-client/implement";
+import { attachArtToTasks } from "@/utils/implement-art-upload";
 import type { ImplementFace } from "@/constants/implement-faces";
 
 // Type definitions for the operations
@@ -80,7 +82,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   // States for file uploads (new files, like task form)
   const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
-  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   // Write-only on purpose: nothing renders the count, but `MultiCutSelector` reports it through
   // `onCutsCountChange` and the resulting re-render is what refreshes the cut section. Kept as a
@@ -149,7 +150,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const resetForm = (_type: BulkOperationType) => {
     // Reset all file states
     setLayouts([]);
-    setLayoutStatuses({});
     setBaseFiles([]);
     setCutsCount(0);
 
@@ -217,7 +217,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
             },
           };
           const include = {
-            layouts: { include: { file: true } },
             baseFiles: true,
             cuts: { include: { file: true } },
             logoPaints: PAINT_DISPLAY_SELECT,
@@ -269,59 +268,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
             computed.logoPaints = firstTaskForPaints.logoPaints.filter(p => commonPaintIds.includes(p.id));
           }
 
-          // Find layouts that ALL tasks have in common (by filename, since each task may have different file IDs)
-          // NOTE: task.layouts are now Layout entities with a nested file property
-          // Layout entity: { id: layoutId, fileId, status, file?: { id, filename, originalName, thumbnailUrl, ... } }
-          if (tasks.length > 0) {
-            // Collect all unique filenames from all tasks
-            const allFilenames = new Set<string>();
-            tasks.forEach(task => {
-              (task.layouts || []).forEach((artwork: any) => {
-                // artwork.file contains the actual File data
-                const file = artwork.file || artwork;
-                const filename = file.originalName || file.filename;
-                if (filename) allFilenames.add(filename);
-              });
-            });
-
-            // Filter to only filenames that exist in ALL tasks
-            const commonFilenames = Array.from(allFilenames).filter(filename =>
-              tasks.every(task => (task.layouts || []).some((artwork: any) => {
-                const file = artwork.file || artwork;
-                return (file.originalName || file.filename) === filename;
-              }))
-            );
-
-            // Find the first task that has layouts to use as reference
-            const taskWithLayouts = tasks.find(t => t.layouts && t.layouts.length > 0);
-
-            if (taskWithLayouts && taskWithLayouts.layouts && commonFilenames.length > 0) {
-              // For each common filename, use the reference task's file data
-              const commonLayouts = taskWithLayouts.layouts.filter((artwork: any) => {
-                const file = artwork.file || artwork;
-                return commonFilenames.includes(file.originalName || file.filename);
-              });
-
-              computed.layouts = commonLayouts.map((artwork: any) => {
-                // Extract File data from Layout entity
-                const file = artwork.file || artwork;
-                const fileId = artwork.fileId || file.id;
-                return {
-                  id: fileId, // File ID (not Layout entity ID)
-                  name: file.filename || file.originalName || 'artwork',
-                  originalName: file.originalName,
-                  size: file.size || 0,
-                  type: file.mimetype || 'application/octet-stream',
-                  lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-                  uploaded: true,
-                  uploadProgress: 100,
-                  uploadedFileId: fileId, // File ID for form submission
-                  thumbnailUrl: file.thumbnailUrl,
-                  status: artwork.status || 'DRAFT', // Include artwork status
-                };
-              });
-            }
-          }
+          // A ARTE não é pré-carregada: ela é do IMPLEMENTO, com estado e decisão por
+          // veículo, e a "Arte em lote" só ACRESCENTA uma arte (rascunho) a todos.
 
           // Find baseFiles that ALL tasks have in common (by filename)
           // Base files are files used as base for artwork design (shared like artwork)
@@ -500,15 +448,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
           // Pre-fill existing files for display
           if (type === 'arts') {
-            setLayouts(computed.layouts as any);
-            // Initialize artwork statuses from existing artwork data
-            const initialStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-            computed.layouts.forEach((f: any) => {
-              if (f.uploadedFileId) {
-                initialStatuses[f.uploadedFileId] = f.status || 'DRAFT';
-              }
-            });
-            setLayoutStatuses(initialStatuses);
+            setLayouts([]);
           } else if (type === 'baseFiles') {
             setBaseFiles(computed.baseFiles as any);
           } else if (type === 'cuttingPlans') {
@@ -622,91 +562,41 @@ export const AdvancedBulkActionsHandler = forwardRef<
     try {
       const updateData: any = {};
       // Declare file arrays at function scope so they're accessible later
-      let newLayouts: File[] = [];
       let newBaseFiles: File[] = [];
 
       switch (operationType) {
-        case "arts":
-          // New files to upload via FormData
-          newLayouts = layouts.filter(f => f instanceof File) as File[];
-
-          // Determine which common layouts were explicitly REMOVED (user clicked X)
-          const currentFilenames = layouts
-            .filter(f => !(f instanceof File))
-            .map((f: any) => f.originalName || f.name);
-          const removedFileIds = commonValues.layouts
-            .filter((f: any) => !currentFilenames.includes(f.originalName || f.name))
-            .map((f: any) => f.uploadedFileId || f.id);
-
-          const hasRemovals = removedFileIds.length > 0;
-
-          // Detect suggestion files: already-uploaded files the user added from the
-          // suggestion picker that are NOT part of the pre-loaded common layouts.
-          const commonLayoutIds = new Set(
-            commonValues.layouts.map((f: any) => f.uploadedFileId || f.id).filter(Boolean)
-          );
-          const addedSuggestionFileIds = layouts
-            .filter(f => !(f instanceof File) && (f as any).uploaded && ((f as any).uploadedFileId || (f as any).id))
-            .map((f: any) => f.uploadedFileId || f.id)
-            .filter((id: string) => id && !commonLayoutIds.has(id));
-          const hasAddedSuggestions = addedSuggestionFileIds.length > 0;
-
-          // Send layoutIds (SET mode) when files were removed OR suggestions were added.
-          // For pure new-file uploads (no removals, no suggestions), skip layoutIds so
-          // the backend uses ADD mode and doesn't touch existing task-artwork connections.
-          if (hasRemovals || hasAddedSuggestions) {
-            const perTaskLayoutIds: Record<string, string[]> = {};
-            currentTasks.forEach(task => {
-              const keptIds: string[] = [];
-              (task.layouts || []).forEach((artwork: any) => {
-                // In flattened format from API: artwork.id = File ID, artwork.layoutId = Layout entity ID
-                // artwork.fileId and artwork.file don't exist in flattened format
-                const file = artwork.file || artwork;
-                const layoutFileId = artwork.fileId || file.id;
-                if (layoutFileId && !removedFileIds.includes(layoutFileId)) {
-                  // Send File IDs so the backend conversion path applies layoutStatuses
-                  keptIds.push(layoutFileId);
-                }
-              });
-              // Append suggestion file IDs that aren't already on this task
-              addedSuggestionFileIds.forEach((id: string) => {
-                if (!keptIds.includes(id)) keptIds.push(id);
-              });
-              perTaskLayoutIds[task.id] = keptIds;
-            });
-            updateData._perTaskLayoutIds = perTaskLayoutIds;
+        case "arts": {
+          // "ARTE EM LOTE" (Modelo C): a MESMA arte entra como RASCUNHO no implemento
+          // de cada tarefa selecionada. Arquivo novo sobe no primeiro implemento e é
+          // replicado nos demais; o sugerido (já no sistema) vai direto em lote.
+          // Decidir (enviar ao cliente, aprovar, reprovar) é veículo a veículo, no
+          // painel da arte — nunca em lote por aqui.
+          const newArtFiles = layouts.filter(f => f instanceof File) as File[];
+          const suggestedFileIds = layouts
+            .filter(f => !(f instanceof File) && (f as any).uploadedFileId)
+            .map((f: any) => f.uploadedFileId as string);
+          if (newArtFiles.length === 0 && suggestedFileIds.length === 0) {
+            toast.info("Nenhuma arte para aplicar");
+            handleClose();
+            return;
           }
-
-          if (newLayouts.length > 0) {
-            updateData._hasNewLayouts = true;
+          if (newArtFiles.length > 0) {
+            await attachArtToTasks(currentTaskIds, newArtFiles);
           }
-
-          // Artwork statuses must be split into the two channels the backend expects
-          // (mirrors the single-task edit form):
-          //  - layoutStatuses:    UUID-keyed map (File ID → status) for EXISTING / suggestion files.
-          //  - newLayoutStatuses: array aligned to the uploaded `layouts` file order (new files).
-          // New files carry a local non-UUID id (`${Date.now()}-${rand}` from LayoutFileUploadField),
-          // so dumping their status into layoutStatuses makes the backend zod schema
-          // (z.record(z.string().uuid(), ...)) reject the whole batch with 400 "Invalid uuid".
-          const isLayoutFileUuid = (s: string) =>
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-
-          const existingLayoutStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-          Object.entries(layoutStatuses).forEach(([fileId, status]) => {
-            if (isLayoutFileUuid(fileId)) existingLayoutStatuses[fileId] = status;
-          });
-          if (Object.keys(existingLayoutStatuses).length > 0) {
-            updateData._layoutStatuses = existingLayoutStatuses;
+          if (suggestedFileIds.length > 0) {
+            const implementIds = currentTasks
+              .map((task: any) => task.implement?.id as string | undefined)
+              .filter((id): id is string => !!id);
+            for (const fileId of suggestedFileIds) {
+              await bulkImplementLayouts(implementIds, fileId);
+            }
           }
-
-          // Statuses for brand-new uploads, in the same order they are appended to FormData
-          // (newLayouts preserves `layouts` order, and FormData appends newLayouts in order).
-          if (newLayouts.length > 0) {
-            updateData._newLayoutStatuses = newLayouts.map(
-              (f: any) => layoutStatuses[f.id] || f.status || 'DRAFT',
-            );
-          }
-          break;
+          await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+          toast.success("Arte adicionada aos implementos (rascunho)");
+          handleClose();
+          onClearSelection();
+          return;
+        }
 
         case "baseFiles":
           // Get new base files that need to be uploaded (via FormData, like layouts)
@@ -1114,26 +1004,18 @@ export const AdvancedBulkActionsHandler = forwardRef<
       }
 
       // Extract per-task data and internal flags
-      const perTaskLayoutIds = updateData._perTaskLayoutIds;
       const perTaskBaseFileIds = updateData._perTaskBaseFileIds;
       const perTaskImplementUpdates = updateData._perTaskImplementUpdates;
-      const hasNewLayouts = updateData._hasNewLayouts;
       const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
-      const layoutStatusesMap = updateData._layoutStatuses as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> | undefined;
-      const newLayoutStatuses = updateData._newLayoutStatuses as ('DRAFT' | 'APPROVED' | 'REPROVED')[] | undefined;
 
-      delete updateData._perTaskLayoutIds;
       delete updateData._perTaskBaseFileIds;
       delete updateData._perTaskImplementUpdates;
-      delete updateData._hasNewLayouts;
       delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
-      delete updateData._layoutStatuses;
-      delete updateData._newLayoutStatuses;
 
-      const hasPerTaskData = perTaskLayoutIds || perTaskBaseFileIds || perTaskImplementUpdates;
-      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || layoutStatusesMap || hasNewLayouts;
+      const hasPerTaskData = perTaskBaseFileIds || perTaskImplementUpdates;
+      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData;
       console.log('[BulkActions] hasPerTaskData:', hasPerTaskData, 'hasData:', hasData, 'updateData keys:', Object.keys(updateData), 'perTaskImplementUpdates:', perTaskImplementUpdates);
 
       if (!hasData) {
@@ -1146,15 +1028,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const batchRequest = {
         tasks: currentTaskIds.map(id => {
           const taskData = { ...updateData };
-
-          // Add per-task layoutIds if available
-          // Always send layoutIds when perTaskLayoutIds is set (even if empty for some tasks)
-          // because we need to tell backend the final state of layouts
-          if (perTaskLayoutIds) {
-            const ids = perTaskLayoutIds[id];
-            // Always include the array - this tells backend what files to keep/set
-            taskData.layoutIds = ids || [];
-          }
 
           // Add per-task baseFileIds if available and this task has explicit IDs set
           // Only send baseFileIds when the bulk action specifically targets base files
@@ -1169,16 +1042,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
             taskData.implement = implementUpdate;
           }
 
-          // Add artwork statuses for status changes
-          if (layoutStatusesMap) {
-            taskData.layoutStatuses = layoutStatusesMap;
-          }
-
-          // Statuses for new files being uploaded (array aligned to the uploaded `layouts` order)
-          if (newLayoutStatuses) {
-            taskData.newLayoutStatuses = newLayoutStatuses;
-          }
-
           return {
             id,
             data: taskData,
@@ -1187,10 +1050,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
       };
 
       // Check if we need to send as FormData (files present)
-      const hasLayoutsToUpload = hasNewLayouts && newLayouts.length > 0;
       const hasBaseFilesToUpload = hasNewBaseFiles && newBaseFiles.length > 0;
       const hasLayoutPhotoFiles = layoutPhotoFiles && layoutPhotoFiles.length > 0;
-      const needsFormData = hasLayoutsToUpload || hasBaseFilesToUpload || hasLayoutPhotoFiles;
+      const needsFormData = hasBaseFilesToUpload || hasLayoutPhotoFiles;
       console.log('[BulkActions] about to call batchUpdateAsync, needsFormData:', needsFormData, 'batchRequest tasks:', batchRequest.tasks.length, JSON.stringify(batchRequest.tasks[0]));
 
       if (needsFormData) {
@@ -1198,13 +1060,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
         // Add the batch request structure as JSON string
         formData.append('tasks', JSON.stringify(batchRequest.tasks));
-
-        // Add artwork files if present
-        if (hasLayoutsToUpload) {
-          newLayouts.forEach((file) => {
-            formData.append('layouts', file);
-          });
-        }
 
         // Add base files if present (same pattern as layouts)
         if (hasBaseFilesToUpload) {
@@ -1290,22 +1145,25 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "arts":
         return (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              A arte entra como <strong>rascunho</strong> no implemento de cada tarefa selecionada. Enviar ao
+              cliente e aprovar é feito veículo a veículo, no painel da arte.
+            </p>
             <LayoutFileUploadField
               onFilesChange={setLayouts}
-              onStatusChange={(fileId, status) => {
-                setLayoutStatuses(prev => ({ ...prev, [fileId]: status }));
-              }}
+              showStatus={false}
               maxFiles={10}
               disabled={isSubmitting}
               showPreview={true}
               existingFiles={layouts}
-              placeholder="Selecione layouts para as tarefas"
-              label="Layout Referência"
+              placeholder="Selecione a arte (imagem) para os implementos"
+              label="Arte do implemento"
               variant="card"
+              acceptedFileTypes={{ "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] }}
             >
               <FileSuggestions
                 customerId={commonCustomerId}
-                fileContext="tasksLayouts"
+                fileContext="implementLayouts"
                 excludeFileIds={layouts.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                 onSelect={(newFile) => {
                   const fileWithPreview: FileWithPreview = {

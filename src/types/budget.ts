@@ -2,23 +2,18 @@ import type { BaseEntity } from './common';
 import type { File } from './file';
 import type { Installment } from './invoice';
 import type { Task } from './task';
+import type {
+  BUDGET_VALUE_APPROVAL_SOURCE,
+  BUDGET_SIGNATURE_STATUS as BUDGET_SIGNATURE_STATUS_ENUM,
+  TASK_QUOTE_STATUS as TASK_QUOTE_STATUS_ENUM,
+} from '../constants/enums';
 
 /**
- * O CICLO DO ORÇAMENTO — e só dele. Encolheu para cinco em 16/09/2026: o
- * pagamento é de outra entidade (`Billing`), e o ciclo dele é `BILLING_STATUS`.
- *
- * ⚠️ Espelho de `@/constants/enums`. O enum lá é o valor; este é o tipo que as
- * telas usam. Os dois têm de ter os mesmos cinco membros.
+ * O eixo do VALOR do orçamento — os valores do enum `@/constants/enums`, que
+ * espelha o contrato da API. A assinatura é outro eixo ({@link BUDGET_SIGNATURE_STATUS}).
  */
-export type TASK_QUOTE_STATUS =
-  | 'REQUESTED'
-  | 'EXPIRED'
-  | 'PRE_APPROVED'
-  | 'SIGNED'
-  | 'IN_NEGOTIATION'
-  | 'PENDING'
-  | 'APPROVED'
-  | 'CANCELLED';
+export type TASK_QUOTE_STATUS = `${TASK_QUOTE_STATUS_ENUM}`;
+export type BUDGET_SIGNATURE_STATUS = `${BUDGET_SIGNATURE_STATUS_ENUM}`;
 /**
  * O CICLO DO FATURAMENTO. Derivado no servidor de `approvedAt` + das parcelas;
  * nenhuma tela o escreve. ⚠️ Não existe "A Vencer": depois de aprovar é
@@ -160,8 +155,43 @@ export interface BudgetPayer extends BaseEntity {
 /** Ver `Budget.layoutScope`. */
 export type QuoteLayoutScope = "SHARED" | "PER_VEHICLE";
 
-/** Uma arte aprovada do orçamento, com os veículos que ela cobre (só em `PER_VEHICLE`). */
-export type QuoteLayoutFile = File & { quoteLayoutTasks?: Array<{ taskId: string }> };
+/**
+ * A ARTE do documento, como a página pública a recebe (`GET /budgets/public/:id
+ * → artwork`): a aprovada de cada implemento, com os veículos que ela cobre.
+ */
+export interface QuoteArtworkFile {
+  fileId: string;
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  taskIds: string[];
+}
+
+/** A aprovação do valor VIGENTE (`GET /budgets/:id → valueApproval`). */
+export interface BudgetValueApproval {
+  at: Date | string;
+  source: BUDGET_VALUE_APPROVAL_SOURCE;
+  by: { name: string } | null;
+  note: string | null;
+  total: number | null;
+  current: true;
+}
+
+/** Um impedimento do portão de emissão (E1–E6), na ordem em que a tela os lista. */
+export type BudgetEmissionGateCode =
+  | 'VALUE_NOT_APPROVED'
+  | 'ARTWORK_PENDING'
+  | 'ENVELOPE_LIVE'
+  | 'TWO_PAYERS'
+  | 'VALIDITY_EXPIRED'
+  | 'RESPONSIBLES';
+
+/** "Para emitir falta…" (`GET /budgets/:id → emission`). */
+export interface BudgetEmission {
+  ready: boolean;
+  blockers: Array<{ code: BudgetEmissionGateCode; message: string }>;
+}
 
 export interface Budget extends BaseEntity {
   budgetNumber: number;
@@ -178,13 +208,25 @@ export interface Budget extends BaseEntity {
   customForecastDays: number | null;
 
   /**
-   * As artes aprovadas do orçamento — o "Layout" do documento.
-   *
-   * Com `layoutScope = PER_VEHICLE`, cada arte carrega em `quoteLayoutTasks` os
-   * veículos a que se aplica (ver `utils/quote-layout-coverage.ts`). Em `SHARED`
-   * a lista vem vazia e toda arte vale para todos.
+   * O EIXO DA ASSINATURA (independente do valor). A cobrança só pode ser
+   * aprovada com `SIGNED`, `SIGNED_OFFLINE` ou `WAIVED`.
    */
-  layoutFiles?: QuoteLayoutFile[];
+  signatureStatus?: BUDGET_SIGNATURE_STATUS;
+
+  /** "Já se pode cobrar?" — valor aprovado E assinatura resolvida (vem na leitura). */
+  billable?: boolean;
+
+  /** Só no detalhe (`GET /budgets/:id`): quem aprovou o valor, quando e como. */
+  valueApproval?: BudgetValueApproval | null;
+
+  /** Só no detalhe (`GET /budgets/:id`): o que falta para emitir as assinaturas. */
+  emission?: BudgetEmission;
+
+  /**
+   * Só na página pública: a arte aprovada de cada implemento. O orçamento não
+   * escolhe arte — a arte é do implemento.
+   */
+  artwork?: QuoteArtworkFile[];
 
   /**
    * A arte é a mesma para os N veículos (`SHARED`, o de sempre) ou cada implemento

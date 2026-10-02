@@ -60,7 +60,6 @@ import { getBudgetEditRoute } from "@/utils/task";
 import { SetStatusModal } from "./set-status-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetTermModal } from "./set-term-modal";
-import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
 import { MergeQuotesDialog } from "@/components/production/task/quote/merge-quotes-dialog";
 import { useConfirm } from "../detail/use-confirm";
 import { taskCancelConfirmOpts } from "../cancel-confirmation";
@@ -273,7 +272,6 @@ export function TaskScheduleTablePage() {
   const [sectorModal, setSectorModal] = useState<TaskModalState>(CLOSED);
   const [termModal, setTermModal] = useState<TaskModalState>(CLOSED);
   const [statusModal, setStatusModal] = useState<TaskModalState>(CLOSED);
-  const [quoteLayoutModal, setQuoteLayoutModal] = useState<TaskModalState>(CLOSED);
   const [duplicateModal, setDuplicateModal] = useState<TaskModalState>(CLOSED);
   const [mergeModal, setMergeModal] = useState<TaskModalState>(CLOSED);
   const [deleteDialog, setDeleteDialog] = useState<TaskModalState>(CLOSED);
@@ -286,13 +284,13 @@ export function TaskScheduleTablePage() {
   // users see the indicator while the action is in progress — matching the edit-form flow.
   const editingActionIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const m of [sectorModal, termModal, statusModal, quoteLayoutModal, duplicateModal]) {
+    for (const m of [sectorModal, termModal, statusModal, duplicateModal]) {
       if (m.open) m.tasks.forEach((t) => ids.add(t.id));
     }
     advancedTaskIds.forEach((id) => ids.add(id));
     if (copyState.step !== "idle") copyState.targetTasks.forEach((t) => ids.add(t.id));
     return [...ids];
-  }, [sectorModal, termModal, statusModal, quoteLayoutModal, duplicateModal, advancedTaskIds, copyState]);
+  }, [sectorModal, termModal, statusModal, duplicateModal, advancedTaskIds, copyState]);
   useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
 
   const openAdvanced = useCallback((type: string, rows: Task[]) => {
@@ -635,19 +633,20 @@ export function TaskScheduleTablePage() {
       // --- Avançados submenu ---
       {
         key: "adv-arts",
-        label: "Adicionar Layout Referência",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu || !canAccessLayouts,
         onClick: (r) => openAdvanced("arts", r),
       },
       {
+        // A arte do implemento para o COMERCIAL — o mesmo modal da "Arte em lote".
         key: "adv-quote-layout",
-        label: "Adicionar Layout Aprovados",
+        label: "Adicionar arte",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
-        hidden: () => !canAccessAdvancedMenu || !isCommercial,
-        onClick: (r) => setQuoteLayoutModal({ open: true, tasks: r }),
+        hidden: () => !canAccessAdvancedMenu || !isCommercial || canAccessLayouts,
+        onClick: (r) => openAdvanced("arts", r),
       },
       {
         key: "adv-base-files",
@@ -866,7 +865,6 @@ export function TaskScheduleTablePage() {
 
       <SetSectorModal open={sectorModal.open} onOpenChange={(open) => setSectorModal((s) => ({ ...s, open }))} tasks={sectorModal.tasks} onConfirm={confirmSetSector} />
       <SetTermModal open={termModal.open} onOpenChange={(open) => setTermModal((s) => ({ ...s, open }))} tasks={termModal.tasks} onConfirm={confirmSetTerm} />
-      <SetQuoteLayoutModal open={quoteLayoutModal.open} onOpenChange={(open) => setQuoteLayoutModal((s) => ({ ...s, open }))} tasks={quoteLayoutModal.tasks} />
       <MergeQuotesDialog
         open={mergeModal.open}
         onOpenChange={(open) => !open && setMergeModal(CLOSED)}

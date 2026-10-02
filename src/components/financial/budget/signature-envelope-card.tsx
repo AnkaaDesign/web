@@ -349,8 +349,8 @@ export function SignatureEnvelopeCard({
   const { user } = useAuth();
   // ⚠️ A LISTA NÃO É MAIS ESTADO LOCAL. Ela vem da consulta compartilhada
   // (`use-quote-envelopes.ts`) porque o card de encaminhamento, acima nesta
-  // mesma tela, precisa saber se há coleta viva para NÃO oferecer "Enviar para
-  // pré-aprovação". Mesma chave = uma requisição só, e o `refetch` de qualquer
+  // mesma tela, precisa saber se há coleta viva para NÃO oferecer os atos do
+  // valor. Mesma chave = uma requisição só, e o `refetch` de qualquer
   // ação daqui atualiza os dois.
   const { data: envelopeData, isLoading: loading, refetch } = useQuoteEnvelopes<Envelope>(quoteId);
   const envelopes = envelopeData ?? [];

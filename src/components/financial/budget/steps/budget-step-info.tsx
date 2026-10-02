@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   FormControl,
@@ -13,39 +13,16 @@ import { PINNED_CUSTOMERS } from "@/config/company";
 import { Input } from "@/components/ui/input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { IconUsers, IconCalendar } from "@tabler/icons-react";
-import {
-  ApprovedLayoutPicker,
-  type LayoutOption,
-} from "@/components/financial/common/approved-layout-picker";
 import { formatCNPJ } from "@/utils";
 import { hasNoEffectiveDiscount, pickDiscountTerms } from "@/utils/budget-calculations";
 import { getCustomers } from "@/api-client";
-import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ValidityField } from "@/components/financial/budget/validity";
-
-/**
- * A File id that the SERVER already knows about. A persisted File id is a UUID; a file that has
- * only been picked locally carries a temp id (`<timestamp>-<random>`), and the API rejects
- * anything that is not a UUID (see the resolution loops in `budget/create.tsx` and
- * `budget/details/[taskId].tsx`, which drop non-UUIDs for exactly this reason).
- */
-const isPersistedFileId = (id?: string | null): id is string =>
-  !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 interface BudgetStepInfoProps {
   disabled?: boolean;
-  layoutFiles: FileWithPreview[];
-  onLayoutFilesChange: (files: FileWithPreview[]) => void;
-  layouts?: LayoutOption[];
   customersCache: React.MutableRefObject<Map<string, any>>;
   selectedCustomers: Map<string, any>;
   setSelectedCustomers: (customers: Map<string, any>) => void;
-  /**
-   * Substitui o seletor de layout. O orçamento de N veículos passa o seu
-   * (`BudgetVehicleLayoutsField`), que sabe dar um layout a cada implemento; com um
-   * veículo só — e na criação — fica o seletor de sempre.
-   */
-  layoutSlot?: ReactNode;
 }
 
 const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
@@ -62,13 +39,9 @@ const GUARANTEE_OPTIONS = [
 
 export function BudgetStepInfo({
   disabled,
-  layoutFiles,
-  onLayoutFilesChange,
-  layouts,
   customersCache,
   selectedCustomers: _selectedCustomers,
   setSelectedCustomers,
-  layoutSlot,
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
@@ -279,49 +252,6 @@ export function BudgetStepInfo({
     [customerConfigs, customersCache],
   );
 
-  // --- Layout Aprovados picker -------------------------------------------------
-  // The budget's approved layout is chosen FROM the task's layouts (shared
-  // ApprovedLayoutPicker). Selecting files here syncs the `layoutFileIds` form
-  // field. Raw File uploads (added via the picker's upload card) carry no id yet;
-  // they are resolved to APPROVED task layouts on Save (parent uploads them +
-  // backend syncTaskLayoutsFromQuote), so they must NOT be turned into ids here.
-  //
-  // The gate is "the id is already a real File UUID", NOT "this is not a File instance". The
-  // latter was the previous test and it is not a proxy for either half of the intent:
-  //   · a not-yet-uploaded pick carries a LOCAL temp id (`<timestamp>-<random>`) on a plain
-  //     object, so it passed the old filter and put a non-UUID into `layoutFileIds` — which
-  //     Step 3 then tried to render a thumbnail for and the API rejects outright;
-  //   · a server-backed file built by `backendFileToFileWithPreview` IS `instanceof File`
-  //     (Object.create(File.prototype)), so it failed the old filter and its perfectly good
-  //     UUID was thrown away.
-  // A UUID check is also exactly what both save paths already apply before sending
-  // (`create.tsx` / `details/[taskId].tsx`), so the form field and the submit now agree.
-  const handleLayoutChange = useCallback(
-    (files: FileWithPreview[]) => {
-      onLayoutFilesChange(files);
-      const ids = files
-        .map((f) => f.uploadedFileId || f.id)
-        .filter(isPersistedFileId)
-        .slice(0, 2);
-      setValue("layoutFileIds", ids, { shouldDirty: true });
-    },
-    [onLayoutFilesChange, setValue],
-  );
-
-  // Upload a NEW reference image directly in Step 2 (mirrors the right-click
-  // "Layout do Orçamento" modal). The raw File is appended to the selection and
-  // resolved to an APPROVED task layout on Save; the authoritative reprove then
-  // reproves every non-selected task layout. Capped at 2.
-  const handleUploadFiles = useCallback(
-    (picked: File[]) => {
-      const withPreview = picked.map(
-        (f) => Object.assign(f, { preview: URL.createObjectURL(f) }) as FileWithPreview,
-      );
-      handleLayoutChange([...layoutFiles, ...withPreview].slice(0, 2));
-    },
-    [layoutFiles, handleLayoutChange],
-  );
-
   return (
     <div className="space-y-4">
       {/* Invoice-To Customers */}
@@ -517,28 +447,6 @@ export function BudgetStepInfo({
         </CardContent>
       </Card>
 
-      {/* Layout Aprovados — pick the budget's approved layout FROM the task's
-          layouts, or upload a NEW one (auto-approved). Selection is authoritative:
-          on Save every non-selected task layout is reproved. Shared with billing.
-
-          ⚠️ O `id` é ENDEREÇO, não enfeite: o modal de envio para assinatura
-          recusa o orçamento sem layout aprovado e agora oferece um botão que
-          traz o operador até AQUI. Ver `goToLayoutStep` no detalhe do orçamento
-          e `LAYOUT_PICKER_ANCHOR_ID`. Renomear este id quebra aquele atalho em
-          silêncio. Vale para as duas formas: o seletor único e o por veículo
-          (`layoutSlot`). */}
-      <div id="layout-aprovado">
-        {layoutSlot ?? (
-          <ApprovedLayoutPicker
-            layouts={layouts}
-            layoutFiles={layoutFiles}
-            onChange={handleLayoutChange}
-            onUploadFiles={handleUploadFiles}
-            uploadLabel="Selecione ou envie um layout"
-            disabled={disabled}
-          />
-        )}
-      </div>
     </div>
   );
 }
