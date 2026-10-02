@@ -197,7 +197,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     // Track if we're syncing to prevent infinite loops
     const isSyncingToForm = useRef<boolean>(false);
-    const lastFieldValueRef = useRef<string>("");
+    // Começa com o valor de MONTAGEM: o estado local acabou de ser derivado dele
+    // (o `useState` acima). Começando vazio, o primeiro sync form → local
+    // remapeava a mesma lista, e o sync local → form a devolvia ao formulário
+    // com os padrões preenchidos (`creationMode` etc.) — o campo nascia "sujo"
+    // sem ninguém mexer, e a tela acusava alterações não salvas ao sair. Com o
+    // seletor dentro de um acordeão fechado isso não se via; numa seção aberta
+    // (o passo Tarefa do orçamento) o veículo abria marcado como alterado.
+    const lastFieldValueRef = useRef<string>(JSON.stringify(field.value));
 
     // Sync FROM form field TO local state when form resets (form → local)
     useEffect(() => {
