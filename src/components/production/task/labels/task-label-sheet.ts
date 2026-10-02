@@ -63,24 +63,29 @@ export function taskLabelCaption(name: string, identifier: string | null | undef
 }
 
 /**
- * Orientation mark for a fresh sheet: a small grey "▲ TOPO" in BOTH top corners, on the leading edge
- * — the L3250 feeds from the rear tray and prints the first raster line on the edge that goes in
- * first, so the top of this page IS the edge that enters the printer. The sheet goes back in with
- * the mark leading, and the next print lands on the free slots. It sits right at the 3 mm printable
- * limit, far from the cards, and in grey, so the ScanNCut's Direct Cut doesn't take it for a shape.
+ * Orientation mark for a fresh sheet: a small grey "▲ TOPO" in BOTH top corners — the edge that stays
+ * UP when the sheet stands in the printer's rear tray. The printer prints the page head-first (the
+ * edge that goes in first), so the API turns the page 180° before sending it: the sheet comes out
+ * reading upright as it stands in the tray, exactly like this preview (api task-label-sheet.ts,
+ * FEED ORIENTATION). Grey and at the 3 mm limit, far from the cards, so the ScanNCut ignores it.
  */
 export function orientationMarkSvg(): string {
   const edge = 3.5; // just inside the printer's 3 mm unprintable border
-  const size = 2.6; // triangle width and the text cap height
+  const fontSize = 3.4;
+  const capHeight = fontSize * 0.71; // Manrope/Helvetica capitals: the triangle is exactly as tall
+  const baseline = edge + capHeight;
+  const width = capHeight * 1.15;
+  const gap = 1;
   const f = (v: number) => v.toFixed(2);
+  // the triangle sits on the text's baseline and reaches its cap height, so "▲ TOPO" reads as one line
   const triangle = (x: number) =>
-    `<path d="M${f(x + size / 2)} ${f(edge)}L${f(x + size)} ${f(edge + size)}H${f(x)}Z" fill="#9CA3AF"/>`;
+    `<path d="M${f(x + width / 2)} ${f(baseline - capHeight)}L${f(x + width)} ${f(baseline)}H${f(x)}Z" fill="#9CA3AF"/>`;
   const label = (x: number, anchor: "start" | "end") =>
-    `<text x="${f(x)}" y="${f(edge + size)}" font-family="Manrope, Helvetica, Arial, sans-serif" font-weight="700" font-size="3.4" fill="#9CA3AF" text-anchor="${anchor}">TOPO</text>`;
+    `<text x="${f(x)}" y="${f(baseline)}" font-family="Manrope, Helvetica, Arial, sans-serif" font-weight="700" font-size="${fontSize}" fill="#9CA3AF" text-anchor="${anchor}">TOPO</text>`;
   return (
     triangle(edge) +
-    label(edge + size + 1, "start") +
-    triangle(SHEET_WIDTH - edge - size) +
-    label(SHEET_WIDTH - edge - size - 1, "end")
+    label(edge + width + gap, "start") +
+    triangle(SHEET_WIDTH - edge - width) +
+    label(SHEET_WIDTH - edge - width - gap, "end")
   );
 }

@@ -369,8 +369,8 @@ export function TaskLabelPrintModal({ open, onOpenChange, tasks }: TaskLabelPrin
             </div>
 
             <p className="mt-auto text-xs text-muted-foreground">
-              Papel fotográfico A4 na bandeja de trás, lado de imprimir para a frente. A folha nova sai com "▲ TOPO" nos cantos: recoloque-a
-              sempre com o TOPO entrando primeiro.
+              Papel fotográfico A4 na bandeja de trás, lado de imprimir para a frente. A folha sai como aparece aqui; na folha nova vem
+              "▲ TOPO" nos cantos — recoloque-a sempre com o TOPO para cima.
             </p>
           </div>
         </div>
