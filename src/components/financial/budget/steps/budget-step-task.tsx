@@ -63,6 +63,8 @@ interface BudgetStepTaskProps {
    * tem rotas próprias; aqui só se vê em que pé ela está.
    */
   artVehicles?: ImplementArtVehicle[];
+  /** O orçamento dos veículos: "uma imagem para todos" vira lote atômico sobre ele. */
+  budgetId?: string | null;
   /** Âncora do quadro da arte (o atalho "arte pendente" da emissão rola até ele). */
   artAnchorId?: string;
   onPaintCreated?: (paint: any) => void;
@@ -113,6 +115,7 @@ export function BudgetStepTask({
   onBaseFilesChange,
   artVehicles = [],
   artAnchorId,
+  budgetId,
   onPaintCreated,
   vinPlateFiles,
   onVinPlateFilesChange,
@@ -740,7 +743,7 @@ export function BudgetStepTask({
         {showLayouts && artVehicles.length > 0 && (
           <Card className="border border-border rounded-lg">
             <CardContent className="pt-4">
-              <VehiclesArtSection vehicles={artVehicles} anchorId={artAnchorId} />
+              <VehiclesArtSection vehicles={artVehicles} budgetId={budgetId} anchorId={artAnchorId} />
             </CardContent>
           </Card>
         )}

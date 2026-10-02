@@ -113,7 +113,8 @@ const ACTS_BY_STATUS: Partial<Record<QuoteStatus, ActKind[]>> = {
   [TASK_QUOTE_STATUS.PENDING]: ["send", "approve"],
   [TASK_QUOTE_STATUS.EXPIRED]: ["send"],
   [TASK_QUOTE_STATUS.IN_NEGOTIATION]: ["approve", "withdraw"],
-  [TASK_QUOTE_STATUS.APPROVED]: ["revoke"],
+  // APPROVED: "Reprovar valor" mora no cartão da aprovação (`BudgetValueApprovalCard`),
+  // junto de quem aprovou e como — desfazer sem ver o registro era o erro fácil.
 };
 
 const WAITING_HINT: Partial<Record<QuoteStatus, string>> = {

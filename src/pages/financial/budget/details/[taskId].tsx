@@ -12,6 +12,7 @@ import { isQuoteValidityExpired } from "@/components/financial/budget/validity";
 import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
+  useBudget,
   useBudgetByTask,
   useCreateBudget,
   useUpdateBudget,
@@ -22,7 +23,7 @@ import {
   canViewQuote,
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
-import type { TASK_QUOTE_STATUS } from "@/types/budget";
+import type { Budget, TASK_QUOTE_STATUS } from "@/types/budget";
 import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
@@ -51,6 +52,10 @@ import { BudgetStepReview } from "@/components/financial/budget/steps/budget-ste
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import { BudgetRequestCard } from "@/components/financial/budget/budget-request-card";
 import { BudgetStateActions } from "@/components/financial/budget/budget-state-actions";
+import { BudgetAxesStrip } from "@/components/financial/budget/budget-axes-strip";
+import { BudgetValueApprovalCard } from "@/components/financial/budget/budget-value-approval-card";
+import { OfflineSignatureCard } from "@/components/financial/budget/offline-signature-card";
+import type { BudgetAxisTarget } from "@/utils/budget-axes";
 import {
   envelopeGlanceOf,
   useQuoteEnvelopes,
@@ -82,7 +87,7 @@ import {
 } from "@/components/financial/budget/vehicles/use-budget-vehicles";
 import { BudgetVehicleTabs } from "@/components/financial/budget/vehicles/budget-vehicle-tabs";
 import type { ImplementArtVehicle } from "@/components/production/implement-art/vehicles-art-section";
-import { approvedArtFilesOf } from "@/utils/implement-art";
+import { approvedArtFilesOf, implementArtStateOf } from "@/utils/implement-art";
 import {
   planAirbrushingReconciliation,
   applyAirbrushingPlan,
@@ -180,6 +185,12 @@ const SIGNATURE_ANCHOR_ID = "assinatura-eletronica";
  */
 const ARTWORK_STEP = 1;
 const ARTWORK_ANCHOR_ID = "arte-do-implemento";
+/** Os atos e o registro da aprovação do valor, no Resumo. */
+const VALUE_ANCHOR_ID = "valor-do-orcamento";
+/** Os pagadores: o primeiro passo de cliente. */
+const FIRST_CUSTOMER_STEP = 4;
+/** A validade da proposta mora no passo "Informações". */
+const INFO_STEP = 2;
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -831,6 +842,14 @@ const FinancialBudgetDetailPageInner = () => {
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
+  /**
+   * O ORÇAMENTO COMO A API O LÊ POR ID — é a leitura que traz `emission`
+   * ("para emitir falta…") e `valueApproval` (quem aprovou o valor). A leitura
+   * por tarefa, que alimenta o formulário, não os traz.
+   */
+  const { data: budgetDetailResponse } = useBudget(existingQuote?.id ?? "");
+  const budgetDetail = ((budgetDetailResponse as any)?.data?.data ?? null) as Budget | null;
+
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
   const steps = useMemo(() => {
@@ -861,6 +880,47 @@ const FinancialBudgetDetailPageInner = () => {
   }, [customerConfigs, multiVehicle, vehicleCount]);
 
   const totalSteps = steps.length;
+
+  /**
+   * DA FAIXA DOS EIXOS ATÉ O LUGAR DE RESOLVER. A faixa não age; ela leva ao
+   * passo e ao cartão do ato (valor, arte, assinatura) — ou ao faturamento,
+   * quando a cobrança está liberada.
+   */
+  const goToStepAnchor = useCallback((step: number, anchorId?: string) => {
+    setCurrentStep(step);
+    if (!anchorId) return;
+    // Mesmo atraso de `goToArtworkStep`: o passo só fica visível no commit seguinte.
+    window.setTimeout(() => {
+      document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+  }, []);
+
+  const handleAxisNavigate = useCallback(
+    (target: BudgetAxisTarget) => {
+      switch (target) {
+        case "art":
+          goToArtworkStep();
+          return;
+        case "value":
+          goToStepAnchor(totalSteps, VALUE_ANCHOR_ID);
+          return;
+        case "signature":
+          goToStepAnchor(totalSteps, SIGNATURE_ANCHOR_ID);
+          return;
+        case "billing":
+          if (budgetDetail?.billable && taskId) navigate(routes.financial.billing.details(taskId));
+          else goToStepAnchor(Math.min(FIRST_CUSTOMER_STEP, totalSteps));
+          return;
+        case "validity":
+          goToStepAnchor(INFO_STEP);
+          return;
+        case "responsibles":
+          goToStepAnchor(1);
+          return;
+      }
+    },
+    [goToArtworkStep, goToStepAnchor, totalSteps, budgetDetail?.billable, taskId, navigate],
+  );
 
   // Clamp current step when customer count changes
   useEffect(() => {
@@ -2038,6 +2098,21 @@ const FinancialBudgetDetailPageInner = () => {
       <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
 
       <div className="flex-1 overflow-y-auto pb-6">
+        {/* OS QUATRO EIXOS — valor, arte, assinatura e cobrança, cada um com o
+            próximo passo, e "para emitir falta…". Em todos os passos: é o
+            mapa do orçamento, e cada atalho leva ao lugar de resolver. */}
+        {existingQuote?.id && (
+          <BudgetAxesStrip
+            className="mb-4"
+            status={budgetDetail?.status ?? existingQuote.status}
+            signatureStatus={budgetDetail?.signatureStatus ?? (existingQuote as any).signatureStatus}
+            billable={budgetDetail?.billable ?? (existingQuote as any).billable}
+            emission={budgetDetail?.emission}
+            artStates={artVehicles.map((vehicle) => implementArtStateOf(vehicle))}
+            onNavigate={handleAxisNavigate}
+          />
+        )}
+
         {/* A REQUISIÇÃO — acima dos passos, e não dentro de um deles, porque
             não é campo de passo nenhum: é leitura. Fora do `FormProvider` pelo
             mesmo motivo. Só aparece quando o orçamento nasceu no portal; um
@@ -2079,6 +2154,7 @@ const FinancialBudgetDetailPageInner = () => {
               baseFiles={baseFiles}
               onBaseFilesChange={handleBaseFilesChange}
               artVehicles={artVehicles}
+              budgetId={existingQuote?.id}
               artAnchorId={ARTWORK_ANCHOR_ID}
               vinPlateFiles={vinPlateFilesByTask[activeVehicleId] ?? []}
               onVinPlateFilesChange={handleVinPlateFilesChange}
@@ -2167,6 +2243,15 @@ const FinancialBudgetDetailPageInner = () => {
               {/* AS AÇÕES DE ESTADO, no passo em que a decisão se consuma — o
                   mesmo passo do "Salvar" do cabeçalho. Ver o cabeçalho de
                   `budget-state-actions.tsx`. */}
+              <div id={VALUE_ANCHOR_ID}>
+              <BudgetValueApprovalCard
+                budgetId={existingQuote?.id}
+                status={existingQuote?.status}
+                valueApproval={budgetDetail?.valueApproval}
+                userRole={userRole}
+                disabled={isSubmitting || !canEdit}
+                hasUnsavedChanges={form.formState.isDirty}
+              />
               <BudgetStateActions
                 budgetId={existingQuote?.id}
                 status={existingQuote?.status}
@@ -2178,6 +2263,7 @@ const FinancialBudgetDetailPageInner = () => {
                 hasUnsavedChanges={form.formState.isDirty}
                 onGoToSignature={scrollToSignature}
               />
+              </div>
 
               <BudgetStepReview
                 task={task}
@@ -2193,6 +2279,15 @@ const FinancialBudgetDetailPageInner = () => {
               {/* Assinatura eletrônica: fica na revisão porque é o passo em que o
                   orçamento está fechado e pronto para ir ao cliente. Só aparece
                   depois que a quote existe — não há o que congelar antes disso. */}
+              <OfflineSignatureCard
+                budgetId={existingQuote?.id}
+                status={existingQuote?.status}
+                signatureStatus={budgetDetail?.signatureStatus ?? (existingQuote as any)?.signatureStatus}
+                hasLiveEnvelope={!!envelopeGlance?.live}
+                userRole={userRole}
+                disabled={isSubmitting || !canEdit}
+              />
+
               {existingQuote?.id && (
                 <div className="mt-6" id={SIGNATURE_ANCHOR_ID}>
                   <SignatureEnvelopeCard
