@@ -88,6 +88,8 @@ import { ResponsiblesSection } from "./sections/responsibles-section";
 import { ImplementMeasuresSection } from "./sections/implement-measures-section";
 import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
 import { LayoutsSection, getVisibleLayouts, downloadAllLayouts } from "./sections/layouts-section";
+import { ImplementArtPanel } from "@/components/production/implement-art/implement-art-panel";
+import { canDecideImplementArt, canEditImplementArt } from "@/utils/permissions/implement-art-permissions";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
 import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
 import { AirbrushingsSection, downloadAllAirbrushingFiles, getAirbrushingFiles } from "./sections/airbrushings-section";
@@ -205,7 +207,7 @@ export const DETAIL_INCLUDE = {
   sector: true,
   responsibles: true,
   // A ARTE é do implemento (Modelo C): `include.layouts` da tarefa a API não aceita.
-  implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
+  implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE, projectFiles: true } },
   createdBy: true,
   serviceOrders: { include: { assignedTo: true, checkinFiles: true, checkoutFiles: true } },
   baseFiles: true,
@@ -392,6 +394,7 @@ function TaskDetailContent() {
   const role = ((user as { sector?: { privileges?: string } } | undefined)?.sector?.privileges ?? "") as SECTOR_PRIVILEGES;
   const currentUserId = (user as { id?: string } | undefined)?.id;
 
+  const canActOnArt = canEditImplementArt(user as any) || canDecideImplementArt(user as any);
   const has = useCallback(
     (privs: SECTOR_PRIVILEGES[]) => role === SECTOR_PRIVILEGES.ADMIN || privs.includes(role),
     [role],
@@ -1355,8 +1358,10 @@ function TaskDetailContent() {
             } as DetailSectionDef<Task>,
           ]
         : []),
-      // Layouts (layouts).
-      ...(filteredLayouts.length > 0
+      // A arte do implemento. Quem age sobre ela (designer, comercial, admin) vê o
+      // painel com os atos — inclusive com o implemento ainda sem arte, para subir a
+      // primeira; os demais veem a galeria do que lhes cabe.
+      ...(filteredLayouts.length > 0 || (canActOnArt && !!task?.implement?.id)
         ? [
             {
               id: "layouts",
@@ -1377,12 +1382,20 @@ function TaskDetailContent() {
                   </>
                 );
               },
-              render: (t: Task) => <LayoutsSection task={t} canViewBadges={canViewLayoutBadges} view={layoutsView} />,
+              render: (t: Task) =>
+                canActOnArt && t.implement?.id ? (
+                  <ImplementArtPanel implementId={t.implement.id} />
+                ) : (
+                  <LayoutsSection task={t} canViewBadges={canViewLayoutBadges} view={layoutsView} />
+                ),
             } as DetailSectionDef<Task>,
           ]
         : []),
       // Arquivos (base + project).
-      ...((canViewBaseFiles && (task?.baseFiles?.length ?? 0) > 0) || (canViewProjectFiles && (task?.projectFiles?.length ?? 0) > 0)
+      ...((canViewBaseFiles && (task?.baseFiles?.length ?? 0) > 0) ||
+      (canViewProjectFiles &&
+        ((task?.projectFiles?.length ?? 0) > 0 ||
+          (((task?.implement as { projectFiles?: unknown[] } | null | undefined)?.projectFiles?.length ?? 0) > 0)))
         ? [
             {
               id: "files",
@@ -1587,6 +1600,7 @@ function TaskDetailContent() {
     hasDossie,
     canViewMeasures,
     canViewLayoutBadges,
+    canActOnArt,
     canViewBaseFiles,
     canViewCheckinFiles,
     canViewRestricted,

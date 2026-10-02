@@ -134,7 +134,7 @@ export const TaskEditPage = () => {
       },
       createdBy: true,
       // A arte é do implemento (Modelo C): o formulário a mostra, só leitura.
-      implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE } },
+      implement: { include: { layouts: IMPLEMENT_ART_LAYOUTS_INCLUDE, projectFiles: true } },
       observation: {
         include: {
           files: true,

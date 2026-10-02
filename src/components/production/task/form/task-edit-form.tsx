@@ -66,6 +66,7 @@ import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { ImplementArtPanel } from "@/components/production/implement-art/implement-art-panel";
+import { ImplementProjectFilesPanel } from "@/components/production/implement-art/implement-project-files-panel";
 import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -3509,7 +3510,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconFolderOpen className="h-5 w-5" />
-                        Projetos
+                        Projeto da tarefa
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -3523,8 +3524,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         showPreview={true}
                         existingFiles={projectFiles}
                         variant="card"
-                        placeholder="Adicione arquivos de projeto (vídeos, imagens, PDFs)"
-                        label="Projetos anexados"
+                        placeholder="Adicione o projeto da tarefa — o PDF cotado da arte (vídeos, imagens, PDFs)"
+                        label="Projeto da tarefa"
                         acceptedFileTypes={{
                           "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
                           "application/pdf": [".pdf"],
@@ -3728,6 +3729,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   <Card className="border border-border rounded-lg">
                     <CardContent className="pt-4">
                       <ImplementArtPanel implementId={task.implement.id} />
+                      <ImplementProjectFilesPanel
+                        implementId={task.implement.id}
+                        files={(task.implement as { projectFiles?: any[] }).projectFiles}
+                        className="mt-6 border-t border-border pt-4"
+                      />
                     </CardContent>
                   </Card>
                 )}

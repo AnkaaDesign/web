@@ -17,10 +17,14 @@ export function getVisibleTaskFiles(
   task: Task,
   canViewBase: boolean,
   canViewProject: boolean,
-): { base: TaskFile[]; project: TaskFile[]; all: TaskFile[] } {
+): { base: TaskFile[]; project: TaskFile[]; implementProject: TaskFile[]; all: TaskFile[] } {
   const base = canViewBase && task.baseFiles ? task.baseFiles : [];
   const project = canViewProject && task.projectFiles ? task.projectFiles : [];
-  return { base, project, all: [...base, ...project] };
+  // O projeto do FABRICANTE é do implemento (acompanha o veículo); o da tarefa é o PDF cotado da arte.
+  const implementProject = canViewProject
+    ? (((task.implement as { projectFiles?: TaskFile[] } | null | undefined)?.projectFiles ?? []) as TaskFile[])
+    : [];
+  return { base, project, implementProject, all: [...base, ...project, ...implementProject] };
 }
 
 /** Open each file's download endpoint in turn, staggered to avoid popup-blocking. */
@@ -33,7 +37,7 @@ export async function downloadAllTaskFiles(files: TaskFile[]): Promise<void> {
 }
 
 /**
- * One file group. The group LABEL ("Arquivos Base" / "Projetos") is only shown when more than one
+ * One file group. The group LABEL ("Arquivos Base" / "Projeto da tarefa" / "Projeto do implemento") is only shown when more than one
  * group is present (`showTitle`); with a single group the section card title "Arquivos" already names
  * it, so the sub-label would be redundant. The grid/list view mode is controlled by the section header
  * (host-owned `view` prop); count + "Baixar Todos" also live in the section header.
@@ -78,9 +82,13 @@ function FileSubsection({
 export function FilesSection({ task, canViewBase, canViewProject, view }: { task: Task; canViewBase: boolean; canViewProject: boolean; view: FileViewMode }): React.ReactNode {
   const fileViewer = useFileViewer();
 
-  const { base: baseFiles, project: projectFiles } = getVisibleTaskFiles(task, canViewBase, canViewProject);
+  const {
+    base: baseFiles,
+    project: projectFiles,
+    implementProject: implementProjectFiles,
+  } = getVisibleTaskFiles(task, canViewBase, canViewProject);
 
-  if (baseFiles.length === 0 && projectFiles.length === 0) return null;
+  if (baseFiles.length === 0 && projectFiles.length === 0 && implementProjectFiles.length === 0) return null;
 
   const handleBaseFileClick = (file: TaskFile) => {
     const index = baseFiles.findIndex((f) => f.id === file.id);
@@ -92,13 +100,21 @@ export function FilesSection({ task, canViewBase, canViewProject, view }: { task
     fileViewer.actions.viewFiles(projectFiles, index);
   };
 
+  const handleImplementProjectFileClick = (file: TaskFile) => {
+    const index = implementProjectFiles.findIndex((f) => f.id === file.id);
+    fileViewer.actions.viewFiles(implementProjectFiles, index);
+  };
+
   const handleDownload = (file: TaskFile) => {
     fileViewer.actions.downloadFile(file);
   };
 
   const groups = [
     baseFiles.length > 0 ? { key: "base", title: "Arquivos Base", files: baseFiles, onPreview: handleBaseFileClick } : null,
-    projectFiles.length > 0 ? { key: "projects", title: "Projetos", files: projectFiles, onPreview: handleProjectFileClick } : null,
+    projectFiles.length > 0 ? { key: "projects", title: "Projeto da tarefa", files: projectFiles, onPreview: handleProjectFileClick } : null,
+    implementProjectFiles.length > 0
+      ? { key: "implement-projects", title: "Projeto do implemento", files: implementProjectFiles, onPreview: handleImplementProjectFileClick }
+      : null,
   ].filter((g): g is NonNullable<typeof g> => g !== null);
   // Only label the groups when there's more than one — with a single group the "Arquivos" card title
   // already names it, so a "Arquivos Base" sub-label would just be redundant.
