@@ -588,7 +588,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               .map((task: any) => task.implement?.id as string | undefined)
               .filter((id): id is string => !!id);
             for (const fileId of suggestedFileIds) {
-              await bulkImplementLayouts(implementIds, fileId);
+              await bulkImplementLayouts({ implementIds }, fileId);
             }
           }
           await queryClient.invalidateQueries({ queryKey: ["tasks"] });

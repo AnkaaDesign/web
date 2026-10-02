@@ -35,14 +35,13 @@ export interface BudgetRequest {
   logoName?: string | null;
 
   /**
-   * O CLIENTE APROVOU O VALOR pelo portal (D-35). O nome da coluna é o antigo
-   * (`preApproved*`) e a API ainda o devolve assim; o significado, desde o P14,
-   * é "aprovou o valor". A fonte da verdade da aprovação é `Budget.valueApproval`
-   * (inclusive a feita em nome do cliente, que não passa por aqui).
+   * O CLIENTE APROVOU O VALOR pelo portal (D-35). A fonte da verdade da
+   * aprovação é `Budget.valueApproval` (inclusive a feita em nome do cliente,
+   * que não passa por aqui).
    */
-  preApprovedAt?: Date | string | null;
-  preApprovedByResponsibleId?: string | null;
-  preApprovedBy?: BudgetRequestActor | null;
+  valueApprovedAt?: Date | string | null;
+  valueApprovedByResponsibleId?: string | null;
+  valueApprovedBy?: BudgetRequestActor | null;
 
   /**
    * RECUSA do valor. NÃO é cancelamento: o orçamento volta para o
@@ -104,6 +103,6 @@ export type BudgetRequestDecision = 'refused' | 'valueApproved' | 'pending';
 
 export function budgetRequestDecision(request: BudgetRequest): BudgetRequestDecision {
   if (request.refusedAt) return 'refused';
-  if (request.preApprovedAt) return 'valueApproved';
+  if (request.valueApprovedAt) return 'valueApproved';
   return 'pending';
 }

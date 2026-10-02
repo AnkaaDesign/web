@@ -642,11 +642,11 @@ export interface PortalBudgetRequestInfo {
   logoName: string | null;
   requestedAt: string | null;
   /** O cliente APROVOU O VALOR (nome antigo da coluna; D-35). */
-  preApprovedAt: string | null;
+  valueApprovedAt: string | null;
   refusedAt: string | null;
   decisionNote: string | null;
   requestedBy?: PortalNamedRef | null;
-  preApprovedBy?: PortalNamedRef | null;
+  valueApprovedBy?: PortalNamedRef | null;
   refusedBy?: PortalNamedRef | null;
 }
 

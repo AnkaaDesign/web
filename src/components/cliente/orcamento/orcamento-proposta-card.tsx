@@ -253,7 +253,7 @@ export function OrcamentoGarantiaCard({ budget }: { budget: PortalBudget }) {
  */
 export function orcamentoTemDecisao(budget: PortalBudget): boolean {
   const request = budget.request;
-  return !!request && (!!request.preApprovedAt || !!request.refusedAt || !!request.decisionNote);
+  return !!request && (!!request.valueApprovedAt || !!request.refusedAt || !!request.decisionNote);
 }
 
 export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
@@ -262,7 +262,7 @@ export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
 
   const recusado = !!request.refusedAt;
   // Os autores só vêm no DETALHE — na lista o `select` não os carrega.
-  const decisor = request.preApprovedBy?.name ?? request.refusedBy?.name ?? null;
+  const decisor = request.valueApprovedBy?.name ?? request.refusedBy?.name ?? null;
 
   return (
     <PortalCard
@@ -275,8 +275,8 @@ export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
       }
     >
       <PortalRows>
-        {request.preApprovedAt ? (
-          <DetailRow label="Valor aprovado em" value={data(request.preApprovedAt)} />
+        {request.valueApprovedAt ? (
+          <DetailRow label="Valor aprovado em" value={data(request.valueApprovedAt)} />
         ) : null}
         {request.refusedAt ? (
           <DetailRow label="Devolvido em" value={data(request.refusedAt)} />

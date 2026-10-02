@@ -561,7 +561,7 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
-  // O recorte é uma LISTA POSITIVA de estados (PENDING, SIGNED, APPROVED), e não "tudo que não é
+  // O recorte é uma LISTA POSITIVA de estados (PENDING, IN_NEGOTIATION, APPROVED), e não "tudo que não é
   // CANCELLED". A forma negativa deixava passar todo estado pós-nota, e orçamentos cujo dinheiro
   // estava no banco havia meses seguiam piscando — era metade do motivo de a lista de Faturamento
   // parecer em chamas. É este teste que guarda a forma positiva.
@@ -573,12 +573,20 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
 
   // Os dois estados que entraram em 11/09/2026, e que caem em lados opostos da
   // mesma pergunta ("ainda dá para destravar a nota preenchendo este campo?").
-  it("continua avisando quando o cliente já assinou e a nota ainda não saiu", async () => {
-    // SIGNED é pré-faturamento: falta só a contra-assinatura da Ankaa, a nota
-    // vem logo atrás, e o pedido de compra em branco ainda trava tudo.
-    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.SIGNED })]);
+  it("continua avisando com o valor aprovado e a nota ainda não saiu", async () => {
+    // Modelo C: "assinou e a nota vem a seguir" é APPROVED com a assinatura
+    // concluída — o pedido de compra em branco ainda trava tudo.
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.APPROVED })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).not.toBeNull();
+  });
+
+  it("silencia no SIGNED legado: deixou de ser escrito em BudgetStatus", async () => {
+    // A M3o-b converteu todo SIGNED em APPROVED + assinatura "Falta a Ankaa";
+    // como na API (`NOT_YET_INVOICED`), ele sai da janela.
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.SIGNED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
   });
 
   it("silencia no orçamento vencido: o que trava ali é o preço, não o pedido", async () => {
@@ -601,15 +609,20 @@ describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
   // enum cresce. O recorte agora é um `Record` TOTAL (`INVOICE_WINDOW`), e é este
   // teste que prova a classificação dos dois.
   //
-  // Os dois caem do mesmo lado de EXPIRED e pela mesma razão: o que segura a
-  // nota ali é o PREÇO, não o cadastro. Uma requisição não tem sequer serviço.
-  it.each([
-    [TASK_QUOTE_STATUS.REQUESTED, "requisição: não há serviço, valor nem nota para travar"],
-    [TASK_QUOTE_STATUS.IN_NEGOTIATION, "aguardando o cliente: o preço está na mesa do cliente"],
-  ])("silencia em %s — %s", async (status) => {
-    setEntities("TASK_QUOTE", [quote({ status })]);
+  // A requisição cai do mesmo lado de EXPIRED: não tem sequer serviço. O
+  // "aguardando aprovação do cliente" entrou na janela com o Modelo C.
+  it("silencia na requisição: não há serviço, valor nem nota para travar", async () => {
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.REQUESTED })]);
     await settle();
     expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  // Modelo C (02/10, espelho de `NOT_YET_INVOICED` na API): com o valor na mesa
+  // do cliente é justamente a janela em que ele ainda pode mandar o que falta.
+  it("avisa em IN_NEGOTIATION — o cliente ainda pode mandar o pedido", async () => {
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.IN_NEGOTIATION })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).not.toBeNull();
   });
 
   it("stays silent when Ibiporã's config will not produce a nota", async () => {

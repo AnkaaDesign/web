@@ -71,12 +71,17 @@ function whileInFlight(node: PredicateNode): PredicateNode {
  * tela deixam de concordar.
  */
 const INVOICE_WINDOW: Record<TASK_QUOTE_STATUS, boolean> = {
-  // Em montagem pela Ankaa: o espelho da API (`NOT_YET_INVOICED`) ainda o põe
-  // na janela.
+  // MODELO C (P14), como o espelho da API (`NOT_YET_INVOICED`): o eixo do VALOR
+  // é Pendente → Aguardando aprovação do cliente → Aprovado, e a assinatura mora
+  // em `signatureStatus`.
   [TASK_QUOTE_STATUS.PENDING]: true,
-  // LEGADO (nenhuma linha desde a M3o-b); fica como na API.
-  [TASK_QUOTE_STATUS.SIGNED]: true,
+  // O valor está com o cliente: é a janela em que ele ainda pode mandar o que falta.
+  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: true,
+  // "Assinou e a nota vem a seguir" é APPROVED com a assinatura concluída.
   [TASK_QUOTE_STATUS.APPROVED]: true,
+  // LEGADO: deixou de ser escrito em `BudgetStatus` (a M3o-b o converteu em
+  // APPROVED + assinatura "Falta a Ankaa"); nenhuma linha o tem.
+  [TASK_QUOTE_STATUS.SIGNED]: false,
 
   // ── FORA DA JANELA: quem segura a nota aqui é o PREÇO, não o cadastro ──────
   //
@@ -84,14 +89,8 @@ const INVOICE_WINDOW: Record<TASK_QUOTE_STATUS, boolean> = {
   // pedido de compra é pedir um dado que talvez nem se use. Ele reentra sozinho
   // quando a reformulação o devolve a PENDING.
   [TASK_QUOTE_STATUS.EXPIRED]: false,
-  // ── E OS DO PORTAL, pela MESMA razão e com mais força ──────────────────────
-  //
-  // Requisição não tem serviço nem valor: não há nota para travar. "Aguardando
-  // aprovação do cliente" é o preço ainda na mesa do cliente — nos dois o que
-  // falta é o acordo, não o cadastro. Deixá-los de fora é o mesmo recorte de
-  // EXPIRED.
+  // Requisição não tem serviço, valor nem pagador decidido: não há nota para travar.
   [TASK_QUOTE_STATUS.REQUESTED]: false,
-  [TASK_QUOTE_STATUS.IN_NEGOTIATION]: false,
 
   [TASK_QUOTE_STATUS.CANCELLED]: false,
 };

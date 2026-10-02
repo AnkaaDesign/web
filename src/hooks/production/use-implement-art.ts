@@ -90,10 +90,14 @@ export function useDeleteImplementArt() {
   );
 }
 
-/** "Uma imagem para todos": a mesma arte, como rascunho, em todos os implementos dados. */
+/**
+ * "Uma imagem para todos": a mesma arte, como rascunho, em todos os veículos — do
+ * orçamento inteiro, atômico, quando há `budgetId`.
+ */
 export function useApplyArtToImplements() {
-  return useArtAct(({ implementIds, files }: { implementIds: string[]; files: File[] }) =>
-    applyArtToImplements(implementIds, files),
+  return useArtAct(
+    ({ implementIds, files, budgetId }: { implementIds: string[]; files: File[]; budgetId?: string | null }) =>
+      applyArtToImplements(implementIds, files, { budgetId }),
   );
 }
 

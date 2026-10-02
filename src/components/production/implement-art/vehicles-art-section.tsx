@@ -56,13 +56,15 @@ const STATE_VARIANT: Record<ImplementArtState, string> = {
 
 interface VehiclesArtSectionProps {
   vehicles: ImplementArtVehicle[];
+  /** O orçamento dos veículos: "uma imagem para todos" vira um lote atômico sobre ele. */
+  budgetId?: string | null;
   /** Âncora para o atalho "arte pendente" da faixa dos eixos. */
   anchorId?: string;
   readOnly?: boolean;
   className?: string;
 }
 
-export function VehiclesArtSection({ vehicles, anchorId, readOnly, className }: VehiclesArtSectionProps) {
+export function VehiclesArtSection({ vehicles, budgetId, anchorId, readOnly, className }: VehiclesArtSectionProps) {
   const { user } = useAuth();
   const canEdit = !readOnly && canEditImplementArt(user as any);
   const applyToAll = useApplyArtToImplements();
@@ -79,7 +81,7 @@ export function VehiclesArtSection({ vehicles, anchorId, readOnly, className }: 
   const confirmApply = () => {
     if (!pendingFiles) return;
     void applyToAll
-      .mutateAsync({ implementIds, files: pendingFiles })
+      .mutateAsync({ implementIds, files: pendingFiles, budgetId })
       .then(() => setPendingFiles(null))
       .catch(() => undefined);
   };

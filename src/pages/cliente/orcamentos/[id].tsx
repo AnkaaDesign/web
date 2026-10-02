@@ -332,9 +332,9 @@ export function ClientePortalOrcamentoDetalhePage() {
                 node: <OrcamentoDecisaoCard budget={budget} />,
                 est: portalEst({
                   rows:
-                    (request?.preApprovedAt ? 1 : 0) +
+                    (request?.valueApprovedAt ? 1 : 0) +
                     (request?.refusedAt ? 1 : 0) +
-                    (request?.preApprovedBy?.name || request?.refusedBy?.name ? 1 : 0),
+                    (request?.valueApprovedBy?.name || request?.refusedBy?.name ? 1 : 0),
                   blocks: request?.decisionNote ? 1 : 0,
                 }),
               }

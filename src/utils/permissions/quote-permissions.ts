@@ -60,25 +60,41 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
 const VALID_TRANSITIONS = BUDGET_MANUAL_TRANSITIONS as Record<TASK_QUOTE_STATUS, readonly TASK_QUOTE_STATUS[]>;
 
 /**
- * Os destinos legais a partir de `currentStatus` para este setor.
+ * O PAPEL PODE PEDIR ESTA ARESTA? Espelho de `isQuoteStatusChangeAllowed` na API
+ * (`budget.guards.ts`), que julga com o status ATUAL:
  *
- * ⚠️ APROVAR O ORÇAMENTO É DO COMERCIAL. Espelha `validateQuoteStatusChangeRole`
- * na API, que restringe `APPROVED` a ADMIN/COMERCIAL — o FINANCEIRO não aprova
- * venda, ele aprova COBRANÇA, e isso é outro botão e outra rota
- * (`PUT /billings/:id/approve`). Antes era o contrário: o filtro tirava
- * `BILLING_APPROVED` do COMERCIAL, porque os dois atos moravam no mesmo enum.
+ *  · os ATOS DO VALOR — aprovar (`→ APPROVED`), enviar ao cliente
+ *    (`→ IN_NEGOTIATION`), e o `→ PENDING` que vem de APPROVED (reprovar o
+ *    valor) ou de IN_NEGOTIATION (retirar do cliente) — são só ADMIN/COMERCIAL,
+ *    por qualquer porta (os atos e o `PUT /status`);
+ *  · o resto (cancelar, reabrir o vencido) também o FINANCEIRO.
+ *
+ * O FINANCEIRO não aprova venda: ele aprova COBRANÇA, que é outro botão e outra
+ * rota (`PUT /billings/:id/approve`).
  */
+export function isQuoteStatusChangeAllowed(
+  targetStatus: TASK_QUOTE_STATUS | string,
+  userRole: string,
+  from?: TASK_QUOTE_STATUS | string | null,
+): boolean {
+  const commercialAct =
+    targetStatus === 'APPROVED' ||
+    targetStatus === 'IN_NEGOTIATION' ||
+    (targetStatus === 'PENDING' && (from === 'APPROVED' || from === 'IN_NEGOTIATION'));
+  const allowed: string[] = commercialAct
+    ? [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]
+    : [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL];
+  return !!userRole && allowed.includes(userRole);
+}
+
+/** Os destinos legais a partir de `currentStatus` para este setor (grafo do contrato ∩ papel). */
 export function getAvailableQuoteStatusTransitions(
   currentStatus: TASK_QUOTE_STATUS,
   userRole: string,
 ): TASK_QUOTE_STATUS[] {
-  const transitions = [...(VALID_TRANSITIONS[currentStatus] || [])];
-
-  if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
-    return transitions.filter((s) => s !== 'APPROVED');
-  }
-
-  return transitions;
+  return [...(VALID_TRANSITIONS[currentStatus] || [])].filter((to) =>
+    isQuoteStatusChangeAllowed(to, userRole, currentStatus),
+  );
 }
 
 /**

@@ -25,27 +25,36 @@ async function implementIdsOf(taskIds: string[]): Promise<string[]> {
 }
 
 /**
- * "UMA IMAGEM PARA TODOS" — a MESMA arte, como rascunho, em cada implemento.
+ * "UMA IMAGEM PARA TODOS" — a MESMA arte, como rascunho, em cada veículo.
  *
- * O único ponto da web que faz isso: sobe no primeiro implemento e replica o
- * mesmo arquivo nos demais pelo lote (`POST /implements/layouts/bulk`, uma
- * transação por arquivo). Quando a API ganhar a rota atômica por orçamento
- * (`bulk` com `budgetId`), só esta função muda.
+ * O único ponto da web que faz isso: sobe no primeiro implemento e aplica o
+ * mesmo arquivo aos demais pelo lote (`POST /implements/layouts/bulk`). Com
+ * `budgetId`, o lote é ATÔMICO sobre todos os veículos não cancelados do
+ * orçamento (a API pula quem já tem o arquivo); sem ele, sobre a lista dada.
  *
- * Devolve quantos implementos receberam a arte.
+ * Devolve quantos implementos ficaram com a arte.
  */
-export async function applyArtToImplements(implementIds: string[], files: File[]): Promise<number> {
+export async function applyArtToImplements(
+  implementIds: string[],
+  files: File[],
+  options: { budgetId?: string | null } = {},
+): Promise<number> {
   const unique = [...new Set(implementIds.filter(Boolean))];
   if (unique.length === 0 || files.length === 0) return 0;
 
   const [first, ...rest] = unique;
   const uploaded = await uploadImplementLayouts(first, files);
-  if (rest.length > 0) {
-    for (const layout of uploaded.data ?? []) {
-      await bulkImplementLayouts(rest, layout.fileId);
-    }
+  if (!options.budgetId && rest.length === 0) return 1;
+
+  let total = unique.length;
+  for (const layout of uploaded.data ?? []) {
+    const result = await bulkImplementLayouts(
+      options.budgetId ? { budgetId: options.budgetId } : { implementIds: rest },
+      layout.fileId,
+    );
+    if (options.budgetId && result.data?.total) total = result.data.total;
   }
-  return unique.length;
+  return total;
 }
 
 /**

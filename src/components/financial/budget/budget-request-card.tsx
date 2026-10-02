@@ -220,8 +220,8 @@ export function BudgetRequestCard({
               <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <IconCircleCheck className="h-4 w-4 shrink-0" />
-                  Valor aprovado por {request.preApprovedBy?.name ?? "contato do cliente"}
-                  {request.preApprovedAt ? ` em ${formatDateTime(request.preApprovedAt)}` : ""}
+                  Valor aprovado por {request.valueApprovedBy?.name ?? "contato do cliente"}
+                  {request.valueApprovedAt ? ` em ${formatDateTime(request.valueApprovedAt)}` : ""}
                 </div>
                 {request.decisionNote?.trim() ? (
                   <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{request.decisionNote}</p>

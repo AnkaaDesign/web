@@ -200,14 +200,25 @@ export const deleteImplementLayout = async (
   return response.data;
 };
 
-/** "Arte em lote": o MESMO arquivo (já no sistema) como rascunho em N implementos, numa transação. */
+/** O que o lote devolve: quantos ganharam a arte, quantos já a tinham, e o total. */
+export interface ImplementLayoutsBulkResult {
+  created: number;
+  alreadyThere: number;
+  total: number;
+}
+
+/**
+ * "Arte em lote": o MESMO arquivo (já no sistema) como rascunho, numa transação —
+ * em N implementos (`implementIds`) ou em TODOS os veículos não cancelados de um
+ * orçamento (`budgetId`), pulando quem já o tem. Um dos dois, nunca os dois.
+ */
 export const bulkImplementLayouts = async (
-  implementIds: string[],
+  target: { implementIds: string[] } | { budgetId: string },
   fileId: string,
-): Promise<{ success: boolean; message: string; data: unknown }> => {
-  const response = await apiClient.post<{ success: boolean; message: string; data: unknown }>(
+): Promise<{ success: boolean; message: string; data: ImplementLayoutsBulkResult }> => {
+  const response = await apiClient.post<{ success: boolean; message: string; data: ImplementLayoutsBulkResult }>(
     `/implements/layouts/bulk`,
-    { implementIds, fileId },
+    { ...target, fileId },
   );
   return response.data;
 };
