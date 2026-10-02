@@ -82,6 +82,8 @@ import {
 import { COMPANY_INFO } from "@/config/company";
 
 import { BRAND_ASSETS } from '@/config/assets';
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
+import { cn } from "@/lib/utils";
 /**
  * A porta de consentimento NÃO abre mais no carregamento.
  *
@@ -570,7 +572,10 @@ export default function PublicSignaturePage() {
             /* force-light também aqui: o Radix monta o modal num portal preso
                ao <body>, fora do wrapper da página, então ele não herdaria o
                escopo claro. */
-            className="force-light max-h-[90vh] max-w-2xl overflow-y-auto supports-[height:100dvh]:max-h-[90dvh]"
+            className={cn(
+              PORTAL_SHEET_ON_MOBILE,
+              "force-light max-h-[90vh] max-w-2xl overflow-y-auto supports-[height:100dvh]:max-h-[90dvh]",
+            )}
           >
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1173,7 +1178,7 @@ export default function PublicSignaturePage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="force-light min-h-screen bg-background px-3 py-6">
+    <div className="portal-toque force-light min-h-screen bg-background px-3 py-6">
       {/* Toaster próprio: esta rota vive fora do AuthProvider, onde o Toaster
           global do App está montado. Sem isto, nenhum toast apareceria. */}
       <Toaster />

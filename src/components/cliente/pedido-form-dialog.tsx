@@ -75,6 +75,8 @@ import {
   type PortalVehicleListParams,
 } from "@/api-client/portal";
 import { usePortalPedidoPorNumero } from "./usar-pedido-por-numero";
+import { cn } from "@/lib/utils";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 export interface PedidoFormDialogProps {
   open: boolean;
@@ -247,7 +249,7 @@ export function PedidoFormDialog({
       }}
     >
       {/* Abraça o conteúdo e cresce só até caber na tela (§10). */}
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "max-h-[90vh] max-w-2xl overflow-y-auto")}>
         <DialogHeader>
           <DialogTitle>Novo pedido de compra</DialogTitle>
           <DialogDescription>

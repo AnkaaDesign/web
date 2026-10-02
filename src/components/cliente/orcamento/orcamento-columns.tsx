@@ -209,7 +209,12 @@ export function createPortalBudgetColumns({
  * e o guard da célula — e um estado fora dela não aparece na tela de jeito
  * nenhum. No portal o servidor já escopa; o filtro só estreita.
  */
-export const PORTAL_BUDGET_STATUS_OPTIONS = (Object.keys(QUOTE_STATUS_CONFIG) as TASK_QUOTE_STATUS[]).map((status) => ({
-  value: status,
-  label: QUOTE_STATUS_CONFIG[status].label,
-}));
+export const PORTAL_BUDGET_STATUS_OPTIONS = (Object.keys(QUOTE_STATUS_CONFIG) as TASK_QUOTE_STATUS[])
+  // `SIGNED` não é mais estado do orçamento (a assinatura tem eixo próprio, Modelo
+  // C): oferecê-lo como filtro ao cliente seria oferecer uma lista que só tem o
+  // legado migrado.
+  .filter((status) => status !== "SIGNED")
+  .map((status) => ({
+    value: status,
+    label: QUOTE_STATUS_CONFIG[status].label,
+  }));

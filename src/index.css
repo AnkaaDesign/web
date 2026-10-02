@@ -34,6 +34,19 @@ html {
   font-size: 90%;
 }
 
+/*
+ * NO CELULAR, TAMANHO CHEIO. A densidade de 90% é para a tela do escritório;
+ * num telefone ela encolhe o texto e os alvos de toque, e o iOS DÁ ZOOM na
+ * página ao focar um campo com fonte abaixo de 16 px — `text-base` a 90% é
+ * 14,4 px. Abaixo de `md` (768 px), a raiz volta a 100%: o portal do
+ * responsável é usado justamente ali.
+ */
+@media (max-width: 767px) {
+  html {
+    font-size: 100%;
+  }
+}
+
 html,
 body,
 #root {
@@ -318,6 +331,39 @@ input[type="time"]::-moz-calendar-picker-indicator {
 @layer base {
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/*
+ * PORTAL DO RESPONSÁVEL — alvo de toque de 44 px em tela de toque.
+ *
+ * O portal é usado no navegador do celular, e os componentes da casa nasceram
+ * para o cursor (botão `sm` de 32 px, abas de 36 px). Em vez de trocar o tamanho
+ * de cada botão em cada tela, a moldura do portal (`.portal-toque`) garante o
+ * mínimo — só quando o ponteiro é o dedo (`pointer: coarse`); no mouse nada muda.
+ * `:where()` mantém a especificidade zero: ninguém precisa brigar com esta regra.
+ * Caixa de seleção e interruptor ficam de fora — o tamanho deles é o desenho.
+ * `a[class*="justify-center"]` é o `<Button asChild>` virando link: a mesma
+ * peça, outra tag. Link dentro de frase não tem essa classe e fica como é.
+ * ⚠️ `PX` MAIÚSCULO, e de propósito: o `postcss-pxtorem` converte todo `px`
+ * minúsculo em `rem` no build, e com a raiz a 90% os 44 viravam 39,6 px. CSS não
+ * diferencia a caixa da unidade; o plugin diferencia — e deixa este em paz.
+ */
+@layer components {
+  @media (pointer: coarse) {
+    .portal-toque
+      :where(
+        button:not([role="checkbox"]):not([role="switch"]),
+        [role="button"],
+        [role="tab"],
+        a[data-touch],
+        a[class*="justify-center"]
+      ) {
+      min-height: 44PX;
+    }
+    .portal-toque :where(button:not([role="checkbox"]):not([role="switch"])) {
+      min-width: 44PX;
+    }
   }
 }
 

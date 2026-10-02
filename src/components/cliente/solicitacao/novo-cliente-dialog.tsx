@@ -37,6 +37,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { novoClienteSchema, type NovoClienteFormData } from "./solicitacao-schema";
+import { cn } from "@/lib/utils";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 interface NovoClienteDialogProps {
   open: boolean;
@@ -88,7 +90,7 @@ export function NovoClienteDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Diálogo abraça o conteúdo: largura do formulário, não da tela. */}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "sm:max-w-md")}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconBuilding className="h-5 w-5" />

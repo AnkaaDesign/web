@@ -27,6 +27,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconFileText } from "@tabler/icons-react";
 
 import { DataTablePage } from "@/components/ui/datatable";
+import { PageHeader } from "@/components/ui/page-header";
+import { PortalMobileList } from "@/components/cliente/portal-mobile-list";
+import { usePortalMobile } from "@/components/cliente/use-portal-mobile";
 import type { DataTableFilterDef, DataTableFilterValues } from "@/components/ui/datatable";
 import { usePortalBudgets } from "@/api-client/portal";
 import type { PortalBudget, PortalBudgetStatus } from "@/api-client/portal";
@@ -155,6 +158,41 @@ export function ClientePortalOrcamentosPage() {
     (budget: PortalBudget) => navigate(routes.customer.portal.orcamento(budget.id)),
     [navigate],
   );
+
+  const mobile = usePortalMobile();
+  const breadcrumbs = [{ label: "Início", href: routes.customer.portal.root }, { label: "Orçamentos" }];
+
+  // NO CELULAR, CARTÕES — as mesmas colunas, a mesma consulta (ver
+  // `portal-mobile-list.tsx`). A tabela a 390 px mostrava duas colunas de seis.
+  if (mobile) {
+    return (
+      <div className="space-y-3">
+        {isError ? (
+          <PortalErrorBanner
+            message="Não foi possível carregar seus orçamentos."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
+        ) : null}
+        <PageHeader variant="list" title="Orçamentos" icon={IconFileText} breadcrumbs={breadcrumbs} />
+        <PortalMobileList<PortalBudget>
+          rows={budgets}
+          columns={columns}
+          getRowId={getRowId}
+          onRowClick={onRowClick}
+          isLoading={isLoading}
+          totalRecords={totalRecords}
+          page={page}
+          pageSize={take}
+          filterDefs={filterDefs}
+          params={params}
+          onParamsChange={onParamsChange}
+          searchPlaceholder="Buscar por número, série ou placa..."
+          emptyMessage="Nenhum orçamento encontrado."
+        />
+      </div>
+    );
+  }
 
   return (
     // A CADEIA DE ALTURA É DA MOLDURA, e esta tela só a repassa.

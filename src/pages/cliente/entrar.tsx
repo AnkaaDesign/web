@@ -236,7 +236,7 @@ export default function ClienteEntrarPage() {
 
   if (isRestoring) {
     return (
-      <div className={cn(authLayoutVariants({ background: "default" }), "w-screen")}>
+      <div className={cn(authLayoutVariants({ background: "default" }), "portal-toque w-screen")}>
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -248,7 +248,7 @@ export default function ClienteEntrarPage() {
   const channelName = channel === "WHATSAPP" ? "WhatsApp" : "e-mail";
 
   return (
-    <div className={cn(authLayoutVariants({ background: "default" }), "w-screen")}>
+    <div className={cn(authLayoutVariants({ background: "default" }), "portal-toque w-screen")}>
       <Card className={cn(authCardVariants({ elevation: "elevated" }))}>
         <CardHeader className="space-y-1">
           <div className="mb-4 flex justify-center">

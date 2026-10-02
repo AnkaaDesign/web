@@ -52,6 +52,9 @@ import {
 } from "@/api-client/portal";
 import { PORTAL_CAPABILITY, hasPortalCapability } from "@/utils/portal-capabilities";
 import { PortalErrorBanner } from "@/components/cliente/portal-detail";
+import { PortalMobileList } from "@/components/cliente/portal-mobile-list";
+import { usePortalMobile } from "@/components/cliente/use-portal-mobile";
+import { PageHeader } from "@/components/ui/page-header";
 import { PedidoFormDialog } from "@/components/cliente/pedido-form-dialog";
 import { routes } from "@/constants/routes";
 import { formatDate } from "@/utils";
@@ -200,6 +203,7 @@ export function ClientePortalPedidosPage() {
   );
 
   const purchaseOrders = usePortalPurchaseOrders(query);
+  const mobile = usePortalMobile();
 
   /**
    * A contagem da faixa âmbar — uma linha de JSON, não a frota.
@@ -267,6 +271,48 @@ export function ClientePortalPedidosPage() {
       {/* `flex-1 min-h-0` — a tabela come o que sobra depois do aviso, sem que
           nenhum dos dois precise saber a altura do outro. Era isto que os dois
           `calc(100dvh - N)` desta tela tentavam adivinhar. */}
+      {mobile ? (
+        <div className="space-y-3">
+          <PageHeader
+            variant="list"
+            title="Pedidos de compra"
+            icon={IconShoppingCart}
+            breadcrumbs={[
+              { label: "Início", href: routes.customer.portal.root },
+              { label: "Pedidos de compra" },
+            ]}
+            actions={
+              canWrite
+                ? [
+                    {
+                      key: "novo",
+                      label: "Novo pedido",
+                      icon: IconShoppingCartPlus,
+                      onClick: () => setDialogOpen(true),
+                    },
+                  ]
+                : []
+            }
+          />
+          <PortalMobileList<PortalPurchaseOrder>
+            rows={pedidos}
+            columns={COLUMNS}
+            getRowId={getRowId}
+            isLoading={purchaseOrders.isLoading}
+            totalRecords={totalRecords}
+            page={page}
+            pageSize={pageSize}
+            params={params}
+            onParamsChange={onParamsChange}
+            searchPlaceholder="Buscar por número do pedido, placa ou série..."
+            emptyMessage={
+              canWrite
+                ? "Nenhum pedido de compra. Crie o primeiro e marque de uma vez todos os veículos que ele cobre."
+                : "Nenhum pedido de compra registrado."
+            }
+          />
+        </div>
+      ) : (
       <div className="min-h-0 flex-1">
         <DataTablePage<PortalPurchaseOrder>
           title="Pedidos de compra"
@@ -331,6 +377,7 @@ export function ClientePortalPedidosPage() {
           }}
         />
       </div>
+      )}
 
       {canWrite && (
         <PedidoFormDialog

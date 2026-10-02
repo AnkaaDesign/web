@@ -190,7 +190,7 @@ export default function PublicSignatureVerifyPage() {
   const tone: Tone = status?.tone ?? "warn";
 
   return (
-    <div className="force-light min-h-screen bg-background px-3 py-6 sm:px-4 sm:py-10">
+    <div className="portal-toque force-light min-h-screen bg-background px-3 py-6 sm:px-4 sm:py-10">
       <Toaster />
       <div className="mx-auto w-full max-w-3xl">
         {/* UM cartão. As seções internas se separam por filete (divide-y) e por

@@ -38,6 +38,7 @@ export interface DetailRowProps {
   /** Slot rendered to the right of the value (e.g. inline actions/icons). */
   trailing?: React.ReactNode;
   /** Interactive props — let the whole row act as a click/keyboard target (inline edit). */
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
   onDoubleClick?: React.MouseEventHandler<HTMLDivElement>;
   onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
   role?: string;
@@ -59,6 +60,7 @@ export function DetailRow({
   tone = "muted",
   trailing,
   className,
+  onClick,
   onDoubleClick,
   onKeyDown,
   role,
@@ -75,7 +77,7 @@ export function DetailRow({
   );
 
   return (
-    <div className={containerCls} onDoubleClick={onDoubleClick} onKeyDown={onKeyDown} role={role} tabIndex={tabIndex} title={title}>
+    <div className={containerCls} onClick={onClick} onDoubleClick={onDoubleClick} onKeyDown={onKeyDown} role={role} tabIndex={tabIndex} title={title}>
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
         {Icon ? <Icon className="h-4 w-4" /> : null}
         <span>{label}</span>

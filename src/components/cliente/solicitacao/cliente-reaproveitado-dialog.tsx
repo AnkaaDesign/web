@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { PortalReusedCustomer } from "@/api-client/portal";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 interface ClienteReaproveitadoDialogProps {
   /** `null` = não houve reaproveitamento; o diálogo não existe. */
@@ -57,7 +58,7 @@ export function ClienteReaproveitadoDialog({ reuso, onConfirm }: ClienteReaprove
         if (!aberto) onConfirm();
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className={PORTAL_SHEET_ON_MOBILE}>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <IconBuildingStore className="h-5 w-5" />

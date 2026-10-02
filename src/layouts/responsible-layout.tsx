@@ -17,15 +17,22 @@
 // seis, ela precisa de navegação — e a navegação do portal é RECORTADA PELO
 // PAPEL: o que a pessoa não pode fazer não aparece.
 //
-// É uma barra de abas horizontal, e não a `Sidebar` interna, por três razões:
-// são poucas seções e uma sidebar seria moldura demais para elas; `/cliente` é
-// isento do `MobileUsageGuard` (por PREFIXO), então metade destas visitas é de
-// celular, onde a barra rola e a sidebar não cabe; e a sidebar interna carrega
-// `navigation.ts`, que é um catálogo de telas de FUNCIONÁRIO.
-import { useEffect } from "react";
+// É uma barra de abas horizontal, e não a `Sidebar` interna, por duas razões:
+// são poucas seções e uma sidebar seria moldura demais para elas; e a sidebar
+// interna carrega `navigation.ts`, que é um catálogo de telas de FUNCIONÁRIO.
+//
+// ── NO CELULAR (02/10/2026) ─────────────────────────────────────────────────
+//
+// O portal é usado no navegador do celular. Lá a barra de abas ROLAVA de lado e
+// escondia metade das seções (a 390 px só cabiam Início, Orçamentos, Solicitar
+// e meio Veículos). Abaixo de `md` a navegação é uma BARRA FIXA EMBAIXO, ao
+// alcance do polegar: as quatro primeiras seções e "Mais", que abre o resto
+// (com o tema e o Sair). Do `md` para cima, as abas de sempre.
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   IconCar,
+  IconDots,
   IconFileInvoice,
   IconFilePlus,
   IconFileText,
@@ -41,6 +48,8 @@ import { routes } from "@/constants/routes";
 import { RESPONSIBLE_ROLE } from "@/constants/enums";
 import { cn } from "@/lib/utils";
 import { PORTAL_CAPABILITY, capabilitiesForRoles } from "@/utils/portal-capabilities";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { usePortalMobile } from "@/components/cliente/use-portal-mobile";
 import { getPricingVisible, setPricingVisible } from "@/utils/pricing-visibility";
 
 type PortalNavItem = {
@@ -134,10 +143,20 @@ function telaComTeto(pathname: string): boolean {
   return ROTAS_COM_TETO.some(r => pathname === r || pathname === `${r}/`);
 }
 
+/** Quantas seções cabem na barra do celular antes do "Mais". */
+const BARRA_MOVEL_DIRETAS = 4;
+
 export const ResponsibleLayout = () => {
   const { responsible, logout } = useResponsibleAuth();
   const { pathname } = useLocation();
-  const comTeto = telaComTeto(pathname);
+  const mobile = usePortalMobile();
+  // ⚠️ NO CELULAR NÃO HÁ TETO: a lista vira cartões, e cartões CRESCEM — quem
+  // rola é a página, como em toda tela de celular. Teto com rolagem interna
+  // num telefone é uma janelinha rolando dentro de outra.
+  const comTeto = !mobile && telaComTeto(pathname);
+  const [maisAberto, setMaisAberto] = useState(false);
+  // Navegar fecha o "Mais".
+  useEffect(() => setMaisAberto(false), [pathname]);
 
   // ── DINHEIRO VISÍVEL NO PORTAL ─────────────────────────────────────────────
   //
@@ -193,7 +212,7 @@ export const ResponsibleLayout = () => {
   // auto` por padrão e se recusa a encolher abaixo do conteúdo, então sem ele a
   // rolagem vaza para a página inteira em vez de ficar na tabela.
   return (
-    <div className="flex h-dvh w-full flex-col bg-background">
+    <div className="portal-toque flex h-dvh w-full flex-col bg-background">
       {/* ⚠️ O SEPARADOR É UMA COSTURA, NÃO UM TRAÇO — decisão do dono, olhando o
           portal no escuro. Eram TRÊS valores empilhados em 4 pixels: a página é
           `--background` 11%, o cabeçalho é `--card` 15% e a borda cheia é
@@ -212,22 +231,21 @@ export const ResponsibleLayout = () => {
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1">
+          {/* No celular o tema e o Sair moram no "Mais" da barra de baixo. */}
+          <div className="hidden shrink-0 items-center gap-1 md:flex">
             <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={() => void logout()} aria-label="Sair">
               <IconLogout className="h-4 w-4" />
-              <span className="ml-2 hidden sm:inline">Sair</span>
+              <span className="ml-2">Sair</span>
             </Button>
           </div>
         </div>
 
-        {/* `overflow-x-auto` e não quebra de linha: no celular as abas ROLAM.
-            Quebrar empurraria o conteúdo da página para baixo da dobra logo na
-            abertura, que é justamente onde o contato procura o que ele veio
-            fazer. */}
+        {/* As abas — só do `md` para cima. No celular a navegação é a barra
+            fixa de baixo (ver o fim desta moldura). */}
         <nav
           aria-label="Seções do portal"
-          className="mx-auto w-full max-w-7xl overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mx-auto hidden w-full max-w-7xl overflow-x-auto px-2 [scrollbar-width:none] md:block [&::-webkit-scrollbar]:hidden"
         >
           <ul className="flex min-w-max items-center gap-1 pb-px">
             {visibleNav.map(({ to, label, icon: Icon, end }) => (
@@ -297,7 +315,9 @@ export const ResponsibleLayout = () => {
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div
           className={cn(
-            "mx-auto flex w-full max-w-7xl flex-col px-4 py-6",
+            // `pb-24` no celular: o respiro da barra fixa de baixo, mais a área
+            // segura do iPhone — senão o último cartão fica atrás dela.
+            "mx-auto flex w-full max-w-7xl flex-col px-4 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:py-6",
             // ⚠️ `h-full` dá TETO — a tabela se limita e rola por dentro.
             // `min-h-full` deixa CRESCER — a margem de baixo cai depois da
             // última linha, em vez de ser pintada no meio da rolagem. Ver
@@ -313,6 +333,97 @@ export const ResponsibleLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* ── A BARRA DE BAIXO, SÓ NO CELULAR ─────────────────────────────── */}
+      <nav
+        aria-label="Seções do portal"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
+        <ul className="mx-auto flex max-w-lg items-stretch justify-around">
+          {(visibleNav.length > BARRA_MOVEL_DIRETAS + 1
+            ? visibleNav.slice(0, BARRA_MOVEL_DIRETAS)
+            : visibleNav
+          ).map(({ to, label, icon: Icon, end }) => (
+            <li key={to} className="flex-1">
+              <NavLink
+                to={to}
+                end={end}
+                data-touch
+                className={({ isActive }) =>
+                  cn(
+                    "flex h-16 flex-col items-center justify-center gap-1 text-xs transition-colors",
+                    isActive ? "font-medium text-primary" : "text-muted-foreground",
+                  )
+                }
+              >
+                <Icon className="h-5 w-5" />
+                <span className="max-w-full truncate px-1">{label}</span>
+              </NavLink>
+            </li>
+          ))}
+          {visibleNav.length > BARRA_MOVEL_DIRETAS + 1 ? (
+            <li className="flex-1">
+              <button
+                type="button"
+                onClick={() => setMaisAberto(true)}
+                aria-haspopup="dialog"
+                aria-expanded={maisAberto}
+                className={cn(
+                  "flex h-16 w-full flex-col items-center justify-center gap-1 text-xs transition-colors",
+                  visibleNav
+                    .slice(BARRA_MOVEL_DIRETAS)
+                    .some((item) => pathname.startsWith(item.to))
+                    ? "font-medium text-primary"
+                    : "text-muted-foreground",
+                )}
+              >
+                <IconDots className="h-5 w-5" />
+                Mais
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      </nav>
+
+      <Sheet open={maisAberto} onOpenChange={setMaisAberto}>
+        <SheetContent side="bottom" aria-describedby={undefined} className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <SheetHeader>
+            <SheetTitle>Mais</SheetTitle>
+          </SheetHeader>
+          <ul className="mt-2 space-y-1">
+            {(visibleNav.length > BARRA_MOVEL_DIRETAS + 1 ? visibleNav.slice(BARRA_MOVEL_DIRETAS) : []).map(
+              ({ to, label, icon: Icon, end }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    data-touch
+                    className={({ isActive }) =>
+                      cn(
+                        "flex h-12 items-center gap-3 rounded-lg px-3 text-base",
+                        isActive ? "bg-muted font-medium text-foreground" : "text-foreground hover:bg-muted",
+                      )
+                    }
+                  >
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    {label}
+                  </NavLink>
+                </li>
+              ),
+            )}
+          </ul>
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/50 pt-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ThemeToggle />
+              Tema
+            </div>
+            <Button variant="outline" className="h-11" onClick={() => void logout()}>
+              <IconLogout className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

@@ -10,7 +10,8 @@
 //
 // O QUE É COPIADO, e de propósito, é o CONTRATO com quem usa:
 //
-//   · duplo clique (ou Enter/F2 com a linha focada) entra em edição;
+//   · duplo clique (ou Enter/F2 com a linha focada) entra em edição — e, com o
+//     dedo como ponteiro (celular), um toque só;
 //   · Enter grava, Escape descarta, clicar fora grava o que está no campo;
 //   · gravou, aparece um "Desfazer" vermelho com contagem regressiva ao lado do
 //     valor — e não um toast de canto, que some junto com o lugar onde a coisa
@@ -236,6 +237,8 @@ export function PortalInlineField({
     // hover, o cursor vira ponteiro e o `title` diz "Duplo clique para editar".
     // Lá também NÃO há lápis parado — a régua já era essa.
     const trailing = undoButton ?? (canEdit ? undefined : lockedHint ?? undefined);
+    const ponteiroDeToque = () =>
+      typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
     return (
       <div className="space-y-1">
@@ -247,6 +250,10 @@ export function PortalInlineField({
           tabIndex={canEdit ? 0 : undefined}
           title={canEdit ? "Duplo clique para editar" : undefined}
           onDoubleClick={canEdit ? begin : undefined}
+          // ⚠️ NO TOQUE NÃO HÁ DUPLO CLIQUE: o celular não o entrega (o segundo
+          // toque vira zoom). Com o dedo como ponteiro, UM toque abre a edição —
+          // no mouse continua o duplo clique, que protege da edição acidental.
+          onClick={canEdit ? () => (ponteiroDeToque() ? begin() : undefined) : undefined}
           onKeyDown={
             canEdit
               ? (e) => {

@@ -79,6 +79,7 @@ import { PortalCard, PortalRows } from "../portal-detail";
 import { PortalInlineField } from "../portal-inline-field";
 
 import { portalVinPlateThumbUrl, portalVinPlateUrl } from "./portal-file-url";
+import { usePortalMobile } from "../use-portal-mobile";
 
 /**
  * O NÚMERO DO PEDIDO VIVE EM DOIS LUGARES, e o da direita é o novo.
@@ -129,6 +130,7 @@ export function VeiculoIdentidadeCard({
   const mutation = usePortalUpdateVehicleIdentity();
 
   const identity = veiculo.identity ?? null;
+  const mobile = usePortalMobile();
   // Tipo e categoria são do IMPLEMENTO (`veiculo.implement`), não da identidade.
   const implement = veiculo.implement ?? null;
   const pedidoAtual = pedidoDe(identity);
@@ -232,7 +234,7 @@ export function VeiculoIdentidadeCard({
               ? "Este veículo ainda está sem placa e sem chassi."
               : `Este veículo ainda está sem ${bloqueando[0]}.`}{" "}
             {canWrite
-              ? "Corrija abaixo para liberar a emissão da nota e a entrega — duplo clique na linha."
+              ? `Corrija abaixo para liberar a emissão da nota e a entrega — ${mobile ? "toque" : "duplo clique"} na linha.`
               : "Peça a quem cuida da frota na sua empresa para informar esses dados."}
           </p>
         </div>

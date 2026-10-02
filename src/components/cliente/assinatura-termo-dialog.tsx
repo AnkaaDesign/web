@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dialog";
 import { COMPANY_INFO } from "@/config/company";
 import type { PortalPendingSignature } from "@/api-client/portal";
+import { cn } from "@/lib/utils";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 export interface AssinaturaTermoDialogProps {
   open: boolean;
@@ -99,7 +101,7 @@ export function AssinaturaTermoDialog({
       {/* `max-w-2xl` + `overflow-y-auto`: o diálogo abraça o conteúdo e cresce só
           até caber na tela. Num celular o termo é longo e a rolagem é dele, não
           da página atrás. */}
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "max-h-[90vh] max-w-2xl overflow-y-auto")}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconShieldCheck className="h-5 w-5 text-primary" />

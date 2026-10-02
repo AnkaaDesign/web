@@ -52,6 +52,9 @@ import {
   type PortalVehicleDetail,
 } from "@/api-client/portal";
 import { DataTablePage } from "@/components/ui/datatable";
+import { PageHeader } from "@/components/ui/page-header";
+import { PortalMobileList } from "@/components/cliente/portal-mobile-list";
+import { usePortalMobile } from "@/components/cliente/use-portal-mobile";
 import { routes } from "@/constants";
 import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
 import {
@@ -184,6 +187,44 @@ export function ClientePortalVeiculosPage() {
     },
     [navigate],
   );
+
+  const mobile = usePortalMobile();
+
+  // NO CELULAR, CARTÕES — as mesmas colunas e a mesma consulta
+  // (`portal-mobile-list.tsx`); a ordem é a padrão da lista.
+  if (mobile) {
+    return (
+      <div className="space-y-3">
+        {error ? (
+          <PortalErrorBanner
+            message="Não foi possível carregar os veículos."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
+        ) : null}
+        <PageHeader
+          variant="list"
+          title="Veículos"
+          icon={IconCar}
+          breadcrumbs={[{ label: "Início", href: routes.customer.portal.root }, { label: "Veículos" }]}
+        />
+        <PortalMobileList<PortalVehicleDetail>
+          rows={veiculos}
+          columns={columns}
+          getRowId={getRowId}
+          onRowClick={onRowClick}
+          isLoading={isLoading}
+          totalRecords={totalRecords}
+          page={page}
+          pageSize={pageSize}
+          params={params}
+          onParamsChange={onParamsChange}
+          searchPlaceholder="Buscar por série, placa, chassi ou pedido..."
+          emptyMessage="Nenhum veículo encontrado."
+        />
+      </div>
+    );
+  }
 
   return (
     // `h-full`, E NÃO UM NÚMERO MÁGICO.

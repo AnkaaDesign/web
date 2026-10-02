@@ -30,6 +30,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { PAINT_FINISH, PAINT_FINISH_LABELS } from "@/constants";
 import { listarTiposDeTinta } from "./solicitacao-api";
 import { novaTintaSchema, type NovaTintaFormData } from "./solicitacao-schema";
+import { cn } from "@/lib/utils";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 interface NovaTintaDialogProps {
   open: boolean;
@@ -97,7 +99,7 @@ export function NovaTintaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "sm:max-w-md")}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconPalette className="h-5 w-5" />

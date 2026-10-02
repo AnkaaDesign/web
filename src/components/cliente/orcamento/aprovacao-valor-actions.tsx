@@ -40,6 +40,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PORTAL_CAPABILITY, hasPortalCapability } from "@/utils/portal-capabilities";
 import type { TASK_QUOTE_STATUS } from "@/types/budget";
+import { cn } from "@/lib/utils";
+import { PORTAL_SHEET_ON_MOBILE } from "@/components/cliente/portal-dialog";
 
 /** Quanto texto o motivo aceita — o mesmo teto confortável de uma observação. */
 const MOTIVO_MAX = 1000;
@@ -168,7 +170,7 @@ export function AprovacaoValorActions({
       {/* ── APROVAR ───────────────────────────────────────────────────────── */}
       <Dialog open={approveOpen} onOpenChange={closeApprove}>
         {/* `max-w-md`: o diálogo ABRAÇA o conteúdo. */}
-        <DialogContent className="max-w-md">
+        <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "max-w-md")}>
           <DialogHeader>
             <DialogTitle>Aprovar este orçamento?</DialogTitle>
             <DialogDescription>
@@ -207,7 +209,7 @@ export function AprovacaoValorActions({
 
       {/* ── RECUSAR ───────────────────────────────────────────────────────── */}
       <Dialog open={refuseOpen} onOpenChange={closeRefuse}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={cn(PORTAL_SHEET_ON_MOBILE, "max-w-md")}>
           <DialogHeader>
             <DialogTitle>Recusar e devolver para a Ankaa?</DialogTitle>
             <DialogDescription asChild>
