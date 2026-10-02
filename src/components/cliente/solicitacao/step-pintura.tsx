@@ -31,6 +31,7 @@ import {
   type NovaTintaFormData,
   type SolicitacaoFormData,
 } from "./solicitacao-schema";
+import { usePortalMobile } from "../use-portal-mobile";
 
 interface StepPinturaProps {
   disabled?: boolean;
@@ -52,6 +53,7 @@ export function SolicitacaoStepPintura({
   onBaseFilesChange,
   onPaintsSeen,
 }: StepPinturaProps) {
+  const mobile = usePortalMobile();
   const { control, setValue } = useFormContext<SolicitacaoFormData>();
   const paintId = useWatch({ control, name: "paintId" });
   const novaTinta = useWatch({ control, name: "novaTinta" });
@@ -277,7 +279,12 @@ export function SolicitacaoStepPintura({
             existingFiles={baseFiles}
             onFilesChange={handleFilesChange}
             disabled={disabled}
-            placeholder="Arraste as imagens aqui ou clique para escolher"
+            // No celular não há o que arrastar: o toque abre a câmera ou a galeria.
+            placeholder={
+              mobile
+                ? "Toque para tirar uma foto ou escolher da galeria"
+                : "Arraste as imagens aqui ou clique para escolher"
+            }
             label="Arquivos-base"
           />
         </CardContent>
