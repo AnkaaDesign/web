@@ -45,6 +45,7 @@ import { RESPONSIBLE_ROLE_LABELS } from "@/constants";
 import type { RESPONSIBLE_ROLE } from "@/constants";
 import { AssinaturaCard } from "@/components/cliente/assinatura-card";
 import { AssinaturaTermoDialog } from "@/components/cliente/assinatura-termo-dialog";
+import { orderNumberPayload } from "@/components/public/signature/order-number-fields";
 
 /**
  * ⛔ AQUI NÃO SE LÊ A FROTA. Nem inteira, nem paginada.
@@ -60,7 +61,7 @@ import { AssinaturaTermoDialog } from "@/components/cliente/assinatura-termo-dia
  *     quais veículos cobre; ler a frota do cliente (358 veículos, no caso da
  *     Marquespan) e filtrar por `vehicle.budget.id` é reconstruir no navegador
  *     um vínculo que o servidor tem de primeira mão — e o veredito do portão
- *     nem sequer era do navegador: `pedidoDeCompra` já vinha decidido.
+ *     nem sequer era do navegador: o servidor já o manda decidido (`orderNumber`).
  *
  * `GET /cliente/me/assinaturas` passou a trazer `veiculos[]` por envelope, com
  * série, placa e número do pedido, recortados pela seção `VEHICLE` como todo o
@@ -118,6 +119,8 @@ export function ClientePortalAssinaturasPage() {
   /** O envelope cujo termo está aberto. `null` = nenhum diálogo. */
   const [activeSignerId, setActiveSignerId] = useState<string | null>(null);
   const [signError, setSignError] = useState<string | null>(null);
+  /** O nº do pedido digitado em cada cartão (DD12.1), por `signerId`. */
+  const [orderValues, setOrderValues] = useState<Record<string, string>>({});
 
   const ativa = useMemo(
     () => pendentes.find((item) => item.signerId === activeSignerId) ?? null,
@@ -144,16 +147,24 @@ export function ClientePortalAssinaturasPage() {
     setSignError(null);
     try {
       const geo = await collectGeo();
+      // DD12.1: o nº do pedido vai NO ATO — o mesmo valor em cada veículo sem
+      // pedido; vazio quando nada precisa ser digitado (herança no servidor).
+      const orderNumbers = orderNumberPayload(ativa.orderNumber, orderValues[ativa.signerId] ?? "");
       await sign.mutateAsync({
         signerId: ativa.signerId,
-        data: { declarations, clientTimestamp: new Date().toISOString(), geo },
+        data: {
+          declarations,
+          clientTimestamp: new Date().toISOString(),
+          geo,
+          ...(orderNumbers.length ? { orderNumbers } : {}),
+        },
       });
       // Sem toast próprio: o interceptor de `api-client/portal.ts` já anuncia a
       // mensagem que o servidor devolveu, e a mutation invalida o cache — o
       // envelope some da fila sozinho, que é o aviso que de fato importa.
       setActiveSignerId(null);
     } catch (e) {
-      // 403 do portão do Compras cai aqui com a frase do servidor. Fica DENTRO
+      // A recusa do pedido de compra (400, DD12.1) cai aqui com a frase do servidor. Fica DENTRO
       // do diálogo, ao lado do botão que falhou.
       setSignError(portalErrorMessage(e, "Não foi possível concluir a assinatura."));
     }
@@ -227,7 +238,6 @@ export function ClientePortalAssinaturasPage() {
           <AssinaturaCard
             key={assinatura.signerId}
             assinatura={assinatura}
-            roles={roles}
             expanded={expandedSignerId === assinatura.signerId}
             onToggleExpanded={() =>
               setExpandedSignerId((current) =>
@@ -235,6 +245,10 @@ export function ClientePortalAssinaturasPage() {
               )
             }
             signing={sign.isPending && activeSignerId === assinatura.signerId}
+            orderValue={orderValues[assinatura.signerId] ?? ""}
+            onOrderValueChange={(value) =>
+              setOrderValues((current) => ({ ...current, [assinatura.signerId]: value }))
+            }
             onSign={() => {
               setSignError(null);
               setActiveSignerId(assinatura.signerId);

@@ -34,7 +34,9 @@ function problemOf(value: string, maxLength: number): string | null {
 
 /** Veículos que ainda estão sem número. */
 export function missingOrderVehicles(gate: PublicOrderNumberGate | null | undefined) {
-  return (gate?.vehicles ?? []).filter(v => !normalizeOrderNumber(v.value));
+  return (gate?.vehicles ?? []).filter(v =>
+    typeof v.hasNumber === "boolean" ? !v.hasNumber : !normalizeOrderNumber(v.value),
+  );
 }
 
 /**

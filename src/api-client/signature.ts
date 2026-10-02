@@ -293,7 +293,12 @@ export interface PublicOrderNumberGate {
   maxLength: number;
   /** Número já registrado e único: os veículos sem número o herdam na assinatura. */
   inherited?: string | null;
-  vehicles: Array<{ taskId: string; label: string; value: string | null }>;
+  /**
+   * `hasNumber`: o veículo JÁ TEM pedido — número digitado OU pedido registrado
+   * pelo portal (`purchaseOrderId`, DD12). Um veículo com pedido do portal e sem
+   * número digitado não é cobrado. Ausente em servidor antigo: aí vale `value`.
+   */
+  vehicles: Array<{ taskId: string; label: string; value: string | null; hasNumber?: boolean }>;
 }
 
 /** Um dos PDFs congelados por uma coleta. */

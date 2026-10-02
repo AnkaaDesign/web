@@ -4,27 +4,18 @@
 //
 // O cartão é um DOCUMENTO, não um formulário: número do orçamento, o recorte que
 // esta pessoa recebeu, os veículos cobertos, a folha, e um botão. Tudo o que se
-// digita aqui cabe num campo só — e é o do ⛔ PORTÃO DO COMPRAS.
+// digita aqui cabe num campo só — o do Nº DO PEDIDO DE COMPRA.
 //
-// ── O PORTÃO DO COMPRAS (§7) ────────────────────────────────────────────────
+// ── O Nº DO PEDIDO (DD12.1) ─────────────────────────────────────────────────
 //
-// Responsável cujo ÚNICO papel é `PURCHASING` só assina se o veículo tiver
-// número de pedido de compra. A régua é `roles.length === 1 && roles[0] ===
-// 'PURCHASING'` — quem acumula Compras com Comercial, Vendedor, Representante ou
-// Coordenador NÃO é barrado.
-//
-// ⛔ E QUEM APLICA A RÉGUA É O SERVIDOR, NÃO ESTE ARQUIVO. `pedidoDeCompra`
-// chega pronto em cada pendência: `exigido` (o papel único), `pendente` (o
-// veredito sobre TODOS os veículos do envelope) e `mensagem` (a frase literal do
-// 403). A versão anterior deste cartão recalculava o veredito aqui, e para isso
-// precisava da frota inteira do cliente — `GET /cliente/me/veiculos?take=500`,
-// filtrada no navegador por `vehicle.budget.id`. Eram 358 linhas para responder
-// sobre 4, um 400 do teto de `take`, e duas réguas que podiam divergir.
-//
-// ⚠️ A TELA NUNCA CONTRADIZ O SERVIDOR, e agora nem tem como: ela DESENHA o
-// veredito dele. O que sobra de decisão local é `podeAssinarAqui` — a cerimônia
-// antiga, por código, que se resolve no link pessoal e não aqui.
-import { useMemo } from "react";
+// Quem TEM a função Compras (mesmo acumulando outras) só assina com o pedido do
+// orçamento. O pedido é UM SÓ para o orçamento: havendo um número único já
+// registrado, os veículos sem número o herdam e nada se digita; sem ele, o
+// signatário informa um número, o mesmo para todos, NO PRÓPRIO ATO de assinar
+// (`orderNumbers` no corpo). É a mesma regra e o mesmo campo da página pública
+// (`OrderNumberFields`), e quem julga é o servidor (`orderNumber` em cada
+// pendência). A tela só impede o clique enquanto o campo obrigatório está vazio
+// ou inválido — a recusa, se vier, é a frase do servidor.
 import {
   IconAlertTriangle,
   IconCheck,
@@ -41,75 +32,53 @@ import { Button } from "@/components/ui/button";
 import { PortalCard } from "./portal-detail";
 import { Separator } from "@/components/ui/separator";
 import type { PortalPendingSignature } from "@/api-client/portal";
-import { PORTAL_CAPABILITY, hasPortalCapability } from "@/utils/portal-capabilities";
 import { formatDate } from "@/utils";
+import {
+  OrderNumberFields,
+  orderNumberClientProblem,
+} from "@/components/public/signature/order-number-fields";
 import { AssinaturaDocumento } from "./assinatura-documento";
-import { PedidoCompraField } from "./pedido-compra-field";
-
-/**
- * A MENSAGEM DO PORTÃO — o recuo, e só o recuo.
- *
- * O servidor manda a frase em `pedidoDeCompra.mensagem`, e é ela que a tela
- * imprime: as duas não podem divergir por uma vírgula. Esta constante fica como
- * texto de reserva para o caso de o veredito chegar bloqueado e sem frase, e
- * continua exportada porque o teste de tela a cita.
- */
-export const COMPRAS_GATE_MESSAGE = "Informe o número do pedido de compra antes de assinar.";
 
 export interface AssinaturaCardProps {
   assinatura: PortalPendingSignature;
-  /** Os papéis DESTE contato — decidem se o campo de conserto aparece. */
-  roles: string[];
   /** Documento aberto? A expansão é ÚNICA — quem manda é a página. */
   expanded: boolean;
   onToggleExpanded: () => void;
   signing: boolean;
+  /** O nº do pedido digitado neste cartão (DD12.1). Quem guarda é a página. */
+  orderValue: string;
+  onOrderValueChange: (value: string) => void;
   onSign: () => void;
 }
 
 export function AssinaturaCard({
   assinatura,
-  roles,
   expanded,
   onToggleExpanded,
   signing,
+  orderValue,
+  onOrderValueChange,
   onSign,
 }: AssinaturaCardProps) {
   /**
    * Os veículos DESTE envelope, ditos pelo próprio envelope.
    *
    * ⚠️ Vazio significa "você não vê isto" quando o recorte não tem `VEHICLE`, e
-   * não "o orçamento não tem veículos". Quem responde a segunda pergunta é
-   * `pedidoDeCompra.pendente`, julgado no servidor sobre a lista COMPLETA.
+   * não "o orçamento não tem veículos". O pedido é julgado pelo servidor sobre a
+   * lista COMPLETA (`orderNumber`), não sobre esta.
    */
   const veiculos = assinatura.veiculos ?? [];
 
-  /** Os que ainda não têm número — a escrita dupla conta dos dois lados. */
-  const semPedido = useMemo(
-    () =>
-      veiculos.filter(
-        (veiculo) =>
-          !veiculo.purchaseOrder?.number?.trim() && !veiculo.customerOrderNumber?.trim(),
-      ),
-    [veiculos],
-  );
-
-  const gate = assinatura.pedidoDeCompra;
-  const comprasGateFechado = !!gate?.pendente;
-  const canWritePurchaseOrder = hasPortalCapability(
-    roles,
-    PORTAL_CAPABILITY.WRITE_PURCHASE_ORDER,
-  );
+  const gate = assinatura.orderNumber;
+  /** Falta o nº do pedido e o campo ainda não o tem num formato aceito. */
+  const pedidoProblema = orderNumberClientProblem(gate, orderValue);
 
   /**
-   * O servidor é soberano, e desta vez literalmente: `podeAssinarAqui` é a
-   * cerimônia (uma coleta antiga, por código, se resolve no link pessoal) e
-   * `pedidoDeCompra.pendente` é o portão. A tela não acrescenta condição própria.
+   * `podeAssinarAqui` é a cerimônia (uma coleta antiga, por código, se resolve
+   * no link pessoal); o pedido só segura o botão enquanto o campo obrigatório
+   * está vazio ou inválido.
    */
-  const podeAssinar = assinatura.podeAssinarAqui && !comprasGateFechado;
-
-  /** Os veículos que o campo do portão vai carimbar. */
-  const alvoDoPedido = semPedido.length ? semPedido : veiculos;
+  const podeAssinar = assinatura.podeAssinarAqui && !pedidoProblema;
 
   /**
    * O rótulo do recorte vem PRONTO do servidor (`documento.label`).
@@ -179,9 +148,11 @@ export function AssinaturaCard({
                     className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-sm"
                   >
                     <span className="font-medium text-foreground">{veiculo.label}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {numero ? `Pedido ${numero}` : "Sem pedido de compra"}
-                    </span>
+                    {gate ? (
+                      <span className="text-sm text-muted-foreground">
+                        {numero ? `Pedido ${numero}` : "Sem pedido de compra"}
+                      </span>
+                    ) : null}
                   </li>
                 );
               })}
@@ -189,46 +160,16 @@ export function AssinaturaCard({
           </div>
         )}
 
-        {/* ── O PORTÃO DO COMPRAS ─────────────────────────────────────────
-            Faixa âmbar com a mensagem LITERAL que o servidor mandou e, logo
-            abaixo, o campo que a resolve. */}
-        {comprasGateFechado && (
-          <Alert variant="warning">
-            <AlertDescription className="space-y-3">
-              <p className="font-medium text-foreground">
-                {gate?.mensagem || COMPRAS_GATE_MESSAGE}
-              </p>
-              <p className="text-sm">
-                Seu cadastro tem <strong>Compras</strong> como única função, e nessa função a
-                assinatura depende do número do pedido de compra do veículo. Informe-o aqui e o
-                botão de assinar libera.
-              </p>
-
-              {alvoDoPedido.length === 0 ? (
-                // O servidor diz que falta pedido e o recorte não deixa listar
-                // os veículos: não há o que carimbar daqui. Dizer isso é melhor
-                // do que oferecer um campo que não tem onde gravar.
-                <p className="text-sm">
-                  Não foi possível identificar os veículos deste orçamento. Fale com a Ankaa para
-                  registrar o pedido de compra.
-                </p>
-              ) : canWritePurchaseOrder ? (
-                <PedidoCompraField
-                  id={`pedido-${assinatura.signerId}`}
-                  taskIds={alvoDoPedido.map((veiculo) => veiculo.taskId)}
-                  label={
-                    alvoDoPedido.length === 1
-                      ? "Número do pedido de compra"
-                      : `Número do pedido de compra (vale para os ${alvoDoPedido.length} veículos)`
-                  }
-                />
-              ) : (
-                <p className="text-sm">
-                  Peça a quem emite os pedidos de compra da sua empresa para registrar o número.
-                </p>
-              )}
-            </AlertDescription>
-          </Alert>
+        {/* ── O Nº DO PEDIDO (DD12.1) ──────────────────────────────────────
+            Só para quem tem Compras. Com pedido único já registrado o campo
+            mostra o número herdado e não pede nada. */}
+        {gate && assinatura.podeAssinarAqui && (
+          <OrderNumberFields
+            gate={gate}
+            value={orderValue}
+            onChange={onOrderValueChange}
+            disabled={signing}
+          />
         )}
 
         {/* A CERIMÔNIA É OUTRA — uma coleta emitida por código, que se assina
@@ -236,7 +177,7 @@ export function AssinaturaCard({
             o portal dizer "nada esperando por você" enquanto um orçamento
             espera. O que não se pode é oferecer aqui um botão que o servidor
             recusaria. */}
-        {!assinatura.podeAssinarAqui && !comprasGateFechado && (
+        {!assinatura.podeAssinarAqui && (
           <Alert variant="warning">
             <AlertDescription>
               <span className="flex items-start gap-2">
@@ -281,12 +222,12 @@ export function AssinaturaCard({
         </div>
 
         <Button
-          className="w-full"
+          className="h-12 w-full"
           size="lg"
           disabled={!podeAssinar || signing}
           // Dica nativa no botão desabilitado: o motivo aparece no hover mesmo
           // desabilitado, e a faixa acima já o diz por extenso.
-          title={comprasGateFechado ? gate?.mensagem || COMPRAS_GATE_MESSAGE : undefined}
+          title={pedidoProblema ?? undefined}
           onClick={onSign}
         >
           {signing ? (
