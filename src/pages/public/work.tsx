@@ -58,8 +58,24 @@ function useDeviceThemeForVisitors() {
   }, []);
 }
 
+/**
+ * The system shrinks its whole UI to 90% through the root font-size (index.css, GLOBAL UI SCALE) —
+ * right for a dense desktop app, wrong for a page read on a phone. Full size while this page is up.
+ */
+function useFullSizeType() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.fontSize;
+    root.style.fontSize = "100%";
+    return () => {
+      root.style.fontSize = previous;
+    };
+  }, []);
+}
+
 export function PublicWorkPage() {
   useDeviceThemeForVisitors();
+  useFullSizeType();
 
   useEffect(() => {
     document.title = COMPANY_INFO.name;
@@ -76,22 +92,22 @@ export function PublicWorkPage() {
 
       <div />
 
-      <div className="relative flex w-full max-w-md flex-col items-center text-center">
-        <img src={BRAND_ASSETS.logo} alt={COMPANY_INFO.name} className="w-56 max-w-[70vw] select-none sm:w-64" draggable={false} />
+      <div className="relative flex w-full max-w-lg flex-col items-center text-center">
+        <img src={BRAND_ASSETS.logo} alt={COMPANY_INFO.name} className="w-[min(80vw,22rem)] select-none" draggable={false} />
 
-        <h1 className="mt-10 text-balance text-[clamp(1.75rem,7vw,2.5rem)] font-extrabold leading-tight tracking-tight">
+        <h1 className="mt-12 text-balance text-[clamp(2.25rem,10vw,3.25rem)] font-extrabold leading-[1.1] tracking-tight">
           Está procurando o quê, <span className="text-primary">curioso</span>?
         </h1>
-        <p className="mt-4 text-base text-muted-foreground">Este baú foi feito pela {COMPANY_INFO.name}.</p>
-        <p className="mt-1 text-base text-muted-foreground">Logo, logo tem mais coisa por aqui.</p>
+        <p className="mt-6 text-[clamp(1.125rem,4.8vw,1.375rem)] text-muted-foreground">Este baú foi feito pela {COMPANY_INFO.name}.</p>
+        <p className="mt-1.5 text-[clamp(1.125rem,4.8vw,1.375rem)] text-muted-foreground">Logo, logo tem mais coisa por aqui.</p>
       </div>
 
-      <footer className="relative text-sm">
+      <footer className="relative text-base">
         <a
           href={whatsappLinkFor(COMPANY_INFO.phoneClean)}
           className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
         >
-          <IconBrandWhatsapp className="h-4 w-4 text-primary" stroke={2} />
+          <IconBrandWhatsapp className="h-5 w-5 text-primary" stroke={2} />
           {COMPANY_INFO.phone}
         </a>
       </footer>
