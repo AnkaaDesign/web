@@ -1,0 +1,1825 @@
+{
+  "gerado": "2026-09-28T13:49:13.930Z",
+  "camera": {
+    "alturaM": 1.6,
+    "nota": "pessoa de 1,80 m, celular nivelado na altura do peito; teto: em pé sobre o baú, 1 m da borda traseira",
+    "lentes": {
+      "1x": {
+        "fovLongDeg": 68,
+        "usadaEm": "rígidos"
+      },
+      "0.5x": {
+        "fovLongDeg": 106,
+        "usadaEm": "carretas"
+      }
+    },
+    "quadro": {
+      "paisagem": [
+        1600,
+        900
+      ],
+      "retrato": [
+        900,
+        1600
+      ]
+    }
+  },
+  "veiculos": {
+    "toco": {
+      "veiculo": "toco",
+      "thermoKing": false,
+      "bau": {
+        "width": 2.606998562812805,
+        "height": 2.7768721448421445,
+        "length": 7.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-vm-2015",
+        "chassisId": "4x2r",
+        "cab": "models/trucks/volvo_vm_2015_4x2r.glb",
+        "implemento": "sobrechassi-frigorifico-gancheiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "toco/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 9.32,
+            "cam": [
+              -9.33,
+              1.6,
+              5.89
+            ],
+            "mira": [
+              0,
+              1.6,
+              5.89
+            ],
+            "ext": [
+              -0.898,
+              0.891,
+              -0.518,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "toco/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 9.34,
+            "cam": [
+              9.34,
+              1.6,
+              5.89
+            ],
+            "mira": [
+              0,
+              1.6,
+              5.89
+            ],
+            "ext": [
+              -0.89,
+              0.896,
+              -0.517,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "toco/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.38,
+            "cam": [
+              -5.88,
+              1.6,
+              -2.88
+            ],
+            "mira": [
+              0.8,
+              1.6,
+              5.07
+            ],
+            "ext": [
+              -0.585,
+              0.582,
+              -0.612,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "toco/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.34,
+            "cam": [
+              5.85,
+              1.6,
+              -2.85
+            ],
+            "mira": [
+              -0.8,
+              1.6,
+              5.07
+            ],
+            "ext": [
+              -0.584,
+              0.588,
+              -0.611,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "toco/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 12.62,
+            "cam": [
+              -7.36,
+              1.6,
+              16.04
+            ],
+            "mira": [
+              0.75,
+              1.6,
+              6.38
+            ],
+            "ext": [
+              -0.491,
+              0.493,
+              -0.416,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "toco/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 12.62,
+            "cam": [
+              7.36,
+              1.6,
+              16.04
+            ],
+            "mira": [
+              -0.75,
+              1.6,
+              6.37
+            ],
+            "ext": [
+              -0.493,
+              0.492,
+              -0.411,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "toco/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 4.24,
+            "cam": [
+              0,
+              1.6,
+              14.97
+            ],
+            "mira": [
+              0,
+              1.6,
+              10.74
+            ],
+            "ext": [
+              -0.809,
+              0.811,
+              -0.416,
+              0.9
+            ],
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "toco/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -34.4,
+            "cam": [
+              0,
+              5.84,
+              10.54
+            ],
+            "tetoY": 4.237,
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "truck": {
+      "veiculo": "truck",
+      "thermoKing": false,
+      "bau": {
+        "width": 2.606998562812805,
+        "height": 2.7768721448421445,
+        "length": 8.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-vm-2015",
+        "chassisId": "6x2r",
+        "cab": "models/trucks/volvo_vm_2015_6x2r.glb",
+        "implemento": "sobrechassi-frigorifico-gancheiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "truck/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.1,
+            "cam": [
+              -10.1,
+              1.6,
+              6.39
+            ],
+            "mira": [
+              0,
+              1.6,
+              6.39
+            ],
+            "ext": [
+              -0.903,
+              0.897,
+              -0.471,
+              0.785
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "truck/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.1,
+            "cam": [
+              10.1,
+              1.6,
+              6.39
+            ],
+            "mira": [
+              0,
+              1.6,
+              6.39
+            ],
+            "ext": [
+              -0.897,
+              0.903,
+              -0.471,
+              0.784
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "truck/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.62,
+            "cam": [
+              -5.87,
+              1.6,
+              -2.7
+            ],
+            "mira": [
+              0.96,
+              1.6,
+              5.44
+            ],
+            "ext": [
+              -0.62,
+              0.613,
+              -0.617,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "truck/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.66,
+            "cam": [
+              5.89,
+              1.6,
+              -2.73
+            ],
+            "mira": [
+              -0.96,
+              1.6,
+              5.44
+            ],
+            "ext": [
+              -0.611,
+              0.617,
+              -0.615,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "truck/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 13,
+            "cam": [
+              -7.47,
+              1.6,
+              16.95
+            ],
+            "mira": [
+              0.88,
+              1.6,
+              6.98
+            ],
+            "ext": [
+              -0.514,
+              0.516,
+              -0.415,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "truck/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 13,
+            "cam": [
+              7.48,
+              1.6,
+              16.94
+            ],
+            "mira": [
+              -0.88,
+              1.6,
+              6.98
+            ],
+            "ext": [
+              -0.516,
+              0.514,
+              -0.415,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "truck/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 4.24,
+            "cam": [
+              0,
+              1.6,
+              15.97
+            ],
+            "mira": [
+              0,
+              1.6,
+              11.74
+            ],
+            "ext": [
+              -0.81,
+              0.81,
+              -0.416,
+              0.9
+            ],
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "truck/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -34.1,
+            "cam": [
+              0,
+              5.84,
+              10.74
+            ],
+            "tetoY": 4.236,
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "bitruck": {
+      "veiculo": "bitruck",
+      "thermoKing": false,
+      "bau": {
+        "width": 2.606998562812805,
+        "height": 2.7768721448421445,
+        "length": 9.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-vm-2015",
+        "chassisId": "8x2r",
+        "cab": "models/trucks/volvo_vm_2015_8x2r.glb",
+        "implemento": "sobrechassi-frigorifico-gancheiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "bitruck/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.92,
+            "cam": [
+              -10.92,
+              1.6,
+              6.88
+            ],
+            "mira": [
+              0,
+              1.6,
+              6.88
+            ],
+            "ext": [
+              -0.902,
+              0.898,
+              -0.433,
+              0.717
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "bitruck/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.92,
+            "cam": [
+              10.92,
+              1.6,
+              6.89
+            ],
+            "mira": [
+              0,
+              1.6,
+              6.89
+            ],
+            "ext": [
+              -0.898,
+              0.902,
+              -0.433,
+              0.717
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "bitruck/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.96,
+            "cam": [
+              -5.89,
+              1.6,
+              -2.62
+            ],
+            "mira": [
+              1.15,
+              1.6,
+              5.78
+            ],
+            "ext": [
+              -0.639,
+              0.64,
+              -0.626,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "bitruck/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.93,
+            "cam": [
+              5.87,
+              1.6,
+              -2.6
+            ],
+            "mira": [
+              -1.16,
+              1.6,
+              5.77
+            ],
+            "ext": [
+              -0.642,
+              0.64,
+              -0.629,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "bitruck/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 13.38,
+            "cam": [
+              -7.58,
+              1.6,
+              17.85
+            ],
+            "mira": [
+              1.02,
+              1.6,
+              7.6
+            ],
+            "ext": [
+              -0.535,
+              0.538,
+              -0.428,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "bitruck/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 13.38,
+            "cam": [
+              7.58,
+              1.6,
+              17.85
+            ],
+            "mira": [
+              -1.02,
+              1.6,
+              7.6
+            ],
+            "ext": [
+              -0.538,
+              0.535,
+              -0.427,
+              0.86
+            ],
+            "fov": 41.6,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "bitruck/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 4.24,
+            "cam": [
+              0,
+              1.6,
+              16.97
+            ],
+            "mira": [
+              0,
+              1.6,
+              12.74
+            ],
+            "ext": [
+              -0.809,
+              0.811,
+              -0.416,
+              0.9
+            ],
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "bitruck/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -33,
+            "cam": [
+              0,
+              5.84,
+              11.74
+            ],
+            "tetoY": 4.236,
+            "fov": 68,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "carreta-1450-sem-tk": {
+      "veiculo": "carreta-1450",
+      "thermoKing": false,
+      "bau": {
+        "width": 2.607459783554077,
+        "height": 2.794953339576716,
+        "length": 14.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-fh-2024",
+        "chassisId": "4x2",
+        "cab": "models/trucks/volvo_fh_2024_4x2.glb",
+        "implemento": "semirreboque-frigorifico-paleteiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "carreta-1450-sem-tk/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.42,
+            "cam": [
+              -7.42,
+              1.6,
+              9.67
+            ],
+            "mira": [
+              0,
+              1.6,
+              9.67
+            ],
+            "ext": [
+              -0.902,
+              0.898,
+              -0.327,
+              0.581
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "carreta-1450-sem-tk/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.42,
+            "cam": [
+              7.42,
+              1.6,
+              9.67
+            ],
+            "mira": [
+              0,
+              1.6,
+              9.67
+            ],
+            "ext": [
+              -0.898,
+              0.902,
+              -0.327,
+              0.582
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "carreta-1450-sem-tk/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.21,
+            "cam": [
+              -4.6,
+              1.6,
+              0.1
+            ],
+            "mira": [
+              1.96,
+              1.6,
+              7.92
+            ],
+            "ext": [
+              -0.42,
+              0.417,
+              -0.292,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "carreta-1450-sem-tk/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.21,
+            "cam": [
+              4.57,
+              1.6,
+              0.08
+            ],
+            "mira": [
+              -1.99,
+              1.6,
+              7.9
+            ],
+            "ext": [
+              -0.419,
+              0.423,
+              -0.29,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "carreta-1450-sem-tk/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.59,
+            "cam": [
+              -4.81,
+              1.6,
+              19.36
+            ],
+            "mira": [
+              2,
+              1.6,
+              11.25
+            ],
+            "ext": [
+              -0.407,
+              0.409,
+              -0.339,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "carreta-1450-sem-tk/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.59,
+            "cam": [
+              4.8,
+              1.6,
+              19.36
+            ],
+            "mira": [
+              -2,
+              1.6,
+              11.25
+            ],
+            "ext": [
+              -0.41,
+              0.407,
+              -0.339,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "carreta-1450-sem-tk/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 2.07,
+            "cam": [
+              0,
+              1.6,
+              19.13
+            ],
+            "mira": [
+              0,
+              1.6,
+              17.06
+            ],
+            "ext": [
+              -0.808,
+              0.808,
+              -0.362,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "frontal",
+          "arquivo": "carreta-1450-sem-tk/frontal.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 1.79,
+            "cam": [
+              0,
+              1.6,
+              0.29
+            ],
+            "mira": [
+              0,
+              1.6,
+              2.08
+            ],
+            "ext": [
+              -0.848,
+              0.848,
+              -0.197,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "carreta-1450-sem-tk/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -46.8,
+            "cam": [
+              0,
+              5.86,
+              16.1
+            ],
+            "tetoY": 4.26,
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "carreta-1450-com-tk": {
+      "veiculo": "carreta-1450",
+      "thermoKing": true,
+      "bau": {
+        "width": 2.607459783554077,
+        "height": 2.794953339576716,
+        "length": 14.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-fh-2024",
+        "chassisId": "4x2",
+        "cab": "models/trucks/volvo_fh_2024_4x2.glb",
+        "implemento": "semirreboque-frigorifico-paleteiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "carreta-1450-com-tk/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.42,
+            "cam": [
+              -7.42,
+              1.6,
+              9.68
+            ],
+            "mira": [
+              0,
+              1.6,
+              9.68
+            ],
+            "ext": [
+              -0.904,
+              0.896,
+              -0.327,
+              0.581
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "carreta-1450-com-tk/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.42,
+            "cam": [
+              7.42,
+              1.6,
+              9.65
+            ],
+            "mira": [
+              0,
+              1.6,
+              9.65
+            ],
+            "ext": [
+              -0.901,
+              0.899,
+              -0.327,
+              0.582
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "carreta-1450-com-tk/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.16,
+            "cam": [
+              -4.61,
+              1.6,
+              0.11
+            ],
+            "mira": [
+              1.92,
+              1.6,
+              7.89
+            ],
+            "ext": [
+              -0.421,
+              0.416,
+              -0.292,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "carreta-1450-com-tk/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.16,
+            "cam": [
+              4.58,
+              1.6,
+              0.08
+            ],
+            "mira": [
+              -1.95,
+              1.6,
+              7.86
+            ],
+            "ext": [
+              -0.418,
+              0.425,
+              -0.29,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "carreta-1450-com-tk/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.64,
+            "cam": [
+              -4.81,
+              1.6,
+              19.36
+            ],
+            "mira": [
+              2.03,
+              1.6,
+              11.2
+            ],
+            "ext": [
+              -0.407,
+              0.41,
+              -0.339,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "carreta-1450-com-tk/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.64,
+            "cam": [
+              4.81,
+              1.6,
+              19.36
+            ],
+            "mira": [
+              -2.03,
+              1.6,
+              11.2
+            ],
+            "ext": [
+              -0.41,
+              0.407,
+              -0.339,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "carreta-1450-com-tk/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 2.07,
+            "cam": [
+              0,
+              1.6,
+              19.13
+            ],
+            "mira": [
+              0,
+              1.6,
+              17.06
+            ],
+            "ext": [
+              -0.808,
+              0.808,
+              -0.362,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "frontal",
+          "arquivo": "carreta-1450-com-tk/frontal.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 1.8,
+            "cam": [
+              0,
+              1.6,
+              0.14
+            ],
+            "mira": [
+              0,
+              1.6,
+              1.94
+            ],
+            "ext": [
+              -0.791,
+              0.791,
+              -0.192,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "carreta-1450-com-tk/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -46.8,
+            "cam": [
+              0,
+              5.86,
+              16.1
+            ],
+            "tetoY": 4.26,
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "carreta-1550-sem-tk": {
+      "veiculo": "carreta-1550",
+      "thermoKing": false,
+      "bau": {
+        "width": 2.607459783554077,
+        "height": 2.794953339576716,
+        "length": 15.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-fh-2024",
+        "chassisId": "4x2",
+        "cab": "models/trucks/volvo_fh_2024_4x2.glb",
+        "implemento": "semirreboque-frigorifico-paleteiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "carreta-1550-sem-tk/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.84,
+            "cam": [
+              -7.84,
+              1.6,
+              10.17
+            ],
+            "mira": [
+              0,
+              1.6,
+              10.17
+            ],
+            "ext": [
+              -0.903,
+              0.897,
+              -0.297,
+              0.547
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "carreta-1550-sem-tk/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.84,
+            "cam": [
+              7.84,
+              1.6,
+              10.18
+            ],
+            "mira": [
+              0,
+              1.6,
+              10.18
+            ],
+            "ext": [
+              -0.897,
+              0.903,
+              -0.296,
+              0.546
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "carreta-1550-sem-tk/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.56,
+            "cam": [
+              -4.65,
+              1.6,
+              0.14
+            ],
+            "mira": [
+              2.14,
+              1.6,
+              8.23
+            ],
+            "ext": [
+              -0.429,
+              0.424,
+              -0.292,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "carreta-1550-sem-tk/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.56,
+            "cam": [
+              4.62,
+              1.6,
+              0.12
+            ],
+            "mira": [
+              -2.17,
+              1.6,
+              8.21
+            ],
+            "ext": [
+              -0.426,
+              0.432,
+              -0.29,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "carreta-1550-sem-tk/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 11.03,
+            "cam": [
+              -4.88,
+              1.6,
+              20.33
+            ],
+            "mira": [
+              2.21,
+              1.6,
+              11.88
+            ],
+            "ext": [
+              -0.414,
+              0.418,
+              -0.333,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "carreta-1550-sem-tk/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 11.02,
+            "cam": [
+              4.87,
+              1.6,
+              20.32
+            ],
+            "mira": [
+              -2.21,
+              1.6,
+              11.88
+            ],
+            "ext": [
+              -0.418,
+              0.414,
+              -0.334,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "carreta-1550-sem-tk/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 2.16,
+            "cam": [
+              0,
+              1.6,
+              20.14
+            ],
+            "mira": [
+              0,
+              1.6,
+              17.98
+            ],
+            "ext": [
+              -0.803,
+              0.803,
+              -0.355,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "frontal",
+          "arquivo": "carreta-1550-sem-tk/frontal.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 1.79,
+            "cam": [
+              0,
+              1.6,
+              0.29
+            ],
+            "mira": [
+              0,
+              1.6,
+              2.08
+            ],
+            "ext": [
+              -0.848,
+              0.848,
+              -0.197,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "carreta-1550-sem-tk/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -46.4,
+            "cam": [
+              0,
+              5.87,
+              16.98
+            ],
+            "tetoY": 4.273,
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    },
+    "carreta-1550-com-tk": {
+      "veiculo": "carreta-1550",
+      "thermoKing": true,
+      "bau": {
+        "width": 2.607459783554077,
+        "height": 2.794953339576716,
+        "length": 15.5
+      },
+      "escolha": {
+        "manufacturerId": "volvo",
+        "modelId": "volvo-fh-2024",
+        "chassisId": "4x2",
+        "cab": "models/trucks/volvo_fh_2024_4x2.glb",
+        "implemento": "semirreboque-frigorifico-paleteiro"
+      },
+      "poses": [
+        {
+          "nome": "lateral-esquerda",
+          "arquivo": "carreta-1550-com-tk/lateral-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.84,
+            "cam": [
+              -7.84,
+              1.6,
+              10.14
+            ],
+            "mira": [
+              0,
+              1.6,
+              10.14
+            ],
+            "ext": [
+              -0.899,
+              0.901,
+              -0.297,
+              0.547
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "lateral-direita",
+          "arquivo": "carreta-1550-com-tk/lateral-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 7.84,
+            "cam": [
+              7.84,
+              1.6,
+              10.15
+            ],
+            "mira": [
+              0,
+              1.6,
+              10.15
+            ],
+            "ext": [
+              -0.901,
+              0.899,
+              -0.296,
+              0.546
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-esquerda",
+          "arquivo": "carreta-1550-com-tk/tres-quartos-dianteira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.51,
+            "cam": [
+              -4.62,
+              1.6,
+              0.12
+            ],
+            "mira": [
+              2.14,
+              1.6,
+              8.17
+            ],
+            "ext": [
+              -0.424,
+              0.426,
+              -0.292,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-dianteira-direita",
+          "arquivo": "carreta-1550-com-tk/tres-quartos-dianteira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 10.51,
+            "cam": [
+              4.58,
+              1.6,
+              0.09
+            ],
+            "mira": [
+              -2.17,
+              1.6,
+              8.14
+            ],
+            "ext": [
+              -0.429,
+              0.425,
+              -0.29,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-esquerda",
+          "arquivo": "carreta-1550-com-tk/tres-quartos-traseira-esquerda.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 11.07,
+            "cam": [
+              -4.88,
+              1.6,
+              20.32
+            ],
+            "mira": [
+              2.24,
+              1.6,
+              11.84
+            ],
+            "ext": [
+              -0.414,
+              0.418,
+              -0.333,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "tres-quartos-traseira-direita",
+          "arquivo": "carreta-1550-com-tk/tres-quartos-traseira-direita.webp",
+          "orientacao": "paisagem",
+          "camera": {
+            "d": 11.07,
+            "cam": [
+              4.88,
+              1.6,
+              20.32
+            ],
+            "mira": [
+              -2.24,
+              1.6,
+              11.84
+            ],
+            "ext": [
+              -0.418,
+              0.414,
+              -0.334,
+              0.86
+            ],
+            "fov": 73.5,
+            "src": [
+              7680,
+              4320
+            ]
+          }
+        },
+        {
+          "nome": "traseira",
+          "arquivo": "carreta-1550-com-tk/traseira.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 2.16,
+            "cam": [
+              0,
+              1.6,
+              20.14
+            ],
+            "mira": [
+              0,
+              1.6,
+              17.98
+            ],
+            "ext": [
+              -0.803,
+              0.803,
+              -0.355,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "frontal",
+          "arquivo": "carreta-1550-com-tk/frontal.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "d": 1.8,
+            "cam": [
+              0,
+              1.6,
+              0.14
+            ],
+            "mira": [
+              0,
+              1.6,
+              1.95
+            ],
+            "ext": [
+              -0.793,
+              0.793,
+              -0.192,
+              0.9
+            ],
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        },
+        {
+          "nome": "teto",
+          "arquivo": "carreta-1550-com-tk/teto.webp",
+          "orientacao": "retrato",
+          "camera": {
+            "pitch": -46.4,
+            "cam": [
+              0,
+              5.87,
+              16.98
+            ],
+            "tetoY": 4.273,
+            "fov": 106,
+            "src": [
+              4320,
+              7680
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
