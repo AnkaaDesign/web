@@ -398,10 +398,9 @@ export default function ClientePainelPage() {
                 {signatures.length > 0 && (
                   <div className="space-y-2">
                     <PortalSubheading>Documentos para assinar</PortalSubheading>
-                    {/* ⚠️ O resumo NÃO diz se falta o nº do pedido (DD12.1) — quem
-                        diz é a tela de Assinaturas, onde o campo mora. Esta lista
-                        leva até lá; prometer "pronto para assinar" aqui seria
-                        afirmar o que o servidor não disse. */}
+                    {/* O resumo diz se a assinatura vai pedir o nº do pedido de
+                        compra (DD12.1, mesmo predicado da cerimônia) — quem tem
+                        Compras chega à tela de Assinaturas já sabendo. */}
                     <p className="text-sm text-muted-foreground">
                       Envelopes lançados no seu nome, esperando a sua assinatura.
                     </p>
@@ -414,12 +413,23 @@ export default function ClientePainelPage() {
                             ? `Orçamento ${envelope.budget.budgetNumber}`
                             : "Documento para assinar"
                         }
-                        detail={
+                        detail={[
                           envelope.deadlineAt
                             ? `Assine até ${formatDate(envelope.deadlineAt)}`
-                            : "Aguardando a sua assinatura"
+                            : "Aguardando a sua assinatura",
+                          envelope.orderNumber?.required
+                            ? "Tenha o nº do pedido de compra em mãos: ele será pedido na assinatura"
+                            : envelope.orderNumber?.inherited
+                              ? `Pedido de compra nº ${envelope.orderNumber.inherited}`
+                              : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        trailing={
+                          <Badge variant="pending">
+                            {envelope.orderNumber?.required ? "Falta o nº do pedido" : "Assinar"}
+                          </Badge>
                         }
-                        trailing={<Badge variant="pending">Assinar</Badge>}
                       />
                     ))}
                   </div>

@@ -890,6 +890,12 @@ export interface PortalSummaryEnvelope {
   /** O RECORTE que esta pessoa assina — pode não ser o documento inteiro. */
   sections: PortalSection[];
   budget: { id: string; budgetNumber: number | null; status: PortalBudgetStatus } | null;
+  /**
+   * O nº do pedido de compra (DD12.1), pelo mesmo predicado da cerimônia:
+   * `null` quando este contato não tem Compras; `required` quando a assinatura
+   * vai pedir o número; `inherited` = o pedido único que vale para todos.
+   */
+  orderNumber: { required: boolean; inherited: string | null } | null;
 }
 
 /** Um veículo na fábrica AGORA. */
@@ -1957,6 +1963,19 @@ export class PortalService {
     return response.data;
   }
 
+  /**
+   * `PUT /cliente/me/artes/reprovar` — o LOTE ATÔMICO da reprovação: "Reprovar
+   * para os N veículos", com o mesmo motivo (≥ 3 caracteres) para todos. Tudo
+   * ou nada: uma arte já decidida ou fora do escopo derruba o lote inteiro.
+   */
+  async reproveArtworks(layoutIds: string[], motivo: string): Promise<PortalResponse<unknown>> {
+    const response = await responsibleAuthClient.put<PortalResponse<unknown>>(`${BASE}/artes/reprovar`, {
+      layoutIds,
+      motivo,
+    });
+    return response.data;
+  }
+
   // ---- Pedidos de compra ----
 
   /**
@@ -2324,6 +2343,15 @@ export function usePortalApproveArtworks() {
   const invalidate = useInvalidatePortal();
   return useMutation({
     mutationFn: (layoutIds: string[]) => portalService.approveArtworks(layoutIds),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePortalReproveArtworks() {
+  const invalidate = useInvalidatePortal();
+  return useMutation({
+    mutationFn: ({ layoutIds, motivo }: { layoutIds: string[]; motivo: string }) =>
+      portalService.reproveArtworks(layoutIds, motivo),
     onSuccess: invalidate,
   });
 }

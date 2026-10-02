@@ -12,8 +12,8 @@
 // legenda (série/placa) ao lado de cada imagem é o que impede pintar o layout
 // de um veículo no outro — a mesma regra do documento assinado.
 //
-// ⚠️ Reprovar NÃO tem lote no servidor: o "Reprovar" do grupo reprova veículo a
-// veículo, com o mesmo motivo, e para no primeiro erro.
+// O "Reprovar" do grupo usa o LOTE ATÔMICO (`PUT /cliente/me/artes/reprovar`):
+// os N veículos da arte são reprovados juntos, com o mesmo motivo, ou nenhum.
 import { useState } from "react";
 import { IconCheck, IconExternalLink, IconPalette, IconX } from "@tabler/icons-react";
 
@@ -32,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   usePortalApproveArtworks,
-  usePortalReproveArtwork,
+  usePortalReproveArtworks,
   type PortalBudget,
   type PortalBudgetArtwork,
 } from "@/api-client/portal";
@@ -179,7 +179,7 @@ function GrupoDeArte({
 }
 
 export function OrcamentoArteCard({ budget }: { budget: PortalBudget }) {
-  const reprove = usePortalReproveArtwork();
+  const reprove = usePortalReproveArtworks();
   const [reprovando, setReprovando] = useState<Grupo | null>(null);
   const [motivo, setMotivo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -204,13 +204,12 @@ export function OrcamentoArteCard({ budget }: { budget: PortalBudget }) {
       setErro("Diga o motivo da reprovação.");
       return;
     }
+    const layoutIds = reprovando.vehicles.filter((x) => x.canDecide).map((v) => v.layoutId);
     try {
-      for (const v of reprovando.vehicles.filter((x) => x.canDecide)) {
-        await reprove.mutateAsync({ taskId: v.taskId, layoutId: v.layoutId, motivo: texto });
-      }
+      await reprove.mutateAsync({ layoutIds, motivo: texto });
       fechar();
     } catch {
-      setErro("Não foi possível reprovar todas. Confira o estado de cada veículo e tente de novo.");
+      setErro("Não foi possível reprovar a arte. Nada foi alterado — recarregue para ver o estado de cada veículo.");
     }
   };
 
