@@ -41,6 +41,8 @@ import {
   installSeeThroughOnSet, measureSeeThrough, clearSeeThrough, bindSeeThroughSatellite,
 } from './seethrough';
 import { getLampLensPairs, setLampSites } from './lamps';
+import { patchGroundDetail, groundDetailKey, isGroundDetail } from './ground-detail';
+import type { GroundDetailDef } from './ground-detail';
 
 /** Um conjunto PBR ligado a um material nomeado do .glb. */
 export interface SetMaterialDef {
@@ -122,6 +124,12 @@ export interface SetMaterialDef {
      o que agora decide também quem pode ficar transparente na frente do veículo
      (ver installSeeThroughOnSet). Faltava aqui: o tipo nasceu antes da família. */
   surface?: 'asphalt' | 'concrete' | 'gravel' | 'dirt' | 'grass' | 'built';
+  /**
+   * Detalhe de superfície por fragmento — trinca, junta, remendo, trilha de
+   * roda, tinta gasta. Ver scene/ground-detail.ts. Independe de `macro`: a
+   * tinta não tem mapa nenhum e tem detalhe.
+   */
+  detail?: GroundDetailDef;
 }
 
 export interface SetDef {
@@ -657,52 +665,70 @@ const TILE_AO_INCLUDE = /* glsl */`
 #endif
 `;
 
-function installMacro(mat: THREE.MeshStandardMaterial,
-                      cfg: { scale: number; amount: number; break?: number; cell?: number },
-                      roughFloor = 0) {
-  const tex = getMacroTex();
+type MacroCfg = { scale: number; amount: number; break?: number; cell?: number };
+
+function patchMacro(shader: THREE.WebGLProgramParametersWithUniforms, cfg: MacroCfg,
+                    tex: THREE.Texture, breakOn: number, roughFloor: number) {
+  shader.uniforms.uMacroMap = { value: tex };
+  shader.uniforms.uMacroScale = { value: cfg.scale };
+  shader.uniforms.uMacroAmount = { value: cfg.amount };
+  shader.uniforms.uMacroBreak = { value: cfg.break ?? 0 };
+  shader.uniforms.uBreakOn = { value: breakOn };
+  shader.uniforms.uBreakCell = { value: cfg.cell ?? 1.2 };
+  shader.uniforms.uRoughFloor = { value: roughFloor };
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\n'
+      + 'uniform sampler2D uMacroMap;\nuniform float uMacroScale;\n'
+      + 'uniform float uMacroAmount;\nuniform float uMacroBreak;\n'
+      + 'uniform float uBreakOn;\nuniform float uBreakCell;\n'
+      + 'uniform float uRoughFloor;\n'
+      + MACRO_NOISE_GLSL + TILE_GLSL)
+    /* `tsMacroK` é declarado FORA do bloco do macro porque quem o consome —
+       a rugosidade — só aparece várias inclusões mais à frente. Vale 1,0 por
+       omissão, que é o neutro, para o caso de USE_MAP não estar definido.
+       `tsCells()` corre AQUI, antes de qualquer leitura de mapa, porque é
+       quem publica a célula que as outras três inclusões vão ler. */
+    .replace('#include <map_fragment>',
+      'float tsMacroK = 1.0;\n'
+      + '#ifdef USE_MAP\n'
+      + '  tsCells( vMapUv );\n'
+      + '  diffuseColor *= tsTiled( map, vMapUv );\n'
+      + '#endif\n'
+      + MACRO_GLSL)
+    .replace('#include <roughnessmap_fragment>',
+      TILE_ROUGH_INCLUDE + MACRO_ROUGH_GLSL)
+    .replace('#include <normal_fragment_maps>', TILE_NORMAL_INCLUDE)
+    .replace('#include <aomap_fragment>', TILE_AO_INCLUDE);
+}
+
+/* UM onBeforeCompile POR MATERIAL, e é por isso que o macro e o detalhe são
+   COMPOSTOS aqui em vez de cada um instalar o seu: o segundo a atribuir
+   apagaria o primeiro, em silêncio (é uma propriedade, não uma lista). As duas
+   emendas mexem em inclusões diferentes — o macro no mapa, na rugosidade e na
+   normal do mapa; o detalhe depois da cor de vértice, antes do metal e antes
+   do emissivo — então a ordem entre elas não importa. */
+function installGroundShader(mat: THREE.MeshStandardMaterial, def: SetMaterialDef) {
+  const cfg = def.macro && typeof def.macro.scale === 'number' ? def.macro : null;
+  const detail = isGroundDetail(def.detail) ? def.detail : null;
+  if (!cfg && !detail) return;
+  const tex = cfg ? getMacroTex() : null;
   /* LIGA/DESLIGA, e não uma força de mistura — ver o comentário do campo em
      `SetMaterialDef.macro`. Um manifesto antigo com 0.55..0.9 continua a ligar,
      que é o que ele queria dizer. */
-  const breakOn = (cfg.break ?? 0) >= 0.5 ? 1 : 0;
+  const breakOn = cfg && (cfg.break ?? 0) >= 0.5 ? 1 : 0;
+  const roughFloor = typeof def.roughnessFloor === 'number' ? def.roughnessFloor : 0;
   mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uMacroMap = { value: tex };
-    shader.uniforms.uMacroScale = { value: cfg.scale };
-    shader.uniforms.uMacroAmount = { value: cfg.amount };
-    shader.uniforms.uMacroBreak = { value: cfg.break ?? 0 };
-    shader.uniforms.uBreakOn = { value: breakOn };
-    shader.uniforms.uBreakCell = { value: cfg.cell ?? 1.2 };
-    shader.uniforms.uRoughFloor = { value: roughFloor };
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\n'
-        + 'uniform sampler2D uMacroMap;\nuniform float uMacroScale;\n'
-        + 'uniform float uMacroAmount;\nuniform float uMacroBreak;\n'
-        + 'uniform float uBreakOn;\nuniform float uBreakCell;\n'
-        + 'uniform float uRoughFloor;\n'
-        + MACRO_NOISE_GLSL + TILE_GLSL)
-      /* `tsMacroK` é declarado FORA do bloco do macro porque quem o consome —
-         a rugosidade — só aparece várias inclusões mais à frente. Vale 1,0 por
-         omissão, que é o neutro, para o caso de USE_MAP não estar definido.
-         `tsCells()` corre AQUI, antes de qualquer leitura de mapa, porque é
-         quem publica a célula que as outras três inclusões vão ler. */
-      .replace('#include <map_fragment>',
-        'float tsMacroK = 1.0;\n'
-        + '#ifdef USE_MAP\n'
-        + '  tsCells( vMapUv );\n'
-        + '  diffuseColor *= tsTiled( map, vMapUv );\n'
-        + '#endif\n'
-        + MACRO_GLSL)
-      .replace('#include <roughnessmap_fragment>',
-        TILE_ROUGH_INCLUDE + MACRO_ROUGH_GLSL)
-      .replace('#include <normal_fragment_maps>', TILE_NORMAL_INCLUDE)
-      .replace('#include <aomap_fragment>', TILE_AO_INCLUDE);
+    if (cfg && tex) patchMacro(shader, cfg, tex, breakOn, roughFloor);
+    if (detail) patchGroundDetail(shader, detail);
   };
   /* Sem isto o three reaproveita o programa do material SEM a injeção (a chave
      de cache não conhece onBeforeCompile), e a variação some em metade dos
      materiais sem erro nenhum.
      A CHAVE MUDA COM O CÓDIGO INJETADO: mantê-la em v1 depois de mexer no GLSL
      é pedir ao three que sirva o programa antigo para o material novo. */
-  mat.customProgramCacheKey = () => `ts-set-macro-v6:${breakOn}`;
+  const key = (cfg ? `ts-set-macro-v6:${breakOn}` : '')
+    + (detail ? '|' + groundDetailKey(detail) : '');
+  mat.customProgramCacheKey = () => key;
 }
 
 /** Liga os conjuntos PBR do manifesto aos materiais nomeados do .glb. */
@@ -859,10 +885,7 @@ async function bindMaterials(root: THREE.Object3D, defs: Record<string, SetMater
       if (typeof def.normalScale === 'number' && mat.normalMap) {
         mat.normalScale.set(def.normalScale, def.normalScale);
       }
-      if (def.macro && typeof def.macro.scale === 'number') {
-        installMacro(mat, def.macro,
-          typeof def.roughnessFloor === 'number' ? def.roughnessFloor : 0);
-      }
+      installGroundShader(mat, def);
       mat.needsUpdate = true;
       bound++;
     }

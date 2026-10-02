@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconAlertTriangle, IconExternalLink, IconFileDescription, IconPlus } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCalendarPlus, IconExternalLink, IconFileDescription, IconPlus } from "@tabler/icons-react";
 
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableFilterValues, DataTableRowAction } from "@/components/ui/datatable";
@@ -8,7 +8,8 @@ import { useBudgets } from "@/hooks";
 import { getBudgets } from "@/api-client/budget";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import { useAuth } from "@/contexts/auth-context";
-import { canCreateQuote } from "@/utils/permissions/quote-permissions";
+import { canCreateQuote, canEditQuote } from "@/utils/permissions/quote-permissions";
+import { ExtendValidityDialog, type ExtendValidityQuote } from "@/components/financial/budget/validity";
 import { FAVORITE_PAGES, routes } from "@/constants";
 import type { Budget } from "@/types/budget";
 import { primaryTask } from "@/utils/quote-tasks";
@@ -50,6 +51,9 @@ export function BudgetTablePage() {
   // `canEditQuote`, e o financeiro só descobria a diferença ao ser barrado pelo
   // `PrivilegeRoute` na tela seguinte — ou, pelo widget do painel, no 403 do Salvar.
   const canCreate = canCreateQuote(user?.sector?.privileges || "");
+  const canEdit = canEditQuote(user?.sector?.privileges || "");
+  // Orçamentos marcados para "Estender validade" — uma linha ou várias vencidas de uma vez.
+  const [extending, setExtending] = useState<ExtendValidityQuote[] | null>(null);
 
   // Server mode: page/pageSize/sort ride the URL the table writes; search + filters arrive here.
   const [searchParams] = useSearchParams();
@@ -193,8 +197,20 @@ export function BudgetTablePage() {
           if (anchor) window.open(routes.financial.budget.details(anchor), "_blank");
         },
       },
+      {
+        key: "extend-validity",
+        label: "Estender validade",
+        icon: <IconCalendarPlus className="h-4 w-4" />,
+        hidden: (rows) => !canEdit || rows.every((q) => q.status === "CANCELLED"),
+        onClick: (rows) =>
+          setExtending(
+            rows
+              .filter((q) => q.status !== "CANCELLED")
+              .map((q) => ({ id: q.id, budgetNumber: q.budgetNumber, expiresAt: q.expiresAt ?? null, status: q.status })),
+          ),
+      },
     ],
-    [],
+    [canEdit],
   );
 
   return (
@@ -256,6 +272,12 @@ export function BudgetTablePage() {
           }}
         />
       </div>
+
+      <ExtendValidityDialog
+        open={!!extending}
+        onOpenChange={(o) => !o && setExtending(null)}
+        quotes={extending ?? []}
+      />
     </div>
   );
 }

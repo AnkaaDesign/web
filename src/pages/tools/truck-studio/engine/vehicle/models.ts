@@ -30,7 +30,7 @@ import { shiftRearBogie } from './rear-bogie';
 import { swapRearTape } from './rear-tape';
 import {
   getCurrentImplement, setImplementCatalog, setCurrentImplement, getImplements,
-  getImplement, frameRegexOf, sillRegexOf, type ImplementDef,
+  getImplement, frameRegexOf, sillRegexOf, topRailRegexOf, type ImplementDef,
 } from './implements';
 import { applyCabBakeFixes, normalizeExteriorGlass, normalizeBlackPlastic } from './cab-bake-fixes';
 import {
@@ -4252,6 +4252,13 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
   const holesOf = (key: 'SIDE_L' | 'SIDE_R') =>
     state.trailerRig?.body.getDoorHoles(key === 'SIDE_R' ? 'right' : 'left') ?? [];
   let gridFront = 0;
+  /* ---- A PELE DE FIBRA NÃO TEM EMENDA ----
+     O isotérmico é painel contínuo (`ImplementDef.skin`). Sem esta guarda o
+     painel liso cai no ramo da chapa CORRIDA logo abaixo — o do semirreboque —
+     e ganha a grade inventada de 1 m, o remonte de 2,2 mm e a coluna de
+     rebites: chapa de alumínio desenhada em cima de fibra. Grade vazia e sem
+     remonte é o que `addPlateRivets()` já entende como "não há rebite". */
+  const fibra = state.implement.skin === 'fibra';
   for (const key of ['SIDE_L', 'SIDE_R'] as const) {
     const k = keep[key];
     if (!k.p.length) continue;
@@ -4269,7 +4276,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
        coincidiam a 14 mm na testeira e chegavam a 184 mm na traseira. */
     const doBake = state.trailerRig?.body
       .sheetSeamsFromFront(key === 'SIDE_R' ? 'right' : 'left') ?? [];
-    const seams = doBake.length
+    const seams = fibra ? [] : doBake.length
       ? doBake.map((d) => +(zHi - d).toFixed(4))
         /* A MESMA folga de ponta da grade inventada: uma emenda a 42 mm do
            montante de canto é o hem da folha, não uma emenda — e uma coluna de
@@ -4278,7 +4285,7 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
         .sort((a, b) => b - a)
       : plateSeams(zHi, zLo);
     seamsOf[key] = seams;
-    lapOf[key] = !doBake.length;
+    lapOf[key] = !fibra && !doBake.length;
     /* As fileiras de rebite saem da sopa INTACTA — ver measureValeRows(). */
     valesOf[key] = measureValeRows(k, key === 'SIDE_R' ? 1 : -1);
     /* E O REMONTE SÓ ENTRA ONDE ELE NÃO ESTÁ NA MALHA. Aplicá-lo sobre uma pele
@@ -4525,6 +4532,9 @@ function buildTrailerRig(trailer: THREE.Object3D, kitAsset: THREE.Object3D | nul
     const rig = new TrailerRig(trailer, {
       frameMaterial: frameRegexOf(state.implement),
       sillMaterial: sillRegexOf(state.implement),
+      topRailMaterial: topRailRegexOf(state.implement),
+      railSkirt: state.implement.railSkirt,
+      railRelief: state.implement.railRelief,
       kit: kitAsset ?? undefined,
       cornerTape: state.implement.cornerTape,
       lowFrameRail: state.implement.lowFrameRail,

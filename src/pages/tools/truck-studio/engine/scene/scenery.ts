@@ -1143,6 +1143,78 @@ const MAST_RE = /^mast_/i;
 /** Eixo Y para as rotações e para medir o braço. */
 const EIXO_Y = new THREE.Vector3(0, 1, 0);
 
+/* ---------------- O PASSO CONSTANTE PLANTAVA POSTE NA BOCA DA RUA ----------------
+   O relato de 2026-09-27: *"tem um poste no meio da rua"*. Era o décimo mastro. O
+   passo de 27,2 m é cego ao chão, e o leste de `x = +11,47` só é pátio ENTRE as
+   ruas de serviço: com z₀ = −204 o décimo cai em z = 40,8, dentro da boca de
+   `svc_03` (z 30…50). No alternado, os de índice ímpar ficam no leste, e as duas
+   bocas do leste (`svc_00` em z −41…−21 e `svc_03`) são justamente onde uma
+   série de passo fixo pode cair.
+
+   A correção não mexe no passo nem no lado: o poste que cair em ASFALTO desliza
+   ao longo da própria linha até o ponto livre mais próximo, com folga. Medido na
+   malha, como as faixas de plantio (ver O CHÃO QUE EXISTE, E NÃO A CAIXA DELE),
+   e não em nomes de rua cravados: o que decide é o material ser de pista. */
+const PISTA_RE = /ASPHALT/i;
+/** Folga do poste à pista, ao longo da linha dele: a guia da boca faz curva. */
+const FOLGA_PISTA = 2.5;
+
+/**
+ * Grelha de PISTA em volta das linhas de poste: 1 onde há asfalto por cima.
+ * Só o corredor (x das duas linhas ± a folga, o trecho inteiro em z) — a grelha do
+ * set inteiro custaria dez vezes mais para responder a mesma pergunta.
+ */
+function pistaNoCorredor(root: THREE.Object3D, xs: number[], z0: number, z1: number,
+  deslizeMax: number) {
+  const x0 = Math.min(...xs) - FOLGA_PISTA - 1;
+  const zi = z0 - deslizeMax - FOLGA_PISTA - 1;
+  const g: Grelha = {
+    x0, z0: zi,
+    nx: Math.ceil((Math.max(...xs) + FOLGA_PISTA + 1 - x0) / CELULA),
+    nz: Math.ceil((z1 + deslizeMax + FOLGA_PISTA + 1 - zi) / CELULA),
+    dono: new Int16Array(0), topo: new Float32Array(0), duro: new Float32Array(0),
+  };
+  const alvo = new Float32Array(g.nx * g.nz).fill(-Infinity);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry || (mesh as THREE.InstancedMesh).isInstancedMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!mats.some((m) => m && PISTA_RE.test(m.name || ''))) return;
+    rasterizar(mesh, g, alvo, null, 0);
+  });
+  const naPista = (x: number, z: number) => {
+    const i = Math.floor((x - g.x0) / CELULA);
+    const j = Math.floor((z - g.z0) / CELULA);
+    if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) return false;
+    return alvo[j * g.nx + i] > -Infinity;
+  };
+  /** O z livre mais perto de `z` na linha `x`, ou `z` se não houver dentro do limite.
+   *  O limite é MEIO PASSO: além dele o poste passaria do vizinho de lado oposto.
+   *
+   *  A folga é medida também PARA FORA do eixo, e não só ao longo da linha: na
+   *  boca da `svc_03` o asfalto na linha do poste acaba em z 45, mas a 2 m para
+   *  dentro do pátio ele vai até z 50 — é a curva da guia na esquina. Medindo só
+   *  na linha, o poste parava na curva, colado na rua. Para DENTRO (o lado do
+   *  eixo) não se mede: ali está a própria pista em que a série corre. */
+  return (x: number, z: number) => {
+    const fora = Math.sign(x) || 1;
+    const livre = (zz: number) => {
+      for (let d = -FOLGA_PISTA; d <= FOLGA_PISTA; d += CELULA / 2) {
+        for (let k = 0; k <= FOLGA_PISTA; k += CELULA) {
+          if (naPista(x + fora * k, zz + d)) return false;
+        }
+      }
+      return true;
+    };
+    if (livre(z)) return z;
+    for (let d = CELULA / 2; d <= deslizeMax; d += CELULA / 2) {
+      if (livre(z + d)) return z + d;
+      if (livre(z - d)) return z - d;
+    }
+    return z;
+  };
+}
+
 /**
  * Onde a luminária está, na geometria do mastro e em unidades LOCAIS dele.
  *
@@ -1343,13 +1415,16 @@ function realinharPostes(root: THREE.Object3D) {
   const braco = new THREE.Vector3();
   const sites: LampSite[] = [];
   let geoSite: LampSiteGeo | null = null;
-  let movidos = 0, girados = 0;
+  let movidos = 0, girados = 0, fora = 0;
+  const foraDaPista = pistaNoCorredor(root, [xO, xL].filter(Number.isFinite), z0, z1, passo / 2);
 
   for (let i = 0; i < n; i++) {
     const p = postes[i];
     const temOeste = Number.isFinite(xO), temLeste = Number.isFinite(xL);
     const x = temOeste && temLeste ? (i % 2 ? xL : xO) : (temLeste ? xL : xO);
-    const z = z0 + i * passo;
+    const zPasso = z0 + i * passo;
+    const z = foraDaPista(x, zPasso);
+    if (z !== zPasso) fora++;
 
     /* ORIENTAÇÃO ANTES DA POSIÇÃO: girar o nó não muda a origem dele (o mastro
        está no zero local), mas muda a caixa — e quem lê a caixa depois disto é
@@ -1424,7 +1499,7 @@ function realinharPostes(root: THREE.Object3D) {
   }
   root.updateMatrixWorld(true);
   setLampSites(sites.length ? sites : null, geoSite);
-  return { movidos, girados, sites: sites.length };
+  return { movidos, girados, sites: sites.length, ...(fora ? { tiradosDaPista: fora } : {}) };
 }
 
 /**

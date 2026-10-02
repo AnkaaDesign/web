@@ -50,15 +50,30 @@ export const budgetService = {
    * condições de pagamento — que é o que decide se dá para unir. Toast suprimido
    * porque quem fala é o diálogo, com a lista de impedimentos inteira.
    */
-  mergePreview: (taskIds: string[]) =>
+  mergePreview: (taskIds: string[], validityDays?: number) =>
     apiClient.post(
       '/budgets/merge/preview',
-      { taskIds },
+      { taskIds, ...(validityDays ? { validityDays } : {}) },
       { metadata: { suppressToast: true } } as any,
     ),
 
-  merge: (taskIds: string[], billingSplit?: 'JOINT' | 'PER_TASK') =>
-    apiClient.post('/budgets/merge', { taskIds, ...(billingSplit ? { billingSplit } : {}) }),
+  /**
+   * `validityDays`: a validade do orçamento unido RECOMEÇA hoje e vale por este
+   * número de dias (padrão do servidor: 30).
+   */
+  merge: (taskIds: string[], options?: { billingSplit?: 'JOINT' | 'PER_TASK'; validityDays?: number }) =>
+    apiClient.post('/budgets/merge', {
+      taskIds,
+      ...(options?.billingSplit ? { billingSplit: options.billingSplit } : {}),
+      ...(options?.validityDays ? { validityDays: options.validityDays } : {}),
+    }),
+
+  /**
+   * ESTENDER a validade: "vale até daqui a `days` dias", contado de HOJE. Um
+   * orçamento em Aguardando Reanálise volta para Pendente.
+   */
+  extendValidity: (id: string, days: number) =>
+    apiClient.put(`/budgets/${id}/validity`, { days }),
 
   // Update only the layout files — layoutFileIds is a safe-after-billing field, so
   // this works on locked quotes too. Toast suppressed so batch callers can emit one

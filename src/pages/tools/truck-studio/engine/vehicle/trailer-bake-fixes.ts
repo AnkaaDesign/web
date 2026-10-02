@@ -766,7 +766,19 @@ export function attachBrandPlate(
     return false;
   }
   const mesh = src as THREE.Mesh;
-  const geo = mesh.geometry;
+  /* ⚠️ GEOMETRIA PRÓPRIA, NUNCA A DO KIT — e a falta disto era a "placa da
+     traseira flutuando" de 2026-09-29. O kit (`porta_kit_v1.glb`) é carregado
+     UMA vez por sessão e reaproveitado a cada implemento; a chapa entra ANTES
+     de `buildTrailerRig()`, e `TrailerAssembly` reescreve os VÉRTICES de toda
+     peça não branca quando estica o baú (no Scania P 8x2 o sobrechassi vai de
+     8,38 para 9,5 m). `markShared()` só enxerga compartilhamento DENTRO da raiz
+     do implemento, e dentro dela a chapa tem um usuário só — então a escrita
+     não clonava e caía na geometria do KIT. Cada carga seguinte partia da chapa
+     já deslocada e somava mais um esticamento: medido na bancada, a mesma
+     geometria (uuid 7c281e3c) em quatro cargas seguidas, e a chapa a −0,002,
+     −1,048, −2,053 e −3,132 m da traseira. Com as variantes a troca de
+     implemento virou rotina e o defeito saiu do canto. */
+  const geo = mesh.geometry.clone();
   if (!geo.boundingBox) geo.computeBoundingBox();
   const gb = geo.boundingBox as THREE.Box3;
   const w = gb.max.x - gb.min.x;
@@ -2315,6 +2327,11 @@ export function addTopRailRivets(root: THREE.Object3D, roofYMundo: number): numb
 
 export function fixLowFrameRail(
   root: THREE.Object3D, floorYMundo: number, row0Mundo: number,
+  /** Quanto a pele de onde a régua saiu ficava À FRENTE da pele que está aqui
+   *  — o relevo do friso da chapa que um painel de FIBRA substituiu. Ver
+   *  `TrailerBodyOptions.railRelief`. Zero na chapa: a pele mais externa JÁ é
+   *  a crista. */
+  skinOut = 0,
 ): number {
   root.updateWorldMatrix(true, true);
   const toLocal = root.matrixWorld.clone().invert();
@@ -2380,7 +2397,7 @@ export function fixLowFrameRail(
   for (const c of alvos) {
     const lado = (c.b.min.x + c.b.max.x) / 2 > 0 ? 1 : -1;
     const outer = lado > 0 ? c.b.max.x : -c.b.min.x;
-    const alvoX = (skin[String(lado)] || outer) + RAIL_PROUD;
+    const alvoX = (skin[String(lado)] || outer) + skinOut + RAIL_PROUD;
     const dx = lado * (alvoX - outer);
     /* O PÉ NÃO SE MEXE; o TOPO vai parar 47,8 mm abaixo do primeiro friso —
        ver `RAIL_TOP_UNDER_ROW0`. Nenhuma altura fixa entra, e o sinal é livre:

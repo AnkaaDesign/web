@@ -24,7 +24,7 @@ export interface SimulatedUser {
   // Simulation fields
   position: string;
   performanceLevel: number;
-  /** Bruto do período, já prorrateado pelo peso. */
+  /** Bruto da pessoa: curva(B1 da janela dela) × fator de afastamento. */
   bonusAmount: number;
   /** Extras − descontos do período aplicados sobre o bruto simulado. */
   adjustmentAmount: number;
@@ -33,7 +33,8 @@ export interface SimulatedUser {
   /**
    * Peso de elegibilidade do período (0–1), vindo do MESMO cadastro que a folha
    * usa. 1 = período inteiro. Menor que 1 = entrou, saiu ou esteve afastado no
-   * meio do período — e o valor exibido já vem prorrateado por ele.
+   * meio do período. Desde a v5 o valor NÃO é multiplicado por ele: o tempo
+   * já está no B1 da janela da pessoa (menos dias, menos tarefas vistas).
    */
   eligibilityWeight: number;
   /** Rótulo do motivo do peso parcial, para a tela explicar o número. */
@@ -145,8 +146,8 @@ export function createBonusSimulationColumns({
         return (
           <div className="flex min-w-0 items-baseline gap-1.5">
             <TruncatedTextWithTooltip text={u.name} className="text-sm font-medium" />
-            {/* Peso parcial precisa aparecer: sem isto, um valor prorrateado
-                parece erro de cálculo. */}
+            {/* Peso parcial precisa aparecer: sem isto, um valor medido numa
+                janela menor que o período parece erro de cálculo. */}
             {u.eligibilityWeight < 1 && (
               <span className="shrink-0 text-xs text-muted-foreground" title={u.eligibilityReason}>
                 ({Math.round(u.eligibilityWeight * 100)}% do período)

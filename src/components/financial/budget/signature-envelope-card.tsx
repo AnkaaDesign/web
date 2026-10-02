@@ -110,6 +110,9 @@ interface EnvelopeDocument {
   finalSha256: string | null;
   padesLevel: string | null;
   sealedAt: string | null;
+  /** "Orçamento nº 448 - Marquespan 5,20 - Rafael Capobianco" (API nova). */
+  title?: string;
+  /** Quem assina este documento: os contatos amarrados a ele e a Ankaa. */
   signers: string[];
 }
 
@@ -1123,7 +1126,9 @@ export function SignatureEnvelopeCard({
               >
                 <IconFileTypePdf className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{d.label}</span>
+                  <span className="block truncate text-sm" title={d.title ?? d.label}>
+                    {d.title ?? d.label}
+                  </span>
                   <span className="block truncate text-[11px] text-muted-foreground">
                     {d.signers.length > 0
                       ? d.signers.join(", ")

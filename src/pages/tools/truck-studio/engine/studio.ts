@@ -83,7 +83,7 @@ import { teardownTimeline } from './ui/timeline';
    já carrega um ciclo de propósito (livery ↔ livery-editor, ver engine/index.ts)
    e um é o suficiente. */
 import { initPaintPanel, setPaintPanelColor, closePaintPanel } from './ui/paint-panel';
-import { initTrimPanel, refreshTrimPanel } from './ui/trim-panel';
+import { initTrimPanel, refreshTrimPanel, onImplementSwitch } from './ui/trim-panel';
 import { initProjectPanel } from './ui/project-panel';
 import { setStudioHooks } from './project/document';
 import { root, $ } from './core/dom';
@@ -145,7 +145,12 @@ let queueDepth = 0;
    — o card acenderia e absolutamente nada carregaria. */
 const sameRig = (a: Choice | null, b: Choice | null) =>
   !!a && !!b && a.envId === b.envId && a.modelId === b.modelId
-  && a.chassisId === b.chassisId;
+  && a.chassisId === b.chassisId
+  /* O IMPLEMENTO TAMBÉM, desde as variantes: trocar de gancheiro para
+     paleteiro baixa outro `.glb` inteiro. Sem esta linha a troca cairia no
+     atalho de "só a cor mudou" e nada carregaria. Ausente e ausente é igual —
+     é a escolha de quem nunca abriu o seletor. */
+  && (a.implementId ?? null) === (b.implementId ?? null);
 
 /* ---------------- os ACABAMENTOS na escolha gravada ----------------
    `Choice.trim` é o único campo da escolha que NÃO vem do seletor: quem o
@@ -382,6 +387,12 @@ function resolveChoice(choice: Choice | null): ResolvedPick | null {
       chassisId: chassis.id,
       colorId: color.id,
       finishId: finish ? finish.id : null,
+      /* A PREFERÊNCIA DE IMPLEMENTO atravessa a resolução — é daqui que
+         `runApply()` a lê. Sem esta linha o campo morria neste literal e toda
+         troca de variante recarregava o implemento de antes (medido na
+         bancada `checks-variantes-0929.mjs`: o card pedia o gancheiro e a cena
+         montava `trailer_v2.glb`). Quem valida o id é `runApply()`. */
+      ...(choice?.implementId ? { implementId: choice.implementId } : {}),
     },
     env,
     model: found.model,
@@ -1204,10 +1215,19 @@ async function runApply(
      antes: na primeira carga o implemento vem de qualquer jeito. */
   const querKind = model.rigid ? 'sobrechassi' : 'semirreboque';
   const implAtual = models.getCurrentImplement();
-  if (implAtual.kind !== querKind) {
-    const alvo = models.getImplements().find((d) => d.kind === querKind);
-    if (alvo) models.setImplement(alvo.id);
-    else console.warn('[implemento] nenhum', querKind, 'no catálogo —',
+  /* A VARIANTE ESCOLHIDA, quando ela é do tipo que o chassi pede — senão o
+     implemento em cena (se já é do tipo), senão o primeiro do tipo no
+     catálogo. Um id de outro tipo não é erro: é a preferência guardada para a
+     volta do outro veículo. Ver `Choice.implementId`. */
+  const pedido = resolved.choice.implementId
+    ? models.getImplement(resolved.choice.implementId) : null;
+  const alvoImpl = pedido && pedido.kind === querKind ? pedido
+    : implAtual.kind === querKind ? implAtual
+      : models.getImplements().find((d) => d.kind === querKind) ?? null;
+  if (alvoImpl) {
+    if (alvoImpl.id !== implAtual.id) models.setImplement(alvoImpl.id);
+  } else {
+    console.warn('[implemento] nenhum', querKind, 'no catálogo —',
       'o conjunto fica com', implAtual.label);
   }
   const needTrailer = first || models.getCurrentImplement().id !== models.state.implement.id;
@@ -1342,7 +1362,18 @@ async function runApply(
        ~2 000 chamadas de desenho de volta, até a próxima troca que desse certo.
        A imagem seria a mesma (é o contrato do portão de aceitação); o quadro é
        que ficaria 14,9× mais caro, em silêncio. */
-    soltou = needCab ? merge.releaseMerge() : 0;
+    /* ⚠️ E QUANDO SÓ O IMPLEMENTO É NOVO, TAMBÉM (2026-09-29). Até as
+       VARIANTES o implemento só trocava junto com a cabine (o tipo segue o
+       chassi), então `needCab` bastava. Com o seletor de variante do card de
+       Configurações, a troca mais comum passou a ser implemento SEM cabine — e
+       `loadTrailer()` → `attachThermoKing()` → `placeThermoKing()` media a
+       travessa da testeira com a fusão de pé: o console avisava *"a travessa
+       da testeira foi medida com a FUSÃO DE PÉ — 7 balde(s) de ferragem no
+       caminho"*, a unidade caía no recuo fixo de `topGap` e descia 370 mm,
+       deixando o vão da testeira aberto acima dela. Medido na bancada: o MESMO
+       sobrechassi gancheiro com o Thermo King em y 1,953 na 1ª carga e 1,582
+       na 2ª. É exatamente o mesmo defeito deste bloco, pelo outro caminho. */
+    soltou = (needCab || needTrailer) ? merge.releaseMerge() : 0;
 
     /* Cenário e geometria são downloads independentes — rodam juntos. */
     const tasks: Promise<unknown>[] = [];
@@ -1694,6 +1725,13 @@ function applyChoice(
 ): Promise<Choice | null> {
   const first = !!opts.first;
   const curtain = opts.curtain !== false;
+  /* A PREFERÊNCIA DE IMPLEMENTO ATRAVESSA A TROCA DE CAMINHÃO. O seletor
+     monta a escolha com os passos dele — cenário, montadora, modelo, chassi,
+     cor — e não sabe de implemento; sem esta herança, escolher outro cavalo
+     devolveria o implemento ao padrão do tipo e apagaria a variante que o
+     usuário escolheu no card de Configurações. Ver `Choice.implementId`. */
+  const herdado = currentChoice?.implementId ?? pendingChoice?.implementId;
+  if (!choice.implementId && herdado) choice = { ...choice, implementId: herdado };
   const resolved = resolveChoice(choice);
   if (!resolved) {
     setStatus('Catálogo vazio — nada a carregar');
@@ -2043,6 +2081,15 @@ async function boot() {
     initUI();
     initPaintPanel();
     initTrimPanel();
+    /* A TROCA DE VARIANTE passa pela fila de sempre: é a escolha corrente com
+       outro `implementId`, e `sameRig()` já a enxerga como veículo novo — a
+       cortina sobe, o implemento é rebaixado e remontado, a cabine e o cenário
+       ficam (`needCab`/`needEnv` comparam o que já está em cena).
+       `withTrim()` leva junto acabamento, medidas e alvo da tinta. */
+    onImplementSwitch((id) => {
+      if (!currentChoice) return;
+      void applyChoice({ ...withTrim(currentChoice), implementId: id });
+    });
     /* Pelo MESMO motivo de initPaintPanel() logo acima: ui/project-panel importa
        setStatus, makePopover e o cadeado de captura de ui/chrome, então chrome
        chamá-lo fecharia um segundo ciclo de import. */

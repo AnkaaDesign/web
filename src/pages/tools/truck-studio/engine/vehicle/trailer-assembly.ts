@@ -42,6 +42,10 @@ const ROOF_BAND = 0.15;
 
 /** Idem para o piso do baú. */
 const FLOOR_BAND = 0.15;
+/** Quanto a fileira de rebites da ferragem inferior fica abaixo do TOPO do
+ *  trilho: 32,4 mm — medido no semirreboque (centro do corte em y 1,487, topo
+ *  do trilho em 1,5194). Ver o bloco 3b de `lowerRivets()`. */
+const RIVET_LOW_UNDER_TOP = 0.0324;
 
 /** Faixa colada às pontas em Z. */
 const CAP_BAND = 0.10;
@@ -1306,6 +1310,35 @@ export class TrailerAssembly {
     }
     if (faceX <= 0) return;
 
+    /* 3b. O TOPO DA FERRAGEM INFERIOR, por flanco — o teto da fileira.
+       ---------------------------------------------------------------------
+       ⚠️ A ALTURA DA FILEIRA VINHA SÓ DAS BORDAS DE CORTE, e isso vale para o
+       bake em que elas foram medidas: no semirreboque o centro do corte fica em
+       piso + 95 mm e o trilho vai de piso −82,5 a +127,5, ou seja a fileira
+       mora 32,4 mm abaixo do topo do trilho. No SOBRECHASSI as bordas que casam
+       a assinatura ficam mais altas que o trilho (topo em piso + 72,4, ver
+       `fixLowFrameRail()`), e a fileira saía de 60 a 130 mm ACIMA dele — na
+       pele. Na chapa frisada ela se passava pelo rebite de baixo da coluna da
+       emenda; no painel liso do ISOTÉRMICO virou uma fila de pontos soltos a
+       cada metro (*"a chapa do isotérmico parece estar sangrando"*, 2026-09-29;
+       identificados por raio de pixel: `RIVET_LOW_L[2…6]`, 5 a 7 mm fora da
+       face do painel).
+       Rebite de ferragem mora NA ferragem: a fileira nunca passa de
+       `RIVET_LOW_UNDER_TOP` abaixo do topo do trilho do seu flanco. No
+       semirreboque isto é a identidade — é de lá que o número saiu. */
+    const topoDoTrilho = new Map<number, number>();
+    for (const piece of this.pieces) {
+      for (const p of piece.parts) {
+        if (p.max.z - p.min.z < baseLength * 0.8) continue;
+        const dy = (p.min.y + p.max.y) / 2 - floorY;
+        if (dy < -0.10 || dy > 0.20) continue;
+        const lado = Math.sign((p.min.x + p.max.x) / 2);
+        const fora = lado > 0 ? p.max.x : -p.min.x;
+        if (Math.abs(fora - faceX) > 0.012) continue;
+        topoDoTrilho.set(lado, Math.max(topoDoTrilho.get(lado) ?? -Infinity, p.max.y));
+      }
+    }
+
     /* 4. O molde: um rebite da fileira do teto. */
     let mold: { piece: Piece; part: Part } | null = null;
     for (const piece of this.pieces) {
@@ -1349,7 +1382,9 @@ export class TrailerAssembly {
       im.matrix.copy(inv);
       root.add(im);
 
-      const y = mine.reduce((s, c) => s + c.y, 0) / mine.length;
+      const yCorte = mine.reduce((s, c) => s + c.y, 0) / mine.length;
+      const topo = topoDoTrilho.get(side);
+      const y = topo === undefined ? yCorte : Math.min(yCorte, topo - RIVET_LOW_UNDER_TOP);
       const first = new THREE.Vector3(side * faceX, y, mine[0].z);
       this.enroll({
         axis: 'z', pitch, first,
