@@ -435,8 +435,20 @@ export interface PortalVehicleIdentity {
   customer: PortalNamedRef | null;
 }
 
-/** As quatro faces do implemento, na ordem do contrato (`faces.todas`). */
-export type PortalImplementFace = "left" | "right" | "back" | "front";
+/**
+ * As medidas das QUATRO faces do implemento, como o servidor as manda (METROS).
+ *
+ * ⚠️ Objeto com as chaves nomeadas, e não `Record<ImplementFace, …>`: a lista de
+ * faces do web (`constants/implement-faces`) ainda tem três — a frente entra no
+ * sistema interno com o pacote da produção —, e o portal já recebe as quatro
+ * (`faces.todas` do contrato).
+ */
+export interface PortalImplementMeasures {
+  left: PortalMeasure | null;
+  right: PortalMeasure | null;
+  back: PortalMeasure | null;
+  front: PortalMeasure | null;
+}
 
 /** A porta traseira, como o cliente a informou. `null` = nada informado. */
 export interface PortalRearDoor {
@@ -456,7 +468,7 @@ export interface PortalVehicleImplement {
   id: string | null;
   type: string | null;
   category: string | null;
-  measures: Record<PortalImplementFace, PortalMeasure | null>;
+  measures: PortalImplementMeasures;
   rearDoor: PortalRearDoor | null;
   /** O projeto do IMPLEMENTO (PDF da carroceria), não o da tarefa. */
   projectFiles: PortalFile[];
@@ -1825,7 +1837,7 @@ export class PortalService {
   }
 
   /**
-   * `PUT …/recusar` — `IN_NEGOTIATION → REQUESTED`. Capacidade `APPROVE_VALUE`.
+   * `PUT …/recusar` — `IN_NEGOTIATION → PENDING` (volta para o comercial). Capacidade `APPROVE_VALUE`.
    *
    * ⚠️ `motivo` é OBRIGATÓRIO: recusar sem dizer por quê devolve o orçamento ao
    * comercial sem nada para ele corrigir. O corpo é `.strict()` — mandar

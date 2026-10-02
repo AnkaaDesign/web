@@ -31,10 +31,11 @@ export { OrcamentoVeiculosCard, estOrcamentoVeiculos } from "./orcamento-veiculo
 export { OrcamentoAndamentoCard } from "./orcamento-andamento-card";
 export { OrcamentoServicosCard } from "./orcamento-servicos-card";
 export { OrcamentoLayoutCard } from "./orcamento-layout-card";
+export { OrcamentoArteCard, resumoDaArte, rotulosDosVeiculos } from "./orcamento-arte-card";
 export { OrcamentoAssinaturasCard } from "./orcamento-assinaturas-card";
 export { OrcamentoCobrancaCard } from "./orcamento-cobranca-card";
-export { PreAprovacaoActions, canDecideBudget } from "./pre-aprovacao-actions";
-export type { PreAprovacaoActionsProps } from "./pre-aprovacao-actions";
+export { AprovacaoValorActions, canDecideBudget } from "./aprovacao-valor-actions";
+export type { AprovacaoValorActionsProps } from "./aprovacao-valor-actions";
 export {
   PORTAL_ROLE_SECTIONS,
   PORTAL_SECTION_IMPLIED_BY_CAPABILITY,

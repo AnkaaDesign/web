@@ -1,4 +1,4 @@
-// web/src/components/cliente/orcamento/pre-aprovacao-actions.tsx
+// web/src/components/cliente/orcamento/aprovacao-valor-actions.tsx
 //
 // A DECISÃO DO CLIENTE — as duas únicas escritas do portal sobre um orçamento.
 //
@@ -44,7 +44,7 @@ import type { TASK_QUOTE_STATUS } from "@/types/budget";
 /** Quanto texto o motivo aceita — o mesmo teto confortável de uma observação. */
 const MOTIVO_MAX = 1000;
 
-export interface PreAprovacaoActionsProps {
+export interface AprovacaoValorActionsProps {
   budgetId: string;
   status: TASK_QUOTE_STATUS;
   /** Os papéis do contato logado. */
@@ -84,14 +84,14 @@ export function canDecideBudget({
   return canApproveValue !== false;
 }
 
-export function PreAprovacaoActions({
+export function AprovacaoValorActions({
   budgetId,
   status,
   roles,
   canApproveValue,
   onDecided,
   className,
-}: PreAprovacaoActionsProps) {
+}: AprovacaoValorActionsProps) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [refuseOpen, setRefuseOpen] = useState(false);
   const [nota, setNota] = useState("");

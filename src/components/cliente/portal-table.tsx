@@ -100,8 +100,8 @@ export function PortalTable<T>({
   return (
     // A ROLAGEM HORIZONTAL É DESTE QUADRO, NUNCA DA PÁGINA.
     //
-    // `/cliente` é isento do `MobileUsageGuard` por prefixo, então metade
-    // destas visitas é de celular. Sete colunas em 390px precisam rolar de
+    // O portal é usado no navegador do celular, e metade das visitas vem de
+    // lá. Sete colunas em 390px precisam rolar de
     // lado; deixar a PÁGINA rolar arrastaria junto o cabeçalho e as abas do
     // portal, e o contato perderia a navegação para ler uma data.
     <div className={cn("w-full overflow-x-auto", className)}>

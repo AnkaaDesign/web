@@ -36,6 +36,7 @@ import {
 import { useResponsibleAuth } from "@/contexts/responsible-auth-context";
 import { usePortalSummary } from "@/api-client/portal";
 import type {
+  PortalSummaryArtworkVehicle,
   PortalSummaryBudget,
   PortalSummaryEnvelope,
   PortalSummaryVehicle,
@@ -159,17 +160,22 @@ export default function ClientePainelPage() {
    * Início dizia "nada esperando por você" para quem tinha decisão parada.
    *
    * ⛔ E NÃO HÁ GRUPO DE "VEÍCULOS SEM IDENTIFICAÇÃO". O servidor não o calcula:
-   * `resumo` tem `valueApproval`, `signatures` e `inProduction`, e mais nada. O
+   * `resumo` tem `valueApproval`, `artworks`, `signatures` e `inProduction`. O
    * card que existia aqui nunca desenhou uma linha. Quem responde "o que falta
    * identificar?" é a tela de Veículos, que é onde o conserto acontece — e é
    * para lá que o rodapé aponta. Relatado como lacuna da API.
    */
   const valueApprovalGroup = summary?.waitingOnMe?.valueApproval;
+  const artworkGroup = summary?.waitingOnMe?.artworks;
   const signatureGroup = summary?.waitingOnMe?.signatures;
   const inProductionGroup = summary?.waitingOnMe?.inProduction;
 
   const valueApprovals: PortalSummaryBudget[] = valueApprovalGroup?.available
     ? (valueApprovalGroup.budgets ?? [])
+    : [];
+  // As ARTES esperando a decisão — só para quem tem `APPROVE_ARTWORK`.
+  const artworks: PortalSummaryArtworkVehicle[] = artworkGroup?.available
+    ? (artworkGroup.vehicles ?? [])
     : [];
   const signatures: PortalSummaryEnvelope[] = signatureGroup?.available
     ? (signatureGroup.envelopes ?? [])
@@ -178,7 +184,7 @@ export default function ClientePainelPage() {
     ? (inProductionGroup.vehicles ?? [])
     : [];
 
-  const waitingCount = valueApprovals.length + signatures.length;
+  const waitingCount = valueApprovals.length + artworks.length + signatures.length;
 
   return (
     <div className="space-y-4">
@@ -297,13 +303,13 @@ export default function ClientePainelPage() {
           <PortalCard
             icon={IconChecklist}
             title="Aguardando você"
-            description="Decisões e assinaturas paradas do seu lado."
+            description="Valores, artes e assinaturas parados do seu lado."
           >
             {waitingCount === 0 ? (
               <EmptyState
                 icon={<IconChecklist className="h-10 w-10" />}
                 title="Nada esperando por você"
-                description="Nenhuma decisão e nenhuma assinatura estão paradas do seu lado."
+                description="Nenhum valor, nenhuma arte e nenhuma assinatura estão parados do seu lado."
                 action={
                   canWriteVehicleIdentity ? (
                     // ⛔ O servidor NÃO manda um grupo de "veículos sem
@@ -356,14 +362,45 @@ export default function ClientePainelPage() {
                   </div>
                 )}
 
+                {artworks.length > 0 && (
+                  <div className="space-y-2">
+                    <PortalSubheading>Artes para aprovar</PortalSubheading>
+                    <p className="text-sm text-muted-foreground">
+                      A arte de cada veículo, esperando a sua aprovação.
+                    </p>
+                    {artworks.map((vehicle) => (
+                      <PortalRowLink
+                        key={vehicle.taskId}
+                        to={
+                          vehicle.budget
+                            ? routes.customer.portal.orcamento(vehicle.budget.id)
+                            : routes.customer.portal.veiculo(vehicle.taskId)
+                        }
+                        title={
+                          [vehicle.serialNumber ? `Série ${vehicle.serialNumber}` : null, vehicle.plate]
+                            .filter(Boolean)
+                            .join(" · ") ||
+                          vehicle.name ||
+                          "Veículo"
+                        }
+                        detail={[
+                          vehicle.budget?.budgetNumber ? `Orçamento ${vehicle.budget.budgetNumber}` : null,
+                          vehicle.sentAt ? `Enviada em ${formatDate(vehicle.sentAt)}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        trailing={<Badge variant="pending">Aprovar</Badge>}
+                      />
+                    ))}
+                  </div>
+                )}
+
                 {signatures.length > 0 && (
                   <div className="space-y-2">
                     <PortalSubheading>Documentos para assinar</PortalSubheading>
-                    {/* ⚠️ O resumo NÃO traz `canSign` nem `blockedReason` — o
-                        ⛔ PORTÃO DO PEDIDO DE COMPRA só é conhecido pela rota
-                        dedicada de assinaturas, que ainda não existe. Esta lista
-                        leva até a tela de Assinaturas, que é onde a pessoa pode
-                        consertar; prometer "pronto para assinar" aqui seria
+                    {/* ⚠️ O resumo NÃO diz se falta o nº do pedido (DD12.1) — quem
+                        diz é a tela de Assinaturas, onde o campo mora. Esta lista
+                        leva até lá; prometer "pronto para assinar" aqui seria
                         afirmar o que o servidor não disse. */}
                     <p className="text-sm text-muted-foreground">
                       Envelopes lançados no seu nome, esperando a sua assinatura.

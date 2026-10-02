@@ -129,6 +129,13 @@ export function OrcamentoPropostaCard({
           <DetailRow label="Andamento" value={budget.milestoneLabel} />
         ) : null}
 
+        {/* ── O EIXO DA ASSINATURA — cabeçalho, sem seção ────────────────────
+            "Não emitido" não é notícia: a linha só aparece quando já existe
+            documento (aguardando, assinado, assinado fora do sistema, recusado…). */}
+        {budget.signatureStatusLabel && budget.signatureStatus && budget.signatureStatus !== "NOT_ISSUED" ? (
+          <DetailRow label="Assinatura" value={budget.signatureStatusLabel} />
+        ) : null}
+
         {/* ── PRAZO — seção `DELIVERY` ───────────────────────────────────── */}
         {delivery && delivery.customForecastDays !== null ? (
           <DetailRow
@@ -252,17 +259,27 @@ export function OrcamentoGarantiaCard({ budget }: { budget: PortalBudget }) {
  * de um rótulo neutro que serviria aos dois e não nomearia nenhum.
  */
 export function orcamentoTemDecisao(budget: PortalBudget): boolean {
+  // A aprovação do valor vigente vale mesmo sem requisição: o orçamento pode ter
+  // nascido por dentro, e o valor aprovado em nome do cliente ou na assinatura.
+  if (budget.valueApproval) return true;
   const request = budget.request;
   return !!request && (!!request.valueApprovedAt || !!request.refusedAt || !!request.decisionNote);
 }
 
 export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
   const request = budget.request;
-  if (!request || !orcamentoTemDecisao(budget)) return null;
+  const aprovacao = budget.valueApproval;
+  if (!orcamentoTemDecisao(budget)) return null;
 
-  const recusado = !!request.refusedAt;
+  // A APROVAÇÃO VIGENTE (`valueApproval`) é a verdade quando existe: ela diz
+  // QUEM aprovou — o contato pelo nome, ou "Ankaa" quando foi em nome do
+  // cliente — e por qual caminho (`sourceLabel`). A recusa só vale sem ela.
+  const recusado = !aprovacao && !!request?.refusedAt;
   // Os autores só vêm no DETALHE — na lista o `select` não os carrega.
-  const decisor = request.valueApprovedBy?.name ?? request.refusedBy?.name ?? null;
+  const decisor =
+    aprovacao?.decidedBy?.name ?? request?.valueApprovedBy?.name ?? request?.refusedBy?.name ?? null;
+  const aprovadoEm = aprovacao?.decidedAt ?? request?.valueApprovedAt ?? null;
+  const nota = aprovacao?.note ?? request?.decisionNote ?? null;
 
   return (
     <PortalCard
@@ -271,20 +288,25 @@ export function OrcamentoDecisaoCard({ budget }: { budget: PortalBudget }) {
       description={
         recusado
           ? "O que você registrou ao devolver este orçamento ao comercial."
-          : "O que você registrou ao liberar este orçamento para seguir."
+          : aprovacao?.source === "PORTAL"
+            ? "O que foi registrado ao aprovar o valor pelo portal."
+            : "Como o valor deste orçamento foi aprovado."
       }
     >
       <PortalRows>
-        {request.valueApprovedAt ? (
-          <DetailRow label="Valor aprovado em" value={data(request.valueApprovedAt)} />
-        ) : null}
-        {request.refusedAt ? (
+        {!recusado && aprovadoEm ? <DetailRow label="Valor aprovado em" value={data(aprovadoEm)} /> : null}
+        {recusado && request?.refusedAt ? (
           <DetailRow label="Devolvido em" value={data(request.refusedAt)} />
         ) : null}
         {decisor ? <DetailRow label="Por" value={decisor} /> : null}
-        {request.decisionNote ? (
-          <DetailRow label="Observação" value={request.decisionNote} block />
+        {!recusado && aprovacao?.sourceLabel ? <DetailRow label="Como" value={aprovacao.sourceLabel} /> : null}
+        {!recusado && aprovacao?.total != null ? (
+          <DetailRow
+            label="Valor aprovado"
+            value={<span className="tabular-nums">{formatCurrency(aprovacao.total)}</span>}
+          />
         ) : null}
+        {nota ? <DetailRow label="Observação" value={nota} block /> : null}
       </PortalRows>
     </PortalCard>
   );

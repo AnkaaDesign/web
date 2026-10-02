@@ -76,7 +76,7 @@
 // `APPROVED`) ou recusar (VOLTA a `PENDING`, para o comercial refazer).
 // Os botões vivem no cabeçalho do card da Proposta — e NÃO no da página, porque
 // o `headerExtra` do `PageHeader` mora dentro de um `hidden sm:flex` e sumiria
-// no celular, que é metade das visitas do portal. Ver `pre-aprovacao-actions.tsx`
+// no celular, que é metade das visitas do portal. Ver `aprovacao-valor-actions.tsx`
 // para por que a recusa precisa dizer, com todas as letras, que não é um
 // cancelamento.
 import { useMemo } from "react";
@@ -91,12 +91,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import {
   OrcamentoAndamentoCard,
   OrcamentoAssinaturasCard,
   OrcamentoCobrancaCard,
   OrcamentoGarantiaCard,
+  OrcamentoArteCard,
   OrcamentoLayoutCard,
   OrcamentoDecisaoCard,
   OrcamentoPropostaCard,
@@ -105,7 +107,7 @@ import {
   OrcamentoVeiculosCard,
   PortalBand,
   PortalBandSkeleton,
-  PreAprovacaoActions,
+  AprovacaoValorActions,
   estOrcamentoVeiculos,
   hasPortalSection,
   orcamentoTemDecisao,
@@ -273,6 +275,18 @@ export function ClientePortalOrcamentoDetalhePage() {
     <div className="space-y-4">
       {header}
 
+      {/* O QUE FALTA PARA EMITIR O DOCUMENTO, em língua de cliente
+          (`emission.label`, montado no servidor). Só aparece quando falta algo
+          e ainda não há documento emitido. */}
+      {budget.emission?.label ? (
+        <Alert variant="warning">
+          <AlertDescription className="flex items-start gap-2 text-sm">
+            <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{budget.emission.label}</span>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {/* ── FAIXA DE DUAS COLUNAS — o que é campo escalar ─────────────────── */}
       {/* ⚠️ CADA CARD VIAJA COM A SUA ALTURA ESTIMADA.
           A faixa não alterna mais esquerda/direita: ela põe cada card na coluna
@@ -289,7 +303,7 @@ export function ClientePortalOrcamentoDetalhePage() {
               <OrcamentoPropostaCard
                 budget={budget}
                 actions={
-                  <PreAprovacaoActions
+                  <AprovacaoValorActions
                     budgetId={budget.id}
                     status={budget.status}
                     roles={roles}
@@ -361,6 +375,9 @@ export function ClientePortalOrcamentoDetalhePage() {
           ⛔ PAGAMENTO É O ÚLTIMO, depois de Assinaturas, por decisão do dono. */}
       <OrcamentoAndamentoCard vehicles={budget.vehicles} />
       {temServicos && <OrcamentoServicosCard budget={budget} />}
+      {/* A arte dos veículos — o que o cliente DECIDE — antes das referências
+          de layout (cores e arquivos-base). */}
+      <OrcamentoArteCard budget={budget} />
       <OrcamentoLayoutCard budget={budget} />
       <OrcamentoAssinaturasCard budgetId={budget.id} roles={roles} />
       <OrcamentoCobrancaCard budget={budget} />

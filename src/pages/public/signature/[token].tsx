@@ -7,9 +7,8 @@
  *  1. precisa do seu próprio `<Toaster />` — o único montado no App fica dentro do
  *     catch-all autenticado, então todo toast disparado de uma rota pública é
  *     invisível hoje (a página pública de orçamento sofre disso agora mesmo);
- *  2. a rota TEM de viver sob `/cliente` — o `MobileUsageGuard` redireciona para
- *     `/install` qualquer caminho móvel fora de uma allowlist, e celular é
- *     exatamente onde o cliente vai assinar.
+ *  2. a rota vive sob `/cliente`, com o resto do que o contato do cliente abre —
+ *     e celular é exatamente onde ele vai assinar.
  *
  * Fluxo: termo de aceite → revisar documento → conferir identidade (modal) →
  * código no e-mail → 4 declarações → assinar.

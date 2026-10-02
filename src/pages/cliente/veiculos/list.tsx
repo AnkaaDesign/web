@@ -251,7 +251,7 @@ export function ClientePortalVeiculosPage() {
             enableColumnResizing: false,
             // Seleção múltipla não tem ação nenhuma nesta tela — a coluna de
             // marcação só ocuparia largura num celular, que é de onde metade
-            // destas visitas chega (`/cliente/*` é isento do MobileUsageGuard).
+            // destas visitas chega (o portal é usado no navegador do celular).
             enableSelection: false,
             enableRowPinning: false,
             enableShare: false,
