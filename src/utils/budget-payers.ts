@@ -199,6 +199,32 @@ export function customerUpdatePatch(
   return patch;
 }
 
+/**
+ * O patch de UM cliente que paga mais de uma fatura (cobrança veículo a
+ * veículo): cada fatura tem a sua cópia editável do mesmo cadastro, e qualquer
+ * uma delas pode ter sido a editada. Junta os patches de todas, na ordem de
+ * prioridade recebida (a fatura aberta na tela primeiro).
+ *
+ * Duas cópias com valores DIFERENTES para o mesmo campo são um conflito: vale o
+ * da primeira cópia na ordem, e o campo volta em `conflicts` para a tela avisar
+ * — nunca se escolhe calado.
+ */
+export function mergedCustomerPatch(
+  record: Record<string, any> | null | undefined,
+  copies: ReadonlyArray<Record<string, any> | null | undefined>,
+): { patch: Partial<Record<PayerCustomerFieldKey, string>>; conflicts: PayerCustomerFieldKey[] } {
+  const patch: Partial<Record<PayerCustomerFieldKey, string>> = {};
+  const conflicts = new Set<PayerCustomerFieldKey>();
+  for (const copy of copies) {
+    const own = customerUpdatePatch(record, copy);
+    for (const [key, value] of Object.entries(own) as Array<[PayerCustomerFieldKey, string]>) {
+      if (!(key in patch)) patch[key] = value;
+      else if (normalized(key, patch[key]) !== normalized(key, value)) conflicts.add(key);
+    }
+  }
+  return { patch, conflicts: PAYER_CUSTOMER_FIELDS.map((f) => f.key).filter((k) => conflicts.has(k)) };
+}
+
 /** Os rótulos dos campos do cadastro que o Salvar vai alterar. */
 export function changedCustomerFieldLabels(
   record: Record<string, any> | null | undefined,
@@ -208,9 +234,34 @@ export function changedCustomerFieldLabels(
   return PAYER_CUSTOMER_FIELDS.filter((f) => f.key in patch).map((f) => f.label);
 }
 
+/**
+ * A resposta de uma consulta de CNPJ ainda vale para o pagador? A consulta
+ * leva segundos; se nesse meio-tempo o operador trocou o cliente do pagador (ou
+ * editou o documento), escrever a razão social e o endereço que voltaram
+ * gravaria a empresa consultada no cadastro de OUTRO cliente.
+ */
+export function isCnpjLookupStillCurrent(
+  dispatched: { customerId: string | null | undefined; digits: string },
+  current: { customerId: string | null | undefined; cnpj: string | null | undefined },
+): boolean {
+  if ((dispatched.customerId ?? null) !== (current.customerId ?? null)) return false;
+  return String(current.cnpj ?? "").replace(/\D/g, "") === dispatched.digits;
+}
+
 /** O id do cliente dono do documento, quando a API recusou com 409. */
 export function existingCustomerIdFromError(error: unknown): string | null {
-  const data = (error as any)?.response?.data;
-  const id = data?.details?.existingCustomerId ?? data?.existingCustomerId;
-  return typeof id === "string" && id ? id : null;
+  const e = error as
+    | {
+        response?: { data?: unknown };
+        // O interceptor do axiosClient rejeita com um `Error` novo e guarda o
+        // erro do axios aqui — é o formato que a tela recebe de verdade.
+        originalError?: { response?: { data?: unknown } };
+      }
+    | null
+    | undefined;
+  for (const data of [e?.response?.data, e?.originalError?.response?.data] as any[]) {
+    const id = data?.details?.existingCustomerId ?? data?.existingCustomerId;
+    if (typeof id === "string" && id) return id;
+  }
+  return null;
 }

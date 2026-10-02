@@ -9,7 +9,7 @@
  * cartão diz o que o Salvar vai mudar no cadastro e de quem; o documento só se
  * preenche em cadastro sem documento.
  */
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ import type { PaymentConfig } from "@/schemas/budget";
 import { attentionFieldClass, useAttentionField } from "@/lib/attention";
 import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
 import { cn } from "@/lib/utils";
-import { canEditPayerDocument, changedCustomerFieldLabels } from "@/utils/budget-payers";
+import { canEditPayerDocument, changedCustomerFieldLabels, isCnpjLookupStillCurrent } from "@/utils/budget-payers";
 import { vehicleLabel, type BillingSplitVehicle } from "@/components/financial/shared/billing-split-field";
 import { PayerCustomerCombobox } from "./payer-customer-combobox";
 
@@ -114,7 +114,7 @@ export function BudgetPayerCard({
   coverage,
 }: BudgetPayerCardProps) {
   const customer = record;
-  const { control, setValue: setFormValue } = useFormContext();
+  const { control, setValue: setFormValue, getValues } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
   const customerData = config?.customerData || {};
 
@@ -283,8 +283,19 @@ export function BudgetPayerCard({
   // O QUE O SALVAR VAI MUDAR NO CADASTRO — dito antes, com o nome do dono.
   const changedFields = useMemo(() => changedCustomerFieldLabels(record, customerData), [record, customerData]);
 
+  // Para quem a consulta de CNPJ em voo foi disparada (ver `isCnpjLookupStillCurrent`).
+  const lookupTarget = useRef<{ customerId: string | null; digits: string } | null>(null);
+
   const { lookupCnpj, isLoading: isLookingUpCnpj } = useCnpjLookup({
     onSuccess: (data) => {
+      const target = lookupTarget.current;
+      const now = getValues(`customerConfigs.${configIndex}`);
+      if (
+        !target ||
+        !isCnpjLookupStillCurrent(target, { customerId: now?.customerId, cnpj: now?.customerData?.cnpj })
+      ) {
+        return;
+      }
       if (data.corporateName) setCustomerField("corporateName", data.corporateName);
       if (data.fantasyName) setCustomerField("fantasyName", data.fantasyName);
       if (data.address) setCustomerField("address", data.address);
@@ -304,9 +315,10 @@ export function BudgetPayerCard({
     setCustomerField("cnpj", value);
     const digits = value.replace(/\D/g, "");
     if (digits.length === 14) {
+      lookupTarget.current = { customerId: getValues(`customerConfigs.${configIndex}.customerId`) ?? null, digits };
       lookupCnpj(digits);
     }
-  }, [setCustomerField, lookupCnpj, customerHasCnpj]);
+  }, [setCustomerField, lookupCnpj, customerHasCnpj, getValues, configIndex]);
 
   const handleDocTypeChange = useCallback((newType: any) => {
     const type = typeof newType === "string" ? newType : "cnpj";

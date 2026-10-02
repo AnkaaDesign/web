@@ -7,6 +7,8 @@ import {
   distinctPayerCustomerIds,
   duplicatePayerIndex,
   existingCustomerIdFromError,
+  isCnpjLookupStillCurrent,
+  mergedCustomerPatch,
   newPayerConfig,
   remapServicesPayer,
   swapPayerCustomer,
@@ -121,4 +123,43 @@ describe("existingCustomerIdFromError", () => {
     expect(existingCustomerIdFromError({ response: { data: { existingCustomerId: "c1" } } })).toBe("c1");
     expect(existingCustomerIdFromError(new Error("x"))).toBeNull();
   });
+  it("lê o 409 no formato REAL que o interceptor do axiosClient rejeita", () => {
+    // `axiosClient` rejeita com `new Error(msg)` + `originalError` (o AxiosError).
+    const enhanced = Object.assign(new Error("Cliente já cadastrado"), {
+      _statusCode: 409,
+      originalError: { response: { status: 409, data: { details: { existingCustomerId: "c-sola" } } } },
+    });
+    expect(existingCustomerIdFromError(enhanced)).toBe("c-sola");
+  });
 });
+
+describe("isCnpjLookupStillCurrent", () => {
+  const target = { customerId: "a", digits: "11222333000181" };
+  it("vale se o pagador e o documento são os mesmos do disparo", () => {
+    expect(isCnpjLookupStillCurrent(target, { customerId: "a", cnpj: "11.222.333/0001-81" })).toBe(true);
+  });
+  it("descarta se o cliente do pagador foi trocado no meio", () => {
+    expect(isCnpjLookupStillCurrent(target, { customerId: "b", cnpj: "11.222.333/0001-81" })).toBe(false);
+  });
+  it("descarta se o documento foi editado depois do disparo", () => {
+    expect(isCnpjLookupStillCurrent(target, { customerId: "a", cnpj: "11.222.333/0001-8" })).toBe(false);
+  });
+});
+
+describe("mergedCustomerPatch", () => {
+  const record = { id: "x", corporateName: "X LTDA", city: "Ibiporã", address: "Rua A" };
+  it("a edição em QUALQUER cópia entra no patch (não só a primeira)", () => {
+    const intacta = { corporateName: "X LTDA", city: "Ibiporã", address: "Rua A" };
+    const editada = { corporateName: "X LTDA", city: "Ibiporã", address: "Rua B" };
+    expect(mergedCustomerPatch(record, [intacta, editada])).toEqual({ patch: { address: "Rua B" }, conflicts: [] });
+  });
+  it("cópias com valores diferentes: vale a primeira e o campo volta como conflito", () => {
+    const a = { address: "Rua B" };
+    const b = { address: "Rua C", city: "Londrina" };
+    expect(mergedCustomerPatch(record, [a, b])).toEqual({
+      patch: { address: "Rua B", city: "Londrina" },
+      conflicts: ["address"],
+    });
+  });
+});
+

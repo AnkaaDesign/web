@@ -11,7 +11,7 @@ import { signatureService } from "@/api-client/signature";
 import { budgetKeys, useBudgetByTask } from "@/hooks/production/use-budget";
 import { budgetService } from "@/api-client/budget";
 import { customerService, getCustomerById } from "@/api-client/customer";
-import { customerUpdatePatch } from "@/utils/budget-payers";
+import { mergedCustomerPatch, PAYER_CUSTOMER_FIELDS } from "@/utils/budget-payers";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
@@ -1321,25 +1321,43 @@ const BillingDetailPageInner = ({
       // documento só em cadastro sem documento. Antes este Salvar regravava os
       // quinze campos de todo pagador — inclusive o CNPJ —, e numa cobrança
       // veículo a veículo o mesmo cliente era regravado uma vez por fatura.
-      const patchedCustomers = new Set<string>();
-      for (const config of formData.customerConfigs) {
+      // Numa cobrança veículo a veículo o MESMO cliente paga várias faturas, e
+      // cada uma tem a sua cópia do cadastro — a editada pode ser qualquer uma
+      // (normalmente a aberta na tela). Junta as cópias, a visível primeiro;
+      // se duas dizem coisas diferentes, vale a visível e a tela avisa.
+      const copiesByCustomer = new Map<string, any[]>();
+      const order = [
+        ...visibleConfigIdx,
+        ...formData.customerConfigs.map((_: any, i: number) => i).filter((i: number) => !visibleConfigIdx.includes(i)),
+      ];
+      for (const i of order) {
+        const config = formData.customerConfigs[i];
         if (!config?.customerId || !config.customerData) continue;
-        if (patchedCustomers.has(config.customerId)) continue;
-        patchedCustomers.add(config.customerId);
-        let record = customersCache.current.get(config.customerId);
+        const list = copiesByCustomer.get(config.customerId) ?? [];
+        list.push(config.customerData);
+        copiesByCustomer.set(config.customerId, list);
+      }
+      for (const [customerId, copies] of copiesByCustomer) {
+        let record = customersCache.current.get(customerId);
         if (!record) {
           try {
-            record = ((await getCustomerById(config.customerId)) as any)?.data;
+            record = ((await getCustomerById(customerId)) as any)?.data;
             if (record) customersCache.current.set(record.id, record);
           } catch {
             record = null;
           }
         }
         if (!record) continue;
-        const patch = customerUpdatePatch(record, config.customerData);
+        const { patch, conflicts } = mergedCustomerPatch(record, copies);
+        if (conflicts.length > 0) {
+          const labels = PAYER_CUSTOMER_FIELDS.filter((f) => conflicts.includes(f.key)).map((f) => f.label);
+          toast.warning(
+            `O cadastro de ${record.fantasyName || record.corporateName} foi editado de formas diferentes em mais de uma fatura (${labels.join(", ")}). Valeu o da fatura aberta.`,
+          );
+        }
         if (Object.keys(patch).length === 0) continue;
         try {
-          await customerService.updateCustomer(config.customerId, patch as any);
+          await customerService.updateCustomer(customerId, patch as any);
         } catch {
           // Error toast is emitted by the axios error interceptor (o 409 do
           // documento de outro cliente diz de quem é).
@@ -1456,8 +1474,21 @@ const BillingDetailPageInner = ({
       // ⚠️ Saiu daqui a segunda fase, que replicava hop a hop um caminho de transição até
       // `BILLING_APPROVED` (com uma guarda para nunca ATRAVESSAR aquele estado, porque atravessá-lo
       // emitia nota). Aprovar cobrança é uma chamada, a `PUT /billings/:id/approve`, logo abaixo.
+      //
+      // O PIN É SÓ DE `APPROVED`, e com o estado RELIDO agora: `quote.status` é o
+      // da abertura da página, e outra pessoa pode ter retirado a proposta do
+      // cliente ou revogado o valor desde então — regravar o estado velho
+      // desfaria esse ato pela porta da gravação genérica. Os demais estados não
+      // precisam de pin (nada a proteger do auto-revert) e nunca se escrevem daqui.
       if (!isQuoteLocked) {
-        quotePayload.status = quote.status;
+        let currentStatus: string | null = null;
+        try {
+          const fresh: any = await budgetService.getById(quote.id);
+          currentStatus = (fresh?.data?.data ?? fresh?.data)?.status ?? null;
+        } catch {
+          currentStatus = null;
+        }
+        if (currentStatus === "APPROVED") quotePayload.status = "APPROVED";
       }
 
       await budgetService.update(quote.id, quotePayload);
@@ -1516,6 +1547,7 @@ const BillingDetailPageInner = ({
   }, [
     quote?.id,
     quote?.status,
+    visibleConfigIdx,
     isPerVehicleBilling,
     // A COBRANÇA aberta: sem ela na lista, um `executeSave` memorizado aprovaria a cobrança
     // ANTERIOR depois de o operador trocar de página pelo paginador de irmãs.
