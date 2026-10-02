@@ -89,7 +89,7 @@ export function PayerCustomerCombobox({
     async (text: string) => {
       setIsCreating(true);
       try {
-        const result = await quickCreateCustomer(buildCustomerData(text));
+        const result = await quickCreateCustomer(buildCustomerData(text), undefined, { handleDuplicateDocument: true });
         if (result.success && result.data) {
           resetCnpj();
           remember([result.data]);
@@ -108,6 +108,11 @@ export function PayerCustomerCombobox({
             onSelect(existing);
             return undefined;
           }
+        }
+        // O interceptor não avisou o 409 (quem chama trata); sem o dono para
+        // selecionar, o aviso é daqui.
+        if ((error as { _statusCode?: number })?._statusCode === 409) {
+          toast.error(error instanceof Error ? error.message : "Documento já cadastrado.");
         }
         throw error;
       } finally {

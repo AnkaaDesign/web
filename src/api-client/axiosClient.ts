@@ -67,6 +67,12 @@ interface RequestMetadata {
   isCached?: boolean;
   isReactQueryRetry?: boolean; // Track if this is a React Query retry attempt
   suppressToast?: boolean; // Suppress toast for this request
+  /**
+   * HTTP statuses whose ERROR toast the caller handles itself (e.g. the 409
+   * "document already belongs to customer X" that the payer combobox turns into
+   * a selection). Opt-in per request; every other error still toasts.
+   */
+  suppressErrorToastFor?: number[];
 }
 
 // Extend AxiosRequestConfig to include metadata
@@ -935,7 +941,9 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && !isAttention && !isBillingLookup && shouldShow) {
+        const callerHandlesStatus = !!metadata.suppressErrorToastFor?.includes(errorInfo._statusCode as number);
+
+        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && !isAttention && !isBillingLookup && !callerHandlesStatus && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

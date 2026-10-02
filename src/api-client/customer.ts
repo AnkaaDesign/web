@@ -64,10 +64,16 @@ export class CustomerService {
     return response.data;
   }
 
-  async quickCreateCustomer(data: CustomerQuickCreateFormData | FormData, query?: CustomerQueryFormData): Promise<CustomerCreateResponse> {
+  async quickCreateCustomer(
+    data: CustomerQuickCreateFormData | FormData,
+    query?: CustomerQueryFormData,
+    options?: { handleDuplicateDocument?: boolean },
+  ): Promise<CustomerCreateResponse> {
     // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.post<CustomerCreateResponse>(`${this.basePath}/quick`, data, {
       params: query,
+      // 409 = documento já cadastrado: quem chama seleciona o dono e avisa.
+      ...(options?.handleDuplicateDocument ? ({ metadata: { suppressErrorToastFor: [409] } } as any) : {}),
     });
     return response.data;
   }
@@ -139,7 +145,11 @@ export const getCustomerById = (id: string, params?: Omit<CustomerGetByIdFormDat
 
 // Mutation Operations
 export const createCustomer = (data: CustomerCreateFormData | FormData, query?: CustomerQueryFormData) => customerService.createCustomer(data, query);
-export const quickCreateCustomer = (data: CustomerQuickCreateFormData | FormData, query?: CustomerQueryFormData) => customerService.quickCreateCustomer(data, query);
+export const quickCreateCustomer = (
+  data: CustomerQuickCreateFormData | FormData,
+  query?: CustomerQueryFormData,
+  options?: { handleDuplicateDocument?: boolean },
+) => customerService.quickCreateCustomer(data, query, options);
 export const updateCustomer = (id: string, data: CustomerUpdateFormData | FormData, query?: CustomerQueryFormData) => customerService.updateCustomer(id, data, query);
 export const deleteCustomer = (id: string) => customerService.deleteCustomer(id);
 
