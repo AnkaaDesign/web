@@ -8,19 +8,18 @@ import { BillingCoveredVehicles } from "@/components/financial/billing/steps/bil
 import { billingKeys, useBilling, useBillingByTask } from "@/hooks/financial/use-billing";
 import { billingService } from "@/api-client/billing";
 import { signatureService } from "@/api-client/signature";
-import { budgetKeys } from "@/hooks/production/use-budget";
+import { budgetKeys, useBudgetByTask } from "@/hooks/production/use-budget";
 import { budgetService } from "@/api-client/budget";
 import { customerService, getCustomerById } from "@/api-client/customer";
 import { customerUpdatePatch } from "@/utils/budget-payers";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
-import { BillingStepInfo } from "@/components/financial/billing/steps/billing-step-info";
 import { BillingStepServices } from "@/components/financial/billing/steps/billing-step-services";
-import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
+import { BudgetWizardStepBilling } from "@/components/financial/budget/wizard/budget-wizard-step-billing";
+import { BudgetAxesStrip } from "@/components/financial/budget/budget-axes-strip";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
-import { BillingStepBudgetInfo } from "@/components/financial/billing/steps/billing-step-budget-info";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
 import { isBudgetBillable } from "@/constants/budget-contract";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
@@ -75,7 +74,8 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toAttentionQuoteEntity } from "@/components/financial/shared/quote-attention";
 import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
 import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
-import { IMPLEMENT_ART_LAYOUTS_INCLUDE } from "@/utils/implement-art";
+import { IMPLEMENT_ART_LAYOUTS_INCLUDE, implementArtStateOf } from "@/utils/implement-art";
+import type { BudgetAxisTarget } from "@/utils/budget-axes";
 import { useAttentionEntity, useAttentionField } from "@/lib/attention";
 import { hasCompleteBillingCustomerData, missingBillingCustomerLabels } from "@/lib/billing-customer-data";
 
@@ -98,6 +98,9 @@ import { hasCompleteBillingCustomerData, missingBillingCustomerLabels } from "@/
  * estourava: o id vinha `undefined` e o redirecionamento nunca disparava.
  * O critério de "achei" é ter `id`, não ter vindo por um caminho específico.
  */
+/** Os três passos da cobrança: Veículos → Faturamento → Resumo (como o app). */
+const BILLING_STEP = { VEHICLES: 1, PAYERS: 2, REVIEW: 3 } as const;
+
 const unwrapBilling = (r: any): any | null =>
   [r?.data?.data, r?.data, r].find(
     (c) => c && typeof c === "object" && typeof c.id === "string",
@@ -535,6 +538,15 @@ const BillingDetailPageInner = ({
     [quote],
   );
 
+  // O ORÇAMENTO como a API o devolve por tarefa — `status`, `signatureStatus`,
+  // `billable` e `emission` para a faixa dos quatro andamentos (a mesma leitura
+  // do detalhe do Orçamento).
+  const { data: budgetByTaskResponse } = useBudgetByTask(id ?? "");
+  const budgetDetail = useMemo<any | null>(() => {
+    const raw = (budgetByTaskResponse as any)?.data?.data ?? (budgetByTaskResponse as any)?.data;
+    return raw?.id ? raw : null;
+  }, [budgetByTaskResponse]);
+
   // Fetch invoices — polls every 3s during generation
   // AS FATURAS QUE COBRAM ESTE VEÍCULO — pela rota do ORÇAMENTO, filtradas pela
   // cobertura. A rota por tarefa devolvia VAZIO numa fatura conjunta (ali
@@ -932,11 +944,14 @@ const BillingDetailPageInner = ({
       const doBilling = new Set(
         ((currentBilling.customerConfigs ?? []) as any[]).map((c: any) => c.id),
       );
+      // Mais os pagadores ACRESCENTADOS aqui e ainda não gravados (sem `id`):
+      // nasceram nesta página, então são desta cobrança. Sem isso o "+ Adicionar
+      // pagador" criava um cartão que sumia da tela no mesmo instante.
       const idx = customerConfigs
         .map((c: any, i: number) => ({ c, i }))
-        .filter(({ c }: any) => c?.id && doBilling.has(c.id))
+        .filter(({ c }: any) => (c?.id && doBilling.has(c.id)) || (c?.customerId && !c?.id))
         .map(({ i }: any) => i);
-      if (idx.length > 0) return idx;
+      if (idx.some((i: number) => customerConfigs[i]?.id)) return idx;
     }
 
     // RECUO: orçamento aberto antes de a entidade existir, ou fatia ainda não
@@ -945,9 +960,12 @@ const BillingDetailPageInner = ({
     if (!task?.id) return todos;
     const covering = customerConfigs
       .map((c: any, i: number) => ({ c, i }))
-      .filter(({ c }: any) => Array.isArray(c?.taskIds) && c.taskIds.includes(task.id))
+      .filter(
+        ({ c }: any) =>
+          (Array.isArray(c?.taskIds) && c.taskIds.includes(task.id)) || (c?.customerId && !c?.id),
+      )
       .map(({ i }: any) => i);
-    return covering.length > 0 ? covering : todos;
+    return covering.some((i: number) => customerConfigs[i]?.id) ? covering : todos;
   }, [customerConfigs, task?.id, currentBilling]);
 
   // ── AS COBRANÇAS IRMÃS NÃO APARECEM AQUI ────────────────────────────────
@@ -985,7 +1003,7 @@ const BillingDetailPageInner = ({
     // recorte do documento.
     const base: Array<{ id: number; name: string; description: string }> = [
       {
-        id: 1,
+        id: BILLING_STEP.VEHICLES,
         name: "Veículos",
         description:
           coveredVehicleRows.length === 1
@@ -1022,28 +1040,25 @@ const BillingDetailPageInner = ({
     // Agora o rótulo é o VEÍCULO quando há mais de uma fatura, e continua sendo
     // o CLIENTE quando há mais de um cliente. Num orçamento de um veículo e um
     // cliente nada muda: "Cliente 1" era e continua sendo o rótulo certo.
-    const configsHaveSplit = customerConfigs.length > 1 && !hasMultipleCustomersOf(customerConfigs);
-    visibleConfigIdx.forEach((i: number) => {
-      const config: any = customerConfigs[i];
-      if (!config) return;
-      const cached = customersCache.current.get(config.customerId);
-      const name =
-        config.customerData?.fantasyName ||
-        config.customerData?.corporateName ||
-        cached?.fantasyName ||
-        "Cliente";
-      const coverage = coverageSummary(config, quoteVehicles, quoteVehicleRows as any);
-      base.push({
-        id: base.length + 1,
-        name: configsHaveSplit ? `Fatura ${i + 1}` : `Cliente ${i + 1}`,
-        // A descrição é o que o operador lê para se situar: com fatias, o
-        // veículo (ou o lote); sem fatias, o cliente, como sempre foi.
-        description: configsHaveSplit ? coverage : name,
-      });
+    // ═══════════════════════════════════════════════════════════════════════
+    // UM PASSO "FATURAMENTO" — não um por fatura (decisão do dono, 02/10/2026)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Eram "Cliente 1..N" / "Fatura 1..N", um passo por pagador desta cobrança.
+    // Agora é a mesma forma do assistente do Orçamento: os pagadores DESTA
+    // cobrança numa lista de cartões (combobox de cliente com a proteção do
+    // cadastro, "+ Adicionar pagador"), e cada cartão diz de quais veículos é a
+    // fatura. Veículos → Faturamento → Resumo, como no app.
+    const payerCount = visibleConfigIdx.length;
+    base.push({
+      id: BILLING_STEP.PAYERS,
+      name: "Faturamento",
+      description:
+        payerCount === 0 ? "Quem paga" : payerCount === 1 ? "1 pagador" : `${payerCount} pagadores`,
     });
-    base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
+    base.push({ id: BILLING_STEP.REVIEW, name: "Resumo", description: "Revisão e aprovação" });
     return base;
-  }, [customerConfigs, visibleConfigIdx, canSeeBudgetInfoStep, quoteVehicles, quoteVehicleRows, coveredVehicleRows]);
+  }, [visibleConfigIdx, coveredVehicleRows]);
 
   const totalSteps = steps.length;
 
@@ -1094,17 +1109,20 @@ const BillingDetailPageInner = ({
     if (currentStep < 1) setCurrentStep(1);
   }, [currentStep, totalSteps, isTaskLoading, customerConfigs.length]);
 
-  // A tela é: 1..N=Fatura(s) DESTA cobrança, N+1=Resumo. Não há passo de Tarefa,
-  // nem de Proposta, nem de Serviços — os três editam o que foi VENDIDO ou o que
-  // foi PRODUZIDO, e nenhum dos dois é assunto desta tela.
-  //
-  // `proposalStepIdx`/`servicesStepIdx` ficam nulos: os componentes seguem
-  // montados e escondidos (o formulário é um só e o payload da gravação sai
-  // dele; `BillingStepServices` ainda recalcula o total da fatia quando a
-  // cobertura muda), mas não têm posição na navegação.
-  const proposalStepIdx: number | null = null;
-  const servicesStepIdx: number | null = null;
-  const firstCustomerStepIdx = 2;
+  // A tela é: Veículos → Faturamento → Resumo. Não há passo de Tarefa, nem de
+  // Proposta, nem de Serviços — os três editam o que foi VENDIDO ou o que foi
+  // PRODUZIDO, e nenhum dos dois é assunto desta tela. `BillingStepServices`
+  // segue montado e escondido: o formulário é um só, o payload da gravação sai
+  // dele, e é ele que recalcula o total da fatia quando a cobertura muda.
+
+  /** Leva ao passo Faturamento, no cartão do pagador `index` (lista do orçamento). */
+  const goToPayer = useCallback((index?: number) => {
+    setCurrentStep(BILLING_STEP.PAYERS);
+    if (index === undefined) return;
+    window.setTimeout(() => {
+      document.getElementById(`pagador-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, []);
 
   // Attention: open on the customer step that a rule is asking about.
   //
@@ -1155,39 +1173,11 @@ const BillingDetailPageInner = ({
       return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
     });
     if (idx < 0) return;
-    // O passo é a posição entre as cobranças VISÍVEIS, não entre todas as do
-    // orçamento: esta página mostra as do veículo aberto. Apontar pelo índice
-    // global mandava para um passo que não existe — e o corpo da tela, que só
-    // renderiza o passo corrente, ficava em branco.
-    const pos = visibleConfigIdx.indexOf(idx);
-    if (pos < 0) return;
-    setCurrentStep(firstCustomerStepIdx + pos);
-  }, [orderNumberAttentionActive, customerDataAttentionActive, invoices.length, customerConfigs, firstCustomerStepIdx]);
+    // Só um pagador DESTA cobrança: os das irmãs não são desenhados aqui.
+    if (!visibleConfigIdx.includes(idx)) return;
+    goToPayer(idx);
+  }, [orderNumberAttentionActive, customerDataAttentionActive, invoices.length, customerConfigs, visibleConfigIdx, goToPayer]);
 
-  // Step validation. Parameterized by step (not read off `currentStep`) so a
-  // jump can run every gate between here and the target — see handleStepClick.
-  const validateStep = useCallback((step: number) => {
-    if (step === 1) {
-      const configs = form.getValues("customerConfigs") || [];
-      if (configs.length === 0) {
-        toast.error("Selecione pelo menos um cliente para faturamento");
-        return false;
-      }
-      return true;
-    }
-    if (step === servicesStepIdx) {
-      const services = form.getValues("services") || [];
-      const validServices = services.filter((s: any) => s.description?.trim());
-      if (validServices.length === 0) {
-        toast.error("Adicione pelo menos um serviço");
-        return false;
-      }
-      return true;
-    }
-    return true;
-  }, [form, servicesStepIdx]);
-
-  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   /**
    * O que a APROVAÇÃO DA COBRANÇA exige: serviços com valor válido, atribuição de cliente quando
@@ -1203,7 +1193,7 @@ const BillingDetailPageInner = ({
 
     const negativeAmountServices = validServices.filter((s: any) => Number(s.amount) < 0);
     if (negativeAmountServices.length > 0) {
-      if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
+      // Preço é do Orçamento (o que foi vendido); corrige-se lá.
       toast.error("Serviços com valor negativo", {
         description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
       });
@@ -1219,9 +1209,9 @@ const BillingDetailPageInner = ({
     if (hasMultipleCustomersOf(configs)) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
-        if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
+        goToPayer();
         toast.error("Serviços sem cliente atribuído", {
-          description: "Todos os serviços devem ter um cliente selecionado em 'Faturar Para'",
+          description: "No passo Faturamento, em \"Quem paga cada serviço\", escolha o pagador de cada serviço.",
         });
         return false;
       }
@@ -1231,10 +1221,8 @@ const BillingDetailPageInner = ({
     //
     // Varria `configs` inteiro, que é a lista do ORÇAMENTO: num orçamento com quatro cobranças,
     // aprovar a primeira era recusado porque o cliente da QUARTA estava sem CNPJ — e o toast
-    // mandava o operador para um passo que esta página nem renderiza (os passos são construídos a
-    // partir de `visibleConfigIdx`, então `firstCustomerStepIdx + i` com `i` GLOBAL aponta para
-    // fora). Aprovar uma cobrança não pode depender das outras; é a mesma regra que fez a rota
-    // deixar de ser do orçamento.
+    // mandava o operador para um cartão que esta página nem desenha. Aprovar uma cobrança não pode
+    // depender das outras; é a mesma regra que fez a rota deixar de ser do orçamento.
     const scoped =
       visibleConfigIdx.length > 0 ? visibleConfigIdx : configs.map((_: any, i: number) => i);
 
@@ -1257,8 +1245,7 @@ const BillingDetailPageInner = ({
       const errors: string[] = skipCadastro ? [] : missingBillingCustomerLabels(data);
       if (!paymentCondition && !(paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
-        // A POSIÇÃO entre os passos VISÍVEIS, não o índice global — ver o comentário acima.
-        setCurrentStep(firstCustomerStepIdx + pos);
+        goToPayer(i);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
         // Com mais de uma fatura o nome do cliente se repete, e a mensagem
         // mandava o operador para "um passo do mesmo cliente" sem dizer qual.
@@ -1273,40 +1260,25 @@ const BillingDetailPageInner = ({
     }
 
     return true;
-  }, [form, servicesStepIdx, firstCustomerStepIdx, quoteVehicles, quoteVehicleRows, visibleConfigIdx]);
+  }, [form, goToPayer, quoteVehicles, quoteVehicleRows, visibleConfigIdx]);
 
+  // NAVEGAÇÃO LIVRE, como no detalhe do Orçamento: a cobrança é revisitada
+  // (cadastro que chega tarde, pedido de compra, conferência antes de aprovar), e
+  // nenhum passo aqui depende do anterior. Quem confere é o Salvar e o Aprovar.
   const nextStep = useCallback(() => {
-    if (validateCurrentStep()) {
-      setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
-    }
-  }, [validateCurrentStep, totalSteps]);
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
+  }, [totalSteps]);
 
   const prevStep = useCallback(() => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
-  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // EVERY gate between here and the target, exactly as pressing "Próximo" that
-  // many times would — the first refusal parks the user on the offending step,
-  // which already surfaced its own reason. A user who cannot edit skips the gates
-  // entirely: there is nothing to validate on a read-only form.
+  // O marcador leva direto ao passo — navegação livre (ver `nextStep`).
   const handleStepClick = useCallback(
     (step: number) => {
-      if (step === currentStep) return;
-      const target = Math.min(step, totalSteps);
-      if (target < currentStep || !canEdit) {
-        setCurrentStep(target);
-        return;
-      }
-      for (let s = currentStep; s < target; s++) {
-        if (!validateStep(s)) {
-          setCurrentStep(s);
-          return;
-        }
-      }
-      setCurrentStep(target);
+      setCurrentStep(Math.min(Math.max(step, 1), totalSteps));
     },
-    [currentStep, canEdit, validateStep, totalSteps],
+    [totalSteps],
   );
 
 
@@ -1567,15 +1539,22 @@ const BillingDetailPageInner = ({
 
     const configs = formData.customerConfigs || [];
     const services = formData.services || [];
-    if (configs.length === 0) {
-      setCurrentStep(1);
-      toast.error("Selecione pelo menos um cliente para faturamento");
+    // O Salvar confere a tela inteira e abre o PRIMEIRO passo com problema.
+    if (configs.length === 0 || visibleConfigIdx.length === 0) {
+      goToPayer();
+      toast.error("Escolha quem paga esta cobrança");
+      return;
+    }
+    const payerWithoutCustomer = visibleConfigIdx.find((i: number) => !configs[i]?.customerId);
+    if (payerWithoutCustomer !== undefined) {
+      goToPayer(payerWithoutCustomer);
+      toast.error("Há um pagador sem cliente escolhido");
       return;
     }
     const validServices = services.filter((s: any) => s.description?.trim());
     if (validServices.length === 0) {
-      if (servicesStepIdx !== null) setCurrentStep(servicesStepIdx);
-      toast.error("Adicione pelo menos um serviço");
+      // Serviços são do Orçamento (o que foi vendido): corrige-se lá.
+      toast.error("O orçamento não tem serviços", { description: "Adicione os serviços no Orçamento." });
       return;
     }
 
@@ -1583,7 +1562,7 @@ const BillingDetailPageInner = ({
     // próprio caminho (o seletor do Resumo → `handleApproveBilling`). Exigi-lo aqui impedia salvar
     // um rascunho de cobrança enquanto se espera o CNPJ do cliente.
     await executeSave();
-  }, [quote?.id, task?.id, form, executeSave, servicesStepIdx]);
+  }, [quote?.id, task?.id, form, executeSave, visibleConfigIdx, goToPayer]);
 
   /**
    * APROVAR ESTA COBRANÇA — a porta única, vinda do seletor do Resumo.
@@ -1669,11 +1648,13 @@ const BillingDetailPageInner = ({
       key: "next",
       label: "Próximo",
       icon: IconArrowRight,
-      onClick: canEdit ? nextStep : () => setCurrentStep((prev) => Math.min(prev + 1, totalSteps)),
-      variant: "default" as const,
+      onClick: nextStep,
+      variant: canEdit ? ("outline" as const) : ("default" as const),
       disabled: isSaving,
     });
-  } else if (canEdit) {
+  }
+  // O Salvar em TODO passo: a navegação é livre, e ele confere a tela inteira.
+  if (canEdit) {
     actions.push({
       key: "save",
       label: "Salvar",
@@ -1685,10 +1666,18 @@ const BillingDetailPageInner = ({
     });
   }
 
-  // Step detection: 1=Tarefa, 2=Proposta (COMMERCIAL/ADMIN only), then Serviços, Cliente(s), Resumo
-  const isProposalStep = proposalStepIdx !== null && currentStep === proposalStepIdx;
-  const isServicesStep = servicesStepIdx !== null && currentStep === servicesStepIdx;
+  const isPayersStep = currentStep === BILLING_STEP.PAYERS;
   const isReviewStep = currentStep === totalSteps;
+
+  // A faixa não age: leva. Valor, arte e assinatura se resolvem no Orçamento;
+  // a cobrança, aqui.
+  const handleAxisNavigate = (target: BudgetAxisTarget) => {
+    if (target === "billing") {
+      setCurrentStep(totalSteps);
+      return;
+    }
+    guardedNavigate(routes.financial.budget.details(task.id));
+  };
 
   /**
    * O NOME DESTA COBRANÇA — e uma cobrança não é um implemento.
@@ -1794,6 +1783,22 @@ const BillingDetailPageInner = ({
         {!reviewOnly && <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" onStepClick={handleStepClick} disabled={isSaving} />}
 
         <div className="flex-1 overflow-y-auto pb-6">
+          {/* OS QUATRO ANDAMENTOS, com a Cobrança em foco: valor, arte e
+              assinatura são de onde esta cobrança depende (e se resolvem no
+              Orçamento); "para emitir, falta…" não é assunto desta tela. */}
+          {quote?.id && (
+            <BudgetAxesStrip
+              className="mb-4"
+              status={budgetDetail?.status ?? (quote as any).status}
+              signatureStatus={budgetDetail?.signatureStatus ?? (quote as any).signatureStatus}
+              billable={budgetDetail?.billable ?? (quote as any).billable}
+              emission={budgetDetail?.emission}
+              artStates={artVehicles.map((vehicle: any) => implementArtStateOf(vehicle))}
+              onNavigate={handleAxisNavigate}
+              focus="billing"
+              hideEmissionBlockers
+            />
+          )}
           <FormProvider {...form}>
             {/* Tarefa, Serviços, and customer steps stay mounted (hidden via CSS) to preserve useFieldArray state */}
             {!reviewOnly && (
@@ -1818,70 +1823,29 @@ const BillingDetailPageInner = ({
                   />
                 </div>
 
-                {isProposalStep && (
-                  <BillingStepBudgetInfo disabled={!canEdit} artVehicles={artVehicles} budgetId={quote?.id} />
-                )}
-
-                <div style={{ display: isServicesStep ? undefined : "none" }}>
+                <div style={{ display: "none" }}>
                   <BillingStepServices disabled={!canEdit} />
                 </div>
 
-                {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation.
-                    TODAS ficam montadas, inclusive as que não são desta página: o payload da
-                    gravação é montado a partir do formulário, e desmontar uma fatia a tiraria
-                    do envio — a reconciliação leria "esta fatia saiu" e a APAGARIA. O que muda
-                    é que só as de `visibleConfigIdx` ganham posição de passo; as demais ficam
-                    permanentemente escondidas e são alcançadas pela página delas. */}
-                {customerConfigs.map((config: any, i: number) => {
-                  const cachedCustomer = customersCache.current.get(config.customerId);
-                  const stepPos = visibleConfigIdx.indexOf(i);
-                  const isThisStep = stepPos >= 0 && currentStep === firstCustomerStepIdx + stepPos;
-                  return (
-                    // ⚠️ A CHAVE NÃO PODE SER O CLIENTE. Num orçamento cobrado
-                    // veículo a veículo as N faturas são do MESMO cliente, e
-                    // `key={customerId}` repetiria a chave nas N: o React
-                    // reaproveita o nó da primeira para todas, e os campos de uma
-                    // fatura aparecem na tela de outra. O id da fatura é único; o
-                    // índice cobre a fatura ainda não gravada.
-                    <div
-                      key={config.id || `${config.customerId}-${i}`}
-                      style={{ display: isThisStep ? undefined : "none" }}
-                    >
-                      {/* "FATURAR PARA" e os RESPONSÁVEIS — uma vez por página,
-                          no primeiro passo de pagador. São da COBRANÇA inteira,
-                          não de um pagador: repeti-los em cada passo faria a
-                          mesma pergunta aparecer N vezes com N respostas
-                          possíveis para uma só. */}
-                      {stepPos === 0 && (
-                        <div className="mb-4">
-                          <BillingStepInfo
-                            disabled={!canEdit}
-                            customersCache={customersCache}
-                            // O RECORTE: os pagadores desta cobrança, não os do
-                            // orçamento. Sem isto, três implementos do mesmo
-                            // cliente apareciam como "3 selecionados" do mesmo
-                            // CNPJ numa página que cobra um.
-                            configIdx={visibleConfigIdx}
-                          />
-                        </div>
-                      )}
-                      <BillingStepCustomer
-                        configIndex={i}
-                        // O seletor junto/separado/lotes vive UMA vez por página,
-                        // no primeiro passo MOSTRADO — não no índice 0, que pode
-                        // não estar visível (ver `visibleConfigIdx`).
-                        isFirstVisibleBilling={stepPos === 0}
-                        customer={cachedCustomer}
-                        disabled={!canEdit}
-                        quoteId={quote?.id}
-                        vehicles={billingSplitVehicles}
-                        coverage={(config?.taskIds as string[] | undefined) ?? []}
-                        approvedBillingCount={approvedBillingCount}
-                        hasRunningSignature={hasRunningSignature}
-                      />
-                    </div>
-                  );
-                })}
+                {/* PASSO 2 — FATURAMENTO: os pagadores DESTA cobrança numa lista,
+                    na mesma forma do Orçamento (combobox de cliente que aceita
+                    criar, a proteção do cadastro, "+ Adicionar pagador"), cada
+                    cartão dizendo de quais veículos é a fatura. Os pagadores das
+                    cobranças irmãs não são desenhados; os valores deles seguem
+                    no formulário e a gravação os reenvia como vieram. */}
+                <div style={{ display: isPayersStep ? undefined : "none" }}>
+                  <BudgetWizardStepBilling
+                    disabled={!canEdit}
+                    customersCache={customersCache}
+                    quoteId={quote?.id}
+                    vehicleCount={quoteVehicles}
+                    existingVehicles={billingSplitVehicles}
+                    approvedBillingCount={approvedBillingCount}
+                    warnSignature={hasRunningSignature}
+                    scopeIdx={visibleConfigIdx}
+                    showCoverage
+                  />
+                </div>
               </>
             )}
 
