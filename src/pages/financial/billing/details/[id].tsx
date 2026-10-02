@@ -10,7 +10,8 @@ import { billingService } from "@/api-client/billing";
 import { signatureService } from "@/api-client/signature";
 import { budgetKeys } from "@/hooks/production/use-budget";
 import { budgetService } from "@/api-client/budget";
-import { customerService } from "@/api-client/customer";
+import { customerService, getCustomerById } from "@/api-client/customer";
+import { customerUpdatePatch } from "@/utils/budget-payers";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
@@ -1341,33 +1342,35 @@ const BillingDetailPageInner = ({
       // linha por vez, no veículo certo. O resto é produção, e se edita em
       // Produção.
 
-      // 2. Update customer data for NFS-e
+      // 2. O CADASTRO DOS PAGADORES — só o que mudou, e no cliente CERTO.
+      //
+      // A mesma regra do Orçamento (`customerUpdatePatch`): a cópia editável é
+      // comparada com o cadastro como foi carregado; nada mudou, nada se grava;
+      // documento só em cadastro sem documento. Antes este Salvar regravava os
+      // quinze campos de todo pagador — inclusive o CNPJ —, e numa cobrança
+      // veículo a veículo o mesmo cliente era regravado uma vez por fatura.
+      const patchedCustomers = new Set<string>();
       for (const config of formData.customerConfigs) {
-        if (config.customerData && config.customerId) {
+        if (!config?.customerId || !config.customerData) continue;
+        if (patchedCustomers.has(config.customerId)) continue;
+        patchedCustomers.add(config.customerId);
+        let record = customersCache.current.get(config.customerId);
+        if (!record) {
           try {
-            await customerService.updateCustomer(config.customerId, {
-              // First entry of NFSE_REQUIRED_CUSTOMER_FIELDS, and the step renders an input for it
-              // — but it was missing here, so filling it was silently discarded and
-              // `billing-customer-incomplete` kept firing over a field the user had already typed.
-              fantasyName: config.customerData.fantasyName || undefined,
-              corporateName: config.customerData.corporateName || undefined,
-              cnpj: config.customerData.cnpj || undefined,
-              cpf: config.customerData.cpf || undefined,
-              address: config.customerData.address || undefined,
-              addressNumber: config.customerData.addressNumber || undefined,
-              addressComplement: config.customerData.addressComplement || undefined,
-              neighborhood: config.customerData.neighborhood || undefined,
-              city: config.customerData.city || undefined,
-              state: config.customerData.state || undefined,
-              zipCode: config.customerData.zipCode || undefined,
-              stateRegistration: config.customerData.stateRegistration || undefined,
-              municipalRegistration: config.customerData.municipalRegistration || undefined,
-              streetType: config.customerData.streetType || undefined,
-              registrationStatus: config.customerData.registrationStatus ?? undefined,
-            });
+            record = ((await getCustomerById(config.customerId)) as any)?.data;
+            if (record) customersCache.current.set(record.id, record);
           } catch {
-            // Error toast is emitted by the axios error interceptor.
+            record = null;
           }
+        }
+        if (!record) continue;
+        const patch = customerUpdatePatch(record, config.customerData);
+        if (Object.keys(patch).length === 0) continue;
+        try {
+          await customerService.updateCustomer(config.customerId, patch as any);
+        } catch {
+          // Error toast is emitted by the axios error interceptor (o 409 do
+          // documento de outro cliente diz de quem é).
         }
       }
 
