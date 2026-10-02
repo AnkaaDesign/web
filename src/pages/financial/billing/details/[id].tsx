@@ -21,6 +21,7 @@ import { BillingStepReview } from "@/components/financial/billing/steps/billing-
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import { BillingStepBudgetInfo } from "@/components/financial/billing/steps/billing-step-budget-info";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { isBudgetBillable } from "@/constants/budget-contract";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
@@ -1593,9 +1594,15 @@ const BillingDetailPageInner = ({
       toast.error("Esta cobrança ainda não foi criada. Salve antes de aprovar.");
       return;
     }
+    // A cobrança só sai com o orçamento cobrável (valor aprovado E assinatura
+    // resolvida); o seletor já trava a opção, isto fecha a porta de trás.
+    if (quote && !isBudgetBillable(quote as any)) {
+      toast.error("O orçamento ainda não pode ser cobrado: falta o valor aprovado ou a assinatura.");
+      return;
+    }
     if (!validateCustomerData()) return;
     setBillingApprovalDialogOpen(true);
-  }, [currentBilling?.id, validateCustomerData]);
+  }, [currentBilling?.id, validateCustomerData, quote]);
 
   /** LIQUIDAR À MÃO — `PUT /billings/:id/settle`, o orçamento direto pago à vista. */
   const handleSettleBilling = useCallback(async () => {
@@ -1809,7 +1816,7 @@ const BillingDetailPageInner = ({
                 </div>
 
                 {isProposalStep && (
-                  <BillingStepBudgetInfo disabled={!canEdit} artVehicles={artVehicles} />
+                  <BillingStepBudgetInfo disabled={!canEdit} artVehicles={artVehicles} budgetId={quote?.id} />
                 )}
 
                 <div style={{ display: isServicesStep ? undefined : "none" }}>

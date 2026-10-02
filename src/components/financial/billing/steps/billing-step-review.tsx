@@ -21,6 +21,12 @@ import type { BILLING_STATUS } from "@/types/budget";
 import { BILLING_STATUS_LABELS } from "@/constants";
 import { BillingStatusBadge } from "@/components/financial/billing/billing-status-badge";
 import {
+  BILLABLE_SIGNATURE_STATUSES,
+  BUDGET_SIGNATURE_STATUS_LABELS,
+  isBudgetBillable,
+} from "@/constants/budget-contract";
+import { BUDGET_SIGNATURE_STATUS, TASK_QUOTE_STATUS } from "@/constants/enums";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -179,6 +185,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
    * as duas leituras que `BillingStatusCascade` daria na ausência de parcelas.
    */
   const billingApprovedAt = billing?.approvedAt ?? null;
+
+  /**
+   * A COBRANÇA SÓ SAI DEPOIS DE ASSINADO (Modelo C, DD7/DD11): valor aprovado E
+   * assinatura resolvida — assinada, assinada fora do sistema ou dispensada. A
+   * rota (`PUT /billings/:id/approve`) recusa antes disso; aqui o "Aprovar" fica
+   * travado e diz o que falta, em vez de oferecer um 400.
+   */
+  const quoteSignatureStatus = ((task?.quote as any)?.signatureStatus ?? BUDGET_SIGNATURE_STATUS.NOT_ISSUED) as BUDGET_SIGNATURE_STATUS;
+  const quoteBillable = isBudgetBillable((task?.quote ?? {}) as any);
+  const billableBlockReason = quoteBillable
+    ? null
+    : (task?.quote as any)?.status !== TASK_QUOTE_STATUS.APPROVED
+      ? "Falta aprovar o valor do orçamento."
+      : `Falta a assinatura do orçamento (${BUDGET_SIGNATURE_STATUS_LABELS[quoteSignatureStatus] ?? quoteSignatureStatus}). Emita a coleta ou registre a assinatura fora do sistema.`;
   const billingStatus = (billing?.status ??
     (billingApprovedAt ? "APPROVED" : "PENDING")) as BILLING_STATUS;
   // FATURAMENTO FATIADO: alguma fatura cobre MENOS que todos os veículos. É a
@@ -803,6 +823,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     opts.push({
                       value: APPROVE_OPTION_VALUE,
                       label: isPerVehicleBilling ? "Aprovar Faturamento (esta cobrança)" : "Aprovar Faturamento",
+                      // Travado até o orçamento ser cobrável; o motivo aparece abaixo do seletor.
+                      disabled: !quoteBillable,
                     });
                   }
 
@@ -848,6 +870,27 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Cliente</span>
                 <span className="text-sm font-medium">{task.customer.corporateName || task.customer.fantasyName}</span>
+              </div>
+            )}
+            {/* A ASSINATURA DO ORÇAMENTO — o que libera a cobrança. Linha, e não
+                selo no cabeçalho: o cabeçalho é da COBRANÇA (decisão de 17/09). */}
+            {task?.quote && (
+              <div className="flex justify-between items-center gap-3 bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Assinatura do orçamento</span>
+                <Badge
+                  variant={
+                    (BILLABLE_SIGNATURE_STATUSES as readonly string[]).includes(quoteSignatureStatus)
+                      ? "completed"
+                      : "amber"
+                  }
+                >
+                  {BUDGET_SIGNATURE_STATUS_LABELS[quoteSignatureStatus] ?? quoteSignatureStatus}
+                </Badge>
+              </div>
+            )}
+            {!billingApprovedAt && billingStatus !== "CANCELLED" && billableBlockReason && (
+              <div className="rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
+                <span className="font-medium">Aprovar Faturamento está travado.</span> {billableBlockReason}
               </div>
             )}
             {/* ─── OS IDENTIFICADORES DO VEÍCULO ──────────────────────────

@@ -30,11 +30,14 @@ interface BillingStepBudgetInfoProps {
    * o documento leva a aprovada de cada implemento.
    */
   artVehicles?: ImplementArtVehicle[];
+  /** O orçamento dos veículos: "uma imagem para todos" vira lote atômico sobre ele. */
+  budgetId?: string | null;
 }
 
 export function BillingStepBudgetInfo({
   disabled,
   artVehicles = [],
+  budgetId,
 }: BillingStepBudgetInfoProps) {
   const { control, setValue } = useFormContext();
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
@@ -200,7 +203,7 @@ export function BillingStepBudgetInfo({
       {artVehicles.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <VehiclesArtSection vehicles={artVehicles} />
+            <VehiclesArtSection vehicles={artVehicles} budgetId={budgetId} />
           </CardContent>
         </Card>
       )}
